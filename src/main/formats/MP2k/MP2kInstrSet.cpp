@@ -88,7 +88,7 @@ MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
     : VGMInstrSet(MP2kFormat::name, file, offset, count * 12, name), m_count(count),
       m_operating_rate(rate), m_psg_samples(psg_samples) {
   assert(m_psg_samples != nullptr);
-  adoptSampColl(new VGMSampColl(MP2kFormat::name, file, this, offset));
+  emplaceSampColl<VGMSampColl>(MP2kFormat::name, file, this, offset);
 }
 
 MP2kPSGColl& MP2kInstrSet::psgSampColl() const noexcept {
@@ -97,33 +97,25 @@ MP2kPSGColl& MP2kInstrSet::psgSampColl() const noexcept {
 }
 
 bool MP2kInstrSet::loadInstrs() {
-  auto instrs = std::move(aInstrs);
-  aInstrs.clear();
-  aInstrs.reserve(instrs.size());
+  auto instrs = releaseInstrs();
+  reserveInstrs(instrs.size());
 
   for (size_t i = 0; i < instrs.size(); i++) {
-    VGMInstr *instr = instrs[i];
+    auto instr = std::move(instrs[i]);
     if (!instr->loadInstr()) {
       L_ERROR("Failed to load instrument #{} ({}), cannot load bank {} at offset {:#x}", i, instr->name(), name(), offset());
-      delete instr;
-      for (size_t j = i + 1; j < instrs.size(); j++) {
-        delete instrs[j];
-      }
-      for (auto *loadedInstr : aInstrs) {
-        delete loadedInstr;
-      }
-      aInstrs.clear();
+      clearInstrs();
       return false;
     }
 
     if (instr->regions().empty()) {
-      delete instr;
+      continue;
     } else {
-      aInstrs.push_back(instr);
+      adoptInstr(std::move(instr));
     }
   }
 
-  if (sampColl != nullptr && sampColl->samples.empty()) {
+  if (sampColl != nullptr && !sampColl->hasSamples()) {
     clearSampColl();
   }
 
@@ -135,7 +127,7 @@ bool MP2kInstrSet::parseInstrPointers() {
     size_t cur_ofs = offset() + i * 12;
     MP2kInstrData data{rawFile()->get<u32>(cur_ofs), rawFile()->get<u32>(cur_ofs + 4),
                        rawFile()->get<u32>(cur_ofs + 8)};
-    aInstrs.push_back(new MP2kInstr(this, cur_ofs, 0, 0, i, data));
+    emplaceInstr<MP2kInstr>(this, cur_ofs, 0, 0, i, data);
   }
 
   return true;
@@ -168,7 +160,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
     loop = 0;
   }
 
-  MP2kSamp *samp = new MP2kSamp(sampColl, {
+  auto samp = std::make_unique<MP2kSamp>(sampColl, MP2kSampParams{
       .type = loop == 0x01 ? MP2kWaveType::BDPCM : MP2kWaveType::PCM8,
       .offset = static_cast<u32>(sample_pointer),
       .length = 16 + len,
@@ -204,14 +196,14 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   } else {
     /* Invalid loop, assume the whole thing is garbage */
     L_ERROR("Garbage loop data {}", loop);
-    delete samp;
     return -1;
   }
 
-  sampColl->samples.emplace_back(samp);
-  m_samples.insert(std::pair(sample_pointer, sampColl->samples.size() - 1));
+  const auto sample_id = sampColl->sampleCount();
+  sampColl->addSamp(std::move(samp));
+  m_samples.emplace(sample_pointer, sample_id);
 
-  return sampColl->samples.size() - 1;
+  return static_cast<int>(sample_id);
 }
 
 MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
@@ -575,11 +567,10 @@ bool MP2kPSGColl::parseSampleInfo() {
   constexpr const char* kDutyLabels[4] = {"12.5%", "25%", "50%", "75%"};
   for (u8 duty = 0; duty < kPsgSquareCount; duty++) {
     auto name = fmt::format("PSG square {}", kDutyLabels[duty]);
-    auto *sample = new MP2kPSGSamp(this, duty, false, m_sample_rate, m_loop_samples, name);
-    samples.push_back(sample);
+    emplaceSamp<MP2kPSGSamp>(this, duty, false, m_sample_rate, m_loop_samples, name);
   }
 
-  samples.push_back(new MP2kPSGSamp(this, 0, true, m_sample_rate, m_loop_samples, "PSG noise"));
+  emplaceSamp<MP2kPSGSamp>(this, 0, true, m_sample_rate, m_loop_samples, "PSG noise");
   return true;
 }
 
@@ -599,10 +590,10 @@ int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
     return elem->second;
   }
 
-  int sample_id = static_cast<int>(samples.size());
+  int sample_id = static_cast<int>(sampleCount());
   auto name = fmt::format("PSG programmable wave {:#x}", wave_offset);
   constexpr u32 kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
-  samples.push_back(new MP2kPSGWaveSamp(this, wave_offset, kCgbWaveSampleRate, name));
+  emplaceSamp<MP2kPSGWaveSamp>(this, wave_offset, kCgbWaveSampleRate, name);
   m_programmable_waves.emplace(wave_offset, sample_id);
   return sample_id;
 }

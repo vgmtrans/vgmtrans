@@ -83,9 +83,8 @@ void GraphResSnesScanner::searchForGraphResSnesFromARAM(RawFile *file) {
 
   GraphResSnesVersion version = GRAPHRESSNES_STANDARD;
 
-  GraphResSnesSeq *newSeq = new GraphResSnesSeq(file, version, addrSeqHeader, name);
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
+  auto* newSeq = pRoot->emplaceVGMFile<GraphResSnesSeq>(file, version, addrSeqHeader, name);
+  if (!newSeq) {
     return;
   }
 
@@ -98,9 +97,8 @@ void GraphResSnesScanner::searchForGraphResSnesFromARAM(RawFile *file) {
   u16 spcDirAddr = itSpcDIR->second << 8;
 
   // scan SRCN table
-  GraphResSnesInstrSet *newInstrSet = new GraphResSnesInstrSet(file, version, spcDirAddr, newSeq->instrADSRHints);
-  if (!newInstrSet->loadVGMFile()) {
-    delete newInstrSet;
+  auto* newInstrSet = pRoot->emplaceVGMFile<GraphResSnesInstrSet>(file, version, spcDirAddr, newSeq->instrADSRHints);
+  if (!newInstrSet) {
     return;
   }
 }

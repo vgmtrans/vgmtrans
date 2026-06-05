@@ -54,8 +54,7 @@ bool KonamiPS1Seq::parseTrackPointers() {
   u32 trackStart = offset() + kHeaderSize + (numTracks * 2);
   for (u32 trackIndex = 0; trackIndex < numTracks; trackIndex++) {
     u16 trackSize = readShort(offset() + kHeaderSize + (trackIndex * 2));
-    KonamiPS1Track *track = new KonamiPS1Track(this, trackStart, trackSize);
-    aTracks.push_back(track);
+    addTrack<KonamiPS1Track>(this, trackStart, trackSize);
     trackStart += trackSize;
   }
 

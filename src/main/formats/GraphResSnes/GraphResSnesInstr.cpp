@@ -65,19 +65,16 @@ bool GraphResSnesInstrSet::parseInstrPointers() {
       adsr = instrADSRHints[srcn];
     }
 
-    GraphResSnesInstr *newInstr = new GraphResSnesInstr(
+    emplaceInstr<GraphResSnesInstr>(
       this, version, srcn, spcDirAddr, adsr, fmt::format("Instrument {}", srcn));
-    aInstrs.push_back(newInstr);
   }
 
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(GraphResSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(GraphResSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -110,9 +107,8 @@ bool GraphResSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  GraphResSnesRgn *rgn = new GraphResSnesRgn(this, version, instrNum, spcDirAddr, adsr);
+  GraphResSnesRgn *rgn = emplaceRgn<GraphResSnesRgn>(this, version, instrNum, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   setGuessedLength();
   return true;

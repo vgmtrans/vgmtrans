@@ -10,6 +10,7 @@
 #include "ScaleConversion.h"
 #include "VGMSamp.h"
 
+#include <memory>
 #include <utility>
 
 #include <spdlog/fmt/fmt.h>
@@ -52,7 +53,7 @@ constexpr PanLinAmp panToAmp(u8 pan) {
 
 SegSatInstrSet::SegSatInstrSet(RawFile* file, u32 offset, int numInstrs, SegSatDriverVer ver, const std::string& name) :
     VGMInstrSet(SegSatFormat::name, file, offset, 0, name), m_numInstrs(numInstrs), m_driverVer(ver) {
-  adoptSampColl(new VGMSampColl(SegSatFormat::name, file, this, offset));
+  emplaceSampColl<VGMSampColl>(SegSatFormat::name, file, this, offset);
 }
 
 bool SegSatInstrSet::parseHeader() {
@@ -136,7 +137,7 @@ bool SegSatInstrSet::parseInstrPointers() {
     u8 numRgns = rawFile()->readByte(instrOff + 2) + 1;
     size_t instrSize = 4 + numRgns * 0x20;
     auto name = fmt::format("Instrument {:d}", i);
-    aInstrs.push_back(new SegSatInstr(this, instrOff, instrSize, 0, i, name));
+    emplaceInstr<SegSatInstr>(this, instrOff, instrSize, 0, i, name);
     instrList->addChild(off + (i * 2), 2, fmt::format("Instrument {:d} Pointer", i));
   }
 
@@ -144,7 +145,7 @@ bool SegSatInstrSet::parseInstrPointers() {
 }
 
 void SegSatInstrSet::assignBankNumber(u8 bankNum) {
-  for (auto instr : aInstrs) {
+  for (auto instr : instrs()) {
     instr->bank = bankNum;
   }
 }
@@ -172,21 +173,20 @@ bool SegSatInstr::loadInstr() {
   for (int i = 0; i < numRgns; ++i) {
     u32 rgnOff = offset() + 4 + (i * 0x20);
     auto name = fmt::format("Region {:d}", i);
-    auto rgn = new SegSatRgn(this, rgnOff, name);
+    auto rgn = std::make_unique<SegSatRgn>(this, rgnOff, name);
     if (!rgn->isRegionValid()) {
-      delete rgn;
       continue;
     }
-    addRgn(rgn);
+    auto* rawRgn = static_cast<SegSatRgn*>(addRgn(std::move(rgn)));
 
     // Add sample
-    u32 sampLength = rgn->sampleLoopEnd();
-    BPS bps = rgn->sampleType() == SegSatRgn::SampleType::PCM16 ? BPS::PCM16 : BPS::PCM8;
+    u32 sampLength = rawRgn->sampleLoopEnd();
+    BPS bps = rawRgn->sampleType() == SegSatRgn::SampleType::PCM16 ? BPS::PCM16 : BPS::PCM8;
     auto instrSet = static_cast<SegSatInstrSet*>(parInstrSet);
     // check if a sample at the offset was already added
-    bool inserted = instrSet->sampleOffsets.insert(rgn->sampOffset).second;
+    bool inserted = instrSet->sampleOffsets.insert(rawRgn->sampOffset).second;
 
-    u32 sampOffset = rgn->sampOffset;
+    u32 sampOffset = rawRgn->sampOffset;
     if (inserted) {
       auto sample = sampColl->addSamp(
        sampOffset,
@@ -196,13 +196,13 @@ bool SegSatInstr::loadInstr() {
        1,
        bps,
        44100,
-       fmt::format("Sample: 0x{:X}",  rgn->sampOffset)
+       fmt::format("Sample: 0x{:X}",  rawRgn->sampOffset)
       );
       sample->setSignedness(Signedness::Signed);
-      sample->loop = rgn->loop;
+      sample->loop = rawRgn->loop;
       sample->setEndianness(Endianness::Big);
       // TODO: We should only reverse the looped portion of the sample
-      if (rgn->loopType() == SegSatRgn::LoopType::Reverse)
+      if (rawRgn->loopType() == SegSatRgn::LoopType::Reverse)
         sample->setReverse(true);
 
       size_t newLength = sampOffset + sampLength - instrSet->offset();

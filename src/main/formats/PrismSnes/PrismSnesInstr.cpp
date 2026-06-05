@@ -77,20 +77,17 @@ bool PrismSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    PrismSnesInstr *newInstr = new PrismSnesInstr(
+    emplaceInstr<PrismSnesInstr>(
       this, version, srcn, spcDirAddr, ofsADSR1Entry, ofsADSR2Entry, ofsTuningEntryHigh,
       ofsTuningEntryLow, fmt::format("Instrument: {:#x}", srcn));
-    aInstrs.push_back(newInstr);
   }
 
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(PrismSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(PrismSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -130,16 +127,15 @@ bool PrismSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  PrismSnesRgn *rgn = new PrismSnesRgn(this,
-                                       version,
-                                       srcn,
-                                       spcDirAddr,
-                                       addrADSR1Entry,
-                                       addrADSR2Entry,
-                                       addrTuningEntryHigh,
-                                       addrTuningEntryLow);
+  PrismSnesRgn *rgn = emplaceRgn<PrismSnesRgn>(this,
+                                               version,
+                                               srcn,
+                                               spcDirAddr,
+                                               addrADSR1Entry,
+                                               addrADSR2Entry,
+                                               addrTuningEntryHigh,
+                                               addrTuningEntryLow);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   setGuessedLength();
   return true;

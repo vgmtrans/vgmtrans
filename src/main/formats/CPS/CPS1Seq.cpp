@@ -47,29 +47,27 @@ bool CPS1Seq::parseTrackPointers() {
       continue;
     }
 
-    SeqTrack *newTrack;
     switch (fmtVersion) {
       case CPS1_VERSION_UNDEFINED:
         return false;
       case CPS1_V100:
-        newTrack = new CPS1TrackV1(this, CPSSynth::YM2151, trkOff);
+        addTrack<CPS1TrackV1>(this, CPSSynth::YM2151, trkOff);
         break;
       case CPS1_V200:
       case CPS1_V350:
       case CPS1_V425:
-        newTrack = new CPS1TrackV2(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, trkOff);
+        addTrack<CPS1TrackV2>(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, trkOff);
         break;
       case CPS1_V500:
       case CPS1_V502:
-        newTrack = new CPS1TrackV2(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, trkOff + offset());
+        addTrack<CPS1TrackV2>(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, trkOff + offset());
         break;
       default:
         return false;
     }
-    aTracks.push_back(newTrack);
     header->addChild(offset() + 1 + (i * 2), 2, "Track Pointer");
   }
-  if (aTracks.size() == 0)
+  if (!hasTracks())
     return false;
 
   return true;

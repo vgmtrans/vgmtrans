@@ -84,7 +84,7 @@ class WdsInstrSet:
   //ここで、Object"VabSampColl"を生成するべき？
   //（スキャナーでVBを検索すると、複数有るから解らなくなる。）
   bool parseInstrPointers() override;    //音色Object"WdsInstr"を生成する。
-  //"aInstrs"に、登録する。
+  //VGMInstrSet::instrs()に、登録する。
   //各音色毎の処理
 
   enum Version { VERSION_DWDS, VERSION_WDS };
@@ -94,7 +94,7 @@ class WdsInstrSet:
   Version version{};
 
 /*	member of "VGMInstrSet"
-	VGMInstrSet::aInstrs		//音色情報のvector
+	VGMInstrSet::instrs()		//音色情報のvector
 	VGMInstrSet::dls			//class DLSを作る用
 	VGMInstrSet::menu			//
 	VGMInstrSet::sampColl		//波形実体のオブジェクト

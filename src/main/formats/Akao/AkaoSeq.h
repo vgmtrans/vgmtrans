@@ -13,6 +13,7 @@
 
 #include <array>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -160,7 +161,7 @@ class AkaoSeq final :
   [[nodiscard]] double getTempoInBPM(u16 tempo) const;
   [[nodiscard]] bool usesIndividualArts() const noexcept { return bUsesIndividualArts; }
 
-  [[nodiscard]] AkaoInstrSet* newInstrSet() const;
+  [[nodiscard]] std::unique_ptr<AkaoInstrSet> newInstrSet() const;
 
   [[nodiscard]] static bool isPossibleAkaoSeq(const RawFile *file, u32 offset);
   [[nodiscard]] static AkaoPs1Version guessVersion(const RawFile *file, u32 offset);

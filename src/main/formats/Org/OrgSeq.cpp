@@ -22,13 +22,12 @@ bool OrgSeq::parseHeader(void) {
     if (readShort(offset() + 0x16 + i * 6))            //if there are notes in this track
     {
       nNumTracks++;                    //well then, we might as well say it exists
-      OrgTrack
-          *newOrgTrack = new OrgTrack(this, offset() + 0x12 + 16 * 6 + notesSoFar * 8, readShort(0x16 + i * 6) * 8, i);
+      auto *newOrgTrack = addTrack<OrgTrack>(
+          this, offset() + 0x12 + 16 * 6 + notesSoFar * 8, readShort(0x16 + i * 6) * 8, i);
       newOrgTrack->numNotes = readShort(offset() + 0x16 + i * 6);
       newOrgTrack->freq = readShort(offset() + 0x12 + i * 6);
       newOrgTrack->waveNum = readByte(offset() + 0x14 + i * 6);
       newOrgTrack->numNotes = readShort(offset() + 0x16 + i * 6);
-      aTracks.push_back(newOrgTrack);
 
       notesSoFar += newOrgTrack->numNotes;
     }

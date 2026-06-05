@@ -98,17 +98,15 @@ bool KonamiTMNT2Seq::parseTrackPointers() {
   for (size_t i = 0; i < m_ym2151TrackOffsets.size(); ++i) {
     auto offset = m_ym2151TrackOffsets[i];
     auto name = fmt::format("FM Track {}", i);
-    auto *track = new KonamiTMNT2Track(true, this, offset, 0, name);
-    aTracks.push_back(track);
+    addTrack<KonamiTMNT2Track>(true, this, offset, 0, name);
   }
   for (size_t i = 0; i < m_k053260TrackOffsets.size(); ++i) {
     auto offset = m_k053260TrackOffsets[i];
     auto name = fmt::format("Sampled Track {}", i);
-    auto *track = new KonamiTMNT2Track(false, this, offset, 0, name);
-    aTracks.push_back(track);
+    addTrack<KonamiTMNT2Track>(false, this, offset, 0, name);
   }
 
-  nNumTracks = static_cast<u32>(aTracks.size());
+  nNumTracks = static_cast<u32>(trackCount());
   return nNumTracks > 0;
 }
 

@@ -13,6 +13,8 @@
 #include "LogManager.h"
 #include "VGMRgn.h"
 
+#include <memory>
+
 KonamiVendettaSampleInstrSet::KonamiVendettaSampleInstrSet(
   RawFile *file,
   u32 offset,
@@ -125,7 +127,7 @@ bool KonamiVendettaSampleInstrSet::parseMelodicInstrs() {
     auto sampInfo = m_sampInfos[instrInfo.samp_info_idx];
 
     std::string name = fmt::format("Instrument {}", instrNum);
-    VGMInstr* instr = new VGMInstr(
+    auto instr = std::make_unique<VGMInstr>(
       this,
       offset,
       sizeof(konami_vendetta_instr_k053260),
@@ -134,11 +136,11 @@ bool KonamiVendettaSampleInstrSet::parseMelodicInstrs() {
       name
     );
 
-    VGMRgn* rgn = new VGMRgn(instr, offset, sizeof(konami_vendetta_instr_k053260));
+    auto* rawInstr = instr.get();
+    VGMRgn* rgn = rawInstr->emplaceRgn<VGMRgn>(rawInstr, offset, sizeof(konami_vendetta_instr_k053260));
     rgn->sampOffset = sampInfo.start();
     rgn->sampDataLength = sampInfo.length();
-    instr->addRgn(rgn);
-    aInstrs.push_back(instr);
+    adoptInstr(std::move(instr));
     instrNum += 1;
   }
   return true;
@@ -149,7 +151,7 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
   std::vector<konami_vendetta_drum_info> drumInfos;
 
   // Load Drums. Drums end at YM2151 Instr Table
-  VGMItem* drumsItem = new VGMItem(nullptr, m_drumsOffset, 0, "Drums");
+  auto* drumsItem = emplaceChild<VGMItem>(this, m_drumsOffset, 0, "Drums");
 
   std::map<u16, int> drumOffsetToIdx;
   int drumIdx = 0;
@@ -174,7 +176,8 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
 
   auto drumBanksItem = addChild(m_drumBanksOffset, numDrumTables * 0x20, "Drum Banks");
 
-  VGMInstr* drumKit = new VGMInstr(this, offset(), length(), 1, 0, "Drum Kit");
+  auto drumKit = std::make_unique<VGMInstr>(this, offset(), length(), 1, 0, "Drum Kit");
+  auto* rawDrumKit = drumKit.get();
 
   for (u32 i = 0; i < numDrumTables; ++i) {
     u16 drumBankPtr = m_drumBanksOffset + (i * 0x20);
@@ -192,7 +195,7 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
       const konami_vendetta_drum_info& drumInfo = drumInfos[drumNum];
       m_drumKeyMap[(i * 16) + j] = drumInfo;
 
-      VGMRgn* rgn = new VGMRgn(drumKit, ptr - 3, 3);
+      VGMRgn* rgn = rawDrumKit->emplaceRgn<VGMRgn>(rawDrumKit, ptr - 3, 3);
       auto sampInfoIdx = drumInfo.instr.samp_info_idx;
       auto sampInfo = m_sampInfos[sampInfoIdx];
       rgn->sampOffset = sampInfo.start();
@@ -207,10 +210,9 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
       rgn->coarseTune = relativePitchCents / 100;
       rgn->fineTune = static_cast<int>(relativePitchCents) % 100;
 
-      drumKit->addRgn(rgn);
     }
   }
-  aInstrs.emplace_back(drumKit);
+  adoptInstr(std::move(drumKit));
   return true;
 }
 

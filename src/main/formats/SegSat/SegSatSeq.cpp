@@ -44,16 +44,16 @@ void SegSatSeq::useColl(const VGMColl* coll) {
     return;
 
   auto* instrSet = dynamic_cast<SegSatInstrSet*>(instrSets.front());
-  if (!instrSet || instrSet->aInstrs.empty())
+  if (!instrSet || !instrSet->hasInstrs())
     return;
 
   m_collContext.m_vlTables = instrSet->vlTables();
   if (m_collContext.m_vlTables.empty())
     return;
 
-  m_collContext.instrs.reserve(instrSet->aInstrs.size());
+  m_collContext.instrs.reserve(instrSet->instrCount());
 
-  for (VGMInstr* instr : instrSet->aInstrs) {
+  for (VGMInstr* instr : instrSet->instrs()) {
     m_collContext.instrs.push_back(dynamic_cast<const SegSatInstr*>(instr));
   }
 }

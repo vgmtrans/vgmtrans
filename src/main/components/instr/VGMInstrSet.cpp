@@ -16,6 +16,8 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 
+#include <utility>
+
 #include <spdlog/fmt/fmt.h>
 
 // ***********
@@ -25,55 +27,63 @@
 VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, u32 offset, u32 length,
                          std::string name, VGMSampColl *sampColl)
     : VGMFile(format, file, offset, length, std::move(name)),
-      sampColl(sampColl),
-      m_ownedSampColl(sampColl) {
+      sampColl(sampColl) {
 }
 
-VGMInstrSet::~VGMInstrSet() {
-  if (!m_instruments_owned_by_children) {
-    deleteVect(aInstrs);
-  }
-}
+VGMInstrSet::~VGMInstrSet() = default;
 
 VGMInstr *VGMInstrSet::addInstr(u32 offset, u32 length, u32 bank,
                                 u32 instrNum, const std::string &instrName) {
-  VGMInstr *instr =
-      new VGMInstr(this, offset, length, bank, instrNum,
-                   instrName.empty() ? fmt::format("Instrument {}", aInstrs.size()) : instrName);
-  aInstrs.push_back(instr);
-  return instr;
+  return emplaceInstr<VGMInstr>(
+      this, offset, length, bank, instrNum,
+      instrName.empty() ? fmt::format("Instrument {}", instrCount()) : instrName);
 }
 
-bool VGMInstrSet::loadVGMFile(bool useMatcher) {
-  bool val = load();
-  if (!val) {
-    return false;
-  }
+VGMInstr* VGMInstrSet::adoptInstr(std::unique_ptr<VGMInstr> instr) {
+  auto* rawInstr = instr.get();
+  m_instrs.push_back(rawInstr);
+  m_ownedInstrs.emplace_back(std::move(instr));
+  return rawInstr;
+}
 
-  if (useMatcher) {
-    if (auto fmt = format(); fmt) {
-      fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
-    }
-  }
+VGMInstr* VGMInstrSet::adoptInstrAsChild(std::unique_ptr<VGMInstr> instr) {
+  return adoptInstrAsChild(*this, std::move(instr));
+}
 
-  return val;
+VGMInstr* VGMInstrSet::adoptInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInstr> instr) {
+  auto* rawInstr = instr.get();
+  m_instrs.push_back(rawInstr);
+  parent.addChild(std::move(instr));
+  return rawInstr;
+}
+
+std::vector<std::unique_ptr<VGMInstr>> VGMInstrSet::releaseInstrs() {
+  m_instrs.clear();
+  return std::move(m_ownedInstrs);
+}
+
+void VGMInstrSet::clearInstrs() {
+  m_instrs.clear();
+  m_ownedInstrs.clear();
 }
 
 bool VGMInstrSet::load() {
   if (!parseHeader())
     return false;
   if (!parseInstrPointers()) {
-    deleteVect(aInstrs);
+    clearInstrs();
     return false;
   }
   if (!loadInstrs()) {
-    deleteVect(aInstrs);
+    clearInstrs();
     return false;
   }
 
   if (m_auto_add_instruments_as_children) {
-    addChildren(aInstrs);
-    m_instruments_owned_by_children = true;
+    for (auto& instr : m_ownedInstrs) {
+      addChild(std::move(instr));
+    }
+    m_ownedInstrs.clear();
   }
 
   if (length() == 0) {
@@ -88,8 +98,6 @@ bool VGMInstrSet::load() {
     }
   }
 
-  rawFile()->addContainedVGMFile(this);
-  pRoot->addVGMFile(this);
   return true;
 }
 
@@ -102,9 +110,9 @@ bool VGMInstrSet::parseInstrPointers() {
 }
 
 bool VGMInstrSet::loadInstrs() {
-  size_t nInstrs = aInstrs.size();
+  size_t nInstrs = m_instrs.size();
   for (size_t i = 0; i < nInstrs; i++) {
-    if (!aInstrs[i]->loadInstr())
+    if (!m_instrs[i]->loadInstr())
       return false;
   }
   return true;
@@ -112,7 +120,7 @@ bool VGMInstrSet::loadInstrs() {
 
 void VGMInstrSet::prepareForExport(const VGMColl* coll) {
   cleanupAfterExport();
-  m_exportInstrs = aInstrs;
+  m_exportInstrs = m_instrs;
   if (coll != nullptr) {
     if (coll->seq() == nullptr) {
       L_DEBUG("Collection is missing a sequence. This is unusual.");
@@ -128,18 +136,18 @@ void VGMInstrSet::cleanupAfterExport() {
 }
 
 const std::vector<VGMInstr*>& VGMInstrSet::exportInstrs() const {
-  return m_exportInstrs.empty() ? aInstrs : m_exportInstrs;
+  return m_exportInstrs.empty() ? m_instrs : m_exportInstrs;
 }
 
-void VGMInstrSet::addTempInstr(VGMInstr* instr) {
+void VGMInstrSet::addTempInstr(std::unique_ptr<VGMInstr> instr) {
   assert(instr != nullptr);
-  m_exportInstrs.push_back(instr);
-  m_tempInstrs.emplace_back(instr);
+  m_exportInstrs.push_back(instr.get());
+  m_tempInstrs.emplace_back(std::move(instr));
 }
 
-void VGMInstrSet::adoptSampColl(VGMSampColl* newSampColl) {
-  m_ownedSampColl.reset(newSampColl);
-  sampColl = newSampColl;
+void VGMInstrSet::adoptSampColl(std::unique_ptr<VGMSampColl> newSampColl) {
+  sampColl = newSampColl.get();
+  m_ownedSampColl = std::move(newSampColl);
 }
 
 void VGMInstrSet::clearSampColl() {
@@ -179,26 +187,20 @@ void VGMInstr::setInstrNum(u32 theInstrNum) {
   instrNum = theInstrNum;
 }
 
-VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {
-  m_regions.emplace_back(rgn);
+VGMRgn *VGMInstr::addRgn(std::unique_ptr<VGMRgn> rgn) {
+  auto* rawRgn = rgn.get();
+  m_regions.emplace_back(rawRgn);
   if (m_auto_add_regions_as_children) {
-    addChild(rgn);
+    addChild(std::move(rgn));
   } else {
-    m_ownedRegions.emplace_back(rgn);
+    m_ownedRegions.emplace_back(std::move(rgn));
   }
-  return rgn;
+  return rawRgn;
 }
 
 VGMRgn *VGMInstr::addRgn(u32 offset, u32 length, int sampNum, u8 keyLow,
                          u8 keyHigh, u8 velLow, u8 velHigh) {
-  VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
-  m_regions.emplace_back(newRgn);
-  if (m_auto_add_regions_as_children) {
-    addChild(newRgn);
-  } else {
-    m_ownedRegions.emplace_back(newRgn);
-  }
-  return newRgn;
+  return emplaceRgn<VGMRgn>(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
 }
 
 void VGMInstr::deleteRegions() {

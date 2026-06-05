@@ -86,12 +86,11 @@ bool MP2kSeq::parseTrackPointers(void) {
   for (unsigned int i = 0; i < nNumTracks; i++) {
     u32 dwTrackPtrOffset = offset() + 8 + i * 4;
     u32 dwTrackPtr = readWord(dwTrackPtrOffset);
-    aTracks.push_back(new MP2kTrack(this, dwTrackPtr - 0x8000000));
+    addTrack<MP2kTrack>(this, dwTrackPtr - 0x8000000);
   }
 
   // Make seq offset the first track offset
-  for (auto itr = aTracks.begin(); itr != aTracks.end(); ++itr) {
-    SeqTrack *track = (*itr);
+  for (SeqTrack *track : tracks()) {
     if (track->offset() < offset()) {
       if (length() != 0) {
         setLength(length() + ((offset() - track->offset())));

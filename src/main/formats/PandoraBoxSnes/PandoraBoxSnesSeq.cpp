@@ -81,8 +81,7 @@ bool PandoraBoxSnesSeq::parseTrackPointers() {
     curOffset += 2;
     if (ofsTrackStart != 0xffff) {
       u16 addrTrackStart = offset() + ofsTrackStart;
-      PandoraBoxSnesTrack *track = new PandoraBoxSnesTrack(this, addrTrackStart);
-      aTracks.push_back(track);
+      addTrack<PandoraBoxSnesTrack>(this, addrTrackStart);
     }
   }
   return true;

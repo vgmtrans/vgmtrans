@@ -80,8 +80,7 @@ bool GraphResSnesSeq::parseTrackPointers(void) {
     u16 addrTrackStart = 24 + addrTrackStartVirt - addrTrackBase + offset();
 
     if (trackUsed) {
-      GraphResSnesTrack *track = new GraphResSnesTrack(this, addrTrackStart);
-      aTracks.push_back(track);
+      addTrack<GraphResSnesTrack>(this, addrTrackStart);
     }
   }
 

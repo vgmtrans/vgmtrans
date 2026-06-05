@@ -82,9 +82,8 @@ bool ChunSnesSeq::parseHeader() {
     auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
     header->addChild(curOffset, 2, trackName);
 
-    ChunSnesTrack *track = new ChunSnesTrack(this, addrTrackStart);
-    track->index = static_cast<u8>(aTracks.size());
-    aTracks.push_back(track);
+    ChunSnesTrack *track = addTrack<ChunSnesTrack>(this, addrTrackStart);
+    track->index = static_cast<u8>(trackCount() - 1);
 
     curOffset += 2;
   }
@@ -799,8 +798,8 @@ bool ChunSnesTrack::readEvent() {
 }
 
 void ChunSnesTrack::syncNoteLengthWithPriorTrack() {
-  if (index != 0 && index < parentSeq->aTracks.size()) {
-    ChunSnesTrack *priorTrack = static_cast<ChunSnesTrack*>(parentSeq->aTracks[index - 1]);
+  if (index != 0 && index < parentSeq->trackCount()) {
+    auto *priorTrack = static_cast<ChunSnesTrack*>(parentSeq->track(index - 1));
     noteLength = priorTrack->noteLength;
     noteDurationRate = priorTrack->noteDurationRate;
   }

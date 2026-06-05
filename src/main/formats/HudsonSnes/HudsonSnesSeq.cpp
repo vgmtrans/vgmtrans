@@ -361,8 +361,7 @@ bool HudsonSnesSeq::parseTrackPointersInHeader(VGMHeader *header, u32 &offset) {
 bool HudsonSnesSeq::parseTrackPointers() {
   for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if ((TrackAvailableBits & (1 << trackIndex)) != 0) {
-      HudsonSnesTrack *track = new HudsonSnesTrack(this, TrackAddresses[trackIndex]);
-      aTracks.push_back(track);
+      addTrack<HudsonSnesTrack>(this, TrackAddresses[trackIndex]);
     }
   }
 

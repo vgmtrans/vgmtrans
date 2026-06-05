@@ -73,10 +73,7 @@ void VGMColl::addMiscFile(VGMMiscFile *theMiscFile) {
 }
 
 bool VGMColl::load() {
-  if (!loadMain())
-    return false;
-  pRoot->addVGMColl(this);
-  return true;
+  return loadMain();
 }
 
 // A helper lambda function to search for a file in a vector of VGMFile*

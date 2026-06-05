@@ -55,19 +55,16 @@ bool HudsonSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    HudsonSnesInstr *newInstr = new HudsonSnesInstr(
+    emplaceInstr<HudsonSnesInstr>(
       this, version, ofsInstrEntry, instrNum, spcDirAddr, addrSampTuningTable,
       fmt::format("Instrument {}", instrNum));
-    aInstrs.push_back(newInstr);
   }
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(HudsonSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(HudsonSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -108,9 +105,8 @@ bool HudsonSnesInstr::loadInstr() {
     return false;
   }
 
-  HudsonSnesRgn *rgn = new HudsonSnesRgn(this, version, offset(), ofsTuningEnt);
+  HudsonSnesRgn *rgn = emplaceRgn<HudsonSnesRgn>(this, version, offset(), ofsTuningEnt);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   return true;
 }

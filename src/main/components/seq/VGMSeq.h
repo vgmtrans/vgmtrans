@@ -9,25 +9,20 @@
 #include "ConversionContext.h"
 #include "MidiFile.h"
 #include "RawFile.h"
+#include "ReadMode.h"
 #include "SeqEventTimeIndex.h"
+#include "SeqSlider.h"
+#include "SeqTrack.h"
 #include "VGMFile.h"
 
 #include <filesystem>
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
-class SeqTrack;
 class SeqEvent;
-class ISeqSlider;
-
-enum ReadMode : u8 {
-  READMODE_ADD_TO_UI,
-  READMODE_CONVERT_TO_MIDI,
-  READMODE_FIND_DELTA_LENGTH
-};
-
 enum class PanVolumeCorrectionMode : u8 {
   kNoVolumeAdjust,
   kAdjustVolumeController,
@@ -40,7 +35,6 @@ class VGMSeq : public VGMFile {
          std::string name = "VGM Sequence");
   ~VGMSeq() override;
 
-  bool loadVGMFile(bool useMatcher = true) override;
   bool load() override;
   virtual bool parseHeader();
   virtual bool parseTrackPointers();  // Function to find all of the track pointers.   Returns number of total tracks.
@@ -124,9 +118,31 @@ class VGMSeq : public VGMFile {
   void setInitialPitchBendRange(u16 cents) { m_initial_pitch_bend_range_cents = cents; }
 
   SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
+  [[nodiscard]] const std::vector<SeqTrack*>& tracks() const { return m_tracks; }
+  [[nodiscard]] bool hasTracks() const { return !m_tracks.empty(); }
+  [[nodiscard]] size_t trackCount() const { return m_tracks.size(); }
+  SeqTrack* track(size_t index) const { return m_tracks.at(index); }
 
  protected:
   void setConversionContext(const ConversionContext& context) { m_conversionContext = context; }
+  void reserveTracks(size_t count) { m_ownedTracks.reserve(count); m_tracks.reserve(count); }
+  void clearTracks();
+  SeqTrack* addTrack(std::unique_ptr<SeqTrack> track);
+  template <class TrackType, class... Args>
+  TrackType* addTrack(Args&&... args) {
+    auto track = std::make_unique<TrackType>(std::forward<Args>(args)...);
+    auto* rawTrack = track.get();
+    addTrack(std::move(track));
+    return rawTrack;
+  }
+  ISeqSlider* addSlider(std::unique_ptr<ISeqSlider> slider);
+  template <class SliderType, class... Args>
+  SliderType* addSlider(Args&&... args) {
+    auto slider = std::make_unique<SliderType>(std::forward<Args>(args)...);
+    auto* rawSlider = slider.get();
+    addSlider(std::move(slider));
+    return rawSlider;
+  }
 
   virtual bool loadTracks(ReadMode seqReadMode, u32 stopTime = 1000000);
   virtual void loadTracksMain(u32 stopTime);
@@ -162,12 +178,12 @@ private:
 
   double initialTempoBPM;
 
-  std::vector<SeqTrack *> aTracks;  // array of track pointers
   std::vector<u32> aInstrumentsUsed;
 
-  std::vector<ISeqSlider *> aSliders;
-
 private:
+  std::vector<std::unique_ptr<SeqTrack>> m_ownedTracks;
+  std::vector<SeqTrack *> m_tracks;
+  std::vector<std::unique_ptr<ISeqSlider>> m_sliders;
   ConversionContext m_conversionContext;
   std::set<u16> m_referencedBanks;
 

@@ -62,19 +62,16 @@ bool CapcomSnesInstrSet::parseInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    CapcomSnesInstr *newInstr = new CapcomSnesInstr(
+    emplaceInstr<CapcomSnesInstr>(
       this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr,
       fmt::format("Instrument {}", instr));
-    aInstrs.push_back(newInstr);
   }
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(CapcomSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(CapcomSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -113,9 +110,8 @@ bool CapcomSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  CapcomSnesRgn *rgn = new CapcomSnesRgn(this, offset());
+  CapcomSnesRgn *rgn = emplaceRgn<CapcomSnesRgn>(this, offset());
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   return true;
 }

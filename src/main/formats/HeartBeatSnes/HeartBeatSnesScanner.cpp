@@ -184,9 +184,8 @@ void HeartBeatSnesScanner::searchForHeartBeatSnesFromARAM(RawFile *file) {
   }
 
   u16 addrSeqHeader = file->readByte(addrSongListLo + songIndex) | (file->readByte(addrSongListHi + songIndex) << 8);
-  HeartBeatSnesSeq *newSeq = new HeartBeatSnesSeq(file, version, addrSeqHeader, name);
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
+  auto* newSeq = pRoot->emplaceVGMFile<HeartBeatSnesSeq>(file, version, addrSeqHeader, name);
+  if (!newSeq) {
     return;
   }
 
@@ -212,10 +211,9 @@ void HeartBeatSnesScanner::searchForHeartBeatSnesFromARAM(RawFile *file) {
     }
   }
 
-  HeartBeatSnesInstrSet *newInstrSet =
-      new HeartBeatSnesInstrSet(file, version, addrInstrTable, instrTableSize, addrSRCNTable, songIndex, spcDirAddr);
-  if (!newInstrSet->loadVGMFile()) {
-    delete newInstrSet;
+  auto* newInstrSet =
+      pRoot->emplaceVGMFile<HeartBeatSnesInstrSet>(file, version, addrInstrTable, instrTableSize, addrSRCNTable, songIndex, spcDirAddr);
+  if (!newInstrSet) {
     return;
   }
 }

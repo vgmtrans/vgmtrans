@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -28,7 +29,7 @@ public:
              const std::vector<u8>& durRateTable = std::vector<u8>(),
              std::string name = "NinSnes Seq");
   NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult);
-  virtual ~NinSnesSeq();
+  ~NinSnesSeq() override = default;
 
   bool load() override;
   bool parseHeader() override;
@@ -71,7 +72,6 @@ public:
   double maxVibratoRateHz;
   u32 dwStartOffset;
   u32 curOffset;
-  std::vector<NinSnesSection *> aSections;
 
   // Konami:
   u16 konamiBaseAddress;
@@ -116,7 +116,7 @@ private:
   void loadEventMap();
   void createTracks();
   bool loadSection(NinSnesSection *section, u32 stopTime = 1000000);
-  void addSection(NinSnesSection *section);
+  NinSnesSection* addSection(std::unique_ptr<NinSnesSection> section);
   NinSnesSection *getSectionAtOffset(u32 offset);
   bool addLoopForeverNoItem();
   void setImmediateTempo(u8 newTempo);
@@ -130,6 +130,8 @@ private:
   u32 m_nextIntelliTAOverrideProgram;
   std::vector<NinSnesIntelliTAInstrumentOverride> m_intelliTAInstrumentOverrides;
   std::vector<NinSnesIntelliTADrumKitDef> m_intelliTADrumKitDefs;
+  std::vector<std::unique_ptr<NinSnesSection>> m_ownedSections;
+  std::vector<NinSnesSection *> m_sections;
 };
 
 class NinSnesSection : public VGMItem {
@@ -187,6 +189,7 @@ public:
   bool m_loaded = false;
   bool m_tracksAddedToChildren = false;
   std::array<TrackSegment, kNinSnesTrackCount> m_trackSegments {};
+  std::array<std::unique_ptr<NinSnesSectionTrackItem>, kNinSnesTrackCount> m_ownedTracks {};
   std::array<NinSnesSectionTrackItem*, kNinSnesTrackCount> m_tracks {};
 };
 

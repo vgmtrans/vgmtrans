@@ -65,8 +65,7 @@ bool HOSAInstrSet::parseInstrPointers() {
 
   //音色数だけ繰り返す。
   for (unsigned int i = 0; i < instrheader.numInstr; i++) {
-    HOSAInstr *newInstr = new HOSAInstr(this, offset() + readWord(iOffset), 0, i / 0x80, i % 0x80);
-    aInstrs.push_back(newInstr);
+    emplaceInstr<HOSAInstr>(this, offset() + readWord(iOffset), 0, i / 0x80, i % 0x80);
     iOffset += 4;
   }
 
@@ -110,7 +109,7 @@ bool HOSAInstr::loadInstr() {
   u8 cKeyLow = 0x00;
   for (unsigned int i = 0; i < instrinfo.numRgns; i++) {
     RgnInfo *rgninfo = &rgns[i];
-    VGMRgn *rgn = new VGMRgn(this, offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
+    VGMRgn *rgn = emplaceRgn<VGMRgn>(this, offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
 
     rgn->addChild(rgn->offset(), 4, "Sample Offset");
     rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->offset();
@@ -146,7 +145,6 @@ bool HOSAInstr::loadInstr() {
     // Unsure if volume is using a linear scale, but it sounds like it.
     double vol = rgninfo->volume / 255.0;
     rgn->setVolume(vol);
-    addRgn(rgn);
   }
   return true;
 }

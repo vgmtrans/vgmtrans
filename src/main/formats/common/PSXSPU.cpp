@@ -6,6 +6,9 @@
 
 #include "base/Types.h"
 #include "formats/PS1/PS1Format.h"
+#include "Root.h"
+
+#include <memory>
 
 using namespace std;
 
@@ -153,16 +156,15 @@ bool PSXSampColl::parseSampleInfo() {
       }
       // If endLoopOffset wasn't set, default it to the end of the sample
       endLoopOffset = endLoopOffset >= beginOffset ? endLoopOffset : i;
-      PSXSamp *samp = new PSXSamp(this,
-                                  beginOffset,
-                                  i - beginOffset,
-                                  beginOffset,
-                                  endLoopOffset - beginOffset - extraGunkLength,
-                                  1,
-                                  BPS::PCM16,
-                                  44100,
-                                  fmt::format("Sample {:d}", samples.size()));
-      samples.push_back(samp);
+      emplaceSamp<PSXSamp>(this,
+                           beginOffset,
+                           i - beginOffset,
+                           beginOffset,
+                           endLoopOffset - beginOffset - extraGunkLength,
+                           1,
+                           BPS::PCM16,
+                           44100,
+                           fmt::format("Sample {:d}", sampleCount()));
     }
     setLength(i - offset());
   }
@@ -192,17 +194,15 @@ bool PSXSampColl::parseSampleInfo() {
         offSampEnd += 16;
       } while (!lastBlock);
 
-      PSXSamp *samp = new PSXSamp(this,
-                                  offset() + it->offset,
-                                  it->size,
-                                  offset() + it->offset,
-                                  offSampEnd - offSampStart,
-                                  1,
-                                  BPS::PCM16,
-                                  44100,
-                                  fmt::format("Sample {:d}", sampleIndex));
-
-      samples.push_back(samp);
+      emplaceSamp<PSXSamp>(this,
+                           offset() + it->offset,
+                           it->size,
+                           offset() + it->offset,
+                           offSampEnd - offSampStart,
+                           1,
+                           BPS::PCM16,
+                           44100,
+                           fmt::format("Sample {:d}", sampleIndex));
       sampleIndex++;
     }
   }
@@ -334,7 +334,7 @@ static bool isValidSampleStart(const RawFile* file, u32 offset, bool allowShort)
   return true;
 }
 
-std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const std::string&) {
+std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const std::string& format) {
   std::vector<PSXSampColl*> sampColls;
   const size_t len = file->size();
 
@@ -379,16 +379,19 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
       start = offset; // extend the start of the sample collection backward
     }
 
-    auto* coll = new PSXSampColl(PS1Format::name, file, start);
-    if (!coll->loadVGMFile()) { delete coll; continue; }
+    auto coll = std::make_unique<PSXSampColl>(format, file, start);
+    auto* rawColl = coll.get();
+    if (!pRoot->loadVGMFile(std::move(coll))) {
+      continue;
+    }
 
-    sampColls.push_back(coll);
+    sampColls.push_back(rawColl);
 
     // Sanity check that the detected sampcoll isn't smaller than the back scanned distance
-    if ((start + coll->length() - 1) < origOffset) {
+    if ((start + rawColl->length() - 1) < origOffset) {
       i = origOffset + 32;
     } else {
-      i = start + coll->length() - 1;                      // skip parsed area
+      i = start + rawColl->length() - 1;                      // skip parsed area
     }
   }
   return sampColls;

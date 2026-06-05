@@ -30,7 +30,7 @@ bool NDSSeq::parseTrackPointers(void) {
   DATAHdr->addChild(offset() + 0x10 + 8, 4, "Data Pointer");
   u32 off = offset() + 0x1C;
   u8 b = readByte(off);
-  aTracks.push_back(new NDSTrack(this));
+  auto *firstTrack = addTrack<NDSTrack>(this);
 
   //FE XX XX signifies multiple tracks, each true bit in the XX values signifies there is a track for that channel
   if (b == 0xFE)
@@ -60,16 +60,15 @@ bool NDSSeq::parseTrackPointers(void) {
       TrkPtrs->addChild(off, 5, "Track Pointer");
       u32 trkOffset = readByte(off + 2) + (readByte(off + 3) << 8) +
           (readByte(off + 4) << 16) + offset() + 0x1C;
-      NDSTrack *newTrack = new NDSTrack(this, trkOffset);
-      aTracks.push_back(newTrack);
+      addTrack<NDSTrack>(this, trkOffset);
       //newTrack->
       off += 5;
       b = readByte(off);
     }
     TrkPtrs->setLength(off - TrkPtrs->offset());
   }
-  aTracks[0]->setOffset(off);
-  aTracks[0]->dwStartOffset = off;
+  firstTrack->setOffset(off);
+  firstTrack->dwStartOffset = off;
   return true;
 }
 

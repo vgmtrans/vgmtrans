@@ -44,10 +44,7 @@ bool PS1Seq::parseHeader() {
       return false;
 
     setEventsOffset(offset() + 0x0F + 4);
-    PS1Seq *newPS1Seq = new PS1Seq(rawFile(), newSeqOffset);
-    if (!newPS1Seq->loadVGMFile()) {
-      delete newPS1Seq;
-    }
+    addDiscoveredFile<PS1Seq>(rawFile(), newSeqOffset);
     //short relOffset = (short)GetShortBE(curOffset);
     //AddGenericEvent(beginOffset, 4, "Jump Relative", NULL, BG_CLR_PINK);
     //curOffset += relOffset;

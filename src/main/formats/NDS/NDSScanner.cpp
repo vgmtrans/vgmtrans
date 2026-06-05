@@ -12,6 +12,7 @@
 #include "ScannerManager.h"
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -158,8 +159,10 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       waFileIDs.push_back(file->readShort(pWAInfo));
   }
 
-  NDSPSG* psg_sampcoll = new NDSPSG(file);
-  psg_sampcoll->loadVGMFile();
+  auto* psg_sampcoll = pRoot->emplaceVGMFile<NDSPSG>(file);
+  if (!psg_sampcoll) {
+    return SDATLength;
+  }
 
   {
     std::vector<u16> vUniqueWAs;// = vector<u16>(bnkWAs);
@@ -186,11 +189,10 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       u32 pWAFatData = file->readWord(offset) + baseOff;
       offset += 4;
       u32 fileSize = file->readWord(offset);
-      NDSWaveArch *NewNDSwa = new NDSWaveArch(file, pWAFatData, fileSize, waNames[i]);
-      if (!NewNDSwa->loadVGMFile()) {
+      auto* NewNDSwa = pRoot->emplaceVGMFile<NDSWaveArch>(file, pWAFatData, fileSize, waNames[i]);
+      if (!NewNDSwa) {
         L_ERROR("Failed to load NDSWaveArch at 0x{:08X}", pWAFatData);
         WAs.push_back(NULL);
-        delete NewNDSwa;
         continue;
       }
       WAs.push_back(NewNDSwa);
@@ -214,20 +216,22 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       u32 fileSize = file->readWord(offset);
       //if (bnkWAs[*iter][0] == (u16)-1 || numWAs != 1)
       //	continue;
-      NDSInstrSet *NewNDSInstrSet = new NDSInstrSet(file, pBnkFatData, fileSize, psg_sampcoll,
-                                                    bnkNames[*iter]);
+      auto NewNDSInstrSet = std::make_unique<NDSInstrSet>(file, pBnkFatData, fileSize, psg_sampcoll,
+                                                          bnkNames[*iter]);
       for (int i = 0; i < 4; i++)        //use first WA found.  Ideally, should load all WAs
       {
         short WAnum = bnkWAs[*iter][i];
         if (WAnum != -1)
-          NewNDSInstrSet->sampCollWAList.push_back(WAs[WAnum]);
+          NewNDSInstrSet->addWaveArchSampColl(WAs[WAnum]);
         else
-          NewNDSInstrSet->sampCollWAList.push_back(NULL);
+          NewNDSInstrSet->addWaveArchSampColl(nullptr);
       }
-      if (!NewNDSInstrSet->loadVGMFile()) {
+      auto* rawInstrSet = NewNDSInstrSet.get();
+      if (!pRoot->loadVGMFile(std::move(NewNDSInstrSet))) {
         L_ERROR("Failed to load NDSInstrSet at 0x{:08X}", pBnkFatData);
+        continue;
       }
-      std::pair<u16, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
+      std::pair<u16, NDSInstrSet *> theBank(*iter, rawInstrSet);
       BNKs.push_back(theBank);
     }
   }
@@ -244,12 +248,13 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       u32 pSeqFatData = file->readWord(offset) + baseOff;
       offset += 4;
       u32 fileSize = file->readWord(offset);
-      NDSSeq *NewNDSSeq = new NDSSeq(file, pSeqFatData, fileSize, seqNames[i]);
-      if (!NewNDSSeq->loadVGMFile()) {
+      auto* NewNDSSeq = pRoot->emplaceVGMFile<NDSSeq>(file, pSeqFatData, fileSize, seqNames[i]);
+      if (!NewNDSSeq) {
         L_ERROR("Failed to load NDSSeq at 0x{:08X}", pSeqFatData);
+        continue;
       }
 
-      VGMColl *coll = new VGMColl(seqNames[i]);
+      auto coll = std::make_unique<VGMColl>(seqNames[i]);
       coll->useSeq(NewNDSSeq);
       u32 bnkIndex = 0;
       for (u32 j = 0; j < BNKs.size(); j++) {
@@ -266,9 +271,7 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
         if (WAnum != -1)
           coll->addSampColl(WAs[WAnum]);
       }
-      if (!coll->load()) {
-        delete coll;
-      }
+      pRoot->loadVGMColl(std::move(coll));
     }
   }
   return SDATLength;

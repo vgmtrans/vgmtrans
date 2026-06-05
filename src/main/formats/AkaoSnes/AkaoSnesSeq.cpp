@@ -125,8 +125,7 @@ bool AkaoSnesSeq::parseTrackPointers(void) {
   for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     u16 addrTrackStart = getShortAddress(curOffset);
     if (addrTrackStart != addrSequenceEnd) {
-      AkaoSnesTrack *track = new AkaoSnesTrack(this, addrTrackStart);
-      aTracks.push_back(track);
+      addTrack<AkaoSnesTrack>(this, addrTrackStart);
     }
     curOffset += 2;
   }

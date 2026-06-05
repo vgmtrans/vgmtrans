@@ -115,20 +115,17 @@ bool MoriSnesInstrSet::parseInstrPointers() {
       }
     }
 
-    MoriSnesInstr *newInstr = new MoriSnesInstr(
+    emplaceInstr<MoriSnesInstr>(
       this, version, instrNum, spcDirAddr, instrumentHints[instrAddress],
       fmt::format("Instrument {}", instrNum));
-    aInstrs.push_back(newInstr);
   }
 
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(MoriSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(MoriSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -168,9 +165,8 @@ bool MoriSnesInstr::loadInstr() {
     addChild(instrHint->seqAddress, instrHint->seqSize, "Envelope Sequence");
 
     u16 addrSampStart = readShort(offDirEnt);
-    MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint);
+    MoriSnesRgn *rgn = emplaceRgn<MoriSnesRgn>(this, version, spcDirAddr, *instrHint);
     rgn->sampOffset = addrSampStart - spcDirAddr;
-    addRgn(rgn);
   }
   else {
     for (u8 percNoteKey = 0; percNoteKey < instrHintDir.percHints.size(); percNoteKey++) {
@@ -189,9 +185,8 @@ bool MoriSnesInstr::loadInstr() {
       addChild(instrHint->seqAddress, instrHint->seqSize, seqName);
 
       u16 addrSampStart = readShort(offDirEnt);
-      MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);
+      MoriSnesRgn *rgn = emplaceRgn<MoriSnesRgn>(this, version, spcDirAddr, *instrHint, percNoteKey);
       rgn->sampOffset = addrSampStart - spcDirAddr;
-      addRgn(rgn);
     }
   }
 

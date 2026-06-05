@@ -37,19 +37,16 @@ bool ItikitiSnesInstrSet::parseInstrPointers() {
 
     srcns.push_back(srcn);
 
-    auto instrument = std::make_unique<ItikitiSnesInstr>(
+    emplaceInstr<ItikitiSnesInstr>(
       this, ins_tuning_offset, ins_adsr_offset, 0, srcn, srcn, spc_dir_offset(),
       fmt::format("Instrument {}", index));
-    aInstrs.push_back(instrument.release());
   }
 
-  if (aInstrs.empty())
+  if (!hasInstrs())
     return false;
 
-  auto sampleColl = std::make_unique<SNESSampColl>(ItikitiSnesFormat::name, this->rawFile(), spc_dir_offset(), srcns);
-  if (!sampleColl->loadVGMFile())
+  if (!addDiscoveredFile<SNESSampColl>(ItikitiSnesFormat::name, rawFile(), spc_dir_offset(), srcns))
     return false;
-  (void)sampleColl.release();
 
   return true;
 }
@@ -71,7 +68,7 @@ bool ItikitiSnesInstr::loadInstr() {
 
   auto region = std::make_unique<ItikitiSnesRgn>(this, m_tuning_offset, m_adsr_offset, srcn);
   region->sampOffset = sample_offset - spc_dir_offset();
-  addRgn(region.release());
+  addRgn(std::move(region));
 
   return true;
 }

@@ -311,12 +311,12 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, u32 beginOffse
     case EVENT_END:
       if (state.loopCount == 0) {
         if (readMode == READMODE_FIND_DELTA_LENGTH) {
-          for (size_t trackIndex = 0; trackIndex < parentSeq.aTracks.size(); trackIndex++) {
-            parentSeq.aTracks[trackIndex]->totalTicks = getTime();
+          for (size_t trackIndex = 0; trackIndex < parentSeq.trackCount(); trackIndex++) {
+            parentSeq.track(trackIndex)->totalTicks = getTime();
           }
         } else if (readMode == READMODE_CONVERT_TO_MIDI) {
-          for (size_t trackIndex = 0; trackIndex < parentSeq.aTracks.size(); trackIndex++) {
-            parentSeq.aTracks[trackIndex]->limitPrevDurNoteEnd();
+          for (size_t trackIndex = 0; trackIndex < parentSeq.trackCount(); trackIndex++) {
+            parentSeq.track(trackIndex)->limitPrevDurNoteEnd();
           }
         }
 
@@ -611,10 +611,10 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, u32 begi
       for (int channelNo = MAX_TRACKS - 1; channelNo >= 0; channelNo--) {
         if ((spcEON & (1 << channelNo)) != 0) {
           fmt::format_to(std::back_inserter(desc), "{}", channelNo);
-          parentSeq.aTracks[channelNo]->addReverbNoItem(40);
+          parentSeq.track(channelNo)->addReverbNoItem(40);
         } else {
           desc.push_back('-');
-          parentSeq.aTracks[channelNo]->addReverbNoItem(0);
+          parentSeq.track(channelNo)->addReverbNoItem(0);
         }
       }
 

@@ -161,9 +161,8 @@ void CapcomSnesScanner::searchForCapcomSnesFromARAM(RawFile *file) const {
 
   // load a sequence from BGM region
   if (bgmAtFixedAddress) {
-    CapcomSnesSeq *newSeq = new CapcomSnesSeq(file, version, addrBGMHeader + 1, false, name);
-    if (!newSeq->loadVGMFile()) {
-      delete newSeq;
+    auto* newSeq = pRoot->emplaceVGMFile<CapcomSnesSeq>(file, version, addrBGMHeader + 1, false, name);
+    if (!newSeq) {
       return;
     }
   }
@@ -181,9 +180,8 @@ void CapcomSnesScanner::searchForCapcomSnesFromARAM(RawFile *file) const {
       // load current song if possible
       if (guessedSongIndex != -1) {
         u16 addrSongHeader = file->readShortBE(addrSongList + guessedSongIndex * 2);
-        CapcomSnesSeq *newSeq = new CapcomSnesSeq(file, version, addrSongHeader, true, name);
-        if (!newSeq->loadVGMFile()) {
-          delete newSeq;
+        auto* newSeq = pRoot->emplaceVGMFile<CapcomSnesSeq>(file, version, addrSongHeader, true, name);
+        if (!newSeq) {
           return;
         }
       }
@@ -197,13 +195,9 @@ void CapcomSnesScanner::searchForCapcomSnesFromARAM(RawFile *file) const {
           continue;
         }
 
-        CapcomSnesSeq *newSeq = new CapcomSnesSeq(file,
-                                                  version,
-                                                  addrSongHeader,
-                                                  true,
-                                                  (songIndex == guessedSongIndex) ? name : basefilename);
-        if (!newSeq->loadVGMFile()) {
-          delete newSeq;
+        auto* newSeq = pRoot->emplaceVGMFile<CapcomSnesSeq>(
+            file, version, addrSongHeader, true, (songIndex == guessedSongIndex) ? name : basefilename);
+        if (!newSeq) {
           return;
         }
       }
@@ -227,9 +221,8 @@ void CapcomSnesScanner::searchForCapcomSnesFromARAM(RawFile *file) const {
   }
   u8 spcDIR = itSpcDIR->second;
 
-  CapcomSnesInstrSet *newInstrSet = new CapcomSnesInstrSet(file, addrInstrTable, spcDIR << 8);
-  if (!newInstrSet->loadVGMFile()) {
-    delete newInstrSet;
+  auto* newInstrSet = pRoot->emplaceVGMFile<CapcomSnesInstrSet>(file, addrInstrTable, spcDIR << 8);
+  if (!newInstrSet) {
     return;
   }
 }

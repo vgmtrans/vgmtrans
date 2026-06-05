@@ -89,9 +89,8 @@ void AsciiShuichiSnesScanner::scanFromARAM(RawFile *file) {
     return;
   const u16 seqHeaderAddress = file->readShort(ofsLoadSeq + 6);
 
-  const auto newSeq = new AsciiShuichiSnesSeq(file, seqHeaderAddress, name);
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
+  const auto newSeq = pRoot->emplaceVGMFile<AsciiShuichiSnesSeq>(file, seqHeaderAddress, name);
+  if (!newSeq) {
     return;
   }
 
@@ -116,10 +115,9 @@ void AsciiShuichiSnesScanner::scanFromARAM(RawFile *file) {
   const auto sampleDirAddress = static_cast<u16>(file->readByte(ofsLoadDIR + 3) << 8);
   L_DEBUG("{}: found sample DIR address {:#04x}", "AsciiShuichiSnesScanner", sampleDirAddress);
 
-  const auto newInstrSet = new AsciiShuichiSnesInstrSet(file, instrTableAddress,
-                                                        instrTuningTableAddress, sampleDirAddress);
-  if (!newInstrSet->loadVGMFile()) {
-    delete newInstrSet;
+  const auto newInstrSet = pRoot->emplaceVGMFile<AsciiShuichiSnesInstrSet>(file, instrTableAddress,
+                                                                    instrTuningTableAddress, sampleDirAddress);
+  if (!newInstrSet) {
     return;
   }
 }

@@ -39,7 +39,7 @@ bool TriAcePS1InstrSet::parseHeader() {
 
 
   //sampColl = new TriAcePS1SampColl(this, offset()+instrSectionSize, length()-instrSectionSize);
-  adoptSampColl(new PSXSampColl(TriAcePS1Format::name, this, offset() + instrSectionSize, length() - instrSectionSize));
+  emplaceSampColl<PSXSampColl>(TriAcePS1Format::name, this, offset() + instrSectionSize, length() - instrSectionSize);
 
 
   return true;
@@ -59,8 +59,7 @@ bool TriAcePS1InstrSet::parseInstrPointers() {
   for (u32 i = offset() + sizeof(TriAcePS1InstrSet::_InstrHeader);                    //1,Sep.2009 revise
        ((firstWord != 0xFFFFFFFF) && (i < offset() + length()));
        i += sizeof(TriAcePS1Instr::InstrInfo), firstWord = readWord(i)) {
-    TriAcePS1Instr *newInstr = new TriAcePS1Instr(this, i, 0, 0, 0);
-    aInstrs.push_back(newInstr);
+    TriAcePS1Instr *newInstr = emplaceInstr<TriAcePS1Instr>(this, i, 0, 0, 0);
     readBytes(i, sizeof(TriAcePS1Instr::InstrInfo), &newInstr->instrinfo);
     newInstr->addChild(i + 0, sizeof(short), "Instrument Number");            //1,Sep.2009 revise
     newInstr->addChild(i + 2, sizeof(short), "ADSR1");                        //1,Sep.2009 revise
@@ -115,9 +114,9 @@ bool TriAcePS1Instr::loadInstr() {
 
   for (int i = 0; i < instrinfo.numRgns; i++) {
     RgnInfo *rgninfo = &rgns[i];
-    VGMRgn *rgn = new VGMRgn(this,
-                             offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i,
-                             sizeof(RgnInfo));        //1,Sep.2009 revise
+    VGMRgn *rgn = emplaceRgn<VGMRgn>(this,
+                                     offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i,
+                                     sizeof(RgnInfo));        //1,Sep.2009 revise
     rgn->addKeyLow(rgninfo->note_range_low, rgn->offset());
     rgn->addKeyHigh(rgninfo->note_range_high, rgn->offset() + 1);
     rgn->addVelLow(rgninfo->vel_range_high == 0 ? 0 : rgninfo->vel_range_low, rgn->offset() + 2);
@@ -142,7 +141,6 @@ bool TriAcePS1Instr::loadInstr() {
     //  also, be aware the same scale may be employed for vol and expression events (haven't investigated).
     //long dlsAtten = -(ConvertPercentVolToAttenDB(rgninfo->attenuation/((double)255)) * DLS_DECIBEL_UNIT);
     //rgn->SetAttenuation(dlsAtten);
-    addRgn(rgn);
   }
   return true;
 }

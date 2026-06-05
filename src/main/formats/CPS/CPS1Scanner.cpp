@@ -13,6 +13,7 @@
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
 
+#include <memory>
 #include <string>
 
 class CPS1SampleInstrSet;
@@ -128,45 +129,46 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
   // Load the YM2151 Instrument Set
   auto opmInstrsetName = fmt::format("{} YM2151 instrument set", gameentry->name);
   int opmInstrsetLength;
+  std::unique_ptr<CPS1OPMInstrSet> opmInstrsetOwner;
 
   switch (fmt_ver) {
     case CPS1_V200:
       opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV2_00));
-      opmInstrset = new CPS1OPMInstrSet(programFile,
-                                        fmt_ver, masterVol, opm_instr_table_offset,
-                                        opmInstrsetLength,
-                                        opmInstrsetName);
+      opmInstrsetOwner = std::make_unique<CPS1OPMInstrSet>(programFile,
+                                                           fmt_ver, masterVol, opm_instr_table_offset,
+                                                           opmInstrsetLength,
+                                                           opmInstrsetName);
       break;
 
     case CPS1_V500:
     case CPS1_V502:
       opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV5_02));
-      opmInstrset = new CPS1OPMInstrSet(programFile,
-                                        fmt_ver, masterVol, opm_instr_table_offset,
-                                        opmInstrsetLength,
-                                        opmInstrsetName);
+      opmInstrsetOwner = std::make_unique<CPS1OPMInstrSet>(programFile,
+                                                           fmt_ver, masterVol, opm_instr_table_offset,
+                                                           opmInstrsetLength,
+                                                           opmInstrsetName);
       break;
 
     case CPS1_V100:
     case CPS1_V350:
       opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25));
-      opmInstrset = new CPS1OPMInstrSet(programFile,
-                                      fmt_ver, masterVol, opm_instr_table_offset,
-                                      opmInstrsetLength,
-                                      opmInstrsetName);
+      opmInstrsetOwner = std::make_unique<CPS1OPMInstrSet>(programFile,
+                                                           fmt_ver, masterVol, opm_instr_table_offset,
+                                                           opmInstrsetLength,
+                                                           opmInstrsetName);
       break;
     case CPS1_V425:
       opmInstrsetLength = std::min(127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25)), sample_instr_table_offset);
-      opmInstrset = new CPS1OPMInstrSet(programFile,
-                                        fmt_ver, masterVol, opm_instr_table_offset,
-                                        opmInstrsetLength,
-                                        opmInstrsetName);
+      opmInstrsetOwner = std::make_unique<CPS1OPMInstrSet>(programFile,
+                                                           fmt_ver, masterVol, opm_instr_table_offset,
+                                                           opmInstrsetLength,
+                                                           opmInstrsetName);
       break;
     case CPS1_VERSION_UNDEFINED:
       return;
   }
-  if (!opmInstrset->loadVGMFile()) {
-    delete opmInstrset;
+  opmInstrset = opmInstrsetOwner.get();
+  if (!pRoot->loadVGMFile(std::move(opmInstrsetOwner))) {
     opmInstrset = nullptr;
   }
 
@@ -177,35 +179,32 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
     auto sampleInstrsetName = fmt::format("{} oki msm6295 instrument set", gameentry->name);
     auto sampcoll_name = fmt::format("{} sample collection", gameentry->name);
 
-    sampleInstrset = new CPS1SampleInstrSet(programFile,
-                                fmt_ver, sample_instr_table_offset,
-                                sampleInstrsetName);
-    if (!sampleInstrset->loadVGMFile()) {
-      delete sampleInstrset;
+    auto sampleInstrsetOwner = std::make_unique<CPS1SampleInstrSet>(programFile,
+                                                                    fmt_ver, sample_instr_table_offset,
+                                                                    sampleInstrsetName);
+    sampleInstrset = sampleInstrsetOwner.get();
+    if (!pRoot->loadVGMFile(std::move(sampleInstrsetOwner))) {
       sampleInstrset = nullptr;
     }
 
-    sampcoll = new CPS1SampColl(samplesFile, sampleInstrset, 0, static_cast<u32>(samplesFile->size()), sampcoll_name);
-    if (!sampcoll->loadVGMFile()) {
-      delete sampcoll;
-      sampcoll = nullptr;
-    }
+    sampcoll =
+        pRoot->emplaceVGMFile<CPS1SampColl>(samplesFile, sampleInstrset, 0, static_cast<u32>(samplesFile->size()), sampcoll_name);
   }
 
   std::string seq_table_name = fmt::format("{} sequence pointer table", gameentry->name);
 
   // Add SeqTable as Miscfile
-  VGMMiscFile *seqTable = new VGMMiscFile(CPS1Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
-  if (!seqTable->loadVGMFile()) {
-    delete seqTable;
+  auto* seqTable =
+      pRoot->emplaceVGMFile<VGMMiscFile>(CPS1Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
+  if (!seqTable) {
     return;
   }
 
   // Create instrument transpose table
   std::vector<s8> instrTransposeTable;
   if (opmInstrset && (fmt_ver == CPS1_V425 || fmt_ver == CPS1_V350 || fmt_ver == CPS1_V100)) {
-    instrTransposeTable.reserve(opmInstrset->aInstrs.size());
-    for (const auto instr : opmInstrset->aInstrs) {
+    instrTransposeTable.reserve(opmInstrset->instrCount());
+    for (const auto instr : opmInstrset->instrs()) {
       if (auto* opmInstr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV4_25>*>(instr); opmInstr != nullptr) {
         instrTransposeTable.emplace_back(opmInstr->getTranspose());
       }
@@ -224,17 +223,14 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
     seqTable->addChild(seq_table_offset + (seqId * sizeof(u16)), sizeof(u16), "Sequence Pointer");
 
     auto seqName = fmt::format("{} seq {}", gameentry->name, seqId);
-    VGMSeq* newSeq;
-    newSeq = new CPS1Seq(programFile, seqPointer, fmt_ver, seqName, instrTransposeTable);
-
-    if (!newSeq->loadVGMFile()) {
-      delete newSeq;
+    auto* newSeq = pRoot->emplaceVGMFile<CPS1Seq>(programFile, seqPointer, fmt_ver, seqName, instrTransposeTable);
+    if (!newSeq) {
       continue;
     }
 
     if (opmInstrset) {
       auto collName = fmt::format("{} song {}", gameentry->name, seqId);
-      VGMColl* coll = new VGMColl(collName);
+      auto coll = std::make_unique<VGMColl>(collName);
 
       coll->useSeq(newSeq);
       coll->addInstrSet(opmInstrset);
@@ -242,9 +238,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
         coll->addInstrSet(sampleInstrset);
         coll->addSampColl(sampcoll);
       }
-      if (!coll->load()) {
-        delete coll;
-      }
+      pRoot->loadVGMColl(std::move(coll));
     }
   }
 }

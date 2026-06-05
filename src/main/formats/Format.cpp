@@ -35,8 +35,8 @@ bool Format::onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMM
   return matcher->onNewFile(file);
 }
 
-VGMColl *Format::newCollection() {
-  return new VGMColl();
+std::unique_ptr<VGMColl> Format::newCollection() {
+  return std::make_unique<VGMColl>();
 }
 
 bool Format::onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
@@ -47,7 +47,7 @@ bool Format::onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VG
 }
 
 bool Format::init() {
-  scanner.reset(newScanner());
-  matcher.reset(newMatcher());
+  scanner = newScanner();
+  matcher = newMatcher();
   return true;
 }

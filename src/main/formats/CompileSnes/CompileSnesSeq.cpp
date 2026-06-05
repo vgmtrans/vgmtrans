@@ -88,15 +88,13 @@ bool CompileSnesSeq::parseTrackPointers(void) {
   for (u8 trackIndex = 0; trackIndex < nNumTracks; trackIndex++) {
     u16 ofsTrackStart = readShort(curOffset + 8);
 
-    CompileSnesTrack *track = new CompileSnesTrack(this, ofsTrackStart);
+    CompileSnesTrack *track = addTrack<CompileSnesTrack>(this, ofsTrackStart);
     track->spcInitialFlags = readByte(curOffset + 1);
     track->spcInitialVolume = readByte(curOffset + 2);
     track->spcInitialTranspose = static_cast<s8>(readByte(curOffset + 5));
     track->spcInitialTempo = readByte(curOffset + 6);
     track->spcInitialSRCN = readByte(curOffset + 10);
     track->spcInitialPan = static_cast<s8>(readByte(curOffset + 12));
-    aTracks.push_back(track);
-
     if (trackIndex == 0) {
       setAlwaysWriteInitialTempo(getTempoInBPM(track->spcInitialTempo));
     }

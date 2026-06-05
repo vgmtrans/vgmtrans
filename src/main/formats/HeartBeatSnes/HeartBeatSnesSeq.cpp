@@ -104,8 +104,7 @@ bool HeartBeatSnesSeq::parseTrackPointers(void) {
       return false;
     }
 
-    HeartBeatSnesTrack *track = new HeartBeatSnesTrack(this, addrTrackStart);
-    aTracks.push_back(track);
+    addTrack<HeartBeatSnesTrack>(this, addrTrackStart);
   }
 
   return true;

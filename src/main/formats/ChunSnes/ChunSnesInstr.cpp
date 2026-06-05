@@ -87,20 +87,17 @@ bool ChunSnesInstrSet::parseInstrPointers() {
         setOffset(addrInstr);
       }
 
-      ChunSnesInstr *newInstr = new ChunSnesInstr(this, version, instrNum, addrInstr,
-        addrSampleTable, spcDirAddr, instrName);
-      aInstrs.push_back(newInstr);
+      emplaceInstr<ChunSnesInstr>(this, version, instrNum, addrInstr,
+                                  addrSampleTable, spcDirAddr, instrName);
     }
   }
 
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(ChunSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(ChunSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -143,9 +140,8 @@ bool ChunSnesInstr::loadInstr() {
     return false;
   }
 
-  ChunSnesRgn *rgn = new ChunSnesRgn(this, version, srcn, addrRgn, spcDirAddr);
+  ChunSnesRgn *rgn = emplaceRgn<ChunSnesRgn>(this, version, srcn, addrRgn, spcDirAddr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   setGuessedLength();
   return true;

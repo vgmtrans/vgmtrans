@@ -6,6 +6,8 @@
 #include "base/Types.h"
 #include "SeqEvent.h"
 
+#include <memory>
+
 DECLARE_FORMAT(TriAcePS1);
 
 // ************
@@ -40,7 +42,7 @@ bool TriAcePS1Seq::parseTrackPointers() {
   readBytes(offset() + 0x16, 6 * 32, &TrkInfos);
   for (int i = 0; i < 32; i++)
     if (TrkInfos[i].trkOffset != 0) {
-      aTracks.push_back(new TriAcePS1Track(this, TrkInfos[i].trkOffset, 0));
+      addTrack<TriAcePS1Track>(this, TrkInfos[i].trkOffset, 0);
 
       TrkInfoHeader->addHeader(offset() + 0x16 + 6 * i, 6, "Track Info");
     }
@@ -54,9 +56,19 @@ void TriAcePS1Seq::resetVars() {
 bool TriAcePS1Seq::postLoad() {
   bool success = VGMSeq::postLoad();
   if (readMode == READMODE_ADD_TO_UI) {
-    addChildren(aScorePatterns);
+    for (auto& pattern : m_ownedScorePatterns) {
+      addChild(std::move(pattern));
+    }
+    m_ownedScorePatterns.clear();
   }
   return success;
+}
+
+TriAcePS1ScorePattern* TriAcePS1Seq::addScorePattern(std::unique_ptr<TriAcePS1ScorePattern> pattern) {
+  auto* rawPattern = pattern.get();
+  m_scorePatterns.push_back(rawPattern);
+  m_ownedScorePatterns.emplace_back(std::move(pattern));
+  return rawPattern;
 }
 
 // **************
@@ -75,10 +87,9 @@ void TriAcePS1Track::loadTrackMainLoop(u32 stopOffset, s32 stopTime) {
     if (seq->patternMap[scorePatternOffset])
       seq->curScorePattern = NULL;
     else {
-      TriAcePS1ScorePattern *pattern = new TriAcePS1ScorePattern(seq, scorePatternOffset);
+      auto* pattern = seq->addScorePattern(std::make_unique<TriAcePS1ScorePattern>(seq, scorePatternOffset));
       seq->patternMap[scorePatternOffset] = pattern;
       seq->curScorePattern = pattern;
-      seq->aScorePatterns.push_back(pattern);
     }
     u32 endOffset = readScorePattern(scorePatternOffset);
     if (seq->curScorePattern)
@@ -319,17 +330,17 @@ bool TriAcePS1Track::isOffsetUsed(u32 offset) {
   return false;
 }
 
-SeqEvent* TriAcePS1Track::addEvent(SeqEvent *pSeqEvent) {
+SeqEvent* TriAcePS1Track::addEvent(std::unique_ptr<SeqEvent> seqEvent) {
   TriAcePS1ScorePattern *pattern = ((TriAcePS1Seq *) parentSeq)->curScorePattern;
   if (pattern == NULL) {
     // it must be already added, reject it
-    delete pSeqEvent;
     return nullptr;
   }
 
   if (readMode != READMODE_ADD_TO_UI)
     return nullptr;
 
-  pattern->addChild(pSeqEvent);
-  return pSeqEvent;
+  auto* rawEvent = seqEvent.get();
+  pattern->addChild(std::move(seqEvent));
+  return rawEvent;
 }

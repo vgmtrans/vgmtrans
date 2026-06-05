@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -88,25 +89,22 @@ bool AkaoSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    AkaoSnesInstr *newInstr = new AkaoSnesInstr(
+    emplaceInstr<AkaoSnesInstr>(
       this, version, srcn, spcDirAddr, addrTuningTable, addrADSRTable,
       fmt::format("Instrument: {:#x}", srcn));
-    aInstrs.push_back(newInstr);
   }
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   if (addrDrumKitTable) {
     // One percussion instrument covers all percussion sounds
-    AkaoSnesDrumKit *newDrumKitInstr = new AkaoSnesDrumKit(this, version, DRUMKIT_PROGRAM, spcDirAddr, addrTuningTable, addrADSRTable, addrDrumKitTable, "Drum Kit");
-    aInstrs.push_back(newDrumKitInstr);
+    emplaceInstr<AkaoSnesDrumKit>(this, version, DRUMKIT_PROGRAM, spcDirAddr, addrTuningTable,
+                                  addrADSRTable, addrDrumKitTable, "Drum Kit");
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(AkaoSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(AkaoSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -146,11 +144,10 @@ bool AkaoSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  AkaoSnesRgn *rgn = new AkaoSnesRgn(this, version, addrTuningTable);
+  AkaoSnesRgn *rgn = emplaceRgn<AkaoSnesRgn>(this, version, addrTuningTable);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   rgn->initializeRegion(instrNum, spcDirAddr, addrADSRTable);
   rgn->loadRgn();
-  addRgn(rgn);
 
   setGuessedLength();
   return true;
@@ -204,20 +201,17 @@ bool AkaoSnesDrumKit::loadInstr() {
 
   // A new region for every instrument
   for (u8 i = 0; i < NOTE_DUR_TABLE_SIZE; ++i) {
-    AkaoSnesDrumKitRgn *rgn = new AkaoSnesDrumKitRgn(this, version, addrTuningTable);
+    auto rgn = std::make_unique<AkaoSnesDrumKitRgn>(this, version, addrTuningTable);
 
     if (!rgn->initializePercussionRegion(i, spcDirAddr, addrADSRTable, addrDrumKitTable)) {
-      delete rgn;
       continue;
     }
     if (!rgn->loadRgn()) {
-      delete rgn;
       return false;
     }
 
     u32 rgnOffDirEnt = spcDirAddr + (rgn->sampNum * 4);
     if (rgnOffDirEnt + 4 > 0x10000) {
-      delete rgn;
       return false;
     }
 
@@ -225,7 +219,7 @@ bool AkaoSnesDrumKit::loadInstr() {
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
-    addRgn(rgn);
+    addRgn(std::move(rgn));
   }
 
   setGuessedLength();

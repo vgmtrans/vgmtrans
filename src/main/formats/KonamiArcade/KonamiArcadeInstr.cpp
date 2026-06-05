@@ -12,6 +12,8 @@
 #include "LogManager.h"
 #include "VGMRgn.h"
 
+#include <memory>
+
 #include <spdlog/fmt/fmt.h>
 
 // The driver doesn't define an envelope at the instrument level. Instead, it sets release time
@@ -73,18 +75,16 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     int bank = sampNum > 127 ? 1 : 0;
     int instrNum = sampNum > 127 ? sampNum - 128 : sampNum;
     std::string name = fmt::format("Instrument {} Bank {}", instrNum, bank);
-    VGMInstr* instr = new VGMInstr(this, off, sizeof(konami_mw_sample_info), bank, instrNum, name);
-    VGMRgn* rgn = new VGMRgn(instr, off, sizeof(konami_mw_sample_info));
+    VGMInstr* instr = emplaceInstr<VGMInstr>(this, off, sizeof(konami_mw_sample_info), bank, instrNum, name);
+    VGMRgn* rgn = instr->emplaceRgn<VGMRgn>(instr, off, sizeof(konami_mw_sample_info));
     rgn->sampNum = sampNum;
     rgn->release_time = instrReleaseTime;
-    instr->addRgn(rgn);
 
     auto instrSampInfoItem = instrSampInfos->addChild(off, sizeof(konami_mw_sample_info),
                                       fmt::format("Instrument Sample Info {}", sampNum));
     addSampleInfoChildren(instrSampInfoItem, off);
     sampNum++;
 
-    aInstrs.push_back(instr);
   }
 
   if (m_drumTableOffset == 0 || m_drumSampleTableOffset == 0) {
@@ -101,9 +101,9 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
   }
 
   // Load drum table
-  int numMelodicInstrs = aInstrs.size();
+  int numMelodicInstrs = static_cast<int>(instrCount());
   readBytes(m_drumTableOffset, sizeof(m_drums), &m_drums);
-  VGMInstr* drumInstr = new VGMInstr(
+  auto drumInstr = std::make_unique<VGMInstr>(
     this,
     m_drumTableOffset,
     sizeof(m_drums),
@@ -111,7 +111,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     0,
     "Drum Kit"
   );
-  std::vector<VGMInstr *> aDrumKit;
+  auto* drumInstrRaw = drumInstr.get();
   for (size_t i = 0; i < sizeof(m_drums) / sizeof(m_drums[0]); ++i) {
     drum& d = m_drums[i];
     u32 off = m_drumTableOffset + static_cast<u32>(i * sizeof(drum));
@@ -121,7 +121,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
       break;
     }
 
-    VGMRgn* rgn = new VGMRgn(drumInstr, off, sizeof(drum), fmt::format("Region {:d}", i));
+    VGMRgn* rgn = drumInstrRaw->emplaceRgn<VGMRgn>(drumInstrRaw, off, sizeof(drum), fmt::format("Region {:d}", i));
     // The driver offsets notes up 2 octaves relative to midi note values.
     rgn->keyLow = i + 24;
     rgn->keyHigh = i + 24;
@@ -138,11 +138,8 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     rgn->addChild(off + 4, 2, "Unknown");
     rgn->addChild(off + 6, 1, "Default Duration");
     rgn->addChild(off + 7, 1, "Attenuation");
-    drumInstr->addRgn(rgn);
   }
-  aInstrs.push_back(drumInstr);
-  aDrumKit.push_back(drumInstr);
-  addChildren(aDrumKit);
+  adoptInstrAsChild(std::move(drumInstr));
 
   return true;
 }
@@ -227,16 +224,15 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
     if (sampInfo.type() == konami_mw_sample_info::sample_type::ADPCM) {
-      sample = new KonamiAdpcmSamp(
+      sample = addSamp(std::make_unique<KonamiAdpcmSamp>(
         this,
         sampleOffset,
         sampleSize,
         KonamiAdpcmChip::K054539,
         24000,
         name
-      );
+      ));
       sample->setBPS(BPS::PCM16);
-      samples.push_back(sample);
     } else {
       BPS bps = sampInfo.type() == konami_mw_sample_info::sample_type::PCM_8 ? BPS::PCM8 : BPS::PCM16;
       sample = addSamp(sampleOffset,

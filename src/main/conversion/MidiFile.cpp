@@ -33,11 +33,11 @@ MidiTrack *MidiFile::addTrack() {
 }
 
 MidiTrack *MidiFile::insertTrack(u32 trackNum) {
-  if (trackNum + 1 > aTracks.size())
-    aTracks.resize(trackNum + 1, nullptr);
+  if (trackNum + 1 > m_tracks.size())
+    m_tracks.resize(trackNum + 1, nullptr);
 
-  if (aTracks[trackNum]) {
-    std::erase_if(m_ownedTracks, [track = aTracks[trackNum]](const auto& ownedTrack) {
+  if (m_tracks[trackNum]) {
+    std::erase_if(m_ownedTracks, [track = m_tracks[trackNum]](const auto& ownedTrack) {
       return ownedTrack.get() == track;
     });
   }
@@ -45,7 +45,7 @@ MidiTrack *MidiFile::insertTrack(u32 trackNum) {
   auto track = std::make_unique<MidiTrack>(this, bMonophonicTracks);
   auto* rawTrack = track.get();
   m_ownedTracks.push_back(std::move(track));
-  aTracks[trackNum] = rawTrack;
+  m_tracks[trackNum] = rawTrack;
   return rawTrack;
 }
 
@@ -56,19 +56,19 @@ MidiTrack* MidiFile::adoptTrack(std::unique_ptr<MidiTrack> track) {
 
   auto* rawTrack = track.get();
   m_ownedTracks.push_back(std::move(track));
-  aTracks.push_back(rawTrack);
+  m_tracks.push_back(rawTrack);
   return rawTrack;
 }
 
 std::vector<std::unique_ptr<MidiTrack>> MidiFile::releaseTracks() {
-  aTracks.clear();
+  m_tracks.clear();
   return std::move(m_ownedTracks);
 }
 
 int MidiFile::getMidiTrackIndex(const MidiTrack *midiTrack) {
-  auto it = std::ranges::find(aTracks, midiTrack);
-  if (it != aTracks.end()) {
-    return static_cast<int>(std::distance(aTracks.begin(), it));
+  auto it = std::ranges::find(m_tracks, midiTrack);
+  if (it != m_tracks.end()) {
+    return static_cast<int>(std::distance(m_tracks.begin(), it));
   } else {
     return -1;
   }
@@ -83,15 +83,15 @@ u32 MidiFile::ppqn() const {
 }
 
 void MidiFile::sort() {
-  for (u32 i = 0; i < aTracks.size(); i++) {
-    if (aTracks[i]) {
-      if (aTracks[i]->aEvents.empty()) {
-        std::erase_if(m_ownedTracks, [track = aTracks[i]](const auto& ownedTrack) {
+  for (u32 i = 0; i < m_tracks.size(); i++) {
+    if (m_tracks[i]) {
+      if (!m_tracks[i]->hasEvents()) {
+        std::erase_if(m_ownedTracks, [track = m_tracks[i]](const auto& ownedTrack) {
           return ownedTrack.get() == track;
         });
-        aTracks.erase(aTracks.begin() + i--);
+        m_tracks.erase(m_tracks.begin() + i--);
       } else
-        aTracks[i]->sort();
+        m_tracks[i]->sort();
     }
   }
 }
@@ -103,7 +103,7 @@ bool MidiFile::saveMidiFile(const std::filesystem::path &filepath) {
 }
 
 void MidiFile::writeMidiToBuffer(std::vector<u8> &buf) {
-  size_t nNumTracks = aTracks.size();
+  size_t nNumTracks = m_tracks.size();
   buf.push_back('M');
   buf.push_back('T');
   buf.push_back('h');
@@ -121,7 +121,7 @@ void MidiFile::writeMidiToBuffer(std::vector<u8> &buf) {
 
   sort();
 
-  for (auto& aTrack : aTracks) {
+  for (auto& aTrack : m_tracks) {
     if (aTrack) {
       std::vector<u8> trackBuf;
       globalTranspose = 0;
@@ -154,7 +154,7 @@ MidiEvent* MidiTrack::adoptEvent(std::unique_ptr<MidiEvent> event) {
 
   auto* rawEvent = event.get();
   m_ownedEvents.push_back(std::move(event));
-  aEvents.push_back(rawEvent);
+  m_events.push_back(rawEvent);
   return rawEvent;
 }
 
@@ -170,22 +170,22 @@ void MidiTrack::prependEvents(std::vector<std::unique_ptr<MidiEvent>> events) {
     m_ownedEvents.push_back(std::move(event));
   }
 
-  aEvents.insert(aEvents.begin(), rawEvents.begin(), rawEvents.end());
+  m_events.insert(m_events.begin(), rawEvents.begin(), rawEvents.end());
 }
 
 std::vector<std::unique_ptr<MidiEvent>> MidiTrack::releaseEvents() {
   prevDurEvent = nullptr;
-  prevDurNoteOffs.clear();
-  aEvents.clear();
+  m_prevDurNoteOffs.clear();
+  m_events.clear();
   return std::move(m_ownedEvents);
 }
 
 void MidiTrack::sort() {
-  std::ranges::stable_sort(aEvents, PriorityCmp()); // Sort all the events by priority
-  std::ranges::stable_sort(aEvents, AbsTimeCmp());  // Sort all the events by absolute time,
+  std::ranges::stable_sort(m_events, PriorityCmp()); // Sort all the events by priority
+  std::ranges::stable_sort(m_events, AbsTimeCmp());  // Sort all the events by absolute time,
                                                              // so that delta times can be recorded correctly
-  if (!bHasEndOfTrack && !aEvents.empty()) {
-    addEvent<EndOfTrackEvent>(this, aEvents.back()->absTime);
+  if (!bHasEndOfTrack && !m_events.empty()) {
+    addEvent<EndOfTrackEvent>(this, m_events.back()->absTime);
     bHasEndOfTrack = true;
   }
 }
@@ -201,8 +201,8 @@ void MidiTrack::writeTrack(std::vector<u8> &buf) const {
   buf.push_back(0);
   u32 time = 0;  // start at 0 ticks
 
-  std::vector<MidiEvent *> finalEvents(aEvents);
-  std::vector<MidiEvent *> &globEvents = parentSeq->globalTrack.aEvents;
+  std::vector<MidiEvent *> finalEvents(m_events);
+  const auto& globEvents = parentSeq->globalTrack.events();
   finalEvents.insert(finalEvents.end(), globEvents.begin(), globEvents.end());
 
   std::ranges::stable_sort(finalEvents, PriorityCmp()); // Sort all the events by priority
@@ -266,13 +266,13 @@ void MidiTrack::addNoteByDur(u8 channel, s8 key, s8 vel, u32 duration) {
   purgePrevNoteOffs(getDelta());
   addEvent<NoteEvent>(this, channel, getDelta(), true, key, vel);  // add note on
   NoteEvent *prevDurNoteOff = addEvent<NoteEvent>(this, channel, getDelta() + duration, false, key);
-  prevDurNoteOffs.push_back(prevDurNoteOff);
+  m_prevDurNoteOffs.push_back(prevDurNoteOff);
 }
 
 //TODO: MOVE! This definitely doesn't belong here.
 void MidiTrack::addNoteByDur_TriAce(u8 channel, s8 key, s8 vel, u32 duration) {
   u32 CurDelta = getDelta();
-  size_t nNumEvents = aEvents.size();
+  size_t nNumEvents = m_events.size();
 
   NoteEvent* ContNote = nullptr;  // Continuted Note
   for (size_t curEvt = 0; curEvt < nNumEvents; curEvt++) {
@@ -286,8 +286,8 @@ void MidiTrack::addNoteByDur_TriAce(u8 channel, s8 key, s8 vel, u32 duration) {
     // Note: In previous TriAce drivers (like MegaDrive and SNES versions),
     //       a Note gets extended by a Note On event at the tick where another note expires.
     //       Valkyrie Profile: 225 Fragments of the Heart confirms, that this is NOT the case in the PS1 version.
-    if (aEvents[curEvt]->absTime > CurDelta) {
-      auto* noteEvt = dynamic_cast<NoteEvent*>(aEvents[curEvt]);
+    if (m_events[curEvt]->absTime > CurDelta) {
+      auto* noteEvt = dynamic_cast<NoteEvent*>(m_events[curEvt]);
       if (noteEvt != nullptr && noteEvt->key == key && !noteEvt->bNoteDown) {
         ContNote = noteEvt;
         break;
@@ -299,7 +299,7 @@ void MidiTrack::addNoteByDur_TriAce(u8 channel, s8 key, s8 vel, u32 duration) {
     purgePrevNoteOffs(CurDelta);
     addEvent<NoteEvent>(this, channel, CurDelta, true, key, vel);  // add note on
     NoteEvent *prevDurNoteOff = addEvent<NoteEvent>(this, channel, CurDelta + duration, false, key);
-    prevDurNoteOffs.push_back(prevDurNoteOff);
+    m_prevDurNoteOffs.push_back(prevDurNoteOff);
   } else {
     ContNote->absTime = CurDelta + duration;  // fix DeltaTime of the already inserted NoteOff event
   }
@@ -309,30 +309,18 @@ void MidiTrack::insertNoteByDur(u8 channel, s8 key, s8 vel, u32 duration, u32 ab
   purgePrevNoteOffs(std::max(getDelta(), absTime));
   addEvent<NoteEvent>(this, channel, absTime, true, key, vel);  // add note on
   NoteEvent *prevDurNoteOff = addEvent<NoteEvent>(this, channel, absTime + duration, false, key);
-  prevDurNoteOffs.push_back(prevDurNoteOff);
+  m_prevDurNoteOffs.push_back(prevDurNoteOff);
 }
 
 void MidiTrack::purgePrevNoteOffs() {
-  prevDurNoteOffs.clear();
+  m_prevDurNoteOffs.clear();
 }
 
 void MidiTrack::purgePrevNoteOffs(u32 absTime) {
-  prevDurNoteOffs.erase(std::remove_if(prevDurNoteOffs.begin(), prevDurNoteOffs.end(),
+  m_prevDurNoteOffs.erase(std::remove_if(m_prevDurNoteOffs.begin(), m_prevDurNoteOffs.end(),
     [absTime](const NoteEvent *e) { return e && e->absTime <= absTime; }),
-    prevDurNoteOffs.end());
+    m_prevDurNoteOffs.end());
 }
-
-/*void MidiTrack::AddVolMarker(u8 channel, u8 vol, s8 priority)
-{
-	MidiEvent* newEvent = new VolMarkerEvent(this, channel, GetDelta(), vol);
-	aEvents.push_back(newEvent);
-}
-
-void MidiTrack::InsertVolMarker(u8 channel, u8 vol, u32 absTime, s8 priority)
-{
-	MidiEvent* newEvent = new VolMarkerEvent(this, channel, absTime, vol);
-	aEvents.push_back(newEvent);
-}*/
 
 void MidiTrack::addControllerEvent(u8 channel, u8 controllerNum, u8 theDataByte) {
   addEvent<ControllerEvent>(this, channel, getDelta(), controllerNum, theDataByte);
@@ -864,13 +852,7 @@ u32 NoteEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //: MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_LOWER), key(theKey), vel(theVel), duration(theDur)
 //{
 //}
-/*
-DurNoteEvent* DurNoteEvent::MakeCopy()
-{
-	return new DurNoteEvent(prntTrk, channel, AbsTime, key, vel, duration);
-}*/
-
-/*void DurNoteEvent::PrepareWrite(vector<MidiEvent*> & aEvents)
+/*void DurNoteEvent::PrepareWrite(vector<MidiEvent*> & m_events)
 {
 	prntTrk->addEvent<NoteEvent>(prntTrk, channel, AbsTime, true, key, vel);	//add note on
 	prntTrk->addEvent<NoteEvent>(prntTrk, channel, AbsTime+duration, false, key, vel);  //add note off at end of dur
@@ -890,10 +872,7 @@ DurNoteEvent* DurNoteEvent::MakeCopy()
 {
 }
 
-VolEvent* VolEvent::MakeCopy()
-{
-	return new VolEvent(prntTrk, channel, AbsTime, vol, priority);
-}*/
+*/
 
 //  ***************
 //  ControllerEvent

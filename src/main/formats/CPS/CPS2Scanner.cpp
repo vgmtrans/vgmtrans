@@ -13,6 +13,8 @@
 #include "Root.h"
 #include "VGMColl.h"
 
+#include <memory>
+
 CPS2FormatVer cps2VersionEnum(const std::string &versionStr) {
     static const std::unordered_map<std::string, CPS2FormatVer> versionMap = {
         {"CPS2_V1.00", CPS2_V100},
@@ -131,36 +133,26 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   RawFile *samplesFile = sampsRomGroupEntry->file;
 
   if (fmt_ver == CPS3) {
-    sampInfoTable = new CPS3SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+    sampInfoTable = pRoot->emplaceVGMFile<CPS3SampleInfoTable>(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
   }
   else {
-    sampInfoTable = new CPS2SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+    sampInfoTable = pRoot->emplaceVGMFile<CPS2SampleInfoTable>(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
   }
-  sampInfoTable->loadVGMFile();
+  if (!sampInfoTable) {
+    return;
+  }
   if (artic_table_offset) {
-    articTable = new CPSArticTable(programFile, artic_table_name, artic_table_offset, artic_table_length);
-    if (!articTable->loadVGMFile()) {
-      delete articTable;
-      articTable = nullptr;
-    }
+    articTable = pRoot->emplaceVGMFile<CPSArticTable>(programFile, artic_table_name, artic_table_offset, artic_table_length);
   }
 
-  instrset = new CPS2InstrSet(programFile,
-                             fmt_ver,
-                             instr_table_offset,
-                             num_instr_banks,
-                             sampInfoTable,
-                             articTable,
-                             instrset_name);
-  if (!instrset->loadVGMFile()) {
-    delete instrset;
-    instrset = nullptr;
-  }
-  sampcoll = new CPS2SampColl(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
-  if (!sampcoll->loadVGMFile()) {
-    delete sampcoll;
-    sampcoll = nullptr;
-  }
+  instrset = pRoot->emplaceVGMFile<CPS2InstrSet>(programFile,
+                                          fmt_ver,
+                                          instr_table_offset,
+                                          num_instr_banks,
+                                          sampInfoTable,
+                                          articTable,
+                                          instrset_name);
+  sampcoll = pRoot->emplaceVGMFile<CPS2SampColl>(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
 
 
   // LOAD SEQUENCES FROM SEQUENCE TABLE AND CREATE COLLECTIONS
@@ -178,9 +170,9 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   }
 
   // Add SeqTable as Miscfile
-  VGMMiscFile *seqTable = new VGMMiscFile(CPS2Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
-  if (!seqTable->loadVGMFile()) {
-    delete seqTable;
+  auto* seqTable =
+      pRoot->emplaceVGMFile<VGMMiscFile>(CPS2Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
+  if (!seqTable) {
     return;
   }
 
@@ -202,23 +194,20 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
     seqTable->addChild(seq_table_offset + k, 4, "Sequence Pointer");
 
     std::string collName = fmt::format("{} song {}", gameentry->name, k / 4);
-    VGMColl *coll = new VGMColl(collName);
     std::string seqName = fmt::format("{} seq {}", gameentry->name, k / 4);
-    CPS2Seq *newSeq = new CPS2Seq(programFile, seqPointer, fmt_ver, seqName);
-    if (newSeq->loadVGMFile()) {
-      coll->useSeq(newSeq);
-      coll->addInstrSet(instrset);
-      coll->addSampColl(sampcoll);
-      coll->addMiscFile(sampInfoTable);
-      if (articTable)
-        coll->addMiscFile(articTable);
-      if (!coll->load()) {
-        delete coll;
-      }
-    } else {
-      delete newSeq;
-      delete coll;
+    auto* newSeq = pRoot->emplaceVGMFile<CPS2Seq>(programFile, seqPointer, fmt_ver, seqName);
+    if (!newSeq) {
+      continue;
     }
+
+    auto coll = std::make_unique<VGMColl>(collName);
+    coll->useSeq(newSeq);
+    coll->addInstrSet(instrset);
+    coll->addSampColl(sampcoll);
+    coll->addMiscFile(sampInfoTable);
+    if (articTable)
+      coll->addMiscFile(articTable);
+    pRoot->loadVGMColl(std::move(coll));
   }
 
   return;

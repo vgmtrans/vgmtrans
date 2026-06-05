@@ -39,26 +39,32 @@ class SynthFile {
   void adoptWave(std::unique_ptr<SynthWave> wave);
   std::vector<std::unique_ptr<SynthWave>> releaseWaves();
 
-  std::vector<SynthInstr *> vInstrs;
-  std::vector<SynthWave *> vWaves;
+  [[nodiscard]] const std::vector<SynthInstr*>& instrs() const { return m_instrObservers; }
+  [[nodiscard]] const std::vector<SynthWave*>& waves() const { return m_waveObservers; }
+  [[nodiscard]] bool hasInstrs() const { return !m_instrObservers.empty(); }
+  [[nodiscard]] bool hasWaves() const { return !m_waveObservers.empty(); }
+  [[nodiscard]] size_t instrCount() const { return m_instrObservers.size(); }
+  [[nodiscard]] size_t waveCount() const { return m_waveObservers.size(); }
+
   std::string m_name;
 
 private:
   std::vector<std::unique_ptr<SynthInstr>> m_instrs;
   std::vector<std::unique_ptr<SynthWave>> m_waves;
+  std::vector<SynthInstr *> m_instrObservers;
+  std::vector<SynthWave *> m_waveObservers;
 };
 
 class SynthInstr {
  public:
   SynthInstr(u32 bank, u32 instrument, float reverb);
   SynthInstr(u32 bank, u32 instrument, std::string instrName, float reverb);
-  SynthInstr(u32 bank, u32 instrument, std::string instrName,
-             const std::vector<SynthRgn *>& listRgns, float reverb);
   ~SynthInstr();
 
   SynthRgn *addRgn();
   SynthRgn *addRgn(const SynthRgn& rgn);
   void adoptRgn(std::unique_ptr<SynthRgn> rgn);
+  [[nodiscard]] const std::vector<SynthRgn*>& regions() const { return m_regionObservers; }
 
   void addModulator(const SynthModulator& modulator);
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
@@ -73,10 +79,9 @@ class SynthInstr {
   std::string name;
   float reverb;
 
-  std::vector<SynthRgn *> vRgns;
-
 private:
   std::vector<std::unique_ptr<SynthRgn>> m_regions;
+  std::vector<SynthRgn *> m_regionObservers;
   std::vector<SynthModulator> m_modulators;
   std::vector<SynthGenerator> m_generators;
 };

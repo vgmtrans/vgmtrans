@@ -9,7 +9,9 @@
 #include "RawFile.h"
 #include "VGMItem.h"
 
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 class VGMColl;
@@ -25,8 +27,21 @@ public:
 
   [[nodiscard]] std::string description() override;
 
-  virtual bool loadVGMFile(bool useMatcher) = 0;
   virtual bool load() = 0;
+  std::vector<std::unique_ptr<VGMFile>> releaseDiscoveredFiles();
+
+  template <class FileType, class... Args>
+  FileType* addDiscoveredFile(Args&&... args) {
+    auto file = std::make_unique<FileType>(std::forward<Args>(args)...);
+    auto* rawFile = file.get();
+    if (!file->load()) {
+      return nullptr;
+    }
+    m_discoveredFiles.emplace_back(std::move(file));
+    return rawFile;
+  }
+
+  bool addDiscoveredFile(std::unique_ptr<VGMFile> file);
   Format* format() const;
   [[nodiscard]] std::string formatName();
 
@@ -35,6 +50,8 @@ public:
 
   void addCollAssoc(VGMColl *coll);
   void removeCollAssoc(VGMColl *coll);
+  [[nodiscard]] const std::vector<VGMColl*>& assocColls() const { return m_assocColls; }
+  [[nodiscard]] bool hasAssocColls() const { return !m_assocColls.empty(); }
   [[nodiscard]] RawFile *rawFile() const;
 
   [[nodiscard]] size_t size() const noexcept { return length(); }
@@ -58,12 +75,12 @@ public:
 
   [[nodiscard]] const char *data() const { return m_rawfile->data() + offset(); }
 
-  std::vector<VGMColl*> assocColls;
-
 private:
   RawFile* m_rawfile;
   std::string m_format;
   u32 m_id;
+  std::vector<VGMColl*> m_assocColls;
+  std::vector<std::unique_ptr<VGMFile>> m_discoveredFiles;
 };
 
 // *********

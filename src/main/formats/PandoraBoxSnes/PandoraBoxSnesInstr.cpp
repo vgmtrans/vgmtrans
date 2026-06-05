@@ -86,20 +86,17 @@ bool PandoraBoxSnesInstrSet::parseInstrPointers() {
       adsr = instrADSRHints[srcn];
     }
 
-    PandoraBoxSnesInstr *newInstr = new PandoraBoxSnesInstr(
+    emplaceInstr<PandoraBoxSnesInstr>(
       this, version, addrLocalInstrItem, instrNum, srcn, spcDirAddr, adsr,
       fmt::format("Instrument {}", srcn));
-    aInstrs.push_back(newInstr);
   }
 
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(PandoraBoxSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(PandoraBoxSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -135,9 +132,8 @@ bool PandoraBoxSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  PandoraBoxSnesRgn *rgn = new PandoraBoxSnesRgn(this, version, offset(), srcn, spcDirAddr, adsr);
+  PandoraBoxSnesRgn *rgn = emplaceRgn<PandoraBoxSnesRgn>(this, version, offset(), srcn, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   setGuessedLength();
   return true;

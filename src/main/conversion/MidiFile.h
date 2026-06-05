@@ -78,6 +78,9 @@ class MidiTrack {
   MidiEvent* adoptEvent(std::unique_ptr<MidiEvent> event);
   void prependEvents(std::vector<std::unique_ptr<MidiEvent>> events);
   std::vector<std::unique_ptr<MidiEvent>> releaseEvents();
+  [[nodiscard]] const std::vector<MidiEvent*>& events() const { return m_events; }
+  [[nodiscard]] bool hasEvents() const { return !m_events.empty(); }
+  [[nodiscard]] const std::vector<NoteEvent*>& previousDurNoteOffs() const { return m_prevDurNoteOffs; }
 
   template <class EventType, class... Args>
   EventType* addEvent(Args&&... args) {
@@ -214,10 +217,8 @@ class MidiTrack {
   // state
   u32 DeltaTime;            //a time value to be used for AddEvent
   DurNoteEvent *prevDurEvent;
-  std::vector<NoteEvent *> prevDurNoteOffs;
   bool bSustain;
 
-  std::vector<MidiEvent *> aEvents;
   // activeNotes tracks which keys are on during conversion. It maps the note's original key to the
   // final realized key, which will be different when a global transpose is set. It helps us resolve
   // the correct note off events when a global transpose event occurs amidst live note on events,
@@ -226,6 +227,8 @@ class MidiTrack {
 
  private:
   std::vector<std::unique_ptr<MidiEvent>> m_ownedEvents;
+  std::vector<MidiEvent *> m_events;
+  std::vector<NoteEvent *> m_prevDurNoteOffs;
 };
 
 class MidiFile {
@@ -237,6 +240,9 @@ class MidiFile {
   MidiTrack* adoptTrack(std::unique_ptr<MidiTrack> track);
   std::vector<std::unique_ptr<MidiTrack>> releaseTracks();
   int getMidiTrackIndex(const MidiTrack *midiTrack);
+  [[nodiscard]] const std::vector<MidiTrack*>& tracks() const { return m_tracks; }
+  [[nodiscard]] size_t trackCount() const { return m_tracks.size(); }
+  MidiTrack* track(size_t index) const { return m_tracks.at(index); }
   void setPPQN(u16 ppqn);
   u32 ppqn() const;
   void writeMidiToBuffer(std::vector<u8> &buf);
@@ -250,7 +256,6 @@ class MidiFile {
  public:
   VGMSeq *assocSeq;
 
-  std::vector<MidiTrack *> aTracks;
   MidiTrack globalTrack;            //events in the globalTrack will be copied into every other track
   s8 globalTranspose;
   bool bMonophonicTracks;
@@ -258,6 +263,7 @@ class MidiFile {
 private:
   u16 m_ppqn;
   std::vector<std::unique_ptr<MidiTrack>> m_ownedTracks;
+  std::vector<MidiTrack *> m_tracks;
 };
 
 class MidiEvent {
@@ -317,7 +323,7 @@ class NoteEvent
 //{
 //public:
 //	DurNoteEvent(MidiTrack* prntTrk, u8 channel, u32 absoluteTime, u8 theKey, u8 theVel, u32 theDur);
-//	//virtual void PrepareWrite(std::vector<MidiEvent*> & aEvents);
+//	//virtual void PrepareWrite(std::vector<MidiEvent*> & events);
 //	virtual u32 WriteEvent(std::vector<u8> & buf, u32 time);
 //
 //	bool bNoteDown;

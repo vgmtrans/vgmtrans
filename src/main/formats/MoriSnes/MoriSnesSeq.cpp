@@ -98,8 +98,7 @@ bool MoriSnesSeq::parseHeader() {
 bool MoriSnesSeq::parseTrackPointers() {
   for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if (TrackStartAddress[trackIndex] != 0) {
-      MoriSnesTrack *track = new MoriSnesTrack(this, TrackStartAddress[trackIndex]);
-      aTracks.push_back(track);
+      addTrack<MoriSnesTrack>(this, TrackStartAddress[trackIndex]);
     }
   }
   return true;

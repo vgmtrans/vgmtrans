@@ -48,27 +48,24 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, u32 offset, u32 length,
   setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
 }
 
-VGMSeq::~VGMSeq() {
-  deleteVect<ISeqSlider>(aSliders);
+VGMSeq::~VGMSeq() = default;
+
+SeqTrack* VGMSeq::addTrack(std::unique_ptr<SeqTrack> track) {
+  auto* rawTrack = track.get();
+  m_tracks.push_back(rawTrack);
+  m_ownedTracks.emplace_back(std::move(track));
+  return rawTrack;
 }
 
-bool VGMSeq::loadVGMFile(bool useMatcher) {
-  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
+void VGMSeq::clearTracks() {
+  m_tracks.clear();
+  m_ownedTracks.clear();
+}
 
-  if (!load()) {
-    return false;
-  }
-
-  rawFile()->addContainedVGMFile(this);
-  pRoot->addVGMFile(this);
-
-  if (useMatcher) {
-    if (auto fmt = format(); fmt) {
-      fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
-    }
-  }
-
-  return true;
+ISeqSlider* VGMSeq::addSlider(std::unique_ptr<ISeqSlider> slider) {
+  auto* rawSlider = slider.get();
+  m_sliders.emplace_back(std::move(slider));
+  return rawSlider;
 }
 
 std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll) {
@@ -78,7 +75,7 @@ std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll) {
 
 std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll, const ConversionContext& context) {
   setConversionContext(context);
-  size_t numTracks = aTracks.size();
+  size_t numTracks = m_tracks.size();
 
   if (!loadTracks(READMODE_FIND_DELTA_LENGTH)) {
       return nullptr;
@@ -89,7 +86,7 @@ std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll, const Conve
   // Find the greatest length of all tracks to use as stop point for every track
   long stopTime = 0;
   for (size_t i = 0; i < numTracks; i++)
-    stopTime = std::max(stopTime, aTracks[i]->totalTicks);
+    stopTime = std::max(stopTime, m_tracks[i]->totalTicks);
 
   auto newMidi = std::make_unique<MidiFile>(this);
   this->midi = newMidi.get();
@@ -103,17 +100,18 @@ std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll, const Conve
 }
 
 MidiTrack *VGMSeq::firstMidiTrack() {
-  return aTracks.empty() ? nullptr : aTracks[0]->pMidiTrack;
+  return m_tracks.empty() ? nullptr : m_tracks[0]->pMidiTrack;
 }
 
 bool VGMSeq::load() {
+  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
   readMode = READMODE_ADD_TO_UI;
 
   if (!parseHeader())
     return false;
   if (!parseTrackPointers())
     return false;
-  nNumTracks = static_cast<u32>(aTracks.size());
+  nNumTracks = static_cast<u32>(m_tracks.size());
   if (nNumTracks == 0)
     return false;
 
@@ -124,10 +122,13 @@ bool VGMSeq::postLoad() {
   if (readMode == READMODE_ADD_TO_UI) {
     std::ranges::sort(aInstrumentsUsed);
 
-    for (auto & track : aTracks) {
+    for (auto & track : m_tracks) {
       track->sortChildrenByOffset();
     }
-    addChildren(aTracks);
+    for (auto& track : m_ownedTracks) {
+      addChild(std::move(track));
+    }
+    m_ownedTracks.clear();
 
     setGuessedLength();
     if (length() == 0) {
@@ -145,7 +146,7 @@ bool VGMSeq::loadTracks(ReadMode seqReadMode, u32 stopTime) {
   // set read mode
   this->readMode = seqReadMode;
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    aTracks[trackNum]->readMode = seqReadMode;
+    m_tracks[trackNum]->readMode = seqReadMode;
   }
 
   if (seqReadMode == READMODE_CONVERT_TO_MIDI) {
@@ -155,7 +156,7 @@ bool VGMSeq::loadTracks(ReadMode seqReadMode, u32 stopTime) {
   // reset variables
   resetVars();
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    if (!aTracks[trackNum]->loadTrackInit(trackNum, nullptr))
+    if (!m_tracks[trackNum]->loadTrackInit(trackNum, nullptr))
       return false;
   }
 
@@ -176,15 +177,15 @@ void VGMSeq::loadTracksMain(u32 stopTime) {
         if (!m_allow_discontinuous_track_data) {
           // set length from the next track by offset
           for (u32 j = 0; j < nNumTracks; j++) {
-            if (aTracks[j]->offset() > aTracks[trackNum]->offset() &&
-                aTracks[j]->offset() < aStopOffset[trackNum]) {
-              aStopOffset[trackNum] = aTracks[j]->offset();
+            if (m_tracks[j]->offset() > m_tracks[trackNum]->offset() &&
+                m_tracks[j]->offset() < aStopOffset[trackNum]) {
+              aStopOffset[trackNum] = m_tracks[j]->offset();
             }
           }
         }
       }
     } else {
-      aStopOffset[trackNum] = aTracks[trackNum]->offset() + aTracks[trackNum]->length();
+      aStopOffset[trackNum] = m_tracks[trackNum]->offset() + m_tracks[trackNum]->length();
     }
   }
 
@@ -203,24 +204,24 @@ void VGMSeq::loadTracksMain(u32 stopTime) {
 
       // process tracks
       for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-        if (!aTracks[trackNum]->active)
+        if (!m_tracks[trackNum]->active)
           continue;
 
         // tick
-        aTracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
+        m_tracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
       }
 
       // process sliders
-      auto itrSlider = aSliders.begin();
-      while (itrSlider != aSliders.end()) {
+      auto itrSlider = m_sliders.begin();
+      while (itrSlider != m_sliders.end()) {
         auto itrNextSlider = itrSlider + 1;
 
-        ISeqSlider *slider = *itrSlider;
+        ISeqSlider *slider = itrSlider->get();
         if (slider->isStarted(time)) {
           if (slider->isActive(time)) {
             slider->write(time);
           } else {
-            itrNextSlider = aSliders.erase(itrSlider);
+            itrNextSlider = m_sliders.erase(itrSlider);
           }
         }
 
@@ -237,8 +238,8 @@ void VGMSeq::loadTracksMain(u32 stopTime) {
       bIncTickAfterProcessingTracks = true;
       if (readMode == READMODE_CONVERT_TO_MIDI) {
         for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-          if (aTracks.at(trackNum)->pMidiTrack != nullptr) {
-            aTracks[trackNum]->pMidiTrack->setDelta(time);
+          if (m_tracks.at(trackNum)->pMidiTrack != nullptr) {
+            m_tracks[trackNum]->pMidiTrack->setDelta(time);
           }
         }
       }
@@ -255,18 +256,18 @@ void VGMSeq::loadTracksMain(u32 stopTime) {
     u32 initialTime = time;  // preserve current time for multi section sequence
 
     // load track by track
-    for (u32 trackNum = 0; trackNum < nNumTracks && trackNum < aTracks.size(); trackNum++) {
+    for (u32 trackNum = 0; trackNum < nNumTracks && trackNum < m_tracks.size(); trackNum++) {
       time = initialTime;
 
-      aTracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
-      aTracks[trackNum]->active = false;
+      m_tracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
+      m_tracks[trackNum]->active = false;
     }
   }
 }
 
 bool VGMSeq::hasActiveTracks() {
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    if (aTracks[trackNum]->active)
+    if (m_tracks[trackNum]->active)
       return true;
   }
   return false;
@@ -274,7 +275,7 @@ bool VGMSeq::hasActiveTracks() {
 
 void VGMSeq::deactivateAllTracks() {
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    aTracks[trackNum]->active = false;
+    m_tracks[trackNum]->active = false;
   }
 }
 
@@ -284,11 +285,11 @@ int VGMSeq::foreverLoopCount() {
 
   int foreverLoops = INT_MAX;
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    if (!aTracks[trackNum]->active)
+    if (!m_tracks[trackNum]->active)
       continue;
 
-    if (foreverLoops > aTracks[trackNum]->infiniteLoops)
-      foreverLoops = aTracks[trackNum]->infiniteLoops;
+    if (foreverLoops > m_tracks[trackNum]->infiniteLoops)
+      foreverLoops = m_tracks[trackNum]->infiniteLoops;
   }
   return (foreverLoops != INT_MAX) ? foreverLoops : 0;
 }
@@ -307,7 +308,7 @@ void VGMSeq::resetVars() {
   time = 0;
   tempoBPM = initialTempoBPM;
 
-  deleteVect<ISeqSlider>(aSliders);
+  m_sliders.clear();
 
   if (readMode == READMODE_ADD_TO_UI) {
     aInstrumentsUsed.clear();

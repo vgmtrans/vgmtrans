@@ -62,19 +62,16 @@ bool CompileSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    CompileSnesInstr *newInstr = new CompileSnesInstr(
+    emplaceInstr<CompileSnesInstr>(
       this, version, ofsInstrEntry, addrPitchTablePtrs, srcn, spcDirAddr,
       fmt::format("Instrument: {:#x}", srcn));
-    aInstrs.push_back(newInstr);
   }
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(CompileSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(CompileSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -106,9 +103,8 @@ bool CompileSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  CompileSnesRgn *rgn = new CompileSnesRgn(this, version, offset(), addrPitchTablePtrs);
+  CompileSnesRgn *rgn = emplaceRgn<CompileSnesRgn>(this, version, offset(), addrPitchTablePtrs);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   return true;
 }

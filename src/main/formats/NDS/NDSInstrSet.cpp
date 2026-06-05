@@ -64,7 +64,7 @@ bool NDSInstrSet::parseInstrPointers() {
 
     u8 instrType = temp & 0xFF;
     u32 pInstr = temp >> 8;
-    aInstrs.push_back(new NDSInstr(this, pInstr + offset(), 0, 0, i, instrType));
+    emplaceInstr<NDSInstr>(this, pInstr + offset(), 0, 0, i, instrType);
 
     VGMHeader* hdr = instrptrHdr->addHeader(instrPtrOff, 4, "Pointer");
     hdr->addChild(instrPtrOff, 1, "Type");
@@ -180,7 +180,7 @@ bool NDSInstr::loadInstr() {
 }
 
 void NDSInstr::getSampCollPtr(VGMRgn* rgn, int waNum) const {
-  rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->sampCollWAList[waNum];
+  rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->waveArchSampColl(waNum);
 }
 
 void NDSInstr::getArticData(VGMRgn* rgn, u32 offset) const {
@@ -331,9 +331,9 @@ bool NDSWaveArch::parseSampleInfo() {
       dataLength = loopOff + nonLoopLength;
     }
 
-    auto name = fmt::format("Sample {}", samples.size());
-    NDSSamp* samp = new NDSSamp(this, pSample, dataStart + dataLength - pSample, dataStart,
-                                dataLength, nChannels, bps, rate, waveType, name);
+    auto name = fmt::format("Sample {}", sampleCount());
+    auto* samp = emplaceSamp<NDSSamp>(this, pSample, dataStart + dataLength - pSample, dataStart,
+                                      dataLength, nChannels, bps, rate, waveType, name);
 
     if (waveType == NDSSamp::IMA_ADPCM) {
       samp->setLoopStartMeasure(LM_SAMPLES);
@@ -347,7 +347,6 @@ bool NDSWaveArch::parseSampleInfo() {
     samp->setLoopStatus(bLoops);
     samp->setLoopOffset(loopOff);
     samp->setLoopLength(nonLoopLength);
-    samples.push_back(samp);
   }
   return true;
 }
@@ -358,7 +357,7 @@ NDSPSG::NDSPSG(RawFile* file) : VGMSampColl(NDSFormat::name, file, 0, 0, "NDS PS
 bool NDSPSG::parseSampleInfo() {
   /* 8 waves + noise */
   for (u8 i = 0; i <= 8; i++) {
-    samples.push_back(new NDSPSGSamp(this, i));
+    emplaceSamp<NDSPSGSamp>(this, i);
   }
 
   return true;

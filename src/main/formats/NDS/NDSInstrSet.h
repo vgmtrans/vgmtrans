@@ -27,9 +27,11 @@ public:
               std::string name = "NDS Instrument Bank");
   bool parseInstrPointers() override;
 
-  std::vector<VGMSampColl *> sampCollWAList;
+  void addWaveArchSampColl(VGMSampColl* sampColl) { m_sampCollWAList.push_back(sampColl); }
+  [[nodiscard]] VGMSampColl* waveArchSampColl(size_t index) const { return m_sampCollWAList.at(index); }
 
 private:
+  std::vector<VGMSampColl *> m_sampCollWAList;
   VGMSampColl* m_psg_samples{};
   friend NDSInstr;
 };

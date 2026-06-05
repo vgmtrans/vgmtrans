@@ -57,8 +57,7 @@ bool SoftCreatSnesSeq::parseHeader(void) {
 
     u16 addrTrackStart = readByte(addrTrackLowPtr) | (readByte(addrTrackHighPtr) << 8);
     if (addrTrackStart != 0xffff) {
-      SoftCreatSnesTrack *track = new SoftCreatSnesTrack(this, addrTrackStart);
-      aTracks.push_back(track);
+      addTrack<SoftCreatSnesTrack>(this, addrTrackStart);
     }
   }
 

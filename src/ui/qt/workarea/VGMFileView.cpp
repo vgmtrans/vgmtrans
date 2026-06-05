@@ -181,8 +181,8 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   if (!event || !event->parentTrack || !event->parentTrack->parentSeq) {
     return;
   }
-  if (!m_vgmfile->assocColls.empty()) {
-    auto assocColl = m_vgmfile->assocColls.front();
+  if (m_vgmfile->hasAssocColls()) {
+    auto assocColl = m_vgmfile->assocColls().front();
     if (SequencePlayer::the().activeCollection() != assocColl) {
       auto& seqPlayer = SequencePlayer::the();
       seqPlayer.setActiveCollection(assocColl);
@@ -209,15 +209,15 @@ void VGMFileView::ensureTrackIndexMap(VGMSeq* seq) {
     return;
   }
 
-  if (m_trackIndexSeq == seq && m_trackIndexByPtr.size() == seq->aTracks.size()) {
+  if (m_trackIndexSeq == seq && m_trackIndexByPtr.size() == seq->trackCount()) {
     return;
   }
 
   m_trackIndexSeq = seq;
   m_trackIndexByPtr.clear();
   m_trackIndexByMidiPtr.clear();
-  for (size_t i = 0; i < seq->aTracks.size(); ++i) {
-    auto* track = seq->aTracks[i];
+  for (size_t i = 0; i < seq->trackCount(); ++i) {
+    auto* track = seq->track(i);
     if (!track) {
       continue;
     }

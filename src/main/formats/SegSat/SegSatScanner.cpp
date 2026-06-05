@@ -14,6 +14,7 @@
 #include "VGMMiscFile.h"
 
 #include <array>
+#include <memory>
 
 namespace vgmtrans::scanners {
 ScannerRegistration<SegSatScanner> s_segsat("SegSat");
@@ -118,7 +119,7 @@ void SegSatScanner::handleSsfFile(RawFile* file) {
     return;
 
   for (const auto seq : seqs) {
-    VGMColl* coll = new VGMColl(seq->name());
+    auto coll = std::make_unique<VGMColl>(seq->name());
     coll->useSeq(seq);
     if (instrSets.size() == 1) {
       instrSets[0]->assignBankNumber(0);
@@ -137,9 +138,7 @@ void SegSatScanner::handleSsfFile(RawFile* file) {
         coll->addInstrSet(bank);
       }
     }
-    if (!coll->load()) {
-      delete coll;
-    }
+    pRoot->loadVGMColl(std::move(coll));
   }
 }
 
@@ -207,22 +206,20 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatc
       }
 
       auto name = fmt::format("{} {:d}_{:d}", file->name(), seqTableCounter, n);
-      SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, name);
-      if (!seq->loadVGMFile(useMatcher))
-        delete seq;
-      else {
+      auto* seq = pRoot->emplaceVGMFileWithMatcher<SegSatSeq>(useMatcher, file, i + seqPtr, name);
+      if (seq) {
         bParsedSeq = true;
         seqs.push_back(seq);
       }
     }
     if (bParsedSeq) {
-      auto seqTable = new VGMMiscFile(SegSatFormat::name, file, i,
-        2 + (numSeqs * 4), "Sega Saturn Seq Table");
+      auto seqTable = std::make_unique<VGMMiscFile>(SegSatFormat::name, file, i,
+                                                    2 + (numSeqs * 4), "Sega Saturn Seq Table");
       seqTable->addChild(i, 2, "Sequence Count");
       for (int j = 0; j < numSeqs; j++) {
         seqTable->addChild(i + 2 + (j * 4), 4, fmt::format("Sequence {:d} Pointer", j));
       }
-      seqTable->loadVGMFile();
+      pRoot->loadVGMFile(std::move(seqTable), useMatcher);
       seqTableCounter += 1;
     }
 
@@ -342,15 +339,13 @@ std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrSets(RawFile* file, Se
       if (ver == SegSatDriverVer::Unknown)
         ver = determineVersion(file);
       u32 numInstrs = ((ptrMixes - 8) / 2);
-      auto instrSet = new SegSatInstrSet(file, base, numInstrs, ver);
-      if (useMatcher ? !instrSet->loadVGMFile() : !instrSet->load())
-        delete instrSet;
-      else
+      auto* instrSet = pRoot->emplaceVGMFileWithMatcher<SegSatInstrSet>(useMatcher, file, base, numInstrs, ver);
+      if (instrSet)
         instrSets.push_back(instrSet);
 
       // We can safely skip ahead: the instrument table runs until base + ptrMixes
       // Jumping avoids re-scanning in the middle of a confirmed bank.
-      base = std::min(base + instrSet->length(), fileLength - 8);
+      base = std::min(base + (instrSet ? instrSet->length() : 1), fileLength - 8);
     } else {
       ++base;
     }

@@ -24,11 +24,7 @@ VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, u32 offset
       bLoaded(false) {
 }
 
-VGMSampColl::~VGMSampColl() {
-  if (!m_samples_owned_by_children) {
-    deleteVect(samples);
-  }
-}
+VGMSampColl::~VGMSampColl() = default;
 
 VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset,
                          u32 offset, u32 length, std::string name)
@@ -39,40 +35,28 @@ VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSe
       bLoaded(false) {
 }
 
-bool VGMSampColl::loadVGMFile(bool useMatcher) {
-  bool val = load();
-  if (!val) {
-    return false;
-  }
-
-  if (useMatcher) {
-    if (auto fmt = format(); fmt) {
-      fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
-    }
-  }
-
-  return val;
-}
-
-
 bool VGMSampColl::load() {
   if (bLoaded)
     return true;
   if (!parseHeader())
     return false;
-  if (!parseSampleInfo())
+  if (!parseSampleInfo()) {
+    clearSamples();
     return false;
+  }
 
-  if (samples.size() == 0)
+  if (m_samples.empty()) {
+    clearSamples();
     return false;
+  }
 
-  addChildren(samples);
-  m_samples_owned_by_children = true;
+  for (auto& sample : m_ownedSamples) {
+    addChild(std::move(sample));
+  }
+  m_ownedSamples.clear();
 
   if (length() == 0) {
-    for (std::vector<VGMSamp *>::iterator itr = samples.begin(); itr != samples.end(); ++itr) {
-      VGMSamp *samp = *itr;
-
+    for (auto* samp : m_samples) {
       // Some formats can have negative sample offset
       // For example, Konami's SNES format and Hudson's SNES format
       // TODO: Fix negative sample offset without breaking instrument
@@ -90,11 +74,6 @@ bool VGMSampColl::load() {
     }
   }
 
-  if (!parInstrSet) {
-    rawFile()->addContainedVGMFile(this);
-    pRoot->addVGMFile(this);
-  }
-
   bLoaded = true;
   return true;
 }
@@ -110,7 +89,17 @@ bool VGMSampColl::parseSampleInfo() {
 VGMSamp *VGMSampColl::addSamp(u32 offset, u32 length, u32 dataOffset,
                               u32 dataLength, u8 nChannels, BPS bps,
                               u32 rate, std::string name) {
-  VGMSamp *newSamp = new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels, bps, rate, std::move(name));
-  samples.push_back(newSamp);
-  return newSamp;
+  return emplaceSamp<VGMSamp>(this, offset, length, dataOffset, dataLength, nChannels, bps, rate, std::move(name));
+}
+
+VGMSamp *VGMSampColl::addSamp(std::unique_ptr<VGMSamp> samp) {
+  auto* rawSamp = samp.get();
+  m_samples.emplace_back(rawSamp);
+  m_ownedSamples.emplace_back(std::move(samp));
+  return rawSamp;
+}
+
+void VGMSampColl::clearSamples() {
+  m_samples.clear();
+  m_ownedSamples.clear();
 }

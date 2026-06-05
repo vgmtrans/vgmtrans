@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 class VGMSampColl;
@@ -27,7 +28,6 @@ public:
               std::string name = "VGMInstrSet", VGMSampColl *sampColl = nullptr);
   ~VGMInstrSet() override;
 
-  bool loadVGMFile(bool useMatcher = true) override;
   bool load() override;
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
@@ -39,23 +39,48 @@ public:
   void prepareForExport(const VGMColl* coll);
   void cleanupAfterExport();
 
+  [[nodiscard]] const std::vector<VGMInstr*>& instrs() const { return m_instrs; }
+  [[nodiscard]] bool hasInstrs() const { return !m_instrs.empty(); }
+  [[nodiscard]] size_t instrCount() const { return m_instrs.size(); }
+  VGMInstr* instr(size_t index) const { return m_instrs.at(index); }
   const std::vector<VGMInstr*>& exportInstrs() const;
 
   VGMInstr *addInstr(u32 offset, u32 length, u32 bank, u32 instrNum,
                      const std::string &instrName = "");
-  void adoptSampColl(VGMSampColl* newSampColl);
+  void adoptSampColl(std::unique_ptr<VGMSampColl> newSampColl);
+  template <class SampCollType, class... Args>
+  SampCollType* emplaceSampColl(Args&&... args) {
+    auto newSampColl = std::make_unique<SampCollType>(std::forward<Args>(args)...);
+    auto* rawSampColl = newSampColl.get();
+    adoptSampColl(std::move(newSampColl));
+    return rawSampColl;
+  }
   void clearSampColl();
 
-  std::vector<VGMInstr *> aInstrs;
+  // Observer; use adoptSampColl/emplaceSampColl when the instrument set owns the sample collection.
   VGMSampColl *sampColl;
 
 protected:
-   void addTempInstr(VGMInstr* instr);
+   void reserveInstrs(size_t count) { m_ownedInstrs.reserve(count); m_instrs.reserve(count); }
+   VGMInstr* adoptInstr(std::unique_ptr<VGMInstr> instr);
+   VGMInstr* adoptInstrAsChild(std::unique_ptr<VGMInstr> instr);
+   VGMInstr* adoptInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInstr> instr);
+   template <class InstrType, class... Args>
+   InstrType* emplaceInstr(Args&&... args) {
+     auto instr = std::make_unique<InstrType>(std::forward<Args>(args)...);
+     auto* rawInstr = instr.get();
+     adoptInstr(std::move(instr));
+     return rawInstr;
+   }
+   std::vector<std::unique_ptr<VGMInstr>> releaseInstrs();
+   void clearInstrs();
+   void addTempInstr(std::unique_ptr<VGMInstr> instr);
    void disableAutoAddInstrumentsAsChildren() { m_auto_add_instruments_as_children = false; }
 
 private:
    bool m_auto_add_instruments_as_children{true};
-   bool m_instruments_owned_by_children{false};
+   std::vector<std::unique_ptr<VGMInstr>> m_ownedInstrs;
+   std::vector<VGMInstr*> m_instrs;
    std::vector<VGMInstr*> m_exportInstrs;
    std::vector<std::unique_ptr<VGMInstr>> m_tempInstrs;
    std::unique_ptr<VGMSampColl> m_ownedSampColl;
@@ -79,7 +104,14 @@ public:
   inline void setBank(u32 bankNum);
   inline void setInstrNum(u32 theInstrNum);
 
-  VGMRgn *addRgn(VGMRgn *rgn);
+  VGMRgn *addRgn(std::unique_ptr<VGMRgn> rgn);
+  template <class RgnType, class... Args>
+  RgnType* emplaceRgn(Args&&... args) {
+    auto rgn = std::make_unique<RgnType>(std::forward<Args>(args)...);
+    auto* rawRgn = rgn.get();
+    addRgn(std::move(rgn));
+    return rawRgn;
+  }
   VGMRgn *addRgn(u32 offset, u32 length, int sampNum, u8 keyLow = 0,
                  u8 keyHigh = 0x7F, u8 velLow = 0, u8 velHigh = 0x7F);
 

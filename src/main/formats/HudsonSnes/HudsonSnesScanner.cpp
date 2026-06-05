@@ -245,9 +245,8 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
   // load song
   u16 addrSeqHeaderPtr = addrSongList + guessedSongIndex * 2;
   u16 addrSeqHeader = file->readShort(addrSeqHeaderPtr);
-  HudsonSnesSeq *newSeq = new HudsonSnesSeq(file, version, addrSeqHeader, name);
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
+  auto* newSeq = pRoot->emplaceVGMFile<HudsonSnesSeq>(file, version, addrSeqHeader, name);
+  if (!newSeq) {
     return;
   }
 
@@ -273,15 +272,14 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
       addrSampTuningTable = file->readShort(addrEngineHeader + 4);
     }
 
-    HudsonSnesInstrSet *newInstrSet = new HudsonSnesInstrSet(file,
-                                                             version,
-                                                             newSeq->InstrumentTableAddress,
-                                                             newSeq->InstrumentTableSize,
-                                                             spcDirAddr,
-                                                             addrSampTuningTable,
-                                                             name);
-    if (!newInstrSet->loadVGMFile()) {
-      delete newInstrSet;
+    auto* newInstrSet = pRoot->emplaceVGMFile<HudsonSnesInstrSet>(file,
+                                                           version,
+                                                           newSeq->InstrumentTableAddress,
+                                                           newSeq->InstrumentTableSize,
+                                                           spcDirAddr,
+                                                           addrSampTuningTable,
+                                                           name);
+    if (!newInstrSet) {
       return;
     }
   }

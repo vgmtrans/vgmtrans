@@ -84,8 +84,7 @@ bool NeverlandSnesSeq::parseHeader(void) {
       auto playlistName = fmt::format("Track {:d} Playlist Pointer", trackIndex + 1);
       header->addChild(sectionListOffsetPtr, 2, playlistName);
 
-      NeverlandSnesTrack *track = new NeverlandSnesTrack(this, sectionListAddress);
-      aTracks.push_back(track);
+      addTrack<NeverlandSnesTrack>(this, sectionListAddress);
     }
     else {
       header->addChild(sectionListOffsetPtr, 2, "NULL");

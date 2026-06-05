@@ -34,17 +34,15 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       u16 id = file->readShort(offset + 4);
       auto name = fmt::format("Akao Seq {:02X}", id);
 
-      AkaoSeq *seq = new AkaoSeq(file, offset, version, name);
-      if (!seq->loadVGMFile()) {
-        delete seq;
+      auto* seq = pRoot->emplaceVGMFile<AkaoSeq>(file, offset, version, name);
+      if (!seq) {
         continue;
       }
 
-      AkaoInstrSet* instrset = seq->newInstrSet();
-      if (instrset == nullptr)
+      auto instrset = seq->newInstrSet();
+      if (!instrset)
         continue;
-      if (!instrset->loadVGMFile())
-        delete instrset;
+      pRoot->loadVGMFile(std::move(instrset));
     }
     else {
       // Samples
@@ -58,9 +56,7 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       u16 id = file->readShort(offset + 4);
       auto name = fmt::format("Akao Sample Collection {:02X}", id);
 
-      AkaoSampColl *sampColl = new AkaoSampColl(file, offset, version, name);
-      if (!sampColl->loadVGMFile())
-        delete sampColl;
+      pRoot->emplaceVGMFile<AkaoSampColl>(file, offset, version, name);
     }
   }
 
@@ -83,9 +79,7 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
 
     if (!instrLocations.empty()) {
       for (const auto & loc : instrLocations) {
-        auto *sampColl = new AkaoSampColl(file, loc);
-        if (!sampColl->loadVGMFile())
-          delete sampColl;
+        pRoot->emplaceVGMFile<AkaoSampColl>(file, loc);
       }
     }
   }

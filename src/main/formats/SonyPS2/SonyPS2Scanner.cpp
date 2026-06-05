@@ -39,9 +39,7 @@ void SonyPS2Scanner::searchForSeq(RawFile *file) {
     if (sig1 != 0x53434549 || sig2 != 0x4D696469)  // "SCEIMidi" in ASCII
       continue;
 
-    SonyPS2Seq *newSeq = new SonyPS2Seq(file, i, "Sony PS2 Seq");
-    if (!newSeq->loadVGMFile())
-      delete newSeq;
+    pRoot->emplaceVGMFile<SonyPS2Seq>(file, i, "Sony PS2 Seq");
   }
 }
 
@@ -63,9 +61,7 @@ void SonyPS2Scanner::searchForInstrSet(RawFile *file) {
     if (sig1 != 0x53434549 || sig2 != 0x56616769)  // "SCEIVagi" in ASCII
       continue;
 
-    SonyPS2InstrSet *newInstrSet = new SonyPS2InstrSet(file, i);
-    if (!newInstrSet->loadVGMFile())
-      delete newInstrSet;
+    pRoot->emplaceVGMFile<SonyPS2InstrSet>(file, i);
   }
 }
 
@@ -88,11 +84,6 @@ void SonyPS2Scanner::searchForSampColl(RawFile *file) {
       return;
     }
 
-    SonyPS2SampColl *sampColl = new SonyPS2SampColl(file, 0);
-    Format *fmt = sampColl->format();
-    if (fmt) {
-      fmt->onNewFile(sampColl);
-      file->addContainedVGMFile(sampColl);
-    }
+    pRoot->emplacePendingVGMFile<SonyPS2SampColl>(file, 0);
   }
 }

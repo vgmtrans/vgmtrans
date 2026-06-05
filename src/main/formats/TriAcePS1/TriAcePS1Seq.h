@@ -6,6 +6,7 @@
 #include "VGMSeq.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -28,13 +29,22 @@ class TriAcePS1Seq:
   void resetVars() override;
 
   bool postLoad() override;
+  [[nodiscard]] const std::vector<TriAcePS1ScorePattern*>& scorePatterns() const {
+    return m_scorePatterns;
+  }
 
   VGMHeader *header;
   TrkInfo TrkInfos[32];
-  std::vector<TriAcePS1ScorePattern *> aScorePatterns;
-  TriAcePS1ScorePattern *curScorePattern;
-  std::map<u32, TriAcePS1ScorePattern *> patternMap;
   u8 initialTempoBPM;
+
+ private:
+  friend class TriAcePS1Track;
+  TriAcePS1ScorePattern* addScorePattern(std::unique_ptr<TriAcePS1ScorePattern> pattern);
+
+  TriAcePS1ScorePattern *curScorePattern = nullptr;
+  std::map<u32, TriAcePS1ScorePattern *> patternMap;
+  std::vector<std::unique_ptr<TriAcePS1ScorePattern>> m_ownedScorePatterns;
+  std::vector<TriAcePS1ScorePattern *> m_scorePatterns;
 };
 
 class TriAcePS1ScorePattern
@@ -50,11 +60,11 @@ class TriAcePS1Track
  public:
   TriAcePS1Track(TriAcePS1Seq *parentSeq, u32 offset = 0, u32 length = 0);
 
-  virtual void loadTrackMainLoop(u32 stopOffset, s32 stopTime);
+  void loadTrackMainLoop(u32 stopOffset, s32 stopTime) override;
   u32 readScorePattern(u32 offset);
-  virtual bool isOffsetUsed(u32 offset);
-  virtual SeqEvent* addEvent(SeqEvent *pSeqEvent);
-  virtual bool readEvent();
+  bool isOffsetUsed(u32 offset) override;
+  SeqEvent* addEvent(std::unique_ptr<SeqEvent> seqEvent) override;
+  bool readEvent() override;
 
   u8 impliedNoteDur;
   u8 impliedVelocity;

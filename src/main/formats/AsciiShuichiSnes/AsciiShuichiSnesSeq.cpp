@@ -11,6 +11,7 @@
 #include "SeqEvent.h"
 
 #include <iterator>
+#include <memory>
 
 using namespace std;
 
@@ -75,8 +76,7 @@ bool AsciiShuichiSnesSeq::parseTrackPointers() {
     const u8 hi = readByte(offset() + MAX_TRACKS + trackIndex);
     const auto trackStartAddress = static_cast<u16>(lo | (hi << 8));
 
-    const auto track = new AsciiShuichiSnesTrack(this, trackStartAddress);
-    aTracks.push_back(track);
+    addTrack<AsciiShuichiSnesTrack>(this, trackStartAddress);
   }
 
   return true;
@@ -272,9 +272,11 @@ bool AsciiShuichiSnesTrack::readEvent() {
           makePrevDurNoteEnd(getTime() + actualDur);
 
           // add event without midi event
-          if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(beginOffset, true))
-            addEvent(new DurNoteSeqEvent(this, key + cKeyCorrection, 100, noteDuration, beginOffset,
-                                         curOffset - beginOffset, "Note with Duration"));
+          if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(beginOffset, true)) {
+            addEvent(std::make_unique<DurNoteSeqEvent>(
+                this, key + cKeyCorrection, 100, noteDuration, beginOffset,
+                curOffset - beginOffset, "Note with Duration"));
+          }
         } else {
           if (slurDeferred) {
             makePrevDurNoteEnd(getTime());

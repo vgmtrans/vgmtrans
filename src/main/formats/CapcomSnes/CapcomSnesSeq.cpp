@@ -85,7 +85,7 @@ bool CapcomSnesSeq::parseTrackPointers() {
   for (int i = MAX_TRACKS - 1; i >= 0; i--) {
     u16 trkOff = readShortBE(offset() + (priorityInHeader ? 1 : 0) + i * 2);
     if (trkOff != 0)
-      aTracks.push_back(new CapcomSnesTrack(this, trkOff));
+      addTrack<CapcomSnesTrack>(this, trkOff);
   }
   return true;
 }

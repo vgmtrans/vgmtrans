@@ -30,15 +30,11 @@ void ItikitiSnesScanner::scanFromApuRam(RawFile *file) {
   if (!scanSongHeader(file, song_header_offset))
     return;
 
-  auto seq = std::make_unique<ItikitiSnesSeq>(file, song_header_offset, name);
-  if (!seq->loadVGMFile())
+  if (!pRoot->emplaceVGMFile<ItikitiSnesSeq>(file, song_header_offset, name))
     return;
-  (void)seq.release();
 
-  auto insrument_set = std::make_unique<ItikitiSnesInstrSet>(file, 0x1d40, 0x1e60, 0x1b00);
-  if (!insrument_set->loadVGMFile())
+  if (!pRoot->emplaceVGMFile<ItikitiSnesInstrSet>(file, 0x1d40, 0x1e60, 0x1b00))
     return;
-  (void)insrument_set.release();
 }
 
 void ItikitiSnesScanner::scanFromRom(RawFile *file) {

@@ -74,20 +74,17 @@ bool HeartBeatSnesInstrSet::parseInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    HeartBeatSnesInstr *newInstr = new HeartBeatSnesInstr(
+    emplaceInstr<HeartBeatSnesInstr>(
       this, version, addrInstrHeader, instrNum >> 7, instrNum & 0x7f, addrSRCNTable,
       songIndex, spcDirAddr, fmt::format("Instrument {}", instrNum));
-    aInstrs.push_back(newInstr);
   }
 
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(HeartBeatSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(HeartBeatSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -131,9 +128,8 @@ bool HeartBeatSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  HeartBeatSnesRgn *rgn = new HeartBeatSnesRgn(this, version, offset());
+  HeartBeatSnesRgn *rgn = emplaceRgn<HeartBeatSnesRgn>(this, version, offset());
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   return true;
 }

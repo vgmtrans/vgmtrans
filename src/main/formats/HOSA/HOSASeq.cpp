@@ -64,8 +64,7 @@ bool HOSASeq::parseHeader(void) {
 //==============================================================
 bool HOSASeq::parseTrackPointers(void) {
   for (unsigned int i = 0; i < nNumTracks; i++)
-    aTracks.push_back(new HOSATrack(this, readShort(offset() + 0x50 + (i * 2)) + offset()));
-  //delect object is in "VGMSeq::~VGMSeq()"
+    addTrack<HOSATrack>(this, readShort(offset() + 0x50 + (i * 2)) + offset());
   return true;
 }
 

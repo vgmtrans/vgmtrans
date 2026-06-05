@@ -38,7 +38,7 @@ AkaoColl::mapSampleCollections() const {
       artIdToSampleNumMap[artId] = sampcoll->akArts[i].sample_num + cumulativeSamples;
       artIdToSampCollMap[artId] = sampcoll;
     }
-    cumulativeSamples += sampcoll->samples.size();
+    cumulativeSamples += static_cast<int>(sampcoll->sampleCount());
   }
 
   return std::make_tuple(std::move(artIdToArtMap), std::move(artIdToSampleNumMap), std::move(artIdToSampCollMap));
@@ -49,7 +49,7 @@ bool AkaoColl::loadMain() {
 
   auto [artIdToArtMap, artIdToSampleNumMap, artIdToSampCollMap] = mapSampleCollections();
 
-  for (auto *vgminstr : instrset->aInstrs) {
+  for (auto *vgminstr : instrset->instrs()) {
     auto* instr = dynamic_cast<AkaoInstr*>(vgminstr);
     if (!instr) {
       L_ERROR("AkaoInstrSet contained an instrument that wasn't an AkaoInstr.");
@@ -73,9 +73,9 @@ bool AkaoColl::loadMain() {
 
       if (art->loop_point != 0) {
         AkaoSampColl *sampColl = artIdToSampCollMap[rgn->artNum];
-        if (rgn->sampNum < sampColl->samples.size()) {
+        if (art->sample_num >= 0 && static_cast<size_t>(art->sample_num) < sampColl->sampleCount()) {
           rgn->setLoopInfo(1, art->loop_point,
-                           sampColl->samples[art->sample_num]->dataLength - art->loop_point);
+                           sampColl->sample(static_cast<size_t>(art->sample_num))->dataLength - art->loop_point);
         } else
           L_ERROR("Akao region points to out-of-range sample (#{:d}) in {}.", rgn->sampNum, sampColl->name());
       }

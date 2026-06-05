@@ -357,12 +357,11 @@ bool SNESSampColl::parseSampleInfo() {
         spcDirHeader->addChild(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
         spcDirHeader->addChild(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
 
-        SNESSamp *samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length,
-                                      addrSampLoop, fmt::format("Sample: {:#x}", srcn));
-    samples.push_back(samp);
+    emplaceSamp<SNESSamp>(this, addrSampStart, length, addrSampStart, length,
+                          addrSampLoop, fmt::format("Sample: {:#x}", srcn));
   }
   spcDirHeader->setGuessedLength();
-  return samples.size() != 0;
+  return hasSamples();
 }
 
 bool SNESSampColl::isValidSampleDir(const RawFile *file, u32 spcDirEntAddr, bool validateSample) {

@@ -135,8 +135,7 @@ bool TamSoftPS1Seq::parseHeader() {
 
         if (live != 0) {
           if (dwHeaderOffset + dwRelTrackOffset < vgmFile()->endOffset()) {
-            TamSoftPS1Track *track = new TamSoftPS1Track(this, dwHeaderOffset + dwRelTrackOffset);
-            aTracks.push_back(track);
+            addTrack<TamSoftPS1Track>(this, dwHeaderOffset + dwRelTrackOffset);
           }
           else {
             return false;
@@ -151,8 +150,7 @@ bool TamSoftPS1Seq::parseHeader() {
 
     // ignore silence sequence
     if (readShort(dwTrackOffset) != 0xfff0) {
-      TamSoftPS1Track *track = new TamSoftPS1Track(this, dwTrackOffset);
-      aTracks.push_back(track);
+      addTrack<TamSoftPS1Track>(this, dwTrackOffset);
     }
   }
 

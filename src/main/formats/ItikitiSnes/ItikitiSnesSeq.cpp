@@ -65,8 +65,7 @@ bool ItikitiSnesSeq::parseTrackPointers() {
   for (unsigned int track_index = 0; track_index < nNumTracks; track_index++) {
     const u32 offset_to_pointer = offset() + 2 + (2 * track_index);
     const u32 offset = readDecodedOffset(offset_to_pointer);
-    auto track = std::make_unique<ItikitiSnesTrack>(this, offset);
-    aTracks.push_back(track.release());
+    addTrack<ItikitiSnesTrack>(this, offset);
   }
   return true;
 }

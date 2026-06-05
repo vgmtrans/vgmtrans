@@ -96,8 +96,7 @@ bool FalcomSnesSeq::parseTrackPointers() {
     curOffset += 2;
     if (ofsTrackStart != 0) {
       u16 addrTrackStart = offset() + ofsTrackStart;
-      FalcomSnesTrack *track = new FalcomSnesTrack(this, addrTrackStart);
-      aTracks.push_back(track);
+      addTrack<FalcomSnesTrack>(this, addrTrackStart);
     }
   }
   return true;

@@ -51,19 +51,19 @@ u64 rescaleTick(u32 tick, u16 srcPPQN, u16 dstPPQN) {
 u32 getMidiDurationTicks(const MidiFile& midi) {
   u32 maxTick = 0;
 
-  for (const MidiTrack* track : midi.aTracks) {
+  for (const MidiTrack* track : midi.tracks()) {
     if (!track) {
       continue;
     }
 
-    for (const MidiEvent* event : track->aEvents) {
+    for (const MidiEvent* event : track->events()) {
       if (event) {
         maxTick = std::max(maxTick, event->absTime);
       }
     }
   }
 
-  for (const MidiEvent* event : midi.globalTrack.aEvents) {
+  for (const MidiEvent* event : midi.globalTrack.events()) {
     if (event) {
       maxTick = std::max(maxTick, event->absTime);
     }
@@ -77,7 +77,7 @@ void retimeTrack(MidiTrack* track, u16 srcPPQN, u16 dstPPQN, u32 startTick) {
     return;
   }
 
-  for (MidiEvent* event : track->aEvents) {
+  for (MidiEvent* event : track->events()) {
     if (!event) {
       continue;
     }
@@ -135,7 +135,7 @@ bool applyBankOffsetToTrack(MidiTrack* track,
     return true;
   };
 
-  for (MidiEvent* event : track->aEvents) {
+  for (MidiEvent* event : track->events()) {
     if (!event) {
       continue;
     }
@@ -503,13 +503,13 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
       instr->ulBank = remapped;
     }
 
-    const u32 waveOffset = static_cast<u32>(mergedSynth->vWaves.size());
+    const u32 waveOffset = static_cast<u32>(mergedSynth->waveCount());
 
     for (auto& instr : partInstrs) {
       if (!instr) {
         continue;
       }
-      for (SynthRgn* rgn : instr->vRgns) {
+      for (SynthRgn* rgn : instr->regions()) {
         if (rgn) {
           rgn->tableIndex += waveOffset;
         }
@@ -523,7 +523,7 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
     }
   }
 
-  if (mergedSynth->vInstrs.empty() || mergedSynth->vWaves.empty()) {
+  if (!mergedSynth->hasInstrs() || !mergedSynth->hasWaves()) {
     L_ERROR("Merged SF2 has no instruments or no samples.");
     return false;
   }

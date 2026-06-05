@@ -12,6 +12,8 @@
 #include "VGMColl.h"
 #include "VGMSamp.h"
 
+#include <memory>
+
 // ************
 // AkaoInstrSet
 // ************
@@ -80,23 +82,23 @@ bool AkaoInstrSet::parseInstrPointers() {
       if (instrPtr == 0xFFFF || (instrPtr == 0 && i != 0))
         continue;
       SSEQHdr->addChild(ptrOff, 2, "Instr Pointer");
-      aInstrs.push_back(new AkaoInstr(this, instrSetOff + 0x20 + instrPtr, 0, 1, i));
+      emplaceInstr<AkaoInstr>(this, instrSetOff + 0x20 + instrPtr, 0, 1, i);
     }
   }
   else if (!custom_instrument_addresses.empty()) {
     u32 instrNum = 0;
     for (const u32 instrOff : custom_instrument_addresses) {
-      aInstrs.push_back(new AkaoInstr(this, instrOff, 0, 1, instrNum++));
+      emplaceInstr<AkaoInstr>(this, instrOff, 0, 1, instrNum++);
     }
   }
 
   if (bDrumKit) {
-    aInstrs.push_back(new AkaoDrumKit(this, drumkitOff, 0, 127, 127));
+    emplaceInstr<AkaoDrumKit>(this, drumkitOff, 0, 127, 127);
   }
   else if (!drum_instrument_addresses.empty()) {
     u32 instrNum = 127;
     for (const u32 instrOff : drum_instrument_addresses) {
-      aInstrs.push_back(new AkaoDrumKit(this, instrOff, 0, 127, instrNum--));
+      emplaceInstr<AkaoDrumKit>(this, instrOff, 0, 127, instrNum--);
     }
   }
 
@@ -125,12 +127,13 @@ void AkaoInstrSet::useColl(const VGMColl* coll) {
 
     for (size_t i = 0; i < sampcoll->akArts.size(); i++) {
       const AkaoArt* art = &sampcoll->akArts[i];
-      auto* newInstr = new AkaoInstr(this, 0, 0, 0, sampcoll->starting_art_id + static_cast<u32>(i));
-      auto* rgn = new AkaoRgn(newInstr, 0, 0);
+      auto newInstr = std::make_unique<AkaoInstr>(this, 0, 0, 0, sampcoll->starting_art_id + static_cast<u32>(i));
+      auto* rawInstr = newInstr.get();
+      auto* rgn = rawInstr->emplaceRgn<AkaoRgn>(rawInstr, 0, 0);
 
       if (art->loop_point != 0) {
         rgn->setLoopInfo(1, art->loop_point,
-                         sampcoll->samples[art->sample_num]->dataLength - art->loop_point);
+                         sampcoll->sample(static_cast<size_t>(art->sample_num))->dataLength - art->loop_point);
       }
 
       if (auto itSampleNum = artIdToSampleNumMap.find(art->artID); itSampleNum != artIdToSampleNumMap.end()) {
@@ -141,8 +144,7 @@ void AkaoInstrSet::useColl(const VGMColl* coll) {
       rgn->unityKey = art->unityKey;
       rgn->fineTune = art->fineTune;
 
-      newInstr->addRgn(rgn);
-      addTempInstr(newInstr);
+      addTempInstr(std::move(newInstr));
     }
   }
 }
@@ -171,27 +173,27 @@ bool AkaoInstr::loadInstr() {
       }
     }
 
-    auto rgn = new AkaoRgn(this, offset() + k * 8, 8);
+    auto rgn = std::make_unique<AkaoRgn>(this, offset() + k * 8, 8);
     if (!rgn->loadRgn()) {
-      delete rgn;
       return false;
     }
+    auto* rawRgn = rgn.get();
     if (k > 0) {
       // Some tracks have apparently malformed key low / key high regions, where sections of the
       // keyboard are left unaccounted for, but notes still play in these regions.
       // For ex: Saga Frontier 2 - Thema instrument 0 (harp). The logic below ensures
       // all keys are covered, though it is imperfect as the wrong regions are being extended.
       auto prevRgn = regions().back();
-      if (rgn->keyHigh > prevRgn->keyHigh && rgn->keyLow > prevRgn->keyHigh) {
-        addRgn(rgn);
-      } else if (rgn->keyHigh == prevRgn->keyHigh) {
+      if (rawRgn->keyHigh > prevRgn->keyHigh && rawRgn->keyLow > prevRgn->keyHigh) {
+        addRgn(std::move(rgn));
+      } else if (rawRgn->keyHigh == prevRgn->keyHigh) {
         // TODO: replace the last region with this one?
       }
-      if (rgn->keyLow - prevRgn->keyHigh > 1) {
-        rgn->keyLow = prevRgn->keyHigh + 1;
+      if (rawRgn->keyLow - prevRgn->keyHigh > 1) {
+        rawRgn->keyLow = prevRgn->keyHigh + 1;
       }
     } else {
-      addRgn(rgn);
+      addRgn(std::move(rgn));
     }
   }
   if (!regions().empty()) {
@@ -235,8 +237,7 @@ bool AkaoDrumKit::loadInstr() {
         break;
 
       const u8 assoc_art_id = readByte(rgn_offset + 0);
-      auto *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
-      addRgn(rgn);
+      auto *rgn = emplaceRgn<AkaoRgn>(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       rgn->drumRelUnityKey = readByte(rgn_offset + 1);
       const u8 raw_volume = readByte(rgn_offset + 6);
       const double volume = raw_volume == 0 ? 1.0 : raw_volume / 128.0;
@@ -275,8 +276,7 @@ bool AkaoDrumKit::loadInstr() {
 
       const u8 assoc_art_id = readByte(rgn_offset + 0);
       const u8 drum_note_number = drum_octave * 12 + drum_key;
-      auto *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
-      addRgn(rgn);
+      auto *rgn = emplaceRgn<AkaoRgn>(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       rgn->drumRelUnityKey = readByte(rgn_offset + 1);
       const u16 raw_volume = getWord(rgn_offset + 2);
       rgn->setVolume(raw_volume / (127 * 128.0));
@@ -715,21 +715,19 @@ bool AkaoSampColl::parseSampleInfo() {
     }
 
     const u32 length = PSXSamp::getSampleLength(rawFile(), offset, sample_section_offset + sample_section_size, loop);
-    auto *samp = new PSXSamp(this, offset, length, offset, length, 1, BPS::PCM16, 44100,
-      fmt::format("Sample {}", samples.size()));
-
-    samples.push_back(samp);
+    emplaceSamp<PSXSamp>(this, offset, length, offset, length, 1, BPS::PCM16, 44100,
+                         fmt::format("Sample {}", sampleCount()));
   }
 
-  if (samples.empty())
+  if (!hasSamples())
     return false;
 
   // now to verify and associate each articulation with a sample index value
   // for every sample of every instrument, we add sample_section offset, because those values
   //  are relative to the beginning of the sample section
   for (auto& akArt : akArts) {
-    for (u32 l = 0; l < samples.size(); l++) {
-      if (akArt.sample_offset + sample_section_offset == samples[l]->offset()) {
+    for (u32 l = 0; l < sampleCount(); l++) {
+      if (akArt.sample_offset + sample_section_offset == sample(l)->offset()) {
         akArt.sample_num = l;
         break;
       }

@@ -8,12 +8,14 @@
 #include "base/Types.h"
 #include "LogManager.h"
 #include "Modulation.h"
+#include "ReadMode.h"
 #include "SynthType.h"
 #include "VGMItem.h"
-#include "VGMSeq.h"
+#include "SeqEventTimeIndex.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -33,8 +35,6 @@ template <typename ValueType>
 struct SeqMotionTick;
 template <typename PitchType>
 class SeqPitchBendAutomation;
-
-enum ReadMode : u8;
 
 enum class LevelController : u8 {
   Volume,
@@ -93,9 +93,7 @@ class SeqTrack : public VGMItem {
  public:
   SeqTrack(VGMSeq *parentSeqFile, u32 offset = 0, u32 length = 0, std::string name = "Track");
 
-  [[nodiscard]] bool usesLinearAmplitudeScale() const {
-    return m_useLinearAmpScale || parentSeq->usesLinearAmplitudeScale();
-  }
+  [[nodiscard]] bool usesLinearAmplitudeScale() const;
   void setUseLinearAmplitudeScale(bool set) { m_useLinearAmpScale = set; }
 
   virtual bool loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
@@ -122,7 +120,7 @@ protected:
   virtual bool isOffsetUsed(u32 offset);
 
   virtual bool onEvent(u32 offset, u32 length);
-  virtual SeqEvent* addEvent(SeqEvent *pSeqEvent);
+  virtual SeqEvent* addEvent(std::unique_ptr<SeqEvent> seqEvent);
   // Some parsers emit SeqEvents under a display track that differs from the parser track.
   void setSeqEventTarget(SeqTrack* target, bool emitEvents = true) {
     m_seqEventTarget = target;
@@ -144,20 +142,22 @@ protected:
     if (readMode == READMODE_ADD_TO_UI) {
       if (isNewOffset && m_emitSeqEvents) {
         auto* target = seqEventTarget();
-        auto* event = new EventType(target, std::forward<Args>(args)...);
+        auto event = std::make_unique<EventType>(target, std::forward<Args>(args)...);
         event->channel = static_cast<u8>(channel);
-        target->addEvent(event);
+        target->addEvent(std::move(event));
       }
       return SeqEventTimeIndex::kInvalidIndex;
     }
     if (readMode == READMODE_CONVERT_TO_MIDI) {
       if (SeqEvent* existing =
               seqEventTarget()->findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
-        return parentSeq->timedEventIndex().addEvent(existing, startTick, duration);
+        return addTimedEventIndexEntry(existing, startTick, duration);
       }
     }
     return SeqEventTimeIndex::kInvalidIndex;
   }
+
+  SeqEventTimeIndex::Index addTimedEventIndexEntry(SeqEvent* event, u32 startTick, u32 duration);
 
   bool shouldTrackControlFlowState() const;
   void addControlFlowState(u32 destinationOffset);

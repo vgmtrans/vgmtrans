@@ -533,9 +533,8 @@ void AkaoSnesScanner::searchForAkaoSnesFromARAM(RawFile *file) {
   }
 
   // load sequence
-  AkaoSnesSeq *newSeq = new AkaoSnesSeq(file, version, minorVersion, addrSeqHeader, addrAPURelocBase, name);
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
+  auto* newSeq = pRoot->emplaceVGMFile<AkaoSnesSeq>(file, version, minorVersion, addrSeqHeader, addrAPURelocBase, name);
+  if (!newSeq) {
     return;
   }
 
@@ -581,9 +580,9 @@ void AkaoSnesScanner::searchForAkaoSnesFromARAM(RawFile *file) {
     addrPercussionTable = 0;
   }
 
-  AkaoSnesInstrSet *newInstrSet = new AkaoSnesInstrSet(file, version, spcDirAddr, addrTuningTable, addrADSRTable, addrPercussionTable);
-  if (!newInstrSet->loadVGMFile()) {
-    delete newInstrSet;
+  auto* newInstrSet =
+      pRoot->emplaceVGMFile<AkaoSnesInstrSet>(file, version, spcDirAddr, addrTuningTable, addrADSRTable, addrPercussionTable);
+  if (!newInstrSet) {
     return;
   }
 }

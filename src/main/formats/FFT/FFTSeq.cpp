@@ -85,7 +85,7 @@ bool FFTSeq::parseHeader(void) {
 
 bool FFTSeq::parseTrackPointers(void) {
   for (unsigned int i = 0; i < nNumTracks; i++)
-    aTracks.push_back(new FFTTrack(this, readShort(offset() + 0x22 + (i * 2)) + offset()));
+    addTrack<FFTTrack>(this, readShort(offset() + 0x22 + (i * 2)) + offset());
   return true;
 }
 

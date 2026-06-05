@@ -159,12 +159,11 @@ bool RareSnesInstrSet::parseInstrPointers() {
       adsr = itrADSR->second;
     }
 
-    RareSnesInstr *newInstr = new RareSnesInstr(
+    emplaceInstr<RareSnesInstr>(
       this, offset() + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose,
       pitch, adsr, fmt::format("Instrument: {:#x}", inst));
-    aInstrs.push_back(newInstr);
   }
-  return aInstrs.size() != 0;
+  return hasInstrs();
 }
 
 const std::vector<u8> &RareSnesInstrSet::getAvailableInstruments() {
@@ -203,9 +202,8 @@ bool RareSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  RareSnesRgn *rgn = new RareSnesRgn(this, offset(), transpose, pitch, adsr);
+  RareSnesRgn *rgn = emplaceRgn<RareSnesRgn>(this, offset(), transpose, pitch, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
   return true;
 }
 

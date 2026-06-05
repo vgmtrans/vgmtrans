@@ -75,17 +75,17 @@ void VGMRgn::setADSR(long attackTime, u16 atkTransform, long decayTime, long sus
 }
 
 void VGMRgn::addGeneralItem(u32 offset, u32 length, const std::string &name) {
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_GENERIC, offset, length, name));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_GENERIC, offset, length, name);
 }
 
 void VGMRgn::addUnknown(u32 offset, u32 length) {
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_UNKNOWN, offset, length, "Unknown"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_UNKNOWN, offset, length, "Unknown");
 }
 
 //assumes pan is given as 0-127 value, converts it to our double -1.0 to 1.0 format
 void VGMRgn::addPan(u8 p, u32 offset, u32 length, const std::string& name) {
   setPan(p);
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_PAN, offset, length, name));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_PAN, offset, length, name);
 }
 
 void VGMRgn::setVolume(double vol) {
@@ -98,56 +98,56 @@ void VGMRgn::setAttenuation(double attenDb) {
 
 void VGMRgn::addVolume(double vol, u32 offset, u32 length) {
   setVolume(vol);
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VOL, offset, length, "Volume"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_VOL, offset, length, "Volume");
 }
 
 void VGMRgn::addAttenuation(double attenDb, u32 offset, u32 length) {
   setAttenuation(attenDb);
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VOL, offset, length, "Attenuation"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_VOL, offset, length, "Attenuation");
 }
 
 void VGMRgn::addUnityKey(u8 uk, u32 offset, u32 length) {
   this->unityKey = uk;
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_UNITYKEY, offset, length, "Unity Key"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_UNITYKEY, offset, length, "Unity Key");
 }
 
 void VGMRgn::addCoarseTune(s16 relativeSemitones, u32 offset, u32 length) {
   this->coarseTune = relativeSemitones;
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_FINETUNE, offset, length, "Coarse Tune"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_FINETUNE, offset, length, "Coarse Tune");
 }
 
 void VGMRgn::addFineTune(s16 relativePitchCents, u32 offset, u32 length) {
   this->fineTune = relativePitchCents;
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_FINETUNE, offset, length, "Fine Tune"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_FINETUNE, offset, length, "Fine Tune");
 }
 
 void VGMRgn::addKeyLow(u8 kl, u32 offset, u32 length) {
   keyLow = kl;
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_KEYLOW, offset, length, "Note Range: Low Key"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_KEYLOW, offset, length, "Note Range: Low Key");
 }
 
 void VGMRgn::addKeyHigh(u8 kh, u32 offset, u32 length) {
   keyHigh = kh;
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_KEYHIGH, offset, length, "Note Range: High Key"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_KEYHIGH, offset, length, "Note Range: High Key");
 }
 
 void VGMRgn::addVelLow(u8 vl, u32 offset, u32 length) {
   velLow = vl;
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VELLOW, offset, length, "Vel Range: Low"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_VELLOW, offset, length, "Vel Range: Low");
 }
 
 void VGMRgn::addVelHigh(u8 vh, u32 offset, u32 length) {
   velHigh = vh;
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VELHIGH, offset, length, "Vel Range: High"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_VELHIGH, offset, length, "Vel Range: High");
 }
 
 void VGMRgn::addSampNum(int sn, u32 offset, u32 length) {
   sampNum = sn;
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_SAMPNUM, offset, length, "Sample Number"));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_SAMPNUM, offset, length, "Sample Number");
 }
 
 void VGMRgn::addADSRValue(u32 offset, u32 length, const std::string& name) {
-  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_ADSR, offset, length, name));
+  emplaceChild<VGMRgnItem>(this, VGMRgnItem::RIT_ADSR, offset, length, name);
 }
 
 

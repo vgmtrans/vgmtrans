@@ -8,6 +8,7 @@
 
 #include "Format.h"
 #include "Matcher.h"
+#include "Root.h"
 #include "VGMColl.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
@@ -47,29 +48,27 @@ protected:
     if (VGMInstrSet *matchingInstrSet = instrsets[id]) {
       if (bRequiresSampColl) {
         if (VGMSampColl *matchingSampColl = sampcolls[id]) {
-          std::unique_ptr<VGMColl> coll(fmt->newCollection());
+          auto coll = fmt->newCollection();
           if (!coll)
             return false;
           coll->setName(seq->name());
           coll->useSeq(seq);
           coll->addInstrSet(matchingInstrSet);
           coll->addSampColl(matchingSampColl);
-          if (!coll->load()) {
+          if (!pRoot->loadVGMColl(std::move(coll))) {
             return false;
           }
-          coll.release();
         }
       } else {
-        std::unique_ptr<VGMColl> coll(fmt->newCollection());
+        auto coll = fmt->newCollection();
         if (!coll)
           return false;
         coll->setName(seq->name());
         coll->useSeq(seq);
         coll->addInstrSet(matchingInstrSet);
-        if (!coll->load()) {
+        if (!pRoot->loadVGMColl(std::move(coll))) {
           return false;
         }
-        coll.release();
       }
     }
 
@@ -109,28 +108,26 @@ protected:
 
       if (bRequiresSampColl) {
         if (matchingSampColl) {
-          std::unique_ptr<VGMColl> coll(fmt->newCollection());
+          auto coll = fmt->newCollection();
           if (!coll)
             return false;
           coll->setName(matchingSeq->name());
           coll->useSeq(matchingSeq);
           coll->addInstrSet(instrset);
           coll->addSampColl(matchingSampColl);
-          if (!coll->load())
+          if (!pRoot->loadVGMColl(std::move(coll)))
             return false;
-          coll.release();
         }
       } else {
-        std::unique_ptr<VGMColl> coll(fmt->newCollection());
+        auto coll = fmt->newCollection();
         if (!coll)
           return false;
         coll->setName(matchingSeq->name());
         coll->useSeq(matchingSeq);
         coll->addInstrSet(instrset);
-        if (!coll->load()) {
+        if (!pRoot->loadVGMColl(std::move(coll))) {
           return false;
         }
-        coll.release();
       }
     }
     return true;
@@ -169,17 +166,16 @@ protected:
         VGMSeq *matchingSeq = (*it2).second;
 
         if (matchingSeq && matchingInstrSet) {
-          std::unique_ptr<VGMColl> coll(fmt->newCollection());
+          auto coll = fmt->newCollection();
           if (!coll)
             return false;
           coll->setName(matchingSeq->name());
           coll->useSeq(matchingSeq);
           coll->addInstrSet(matchingInstrSet);
           coll->addSampColl(sampcoll);
-          if (!coll->load()) {
+          if (!pRoot->loadVGMColl(std::move(coll))) {
             return false;
           }
-          coll.release();
         }
       }
       return true;

@@ -82,19 +82,16 @@ bool FalcomSnesInstrSet::parseInstrPointers() {
     }
 
     auto instrName = fmt::format("Instrument {}", instr);
-    FalcomSnesInstr *newInstr = new FalcomSnesInstr(
+    emplaceInstr<FalcomSnesInstr>(
       this, version, addrInstrHeader, instr >> 7, instr & 0x7f, srcn,
       spcDirAddr, instrName);
-    aInstrs.push_back(newInstr);
   }
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(FalcomSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(FalcomSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -127,9 +124,8 @@ bool FalcomSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  FalcomSnesRgn *rgn = new FalcomSnesRgn(this, version, offset(), srcn);
+  FalcomSnesRgn *rgn = emplaceRgn<FalcomSnesRgn>(this, version, offset(), srcn);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   return true;
 }

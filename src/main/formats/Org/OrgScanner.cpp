@@ -25,9 +25,7 @@ void OrgScanner::searchForOrgSeq(RawFile *file) {
     if ((*file)[i] == 'O' && (*file)[i + 1] == 'r' && (*file)[i + 2] == 'g' && (*file)[i + 3] == '-' &&
         (*file)[i + 4] == '0' && (*file)[i + 5] == '2') {
       if (file->readShort(i + 6)) {
-        OrgSeq *NewOrgSeq = new OrgSeq(file, i);
-        if (!NewOrgSeq->loadVGMFile())
-          delete NewOrgSeq;
+        pRoot->emplaceVGMFile<OrgSeq>(file, i);
       }
     }
   }

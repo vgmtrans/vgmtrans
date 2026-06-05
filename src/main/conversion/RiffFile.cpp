@@ -38,9 +38,10 @@ void Chunk::write(u8 *buffer) {
   memcpy(buffer + 8, data.get(), paddedSize(m_size));
 }
 
-Chunk *ListTypeChunk::addChildChunk(Chunk *ck) {
-  childChunks.emplace_back(ck);
-  return ck;
+Chunk *ListTypeChunk::addChildChunk(std::unique_ptr<Chunk> ck) {
+  auto* rawChunk = ck.get();
+  childChunks.emplace_back(std::move(ck));
+  return rawChunk;
 }
 
 u32 ListTypeChunk::size() {

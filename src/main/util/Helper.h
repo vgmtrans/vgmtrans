@@ -8,34 +8,8 @@
 
 #include "base/Types.h"
 
-#include <list>
-#include <map>
 #include <string>
 #include <vector>
-
-template <class T>
-void deleteVect(std::vector<T *> &vect) {
-  for (auto p : vect) {
-    delete p;
-  }
-  vect.clear();
-}
-
-template <class T>
-void deleteList(std::list<T *> &list) {
-  for (auto p : list) {
-    delete p;
-  }
-  list.clear();
-}
-
-template <class T1, class T2>
-void deleteMap(std::map<T1, T2 *> &container) {
-  for (auto el : container) {
-    delete el.second;
-  }
-  container.clear();
-}
 
 template <class T>
 inline void pushTypeOnVect(std::vector<u8> &theVector, T unit) {

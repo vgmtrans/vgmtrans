@@ -34,16 +34,16 @@ class VGMScanner;
   ;
 
 #define USING_SCANNER(scanner) \
-  VGMScanner* newScanner() override { return new scanner(this); }
+  std::unique_ptr<VGMScanner> newScanner() override { return std::make_unique<scanner>(this); }
 
 #define USING_MATCHER(matcher) \
-  Matcher* newMatcher() override { return new matcher(this); }
+  std::unique_ptr<Matcher> newMatcher() override { return std::make_unique<matcher>(this); }
 
 #define USING_MATCHER_WITH_ARG(matcher, arg) \
-  Matcher* newMatcher() override { return new matcher(this, arg); }
+  std::unique_ptr<Matcher> newMatcher() override { return std::make_unique<matcher>(this, arg); }
 
 #define USING_COLL(coll) \
-  VGMColl* newCollection() override { return new coll(); }
+  std::unique_ptr<VGMColl> newCollection() override { return std::make_unique<coll>(); }
 
 #define USES_COLLECTION_FOR_SEQ_CONVERSION() \
   bool usesCollectionDataForSeqConversion() override { return true; }
@@ -67,10 +67,10 @@ public:
 
   virtual bool init();
   virtual const std::string &getName() = 0;
-  virtual VGMScanner *newScanner() { return nullptr; }
+  virtual std::unique_ptr<VGMScanner> newScanner() { return nullptr; }
   VGMScanner &getScanner() const { return *scanner; }
-  virtual Matcher *newMatcher() { return nullptr; }
-  virtual VGMColl *newCollection();
+  virtual std::unique_ptr<Matcher> newMatcher() { return nullptr; }
+  virtual std::unique_ptr<VGMColl> newCollection();
   virtual bool onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
   virtual bool onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
   virtual bool onMatch(std::vector<VGMFile *> &) { return true; }

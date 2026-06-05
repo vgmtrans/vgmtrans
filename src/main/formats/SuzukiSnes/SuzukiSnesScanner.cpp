@@ -192,9 +192,8 @@ void SuzukiSnesScanner::searchForSuzukiSnesFromARAM(RawFile *file) {
   }
 
   // load sequence
-  SuzukiSnesSeq *newSeq = new SuzukiSnesSeq(file, version, addrSeqHeader, name);
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
+  auto* newSeq = pRoot->emplaceVGMFile<SuzukiSnesSeq>(file, version, addrSeqHeader, name);
+  if (!newSeq) {
     return;
   }
 
@@ -220,11 +219,9 @@ void SuzukiSnesScanner::searchForSuzukiSnesFromARAM(RawFile *file) {
     return;
   }
 
-  SuzukiSnesInstrSet *newInstrSet =
-      new SuzukiSnesInstrSet(file, version, spcDirAddr, addrSRCNTable, addrVolumeTable,
-                             addrADSRTable, addrTuningTable);
-  if (!newInstrSet->loadVGMFile()) {
-    delete newInstrSet;
+  auto* newInstrSet = pRoot->emplaceVGMFile<SuzukiSnesInstrSet>(
+      file, version, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable, addrTuningTable);
+  if (!newInstrSet) {
     return;
   }
 }

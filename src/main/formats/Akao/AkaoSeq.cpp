@@ -183,7 +183,7 @@ bool AkaoSeq::parseTrackPointers() {
     const u32 base = p + (version() >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
     const u32 relative_offset = readShort(offset() + p);
     const u32 track_offset = base + relative_offset;
-    aTracks.push_back(new AkaoTrack(this, offset() + track_offset));
+    addTrack<AkaoTrack>(this, offset() + track_offset);
   }
   return true;
 }
@@ -219,7 +219,7 @@ double AkaoSeq::getTempoInBPM(u16 tempo) const {
   }
 }
 
-AkaoInstrSet* AkaoSeq::newInstrSet() const {
+std::unique_ptr<AkaoInstrSet> AkaoSeq::newInstrSet() const {
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     u32 instrSetLen = 0;
     if (has_instrument_set_offset())
@@ -228,10 +228,12 @@ AkaoInstrSet* AkaoSeq::newInstrSet() const {
       instrSetLen = length() - (drum_set_offset() - offset());
 
     return instrSetLen != 0
-      ? new AkaoInstrSet(rawFile(), instrSetLen, version(), instrument_set_offset(), drum_set_offset(), seq_id, "Akao Instr Set")
-      : new AkaoInstrSet(rawFile(), offset(), offset() + length(), version(), seq_id);
+      ? std::make_unique<AkaoInstrSet>(
+            rawFile(), instrSetLen, version(), instrument_set_offset(), drum_set_offset(), seq_id, "Akao Instr Set")
+      : std::make_unique<AkaoInstrSet>(rawFile(), offset(), offset() + length(), version(), seq_id);
   } else {
-    return new AkaoInstrSet(rawFile(), offset() + length(), version(), custom_instrument_addresses, drum_instrument_addresses, seq_id);
+    return std::make_unique<AkaoInstrSet>(
+        rawFile(), offset() + length(), version(), custom_instrument_addresses, drum_instrument_addresses, seq_id);
   }
 }
 

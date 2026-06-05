@@ -381,8 +381,8 @@ void instrumentset_info(const std::vector<std::string>& args) {
   fmt::print("Name: {}\nFormat: {}\nOffset: 0x{:x}\nLength: 0x{:x}\n", instrSet->name(),
              instrSet->formatName(), instrSet->startOffset(), instrSet->size());
   fmt::println("Instruments:");
-  for (size_t i = 0; i < instrSet->aInstrs.size(); ++i) {
-    VGMInstr* instr = instrSet->aInstrs[i];
+  for (size_t i = 0; i < instrSet->instrCount(); ++i) {
+    VGMInstr* instr = instrSet->instr(i);
     fmt::print("  Instr #{}: Bank {} Num {} - {}\n", i, instr->bank, instr->instrNum,
                instr->name());
   }
@@ -401,8 +401,8 @@ void instrumentset_inspect(const std::vector<std::string>& args) {
 
   try {
     int instrIdx = std::stoi(args[3]);
-    if (instrIdx >= 0 && static_cast<size_t>(instrIdx) < instrSet->aInstrs.size()) {
-      VGMInstr* instr = instrSet->aInstrs[instrIdx];
+    if (instrIdx >= 0 && static_cast<size_t>(instrIdx) < instrSet->instrCount()) {
+      VGMInstr* instr = instrSet->instr(static_cast<size_t>(instrIdx));
       fmt::println("Regions for Instrument #{}:", instrIdx);
       const auto& regions = instr->regions();
       for (size_t i = 0; i < regions.size(); ++i) {
@@ -473,9 +473,9 @@ void samplecollection_info(const std::vector<std::string>& args) {
 
   fmt::print("Name: {}\nFormat: {}\nOffset: 0x{:x}\nLength: 0x{:x}\n", sampColl->name(),
              sampColl->formatName(), sampColl->startOffset(), sampColl->size());
-  fmt::println("Samples ({}):", sampColl->samples.size());
-  for (size_t i = 0; i < sampColl->samples.size(); ++i) {
-    VGMSamp* samp = sampColl->samples[i];
+  fmt::println("Samples ({}):", sampColl->sampleCount());
+  for (size_t i = 0; i < sampColl->sampleCount(); ++i) {
+    VGMSamp* samp = sampColl->sample(i);
     fmt::print("  [{}] Def [{}:{}] Data [{}:{}] {} ({} Hz)\n",
                fmt::styled(fmt::format("#{}", i), fmt::fg(fmt::color::cyan)),
                fmt::styled(fmt::format("0x{:x}", samp->offset()), fmt::fg(fmt::color::yellow)),
@@ -499,8 +499,8 @@ void samplecollection_inspect(const std::vector<std::string>& args) {
 
   try {
     int sampIdx = std::stoi(args[3]);
-    if (sampIdx >= 0 && static_cast<size_t>(sampIdx) < sampColl->samples.size()) {
-      VGMSamp* samp = sampColl->samples[sampIdx];
+    if (sampIdx >= 0 && static_cast<size_t>(sampIdx) < sampColl->sampleCount()) {
+      VGMSamp* samp = sampColl->sample(sampIdx);
       fmt::print("{}\n",
                  fmt::styled(fmt::format("Sample #{} Information:", sampIdx), fmt::emphasis::bold));
       fmt::print("  {:<12} {}\n", "Name:", samp->name());
@@ -555,7 +555,7 @@ void samplecollection_export(const std::vector<std::string>& args) {
     std::filesystem::create_directories(dir);
   }
 
-  fmt::println("Exporting {} samples to {}...", sampColl->samples.size(), dir.string());
+  fmt::println("Exporting {} samples to {}...", sampColl->sampleCount(), dir.string());
   conversion::saveAllAsWav(*sampColl, dir);
 }
 
@@ -572,11 +572,11 @@ void samplecollection_dump(const std::vector<std::string>& args) {
 
   try {
     int sampIdx = std::stoi(args[3]);
-    if (sampIdx < 0 || static_cast<size_t>(sampIdx) >= sampColl->samples.size()) {
+    if (sampIdx < 0 || static_cast<size_t>(sampIdx) >= sampColl->sampleCount()) {
       fmt::println("Sample index out of bounds");
       return;
     }
-    VGMSamp* samp = sampColl->samples[sampIdx];
+    VGMSamp* samp = sampColl->sample(sampIdx);
     const char* rawData = samp->rawFile()->data();
     writeToFile(args[4], rawData + samp->dataOff, samp->dataLength);
   } catch (...) {
@@ -601,8 +601,8 @@ void sequence_events(const std::vector<std::string>& args) {
 
   try {
     int trackIdx = std::stoi(args[3]);
-    if (trackIdx >= 0 && static_cast<size_t>(trackIdx) < seq->aTracks.size()) {
-      SeqTrack* track = seq->aTracks[trackIdx];
+    if (trackIdx >= 0 && static_cast<size_t>(trackIdx) < seq->trackCount()) {
+      SeqTrack* track = seq->track(static_cast<size_t>(trackIdx));
       fmt::println("Events for Track {}:", trackIdx);
       printChildren(track);
     } else {

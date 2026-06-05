@@ -8,6 +8,8 @@
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
 
+#include <memory>
+
 KonamiArcadeFormatVer konamiArcadeVersionEnum(const std::string &versionStr) {
   static const std::unordered_map<std::string, KonamiArcadeFormatVer> versionMap = {
     {"MysticWarrior", MysticWarrior},
@@ -151,7 +153,7 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
 
   std::string instrSetName = fmt::format("{} instrument set", gameentry->name);
 
-  auto instrSet = new KonamiArcadeInstrSet(
+  auto* instrSet = pRoot->emplaceVGMFile<KonamiArcadeInstrSet>(
     codeFile,
     samp_tables_offset,
     instrSetName,
@@ -159,19 +161,14 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
     drum_samp_table_offset,
     fmt_ver
   );
-  if (!instrSet->loadVGMFile()) {
-    delete instrSet;
-    instrSet = nullptr;
+  if (!instrSet) {
+    return;
   }
 
   std::string sampCollName = fmt::format("{} sample collection", gameentry->name);
 
-  auto sampcoll = new KonamiArcadeSampColl(samplesFile, instrSet, sampInfos, 0,
-    static_cast<u32>(samplesFile->size()), sampCollName);
-  if (!sampcoll->loadVGMFile()) {
-    delete sampcoll;
-    sampcoll = nullptr;
-  }
+  auto* sampcoll = pRoot->emplaceVGMFile<KonamiArcadeSampColl>(samplesFile, instrSet, sampInfos, 0,
+                                                        static_cast<u32>(samplesFile->size()), sampCollName);
 
   std::vector<KonamiArcadeSeq*> seqs = loadSeqTable(
     seqRomGroupEntry->file,
@@ -183,14 +180,12 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
   );
 
   for (auto seq : seqs) {
-    VGMColl* coll = new VGMColl(seq->name());
+    auto coll = std::make_unique<VGMColl>(seq->name());
 
     coll->useSeq(seq);
     coll->addInstrSet(instrSet);
     coll->addSampColl(sampcoll);
-    if (!coll->load()) {
-      delete coll;
-    }
+    pRoot->loadVGMColl(std::move(coll));
   }
 }
 
@@ -216,10 +211,9 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
   KonamiArcadeFormatVer fmtVer
 ) {
   auto seqTableName = fmt::format("{} sequence pointer table", gameName);
-  VGMMiscFile *seqTable = new VGMMiscFile(KonamiArcadeFormat::name, file, offset, 1, seqTableName);
+  auto* seqTable = pRoot->emplaceVGMFile<VGMMiscFile>(KonamiArcadeFormat::name, file, offset, 1, seqTableName);
   // Add SeqTable as Miscfile
-  if (!seqTable->loadVGMFile()) {
-    delete seqTable;
+  if (!seqTable) {
     return {};
   }
   std::vector<KonamiArcadeSeq*> seqs;
@@ -240,10 +234,8 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
       if (seqPointer == 0 || seqPointer >= nFileLength)
         break;
       auto name = fmt::format("{} {:d}", gameName, seqCounter++);
-      KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, GX, seqPointer, 0, drums, nmiRate, name);
-      if (!newSeq->loadVGMFile())
-        delete newSeq;
-      else
+      auto* newSeq = pRoot->emplaceVGMFile<KonamiArcadeSeq>(file, GX, seqPointer, 0, drums, nmiRate, name);
+      if (newSeq)
         seqs.push_back(newSeq);
 
       auto child = seqTable->addChild(offset, sizeof(sequence_table_entry_gx), "Sequence Info Block");
@@ -266,10 +258,8 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
       if (seqOffset == 0 || seqOffset >= nFileLength)
         break;
       auto name = fmt::format("{} {:d}", gameName, seqCounter++);
-      KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, MysticWarrior, seqOffset, dest, drums, nmiRate, name);
-      if (!newSeq->loadVGMFile())
-        delete newSeq;
-      else
+      auto* newSeq = pRoot->emplaceVGMFile<KonamiArcadeSeq>(file, MysticWarrior, seqOffset, dest, drums, nmiRate, name);
+      if (newSeq)
         seqs.push_back(newSeq);
 
       auto child = seqTable->addChild(offset, sizeof(sequence_table_entry), "Sequence Pointer");

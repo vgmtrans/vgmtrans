@@ -77,7 +77,7 @@ bool SuzukiSnesSeq::parseHeader() {
         auto trackName = fmt::format("Track Pointer {:d}", trackIndex + 1);
         header->addChild(curOffset, 2, trackName);
 
-        aTracks.push_back(new SuzukiSnesTrack(this, addrTrackStart));
+        addTrack<SuzukiSnesTrack>(this, addrTrackStart);
       }
       else {
         // example: Super Mario RPG - Where Am I Going?

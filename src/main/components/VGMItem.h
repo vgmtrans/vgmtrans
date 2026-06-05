@@ -3,11 +3,9 @@
 #include "base/Types.h"
 
 #include <algorithm>
-#include <concepts>
-#include <iterator>
 #include <memory>
-#include <ranges>
 #include <string>
+#include <utility>
 #include <vector>
 
 template <class T>
@@ -114,27 +112,25 @@ public:
   virtual std::string description() { return ""; }
   virtual void addToUI(VGMItem *parent, void *UI_specific);
 
-  const std::vector<VGMItem*>& children() { return m_children; }
+  [[nodiscard]] const std::vector<VGMItem*>& children() const { return m_children; }
   [[nodiscard]] u32 offset() const noexcept { return m_offset; }
   [[nodiscard]] u32 length() const noexcept { return m_length; }
   void setOffset(u32 offset);
   void setLength(u32 length);
   void setRange(u32 offset, u32 length);
   VGMItem* addChild(std::unique_ptr<VGMItem> child);
-  VGMItem* addChild(VGMItem* child);
+  template <class ChildType, class... Args>
+  ChildType* emplaceChild(Args&&... args) {
+    auto child = std::make_unique<ChildType>(std::forward<Args>(args)...);
+    auto* rawChild = child.get();
+    addChild(std::move(child));
+    return rawChild;
+  }
   VGMItem* addChild(u32 offset, u32 length, const std::string &name);
   VGMItem* addUnknownChild(u32 offset, u32 length);
   VGMHeader* addHeader(u32 offset, u32 length, const std::string &name = "Header");
   void removeChildren();
   void transferChildren(VGMItem* destination);
-
-  template <std::ranges::input_range Range>
-  requires std::convertible_to<std::ranges::range_value_t<Range>, VGMItem*>
-  void addChildren(const Range& items) {
-    for (auto *child : items) {
-      addChild(child);
-    }
-  }
 
   void sortChildrenByOffset();
 

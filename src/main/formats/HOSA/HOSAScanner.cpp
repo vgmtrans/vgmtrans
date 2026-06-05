@@ -12,6 +12,8 @@
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
 
+#include <memory>
+
 namespace vgmtrans::scanners {
 ScannerRegistration<HOSAScanner> s_hosa("HOSA");
 }
@@ -50,13 +52,11 @@ void HOSAScanner::scan(RawFile *file, void *info) {
     return;
   }
 
-  VGMColl *coll = new VGMColl(seq->name());
+  auto coll = std::make_unique<VGMColl>(seq->name());
   coll->useSeq(seq);
   coll->addInstrSet(instrset);
   coll->addSampColl(sampcoll);
-  if (!coll->load()) {
-    delete coll;
-  }
+  pRoot->loadVGMColl(std::move(coll));
 
   return;
 }
@@ -80,9 +80,8 @@ HOSASeq *HOSAScanner::searchForHOSASeq(RawFile *file) {
     if (firstTrkPtr >= file->readShort(i + 0x54) && firstTrkPtr != 0x54)
       continue;
 
-    HOSASeq *seq = new HOSASeq(file, i, name);
-    if (!seq->loadVGMFile()) {
-      delete seq;
+    auto* seq = pRoot->emplaceVGMFile<HOSASeq>(file, i, name);
+    if (!seq) {
       return nullptr;
     }
     return seq;
@@ -95,14 +94,14 @@ HOSASeq *HOSAScanner::searchForHOSASeq(RawFile *file) {
 #define MIN_NUM_SAMPLES_COMPARE 5
 #define MIN_SAMPLES_MATCH 4
 HOSAInstrSet *HOSAScanner::searchForHOSAInstrSet(RawFile *file, const PSXSampColl *sampcoll) {
-  int numSamples = static_cast<int>(sampcoll->samples.size());
+  int numSamples = static_cast<int>(sampcoll->sampleCount());
   if (numSamples < MIN_NUM_SAMPLES_COMPARE) {
     return nullptr;
   }
 
   u32 *sampOffsets = new u32[numSamples];
   for (int i = 0; i < numSamples; i++)
-    sampOffsets[i] = sampcoll->samples[i]->offset() - sampcoll->offset();
+    sampOffsets[i] = sampcoll->sample(i)->offset() - sampcoll->offset();
 
   size_t nFileLength = file->size();
   for (u32 i = 0x20; i + 0x14 < nFileLength; i++) {
@@ -111,9 +110,8 @@ HOSAInstrSet *HOSAScanner::searchForHOSAInstrSet(RawFile *file, const PSXSampCol
         if ((file->readWord(i + 4) != 0) || (file->readWord(i) != 0))
           continue;
 
-        HOSAInstrSet *instrset = new HOSAInstrSet(file, i);
-        if (!instrset->loadVGMFile()) {
-          delete instrset;
+        auto* instrset = pRoot->emplaceVGMFile<HOSAInstrSet>(file, i);
+        if (!instrset) {
           delete[] sampOffsets;
           return nullptr;
         }

@@ -68,7 +68,7 @@ bool KonamiArcadeSeq::parseTrackPointers() {
 
       trackPtrTableItem->addChild(pos, 2, fmt::format("Track {} Pointer", i));
 
-      aTracks.push_back(new KonamiArcadeTrack(this, romTrackOffset, 0));
+      addTrack<KonamiArcadeTrack>(this, romTrackOffset, 0);
       pos += 2;
     }
   } else {
@@ -83,7 +83,7 @@ bool KonamiArcadeSeq::parseTrackPointers() {
 
       trackPtrTableItem->addChild(pos, 4, fmt::format("Track {} Pointer", i));
 
-      aTracks.push_back(new KonamiArcadeTrack(this, trackOffset, 0));
+      addTrack<KonamiArcadeTrack>(this, trackOffset, 0);
       pos += 4;
     }
   }
@@ -207,8 +207,9 @@ void KonamiArcadeTrack::applyTranspose() {
 
 void KonamiArcadeTrack::makeTrulyPrevDurNoteEnd(u32 absTime) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    if (pMidiTrack->prevDurNoteOffs.size() > 0) {
-      auto prevDurNoteOff = pMidiTrack->prevDurNoteOffs.back();
+    const auto& previousDurNoteOffs = pMidiTrack->previousDurNoteOffs();
+    if (!previousDurNoteOffs.empty()) {
+      auto* prevDurNoteOff = previousDurNoteOffs.back();
       prevDurNoteOff->absTime = absTime;
     }
   }

@@ -105,7 +105,7 @@ std::unique_ptr<SynthFile> createSynthFile(
       }
       for (u32 j = 0; j < nRgns; j++) {
         VGMRgn* rgn = vgminstr->regions()[j];
-        //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
+        //				if (rgn->sampNum+1 > sampColl->sampleCount())	//does thereferenced sample exist?
         //					continue;
 
         // Determine the SampColl associated with this rgn.  If there's an explicit pointer to it, use that.
@@ -125,8 +125,8 @@ std::unique_ptr<SynthFile> createSynthFile(
         // see sampOffset declaration in header file for more info.
         if (rgn->sampOffset != -1) {
           bool bFoundIt = false;
-          for (u32 s = 0; s < sampColl->samples.size(); s++) {  //for every sample
-            auto sample = sampColl->samples[s];
+          for (u32 s = 0; s < sampColl->sampleCount(); s++) {  //for every sample
+            auto sample = sampColl->sample(s);
             if (std::cmp_equal(rgn->sampOffset, sample->offset()) ||
                 std::cmp_equal(rgn->sampOffset, sample->offset() - sampColl->offset() - sampColl->sampDataOffset)) {
               if (rgn->sampDataLength != -1 && !std::cmp_equal(rgn->sampDataLength, sample->dataLength)) {
@@ -135,8 +135,6 @@ std::unique_ptr<SynthFile> createSynthFile(
 
               realSampNum = s;
 
-              //samples[m]->loop.loopStart = parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart;
-              //samples[m]->loop.loopLength = (samples[m]->dataLength) - (parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart); //[aInstrs[i]->aRegions[k]->sample_num]->dwUncompSize/2) - ((aInstrs[i]->aRegions[k]->loop_point*28)/16); //to end of sample
               bFoundIt = true;
               break;
             }
@@ -165,7 +163,7 @@ std::unique_ptr<SynthFile> createSynthFile(
         // now we add the number of samples from the preceding SampColls to the value to
         // get the real sampNum in the final DLS file.
         for (u32 k = 0; k < sampCollNum; k++)
-          realSampNum += finalSampColls[k]->samples.size();
+          realSampNum += finalSampColls[k]->sampleCount();
 
         if (realSampNum >= finalSamps.size()) {
           L_ERROR("Region has an explicit sample number that exceeds sample count. Sample Num: {:d} (Instrset "
@@ -187,7 +185,7 @@ std::unique_ptr<SynthFile> createSynthFile(
           realSampNum = finalSamps.size() - 1;
         }
 
-        VGMSamp* samp = finalSamps[realSampNum];  // sampColl->samples[rgn->sampNum];
+        VGMSamp* samp = finalSamps[realSampNum];  // sampColl->sample(rgn->sampNum);
         SynthSampInfo* sampInfo = newRgn->addSampInfo();
 
         // This is a really loopy way of determining the loop information, pardon the pun.  However, it works.
@@ -251,9 +249,9 @@ std::unique_ptr<SynthFile> createSynthFile(
 void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
   assert(sampColl != nullptr);
 
-  size_t nSamples = sampColl->samples.size();
+  size_t nSamples = sampColl->sampleCount();
   for (size_t i = 0; i < nSamples; i++) {
-    VGMSamp *samp = sampColl->samples[i];
+    VGMSamp *samp = sampColl->sample(i);
 
     std::vector<u8> uncompSampBuf = samp->toPcm(Signedness::Signed, Endianness::Little, BPS::PCM16);
 

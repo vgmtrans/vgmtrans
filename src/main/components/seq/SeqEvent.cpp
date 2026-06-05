@@ -7,6 +7,7 @@
 
 #include "base/Types.h"
 #include "SeqTrack.h"
+#include "VGMSeq.h"
 
 //  ********
 //  SeqEvent

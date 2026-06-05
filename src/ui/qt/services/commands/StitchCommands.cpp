@@ -25,7 +25,8 @@ void StitchSequencesCommand::executeItems(std::vector<VGMFile*> vgmfiles) const 
       continue;
     }
 
-    const VGMColl* coll = seq->assocColls.empty() ? nullptr : seq->assocColls.front();
+    const auto& assocColls = seq->assocColls();
+    const VGMColl* coll = assocColls.empty() ? nullptr : assocColls.front();
     if (!coll) {
       pRoot->UI_toast("Each selected sequence must be associated with a collection to stitch.",
                       ToastType::Error, 15000);

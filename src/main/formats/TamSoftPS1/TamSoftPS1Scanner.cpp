@@ -44,11 +44,9 @@ void TamSoftPS1Scanner::scan(RawFile *file, void *info) {
 
     for (u8 songIndex = 0; songIndex < numSongs; songIndex++) {
       std::string seqname = fmt::format("{} ({})", basename, songIndex);
-      TamSoftPS1Seq *newSeq = new TamSoftPS1Seq(file, 0, songIndex, seqname);
-      if (newSeq->loadVGMFile()) {
+      auto* newSeq = pRoot->emplaceVGMFile<TamSoftPS1Seq>(file, 0, songIndex, seqname);
+      if (newSeq) {
         newSeq->setLength(file->size());
-      } else {
-        delete newSeq;
       }
     }
   } else if (extension == "tvb" || extension == "tvb2") {
@@ -58,11 +56,9 @@ void TamSoftPS1Scanner::scan(RawFile *file, void *info) {
       ps2 = true;
     }
 
-    TamSoftPS1InstrSet *newInstrSet = new TamSoftPS1InstrSet(file, 0, ps2, basename);
-    if (newInstrSet->loadVGMFile()) {
+    auto* newInstrSet = pRoot->emplaceVGMFile<TamSoftPS1InstrSet>(file, 0, ps2, basename);
+    if (newInstrSet) {
       newInstrSet->setLength(file->size());
-    } else {
-      delete newInstrSet;
     }
   }
 

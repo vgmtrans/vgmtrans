@@ -60,7 +60,7 @@ bool WdsInstrSet::parseHeader() {
   wdsHeader->addUnknownChild(offset() + 0x2C, sizeof(long));
 
   //波形objectの生成
-  adoptSampColl(new PSXSampColl(FFTFormat::name, this, offset() + hdr.szHeader1, hdr.szSampColl));
+  emplaceSampColl<PSXSampColl>(FFTFormat::name, this, offset() + hdr.szHeader1, hdr.szSampColl);
 //	sampColl->Load();				//VGMInstrSet::Load()関数内でやっている。
 //	sampColl->UseInstrSet(this);	//"WD.cpp"では、同様の事をやっている。
 
@@ -81,8 +81,7 @@ bool    WdsInstrSet::parseInstrPointers() {
   //音色数だけ繰り返す。
   for (unsigned int i = 0; i <= hdr.iNumInstrs; i++) {
     //WdsInstr* newInstr = new WdsInstr(this,iOffset,sizeof(WdsRgnData),hdr.iBank,i);		//0 … hdr.iBank
-    WdsInstr *newInstr = new WdsInstr(this, iOffset, sizeof(WdsRgnData), i / 128, i % 128);        //0 … hdr.iBank
-    aInstrs.push_back(newInstr);
+    emplaceInstr<WdsInstr>(this, iOffset, sizeof(WdsRgnData), i / 128, i % 128);        //0 … hdr.iBank
     //	newInstr->LoadInstr();		//VGMInstrSet::Load()関数内（LoadInstrs()）でやっている。
     iOffset += sizeof(WdsRgnData);    // size = 0x0010
   }
@@ -115,7 +114,7 @@ bool WdsInstr::loadInstr() {
   WdsInstrSet *parInstrSet = static_cast<WdsInstrSet*>(this->parInstrSet);
 
   readBytes(offset(), sizeof(WdsRgnData), &rgndata);
-  VGMRgn *rgn = new VGMRgn(this, offset(), length());
+  VGMRgn *rgn = emplaceRgn<VGMRgn>(this, offset(), length());
   rgn->sampOffset = rgndata.ptBody;
   if (parInstrSet->version == WdsInstrSet::VERSION_WDS) {
     rgn->sampOffset *= 8;
@@ -155,11 +154,9 @@ bool WdsInstr::loadInstr() {
     rgn->addUnknown(offset() + 0x0f, sizeof(u8));
 
     psxConvADSR(rgn, Am >> 2, Ar, Dr, Sl, Sm >> 2, (Sm >> 1) & 1, Sr, Rm >> 2, Rr, false);
-    addRgn(rgn);
   }
   else if (parInstrSet->version == WdsInstrSet::VERSION_DWDS) {
     psxConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
-    addRgn(rgn);
 
     rgn->addADSRValue(offset() + 0x08, sizeof(u8), "Attack Rate");
     rgn->addADSRValue(offset() + 0x09, sizeof(u8), "Decay Rate");

@@ -176,10 +176,6 @@ VGMItem* VGMItem::addChild(std::unique_ptr<VGMItem> item) {
   return rawChild;
 }
 
-VGMItem* VGMItem::addChild(VGMItem *item) {
-  return addChild(std::unique_ptr<VGMItem>(item));
-}
-
 VGMItem* VGMItem::addChild(u32 offset, u32 length, const std::string &name) {
   return addChild(std::make_unique<VGMItem>(vgmFile(), offset, length, name, Type::Header));
 }

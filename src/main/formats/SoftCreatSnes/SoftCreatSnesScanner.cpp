@@ -138,9 +138,8 @@ void SoftCreatSnesScanner::searchForSoftCreatSnesFromARAM(RawFile *file) {
   s8 songIndex = 1;
 
   u32 addrSeqHeader = addrSeqList + songIndex;
-  SoftCreatSnesSeq *newSeq = new SoftCreatSnesSeq(file, version, addrSeqHeader, headerAlignSize, name);
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
+  auto* newSeq = pRoot->emplaceVGMFile<SoftCreatSnesSeq>(file, version, addrSeqHeader, headerAlignSize, name);
+  if (!newSeq) {
     return;
   }
 }

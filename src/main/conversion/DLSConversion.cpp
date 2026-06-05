@@ -25,9 +25,9 @@ namespace conversion {
 void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
   assert(sampColl != nullptr);
 
-  size_t nSamples = sampColl->samples.size();
+  size_t nSamples = sampColl->sampleCount();
   for (size_t i = 0; i < nSamples; i++) {
-    VGMSamp *samp = sampColl->samples[i];
+    VGMSamp *samp = sampColl->sample(i);
 
     BPS targetBps = samp->bps();
     std::vector<u8> uncompSampBuf = samp->toPcm(
@@ -134,7 +134,7 @@ bool mainDLSCreation(
       DLSInstr *newInstr = dls.addInstr(bank_no, vgminstr->instrNum, name);
       for (u32 j = 0; j < nRgns; j++) {
         VGMRgn *rgn = vgminstr->regions()[j];
-        //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
+        //				if (rgn->sampNum+1 > sampColl->sampleCount())	//does thereferenced sample exist?
         //					continue;
 
         // Determine the SampColl associated with this rgn.  If there's an explicit pointer to it, use that.
@@ -155,13 +155,12 @@ bool mainDLSCreation(
         // see sampOffset declaration in header file for more info.
         if (rgn->sampOffset != -1) {
           bool bFoundIt = false;
-          for (u32 s = 0; s < sampColl->samples.size(); s++) {             //for every sample
-            if (std::cmp_equal(rgn->sampOffset, sampColl->samples[s]->offset()) ||
-                std::cmp_equal(rgn->sampOffset, sampColl->samples[s]->offset() - sampColl->offset() - sampColl->sampDataOffset)) {
+          for (u32 s = 0; s < sampColl->sampleCount(); s++) {             //for every sample
+            auto* sample = sampColl->sample(s);
+            if (std::cmp_equal(rgn->sampOffset, sample->offset()) ||
+                std::cmp_equal(rgn->sampOffset, sample->offset() - sampColl->offset() - sampColl->sampDataOffset)) {
               realSampNum = s;
 
-              //samples[m]->loop.loopStart = parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart;
-              //samples[m]->loop.loopLength = (samples[m]->dataLength) - (parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart); //[aInstrs[i]->aRegions[k]->sample_num]->dwUncompSize/2) - ((aInstrs[i]->aRegions[k]->loop_point*28)/16); //to end of sample
               bFoundIt = true;
               break;
             }
@@ -185,7 +184,7 @@ bool mainDLSCreation(
         // now we add the number of samples from the preceding SampColls to the value to
         // get the real sampNum in the final DLS file.
         for (unsigned int k = 0; k < sampCollNum; k++)
-          realSampNum += finalSampColls[k]->samples.size();
+          realSampNum += finalSampColls[k]->sampleCount();
 
         // For collections with multiple SampColls
         // If a SampColl ptr is given, find the SampColl and adjust the sample number of the region
@@ -202,7 +201,7 @@ bool mainDLSCreation(
         //if (rgn->sampCollNum != -1)		//if a sampCollNum is defined
         //{									//then sampNum represents the sample number in the specific sample collection
         //	for (int k=0; k < rgn->sampCollNum; k++)
-        //		realSampNum += finalSampColls[k]->samples.size();	//so now we add all previous sample collection samples to the value to get the real (absolute) sampNum
+        //		realSampNum += finalSampColls[k]->sampleCount();	//so now we add all previous sample collection samples to the value to get the real (absolute) sampNum
         //}
 
         if (realSampNum >= finalSamps.size()) {
@@ -214,7 +213,7 @@ bool mainDLSCreation(
         newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
         newRgn->setWaveLinkInfo(0, 0, 1, static_cast<u32>(realSampNum));
 
-        VGMSamp *samp = finalSamps[realSampNum]; //sampColl->samples[rgn->sampNum];
+        VGMSamp *samp = finalSamps[realSampNum]; //sampColl->sample(rgn->sampNum);
         DLSWsmp *newWsmp = newRgn->addWsmp();
 
         // This is a really loopy way of determining the loop information, pardon the pun.  However, it works.

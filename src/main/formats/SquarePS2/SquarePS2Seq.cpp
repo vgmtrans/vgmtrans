@@ -48,7 +48,7 @@ bool BGMSeq::parseTrackPointers() {
       return true;
     //END HACK
     u32 trackSize = readWord(pos);        //get the track size (first word before track data)
-    aTracks.push_back(new BGMTrack(this, pos + 4, trackSize));
+    addTrack<BGMTrack>(this, pos + 4, trackSize);
     pos += trackSize + 4;                //jump to the next track
   }
   return true;

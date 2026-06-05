@@ -24,7 +24,7 @@ namespace conversion {
 
 bool saveAsDLS(VGMInstrSet &set, const fs::path &filepath) {
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::DLS);
-  VGMColl* coll = !set.assocColls.empty() ? set.assocColls.front() : nullptr;
+  VGMColl* coll = set.hasAssocColls() ? set.assocColls().front() : nullptr;
   if (!coll && !set.sampColl)
     return false;
 
@@ -46,7 +46,7 @@ bool saveAsDLS(VGMInstrSet &set, const fs::path &filepath) {
 
 bool saveAsSF2(VGMInstrSet &set, const fs::path &filepath) {
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
-  VGMColl* coll = !set.assocColls.empty() ? set.assocColls.front() : nullptr;
+  VGMColl* coll = set.hasAssocColls() ? set.assocColls().front() : nullptr;
   if (!coll && !set.sampColl)
     return false;
 
@@ -79,7 +79,7 @@ bool saveAsSF2(const VGMColl &coll, const fs::path &filepath) {
 
 void saveAllAsWav(const VGMSampColl &coll, const fs::path &save_dir) {
   const auto sampCollName = makeSafeFileName(coll.name()).u8string();
-  for (auto &sample : coll.samples) {
+  for (auto* sample : coll.samples()) {
     std::u8string filename = sampCollName + u8" - " + makeSafeFileName(sample->name()).u8string() + u8".wav";
     sample->saveAsWav(save_dir / filename);
   }

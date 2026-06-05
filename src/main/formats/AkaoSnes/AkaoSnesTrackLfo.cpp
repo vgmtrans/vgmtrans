@@ -26,7 +26,7 @@
  */
 
 void AkaoSnesSeq::syncTempoDependentTracks() {
-  for (auto *track : aTracks) {
+  for (auto *track : tracks()) {
     static_cast<AkaoSnesTrack*>(track)->syncTempoDependentLfos();
   }
 }

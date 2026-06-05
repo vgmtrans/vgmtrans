@@ -88,7 +88,7 @@ bool RareSnesSeq::parseTrackPointers(void) {
   for (int i = 0; i < MAX_TRACKS; i++) {
     u16 trkOff = readShort(offset() + i * 2);
     if (trkOff != 0)
-      aTracks.push_back(new RareSnesTrack(this, trkOff));
+      addTrack<RareSnesTrack>(this, trkOff);
   }
   return true;
 }

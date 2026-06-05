@@ -174,7 +174,8 @@ public:
   SaveAsMidiCommand() : SaveCommand<VGMSeq, VGMFile>(false) {}
 
   void save(const std::filesystem::path& path, VGMSeq* seq) const override {
-    int numAssocColls = seq->assocColls.size();
+    const auto& assocColls = seq->assocColls();
+    int numAssocColls = static_cast<int>(assocColls.size());
     if (numAssocColls > 0) {
       if (numAssocColls > 1 && seq->format()->usesCollectionDataForSeqConversion()) {
         pRoot->UI_toast("This sequence format uses collection data as context for "
@@ -183,7 +184,7 @@ public:
           "on a collection directly.",
           ToastType::Info, 15000);
       }
-      seq->saveAsMidi(path, seq->assocColls[0]);
+      seq->saveAsMidi(path, assocColls[0]);
     } else {
       if (seq->format()->usesCollectionDataForSeqConversion()) {
         pRoot->UI_toast("This sequence format uses collection data as context for "

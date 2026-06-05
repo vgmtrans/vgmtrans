@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <variant>
+#include <utility>
 #include <vector>
 
 class VGMScanner;
@@ -49,11 +50,36 @@ public:
   virtual bool openRawFile(const std::filesystem::path& filePath);
   bool createVirtFile(const u8* databuf, u32 fileSize, const std::string& filename,
                       const std::filesystem::path& parRawFileFullPath = {}, const VGMTag& tag = VGMTag());
-  bool loadRawFile(RawFile* newRawFile);
+  bool loadRawFile(std::unique_ptr<RawFile> newRawFile);
   bool removeRawFile(RawFile *targFile);
-  void addVGMFile(VGMFileVariant file);
+  bool loadVGMFile(std::unique_ptr<VGMFile> file, bool useMatcher = true);
+  void adoptVGMFile(std::unique_ptr<VGMFile> file, bool useMatcher = true);
+  template <class FileType, class... Args>
+  FileType* emplaceVGMFile(Args&&... args) {
+    return emplaceVGMFileWithMatcher<FileType>(true, std::forward<Args>(args)...);
+  }
+  template <class FileType, class... Args>
+  FileType* emplaceVGMFileWithMatcher(bool useMatcher, Args&&... args) {
+    auto file = std::make_unique<FileType>(std::forward<Args>(args)...);
+    auto* rawFile = file.get();
+    return loadVGMFile(std::move(file), useMatcher) ? rawFile : nullptr;
+  }
+  template <class FileType, class... Args>
+  FileType* emplacePendingVGMFile(Args&&... args) {
+    auto file = std::make_unique<FileType>(std::forward<Args>(args)...);
+    auto* rawFile = file.get();
+    adoptVGMFile(std::move(file));
+    return rawFile;
+  }
   void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
-  void addVGMColl(VGMColl *theColl);
+  bool loadVGMColl(std::unique_ptr<VGMColl> coll);
+  void addVGMColl(std::unique_ptr<VGMColl> coll);
+  template <class CollType, class... Args>
+  CollType* emplaceVGMColl(Args&&... args) {
+    auto coll = std::make_unique<CollType>(std::forward<Args>(args)...);
+    auto* rawColl = coll.get();
+    return loadVGMColl(std::move(coll)) ? rawColl : nullptr;
+  }
   void removeVGMColl(VGMColl *coll);
   void removeAllFilesAndCollections();
 

@@ -15,6 +15,7 @@
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
 
+#include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -134,7 +135,7 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
   u8 clkb,
   const std::string& gameName
 ) {
-  VGMMiscFile *seqTable = new VGMMiscFile(
+  auto seqTable = std::make_unique<VGMMiscFile>(
     KonamiTMNT2Format::name,
     programRom,
     seqTableAddr,
@@ -198,7 +199,7 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
       std::ranges::min(k053260TrkPtrs)
     );
 
-    auto *sequence = new KonamiTMNT2Seq(
+    auto* sequence = pRoot->emplaceVGMFile<KonamiTMNT2Seq>(
       programRom,
       fmtVer,
       start,
@@ -208,17 +209,13 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
       clkb,
       sequenceName
     );
-    if (!sequence->loadVGMFile()) {
-      delete sequence;
-    } else {
+    if (sequence) {
       seqs.push_back(sequence);
     }
   }
   auto lastSeq = seqTable->children().back();
   seqTable->setLength((lastSeq->offset() + lastSeq->length()) - seqTable->offset());
-  if (!seqTable->loadVGMFile()) {
-    delete seqTable;
-  }
+  pRoot->loadVGMFile(std::move(seqTable));
   return seqs;
 }
 
@@ -341,7 +338,7 @@ void KonamiTMNT2Scanner::scanTMNT2(
     minDrumPtr
   );
 
-  auto instrSet = new KonamiTMNT2SampleInstrSet(
+  auto* instrSet = pRoot->emplaceVGMFile<KonamiTMNT2SampleInstrSet>(
     programRom,
     instrTableAddrK053260,
     instrTableAddrK053260,
@@ -351,10 +348,6 @@ void KonamiTMNT2Scanner::scanTMNT2(
     fmt::format("{} K053260 Instrument Set", name),
     fmtVer
   );
-  if (!instrSet->loadVGMFile()) {
-    delete instrSet;
-    instrSet = nullptr;
-  }
 
 
   // Consolidate the melodic and drum instruments into a single sample_info vector
@@ -371,39 +364,35 @@ void KonamiTMNT2Scanner::scanTMNT2(
 
   std::string sampCollName = fmt::format("{} sample collection", name);
 
-  auto sampcoll = new KonamiTMNT2SampColl(
+  auto* sampcoll = pRoot->emplaceVGMFile<KonamiTMNT2SampColl>(
     samplesRom,
     sampInfos,
     0,
     static_cast<u32>(samplesRom->size()),
     sampCollName
   );
-  if (!sampcoll->loadVGMFile()) {
-    delete sampcoll;
-    sampcoll = nullptr;
-  }
 
-  auto opmInstrSet = new KonamiTMNT2OPMInstrSet(
+  auto* opmInstrSet = pRoot->emplaceVGMFile<KonamiTMNT2OPMInstrSet>(
     programRom,
     fmtVer,
     instrTableAddrYM2151,
     fmt::format("{} YM2151 Instrument Set", name)
   );
-  if (!opmInstrSet->loadVGMFile()) {
-    delete opmInstrSet;
-    opmInstrSet = nullptr;
-  }
 
   for (auto seq : seqs) {
-    VGMColl* coll = new VGMColl(seq->name());
+    auto coll = std::make_unique<VGMColl>(seq->name());
 
     coll->useSeq(seq);
-    coll->addInstrSet(opmInstrSet);
-    coll->addInstrSet(instrSet);
-    coll->addSampColl(sampcoll);
-    if (!coll->load()) {
-      delete coll;
+    if (opmInstrSet) {
+      coll->addInstrSet(opmInstrSet);
     }
+    if (instrSet) {
+      coll->addInstrSet(instrSet);
+    }
+    if (sampcoll) {
+      coll->addSampColl(sampcoll);
+    }
+    pRoot->loadVGMColl(std::move(coll));
   }
 }
 
@@ -496,7 +485,8 @@ void KonamiTMNT2Scanner::scanVendetta(
     sampInfos.emplace_back(sampInfo);
   }
 
-  auto instrSet = new KonamiVendettaSampleInstrSet(
+  vendetta_sub_offsets subOffsets{loadInstrSub, setPanSub, setPitchSub, noteOnSub};
+  auto* instrSet = pRoot->emplaceVGMFile<KonamiVendettaSampleInstrSet>(
     programRom,
     sampInfoTableOffset,
     instrTableOffsetYM2151,
@@ -504,16 +494,12 @@ void KonamiTMNT2Scanner::scanVendetta(
     sampInfoTableOffset,
     drumBanksOffset,
     drumsOffset,
-    { loadInstrSub, setPanSub, setPitchSub, noteOnSub },
+    subOffsets,
     instrs,
     sampInfos,
     fmt::format("{} K053260 Instrument Set", name),
     fmtVer
   );
-  if (!instrSet->loadVGMFile()) {
-    delete instrSet;
-    instrSet = nullptr;
-  }
 
   std::vector<KonamiTMNT2SampColl::sample_info> commonSampInfos;
   for (auto const& sampInfo : sampInfos) {
@@ -521,38 +507,34 @@ void KonamiTMNT2Scanner::scanVendetta(
   }
   std::string sampCollName = fmt::format("{} Sample Collection", name);
 
-  auto sampcoll = new KonamiTMNT2SampColl(
+  auto* sampcoll = pRoot->emplaceVGMFile<KonamiTMNT2SampColl>(
     samplesRom,
     commonSampInfos,
     0,
     static_cast<u32>(samplesRom->size()),
     sampCollName
   );
-  if (!sampcoll->loadVGMFile()) {
-    delete sampcoll;
-    sampcoll = nullptr;
-  }
 
-  auto opmInstrSet = new KonamiTMNT2OPMInstrSet(
+  auto* opmInstrSet = pRoot->emplaceVGMFile<KonamiTMNT2OPMInstrSet>(
     programRom,
     fmtVer,
     instrTableOffsetYM2151,
     fmt::format("{} YM2151 Instrument Set", name)
   );
-  if (!opmInstrSet->loadVGMFile()) {
-    delete opmInstrSet;
-    opmInstrSet = nullptr;
-  }
 
   for (auto seq : seqs) {
-    VGMColl* coll = new VGMColl(seq->name());
+    auto coll = std::make_unique<VGMColl>(seq->name());
 
     coll->useSeq(seq);
-    coll->addInstrSet(opmInstrSet);
-    coll->addInstrSet(instrSet);
-    coll->addSampColl(sampcoll);
-    if (!coll->load()) {
-      delete coll;
+    if (opmInstrSet) {
+      coll->addInstrSet(opmInstrSet);
     }
+    if (instrSet) {
+      coll->addInstrSet(instrSet);
+    }
+    if (sampcoll) {
+      coll->addSampColl(sampcoll);
+    }
+    pRoot->loadVGMColl(std::move(coll));
   }
 }

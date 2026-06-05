@@ -5,6 +5,8 @@
 #include "formats/PS1/PS1Format.h"
 #include "PSXSPU.h"
 
+#include <memory>
+
 using namespace std;
 
 Vab::Vab(RawFile *file, u32 offset)
@@ -79,7 +81,7 @@ bool Vab::parseInstrPointers() {
   u32 numProgramsLoaded = 0;
   for (u32 progIndex = 0; progIndex < 128 && numProgramsLoaded < numPrograms; progIndex++) {
     u32 offCurrProg = offProgs + (progIndex * 16);
-    u32 offCurrToneAttrs = offToneAttrs + (u32) (aInstrs.size() * 32 * 16);
+    u32 offCurrToneAttrs = offToneAttrs + (u32) (instrCount() * 32 * 16);
 
     if (offCurrToneAttrs + (32 * 16) > nEndOffset) {
       break;
@@ -91,8 +93,7 @@ bool Vab::parseInstrPointers() {
     }
     else if (numTonesPerInstr != 0) {
       auto instrName = fmt::format("Instrument {:d}", progIndex);
-      VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex, instrName);
-      aInstrs.push_back(newInstr);
+      VabInstr *newInstr = emplaceInstr<VabInstr>(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex, instrName);
       readBytes(offCurrProg, 0x10, &newInstr->attr);
 
       const auto progName = fmt::format("Program {:d}", progIndex);
@@ -152,10 +153,10 @@ bool Vab::isViableSampCollMatch(VGMSampColl* sampColl) {
     if (vagLoc.offset == 0 && vagLoc.size == 0)
       continue;
 
-    if (sampleIndex >= sampColl->samples.size())
+    if (sampleIndex >= sampColl->sampleCount())
       return false;
 
-    auto sample = sampColl->samples[sampleIndex++];
+    auto sample = sampColl->sample(sampleIndex++);
     auto sampleRelOffset = sample->offset() - sampCollOffset;
     if (sampleRelOffset != vagLoc.offset ||
       (sample->length() > vagLoc.size + 32 || sample->length() < vagLoc.size))
@@ -185,12 +186,11 @@ VabInstr::~VabInstr() {
 bool VabInstr::loadInstr() {
   s8 numRgns = attr.tones;
   for (int i = 0; i < numRgns; i++) {
-    VabRgn *rgn = new VabRgn(this, offset() + i * 0x20);
+    auto rgn = std::make_unique<VabRgn>(this, offset() + i * 0x20);
     if (!rgn->loadRgn()) {
-      delete rgn;
       continue;
     }
-    addRgn(rgn);
+    addRgn(std::move(rgn));
   }
   return true;
 }

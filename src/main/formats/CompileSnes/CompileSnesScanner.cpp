@@ -101,9 +101,8 @@ void CompileSnesScanner::searchForCompileSnesFromARAM(RawFile *file) {
     u16 addrSongHeader = file->readShort(addrSongHeaderPtr);
     u8 numTracks = file->readByte(addrSongHeader);
     if (numTracks > 0 && numTracks <= 8) {
-      CompileSnesSeq *newSeq = new CompileSnesSeq(file, version, addrSongHeader, name);
-      if (!newSeq->loadVGMFile()) {
-        delete newSeq;
+      auto* newSeq = pRoot->emplaceVGMFile<CompileSnesSeq>(file, version, addrSongHeader, name);
+      if (!newSeq) {
         return;
       }
     }
@@ -117,9 +116,8 @@ void CompileSnesScanner::searchForCompileSnesFromARAM(RawFile *file) {
     addrPitchTablePtrs = file->readShort(addrEngineHeader + 0x16);
   }
 
-  CompileSnesInstrSet *newInstrSet = new CompileSnesInstrSet(file, version, addrTuningTable, addrPitchTablePtrs, spcDirAddr);
-  if (!newInstrSet->loadVGMFile()) {
-    delete newInstrSet;
+  auto* newInstrSet = pRoot->emplaceVGMFile<CompileSnesInstrSet>(file, version, addrTuningTable, addrPitchTablePtrs, spcDirAddr);
+  if (!newInstrSet) {
     return;
   }
 }

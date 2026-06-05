@@ -24,6 +24,7 @@
 
 #include <array>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <set>
 #include <span>
@@ -99,8 +100,10 @@ void MP2kScanner::scan(RawFile *file, void *) {
     return;
   }
 
-  auto* psg_sampcoll = new MP2kPSGColl(file, psg_sample_rate, psg_sample_rate);
-  psg_sampcoll->loadVGMFile();
+  auto* psg_sampcoll = pRoot->emplaceVGMFile<MP2kPSGColl>(file, psg_sample_rate, psg_sample_rate);
+  if (!psg_sampcoll) {
+    return;
+  }
 
   /* First 32 bytes are the pointer, the rest is song info */
   std::set<size_t> soundbanks;
@@ -118,9 +121,8 @@ void MP2kScanner::scan(RawFile *file, void *) {
       break;
     }
 
-    auto nseq = new MP2kSeq(file, song_pointer);
-    if (!nseq->loadVGMFile()) {
-      delete nseq;
+    auto* nseq = pRoot->emplaceVGMFile<MP2kSeq>(file, song_pointer);
+    if (!nseq) {
       continue;
     }
 
@@ -142,26 +144,22 @@ void MP2kScanner::scan(RawFile *file, void *) {
       count = (*next_addr - *it) / 12;
     }
 
-    if (auto iset =
-            new MP2kInstrSet(file, samplerate_LUT[engine_settings.sampling_rate_index], *it, count,
-                              psg_sampcoll);
-        !iset->loadVGMFile()) {
-      delete iset;
-    } else {
+    auto iset = std::make_unique<MP2kInstrSet>(file, samplerate_LUT[engine_settings.sampling_rate_index], *it, count,
+                                               psg_sampcoll);
+    auto* rawInstrSet = iset.get();
+    if (pRoot->loadVGMFile(std::move(iset))) {
       auto seq = seqs.find(*it);
       if (seq != seqs.end()) {
         for (auto seqval : seq->second) {
-          auto coll = new VGMColl(fmt::format("MP2k Collection #{}", seqval.song_index));
+          auto coll = std::make_unique<VGMColl>(fmt::format("MP2k Collection #{}", seqval.song_index));
           coll->useSeq(seqval.seq);
-          coll->addInstrSet(iset);
-          if (iset->sampColl != nullptr && !iset->sampColl->samples.empty()) {
-            coll->addSampColl(iset->sampColl);
+          coll->addInstrSet(rawInstrSet);
+          if (rawInstrSet->sampColl != nullptr && rawInstrSet->sampColl->hasSamples()) {
+            coll->addSampColl(rawInstrSet->sampColl);
           }
           coll->addSampColl(psg_sampcoll);
 
-          if (!coll->load()) {
-            delete coll;
-          }
+          pRoot->loadVGMColl(std::move(coll));
         }
         seqs.erase(seq);
       }

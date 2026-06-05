@@ -98,8 +98,7 @@ bool PrismSnesSeq::parseHeader() {
     trackHeader->addChild(curOffset, 2, "Track Pointer");
     curOffset += 2;
 
-    PrismSnesTrack *track = new PrismSnesTrack(this, addrTrackStart);
-    aTracks.push_back(track);
+    addTrack<PrismSnesTrack>(this, addrTrackStart);
   }
 
   return true;

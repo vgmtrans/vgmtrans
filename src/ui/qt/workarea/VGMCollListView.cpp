@@ -544,11 +544,11 @@ void VGMCollListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
   }
 
   auto *seq = dynamic_cast<VGMSeq *>(file);
-  if (!seq || seq->assocColls.empty()) {
+  if (!seq || !seq->hasAssocColls()) {
     return;
   }
 
-  VGMColl *coll = seq->assocColls.front();
+  VGMColl *coll = seq->assocColls().front();
   const auto& colls = qtVGMRoot.vgmColls();
   auto it = std::find(colls.begin(), colls.end(), coll);
   if (it == colls.end()) {

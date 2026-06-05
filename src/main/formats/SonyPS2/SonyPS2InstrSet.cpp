@@ -3,6 +3,8 @@
 #include "base/Types.h"
 #include "PSXSPU.h"
 
+#include <memory>
+
 using namespace std;
 
 // ***************
@@ -215,9 +217,9 @@ bool SonyPS2InstrSet::parseInstrPointers() {
     //VGMHeader* progParamHdr = progParamsHdr->addHeader(curOffset+progCk.programOffsetAddr[i],
     //	sizeof(SonyPS2Instr::ProgParam), "Program Param");
 
-    SonyPS2Instr *instr = new SonyPS2Instr(this, curOffset + progCk.programOffsetAddr[i],
-                                           sizeof(SonyPS2Instr::ProgParam), i / 128, i % 128);
-    aInstrs.push_back(instr);
+    auto newInstr = std::make_unique<SonyPS2Instr>(this, curOffset + progCk.programOffsetAddr[i],
+                                                   sizeof(SonyPS2Instr::ProgParam), i / 128, i % 128);
+    SonyPS2Instr *instr = newInstr.get();
 
     instr->addChild(curOffset + progCk.programOffsetAddr[i], 4, "SplitBlock Addr");
     instr->addChild(curOffset + progCk.programOffsetAddr[i] + 4, 1, "Number of SplitBlocks");
@@ -277,9 +279,8 @@ bool SonyPS2InstrSet::parseInstrPointers() {
       splitBlockHdr->addChild(splitOff + 18, 1, "Split Transpose");
       splitBlockHdr->addChild(splitOff + 19, 1, "Split Detune");
     }
+    adoptInstrAsChild(*progParamsHdr, std::move(newInstr));
   }
-
-  progParamsHdr->addChildren(aInstrs);
 
   u32 maxProgNum = progCk.maxProgramNumber;
   progParamsHdr->setLength((curOffset + progCk.programOffsetAddr[maxProgNum]) + sizeof(SonyPS2Instr::ProgParam) +
@@ -387,7 +388,6 @@ s8 SonyPS2Instr::convertPanValue(u8 panVal) {
 SonyPS2SampColl::SonyPS2SampColl(RawFile *rawfile, u32 offset, u32 length)
     : VGMSampColl(SonyPS2Format::name, rawfile, offset, length) {
   this->setShouldLoadOnInstrSetMatch(true);
-  pRoot->addVGMFile(this);
 }
 
 bool SonyPS2SampColl::parseSampleInfo() {
@@ -414,10 +414,9 @@ bool SonyPS2SampColl::parseSampleInfo() {
 
     u16 sampleRate = vagInfoParam.vagSampleRate;
 
-    auto name = fmt::format("Sample {}", samples.size());
-    PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1,
-      BPS::PCM16, sampleRate, name, true);
-    samples.push_back(samp);
+    auto name = fmt::format("Sample {}", sampleCount());
+    auto* samp = emplaceSamp<PSXSamp>(this, offset, length, offset, length, 1,
+                                      BPS::PCM16, sampleRate, name, true);
 
     // Determine loop information from VAGInfo Param
     if (vagInfoParam.vagAttribute == SCEHD_VAG_1SHOT) {

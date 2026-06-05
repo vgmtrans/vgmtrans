@@ -56,13 +56,6 @@ NinSnesSeq::NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult)
   falcomBaseOffset = scanResult.falcomBaseOffset;
 }
 
-NinSnesSeq::~NinSnesSeq() {
-  for (auto* track : aTracks) {
-    delete track;
-  }
-  aTracks.clear();
-}
-
 bool NinSnesSeq::load() {
   readMode = READMODE_ADD_TO_UI;
 
@@ -70,7 +63,7 @@ bool NinSnesSeq::load() {
     return false;
   }
 
-  nNumTracks = static_cast<u32>(aTracks.size());
+  nNumTracks = static_cast<u32>(trackCount());
   if (nNumTracks == 0) {
     return false;
   }
@@ -111,20 +104,20 @@ void NinSnesSeq::resetVars() {
 }
 
 void NinSnesSeq::createTracks() {
-  if (!aTracks.empty()) {
+  if (hasTracks()) {
     return;
   }
 
-  aTracks.reserve(MAX_TRACKS);
+  reserveTracks(MAX_TRACKS);
   for (u32 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     auto trackName = fmt::format("Track {}", trackIndex + 1);
-    aTracks.push_back(new NinSnesTrack(this, dwStartOffset, 0, trackName));
+    addTrack<NinSnesTrack>(this, dwStartOffset, 0, trackName);
   }
 }
 
 bool NinSnesSeq::loadTracks(ReadMode readMode, u32 stopTime) {
   this->readMode = readMode;
-  for (auto* track : aTracks) {
+  for (auto* track : tracks()) {
     track->readMode = readMode;
   }
 
@@ -136,7 +129,7 @@ bool NinSnesSeq::loadTracks(ReadMode readMode, u32 stopTime) {
 
   resetVars();
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    if (!aTracks[trackNum]->loadTrackInit(trackNum, nullptr)) {
+    if (!track(trackNum)->loadTrackInit(trackNum, nullptr)) {
       return false;
     }
   }
@@ -155,11 +148,14 @@ bool NinSnesSeq::postLoad() {
   if (readMode == READMODE_ADD_TO_UI) {
     std::ranges::sort(aInstrumentsUsed);
 
-    for (auto* section : aSections) {
+    for (auto* section : m_sections) {
       section->postLoad();
     }
 
-    addChildren(aSections);
+    for (auto& section : m_ownedSections) {
+      addChild(std::move(section));
+    }
+    m_ownedSections.clear();
     setGuessedLength();
     if (length() == 0) {
       return false;
@@ -173,9 +169,9 @@ bool NinSnesSeq::postLoad() {
 }
 
 bool NinSnesSeq::loadSection(NinSnesSection *section, u32 stopTime) {
-  assert(aTracks.size() == nNumTracks);
+  assert(trackCount() == nNumTracks);
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    auto* track = static_cast<NinSnesTrack*>(aTracks[trackNum]);
+    auto* track = static_cast<NinSnesTrack*>(this->track(trackNum));
     track->readMode = readMode;
     if (!track->prepareSectionTrack(*section, trackNum)) {
       return false;
@@ -189,7 +185,8 @@ bool NinSnesSeq::loadSection(NinSnesSection *section, u32 stopTime) {
   return section->postLoad();
 }
 
-void NinSnesSeq::addSection(NinSnesSection *section) {
+NinSnesSection* NinSnesSeq::addSection(std::unique_ptr<NinSnesSection> section) {
+  auto* rawSection = section.get();
   if (offset() > section->offset()) {
     const u32 distance = offset() - section->offset();
     setOffset(section->offset());
@@ -197,11 +194,13 @@ void NinSnesSeq::addSection(NinSnesSection *section) {
       setLength(length() + distance);
     }
   }
-  aSections.push_back(section);
+  m_sections.push_back(rawSection);
+  m_ownedSections.emplace_back(std::move(section));
+  return rawSection;
 }
 
 NinSnesSection *NinSnesSeq::getSectionAtOffset(u32 offset) {
-  for (auto* section : aSections) {
+  for (auto* section : m_sections) {
     if (section->offset() == offset) {
       return section;
     }
@@ -378,12 +377,13 @@ bool NinSnesSeq::readPlaylistEvent(long stopTime) {
 
     NinSnesSection* section = getSectionAtOffset(sectionAddress);
     if (section == nullptr) {
-      section = new NinSnesSection(this, sectionAddress);
+      auto newSection = std::make_unique<NinSnesSection>(this, sectionAddress);
+      section = newSection.get();
       if (!section->load()) {
         L_ERROR("Failed to load section");
         return false;
       }
-      addSection(section);
+      addSection(std::move(newSection));
     }
 
     if (!loadSection(section, stopTime)) {
@@ -436,7 +436,7 @@ void NinSnesSeq::startTempoFade(u8 fadeLength, u8 targetTempo) {
 }
 
 void NinSnesSeq::syncTempoDependentTracks() {
-  for (auto* track : aTracks) {
+  for (auto* track : tracks()) {
     static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
   }
 }
@@ -445,8 +445,8 @@ void NinSnesSeq::onTickEnd() {
   // EVENT_TEMPO_FADE applies its first tempo step at the end of the tick that parsed the command.
   tempoFade.tickRaw([this](s32 tempoValue) {
     tempo = static_cast<u8>(std::clamp(tempoValue, 0, 0xff));
-    if (!aTracks.empty()) {
-      aTracks[0]->addTempoBPMNoItem(getTempoInBPM(tempo));
+    if (hasTracks()) {
+      track(0)->addTempoBPMNoItem(getTempoInBPM(tempo));
     }
     syncTempoDependentTracks();
   });
@@ -516,7 +516,9 @@ bool NinSnesSection::parseTrackPointers() {
       segment.startOffset = curOffset;
       segment.rangeOffset = curOffset;
       segment.rangeLength = 2;
-      m_tracks[trackIndex] = new NinSnesSectionTrackItem(parentSeq, curOffset, 2, "NULL");
+      auto track = std::make_unique<NinSnesSectionTrackItem>(parentSeq, curOffset, 2, "NULL");
+      m_tracks[trackIndex] = track.get();
+      m_ownedTracks[trackIndex] = std::move(track);
       m_tracks[trackIndex]->readMode = parentSeq->readMode;
       curOffset += 2;
       continue;
@@ -525,8 +527,10 @@ bool NinSnesSection::parseTrackPointers() {
     startAddress = convertToApuAddress(startAddress);
     segment.startOffset = startAddress;
     segment.rangeOffset = startAddress;
-    m_tracks[trackIndex] = new NinSnesSectionTrackItem(
+    auto track = std::make_unique<NinSnesSectionTrackItem>(
         parentSeq, startAddress, 0, fmt::format("Track {}", trackIndex + 1));
+    m_tracks[trackIndex] = track.get();
+    m_ownedTracks[trackIndex] = std::move(track);
     m_tracks[trackIndex]->readMode = parentSeq->readMode;
 
     // Correct section address. Probably not necessary for regular cases, but just in case.
@@ -554,9 +558,9 @@ bool NinSnesSection::postLoad() {
     }
 
     if (!m_tracksAddedToChildren) {
-      for (auto* track : m_tracks) {
+      for (auto& track : m_ownedTracks) {
         if (track != nullptr) {
-          addChild(track);
+          addChild(std::move(track));
         }
       }
       m_tracksAddedToChildren = true;

@@ -13,6 +13,7 @@
 #include "VGMColl.h"
 
 #include <algorithm>
+#include <memory>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -173,10 +174,9 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
 
     addUsedSRCN(srcn);
 
-    KonamiSnesInstr *newInstr = new KonamiSnesInstr(
+    emplaceInstr<KonamiSnesInstr>(
       this, version, addrInstrHeader, instr >> 7, instr & 0x7f,
       spcDirAddr, false, fmt::format("Instrument {}", instr));
-    aInstrs.push_back(newInstr);
   }
 
   const auto percussionHeaders = collectPercussionHeaders(this->rawFile(), version, percInstrOffset, spcDirAddr);
@@ -185,25 +185,22 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
     addUsedSRCN(readByte(header.offset));
   }
   if (!percussionHeaders.empty()) {
-    auto *newInstr = new KonamiSnesInstr(this,
-                                         version,
-                                         percInstrOffset,
-                                         DRUMKIT_PROGRAM >> 7,
-                                         DRUMKIT_PROGRAM & 0x7f,
-                                         spcDirAddr,
-                                         true,
-                                         "Percussion");
-    aInstrs.push_back(newInstr);
+    emplaceInstr<KonamiSnesInstr>(this,
+                                  version,
+                                  percInstrOffset,
+                                  DRUMKIT_PROGRAM >> 7,
+                                  DRUMKIT_PROGRAM & 0x7f,
+                                  spcDirAddr,
+                                  true,
+                                  "Percussion");
   }
 
-  if (aInstrs.empty()) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(KonamiSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(KonamiSnesFormat::name, rawFile(), spcDirAddr, usedSRCNs)) {
     return false;
   }
 
@@ -262,14 +259,13 @@ bool KonamiSnesInstr::loadInstr() {
       const u32 offDirEnt = spcDirAddr + (srcn * 4);
       const u16 addrSampStart = readShort(offDirEnt);
 
-      auto *rgn = new KonamiSnesRgn(this, version, header.offset, true, header.note);
+      auto rgn = std::make_unique<KonamiSnesRgn>(this, version, header.offset, true, header.note);
       rgn->sampOffset = addrSampStart - spcDirAddr;
       if (!rgn->loadRgn()) {
-        delete rgn;
         return false;
       }
 
-      addRgn(rgn);
+      addRgn(std::move(rgn));
     }
     setGuessedLength();
     return !percussionHeaders.empty() && !regions().empty();
@@ -283,9 +279,8 @@ bool KonamiSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  KonamiSnesRgn *rgn = new KonamiSnesRgn(this, version, offset(), percussion);
+  KonamiSnesRgn *rgn = emplaceRgn<KonamiSnesRgn>(this, version, offset(), percussion);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  addRgn(rgn);
 
   setGuessedLength();
   return true;

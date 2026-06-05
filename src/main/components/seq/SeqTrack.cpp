@@ -38,6 +38,16 @@ SeqTrack::SeqTrack(VGMSeq *parentFile, u32 offset, u32 length, std::string name)
   SeqTrack::resetVars();
 }
 
+bool SeqTrack::usesLinearAmplitudeScale() const {
+  return m_useLinearAmpScale || parentSeq->usesLinearAmplitudeScale();
+}
+
+SeqEventTimeIndex::Index SeqTrack::addTimedEventIndexEntry(SeqEvent* event,
+                                                           u32 startTick,
+                                                           u32 duration) {
+  return parentSeq->timedEventIndex().addEvent(event, startTick, duration);
+}
+
 void SeqTrack::resetVars() {
   active = true;
   bInLoop = false;
@@ -388,28 +398,29 @@ bool SeqTrack::onEvent(u32 offset, u32 length) {
   return visitedAddresses.insert(offset).second;
 }
 
-SeqEvent* SeqTrack::addEvent(SeqEvent *pSeqEvent) {
+SeqEvent* SeqTrack::addEvent(std::unique_ptr<SeqEvent> seqEvent) {
   if (readMode != READMODE_ADD_TO_UI)
     return nullptr;
 
-  addChild(pSeqEvent);
+  auto* rawEvent = seqEvent.get();
+  addChild(std::move(seqEvent));
 
   // care for a case where the new event is located before the start address
   // (example: Donkey Kong Country - Map, Track 7 of 8)
-  if (offset() > pSeqEvent->offset()) {
+  if (offset() > rawEvent->offset()) {
     if (bDetermineTrackLengthEventByEvent) {
-      setLength(length() + ((offset() - pSeqEvent->offset())));
+      setLength(length() + ((offset() - rawEvent->offset())));
     }
-    setOffset(pSeqEvent->offset());
+    setOffset(rawEvent->offset());
   }
 
   if (bDetermineTrackLengthEventByEvent) {
-    u32 newTrkLen = pSeqEvent->offset() + pSeqEvent->length() - offset();
+    u32 newTrkLen = rawEvent->offset() + rawEvent->length() - offset();
     if (length() < newTrkLen)
       setLength(newTrkLen);
   }
 
-  return pSeqEvent;
+  return rawEvent;
 }
 
 SeqEvent* SeqTrack::findSeqEventAtOffset(u32 offset, u32 length) {
@@ -443,9 +454,9 @@ SeqEvent* SeqTrack::addGenericEvent(u32 offset,
   if (readMode == READMODE_ADD_TO_UI) {
     if (isNewOffset && m_emitSeqEvents) {
       auto* target = seqEventTarget();
-      auto* event = new SeqEvent(target, offset, length, sEventName, type, sEventDesc);
+      auto event = std::make_unique<SeqEvent>(target, offset, length, sEventName, type, sEventDesc);
       event->channel = static_cast<u8>(channel);
-      return target->addEvent(event);
+      return target->addEvent(std::move(event));
     }
     return nullptr;
   }
@@ -848,7 +859,7 @@ void SeqTrack::makePrevDurNoteEnd() const {
 
 void SeqTrack::makePrevDurNoteEnd(u32 absTime) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    for (auto& prevDurNoteOff : pMidiTrack->prevDurNoteOffs) {
+    for (auto* prevDurNoteOff : pMidiTrack->previousDurNoteOffs()) {
       prevDurNoteOff->absTime = absTime;
     }
     auto& timeline = parentSeq->timedEventIndex();
@@ -865,7 +876,7 @@ void SeqTrack::limitPrevDurNoteEnd() const {
 
 void SeqTrack::limitPrevDurNoteEnd(u32 absTime) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    for (auto& prevDurNoteOff : pMidiTrack->prevDurNoteOffs) {
+    for (auto* prevDurNoteOff : pMidiTrack->previousDurNoteOffs()) {
       if (prevDurNoteOff->absTime > absTime) {
         prevDurNoteOff->absTime = absTime;
       }

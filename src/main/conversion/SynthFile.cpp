@@ -39,12 +39,12 @@ SynthInstr *SynthFile::addInstr(u32 bank, u32 instrNum, std::string name, float 
 }
 
 void SynthFile::adoptInstr(std::unique_ptr<SynthInstr> instr) {
-  vInstrs.push_back(instr.get());
+  m_instrObservers.push_back(instr.get());
   m_instrs.push_back(std::move(instr));
 }
 
 std::vector<std::unique_ptr<SynthInstr>> SynthFile::releaseInstrs() {
-  vInstrs.clear();
+  m_instrObservers.clear();
   return std::exchange(m_instrs, {});
 }
 
@@ -72,12 +72,12 @@ SynthWave *SynthFile::addWave(u16 formatTag,
 }
 
 void SynthFile::adoptWave(std::unique_ptr<SynthWave> wave) {
-  vWaves.push_back(wave.get());
+  m_waveObservers.push_back(wave.get());
   m_waves.push_back(std::move(wave));
 }
 
 std::vector<std::unique_ptr<SynthWave>> SynthFile::releaseWaves() {
-  vWaves.clear();
+  m_waveObservers.clear();
   return std::exchange(m_waves, {});
 }
 
@@ -97,15 +97,6 @@ SynthInstr::SynthInstr(u32 bank, u32 instrument, std::string instrName, float re
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(u32 bank, u32 instrument, std::string instrName,
-                       const std::vector<SynthRgn *>& listRgns, float reverb)
-    : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverb)  {
-  //RiffFile::AlignName(name);
-  for (auto *rgn : listRgns) {
-    adoptRgn(std::unique_ptr<SynthRgn>(rgn));
-  }
-}
-
 SynthInstr::~SynthInstr() = default;
 
 SynthRgn *SynthInstr::addRgn() {
@@ -123,7 +114,7 @@ SynthRgn *SynthInstr::addRgn(const SynthRgn& rgn) {
 }
 
 void SynthInstr::adoptRgn(std::unique_ptr<SynthRgn> rgn) {
-  vRgns.push_back(rgn.get());
+  m_regionObservers.push_back(rgn.get());
   m_regions.push_back(std::move(rgn));
 }
 

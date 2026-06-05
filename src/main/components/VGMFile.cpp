@@ -11,6 +11,7 @@
 #include "Root.h"
 
 #include <limits>
+#include <utility>
 
 VGMFile::VGMFile(std::string format, RawFile *rawfile, u32 offset,
                  u32 length, std::string name)
@@ -18,6 +19,19 @@ VGMFile::VGMFile(std::string format, RawFile *rawfile, u32 offset,
       m_rawfile(rawfile),
       m_format(std::move(format)),
       m_id(std::numeric_limits<u32>::max()) {}
+
+std::vector<std::unique_ptr<VGMFile>> VGMFile::releaseDiscoveredFiles() {
+  return std::exchange(m_discoveredFiles, {});
+}
+
+bool VGMFile::addDiscoveredFile(std::unique_ptr<VGMFile> file) {
+  if (!file || !file->load()) {
+    return false;
+  }
+
+  m_discoveredFiles.emplace_back(std::move(file));
+  return true;
+}
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add
 // this as an item because we do not want the VGMFile to be itself an item in the Item View
@@ -42,13 +56,13 @@ std::string VGMFile::description() {
 }
 
 void VGMFile::addCollAssoc(VGMColl *coll) {
-  assocColls.push_back(coll);
+  m_assocColls.push_back(coll);
 }
 
 void VGMFile::removeCollAssoc(VGMColl *coll) {
-  auto iter = std::ranges::find(assocColls, coll);
-  if (iter != assocColls.end())
-    assocColls.erase(iter);
+  auto iter = std::ranges::find(m_assocColls, coll);
+  if (iter != m_assocColls.end())
+    m_assocColls.erase(iter);
 }
 
 // These functions are common to all VGMItems, but no reason to refer to vgmfile
@@ -81,15 +95,15 @@ VGMHeader::~VGMHeader() = default;
 
 void VGMHeader::addPointer(u32 offset, u32 length, u32 /*destAddress*/, bool /*notNull*/,
                            const std::string &name) {
-  addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_POINTER, offset, length, name));
+  emplaceChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_POINTER, offset, length, name);
 }
 
 void VGMHeader::addTempo(u32 offset, u32 length, const std::string &name) {
-  addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_TEMPO, offset, length, name));
+  emplaceChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_TEMPO, offset, length, name);
 }
 
 void VGMHeader::addSig(u32 offset, u32 length, const std::string &name) {
-  addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_SIG, offset, length, name));
+  emplaceChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_SIG, offset, length, name);
 }
 
 // *************

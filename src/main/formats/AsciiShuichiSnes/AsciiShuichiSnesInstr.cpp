@@ -48,19 +48,16 @@ bool AsciiShuichiSnesInstrSet::parseInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    const auto newInstr = new AsciiShuichiSnesInstr(
+    emplaceInstr<AsciiShuichiSnesInstr>(
       this, instrHeaderAddress, instr >> 7, instr & 0x7f, spcDirAddress, fineTuningTableAddress,
       fmt::format("Instrument {}", instr));
-    aInstrs.push_back(newInstr);
   }
-  if (aInstrs.empty()) {
+  if (!hasInstrs()) {
     return false;
   }
 
   std::ranges::sort(usedSRCNs);
-  auto newSampColl = new SNESSampColl(AsciiShuichiSnesFormat::name, this->rawFile(), spcDirAddress, usedSRCNs);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(AsciiShuichiSnesFormat::name, rawFile(), spcDirAddress, usedSRCNs)) {
     return false;
   }
 
@@ -97,9 +94,8 @@ bool AsciiShuichiSnesInstr::loadInstr() {
   }
   const auto spcFineTuning = static_cast<s8>(readByte(fineTuningTableAddress + srcn));
 
-  const auto rgn = new AsciiShuichiSnesRgn(this, offset(), spcFineTuning);
+  const auto rgn = emplaceRgn<AsciiShuichiSnesRgn>(this, offset(), spcFineTuning);
   rgn->sampOffset = sampleStartAddress - spcDirAddress;
-  addRgn(rgn);
 
   return true;
 }

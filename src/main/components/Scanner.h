@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "Root.h"
+
 class RawFile;
 class Format;
 

@@ -11,6 +11,8 @@
 #include "SuzukiSnesSeq.h"
 #include "VGMColl.h"
 
+#include <memory>
+
 #include <spdlog/fmt/fmt.h>
 
 namespace {
@@ -86,20 +88,17 @@ bool SuzukiSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    SuzukiSnesInstr *newInstr = new SuzukiSnesInstr(
+    emplaceInstr<SuzukiSnesInstr>(
       this, version, instrNum, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable,
       addrTuningTable, fmt::format("Instrument: {:#x}", srcn));
-    aInstrs.push_back(newInstr);
   }
-  if (aInstrs.size() == 0) {
+  if (!hasInstrs()) {
     return false;
   }
 
   // Load all valid Suzuki sample slots so conversion-time drumkits can reuse the base sample collection.
-  SNESSampColl *newSampColl = new SNESSampColl(
-      SuzukiSnesFormat::name, this->rawFile(), spcDirAddr, kSuzukiSnesSrcnCount);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
+  if (!addDiscoveredFile<SNESSampColl>(
+      SuzukiSnesFormat::name, rawFile(), spcDirAddr, kSuzukiSnesSrcnCount)) {
     return false;
   }
 
@@ -124,14 +123,14 @@ void SuzukiSnesInstrSet::useColl(const VGMColl* coll) {
     return;
   }
 
-  auto* drumKit = new SuzukiSnesDrumKit(this, version, DRUMKIT_PROGRAM, spcDirAddr, addrSRCNTable,
-                                        addrTuningTable, addrADSRTable, addrDrumKitTable, "Drum Kit");
+  auto drumKit = std::make_unique<SuzukiSnesDrumKit>(
+      this, version, DRUMKIT_PROGRAM, spcDirAddr, addrSRCNTable,
+      addrTuningTable, addrADSRTable, addrDrumKitTable, "Drum Kit");
   if (!drumKit->loadInstr() || drumKit->regions().empty()) {
-    delete drumKit;
     return;
   }
 
-  addTempInstr(drumKit);
+  addTempInstr(std::move(drumKit));
 }
 
 // ***************
@@ -172,12 +171,11 @@ bool SuzukiSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  SuzukiSnesRgn *rgn = new SuzukiSnesRgn(this, version, addrSRCNTable);
+  SuzukiSnesRgn *rgn = emplaceRgn<SuzukiSnesRgn>(this, version, addrSRCNTable);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   rgn->initializeNonPercussionRegion(instrNum, addrVolumeTable);
   rgn->initializeCommonRegion(srcn, spcDirAddr, addrADSRTable, addrTuningTable);
   rgn->loadRgn();
-  addRgn(rgn);
 
   setGuessedLength();
   return true;
@@ -208,20 +206,17 @@ bool SuzukiSnesDrumKit::loadInstr() {
   u16 addr = addrDrumKitTable;
 
   for (u16 i = addr; readByte(i) < 0x80; i += 5) {
-    SuzukiSnesDrumKitRgn *rgn = new SuzukiSnesDrumKitRgn(this, version, addrDrumKitTable);
+    auto rgn = std::make_unique<SuzukiSnesDrumKitRgn>(this, version, addrDrumKitTable);
 
     if (!rgn->initializePercussionRegion(i, spcDirAddr, addrSRCNTable, addrADSRTable, addrTuningTable)) {
-      delete rgn;
       continue;
     }
     if (!rgn->loadRgn()) {
-      delete rgn;
       return false;
     }
 
     u32 rgnOffDirEnt = spcDirAddr + (rgn->sampNum * 4);
     if (rgnOffDirEnt + 4 > 0x10000) {
-      delete rgn;
       return false;
     }
 
@@ -229,7 +224,7 @@ bool SuzukiSnesDrumKit::loadInstr() {
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
-    addRgn(rgn);
+    addRgn(std::move(rgn));
   }
 
   setGuessedLength();

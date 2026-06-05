@@ -62,24 +62,15 @@ void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
     std::vector<TriAcePS1InstrSet *> instrsets;
     searchForInstrSet(file, instrsets);
 
-    //u32 cfSize = file->GetWord(i-4);
-    //TriAcePS1InstrSet* instrset = new TriAcePS1InstrSet(file, i-4 + cfSize);
-    //if (!instrset->LoadVGMFile())
-    //{
-    //	delete instrset;
-    //	return;
-    //}
     if (!instrsets.size())
       return;
 
     std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
-    VGMColl *coll = new VGMColl(name);
+    auto coll = std::make_unique<VGMColl>(name);
     coll->useSeq(seq);
     for (u32 setIdx = 0; setIdx < instrsets.size(); setIdx++)
       coll->addInstrSet(instrsets[setIdx]);
-    if (!coll->load()) {
-      delete coll;
-    }
+    pRoot->loadVGMColl(std::move(coll));
   }
 }
 
@@ -117,9 +108,8 @@ void TriAcePS1Scanner::searchForInstrSet(RawFile *file, std::vector<TriAcePS1Ins
     if (file->readWord(i + instrSectSize - 4) != 0xFFFFFFFF)
       continue;
 
-    TriAcePS1InstrSet *instrset = new TriAcePS1InstrSet(file, i);
-    if (!instrset->loadVGMFile()) {
-      delete instrset;
+    auto* instrset = pRoot->emplaceVGMFile<TriAcePS1InstrSet>(file, i);
+    if (!instrset) {
       continue;
     }
     instrsets.push_back(instrset);
@@ -211,19 +201,17 @@ TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, u32 cfOff
 
   // Create the new virtual file, and analyze the sequence
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
-  auto newVirtFile = new VirtFile(uf, ufOff, fmt::format("{} Sequence", name), file->path());
+  auto newVirtFile = std::make_unique<VirtFile>(uf, ufOff, fmt::format("{} Sequence", name), file->path());
+  delete[] uf;
 
-  TriAcePS1Seq *newSeq = new TriAcePS1Seq(newVirtFile, 0, name);
-  bool bLoadSucceed = newSeq->loadVGMFile();
+  auto* rawVirtFile = newVirtFile.get();
+  rawVirtFile->setUseLoaders(false);
+  rawVirtFile->setUseScanners(false);
 
-  newVirtFile->setUseLoaders(false);
-  newVirtFile->setUseScanners(false);
-  pRoot->loadRawFile(newVirtFile);
+  auto seq = std::make_unique<TriAcePS1Seq>(rawVirtFile, 0, name);
+  auto* rawSeq = seq.get();
+  const bool loadSucceeded = pRoot->loadVGMFile(std::move(seq));
+  pRoot->loadRawFile(std::move(newVirtFile));
 
-  if (bLoadSucceed)
-    return newSeq;
-  else {
-    delete newSeq;
-    return NULL;
-  }
+  return loadSucceeded ? rawSeq : nullptr;
 }

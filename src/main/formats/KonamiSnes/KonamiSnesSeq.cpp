@@ -203,7 +203,7 @@ bool KonamiSnesSeq::parseHeader(void) {
 bool KonamiSnesSeq::parseTrackPointers(void) {
   for (u32 trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
     u16 trkOff = readShort(offset() + trackNumber * 2);
-    aTracks.push_back(new KonamiSnesTrack(this, trkOff));
+    addTrack<KonamiSnesTrack>(this, trkOff);
   }
   return true;
 }
@@ -709,7 +709,7 @@ void KonamiSnesTrack::applyCurrentTempo() {
     parentSeq.tempo = newTempo;
     addTempoBPMNoItem(parentSeq.getTempoInBPM(newTempo));
     if (konami_snes::usesLegacyVibrato(parentSeq.version)) {
-      for (SeqTrack *track : parentSeq.aTracks) {
+      for (SeqTrack *track : parentSeq.tracks()) {
         static_cast<KonamiSnesTrack*>(track)->syncVibratoRateAndDelay();
       }
     }
@@ -1159,7 +1159,7 @@ bool KonamiSnesTrack::readEvent() {
       parentSeq.tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
       if (konami_snes::usesLegacyVibrato(parentSeq.version)) {
-        for (SeqTrack *track : parentSeq.aTracks) {
+        for (SeqTrack *track : parentSeq.tracks()) {
           static_cast<KonamiSnesTrack*>(track)->syncVibratoRateAndDelay();
         }
       }

@@ -24,13 +24,11 @@ void KonamiPS1Scanner::scan(RawFile *file, void *info) {
         name += fmt::format("({})", numSeqFiles + 1);
       }
 
-      KonamiPS1Seq *newSeq = new KonamiPS1Seq(file, offset, name);
-      if (newSeq->loadVGMFile()) {
+      auto* newSeq = pRoot->emplaceVGMFile<KonamiPS1Seq>(file, offset, name);
+      if (newSeq) {
         offset += newSeq->length();
         numSeqFiles++;
         continue;
-      } else {
-        delete newSeq;
       }
     }
     offset++;

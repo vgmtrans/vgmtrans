@@ -59,23 +59,20 @@ bool CPS2Seq::parseTrackPointers() {
     //if (GetShortBE(offset+offset()) == 0xE017)	//Rest, EndTrack (used by empty tracks)
     //	continue;
 
-    SeqTrack *newTrack;
-
     switch (fmt_version) {
       case CPS2_V200:
       case CPS2_V201B:
       case CPS2_V210:
       case CPS2_V211:
       case CPS3:
-        newTrack = new CPS2TrackV2(this, trkOff + offset());
+        addTrack<CPS2TrackV2>(this, trkOff + offset());
         break;
       default:
-        newTrack = new CPS2TrackV1(this, trkOff + offset());
+        addTrack<CPS2TrackV1>(this, trkOff + offset());
     }
-    aTracks.push_back(newTrack);
     header->addChild(offset() + 1 + (i * 2), 2, "Track Pointer");
   }
-  if (aTracks.size() == 0)
+  if (!hasTracks())
     return false;
 
   return true;
@@ -95,11 +92,12 @@ bool CPS2Seq::postLoad() {
   //  ticks in our sequence into absolute elapsed time, which means we also need to keep
   //  track of any tempo events that change the absolute time per tick.
   std::vector<MidiEvent *> tempoEvents;
-  std::vector<MidiTrack *> &miditracks = midi->aTracks;
+  const auto &miditracks = midi->tracks();
 
   // First get all tempo events, we assume they occur on track 1
-  for (unsigned int i = 0; i < miditracks[0]->aEvents.size(); i++) {
-    MidiEvent *event = miditracks[0]->aEvents[i];
+  const auto& firstTrackEvents = miditracks[0]->events();
+  for (unsigned int i = 0; i < firstTrackEvents.size(); i++) {
+    MidiEvent *event = firstTrackEvents[i];
     if (event->eventType() == MIDIEVENT_TEMPO)
       tempoEvents.push_back(event);
   }
@@ -108,10 +106,11 @@ bool CPS2Seq::postLoad() {
   for (unsigned int i = 0; i < miditracks.size(); i++) {
     std::vector<MidiEvent *> events(tempoEvents);
     MidiTrack *track = miditracks[i];
-    int channel = this->aTracks[i]->channel;
+    int channel = this->track(i)->channel;
 
-    for (unsigned int j = 0; j < track->aEvents.size(); j++) {
-      MidiEvent *event = miditracks[i]->aEvents[j];
+    const auto& trackEvents = track->events();
+    for (unsigned int j = 0; j < trackEvents.size(); j++) {
+      MidiEvent *event = trackEvents[j];
       MidiEventType type = event->eventType();
       if (type == MIDIEVENT_MARKER || type == MIDIEVENT_PITCHBEND || type == MIDIEVENT_ENDOFTRACK)
         events.push_back(event);
