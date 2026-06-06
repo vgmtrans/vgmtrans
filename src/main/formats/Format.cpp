@@ -39,6 +39,10 @@ std::unique_ptr<VGMColl> Format::newCollection() {
   return std::make_unique<VGMColl>();
 }
 
+std::unique_ptr<Matcher> Format::newMatcher() {
+  return nullptr;
+}
+
 bool Format::onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
   if (!matcher) {
     return false;

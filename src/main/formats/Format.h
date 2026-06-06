@@ -69,7 +69,7 @@ public:
   virtual const std::string &getName() = 0;
   virtual std::unique_ptr<VGMScanner> newScanner() { return nullptr; }
   VGMScanner &getScanner() const { return *scanner; }
-  virtual std::unique_ptr<Matcher> newMatcher() { return nullptr; }
+  virtual std::unique_ptr<Matcher> newMatcher();
   virtual std::unique_ptr<VGMColl> newCollection();
   virtual bool onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
   virtual bool onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
