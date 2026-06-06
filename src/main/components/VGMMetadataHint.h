@@ -15,24 +15,22 @@
 #include <utility>
 #include <vector>
 
-struct VGMMetadataHint {
+struct VGMMetadataHintTarget {
   std::string targetFormat;
-  std::string sourceFormat;
-  std::filesystem::path sourcePath;
-  VGMTag tag;
   std::optional<u32> songIndex;
   std::optional<u32> romAddress;
   std::optional<u32> fileOffset;
   std::optional<std::string> lookupKey;
 };
 
-struct VGMMetadataHintQuery {
-  std::string targetFormat;
-  std::optional<u32> songIndex;
-  std::optional<u32> romAddress;
-  std::optional<u32> fileOffset;
-  std::optional<std::string> lookupKey;
+struct VGMMetadataHint {
+  VGMMetadataHintTarget target;
+  std::string sourceFormat;
+  std::filesystem::path sourcePath;
+  VGMTag tag;
 };
+
+using VGMMetadataHintQuery = VGMMetadataHintTarget;
 
 class VGMMetadataHintProvider {
 public:
@@ -46,35 +44,33 @@ public:
 class IndexedMetadataHintProvider final : public VGMMetadataHintProvider {
 public:
   explicit IndexedMetadataHintProvider(std::vector<VGMMetadataHint> hints)
-      : m_hints(std::move(hints)) {
-    buildIndexes();
-  }
+      : m_hints(std::move(hints)), m_indexes(buildIndexes(m_hints)) {}
 
   [[nodiscard]] const VGMMetadataHint* findHint(
       const VGMMetadataHintQuery& query) const override {
     if (query.songIndex) {
-      if (const auto* hint = findIndexed(m_bySongIndex, query.targetFormat, *query.songIndex);
+      if (const auto* hint = findIndexed(m_indexes.bySongIndex, query.targetFormat, *query.songIndex);
           hint && matchesQuery(*hint, query)) {
         return hint;
       }
     }
 
     if (query.romAddress) {
-      if (const auto* hint = findIndexed(m_byRomAddress, query.targetFormat, *query.romAddress);
+      if (const auto* hint = findIndexed(m_indexes.byRomAddress, query.targetFormat, *query.romAddress);
           hint && matchesQuery(*hint, query)) {
         return hint;
       }
     }
 
     if (query.fileOffset) {
-      if (const auto* hint = findIndexed(m_byFileOffset, query.targetFormat, *query.fileOffset);
+      if (const auto* hint = findIndexed(m_indexes.byFileOffset, query.targetFormat, *query.fileOffset);
           hint && matchesQuery(*hint, query)) {
         return hint;
       }
     }
 
     if (query.lookupKey) {
-      if (const auto* hint = findIndexed(m_byLookupKey, query.targetFormat, *query.lookupKey);
+      if (const auto* hint = findIndexed(m_indexes.byLookupKey, query.targetFormat, *query.lookupKey);
           hint && matchesQuery(*hint, query)) {
         return hint;
       }
@@ -97,47 +93,53 @@ private:
   using Index = std::unordered_map<std::string, std::unordered_map<u32, size_t>>;
   using StringIndex = std::unordered_map<std::string, std::unordered_map<std::string, size_t>>;
 
-  std::vector<VGMMetadataHint> m_hints;
-  Index m_bySongIndex;
-  Index m_byRomAddress;
-  Index m_byFileOffset;
-  StringIndex m_byLookupKey;
+  struct Indexes {
+    Index bySongIndex;
+    Index byRomAddress;
+    Index byFileOffset;
+    StringIndex byLookupKey;
+  };
+
+  const std::vector<VGMMetadataHint> m_hints;
+  const Indexes m_indexes;
 
   static bool matchesQuery(const VGMMetadataHint& hint, const VGMMetadataHintQuery& query) {
-    if (!query.targetFormat.empty() && hint.targetFormat != query.targetFormat) {
+    if (!query.targetFormat.empty() && hint.target.targetFormat != query.targetFormat) {
       return false;
     }
-    if (query.songIndex && hint.songIndex != query.songIndex) {
+    if (query.songIndex && hint.target.songIndex != query.songIndex) {
       return false;
     }
-    if (query.romAddress && hint.romAddress != query.romAddress) {
+    if (query.romAddress && hint.target.romAddress != query.romAddress) {
       return false;
     }
-    if (query.fileOffset && hint.fileOffset != query.fileOffset) {
+    if (query.fileOffset && hint.target.fileOffset != query.fileOffset) {
       return false;
     }
-    if (query.lookupKey && hint.lookupKey != query.lookupKey) {
+    if (query.lookupKey && hint.target.lookupKey != query.lookupKey) {
       return false;
     }
     return true;
   }
 
-  void buildIndexes() {
-    for (size_t i = 0; i < m_hints.size(); i++) {
-      const auto& hint = m_hints[i];
-      if (hint.songIndex) {
-        m_bySongIndex[hint.targetFormat].try_emplace(*hint.songIndex, i);
+  static Indexes buildIndexes(const std::vector<VGMMetadataHint>& hints) {
+    Indexes indexes;
+    for (size_t i = 0; i < hints.size(); i++) {
+      const auto& hint = hints[i];
+      if (hint.target.songIndex) {
+        indexes.bySongIndex[hint.target.targetFormat].try_emplace(*hint.target.songIndex, i);
       }
-      if (hint.romAddress) {
-        m_byRomAddress[hint.targetFormat].try_emplace(*hint.romAddress, i);
+      if (hint.target.romAddress) {
+        indexes.byRomAddress[hint.target.targetFormat].try_emplace(*hint.target.romAddress, i);
       }
-      if (hint.fileOffset) {
-        m_byFileOffset[hint.targetFormat].try_emplace(*hint.fileOffset, i);
+      if (hint.target.fileOffset) {
+        indexes.byFileOffset[hint.target.targetFormat].try_emplace(*hint.target.fileOffset, i);
       }
-      if (hint.lookupKey) {
-        m_byLookupKey[hint.targetFormat].try_emplace(*hint.lookupKey, i);
+      if (hint.target.lookupKey) {
+        indexes.byLookupKey[hint.target.targetFormat].try_emplace(*hint.target.lookupKey, i);
       }
     }
+    return indexes;
   }
 
   [[nodiscard]] const VGMMetadataHint* findIndexed(

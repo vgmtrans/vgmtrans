@@ -152,14 +152,13 @@ std::optional<VGMMetadataHint> hintFromGsf(const PSFFile& psf,
   }
 
   return VGMMetadataHint{
-      .targetFormat = MP2K_FORMAT_NAME,
+      .target = {
+          .targetFormat = MP2K_FORMAT_NAME,
+          .songIndex = songIndex,
+      },
       .sourceFormat = "GSF",
       .sourcePath = sourcePath,
       .tag = PSFFile::tagFromPSFFile(psf),
-      .songIndex = songIndex,
-      .romAddress = std::nullopt,
-      .fileOffset = std::nullopt,
-      .lookupKey = std::nullopt,
   };
 }
 
@@ -236,14 +235,13 @@ std::optional<VGMMetadataHint> hintFromNdsPsf(const PSFFile& psf,
   }
 
   return VGMMetadataHint{
-      .targetFormat = NDS_FORMAT_NAME,
+      .target = {
+          .targetFormat = NDS_FORMAT_NAME,
+          .lookupKey = origFilename->second,
+      },
       .sourceFormat = ndsSourceFormat(psf.version()),
       .sourcePath = sourcePath,
       .tag = PSFFile::tagFromPSFFile(psf),
-      .songIndex = std::nullopt,
-      .romAddress = std::nullopt,
-      .fileOffset = std::nullopt,
-      .lookupKey = origFilename->second,
   };
 }
 
