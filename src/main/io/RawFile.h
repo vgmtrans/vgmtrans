@@ -7,6 +7,7 @@
 #pragma once
 
 #include "base/Types.h"
+#include "components/VGMMetadataHint.h"
 #include "components/VGMTag.h"
 #include "Root.h"
 #include "util/Path.h"
@@ -124,10 +125,22 @@ class RawFile {
     void addContainedVGMFile(VGMFileVariant);
     void removeContainedVGMFile(VGMFileVariant);
 
+    void setMetadataHintProvider(std::shared_ptr<const VGMMetadataHintProvider> provider) {
+      m_metadataHintProvider = std::move(provider);
+    }
+    [[nodiscard]] std::shared_ptr<const VGMMetadataHintProvider> metadataHintProvider() const {
+      return m_metadataHintProvider;
+    }
+    [[nodiscard]] const VGMMetadataHint* findMetadataHint(
+        const VGMMetadataHintQuery& query) const {
+      return m_metadataHintProvider ? m_metadataHintProvider->findHint(query) : nullptr;
+    }
+
     VGMTag tag;
 
    private:
     std::vector<VGMFileVariant> m_vgmfiles;
+    std::shared_ptr<const VGMMetadataHintProvider> m_metadataHintProvider;
     enum ProcessFlags { UseLoaders = 1, UseScanners = 2 };
     unsigned m_flags = UseLoaders | UseScanners;
 };
@@ -169,7 +182,8 @@ class VirtFile final : public RawFile {
     VirtFile(const RawFile &, size_t offset = 0);
     VirtFile(const RawFile &, size_t offset, size_t limit);
     VirtFile(const u8 *data, u32 size, std::string name, std::filesystem::path parent_fullpath = "",
-             const VGMTag& tag = VGMTag());
+             const VGMTag& tag = VGMTag(),
+             std::shared_ptr<const VGMMetadataHintProvider> metadataHintProvider = nullptr);
     ~VirtFile() override = default;
 
     [[nodiscard]] std::string name() const override { return m_name; };

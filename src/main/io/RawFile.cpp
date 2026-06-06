@@ -82,8 +82,10 @@ VirtFile::VirtFile(const RawFile &file, size_t offset, size_t limit)
 }
 
 VirtFile::VirtFile(const u8 *data, u32 fileSize, std::string name,
-                   std::filesystem::path parent_fullpath, const VGMTag& tag)
+                   std::filesystem::path parent_fullpath, const VGMTag& tag,
+                   std::shared_ptr<const VGMMetadataHintProvider> metadataHintProvider)
     : m_name(std::move(name)), m_lpath(std::move(parent_fullpath)) {
   std::copy_n(data, fileSize, std::back_inserter(m_data));
   this->tag = tag;
+  setMetadataHintProvider(std::move(metadataHintProvider));
 }

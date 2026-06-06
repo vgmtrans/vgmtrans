@@ -501,6 +501,7 @@ target_sources(vgmtranscore
       components/VGMColl.h
       components/VGMFile.h
       components/VGMItem.h
+      components/VGMMetadataHint.h
       components/VGMMiscFile.h
       components/VGMSampColl.h
       components/VGMTag.h

@@ -10,17 +10,70 @@
 #include "io/RawFile.h"
 #include "util/Decompression.h"
 
+#include <cerrno>
+#include <optional>
+#include <cstdlib>
+#include <string>
+#include <string_view>
+
 constexpr auto PSF_TAG_SIG = "[TAG]";
 constexpr auto PSF_TAG_SIG_LEN = 5;
 
+namespace {
+
+std::optional<double> parsePsfLength(std::string_view value) {
+  double totalSeconds = 0.0;
+  size_t componentStart = 0;
+  size_t componentCount = 0;
+
+  while (componentStart <= value.size()) {
+    const size_t componentEnd = value.find(':', componentStart);
+    const auto component = value.substr(
+        componentStart,
+        componentEnd == std::string_view::npos ? std::string_view::npos
+                                               : componentEnd - componentStart);
+    if (component.empty()) {
+      return std::nullopt;
+    }
+
+    const std::string componentString(component);
+    char* parseEnd = nullptr;
+    errno = 0;
+    const double parsed = std::strtod(componentString.c_str(), &parseEnd);
+    if (errno == ERANGE || parseEnd != componentString.c_str() + componentString.size()) {
+      return std::nullopt;
+    }
+
+    totalSeconds = totalSeconds * 60.0 + parsed;
+    componentCount++;
+
+    if (componentEnd == std::string_view::npos) {
+      break;
+    }
+    componentStart = componentEnd + 1;
+  }
+
+  return componentCount > 0 ? std::optional<double>(totalSeconds) : std::nullopt;
+}
+
+}  // namespace
+
 VGMTag PSFFile::tagFromPSFFile(const PSFFile& psf) {
   auto& psfTags = psf.tags();
-  return VGMTag(
+  auto tag = VGMTag(
     psfTags.contains("title") ? psfTags.at("title") : "",
     psfTags.contains("artist") ? psfTags.at("artist") : "",
     psfTags.contains("game") ? psfTags.at("game") : "",
     psfTags.contains("comment") ? psfTags.at("comment") : ""
   );
+
+  if (auto it = psfTags.find("length"); it != psfTags.end()) {
+    if (auto length = parsePsfLength(it->second)) {
+      tag.length = *length;
+    }
+  }
+
+  return tag;
 }
 
 PSFFile::PSFFile(const RawFile &file) {
