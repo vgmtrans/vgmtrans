@@ -7,6 +7,7 @@
 
 #include <map>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -29,7 +30,7 @@ class TriAcePS1Seq:
   void resetVars() override;
 
   bool postLoad() override;
-  [[nodiscard]] const std::vector<TriAcePS1ScorePattern*>& scorePatterns() const {
+  [[nodiscard]] std::span<TriAcePS1ScorePattern* const> scorePatterns() const {
     return m_scorePatterns;
   }
 

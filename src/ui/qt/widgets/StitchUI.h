@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <span>
 #include <vector>
 
 class QWidget;
@@ -13,11 +14,11 @@ class QAbstractButton;
 class VGMColl;
 
 namespace stitchui {
-void openCollectionStitchBalloon(const std::vector<VGMColl*>& initialCollections,
+void openCollectionStitchBalloon(std::span<VGMColl* const> initialCollections,
                                  QWidget* parent = nullptr,
                                  QWidget* anchor = nullptr,
                                  QAbstractButton* toggleButton = nullptr);
-[[nodiscard]] bool toggleCollectionStitchBalloon(const std::vector<VGMColl*>& initialCollections,
+[[nodiscard]] bool toggleCollectionStitchBalloon(std::span<VGMColl* const> initialCollections,
                                                  QWidget* parent = nullptr,
                                                  QWidget* anchor = nullptr,
                                                  QAbstractButton* toggleButton = nullptr);

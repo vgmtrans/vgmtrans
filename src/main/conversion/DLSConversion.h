@@ -5,6 +5,7 @@
 */
 #pragma once
 
+#include <span>
 #include <vector>
 
 class DLSFile;
@@ -20,15 +21,15 @@ bool createDLSFile(DLSFile& dls, const VGMColl& coll);
 bool createDLSFile(DLSFile& dls, const VGMColl& coll, const ConversionContext& context);
 bool createDLSFile(
   DLSFile& dls,
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
+  std::span<VGMInstrSet* const> instrsets,
+  std::span<VGMSampColl* const> sampcolls,
   const VGMColl* coll,
   const ConversionContext& context
 );
 bool mainDLSCreation(
   DLSFile& dls,
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
+  std::span<VGMInstrSet* const> instrsets,
+  std::span<VGMSampColl* const> sampcolls,
   const ConversionContext& context
 );
 void unpackSampColl(DLSFile& dls, const VGMSampColl* sampColl, std::vector<VGMSamp*>& finalSamps);

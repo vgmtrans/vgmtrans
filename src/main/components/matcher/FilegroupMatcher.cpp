@@ -135,7 +135,7 @@ void FilegroupMatcher::lookForMatch() {
   for (VGMSeq* seq : seqs) {
     const InstrAssoc& assoc = *assocIt;
 
-    auto coll = fmt->newCollection();
+    auto coll = fmt->createCollection();
     coll->setName(seq->name());
     coll->attachSeq(seq);
     coll->attachInstrSet(assoc.instrSet);

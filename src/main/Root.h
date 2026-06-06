@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -130,9 +131,9 @@ public:
   virtual std::filesystem::path UI_openFolder(const std::filesystem::path& suggestedPath,
                                               std::string_view reason) { return {}; }
 
-  const std::vector<RawFile*>& rawFiles() { return m_rawfiles; }
+  std::span<RawFile* const> rawFiles() const { return m_rawfiles; }
   const std::vector<VGMFileVariant>& vgmFiles() { return m_vgmfiles; }
-  const std::vector<VGMColl*>& vgmColls() { return m_vgmcolls; }
+  std::span<VGMColl* const> vgmColls() const { return m_vgmcolls; }
 
 private:
   int rawFileLoadRecurseStack = 0;

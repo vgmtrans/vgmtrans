@@ -153,7 +153,7 @@ void ManualCollectionDialog::createCollection() {
   }
 
   // Get the VGMColl class for the format of the chosen sequence
-  auto coll = chosen_seq->format()->newCollection();
+  auto coll = chosen_seq->format()->createCollection();
   coll->setName(m_name_field->text().toStdString());
   coll->attachSeq(chosen_seq);
 

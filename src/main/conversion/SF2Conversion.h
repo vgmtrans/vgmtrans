@@ -6,6 +6,7 @@
 #pragma once
 
 #include <memory>
+#include <span>
 #include <vector>
 
 class SF2File;
@@ -21,14 +22,14 @@ namespace conversion {
 std::unique_ptr<SF2File> createSF2File(const VGMColl& coll);
 std::unique_ptr<SF2File> createSF2File(const VGMColl& coll, const ConversionContext& context);
 std::unique_ptr<SF2File> createSF2File(
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
+  std::span<VGMInstrSet* const> instrsets,
+  std::span<VGMSampColl* const> sampcolls,
   const VGMColl* coll,
   const ConversionContext& context
 );
 std::unique_ptr<SynthFile> createSynthFile(
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls
+  std::span<VGMInstrSet* const> instrsets,
+  std::span<VGMSampColl* const> sampcolls
 );
 void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps);
 

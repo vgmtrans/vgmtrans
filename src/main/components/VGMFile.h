@@ -10,6 +10,7 @@
 #include "VGMItem.h"
 
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -50,7 +51,7 @@ public:
 
   void addCollAssoc(VGMColl *coll);
   void removeCollAssoc(VGMColl *coll);
-  [[nodiscard]] const std::vector<VGMColl*>& assocColls() const { return m_assocColls; }
+  [[nodiscard]] std::span<VGMColl* const> assocColls() const { return m_assocColls; }
   [[nodiscard]] bool hasAssocColls() const { return !m_assocColls.empty(); }
   [[nodiscard]] RawFile *rawFile() const;
 

@@ -56,8 +56,8 @@ bool createDLSFile(DLSFile& dls, const VGMColl& coll, const ConversionContext& c
 
 bool createDLSFile(
   DLSFile& dls,
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
+  std::span<VGMInstrSet* const> instrsets,
+  std::span<VGMSampColl* const> sampcolls,
   const VGMColl* coll,
   const ConversionContext& context
 ) {
@@ -76,8 +76,8 @@ bool createDLSFile(
 
 bool mainDLSCreation(
   DLSFile& dls,
-  const std::vector<VGMInstrSet*>& m_instrsets,
-  const std::vector<VGMSampColl*>& m_sampcolls,
+  std::span<VGMInstrSet* const> m_instrsets,
+  std::span<VGMSampColl* const> m_sampcolls,
   const ConversionContext& context
 ) {
   if (m_instrsets.empty()) {

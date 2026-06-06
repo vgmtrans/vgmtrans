@@ -12,6 +12,7 @@
 #include "VGMColl.h"
 
 #include <memory>
+#include <span>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -40,7 +41,7 @@ void applyVibratoScaling(NinSnesInstrSet* instrSet, const VibratoModulationSpec&
   }
 }
 
-VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, u32 progNum) {
+VGMInstr* findInstrByProgram(std::span<VGMInstr* const> instrs, u32 progNum) {
   for (auto* instr : instrs) {
     if (getProgramNumber(instr) == progNum) {
       return instr;

@@ -11,11 +11,12 @@
 #include "VGMSeq.h"
 #include "widgets/StitchUI.h"
 
+#include <span>
 #include <vector>
 
 #include <QApplication>
 
-void StitchSequencesCommand::executeItems(std::vector<VGMFile*> vgmfiles) const {
+void StitchSequencesCommand::executeItems(std::span<VGMFile* const> vgmfiles) const {
   std::vector<VGMColl*> collections;
   collections.reserve(vgmfiles.size());
 
@@ -25,7 +26,7 @@ void StitchSequencesCommand::executeItems(std::vector<VGMFile*> vgmfiles) const 
       continue;
     }
 
-    const auto& assocColls = seq->assocColls();
+    const auto assocColls = seq->assocColls();
     const VGMColl* coll = assocColls.empty() ? nullptr : assocColls.front();
     if (!coll) {
       pRoot->UI_toast("Each selected sequence must be associated with a collection to stitch.",
@@ -38,6 +39,6 @@ void StitchSequencesCommand::executeItems(std::vector<VGMFile*> vgmfiles) const 
   stitchui::openCollectionStitchBalloon(collections, QApplication::activeWindow());
 }
 
-void StitchCollectionsCommand::executeItems(std::vector<VGMColl*> vgmcolls) const {
+void StitchCollectionsCommand::executeItems(std::span<VGMColl* const> vgmcolls) const {
   stitchui::openCollectionStitchBalloon(vgmcolls, QApplication::activeWindow());
 }

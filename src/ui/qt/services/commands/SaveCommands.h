@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -41,7 +42,7 @@ public:
     m_path = p;
   }
 
-  [[nodiscard]] const std::vector<TSavable*>& items() const { return *m_items; }
+  [[nodiscard]] std::span<TSavable* const> items() const { return *m_items; }
   [[nodiscard]] const std::filesystem::path& path() const { return m_path; }
 
 private:
@@ -111,7 +112,7 @@ public:
 
   void execute(CommandContext& context) override {
     auto& vgmContext = dynamic_cast<SaveCommandContext<TInContext>&>(context);
-    const auto& files = vgmContext.items();
+    const auto files = vgmContext.items();
     const auto& path = vgmContext.path();
 
     if (alwaysSaveToDir) {
@@ -174,7 +175,7 @@ public:
   SaveAsMidiCommand() : SaveCommand<VGMSeq, VGMFile>(false) {}
 
   void save(const std::filesystem::path& path, VGMSeq* seq) const override {
-    const auto& assocColls = seq->assocColls();
+    const auto assocColls = seq->assocColls();
     int numAssocColls = static_cast<int>(assocColls.size());
     if (numAssocColls > 0) {
       if (numAssocColls > 1 && seq->format()->usesCollectionDataForSeqConversion()) {

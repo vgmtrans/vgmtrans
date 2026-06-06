@@ -12,6 +12,7 @@
 
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -29,7 +30,7 @@ public:
     m_items = f;
   }
 
-  [[nodiscard]] const std::vector<T*>& items() const { return *m_items; }
+  [[nodiscard]] std::span<T* const> items() const { return *m_items; }
 
 private:
   std::shared_ptr<std::vector<T*>> m_items{};
@@ -75,7 +76,7 @@ public:
 
   void execute(CommandContext& context) override {
     auto& vgmContext = dynamic_cast<ItemListCommandContext<T>&>(context);
-    const auto& items = vgmContext.items();
+    const auto items = vgmContext.items();
 
     executeItems(items);
   }
@@ -90,12 +91,12 @@ public:
       return false;
     }
 
-    const auto& items = dynamic_cast<ItemListCommandContext<T>&>(*context).items();
+    const auto items = dynamic_cast<ItemListCommandContext<T>&>(*context).items();
     return isEnabledForItems(items);
   }
 
-  virtual void executeItems(std::vector<T*> items) const = 0;
-  [[nodiscard]] virtual bool isEnabledForItems(const std::vector<T*>& items) const { return !items.empty(); }
+  virtual void executeItems(std::span<T* const> items) const = 0;
+  [[nodiscard]] virtual bool isEnabledForItems(std::span<T* const> items) const { return !items.empty(); }
 
 private:
   std::shared_ptr<ItemListContextFactory<T>> m_contextFactory;
@@ -108,7 +109,7 @@ private:
 template <typename T>
 class SingleItemCommand : public ItemListCommand<T> {
 public:
-  void executeItems(std::vector<T*> items) const override {
+  void executeItems(std::span<T* const> items) const override {
     T* item = items.front();
     this->executeItem(item);
   }
@@ -120,7 +121,7 @@ public:
  */
 class CloseVGMFileCommand : public ItemListCommand<VGMFile> {
 public:
-  void executeItems(std::vector<VGMFile*> vgmfiles) const override {
+  void executeItems(std::span<VGMFile* const> vgmfiles) const override {
     // If all files are selected, we can remove everything at once more efficiently
     if (vgmfiles.size() == pRoot->vgmFiles().size()) {
       pRoot->removeAllFilesAndCollections();
@@ -142,7 +143,7 @@ public:
  */
 class CloseRawFileCommand : public ItemListCommand<RawFile> {
 public:
-  void executeItems(std::vector<RawFile*> rawfiles) const override {
+  void executeItems(std::span<RawFile* const> rawfiles) const override {
     // If all files are selected, we can remove everything at once more efficiently
     if (rawfiles.size() == pRoot->rawFiles().size()) {
       pRoot->removeAllFilesAndCollections();
@@ -164,7 +165,7 @@ public:
  */
 class OpenCommand : public ItemListCommand<VGMFile> {
 public:
-  void executeItems(std::vector<VGMFile*> vgmfiles) const override {
+  void executeItems(std::span<VGMFile* const> vgmfiles) const override {
     for (auto vgmfile : vgmfiles) {
       MdiArea::the()->newView(vgmfile);
     }
