@@ -82,6 +82,15 @@ class MidiTrack {
   [[nodiscard]] std::span<MidiEvent* const> events() const { return m_events; }
   [[nodiscard]] bool hasEvents() const { return !m_events.empty(); }
   [[nodiscard]] std::span<NoteEvent* const> previousDurNoteOffs() const { return m_prevDurNoteOffs; }
+  [[nodiscard]] MidiFile* midiFile() const { return m_midiFile; }
+  void attachMidiFile(MidiFile* midiFile) { m_midiFile = midiFile; }
+  [[nodiscard]] bool isMonophonic() const { return m_monophonic; }
+  void setMonophonic(bool monophonic) { m_monophonic = monophonic; }
+  [[nodiscard]] bool hasEndOfTrack() const { return m_hasEndOfTrack; }
+  [[nodiscard]] int channelGroup() const { return m_channelGroup; }
+  [[nodiscard]] bool hasActiveNote(u8 key) const;
+  void rememberActiveNote(u8 key, u8 finalKey);
+  bool takeActiveNote(u8 key, u8& finalKey);
 
   template <class EventType, class... Args>
   EventType* addEvent(Args&&... args) {
@@ -209,24 +218,16 @@ class MidiTrack {
                     s8 priority,
                     u32 absTime);
 
- public:
-  MidiFile *parentSeq;
-  bool bMonophonic;
-  bool bHasEndOfTrack;
-  int channelGroup;
-
-  // state
-  u32 DeltaTime;            //a time value to be used for AddEvent
-  DurNoteEvent *prevDurEvent;
-  bool bSustain;
-
-  // activeNotes tracks which keys are on during conversion. It maps the note's original key to the
-  // final realized key, which will be different when a global transpose is set. It helps us resolve
-  // the correct note off events when a global transpose event occurs amidst live note on events,
-  // and also allows us to warn about unpaired note on/off events.
-  std::unordered_map<u8, u8> activeNotes;
-
  private:
+  MidiFile* m_midiFile;
+  bool m_monophonic;
+  bool m_hasEndOfTrack;
+  int m_channelGroup;
+  u32 m_deltaTime;            // a time value to be used for addEvent
+  DurNoteEvent* m_prevDurEvent;
+  bool m_sustain;
+  // Tracks which original keys are currently on and the realized keys written to MIDI.
+  std::unordered_map<u8, u8> m_activeNotes;
   std::vector<std::unique_ptr<MidiEvent>> m_ownedEvents;
   std::vector<MidiEvent *> m_events;
   std::vector<NoteEvent *> m_prevDurNoteOffs;
@@ -244,6 +245,12 @@ class MidiFile {
   [[nodiscard]] std::span<MidiTrack* const> tracks() const { return m_tracks; }
   [[nodiscard]] size_t trackCount() const { return m_tracks.size(); }
   MidiTrack* track(size_t index) const { return m_tracks.at(index); }
+  [[nodiscard]] VGMSeq* associatedSeq() const { return m_assocSeq; }
+  [[nodiscard]] MidiTrack& globalTrack() { return m_globalTrack; }
+  [[nodiscard]] const MidiTrack& globalTrack() const { return m_globalTrack; }
+  [[nodiscard]] s8 globalTranspose() const { return m_globalTranspose; }
+  void setGlobalTranspose(s8 semitones) { m_globalTranspose = semitones; }
+  void resetGlobalTranspose() { m_globalTranspose = 0; }
   void setPPQN(u16 ppqn);
   u32 ppqn() const;
   void writeMidiToBuffer(std::vector<u8> &buf);
@@ -254,14 +261,11 @@ class MidiFile {
   //bool bAddedTempo;
   //bool bAddedTimeSig;
 
- public:
-  VGMSeq *assocSeq;
-
-  MidiTrack globalTrack;            //events in the globalTrack will be copied into every other track
-  s8 globalTranspose;
-  bool bMonophonicTracks;
-
 private:
+  VGMSeq* m_assocSeq;
+  MidiTrack m_globalTrack;            // events in the global track are copied into every other track
+  s8 m_globalTranspose;
+  bool m_monophonicTracks;
   u16 m_ppqn;
   std::vector<std::unique_ptr<MidiTrack>> m_ownedTracks;
   std::vector<MidiTrack *> m_tracks;
@@ -282,14 +286,18 @@ class MidiEvent {
     const std::string& str) const;
 
   static std::string getNoteName(int noteNumber);
+  [[nodiscard]] MidiTrack* parentTrack() const { return m_track; }
+  void attachTrack(MidiTrack* track) { m_track = track; }
 
   bool operator<(const MidiEvent &) const;
   bool operator>(const MidiEvent &) const;
 
-  MidiTrack *prntTrk;
   u8 channel;
   u32 absTime;            //absolute time... the number of ticks from the very beginning of the sequence at which this event occurs
   s8 priority;
+
+ private:
+  MidiTrack* m_track;
 };
 
 class PriorityCmp {

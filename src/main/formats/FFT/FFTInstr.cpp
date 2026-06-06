@@ -111,12 +111,12 @@ WdsInstr::~WdsInstr() {}
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
 bool WdsInstr::loadInstr() {
-  WdsInstrSet *parInstrSet = static_cast<WdsInstrSet*>(this->parInstrSet);
+  auto* instrSet = static_cast<WdsInstrSet*>(this->instrSet());
 
   readBytes(offset(), sizeof(WdsRgnData), &rgndata);
   VGMRgn *rgn = addRgn<VGMRgn>(this, offset(), length());
   rgn->sampOffset = rgndata.ptBody;
-  if (parInstrSet->version == WdsInstrSet::VERSION_WDS) {
+  if (instrSet->version == WdsInstrSet::VERSION_WDS) {
     rgn->sampOffset *= 8;
   }
   //rgn->loop.loopStart =	rgndata.ptLoop;
@@ -129,7 +129,7 @@ bool WdsInstr::loadInstr() {
   rgn->addGeneralItem(offset() + 0x04, sizeof(u16), "Loop Offset");
   rgn->addGeneralItem(offset() + 0x06, sizeof(u16), "Pitch Fine Tune");
 
-  if (parInstrSet->version == WdsInstrSet::VERSION_WDS) {
+  if (instrSet->version == WdsInstrSet::VERSION_WDS) {
     u32 adsr_rate = getWord(offset() + 0x08);
     u16 adsr_mode = readShort(offset() + 0x0c);
 
@@ -155,7 +155,7 @@ bool WdsInstr::loadInstr() {
 
     psxConvADSR(rgn, Am >> 2, Ar, Dr, Sl, Sm >> 2, (Sm >> 1) & 1, Sr, Rm >> 2, Rr, false);
   }
-  else if (parInstrSet->version == WdsInstrSet::VERSION_DWDS) {
+  else if (instrSet->version == WdsInstrSet::VERSION_DWDS) {
     psxConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
 
     rgn->addADSRValue(offset() + 0x08, sizeof(u8), "Attack Rate");

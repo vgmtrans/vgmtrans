@@ -14,13 +14,13 @@
 // ******
 
 VGMRgn::VGMRgn(VGMInstr *instr, u32 offset, u32 length, std::string name)
-    : VGMItem(instr->parInstrSet, offset, length, std::move(name)),
+    : VGMItem(instr->instrSet(), offset, length, std::move(name)),
       parInstr(instr)
 {}
 
 VGMRgn::VGMRgn(VGMInstr *instr, u32 offset, u32 length, u8 keyLow, u8 keyHigh,
                u8 velLow, u8 velHigh, int sampNum, std::string name)
-    : VGMItem(instr->parInstrSet, offset, length, std::move(name)),
+    : VGMItem(instr->instrSet(), offset, length, std::move(name)),
       parInstr(instr),
       keyLow(keyLow),
       keyHigh(keyHigh),

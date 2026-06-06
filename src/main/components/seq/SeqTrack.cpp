@@ -1827,7 +1827,7 @@ void SeqTrack::addTempoBPMNoItem(double bpm) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     // Some MIDI tool can recognise tempo event only in the first track.
     MidiTrack *pFirstMidiTrack = parentSeq->firstMidiTrack();
-    if (!pFirstMidiTrack->bHasEndOfTrack) {
+    if (!pFirstMidiTrack->hasEndOfTrack()) {
       pFirstMidiTrack->insertTempoBPM(bpm, pMidiTrack->getDelta());
     } else {
       // Adding an event after the EOT is even worse. So here's a little workaround.
@@ -1921,7 +1921,7 @@ void SeqTrack::addGlobalTranspose(u32 offset, u32 length, s8 semitones, const st
   recordSeqEvent<TransposeSeqEvent>(isNewOffset, getTime(), semitones, offset, length, sEventName);
 
   if (readMode == READMODE_CONVERT_TO_MIDI)
-    parentSeq->midi->globalTrack.insertGlobalTranspose(getTime(), semitones);
+    parentSeq->midi->globalTrack().insertGlobalTranspose(getTime(), semitones);
 }
 
 void SeqTrack::addMarker(u32 offset,

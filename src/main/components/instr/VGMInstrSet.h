@@ -56,10 +56,9 @@ public:
     adoptSampColl(std::move(newSampColl));
     return rawSampColl;
   }
+  [[nodiscard]] VGMSampColl* sampColl() const { return m_sampColl; }
+  void attachSampColl(VGMSampColl* sampColl);
   void clearSampColl();
-
-  // Observer; use adoptSampColl/addSampColl<T> when the instrument set owns the sample collection.
-  VGMSampColl *sampColl;
 
 protected:
    void reserveInstrs(size_t count) { m_ownedInstrs.reserve(count); m_instrs.reserve(count); }
@@ -84,6 +83,8 @@ private:
    std::vector<VGMInstr*> m_instrs;
    std::vector<VGMInstr*> m_exportInstrs;
    std::vector<std::unique_ptr<VGMInstr>> m_tempInstrs;
+   // Observer; use adoptSampColl/addSampColl<T> when the instrument set owns the sample collection.
+   VGMSampColl* m_sampColl{nullptr};
    std::unique_ptr<VGMSampColl> m_ownedSampColl;
 };
 
@@ -93,13 +94,14 @@ private:
 
 class VGMInstr : public VGMItem {
 public:
-  VGMInstr(VGMInstrSet *parInstrSet, u32 offset, u32 length, u32 bank,
+  VGMInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank,
            u32 instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
   VGMInstr(const VGMInstr& other);
   ~VGMInstr() override;
 
   std::span<VGMRgn* const> regions() const { return m_regions; }
+  [[nodiscard]] VGMInstrSet* instrSet() const { return m_instrSet; }
 
   inline void setBank(u32 bankNum);
   inline void setInstrNum(u32 theInstrNum);
@@ -147,7 +149,6 @@ public:
 
   u32 bank;
   u32 instrNum;
-  VGMInstrSet *parInstrSet;
   float reverb;
 
 
@@ -157,6 +158,7 @@ protected:
 
 private:
   bool m_auto_add_regions_as_children{true};
+  VGMInstrSet* m_instrSet{nullptr};
   std::vector<VGMRgn*> m_regions;
   std::vector<std::unique_ptr<VGMRgn>> m_ownedRegions;
   std::vector<SynthModulator> m_modulators;

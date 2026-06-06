@@ -26,8 +26,8 @@
 
 VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, u32 offset, u32 length,
                          std::string name, VGMSampColl *sampColl)
-    : VGMFile(format, file, offset, length, std::move(name)),
-      sampColl(sampColl) {
+    : VGMFile(format, file, offset, length, std::move(name)) {
+  m_sampColl = sampColl;
 }
 
 VGMInstrSet::~VGMInstrSet() = default;
@@ -90,11 +90,11 @@ bool VGMInstrSet::load() {
     setGuessedLength();
   }
 
-  if (sampColl != nullptr) {
-    if (!sampColl->load()) {
+  if (m_sampColl != nullptr) {
+    if (!m_sampColl->load()) {
       L_WARN("Failed to load VGMSampColl");
     } else {
-      sampColl->transferChildren(this);
+      m_sampColl->transferChildren(this);
     }
   }
 
@@ -146,13 +146,18 @@ void VGMInstrSet::adoptTempInstr(std::unique_ptr<VGMInstr> instr) {
 }
 
 void VGMInstrSet::adoptSampColl(std::unique_ptr<VGMSampColl> newSampColl) {
-  sampColl = newSampColl.get();
   m_ownedSampColl = std::move(newSampColl);
+  m_sampColl = m_ownedSampColl.get();
+}
+
+void VGMInstrSet::attachSampColl(VGMSampColl* sampColl) {
+  m_ownedSampColl.reset();
+  m_sampColl = sampColl;
 }
 
 void VGMInstrSet::clearSampColl() {
   m_ownedSampColl.reset();
-  sampColl = nullptr;
+  m_sampColl = nullptr;
 }
 
 // ********
@@ -162,16 +167,16 @@ void VGMInstrSet::clearSampColl() {
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank,
                    u32 instrNum, std::string name, float reverb)
     : VGMItem(instrSet, offset, length, std::move(name), Type::Instrument),
-      bank(bank), instrNum(instrNum), parInstrSet(instrSet), reverb(reverb) {
+      bank(bank), instrNum(instrNum), reverb(reverb), m_instrSet(instrSet) {
 }
 
 VGMInstr::VGMInstr(const VGMInstr& other)
     : VGMItem(other),
       bank(other.bank),
       instrNum(other.instrNum),
-      parInstrSet(other.parInstrSet),
       reverb(other.reverb),
       m_auto_add_regions_as_children(other.m_auto_add_regions_as_children),
+      m_instrSet(other.m_instrSet),
       m_regions(other.m_regions),
       m_modulators(other.m_modulators),
       m_generators(other.m_generators) {

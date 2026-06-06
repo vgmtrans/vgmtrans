@@ -181,7 +181,7 @@ void ManualCollectionDialog::createCollection() {
     }
   }
 
-  if (coll->sampColls().empty() && coll->instrSets().front()->sampColl == nullptr) {
+  if (coll->sampColls().empty() && coll->instrSets().front()->sampColl() == nullptr) {
     pRoot->UI_toast("The created collection does not contain a sample collection. "
                     "The instrument bank will be silent.", ToastType::Warning);
   }

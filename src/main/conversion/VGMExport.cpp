@@ -25,7 +25,7 @@ namespace conversion {
 bool saveAsDLS(VGMInstrSet &set, const fs::path &filepath) {
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::DLS);
   VGMColl* coll = set.hasAssocColls() ? set.assocColls().front() : nullptr;
-  if (!coll && !set.sampColl)
+  if (!coll && !set.sampColl())
     return false;
 
   std::vector<VGMInstrSet*> instrsets;
@@ -49,7 +49,7 @@ bool saveAsDLS(VGMInstrSet &set, const fs::path &filepath) {
 bool saveAsSF2(VGMInstrSet &set, const fs::path &filepath) {
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   VGMColl* coll = set.hasAssocColls() ? set.assocColls().front() : nullptr;
-  if (!coll && !set.sampColl)
+  if (!coll && !set.sampColl())
     return false;
 
   std::vector<VGMInstrSet*> instrsets;

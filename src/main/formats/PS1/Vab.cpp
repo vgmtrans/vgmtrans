@@ -205,7 +205,7 @@ VabRgn::VabRgn(VabInstr *instr, u32 offset)
 
 bool VabRgn::loadRgn() {
   VabInstr *instr = (VabInstr *) parInstr;
-  Vab *vab = static_cast<Vab *>(instr->parInstrSet);
+  Vab *vab = static_cast<Vab *>(instr->instrSet());
   setLength(0x20);
   readBytes(offset(), 0x20, &attr);
 

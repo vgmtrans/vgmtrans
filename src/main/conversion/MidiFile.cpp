@@ -16,12 +16,12 @@
 #include <spdlog/fmt/fmt.h>
 
 MidiFile::MidiFile(VGMSeq *assocSeq)
-    : assocSeq(assocSeq),
-      globalTrack(this, false),
-      globalTranspose(0),
-      bMonophonicTracks(false) {
-  this->bMonophonicTracks = assocSeq->usesMonophonicTracks();
-  this->globalTrack.bMonophonic = this->bMonophonicTracks;
+    : m_assocSeq(assocSeq),
+      m_globalTrack(this, false),
+      m_globalTranspose(0),
+      m_monophonicTracks(false) {
+  m_monophonicTracks = assocSeq->usesMonophonicTracks();
+  m_globalTrack.setMonophonic(m_monophonicTracks);
 
   this->m_ppqn = assocSeq->ppqn();
 }
@@ -29,7 +29,7 @@ MidiFile::MidiFile(VGMSeq *assocSeq)
 MidiFile::~MidiFile() = default;
 
 MidiTrack *MidiFile::addTrack() {
-  return adoptTrack(std::make_unique<MidiTrack>(this, bMonophonicTracks));
+  return adoptTrack(std::make_unique<MidiTrack>(this, m_monophonicTracks));
 }
 
 MidiTrack *MidiFile::insertTrack(u32 trackNum) {
@@ -42,7 +42,7 @@ MidiTrack *MidiFile::insertTrack(u32 trackNum) {
     });
   }
 
-  auto track = std::make_unique<MidiTrack>(this, bMonophonicTracks);
+  auto track = std::make_unique<MidiTrack>(this, m_monophonicTracks);
   auto* rawTrack = track.get();
   m_ownedTracks.push_back(std::move(track));
   m_tracks[trackNum] = rawTrack;
@@ -124,12 +124,12 @@ void MidiFile::writeMidiToBuffer(std::vector<u8> &buf) {
   for (auto& aTrack : m_tracks) {
     if (aTrack) {
       std::vector<u8> trackBuf;
-      globalTranspose = 0;
+      resetGlobalTranspose();
       aTrack->writeTrack(trackBuf);
       buf.insert(buf.end(), trackBuf.begin(), trackBuf.end());
     }
   }
-  globalTranspose = 0;
+  resetGlobalTranspose();
 }
 
 //  *********
@@ -137,15 +137,34 @@ void MidiFile::writeMidiToBuffer(std::vector<u8> &buf) {
 //  *********
 
 MidiTrack::MidiTrack(MidiFile *parentSeq, bool monophonic)
-    : parentSeq(parentSeq),
-      bMonophonic(monophonic),
-      bHasEndOfTrack(false),
-      channelGroup(0),
-      DeltaTime(0),
-      prevDurEvent(nullptr),
-      bSustain(false) {}
+    : m_midiFile(parentSeq),
+      m_monophonic(monophonic),
+      m_hasEndOfTrack(false),
+      m_channelGroup(0),
+      m_deltaTime(0),
+      m_prevDurEvent(nullptr),
+      m_sustain(false) {}
 
 MidiTrack::~MidiTrack() = default;
+
+bool MidiTrack::hasActiveNote(u8 key) const {
+  return m_activeNotes.contains(key);
+}
+
+void MidiTrack::rememberActiveNote(u8 key, u8 finalKey) {
+  m_activeNotes[key] = finalKey;
+}
+
+bool MidiTrack::takeActiveNote(u8 key, u8& finalKey) {
+  auto note = m_activeNotes.find(key);
+  if (note == m_activeNotes.end()) {
+    return false;
+  }
+
+  finalKey = note->second;
+  m_activeNotes.erase(note);
+  return true;
+}
 
 MidiEvent* MidiTrack::adoptEvent(std::unique_ptr<MidiEvent> event) {
   if (!event) {
@@ -174,7 +193,7 @@ void MidiTrack::prependEvents(std::vector<std::unique_ptr<MidiEvent>> events) {
 }
 
 std::vector<std::unique_ptr<MidiEvent>> MidiTrack::releaseEvents() {
-  prevDurEvent = nullptr;
+  m_prevDurEvent = nullptr;
   m_prevDurNoteOffs.clear();
   m_events.clear();
   return std::move(m_ownedEvents);
@@ -184,9 +203,9 @@ void MidiTrack::sort() {
   std::ranges::stable_sort(m_events, PriorityCmp()); // Sort all the events by priority
   std::ranges::stable_sort(m_events, AbsTimeCmp());  // Sort all the events by absolute time,
                                                              // so that delta times can be recorded correctly
-  if (!bHasEndOfTrack && !m_events.empty()) {
+  if (!m_hasEndOfTrack && !m_events.empty()) {
     addEvent<EndOfTrackEvent>(this, m_events.back()->absTime);
-    bHasEndOfTrack = true;
+    m_hasEndOfTrack = true;
   }
 }
 
@@ -202,7 +221,7 @@ void MidiTrack::writeTrack(std::vector<u8> &buf) const {
   u32 time = 0;  // start at 0 ticks
 
   std::vector<MidiEvent *> finalEvents(m_events);
-  const auto& globEvents = parentSeq->globalTrack.events();
+  const auto& globEvents = m_midiFile->globalTrack().events();
   finalEvents.insert(finalEvents.end(), globEvents.begin(), globEvents.end());
 
   std::ranges::stable_sort(finalEvents, PriorityCmp()); // Sort all the events by priority
@@ -222,28 +241,28 @@ void MidiTrack::writeTrack(std::vector<u8> &buf) const {
 }
 
 void MidiTrack::setChannelGroup(int theChannelGroup) {
-  channelGroup = theChannelGroup;
+  m_channelGroup = theChannelGroup;
 }
 
 // Delta Time Functions
 u32 MidiTrack::getDelta() const {
-  return DeltaTime;
+  return m_deltaTime;
 }
 
 void MidiTrack::setDelta(u32 NewDelta) {
-  DeltaTime = NewDelta;
+  m_deltaTime = NewDelta;
 }
 
 void MidiTrack::addDelta(u32 AddDelta) {
-  DeltaTime += AddDelta;
+  m_deltaTime += AddDelta;
 }
 
 void MidiTrack::subtractDelta(u32 SubtractDelta) {
-  DeltaTime -= SubtractDelta;
+  m_deltaTime -= SubtractDelta;
 }
 
 void MidiTrack::resetDelta() {
-  DeltaTime = 0;
+  m_deltaTime = 0;
 }
 
 void MidiTrack::addNoteOn(u8 channel, s8 key, s8 vel) {
@@ -617,12 +636,12 @@ void MidiTrack::insertTimeSig(u8 numer, u8 denom, u8 ticksPerQuarter, u32 absTim
 
 void MidiTrack::addEndOfTrack() {
   addEvent<EndOfTrackEvent>(this, getDelta());
-  bHasEndOfTrack = true;
+  m_hasEndOfTrack = true;
 }
 
 void MidiTrack::insertEndOfTrack(u32 absTime) {
   addEvent<EndOfTrackEvent>(this, absTime);
-  bHasEndOfTrack = true;
+  m_hasEndOfTrack = true;
 }
 
 void MidiTrack::addText(const std::string &str) {
@@ -718,7 +737,7 @@ void MidiTrack::insertMarker(u8 channel,
 //  *********
 
 MidiEvent::MidiEvent(MidiTrack *track, u32 absoluteTime, u8 channel, s8 priority)
-    : prntTrk(track), channel(channel), absTime(absoluteTime), priority(priority) {
+    : channel(channel), absTime(absoluteTime), priority(priority), m_track(track) {
 }
 
 bool MidiEvent::isMetaEvent() {
@@ -817,22 +836,20 @@ NoteEvent::NoteEvent(MidiTrack *track,
 u32 NoteEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   writeVarLength(buf, absTime - time);
 
-  u8 finalKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
+  MidiTrack* track = parentTrack();
+  u8 finalKey = key + ((channel == 9) ? 0 : track->midiFile()->globalTranspose());
 
   if (bNoteDown) {
     buf.push_back(0x90 + channel);
-    if (prntTrk->activeNotes.contains(key)) {
+    if (track->hasActiveNote(key)) {
       L_WARN("During MIDI conversion, received note on event for a key with an already live note on event."
         " Channel: {} Key: {}", channel, key);
     }
-    prntTrk->activeNotes[key] = finalKey;
+    track->rememberActiveNote(key, finalKey);
   }
   else {
     buf.push_back(0x80 + channel);
-    if (prntTrk->activeNotes.contains(key)) {
-      finalKey = prntTrk->activeNotes[key];
-      prntTrk->activeNotes.erase(key);
-    } else {
+    if (!track->takeActiveNote(key, finalKey)) {
       L_WARN("During MIDI conversion, a note off event could not find a matching prior note on event."
         " Channel: {} Key: {}", channel, key);
     }
@@ -902,7 +919,7 @@ u32 ControllerEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 u32 PortamentoControlEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   // Add the global transpose into the starting key of the portamento control event
   u8 originalDataByte = dataByte;
-  dataByte = std::clamp<s16>(dataByte + prntTrk->parentSeq->globalTranspose, 0, 127);
+  dataByte = std::clamp<s16>(dataByte + parentTrack()->midiFile()->globalTranspose(), 0, 127);
   u32 result = ControllerEvent::writeEvent(buf, time);
   dataByte = originalDataByte;
   return result;
@@ -1096,6 +1113,6 @@ GlobalTransposeEvent::GlobalTransposeEvent(MidiTrack *track, u32 absoluteTime, s
 }
 
 u32 GlobalTransposeEvent::writeEvent(std::vector<u8>& /*buf*/, u32 time) {
-  this->prntTrk->parentSeq->globalTranspose = this->semitones;
+  parentTrack()->midiFile()->setGlobalTranspose(this->semitones);
   return time;
 }

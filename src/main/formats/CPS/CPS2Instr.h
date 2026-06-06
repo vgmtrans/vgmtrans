@@ -239,7 +239,7 @@ public:
   ~CPS2Instr() override = default;
   bool loadInstr() override;
 protected:
-  CPS2FormatVer formatVersion() const { return (static_cast<CPS2InstrSet*>(parInstrSet))->fmt_version; }
+  CPS2FormatVer formatVersion() const { return static_cast<CPS2InstrSet*>(instrSet())->fmt_version; }
 
 protected:
   int info_ptr{};        //pointer to start of instrument set block

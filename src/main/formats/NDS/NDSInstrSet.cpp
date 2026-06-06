@@ -108,7 +108,7 @@ bool NDSInstr::loadInstr() {
       VGMRgn* rgn = addRgn(offset(), 10, dutyCycle);
       getArticData(rgn, offset() + 4);
 
-      rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->m_psg_samples;
+      rgn->sampCollPtr = static_cast<NDSInstrSet*>(instrSet())->m_psg_samples;
       /* We have to set this manually as all of our samples are generated at 440Hz (69 = A4) */
       rgn->setUnityKey(69);
       break;
@@ -122,7 +122,7 @@ bool NDSInstr::loadInstr() {
       VGMRgn* rgn = addRgn(offset(), 10, 8);
       getArticData(rgn, offset() + 4);
 
-      rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->m_psg_samples;
+      rgn->sampCollPtr = static_cast<NDSInstrSet*>(instrSet())->m_psg_samples;
       rgn->setUnityKey(45);
 
       break;
@@ -180,7 +180,7 @@ bool NDSInstr::loadInstr() {
 }
 
 void NDSInstr::getSampCollPtr(VGMRgn* rgn, int waNum) const {
-  rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->waveArchSampColl(waNum);
+  rgn->sampCollPtr = static_cast<NDSInstrSet*>(instrSet())->waveArchSampColl(waNum);
 }
 
 void NDSInstr::getArticData(VGMRgn* rgn, u32 offset) const {

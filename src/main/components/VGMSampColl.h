@@ -24,7 +24,8 @@ class VGMSampColl : public VGMFile {
   VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset, u32 offset,
                 u32 length = 0, std::string name = "VGMSampColl");
   ~VGMSampColl() override;
-  void attachInstrSet(VGMInstrSet *instrset) { parInstrSet = instrset; }
+  void attachInstrSet(VGMInstrSet *instrset) { m_instrSet = instrset; }
+  [[nodiscard]] VGMInstrSet* instrSet() const { return m_instrSet; }
 
   bool load() override;
   virtual bool parseHeader();        // retrieve any header data
@@ -51,7 +52,6 @@ class VGMSampColl : public VGMFile {
 
 public:
   u32 sampDataOffset;        // offset of the beginning of the sample data.  Used for rgn->sampOffset matching
-  VGMInstrSet *parInstrSet;
 
 protected:
   void setShouldLoadOnInstrSetMatch(bool should_load) { m_should_load_on_instr_set_match = should_load; }
@@ -59,6 +59,7 @@ protected:
   void clearSamples();
 
 private:
+  VGMInstrSet* m_instrSet{nullptr};
   bool m_should_load_on_instr_set_match, bLoaded;
   std::vector<std::unique_ptr<VGMSamp>> m_ownedSamples;
   std::vector<VGMSamp*> m_samples;

@@ -97,7 +97,7 @@ class WdsInstrSet:
 	VGMInstrSet::instrs()		//音色情報のvector
 	VGMInstrSet::dls			//class DLSを作る用
 	VGMInstrSet::menu			//
-	VGMInstrSet::sampColl		//波形実体のオブジェクト
+	VGMInstrSet::sampColl()		//波形実体のオブジェクト
 */
 };
 
@@ -122,7 +122,7 @@ class WdsInstr
 	VGMInstr::aRgns				// 
 	VGMInstr::bank				// bank number
 	VGMInstr::instrNum			// program number
-	VGMInstr::parInstrSet		// 
+	VGMInstr::instrSet()		//
 */
 
 };

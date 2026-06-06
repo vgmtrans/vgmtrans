@@ -169,7 +169,7 @@ bool SegSatInstr::loadInstr() {
   u8 numRgns = rawFile()->readByte(offset() + 2) + 1;
   m_volBias = rawFile()->readByte(offset() + 3);
 
-  auto sampColl = parInstrSet->sampColl;
+  auto sampColl = instrSet()->sampColl();
   for (int i = 0; i < numRgns; ++i) {
     u32 rgnOff = offset() + 4 + (i * 0x20);
     auto name = fmt::format("Region {:d}", i);
@@ -182,7 +182,7 @@ bool SegSatInstr::loadInstr() {
     // Add sample
     u32 sampLength = rawRgn->sampleLoopEnd();
     BPS bps = rawRgn->sampleType() == SegSatRgn::SampleType::PCM16 ? BPS::PCM16 : BPS::PCM8;
-    auto instrSet = static_cast<SegSatInstrSet*>(parInstrSet);
+    auto instrSet = static_cast<SegSatInstrSet*>(this->instrSet());
     // check if a sample at the offset was already added
     bool inserted = instrSet->sampleOffsets.insert(rawRgn->sampOffset).second;
 
@@ -283,7 +283,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, u32 offset, const std::string& name) :
 
   u8 bytesPerSamp = m_sampleType == SampleType::PCM16 ? 2 : 1;
 
-  u32 instrSetOffset = parInstr->parInstrSet->offset();
+  u32 instrSetOffset = parInstr->instrSet()->offset();
   sampOffset = (getWordBE(offset + 2) & 0x7FFFF);
   if (m_sampleType == SampleType::PCM16)
     sampOffset = sampOffset & ~1;
@@ -395,7 +395,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, u32 offset, const std::string& name) :
   setAttenuation(finalAtten);
   this->pan = panPerc;
 
-  SegSatInstrSet* instrSet = static_cast<SegSatInstrSet*>(parInstr->parInstrSet);
+  SegSatInstrSet* instrSet = static_cast<SegSatInstrSet*>(parInstr->instrSet());
   SegSatDriverVer driverVer = instrSet->driverVer();
   double driverHz = calculateDriverHz(driverVer);
 
@@ -444,7 +444,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, u32 offset, const std::string& name) :
 bool SegSatRgn::isRegionValid() {
   if (keyLow == 0xFF) return false;
   if (keyLow > keyHigh) return false;
-  u32 instrSetOffset = parInstr->parInstrSet->offset();
+  u32 instrSetOffset = parInstr->instrSet()->offset();
   if (!std::cmp_greater(sampOffset, instrSetOffset)) return false;
   if (std::cmp_greater_equal(sampOffset, instrSetOffset + 0x7FFFE)) return false;
   return true;

@@ -319,7 +319,7 @@ SonyPS2Instr::~SonyPS2Instr() {
 }
 
 bool SonyPS2Instr::loadInstr() {
-  SonyPS2InstrSet *instrset = (SonyPS2InstrSet *) parInstrSet;
+  auto* instrset = static_cast<SonyPS2InstrSet*>(instrSet());
   SonyPS2InstrSet::ProgCk &progCk = instrset->progCk;
   SonyPS2InstrSet::SampSetCk &sampSetCk = instrset->sampSetCk;
   SonyPS2InstrSet::SampCk &sampCk = instrset->sampCk;
@@ -391,7 +391,7 @@ SonyPS2SampColl::SonyPS2SampColl(RawFile *rawfile, u32 offset, u32 length)
 }
 
 bool SonyPS2SampColl::parseSampleInfo() {
-  SonyPS2InstrSet *instrset = (SonyPS2InstrSet *) parInstrSet;
+  auto* instrset = static_cast<SonyPS2InstrSet*>(instrSet());
   if (!instrset)
     return false;
   SonyPS2InstrSet::VAGInfoCk &vagInfoCk = instrset->vagInfoCk;

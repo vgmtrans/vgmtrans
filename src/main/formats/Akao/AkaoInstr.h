@@ -76,7 +76,7 @@ class AkaoInstr: public VGMInstr {
             std::string name = "Instrument");
   bool loadInstr() override;
 
-  [[nodiscard]] AkaoInstrSet * instrSet() const noexcept { return reinterpret_cast<AkaoInstrSet*>(this->parInstrSet); }
+  [[nodiscard]] AkaoInstrSet * instrSet() const noexcept { return reinterpret_cast<AkaoInstrSet*>(VGMInstr::instrSet()); }
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return instrSet()->version(); }
 

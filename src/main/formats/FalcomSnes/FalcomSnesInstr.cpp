@@ -144,8 +144,8 @@ FalcomSnesRgn::FalcomSnesRgn(FalcomSnesInstr *instr,
   s16 pitch_scale = getShortBE(offset + 3);
 
   // override ADSR
-  //if (parInstrSet->instrADSRHints.count(instr->instrNum) != 0) {
-  //  u16 adsr = parInstrSet->instrADSRHints[instr->instrNum];
+  //if (instrSet->instrADSRHints.count(instr->instrNum) != 0) {
+  //  u16 adsr = instrSet->instrADSRHints[instr->instrNum];
   //  if (adsr != 0) {
   //    adsr1 = adsr & 0xff;
   //    adsr2 = (adsr >> 8) & 0xff;

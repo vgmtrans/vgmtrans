@@ -64,7 +64,7 @@ u32 getMidiDurationTicks(const MidiFile& midi) {
     }
   }
 
-  for (const MidiEvent* event : midi.globalTrack.events()) {
+  for (const MidiEvent* event : midi.globalTrack().events()) {
     if (event) {
       maxTick = std::max(maxTick, event->absTime);
     }
@@ -407,15 +407,15 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
     const u32 startTick = startTicks[i];
     const u8 bankOffset = options.bankOffsets.empty() ? 0 : options.bankOffsets[i];
 
-    retimeTrack(&source->globalTrack, sourcePPQN, targetPPQN, startTick);
-    auto globalEvents = source->globalTrack.releaseEvents();
+    retimeTrack(&source->globalTrack(), sourcePPQN, targetPPQN, startTick);
+    auto globalEvents = source->globalTrack().releaseEvents();
     for (auto& event : globalEvents) {
       if (!event) {
         continue;
       }
 
-      event->prntTrk = &mergedMidi->globalTrack;
-      mergedMidi->globalTrack.adoptEvent(std::move(event));
+      event->attachTrack(&mergedMidi->globalTrack());
+      mergedMidi->globalTrack().adoptEvent(std::move(event));
     }
 
     auto tracks = source->releaseTracks();
@@ -430,7 +430,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
         return nullptr;
       }
 
-      track->parentSeq = mergedMidi.get();
+      track->attachMidiFile(mergedMidi.get());
       mergedMidi->adoptTrack(std::move(track));
     }
   }

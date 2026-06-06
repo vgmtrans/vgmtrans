@@ -154,8 +154,9 @@ void MP2kScanner::scan(RawFile *file, void *) {
           auto coll = std::make_unique<VGMColl>(fmt::format("MP2k Collection #{}", seqval.song_index));
           coll->attachSeq(seqval.seq);
           coll->attachInstrSet(rawInstrSet);
-          if (rawInstrSet->sampColl != nullptr && rawInstrSet->sampColl->hasSamples()) {
-            coll->attachSampColl(rawInstrSet->sampColl);
+          auto* samples = rawInstrSet->sampColl();
+          if (samples != nullptr && samples->hasSamples()) {
+            coll->attachSampColl(samples);
           }
           coll->attachSampColl(psg_sampcoll);
 

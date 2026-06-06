@@ -62,11 +62,11 @@ TamSoftPS1Instr::~TamSoftPS1Instr() {
 }
 
 bool TamSoftPS1Instr::loadInstr() {
-  TamSoftPS1InstrSet *parInstrSet = (TamSoftPS1InstrSet *) this->parInstrSet;
+  auto* instrSet = static_cast<TamSoftPS1InstrSet*>(this->instrSet());
 
   addChild(offset(), 4, "Sample Offset");
 
-  TamSoftPS1Rgn *rgn = addRgn<TamSoftPS1Rgn>(this, offset() + 0x400, parInstrSet->ps2);
+  TamSoftPS1Rgn *rgn = addRgn<TamSoftPS1Rgn>(this, offset() + 0x400, instrSet->ps2);
   rgn->sampNum = instrNum;
   return true;
 }

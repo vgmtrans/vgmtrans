@@ -400,7 +400,7 @@ bool CPS2Instr::loadInstr() {
     rgn->addFineTune( static_cast<s16>((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
     rgn->addChild(this->offset() + 3, 1, "Articulation Index");
 
-    const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->parInstrSet)->articTable;
+    const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->instrSet())->articTable;
     const qs_artic_info* artic = &articTable->artics[progInfo.artic_index];
     rgn->sampNum = progInfo.sample_index;
     rgns.push_back({rgn,
@@ -419,7 +419,7 @@ bool CPS2Instr::loadInstr() {
       rgn->sampNum -= 0x8000;
 
     // if the sample doesn't exist, set it to the first sample
-    if (rgn->sampNum >= static_cast<CPS2InstrSet*>(parInstrSet)->sampInfoTable->numSamples)
+    if (rgn->sampNum >= static_cast<CPS2InstrSet*>(instrSet())->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
     u16 Ar = attack_rate_table[std::min<u8>(rgnInfo.attack_rate, 63)];
@@ -472,7 +472,7 @@ bool CPS2Instr::loadInstr() {
     rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
     rgn->release_time = linearAmpDecayTimeToLinDBDecayTime(rgn->release_time);
 
-    auto *instrSet = static_cast<CPS2InstrSet*>(parInstrSet);
+    auto *instrSet = static_cast<CPS2InstrSet*>(this->instrSet());
     if (rgn->sampNum == 0xFFFF || rgn->sampNum >= instrSet->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 

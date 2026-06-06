@@ -112,7 +112,7 @@ bool HOSAInstr::loadInstr() {
     VGMRgn *rgn = addRgn<VGMRgn>(this, offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
 
     rgn->addChild(rgn->offset(), 4, "Sample Offset");
-    rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->offset();
+    rgn->sampOffset = rgninfo->sampOffset; //+ static_cast<VGMInstrSet*>(this->vgmFile())->sampColl()->offset();
 
     rgn->velLow = 0x00;
     rgn->velHigh = 0x7F;

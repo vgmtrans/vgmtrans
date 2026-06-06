@@ -90,7 +90,7 @@ bool WDInstrSet::parseInstrPointers() {
     if (i != dwNumInstrs - 1)  // while not the last instr
       instrLength = readWord(j + ((i + 1) * 4)) - readWord(j + (i * 4));
     else
-      instrLength = sampColl->offset() - (readWord(j + (i * 4)) + offset());
+      instrLength = sampColl()->offset() - (readWord(j + (i * 4)) + offset());
 
     addInstr<WDInstr>(this, offset() + readWord(j + (i * 4)), instrLength,
                           0, i, fmt::format("Instrument {}", i));
