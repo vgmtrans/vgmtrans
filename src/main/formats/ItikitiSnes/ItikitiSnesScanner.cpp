@@ -30,10 +30,10 @@ void ItikitiSnesScanner::scanFromApuRam(RawFile *file) {
   if (!scanSongHeader(file, song_header_offset))
     return;
 
-  if (!pRoot->emplaceVGMFile<ItikitiSnesSeq>(file, song_header_offset, name))
+  if (!pRoot->loadVGMFile<ItikitiSnesSeq>(file, song_header_offset, name))
     return;
 
-  if (!pRoot->emplaceVGMFile<ItikitiSnesInstrSet>(file, 0x1d40, 0x1e60, 0x1b00))
+  if (!pRoot->loadVGMFile<ItikitiSnesInstrSet>(file, 0x1d40, 0x1e60, 0x1b00))
     return;
 }
 

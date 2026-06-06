@@ -159,7 +159,7 @@ bool RareSnesInstrSet::parseInstrPointers() {
       adsr = itrADSR->second;
     }
 
-    emplaceInstr<RareSnesInstr>(
+    addInstr<RareSnesInstr>(
       this, offset() + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose,
       pitch, adsr, fmt::format("Instrument: {:#x}", inst));
   }
@@ -202,7 +202,7 @@ bool RareSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  RareSnesRgn *rgn = emplaceRgn<RareSnesRgn>(this, offset(), transpose, pitch, adsr);
+  RareSnesRgn *rgn = addRgn<RareSnesRgn>(this, offset(), transpose, pitch, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   return true;
 }

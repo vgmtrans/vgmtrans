@@ -75,8 +75,8 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     int bank = sampNum > 127 ? 1 : 0;
     int instrNum = sampNum > 127 ? sampNum - 128 : sampNum;
     std::string name = fmt::format("Instrument {} Bank {}", instrNum, bank);
-    VGMInstr* instr = emplaceInstr<VGMInstr>(this, off, sizeof(konami_mw_sample_info), bank, instrNum, name);
-    VGMRgn* rgn = instr->emplaceRgn<VGMRgn>(instr, off, sizeof(konami_mw_sample_info));
+    VGMInstr* instr = addInstr<VGMInstr>(this, off, sizeof(konami_mw_sample_info), bank, instrNum, name);
+    VGMRgn* rgn = instr->addRgn<VGMRgn>(instr, off, sizeof(konami_mw_sample_info));
     rgn->sampNum = sampNum;
     rgn->release_time = instrReleaseTime;
 
@@ -121,7 +121,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
       break;
     }
 
-    VGMRgn* rgn = drumInstrRaw->emplaceRgn<VGMRgn>(drumInstrRaw, off, sizeof(drum), fmt::format("Region {:d}", i));
+    VGMRgn* rgn = drumInstrRaw->addRgn<VGMRgn>(drumInstrRaw, off, sizeof(drum), fmt::format("Region {:d}", i));
     // The driver offsets notes up 2 octaves relative to midi note values.
     rgn->keyLow = i + 24;
     rgn->keyHigh = i + 24;
@@ -224,7 +224,7 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
     if (sampInfo.type() == konami_mw_sample_info::sample_type::ADPCM) {
-      sample = addSamp(std::make_unique<KonamiAdpcmSamp>(
+      sample = adoptSamp(std::make_unique<KonamiAdpcmSamp>(
         this,
         sampleOffset,
         sampleSize,

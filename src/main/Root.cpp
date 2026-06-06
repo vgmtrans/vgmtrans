@@ -262,11 +262,11 @@ bool VGMRoot::loadVGMColl(std::unique_ptr<VGMColl> coll) {
     return false;
   }
 
-  addVGMColl(std::move(coll));
+  adoptVGMColl(std::move(coll));
   return true;
 }
 
-void VGMRoot::addVGMColl(std::unique_ptr<VGMColl> coll) {
+void VGMRoot::adoptVGMColl(std::unique_ptr<VGMColl> coll) {
   if (!coll) {
     return;
   }

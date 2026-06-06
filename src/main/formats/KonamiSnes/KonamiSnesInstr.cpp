@@ -174,7 +174,7 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
 
     addUsedSRCN(srcn);
 
-    emplaceInstr<KonamiSnesInstr>(
+    addInstr<KonamiSnesInstr>(
       this, version, addrInstrHeader, instr >> 7, instr & 0x7f,
       spcDirAddr, false, fmt::format("Instrument {}", instr));
   }
@@ -185,7 +185,7 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
     addUsedSRCN(readByte(header.offset));
   }
   if (!percussionHeaders.empty()) {
-    emplaceInstr<KonamiSnesInstr>(this,
+    addInstr<KonamiSnesInstr>(this,
                                   version,
                                   percInstrOffset,
                                   DRUMKIT_PROGRAM >> 7,
@@ -265,7 +265,7 @@ bool KonamiSnesInstr::loadInstr() {
         return false;
       }
 
-      addRgn(std::move(rgn));
+      adoptRgn(std::move(rgn));
     }
     setGuessedLength();
     return !percussionHeaders.empty() && !regions().empty();
@@ -279,7 +279,7 @@ bool KonamiSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  KonamiSnesRgn *rgn = emplaceRgn<KonamiSnesRgn>(this, version, offset(), percussion);
+  KonamiSnesRgn *rgn = addRgn<KonamiSnesRgn>(this, version, offset(), percussion);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   setGuessedLength();

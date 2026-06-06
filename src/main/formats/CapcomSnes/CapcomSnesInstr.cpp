@@ -62,7 +62,7 @@ bool CapcomSnesInstrSet::parseInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    emplaceInstr<CapcomSnesInstr>(
+    addInstr<CapcomSnesInstr>(
       this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr,
       fmt::format("Instrument {}", instr));
   }
@@ -110,7 +110,7 @@ bool CapcomSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  CapcomSnesRgn *rgn = emplaceRgn<CapcomSnesRgn>(this, offset());
+  CapcomSnesRgn *rgn = addRgn<CapcomSnesRgn>(this, offset());
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   return true;

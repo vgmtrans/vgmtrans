@@ -153,7 +153,7 @@ bool NinSnesSeq::postLoad() {
     }
 
     for (auto& section : m_ownedSections) {
-      addChild(std::move(section));
+      adoptChild(std::move(section));
     }
     m_ownedSections.clear();
     setGuessedLength();
@@ -185,7 +185,7 @@ bool NinSnesSeq::loadSection(NinSnesSection *section, u32 stopTime) {
   return section->postLoad();
 }
 
-NinSnesSection* NinSnesSeq::addSection(std::unique_ptr<NinSnesSection> section) {
+NinSnesSection* NinSnesSeq::adoptSection(std::unique_ptr<NinSnesSection> section) {
   auto* rawSection = section.get();
   if (offset() > section->offset()) {
     const u32 distance = offset() - section->offset();
@@ -383,7 +383,7 @@ bool NinSnesSeq::readPlaylistEvent(long stopTime) {
         L_ERROR("Failed to load section");
         return false;
       }
-      addSection(std::move(newSection));
+      adoptSection(std::move(newSection));
     }
 
     if (!loadSection(section, stopTime)) {
@@ -560,7 +560,7 @@ bool NinSnesSection::postLoad() {
     if (!m_tracksAddedToChildren) {
       for (auto& track : m_ownedTracks) {
         if (track != nullptr) {
-          addChild(std::move(track));
+          adoptChild(std::move(track));
         }
       }
       m_tracksAddedToChildren = true;

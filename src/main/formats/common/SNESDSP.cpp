@@ -357,7 +357,7 @@ bool SNESSampColl::parseSampleInfo() {
         spcDirHeader->addChild(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
         spcDirHeader->addChild(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
 
-    emplaceSamp<SNESSamp>(this, addrSampStart, length, addrSampStart, length,
+    addSamp<SNESSamp>(this, addrSampStart, length, addrSampStart, length,
                           addrSampLoop, fmt::format("Sample: {:#x}", srcn));
   }
   spcDirHeader->setGuessedLength();

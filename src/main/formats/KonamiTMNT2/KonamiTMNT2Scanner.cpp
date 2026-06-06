@@ -199,7 +199,7 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
       std::ranges::min(k053260TrkPtrs)
     );
 
-    auto* sequence = pRoot->emplaceVGMFile<KonamiTMNT2Seq>(
+    auto* sequence = pRoot->loadVGMFile<KonamiTMNT2Seq>(
       programRom,
       fmtVer,
       start,
@@ -338,7 +338,7 @@ void KonamiTMNT2Scanner::scanTMNT2(
     minDrumPtr
   );
 
-  auto* instrSet = pRoot->emplaceVGMFile<KonamiTMNT2SampleInstrSet>(
+  auto* instrSet = pRoot->loadVGMFile<KonamiTMNT2SampleInstrSet>(
     programRom,
     instrTableAddrK053260,
     instrTableAddrK053260,
@@ -364,7 +364,7 @@ void KonamiTMNT2Scanner::scanTMNT2(
 
   std::string sampCollName = fmt::format("{} sample collection", name);
 
-  auto* sampcoll = pRoot->emplaceVGMFile<KonamiTMNT2SampColl>(
+  auto* sampcoll = pRoot->loadVGMFile<KonamiTMNT2SampColl>(
     samplesRom,
     sampInfos,
     0,
@@ -372,7 +372,7 @@ void KonamiTMNT2Scanner::scanTMNT2(
     sampCollName
   );
 
-  auto* opmInstrSet = pRoot->emplaceVGMFile<KonamiTMNT2OPMInstrSet>(
+  auto* opmInstrSet = pRoot->loadVGMFile<KonamiTMNT2OPMInstrSet>(
     programRom,
     fmtVer,
     instrTableAddrYM2151,
@@ -382,15 +382,15 @@ void KonamiTMNT2Scanner::scanTMNT2(
   for (auto seq : seqs) {
     auto coll = std::make_unique<VGMColl>(seq->name());
 
-    coll->useSeq(seq);
+    coll->attachSeq(seq);
     if (opmInstrSet) {
-      coll->addInstrSet(opmInstrSet);
+      coll->attachInstrSet(opmInstrSet);
     }
     if (instrSet) {
-      coll->addInstrSet(instrSet);
+      coll->attachInstrSet(instrSet);
     }
     if (sampcoll) {
-      coll->addSampColl(sampcoll);
+      coll->attachSampColl(sampcoll);
     }
     pRoot->loadVGMColl(std::move(coll));
   }
@@ -486,7 +486,7 @@ void KonamiTMNT2Scanner::scanVendetta(
   }
 
   vendetta_sub_offsets subOffsets{loadInstrSub, setPanSub, setPitchSub, noteOnSub};
-  auto* instrSet = pRoot->emplaceVGMFile<KonamiVendettaSampleInstrSet>(
+  auto* instrSet = pRoot->loadVGMFile<KonamiVendettaSampleInstrSet>(
     programRom,
     sampInfoTableOffset,
     instrTableOffsetYM2151,
@@ -507,7 +507,7 @@ void KonamiTMNT2Scanner::scanVendetta(
   }
   std::string sampCollName = fmt::format("{} Sample Collection", name);
 
-  auto* sampcoll = pRoot->emplaceVGMFile<KonamiTMNT2SampColl>(
+  auto* sampcoll = pRoot->loadVGMFile<KonamiTMNT2SampColl>(
     samplesRom,
     commonSampInfos,
     0,
@@ -515,7 +515,7 @@ void KonamiTMNT2Scanner::scanVendetta(
     sampCollName
   );
 
-  auto* opmInstrSet = pRoot->emplaceVGMFile<KonamiTMNT2OPMInstrSet>(
+  auto* opmInstrSet = pRoot->loadVGMFile<KonamiTMNT2OPMInstrSet>(
     programRom,
     fmtVer,
     instrTableOffsetYM2151,
@@ -525,15 +525,15 @@ void KonamiTMNT2Scanner::scanVendetta(
   for (auto seq : seqs) {
     auto coll = std::make_unique<VGMColl>(seq->name());
 
-    coll->useSeq(seq);
+    coll->attachSeq(seq);
     if (opmInstrSet) {
-      coll->addInstrSet(opmInstrSet);
+      coll->attachInstrSet(opmInstrSet);
     }
     if (instrSet) {
-      coll->addInstrSet(instrSet);
+      coll->attachInstrSet(instrSet);
     }
     if (sampcoll) {
-      coll->addSampColl(sampcoll);
+      coll->attachSampColl(sampcoll);
     }
     pRoot->loadVGMColl(std::move(coll));
   }

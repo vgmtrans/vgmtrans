@@ -44,7 +44,7 @@ void TamSoftPS1Scanner::scan(RawFile *file, void *info) {
 
     for (u8 songIndex = 0; songIndex < numSongs; songIndex++) {
       std::string seqname = fmt::format("{} ({})", basename, songIndex);
-      auto* newSeq = pRoot->emplaceVGMFile<TamSoftPS1Seq>(file, 0, songIndex, seqname);
+      auto* newSeq = pRoot->loadVGMFile<TamSoftPS1Seq>(file, 0, songIndex, seqname);
       if (newSeq) {
         newSeq->setLength(file->size());
       }
@@ -56,7 +56,7 @@ void TamSoftPS1Scanner::scan(RawFile *file, void *info) {
       ps2 = true;
     }
 
-    auto* newInstrSet = pRoot->emplaceVGMFile<TamSoftPS1InstrSet>(file, 0, ps2, basename);
+    auto* newInstrSet = pRoot->loadVGMFile<TamSoftPS1InstrSet>(file, 0, ps2, basename);
     if (newInstrSet) {
       newInstrSet->setLength(file->size());
     }

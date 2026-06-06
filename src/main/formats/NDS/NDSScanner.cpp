@@ -159,7 +159,7 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       waFileIDs.push_back(file->readShort(pWAInfo));
   }
 
-  auto* psg_sampcoll = pRoot->emplaceVGMFile<NDSPSG>(file);
+  auto* psg_sampcoll = pRoot->loadVGMFile<NDSPSG>(file);
   if (!psg_sampcoll) {
     return SDATLength;
   }
@@ -189,7 +189,7 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       u32 pWAFatData = file->readWord(offset) + baseOff;
       offset += 4;
       u32 fileSize = file->readWord(offset);
-      auto* NewNDSwa = pRoot->emplaceVGMFile<NDSWaveArch>(file, pWAFatData, fileSize, waNames[i]);
+      auto* NewNDSwa = pRoot->loadVGMFile<NDSWaveArch>(file, pWAFatData, fileSize, waNames[i]);
       if (!NewNDSwa) {
         L_ERROR("Failed to load NDSWaveArch at 0x{:08X}", pWAFatData);
         WAs.push_back(NULL);
@@ -248,14 +248,14 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       u32 pSeqFatData = file->readWord(offset) + baseOff;
       offset += 4;
       u32 fileSize = file->readWord(offset);
-      auto* NewNDSSeq = pRoot->emplaceVGMFile<NDSSeq>(file, pSeqFatData, fileSize, seqNames[i]);
+      auto* NewNDSSeq = pRoot->loadVGMFile<NDSSeq>(file, pSeqFatData, fileSize, seqNames[i]);
       if (!NewNDSSeq) {
         L_ERROR("Failed to load NDSSeq at 0x{:08X}", pSeqFatData);
         continue;
       }
 
       auto coll = std::make_unique<VGMColl>(seqNames[i]);
-      coll->useSeq(NewNDSSeq);
+      coll->attachSeq(NewNDSSeq);
       u32 bnkIndex = 0;
       for (u32 j = 0; j < BNKs.size(); j++) {
         if (seqFileBnks[i] == BNKs[j].first) {
@@ -264,12 +264,12 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
         }
       }
       
-      coll->addSampColl(psg_sampcoll);
-      coll->addInstrSet(BNKs[bnkIndex].second);
+      coll->attachSampColl(psg_sampcoll);
+      coll->attachInstrSet(BNKs[bnkIndex].second);
       for (int j = 0; j < 4; j++) {
         short WAnum = bnkWAs[seqFileBnks[i]][j];
         if (WAnum != -1)
-          coll->addSampColl(WAs[WAnum]);
+          coll->attachSampColl(WAs[WAnum]);
       }
       pRoot->loadVGMColl(std::move(coll));
     }

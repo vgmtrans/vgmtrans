@@ -33,7 +33,7 @@ bool KonamiTMNT2OPMInstrSet::parseInstrPointers() {
     konami_tmnt2_ym2151_instr instrData{};
     readBytes(instrPtr, sizeof(konami_tmnt2_ym2151_instr), &instrData);
 
-    VGMInstr* instr = emplaceInstr<VGMInstr>(this, instrPtr, sizeof(konami_tmnt2_ym2151_instr), 0, i, name, 0);
+    VGMInstr* instr = addInstr<VGMInstr>(this, instrPtr, sizeof(konami_tmnt2_ym2151_instr), 0, i, name, 0);
     instr->addChild(instrPtr, 1, "RL_FB_CONECT");
     for (int op = 0; op < 4; ++op) {
       int offset = instrPtr + 1 + (op * 6);

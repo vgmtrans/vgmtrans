@@ -24,7 +24,7 @@ std::vector<std::unique_ptr<VGMFile>> VGMFile::releaseDiscoveredFiles() {
   return std::exchange(m_discoveredFiles, {});
 }
 
-bool VGMFile::addDiscoveredFile(std::unique_ptr<VGMFile> file) {
+bool VGMFile::adoptDiscoveredFile(std::unique_ptr<VGMFile> file) {
   if (!file || !file->load()) {
     return false;
   }
@@ -95,15 +95,15 @@ VGMHeader::~VGMHeader() = default;
 
 void VGMHeader::addPointer(u32 offset, u32 length, u32 /*destAddress*/, bool /*notNull*/,
                            const std::string &name) {
-  emplaceChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_POINTER, offset, length, name);
+  addChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_POINTER, offset, length, name);
 }
 
 void VGMHeader::addTempo(u32 offset, u32 length, const std::string &name) {
-  emplaceChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_TEMPO, offset, length, name);
+  addChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_TEMPO, offset, length, name);
 }
 
 void VGMHeader::addSig(u32 offset, u32 length, const std::string &name) {
-  emplaceChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_SIG, offset, length, name);
+  addChild<VGMHeaderItem>(this, VGMHeaderItem::HIT_SIG, offset, length, name);
 }
 
 // *************

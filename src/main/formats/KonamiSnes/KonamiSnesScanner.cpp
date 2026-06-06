@@ -633,7 +633,7 @@ void KonamiSnesScanner::searchForKonamiSnesFromARAM(RawFile *file) {
     }
   }
 
-  auto* newSeq = pRoot->emplaceVGMFile<KonamiSnesSeq>(file, version, addrSongHeader, name);
+  auto* newSeq = pRoot->loadVGMFile<KonamiSnesSeq>(file, version, addrSongHeader, name);
   if (!newSeq) {
     return;
   }
@@ -737,7 +737,7 @@ void KonamiSnesScanner::searchForKonamiSnesFromARAM(RawFile *file) {
     return;
   }
 
-  auto* newInstrSet = pRoot->emplaceVGMFile<KonamiSnesInstrSet>(file,
+  auto* newInstrSet = pRoot->loadVGMFile<KonamiSnesInstrSet>(file,
                                                          version,
                                                          addrCommonInstrTable,
                                                          addrBankedInstrTable,

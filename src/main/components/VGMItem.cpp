@@ -165,7 +165,7 @@ bool VGMItem::isValidOffset(u32 offset) const {
   return m_vgmfile->isValidOffset(offset);
 }
 
-VGMItem* VGMItem::addChild(std::unique_ptr<VGMItem> item) {
+VGMItem* VGMItem::adoptChild(std::unique_ptr<VGMItem> item) {
   auto *rawChild = item.get();
   rawChild->m_vgmfile = vgmFile();
   rawChild->m_parent = this;
@@ -177,17 +177,17 @@ VGMItem* VGMItem::addChild(std::unique_ptr<VGMItem> item) {
 }
 
 VGMItem* VGMItem::addChild(u32 offset, u32 length, const std::string &name) {
-  return addChild(std::make_unique<VGMItem>(vgmFile(), offset, length, name, Type::Header));
+  return adoptChild(std::make_unique<VGMItem>(vgmFile(), offset, length, name, Type::Header));
 }
 
 VGMItem* VGMItem::addUnknownChild(u32 offset, u32 length) {
-  return addChild(std::make_unique<VGMItem>(vgmFile(), offset, length, "Unknown"));
+  return adoptChild(std::make_unique<VGMItem>(vgmFile(), offset, length, "Unknown"));
 }
 
 VGMHeader* VGMItem::addHeader(u32 offset, u32 length, const std::string &name) {
   auto header = std::make_unique<VGMHeader>(this, offset, length, name);
   auto *rawHeader = header.get();
-  addChild(std::move(header));
+  adoptChild(std::move(header));
   return rawHeader;
 }
 

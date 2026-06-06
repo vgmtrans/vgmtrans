@@ -65,7 +65,7 @@ bool HOSAInstrSet::parseInstrPointers() {
 
   //音色数だけ繰り返す。
   for (unsigned int i = 0; i < instrheader.numInstr; i++) {
-    emplaceInstr<HOSAInstr>(this, offset() + readWord(iOffset), 0, i / 0x80, i % 0x80);
+    addInstr<HOSAInstr>(this, offset() + readWord(iOffset), 0, i / 0x80, i % 0x80);
     iOffset += 4;
   }
 
@@ -109,7 +109,7 @@ bool HOSAInstr::loadInstr() {
   u8 cKeyLow = 0x00;
   for (unsigned int i = 0; i < instrinfo.numRgns; i++) {
     RgnInfo *rgninfo = &rgns[i];
-    VGMRgn *rgn = emplaceRgn<VGMRgn>(this, offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
+    VGMRgn *rgn = addRgn<VGMRgn>(this, offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
 
     rgn->addChild(rgn->offset(), 4, "Sample Offset");
     rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->offset();

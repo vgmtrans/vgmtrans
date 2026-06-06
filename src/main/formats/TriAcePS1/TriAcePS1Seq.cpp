@@ -57,14 +57,14 @@ bool TriAcePS1Seq::postLoad() {
   bool success = VGMSeq::postLoad();
   if (readMode == READMODE_ADD_TO_UI) {
     for (auto& pattern : m_ownedScorePatterns) {
-      addChild(std::move(pattern));
+      adoptChild(std::move(pattern));
     }
     m_ownedScorePatterns.clear();
   }
   return success;
 }
 
-TriAcePS1ScorePattern* TriAcePS1Seq::addScorePattern(std::unique_ptr<TriAcePS1ScorePattern> pattern) {
+TriAcePS1ScorePattern* TriAcePS1Seq::adoptScorePattern(std::unique_ptr<TriAcePS1ScorePattern> pattern) {
   auto* rawPattern = pattern.get();
   m_scorePatterns.push_back(rawPattern);
   m_ownedScorePatterns.emplace_back(std::move(pattern));
@@ -87,7 +87,7 @@ void TriAcePS1Track::loadTrackMainLoop(u32 stopOffset, s32 stopTime) {
     if (seq->patternMap[scorePatternOffset])
       seq->curScorePattern = NULL;
     else {
-      auto* pattern = seq->addScorePattern(std::make_unique<TriAcePS1ScorePattern>(seq, scorePatternOffset));
+      auto* pattern = seq->adoptScorePattern(std::make_unique<TriAcePS1ScorePattern>(seq, scorePatternOffset));
       seq->patternMap[scorePatternOffset] = pattern;
       seq->curScorePattern = pattern;
     }
@@ -330,7 +330,7 @@ bool TriAcePS1Track::isOffsetUsed(u32 offset) {
   return false;
 }
 
-SeqEvent* TriAcePS1Track::addEvent(std::unique_ptr<SeqEvent> seqEvent) {
+SeqEvent* TriAcePS1Track::adoptEvent(std::unique_ptr<SeqEvent> seqEvent) {
   TriAcePS1ScorePattern *pattern = ((TriAcePS1Seq *) parentSeq)->curScorePattern;
   if (pattern == NULL) {
     // it must be already added, reject it
@@ -341,6 +341,6 @@ SeqEvent* TriAcePS1Track::addEvent(std::unique_ptr<SeqEvent> seqEvent) {
     return nullptr;
 
   auto* rawEvent = seqEvent.get();
-  pattern->addChild(std::move(seqEvent));
+  pattern->adoptChild(std::move(seqEvent));
   return rawEvent;
 }

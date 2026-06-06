@@ -87,7 +87,7 @@ bool ChunSnesInstrSet::parseInstrPointers() {
         setOffset(addrInstr);
       }
 
-      emplaceInstr<ChunSnesInstr>(this, version, instrNum, addrInstr,
+      addInstr<ChunSnesInstr>(this, version, instrNum, addrInstr,
                                   addrSampleTable, spcDirAddr, instrName);
     }
   }
@@ -140,7 +140,7 @@ bool ChunSnesInstr::loadInstr() {
     return false;
   }
 
-  ChunSnesRgn *rgn = emplaceRgn<ChunSnesRgn>(this, version, srcn, addrRgn, spcDirAddr);
+  ChunSnesRgn *rgn = addRgn<ChunSnesRgn>(this, version, srcn, addrRgn, spcDirAddr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   setGuessedLength();

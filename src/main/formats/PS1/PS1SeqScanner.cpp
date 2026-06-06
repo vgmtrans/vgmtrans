@@ -32,7 +32,7 @@ std::vector<PS1Seq *> PS1SeqScanner::searchForPS1Seq(RawFile *file) {
                         std::boyer_moore_searcher(signature.rbegin(), signature.rend()));
 
   while (it != file->end()) {
-    auto* newPS1Seq = pRoot->emplaceVGMFile<PS1Seq>(file, it - file->begin());
+    auto* newPS1Seq = pRoot->loadVGMFile<PS1Seq>(file, it - file->begin());
     if (newPS1Seq) {
       loadedFiles.push_back(newPS1Seq);
     }
@@ -53,7 +53,7 @@ std::vector<Vab *> PS1SeqScanner::searchForVab(RawFile *file) {
                         std::boyer_moore_searcher(signature.rbegin(), signature.rend()));
 
   while (it != file->end()) {
-    auto* newVab = pRoot->emplaceVGMFile<Vab>(file, it - file->begin());
+    auto* newVab = pRoot->loadVGMFile<Vab>(file, it - file->begin());
     if (newVab) {
       loadedFiles.push_back(newVab);
     }

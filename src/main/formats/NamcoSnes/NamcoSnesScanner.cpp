@@ -171,7 +171,7 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
     return;
   }
 
-  auto* newSeq = pRoot->emplaceVGMFile<NamcoSnesSeq>(file, version, addrEventStart, name);
+  auto* newSeq = pRoot->loadVGMFile<NamcoSnesSeq>(file, version, addrEventStart, name);
   if (!newSeq) {
     return;
   }
@@ -191,7 +191,7 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
   }
   u16 spcDirAddr = dspRegMap[0x5d] << 8;
 
-  auto* newInstrSet = pRoot->emplaceVGMFile<NamcoSnesInstrSet>(file, version, spcDirAddr, addrTuningTable);
+  auto* newInstrSet = pRoot->loadVGMFile<NamcoSnesInstrSet>(file, version, spcDirAddr, addrTuningTable);
   if (!newInstrSet) {
     return;
   }

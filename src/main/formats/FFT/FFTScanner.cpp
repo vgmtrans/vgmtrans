@@ -36,7 +36,7 @@ void FFTScanner::searchForFFTSeq(RawFile *file) {
     if (file->readShort(i + 10) != 0 && file->readShort(i + 16) != 0)
       continue;
 
-    pRoot->emplaceVGMFile<FFTSeq>(file, i);
+    pRoot->loadVGMFile<FFTSeq>(file, i);
   }
 }
 
@@ -66,6 +66,6 @@ void FFTScanner::searchForFFTwds(RawFile *file) {
     //if (size <= file->GetWord(i+0x10) || size <= file->GetWord(i+0x18))
     //	continue;
 
-    pRoot->emplaceVGMFile<WdsInstrSet>(file, i);
+    pRoot->loadVGMFile<WdsInstrSet>(file, i);
   }
 }

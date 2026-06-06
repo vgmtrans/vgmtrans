@@ -119,7 +119,7 @@ void PandoraBoxSnesScanner::searchForPandoraBoxSnesFromARAM(RawFile *file) {
     return;
   }
 
-  auto* newSeq = pRoot->emplaceVGMFile<PandoraBoxSnesSeq>(file, version, addrSeqHeader, name);
+  auto* newSeq = pRoot->loadVGMFile<PandoraBoxSnesSeq>(file, version, addrSeqHeader, name);
   if (!newSeq) {
     return;
   }
@@ -153,7 +153,7 @@ void PandoraBoxSnesScanner::searchForPandoraBoxSnesFromARAM(RawFile *file) {
     return;
   }
 
-  auto* newInstrSet = pRoot->emplaceVGMFile<PandoraBoxSnesInstrSet>(
+  auto* newInstrSet = pRoot->loadVGMFile<PandoraBoxSnesInstrSet>(
       file, version, spcDirAddr, addrLocalInstrTable, addrGlobalInstrTable, globalInstrumentCount,
       newSeq->instrADSRHints);
   if (!newInstrSet) {

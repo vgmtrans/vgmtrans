@@ -66,7 +66,7 @@ bool NamcoSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    emplaceInstr<NamcoSnesInstr>(this, version, srcn, spcDirAddr, ofsTuningEntry,
+    addInstr<NamcoSnesInstr>(this, version, srcn, spcDirAddr, ofsTuningEntry,
                                  fmt::format("Instrument {}", srcn));
   }
 
@@ -108,7 +108,7 @@ bool NamcoSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  NamcoSnesRgn *rgn = emplaceRgn<NamcoSnesRgn>(this, version, instrNum, spcDirAddr, addrTuningEntry);
+  NamcoSnesRgn *rgn = addRgn<NamcoSnesRgn>(this, version, instrNum, spcDirAddr, addrTuningEntry);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   setGuessedLength();

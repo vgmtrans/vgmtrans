@@ -50,7 +50,7 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, u32 offset, u32 length,
 
 VGMSeq::~VGMSeq() = default;
 
-SeqTrack* VGMSeq::addTrack(std::unique_ptr<SeqTrack> track) {
+SeqTrack* VGMSeq::adoptTrack(std::unique_ptr<SeqTrack> track) {
   auto* rawTrack = track.get();
   m_tracks.push_back(rawTrack);
   m_ownedTracks.emplace_back(std::move(track));
@@ -62,7 +62,7 @@ void VGMSeq::clearTracks() {
   m_ownedTracks.clear();
 }
 
-ISeqSlider* VGMSeq::addSlider(std::unique_ptr<ISeqSlider> slider) {
+ISeqSlider* VGMSeq::adoptSlider(std::unique_ptr<ISeqSlider> slider) {
   auto* rawSlider = slider.get();
   m_sliders.emplace_back(std::move(slider));
   return rawSlider;
@@ -126,7 +126,7 @@ bool VGMSeq::postLoad() {
       track->sortChildrenByOffset();
     }
     for (auto& track : m_ownedTracks) {
-      addChild(std::move(track));
+      adoptChild(std::move(track));
     }
     m_ownedTracks.clear();
 

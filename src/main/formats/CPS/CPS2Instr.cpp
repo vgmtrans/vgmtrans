@@ -35,7 +35,7 @@ bool CPSArticTable::loadMain() {
       continue;
 
     auto name = fmt::format("Articulation {:d}", i);
-    auto* containerItem = emplaceChild<VGMItem>(this, off, sizeof(qs_artic_info), name);
+    auto* containerItem = addChild<VGMItem>(this, off, sizeof(qs_artic_info), name);
     containerItem->addChild(off, 1, "Attack Rate");
     containerItem->addChild(off + 1, 1, "Decay Rate");
     containerItem->addChild(off + 2, 1, "Sustain Level");
@@ -90,7 +90,7 @@ bool CPS2SampleInfoTable::loadMain() {
 
     auto name = fmt::format("Sample Info: {:d}", i);
 
-    auto* containerItem = emplaceChild<VGMItem>(this, off, sizeof(qs_samp_info_cps2), name);
+    auto* containerItem = addChild<VGMItem>(this, off, sizeof(qs_samp_info_cps2), name);
     containerItem->addChild(off + 0, 1, "Bank");
     containerItem->addChild(off + 1, 2, "Offset");
     containerItem->addChild(off + 3, 2, "Loop Offset");
@@ -148,7 +148,7 @@ bool CPS3SampleInfoTable::loadMain() {
 
     auto name = fmt::format("Sample Info: {:d}", i);
 
-    auto* containerItem = emplaceChild<VGMItem>(this, off, 16, name);
+    auto* containerItem = addChild<VGMItem>(this, off, 16, name);
     containerItem->addChild(off + 0, 4, "Offset");
     containerItem->addChild(off + 4, 4, "Loop Offset");
     containerItem->addChild(off + 8, 4, "End Offset");
@@ -200,7 +200,7 @@ bool CPS2InstrSet::parseInstrPointers() {
     for (u32 bank = 0; bank < num_instr_banks; bank++)
       for (u32 i = 0; i < 256; i++) {
         auto name = fmt::format("Instrument: bank {:d}  num {:d}", bank * 256, i);
-        emplaceInstr<CPS2Instr>(this,
+        addInstr<CPS2Instr>(this,
                                 offset() + i * 8 + (bank * 256 * 8),
                                 8,
                                 (bank * 2) + (i / 128),
@@ -234,7 +234,7 @@ bool CPS2InstrSet::parseInstrPointers() {
         u32 bankOff = instr_table_ptrs[bank] - 0x6000000;
 
         auto pointersName = fmt::format("Bank {:d} Instrument Pointers", bank);
-        auto* instrPointersItem = emplaceChild<VGMItem>(vgmFile(), bankOff, 128*2, pointersName, Type::Header);
+        auto* instrPointersItem = addChild<VGMItem>(vgmFile(), bankOff, 128*2, pointersName, Type::Header);
 
         // For each bank, iterate over all instr ptrs and create instruments
         for (u8 j = 0; j < 128; j++) {
@@ -252,7 +252,7 @@ bool CPS2InstrSet::parseInstrPointers() {
           instrPointersItem->addChild(bankOff + (j*2), 2, pointerStream.str());
 
           auto name = fmt::format("Instrument: {:d}  bank: {:d}", j, bank);
-          emplaceInstr<CPS2Instr>(this, instrPtr, instrLength, bank*2, j, name);
+          addInstr<CPS2Instr>(this, instrPtr, instrLength, bank*2, j, name);
         }
         continue;
       }
@@ -270,7 +270,7 @@ bool CPS2InstrSet::parseInstrPointers() {
           break;
 
         auto name = fmt::format("Instrument {:d}", k);
-        emplaceInstr<CPS2Instr>(this, j, instr_info_length, (i * 2) + (k / 128), (k % 128), name);
+        addInstr<CPS2Instr>(this, j, instr_info_length, (i * 2) + (k / 128), (k % 128), name);
       }
     }
   }
@@ -304,7 +304,7 @@ bool CPS2Instr::loadInstr() {
   std::vector<CPSRgnInfo> rgns;
   const CPS2FormatVer formatVer = formatVersion();
   if (formatVer < CPS2_V103) {
-    VGMRgn* rgn = emplaceRgn<VGMRgn>(this, offset(), length());
+    VGMRgn* rgn = addRgn<VGMRgn>(this, offset(), length());
     rgn->addChild(this->offset(),     1, "Sample Info Index");
     rgn->addChild(this->offset() + 1, 1, "Unknown / Ignored");
     rgn->addChild(this->offset() + 2, 1, "Attack Rate");
@@ -325,7 +325,7 @@ bool CPS2Instr::loadInstr() {
                     progInfo.release_rate});
   }
   else if (formatVer < CPS2_V130 || formatVer == CPS2_V200 || formatVer == CPS2_V201B) {
-    VGMRgn* rgn = emplaceRgn<VGMRgn>(this, offset(), length());
+    VGMRgn* rgn = addRgn<VGMRgn>(this, offset(), length());
     qs_prog_info_ver_103 progInfo;
     readBytes(offset(), sizeof(qs_prog_info_ver_103), &progInfo);
 
@@ -351,7 +351,7 @@ bool CPS2Instr::loadInstr() {
       if (length() != 0 && off >= offset() + length())
         break;
 
-      VGMRgn* rgn = emplaceRgn<VGMRgn>(this, off, 12);
+      VGMRgn* rgn = addRgn<VGMRgn>(this, off, 12);
 
       qs_prog_info_ver_cps3 progInfo;
       readBytes(off, sizeof(qs_prog_info_ver_cps3), &progInfo);
@@ -392,7 +392,7 @@ bool CPS2Instr::loadInstr() {
     setLength(off - offset());
   }
   else {
-    VGMRgn* rgn = emplaceRgn<VGMRgn>(this, offset(), length(), "Region");
+    VGMRgn* rgn = addRgn<VGMRgn>(this, offset(), length(), "Region");
     qs_prog_info_ver_130 progInfo;
     readBytes(offset(), sizeof(qs_prog_info_ver_130), &progInfo);
 

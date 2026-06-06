@@ -259,7 +259,7 @@ bool NinSnesInstrSet::parseInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    auto *newInstr = emplaceInstr<NinSnesInstr>(
+    auto *newInstr = addInstr<NinSnesInstr>(
       this, profileId, addrInstrHeader, instr >> 7, instr & 0x7f,
       spcDirAddr, fmt::format("Instrument {}", instr));
     newInstr->konamiTuningTableAddress = konamiTuningTableAddress;
@@ -306,8 +306,8 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
       if (rgn == nullptr) {
         continue;
       }
-      overrideInstrOwner->addRgn(std::move(rgn));
-      addTempInstr(std::move(overrideInstrOwner));
+      overrideInstrOwner->adoptRgn(std::move(rgn));
+      adoptTempInstr(std::move(overrideInstrOwner));
     }
 
     for (const auto& drumKitDef : seq->intelliTADrumKitDefs()) {
@@ -328,7 +328,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
 
         const u8 drumKey = static_cast<u8>(0x24 + slot);
         for (auto* sourceRgn : sourceInstr->regions()) {
-          drumKit->addRgn(
+          drumKit->adoptRgn(
               cloneIntelliTARgnForDrumKit(drumKit.get(), sourceRgn, drumKey, slotDef.playedNoteByte));
         }
       }
@@ -337,7 +337,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
         continue;
       }
 
-      addTempInstr(std::move(drumKit));
+      adoptTempInstr(std::move(drumKit));
     }
   } else {
     const auto& percussionInstrNoteMap = seq->percussionInstrNoteMap();
@@ -358,15 +358,15 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
         }
 
         for (auto* sourceRgn : sourceInstr->regions()) {
-          drumKit->addRgn(cloneLegacyRgnForDrumKit(drumKit.get(),
-                                                   sourceRgn,
-                                                   percussionDef.noteIndex,
-                                                   percussionDef.globalTranspose));
+          drumKit->adoptRgn(cloneLegacyRgnForDrumKit(drumKit.get(),
+                                                     sourceRgn,
+                                                     percussionDef.noteIndex,
+                                                     percussionDef.globalTranspose));
         }
       }
 
       if (!drumKit->regions().empty()) {
-        addTempInstr(std::move(drumKit));
+        adoptTempInstr(std::move(drumKit));
       }
     }
   }
@@ -411,7 +411,7 @@ bool NinSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  NinSnesRgn *rgn = emplaceRgn<NinSnesRgn>(this, profileId, offset(), konamiTuningTableAddress, konamiTuningTableSize);
+  NinSnesRgn *rgn = addRgn<NinSnesRgn>(this, profileId, offset(), konamiTuningTableAddress, konamiTuningTableSize);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   return true;

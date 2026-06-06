@@ -188,14 +188,14 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
     }
 
     sampcoll =
-        pRoot->emplaceVGMFile<CPS1SampColl>(samplesFile, sampleInstrset, 0, static_cast<u32>(samplesFile->size()), sampcoll_name);
+        pRoot->loadVGMFile<CPS1SampColl>(samplesFile, sampleInstrset, 0, static_cast<u32>(samplesFile->size()), sampcoll_name);
   }
 
   std::string seq_table_name = fmt::format("{} sequence pointer table", gameentry->name);
 
   // Add SeqTable as Miscfile
   auto* seqTable =
-      pRoot->emplaceVGMFile<VGMMiscFile>(CPS1Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
+      pRoot->loadVGMFile<VGMMiscFile>(CPS1Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
   if (!seqTable) {
     return;
   }
@@ -223,7 +223,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
     seqTable->addChild(seq_table_offset + (seqId * sizeof(u16)), sizeof(u16), "Sequence Pointer");
 
     auto seqName = fmt::format("{} seq {}", gameentry->name, seqId);
-    auto* newSeq = pRoot->emplaceVGMFile<CPS1Seq>(programFile, seqPointer, fmt_ver, seqName, instrTransposeTable);
+    auto* newSeq = pRoot->loadVGMFile<CPS1Seq>(programFile, seqPointer, fmt_ver, seqName, instrTransposeTable);
     if (!newSeq) {
       continue;
     }
@@ -232,11 +232,11 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
       auto collName = fmt::format("{} song {}", gameentry->name, seqId);
       auto coll = std::make_unique<VGMColl>(collName);
 
-      coll->useSeq(newSeq);
-      coll->addInstrSet(opmInstrset);
+      coll->attachSeq(newSeq);
+      coll->attachInstrSet(opmInstrset);
       if (sampleInstrset && sampcoll) {
-        coll->addInstrSet(sampleInstrset);
-        coll->addSampColl(sampcoll);
+        coll->attachInstrSet(sampleInstrset);
+        coll->attachSampColl(sampcoll);
       }
       pRoot->loadVGMColl(std::move(coll));
     }

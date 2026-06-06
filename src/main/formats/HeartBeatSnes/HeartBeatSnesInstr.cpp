@@ -74,7 +74,7 @@ bool HeartBeatSnesInstrSet::parseInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    emplaceInstr<HeartBeatSnesInstr>(
+    addInstr<HeartBeatSnesInstr>(
       this, version, addrInstrHeader, instrNum >> 7, instrNum & 0x7f, addrSRCNTable,
       songIndex, spcDirAddr, fmt::format("Instrument {}", instrNum));
   }
@@ -128,7 +128,7 @@ bool HeartBeatSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  HeartBeatSnesRgn *rgn = emplaceRgn<HeartBeatSnesRgn>(this, version, offset());
+  HeartBeatSnesRgn *rgn = addRgn<HeartBeatSnesRgn>(this, version, offset());
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   return true;

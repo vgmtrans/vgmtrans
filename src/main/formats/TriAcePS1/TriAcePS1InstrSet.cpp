@@ -39,7 +39,7 @@ bool TriAcePS1InstrSet::parseHeader() {
 
 
   //sampColl = new TriAcePS1SampColl(this, offset()+instrSectionSize, length()-instrSectionSize);
-  emplaceSampColl<PSXSampColl>(TriAcePS1Format::name, this, offset() + instrSectionSize, length() - instrSectionSize);
+  addSampColl<PSXSampColl>(TriAcePS1Format::name, this, offset() + instrSectionSize, length() - instrSectionSize);
 
 
   return true;
@@ -59,7 +59,7 @@ bool TriAcePS1InstrSet::parseInstrPointers() {
   for (u32 i = offset() + sizeof(TriAcePS1InstrSet::_InstrHeader);                    //1,Sep.2009 revise
        ((firstWord != 0xFFFFFFFF) && (i < offset() + length()));
        i += sizeof(TriAcePS1Instr::InstrInfo), firstWord = readWord(i)) {
-    TriAcePS1Instr *newInstr = emplaceInstr<TriAcePS1Instr>(this, i, 0, 0, 0);
+    TriAcePS1Instr *newInstr = addInstr<TriAcePS1Instr>(this, i, 0, 0, 0);
     readBytes(i, sizeof(TriAcePS1Instr::InstrInfo), &newInstr->instrinfo);
     newInstr->addChild(i + 0, sizeof(short), "Instrument Number");            //1,Sep.2009 revise
     newInstr->addChild(i + 2, sizeof(short), "ADSR1");                        //1,Sep.2009 revise
@@ -114,7 +114,7 @@ bool TriAcePS1Instr::loadInstr() {
 
   for (int i = 0; i < instrinfo.numRgns; i++) {
     RgnInfo *rgninfo = &rgns[i];
-    VGMRgn *rgn = emplaceRgn<VGMRgn>(this,
+    VGMRgn *rgn = addRgn<VGMRgn>(this,
                                      offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i,
                                      sizeof(RgnInfo));        //1,Sep.2009 revise
     rgn->addKeyLow(rgninfo->note_range_low, rgn->offset());

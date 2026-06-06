@@ -53,9 +53,9 @@ void HOSAScanner::scan(RawFile *file, void *info) {
   }
 
   auto coll = std::make_unique<VGMColl>(seq->name());
-  coll->useSeq(seq);
-  coll->addInstrSet(instrset);
-  coll->addSampColl(sampcoll);
+  coll->attachSeq(seq);
+  coll->attachInstrSet(instrset);
+  coll->attachSampColl(sampcoll);
   pRoot->loadVGMColl(std::move(coll));
 
   return;
@@ -80,7 +80,7 @@ HOSASeq *HOSAScanner::searchForHOSASeq(RawFile *file) {
     if (firstTrkPtr >= file->readShort(i + 0x54) && firstTrkPtr != 0x54)
       continue;
 
-    auto* seq = pRoot->emplaceVGMFile<HOSASeq>(file, i, name);
+    auto* seq = pRoot->loadVGMFile<HOSASeq>(file, i, name);
     if (!seq) {
       return nullptr;
     }
@@ -110,7 +110,7 @@ HOSAInstrSet *HOSAScanner::searchForHOSAInstrSet(RawFile *file, const PSXSampCol
         if ((file->readWord(i + 4) != 0) || (file->readWord(i) != 0))
           continue;
 
-        auto* instrset = pRoot->emplaceVGMFile<HOSAInstrSet>(file, i);
+        auto* instrset = pRoot->loadVGMFile<HOSAInstrSet>(file, i);
         if (!instrset) {
           delete[] sampOffsets;
           return nullptr;

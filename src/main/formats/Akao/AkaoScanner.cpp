@@ -34,7 +34,7 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       u16 id = file->readShort(offset + 4);
       auto name = fmt::format("Akao Seq {:02X}", id);
 
-      auto* seq = pRoot->emplaceVGMFile<AkaoSeq>(file, offset, version, name);
+      auto* seq = pRoot->loadVGMFile<AkaoSeq>(file, offset, version, name);
       if (!seq) {
         continue;
       }
@@ -56,7 +56,7 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       u16 id = file->readShort(offset + 4);
       auto name = fmt::format("Akao Sample Collection {:02X}", id);
 
-      pRoot->emplaceVGMFile<AkaoSampColl>(file, offset, version, name);
+      pRoot->loadVGMFile<AkaoSampColl>(file, offset, version, name);
     }
   }
 
@@ -79,7 +79,7 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
 
     if (!instrLocations.empty()) {
       for (const auto & loc : instrLocations) {
-        pRoot->emplaceVGMFile<AkaoSampColl>(file, loc);
+        pRoot->loadVGMFile<AkaoSampColl>(file, loc);
       }
     }
   }

@@ -77,7 +77,7 @@ bool PrismSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    emplaceInstr<PrismSnesInstr>(
+    addInstr<PrismSnesInstr>(
       this, version, srcn, spcDirAddr, ofsADSR1Entry, ofsADSR2Entry, ofsTuningEntryHigh,
       ofsTuningEntryLow, fmt::format("Instrument: {:#x}", srcn));
   }
@@ -127,7 +127,7 @@ bool PrismSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  PrismSnesRgn *rgn = emplaceRgn<PrismSnesRgn>(this,
+  PrismSnesRgn *rgn = addRgn<PrismSnesRgn>(this,
                                                version,
                                                srcn,
                                                spcDirAddr,

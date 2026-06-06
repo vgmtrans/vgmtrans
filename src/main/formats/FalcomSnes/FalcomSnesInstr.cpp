@@ -82,7 +82,7 @@ bool FalcomSnesInstrSet::parseInstrPointers() {
     }
 
     auto instrName = fmt::format("Instrument {}", instr);
-    emplaceInstr<FalcomSnesInstr>(
+    addInstr<FalcomSnesInstr>(
       this, version, addrInstrHeader, instr >> 7, instr & 0x7f, srcn,
       spcDirAddr, instrName);
   }
@@ -124,7 +124,7 @@ bool FalcomSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  FalcomSnesRgn *rgn = emplaceRgn<FalcomSnesRgn>(this, version, offset(), srcn);
+  FalcomSnesRgn *rgn = addRgn<FalcomSnesRgn>(this, version, offset(), srcn);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   return true;

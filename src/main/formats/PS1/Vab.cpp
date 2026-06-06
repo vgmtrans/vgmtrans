@@ -93,7 +93,7 @@ bool Vab::parseInstrPointers() {
     }
     else if (numTonesPerInstr != 0) {
       auto instrName = fmt::format("Instrument {:d}", progIndex);
-      VabInstr *newInstr = emplaceInstr<VabInstr>(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex, instrName);
+      VabInstr *newInstr = addInstr<VabInstr>(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex, instrName);
       readBytes(offCurrProg, 0x10, &newInstr->attr);
 
       const auto progName = fmt::format("Program {:d}", progIndex);
@@ -190,7 +190,7 @@ bool VabInstr::loadInstr() {
     if (!rgn->loadRgn()) {
       continue;
     }
-    addRgn(std::move(rgn));
+    adoptRgn(std::move(rgn));
   }
   return true;
 }

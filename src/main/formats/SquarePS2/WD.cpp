@@ -70,7 +70,7 @@ bool WDInstrSet::parseHeader() {
 
   u32 sampCollOff = offset() + readWord(offset() + 0x20) + (dwTotalRegions * 0x20);
 
-  emplaceSampColl<PSXSampColl>(SquarePS2Format::name, this, sampCollOff, dwSampSectSize);
+  addSampColl<PSXSampColl>(SquarePS2Format::name, this, sampCollOff, dwSampSectSize);
   setLength(sampCollOff + dwSampSectSize - offset());
 
   return true;
@@ -92,7 +92,7 @@ bool WDInstrSet::parseInstrPointers() {
     else
       instrLength = sampColl->offset() - (readWord(j + (i * 4)) + offset());
 
-    emplaceInstr<WDInstr>(this, offset() + readWord(j + (i * 4)), instrLength,
+    addInstr<WDInstr>(this, offset() + readWord(j + (i * 4)), instrLength,
                           0, i, fmt::format("Instrument {}", i));
   }
   return true;
@@ -110,7 +110,7 @@ WDInstr::WDInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank,
 bool WDInstr::loadInstr() {
   unsigned int k = 0;
   while (k * 0x20 < length()) {
-    auto *rgn = emplaceRgn<WDRgn>(this, k * 0x20 + offset());
+    auto *rgn = addRgn<WDRgn>(this, k * 0x20 + offset());
 
     rgn->addChild(k * 0x20 + offset(), 1, "Stereo Region Flag");
     rgn->addChild(k * 0x20 + 1 + offset(), 1, "First/Last Region Flags");

@@ -127,20 +127,20 @@ class VGMSeq : public VGMFile {
   void setConversionContext(const ConversionContext& context) { m_conversionContext = context; }
   void reserveTracks(size_t count) { m_ownedTracks.reserve(count); m_tracks.reserve(count); }
   void clearTracks();
-  SeqTrack* addTrack(std::unique_ptr<SeqTrack> track);
+  SeqTrack* adoptTrack(std::unique_ptr<SeqTrack> track);
   template <class TrackType, class... Args>
   TrackType* addTrack(Args&&... args) {
     auto track = std::make_unique<TrackType>(std::forward<Args>(args)...);
     auto* rawTrack = track.get();
-    addTrack(std::move(track));
+    adoptTrack(std::move(track));
     return rawTrack;
   }
-  ISeqSlider* addSlider(std::unique_ptr<ISeqSlider> slider);
+  ISeqSlider* adoptSlider(std::unique_ptr<ISeqSlider> slider);
   template <class SliderType, class... Args>
   SliderType* addSlider(Args&&... args) {
     auto slider = std::make_unique<SliderType>(std::forward<Args>(args)...);
     auto* rawSlider = slider.get();
-    addSlider(std::move(slider));
+    adoptSlider(std::move(slider));
     return rawSlider;
   }
 

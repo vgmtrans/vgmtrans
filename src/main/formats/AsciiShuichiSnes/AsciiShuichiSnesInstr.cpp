@@ -48,7 +48,7 @@ bool AsciiShuichiSnesInstrSet::parseInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    emplaceInstr<AsciiShuichiSnesInstr>(
+    addInstr<AsciiShuichiSnesInstr>(
       this, instrHeaderAddress, instr >> 7, instr & 0x7f, spcDirAddress, fineTuningTableAddress,
       fmt::format("Instrument {}", instr));
   }
@@ -94,7 +94,7 @@ bool AsciiShuichiSnesInstr::loadInstr() {
   }
   const auto spcFineTuning = static_cast<s8>(readByte(fineTuningTableAddress + srcn));
 
-  const auto rgn = emplaceRgn<AsciiShuichiSnesRgn>(this, offset(), spcFineTuning);
+  const auto rgn = addRgn<AsciiShuichiSnesRgn>(this, offset(), spcFineTuning);
   rgn->sampOffset = sampleStartAddress - spcDirAddress;
 
   return true;

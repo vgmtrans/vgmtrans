@@ -34,7 +34,7 @@ VGMInstrSet::~VGMInstrSet() = default;
 
 VGMInstr *VGMInstrSet::addInstr(u32 offset, u32 length, u32 bank,
                                 u32 instrNum, const std::string &instrName) {
-  return emplaceInstr<VGMInstr>(
+  return addInstr<VGMInstr>(
       this, offset, length, bank, instrNum,
       instrName.empty() ? fmt::format("Instrument {}", instrCount()) : instrName);
 }
@@ -53,7 +53,7 @@ VGMInstr* VGMInstrSet::adoptInstrAsChild(std::unique_ptr<VGMInstr> instr) {
 VGMInstr* VGMInstrSet::adoptInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInstr> instr) {
   auto* rawInstr = instr.get();
   m_instrs.push_back(rawInstr);
-  parent.addChild(std::move(instr));
+  parent.adoptChild(std::move(instr));
   return rawInstr;
 }
 
@@ -81,7 +81,7 @@ bool VGMInstrSet::load() {
 
   if (m_auto_add_instruments_as_children) {
     for (auto& instr : m_ownedInstrs) {
-      addChild(std::move(instr));
+      adoptChild(std::move(instr));
     }
     m_ownedInstrs.clear();
   }
@@ -139,7 +139,7 @@ const std::vector<VGMInstr*>& VGMInstrSet::exportInstrs() const {
   return m_exportInstrs.empty() ? m_instrs : m_exportInstrs;
 }
 
-void VGMInstrSet::addTempInstr(std::unique_ptr<VGMInstr> instr) {
+void VGMInstrSet::adoptTempInstr(std::unique_ptr<VGMInstr> instr) {
   assert(instr != nullptr);
   m_exportInstrs.push_back(instr.get());
   m_tempInstrs.emplace_back(std::move(instr));
@@ -187,11 +187,11 @@ void VGMInstr::setInstrNum(u32 theInstrNum) {
   instrNum = theInstrNum;
 }
 
-VGMRgn *VGMInstr::addRgn(std::unique_ptr<VGMRgn> rgn) {
+VGMRgn *VGMInstr::adoptRgn(std::unique_ptr<VGMRgn> rgn) {
   auto* rawRgn = rgn.get();
   m_regions.emplace_back(rawRgn);
   if (m_auto_add_regions_as_children) {
-    addChild(std::move(rgn));
+    adoptChild(std::move(rgn));
   } else {
     m_ownedRegions.emplace_back(std::move(rgn));
   }
@@ -200,7 +200,7 @@ VGMRgn *VGMInstr::addRgn(std::unique_ptr<VGMRgn> rgn) {
 
 VGMRgn *VGMInstr::addRgn(u32 offset, u32 length, int sampNum, u8 keyLow,
                          u8 keyHigh, u8 velLow, u8 velHigh) {
-  return emplaceRgn<VGMRgn>(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
+  return addRgn<VGMRgn>(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
 }
 
 void VGMInstr::deleteRegions() {

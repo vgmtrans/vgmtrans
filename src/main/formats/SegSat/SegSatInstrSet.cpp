@@ -53,7 +53,7 @@ constexpr PanLinAmp panToAmp(u8 pan) {
 
 SegSatInstrSet::SegSatInstrSet(RawFile* file, u32 offset, int numInstrs, SegSatDriverVer ver, const std::string& name) :
     VGMInstrSet(SegSatFormat::name, file, offset, 0, name), m_numInstrs(numInstrs), m_driverVer(ver) {
-  emplaceSampColl<VGMSampColl>(SegSatFormat::name, file, this, offset);
+  addSampColl<VGMSampColl>(SegSatFormat::name, file, this, offset);
 }
 
 bool SegSatInstrSet::parseHeader() {
@@ -137,7 +137,7 @@ bool SegSatInstrSet::parseInstrPointers() {
     u8 numRgns = rawFile()->readByte(instrOff + 2) + 1;
     size_t instrSize = 4 + numRgns * 0x20;
     auto name = fmt::format("Instrument {:d}", i);
-    emplaceInstr<SegSatInstr>(this, instrOff, instrSize, 0, i, name);
+    addInstr<SegSatInstr>(this, instrOff, instrSize, 0, i, name);
     instrList->addChild(off + (i * 2), 2, fmt::format("Instrument {:d} Pointer", i));
   }
 
@@ -177,7 +177,7 @@ bool SegSatInstr::loadInstr() {
     if (!rgn->isRegionValid()) {
       continue;
     }
-    auto* rawRgn = static_cast<SegSatRgn*>(addRgn(std::move(rgn)));
+    auto* rawRgn = static_cast<SegSatRgn*>(adoptRgn(std::move(rgn)));
 
     // Add sample
     u32 sampLength = rawRgn->sampleLoopEnd();

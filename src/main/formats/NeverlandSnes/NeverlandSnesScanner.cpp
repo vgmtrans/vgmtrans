@@ -90,7 +90,7 @@ void NeverlandSnesScanner::searchForNeverlandSnesFromARAM(RawFile *file) {
     return;
   }
 
-  auto* newSeq = pRoot->emplaceVGMFile<NeverlandSnesSeq>(file, version, addrSeqHeader);
+  auto* newSeq = pRoot->loadVGMFile<NeverlandSnesSeq>(file, version, addrSeqHeader);
   if (!newSeq) {
     return;
   }

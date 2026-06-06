@@ -60,7 +60,7 @@ bool WdsInstrSet::parseHeader() {
   wdsHeader->addUnknownChild(offset() + 0x2C, sizeof(long));
 
   //波形objectの生成
-  emplaceSampColl<PSXSampColl>(FFTFormat::name, this, offset() + hdr.szHeader1, hdr.szSampColl);
+  addSampColl<PSXSampColl>(FFTFormat::name, this, offset() + hdr.szHeader1, hdr.szSampColl);
 //	sampColl->Load();				//VGMInstrSet::Load()関数内でやっている。
 //	sampColl->UseInstrSet(this);	//"WD.cpp"では、同様の事をやっている。
 
@@ -81,7 +81,7 @@ bool    WdsInstrSet::parseInstrPointers() {
   //音色数だけ繰り返す。
   for (unsigned int i = 0; i <= hdr.iNumInstrs; i++) {
     //WdsInstr* newInstr = new WdsInstr(this,iOffset,sizeof(WdsRgnData),hdr.iBank,i);		//0 … hdr.iBank
-    emplaceInstr<WdsInstr>(this, iOffset, sizeof(WdsRgnData), i / 128, i % 128);        //0 … hdr.iBank
+    addInstr<WdsInstr>(this, iOffset, sizeof(WdsRgnData), i / 128, i % 128);        //0 … hdr.iBank
     //	newInstr->LoadInstr();		//VGMInstrSet::Load()関数内（LoadInstrs()）でやっている。
     iOffset += sizeof(WdsRgnData);    // size = 0x0010
   }
@@ -114,7 +114,7 @@ bool WdsInstr::loadInstr() {
   WdsInstrSet *parInstrSet = static_cast<WdsInstrSet*>(this->parInstrSet);
 
   readBytes(offset(), sizeof(WdsRgnData), &rgndata);
-  VGMRgn *rgn = emplaceRgn<VGMRgn>(this, offset(), length());
+  VGMRgn *rgn = addRgn<VGMRgn>(this, offset(), length());
   rgn->sampOffset = rgndata.ptBody;
   if (parInstrSet->version == WdsInstrSet::VERSION_WDS) {
     rgn->sampOffset *= 8;

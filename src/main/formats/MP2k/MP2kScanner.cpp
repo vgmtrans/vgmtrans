@@ -100,7 +100,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
     return;
   }
 
-  auto* psg_sampcoll = pRoot->emplaceVGMFile<MP2kPSGColl>(file, psg_sample_rate, psg_sample_rate);
+  auto* psg_sampcoll = pRoot->loadVGMFile<MP2kPSGColl>(file, psg_sample_rate, psg_sample_rate);
   if (!psg_sampcoll) {
     return;
   }
@@ -121,7 +121,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
       break;
     }
 
-    auto* nseq = pRoot->emplaceVGMFile<MP2kSeq>(file, song_pointer);
+    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer);
     if (!nseq) {
       continue;
     }
@@ -152,12 +152,12 @@ void MP2kScanner::scan(RawFile *file, void *) {
       if (seq != seqs.end()) {
         for (auto seqval : seq->second) {
           auto coll = std::make_unique<VGMColl>(fmt::format("MP2k Collection #{}", seqval.song_index));
-          coll->useSeq(seqval.seq);
-          coll->addInstrSet(rawInstrSet);
+          coll->attachSeq(seqval.seq);
+          coll->attachInstrSet(rawInstrSet);
           if (rawInstrSet->sampColl != nullptr && rawInstrSet->sampColl->hasSamples()) {
-            coll->addSampColl(rawInstrSet->sampColl);
+            coll->attachSampColl(rawInstrSet->sampColl);
           }
-          coll->addSampColl(psg_sampcoll);
+          coll->attachSampColl(psg_sampcoll);
 
           pRoot->loadVGMColl(std::move(coll));
         }

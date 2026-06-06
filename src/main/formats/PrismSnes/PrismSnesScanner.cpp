@@ -172,7 +172,7 @@ void PrismSnesScanner::searchForPrismSnesFromARAM(RawFile *file) {
 
   u32 addrSeqHeaderPtr = addrSeqList + (songIndex * 2);
   u32 addrSeqHeader = file->readShort(addrSeqHeaderPtr);
-  auto* newSeq = pRoot->emplaceVGMFile<PrismSnesSeq>(file, version, addrSeqHeader, name);
+  auto* newSeq = pRoot->loadVGMFile<PrismSnesSeq>(file, version, addrSeqHeader, name);
   if (!newSeq) {
     return;
   }
@@ -209,7 +209,7 @@ void PrismSnesScanner::searchForPrismSnesFromARAM(RawFile *file) {
     return;
   }
 
-  auto* newInstrSet = pRoot->emplaceVGMFile<PrismSnesInstrSet>(
+  auto* newInstrSet = pRoot->loadVGMFile<PrismSnesInstrSet>(
     file, version, spcDirAddr, addrADSR1Table, addrADSR2Table, adsrTuningTableHigh, adsrTuningTableLow);
   if (!newInstrSet) {
     return;

@@ -160,8 +160,8 @@ bool AkaoMatcher::tryCreateCollection(int id) {
       if (!coll) return false;
 
       coll->setName(seq->name());
-      coll->useSeq(seq);
-      coll->addInstrSet(instrSet);
+      coll->attachSeq(seq);
+      coll->attachInstrSet(instrSet);
 
       // Sort the vector by starting_art_id in ascending order
       std::sort(matchingSampColls.begin(), matchingSampColls.end(),
@@ -169,7 +169,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
           return a->starting_art_id < b->starting_art_id;
       });
       for (auto *sc : matchingSampColls) {
-        coll->addSampColl(sc);
+        coll->attachSampColl(sc);
       }
 
       seqs.erase(seq->seq_id);

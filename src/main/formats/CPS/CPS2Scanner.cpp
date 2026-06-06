@@ -133,26 +133,26 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   RawFile *samplesFile = sampsRomGroupEntry->file;
 
   if (fmt_ver == CPS3) {
-    sampInfoTable = pRoot->emplaceVGMFile<CPS3SampleInfoTable>(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+    sampInfoTable = pRoot->loadVGMFile<CPS3SampleInfoTable>(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
   }
   else {
-    sampInfoTable = pRoot->emplaceVGMFile<CPS2SampleInfoTable>(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+    sampInfoTable = pRoot->loadVGMFile<CPS2SampleInfoTable>(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
   }
   if (!sampInfoTable) {
     return;
   }
   if (artic_table_offset) {
-    articTable = pRoot->emplaceVGMFile<CPSArticTable>(programFile, artic_table_name, artic_table_offset, artic_table_length);
+    articTable = pRoot->loadVGMFile<CPSArticTable>(programFile, artic_table_name, artic_table_offset, artic_table_length);
   }
 
-  instrset = pRoot->emplaceVGMFile<CPS2InstrSet>(programFile,
+  instrset = pRoot->loadVGMFile<CPS2InstrSet>(programFile,
                                           fmt_ver,
                                           instr_table_offset,
                                           num_instr_banks,
                                           sampInfoTable,
                                           articTable,
                                           instrset_name);
-  sampcoll = pRoot->emplaceVGMFile<CPS2SampColl>(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
+  sampcoll = pRoot->loadVGMFile<CPS2SampColl>(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
 
 
   // LOAD SEQUENCES FROM SEQUENCE TABLE AND CREATE COLLECTIONS
@@ -171,7 +171,7 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
 
   // Add SeqTable as Miscfile
   auto* seqTable =
-      pRoot->emplaceVGMFile<VGMMiscFile>(CPS2Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
+      pRoot->loadVGMFile<VGMMiscFile>(CPS2Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
   if (!seqTable) {
     return;
   }
@@ -195,18 +195,18 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
 
     std::string collName = fmt::format("{} song {}", gameentry->name, k / 4);
     std::string seqName = fmt::format("{} seq {}", gameentry->name, k / 4);
-    auto* newSeq = pRoot->emplaceVGMFile<CPS2Seq>(programFile, seqPointer, fmt_ver, seqName);
+    auto* newSeq = pRoot->loadVGMFile<CPS2Seq>(programFile, seqPointer, fmt_ver, seqName);
     if (!newSeq) {
       continue;
     }
 
     auto coll = std::make_unique<VGMColl>(collName);
-    coll->useSeq(newSeq);
-    coll->addInstrSet(instrset);
-    coll->addSampColl(sampcoll);
-    coll->addMiscFile(sampInfoTable);
+    coll->attachSeq(newSeq);
+    coll->attachInstrSet(instrset);
+    coll->attachSampColl(sampcoll);
+    coll->attachMiscFile(sampInfoTable);
     if (articTable)
-      coll->addMiscFile(articTable);
+      coll->attachMiscFile(articTable);
     pRoot->loadVGMColl(std::move(coll));
   }
 

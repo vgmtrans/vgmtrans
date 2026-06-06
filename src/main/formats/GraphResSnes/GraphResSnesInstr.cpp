@@ -65,7 +65,7 @@ bool GraphResSnesInstrSet::parseInstrPointers() {
       adsr = instrADSRHints[srcn];
     }
 
-    emplaceInstr<GraphResSnesInstr>(
+    addInstr<GraphResSnesInstr>(
       this, version, srcn, spcDirAddr, adsr, fmt::format("Instrument {}", srcn));
   }
 
@@ -107,7 +107,7 @@ bool GraphResSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  GraphResSnesRgn *rgn = emplaceRgn<GraphResSnesRgn>(this, version, instrNum, spcDirAddr, adsr);
+  GraphResSnesRgn *rgn = addRgn<GraphResSnesRgn>(this, version, instrNum, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   setGuessedLength();

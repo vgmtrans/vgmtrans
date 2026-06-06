@@ -273,7 +273,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
           // add event without midi event
           if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(beginOffset, true)) {
-            addEvent(std::make_unique<DurNoteSeqEvent>(
+            adoptEvent(std::make_unique<DurNoteSeqEvent>(
                 this, key + cKeyCorrection, 100, noteDuration, beginOffset,
                 curOffset - beginOffset, "Note with Duration"));
           }

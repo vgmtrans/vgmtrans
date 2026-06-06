@@ -64,7 +64,7 @@ bool NDSInstrSet::parseInstrPointers() {
 
     u8 instrType = temp & 0xFF;
     u32 pInstr = temp >> 8;
-    emplaceInstr<NDSInstr>(this, pInstr + offset(), 0, 0, i, instrType);
+    addInstr<NDSInstr>(this, pInstr + offset(), 0, 0, i, instrType);
 
     VGMHeader* hdr = instrptrHdr->addHeader(instrPtrOff, 4, "Pointer");
     hdr->addChild(instrPtrOff, 1, "Type");
@@ -332,7 +332,7 @@ bool NDSWaveArch::parseSampleInfo() {
     }
 
     auto name = fmt::format("Sample {}", sampleCount());
-    auto* samp = emplaceSamp<NDSSamp>(this, pSample, dataStart + dataLength - pSample, dataStart,
+    auto* samp = addSamp<NDSSamp>(this, pSample, dataStart + dataLength - pSample, dataStart,
                                       dataLength, nChannels, bps, rate, waveType, name);
 
     if (waveType == NDSSamp::IMA_ADPCM) {
@@ -357,7 +357,7 @@ NDSPSG::NDSPSG(RawFile* file) : VGMSampColl(NDSFormat::name, file, 0, 0, "NDS PS
 bool NDSPSG::parseSampleInfo() {
   /* 8 waves + noise */
   for (u8 i = 0; i <= 8; i++) {
-    emplaceSamp<NDSPSGSamp>(this, i);
+    addSamp<NDSPSGSamp>(this, i);
   }
 
   return true;

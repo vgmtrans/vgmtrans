@@ -89,7 +89,7 @@ bool AkaoSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    emplaceInstr<AkaoSnesInstr>(
+    addInstr<AkaoSnesInstr>(
       this, version, srcn, spcDirAddr, addrTuningTable, addrADSRTable,
       fmt::format("Instrument: {:#x}", srcn));
   }
@@ -99,7 +99,7 @@ bool AkaoSnesInstrSet::parseInstrPointers() {
 
   if (addrDrumKitTable) {
     // One percussion instrument covers all percussion sounds
-    emplaceInstr<AkaoSnesDrumKit>(this, version, DRUMKIT_PROGRAM, spcDirAddr, addrTuningTable,
+    addInstr<AkaoSnesDrumKit>(this, version, DRUMKIT_PROGRAM, spcDirAddr, addrTuningTable,
                                   addrADSRTable, addrDrumKitTable, "Drum Kit");
   }
 
@@ -144,7 +144,7 @@ bool AkaoSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  AkaoSnesRgn *rgn = emplaceRgn<AkaoSnesRgn>(this, version, addrTuningTable);
+  AkaoSnesRgn *rgn = addRgn<AkaoSnesRgn>(this, version, addrTuningTable);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   rgn->initializeRegion(instrNum, spcDirAddr, addrADSRTable);
   rgn->loadRgn();
@@ -219,7 +219,7 @@ bool AkaoSnesDrumKit::loadInstr() {
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
-    addRgn(std::move(rgn));
+    adoptRgn(std::move(rgn));
   }
 
   setGuessedLength();

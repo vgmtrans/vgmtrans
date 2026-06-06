@@ -67,9 +67,9 @@ void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
 
     std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
     auto coll = std::make_unique<VGMColl>(name);
-    coll->useSeq(seq);
+    coll->attachSeq(seq);
     for (u32 setIdx = 0; setIdx < instrsets.size(); setIdx++)
-      coll->addInstrSet(instrsets[setIdx]);
+      coll->attachInstrSet(instrsets[setIdx]);
     pRoot->loadVGMColl(std::move(coll));
   }
 }
@@ -108,7 +108,7 @@ void TriAcePS1Scanner::searchForInstrSet(RawFile *file, std::vector<TriAcePS1Ins
     if (file->readWord(i + instrSectSize - 4) != 0xFFFFFFFF)
       continue;
 
-    auto* instrset = pRoot->emplaceVGMFile<TriAcePS1InstrSet>(file, i);
+    auto* instrset = pRoot->loadVGMFile<TriAcePS1InstrSet>(file, i);
     if (!instrset) {
       continue;
     }

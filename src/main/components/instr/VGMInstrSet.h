@@ -49,7 +49,7 @@ public:
                      const std::string &instrName = "");
   void adoptSampColl(std::unique_ptr<VGMSampColl> newSampColl);
   template <class SampCollType, class... Args>
-  SampCollType* emplaceSampColl(Args&&... args) {
+  SampCollType* addSampColl(Args&&... args) {
     auto newSampColl = std::make_unique<SampCollType>(std::forward<Args>(args)...);
     auto* rawSampColl = newSampColl.get();
     adoptSampColl(std::move(newSampColl));
@@ -57,7 +57,7 @@ public:
   }
   void clearSampColl();
 
-  // Observer; use adoptSampColl/emplaceSampColl when the instrument set owns the sample collection.
+  // Observer; use adoptSampColl/addSampColl<T> when the instrument set owns the sample collection.
   VGMSampColl *sampColl;
 
 protected:
@@ -66,7 +66,7 @@ protected:
    VGMInstr* adoptInstrAsChild(std::unique_ptr<VGMInstr> instr);
    VGMInstr* adoptInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInstr> instr);
    template <class InstrType, class... Args>
-   InstrType* emplaceInstr(Args&&... args) {
+   InstrType* addInstr(Args&&... args) {
      auto instr = std::make_unique<InstrType>(std::forward<Args>(args)...);
      auto* rawInstr = instr.get();
      adoptInstr(std::move(instr));
@@ -74,7 +74,7 @@ protected:
    }
    std::vector<std::unique_ptr<VGMInstr>> releaseInstrs();
    void clearInstrs();
-   void addTempInstr(std::unique_ptr<VGMInstr> instr);
+   void adoptTempInstr(std::unique_ptr<VGMInstr> instr);
    void disableAutoAddInstrumentsAsChildren() { m_auto_add_instruments_as_children = false; }
 
 private:
@@ -104,12 +104,12 @@ public:
   inline void setBank(u32 bankNum);
   inline void setInstrNum(u32 theInstrNum);
 
-  VGMRgn *addRgn(std::unique_ptr<VGMRgn> rgn);
+  VGMRgn *adoptRgn(std::unique_ptr<VGMRgn> rgn);
   template <class RgnType, class... Args>
-  RgnType* emplaceRgn(Args&&... args) {
+  RgnType* addRgn(Args&&... args) {
     auto rgn = std::make_unique<RgnType>(std::forward<Args>(args)...);
     auto* rawRgn = rgn.get();
-    addRgn(std::move(rgn));
+    adoptRgn(std::move(rgn));
     return rawRgn;
   }
   VGMRgn *addRgn(u32 offset, u32 length, int sampNum, u8 keyLow = 0,

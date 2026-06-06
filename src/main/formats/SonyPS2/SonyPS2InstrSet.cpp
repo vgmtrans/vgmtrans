@@ -415,7 +415,7 @@ bool SonyPS2SampColl::parseSampleInfo() {
     u16 sampleRate = vagInfoParam.vagSampleRate;
 
     auto name = fmt::format("Sample {}", sampleCount());
-    auto* samp = emplaceSamp<PSXSamp>(this, offset, length, offset, length, 1,
+    auto* samp = addSamp<PSXSamp>(this, offset, length, offset, length, 1,
                                       BPS::PCM16, sampleRate, name, true);
 
     // Determine loop information from VAGInfo Param

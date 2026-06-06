@@ -55,17 +55,17 @@ public:
   bool loadVGMFile(std::unique_ptr<VGMFile> file, bool useMatcher = true);
   void adoptVGMFile(std::unique_ptr<VGMFile> file, bool useMatcher = true);
   template <class FileType, class... Args>
-  FileType* emplaceVGMFile(Args&&... args) {
-    return emplaceVGMFileWithMatcher<FileType>(true, std::forward<Args>(args)...);
+  FileType* loadVGMFile(Args&&... args) {
+    return loadVGMFileWithMatcher<FileType>(true, std::forward<Args>(args)...);
   }
   template <class FileType, class... Args>
-  FileType* emplaceVGMFileWithMatcher(bool useMatcher, Args&&... args) {
+  FileType* loadVGMFileWithMatcher(bool useMatcher, Args&&... args) {
     auto file = std::make_unique<FileType>(std::forward<Args>(args)...);
     auto* rawFile = file.get();
     return loadVGMFile(std::move(file), useMatcher) ? rawFile : nullptr;
   }
   template <class FileType, class... Args>
-  FileType* emplacePendingVGMFile(Args&&... args) {
+  FileType* loadPendingVGMFile(Args&&... args) {
     auto file = std::make_unique<FileType>(std::forward<Args>(args)...);
     auto* rawFile = file.get();
     adoptVGMFile(std::move(file));
@@ -73,9 +73,9 @@ public:
   }
   void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
   bool loadVGMColl(std::unique_ptr<VGMColl> coll);
-  void addVGMColl(std::unique_ptr<VGMColl> coll);
+  void adoptVGMColl(std::unique_ptr<VGMColl> coll);
   template <class CollType, class... Args>
-  CollType* emplaceVGMColl(Args&&... args) {
+  CollType* loadVGMColl(Args&&... args) {
     auto coll = std::make_unique<CollType>(std::forward<Args>(args)...);
     auto* rawColl = coll.get();
     return loadVGMColl(std::move(coll)) ? rawColl : nullptr;

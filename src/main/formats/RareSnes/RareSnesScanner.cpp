@@ -156,7 +156,7 @@ void RareSnesScanner::searchForRareSnesFromARAM(RawFile *file) {
   }
 
   // load sequence
-  auto* newSeq = pRoot->emplaceVGMFile<RareSnesSeq>(file, version, addrSeqHeader, name);
+  auto* newSeq = pRoot->loadVGMFile<RareSnesSeq>(file, version, addrSeqHeader, name);
   if (!newSeq) {
     return;
   }
@@ -179,7 +179,7 @@ void RareSnesScanner::searchForRareSnesFromARAM(RawFile *file) {
   u32 spcDirAddr = file->readByte(ofsSetDIRASM + 4) << 8;
 
   // scan SRCN table
-  auto* newInstrSet = pRoot->emplaceVGMFile<RareSnesInstrSet>(
+  auto* newInstrSet = pRoot->loadVGMFile<RareSnesInstrSet>(
       file, addrSRCNTable, spcDirAddr, newSeq->instrUnityKeyHints,
       newSeq->instrPitchHints, newSeq->instrADSRHints);
   if (!newInstrSet) {
@@ -206,7 +206,7 @@ void RareSnesScanner::searchForRareSnesFromARAM(RawFile *file) {
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
 
   // load BRR samples
-  if (!pRoot->emplaceVGMFile<SNESSampColl>(RareSnesFormat::name, file, spcDirAddr, usedSRCNs)) {
+  if (!pRoot->loadVGMFile<SNESSampColl>(RareSnesFormat::name, file, spcDirAddr, usedSRCNs)) {
     return;
   }
 }

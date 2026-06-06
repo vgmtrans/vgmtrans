@@ -37,7 +37,7 @@ bool ItikitiSnesInstrSet::parseInstrPointers() {
 
     srcns.push_back(srcn);
 
-    emplaceInstr<ItikitiSnesInstr>(
+    addInstr<ItikitiSnesInstr>(
       this, ins_tuning_offset, ins_adsr_offset, 0, srcn, srcn, spc_dir_offset(),
       fmt::format("Instrument {}", index));
   }
@@ -68,7 +68,7 @@ bool ItikitiSnesInstr::loadInstr() {
 
   auto region = std::make_unique<ItikitiSnesRgn>(this, m_tuning_offset, m_adsr_offset, srcn);
   region->sampOffset = sample_offset - spc_dir_offset();
-  addRgn(std::move(region));
+  adoptRgn(std::move(region));
 
   return true;
 }

@@ -62,7 +62,7 @@ bool CompileSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    emplaceInstr<CompileSnesInstr>(
+    addInstr<CompileSnesInstr>(
       this, version, ofsInstrEntry, addrPitchTablePtrs, srcn, spcDirAddr,
       fmt::format("Instrument: {:#x}", srcn));
   }
@@ -103,7 +103,7 @@ bool CompileSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  CompileSnesRgn *rgn = emplaceRgn<CompileSnesRgn>(this, version, offset(), addrPitchTablePtrs);
+  CompileSnesRgn *rgn = addRgn<CompileSnesRgn>(this, version, offset(), addrPitchTablePtrs);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   return true;

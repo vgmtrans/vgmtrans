@@ -23,7 +23,7 @@ class VGMSampColl : public VGMFile {
   VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset, u32 offset,
                 u32 length = 0, std::string name = "VGMSampColl");
   ~VGMSampColl() override;
-  void useInstrSet(VGMInstrSet *instrset) { parInstrSet = instrset; }
+  void attachInstrSet(VGMInstrSet *instrset) { parInstrSet = instrset; }
 
   bool load() override;
   virtual bool parseHeader();        // retrieve any header data
@@ -32,12 +32,12 @@ class VGMSampColl : public VGMFile {
   VGMSamp *addSamp(u32 offset, u32 length, u32 dataOffset, u32 dataLength,
                    u8 nChannels = 1, BPS bps = BPS::PCM16, u32 rate = 0,
                    std::string name = "Sample");
-  VGMSamp *addSamp(std::unique_ptr<VGMSamp> samp);
+  VGMSamp *adoptSamp(std::unique_ptr<VGMSamp> samp);
   template <class SampType, class... Args>
-  SampType* emplaceSamp(Args&&... args) {
+  SampType* addSamp(Args&&... args) {
     auto samp = std::make_unique<SampType>(std::forward<Args>(args)...);
     auto* rawSamp = samp.get();
-    addSamp(std::move(samp));
+    adoptSamp(std::move(samp));
     return rawSamp;
   }
 

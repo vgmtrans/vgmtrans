@@ -27,10 +27,10 @@ class VGMColl {
   [[nodiscard]] const std::string& name() const;
   void setName(const std::string& newName);
   [[nodiscard]] VGMSeq* seq() const;
-  void useSeq(VGMSeq* theSeq);
-  void addInstrSet(VGMInstrSet* theInstrSet);
-  void addSampColl(VGMSampColl* theSampColl);
-  void addMiscFile(VGMMiscFile* theMiscFile);
+  void attachSeq(VGMSeq* theSeq);
+  void attachInstrSet(VGMInstrSet* theInstrSet);
+  void attachSampColl(VGMSampColl* theSampColl);
+  void attachMiscFile(VGMMiscFile* theMiscFile);
   bool load();
   virtual bool loadMain() { return true; }
 

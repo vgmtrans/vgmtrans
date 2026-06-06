@@ -137,10 +137,10 @@ void FilegroupMatcher::lookForMatch() {
 
     auto coll = fmt->newCollection();
     coll->setName(seq->name());
-    coll->useSeq(seq);
-    coll->addInstrSet(assoc.instrSet);
+    coll->attachSeq(seq);
+    coll->attachInstrSet(assoc.instrSet);
     if (assoc.sampColl && assoc.instrSet->sampColl == nullptr) {
-      coll->addSampColl(assoc.sampColl);
+      coll->attachSampColl(assoc.sampColl);
     }
 
     if (!pRoot->loadVGMColl(std::move(coll))) {

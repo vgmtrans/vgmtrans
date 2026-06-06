@@ -398,12 +398,12 @@ bool SeqTrack::onEvent(u32 offset, u32 length) {
   return visitedAddresses.insert(offset).second;
 }
 
-SeqEvent* SeqTrack::addEvent(std::unique_ptr<SeqEvent> seqEvent) {
+SeqEvent* SeqTrack::adoptEvent(std::unique_ptr<SeqEvent> seqEvent) {
   if (readMode != READMODE_ADD_TO_UI)
     return nullptr;
 
   auto* rawEvent = seqEvent.get();
-  addChild(std::move(seqEvent));
+  adoptChild(std::move(seqEvent));
 
   // care for a case where the new event is located before the start address
   // (example: Donkey Kong Country - Map, Track 7 of 8)
@@ -456,7 +456,7 @@ SeqEvent* SeqTrack::addGenericEvent(u32 offset,
       auto* target = seqEventTarget();
       auto event = std::make_unique<SeqEvent>(target, offset, length, sEventName, type, sEventDesc);
       event->channel = static_cast<u8>(channel);
-      return target->addEvent(std::move(event));
+      return target->adoptEvent(std::move(event));
     }
     return nullptr;
   }

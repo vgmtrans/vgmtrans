@@ -82,23 +82,23 @@ bool AkaoInstrSet::parseInstrPointers() {
       if (instrPtr == 0xFFFF || (instrPtr == 0 && i != 0))
         continue;
       SSEQHdr->addChild(ptrOff, 2, "Instr Pointer");
-      emplaceInstr<AkaoInstr>(this, instrSetOff + 0x20 + instrPtr, 0, 1, i);
+      addInstr<AkaoInstr>(this, instrSetOff + 0x20 + instrPtr, 0, 1, i);
     }
   }
   else if (!custom_instrument_addresses.empty()) {
     u32 instrNum = 0;
     for (const u32 instrOff : custom_instrument_addresses) {
-      emplaceInstr<AkaoInstr>(this, instrOff, 0, 1, instrNum++);
+      addInstr<AkaoInstr>(this, instrOff, 0, 1, instrNum++);
     }
   }
 
   if (bDrumKit) {
-    emplaceInstr<AkaoDrumKit>(this, drumkitOff, 0, 127, 127);
+    addInstr<AkaoDrumKit>(this, drumkitOff, 0, 127, 127);
   }
   else if (!drum_instrument_addresses.empty()) {
     u32 instrNum = 127;
     for (const u32 instrOff : drum_instrument_addresses) {
-      emplaceInstr<AkaoDrumKit>(this, instrOff, 0, 127, instrNum--);
+      addInstr<AkaoDrumKit>(this, instrOff, 0, 127, instrNum--);
     }
   }
 
@@ -129,7 +129,7 @@ void AkaoInstrSet::useColl(const VGMColl* coll) {
       const AkaoArt* art = &sampcoll->akArts[i];
       auto newInstr = std::make_unique<AkaoInstr>(this, 0, 0, 0, sampcoll->starting_art_id + static_cast<u32>(i));
       auto* rawInstr = newInstr.get();
-      auto* rgn = rawInstr->emplaceRgn<AkaoRgn>(rawInstr, 0, 0);
+      auto* rgn = rawInstr->addRgn<AkaoRgn>(rawInstr, 0, 0);
 
       if (art->loop_point != 0) {
         rgn->setLoopInfo(1, art->loop_point,
@@ -144,7 +144,7 @@ void AkaoInstrSet::useColl(const VGMColl* coll) {
       rgn->unityKey = art->unityKey;
       rgn->fineTune = art->fineTune;
 
-      addTempInstr(std::move(newInstr));
+      adoptTempInstr(std::move(newInstr));
     }
   }
 }
@@ -185,7 +185,7 @@ bool AkaoInstr::loadInstr() {
       // all keys are covered, though it is imperfect as the wrong regions are being extended.
       auto prevRgn = regions().back();
       if (rawRgn->keyHigh > prevRgn->keyHigh && rawRgn->keyLow > prevRgn->keyHigh) {
-        addRgn(std::move(rgn));
+        adoptRgn(std::move(rgn));
       } else if (rawRgn->keyHigh == prevRgn->keyHigh) {
         // TODO: replace the last region with this one?
       }
@@ -193,7 +193,7 @@ bool AkaoInstr::loadInstr() {
         rawRgn->keyLow = prevRgn->keyHigh + 1;
       }
     } else {
-      addRgn(std::move(rgn));
+      adoptRgn(std::move(rgn));
     }
   }
   if (!regions().empty()) {
@@ -237,7 +237,7 @@ bool AkaoDrumKit::loadInstr() {
         break;
 
       const u8 assoc_art_id = readByte(rgn_offset + 0);
-      auto *rgn = emplaceRgn<AkaoRgn>(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
+      auto *rgn = addRgn<AkaoRgn>(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       rgn->drumRelUnityKey = readByte(rgn_offset + 1);
       const u8 raw_volume = readByte(rgn_offset + 6);
       const double volume = raw_volume == 0 ? 1.0 : raw_volume / 128.0;
@@ -276,7 +276,7 @@ bool AkaoDrumKit::loadInstr() {
 
       const u8 assoc_art_id = readByte(rgn_offset + 0);
       const u8 drum_note_number = drum_octave * 12 + drum_key;
-      auto *rgn = emplaceRgn<AkaoRgn>(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
+      auto *rgn = addRgn<AkaoRgn>(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       rgn->drumRelUnityKey = readByte(rgn_offset + 1);
       const u16 raw_volume = getWord(rgn_offset + 2);
       rgn->setVolume(raw_volume / (127 * 128.0));
@@ -715,7 +715,7 @@ bool AkaoSampColl::parseSampleInfo() {
     }
 
     const u32 length = PSXSamp::getSampleLength(rawFile(), offset, sample_section_offset + sample_section_size, loop);
-    emplaceSamp<PSXSamp>(this, offset, length, offset, length, 1, BPS::PCM16, 44100,
+    addSamp<PSXSamp>(this, offset, length, offset, length, 1, BPS::PCM16, 44100,
                          fmt::format("Sample {}", sampleCount()));
   }
 

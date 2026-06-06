@@ -88,7 +88,7 @@ bool SuzukiSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    emplaceInstr<SuzukiSnesInstr>(
+    addInstr<SuzukiSnesInstr>(
       this, version, instrNum, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable,
       addrTuningTable, fmt::format("Instrument: {:#x}", srcn));
   }
@@ -130,7 +130,7 @@ void SuzukiSnesInstrSet::useColl(const VGMColl* coll) {
     return;
   }
 
-  addTempInstr(std::move(drumKit));
+  adoptTempInstr(std::move(drumKit));
 }
 
 // ***************
@@ -171,7 +171,7 @@ bool SuzukiSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  SuzukiSnesRgn *rgn = emplaceRgn<SuzukiSnesRgn>(this, version, addrSRCNTable);
+  SuzukiSnesRgn *rgn = addRgn<SuzukiSnesRgn>(this, version, addrSRCNTable);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   rgn->initializeNonPercussionRegion(instrNum, addrVolumeTable);
   rgn->initializeCommonRegion(srcn, spcDirAddr, addrADSRTable, addrTuningTable);
@@ -224,7 +224,7 @@ bool SuzukiSnesDrumKit::loadInstr() {
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
-    addRgn(std::move(rgn));
+    adoptRgn(std::move(rgn));
   }
 
   setGuessedLength();

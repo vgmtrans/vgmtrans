@@ -38,7 +38,7 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
       SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::getSampleLength(rawFile(), vagOffset, offset() + length(), vagLoop));
       vagLocations.push_back(vagLocation);
 
-      emplaceInstr<TamSoftPS1Instr>(this, instrNum, fmt::format("Instrument {}", instrNum));
+      addInstr<TamSoftPS1Instr>(this, instrNum, fmt::format("Instrument {}", instrNum));
     }
   }
 
@@ -46,7 +46,7 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
     return false;
   }
 
-  emplaceSampColl<PSXSampColl>(TamSoftPS1Format::name, this, offset() + 0x800, length() - 0x800, vagLocations);
+  addSampColl<PSXSampColl>(TamSoftPS1Format::name, this, offset() + 0x800, length() - 0x800, vagLocations);
   return true;
 }
 
@@ -66,7 +66,7 @@ bool TamSoftPS1Instr::loadInstr() {
 
   addChild(offset(), 4, "Sample Offset");
 
-  TamSoftPS1Rgn *rgn = emplaceRgn<TamSoftPS1Rgn>(this, offset() + 0x400, parInstrSet->ps2);
+  TamSoftPS1Rgn *rgn = addRgn<TamSoftPS1Rgn>(this, offset() + 0x400, parInstrSet->ps2);
   rgn->sampNum = instrNum;
   return true;
 }

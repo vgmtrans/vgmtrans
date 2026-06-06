@@ -115,7 +115,7 @@ bool MoriSnesInstrSet::parseInstrPointers() {
       }
     }
 
-    emplaceInstr<MoriSnesInstr>(
+    addInstr<MoriSnesInstr>(
       this, version, instrNum, spcDirAddr, instrumentHints[instrAddress],
       fmt::format("Instrument {}", instrNum));
   }
@@ -165,7 +165,7 @@ bool MoriSnesInstr::loadInstr() {
     addChild(instrHint->seqAddress, instrHint->seqSize, "Envelope Sequence");
 
     u16 addrSampStart = readShort(offDirEnt);
-    MoriSnesRgn *rgn = emplaceRgn<MoriSnesRgn>(this, version, spcDirAddr, *instrHint);
+    MoriSnesRgn *rgn = addRgn<MoriSnesRgn>(this, version, spcDirAddr, *instrHint);
     rgn->sampOffset = addrSampStart - spcDirAddr;
   }
   else {
@@ -185,7 +185,7 @@ bool MoriSnesInstr::loadInstr() {
       addChild(instrHint->seqAddress, instrHint->seqSize, seqName);
 
       u16 addrSampStart = readShort(offDirEnt);
-      MoriSnesRgn *rgn = emplaceRgn<MoriSnesRgn>(this, version, spcDirAddr, *instrHint, percNoteKey);
+      MoriSnesRgn *rgn = addRgn<MoriSnesRgn>(this, version, spcDirAddr, *instrHint, percNoteKey);
       rgn->sampOffset = addrSampStart - spcDirAddr;
     }
   }

@@ -88,7 +88,7 @@ MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
     : VGMInstrSet(MP2kFormat::name, file, offset, count * 12, name), m_count(count),
       m_operating_rate(rate), m_psg_samples(psg_samples) {
   assert(m_psg_samples != nullptr);
-  emplaceSampColl<VGMSampColl>(MP2kFormat::name, file, this, offset);
+  addSampColl<VGMSampColl>(MP2kFormat::name, file, this, offset);
 }
 
 MP2kPSGColl& MP2kInstrSet::psgSampColl() const noexcept {
@@ -127,7 +127,7 @@ bool MP2kInstrSet::parseInstrPointers() {
     size_t cur_ofs = offset() + i * 12;
     MP2kInstrData data{rawFile()->get<u32>(cur_ofs), rawFile()->get<u32>(cur_ofs + 4),
                        rawFile()->get<u32>(cur_ofs + 8)};
-    emplaceInstr<MP2kInstr>(this, cur_ofs, 0, 0, i, data);
+    addInstr<MP2kInstr>(this, cur_ofs, 0, 0, i, data);
   }
 
   return true;
@@ -200,7 +200,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   }
 
   const auto sample_id = sampColl->sampleCount();
-  sampColl->addSamp(std::move(samp));
+  sampColl->adoptSamp(std::move(samp));
   m_samples.emplace(sample_pointer, sample_id);
 
   return static_cast<int>(sample_id);
@@ -567,10 +567,10 @@ bool MP2kPSGColl::parseSampleInfo() {
   constexpr const char* kDutyLabels[4] = {"12.5%", "25%", "50%", "75%"};
   for (u8 duty = 0; duty < kPsgSquareCount; duty++) {
     auto name = fmt::format("PSG square {}", kDutyLabels[duty]);
-    emplaceSamp<MP2kPSGSamp>(this, duty, false, m_sample_rate, m_loop_samples, name);
+    addSamp<MP2kPSGSamp>(this, duty, false, m_sample_rate, m_loop_samples, name);
   }
 
-  emplaceSamp<MP2kPSGSamp>(this, 0, true, m_sample_rate, m_loop_samples, "PSG noise");
+  addSamp<MP2kPSGSamp>(this, 0, true, m_sample_rate, m_loop_samples, "PSG noise");
   return true;
 }
 
@@ -593,7 +593,7 @@ int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
   int sample_id = static_cast<int>(sampleCount());
   auto name = fmt::format("PSG programmable wave {:#x}", wave_offset);
   constexpr u32 kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
-  emplaceSamp<MP2kPSGWaveSamp>(this, wave_offset, kCgbWaveSampleRate, name);
+  addSamp<MP2kPSGWaveSamp>(this, wave_offset, kCgbWaveSampleRate, name);
   m_programmable_waves.emplace(wave_offset, sample_id);
   return sample_id;
 }

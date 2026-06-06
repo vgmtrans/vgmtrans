@@ -118,12 +118,12 @@ public:
   void setOffset(u32 offset);
   void setLength(u32 length);
   void setRange(u32 offset, u32 length);
-  VGMItem* addChild(std::unique_ptr<VGMItem> child);
+  VGMItem* adoptChild(std::unique_ptr<VGMItem> child);
   template <class ChildType, class... Args>
-  ChildType* emplaceChild(Args&&... args) {
+  ChildType* addChild(Args&&... args) {
     auto child = std::make_unique<ChildType>(std::forward<Args>(args)...);
     auto* rawChild = child.get();
-    addChild(std::move(child));
+    adoptChild(std::move(child));
     return rawChild;
   }
   VGMItem* addChild(u32 offset, u32 length, const std::string &name);

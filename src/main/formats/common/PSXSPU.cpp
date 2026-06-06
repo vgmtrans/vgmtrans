@@ -156,7 +156,7 @@ bool PSXSampColl::parseSampleInfo() {
       }
       // If endLoopOffset wasn't set, default it to the end of the sample
       endLoopOffset = endLoopOffset >= beginOffset ? endLoopOffset : i;
-      emplaceSamp<PSXSamp>(this,
+      addSamp<PSXSamp>(this,
                            beginOffset,
                            i - beginOffset,
                            beginOffset,
@@ -194,7 +194,7 @@ bool PSXSampColl::parseSampleInfo() {
         offSampEnd += 16;
       } while (!lastBlock);
 
-      emplaceSamp<PSXSamp>(this,
+      addSamp<PSXSamp>(this,
                            offset() + it->offset,
                            it->size,
                            offset() + it->offset,

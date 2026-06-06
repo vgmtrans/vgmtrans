@@ -105,7 +105,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
       name
     );
     auto* rawInstr = instr.get();
-    VGMRgn* rgn = rawInstr->emplaceRgn<VGMRgn>(rawInstr, offset, sizeof(konami_tmnt2_instr_info));
+    VGMRgn* rgn = rawInstr->addRgn<VGMRgn>(rawInstr, offset, sizeof(konami_tmnt2_instr_info));
     rgn->sampOffset = instrInfo.start();
     rgn->sampDataLength = (instrInfo.length_hi << 8) | instrInfo.length_lo;
 
@@ -181,7 +181,7 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
 
       const konami_tmnt2_drum_info& drumInfo = m_drumTables[i][j];
 
-      VGMRgn* rgn = rawDrumKit->emplaceRgn<VGMRgn>(rawDrumKit, ptr, sizeof(konami_tmnt2_drum_info));
+      VGMRgn* rgn = rawDrumKit->addRgn<VGMRgn>(rawDrumKit, ptr, sizeof(konami_tmnt2_drum_info));
       rgn->sampOffset = drumInfo.start();
       rgn->sampDataLength = (drumInfo.length_hi << 8) | drumInfo.length_lo;
       u8 key = (i * 16) + j;
@@ -237,10 +237,10 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
     if (sampleOffset + sampleSize > length()) {
-      sample = addSamp(std::make_unique<EmptySamp>(this));
+      sample = adoptSamp(std::make_unique<EmptySamp>(this));
     }
     else if (sampInfo.isAdpcm) {
-      sample = addSamp(std::make_unique<KonamiAdpcmSamp>(
+      sample = adoptSamp(std::make_unique<KonamiAdpcmSamp>(
         this,
         sampleOffset,
         sampleSize,

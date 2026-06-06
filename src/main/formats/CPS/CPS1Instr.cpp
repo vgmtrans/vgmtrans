@@ -31,8 +31,8 @@ bool CPS1SampleInstrSet::parseInstrPointers() {
     case CPS1_V502:
       for (int i = 1; i < 128; ++i) {
         std::string name = fmt::format("Instrument {:03d}", i);
-        VGMInstr* instr = emplaceInstr<VGMInstr>(this, 0, 0, 0, i, name, 0);
-        VGMRgn* rgn = instr->emplaceRgn<VGMRgn>(instr, 0);
+        VGMInstr* instr = addInstr<VGMInstr>(this, 0, 0, 0, i, name, 0);
+        VGMRgn* rgn = instr->addRgn<VGMRgn>(instr, 0);
         rgn->sampNum = i - 1;
         rgn->release_time = 10;
       }
@@ -45,8 +45,8 @@ bool CPS1SampleInstrSet::parseInstrPointers() {
           break;
         }
         std::string name = fmt::format("Instrument {}", i);
-        VGMInstr* instr = emplaceInstr<VGMInstr>(this, instrOff, 4, 0, i, name, 0);
-        VGMRgn* rgn = instr->emplaceRgn<VGMRgn>(instr, instrOff);
+        VGMInstr* instr = addInstr<VGMInstr>(this, instrOff, 4, 0, i, name, 0);
+        VGMRgn* rgn = instr->addRgn<VGMRgn>(instr, instrOff);
         instr->setLength(4);
         rgn->setLength(4);
         // subtract 1 to account for the first OKIM6295 sample ptr always being null
@@ -115,7 +115,7 @@ bool CPS1SampColl::parseSampleInfo() {
     rawSample->setBPS(BPS::PCM16);
     rawSample->setLoopStatus(false);
     rawSample->unityKey = 0x3C;
-    addSamp(std::move(sample));
+    adoptSamp(std::move(sample));
   }
   return true;
 }
@@ -168,7 +168,7 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       case CPS1_V200: {
         CPS1OPMInstrDataV2_00 instrData{};
         readBytes(instrOff, static_cast<u32>(instrSize), &instrData);
-        emplaceInstr<CPS1OPMInstr<CPS1OPMInstrDataV2_00>>(this, masterVol, instrOff, instrSize, 0, i, name);
+        addInstr<CPS1OPMInstr<CPS1OPMInstrDataV2_00>>(this, masterVol, instrOff, instrSize, 0, i, name);
         addOPMInstrument(instrData.convertToOPMData(masterVol, name));
         break;
       }
@@ -176,7 +176,7 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       case CPS1_V502: {
         CPS1OPMInstrDataV5_02 instrData{};
         readBytes(instrOff, static_cast<u32>(instrSize), &instrData);
-        emplaceInstr<CPS1OPMInstr<CPS1OPMInstrDataV5_02>>(this, masterVol, instrOff, instrSize, 0, i, name);
+        addInstr<CPS1OPMInstr<CPS1OPMInstrDataV5_02>>(this, masterVol, instrOff, instrSize, 0, i, name);
         addOPMInstrument(instrData.convertToOPMData(masterVol, name));
         break;
       }
@@ -185,7 +185,7 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       case CPS1_V425: {
         CPS1OPMInstrDataV4_25 instrData{};
         readBytes(instrOff, static_cast<u32>(instrSize), &instrData);
-        auto* instr = emplaceInstr<CPS1OPMInstr<CPS1OPMInstrDataV4_25>>(
+        auto* instr = addInstr<CPS1OPMInstr<CPS1OPMInstrDataV4_25>>(
             this, masterVol, instrOff, instrSize, 0, i, name);
         std::vector<u8> driverData;
         u8 enableLfo = instrData.LFO_ENABLE_AND_WF >> 7;
@@ -198,20 +198,20 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
         }
 
         addOPMInstrument(instrData.convertToOPMData(masterVol, name), "cps", std::move(driverData));
-        instr->emplaceChild<VGMItem>(this, instrOff, 1, "Transpose");
-        instr->emplaceChild<VGMItem>(this, instrOff+1, 1, "LFO_ENABLE_AND_WF");
-        instr->emplaceChild<VGMItem>(this, instrOff+2, 1, "LFRQ");
-        instr->emplaceChild<VGMItem>(this, instrOff+3, 1, "PMD");
-        instr->emplaceChild<VGMItem>(this, instrOff+4, 1, "AMD");
-        instr->emplaceChild<VGMItem>(this, instrOff+5, 1, "FL_CON");
-        instr->emplaceChild<VGMItem>(this, instrOff+6, 1, "PMS_AMS");
-        instr->emplaceChild<VGMItem>(this, instrOff+7, 1, "SLOT_MASK");
-        instr->emplaceChild<VGMItem>(this, instrOff+8, 12, "Driver-specific Volume Params");
-        instr->emplaceChild<VGMItem>(this, instrOff+20, 4, "DT1_MUL");
-        instr->emplaceChild<VGMItem>(this, instrOff+24, 4, "KS_AR");
-        instr->emplaceChild<VGMItem>(this, instrOff+28, 4, "AMSEN_D1R");
-        instr->emplaceChild<VGMItem>(this, instrOff+32, 4, "DT2_D2R");
-        instr->emplaceChild<VGMItem>(this, instrOff+36, 4, "D1L_RR");
+        instr->addChild<VGMItem>(this, instrOff, 1, "Transpose");
+        instr->addChild<VGMItem>(this, instrOff+1, 1, "LFO_ENABLE_AND_WF");
+        instr->addChild<VGMItem>(this, instrOff+2, 1, "LFRQ");
+        instr->addChild<VGMItem>(this, instrOff+3, 1, "PMD");
+        instr->addChild<VGMItem>(this, instrOff+4, 1, "AMD");
+        instr->addChild<VGMItem>(this, instrOff+5, 1, "FL_CON");
+        instr->addChild<VGMItem>(this, instrOff+6, 1, "PMS_AMS");
+        instr->addChild<VGMItem>(this, instrOff+7, 1, "SLOT_MASK");
+        instr->addChild<VGMItem>(this, instrOff+8, 12, "Driver-specific Volume Params");
+        instr->addChild<VGMItem>(this, instrOff+20, 4, "DT1_MUL");
+        instr->addChild<VGMItem>(this, instrOff+24, 4, "KS_AR");
+        instr->addChild<VGMItem>(this, instrOff+28, 4, "AMSEN_D1R");
+        instr->addChild<VGMItem>(this, instrOff+32, 4, "DT2_D2R");
+        instr->addChild<VGMItem>(this, instrOff+36, 4, "D1L_RR");
         break;
       }
       case CPS1_VERSION_UNDEFINED:

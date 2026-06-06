@@ -55,7 +55,7 @@ bool HudsonSnesInstrSet::parseInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    emplaceInstr<HudsonSnesInstr>(
+    addInstr<HudsonSnesInstr>(
       this, version, ofsInstrEntry, instrNum, spcDirAddr, addrSampTuningTable,
       fmt::format("Instrument {}", instrNum));
   }
@@ -105,7 +105,7 @@ bool HudsonSnesInstr::loadInstr() {
     return false;
   }
 
-  HudsonSnesRgn *rgn = emplaceRgn<HudsonSnesRgn>(this, version, offset(), ofsTuningEnt);
+  HudsonSnesRgn *rgn = addRgn<HudsonSnesRgn>(this, version, offset(), ofsTuningEnt);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   return true;

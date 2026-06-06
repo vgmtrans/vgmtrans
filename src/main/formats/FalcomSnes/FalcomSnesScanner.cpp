@@ -103,7 +103,7 @@ void FalcomSnesScanner::searchForFalcomSnesFromARAM(RawFile *file) {
     return;
   }
 
-  auto* newSeq = pRoot->emplaceVGMFile<FalcomSnesSeq>(file, version, addrSeqHeader, name);
+  auto* newSeq = pRoot->loadVGMFile<FalcomSnesSeq>(file, version, addrSeqHeader, name);
   if (!newSeq) {
     return;
   }
@@ -128,7 +128,7 @@ void FalcomSnesScanner::searchForFalcomSnesFromARAM(RawFile *file) {
     return;
   }
 
-  auto* newInstrSet = pRoot->emplaceVGMFile<FalcomSnesInstrSet>(
+  auto* newInstrSet = pRoot->loadVGMFile<FalcomSnesInstrSet>(
     file, version, addrInstrTable, addrSampToInstrTable, spcDirAddr, newSeq->instrADSRHints);
   if (!newInstrSet) {
     return;

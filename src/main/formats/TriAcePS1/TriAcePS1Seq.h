@@ -39,7 +39,7 @@ class TriAcePS1Seq:
 
  private:
   friend class TriAcePS1Track;
-  TriAcePS1ScorePattern* addScorePattern(std::unique_ptr<TriAcePS1ScorePattern> pattern);
+  TriAcePS1ScorePattern* adoptScorePattern(std::unique_ptr<TriAcePS1ScorePattern> pattern);
 
   TriAcePS1ScorePattern *curScorePattern = nullptr;
   std::map<u32, TriAcePS1ScorePattern *> patternMap;
@@ -63,7 +63,7 @@ class TriAcePS1Track
   void loadTrackMainLoop(u32 stopOffset, s32 stopTime) override;
   u32 readScorePattern(u32 offset);
   bool isOffsetUsed(u32 offset) override;
-  SeqEvent* addEvent(std::unique_ptr<SeqEvent> seqEvent) override;
+  SeqEvent* adoptEvent(std::unique_ptr<SeqEvent> seqEvent) override;
   bool readEvent() override;
 
   u8 impliedNoteDur;

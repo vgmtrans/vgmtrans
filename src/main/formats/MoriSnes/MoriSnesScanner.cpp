@@ -90,14 +90,14 @@ void MoriSnesScanner::searchForMoriSnesFromARAM(RawFile *file) {
   if (addrSongHeaderPtr + 2 <= 0x10000) {
     u16 addrSongHeader = file->readShort(addrSongHeaderPtr);
 
-    auto* newSeq = pRoot->emplaceVGMFile<MoriSnesSeq>(file, version, addrSongHeader, name);
+    auto* newSeq = pRoot->loadVGMFile<MoriSnesSeq>(file, version, addrSongHeader, name);
     if (!newSeq) {
       return;
     }
 
     if (spcDirAddr != 0) {
       auto* newInstrSet =
-          pRoot->emplaceVGMFile<MoriSnesInstrSet>(file, version, spcDirAddr, newSeq->InstrumentAddresses, newSeq->InstrumentHints);
+          pRoot->loadVGMFile<MoriSnesInstrSet>(file, version, spcDirAddr, newSeq->InstrumentAddresses, newSeq->InstrumentHints);
       if (!newInstrSet) {
         return;
       }

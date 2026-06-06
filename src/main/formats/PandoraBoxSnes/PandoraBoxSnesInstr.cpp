@@ -86,7 +86,7 @@ bool PandoraBoxSnesInstrSet::parseInstrPointers() {
       adsr = instrADSRHints[srcn];
     }
 
-    emplaceInstr<PandoraBoxSnesInstr>(
+    addInstr<PandoraBoxSnesInstr>(
       this, version, addrLocalInstrItem, instrNum, srcn, spcDirAddr, adsr,
       fmt::format("Instrument {}", srcn));
   }
@@ -132,7 +132,7 @@ bool PandoraBoxSnesInstr::loadInstr() {
 
   u16 addrSampStart = readShort(offDirEnt);
 
-  PandoraBoxSnesRgn *rgn = emplaceRgn<PandoraBoxSnesRgn>(this, version, offset(), srcn, spcDirAddr, adsr);
+  PandoraBoxSnesRgn *rgn = addRgn<PandoraBoxSnesRgn>(this, version, offset(), srcn, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
 
   setGuessedLength();

@@ -120,10 +120,10 @@ void SegSatScanner::handleSsfFile(RawFile* file) {
 
   for (const auto seq : seqs) {
     auto coll = std::make_unique<VGMColl>(seq->name());
-    coll->useSeq(seq);
+    coll->attachSeq(seq);
     if (instrSets.size() == 1) {
       instrSets[0]->assignBankNumber(0);
-      coll->addInstrSet(instrSets[0]);
+      coll->attachInstrSet(instrSets[0]);
     } else {
       auto referencedBanks = seq->referencedBanks();
       auto numRefBanks = referencedBanks.size();
@@ -135,7 +135,7 @@ void SegSatScanner::handleSsfFile(RawFile* file) {
         else
           bank = it->second;
         bank->assignBankNumber(numRefBanks == 1 ? 0 : bankNum);
-        coll->addInstrSet(bank);
+        coll->attachInstrSet(bank);
       }
     }
     pRoot->loadVGMColl(std::move(coll));
@@ -206,7 +206,7 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatc
       }
 
       auto name = fmt::format("{} {:d}_{:d}", file->name(), seqTableCounter, n);
-      auto* seq = pRoot->emplaceVGMFileWithMatcher<SegSatSeq>(useMatcher, file, i + seqPtr, name);
+      auto* seq = pRoot->loadVGMFileWithMatcher<SegSatSeq>(useMatcher, file, i + seqPtr, name);
       if (seq) {
         bParsedSeq = true;
         seqs.push_back(seq);
@@ -339,7 +339,7 @@ std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrSets(RawFile* file, Se
       if (ver == SegSatDriverVer::Unknown)
         ver = determineVersion(file);
       u32 numInstrs = ((ptrMixes - 8) / 2);
-      auto* instrSet = pRoot->emplaceVGMFileWithMatcher<SegSatInstrSet>(useMatcher, file, base, numInstrs, ver);
+      auto* instrSet = pRoot->loadVGMFileWithMatcher<SegSatInstrSet>(useMatcher, file, base, numInstrs, ver);
       if (instrSet)
         instrSets.push_back(instrSet);
 

@@ -518,7 +518,7 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
   }
 
   u16 addrSeqHeader = file->readShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
-  auto* newSeq = pRoot->emplaceVGMFile<ChunSnesSeq>(file, version, minorVersion, addrSeqHeader, name);
+  auto* newSeq = pRoot->loadVGMFile<ChunSnesSeq>(file, version, minorVersion, addrSeqHeader, name);
   if (!newSeq) {
     return;
   }
@@ -588,7 +588,7 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
   }
 
   auto* newInstrSet =
-      pRoot->emplaceVGMFile<ChunSnesInstrSet>(file, version, addrInstrSet, addrSampNumTable, addrSampleTable, spcDirAddr);
+      pRoot->loadVGMFile<ChunSnesInstrSet>(file, version, addrInstrSet, addrSampNumTable, addrSampleTable, spcDirAddr);
   if (!newInstrSet) {
     return;
   }
