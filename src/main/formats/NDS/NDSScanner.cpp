@@ -7,6 +7,7 @@
 #include "NDSScanner.h"
 
 #include "base/Types.h"
+#include "components/VGMMetadataHint.h"
 #include "NDSInstrSet.h"
 #include "NDSSeq.h"
 #include "ScannerManager.h"
@@ -24,6 +25,45 @@ namespace vgmtrans::scanners {
 
 /* Observed from multiple samples, the maximum length of standard archives is 127 + null terminator */
 constexpr auto MAX_NAME_LEN = 128;
+constexpr auto NDS_FORMAT_NAME = "NDS";
+
+const VGMMetadataHint* findNDSMetadataHint(RawFile* file,
+                                           u32 seqIndex,
+                                           const std::string& seqName,
+                                           u32 seqOffset) {
+  if (!seqName.empty()) {
+    if (const auto* hint = file->findMetadataHint(VGMMetadataHintQuery{
+        .targetFormat = NDS_FORMAT_NAME,
+        .lookupKey = seqName,
+    })) {
+      return hint;
+    }
+  }
+
+  if (const auto* hint = file->findMetadataHint(VGMMetadataHintQuery{
+      .targetFormat = NDS_FORMAT_NAME,
+      .songIndex = seqIndex,
+  })) {
+    return hint;
+  }
+
+  return file->findMetadataHint(VGMMetadataHintQuery{
+      .targetFormat = NDS_FORMAT_NAME,
+      .fileOffset = seqOffset,
+  });
+}
+
+std::string displayNameForNDSSeq(RawFile* file,
+                                 u32 seqIndex,
+                                 const std::string& seqName,
+                                 u32 seqOffset) {
+  const auto* hint = findNDSMetadataHint(file, seqIndex, seqName, seqOffset);
+  if (hint && hint->tag.hasTitle()) {
+    return hint->tag.title;
+  }
+
+  return seqName;
+}
 
 void NDSScanner::scan(RawFile* file, void* /*info*/) {
   searchForSDAT(file);
@@ -248,13 +288,14 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       u32 pSeqFatData = file->readWord(offset) + baseOff;
       offset += 4;
       u32 fileSize = file->readWord(offset);
-      auto* NewNDSSeq = pRoot->loadVGMFile<NDSSeq>(file, pSeqFatData, fileSize, seqNames[i]);
+      const auto displayName = displayNameForNDSSeq(file, i, seqNames[i], pSeqFatData);
+      auto* NewNDSSeq = pRoot->loadVGMFile<NDSSeq>(file, pSeqFatData, fileSize, displayName);
       if (!NewNDSSeq) {
         L_ERROR("Failed to load NDSSeq at 0x{:08X}", pSeqFatData);
         continue;
       }
 
-      auto coll = std::make_unique<VGMColl>(seqNames[i]);
+      auto coll = std::make_unique<VGMColl>(displayName);
       coll->attachSeq(NewNDSSeq);
       u32 bnkIndex = 0;
       for (u32 j = 0; j < BNKs.size(); j++) {
