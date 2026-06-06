@@ -39,7 +39,7 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
         continue;
       }
 
-      auto instrset = seq->newInstrSet();
+      auto instrset = seq->createInstrSet();
       if (!instrset)
         continue;
       pRoot->loadVGMFile(std::move(instrset));
