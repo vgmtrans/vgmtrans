@@ -219,7 +219,7 @@ double AkaoSeq::getTempoInBPM(u16 tempo) const {
   }
 }
 
-std::unique_ptr<AkaoInstrSet> AkaoSeq::newInstrSet() const {
+std::unique_ptr<AkaoInstrSet> AkaoSeq::createInstrSet() const {
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     u32 instrSetLen = 0;
     if (has_instrument_set_offset())
