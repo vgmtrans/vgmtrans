@@ -5,6 +5,7 @@
 #include "VGMSamp.h"
 
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -41,7 +42,7 @@ class VGMSampColl : public VGMFile {
     return rawSamp;
   }
 
-  [[nodiscard]] const std::vector<VGMSamp*>& samples() const { return m_samples; }
+  [[nodiscard]] std::span<VGMSamp* const> samples() const { return m_samples; }
   [[nodiscard]] bool hasSamples() const { return !m_samples.empty(); }
   [[nodiscard]] size_t sampleCount() const { return m_samples.size(); }
   [[nodiscard]] VGMSamp* sample(size_t index) const { return m_samples.at(index); }

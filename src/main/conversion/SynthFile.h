@@ -5,6 +5,7 @@
 #include "RiffFile.h"
 
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -39,8 +40,8 @@ class SynthFile {
   void sinkWave(std::unique_ptr<SynthWave>&& wave);
   std::vector<std::unique_ptr<SynthWave>> releaseWaves();
 
-  [[nodiscard]] const std::vector<SynthInstr*>& instrs() const { return m_instrObservers; }
-  [[nodiscard]] const std::vector<SynthWave*>& waves() const { return m_waveObservers; }
+  [[nodiscard]] std::span<SynthInstr* const> instrs() const { return m_instrObservers; }
+  [[nodiscard]] std::span<SynthWave* const> waves() const { return m_waveObservers; }
   [[nodiscard]] bool hasInstrs() const { return !m_instrObservers.empty(); }
   [[nodiscard]] bool hasWaves() const { return !m_waveObservers.empty(); }
   [[nodiscard]] size_t instrCount() const { return m_instrObservers.size(); }
@@ -64,7 +65,7 @@ class SynthInstr {
   SynthRgn *addRgn();
   SynthRgn *addRgn(const SynthRgn& rgn);
   void sinkRgn(std::unique_ptr<SynthRgn>&& rgn);
-  [[nodiscard]] const std::vector<SynthRgn*>& regions() const { return m_regionObservers; }
+  [[nodiscard]] std::span<SynthRgn* const> regions() const { return m_regionObservers; }
 
   void addModulator(const SynthModulator& modulator);
   void addModulator(ModSource source, ModDest destination, ModAmount amount);

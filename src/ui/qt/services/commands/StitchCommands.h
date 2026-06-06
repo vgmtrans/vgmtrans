@@ -9,6 +9,7 @@
 #include "services/commands/GeneralCommands.h"
 
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -20,8 +21,8 @@ class QAbstractButton;
 
 class StitchSequencesCommand : public ItemListCommand<VGMFile> {
 public:
-  void executeItems(std::vector<VGMFile*> vgmfiles) const override;
-  [[nodiscard]] bool isEnabledForItems(const std::vector<VGMFile*>& vgmfiles) const override {
+  void executeItems(std::span<VGMFile* const> vgmfiles) const override;
+  [[nodiscard]] bool isEnabledForItems(std::span<VGMFile* const> vgmfiles) const override {
     return vgmfiles.size() >= 2;
   }
   [[nodiscard]] std::string name() const override { return "Stitch"; }
@@ -30,8 +31,8 @@ public:
 
 class StitchCollectionsCommand : public ItemListCommand<VGMColl> {
 public:
-  void executeItems(std::vector<VGMColl*> vgmcolls) const override;
-  [[nodiscard]] bool isEnabledForItems(const std::vector<VGMColl*>& vgmcolls) const override {
+  void executeItems(std::span<VGMColl* const> vgmcolls) const override;
+  [[nodiscard]] bool isEnabledForItems(std::span<VGMColl* const> vgmcolls) const override {
     return vgmcolls.size() >= 2;
   }
   [[nodiscard]] std::string name() const override { return "Stitch"; }

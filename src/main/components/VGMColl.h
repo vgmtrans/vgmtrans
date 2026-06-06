@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <span>
 #include <string>
 #include <vector>
 
@@ -36,9 +37,9 @@ class VGMColl {
 
   bool containsVGMFile(const VGMFile*) const;
 
-  const std::vector<VGMInstrSet*>& instrSets() const { return m_instrsets; }
-  const std::vector<VGMSampColl*>& sampColls() const { return m_sampcolls; }
-  const std::vector<VGMMiscFile*>& miscFiles() const { return m_miscfiles; }
+  std::span<VGMInstrSet* const> instrSets() const { return m_instrsets; }
+  std::span<VGMSampColl* const> sampColls() const { return m_sampcolls; }
+  std::span<VGMMiscFile* const> miscFiles() const { return m_miscfiles; }
 
  private:
   std::vector<VGMInstrSet*> m_instrsets;

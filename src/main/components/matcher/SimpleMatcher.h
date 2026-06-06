@@ -48,7 +48,7 @@ protected:
     if (VGMInstrSet *matchingInstrSet = instrsets[id]) {
       if (bRequiresSampColl) {
         if (VGMSampColl *matchingSampColl = sampcolls[id]) {
-          auto coll = fmt->newCollection();
+          auto coll = fmt->createCollection();
           if (!coll)
             return false;
           coll->setName(seq->name());
@@ -60,7 +60,7 @@ protected:
           }
         }
       } else {
-        auto coll = fmt->newCollection();
+        auto coll = fmt->createCollection();
         if (!coll)
           return false;
         coll->setName(seq->name());
@@ -108,7 +108,7 @@ protected:
 
       if (bRequiresSampColl) {
         if (matchingSampColl) {
-          auto coll = fmt->newCollection();
+          auto coll = fmt->createCollection();
           if (!coll)
             return false;
           coll->setName(matchingSeq->name());
@@ -119,7 +119,7 @@ protected:
             return false;
         }
       } else {
-        auto coll = fmt->newCollection();
+        auto coll = fmt->createCollection();
         if (!coll)
           return false;
         coll->setName(matchingSeq->name());
@@ -166,7 +166,7 @@ protected:
         VGMSeq *matchingSeq = (*it2).second;
 
         if (matchingSeq && matchingInstrSet) {
-          auto coll = fmt->newCollection();
+          auto coll = fmt->createCollection();
           if (!coll)
             return false;
           coll->setName(matchingSeq->name());

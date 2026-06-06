@@ -17,6 +17,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <set>
 #include <string>
 #include <utility>
@@ -118,7 +119,7 @@ class VGMSeq : public VGMFile {
   void setInitialPitchBendRange(u16 cents) { m_initial_pitch_bend_range_cents = cents; }
 
   SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
-  [[nodiscard]] const std::vector<SeqTrack*>& tracks() const { return m_tracks; }
+  [[nodiscard]] std::span<SeqTrack* const> tracks() const { return m_tracks; }
   [[nodiscard]] bool hasTracks() const { return !m_tracks.empty(); }
   [[nodiscard]] size_t trackCount() const { return m_tracks.size(); }
   SeqTrack* track(size_t index) const { return m_tracks.at(index); }

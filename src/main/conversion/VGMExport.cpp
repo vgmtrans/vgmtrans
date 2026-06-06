@@ -31,8 +31,10 @@ bool saveAsDLS(VGMInstrSet &set, const fs::path &filepath) {
   std::vector<VGMInstrSet*> instrsets;
   std::vector<VGMSampColl*> sampcolls;
   if (coll) {
-    instrsets = coll->instrSets();
-    sampcolls = coll->sampColls();
+    const auto collInstrSets = coll->instrSets();
+    const auto collSampColls = coll->sampColls();
+    instrsets.assign(collInstrSets.begin(), collInstrSets.end());
+    sampcolls.assign(collSampColls.begin(), collSampColls.end());
   } else {
     instrsets.emplace_back(&set);
   }
@@ -53,8 +55,10 @@ bool saveAsSF2(VGMInstrSet &set, const fs::path &filepath) {
   std::vector<VGMInstrSet*> instrsets;
   std::vector<VGMSampColl*> sampcolls;
   if (coll) {
-    instrsets = coll->instrSets();
-    sampcolls = coll->sampColls();
+    const auto collInstrSets = coll->instrSets();
+    const auto collSampColls = coll->sampColls();
+    instrsets.assign(collInstrSets.begin(), collInstrSets.end());
+    sampcolls.assign(collSampColls.begin(), collSampColls.end());
   } else {
     instrsets.emplace_back(&set);
   }

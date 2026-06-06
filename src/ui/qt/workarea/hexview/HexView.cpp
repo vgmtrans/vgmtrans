@@ -907,7 +907,7 @@ void HexView::rebuildStyleMap() {
   // Flatten the item tree to leaf items; leaf ranges represent final semantic regions.
   std::vector<VGMItem*> leaves;
   std::function<void(VGMItem*)> walk = [&](VGMItem* item) {
-    auto& children = item->children();
+    auto children = item->children();
     if (children.empty()) {
       leaves.push_back(item);
       return;

@@ -156,7 +156,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
     }
 
     if (matchingSampColls.size() > 0) {
-      auto coll = fmt->newCollection();
+      auto coll = fmt->createCollection();
       if (!coll) return false;
 
       coll->setName(seq->name());

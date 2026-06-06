@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -39,11 +40,11 @@ public:
   void prepareForExport(const VGMColl* coll);
   void cleanupAfterExport();
 
-  [[nodiscard]] const std::vector<VGMInstr*>& instrs() const { return m_instrs; }
+  [[nodiscard]] std::span<VGMInstr* const> instrs() const { return m_instrs; }
   [[nodiscard]] bool hasInstrs() const { return !m_instrs.empty(); }
   [[nodiscard]] size_t instrCount() const { return m_instrs.size(); }
   VGMInstr* instr(size_t index) const { return m_instrs.at(index); }
-  const std::vector<VGMInstr*>& exportInstrs() const;
+  std::span<VGMInstr* const> exportInstrs() const;
 
   VGMInstr *addInstr(u32 offset, u32 length, u32 bank, u32 instrNum,
                      const std::string &instrName = "");
@@ -99,8 +100,7 @@ public:
   VGMInstr& operator=(const VGMInstr& other) = delete;
   ~VGMInstr() override;
 
-  const std::vector<VGMRgn*>& regions() { return m_regions; }
-  const std::vector<VGMRgn*>& regions() const { return m_regions; }
+  std::span<VGMRgn* const> regions() const { return m_regions; }
 
   inline void setBank(u32 bankNum);
   inline void setInstrNum(u32 theInstrNum);

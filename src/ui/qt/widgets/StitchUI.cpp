@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <span>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -60,7 +61,7 @@ constexpr int kBalloonMinWidth = 420;
 constexpr int kBalloonMinHeight = 320;
 constexpr int kAnchorVerticalGap = 6;
 
-std::vector<VGMColl*> dedupeCollections(const std::vector<VGMColl*>& collections) {
+std::vector<VGMColl*> dedupeCollections(std::span<VGMColl* const> collections) {
   std::vector<VGMColl*> deduped;
   deduped.reserve(collections.size());
   std::unordered_set<VGMColl*> seen;
@@ -82,7 +83,7 @@ bool collectionExists(VGMColl* coll) {
     return false;
   }
 
-  const auto& allCollections = qtVGMRoot.vgmColls();
+  const auto allCollections = qtVGMRoot.vgmColls();
   return std::find(allCollections.begin(), allCollections.end(), coll) != allCollections.end();
 }
 
@@ -699,7 +700,7 @@ StitchExportBalloon* ensureStitchExportBalloon(QWidget* owner) {
 
 namespace stitchui {
 
-void openCollectionStitchBalloon(const std::vector<VGMColl*>& initialCollections,
+void openCollectionStitchBalloon(std::span<VGMColl* const> initialCollections,
                                  QWidget* parent,
                                  QWidget* anchor,
                                  QAbstractButton* toggleButton) {
@@ -708,7 +709,7 @@ void openCollectionStitchBalloon(const std::vector<VGMColl*>& initialCollections
   balloon->openForCollections(dedupeCollections(initialCollections), anchor ? anchor : owner, toggleButton);
 }
 
-bool toggleCollectionStitchBalloon(const std::vector<VGMColl*>& initialCollections,
+bool toggleCollectionStitchBalloon(std::span<VGMColl* const> initialCollections,
                                    QWidget* parent,
                                    QWidget* anchor,
                                    QAbstractButton* toggleButton) {

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -112,7 +113,7 @@ public:
   virtual std::string description() { return ""; }
   virtual void addToUI(VGMItem *parent, void *UI_specific);
 
-  [[nodiscard]] const std::vector<VGMItem*>& children() const { return m_children; }
+  [[nodiscard]] std::span<VGMItem* const> children() const { return m_children; }
   [[nodiscard]] u32 offset() const noexcept { return m_offset; }
   [[nodiscard]] u32 length() const noexcept { return m_length; }
   void setOffset(u32 offset);

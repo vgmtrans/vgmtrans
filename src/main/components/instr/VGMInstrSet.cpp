@@ -134,7 +134,7 @@ void VGMInstrSet::cleanupAfterExport() {
   m_tempInstrs.clear();
 }
 
-const std::vector<VGMInstr*>& VGMInstrSet::exportInstrs() const {
+std::span<VGMInstr* const> VGMInstrSet::exportInstrs() const {
   return m_exportInstrs.empty() ? m_instrs : m_exportInstrs;
 }
 

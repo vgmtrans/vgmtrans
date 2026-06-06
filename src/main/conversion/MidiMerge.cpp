@@ -25,6 +25,7 @@
 #include <memory>
 #include <numeric>
 #include <set>
+#include <span>
 #include <unordered_map>
 #include <utility>
 
@@ -186,8 +187,8 @@ bool applyBankOffsetToTrack(MidiTrack* track,
 
 class ExportPrepGuard {
 public:
-  ExportPrepGuard(std::vector<VGMInstrSet*> instrsets, const VGMColl* coll)
-      : m_instrsets(std::move(instrsets)) {
+  ExportPrepGuard(std::span<VGMInstrSet* const> instrsets, const VGMColl* coll)
+      : m_instrsets(instrsets.begin(), instrsets.end()) {
     for (VGMInstrSet* instrset : m_instrsets) {
       if (instrset) {
         instrset->prepareForExport(coll);
@@ -473,7 +474,7 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
     processedColls.insert(coll);
 
     const auto instrsets = coll->instrSets();
-    const auto& sampcolls = coll->sampColls();
+    const auto sampcolls = coll->sampColls();
 
     if (instrsets.empty()) {
       L_ERROR("Collection has no instrument sets, so a merged SF2 cannot be produced.");

@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <list>
 #include <memory>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -78,9 +79,9 @@ class MidiTrack {
   MidiEvent* sinkEvent(std::unique_ptr<MidiEvent>&& event);
   void prependEvents(std::vector<std::unique_ptr<MidiEvent>> events);
   std::vector<std::unique_ptr<MidiEvent>> releaseEvents();
-  [[nodiscard]] const std::vector<MidiEvent*>& events() const { return m_events; }
+  [[nodiscard]] std::span<MidiEvent* const> events() const { return m_events; }
   [[nodiscard]] bool hasEvents() const { return !m_events.empty(); }
-  [[nodiscard]] const std::vector<NoteEvent*>& previousDurNoteOffs() const { return m_prevDurNoteOffs; }
+  [[nodiscard]] std::span<NoteEvent* const> previousDurNoteOffs() const { return m_prevDurNoteOffs; }
 
   template <class EventType, class... Args>
   EventType* addEvent(Args&&... args) {
@@ -240,7 +241,7 @@ class MidiFile {
   MidiTrack* sinkTrack(std::unique_ptr<MidiTrack>&& track);
   std::vector<std::unique_ptr<MidiTrack>> releaseTracks();
   int getMidiTrackIndex(const MidiTrack *midiTrack);
-  [[nodiscard]] const std::vector<MidiTrack*>& tracks() const { return m_tracks; }
+  [[nodiscard]] std::span<MidiTrack* const> tracks() const { return m_tracks; }
   [[nodiscard]] size_t trackCount() const { return m_tracks.size(); }
   MidiTrack* track(size_t index) const { return m_tracks.at(index); }
   void setPPQN(u16 ppqn);
