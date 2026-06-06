@@ -20,6 +20,7 @@
 #include "MP2kInstrSet.h"
 #include "MP2kSeq.h"
 #include "ScannerManager.h"
+#include "VGMMetadataHint.h"
 #include "VGMColl.h"
 
 #include <array>
@@ -28,6 +29,7 @@
 #include <optional>
 #include <set>
 #include <span>
+#include <string>
 #include <vector>
 
 #include <spdlog/fmt/fmt.h>
@@ -57,8 +59,33 @@ struct EngineParams {
 
 struct MP2kSeqWithIndex {
   u32 song_index;
+  std::string collection_name;
   MP2kSeq *seq;
 };
+
+constexpr auto MP2K_FORMAT_NAME = "MP2k";
+constexpr u32 GBA_ROM_BASE = 0x08000000;
+
+const VGMMetadataHint* findMP2kMetadataHint(RawFile* file, u32 song_index, u32 song_pointer) {
+  if (const auto* hint = file->findMetadataHint(VGMMetadataHintQuery{
+      .targetFormat = MP2K_FORMAT_NAME,
+      .songIndex = song_index,
+  })) {
+    return hint;
+  }
+
+  if (const auto* hint = file->findMetadataHint(VGMMetadataHintQuery{
+      .targetFormat = MP2K_FORMAT_NAME,
+      .romAddress = GBA_ROM_BASE | song_pointer,
+  })) {
+    return hint;
+  }
+
+  return file->findMetadataHint(VGMMetadataHintQuery{
+      .targetFormat = MP2K_FORMAT_NAME,
+      .fileOffset = song_pointer,
+  });
+}
 
 /* Test if an area of ROM is eligible to be the base pointer */
 static bool test_pointer_validity(RawFile *file, size_t offset, u32 inGBA_length) {
@@ -121,7 +148,11 @@ void MP2kScanner::scan(RawFile *file, void *) {
       break;
     }
 
-    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer);
+    const auto* hint = findMP2kMetadataHint(file, song_index, song_pointer);
+    const bool hasHintTitle = hint != nullptr && hint->tag.hasTitle();
+    const auto seq_name = hasHintTitle ? hint->tag.title : std::string("MP2kSeq");
+
+    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer, seq_name);
     if (!nseq) {
       continue;
     }
@@ -129,11 +160,13 @@ void MP2kScanner::scan(RawFile *file, void *) {
     /* Load the soundbanks later because we need to know the number of instruments in each of
      * them */
     u32 inst_pointer = file->get<u32>(song_pointer + 4) & 0x1FFFFFF;
+    const auto collection_name =
+        hasHintTitle ? hint->tag.title : fmt::format("MP2k Collection #{}", song_index);
     soundbanks.insert(inst_pointer);
     if (auto inst = seqs.find(inst_pointer); inst != seqs.end()) {
-      inst->second.push_back({song_index, nseq});
+      inst->second.push_back({song_index, collection_name, nseq});
     } else {
-      seqs.insert({inst_pointer, std::vector<MP2kSeqWithIndex>{{song_index, nseq}}});
+      seqs.insert({inst_pointer, std::vector<MP2kSeqWithIndex>{{song_index, collection_name, nseq}}});
     }
   }
 
@@ -151,7 +184,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
       auto seq = seqs.find(*it);
       if (seq != seqs.end()) {
         for (auto seqval : seq->second) {
-          auto coll = std::make_unique<VGMColl>(fmt::format("MP2k Collection #{}", seqval.song_index));
+          auto coll = std::make_unique<VGMColl>(seqval.collection_name);
           coll->attachSeq(seqval.seq);
           coll->attachInstrSet(rawInstrSet);
           if (rawInstrSet->sampColl() != nullptr && rawInstrSet->sampColl()->hasSamples()) {

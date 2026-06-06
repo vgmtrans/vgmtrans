@@ -7,13 +7,18 @@
 #include "PSFLoader.h"
 
 #include "base/Types.h"
+#include "components/VGMMetadataHint.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "PSFFile.h"
+#include "util/Path.h"
+#include "util/Text.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -45,6 +50,8 @@ struct Image {
 };
 
 constexpr int MAX_RECURSION = 10;
+constexpr u32 GBA_ROM_BASE = 0x08000000;
+constexpr auto MP2K_FORMAT_NAME = "MP2k";
 
 void overlay(Image &img, u32 addr, const u8 *data, size_t size) {
   if (!size)
@@ -66,6 +73,140 @@ void overlay(Image &img, u32 addr, const u8 *data, size_t size) {
     img.end = new_end;
   }
   std::copy(data, data + size, img.data.begin() + (addr - img.start));
+}
+
+std::optional<std::string> findLibTag(const PSFFile& psf) {
+  if (auto it = psf.tags().find("_lib"); it != psf.tags().end()) {
+    return it->second;
+  }
+  if (auto it = psf.tags().find("_Lib"); it != psf.tags().end()) {
+    return it->second;
+  }
+  return std::nullopt;
+}
+
+std::filesystem::path resolveLibPath(const std::filesystem::path& basepath,
+                                     const std::string& libname) {
+  return std::filesystem::absolute(basepath / libname).lexically_normal();
+}
+
+bool isGsfMetadataCandidate(const std::filesystem::path& path) {
+  const auto ext = toLower(pathToUtf8String(path.extension()));
+  return ext == ".gsf" || ext == ".minigsf";
+}
+
+std::optional<u32> selectedSongIndexFromGsf(const PSFFile& psf) {
+  if (psf.version() != GSF_VERSION) {
+    return std::nullopt;
+  }
+
+  const auto& exe = psf.exe();
+  const auto payloadOffset = data_offset.at(GSF_VERSION);
+  if (exe.size() <= payloadOffset) {
+    return std::nullopt;
+  }
+
+  const u32 address = psf.getExe<u32>(0);
+  if (address != GBA_ROM_BASE) {
+    return std::nullopt;
+  }
+
+  const auto* payload = exe.data() + payloadOffset;
+  const size_t payloadSize = exe.size() - payloadOffset;
+  if (payloadSize == sizeof(u32)) {
+    return static_cast<u32>(payload[0]) |
+           (static_cast<u32>(payload[1]) << 8) |
+           (static_cast<u32>(payload[2]) << 16) |
+           (static_cast<u32>(payload[3]) << 24);
+  }
+  if (payloadSize == sizeof(u16)) {
+    return static_cast<u32>(payload[0]) | (static_cast<u32>(payload[1]) << 8);
+  }
+  if (payloadSize == sizeof(u8)) {
+    return static_cast<u32>(payload[0]);
+  }
+
+  return std::nullopt;
+}
+
+std::optional<VGMMetadataHint> hintFromGsf(const PSFFile& psf,
+                                           const std::filesystem::path& sourcePath) {
+  auto songIndex = selectedSongIndexFromGsf(psf);
+  if (!songIndex) {
+    return std::nullopt;
+  }
+
+  return VGMMetadataHint{
+      .targetFormat = MP2K_FORMAT_NAME,
+      .sourceFormat = "GSF",
+      .sourcePath = sourcePath,
+      .tag = PSFFile::tagFromPSFFile(psf),
+      .songIndex = songIndex,
+      .romAddress = std::nullopt,
+      .fileOffset = std::nullopt,
+      .lookupKey = std::nullopt,
+  };
+}
+
+std::vector<VGMMetadataHint> collectGsfMetadataHints(const RawFile* file, const PSFFile& psf) {
+  std::vector<VGMMetadataHint> hints;
+  if (psf.version() != GSF_VERSION) {
+    return hints;
+  }
+
+  auto lib = findLibTag(psf);
+  if (!lib) {
+    return hints;
+  }
+
+  if (auto hint = hintFromGsf(psf, file->path())) {
+    hints.emplace_back(std::move(*hint));
+  }
+
+  const auto basepath = file->path().parent_path();
+  std::error_code ec;
+  if (basepath.empty() || !std::filesystem::is_directory(basepath, ec)) {
+    return hints;
+  }
+
+  const auto expectedLibPath = resolveLibPath(basepath, *lib);
+  const auto openedPath = std::filesystem::absolute(file->path()).lexically_normal();
+
+  for (const auto& entry : std::filesystem::directory_iterator(basepath, ec)) {
+    if (ec) {
+      break;
+    }
+    if (!entry.is_regular_file(ec) || !isGsfMetadataCandidate(entry.path())) {
+      continue;
+    }
+
+    const auto siblingPath = std::filesystem::absolute(entry.path()).lexically_normal();
+    if (siblingPath == openedPath) {
+      continue;
+    }
+
+    try {
+      DiskFile siblingFile(entry.path());
+      PSFFile siblingPsf(siblingFile);
+      if (siblingPsf.version() != GSF_VERSION) {
+        continue;
+      }
+
+      auto siblingLib = findLibTag(siblingPsf);
+      if (!siblingLib ||
+          resolveLibPath(entry.path().parent_path(), *siblingLib) != expectedLibPath) {
+        continue;
+      }
+
+      if (auto hint = hintFromGsf(siblingPsf, entry.path())) {
+        hints.emplace_back(std::move(*hint));
+      }
+    } catch (const std::exception& e) {
+      L_DEBUG("Ignoring GSF metadata candidate '{}': {}", pathToUtf8String(entry.path()), e.what());
+    }
+  }
+
+  return hints;
 }
 
 void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, Image &img,
@@ -144,7 +285,14 @@ void PSFLoader::psf_read_exe(const RawFile *file) {
     load_with_libs(psf, file->path().parent_path(), img);
     if (!img.data.empty()) {
       auto tag = PSFFile::tagFromPSFFile(psf);
-      enqueue(std::make_unique<VirtFile>(img.data.data(), img.data.size(), file->name(), file->path(), tag));
+      std::shared_ptr<const VGMMetadataHintProvider> metadataProvider;
+      auto hints = collectGsfMetadataHints(file, psf);
+      if (!hints.empty()) {
+        metadataProvider = std::make_shared<IndexedMetadataHintProvider>(std::move(hints));
+      }
+
+      enqueue(std::make_unique<VirtFile>(img.data.data(), img.data.size(), file->name(),
+                                         file->path(), tag, std::move(metadataProvider)));
     }
   } catch (std::exception &e) {
     L_ERROR(e.what());
