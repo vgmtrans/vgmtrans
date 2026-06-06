@@ -19,11 +19,13 @@
 
 * **Sappy (mp2k):** Added support for missing commands (LFO, pitch bend range, transpose, etc.).
 * **Sappy (mp2k):** Added support for GBA PSG instruments and programmable wavetables.
+* **Sappy (mp2k):** When possible, track names from GSF files are used instead of the song table index.
 * **Sappy (mp2k):** Fixed sequences being exported 0.45% faster than they should be.
 * **Sappy (mp2k):** Fixed instruments potentially having very long release times.
 
 **Nintendo DS (SDAT)**
 
+* **2SF/NCSF:** When possible, track names from 2SF/NCSF is used instead of "NDS Seq" or internal track names.
 * **Instruments:** Improved accuracy of instrument ADSR.
 * **Instruments:** Fixed an issue where PSG instruments were exported too quiet (-4.6dB attenuated).
 * **Samples:** Fixed an issue where samples were being read with the wrong sample rate, resulting in instruments playing at the wrong pitch or seemingly being absent.
