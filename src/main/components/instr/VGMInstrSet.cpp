@@ -110,9 +110,8 @@ bool VGMInstrSet::parseInstrPointers() {
 }
 
 bool VGMInstrSet::loadInstrs() {
-  size_t nInstrs = m_instrs.size();
-  for (size_t i = 0; i < nInstrs; i++) {
-    if (!m_instrs[i]->loadInstr())
+  for (auto* instr : m_instrs) {
+    if (!instr->loadInstr())
       return false;
   }
   return true;
