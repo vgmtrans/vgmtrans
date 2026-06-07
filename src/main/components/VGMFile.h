@@ -41,7 +41,7 @@ public:
     return rawFile;
   }
 
-  bool adoptDiscoveredFile(std::unique_ptr<VGMFile> file);
+  bool sinkDiscoveredFile(std::unique_ptr<VGMFile>&& file);
   Format* format() const;
   [[nodiscard]] std::string formatName();
 

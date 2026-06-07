@@ -279,7 +279,7 @@ bool SonyPS2InstrSet::parseInstrPointers() {
       splitBlockHdr->addChild(splitOff + 18, 1, "Split Transpose");
       splitBlockHdr->addChild(splitOff + 19, 1, "Split Detune");
     }
-    adoptInstrAsChild(*progParamsHdr, std::move(newInstr));
+    sinkInstrAsChild(*progParamsHdr, std::move(newInstr));
   }
 
   u32 maxProgNum = progCk.maxProgramNumber;

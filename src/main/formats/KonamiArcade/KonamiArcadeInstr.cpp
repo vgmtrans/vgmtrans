@@ -139,7 +139,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     rgn->addChild(off + 6, 1, "Default Duration");
     rgn->addChild(off + 7, 1, "Attenuation");
   }
-  adoptInstrAsChild(std::move(drumInstr));
+  sinkInstrAsChild(std::move(drumInstr));
 
   return true;
 }
@@ -224,7 +224,7 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
     if (sampInfo.type() == konami_mw_sample_info::sample_type::ADPCM) {
-      sample = adoptSamp(std::make_unique<KonamiAdpcmSamp>(
+      sample = sinkSamp(std::make_unique<KonamiAdpcmSamp>(
         this,
         sampleOffset,
         sampleSize,

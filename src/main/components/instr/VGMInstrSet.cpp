@@ -39,21 +39,21 @@ VGMInstr *VGMInstrSet::addInstr(u32 offset, u32 length, u32 bank,
       instrName.empty() ? fmt::format("Instrument {}", instrCount()) : instrName);
 }
 
-VGMInstr* VGMInstrSet::adoptInstr(std::unique_ptr<VGMInstr> instr) {
+VGMInstr* VGMInstrSet::sinkInstr(std::unique_ptr<VGMInstr>&& instr) {
   auto* rawInstr = instr.get();
   m_instrs.push_back(rawInstr);
   m_ownedInstrs.emplace_back(std::move(instr));
   return rawInstr;
 }
 
-VGMInstr* VGMInstrSet::adoptInstrAsChild(std::unique_ptr<VGMInstr> instr) {
-  return adoptInstrAsChild(*this, std::move(instr));
+VGMInstr* VGMInstrSet::sinkInstrAsChild(std::unique_ptr<VGMInstr>&& instr) {
+  return sinkInstrAsChild(*this, std::move(instr));
 }
 
-VGMInstr* VGMInstrSet::adoptInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInstr> instr) {
+VGMInstr* VGMInstrSet::sinkInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInstr>&& instr) {
   auto* rawInstr = instr.get();
   m_instrs.push_back(rawInstr);
-  parent.adoptChild(std::move(instr));
+  parent.sinkChild(std::move(instr));
   return rawInstr;
 }
 
@@ -81,7 +81,7 @@ bool VGMInstrSet::load() {
 
   if (m_auto_add_instruments_as_children) {
     for (auto& instr : m_ownedInstrs) {
-      adoptChild(std::move(instr));
+      sinkChild(std::move(instr));
     }
     m_ownedInstrs.clear();
   }
@@ -139,13 +139,13 @@ const std::vector<VGMInstr*>& VGMInstrSet::exportInstrs() const {
   return m_exportInstrs.empty() ? m_instrs : m_exportInstrs;
 }
 
-void VGMInstrSet::adoptTempInstr(std::unique_ptr<VGMInstr> instr) {
+void VGMInstrSet::sinkTempInstr(std::unique_ptr<VGMInstr>&& instr) {
   assert(instr != nullptr);
   m_exportInstrs.push_back(instr.get());
   m_tempInstrs.emplace_back(std::move(instr));
 }
 
-void VGMInstrSet::adoptSampColl(std::unique_ptr<VGMSampColl> newSampColl) {
+void VGMInstrSet::sinkSampColl(std::unique_ptr<VGMSampColl>&& newSampColl) {
   sampColl = newSampColl.get();
   m_ownedSampColl = std::move(newSampColl);
 }
@@ -187,11 +187,11 @@ void VGMInstr::setInstrNum(u32 theInstrNum) {
   instrNum = theInstrNum;
 }
 
-VGMRgn *VGMInstr::adoptRgn(std::unique_ptr<VGMRgn> rgn) {
+VGMRgn *VGMInstr::sinkRgn(std::unique_ptr<VGMRgn>&& rgn) {
   auto* rawRgn = rgn.get();
   m_regions.emplace_back(rawRgn);
   if (m_auto_add_regions_as_children) {
-    adoptChild(std::move(rgn));
+    sinkChild(std::move(rgn));
   } else {
     m_ownedRegions.emplace_back(std::move(rgn));
   }

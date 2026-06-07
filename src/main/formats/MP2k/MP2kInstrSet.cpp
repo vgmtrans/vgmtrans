@@ -111,7 +111,7 @@ bool MP2kInstrSet::loadInstrs() {
     if (instr->regions().empty()) {
       continue;
     } else {
-      adoptInstr(std::move(instr));
+      sinkInstr(std::move(instr));
     }
   }
 
@@ -200,7 +200,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   }
 
   const auto sample_id = sampColl->sampleCount();
-  sampColl->adoptSamp(std::move(samp));
+  sampColl->sinkSamp(std::move(samp));
   m_samples.emplace(sample_pointer, sample_id);
 
   return static_cast<int>(sample_id);

@@ -140,7 +140,7 @@ bool KonamiVendettaSampleInstrSet::parseMelodicInstrs() {
     VGMRgn* rgn = rawInstr->addRgn<VGMRgn>(rawInstr, offset, sizeof(konami_vendetta_instr_k053260));
     rgn->sampOffset = sampInfo.start();
     rgn->sampDataLength = sampInfo.length();
-    adoptInstr(std::move(instr));
+    sinkInstr(std::move(instr));
     instrNum += 1;
   }
   return true;
@@ -212,7 +212,7 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
 
     }
   }
-  adoptInstr(std::move(drumKit));
+  sinkInstr(std::move(drumKit));
   return true;
 }
 

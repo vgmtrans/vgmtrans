@@ -185,18 +185,18 @@ bool VGMRoot::loadVGMFile(std::unique_ptr<VGMFile> file, bool useMatcher) {
     return false;
   }
 
-  adoptVGMFile(std::move(file), useMatcher);
+  sinkVGMFile(std::move(file), useMatcher);
   return true;
 }
 
-void VGMRoot::adoptVGMFile(std::unique_ptr<VGMFile> file, bool useMatcher) {
+void VGMRoot::sinkVGMFile(std::unique_ptr<VGMFile>&& file, bool useMatcher) {
   if (!file) {
     return;
   }
 
   auto discoveredFiles = file->releaseDiscoveredFiles();
   for (auto& discoveredFile : discoveredFiles) {
-    adoptVGMFile(std::move(discoveredFile), useMatcher);
+    sinkVGMFile(std::move(discoveredFile), useMatcher);
   }
 
   auto* vgmFile = file.get();
@@ -262,11 +262,11 @@ bool VGMRoot::loadVGMColl(std::unique_ptr<VGMColl> coll) {
     return false;
   }
 
-  adoptVGMColl(std::move(coll));
+  sinkVGMColl(std::move(coll));
   return true;
 }
 
-void VGMRoot::adoptVGMColl(std::unique_ptr<VGMColl> coll) {
+void VGMRoot::sinkVGMColl(std::unique_ptr<VGMColl>&& coll) {
   if (!coll) {
     return;
   }

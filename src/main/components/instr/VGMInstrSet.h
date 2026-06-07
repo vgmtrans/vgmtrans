@@ -47,34 +47,34 @@ public:
 
   VGMInstr *addInstr(u32 offset, u32 length, u32 bank, u32 instrNum,
                      const std::string &instrName = "");
-  void adoptSampColl(std::unique_ptr<VGMSampColl> newSampColl);
+  void sinkSampColl(std::unique_ptr<VGMSampColl>&& newSampColl);
   template <class SampCollType, class... Args>
   SampCollType* addSampColl(Args&&... args) {
     auto newSampColl = std::make_unique<SampCollType>(std::forward<Args>(args)...);
     auto* rawSampColl = newSampColl.get();
-    adoptSampColl(std::move(newSampColl));
+    sinkSampColl(std::move(newSampColl));
     return rawSampColl;
   }
   void clearSampColl();
 
-  // Observer; use adoptSampColl/addSampColl<T> when the instrument set owns the sample collection.
+  // Observer; use sinkSampColl/addSampColl<T> when the instrument set owns the sample collection.
   VGMSampColl *sampColl;
 
 protected:
    void reserveInstrs(size_t count) { m_ownedInstrs.reserve(count); m_instrs.reserve(count); }
-   VGMInstr* adoptInstr(std::unique_ptr<VGMInstr> instr);
-   VGMInstr* adoptInstrAsChild(std::unique_ptr<VGMInstr> instr);
-   VGMInstr* adoptInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInstr> instr);
+   VGMInstr* sinkInstr(std::unique_ptr<VGMInstr>&& instr);
+   VGMInstr* sinkInstrAsChild(std::unique_ptr<VGMInstr>&& instr);
+   VGMInstr* sinkInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInstr>&& instr);
    template <class InstrType, class... Args>
    InstrType* addInstr(Args&&... args) {
      auto instr = std::make_unique<InstrType>(std::forward<Args>(args)...);
      auto* rawInstr = instr.get();
-     adoptInstr(std::move(instr));
+     sinkInstr(std::move(instr));
      return rawInstr;
    }
    std::vector<std::unique_ptr<VGMInstr>> releaseInstrs();
    void clearInstrs();
-   void adoptTempInstr(std::unique_ptr<VGMInstr> instr);
+   void sinkTempInstr(std::unique_ptr<VGMInstr>&& instr);
    void disableAutoAddInstrumentsAsChildren() { m_auto_add_instruments_as_children = false; }
 
 private:
@@ -104,12 +104,12 @@ public:
   inline void setBank(u32 bankNum);
   inline void setInstrNum(u32 theInstrNum);
 
-  VGMRgn *adoptRgn(std::unique_ptr<VGMRgn> rgn);
+  VGMRgn *sinkRgn(std::unique_ptr<VGMRgn>&& rgn);
   template <class RgnType, class... Args>
   RgnType* addRgn(Args&&... args) {
     auto rgn = std::make_unique<RgnType>(std::forward<Args>(args)...);
     auto* rawRgn = rgn.get();
-    adoptRgn(std::move(rgn));
+    sinkRgn(std::move(rgn));
     return rawRgn;
   }
   VGMRgn *addRgn(u32 offset, u32 length, int sampNum, u8 keyLow = 0,

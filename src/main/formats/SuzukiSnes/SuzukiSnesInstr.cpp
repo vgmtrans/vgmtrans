@@ -130,7 +130,7 @@ void SuzukiSnesInstrSet::useColl(const VGMColl* coll) {
     return;
   }
 
-  adoptTempInstr(std::move(drumKit));
+  sinkTempInstr(std::move(drumKit));
 }
 
 // ***************
@@ -224,7 +224,7 @@ bool SuzukiSnesDrumKit::loadInstr() {
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
-    adoptRgn(std::move(rgn));
+    sinkRgn(std::move(rgn));
   }
 
   setGuessedLength();

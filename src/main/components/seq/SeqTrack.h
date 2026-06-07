@@ -120,7 +120,7 @@ protected:
   virtual bool isOffsetUsed(u32 offset);
 
   virtual bool onEvent(u32 offset, u32 length);
-  virtual SeqEvent* adoptEvent(std::unique_ptr<SeqEvent> seqEvent);
+  virtual SeqEvent* sinkEvent(std::unique_ptr<SeqEvent>&& seqEvent);
   // Some parsers emit SeqEvents under a display track that differs from the parser track.
   void setSeqEventTarget(SeqTrack* target, bool emitEvents = true) {
     m_seqEventTarget = target;
@@ -144,7 +144,7 @@ protected:
         auto* target = seqEventTarget();
         auto event = std::make_unique<EventType>(target, std::forward<Args>(args)...);
         event->channel = static_cast<u8>(channel);
-        target->adoptEvent(std::move(event));
+        target->sinkEvent(std::move(event));
       }
       return SeqEventTimeIndex::kInvalidIndex;
     }

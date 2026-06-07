@@ -24,7 +24,7 @@ std::vector<std::unique_ptr<VGMFile>> VGMFile::releaseDiscoveredFiles() {
   return std::exchange(m_discoveredFiles, {});
 }
 
-bool VGMFile::adoptDiscoveredFile(std::unique_ptr<VGMFile> file) {
+bool VGMFile::sinkDiscoveredFile(std::unique_ptr<VGMFile>&& file) {
   if (!file || !file->load()) {
     return false;
   }

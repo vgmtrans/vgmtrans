@@ -177,7 +177,7 @@ bool SegSatInstr::loadInstr() {
     if (!rgn->isRegionValid()) {
       continue;
     }
-    auto* rawRgn = static_cast<SegSatRgn*>(adoptRgn(std::move(rgn)));
+    auto* rawRgn = static_cast<SegSatRgn*>(sinkRgn(std::move(rgn)));
 
     // Add sample
     u32 sampLength = rawRgn->sampleLoopEnd();

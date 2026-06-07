@@ -32,12 +32,12 @@ class VGMSampColl : public VGMFile {
   VGMSamp *addSamp(u32 offset, u32 length, u32 dataOffset, u32 dataLength,
                    u8 nChannels = 1, BPS bps = BPS::PCM16, u32 rate = 0,
                    std::string name = "Sample");
-  VGMSamp *adoptSamp(std::unique_ptr<VGMSamp> samp);
+  VGMSamp *sinkSamp(std::unique_ptr<VGMSamp>&& samp);
   template <class SampType, class... Args>
   SampType* addSamp(Args&&... args) {
     auto samp = std::make_unique<SampType>(std::forward<Args>(args)...);
     auto* rawSamp = samp.get();
-    adoptSamp(std::move(samp));
+    sinkSamp(std::move(samp));
     return rawSamp;
   }
 

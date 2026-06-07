@@ -306,8 +306,8 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
       if (rgn == nullptr) {
         continue;
       }
-      overrideInstrOwner->adoptRgn(std::move(rgn));
-      adoptTempInstr(std::move(overrideInstrOwner));
+      overrideInstrOwner->sinkRgn(std::move(rgn));
+      sinkTempInstr(std::move(overrideInstrOwner));
     }
 
     for (const auto& drumKitDef : seq->intelliTADrumKitDefs()) {
@@ -328,7 +328,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
 
         const u8 drumKey = static_cast<u8>(0x24 + slot);
         for (auto* sourceRgn : sourceInstr->regions()) {
-          drumKit->adoptRgn(
+          drumKit->sinkRgn(
               cloneIntelliTARgnForDrumKit(drumKit.get(), sourceRgn, drumKey, slotDef.playedNoteByte));
         }
       }
@@ -337,7 +337,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
         continue;
       }
 
-      adoptTempInstr(std::move(drumKit));
+      sinkTempInstr(std::move(drumKit));
     }
   } else {
     const auto& percussionInstrNoteMap = seq->percussionInstrNoteMap();
@@ -358,7 +358,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
         }
 
         for (auto* sourceRgn : sourceInstr->regions()) {
-          drumKit->adoptRgn(cloneLegacyRgnForDrumKit(drumKit.get(),
+          drumKit->sinkRgn(cloneLegacyRgnForDrumKit(drumKit.get(),
                                                      sourceRgn,
                                                      percussionDef.noteIndex,
                                                      percussionDef.globalTranspose));
@@ -366,7 +366,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
       }
 
       if (!drumKit->regions().empty()) {
-        adoptTempInstr(std::move(drumKit));
+        sinkTempInstr(std::move(drumKit));
       }
     }
   }

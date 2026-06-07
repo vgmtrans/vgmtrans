@@ -29,7 +29,7 @@ MidiFile::MidiFile(VGMSeq *assocSeq)
 MidiFile::~MidiFile() = default;
 
 MidiTrack *MidiFile::addTrack() {
-  return adoptTrack(std::make_unique<MidiTrack>(this, bMonophonicTracks));
+  return sinkTrack(std::make_unique<MidiTrack>(this, bMonophonicTracks));
 }
 
 MidiTrack *MidiFile::insertTrack(u32 trackNum) {
@@ -49,7 +49,7 @@ MidiTrack *MidiFile::insertTrack(u32 trackNum) {
   return rawTrack;
 }
 
-MidiTrack* MidiFile::adoptTrack(std::unique_ptr<MidiTrack> track) {
+MidiTrack* MidiFile::sinkTrack(std::unique_ptr<MidiTrack>&& track) {
   if (!track) {
     return nullptr;
   }
@@ -147,7 +147,7 @@ MidiTrack::MidiTrack(MidiFile *parentSeq, bool monophonic)
 
 MidiTrack::~MidiTrack() = default;
 
-MidiEvent* MidiTrack::adoptEvent(std::unique_ptr<MidiEvent> event) {
+MidiEvent* MidiTrack::sinkEvent(std::unique_ptr<MidiEvent>&& event) {
   if (!event) {
     return nullptr;
   }

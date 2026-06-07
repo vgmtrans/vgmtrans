@@ -219,7 +219,7 @@ bool AkaoSnesDrumKit::loadInstr() {
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
-    adoptRgn(std::move(rgn));
+    sinkRgn(std::move(rgn));
   }
 
   setGuessedLength();

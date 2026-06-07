@@ -265,7 +265,7 @@ bool KonamiSnesInstr::loadInstr() {
         return false;
       }
 
-      adoptRgn(std::move(rgn));
+      sinkRgn(std::move(rgn));
     }
     setGuessedLength();
     return !percussionHeaders.empty() && !regions().empty();

@@ -30,13 +30,13 @@ class SynthFile {
 
   SynthInstr *addInstr(u32 bank, u32 instrNum, float reverb);
   SynthInstr *addInstr(u32 bank, u32 instrNum, std::string Name, float reverb);
-  void adoptInstr(std::unique_ptr<SynthInstr> instr);
+  void sinkInstr(std::unique_ptr<SynthInstr>&& instr);
   std::vector<std::unique_ptr<SynthInstr>> releaseInstrs();
   SynthWave *addWave(u16 formatTag, u16 channels, int samplesPerSec, int aveBytesPerSec,
                      u16 blockAlign, u16 bitsPerSample, u32 waveDataSize,
                      std::vector<u8> waveData,
                      std::string name = "Unnamed Wave");
-  void adoptWave(std::unique_ptr<SynthWave> wave);
+  void sinkWave(std::unique_ptr<SynthWave>&& wave);
   std::vector<std::unique_ptr<SynthWave>> releaseWaves();
 
   [[nodiscard]] const std::vector<SynthInstr*>& instrs() const { return m_instrObservers; }
@@ -63,7 +63,7 @@ class SynthInstr {
 
   SynthRgn *addRgn();
   SynthRgn *addRgn(const SynthRgn& rgn);
-  void adoptRgn(std::unique_ptr<SynthRgn> rgn);
+  void sinkRgn(std::unique_ptr<SynthRgn>&& rgn);
   [[nodiscard]] const std::vector<SynthRgn*>& regions() const { return m_regionObservers; }
 
   void addModulator(const SynthModulator& modulator);

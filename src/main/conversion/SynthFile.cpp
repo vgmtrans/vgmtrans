@@ -27,18 +27,18 @@ SynthInstr *SynthFile::addInstr(u32 bank, u32 instrNum, float reverb) {
   auto str = fmt::format("Instr bnk {} num {}", bank, instrNum);
   auto instr = std::make_unique<SynthInstr>(bank, instrNum, str, reverb);
   auto *rawInstr = instr.get();
-  adoptInstr(std::move(instr));
+  sinkInstr(std::move(instr));
   return rawInstr;
 }
 
 SynthInstr *SynthFile::addInstr(u32 bank, u32 instrNum, std::string name, float reverb) {
   auto instr = std::make_unique<SynthInstr>(bank, instrNum, std::move(name), reverb);
   auto *rawInstr = instr.get();
-  adoptInstr(std::move(instr));
+  sinkInstr(std::move(instr));
   return rawInstr;
 }
 
-void SynthFile::adoptInstr(std::unique_ptr<SynthInstr> instr) {
+void SynthFile::sinkInstr(std::unique_ptr<SynthInstr>&& instr) {
   m_instrObservers.push_back(instr.get());
   m_instrs.push_back(std::move(instr));
 }
@@ -67,11 +67,11 @@ SynthWave *SynthFile::addWave(u16 formatTag,
                                           std::move(waveData),
                                           std::move(name));
   auto *rawWave = wave.get();
-  adoptWave(std::move(wave));
+  sinkWave(std::move(wave));
   return rawWave;
 }
 
-void SynthFile::adoptWave(std::unique_ptr<SynthWave> wave) {
+void SynthFile::sinkWave(std::unique_ptr<SynthWave>&& wave) {
   m_waveObservers.push_back(wave.get());
   m_waves.push_back(std::move(wave));
 }
@@ -102,18 +102,18 @@ SynthInstr::~SynthInstr() = default;
 SynthRgn *SynthInstr::addRgn() {
   auto rgn = std::make_unique<SynthRgn>();
   auto *rawRgn = rgn.get();
-  adoptRgn(std::move(rgn));
+  sinkRgn(std::move(rgn));
   return rawRgn;
 }
 
 SynthRgn *SynthInstr::addRgn(const SynthRgn& rgn) {
   auto newRgn = std::make_unique<SynthRgn>(rgn);
   auto *rawRgn = newRgn.get();
-  adoptRgn(std::move(newRgn));
+  sinkRgn(std::move(newRgn));
   return rawRgn;
 }
 
-void SynthInstr::adoptRgn(std::unique_ptr<SynthRgn> rgn) {
+void SynthInstr::sinkRgn(std::unique_ptr<SynthRgn>&& rgn) {
   m_regionObservers.push_back(rgn.get());
   m_regions.push_back(std::move(rgn));
 }

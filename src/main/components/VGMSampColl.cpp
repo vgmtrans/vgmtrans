@@ -51,7 +51,7 @@ bool VGMSampColl::load() {
   }
 
   for (auto& sample : m_ownedSamples) {
-    adoptChild(std::move(sample));
+    sinkChild(std::move(sample));
   }
   m_ownedSamples.clear();
 
@@ -92,7 +92,7 @@ VGMSamp *VGMSampColl::addSamp(u32 offset, u32 length, u32 dataOffset,
   return addSamp<VGMSamp>(this, offset, length, dataOffset, dataLength, nChannels, bps, rate, std::move(name));
 }
 
-VGMSamp *VGMSampColl::adoptSamp(std::unique_ptr<VGMSamp> samp) {
+VGMSamp *VGMSampColl::sinkSamp(std::unique_ptr<VGMSamp>&& samp) {
   auto* rawSamp = samp.get();
   m_samples.emplace_back(rawSamp);
   m_ownedSamples.emplace_back(std::move(samp));

@@ -53,7 +53,7 @@ public:
   bool loadRawFile(std::unique_ptr<RawFile> newRawFile);
   bool removeRawFile(RawFile *targFile);
   bool loadVGMFile(std::unique_ptr<VGMFile> file, bool useMatcher = true);
-  void adoptVGMFile(std::unique_ptr<VGMFile> file, bool useMatcher = true);
+  void sinkVGMFile(std::unique_ptr<VGMFile>&& file, bool useMatcher = true);
   template <class FileType, class... Args>
   FileType* loadVGMFile(Args&&... args) {
     return loadVGMFileWithMatcher<FileType>(true, std::forward<Args>(args)...);
@@ -68,12 +68,12 @@ public:
   FileType* loadPendingVGMFile(Args&&... args) {
     auto file = std::make_unique<FileType>(std::forward<Args>(args)...);
     auto* rawFile = file.get();
-    adoptVGMFile(std::move(file));
+    sinkVGMFile(std::move(file));
     return rawFile;
   }
   void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
   bool loadVGMColl(std::unique_ptr<VGMColl> coll);
-  void adoptVGMColl(std::unique_ptr<VGMColl> coll);
+  void sinkVGMColl(std::unique_ptr<VGMColl>&& coll);
   template <class CollType, class... Args>
   CollType* loadVGMColl(Args&&... args) {
     auto coll = std::make_unique<CollType>(std::forward<Args>(args)...);

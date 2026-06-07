@@ -38,7 +38,7 @@ void Chunk::write(u8 *buffer) {
   memcpy(buffer + 8, data.get(), paddedSize(m_size));
 }
 
-Chunk *ListTypeChunk::adoptChildChunk(std::unique_ptr<Chunk> ck) {
+Chunk *ListTypeChunk::sinkChildChunk(std::unique_ptr<Chunk>&& ck) {
   auto* rawChunk = ck.get();
   childChunks.emplace_back(std::move(ck));
   return rawChunk;

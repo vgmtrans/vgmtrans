@@ -116,7 +116,7 @@ private:
   void loadEventMap();
   void createTracks();
   bool loadSection(NinSnesSection *section, u32 stopTime = 1000000);
-  NinSnesSection* adoptSection(std::unique_ptr<NinSnesSection> section);
+  NinSnesSection* sinkSection(std::unique_ptr<NinSnesSection>&& section);
   NinSnesSection *getSectionAtOffset(u32 offset);
   bool addLoopForeverNoItem();
   void setImmediateTempo(u8 newTempo);

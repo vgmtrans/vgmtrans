@@ -109,7 +109,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
     rgn->sampOffset = instrInfo.start();
     rgn->sampDataLength = (instrInfo.length_hi << 8) | instrInfo.length_lo;
 
-    adoptInstr(std::move(instr));
+    sinkInstr(std::move(instr));
     instrNum += 1;
   }
   return true;
@@ -196,7 +196,7 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
       drumNum += 1;
     }
   }
-  adoptInstr(std::move(drumKit));
+  sinkInstr(std::move(drumKit));
   drumsItem->setOffset(minDrumOffset);
   drumsItem->setLength((maxDrumOffset + sizeof(konami_tmnt2_drum_info)) - minDrumOffset);
   return true;
@@ -237,10 +237,10 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
     if (sampleOffset + sampleSize > length()) {
-      sample = adoptSamp(std::make_unique<EmptySamp>(this));
+      sample = sinkSamp(std::make_unique<EmptySamp>(this));
     }
     else if (sampInfo.isAdpcm) {
-      sample = adoptSamp(std::make_unique<KonamiAdpcmSamp>(
+      sample = sinkSamp(std::make_unique<KonamiAdpcmSamp>(
         this,
         sampleOffset,
         sampleSize,

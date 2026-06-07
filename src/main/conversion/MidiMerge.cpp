@@ -414,7 +414,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
       }
 
       event->prntTrk = &mergedMidi->globalTrack;
-      mergedMidi->globalTrack.adoptEvent(std::move(event));
+      mergedMidi->globalTrack.sinkEvent(std::move(event));
     }
 
     auto tracks = source->releaseTracks();
@@ -430,7 +430,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
       }
 
       track->parentSeq = mergedMidi.get();
-      mergedMidi->adoptTrack(std::move(track));
+      mergedMidi->sinkTrack(std::move(track));
     }
   }
 
@@ -514,11 +514,11 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
           rgn->tableIndex += waveOffset;
         }
       }
-      mergedSynth->adoptInstr(std::move(instr));
+      mergedSynth->sinkInstr(std::move(instr));
     }
     for (auto& wave : partWaves) {
       if (wave) {
-        mergedSynth->adoptWave(std::move(wave));
+        mergedSynth->sinkWave(std::move(wave));
       }
     }
   }

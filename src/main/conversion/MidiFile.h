@@ -75,7 +75,7 @@ class MidiTrack {
 
   void sort();
   void writeTrack(std::vector<u8> &buf) const;
-  MidiEvent* adoptEvent(std::unique_ptr<MidiEvent> event);
+  MidiEvent* sinkEvent(std::unique_ptr<MidiEvent>&& event);
   void prependEvents(std::vector<std::unique_ptr<MidiEvent>> events);
   std::vector<std::unique_ptr<MidiEvent>> releaseEvents();
   [[nodiscard]] const std::vector<MidiEvent*>& events() const { return m_events; }
@@ -84,7 +84,7 @@ class MidiTrack {
 
   template <class EventType, class... Args>
   EventType* addEvent(Args&&... args) {
-    return static_cast<EventType*>(adoptEvent(std::make_unique<EventType>(std::forward<Args>(args)...)));
+    return static_cast<EventType*>(sinkEvent(std::make_unique<EventType>(std::forward<Args>(args)...)));
   }
 
   //void setChannel(int theChannel);
@@ -237,7 +237,7 @@ class MidiFile {
   ~MidiFile();
   MidiTrack *addTrack();
   MidiTrack *insertTrack(u32 trackNum);
-  MidiTrack* adoptTrack(std::unique_ptr<MidiTrack> track);
+  MidiTrack* sinkTrack(std::unique_ptr<MidiTrack>&& track);
   std::vector<std::unique_ptr<MidiTrack>> releaseTracks();
   int getMidiTrackIndex(const MidiTrack *midiTrack);
   [[nodiscard]] const std::vector<MidiTrack*>& tracks() const { return m_tracks; }

@@ -59,12 +59,12 @@ class ListTypeChunk: public Chunk {
   }
   ~ListTypeChunk() override = default;
 
-  Chunk *adoptChildChunk(std::unique_ptr<Chunk> ck);
+  Chunk *sinkChildChunk(std::unique_ptr<Chunk>&& ck);
   template <class ChunkType, class... Args>
   ChunkType* addChildChunk(Args&&... args) {
     auto ck = std::make_unique<ChunkType>(std::forward<Args>(args)...);
     auto* rawChunk = ck.get();
-    adoptChildChunk(std::move(ck));
+    sinkChildChunk(std::move(ck));
     return rawChunk;
   }
   u32 size() override;    //  Returns the size of the chunk in bytes, including any pad byte.

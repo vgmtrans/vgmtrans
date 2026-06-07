@@ -190,7 +190,7 @@ bool VabInstr::loadInstr() {
     if (!rgn->loadRgn()) {
       continue;
     }
-    adoptRgn(std::move(rgn));
+    sinkRgn(std::move(rgn));
   }
   return true;
 }

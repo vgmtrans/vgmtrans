@@ -144,7 +144,7 @@ void AkaoInstrSet::useColl(const VGMColl* coll) {
       rgn->unityKey = art->unityKey;
       rgn->fineTune = art->fineTune;
 
-      adoptTempInstr(std::move(newInstr));
+      sinkTempInstr(std::move(newInstr));
     }
   }
 }
@@ -185,7 +185,7 @@ bool AkaoInstr::loadInstr() {
       // all keys are covered, though it is imperfect as the wrong regions are being extended.
       auto prevRgn = regions().back();
       if (rawRgn->keyHigh > prevRgn->keyHigh && rawRgn->keyLow > prevRgn->keyHigh) {
-        adoptRgn(std::move(rgn));
+        sinkRgn(std::move(rgn));
       } else if (rawRgn->keyHigh == prevRgn->keyHigh) {
         // TODO: replace the last region with this one?
       }
@@ -193,7 +193,7 @@ bool AkaoInstr::loadInstr() {
         rawRgn->keyLow = prevRgn->keyHigh + 1;
       }
     } else {
-      adoptRgn(std::move(rgn));
+      sinkRgn(std::move(rgn));
     }
   }
   if (!regions().empty()) {

@@ -115,7 +115,7 @@ bool CPS1SampColl::parseSampleInfo() {
     rawSample->setBPS(BPS::PCM16);
     rawSample->setLoopStatus(false);
     rawSample->unityKey = 0x3C;
-    adoptSamp(std::move(sample));
+    sinkSamp(std::move(sample));
   }
   return true;
 }
