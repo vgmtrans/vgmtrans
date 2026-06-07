@@ -87,7 +87,7 @@ public:
           u32 length = 0,
           std::string name = "",
           Type type = Type::Unknown);
-  VGMItem(const VGMItem& other);
+  VGMItem(const VGMItem& other) = delete;
   VGMItem(VGMItem&& other) noexcept;
   VGMItem& operator=(const VGMItem& other) = delete;
   VGMItem& operator=(VGMItem&& other) noexcept = delete;

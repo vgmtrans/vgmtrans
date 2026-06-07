@@ -18,14 +18,6 @@ VGMItem::VGMItem(VGMFile *vgmfile, u32 offset, u32 length, std::string name, Typ
       m_name(std::move(name)) {
 }
 
-VGMItem::VGMItem(const VGMItem& other)
-    : type(other.type),
-      m_vgmfile(other.m_vgmfile),
-      m_offset(other.m_offset),
-      m_length(other.m_length),
-      m_name(other.m_name) {
-}
-
 VGMItem::VGMItem(VGMItem&& other) noexcept
     : type(other.type),
       m_ownedChildren(std::move(other.m_ownedChildren)),
