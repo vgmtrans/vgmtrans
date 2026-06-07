@@ -59,7 +59,7 @@ VGMInstr* VGMInstrSet::sinkInstrAsChild(VGMItem& parent, std::unique_ptr<VGMInst
 
 std::vector<std::unique_ptr<VGMInstr>> VGMInstrSet::releaseInstrs() {
   m_instrs.clear();
-  return std::move(m_ownedInstrs);
+  return std::exchange(m_ownedInstrs, {});
 }
 
 void VGMInstrSet::clearInstrs() {
@@ -167,18 +167,6 @@ VGMInstr::VGMInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank,
                    u32 instrNum, std::string name, float reverb)
     : VGMItem(instrSet, offset, length, std::move(name), Type::Instrument),
       bank(bank), instrNum(instrNum), parInstrSet(instrSet), reverb(reverb) {
-}
-
-VGMInstr::VGMInstr(const VGMInstr& other)
-    : VGMItem(other),
-      bank(other.bank),
-      instrNum(other.instrNum),
-      parInstrSet(other.parInstrSet),
-      reverb(other.reverb),
-      m_auto_add_regions_as_children(other.m_auto_add_regions_as_children),
-      m_regions(other.m_regions),
-      m_modulators(other.m_modulators),
-      m_generators(other.m_generators) {
 }
 
 VGMInstr::~VGMInstr() = default;
