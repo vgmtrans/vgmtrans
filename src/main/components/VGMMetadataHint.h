@@ -16,18 +16,18 @@
 #include <vector>
 
 struct VGMMetadataHintTarget {
-  std::string targetFormat;
-  std::optional<u32> songIndex;
-  std::optional<u32> romAddress;
-  std::optional<u32> fileOffset;
-  std::optional<std::string> lookupKey;
+  std::string targetFormat{};
+  std::optional<u32> songIndex = std::nullopt;
+  std::optional<u32> romAddress = std::nullopt;
+  std::optional<u32> fileOffset = std::nullopt;
+  std::optional<std::string> lookupKey = std::nullopt;
 };
 
 struct VGMMetadataHint {
-  VGMMetadataHintTarget target;
-  std::string sourceFormat;
-  std::filesystem::path sourcePath;
-  VGMTag tag;
+  VGMMetadataHintTarget target{};
+  std::string sourceFormat{};
+  std::filesystem::path sourcePath{};
+  VGMTag tag{};
 };
 
 using VGMMetadataHintQuery = VGMMetadataHintTarget;
