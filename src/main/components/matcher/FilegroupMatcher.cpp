@@ -95,7 +95,7 @@ void FilegroupMatcher::lookForMatch() {
   for (VGMInstrSet* instr : instrsets) {
     VGMSampColl* extraSamp = nullptr;
 
-    if (instr->sampColl == nullptr) {
+    if (instr->sampColl() == nullptr) {
       if (forcePairSingle) {                     // exactly one‑and‑one: pair regardless
         extraSamp = sampcolls.front();
         sampcolls.clear();
@@ -117,7 +117,7 @@ void FilegroupMatcher::lookForMatch() {
         }
       }
     } else {
-      extraSamp = instr->sampColl;                // use the existing sample collection
+      extraSamp = instr->sampColl();                // use the existing sample collection
     }
 
     // keep only instrsets that actually have a sample collection to work with
@@ -139,7 +139,7 @@ void FilegroupMatcher::lookForMatch() {
     coll->setName(seq->name());
     coll->attachSeq(seq);
     coll->attachInstrSet(assoc.instrSet);
-    if (assoc.sampColl && assoc.instrSet->sampColl == nullptr) {
+    if (assoc.sampColl && assoc.instrSet->sampColl() == nullptr) {
       coll->attachSampColl(assoc.sampColl);
     }
 

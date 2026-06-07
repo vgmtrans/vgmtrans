@@ -47,6 +47,8 @@ public:
 
   VGMInstr *addInstr(u32 offset, u32 length, u32 bank, u32 instrNum,
                      const std::string &instrName = "");
+  [[nodiscard]] VGMSampColl* sampColl() const { return m_sampColl; }
+  void attachSampColl(VGMSampColl* newSampColl);
   void sinkSampColl(std::unique_ptr<VGMSampColl>&& newSampColl);
   template <class SampCollType, class... Args>
   SampCollType* addSampColl(Args&&... args) {
@@ -56,9 +58,6 @@ public:
     return rawSampColl;
   }
   void clearSampColl();
-
-  // Observer; use sinkSampColl/addSampColl<T> when the instrument set owns the sample collection.
-  VGMSampColl *sampColl;
 
 protected:
    void reserveInstrs(size_t count) { m_ownedInstrs.reserve(count); m_instrs.reserve(count); }
@@ -83,6 +82,7 @@ private:
    std::vector<VGMInstr*> m_instrs;
    std::vector<VGMInstr*> m_exportInstrs;
    std::vector<std::unique_ptr<VGMInstr>> m_tempInstrs;
+   VGMSampColl* m_sampColl{};
    std::unique_ptr<VGMSampColl> m_ownedSampColl;
 };
 

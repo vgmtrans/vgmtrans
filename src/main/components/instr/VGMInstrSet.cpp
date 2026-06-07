@@ -27,7 +27,7 @@
 VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, u32 offset, u32 length,
                          std::string name, VGMSampColl *sampColl)
     : VGMFile(format, file, offset, length, std::move(name)),
-      sampColl(sampColl) {
+      m_sampColl(sampColl) {
 }
 
 VGMInstrSet::~VGMInstrSet() = default;
@@ -90,11 +90,11 @@ bool VGMInstrSet::load() {
     setGuessedLength();
   }
 
-  if (sampColl != nullptr) {
-    if (!sampColl->load()) {
+  if (m_sampColl != nullptr) {
+    if (!m_sampColl->load()) {
       L_WARN("Failed to load VGMSampColl");
     } else {
-      sampColl->transferChildren(this);
+      m_sampColl->transferChildren(this);
     }
   }
 
@@ -144,14 +144,19 @@ void VGMInstrSet::sinkTempInstr(std::unique_ptr<VGMInstr>&& instr) {
   m_tempInstrs.emplace_back(std::move(instr));
 }
 
+void VGMInstrSet::attachSampColl(VGMSampColl* newSampColl) {
+  m_ownedSampColl.reset();
+  m_sampColl = newSampColl;
+}
+
 void VGMInstrSet::sinkSampColl(std::unique_ptr<VGMSampColl>&& newSampColl) {
-  sampColl = newSampColl.get();
+  m_sampColl = newSampColl.get();
   m_ownedSampColl = std::move(newSampColl);
 }
 
 void VGMInstrSet::clearSampColl() {
   m_ownedSampColl.reset();
-  sampColl = nullptr;
+  m_sampColl = nullptr;
 }
 
 // ********

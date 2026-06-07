@@ -122,7 +122,7 @@ bool TriAcePS1Instr::loadInstr() {
     rgn->addVelLow(rgninfo->vel_range_high == 0 ? 0 : rgninfo->vel_range_low, rgn->offset() + 2);
     rgn->addVelHigh(rgninfo->vel_range_high == 0 ? 0x7F : rgninfo->vel_range_high, rgn->offset() + 3);
     rgn->addChild(rgn->offset() + 4, 4, "Sample Offset");
-    rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->offset();
+    rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl()->offset();
     rgn->addChild(rgn->offset() + 8, 4, "Sample Loop Point");
     //rgn->loop.loopStatus = (rgninfo->loopOffset != rgninfo->sampOffset) && (rgninfo->loopOffset != 0);
     rgn->loop.loopStart = rgninfo->loopOffset;
@@ -132,7 +132,7 @@ bool TriAcePS1Instr::loadInstr() {
     rgn->addChild(rgn->offset() + 14, 1, "Pitch Fine Tune");
     const int kTuningOffset = 22; // approx. 21.500638 from pitch table (0x10be vs 0x1000)
     rgn->fineTune = (short)((double)rgninfo->pitchTuneFine / 64.0 * 100) - kTuningOffset;
-    rgn->sampCollPtr = ((VGMInstrSet *) this->vgmFile())->sampColl;
+    rgn->sampCollPtr = ((VGMInstrSet *) this->vgmFile())->sampColl();
     rgn->addChild(rgn->offset() + 15, 5, "Unknown values");
 
 

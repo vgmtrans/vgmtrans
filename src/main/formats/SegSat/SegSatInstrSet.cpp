@@ -169,7 +169,7 @@ bool SegSatInstr::loadInstr() {
   u8 numRgns = rawFile()->readByte(offset() + 2) + 1;
   m_volBias = rawFile()->readByte(offset() + 3);
 
-  auto sampColl = parInstrSet->sampColl;
+  auto sampColl = parInstrSet->sampColl();
   for (int i = 0; i < numRgns; ++i) {
     u32 rgnOff = offset() + 4 + (i * 0x20);
     auto name = fmt::format("Region {:d}", i);

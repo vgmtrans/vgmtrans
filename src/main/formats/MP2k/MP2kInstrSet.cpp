@@ -115,7 +115,7 @@ bool MP2kInstrSet::loadInstrs() {
     }
   }
 
-  if (sampColl != nullptr && !sampColl->hasSamples()) {
+  if (sampColl() != nullptr && !sampColl()->hasSamples()) {
     clearSampColl();
   }
 
@@ -160,7 +160,8 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
     loop = 0;
   }
 
-  auto samp = std::make_unique<MP2kSamp>(sampColl, MP2kSampParams{
+  auto* sampleColl = sampColl();
+  auto samp = std::make_unique<MP2kSamp>(sampleColl, MP2kSampParams{
       .type = loop == 0x01 ? MP2kWaveType::BDPCM : MP2kWaveType::PCM8,
       .offset = static_cast<u32>(sample_pointer),
       .length = 16 + len,
@@ -199,8 +200,8 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
     return -1;
   }
 
-  const auto sample_id = sampColl->sampleCount();
-  sampColl->sinkSamp(std::move(samp));
+  const auto sample_id = sampleColl->sampleCount();
+  sampleColl->sinkSamp(std::move(samp));
   m_samples.emplace(sample_pointer, sample_id);
 
   return static_cast<int>(sample_id);
@@ -362,7 +363,7 @@ bool MP2kInstr::loadInstr() {
               sample_id != -1) {
             VGMRgn *rgn = addRgn(off, 12, sample_id, split_list[i], split_list[i + 1] - 1);
 
-            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
+            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl();
             setADSR(rgn, rawFile()->get<u32>(off + 8));
           }
         } else if (cgb_type == 1 || cgb_type == 2) {
@@ -410,7 +411,7 @@ bool MP2kInstr::loadInstr() {
                   static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
               sample_id != -1) {
             VGMRgn *rgn = addRgn(offset(), length(), sample_id, key, key);
-            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
+            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl();
             rgn->setPan(pan);
 
             u32 pitch = rawFile()->get<u32>(sample_pointer + 4);

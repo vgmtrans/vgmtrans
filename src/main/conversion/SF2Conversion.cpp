@@ -75,7 +75,7 @@ std::unique_ptr<SynthFile> createSynthFile(
     }
   } else {
     for (auto & instrset : m_instrsets) {
-      if (auto instrset_sampcoll = instrset->sampColl) {
+      if (auto instrset_sampcoll = instrset->sampColl()) {
         finalSampColls.push_back(instrset_sampcoll);
         unpackSampColl(*synthfile, instrset_sampcoll, finalSamps);
       }
@@ -112,8 +112,8 @@ std::unique_ptr<SynthFile> createSynthFile(
         const VGMSampColl* sampColl = rgn->sampCollPtr;
         if (!sampColl) {
           // If rgn is of an InstrSet with an embedded SampColl, use that SampColl.
-          if (static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl)
-            sampColl = static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl;
+          if (static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl())
+            sampColl = static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl();
           // If that does not exist, assume the first SampColl
           else
             sampColl = finalSampColls[0];
