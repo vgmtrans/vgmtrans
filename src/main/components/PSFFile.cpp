@@ -76,6 +76,16 @@ VGMTag PSFFile::tagFromPSFFile(const PSFFile& psf) {
   return tag;
 }
 
+std::optional<std::string> PSFFile::primaryLibName`() const {
+  if (auto it = m_tags.find("_lib"); it != m_tags.end()) {
+    return it->second;
+  }
+  if (auto it = m_tags.find("_Lib"); it != m_tags.end()) {
+    return it->second;
+  }
+  return std::nullopt;
+}
+
 PSFFile::PSFFile(const RawFile &file) {
     size_t fileSize = file.size();
     if (fileSize < 0x10) {

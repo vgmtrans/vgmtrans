@@ -26,17 +26,14 @@
 
 namespace {
 
-constexpr int GSF_VERSION = 0x22;
-constexpr int NDS2SF_VERSION = 0x24;
-constexpr int NCSF_VERSION = 0x25;
-constexpr size_t GSF_PAYLOAD_OFFSET = 0x0C;
 constexpr u32 GBA_ROM_BASE = 0x08000000;
 constexpr auto MP2K_FORMAT_NAME = "MP2k";
 constexpr auto NDS_FORMAT_NAME = "NDS";
 
 constexpr std::array<std::string_view, 2> GSF_METADATA_EXTENSIONS = {".gsf", ".minigsf"};
 constexpr std::array<std::string_view, 1> GSF_LIBRARY_EXTENSIONS = {".gsflib"};
-constexpr std::array<std::string_view, 4> NDS_METADATA_EXTENSIONS = { ".2sf", ".mini2sf", ".ncsf", ".minincsf"};
+constexpr std::array<std::string_view, 4> NDS_METADATA_EXTENSIONS = {
+    ".2sf", ".mini2sf", ".ncsf", ".minincsf"};
 constexpr std::array<std::string_view, 2> NDS_LIBRARY_EXTENSIONS = {".2sflib", ".ncsflib"};
 
 struct Rules {
@@ -47,16 +44,6 @@ struct Rules {
   std::optional<VGMMetadataHint> (*makeHint)(const PSFFile& psf,
                                              const std::filesystem::path& sourcePath);
 };
-
-std::optional<std::string> findLibTag(const PSFFile& psf) {
-  if (auto it = psf.tags().find("_lib"); it != psf.tags().end()) {
-    return it->second;
-  }
-  if (auto it = psf.tags().find("_Lib"); it != psf.tags().end()) {
-    return it->second;
-  }
-  return std::nullopt;
-}
 
 std::filesystem::path normalizePath(const std::filesystem::path& path) {
   return std::filesystem::absolute(path).lexically_normal();
@@ -82,15 +69,15 @@ bool hasExtension(const std::filesystem::path& path, std::span<const std::string
 }
 
 bool isGsfVersion(u8 version) {
-  return version == GSF_VERSION;
+  return version == vgmtrans::psf::GSF_VERSION;
 }
 
 bool isNdsPsfVersion(u8 version) {
-  return version == NDS2SF_VERSION || version == NCSF_VERSION;
+  return version == vgmtrans::psf::NDS2SF_VERSION || version == vgmtrans::psf::NCSF_VERSION;
 }
 
 const char* ndsSourceFormat(u8 version) {
-  return version == NCSF_VERSION ? "NCSF" : "2SF";
+  return version == vgmtrans::psf::NCSF_VERSION ? "NCSF" : "2SF";
 }
 
 std::optional<u32> selectedSongIndexFromGsf(const PSFFile& psf) {
@@ -99,7 +86,7 @@ std::optional<u32> selectedSongIndexFromGsf(const PSFFile& psf) {
   }
 
   const auto& exe = psf.exe();
-  if (exe.size() <= GSF_PAYLOAD_OFFSET) {
+  if (exe.size() <= vgmtrans::psf::GSF_DATA_OFFSET) {
     return std::nullopt;
   }
 
@@ -108,8 +95,8 @@ std::optional<u32> selectedSongIndexFromGsf(const PSFFile& psf) {
     return std::nullopt;
   }
 
-  const auto* payload = exe.data() + GSF_PAYLOAD_OFFSET;
-  const size_t payloadSize = exe.size() - GSF_PAYLOAD_OFFSET;
+  const auto* payload = exe.data() + vgmtrans::psf::GSF_DATA_OFFSET;
+  const size_t payloadSize = exe.size() - vgmtrans::psf::GSF_DATA_OFFSET;
   if (payloadSize == sizeof(u32)) {
     return static_cast<u32>(payload[0]) |
            (static_cast<u32>(payload[1]) << 8) |
@@ -221,7 +208,7 @@ std::vector<VGMMetadataHint> collectSiblingHintsReferencingLibPath(
         continue;
       }
 
-      auto siblingLib = findLibTag(siblingPsf);
+      auto siblingLib = siblingPsf.primaryLibName();
       if (!siblingLib ||
           resolveLibPath(candidatePath.parent_path(), *siblingLib) != targetLibPath) {
         continue;
@@ -251,7 +238,7 @@ std::vector<VGMMetadataHint> collectOwnHint(
 std::vector<VGMMetadataHint> collectSiblingHintsForSameLib(
     const RawFile& openedFile, const PSFFile& openedPsf, const Rules& rules) {
   const auto basepath = containingDirectory(openedFile);
-  const auto lib = findLibTag(openedPsf);
+  const auto lib = openedPsf.primaryLibName();
   if (!basepath || !lib) {
     return {};
   }
@@ -277,7 +264,7 @@ std::vector<VGMMetadataHint> collectForRules(
 
   appendHints(hints, collectOwnHint(psf, file.path(), rules));
 
-  if (findLibTag(psf)) {
+  if (psf.primaryLibName()) {
     appendHints(hints, collectSiblingHintsForSameLib(file, psf, rules));
   } else {
     appendHints(hints, collectSiblingHintsReferencingThisLib(file, rules));

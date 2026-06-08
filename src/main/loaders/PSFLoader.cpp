@@ -16,9 +16,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <memory>
-#include <optional>
+#include <stdexcept>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <spdlog/fmt/fmt.h>
@@ -26,19 +25,6 @@
 namespace vgmtrans::loaders {
 LoaderRegistration<PSFLoader> psf{"PSF"};
 }
-
-constexpr int PSF1_VERSION = 0x1;
-constexpr int SSF_VERSION = 0x11;
-constexpr int GSF_VERSION = 0x22;
-constexpr int SNSF_VERSION = 0x23;
-constexpr int NDS2SF_VERSION = 0x24;
-constexpr int NCSF_VERSION = 0x25;
-const std::unordered_map<int, size_t> data_offset = {{PSF1_VERSION, 0x800},
-                                                     {SSF_VERSION, 0x04},
-                                                     {GSF_VERSION, 0x0C},
-                                                     {SNSF_VERSION, 0x08},
-                                                     {NDS2SF_VERSION, 0x08},
-                                                     {NCSF_VERSION, 0x0}};
 
 namespace {
 
@@ -77,12 +63,6 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
   if (depth >= MAX_RECURSION)
     return;
 
-  auto findLib = [&](const std::string &key) {
-    auto it = psf.tags().find(key);
-    return it != psf.tags().end() ? std::optional<std::string>(it->second)
-                                  : std::nullopt;
-  };
-
   auto tryOpenLib = [&](const std::string& libname) {
     auto newpath = basepath / libname;
     auto doLoad = [&](const std::filesystem::path& p) {
@@ -104,20 +84,21 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
     }
   };
 
-  auto lib = findLib("_lib");
-  if (!lib)
-    lib = findLib("_Lib");
-
+  auto lib = psf.primaryLibName();
   if (lib)
     tryOpenLib(*lib);
 
   if (!psf.exe().empty()) {
-    u32 addr = psf.version() == PSF1_VERSION ? psf.getExe<u32>(0x18)
-                                                 : psf.getExe<u32>(0);
-    size_t off = data_offset.at(psf.version());
+    u32 addr = psf.version() == vgmtrans::psf::PSF1_VERSION ? psf.getExe<u32>(0x18)
+                                                            : psf.getExe<u32>(0);
+    auto off = vgmtrans::psf::dataOffsetForVersion(psf.version());
+    if (!off) {
+      throw std::runtime_error(fmt::format("Unsupported PSF version {:#x}",
+                                           static_cast<unsigned>(psf.version())));
+    }
     overlay(img, addr,
-            reinterpret_cast<const u8 *>(psf.exe().data()) + off,
-            psf.exe().size() - off);
+            reinterpret_cast<const u8 *>(psf.exe().data()) + *off,
+            psf.exe().size() - *off);
   }
 
   for (int i = 2;; ++i) {
@@ -135,7 +116,7 @@ void PSFLoader::apply(const RawFile *file) {
     return;
   if (std::equal(file->begin(), file->begin() + 3, "PSF")) {
     u8 version = file->get<u8>(3);
-    if (data_offset.contains(version)) {
+    if (vgmtrans::psf::dataOffsetForVersion(version)) {
       psf_read_exe(file);
     }
   }
