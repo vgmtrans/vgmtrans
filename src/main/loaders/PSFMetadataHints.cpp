@@ -246,8 +246,7 @@ std::vector<VGMMetadataHint> collectSiblingHintsForSameLib(
   return collectSiblingHintsReferencingLibPath(openedFile, rules, resolveLibPath(*basepath, *lib));
 }
 
-std::vector<VGMMetadataHint> collectSiblingHintsReferencingThisLib(
-    const RawFile& openedFile, const Rules& rules) {
+std::vector<VGMMetadataHint> collectSiblingHintsReferencingThisLib(const RawFile& openedFile, const Rules& rules) {
   if (openedFile.path().empty() || !hasExtension(openedFile.path(), rules.libraryExtensions)) {
     return {};
   }
@@ -255,8 +254,7 @@ std::vector<VGMMetadataHint> collectSiblingHintsReferencingThisLib(
   return collectSiblingHintsReferencingLibPath(openedFile, rules, normalizePath(openedFile.path()));
 }
 
-std::vector<VGMMetadataHint> collectForRules(
-    const RawFile& file, const PSFFile& psf, const Rules& rules) {
+std::vector<VGMMetadataHint> collectForRules(const RawFile& file, const PSFFile& psf, const Rules& rules) {
   std::vector<VGMMetadataHint> hints;
   if (!rules.supportsVersion(psf.version())) {
     return hints;
