@@ -12,8 +12,9 @@
 class PSFFile;
 class RawFile;
 
-class PSFMetadataHintCollector {
-public:
-  [[nodiscard]] std::vector<VGMMetadataHint> collectForOpenedFile(
-      const RawFile& file, const PSFFile& psf) const;
-};
+namespace vgmtrans::psf {
+
+[[nodiscard]] std::vector<VGMMetadataHint> collectMetadataHintsForOpenedFile(
+    const RawFile& file, const PSFFile& psf);
+
+}  // namespace vgmtrans::psf

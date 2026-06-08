@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "PSFMetadataHintCollector.h"
+#include "PSFMetadataHints.h"
 
 #include "base/Types.h"
 #include "io/RawFile.h"
@@ -295,8 +295,8 @@ const std::array<Rules, 2>& metadataRules() {
 
 }  // namespace
 
-std::vector<VGMMetadataHint> PSFMetadataHintCollector::collectForOpenedFile(
-    const RawFile& file, const PSFFile& psf) const {
+std::vector<VGMMetadataHint> vgmtrans::psf::collectMetadataHintsForOpenedFile(
+    const RawFile& file, const PSFFile& psf) {
   std::vector<VGMMetadataHint> hints;
   for (const auto& rules : metadataRules()) {
     appendHints(hints, collectForRules(file, psf, rules));

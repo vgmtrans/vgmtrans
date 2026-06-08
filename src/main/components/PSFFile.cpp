@@ -76,7 +76,7 @@ VGMTag PSFFile::tagFromPSFFile(const PSFFile& psf) {
   return tag;
 }
 
-std::optional<std::string> PSFFile::primaryLibName`() const {
+std::optional<std::string> PSFFile::primaryLibName() const {
   if (auto it = m_tags.find("_lib"); it != m_tags.end()) {
     return it->second;
   }

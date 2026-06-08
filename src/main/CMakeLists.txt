@@ -281,7 +281,7 @@ target_sources(vgmtranscore
     loaders/MAMELoader.cpp
     loaders/PSF2Loader.cpp
     loaders/PSFLoader.cpp
-    loaders/PSFMetadataHintCollector.cpp
+    loaders/PSFMetadataHints.cpp
     loaders/RSNLoader.cpp
     loaders/SPC2Loader.cpp
     loaders/SPCLoader.cpp
@@ -552,7 +552,7 @@ target_sources(vgmtranscore
       loaders/MAMELoader.h
       loaders/PSF2Loader.h
       loaders/PSFLoader.h
-      loaders/PSFMetadataHintCollector.h
+      loaders/PSFMetadataHints.h
       loaders/RSNLoader.h
       loaders/SPC2Loader.h
       loaders/SPCLoader.h

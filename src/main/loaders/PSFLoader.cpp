@@ -11,7 +11,7 @@
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "PSFFile.h"
-#include "PSFMetadataHintCollector.h"
+#include "PSFMetadataHints.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -130,7 +130,7 @@ void PSFLoader::psf_read_exe(const RawFile *file) {
     if (!img.data.empty()) {
       auto tag = PSFFile::tagFromPSFFile(psf);
       std::shared_ptr<const VGMMetadataHintProvider> metadataProvider;
-      auto hints = PSFMetadataHintCollector().collectForOpenedFile(*file, psf);
+      auto hints = vgmtrans::psf::collectMetadataHintsForOpenedFile(*file, psf);
       if (!hints.empty()) {
         metadataProvider = std::make_shared<IndexedMetadataHintProvider>(std::move(hints));
       }
