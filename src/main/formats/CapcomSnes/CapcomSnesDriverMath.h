@@ -20,6 +20,7 @@ struct PanConversionResult {
 [[nodiscard]] PanConversionResult linear8BitPanToMidi(u8 biasedPan);
 [[nodiscard]] PanConversionResult calculatePanV2(u8 biasedPan);
 
+[[nodiscard]] double calculateVolumeV1(u8 sourceVolume);
 [[nodiscard]] int calculateVolumeScalar(u8 sourceVolume);
 [[nodiscard]] double calculateVolumeV2(u8 sourceVolume);
 

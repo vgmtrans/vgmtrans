@@ -30,6 +30,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void capcomSnesModuleScansSpcThroughVirtualAramSource();
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
 void capcomSnesPanLoweringDoesNotRecurveMidiPan();
+void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
 
 namespace {
 
@@ -930,6 +931,7 @@ int main() {
     capcomSnesModuleScansSpcThroughVirtualAramSource();
     capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
     capcomSnesPanLoweringDoesNotRecurveMidiPan();
+    capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;

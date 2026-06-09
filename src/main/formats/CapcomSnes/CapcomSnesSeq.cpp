@@ -485,7 +485,10 @@ bool CapcomSnesTrack::readEvent() {
 
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
           // linear volume
-          addVol(beginOffset, curOffset - beginOffset, newVolume >> 1);
+          addVol(beginOffset,
+                 curOffset - beginOffset,
+                 capcom_snes::calculateVolumeV1(newVolume),
+                 Resolution::FourteenBit);
         }
         else {
           // V2/V3 drivers shape volume through the engine's 17-point loudness curve.
@@ -681,7 +684,10 @@ bool CapcomSnesTrack::readEvent() {
 
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
           // linear volume
-          addMasterVol(beginOffset, curOffset - beginOffset, newVolume >> 1);
+          addMasterVol(beginOffset,
+                       curOffset - beginOffset,
+                       capcom_snes::calculateVolumeV1(newVolume),
+                       Resolution::FourteenBit);
         }
         else {
           // Master volume follows the same loudness curve as per-track volume.

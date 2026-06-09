@@ -153,10 +153,11 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerVolume(
     const VolumeCommand& command,
     const TrackState& state) const {
   if (version_ == CapcomSnesEngineVersion::v1BgmInList) {
-    return {Volume{
+    return {Volume14{
         .tick = state.tick,
         .channel = state.channel,
-        .value = static_cast<u8>(std::min<u32>(command.rawValue >> 1, 127)),
+        .value = ::capcom_snes::percentAmpTo14BitMidi(
+            ::capcom_snes::calculateVolumeV1(static_cast<u8>(command.rawValue))),
     }};
   }
 
@@ -217,7 +218,8 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerMasterVolume(
   if (version_ == CapcomSnesEngineVersion::v1BgmInList) {
     return {MasterVolume{
         .tick = state.tick,
-        .value = static_cast<u16>(std::min<u32>((command.rawValue >> 1) * 129, 0x3fff)),
+        .value = ::capcom_snes::percentAmpTo14BitMidi(
+            ::capcom_snes::calculateVolumeV1(static_cast<u8>(command.rawValue))),
     }};
   }
 

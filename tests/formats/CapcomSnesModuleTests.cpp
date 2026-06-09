@@ -509,3 +509,41 @@ void capcomSnesPanLoweringDoesNotRecurveMidiPan() {
   expect(std::get<Pan>(*v1Pan).value == 65,
          "CapcomSnes V1 pan lowering should apply the pan curve before reducing to a MIDI controller value");
 }
+
+void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
+  const SequenceProgram program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {TrackProgram{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .startAddress = Address{0x3000},
+          .commands = {
+              VolumeCommand{.rawValue = 0x01},
+              MasterVolumeCommand{.rawValue = 0x03},
+              EndCommand{},
+          },
+      }},
+  };
+
+  const PerformanceSequence performance = PerformanceLowerer().lower(
+      program, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
+  expect(performance.diagnostics.empty(), "CapcomSnes V1 volume fixture should lower without diagnostics");
+  expect(!performance.tracks.empty(), "CapcomSnes V1 volume fixture should emit one track");
+
+  const auto& events = performance.tracks[0].events;
+  const auto volume = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* typed = std::get_if<Volume14>(&event);
+    return typed != nullptr && typed->tick == 0;
+  });
+  expect(volume != events.end(), "CapcomSnes V1 volume should lower to a 14-bit MIDI volume controller");
+  expect(std::get<Volume14>(*volume).value == 1026,
+         "CapcomSnes V1 volume should apply the amplitude curve before MIDI quantization");
+
+  const auto masterVolume = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* typed = std::get_if<MasterVolume>(&event);
+    return typed != nullptr && typed->tick == 0;
+  });
+  expect(masterVolume != events.end(), "CapcomSnes V1 master volume should lower to MIDI master volume");
+  expect(std::get<MasterVolume>(*masterVolume).value == 1777,
+         "CapcomSnes V1 master volume should apply the amplitude curve before MIDI quantization");
+}

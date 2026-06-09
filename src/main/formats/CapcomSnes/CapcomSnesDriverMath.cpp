@@ -188,6 +188,10 @@ PanConversionResult calculatePanV2(u8 biasedPan) {
   return volumeBalanceToMidiPan(volumeLeft, volumeRight);
 }
 
+double calculateVolumeV1(u8 sourceVolume) {
+  return sourceVolume / 255.0;
+}
+
 int calculateVolumeScalar(u8 sourceVolume) {
   if (sourceVolume >= 0x80) {
     return kVolumeTable[kVolumeCurveLastIndex];
