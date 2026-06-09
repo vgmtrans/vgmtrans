@@ -208,6 +208,17 @@ const char* valueAssetKindName(const vgmtrans::core::Asset& asset) {
   return "misc";
 }
 
+const vgmtrans::core::Asset* valueAssetById(const vgmtrans::core::Project& project,
+                                            vgmtrans::core::AssetId id) {
+  const auto found = std::ranges::find_if(project.assets, [id](const vgmtrans::core::Asset& asset) {
+    return vgmtrans::core::metadata(asset).id == id;
+  });
+  if (found == project.assets.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
 const char* valueSeverityName(vgmtrans::core::Severity severity) {
   using vgmtrans::core::Severity;
   switch (severity) {
@@ -580,6 +591,77 @@ bool printValueNoCollections(const vgmtrans::core::Project& project) {
     printValueDiagnostic(diagnostic);
   }
   return true;
+}
+
+void printValueCollectionAssetRef(const vgmtrans::core::Project& project,
+                                  std::string_view label,
+                                  size_t index,
+                                  vgmtrans::core::AssetId id) {
+  const auto* asset = valueAssetById(project, id);
+  if (asset == nullptr) {
+    fmt::println("  {} #{} id={} missing", label, index, id.value);
+    return;
+  }
+
+  const auto& meta = vgmtrans::core::metadata(*asset);
+  fmt::println("  {} #{} id={} [{}] format={} name='{}' range=0x{:x}:0x{:x}",
+               label, index, meta.id.value, valueAssetKindName(*asset), meta.format, meta.name,
+               meta.range.offset, meta.range.size);
+}
+
+void printValueCollectionInfo(const vgmtrans::core::Project& project,
+                              const vgmtrans::core::Collection& collection,
+                              size_t index) {
+  fmt::println("collection #{} id={} name='{}'", index, collection.id.value, collection.name);
+  if (collection.sequence) {
+    printValueCollectionAssetRef(project, "Sequence", 0, *collection.sequence);
+  } else {
+    fmt::println("  Sequence: none");
+  }
+
+  for (size_t i = 0; i < collection.instrumentBanks.size(); ++i) {
+    printValueCollectionAssetRef(project, "InstrumentBank", i, collection.instrumentBanks[i]);
+  }
+  for (size_t i = 0; i < collection.sampleCollections.size(); ++i) {
+    printValueCollectionAssetRef(project, "SampleCollection", i, collection.sampleCollections[i]);
+  }
+  for (size_t i = 0; i < collection.miscAssets.size(); ++i) {
+    printValueCollectionAssetRef(project, "Misc", i, collection.miscAssets[i]);
+  }
+}
+
+bool printValueCollections(const vgmtrans::core::Project& project,
+                           const std::vector<std::string>& args,
+                           size_t collectionArgIndex) {
+  if (printValueNoCollections(project)) {
+    return false;
+  }
+
+  if (args.size() <= collectionArgIndex) {
+    for (size_t i = 0; i < project.collections.size(); ++i) {
+      const auto& collection = project.collections[i];
+      fmt::println("collection #{} id={} name='{}' sequence={} instrumentBanks={} sampleCollections={} misc={}",
+                   i, collection.id.value, collection.name,
+                   collection.sequence ? std::to_string(collection.sequence->value) : std::string("-"),
+                   collection.instrumentBanks.size(), collection.sampleCollections.size(),
+                   collection.miscAssets.size());
+    }
+    return true;
+  }
+
+  try {
+    const int collectionIndex = std::stoi(args[collectionArgIndex]);
+    if (collectionIndex < 0 || static_cast<size_t>(collectionIndex) >= project.collections.size()) {
+      fmt::println("Collection index out of bounds");
+      return false;
+    }
+    printValueCollectionInfo(project, project.collections[static_cast<size_t>(collectionIndex)],
+                             static_cast<size_t>(collectionIndex));
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
 }
 
 size_t exportValueCollectionsToDirectory(const vgmtrans::core::Project& project,
@@ -1213,6 +1295,27 @@ void value_events_path(const std::vector<std::string>& args) {
   }
 }
 
+void value_collections(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  const auto project = session.scan();
+  printValueCollections(project, args, 3);
+}
+
+void value_collections_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    const auto project = session.scan();
+    printValueCollections(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-collections {}: {}", args[2], ex.what());
+  }
+}
+
 void value_export(const std::vector<std::string>& args) {
   RawFile* file = getRawFile(args[2]);
   if (!file) {
@@ -1443,6 +1546,10 @@ void registerCommands() {
         "List decoded commands in a value sequence track", 5, value_events},
        {"events-path", "<path> <asset_idx> <track_idx> [limit]",
         "List decoded commands in a value sequence track from a filesystem path", 5, value_events_path},
+       {"collections", "<rawfile_idx> [collection_idx]", "List or inspect value collections", 3,
+        value_collections},
+       {"collections-path", "<path> [collection_idx]", "List or inspect value collections from a filesystem path",
+        3, value_collections_path},
        {"export", "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav]",
         "Export value artifacts for a collection", 5, value_export},
        {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav]",
