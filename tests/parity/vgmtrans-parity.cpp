@@ -885,6 +885,50 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
   throw std::runtime_error("value exporter did not produce a MIDI artifact");
 }
 
+std::vector<u8> valueCapcomSnesMidi(ProjectSession& session, CollectionId collection) {
+  const auto artifacts =
+      session.exportCollection(collection, ExportRequest{
+                                             .kinds = {ExportKind::Midi},
+                                             .loopPolicy = LoopPolicy::PlayOnce,
+                                         });
+
+  for (const auto& artifact : artifacts) {
+    if (artifact.mediaType == "audio/midi") {
+      if (!artifact.diagnostics.empty()) {
+        throw std::runtime_error("value MIDI export reported: " + artifact.diagnostics.front().message);
+      }
+      return artifact.bytes;
+    }
+  }
+
+  throw std::runtime_error("value exporter did not produce a MIDI artifact");
+}
+
+std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesystem::path& path) {
+  ProjectSession session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const Project project = session.scan();
+  if (project.collections.empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover collections from RSN";
+    if (!project.diagnostics.empty()) {
+      message << ": " << project.diagnostics.front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, std::vector<u8>> midis;
+  for (const auto& collection : project.collections) {
+    auto [_, inserted] = midis.emplace(collection.name, valueCapcomSnesMidi(session, collection.id));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value collection name from RSN: " + collection.name);
+    }
+  }
+  return midis;
+}
+
 class MidiReader {
 public:
   explicit MidiReader(std::span<const u8> bytes) : bytes_(bytes) {}
@@ -1351,6 +1395,38 @@ int compareCapcomSnesRsnMidi(const std::filesystem::path& path) {
   return 0;
 }
 
+int compareCapcomSnesRsnDirectMidi(const std::filesystem::path& path) {
+  const auto arams = legacyExtractedArams(path);
+  if (arams.empty()) {
+    throw std::runtime_error("legacy loader did not extract any 64 KiB ARAM files from: " + path.string());
+  }
+
+  const auto valueMidis = valueCapcomSnesRsnMidis(path);
+  if (valueMidis.size() != arams.size()) {
+    std::cout << "value RSN collection count differs: legacy=" << arams.size()
+              << " value=" << valueMidis.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& aram : arams) {
+    const auto collectionName = std::filesystem::path(aram.name).stem().string();
+    const auto found = valueMidis.find(collectionName);
+    if (found == valueMidis.end()) {
+      std::cout << "value RSN scan did not produce collection '" << collectionName << "'\n";
+      return 1;
+    }
+
+    std::cout << "checking " << aram.name << " via direct RSN value scan\n";
+    const auto legacyMidi = legacyCapcomSnesMidi(aram.bytes, aram.name);
+    if (!compareMidi(legacyMidi, found->second, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "CapcomSnes direct RSN MIDI parity ok: files=" << arams.size() << "\n";
+  return 0;
+}
+
 int compareCapcomSnesAramSummary(const std::filesystem::path& path) {
   const auto aramBytes = readFile(path);
   return compareCapcomSnesSummary(aramBytes, path.filename().string(), std::cout) ? 0 : 1;
@@ -1379,6 +1455,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-aram-midi <raw-aram-file>\n"
       << "  vgmtrans-parity capcom-snes-aram-summary <raw-aram-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-midi <rsn-file>\n"
+      << "  vgmtrans-parity capcom-snes-rsn-direct-midi <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n";
 }
 
@@ -1396,6 +1473,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-midi") {
       return compareCapcomSnesRsnMidi(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-midi") {
+      return compareCapcomSnesRsnDirectMidi(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-aram-summary") {
