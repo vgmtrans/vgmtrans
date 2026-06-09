@@ -136,6 +136,7 @@ Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) c
 
         for (auto& extracted : result.extractedSources) {
           extracted.file.virtualized = true;
+          extracted.file.origin = extracted.origin;
           sources.add(std::move(extracted.file), std::move(extracted.bytes));
         }
       } catch (const std::exception& ex) {

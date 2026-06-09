@@ -181,6 +181,9 @@ void projectSessionScansValuesAndVirtualSources() {
   Project project = session.scan();
   expect(project.sources.size() == 2, "scan should include extracted virtual source");
   expect(project.sources[1].virtualized, "extracted source should be virtualized");
+  expect(project.sources[1].origin.has_value() && project.sources[1].origin->source == sourceId &&
+             project.sources[1].origin->offset == 0 && project.sources[1].origin->size == 1,
+         "extracted virtual source should preserve its origin range");
   expect(project.assets.size() == 2, "scan should produce sequence and misc assets");
   expect(project.collections.size() == 1, "scan should produce one collection");
   expect(project.diagnostics.size() == 1, "scan should preserve module diagnostics");

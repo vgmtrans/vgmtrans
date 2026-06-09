@@ -10,6 +10,7 @@
 #include "core/CoreTypes.h"
 
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -22,6 +23,7 @@ struct SourceFile {
   std::filesystem::path path;
   u64 size = 0;
   bool virtualized = false;
+  std::optional<SourceRange> origin;
 };
 
 class ByteReader {
