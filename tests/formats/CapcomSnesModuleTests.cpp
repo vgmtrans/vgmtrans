@@ -304,3 +304,50 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(project.collections[0].sampleCollections == std::vector<AssetId>{samples->metadata.id},
          "collection should reference sample collection");
 }
+
+void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
+  const SequenceProgram program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {TrackProgram{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .startAddress = Address{0x3000},
+          .commands = {
+              PortamentoCommand{.rawTime = 0x40},
+              NoteCommand{.key = 5, .rawDuration = 7},
+              TransposeCommand{.rawSemitones = 1},
+              NoteCommand{.key = 8, .rawDuration = 7},
+              EndCommand{},
+          },
+      }},
+      .behavior = SequenceBehavior{.initialGlobalTranspose = 6},
+  };
+
+  const PerformanceSequence performance = PerformanceLowerer().lower(
+      program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+  const auto& events = performance.tracks[0].events;
+
+  const auto portamentoTime = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* time = std::get_if<PortamentoTime14>(&event);
+    return time != nullptr && time->tick == 192;
+  });
+  expect(portamentoTime != events.end(), "CapcomSnes portamento should emit 14-bit time before the next note");
+  expect(std::get<PortamentoTime14>(*portamentoTime).value == 96,
+         "CapcomSnes portamento distance should use source keys, ignoring active transpose");
+
+  const auto portamentoControl = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* control = std::get_if<PortamentoControl>(&event);
+    return control != nullptr && control->tick == 192;
+  });
+  expect(portamentoControl != events.end(), "CapcomSnes portamento should emit previous-key control");
+  expect(std::get<PortamentoControl>(*portamentoControl).key == 10,
+         "CapcomSnes portamento control should include global but not local transpose");
+
+  const auto secondNote = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* note = std::get_if<NoteDuration>(&event);
+    return note != nullptr && note->tick == 192;
+  });
+  expect(secondNote != events.end(), "CapcomSnes portamento fixture should emit the second note");
+  expect(std::get<NoteDuration>(*secondNote).key == 14,
+         "CapcomSnes note pitch should still include active global and local transpose");
+}

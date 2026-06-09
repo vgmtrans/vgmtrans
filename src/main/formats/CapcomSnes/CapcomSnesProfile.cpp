@@ -313,17 +313,14 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
     duration = 1;
   }
 
-  const s32 key = std::clamp<s32>(static_cast<s32>(command.key) - 1 +
-                                      static_cast<s32>(state.noteOctave * 12) +
-                                      (state.noteOctaveUp ? 24 : 0) +
-                                      state.globalTranspose +
-                                      state.transpose,
-                                  0,
-                                  127);
-  const bool extendsPrevious = state.lastNoteSlurred && key == state.lastKey && !state.didRest;
+  const s32 sourceKey = static_cast<s32>(command.key) - 1 +
+                        static_cast<s32>(state.noteOctave * 12) +
+                        (state.noteOctaveUp ? 24 : 0);
+  const s32 midiKey = std::clamp<s32>(sourceKey + state.globalTranspose + state.transpose, 0, 127);
+  const bool extendsPrevious = state.lastNoteSlurred && sourceKey == state.lastKey && !state.didRest;
   std::vector<PerformanceEvent> beforeEvents;
   if (!extendsPrevious && state.portamentoMillisecondsPerCent > 0.0 && state.lastKey >= 0) {
-    const auto keyDistance = static_cast<u32>(std::abs(key - state.lastKey));
+    const auto keyDistance = static_cast<u32>(std::abs(sourceKey - state.lastKey));
     const auto portamentoTime =
         static_cast<u16>((keyDistance * 100) * state.portamentoMillisecondsPerCent);
     if (portamentoTime != state.lastPortamentoTime) {
@@ -337,16 +334,16 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
     beforeEvents.push_back(PortamentoControl{
         .tick = state.tick,
         .channel = state.channel,
-        .key = static_cast<u8>(state.lastKey),
+        .key = static_cast<u8>(std::clamp<s32>(state.lastKey + state.globalTranspose, 0, 127)),
     });
   }
   if (!extendsPrevious) {
-    state.lastKey = key;
+    state.lastKey = sourceKey;
     state.didRest = false;
   }
   state.lastNoteSlurred = state.noteSlurred;
   return NoteTiming{
-      .key = static_cast<u8>(key),
+      .key = static_cast<u8>(midiKey),
       .velocity = 127,
       .soundingTicks = duration + (!extendsPrevious && state.noteSlurred ? 1 : 0),
       .advanceTicks = length,

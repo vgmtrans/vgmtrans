@@ -29,20 +29,32 @@ void appendEvents(std::vector<PerformanceEvent>& destination, std::vector<T> eve
                      std::make_move_iterator(events.end()));
 }
 
-bool extendPreviousNote(std::vector<PerformanceEvent>& events, u8 channel, u8 key, u64 endTick) {
-  for (auto event = events.rbegin(); event != events.rend(); ++event) {
-    auto* note = std::get_if<NoteDuration>(&*event);
-    if (note == nullptr) {
-      continue;
-    }
-    if (note->channel == channel && note->key == key) {
-      if (endTick > note->tick) {
-        note->duration = static_cast<u32>(std::max<u64>(note->duration, endTick - note->tick));
-      }
+void purgeEndedPendingNotes(
+    const std::vector<PerformanceEvent>& events,
+    std::vector<size_t>& pendingNoteIndexes,
+    u64 tick) {
+  std::erase_if(pendingNoteIndexes, [&](size_t index) {
+    if (index >= events.size()) {
       return true;
     }
+    const auto* note = std::get_if<NoteDuration>(&events[index]);
+    return note == nullptr || note->tick + note->duration <= tick;
+  });
+}
+
+void extendPendingNotes(
+    std::vector<PerformanceEvent>& events,
+    const std::vector<size_t>& pendingNoteIndexes,
+    u64 endTick) {
+  for (const size_t index : pendingNoteIndexes) {
+    if (index >= events.size()) {
+      continue;
+    }
+    auto* note = std::get_if<NoteDuration>(&events[index]);
+    if (note != nullptr && endTick > note->tick) {
+      note->duration = static_cast<u32>(std::max<u64>(note->duration, endTick - note->tick));
+    }
   }
-  return false;
 }
 
 [[nodiscard]] SourceRange commandRange(const SequencerCommand& command) {
@@ -401,6 +413,7 @@ PerformanceSequence PerformanceLowerer::lower(
     size_t executedCommands = 0;
     bool ended = false;
     std::optional<u64> loopPlaybackStopTick;
+    std::vector<size_t> pendingNoteIndexes;
     while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
       const auto& command = track.commands[pc];
       bool incrementPc = true;
@@ -418,11 +431,11 @@ PerformanceSequence PerformanceLowerer::lower(
                 }
               }
               appendEvents(loweredTrack.events, std::move(timing.beforeEvents));
-              if (!timing.extendsPrevious ||
-                  !extendPreviousNote(loweredTrack.events,
-                                      state.channel,
-                                      timing.key,
-                                      state.tick + soundingTicks)) {
+              if (timing.extendsPrevious) {
+                extendPendingNotes(loweredTrack.events, pendingNoteIndexes, state.tick + soundingTicks);
+              } else {
+                purgeEndedPendingNotes(loweredTrack.events, pendingNoteIndexes, state.tick);
+                const size_t noteIndex = loweredTrack.events.size();
                 loweredTrack.events.push_back(NoteDuration{
                     .tick = state.tick,
                     .channel = state.channel,
@@ -430,6 +443,7 @@ PerformanceSequence PerformanceLowerer::lower(
                     .velocity = timing.velocity,
                     .duration = soundingTicks,
                 });
+                pendingNoteIndexes.push_back(noteIndex);
               }
               state.tick += timing.advanceTicks;
             } else if constexpr (std::is_same_v<Command, RestCommand>) {

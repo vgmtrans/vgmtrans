@@ -25,6 +25,7 @@
 using namespace vgmtrans::core;
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
+void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
 
 namespace {
 
@@ -430,6 +431,7 @@ int main() {
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
+    capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;
