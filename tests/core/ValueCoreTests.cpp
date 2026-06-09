@@ -287,6 +287,34 @@ void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
          "play-once lowering should skip commands exactly at the loop boundary");
 }
 
+void performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce() {
+  const auto range = [](u64 offset, u64 size) {
+    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
+  };
+  const SequenceProgram program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {TrackProgram{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .startAddress = Address{0},
+          .commands = {
+              NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
+              JumpCommand{.destination = Address{0}, .range = range(1, 3)},
+          },
+      }},
+  };
+
+  const PerformanceSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::Default);
+  const auto& events = performance.tracks[0].events;
+  expect(performance.diagnostics.empty(), "unset default loop policy should not run until command cap");
+  expect(std::ranges::count_if(events, [](const PerformanceEvent& event) {
+           return std::holds_alternative<NoteDuration>(event);
+         }) == 1,
+         "unset default loop policy should lower self-looping tracks once");
+  expect(std::get<EndOfTrack>(events.back()).tick == 12,
+         "unset default loop policy should end at the first playthrough boundary");
+}
+
 void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
@@ -544,6 +572,7 @@ int main() {
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
     performanceLowererSkipsCommandsAtPlayOnceLoopBoundary();
+    performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce();
     performanceLowererTreatsLoopBoundaryAsAStopPoint();
     performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop();
     wavExporterWritesPcm16RiffFile();

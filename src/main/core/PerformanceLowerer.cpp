@@ -390,6 +390,9 @@ PerformanceSequence PerformanceLowerer::lower(
   if (loopPolicy == LoopPolicy::Default) {
     loopPolicy = program.behavior.defaultLoopPolicy;
   }
+  if (loopPolicy == LoopPolicy::Default) {
+    loopPolicy = LoopPolicy::PlayOnce;
+  }
 
   PerformanceSequence result{
       .timebase = program.timebase,
