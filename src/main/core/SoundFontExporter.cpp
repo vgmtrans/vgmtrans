@@ -39,6 +39,9 @@ constexpr u16 kSfGenFineTune = 52;
 constexpr u16 kSfGenSampleId = 53;
 constexpr u16 kSfGenSampleModes = 54;
 constexpr u16 kSfGenOverridingRootKey = 58;
+constexpr u16 kSfModNoteOnVelocity = 2;
+constexpr u16 kSfModKeyNumber = 3;
+constexpr u16 kSfTransformLinear = 0;
 
 constexpr u32 kSf2SamplePaddingFrames = 46;
 constexpr u8 kDefaultRootKey = 60;
@@ -70,6 +73,12 @@ struct SfRegion {
 struct SfInstrument {
   const Instrument* instrument = nullptr;
   std::vector<SfRegion> regions;
+};
+
+struct SfModulatorRecord {
+  u16 source = 0;
+  u16 destination = 0;
+  s16 amount = 0;
 };
 
 [[nodiscard]] std::optional<SourceRange> diagnosticRange(SourceRange range) {
@@ -251,6 +260,40 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return clampS16(generator.amount);
 }
 
+[[nodiscard]] std::optional<u16> sf2SourceForSynthSource(SynthSource source) {
+  switch (source) {
+    case SynthSource::NoteOnVelocity:
+      return kSfModNoteOnVelocity;
+    case SynthSource::KeyNumber:
+      return kSfModKeyNumber;
+    case SynthSource::Lfo:
+    case SynthSource::Envelope:
+    case SynthSource::MidiController:
+    case SynthSource::Unknown:
+      return std::nullopt;
+  }
+
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(const SynthModulator& modulator) {
+  if (!modulator.source) {
+    return std::nullopt;
+  }
+
+  const auto source = sf2SourceForSynthSource(*modulator.source);
+  const auto destination = sf2GeneratorForDestination(modulator.destination);
+  if (!source || !destination) {
+    return std::nullopt;
+  }
+
+  return SfModulatorRecord{
+      .source = *source,
+      .destination = *destination,
+      .amount = clampS16(modulator.amount),
+  };
+}
+
 [[nodiscard]] u16 sf2Attenuation(const Region& region, const Sample& sample) {
   constexpr double centibelsPerDb = 10.0;
   constexpr double maxInitialAttenuation = 1440.0;
@@ -295,8 +338,14 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   }));
 }
 
+[[nodiscard]] u32 instrumentGlobalModulatorCount(const Instrument& instrument) {
+  return static_cast<u32>(std::ranges::count_if(instrument.modulators, [](const SynthModulator& modulator) {
+    return sf2ModulatorFor(modulator).has_value();
+  }));
+}
+
 [[nodiscard]] bool hasInstrumentGlobalZone(const Instrument& instrument) {
-  return instrumentGlobalGeneratorCount(instrument) != 0;
+  return instrumentGlobalGeneratorCount(instrument) != 0 || instrumentGlobalModulatorCount(instrument) != 0;
 }
 
 [[nodiscard]] std::vector<Chunk> infoChunks(const std::string& name) {
@@ -522,23 +571,45 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 [[nodiscard]] Chunk ibagChunk(std::span<const SfInstrument> instruments) {
   std::vector<u8> payload;
   u32 generatorIndex = 0;
+  u32 modulatorIndex = 0;
   for (const auto& instrument : instruments) {
     if (hasInstrumentGlobalZone(*instrument.instrument)) {
       writeLe16(payload, clampU16(generatorIndex));
-      writeLe16(payload, 0);
+      writeLe16(payload, clampU16(modulatorIndex));
       generatorIndex += instrumentGlobalGeneratorCount(*instrument.instrument);
+      modulatorIndex += instrumentGlobalModulatorCount(*instrument.instrument);
     }
 
     for (size_t i = 0; i < instrument.regions.size(); ++i) {
       writeLe16(payload, clampU16(generatorIndex));
-      writeLe16(payload, 0);
+      writeLe16(payload, clampU16(modulatorIndex));
       generatorIndex += instrumentRegionGeneratorCount(*instrument.regions[i].region);
     }
   }
 
   writeLe16(payload, clampU16(generatorIndex));
-  writeLe16(payload, 0);
+  writeLe16(payload, clampU16(modulatorIndex));
   return makeChunk("ibag", std::move(payload));
+}
+
+[[nodiscard]] Chunk imodChunk(std::span<const SfInstrument> instruments) {
+  std::vector<u8> payload;
+  for (const auto& instrument : instruments) {
+    for (const auto& modulator : instrument.instrument->modulators) {
+      const auto record = sf2ModulatorFor(modulator);
+      if (!record) {
+        continue;
+      }
+
+      writeWordGen(payload, record->source, record->destination);
+      writeLeS16(payload, record->amount);
+      writeLe16(payload, 0);
+      writeLe16(payload, kSfTransformLinear);
+    }
+  }
+
+  payload.insert(payload.end(), 10, 0);
+  return makeChunk("imod", std::move(payload));
 }
 
 [[nodiscard]] Chunk igenChunk(std::span<const SfInstrument> instruments,
@@ -618,7 +689,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return {
       phdrChunk(instruments),   pbagChunk(instruments),          terminalModChunk("pmod"),
       pgenChunk(instruments),   instChunk(instruments),          ibagChunk(instruments),
-      terminalModChunk("imod"), igenChunk(instruments, samples), shdrChunk(samples),
+      imodChunk(instruments),   igenChunk(instruments, samples), shdrChunk(samples),
   };
 }
 
