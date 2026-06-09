@@ -26,7 +26,13 @@ constexpr u16 kWaveFormatPcm = 1;
 constexpr u16 kBitsPerSample = 16;
 constexpr u16 kDefaultRootKey = 60;
 constexpr u16 kDlsConnSrcNone = 0;
+constexpr u16 kDlsConnSrcLfo = 0x0001;
+constexpr u16 kDlsConnSrcVibrato = 0x0009;
+constexpr u16 kDlsConnDstAttenuation = 0x0001;
+constexpr u16 kDlsConnDstPitch = 0x0003;
 constexpr u16 kDlsConnDstPan = 0x0004;
+constexpr u16 kDlsConnDstLfoFrequency = 0x0104;
+constexpr u16 kDlsConnDstVibFrequency = 0x0114;
 constexpr u16 kDlsConnDstEg1AttackTime = 0x0206;
 constexpr u16 kDlsConnDstEg1DecayTime = 0x0207;
 constexpr u16 kDlsConnDstEg1ReleaseTime = 0x0209;
@@ -57,6 +63,13 @@ struct DlsRegion {
 struct DlsInstrument {
   const Instrument* instrument = nullptr;
   std::vector<DlsRegion> regions;
+};
+
+struct DlsConnection {
+  u16 source = kDlsConnSrcNone;
+  u16 control = kDlsConnSrcNone;
+  u16 destination = 0;
+  s32 scale = 0;
 };
 
 using SampleIndexKey = std::pair<u32, u32>;
@@ -191,9 +204,54 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return {coarse, fine};
 }
 
+[[nodiscard]] s32 clampS32(s64 value) {
+  return static_cast<s32>(std::clamp<s64>(
+      value, std::numeric_limits<s32>::min(), std::numeric_limits<s32>::max()));
+}
+
+[[nodiscard]] s32 dls16Dot16Scale(s32 value) {
+  return clampS32(static_cast<s64>(value) * 65536);
+}
+
+[[nodiscard]] s32 dlsPitchScale(s32 cents) {
+  return dls16Dot16Scale(cents);
+}
+
 [[nodiscard]] s32 dlsAttenuation(const Region& region, const DecodedDlsSample& sample) {
   constexpr double centibelsPerDb = 10.0;
   return static_cast<s32>(std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb));
+}
+
+[[nodiscard]] std::optional<DlsConnection> dlsConnectionForGenerator(const SynthGenerator& generator) {
+  switch (generator.destination) {
+    case SynthDestination::Pitch:
+      return DlsConnection{.destination = kDlsConnDstPitch, .scale = dlsPitchScale(generator.amount)};
+    case SynthDestination::Volume:
+      return DlsConnection{.destination = kDlsConnDstAttenuation, .scale = dls16Dot16Scale(generator.amount)};
+    case SynthDestination::Pan:
+      return DlsConnection{.destination = kDlsConnDstPan, .scale = dls16Dot16Scale(generator.amount)};
+    case SynthDestination::VibratoDepth:
+      return DlsConnection{
+          .source = kDlsConnSrcVibrato,
+          .destination = kDlsConnDstPitch,
+          .scale = dlsPitchScale(generator.amount),
+      };
+    case SynthDestination::VibratoRate:
+      return DlsConnection{.destination = kDlsConnDstVibFrequency, .scale = dlsPitchScale(generator.amount)};
+    case SynthDestination::TremoloDepth:
+      return DlsConnection{
+          .source = kDlsConnSrcLfo,
+          .destination = kDlsConnDstAttenuation,
+          .scale = dls16Dot16Scale(generator.amount),
+      };
+    case SynthDestination::TremoloRate:
+      return DlsConnection{.destination = kDlsConnDstLfoFrequency, .scale = dlsPitchScale(generator.amount)};
+    case SynthDestination::FilterCutoff:
+    case SynthDestination::Unknown:
+      return std::nullopt;
+  }
+
+  return std::nullopt;
 }
 
 [[nodiscard]] s32 dlsEnvelopeTimecents(u32 microseconds) {
@@ -382,15 +440,19 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return makeChunk("wlnk", std::move(payload));
 }
 
-void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
-  writeLe16(bytes, kDlsConnSrcNone);
-  writeLe16(bytes, kDlsConnSrcNone);
-  writeLe16(bytes, destination);
+void writeConnection(std::vector<u8>& bytes, DlsConnection connection) {
+  writeLe16(bytes, connection.source);
+  writeLe16(bytes, connection.control);
+  writeLe16(bytes, connection.destination);
   writeLe16(bytes, kDlsConnTrnNone);
-  writeLeS32(bytes, scale);
+  writeLeS32(bytes, connection.scale);
 }
 
-[[nodiscard]] Chunk art2Chunk(const Region& region) {
+void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
+  writeConnection(bytes, DlsConnection{.destination = destination, .scale = scale});
+}
+
+[[nodiscard]] Chunk art2Chunk(const Instrument& instrument, const Region& region) {
   const auto panScale = static_cast<s32>(std::lround((std::clamp(region.pan, 0.0, 1.0) - 0.5) * 65536.0));
 
   std::vector<u8> connections;
@@ -401,6 +463,13 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
     writeConnection(connections, kDlsConnDstEg1SustainLevel, dlsSustainLevel(region.envelope));
     writeConnection(connections, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(region.envelope.release));
   }
+  for (const auto& generator : instrument.generators) {
+    const auto connection = dlsConnectionForGenerator(generator);
+    if (!connection) {
+      continue;
+    }
+    writeConnection(connections, *connection);
+  }
 
   std::vector<u8> art;
   writeLe32(art, 8);
@@ -409,14 +478,17 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("lar2", {makeChunk("art2", std::move(art))});
 }
 
-[[nodiscard]] Chunk rgn2Chunk(const DlsRegion& dlsRegion, std::span<const DecodedDlsSample> samples) {
+[[nodiscard]] Chunk rgn2Chunk(
+    const Instrument& instrument,
+    const DlsRegion& dlsRegion,
+    std::span<const DecodedDlsSample> samples) {
   const auto& region = *dlsRegion.region;
   const auto& sample = samples[dlsRegion.waveIndex];
   return makeListChunk("rgn2", {
                                    rgnhChunk(region),
                                    wsmpChunk(region, sample),
                                    wlnkChunk(dlsRegion.waveIndex),
-                                   art2Chunk(region),
+                                   art2Chunk(instrument, region),
                                });
 }
 
@@ -424,7 +496,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   std::vector<Chunk> regions;
   regions.reserve(instrument.regions.size());
   for (const auto& region : instrument.regions) {
-    regions.push_back(rgn2Chunk(region, samples));
+    regions.push_back(rgn2Chunk(*instrument.instrument, region, samples));
   }
   return makeListChunk("lrgn", std::move(regions));
 }
