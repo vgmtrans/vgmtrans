@@ -150,6 +150,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->program.referencedInstruments[0].bank == 0 &&
              sequence->program.referencedInstruments[0].program == 0,
          "instrument reference should preserve decoded bank and program");
+  expect(sequence->program.referencedInstruments[0].asset == project.collections[0].instrumentBanks[0],
+         "instrument reference should point at the decoded instrument bank asset");
   expect(sequence->program.referencedInstruments[0].range.has_value() &&
              sequence->program.referencedInstruments[0].range->offset == 0x3003 &&
              sequence->program.referencedInstruments[0].range->size == 2,

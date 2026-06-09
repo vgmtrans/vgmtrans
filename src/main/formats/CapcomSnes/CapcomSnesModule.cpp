@@ -843,6 +843,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
     const ScanInput& input,
     const Layout& layout,
     AssetId sequenceId,
+    std::optional<AssetId> instrumentBankId,
     std::string_view displayName) {
   const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kMaxTracks * 2;
   ItemTree items;
@@ -900,6 +901,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
         const u32 programNumber = programCommand->rawProgram & 0x7f;
         if (referencedInstruments.insert({bank, programNumber}).second) {
           program.referencedInstruments.push_back(InstrumentRef{
+              .asset = instrumentBankId,
               .bank = bank,
               .program = programNumber,
               .range = programCommand->range,
@@ -1280,7 +1282,6 @@ ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
   const auto sampleCollectionId = input.ids.nextAssetId();
 
   ScanResult result;
-  result.assets.emplace_back(parseSequence(input, *layout, sequenceId, displayName));
 
   std::vector<InstrumentInfo> instrumentInfos;
   std::vector<SampleInfo> sampleInfos;
@@ -1291,7 +1292,14 @@ ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
     sampleInfos = parseSampleInfos(input.reader.slice(0, input.reader.size()), *layout->spcDirAddress, instrumentInfos);
   }
 
-  if (!instrumentInfos.empty() && !sampleInfos.empty()) {
+  const bool hasInstrumentBank = !instrumentInfos.empty() && !sampleInfos.empty();
+  result.assets.emplace_back(parseSequence(input,
+                                           *layout,
+                                           sequenceId,
+                                           hasInstrumentBank ? std::optional<AssetId>{instrumentBankId} : std::nullopt,
+                                           displayName));
+
+  if (hasInstrumentBank) {
     result.assets.emplace_back(parseInstrumentBank(input,
                                                    instrumentBankId,
                                                    sampleCollectionId,
@@ -1306,7 +1314,7 @@ ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
       .name = displayName,
       .sequence = sequenceId,
   };
-  if (!instrumentInfos.empty() && !sampleInfos.empty()) {
+  if (hasInstrumentBank) {
     collection.instrumentBanks.push_back(instrumentBankId);
     collection.sampleCollections.push_back(sampleCollectionId);
   }
