@@ -135,6 +135,28 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::holds_alternative<EndCommand>(sequence->program.tracks[0].commands[5]),
          "track should decode end command");
 
+  const auto& sequenceItems = sequence->metadata.items.nodes;
+  const auto commandItemCount =
+      std::ranges::count_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Command; });
+  expect(commandItemCount == sequence->program.tracks.size() * sequence->program.tracks[0].commands.size(),
+         "sequence item tree should expose decoded command nodes for every track");
+
+  const auto firstTrackItem =
+      std::ranges::find_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Track; });
+  expect(firstTrackItem != sequenceItems.end(), "sequence item tree should expose track nodes");
+  expect(firstTrackItem->children.size() == sequence->program.tracks[0].commands.size(),
+         "track item should parent its decoded command nodes");
+
+  const auto firstTempoItem = std::ranges::find_if(sequenceItems, [](const ItemNode& item) {
+    return item.kind == ItemKind::Command && item.detailKind == "capcom-snes-tempo";
+  });
+  expect(firstTempoItem != sequenceItems.end(), "sequence item tree should expose typed command nodes");
+  expect(firstTempoItem->parent == firstTrackItem->id, "command item should point back to its track item");
+  expect(firstTempoItem->name == "Tempo", "command item should carry a readable command name");
+  expect(firstTempoItem->description == "Raw 4660", "command item should preserve raw command values");
+  expect(firstTempoItem->range.offset == 0x3000 && firstTempoItem->range.size == 3,
+         "command item should preserve command source range");
+
   const PerformanceSequence performance = PerformanceLowerer().lower(
       sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes lowering should not warn for linear fixture");

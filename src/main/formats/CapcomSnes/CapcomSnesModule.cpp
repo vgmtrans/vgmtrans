@@ -17,7 +17,9 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
+#include <variant>
 
 namespace vgmtrans::formats::capcom_snes {
 
@@ -368,6 +370,154 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   };
 }
 
+[[nodiscard]] SourceRange commandRange(const SequencerCommand& command) {
+  return std::visit([](const auto& typedCommand) { return typedCommand.range; }, command);
+}
+
+[[nodiscard]] std::string commandDetailKind(const SequencerCommand& command) {
+  return std::visit(
+      [](const auto& typedCommand) -> std::string {
+        using Command = std::decay_t<decltype(typedCommand)>;
+        if constexpr (std::is_same_v<Command, NoteCommand>) {
+          return "capcom-snes-note";
+        } else if constexpr (std::is_same_v<Command, RestCommand>) {
+          return "capcom-snes-rest";
+        } else if constexpr (std::is_same_v<Command, DurationCommand>) {
+          return "capcom-snes-duration";
+        } else if constexpr (std::is_same_v<Command, ProgramCommand>) {
+          return "capcom-snes-program";
+        } else if constexpr (std::is_same_v<Command, VolumeCommand>) {
+          return "capcom-snes-volume";
+        } else if constexpr (std::is_same_v<Command, PanCommand>) {
+          return "capcom-snes-pan";
+        } else if constexpr (std::is_same_v<Command, TempoCommand>) {
+          return "capcom-snes-tempo";
+        } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
+          return "capcom-snes-transpose";
+        } else if constexpr (std::is_same_v<Command, TuningCommand>) {
+          return "capcom-snes-tuning";
+        } else if constexpr (std::is_same_v<Command, PortamentoCommand>) {
+          return "capcom-snes-portamento";
+        } else if constexpr (std::is_same_v<Command, LfoCommand>) {
+          return "capcom-snes-lfo";
+        } else if constexpr (std::is_same_v<Command, ReverbCommand>) {
+          return "capcom-snes-reverb";
+        } else if constexpr (std::is_same_v<Command, EnvelopeCommand>) {
+          return "capcom-snes-envelope";
+        } else if constexpr (std::is_same_v<Command, MasterVolumeCommand>) {
+          return "capcom-snes-master-volume";
+        } else if constexpr (std::is_same_v<Command, JumpCommand>) {
+          return "capcom-snes-jump";
+        } else if constexpr (std::is_same_v<Command, RepeatCommand>) {
+          return "capcom-snes-repeat";
+        } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
+          return "capcom-snes-repeat-break";
+        } else if constexpr (std::is_same_v<Command, EndCommand>) {
+          return "capcom-snes-end";
+        } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
+          return "capcom-snes-unknown";
+        } else {
+          return "capcom-snes-driver-specific";
+        }
+      },
+      command);
+}
+
+[[nodiscard]] std::string commandName(const SequencerCommand& command) {
+  return std::visit(
+      [](const auto& typedCommand) -> std::string {
+        using Command = std::decay_t<decltype(typedCommand)>;
+        if constexpr (std::is_same_v<Command, NoteCommand>) {
+          return "Note";
+        } else if constexpr (std::is_same_v<Command, RestCommand>) {
+          return "Rest";
+        } else if constexpr (std::is_same_v<Command, DurationCommand>) {
+          return "Duration";
+        } else if constexpr (std::is_same_v<Command, ProgramCommand>) {
+          return "Program";
+        } else if constexpr (std::is_same_v<Command, VolumeCommand>) {
+          return "Volume";
+        } else if constexpr (std::is_same_v<Command, PanCommand>) {
+          return "Pan";
+        } else if constexpr (std::is_same_v<Command, TempoCommand>) {
+          return "Tempo";
+        } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
+          return "Transpose";
+        } else if constexpr (std::is_same_v<Command, TuningCommand>) {
+          return "Tuning";
+        } else if constexpr (std::is_same_v<Command, PortamentoCommand>) {
+          return "Portamento";
+        } else if constexpr (std::is_same_v<Command, LfoCommand>) {
+          return "LFO";
+        } else if constexpr (std::is_same_v<Command, ReverbCommand>) {
+          return "Reverb";
+        } else if constexpr (std::is_same_v<Command, EnvelopeCommand>) {
+          return "Envelope";
+        } else if constexpr (std::is_same_v<Command, MasterVolumeCommand>) {
+          return "Master Volume";
+        } else if constexpr (std::is_same_v<Command, JumpCommand>) {
+          return "Jump";
+        } else if constexpr (std::is_same_v<Command, RepeatCommand>) {
+          return "Repeat";
+        } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
+          return "Repeat Break";
+        } else if constexpr (std::is_same_v<Command, EndCommand>) {
+          return "End";
+        } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
+          return "Unknown";
+        } else {
+          return typedCommand.name;
+        }
+      },
+      command);
+}
+
+[[nodiscard]] std::string commandDescription(const SequencerCommand& command) {
+  return std::visit(
+      [](const auto& typedCommand) -> std::string {
+        using Command = std::decay_t<decltype(typedCommand)>;
+        if constexpr (std::is_same_v<Command, NoteCommand>) {
+          return "Key " + std::to_string(typedCommand.key) + ", length index " +
+                 std::to_string(typedCommand.rawDuration);
+        } else if constexpr (std::is_same_v<Command, RestCommand>) {
+          return "Length index " + std::to_string(typedCommand.rawDuration);
+        } else if constexpr (std::is_same_v<Command, DurationCommand>) {
+          return "Raw " + std::to_string(typedCommand.rawValue);
+        } else if constexpr (std::is_same_v<Command, ProgramCommand>) {
+          return "Program " + std::to_string(typedCommand.rawProgram);
+        } else if constexpr (std::is_same_v<Command, VolumeCommand> || std::is_same_v<Command, PanCommand> ||
+                             std::is_same_v<Command, TempoCommand> || std::is_same_v<Command, MasterVolumeCommand> ||
+                             std::is_same_v<Command, ReverbCommand>) {
+          return "Raw " + std::to_string(typedCommand.rawValue);
+        } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
+          return "Semitones " + std::to_string(typedCommand.rawSemitones);
+        } else if constexpr (std::is_same_v<Command, TuningCommand>) {
+          return "Raw " + std::to_string(typedCommand.rawValue);
+        } else if constexpr (std::is_same_v<Command, PortamentoCommand>) {
+          return "Time " + std::to_string(typedCommand.rawTime);
+        } else if constexpr (std::is_same_v<Command, LfoCommand>) {
+          return "Type " + std::to_string(typedCommand.rawType) + ", amount " + std::to_string(typedCommand.rawAmount);
+        } else if constexpr (std::is_same_v<Command, EnvelopeCommand>) {
+          return "Release " + std::to_string(typedCommand.rawRelease);
+        } else if constexpr (std::is_same_v<Command, JumpCommand>) {
+          return "Destination $" + std::to_string(typedCommand.destination.value);
+        } else if constexpr (std::is_same_v<Command, RepeatCommand>) {
+          return "Slot " + std::to_string(typedCommand.slot) + ", count " + std::to_string(typedCommand.count) +
+                 ", destination $" + std::to_string(typedCommand.destination.value);
+        } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
+          return "Slot " + std::to_string(typedCommand.slot) + ", destination $" +
+                 std::to_string(typedCommand.destination.value);
+        } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
+          return "Opcode " + std::to_string(typedCommand.opcode);
+        } else if constexpr (std::is_same_v<Command, DriverSpecificCommand>) {
+          return "Bytes " + std::to_string(typedCommand.bytes.size());
+        } else {
+          return {};
+        }
+      },
+      command);
+}
+
 [[nodiscard]] TrackProgram decodeTrack(
     ByteReader reader,
     EngineVersion version,
@@ -691,18 +841,29 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
       continue;
     }
 
-    static_cast<void>(addItem(items,
-                              input.ids,
-                              root,
-                              ItemKind::Track,
-                              "capcom-snes-track-pointer",
-                              "Track Pointer",
-                              input.reader.range(pointerOffset, 2),
-                              "Track starts at $" + std::to_string(trackAddress)));
-    program.tracks.push_back(decodeTrack(input.reader,
-                                         layout.version,
-                                         static_cast<u32>(kMaxTracks - 1 - trackIndex),
-                                         trackAddress));
+    const auto trackItem = addItem(items,
+                                   input.ids,
+                                   root,
+                                   ItemKind::Track,
+                                   "capcom-snes-track-pointer",
+                                   "Track Pointer",
+                                   input.reader.range(pointerOffset, 2),
+                                   "Track starts at $" + std::to_string(trackAddress));
+    auto track = decodeTrack(input.reader,
+                             layout.version,
+                             static_cast<u32>(kMaxTracks - 1 - trackIndex),
+                             trackAddress);
+    for (const auto& command : track.commands) {
+      static_cast<void>(addItem(items,
+                                input.ids,
+                                trackItem,
+                                ItemKind::Command,
+                                commandDetailKind(command),
+                                commandName(command),
+                                commandRange(command),
+                                commandDescription(command)));
+    }
+    program.tracks.push_back(std::move(track));
   }
 
   return SequenceAsset{
