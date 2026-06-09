@@ -535,22 +535,32 @@ std::optional<u32> legacyRegionSampleOffset(const VGMRgn& region, std::span<VGMS
   return std::nullopt;
 }
 
-CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const std::string& name) {
-  const auto root = scanLegacyCapcomSnes(aramBytes, name);
+template <typename T>
+void appendUnique(std::vector<T*>& items, T* item) {
+  if (item != nullptr && std::ranges::find(items, item) == items.end()) {
+    items.push_back(item);
+  }
+}
 
-  CapcomSnesSummary summary;
-  std::vector<VGMSamp*> samples;
+template <typename T>
+void appendUnique(std::vector<T*>& items, std::span<T* const> newItems) {
+  for (auto* item : newItems) {
+    appendUnique(items, item);
+  }
+}
 
-  for (const auto& file : root->vgmFiles()) {
-    if (const auto* sequenceSlot = std::get_if<VGMSeq*>(&file); sequenceSlot != nullptr && *sequenceSlot != nullptr) {
-      ++summary.sequenceCount;
-      summary.trackCounts.push_back(static_cast<u32>((*sequenceSlot)->trackCount()));
-    } else if (const auto* sampleSlot = std::get_if<VGMSampColl*>(&file);
-               sampleSlot != nullptr && *sampleSlot != nullptr) {
-      ++summary.sampleCollectionCount;
-      for (auto* sample : (*sampleSlot)->samples()) {
-        samples.push_back(sample);
-      }
+void appendLegacySamples(
+    CapcomSnesSummary& summary,
+    std::vector<VGMSamp*>& samples,
+    std::span<VGMSampColl* const> sampleCollections) {
+  for (auto* sampleCollection : sampleCollections) {
+    if (sampleCollection == nullptr) {
+      continue;
+    }
+
+    ++summary.sampleCollectionCount;
+    for (auto* sample : sampleCollection->samples()) {
+      appendUnique(samples, sample);
     }
   }
 
@@ -570,15 +580,18 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
         .pcmHash = fnv1a(pcm),
     });
   }
+}
 
-  for (const auto& file : root->vgmFiles()) {
-    const auto* instrumentSlot = std::get_if<VGMInstrSet*>(&file);
-    if (instrumentSlot == nullptr || *instrumentSlot == nullptr) {
+void appendLegacyInstruments(
+    CapcomSnesSummary& summary,
+    std::span<VGMInstrSet* const> instrumentBanks,
+    std::span<VGMSamp* const> samples) {
+  for (const auto* instrumentBank : instrumentBanks) {
+    if (instrumentBank == nullptr) {
       continue;
     }
 
     ++summary.instrumentBankCount;
-    const auto* instrumentBank = *instrumentSlot;
     for (const auto* instrument : instrumentBank->instrs()) {
       InstrumentSynthSummary synth{
           .bank = instrument->bank,
@@ -613,7 +626,9 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
       }
     }
   }
+}
 
+void normalizeSummary(CapcomSnesSummary& summary) {
   std::ranges::sort(summary.trackCounts);
   std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
   std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
@@ -632,50 +647,141 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
   for (u32 i = 0; i < summary.samples.size(); ++i) {
     summary.samples[i].index = i;
   }
+}
+
+CapcomSnesSummary legacyCapcomSnesCollectionSummary(const VGMColl& collection) {
+  CapcomSnesSummary summary;
+
+  if (const auto* sequence = collection.seq()) {
+    ++summary.sequenceCount;
+    summary.trackCounts.push_back(static_cast<u32>(sequence->trackCount()));
+  }
+
+  std::vector<VGMInstrSet*> instrumentBanks;
+  appendUnique(instrumentBanks, collection.instrSets());
+
+  std::vector<VGMSampColl*> sampleCollections;
+  appendUnique(sampleCollections, collection.sampColls());
+  for (const auto* instrumentBank : instrumentBanks) {
+    appendUnique(sampleCollections, instrumentBank->sampColl());
+  }
+
+  std::vector<VGMSamp*> samples;
+  appendLegacySamples(summary, samples, sampleCollections);
+  appendLegacyInstruments(summary, instrumentBanks, samples);
+  normalizeSummary(summary);
 
   return summary;
 }
 
-CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::string& name) {
-  ProjectSession session;
-  vgmtrans::formats::registerValueFormats(session);
-  session.addSource(SourceFile{.name = name}, std::move(aramBytes));
+CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const std::string& name) {
+  const auto root = scanLegacyCapcomSnes(aramBytes, name);
 
-  const Project project = session.scan();
+  CapcomSnesSummary summary;
+  std::vector<VGMInstrSet*> instrumentBanks;
+  std::vector<VGMSampColl*> sampleCollections;
+
+  for (const auto& file : root->vgmFiles()) {
+    if (const auto* sequenceSlot = std::get_if<VGMSeq*>(&file); sequenceSlot != nullptr && *sequenceSlot != nullptr) {
+      ++summary.sequenceCount;
+      summary.trackCounts.push_back(static_cast<u32>((*sequenceSlot)->trackCount()));
+    } else if (const auto* sampleSlot = std::get_if<VGMSampColl*>(&file);
+               sampleSlot != nullptr && *sampleSlot != nullptr) {
+      appendUnique(sampleCollections, *sampleSlot);
+    } else if (const auto* instrumentSlot = std::get_if<VGMInstrSet*>(&file);
+               instrumentSlot != nullptr && *instrumentSlot != nullptr) {
+      appendUnique(instrumentBanks, *instrumentSlot);
+    }
+  }
+
+  for (const auto* instrumentBank : instrumentBanks) {
+    appendUnique(sampleCollections, instrumentBank->sampColl());
+  }
+
+  std::vector<VGMSamp*> samples;
+  appendLegacySamples(summary, samples, sampleCollections);
+  appendLegacyInstruments(summary, instrumentBanks, samples);
+  normalizeSummary(summary);
+  return summary;
+}
+
+std::map<std::string, CapcomSnesSummary> legacyCapcomSnesRsnSummaries(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, CapcomSnesSummary> summaries;
+
+  for (const auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr) {
+      continue;
+    }
+
+    auto [_, inserted] = summaries.emplace(collection->name(), legacyCapcomSnesCollectionSummary(*collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy collection name from RSN: " + collection->name());
+    }
+  }
+
+  if (summaries.empty()) {
+    throw std::runtime_error("legacy scanner did not discover collections in: " + path.string());
+  }
+  return summaries;
+}
+
+template <typename T>
+[[nodiscard]] const T* findAsset(const Project& project, AssetId id) {
+  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
+    return metadata(asset).id == id && std::holds_alternative<T>(asset);
+  });
+  if (found == project.assets.end()) {
+    return nullptr;
+  }
+  return std::get_if<T>(&*found);
+}
+
+CapcomSnesSummary valueCapcomSnesSummary(
+    const Project& project,
+    const SourceStore& sources,
+    const Collection& collection) {
   const auto decoders = SampleDecoderRegistry::withDefaultDecoders();
 
   CapcomSnesSummary summary;
   std::map<u32, const SampleCollectionAsset*> sampleCollectionsById;
 
-  for (const auto& asset : project.assets) {
-    if (const auto* sequence = std::get_if<SequenceAsset>(&asset)) {
+  if (collection.sequence) {
+    if (const auto* sequence = findAsset<SequenceAsset>(project, *collection.sequence)) {
       ++summary.sequenceCount;
       summary.trackCounts.push_back(static_cast<u32>(sequence->program.tracks.size()));
-    } else if (const auto* sampleCollection = std::get_if<SampleCollectionAsset>(&asset)) {
-      ++summary.sampleCollectionCount;
-      sampleCollectionsById[sampleCollection->metadata.id.value] = sampleCollection;
-      for (u32 i = 0; i < sampleCollection->samples.samples.size(); ++i) {
-        const auto& sample = sampleCollection->samples.samples[i];
-        const auto decoded = decoders.decode(sample, session.sources().bytes(sample.encodedData.source));
-        expect(decoded.has_value(), "value sample summary expected decodable sample");
-        summary.samples.push_back(SampleSummary{
-            .index = i,
-            .sourceOffset = static_cast<u32>(sample.encodedData.offset),
-            .sourceSize = static_cast<u32>(sample.encodedData.size),
-            .sampleRate = decoded->sampleRate,
-            .channels = decoded->channels,
-            .frameCount = static_cast<u32>(decoded->pcm.size() / std::max<u8>(1, decoded->channels)),
-            .loopEnabled = decoded->loop.enabled,
-            .loopStart = decoded->loop.enabled ? decoded->loop.start : 0,
-            .loopLength = decoded->loop.enabled ? decoded->loop.length : 0,
-            .pcmHash = fnv1aPcm16(decoded->pcm),
-        });
-      }
     }
   }
 
-  for (const auto& asset : project.assets) {
-    const auto* instrumentBank = std::get_if<InstrumentBankAsset>(&asset);
+  for (const auto sampleCollectionId : collection.sampleCollections) {
+    const auto* sampleCollection = findAsset<SampleCollectionAsset>(project, sampleCollectionId);
+    if (sampleCollection == nullptr) {
+      continue;
+    }
+
+    ++summary.sampleCollectionCount;
+    sampleCollectionsById[sampleCollection->metadata.id.value] = sampleCollection;
+    for (u32 i = 0; i < sampleCollection->samples.samples.size(); ++i) {
+      const auto& sample = sampleCollection->samples.samples[i];
+      const auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source));
+      expect(decoded.has_value(), "value sample summary expected decodable sample");
+      summary.samples.push_back(SampleSummary{
+          .index = i,
+          .sourceOffset = static_cast<u32>(sample.encodedData.offset),
+          .sourceSize = static_cast<u32>(sample.encodedData.size),
+          .sampleRate = decoded->sampleRate,
+          .channels = decoded->channels,
+          .frameCount = static_cast<u32>(decoded->pcm.size() / std::max<u8>(1, decoded->channels)),
+          .loopEnabled = decoded->loop.enabled,
+          .loopStart = decoded->loop.enabled ? decoded->loop.start : 0,
+          .loopLength = decoded->loop.enabled ? decoded->loop.length : 0,
+          .pcmHash = fnv1aPcm16(decoded->pcm),
+      });
+    }
+  }
+
+  for (const auto instrumentBankId : collection.instrumentBanks) {
+    const auto* instrumentBank = findAsset<InstrumentBankAsset>(project, instrumentBankId);
     if (instrumentBank == nullptr) {
       continue;
     }
@@ -725,26 +831,44 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
     }
   }
 
-  std::ranges::sort(summary.trackCounts);
-  std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
-  std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
-    return std::tie(lhs.bank, lhs.program, lhs.sourceOffset, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh,
-                    lhs.velocityLow, lhs.velocityHigh, lhs.tuningCents, lhs.envelopeAttack, lhs.envelopeDecay,
-                    lhs.envelopeSustain, lhs.envelopeRelease) <
-           std::tie(rhs.bank, rhs.program, rhs.sourceOffset, rhs.sampleSourceOffset, rhs.keyLow, rhs.keyHigh,
-                    rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents, rhs.envelopeAttack, rhs.envelopeDecay,
-                    rhs.envelopeSustain, rhs.envelopeRelease);
-  });
-  std::ranges::sort(summary.instrumentSynths, [](const InstrumentSynthSummary& lhs,
-                                                 const InstrumentSynthSummary& rhs) {
-    return std::tie(lhs.bank, lhs.program, lhs.sourceOffset) <
-           std::tie(rhs.bank, rhs.program, rhs.sourceOffset);
-  });
-  for (u32 i = 0; i < summary.samples.size(); ++i) {
-    summary.samples[i].index = i;
+  normalizeSummary(summary);
+  return summary;
+}
+
+CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::string& name) {
+  ProjectSession session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = name}, std::move(aramBytes));
+
+  const Project project = session.scan();
+  expect(project.collections.size() == 1, "value ARAM summary expected one collection");
+  return valueCapcomSnesSummary(project, session.sources(), project.collections.front());
+}
+
+std::map<std::string, CapcomSnesSummary> valueCapcomSnesRsnSummaries(const std::filesystem::path& path) {
+  ProjectSession session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const Project project = session.scan();
+  if (project.collections.empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover collections from RSN";
+    if (!project.diagnostics.empty()) {
+      message << ": " << project.diagnostics.front().message;
+    }
+    throw std::runtime_error(message.str());
   }
 
-  return summary;
+  std::map<std::string, CapcomSnesSummary> summaries;
+  for (const auto& collection : project.collections) {
+    auto [_, inserted] =
+        summaries.emplace(collection.name, valueCapcomSnesSummary(project, session.sources(), collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value collection name from RSN: " + collection.name);
+    }
+  }
+  return summaries;
 }
 
 std::string describeSample(const SampleSummary& sample) {
@@ -1450,6 +1574,32 @@ int compareCapcomSnesRsnDirectMidi(const std::filesystem::path& path) {
   return 0;
 }
 
+int compareCapcomSnesRsnDirectSummary(const std::filesystem::path& path) {
+  const auto legacySummaries = legacyCapcomSnesRsnSummaries(path);
+  const auto valueSummaries = valueCapcomSnesRsnSummaries(path);
+  if (valueSummaries.size() != legacySummaries.size()) {
+    std::cout << "value RSN collection count differs: legacy=" << legacySummaries.size()
+              << " value=" << valueSummaries.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacySummary] : legacySummaries) {
+    const auto found = valueSummaries.find(collectionName);
+    if (found == valueSummaries.end()) {
+      std::cout << "value RSN scan did not produce collection '" << collectionName << "'\n";
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " via direct RSN value summary\n";
+    if (!compareSummary(legacySummary, found->second, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "CapcomSnes direct RSN summary parity ok: collections=" << legacySummaries.size() << "\n";
+  return 0;
+}
+
 int compareCapcomSnesAramSummary(const std::filesystem::path& path) {
   const auto aramBytes = readFile(path);
   return compareCapcomSnesSummary(aramBytes, path.filename().string(), std::cout) ? 0 : 1;
@@ -1479,6 +1629,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-aram-summary <raw-aram-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-midi <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-midi <rsn-file>\n"
+      << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n";
 }
 
@@ -1500,6 +1651,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-midi") {
       return compareCapcomSnesRsnDirectMidi(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-summary") {
+      return compareCapcomSnesRsnDirectSummary(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-aram-summary") {
