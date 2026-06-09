@@ -664,6 +664,93 @@ bool printValueCollections(const vgmtrans::core::Project& project,
   }
 }
 
+std::string valueSampleRefName(const vgmtrans::core::SampleRef& sample) {
+  if (sample.collection) {
+    return fmt::format("collection {} sample {}", sample.collection->value, sample.index);
+  }
+  return fmt::format("sample {}", sample.index);
+}
+
+std::string valueEnvelopeName(const vgmtrans::core::Envelope& envelope) {
+  if (!vgmtrans::core::hasExplicitEnvelope(envelope)) {
+    return "none";
+  }
+  const auto stage = [](u32 micros) {
+    if (micros == vgmtrans::core::kEnvelopeInfinite) {
+      return std::string("inf");
+    }
+    return fmt::format("{:.3f}s", micros / 1000000.0);
+  };
+  return fmt::format("A {} D {} S {:.1f}% R {}",
+                     stage(envelope.attack), stage(envelope.decay), envelope.sustain / 10.0,
+                     stage(envelope.release));
+}
+
+void printValueInstrument(const vgmtrans::core::Instrument& instrument, size_t index) {
+  fmt::println("instrument #{} bank={} program={} name='{}' range=0x{:x}:0x{:x} regions={} generators={} modulators={}",
+               index, instrument.bank, instrument.program, instrument.name, instrument.range.offset,
+               instrument.range.size, instrument.regions.size(), instrument.generators.size(),
+               instrument.modulators.size());
+
+  for (size_t i = 0; i < instrument.regions.size(); ++i) {
+    const auto& region = instrument.regions[i];
+    fmt::println("  region #{} range=0x{:x}:0x{:x} key={}-{} vel={}-{} {} tuning={}c pan={:.3f} atten={:.2f}dB",
+                 i, region.range.offset, region.range.size, region.keyRange.low, region.keyRange.high,
+                 region.velocityRange.low, region.velocityRange.high, valueSampleRefName(region.sample),
+                 region.tuning.cents, region.pan, region.attenuationDb);
+    fmt::println("    envelope {}", valueEnvelopeName(region.envelope));
+  }
+}
+
+bool printValueInstruments(const vgmtrans::core::Project& project,
+                           const std::vector<std::string>& args,
+                           size_t assetArgIndex) {
+  try {
+    const int assetIndex = std::stoi(args[assetArgIndex]);
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets.size()) {
+      fmt::println("Asset index out of bounds");
+      return false;
+    }
+
+    const auto* bankAsset = std::get_if<vgmtrans::core::InstrumentBankAsset>(
+        &project.assets[static_cast<size_t>(assetIndex)]);
+    if (bankAsset == nullptr) {
+      fmt::println("Asset is not an instrument bank");
+      return false;
+    }
+
+    const auto& meta = bankAsset->metadata;
+    fmt::println("instrument-bank asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} instruments={}",
+                 assetIndex, meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size,
+                 bankAsset->bank.instruments.size());
+
+    const size_t instrumentArgIndex = assetArgIndex + 1;
+    if (args.size() <= instrumentArgIndex) {
+      for (size_t i = 0; i < bankAsset->bank.instruments.size(); ++i) {
+        const auto& instrument = bankAsset->bank.instruments[i];
+        fmt::println("  instrument #{} bank={} program={} regions={} name='{}' range=0x{:x}:0x{:x}",
+                     i, instrument.bank, instrument.program, instrument.regions.size(), instrument.name,
+                     instrument.range.offset, instrument.range.size);
+      }
+      return true;
+    }
+
+    const int instrumentIndex = std::stoi(args[instrumentArgIndex]);
+    if (instrumentIndex < 0 ||
+        static_cast<size_t>(instrumentIndex) >= bankAsset->bank.instruments.size()) {
+      fmt::println("Instrument index out of bounds");
+      return false;
+    }
+
+    printValueInstrument(bankAsset->bank.instruments[static_cast<size_t>(instrumentIndex)],
+                         static_cast<size_t>(instrumentIndex));
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+}
+
 size_t exportValueCollectionsToDirectory(const vgmtrans::core::Project& project,
                                          std::span<const vgmtrans::core::CollectionExport> exports,
                                          const std::filesystem::path& dir) {
@@ -1316,6 +1403,27 @@ void value_collections_path(const std::vector<std::string>& args) {
   }
 }
 
+void value_instruments(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  const auto project = session.scan();
+  printValueInstruments(project, args, 3);
+}
+
+void value_instruments_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    const auto project = session.scan();
+    printValueInstruments(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-instruments {}: {}", args[2], ex.what());
+  }
+}
+
 void value_export(const std::vector<std::string>& args) {
   RawFile* file = getRawFile(args[2]);
   if (!file) {
@@ -1550,6 +1658,10 @@ void registerCommands() {
         value_collections},
        {"collections-path", "<path> [collection_idx]", "List or inspect value collections from a filesystem path",
         3, value_collections_path},
+       {"instruments", "<rawfile_idx> <asset_idx> [instrument_idx]", "List or inspect a value instrument bank",
+        4, value_instruments},
+       {"instruments-path", "<path> <asset_idx> [instrument_idx]",
+        "List or inspect a value instrument bank from a filesystem path", 4, value_instruments_path},
        {"export", "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav]",
         "Export value artifacts for a collection", 5, value_export},
        {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav]",
