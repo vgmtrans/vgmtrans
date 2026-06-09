@@ -51,6 +51,10 @@ s16 readLeS16(const std::vector<u8>& bytes, size_t offset) {
   return static_cast<s16>(readLe16(bytes, offset));
 }
 
+s32 readLeS32(const std::vector<u8>& bytes, size_t offset) {
+  return static_cast<s32>(readLe32(bytes, offset));
+}
+
 bool containsAscii(const std::vector<u8>& bytes, std::string_view text) {
   return std::search(bytes.begin(), bytes.end(), text.begin(), text.end()) != bytes.end();
 }
@@ -73,6 +77,19 @@ bool soundFontIgenContainsAmount(const std::vector<u8>& bytes, u16 generator, s1
   const auto payloadOffset = chunkOffset + 8;
   for (size_t offset = payloadOffset; offset + 4 <= payloadOffset + size; offset += 4) {
     if (readLe16(bytes, offset) == generator && readLeS16(bytes, offset + 2) == expectedAmount) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 destination, s32 expectedScale) {
+  const auto chunkOffset = asciiOffset(bytes, "art2");
+  const auto payloadOffset = chunkOffset + 8;
+  const auto connectionCount = readLe32(bytes, payloadOffset + 4);
+  for (u32 i = 0; i < connectionCount; ++i) {
+    const auto offset = payloadOffset + 8 + (static_cast<size_t>(i) * 12);
+    if (readLe16(bytes, offset + 4) == destination && readLeS32(bytes, offset + 8) == expectedScale) {
       return true;
     }
   }
@@ -599,6 +616,12 @@ void dlsExporterWritesDlsRiffFile() {
                       .keyRange = KeyRange{.low = 24, .high = 96},
                       .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
                       .tuning = Tuning{.cents = 125},
+                      .envelope = Envelope{
+                          .attack = 1'000'000,
+                          .decay = 2'000'000,
+                          .sustain = 500,
+                          .release = 250'000,
+                      },
                       .pan = 1.0,
                   }},
               }},
@@ -630,11 +653,21 @@ void dlsExporterWritesDlsRiffFile() {
   expect(containsAscii(result.bytes, "rgnh"), "DLS export should include region header");
   expect(containsAscii(result.bytes, "wsmp"), "DLS export should include sample metadata");
   expect(containsAscii(result.bytes, "wlnk"), "DLS export should include wave link");
+  expect(containsAscii(result.bytes, "art2"), "DLS export should include region articulation");
   expect(containsAscii(result.bytes, "Lead"), "DLS export should include instrument name");
   expect(containsAscii(result.bytes, "Zero"), "DLS export should include sample name");
   expect(chunkSize(result.bytes, "colh") == 4, "DLS colh chunk should store one u32 count");
   expect(chunkSize(result.bytes, "ptbl") == 12, "DLS ptbl chunk should include one pool cue");
   expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
+  expect(chunkSize(result.bytes, "art2") == 68, "DLS art2 chunk should include pan plus envelope connections");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0206, 0),
+         "DLS export should write EG1 attack time from Region envelope");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 78643200),
+         "DLS export should write EG1 decay time from Region envelope");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x020a, 61425937),
+         "DLS export should write EG1 sustain level from Region envelope");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0209, -157286400),
+         "DLS export should write EG1 release time from Region envelope");
 }
 
 void exportDiagnosticsPreserveSourceRanges() {

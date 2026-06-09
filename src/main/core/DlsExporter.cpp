@@ -25,6 +25,14 @@ namespace {
 constexpr u16 kWaveFormatPcm = 1;
 constexpr u16 kBitsPerSample = 16;
 constexpr u16 kDefaultRootKey = 60;
+constexpr u16 kDlsConnSrcNone = 0;
+constexpr u16 kDlsConnDstPan = 0x0004;
+constexpr u16 kDlsConnDstEg1AttackTime = 0x0206;
+constexpr u16 kDlsConnDstEg1DecayTime = 0x0207;
+constexpr u16 kDlsConnDstEg1ReleaseTime = 0x0209;
+constexpr u16 kDlsConnDstEg1SustainLevel = 0x020a;
+constexpr u16 kDlsConnTrnNone = 0;
+constexpr s32 kDlsSustainLevelFullScale = 0x03e80000;
 
 struct Chunk {
   std::string id;
@@ -188,6 +196,39 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return static_cast<s32>(std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb));
 }
 
+[[nodiscard]] bool hasEnvelope(const Envelope& envelope) {
+  return envelope.attack != 0 || envelope.decay != 0 || envelope.sustain != 0 || envelope.release != 0;
+}
+
+[[nodiscard]] s32 dlsEnvelopeTimecents(u32 microseconds) {
+  if (microseconds == 0) {
+    return std::numeric_limits<s32>::min();
+  }
+  if (microseconds == kEnvelopeInfinite) {
+    return std::numeric_limits<s32>::max();
+  }
+
+  const double seconds = static_cast<double>(microseconds) / 1'000'000.0;
+  const double timecents = 1200.0 * std::log2(seconds) * 65536.0;
+  return static_cast<s32>(std::clamp(std::lround(timecents), static_cast<long>(std::numeric_limits<s32>::min()),
+                                     static_cast<long>(std::numeric_limits<s32>::max())));
+}
+
+[[nodiscard]] s32 dlsSustainLevel(const Envelope& envelope) {
+  if (envelope.sustain == 0) {
+    return 0;
+  }
+
+  const double amplitude = std::clamp(static_cast<double>(envelope.sustain) / 1000.0, 0.0, 1.0);
+  if (amplitude >= 1.0) {
+    return kDlsSustainLevelFullScale;
+  }
+
+  const double attenuationDb = std::clamp(-20.0 * std::log10(amplitude), 0.0, 96.0);
+  const double scaledLevel = ((96.0 - attenuationDb) / 96.0) * kDlsSustainLevelFullScale;
+  return static_cast<s32>(std::clamp(std::lround(scaledLevel), 0l, static_cast<long>(kDlsSustainLevelFullScale)));
+}
+
 [[nodiscard]] std::vector<DecodedDlsSample> decodeSamples(const DlsInput& input, const SourceStore& sources,
                                                           std::vector<Diagnostic>& diagnostics) {
   std::vector<DecodedDlsSample> samples;
@@ -345,23 +386,29 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return makeChunk("wlnk", std::move(payload));
 }
 
-[[nodiscard]] Chunk art2Chunk(const Region& region) {
-  constexpr u16 connSrcNone = 0;
-  constexpr u16 connDstPan = 4;
-  constexpr u16 connTrnNone = 0;
+void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
+  writeLe16(bytes, kDlsConnSrcNone);
+  writeLe16(bytes, kDlsConnSrcNone);
+  writeLe16(bytes, destination);
+  writeLe16(bytes, kDlsConnTrnNone);
+  writeLeS32(bytes, scale);
+}
 
+[[nodiscard]] Chunk art2Chunk(const Region& region) {
   const auto panScale = static_cast<s32>(std::lround((std::clamp(region.pan, 0.0, 1.0) - 0.5) * 65536.0));
 
   std::vector<u8> connections;
-  writeLe16(connections, connSrcNone);
-  writeLe16(connections, connSrcNone);
-  writeLe16(connections, connDstPan);
-  writeLe16(connections, connTrnNone);
-  writeLeS32(connections, panScale);
+  writeConnection(connections, kDlsConnDstPan, panScale);
+  if (hasEnvelope(region.envelope)) {
+    writeConnection(connections, kDlsConnDstEg1AttackTime, dlsEnvelopeTimecents(region.envelope.attack));
+    writeConnection(connections, kDlsConnDstEg1DecayTime, dlsEnvelopeTimecents(region.envelope.decay));
+    writeConnection(connections, kDlsConnDstEg1SustainLevel, dlsSustainLevel(region.envelope));
+    writeConnection(connections, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(region.envelope.release));
+  }
 
   std::vector<u8> art;
   writeLe32(art, 8);
-  writeLe32(art, 1);
+  writeLe32(art, static_cast<u32>(connections.size() / 12));
   art.insert(art.end(), connections.begin(), connections.end());
   return makeListChunk("lar2", {makeChunk("art2", std::move(art))});
 }
