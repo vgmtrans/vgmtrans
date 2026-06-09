@@ -20,7 +20,12 @@ namespace vgmtrans::core {
 
 namespace {
 
+constexpr u16 kSfGenVibLfoToPitch = 6;
+constexpr u16 kSfGenInitialFilterFc = 8;
+constexpr u16 kSfGenModLfoToVolume = 13;
 constexpr u16 kSfGenPan = 17;
+constexpr u16 kSfGenFreqModLfo = 22;
+constexpr u16 kSfGenFreqVibLfo = 24;
 constexpr u16 kSfGenAttackVolEnv = 34;
 constexpr u16 kSfGenDecayVolEnv = 36;
 constexpr u16 kSfGenSustainVolEnv = 37;
@@ -217,6 +222,35 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return clampS16(static_cast<s32>(std::lround((std::clamp(pan, 0.0, 1.0) - 0.5) * 1000.0)));
 }
 
+[[nodiscard]] std::optional<u16> sf2GeneratorForDestination(SynthDestination destination) {
+  switch (destination) {
+    case SynthDestination::Pitch:
+      return kSfGenFineTune;
+    case SynthDestination::FilterCutoff:
+      return kSfGenInitialFilterFc;
+    case SynthDestination::Volume:
+      return kSfGenInitialAttenuation;
+    case SynthDestination::Pan:
+      return kSfGenPan;
+    case SynthDestination::VibratoDepth:
+      return kSfGenVibLfoToPitch;
+    case SynthDestination::VibratoRate:
+      return kSfGenFreqVibLfo;
+    case SynthDestination::TremoloDepth:
+      return kSfGenModLfoToVolume;
+    case SynthDestination::TremoloRate:
+      return kSfGenFreqModLfo;
+    case SynthDestination::Unknown:
+      return std::nullopt;
+  }
+
+  return std::nullopt;
+}
+
+[[nodiscard]] s16 sf2GeneratorAmount(const SynthGenerator& generator) {
+  return clampS16(generator.amount);
+}
+
 [[nodiscard]] u16 sf2Attenuation(const Region& region, const Sample& sample) {
   constexpr double centibelsPerDb = 10.0;
   constexpr double maxInitialAttenuation = 1440.0;
@@ -253,6 +287,16 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 [[nodiscard]] u32 instrumentRegionGeneratorCount(const Region& region) {
   return kBaseInstrumentRegionGenerators +
          (hasExplicitEnvelope(region.envelope) ? kEnvelopeInstrumentRegionGenerators : 0);
+}
+
+[[nodiscard]] u32 instrumentGlobalGeneratorCount(const Instrument& instrument) {
+  return static_cast<u32>(std::ranges::count_if(instrument.generators, [](const SynthGenerator& generator) {
+    return sf2GeneratorForDestination(generator.destination).has_value();
+  }));
+}
+
+[[nodiscard]] bool hasInstrumentGlobalZone(const Instrument& instrument) {
+  return instrumentGlobalGeneratorCount(instrument) != 0;
 }
 
 [[nodiscard]] std::vector<Chunk> infoChunks(const std::string& name) {
@@ -467,7 +511,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   for (const auto& instrument : instruments) {
     writeFixedString(payload, sf2Name(instrument.instrument->name, "Instrument"), 20);
     writeLe16(payload, clampU16(bagIndex));
-    bagIndex += static_cast<u32>(instrument.regions.size());
+    bagIndex += static_cast<u32>(instrument.regions.size()) + (hasInstrumentGlobalZone(*instrument.instrument) ? 1 : 0);
   }
 
   writeFixedString(payload, "EOI", 20);
@@ -479,6 +523,12 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   std::vector<u8> payload;
   u32 generatorIndex = 0;
   for (const auto& instrument : instruments) {
+    if (hasInstrumentGlobalZone(*instrument.instrument)) {
+      writeLe16(payload, clampU16(generatorIndex));
+      writeLe16(payload, 0);
+      generatorIndex += instrumentGlobalGeneratorCount(*instrument.instrument);
+    }
+
     for (size_t i = 0; i < instrument.regions.size(); ++i) {
       writeLe16(payload, clampU16(generatorIndex));
       writeLe16(payload, 0);
@@ -495,6 +545,15 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
                               std::span<const DecodedSfSample> samplesByIndex) {
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
+    for (const auto& generator : instrument.instrument->generators) {
+      const auto sf2Generator = sf2GeneratorForDestination(generator.destination);
+      if (!sf2Generator) {
+        continue;
+      }
+
+      writeAmountGen(payload, *sf2Generator, sf2GeneratorAmount(generator));
+    }
+
     for (const auto& sfRegion : instrument.regions) {
       const auto& region = *sfRegion.region;
       const auto& sample = samplesByIndex[sfRegion.sampleIndex];

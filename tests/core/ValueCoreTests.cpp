@@ -83,6 +83,17 @@ bool soundFontIgenContainsAmount(const std::vector<u8>& bytes, u16 generator, s1
   return false;
 }
 
+bool soundFontBagAt(const std::vector<u8>& bytes, std::string_view chunkId, size_t index, u16 genIndex, u16 modIndex) {
+  const auto chunkOffset = asciiOffset(bytes, chunkId);
+  const auto size = chunkSize(bytes, chunkId);
+  const auto offset = chunkOffset + 8 + (index * 4);
+  if (offset + 4 > chunkOffset + 8 + size) {
+    return false;
+  }
+
+  return readLe16(bytes, offset) == genIndex && readLe16(bytes, offset + 2) == modIndex;
+}
+
 bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 destination, s32 expectedScale) {
   const auto chunkOffset = asciiOffset(bytes, "art2");
   const auto payloadOffset = chunkOffset + 8;
@@ -534,6 +545,10 @@ void soundFontExporterWritesSfbkRiffFile() {
                       },
                       .pan = 1.0,
                   }},
+                  .generators = {
+                      SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
+                      SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
+                  },
               }},
           },
   };
@@ -565,8 +580,17 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(containsAscii(result.bytes, "Lead"), "SoundFont export should include instrument name");
   expect(containsAscii(result.bytes, "Zero"), "SoundFont export should include sample name");
   expect(chunkSize(result.bytes, "smpl") == 124, "SoundFont smpl chunk should include PCM and SF2 padding samples");
-  expect(chunkSize(result.bytes, "igen") == 56, "SoundFont igen chunk should include envelope generators");
+  expect(chunkSize(result.bytes, "ibag") == 12, "SoundFont ibag chunk should include a global generator zone");
+  expect(soundFontBagAt(result.bytes, "ibag", 0, 0, 0), "SoundFont global zone should start at generator index 0");
+  expect(soundFontBagAt(result.bytes, "ibag", 1, 2, 0),
+         "SoundFont region zone should start after instrument generators");
+  expect(soundFontBagAt(result.bytes, "ibag", 2, 15, 0), "SoundFont terminal bag should include all generators");
+  expect(chunkSize(result.bytes, "igen") == 64, "SoundFont igen chunk should include global and region generators");
   expect(chunkSize(result.bytes, "shdr") == 92, "SoundFont shdr chunk should include one sample and terminal record");
+  expect(soundFontIgenContainsAmount(result.bytes, 6, 120),
+         "SoundFont export should write instrument vibrato depth generator");
+  expect(soundFontIgenContainsAmount(result.bytes, 24, 240),
+         "SoundFont export should write instrument vibrato rate generator");
   expect(soundFontIgenContainsAmount(result.bytes, 34, 0),
          "SoundFont export should write attackVolEnv from Region envelope");
   expect(soundFontIgenContainsAmount(result.bytes, 36, 1200),
