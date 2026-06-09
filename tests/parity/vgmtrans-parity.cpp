@@ -267,6 +267,31 @@ struct RegionSummary {
   friend bool operator==(const RegionSummary&, const RegionSummary&) = default;
 };
 
+struct GeneratorSummary {
+  s32 destination = 0;
+  s32 amount = 0;
+
+  friend bool operator==(const GeneratorSummary&, const GeneratorSummary&) = default;
+};
+
+struct ModulatorSummary {
+  std::optional<s32> source;
+  s32 destination = 0;
+  s32 amount = 0;
+
+  friend bool operator==(const ModulatorSummary&, const ModulatorSummary&) = default;
+};
+
+struct InstrumentSynthSummary {
+  u32 bank = 0;
+  u32 program = 0;
+  u32 sourceOffset = 0;
+  std::vector<GeneratorSummary> generators;
+  std::vector<ModulatorSummary> modulators;
+
+  friend bool operator==(const InstrumentSynthSummary&, const InstrumentSynthSummary&) = default;
+};
+
 struct CapcomSnesSummary {
   u32 sequenceCount = 0;
   std::vector<u32> trackCounts;
@@ -274,6 +299,7 @@ struct CapcomSnesSummary {
   u32 sampleCollectionCount = 0;
   std::vector<SampleSummary> samples;
   std::vector<RegionSummary> regions;
+  std::vector<InstrumentSynthSummary> instrumentSynths;
 
   friend bool operator==(const CapcomSnesSummary&, const CapcomSnesSummary&) = default;
 };
@@ -321,6 +347,133 @@ u32 envelopeMicros(double seconds) {
 
 u32 envelopePermille(double level) {
   return static_cast<u32>(std::lround(std::clamp(level, 0.0, 1.0) * 1000.0));
+}
+
+[[nodiscard]] s32 destinationCode(SynthDestination destination) {
+  switch (destination) {
+    case SynthDestination::Pitch:
+      return 1;
+    case SynthDestination::FilterCutoff:
+      return 2;
+    case SynthDestination::Volume:
+      return 3;
+    case SynthDestination::Pan:
+      return 4;
+    case SynthDestination::VibratoDepth:
+      return 10;
+    case SynthDestination::VibratoRate:
+      return 11;
+    case SynthDestination::TremoloDepth:
+      return 20;
+    case SynthDestination::TremoloRate:
+      return 21;
+    case SynthDestination::Unknown:
+      return -1;
+  }
+
+  return -1;
+}
+
+[[nodiscard]] s32 destinationCode(ModDest destination) {
+  switch (destination) {
+    case ModDest::VibLfoToPitch:
+      return destinationCode(SynthDestination::VibratoDepth);
+    case ModDest::VibLfoFreq:
+      return destinationCode(SynthDestination::VibratoRate);
+    case ModDest::ModLfoToVol:
+      return destinationCode(SynthDestination::TremoloDepth);
+    case ModDest::ModLfoFreq:
+      return destinationCode(SynthDestination::TremoloRate);
+    case ModDest::InitialAtten:
+      return destinationCode(SynthDestination::Volume);
+    case ModDest::VibLfoDelay:
+    case ModDest::ModLfoDelay:
+      return destinationCode(SynthDestination::Unknown);
+  }
+
+  return destinationCode(SynthDestination::Unknown);
+}
+
+[[nodiscard]] std::optional<s32> sourceCode(std::optional<SynthSource> source) {
+  if (!source) {
+    return std::nullopt;
+  }
+
+  switch (*source) {
+    case SynthSource::NoteOnVelocity:
+      return 1;
+    case SynthSource::KeyNumber:
+      return 2;
+    case SynthSource::Lfo:
+      return 3;
+    case SynthSource::Envelope:
+      return 4;
+    case SynthSource::MidiController:
+      return 1000;
+    case SynthSource::ChannelPressure:
+      return 128;
+    case SynthSource::PolyPressure:
+      return 129;
+    case SynthSource::PitchWheel:
+      return 130;
+    case SynthSource::Unknown:
+      return -1;
+  }
+
+  return -1;
+}
+
+[[nodiscard]] std::optional<s32> sourceCode(std::optional<ModSource> source) {
+  if (!source) {
+    return std::nullopt;
+  }
+
+  if (const auto controller = midiControllerForModSource(*source)) {
+    return 1000 + *controller;
+  }
+
+  switch (*source) {
+    case ModSource::None:
+      return -1;
+    case ModSource::ChannelPressure:
+      return 128;
+    case ModSource::PolyPressure:
+      return 129;
+    case ModSource::PitchWheel:
+      return 130;
+    default:
+      return -1;
+  }
+}
+
+[[nodiscard]] GeneratorSummary summarizeGenerator(const ::SynthGenerator& generator) {
+  return GeneratorSummary{
+      .destination = destinationCode(generator.destination),
+      .amount = generator.amount,
+  };
+}
+
+[[nodiscard]] GeneratorSummary summarizeGenerator(const vgmtrans::core::SynthGenerator& generator) {
+  return GeneratorSummary{
+      .destination = destinationCode(generator.destination),
+      .amount = generator.amount,
+  };
+}
+
+[[nodiscard]] ModulatorSummary summarizeModulator(const ::SynthModulator& modulator) {
+  return ModulatorSummary{
+      .source = sourceCode(modulator.source),
+      .destination = destinationCode(modulator.destination),
+      .amount = modulator.amount,
+  };
+}
+
+[[nodiscard]] ModulatorSummary summarizeModulator(const vgmtrans::core::SynthModulator& modulator) {
+  return ModulatorSummary{
+      .source = sourceCode(modulator.source),
+      .destination = destinationCode(modulator.destination),
+      .amount = modulator.amount,
+  };
 }
 
 std::optional<u32> legacyRegionSampleOffset(const VGMRgn& region, std::span<VGMSamp* const> samples) {
@@ -397,6 +550,19 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
     ++summary.instrumentBankCount;
     const auto* instrumentBank = *instrumentSlot;
     for (const auto* instrument : instrumentBank->instrs()) {
+      InstrumentSynthSummary synth{
+          .bank = instrument->bank,
+          .program = instrument->instrNum,
+          .sourceOffset = instrument->offset(),
+      };
+      for (const auto& generator : instrument->generators()) {
+        synth.generators.push_back(summarizeGenerator(generator));
+      }
+      for (const auto& modulator : instrument->modulators()) {
+        synth.modulators.push_back(summarizeModulator(modulator));
+      }
+      summary.instrumentSynths.push_back(std::move(synth));
+
       for (const auto* region : instrument->regions()) {
         summary.regions.push_back(RegionSummary{
             .bank = instrument->bank,
@@ -427,6 +593,11 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
            std::tie(rhs.bank, rhs.program, rhs.sourceOffset, rhs.sampleSourceOffset, rhs.keyLow, rhs.keyHigh,
                     rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents, rhs.envelopeAttack, rhs.envelopeDecay,
                     rhs.envelopeSustain, rhs.envelopeRelease);
+  });
+  std::ranges::sort(summary.instrumentSynths, [](const InstrumentSynthSummary& lhs,
+                                                 const InstrumentSynthSummary& rhs) {
+    return std::tie(lhs.bank, lhs.program, lhs.sourceOffset) <
+           std::tie(rhs.bank, rhs.program, rhs.sourceOffset);
   });
   for (u32 i = 0; i < summary.samples.size(); ++i) {
     summary.samples[i].index = i;
@@ -482,6 +653,19 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
 
     ++summary.instrumentBankCount;
     for (const auto& instrument : instrumentBank->bank.instruments) {
+      InstrumentSynthSummary synth{
+          .bank = instrument.bank,
+          .program = instrument.program,
+          .sourceOffset = static_cast<u32>(instrument.range.offset),
+      };
+      for (const auto& generator : instrument.generators) {
+        synth.generators.push_back(summarizeGenerator(generator));
+      }
+      for (const auto& modulator : instrument.modulators) {
+        synth.modulators.push_back(summarizeModulator(modulator));
+      }
+      summary.instrumentSynths.push_back(std::move(synth));
+
       for (const auto& region : instrument.regions) {
         u32 sampleSourceOffset = 0;
         if (region.sample.collection) {
@@ -522,6 +706,11 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
                     rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents, rhs.envelopeAttack, rhs.envelopeDecay,
                     rhs.envelopeSustain, rhs.envelopeRelease);
   });
+  std::ranges::sort(summary.instrumentSynths, [](const InstrumentSynthSummary& lhs,
+                                                 const InstrumentSynthSummary& rhs) {
+    return std::tie(lhs.bank, lhs.program, lhs.sourceOffset) <
+           std::tie(rhs.bank, rhs.program, rhs.sourceOffset);
+  });
   for (u32 i = 0; i < summary.samples.size(); ++i) {
     summary.samples[i].index = i;
   }
@@ -550,20 +739,62 @@ std::string describeRegion(const RegionSummary& region) {
   return out.str();
 }
 
+std::string describeGenerator(const GeneratorSummary& generator) {
+  std::ostringstream out;
+  out << "{destination=" << generator.destination << ", amount=" << generator.amount << "}";
+  return out.str();
+}
+
+std::string describeModulator(const ModulatorSummary& modulator) {
+  std::ostringstream out;
+  out << "{source=";
+  if (modulator.source) {
+    out << *modulator.source;
+  } else {
+    out << "default";
+  }
+  out << ", destination=" << modulator.destination << ", amount=" << modulator.amount << "}";
+  return out.str();
+}
+
+std::string describeInstrumentSynth(const InstrumentSynthSummary& synth) {
+  std::ostringstream out;
+  out << "instrument synth bank=" << synth.bank << " program=" << synth.program << " offset=0x" << std::hex
+      << synth.sourceOffset << std::dec << " generators=[";
+  for (size_t i = 0; i < synth.generators.size(); ++i) {
+    if (i != 0) {
+      out << ", ";
+    }
+    out << describeGenerator(synth.generators[i]);
+  }
+  out << "] modulators=[";
+  for (size_t i = 0; i < synth.modulators.size(); ++i) {
+    if (i != 0) {
+      out << ", ";
+    }
+    out << describeModulator(synth.modulators[i]);
+  }
+  out << "]";
+  return out.str();
+}
+
 bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& value, std::ostream& out) {
   if (legacy == value) {
     out << "CapcomSnes summary parity ok: sequences=" << legacy.sequenceCount
-        << " instruments=" << legacy.regions.size() << " samples=" << legacy.samples.size() << "\n";
+        << " instruments=" << legacy.regions.size() << " synths=" << legacy.instrumentSynths.size()
+        << " samples=" << legacy.samples.size() << "\n";
     return true;
   }
 
   out << "CapcomSnes summary parity mismatch\n";
   out << "legacy counts: sequences=" << legacy.sequenceCount << " trackCounts=" << legacy.trackCounts.size()
       << " instrumentBanks=" << legacy.instrumentBankCount << " sampleCollections=" << legacy.sampleCollectionCount
-      << " regions=" << legacy.regions.size() << " samples=" << legacy.samples.size() << "\n";
+      << " regions=" << legacy.regions.size() << " synths=" << legacy.instrumentSynths.size()
+      << " samples=" << legacy.samples.size() << "\n";
   out << "value counts:  sequences=" << value.sequenceCount << " trackCounts=" << value.trackCounts.size()
       << " instrumentBanks=" << value.instrumentBankCount << " sampleCollections=" << value.sampleCollectionCount
-      << " regions=" << value.regions.size() << " samples=" << value.samples.size() << "\n";
+      << " regions=" << value.regions.size() << " synths=" << value.instrumentSynths.size()
+      << " samples=" << value.samples.size() << "\n";
 
   if (legacy.trackCounts != value.trackCounts) {
     out << "track count vectors differ\n";
@@ -595,6 +826,20 @@ bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& va
   }
   if (legacy.regions.size() != value.regions.size()) {
     out << "region count differs\n";
+    return false;
+  }
+
+  const size_t sharedSynths = std::min(legacy.instrumentSynths.size(), value.instrumentSynths.size());
+  for (size_t i = 0; i < sharedSynths; ++i) {
+    if (!(legacy.instrumentSynths[i] == value.instrumentSynths[i])) {
+      out << "first instrument synth mismatch at " << i << "\n";
+      out << "legacy: " << describeInstrumentSynth(legacy.instrumentSynths[i]) << "\n";
+      out << "value:  " << describeInstrumentSynth(value.instrumentSynths[i]) << "\n";
+      return false;
+    }
+  }
+  if (legacy.instrumentSynths.size() != value.instrumentSynths.size()) {
+    out << "instrument synth count differs\n";
     return false;
   }
 
