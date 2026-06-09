@@ -7,6 +7,7 @@
 #include "formats/CapcomSnes/CapcomSnesModule.h"
 
 #include "core/SnesDsp.h"
+#include "core/SynthMath.h"
 #include "formats/CapcomSnes/CapcomSnesConstants.h"
 
 #include <algorithm>
@@ -1121,17 +1122,6 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   const u8 sustainLevel = adsr2 >> 5;
   envelope.release = snesDspGainEnvelopeMicros(gain, static_cast<s16>((sustainLevel << 8) | 0xff), 0);
   return envelope;
-}
-
-[[nodiscard]] s32 synthAmountFromHertz(double hertz) {
-  constexpr double kSf2LfoReferenceHz = 8.176;
-  return static_cast<s32>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
-}
-
-[[nodiscard]] s32 synthAmountFromHertzRange(double minHertz, double maxHertz) {
-  const double minCents = static_cast<double>(synthAmountFromHertz(minHertz));
-  const double maxCents = static_cast<double>(synthAmountFromHertz(maxHertz));
-  return static_cast<s32>(std::lround((maxCents - minCents) * 128.0 / 127.0));
 }
 
 [[nodiscard]] std::vector<SynthGenerator> capcomInstrumentGenerators() {

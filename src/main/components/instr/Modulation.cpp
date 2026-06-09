@@ -7,6 +7,7 @@
 #include "Modulation.h"
 
 #include "base/Types.h"
+#include "core/SynthMath.h"
 #include "LogManager.h"
 #include "ScaleConversion.h"
 
@@ -15,12 +16,7 @@
 
 namespace {
 
-constexpr double kSf2LfoReferenceHz = 8.176;
 constexpr double kSf2MinNormalDelaySeconds = 1.0 / 1024.0;
-
-s32 hertzToInstrumentCents(double hertz) {
-  return static_cast<s32>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
-}
 
 // Linearly map an absolute amount in destination units onto a 7-bit unipolar
 // MIDI controller value for the [minAmount, maxAmount] range, clamped to 0..127.
@@ -59,7 +55,7 @@ ModAmount ModAmount::fromHertz(double hertz) {
     return ModAmount(0, false);
   }
 
-  return ModAmount(hertzToInstrumentCents(hertz), true);
+  return ModAmount(vgmtrans::core::synthAmountFromHertz(hertz), true);
 }
 
 ModAmount ModAmount::fromHertzRange(double minHertz, double maxHertz) {
@@ -69,10 +65,7 @@ ModAmount ModAmount::fromHertzRange(double minHertz, double maxHertz) {
     return ModAmount(0, false);
   }
 
-  const double minCents = static_cast<double>(hertzToInstrumentCents(minHertz));
-  const double maxCents = static_cast<double>(hertzToInstrumentCents(maxHertz));
-  const double fullScaleRange = (maxCents - minCents) * 128.0 / 127.0;
-  return ModAmount(static_cast<s32>(std::lround(fullScaleRange)), true);
+  return ModAmount(vgmtrans::core::synthAmountFromHertzRange(minHertz, maxHertz), true);
 }
 
 u8 midiValueForHertzInRange(double hertz, double minHertz, double maxHertz) {
@@ -130,7 +123,7 @@ ModAmount ModAmount::fromCentibels(double centibels) {
     return ModAmount(0, false);
   }
 
-  return ModAmount(static_cast<s32>(std::lround(centibels)), true);
+  return ModAmount(vgmtrans::core::synthAmountFromCentibels(centibels), true);
 }
 
 ModAmount ModAmount::fromDecibels(double decibels) {
@@ -139,5 +132,5 @@ ModAmount ModAmount::fromDecibels(double decibels) {
     return ModAmount(0, false);
   }
 
-  return ModAmount(static_cast<s32>(std::lround(decibels * 10.0)), true);
+  return ModAmount(vgmtrans::core::synthAmountFromDecibels(decibels), true);
 }

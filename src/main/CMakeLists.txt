@@ -120,6 +120,7 @@ target_sources(vgmtransvaluecore
     core/SoundFontExporter.cpp
     core/SnesDsp.cpp
     core/Source.cpp
+    core/SynthMath.cpp
     core/WavExporter.cpp
   PUBLIC
     FILE_SET HEADERS
@@ -137,6 +138,7 @@ target_sources(vgmtransvaluecore
       core/SoundFontExporter.h
       core/SnesDsp.h
       core/Source.h
+      core/SynthMath.h
       core/WavExporter.h
 )
 target_include_directories(vgmtransvaluecore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
