@@ -20,6 +20,26 @@ SourceRange commandRange(const SequencerCommand& command) {
   return std::visit([](const auto& typedCommand) { return typedCommand.range; }, command);
 }
 
+ItemNode* itemById(ItemTree& tree, ItemId id) {
+  const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) {
+    return item.id == id;
+  });
+  if (found == tree.nodes.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
+const ItemNode* itemById(const ItemTree& tree, ItemId id) {
+  const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) {
+    return item.id == id;
+  });
+  if (found == tree.nodes.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
 const Collection* collectionById(const Project& project, CollectionId id) {
   const auto found = std::ranges::find_if(project.collections, [id](const Collection& collection) {
     return collection.id == id;

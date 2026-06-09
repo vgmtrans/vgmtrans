@@ -252,13 +252,6 @@ void printValueProjectSummary(const vgmtrans::core::Project& project) {
   }
 }
 
-const vgmtrans::core::ItemNode* valueItemById(const vgmtrans::core::ItemTree& tree, vgmtrans::core::ItemId id) {
-  const auto found = std::ranges::find_if(tree.nodes, [id](const vgmtrans::core::ItemNode& node) {
-    return node.id == id;
-  });
-  return found == tree.nodes.end() ? nullptr : &*found;
-}
-
 void printValueItemTree(const vgmtrans::core::ItemTree& tree,
                         vgmtrans::core::ItemId id,
                         int depth,
@@ -267,7 +260,7 @@ void printValueItemTree(const vgmtrans::core::ItemTree& tree,
     return;
   }
 
-  const auto* item = valueItemById(tree, id);
+  const auto* item = vgmtrans::core::itemById(tree, id);
   if (item == nullptr) {
     return;
   }

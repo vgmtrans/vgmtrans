@@ -354,6 +354,12 @@ void projectSessionScansValuesAndVirtualSources() {
          "scanner should preserve valid item tree root");
   expect(sequence->metadata.items.nodes[0].children == std::vector<ItemId>{sequence->metadata.items.nodes[1].id},
          "scanner should rebuild item children from parent links");
+  expect(itemById(sequence->metadata.items, sequence->metadata.items.nodes[0].id) == &sequence->metadata.items.nodes[0],
+         "item tree should find its root item by stable id");
+  expect(itemById(sequence->metadata.items, sequence->metadata.items.nodes[1].id) == &sequence->metadata.items.nodes[1],
+         "item tree should find child items by stable id");
+  expect(itemById(sequence->metadata.items, ItemId{99}) == nullptr,
+         "item tree should return null for a missing item id");
   expect(project.collections[0].sequence == sequence->metadata.id, "collection should reference sequence asset");
   expect(collectionById(project, project.collections[0].id) == &project.collections[0],
          "project snapshot should find a collection by stable id");

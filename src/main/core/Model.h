@@ -657,6 +657,8 @@ struct PerformanceSequence {
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
 [[nodiscard]] SourceRange commandRange(const SequencerCommand& command);
+[[nodiscard]] ItemNode* itemById(ItemTree& tree, ItemId id);
+[[nodiscard]] const ItemNode* itemById(const ItemTree& tree, ItemId id);
 
 template <typename T>
 [[nodiscard]] const T* assetById(const Project& project, AssetId id) {

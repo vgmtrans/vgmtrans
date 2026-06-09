@@ -17,16 +17,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-ItemNode* findItem(ItemTree& items, ItemId id) {
-  const auto found = std::ranges::find_if(items.nodes, [id](const ItemNode& item) {
-    return item.id == id;
-  });
-  if (found == items.nodes.end()) {
-    return nullptr;
-  }
-  return &*found;
-}
-
 void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
   for (auto& item : items.nodes) {
     if (item.id.valid()) {
@@ -51,7 +41,7 @@ void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
       continue;
     }
 
-    if (auto* parent = findItem(items, *item.parent)) {
+    if (auto* parent = itemById(items, *item.parent)) {
       parent->children.push_back(item.id);
     } else {
       item.parent = std::nullopt;
@@ -61,7 +51,7 @@ void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
     }
   }
 
-  if (!items.root.has_value() || !findItem(items, *items.root)) {
+  if (!items.root.has_value() || !itemById(items, *items.root)) {
     items.root = firstRoot;
   }
 }
