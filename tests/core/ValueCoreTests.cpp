@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "core/FormatModule.h"
 #include "core/DlsExporter.h"
+#include "core/Export.h"
+#include "core/FormatModule.h"
 #include "core/MidiExporter.h"
 #include "core/PerformanceLowerer.h"
 #include "core/ProjectSession.h"
@@ -56,6 +57,29 @@ size_t asciiOffset(const std::vector<u8>& bytes, std::string_view text) {
 
 u32 chunkSize(const std::vector<u8>& bytes, std::string_view chunkId) {
   return readLe32(bytes, asciiOffset(bytes, chunkId) + 4);
+}
+
+bool sameRange(SourceRange lhs, SourceRange rhs) {
+  return lhs.source == rhs.source && lhs.offset == rhs.offset && lhs.size == rhs.size;
+}
+
+const Diagnostic& diagnosticWithMessage(const std::vector<Diagnostic>& diagnostics, std::string_view message) {
+  const auto found = std::ranges::find_if(diagnostics, [message](const Diagnostic& diagnostic) {
+    return diagnostic.message == message;
+  });
+  if (found == diagnostics.end()) {
+    throw std::runtime_error("expected diagnostic was not found");
+  }
+  return *found;
+}
+
+void expectDiagnosticRange(
+    const std::vector<Diagnostic>& diagnostics,
+    std::string_view message,
+    SourceRange expectedRange) {
+  const auto& diagnostic = diagnosticWithMessage(diagnostics, message);
+  expect(diagnostic.range.has_value(), "diagnostic should preserve a source range");
+  expect(sameRange(*diagnostic.range, expectedRange), "diagnostic should preserve the expected source range");
 }
 
 class ProbeSequenceModule final : public FormatModule {
@@ -578,6 +602,120 @@ void dlsExporterWritesDlsRiffFile() {
   expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
 }
 
+void exportDiagnosticsPreserveSourceRanges() {
+  SourceStore sources;
+  const auto validSource = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
+
+  const SourceRange missingSampleRange{.source = SourceId{99}, .offset = 0x12, .size = 9};
+  SampleCollectionAsset missingSampleCollection{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{2},
+              .format = "Probe",
+              .name = "Missing Samples",
+          },
+      .samples =
+          SampleCollection{
+              .samples = {Sample{
+                  .name = "Missing",
+                  .codec = AudioCodec::SnesBrr,
+                  .encodedData = missingSampleRange,
+              }},
+          },
+  };
+
+  Project project;
+  project.assets.push_back(missingSampleCollection);
+  project.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Probe",
+      .sampleCollections = {missingSampleCollection.metadata.id},
+  });
+
+  SequencerProfileRegistry profiles;
+  const auto wavArtifacts = ExportService().exportCollection(
+      project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, profiles);
+  expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
+  expectDiagnosticRange(wavArtifacts[0].diagnostics, "Sample source was not found", missingSampleRange);
+
+  const std::array<const SampleCollectionAsset*, 1> missingSamples{&missingSampleCollection};
+  const auto sf2MissingSample = SoundFontExporter().exportSoundFont(
+      SoundFontInput{
+          .name = "Probe",
+          .sampleCollections = missingSamples,
+      },
+      sources);
+  expectDiagnosticRange(sf2MissingSample.diagnostics, "Sample source was not found", missingSampleRange);
+
+  const auto dlsMissingSample = DlsExporter().exportDls(
+      DlsInput{
+          .name = "Probe",
+          .sampleCollections = missingSamples,
+      },
+      sources);
+  expectDiagnosticRange(dlsMissingSample.diagnostics, "Sample source was not found", missingSampleRange);
+
+  const SourceRange sampleRange{.source = validSource, .offset = 0, .size = 9};
+  const SourceRange regionRange{.source = validSource, .offset = 0x40, .size = 6};
+  SampleCollectionAsset validSampleCollection{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{3},
+              .format = "Probe",
+              .name = "Valid Samples",
+          },
+      .samples =
+          SampleCollection{
+              .samples = {Sample{
+                  .name = "Zero",
+                  .codec = AudioCodec::SnesBrr,
+                  .encodedData = sampleRange,
+                  .sampleRate = 16000,
+              }},
+          },
+  };
+  InstrumentBankAsset badRegionBank{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{1},
+              .format = "Probe",
+              .name = "Bad Region Bank",
+          },
+      .bank =
+          InstrumentBank{
+              .instruments = {Instrument{
+                  .bank = 0,
+                  .program = 0,
+                  .name = "Lead",
+                  .regions = {Region{
+                      .sample = SampleRef{.collection = validSampleCollection.metadata.id, .index = 9},
+                      .range = regionRange,
+                  }},
+              }},
+          },
+  };
+
+  const std::array<const InstrumentBankAsset*, 1> banks{&badRegionBank};
+  const std::array<const SampleCollectionAsset*, 1> validSamples{&validSampleCollection};
+  const auto sf2BadRegion = SoundFontExporter().exportSoundFont(
+      SoundFontInput{
+          .name = "Probe",
+          .instrumentBanks = banks,
+          .sampleCollections = validSamples,
+      },
+      sources);
+  expectDiagnosticRange(sf2BadRegion.diagnostics, "Region sample reference was not found", regionRange);
+
+  const auto dlsBadRegion = DlsExporter().exportDls(
+      DlsInput{
+          .name = "Probe",
+          .instrumentBanks = banks,
+          .sampleCollections = validSamples,
+      },
+      sources);
+  expectDiagnosticRange(dlsBadRegion.diagnostics, "Region sample reference was not found", regionRange);
+}
+
 }  // namespace
 
 int main() {
@@ -593,6 +731,7 @@ int main() {
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();
+    exportDiagnosticsPreserveSourceRanges();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
     capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
     capcomSnesPanLoweringDoesNotRecurveMidiPan();

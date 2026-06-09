@@ -53,10 +53,18 @@ struct DlsInstrument {
 
 using SampleIndexKey = std::pair<u32, u32>;
 
-[[nodiscard]] Diagnostic exportError(std::string message) {
+[[nodiscard]] std::optional<SourceRange> diagnosticRange(SourceRange range) {
+  if (!range.valid()) {
+    return std::nullopt;
+  }
+  return range;
+}
+
+[[nodiscard]] Diagnostic exportError(std::string message, std::optional<SourceRange> range = std::nullopt) {
   return Diagnostic{
       .severity = Severity::Error,
       .message = std::move(message),
+      .range = range,
   };
 }
 
@@ -193,13 +201,13 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     for (u32 sampleIndex = 0; sampleIndex < collection->samples.samples.size(); ++sampleIndex) {
       const auto& sample = collection->samples.samples[sampleIndex];
       if (!sources.contains(sample.encodedData.source)) {
-        diagnostics.push_back(exportError("Sample source was not found"));
+        diagnostics.push_back(exportError("Sample source was not found", diagnosticRange(sample.encodedData)));
         continue;
       }
 
       auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source));
       if (!decoded) {
-        diagnostics.push_back(exportError("No decoder registered for sample codec"));
+        diagnostics.push_back(exportError("No decoder registered for sample codec", diagnosticRange(sample.encodedData)));
         continue;
       }
 
@@ -251,13 +259,13 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
         const std::optional<AssetId> collectionId =
             region.sample.collection ? region.sample.collection : fallbackCollection;
         if (!collectionId) {
-          diagnostics.push_back(exportError("Region does not reference a sample collection"));
+          diagnostics.push_back(exportError("Region does not reference a sample collection", diagnosticRange(region.range)));
           continue;
         }
 
         const auto found = samples.find({collectionId->value, region.sample.index});
         if (found == samples.end()) {
-          diagnostics.push_back(exportError("Region sample reference was not found"));
+          diagnostics.push_back(exportError("Region sample reference was not found", diagnosticRange(region.range)));
           continue;
         }
 
