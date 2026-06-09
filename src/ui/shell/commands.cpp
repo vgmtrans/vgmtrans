@@ -28,6 +28,7 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -128,9 +129,9 @@ VGMColl* getVGMColl(const std::string& indexStr) {
   return nullptr;
 }
 
-void printHexDump(const u8* data, size_t length) {
+void printHexDump(const u8* data, size_t length, size_t displayOffset = 0) {
   for (size_t i = 0; i < length; i += 16) {
-    fmt::print("{:08x}: ", i);
+    fmt::print("{:08x}: ", displayOffset + i);
     for (size_t j = 0; j < 16; ++j) {
       if (i + j < length) {
         fmt::print("{:02x} ", data[i + j]);
@@ -300,6 +301,78 @@ void printValueProjectSummary(const vgmtrans::core::Project& project) {
                  collection.sequence ? std::to_string(collection.sequence->value) : std::string("-"),
                  collection.instrumentBanks.size(), collection.sampleCollections.size());
   }
+}
+
+void printValueSources(const vgmtrans::core::Project& project) {
+  if (project.sources.empty()) {
+    fmt::println("No value sources.");
+    return;
+  }
+
+  for (size_t i = 0; i < project.sources.size(); ++i) {
+    const auto& source = project.sources[i];
+    fmt::print("source #{} id={} name='{}' size=0x{:x}", i, source.id.value, source.name, source.size);
+    if (source.title) {
+      fmt::print(" title='{}'", *source.title);
+    }
+    if (!source.path.empty()) {
+      fmt::print(" path='{}'", source.path.string());
+    }
+    if (source.virtualized) {
+      fmt::print(" virtualized");
+    }
+    if (source.origin) {
+      fmt::print(" origin=source #{} 0x{:x}:0x{:x}", source.origin->source.value,
+                 source.origin->offset, source.origin->size);
+    }
+    fmt::print("\n");
+  }
+}
+
+std::optional<u64> parseValueInteger(const std::string& text) {
+  try {
+    size_t parsed = 0;
+    const auto value = std::stoull(text, &parsed, 0);
+    if (parsed != text.size()) {
+      return std::nullopt;
+    }
+    return static_cast<u64>(value);
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+bool printValueSourceBytes(const vgmtrans::core::SourceStore& sources,
+                           const std::vector<std::string>& args,
+                           size_t sourceArgIndex) {
+  const auto sourceIndex = parseValueInteger(args[sourceArgIndex]);
+  const auto offset = parseValueInteger(args[sourceArgIndex + 1]);
+  const auto length = parseValueInteger(args[sourceArgIndex + 2]);
+  if (!sourceIndex || !offset || !length) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+
+  if (*sourceIndex > std::numeric_limits<u32>::max()) {
+    fmt::println("Source index out of bounds");
+    return false;
+  }
+
+  const auto sourceId = vgmtrans::core::SourceId{static_cast<u32>(*sourceIndex)};
+  if (!sources.contains(sourceId)) {
+    fmt::println("Source index out of bounds");
+    return false;
+  }
+
+  const auto bytes = sources.bytes(sourceId);
+  if (*offset > bytes.size() || *length > bytes.size() - static_cast<size_t>(*offset)) {
+    fmt::println("Range out of bounds (source size: 0x{:x})", bytes.size());
+    return false;
+  }
+
+  printHexDump(bytes.data() + static_cast<size_t>(*offset), static_cast<size_t>(*length),
+               static_cast<size_t>(*offset));
+  return true;
 }
 
 void printValueItemTree(const vgmtrans::core::ItemTree& tree,
@@ -1419,6 +1492,48 @@ void value_scan_path(const std::vector<std::string>& args) {
   }
 }
 
+void value_sources(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  const auto project = session.scan();
+  printValueSources(project);
+}
+
+void value_sources_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    const auto project = session.scan();
+    printValueSources(project);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-sources {}: {}", args[2], ex.what());
+  }
+}
+
+void value_read_source(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  static_cast<void>(session.scan());
+  printValueSourceBytes(session.sources(), args, 3);
+}
+
+void value_read_source_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    static_cast<void>(session.scan());
+    printValueSourceBytes(session.sources(), args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-read-source {}: {}", args[2], ex.what());
+  }
+}
+
 void value_tree(const std::vector<std::string>& args) {
   RawFile* file = getRawFile(args[2]);
   if (!file) {
@@ -1747,6 +1862,12 @@ void registerCommands() {
       "Run the value-oriented scan/export pipeline",
       {{"scan", "<rawfile_idx>", "Scan a raw file with value modules", 3, value_scan},
        {"scan-path", "<path>", "Scan a filesystem path with value modules", 3, value_scan_path},
+       {"sources", "<rawfile_idx>", "List value sources after scanning a raw file", 3, value_sources},
+       {"sources-path", "<path>", "List value sources after scanning a filesystem path", 3, value_sources_path},
+       {"read-source", "<rawfile_idx> <source_idx> <offset> <length>", "Read bytes from a value source", 6,
+        value_read_source},
+       {"read-source-path", "<path> <source_idx> <offset> <length>",
+        "Read bytes from a value source after scanning a filesystem path", 6, value_read_source_path},
        {"tree", "<rawfile_idx> <asset_idx> [depth]", "Show a value asset ItemTree", 4, value_tree},
        {"tree-path", "<path> <asset_idx> [depth]", "Show a value asset ItemTree from a filesystem path",
         4, value_tree_path},
