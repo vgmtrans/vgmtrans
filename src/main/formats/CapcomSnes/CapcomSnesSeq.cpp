@@ -790,7 +790,9 @@ bool CapcomSnesTrack::readEvent() {
         }
 
         addPan(beginOffset, curOffset - beginOffset, pan.midiPan);
-        addExpressionNoItem(std::round(127.0 * pan.volumeScale));
+        // Keep pan volume compensation as a continuous amplitude value. Quantizing to a raw
+        // 7-bit expression before the amplitude curve loses precision.
+        addExpressionNoItem(pan.volumeScale, Resolution::SevenBit);
         break;
       }
 

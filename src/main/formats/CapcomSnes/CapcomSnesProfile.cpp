@@ -425,6 +425,8 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerPan(
       Expression{
           .tick = state.tick,
           .channel = state.channel,
+          // Keep pan volume compensation as a continuous amplitude value. Quantizing before the
+          // amplitude curve loses precision.
           .value = percentAmpTo7BitMidi(pan.volumeScale),
       },
   };

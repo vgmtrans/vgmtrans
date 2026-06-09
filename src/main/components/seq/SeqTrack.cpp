@@ -1114,6 +1114,10 @@ void SeqTrack::addExpressionNoItem(u8 level) {
   expression = level;
 }
 
+void SeqTrack::addExpressionNoItem(double levelPercent, Resolution res) {
+  addLevelNoItem(levelPercent, LevelController::Expression, res);
+}
+
 void SeqTrack::addExpressionSlide(u32 offset,
                                   u32 length,
                                   u32 dur,

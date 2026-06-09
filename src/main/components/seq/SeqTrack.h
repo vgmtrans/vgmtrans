@@ -254,6 +254,7 @@ private:
   void addExpression(u32 offset, u32 length, u8 level, const std::string &sEventName = "Expression");
   void addExpression(u32 offset, u32 length, double levelPercent, Resolution res, const std::string &sEventName = "Expression");
   void addExpressionNoItem(u8 level);
+  void addExpressionNoItem(double levelPercent, Resolution res);
   void addExpressionSlide(u32 offset, u32 length, u32 dur, u8 targExpr, const std::string &sEventName = "Expression Slide");
   void insertExpression(u32 offset, u32 length, u8 level, u32 absTime, const std::string &sEventName = "Expression");
   void insertExpressionNoItem(u8 level, u32 absTime);
