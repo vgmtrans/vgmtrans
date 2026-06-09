@@ -30,10 +30,8 @@
 #include <fstream>
 #include <optional>
 #include <span>
-#include <stdexcept>
 #include <string>
 #include <system_error>
-#include <utility>
 
 #include <fmt/color.h>
 #include <fmt/format.h>
@@ -235,29 +233,6 @@ std::vector<u8> valueBytesForRawFile(const RawFile& file) {
   return std::vector<u8>(begin, begin + file.size());
 }
 
-std::vector<u8> valueBytesForPath(const std::filesystem::path& path) {
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    throw std::runtime_error("failed to open source path");
-  }
-
-  file.seekg(0, std::ios::end);
-  const auto size = file.tellg();
-  if (size < 0) {
-    throw std::runtime_error("failed to stat source path");
-  }
-  file.seekg(0, std::ios::beg);
-
-  std::vector<u8> bytes(static_cast<size_t>(size));
-  if (!bytes.empty()) {
-    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-  }
-  if (!file) {
-    throw std::runtime_error("failed to read source path");
-  }
-  return bytes;
-}
-
 vgmtrans::core::ProjectSession valueSessionForRawFile(const RawFile& file) {
   vgmtrans::core::ProjectSession session;
   vgmtrans::formats::registerValueFormats(session);
@@ -271,15 +246,9 @@ vgmtrans::core::ProjectSession valueSessionForRawFile(const RawFile& file) {
 }
 
 vgmtrans::core::ProjectSession valueSessionForPath(const std::filesystem::path& path) {
-  auto bytes = valueBytesForPath(path);
   vgmtrans::core::ProjectSession session;
   vgmtrans::formats::registerValueFormats(session);
-  session.addSource(vgmtrans::core::SourceFile{
-                        .name = path.filename().string(),
-                        .path = path,
-                        .size = static_cast<u64>(bytes.size()),
-                    },
-                    std::move(bytes));
+  session.addSourceFromPath(path);
   return session;
 }
 

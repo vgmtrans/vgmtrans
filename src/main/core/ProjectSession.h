@@ -11,6 +11,7 @@
 #include "core/Model.h"
 #include "core/Source.h"
 
+#include <filesystem>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -18,6 +19,7 @@ namespace vgmtrans::core {
 class ProjectSession {
  public:
   SourceId addSource(SourceFile file, std::vector<u8> bytes);
+  SourceId addSourceFromPath(std::filesystem::path path);
 
   [[nodiscard]] Project scan();
 

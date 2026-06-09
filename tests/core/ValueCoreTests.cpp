@@ -17,6 +17,8 @@
 #include <algorithm>
 #include <array>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -372,6 +374,35 @@ void projectSessionScansValuesAndVirtualSources() {
 
   project = session.scan();
   expect(project.sources.size() == 2, "rescan should replace, not duplicate, virtual tail sources");
+}
+
+void projectSessionAddsSourceFromPath() {
+  const auto path = std::filesystem::temp_directory_path() / "vgmtrans-value-core-source-load.bin";
+  std::filesystem::remove(path);
+  {
+    std::ofstream out(path, std::ios::binary);
+    out.put(static_cast<char>(0xaa));
+    out.put(static_cast<char>(0x34));
+    out.put(static_cast<char>(0x12));
+  }
+
+  ProjectSession session;
+  session.formats().add(std::make_unique<ProbeSequenceModule>());
+
+  const auto sourceId = session.addSourceFromPath(path);
+  expect(sourceId == SourceId{0}, "path source should get SourceId 0");
+  expect(session.sources().source(sourceId).name == path.filename().string(),
+         "path source should use the filename as source name");
+  expect(session.sources().source(sourceId).path == path, "path source should preserve filesystem path");
+  const std::array<u8, 3> expectedBytes{0xaa, 0x34, 0x12};
+  expect(std::ranges::equal(session.sources().bytes(sourceId), expectedBytes),
+         "path source should preserve file bytes");
+
+  const Project project = session.scan();
+  expect(project.collections.size() == 1, "path source should scan through registered modules");
+  expect(project.sources.front().path == path, "project snapshot should preserve path source metadata");
+
+  std::filesystem::remove(path);
 }
 
 void projectSessionExportsAllCollections() {
@@ -981,6 +1012,7 @@ int main() {
     byteReaderChecksBoundsAndEndian();
     sequencerCommandExposesSourceRange();
     projectSessionScansValuesAndVirtualSources();
+    projectSessionAddsSourceFromPath();
     projectSessionExportsAllCollections();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
