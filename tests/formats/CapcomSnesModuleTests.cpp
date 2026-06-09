@@ -76,15 +76,17 @@ std::vector<u8> makeCapcomSnesAram() {
   bytes[0x3000] = 0x05;
   bytes[0x3001] = 0x12;
   bytes[0x3002] = 0x34;
-  bytes[0x3003] = 0x07;
-  bytes[0x3004] = 0x40;
-  bytes[0x3005] = 0x18;
-  bytes[0x3006] = 0x00;
-  bytes[0x3007] = 0x1a;
+  bytes[0x3003] = 0x08;
+  bytes[0x3004] = 0x00;
+  bytes[0x3005] = 0x07;
+  bytes[0x3006] = 0x40;
+  bytes[0x3007] = 0x18;
   bytes[0x3008] = 0x00;
-  bytes[0x3009] = 0x20;
-  bytes[0x300a] = 0x41;
-  bytes[0x300b] = 0x17;
+  bytes[0x3009] = 0x1a;
+  bytes[0x300a] = 0x00;
+  bytes[0x300b] = 0x20;
+  bytes[0x300c] = 0x41;
+  bytes[0x300d] = 0x17;
 
   bytes[0x4000] = 0x00;
   bytes[0x4001] = 0x8f;
@@ -124,16 +126,27 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "track should decode tempo command");
   expect(std::get<TempoCommand>(sequence->program.tracks[0].commands[0]).rawValue == 0x1234,
          "tempo command should preserve raw big-endian value");
-  expect(std::holds_alternative<VolumeCommand>(sequence->program.tracks[0].commands[1]),
+  expect(std::holds_alternative<ProgramCommand>(sequence->program.tracks[0].commands[1]),
+         "track should decode program command");
+  expect(std::holds_alternative<VolumeCommand>(sequence->program.tracks[0].commands[2]),
          "track should decode volume command");
-  expect(std::holds_alternative<PanCommand>(sequence->program.tracks[0].commands[2]),
+  expect(std::holds_alternative<PanCommand>(sequence->program.tracks[0].commands[3]),
          "track should decode pan command");
-  expect(std::holds_alternative<LfoCommand>(sequence->program.tracks[0].commands[3]),
+  expect(std::holds_alternative<LfoCommand>(sequence->program.tracks[0].commands[4]),
          "track should decode LFO command");
-  expect(std::holds_alternative<NoteCommand>(sequence->program.tracks[0].commands[4]),
+  expect(std::holds_alternative<NoteCommand>(sequence->program.tracks[0].commands[5]),
          "track should decode note command");
-  expect(std::holds_alternative<EndCommand>(sequence->program.tracks[0].commands[5]),
+  expect(std::holds_alternative<EndCommand>(sequence->program.tracks[0].commands[6]),
          "track should decode end command");
+  expect(sequence->program.referencedInstruments.size() == 1,
+         "sequence should expose unique referenced instruments");
+  expect(sequence->program.referencedInstruments[0].bank == 0 &&
+             sequence->program.referencedInstruments[0].program == 0,
+         "instrument reference should preserve decoded bank and program");
+  expect(sequence->program.referencedInstruments[0].range.has_value() &&
+             sequence->program.referencedInstruments[0].range->offset == 0x3003 &&
+             sequence->program.referencedInstruments[0].range->size == 2,
+         "instrument reference should preserve the program command source range");
 
   const auto& sequenceItems = sequence->metadata.items.nodes;
   const auto commandItemCount =
@@ -161,24 +174,26 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes lowering should not warn for linear fixture");
   expect(performance.tracks.size() == 8, "lowerer should preserve track count");
-  expect(performance.tracks[0].events.size() == 9, "lowered track should include initial, command, and end events");
+  expect(performance.tracks[0].events.size() == 10, "lowered track should include initial, command, and end events");
   expect(std::holds_alternative<MonoMode>(performance.tracks[0].events[0]),
          "lowerer should emit initial mono mode from sequence behavior");
   expect(std::holds_alternative<Reverb>(performance.tracks[0].events[1]),
          "lowerer should emit initial reverb from sequence behavior");
   expect(std::get<Tempo>(performance.tracks[0].events[2]).microsecondsPerQuarter == 26369,
          "CapcomSnes profile should lower tempo with legacy timing math");
-  expect(std::holds_alternative<Volume14>(performance.tracks[0].events[3]),
+  expect(std::holds_alternative<ProgramChange>(performance.tracks[0].events[3]),
+         "CapcomSnes lowering should include program changes");
+  expect(std::holds_alternative<Volume14>(performance.tracks[0].events[4]),
          "CapcomSnes V3 profile should lower volume to 14-bit volume");
-  expect(std::get<Pan>(performance.tracks[0].events[4]).value == 64,
+  expect(std::get<Pan>(performance.tracks[0].events[5]).value == 64,
          "CapcomSnes center pan should lower to MIDI center pan");
-  expect(std::holds_alternative<Expression>(performance.tracks[0].events[5]),
+  expect(std::holds_alternative<Expression>(performance.tracks[0].events[6]),
          "CapcomSnes pan lowering should include expression compensation");
-  expect(std::get<VibratoDepth>(performance.tracks[0].events[6]).value == 0x20,
+  expect(std::get<VibratoDepth>(performance.tracks[0].events[7]).value == 0x20,
          "CapcomSnes LFO type 0 should lower to vibrato depth");
-  expect(std::get<NoteDuration>(performance.tracks[0].events[7]).duration == 6,
+  expect(std::get<NoteDuration>(performance.tracks[0].events[8]).duration == 6,
          "CapcomSnes note length index should lower to ticks");
-  expect(std::get<EndOfTrack>(performance.tracks[0].events[8]).tick == 6,
+  expect(std::get<EndOfTrack>(performance.tracks[0].events[9]).tick == 6,
          "lowerer should advance time before end of track");
 
   const auto artifacts = session.exportCollection(project.collections[0].id, ExportRequest{

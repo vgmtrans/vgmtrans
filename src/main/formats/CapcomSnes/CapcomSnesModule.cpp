@@ -834,6 +834,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   };
 
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
+  std::set<std::pair<u32, u32>> referencedInstruments;
   for (int trackIndex = static_cast<int>(kMaxTracks) - 1; trackIndex >= 0; --trackIndex) {
     const auto pointerOffset = pointerBase + static_cast<u32>(trackIndex) * 2;
     const u16 trackAddress = input.reader.be16(pointerOffset);
@@ -862,6 +863,17 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
                                 commandName(command),
                                 commandRange(command),
                                 commandDescription(command)));
+      if (const auto* programCommand = std::get_if<ProgramCommand>(&command)) {
+        const u32 bank = programCommand->rawProgram >> 7;
+        const u32 programNumber = programCommand->rawProgram & 0x7f;
+        if (referencedInstruments.insert({bank, programNumber}).second) {
+          program.referencedInstruments.push_back(InstrumentRef{
+              .bank = bank,
+              .program = programNumber,
+              .range = programCommand->range,
+          });
+        }
+      }
     }
     program.tracks.push_back(std::move(track));
   }
