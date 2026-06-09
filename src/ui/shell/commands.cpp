@@ -751,6 +751,85 @@ bool printValueInstruments(const vgmtrans::core::Project& project,
   }
 }
 
+std::string_view valueAudioCodecName(vgmtrans::core::AudioCodec codec) {
+  switch (codec) {
+    case vgmtrans::core::AudioCodec::Unknown:
+      return "unknown";
+    case vgmtrans::core::AudioCodec::PcmS16:
+      return "pcm-s16";
+    case vgmtrans::core::AudioCodec::SnesBrr:
+      return "snes-brr";
+    case vgmtrans::core::AudioCodec::PsxAdpcm:
+      return "psx-adpcm";
+    case vgmtrans::core::AudioCodec::OkiAdpcm:
+      return "oki-adpcm";
+  }
+  return "unknown";
+}
+
+std::string valueLoopName(const vgmtrans::core::Loop& loop) {
+  if (!loop.enabled) {
+    return "none";
+  }
+  return fmt::format("start=0x{:x} length=0x{:x}", loop.start, loop.length);
+}
+
+void printValueSample(const vgmtrans::core::Sample& sample, size_t index) {
+  fmt::println("sample #{} name='{}' codec={} data=0x{:x}:0x{:x} rate={}Hz channels={} bits={} tuning={}c atten={:.2f}dB",
+               index, sample.name, valueAudioCodecName(sample.codec), sample.encodedData.offset,
+               sample.encodedData.size, sample.sampleRate, sample.channels, sample.bitsPerSample,
+               sample.pitch.cents, sample.attenuationDb);
+  fmt::println("  loop {}", valueLoopName(sample.loop));
+}
+
+bool printValueSamples(const vgmtrans::core::Project& project,
+                       const std::vector<std::string>& args,
+                       size_t assetArgIndex) {
+  try {
+    const int assetIndex = std::stoi(args[assetArgIndex]);
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets.size()) {
+      fmt::println("Asset index out of bounds");
+      return false;
+    }
+
+    const auto* sampleAsset = std::get_if<vgmtrans::core::SampleCollectionAsset>(
+        &project.assets[static_cast<size_t>(assetIndex)]);
+    if (sampleAsset == nullptr) {
+      fmt::println("Asset is not a sample collection");
+      return false;
+    }
+
+    const auto& meta = sampleAsset->metadata;
+    fmt::println("sample-collection asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} samples={}",
+                 assetIndex, meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size,
+                 sampleAsset->samples.samples.size());
+
+    const size_t sampleArgIndex = assetArgIndex + 1;
+    if (args.size() <= sampleArgIndex) {
+      for (size_t i = 0; i < sampleAsset->samples.samples.size(); ++i) {
+        const auto& sample = sampleAsset->samples.samples[i];
+        fmt::println("  sample #{} name='{}' codec={} data=0x{:x}:0x{:x} rate={}Hz channels={} bits={}",
+                     i, sample.name, valueAudioCodecName(sample.codec), sample.encodedData.offset,
+                     sample.encodedData.size, sample.sampleRate, sample.channels, sample.bitsPerSample);
+      }
+      return true;
+    }
+
+    const int sampleIndex = std::stoi(args[sampleArgIndex]);
+    if (sampleIndex < 0 || static_cast<size_t>(sampleIndex) >= sampleAsset->samples.samples.size()) {
+      fmt::println("Sample index out of bounds");
+      return false;
+    }
+
+    printValueSample(sampleAsset->samples.samples[static_cast<size_t>(sampleIndex)],
+                     static_cast<size_t>(sampleIndex));
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+}
+
 size_t exportValueCollectionsToDirectory(const vgmtrans::core::Project& project,
                                          std::span<const vgmtrans::core::CollectionExport> exports,
                                          const std::filesystem::path& dir) {
@@ -1424,6 +1503,27 @@ void value_instruments_path(const std::vector<std::string>& args) {
   }
 }
 
+void value_samples(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  const auto project = session.scan();
+  printValueSamples(project, args, 3);
+}
+
+void value_samples_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    const auto project = session.scan();
+    printValueSamples(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-samples {}: {}", args[2], ex.what());
+  }
+}
+
 void value_export(const std::vector<std::string>& args) {
   RawFile* file = getRawFile(args[2]);
   if (!file) {
@@ -1662,6 +1762,10 @@ void registerCommands() {
         4, value_instruments},
        {"instruments-path", "<path> <asset_idx> [instrument_idx]",
         "List or inspect a value instrument bank from a filesystem path", 4, value_instruments_path},
+       {"samples", "<rawfile_idx> <asset_idx> [sample_idx]", "List or inspect a value sample collection",
+        4, value_samples},
+       {"samples-path", "<path> <asset_idx> [sample_idx]",
+        "List or inspect a value sample collection from a filesystem path", 4, value_samples_path},
        {"export", "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav]",
         "Export value artifacts for a collection", 5, value_export},
        {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav]",
