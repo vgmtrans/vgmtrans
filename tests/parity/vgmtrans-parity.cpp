@@ -17,6 +17,7 @@
 #include "core/SampleDecoder.h"
 #include "formats/CapcomSnes/CapcomSnesModule.h"
 #include "formats/CapcomSnes/CapcomSnesProfile.h"
+#include "formats/ValueFormats.h"
 #include "io/RawFile.h"
 
 #include <algorithm>
@@ -608,8 +609,7 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
 
 CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::string& name) {
   ProjectSession session;
-  registerCapcomSnesModule(session.formats());
-  registerCapcomSnesProfile(session.profiles());
+  vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
   const Project project = session.scan();
@@ -854,8 +854,7 @@ bool compareCapcomSnesSummary(std::span<const u8> aramBytes, const std::string& 
 
 std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string& name) {
   ProjectSession session;
-  registerCapcomSnesModule(session.formats());
-  registerCapcomSnesProfile(session.profiles());
+  vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
   const Project project = session.scan();

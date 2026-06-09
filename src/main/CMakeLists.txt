@@ -148,12 +148,14 @@ add_library(vgmtransvalueformats STATIC)
 vgmtrans_enable_project_warnings(vgmtransvalueformats)
 target_sources(vgmtransvalueformats
   PRIVATE
+    formats/ValueFormats.cpp
     formats/CapcomSnes/CapcomSnesModule.cpp
     formats/CapcomSnes/CapcomSnesProfile.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS .
     FILES
+      formats/ValueFormats.h
       formats/CapcomSnes/CapcomSnesModule.h
       formats/CapcomSnes/CapcomSnesProfile.h
 )

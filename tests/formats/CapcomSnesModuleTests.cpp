@@ -10,6 +10,7 @@
 #include "core/PerformanceLowerer.h"
 #include "core/ProjectSession.h"
 #include "formats/CapcomSnes/CapcomSnesProfile.h"
+#include "formats/ValueFormats.h"
 
 #include <algorithm>
 #include <array>
@@ -108,8 +109,7 @@ std::vector<u8> makeCapcomSnesAram() {
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   ProjectSession session;
-  registerCapcomSnesModule(session.formats());
-  registerCapcomSnesProfile(session.profiles());
+  vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
   const Project project = session.scan();
