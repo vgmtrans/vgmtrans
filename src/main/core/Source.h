@@ -20,6 +20,7 @@ namespace vgmtrans::core {
 struct SourceFile {
   SourceId id;
   std::string name;
+  std::optional<std::string> title;
   std::filesystem::path path;
   u64 size = 0;
   bool virtualized = false;

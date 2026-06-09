@@ -5,6 +5,7 @@
  */
 
 #include "Root.h"
+#include "components/VGMColl.h"
 #include "components/VGMSampColl.h"
 #include "components/instr/VGMInstrSet.h"
 #include "components/instr/VGMRgn.h"
@@ -233,6 +234,34 @@ std::vector<u8> legacyCapcomSnesMidi(std::span<const u8> aramBytes, const std::s
   }
 
   throw std::runtime_error("legacy scanner did not discover a sequence");
+}
+
+std::map<std::string, std::vector<u8>> legacyCapcomSnesRsnMidis(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, std::vector<u8>> midis;
+
+  for (auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr) {
+      continue;
+    }
+
+    auto midi = collection->seq()->convertToMidi(collection);
+    if (!midi) {
+      throw std::runtime_error("legacy collection failed to convert to MIDI: " + collection->name());
+    }
+
+    std::vector<u8> bytes;
+    midi->writeMidiToBuffer(bytes);
+    auto [_, inserted] = midis.emplace(collection->name(), std::move(bytes));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy collection name from RSN: " + collection->name());
+    }
+  }
+
+  if (midis.empty()) {
+    throw std::runtime_error("legacy scanner did not discover collections in: " + path.string());
+  }
+  return midis;
 }
 
 struct SampleSummary {
@@ -1396,34 +1425,28 @@ int compareCapcomSnesRsnMidi(const std::filesystem::path& path) {
 }
 
 int compareCapcomSnesRsnDirectMidi(const std::filesystem::path& path) {
-  const auto arams = legacyExtractedArams(path);
-  if (arams.empty()) {
-    throw std::runtime_error("legacy loader did not extract any 64 KiB ARAM files from: " + path.string());
-  }
-
+  const auto legacyMidis = legacyCapcomSnesRsnMidis(path);
   const auto valueMidis = valueCapcomSnesRsnMidis(path);
-  if (valueMidis.size() != arams.size()) {
-    std::cout << "value RSN collection count differs: legacy=" << arams.size()
+  if (valueMidis.size() != legacyMidis.size()) {
+    std::cout << "value RSN collection count differs: legacy=" << legacyMidis.size()
               << " value=" << valueMidis.size() << "\n";
     return 1;
   }
 
-  for (const auto& aram : arams) {
-    const auto collectionName = std::filesystem::path(aram.name).stem().string();
+  for (const auto& [collectionName, legacyMidi] : legacyMidis) {
     const auto found = valueMidis.find(collectionName);
     if (found == valueMidis.end()) {
       std::cout << "value RSN scan did not produce collection '" << collectionName << "'\n";
       return 1;
     }
 
-    std::cout << "checking " << aram.name << " via direct RSN value scan\n";
-    const auto legacyMidi = legacyCapcomSnesMidi(aram.bytes, aram.name);
+    std::cout << "checking " << collectionName << " via direct RSN value scan\n";
     if (!compareMidi(legacyMidi, found->second, std::cout)) {
       return 1;
     }
   }
 
-  std::cout << "CapcomSnes direct RSN MIDI parity ok: files=" << arams.size() << "\n";
+  std::cout << "CapcomSnes direct RSN MIDI parity ok: collections=" << legacyMidis.size() << "\n";
   return 0;
 }
 

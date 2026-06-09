@@ -113,6 +113,8 @@ std::vector<u8> makeCapcomSnesSpc() {
   bytes[0x22] = 0x1a;
   bytes[0x23] = 0x1a;
   bytes[0x24] = 0x30;
+  constexpr std::string_view title = "Capcom Logo";
+  std::ranges::copy(title, bytes.begin() + 0x2e);
 
   const auto aram = makeCapcomSnesAram();
   std::ranges::copy(aram, bytes.begin() + 0x100);
@@ -382,15 +384,18 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
   expect(!project.sources[0].virtualized, "original SPC source should not be virtualized");
   expect(project.sources[1].virtualized, "SPC RAM source should be virtualized");
   expect(project.sources[1].name == "Mega Man X.spc - ram", "virtual ARAM source should match legacy naming");
+  expect(project.sources[1].title == "Capcom Logo", "virtual ARAM source should carry the SPC title tag");
   expect(project.sources[1].origin.has_value(), "virtual ARAM source should preserve origin range");
   expect(project.sources[1].origin->source == sourceId, "virtual ARAM origin should point at the SPC source");
   expect(project.sources[1].origin->offset == 0x100 && project.sources[1].origin->size == 0x10000,
          "virtual ARAM origin should point at SPC RAM bytes");
 
   expect(project.collections.size() == 1, "SPC-backed scan should produce one collection");
+  expect(project.collections[0].name == "Capcom Logo", "SPC-backed collection should use the SPC title tag");
   expect(project.assets.size() == 3, "SPC-backed scan should produce CapcomSnes assets from virtual ARAM");
   const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
   expect(sequence != nullptr, "SPC-backed scan should produce a sequence");
+  expect(sequence->metadata.name == "Capcom Logo", "SPC-backed sequence should use the SPC title tag");
   expect(sequence->metadata.range.source == SourceId{1}, "sequence range should point at virtual ARAM source");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should preserve ARAM-relative address");
 

@@ -141,6 +141,9 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 }
 
 [[nodiscard]] std::string sourceDisplayName(const SourceFile& source) {
+  if (source.title && !source.title->empty()) {
+    return *source.title;
+  }
   if (!source.name.empty()) {
     return std::filesystem::path(source.name).stem().string();
   }
