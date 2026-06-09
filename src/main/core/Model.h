@@ -318,6 +318,7 @@ struct Instrument {
   u32 bank = 0;
   u32 program = 0;
   std::string name;
+  SourceRange range;
   std::vector<Region> regions;
   std::vector<SynthGenerator> generators;
   std::vector<SynthModulator> modulators;

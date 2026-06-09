@@ -1151,6 +1151,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
         .bank = info.index >> 7,
         .program = info.index & 0x7f,
         .name = "Instrument " + std::to_string(info.index),
+        .range = input.reader.range(info.address, 6),
     };
     instrument.regions.push_back(Region{
         .sample = SampleRef{

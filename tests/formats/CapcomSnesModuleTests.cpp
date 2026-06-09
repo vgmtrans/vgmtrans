@@ -240,6 +240,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument bank");
   expect(instruments->bank.instruments.size() == 1, "instrument bank should parse one valid instrument");
   expect(instruments->bank.instruments[0].program == 0, "instrument program should match table index");
+  expect(instruments->bank.instruments[0].range.offset == 0x4000 && instruments->bank.instruments[0].range.size == 6,
+         "instrument should preserve the table entry source range");
   expect(instruments->bank.instruments[0].regions.size() == 1, "instrument should expose one region");
   expect(instruments->bank.instruments[0].regions[0].range.offset == 0x4000 &&
              instruments->bank.instruments[0].regions[0].range.size == 6,
