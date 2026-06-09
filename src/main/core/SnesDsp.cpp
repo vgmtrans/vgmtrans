@@ -10,6 +10,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 namespace vgmtrans::core {
 
@@ -71,6 +72,13 @@ struct SnesEnvelopeSeconds {
     return std::numeric_limits<u32>::max();
   }
   return static_cast<u32>(std::lround(std::max(0.0, micros)));
+}
+
+[[nodiscard]] std::optional<double> preciseSeconds(double seconds) {
+  if (seconds < 0.0 || !std::isfinite(seconds)) {
+    return std::nullopt;
+  }
+  return std::max(0.0, seconds);
 }
 
 [[nodiscard]] u32 permilleFromLevel(double level) {
@@ -266,11 +274,20 @@ Envelope snesDspEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
       .decay = microsFromSeconds(envelope.decay),
       .sustain = permilleFromLevel(envelope.sustainLevel),
       .release = microsFromSeconds(envelope.release),
+      .attackSeconds = preciseSeconds(envelope.attack),
+      .holdSeconds = 0.0,
+      .decaySeconds = preciseSeconds(envelope.decay),
+      .releaseSeconds = preciseSeconds(envelope.release),
+      .sustainAmplitude = std::clamp(envelope.sustainLevel, 0.0, 1.0),
   };
 }
 
+double snesDspGainEnvelopeSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
+  return emulateGainEnvelope(gain, envelopeFrom, envelopeTo).seconds;
+}
+
 u32 snesDspGainEnvelopeMicros(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
-  return microsFromSeconds(emulateGainEnvelope(gain, envelopeFrom, envelopeTo).seconds);
+  return microsFromSeconds(snesDspGainEnvelopeSeconds(gain, envelopeFrom, envelopeTo));
 }
 
 }  // namespace vgmtrans::core

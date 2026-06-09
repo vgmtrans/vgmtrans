@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -79,6 +80,18 @@ u32 chunkSize(const std::vector<u8>& bytes, std::string_view chunkId) {
 bool soundFontIgenContainsAmount(const std::vector<u8>& bytes, u16 generator, s16 expectedAmount) {
   const auto chunkOffset = asciiOffset(bytes, "igen");
   const auto size = chunkSize(bytes, "igen");
+  const auto payloadOffset = chunkOffset + 8;
+  for (size_t offset = payloadOffset; offset + 4 <= payloadOffset + size; offset += 4) {
+    if (readLe16(bytes, offset) == generator && readLeS16(bytes, offset + 2) == expectedAmount) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool soundFontPgenContainsAmount(const std::vector<u8>& bytes, u16 generator, s16 expectedAmount) {
+  const auto chunkOffset = asciiOffset(bytes, "pgen");
+  const auto size = chunkSize(bytes, "pgen");
   const auto payloadOffset = chunkOffset + 8;
   for (size_t offset = payloadOffset; offset + 4 <= payloadOffset + size; offset += 4) {
     if (readLe16(bytes, offset) == generator && readLeS16(bytes, offset + 2) == expectedAmount) {
@@ -751,11 +764,15 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(containsAscii(result.bytes, "Lead"), "SoundFont export should include instrument name");
   expect(containsAscii(result.bytes, "Zero"), "SoundFont export should include sample name");
   expect(chunkSize(result.bytes, "smpl") == 124, "SoundFont smpl chunk should include PCM and SF2 padding samples");
+  expect(chunkSize(result.bytes, "pgen") == 12, "SoundFont pgen chunk should include reverb, instrument, and terminal generators");
+  expect(soundFontBagAt(result.bytes, "pbag", 1, 2, 0), "SoundFont terminal preset bag should include both preset generators");
+  expect(soundFontPgenContainsAmount(result.bytes, 16, 250),
+         "SoundFont export should write default preset reverb send");
   expect(chunkSize(result.bytes, "ibag") == 12, "SoundFont ibag chunk should include a global generator zone");
   expect(soundFontBagAt(result.bytes, "ibag", 0, 0, 0), "SoundFont global zone should start at generator index 0");
   expect(soundFontBagAt(result.bytes, "ibag", 1, 2, 3),
          "SoundFont region zone should start after instrument generators and modulators");
-  expect(soundFontBagAt(result.bytes, "ibag", 2, 15, 3),
+  expect(soundFontBagAt(result.bytes, "ibag", 2, 16, 3),
          "SoundFont terminal bag should include all generators and modulators");
   expect(chunkSize(result.bytes, "imod") == 40, "SoundFont imod chunk should include modulators plus terminal");
   expect(soundFontImodContains(result.bytes, 2, 6, 300),
@@ -764,7 +781,7 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write explicit channel-pressure-to-vibrato-rate modulator");
   expect(soundFontImodContains(result.bytes, 203, 22, 180),
          "SoundFont export should resolve default tremolo-rate source from the destination");
-  expect(chunkSize(result.bytes, "igen") == 64, "SoundFont igen chunk should include global and region generators");
+  expect(chunkSize(result.bytes, "igen") == 68, "SoundFont igen chunk should include global and region generators");
   expect(chunkSize(result.bytes, "shdr") == 92, "SoundFont shdr chunk should include one sample and terminal record");
   expect(soundFontIgenContainsAmount(result.bytes, 6, 120),
          "SoundFont export should write instrument vibrato depth generator");
@@ -772,6 +789,8 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write instrument vibrato rate generator");
   expect(soundFontIgenContainsAmount(result.bytes, 34, 0),
          "SoundFont export should write attackVolEnv from Region envelope");
+  expect(soundFontIgenContainsAmount(result.bytes, 35, -32768),
+         "SoundFont export should write holdVolEnv from Region envelope");
   expect(soundFontIgenContainsAmount(result.bytes, 36, 1200),
          "SoundFont export should write decayVolEnv from Region envelope");
   expect(soundFontIgenContainsAmount(result.bytes, 37, 60),
@@ -882,10 +901,12 @@ void dlsExporterWritesDlsRiffFile() {
   expect(chunkSize(result.bytes, "colh") == 4, "DLS colh chunk should store one u32 count");
   expect(chunkSize(result.bytes, "ptbl") == 12, "DLS ptbl chunk should include one pool cue");
   expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
-  expect(chunkSize(result.bytes, "art2") == 128,
+  expect(chunkSize(result.bytes, "art2") == 140,
          "DLS art2 chunk should include pan, envelope, generator, and modulator connections");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0206, 0),
          "DLS export should write EG1 attack time from Region envelope");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x020c, std::numeric_limits<s32>::min()),
+         "DLS export should write EG1 hold time from Region envelope");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 78643200),
          "DLS export should write EG1 decay time from Region envelope");
   expect(dlsArt2ContainsConnection(result.bytes, 0x020a, 61425937),

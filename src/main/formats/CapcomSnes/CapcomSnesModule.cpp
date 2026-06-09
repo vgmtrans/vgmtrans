@@ -78,6 +78,12 @@ struct InstrumentInfo {
   s16 pitchScale = 0;
 };
 
+struct InstrumentPitch {
+  Tuning aggregate;
+  u8 rootKey = 96;
+  s16 fineTuneCents = 0;
+};
+
 constexpr std::array<u8, 16> kReadSongListPattern{
     0x1c, 0x5d, 0xf5, 0x03, 0x0e, 0xc4, 0xc0, 0xf5,
     0x02, 0x0e, 0xc4, 0xc1, 0x04, 0xc0, 0xf0, 0xdd};
@@ -1162,7 +1168,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   return samples;
 }
 
-[[nodiscard]] Tuning capcomInstrumentTuning(s16 pitchScale) {
+[[nodiscard]] InstrumentPitch capcomInstrumentPitch(s16 pitchScale) {
   constexpr int baseUnityKey = 96;
   constexpr double referencePitch = 0x10b0 / 4096.0;
 
@@ -1178,14 +1184,20 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
     fine += 100;
   }
 
-  const int unityKeyShift = baseUnityKey - coarse - baseUnityKey;
-  return Tuning{.cents = unityKeyShift * 100 + fine};
+  const int rootKey = baseUnityKey - coarse;
+  return InstrumentPitch{
+      .aggregate = Tuning{.cents = (rootKey - baseUnityKey) * 100 + fine},
+      .rootKey = static_cast<u8>(std::clamp(rootKey, 0, 127)),
+      .fineTuneCents = static_cast<s16>(fine),
+  };
 }
 
 [[nodiscard]] Envelope capcomInstrumentEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
   Envelope envelope = snesDspEnvelope(adsr1, adsr2, gain);
   const u8 sustainLevel = adsr2 >> 5;
-  envelope.release = snesDspGainEnvelopeMicros(gain, static_cast<s16>((sustainLevel << 8) | 0xff), 0);
+  const double releaseSeconds = snesDspGainEnvelopeSeconds(gain, static_cast<s16>((sustainLevel << 8) | 0xff), 0);
+  envelope.release = static_cast<u32>(std::lround(std::max(0.0, releaseSeconds) * 1'000'000.0));
+  envelope.releaseSeconds = releaseSeconds;
   return envelope;
 }
 
@@ -1266,6 +1278,11 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
                               ? ((sampleInfo.loopAddress - sampleInfo.startAddress) / 9) * 16
                               : 0;
     const u32 decodedLength = (sampleInfo.encodedLength / 9) * 16;
+    const u32 lastBlockAddress = sampleInfo.encodedLength >= 9
+                                     ? sampleInfo.startAddress + sampleInfo.encodedLength - 9
+                                     : sampleInfo.startAddress;
+    const bool loopEnabled = sampleInfo.loops && sampleInfo.loopAddress >= sampleInfo.startAddress &&
+                             sampleInfo.loopAddress <= lastBlockAddress;
     collection.samples.push_back(Sample{
         .name = "Sample " + std::to_string(sampleInfo.srcn),
         .codec = AudioCodec::SnesBrr,
@@ -1274,9 +1291,9 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
         .channels = 1,
         .bitsPerSample = 16,
         .loop = Loop{
-            .enabled = sampleInfo.loops,
+            .enabled = loopEnabled,
             .start = loopStart,
-            .length = sampleInfo.loops && decodedLength >= loopStart ? decodedLength - loopStart : 0,
+            .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
         },
     });
 
@@ -1309,9 +1326,11 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
     const std::vector<InstrumentInfo>& instrumentInfos,
     const std::vector<SampleInfo>& sampleInfos,
     std::string_view displayName) {
+  std::map<u32, u32> sampleIndexByStartAddress;
   std::map<u8, u32> sampleIndexBySrcn;
   for (u32 index = 0; index < sampleInfos.size(); ++index) {
-    sampleIndexBySrcn[sampleInfos[index].srcn] = index;
+    const auto [canonical, _] = sampleIndexByStartAddress.emplace(sampleInfos[index].startAddress, index);
+    sampleIndexBySrcn[sampleInfos[index].srcn] = canonical->second;
   }
 
   ItemTree items;
@@ -1332,6 +1351,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
     if (sampleIndex == sampleIndexBySrcn.end()) {
       continue;
     }
+    const auto pitch = capcomInstrumentPitch(info.pitchScale);
 
     Instrument instrument{
         .bank = info.index >> 7,
@@ -1345,7 +1365,9 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
             .index = sampleIndex->second,
         },
         .range = input.reader.range(info.address, 6),
-        .tuning = capcomInstrumentTuning(info.pitchScale),
+        .tuning = pitch.aggregate,
+        .rootKey = pitch.rootKey,
+        .fineTuneCents = pitch.fineTuneCents,
         .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
     });
     instrument.generators = capcomInstrumentGenerators();

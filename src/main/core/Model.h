@@ -19,6 +19,8 @@
 
 namespace vgmtrans::core {
 
+constexpr double kDefaultInstrumentReverbSend = 0.25;
+
 enum class ItemKind {
   Source,
   Header,
@@ -303,14 +305,21 @@ struct Envelope {
   // The all-zero default means no explicit envelope was parsed.
   // Time fields are microseconds. kEnvelopeInfinite means the stage has no finite duration.
   u32 attack = 0;
+  u32 hold = 0;
   u32 decay = 0;
   // Linear amplitude level, where 1000 is full scale.
   u32 sustain = 0;
   u32 release = 0;
+  std::optional<double> attackSeconds;
+  std::optional<double> holdSeconds;
+  std::optional<double> decaySeconds;
+  std::optional<double> releaseSeconds;
+  std::optional<double> sustainAmplitude;
 };
 
 [[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
-  return envelope.attack != 0 || envelope.decay != 0 || envelope.sustain != 0 || envelope.release != 0;
+  return envelope.attack != 0 || envelope.hold != 0 || envelope.decay != 0 || envelope.sustain != 0 ||
+         envelope.release != 0;
 }
 
 enum class SynthDestination {
@@ -354,6 +363,9 @@ struct Region {
   SampleRef sample;
   SourceRange range;
   Tuning tuning;
+  std::optional<u8> rootKey;
+  s16 coarseTuneSemitones = 0;
+  s16 fineTuneCents = 0;
   Envelope envelope;
   double pan = 0.5;
   double attenuationDb = 0.0;
@@ -362,6 +374,7 @@ struct Region {
 struct Instrument {
   u32 bank = 0;
   u32 program = 0;
+  double reverb = kDefaultInstrumentReverbSend;
   std::string name;
   SourceRange range;
   std::vector<Region> regions;

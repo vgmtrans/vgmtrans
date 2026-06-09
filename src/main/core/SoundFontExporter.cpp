@@ -23,10 +23,12 @@ namespace {
 constexpr u16 kSfGenVibLfoToPitch = 6;
 constexpr u16 kSfGenInitialFilterFc = 8;
 constexpr u16 kSfGenModLfoToVolume = 13;
+constexpr u16 kSfGenReverbEffectsSend = 16;
 constexpr u16 kSfGenPan = 17;
 constexpr u16 kSfGenFreqModLfo = 22;
 constexpr u16 kSfGenFreqVibLfo = 24;
 constexpr u16 kSfGenAttackVolEnv = 34;
+constexpr u16 kSfGenHoldVolEnv = 35;
 constexpr u16 kSfGenDecayVolEnv = 36;
 constexpr u16 kSfGenSustainVolEnv = 37;
 constexpr u16 kSfGenReleaseVolEnv = 38;
@@ -54,8 +56,9 @@ constexpr u16 kSfTransformLinear = 0;
 
 constexpr u32 kSf2SamplePaddingFrames = 46;
 constexpr u8 kDefaultRootKey = 60;
+constexpr u32 kPresetGeneratorsPerInstrument = 2;
 constexpr u32 kBaseInstrumentRegionGenerators = 9;
-constexpr u32 kEnvelopeInstrumentRegionGenerators = 4;
+constexpr u32 kEnvelopeInstrumentRegionGenerators = 5;
 
 struct Chunk {
   std::string id;
@@ -82,6 +85,17 @@ struct SfRegion {
 struct SfInstrument {
   const Instrument* instrument = nullptr;
   std::vector<SfRegion> regions;
+};
+
+struct SfRegionPitch {
+  u8 rootKey = kDefaultRootKey;
+  s16 coarseTune = 0;
+  s16 fineTune = 0;
+};
+
+struct SfSampleHeaderPitch {
+  u8 originalKey = kDefaultRootKey;
+  s8 correction = 0;
 };
 
 struct SfModulatorRecord {
@@ -219,6 +233,13 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return static_cast<s16>(std::clamp<s32>(value, std::numeric_limits<s16>::min(), std::numeric_limits<s16>::max()));
 }
 
+[[nodiscard]] s16 sf2ReverbSend(double reverb) {
+  if (!std::isfinite(reverb)) {
+    return 0;
+  }
+  return clampS16(static_cast<s32>(reverb * 1000.0));
+}
+
 [[nodiscard]] u16 clampU16(u32 value) {
   return static_cast<u16>(std::min<u32>(value, std::numeric_limits<u16>::max()));
 }
@@ -234,6 +255,34 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     fine += 100;
   }
   return {coarse, fine};
+}
+
+[[nodiscard]] s8 clampS8(s32 value) {
+  return static_cast<s8>(std::clamp<s32>(value, std::numeric_limits<s8>::min(), std::numeric_limits<s8>::max()));
+}
+
+[[nodiscard]] SfRegionPitch sf2RegionPitch(const Region& region, const DecodedSfSample& sample) {
+  if (region.rootKey) {
+    return SfRegionPitch{
+        .rootKey = *region.rootKey,
+        .coarseTune = region.coarseTuneSemitones,
+        .fineTune = region.fineTuneCents,
+    };
+  }
+
+  const auto [coarseTune, fineTune] = splitTuneCents(region.tuning.cents + sample.pitch.cents);
+  return SfRegionPitch{
+      .rootKey = kDefaultRootKey,
+      .coarseTune = coarseTune,
+      .fineTune = fineTune,
+  };
+}
+
+[[nodiscard]] SfSampleHeaderPitch sf2SampleHeaderPitch(u8 rootKey, s16 fineTune) {
+  return SfSampleHeaderPitch{
+      .originalKey = static_cast<u8>(std::clamp<s32>(static_cast<s32>(rootKey) - (fineTune / 100), 0, 127)),
+      .correction = clampS8(fineTune % 100),
+  };
 }
 
 [[nodiscard]] s16 sf2Pan(double pan) {
@@ -335,20 +384,37 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
                                      static_cast<long>(maxInitialAttenuation)));
 }
 
-[[nodiscard]] s16 sf2EnvelopeTimecents(u32 microseconds) {
+[[nodiscard]] std::optional<double> envelopeSeconds(u32 microseconds, std::optional<double> preciseSeconds) {
+  if (preciseSeconds && *preciseSeconds >= 0.0 && std::isfinite(*preciseSeconds)) {
+    return *preciseSeconds;
+  }
+  if (microseconds == 0 || microseconds == kEnvelopeInfinite) {
+    return std::nullopt;
+  }
+  return static_cast<double>(microseconds) / 1'000'000.0;
+}
+
+[[nodiscard]] s16 sf2EnvelopeTimecents(u32 microseconds, std::optional<double> preciseSeconds) {
+  const auto seconds = envelopeSeconds(microseconds, preciseSeconds);
+  if (seconds && *seconds > 0.0) {
+    return clampS16(static_cast<s32>(std::lround(1200.0 * std::log2(*seconds))));
+  }
+  if (microseconds == kEnvelopeInfinite) {
+    return std::numeric_limits<s16>::min();
+  }
   if (microseconds == 0) {
     return std::numeric_limits<s16>::min();
   }
-  if (microseconds == kEnvelopeInfinite) {
-    return std::numeric_limits<s16>::max();
-  }
-
-  const double seconds = static_cast<double>(microseconds) / 1'000'000.0;
-  return clampS16(static_cast<s32>(std::lround(1200.0 * std::log2(seconds))));
+  return std::numeric_limits<s16>::min();
 }
 
 [[nodiscard]] s16 sf2SustainAttenuation(const Envelope& envelope) {
   constexpr long maxSustainAttenuationCentibels = 1000;
+  if (envelope.sustainAmplitude) {
+    const double amplitude = std::clamp(*envelope.sustainAmplitude, 0.0, 1.0);
+    const double attenuationDb = amplitude == 0.0 ? 100.0 : std::min(-20.0 * std::log10(amplitude), 100.0);
+    return clampS16(static_cast<s32>(std::clamp(attenuationDb * 10.0, 0.0, 1000.0)));
+  }
   if (envelope.sustain == 0) {
     return static_cast<s16>(maxSustainAttenuationCentibels);
   }
@@ -566,10 +632,10 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 [[nodiscard]] Chunk pbagChunk(std::span<const SfInstrument> instruments) {
   std::vector<u8> payload;
   for (u32 i = 0; i < instruments.size(); ++i) {
-    writeLe16(payload, clampU16(i));
+    writeLe16(payload, clampU16(i * kPresetGeneratorsPerInstrument));
     writeLe16(payload, 0);
   }
-  writeLe16(payload, clampU16(instruments.size()));
+  writeLe16(payload, clampU16(instruments.size() * kPresetGeneratorsPerInstrument));
   writeLe16(payload, 0);
   return makeChunk("pbag", std::move(payload));
 }
@@ -577,6 +643,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 [[nodiscard]] Chunk pgenChunk(std::span<const SfInstrument> instruments) {
   std::vector<u8> payload;
   for (u32 i = 0; i < instruments.size(); ++i) {
+    writeAmountGen(payload, kSfGenReverbEffectsSend, sf2ReverbSend(instruments[i].instrument->reverb));
     writeWordGen(payload, kSfGenInstrument, clampU16(i));
   }
   writeWordGen(payload, 0, 0);
@@ -662,22 +729,27 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
     for (const auto& sfRegion : instrument.regions) {
       const auto& region = *sfRegion.region;
       const auto& sample = samplesByIndex[sfRegion.sampleIndex];
-      const auto [coarseTune, fineTune] = splitTuneCents(region.tuning.cents + sample.pitch.cents);
+      const auto pitch = sf2RegionPitch(region, sample);
 
       writeRangeGen(payload, kSfGenKeyRange, region.keyRange.low, region.keyRange.high);
       writeRangeGen(payload, kSfGenVelRange, region.velocityRange.low, region.velocityRange.high);
       writeAmountGen(payload, kSfGenInitialAttenuation,
                      static_cast<s16>(sf2Attenuation(region, Sample{.attenuationDb = sample.attenuationDb})));
       writeAmountGen(payload, kSfGenPan, sf2Pan(region.pan));
-      writeAmountGen(payload, kSfGenCoarseTune, coarseTune);
-      writeAmountGen(payload, kSfGenFineTune, fineTune);
+      writeAmountGen(payload, kSfGenCoarseTune, pitch.coarseTune);
+      writeAmountGen(payload, kSfGenFineTune, pitch.fineTune);
       if (hasExplicitEnvelope(region.envelope)) {
-        writeAmountGen(payload, kSfGenAttackVolEnv, sf2EnvelopeTimecents(region.envelope.attack));
-        writeAmountGen(payload, kSfGenDecayVolEnv, sf2EnvelopeTimecents(region.envelope.decay));
+        writeAmountGen(payload, kSfGenAttackVolEnv,
+                       sf2EnvelopeTimecents(region.envelope.attack, region.envelope.attackSeconds));
+        writeAmountGen(payload, kSfGenHoldVolEnv,
+                       sf2EnvelopeTimecents(region.envelope.hold, region.envelope.holdSeconds));
+        writeAmountGen(payload, kSfGenDecayVolEnv,
+                       sf2EnvelopeTimecents(region.envelope.decay, region.envelope.decaySeconds));
         writeAmountGen(payload, kSfGenSustainVolEnv, sf2SustainAttenuation(region.envelope));
-        writeAmountGen(payload, kSfGenReleaseVolEnv, sf2EnvelopeTimecents(region.envelope.release));
+        writeAmountGen(payload, kSfGenReleaseVolEnv,
+                       sf2EnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
       }
-      writeWordGen(payload, kSfGenOverridingRootKey, kDefaultRootKey);
+      writeWordGen(payload, kSfGenOverridingRootKey, pitch.rootKey);
       writeWordGen(payload, kSfGenSampleModes, sample.decoded.loop.enabled ? 1 : 0);
       writeWordGen(payload, kSfGenSampleId, sfRegion.sampleIndex);
     }
@@ -687,20 +759,39 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("igen", std::move(payload));
 }
 
-[[nodiscard]] Chunk shdrChunk(std::span<const DecodedSfSample> samples) {
+[[nodiscard]] std::vector<SfSampleHeaderPitch> sampleHeaderPitches(std::span<const DecodedSfSample> samples,
+                                                                   std::span<const SfInstrument> instruments) {
+  std::vector<SfSampleHeaderPitch> pitches(samples.size());
+  std::vector<bool> assigned(samples.size(), false);
+  for (const auto& instrument : instruments) {
+    for (const auto& sfRegion : instrument.regions) {
+      if (sfRegion.sampleIndex >= pitches.size() || assigned[sfRegion.sampleIndex]) {
+        continue;
+      }
+      const auto pitch = sf2RegionPitch(*sfRegion.region, samples[sfRegion.sampleIndex]);
+      pitches[sfRegion.sampleIndex] = sf2SampleHeaderPitch(pitch.rootKey, clampS16(samples[sfRegion.sampleIndex].pitch.cents));
+      assigned[sfRegion.sampleIndex] = true;
+    }
+  }
+  return pitches;
+}
+
+[[nodiscard]] Chunk shdrChunk(std::span<const DecodedSfSample> samples, std::span<const SfInstrument> instruments) {
+  const auto pitches = sampleHeaderPitches(samples, instruments);
   std::vector<u8> payload;
-  for (const auto& sample : samples) {
+  for (size_t i = 0; i < samples.size(); ++i) {
+    const auto& sample = samples[i];
     writeFixedString(payload, sf2Name(sample.name, "Sample"), 20);
     writeLe32(payload, sample.startFrame);
     writeLe32(payload, sample.endFrame);
     const u32 loopStart =
         sample.decoded.loop.enabled ? sample.startFrame + sample.decoded.loop.start : sample.startFrame;
-    const u32 loopEnd = sample.decoded.loop.enabled ? loopStart + sample.decoded.loop.length : sample.endFrame;
+    const u32 loopEnd = sample.decoded.loop.enabled ? loopStart + sample.decoded.loop.length : sample.startFrame;
     writeLe32(payload, loopStart);
     writeLe32(payload, std::min(loopEnd, sample.endFrame));
     writeLe32(payload, sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate);
-    writeU8(payload, kDefaultRootKey);
-    writeU8(payload, 0);
+    writeU8(payload, pitches[i].originalKey);
+    writeU8(payload, static_cast<u8>(pitches[i].correction));
     writeLe16(payload, 0);
     writeLe16(payload, 1);
   }
@@ -723,7 +814,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return {
       phdrChunk(instruments),   pbagChunk(instruments),          terminalModChunk("pmod"),
       pgenChunk(instruments),   instChunk(instruments),          ibagChunk(instruments),
-      imodChunk(instruments),   igenChunk(instruments, samples), shdrChunk(samples),
+      imodChunk(instruments),   igenChunk(instruments, samples), shdrChunk(samples, instruments),
   };
 }
 

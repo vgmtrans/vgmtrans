@@ -10,7 +10,12 @@
 #include "components/instr/VGMInstrSet.h"
 #include "components/instr/VGMRgn.h"
 #include "components/seq/VGMSeq.h"
+#include "ConversionContext.h"
+#include "conversion/DLSConversion.h"
+#include "conversion/DLSFile.h"
 #include "conversion/MidiFile.h"
+#include "conversion/SF2Conversion.h"
+#include "conversion/SF2File.h"
 #include "core/Export.h"
 #include "core/MidiExporter.h"
 #include "core/Model.h"
@@ -263,6 +268,50 @@ std::map<std::string, std::vector<u8>> legacyCapcomSnesRsnMidis(const std::files
     throw std::runtime_error("legacy scanner did not discover collections in: " + path.string());
   }
   return midis;
+}
+
+struct SynthExportBytes {
+  std::vector<u8> sf2;
+  std::vector<u8> dls;
+};
+
+SynthExportBytes legacyCollectionSynthExports(const VGMColl& collection) {
+  SynthExportBytes exports;
+
+  const auto sf2 = conversion::createSF2File(collection);
+  if (sf2 == nullptr) {
+    throw std::runtime_error("legacy collection failed to create SF2: " + collection.name());
+  }
+  exports.sf2 = sf2->saveToMem();
+
+  DLSFile dls;
+  if (!conversion::createDLSFile(dls, collection)) {
+    throw std::runtime_error("legacy collection failed to create DLS: " + collection.name());
+  }
+  dls.writeDLSToBuffer(exports.dls);
+
+  return exports;
+}
+
+std::map<std::string, SynthExportBytes> legacyCapcomSnesRsnSynthExports(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, SynthExportBytes> exports;
+
+  for (auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->instrSets().empty() || collection->sampColls().empty()) {
+      continue;
+    }
+
+    auto [_, inserted] = exports.emplace(collection->name(), legacyCollectionSynthExports(*collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy collection name from RSN: " + collection->name());
+    }
+  }
+
+  if (exports.empty()) {
+    throw std::runtime_error("legacy scanner did not discover synth-exportable collections in: " + path.string());
+  }
+  return exports;
 }
 
 struct SampleSummary {
@@ -1072,6 +1121,58 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
   return midis;
 }
 
+SynthExportBytes valueCapcomSnesSynthExports(ProjectSession& session, CollectionId collection) {
+  const auto artifacts =
+      session.exportCollection(collection, ExportRequest{
+                                             .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
+                                         });
+
+  SynthExportBytes exports;
+  for (const auto& artifact : artifacts) {
+    if (!artifact.diagnostics.empty()) {
+      throw std::runtime_error("value synth export reported: " + artifact.diagnostics.front().message);
+    }
+    if (artifact.mediaType == "audio/soundfont") {
+      exports.sf2 = artifact.bytes;
+    } else if (artifact.mediaType == "audio/dls") {
+      exports.dls = artifact.bytes;
+    }
+  }
+
+  if (exports.sf2.empty()) {
+    throw std::runtime_error("value exporter did not produce an SF2 artifact");
+  }
+  if (exports.dls.empty()) {
+    throw std::runtime_error("value exporter did not produce a DLS artifact");
+  }
+  return exports;
+}
+
+std::map<std::string, SynthExportBytes> valueCapcomSnesRsnSynthExports(const std::filesystem::path& path) {
+  ProjectSession session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const Project project = session.scan();
+  if (project.collections.empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover collections from RSN";
+    if (!project.diagnostics.empty()) {
+      message << ": " << project.diagnostics.front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, SynthExportBytes> exports;
+  for (const auto& collection : project.collections) {
+    auto [_, inserted] = exports.emplace(collection.name, valueCapcomSnesSynthExports(session, collection.id));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value collection name from RSN: " + collection.name);
+    }
+  }
+  return exports;
+}
+
 bool bytesMatch(std::span<const u8> bytes, size_t offset, std::string_view expected) {
   if (offset > bytes.size() || expected.size() > bytes.size() - offset) {
     return false;
@@ -1134,6 +1235,610 @@ bool validateExportArtifact(const Artifact& artifact, std::string_view expectedE
   }
 
   return true;
+}
+
+u16 le16At(std::span<const u8> bytes, size_t offset) {
+  expect(offset <= bytes.size() && bytes.size() - offset >= 2, "truncated little-endian u16");
+  return static_cast<u16>(bytes[offset] | (bytes[offset + 1] << 8));
+}
+
+s16 leS16At(std::span<const u8> bytes, size_t offset) {
+  return static_cast<s16>(le16At(bytes, offset));
+}
+
+u32 le32At(std::span<const u8> bytes, size_t offset) {
+  expect(offset <= bytes.size() && bytes.size() - offset >= 4, "truncated little-endian u32");
+  return static_cast<u32>(bytes[offset]) | (static_cast<u32>(bytes[offset + 1]) << 8) |
+         (static_cast<u32>(bytes[offset + 2]) << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);
+}
+
+s32 leS32At(std::span<const u8> bytes, size_t offset) {
+  return static_cast<s32>(le32At(bytes, offset));
+}
+
+std::string asciiAt(std::span<const u8> bytes, size_t offset, size_t count) {
+  expect(offset <= bytes.size() && bytes.size() - offset >= count, "truncated ASCII field");
+  return std::string(reinterpret_cast<const char*>(bytes.data() + offset), count);
+}
+
+struct RiffNode {
+  std::string id;
+  std::string type;
+  size_t dataOffset = 0;
+  size_t size = 0;
+  std::vector<RiffNode> children;
+};
+
+std::vector<RiffNode> parseRiffChildren(std::span<const u8> bytes, size_t begin, size_t end);
+
+RiffNode parseRiff(std::span<const u8> bytes, std::string_view expectedType) {
+  expect(bytes.size() >= 12, "RIFF file is too small");
+  expect(asciiAt(bytes, 0, 4) == "RIFF", "RIFF file missing RIFF header");
+  const u32 declaredSize = le32At(bytes, 4);
+  const size_t riffEnd = std::min(bytes.size(), static_cast<size_t>(declaredSize) + 8);
+  expect(riffEnd <= bytes.size(), "RIFF declared size extends past file end");
+  const std::string type = asciiAt(bytes, 8, 4);
+  expect(type == expectedType, "RIFF file has unexpected type");
+  return RiffNode{
+      .id = "RIFF",
+      .type = type,
+      .dataOffset = 12,
+      .size = riffEnd - 12,
+      .children = parseRiffChildren(bytes, 12, riffEnd),
+  };
+}
+
+std::vector<RiffNode> parseRiffChildren(std::span<const u8> bytes, size_t begin, size_t end) {
+  std::vector<RiffNode> nodes;
+  size_t offset = begin;
+  while (offset + 8 <= end) {
+    RiffNode node{
+        .id = asciiAt(bytes, offset, 4),
+        .dataOffset = offset + 8,
+        .size = le32At(bytes, offset + 4),
+    };
+    const size_t payloadEnd = node.dataOffset + node.size;
+    expect(payloadEnd <= end, "RIFF chunk extends past parent");
+    if (node.id == "LIST") {
+      expect(node.size >= 4, "RIFF LIST chunk is missing a type");
+      node.type = asciiAt(bytes, node.dataOffset, 4);
+      node.children = parseRiffChildren(bytes, node.dataOffset + 4, payloadEnd);
+    }
+    nodes.push_back(std::move(node));
+    offset = payloadEnd + (node.size & 1u);
+  }
+  expect(offset == end || offset == end + 1, "RIFF chunk padding mismatch");
+  return nodes;
+}
+
+const RiffNode* childChunk(const RiffNode& node, std::string_view id) {
+  const auto found = std::ranges::find_if(node.children, [id](const RiffNode& child) {
+    return child.id == id;
+  });
+  return found == node.children.end() ? nullptr : &*found;
+}
+
+const RiffNode* childList(const RiffNode& node, std::string_view type) {
+  const auto found = std::ranges::find_if(node.children, [type](const RiffNode& child) {
+    return child.id == "LIST" && child.type == type;
+  });
+  return found == node.children.end() ? nullptr : &*found;
+}
+
+const RiffNode* firstChunk(const RiffNode& node, std::string_view id) {
+  if (node.id == id) {
+    return &node;
+  }
+  for (const auto& child : node.children) {
+    if (const auto* found = firstChunk(child, id)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+std::vector<const RiffNode*> childLists(const RiffNode& node, std::string_view type) {
+  std::vector<const RiffNode*> lists;
+  for (const auto& child : node.children) {
+    if (child.id == "LIST" && child.type == type) {
+      lists.push_back(&child);
+    }
+  }
+  return lists;
+}
+
+std::vector<u8> chunkBytes(std::span<const u8> bytes, const RiffNode* node) {
+  if (node == nullptr) {
+    return {};
+  }
+  expect(node->dataOffset <= bytes.size() && bytes.size() - node->dataOffset >= node->size,
+         "RIFF chunk payload is out of range");
+  return {bytes.begin() + static_cast<std::ptrdiff_t>(node->dataOffset),
+          bytes.begin() + static_cast<std::ptrdiff_t>(node->dataOffset + node->size)};
+}
+
+struct Sf2Generator {
+  u16 operation = 0;
+  s16 amount = 0;
+
+  friend bool operator==(const Sf2Generator&, const Sf2Generator&) = default;
+};
+
+struct Sf2Modulator {
+  u16 source = 0;
+  u16 destination = 0;
+  s16 amount = 0;
+  u16 amountSource = 0;
+  u16 transform = 0;
+
+  friend bool operator==(const Sf2Modulator&, const Sf2Modulator&) = default;
+};
+
+struct Sf2Zone {
+  std::vector<Sf2Generator> generators;
+  std::vector<Sf2Modulator> modulators;
+
+  friend bool operator==(const Sf2Zone&, const Sf2Zone&) = default;
+};
+
+struct Sf2Preset {
+  u16 preset = 0;
+  u16 bank = 0;
+  std::vector<Sf2Zone> zones;
+
+  friend bool operator==(const Sf2Preset&, const Sf2Preset&) = default;
+};
+
+struct Sf2Instrument {
+  std::vector<Sf2Zone> zones;
+
+  friend bool operator==(const Sf2Instrument&, const Sf2Instrument&) = default;
+};
+
+struct Sf2Sample {
+  u32 length = 0;
+  u32 loopStart = 0;
+  u32 loopEnd = 0;
+  u32 sampleRate = 0;
+  u8 originalPitch = 0;
+  s8 pitchCorrection = 0;
+  u16 sampleLink = 0;
+  u16 sampleType = 0;
+  u64 pcmHash = 0;
+
+  friend bool operator==(const Sf2Sample&, const Sf2Sample&) = default;
+};
+
+struct NormalizedSf2 {
+  std::vector<Sf2Preset> presets;
+  std::vector<Sf2Instrument> instruments;
+  std::vector<Sf2Sample> samples;
+
+  friend bool operator==(const NormalizedSf2&, const NormalizedSf2&) = default;
+};
+
+struct Sf2Bag {
+  u16 generatorIndex = 0;
+  u16 modulatorIndex = 0;
+};
+
+std::vector<Sf2Bag> readSf2Bags(std::span<const u8> bytes, const RiffNode& node) {
+  expect(node.size % 4 == 0, "SF2 bag chunk has invalid size");
+  std::vector<Sf2Bag> bags;
+  for (size_t offset = node.dataOffset; offset < node.dataOffset + node.size; offset += 4) {
+    bags.push_back(Sf2Bag{
+        .generatorIndex = le16At(bytes, offset),
+        .modulatorIndex = le16At(bytes, offset + 2),
+    });
+  }
+  return bags;
+}
+
+std::vector<Sf2Generator> readSf2Generators(std::span<const u8> bytes, const RiffNode& node) {
+  expect(node.size % 4 == 0, "SF2 generator chunk has invalid size");
+  std::vector<Sf2Generator> generators;
+  for (size_t offset = node.dataOffset; offset < node.dataOffset + node.size; offset += 4) {
+    generators.push_back(Sf2Generator{
+        .operation = le16At(bytes, offset),
+        .amount = leS16At(bytes, offset + 2),
+    });
+  }
+  return generators;
+}
+
+std::vector<Sf2Modulator> readSf2Modulators(std::span<const u8> bytes, const RiffNode& node) {
+  expect(node.size % 10 == 0, "SF2 modulator chunk has invalid size");
+  std::vector<Sf2Modulator> modulators;
+  for (size_t offset = node.dataOffset; offset < node.dataOffset + node.size; offset += 10) {
+    modulators.push_back(Sf2Modulator{
+        .source = le16At(bytes, offset),
+        .destination = le16At(bytes, offset + 2),
+        .amount = leS16At(bytes, offset + 4),
+        .amountSource = le16At(bytes, offset + 6),
+        .transform = le16At(bytes, offset + 8),
+    });
+  }
+  return modulators;
+}
+
+void sortSf2Zone(Sf2Zone& zone) {
+  std::ranges::sort(zone.generators, [](const auto& lhs, const auto& rhs) {
+    return std::tie(lhs.operation, lhs.amount) < std::tie(rhs.operation, rhs.amount);
+  });
+  std::ranges::sort(zone.modulators, [](const auto& lhs, const auto& rhs) {
+    return std::tie(lhs.source, lhs.destination, lhs.amount, lhs.amountSource, lhs.transform) <
+           std::tie(rhs.source, rhs.destination, rhs.amount, rhs.amountSource, rhs.transform);
+  });
+}
+
+Sf2Zone readSf2Zone(const std::vector<Sf2Bag>& bags, const std::vector<Sf2Generator>& generators,
+                    const std::vector<Sf2Modulator>& modulators, size_t bagIndex) {
+  expect(bagIndex + 1 < bags.size(), "SF2 bag index is missing terminal bag");
+  const auto& bag = bags[bagIndex];
+  const auto& nextBag = bags[bagIndex + 1];
+  expect(bag.generatorIndex <= nextBag.generatorIndex && nextBag.generatorIndex <= generators.size(),
+         "SF2 generator index is out of range");
+  expect(bag.modulatorIndex <= nextBag.modulatorIndex && nextBag.modulatorIndex <= modulators.size(),
+         "SF2 modulator index is out of range");
+  Sf2Zone zone{
+      .generators = {generators.begin() + bag.generatorIndex, generators.begin() + nextBag.generatorIndex},
+      .modulators = {modulators.begin() + bag.modulatorIndex, modulators.begin() + nextBag.modulatorIndex},
+  };
+  sortSf2Zone(zone);
+  return zone;
+}
+
+NormalizedSf2 normalizeSf2(std::span<const u8> bytes) {
+  const auto root = parseRiff(bytes, "sfbk");
+  const auto* phdr = firstChunk(root, "phdr");
+  const auto* pbagNode = firstChunk(root, "pbag");
+  const auto* pgenNode = firstChunk(root, "pgen");
+  const auto* pmodNode = firstChunk(root, "pmod");
+  const auto* inst = firstChunk(root, "inst");
+  const auto* ibagNode = firstChunk(root, "ibag");
+  const auto* igenNode = firstChunk(root, "igen");
+  const auto* imodNode = firstChunk(root, "imod");
+  const auto* shdr = firstChunk(root, "shdr");
+  const auto* smpl = firstChunk(root, "smpl");
+  expect(phdr != nullptr && pbagNode != nullptr && pgenNode != nullptr && pmodNode != nullptr &&
+             inst != nullptr && ibagNode != nullptr && igenNode != nullptr && imodNode != nullptr &&
+             shdr != nullptr && smpl != nullptr,
+         "SF2 file is missing required pdta/sdta chunks");
+
+  const auto pbag = readSf2Bags(bytes, *pbagNode);
+  const auto ibag = readSf2Bags(bytes, *ibagNode);
+  const auto pgen = readSf2Generators(bytes, *pgenNode);
+  const auto igen = readSf2Generators(bytes, *igenNode);
+  const auto pmod = readSf2Modulators(bytes, *pmodNode);
+  const auto imod = readSf2Modulators(bytes, *imodNode);
+
+  expect(phdr->size % 38 == 0 && phdr->size >= 38, "SF2 phdr chunk has invalid size");
+  expect(inst->size % 22 == 0 && inst->size >= 22, "SF2 inst chunk has invalid size");
+  expect(shdr->size % 46 == 0 && shdr->size >= 46, "SF2 shdr chunk has invalid size");
+
+  NormalizedSf2 normalized;
+  const size_t presetRecords = (phdr->size / 38) - 1;
+  for (size_t i = 0; i < presetRecords; ++i) {
+    const size_t offset = phdr->dataOffset + i * 38;
+    const u16 bagStart = le16At(bytes, offset + 24);
+    const u16 bagEnd = le16At(bytes, offset + 38 + 24);
+    expect(bagStart <= bagEnd && bagEnd < pbag.size(), "SF2 preset bag range is out of range");
+    Sf2Preset preset{
+        .preset = le16At(bytes, offset + 20),
+        .bank = le16At(bytes, offset + 22),
+    };
+    for (size_t bagIndex = bagStart; bagIndex < bagEnd; ++bagIndex) {
+      preset.zones.push_back(readSf2Zone(pbag, pgen, pmod, bagIndex));
+    }
+    normalized.presets.push_back(std::move(preset));
+  }
+
+  const size_t instrumentRecords = (inst->size / 22) - 1;
+  for (size_t i = 0; i < instrumentRecords; ++i) {
+    const size_t offset = inst->dataOffset + i * 22;
+    const u16 bagStart = le16At(bytes, offset + 20);
+    const u16 bagEnd = le16At(bytes, offset + 22 + 20);
+    expect(bagStart <= bagEnd && bagEnd < ibag.size(), "SF2 instrument bag range is out of range");
+    Sf2Instrument instrument;
+    for (size_t bagIndex = bagStart; bagIndex < bagEnd; ++bagIndex) {
+      instrument.zones.push_back(readSf2Zone(ibag, igen, imod, bagIndex));
+    }
+    normalized.instruments.push_back(std::move(instrument));
+  }
+
+  const size_t sampleRecords = (shdr->size / 46) - 1;
+  for (size_t i = 0; i < sampleRecords; ++i) {
+    const size_t offset = shdr->dataOffset + i * 46;
+    const u32 start = le32At(bytes, offset + 20);
+    const u32 end = le32At(bytes, offset + 24);
+    const u32 loopStart = le32At(bytes, offset + 28);
+    const u32 loopEnd = le32At(bytes, offset + 32);
+    expect(start <= end, "SF2 sample has invalid start/end");
+    const size_t sampleOffset = smpl->dataOffset + static_cast<size_t>(start) * 2;
+    const size_t sampleSize = static_cast<size_t>(end - start) * 2;
+    expect(sampleOffset <= bytes.size() && bytes.size() - sampleOffset >= sampleSize,
+           "SF2 sample points outside smpl chunk");
+    normalized.samples.push_back(Sf2Sample{
+        .length = end - start,
+        .loopStart = loopStart - start,
+        .loopEnd = loopEnd - start,
+        .sampleRate = le32At(bytes, offset + 36),
+        .originalPitch = bytes[offset + 40],
+        .pitchCorrection = static_cast<s8>(bytes[offset + 41]),
+        .sampleLink = le16At(bytes, offset + 42),
+        .sampleType = le16At(bytes, offset + 44),
+        .pcmHash = fnv1a(bytes.subspan(sampleOffset, sampleSize)),
+    });
+  }
+
+  return normalized;
+}
+
+struct DlsConnection {
+  u16 source = 0;
+  u16 control = 0;
+  u16 destination = 0;
+  u16 transform = 0;
+  s32 scale = 0;
+
+  friend bool operator==(const DlsConnection&, const DlsConnection&) = default;
+};
+
+struct DlsRegionSummary {
+  std::vector<u8> header;
+  std::vector<u8> sample;
+  std::vector<u8> link;
+  std::vector<DlsConnection> connections;
+
+  friend bool operator==(const DlsRegionSummary&, const DlsRegionSummary&) = default;
+};
+
+struct DlsInstrumentSummary {
+  u32 bank = 0;
+  u32 program = 0;
+  std::vector<DlsRegionSummary> regions;
+
+  friend bool operator==(const DlsInstrumentSummary&, const DlsInstrumentSummary&) = default;
+};
+
+struct DlsWaveSummary {
+  std::vector<u8> format;
+  std::vector<u8> sample;
+  u32 dataSize = 0;
+  u64 dataHash = 0;
+
+  friend bool operator==(const DlsWaveSummary&, const DlsWaveSummary&) = default;
+};
+
+struct NormalizedDls {
+  std::vector<DlsInstrumentSummary> instruments;
+  std::vector<DlsWaveSummary> waves;
+
+  friend bool operator==(const NormalizedDls&, const NormalizedDls&) = default;
+};
+
+std::vector<DlsConnection> readDlsConnections(std::span<const u8> bytes, const RiffNode* art) {
+  if (art == nullptr) {
+    return {};
+  }
+  expect(art->size >= 8, "DLS art chunk is too small");
+  const u32 connectionCount = le32At(bytes, art->dataOffset + 4);
+  expect(art->size >= 8 + static_cast<size_t>(connectionCount) * 12, "DLS art chunk is truncated");
+  std::vector<DlsConnection> connections;
+  for (u32 i = 0; i < connectionCount; ++i) {
+    const size_t offset = art->dataOffset + 8 + static_cast<size_t>(i) * 12;
+    connections.push_back(DlsConnection{
+        .source = le16At(bytes, offset),
+        .control = le16At(bytes, offset + 2),
+        .destination = le16At(bytes, offset + 4),
+        .transform = le16At(bytes, offset + 6),
+        .scale = leS32At(bytes, offset + 8),
+    });
+  }
+  std::ranges::sort(connections, [](const auto& lhs, const auto& rhs) {
+    return std::tie(lhs.source, lhs.control, lhs.destination, lhs.transform, lhs.scale) <
+           std::tie(rhs.source, rhs.control, rhs.destination, rhs.transform, rhs.scale);
+  });
+  return connections;
+}
+
+DlsRegionSummary normalizeDlsRegion(std::span<const u8> bytes, const RiffNode& regionList) {
+  auto connections = readDlsConnections(bytes, childChunk(regionList, "art2"));
+  if (connections.empty()) {
+    connections = readDlsConnections(bytes, childChunk(regionList, "art1"));
+  }
+  return DlsRegionSummary{
+      .header = chunkBytes(bytes, childChunk(regionList, "rgnh")),
+      .sample = chunkBytes(bytes, childChunk(regionList, "wsmp")),
+      .link = chunkBytes(bytes, childChunk(regionList, "wlnk")),
+      .connections = std::move(connections),
+  };
+}
+
+NormalizedDls normalizeDls(std::span<const u8> bytes) {
+  const auto root = parseRiff(bytes, "DLS ");
+  NormalizedDls normalized;
+
+  if (const auto* lins = childList(root, "lins")) {
+    for (const auto* instrumentList : childLists(*lins, "ins ")) {
+      const auto* insh = childChunk(*instrumentList, "insh");
+      expect(insh != nullptr && insh->size >= 12, "DLS instrument is missing insh");
+      DlsInstrumentSummary instrument{
+          .bank = le32At(bytes, insh->dataOffset + 4),
+          .program = le32At(bytes, insh->dataOffset + 8),
+      };
+      if (const auto* lrgn = childList(*instrumentList, "lrgn")) {
+        for (const auto& region : lrgn->children) {
+          if (region.id == "LIST" && (region.type == "rgn " || region.type == "rgn2")) {
+            instrument.regions.push_back(normalizeDlsRegion(bytes, region));
+          }
+        }
+      }
+      normalized.instruments.push_back(std::move(instrument));
+    }
+  }
+
+  if (const auto* wvpl = childList(root, "wvpl")) {
+    for (const auto* waveList : childLists(*wvpl, "wave")) {
+      const auto data = chunkBytes(bytes, childChunk(*waveList, "data"));
+      normalized.waves.push_back(DlsWaveSummary{
+          .format = chunkBytes(bytes, childChunk(*waveList, "fmt ")),
+          .sample = chunkBytes(bytes, childChunk(*waveList, "wsmp")),
+          .dataSize = static_cast<u32>(data.size()),
+          .dataHash = fnv1a(data),
+      });
+    }
+  }
+
+  return normalized;
+}
+
+std::string describeSf2Counts(const NormalizedSf2& sf2) {
+  std::ostringstream out;
+  out << "presets=" << sf2.presets.size() << " instruments=" << sf2.instruments.size()
+      << " samples=" << sf2.samples.size();
+  return out.str();
+}
+
+std::string describeSf2Zone(const Sf2Zone& zone) {
+  std::ostringstream out;
+  out << "gens=[";
+  for (size_t i = 0; i < zone.generators.size(); ++i) {
+    if (i != 0) {
+      out << ", ";
+    }
+    out << "(" << zone.generators[i].operation << "," << zone.generators[i].amount << ")";
+  }
+  out << "] mods=[";
+  for (size_t i = 0; i < zone.modulators.size(); ++i) {
+    if (i != 0) {
+      out << ", ";
+    }
+    const auto& modulator = zone.modulators[i];
+    out << "(" << modulator.source << "," << modulator.destination << "," << modulator.amount << ","
+        << modulator.amountSource << "," << modulator.transform << ")";
+  }
+  out << "]";
+  return out.str();
+}
+
+std::string describeSf2Preset(const Sf2Preset& preset) {
+  std::ostringstream out;
+  out << "preset=" << preset.preset << " bank=" << preset.bank << " zones=" << preset.zones.size();
+  if (!preset.zones.empty()) {
+    out << " firstZone{" << describeSf2Zone(preset.zones.front()) << "}";
+  }
+  return out.str();
+}
+
+std::string describeSf2Instrument(const Sf2Instrument& instrument) {
+  std::ostringstream out;
+  out << "zones=" << instrument.zones.size();
+  if (!instrument.zones.empty()) {
+    out << " firstZone{" << describeSf2Zone(instrument.zones.front()) << "}";
+  }
+  return out.str();
+}
+
+void describeFirstZoneMismatch(std::ostream& out,
+                               std::span<const Sf2Zone> legacyZones,
+                               std::span<const Sf2Zone> valueZones) {
+  const size_t shared = std::min(legacyZones.size(), valueZones.size());
+  for (size_t i = 0; i < shared; ++i) {
+    if (!(legacyZones[i] == valueZones[i])) {
+      out << "first zone mismatch at " << i << "\n";
+      out << "legacy zone: " << describeSf2Zone(legacyZones[i]) << "\n";
+      out << "value zone:  " << describeSf2Zone(valueZones[i]) << "\n";
+      return;
+    }
+  }
+  if (legacyZones.size() != valueZones.size()) {
+    out << "zone count differs: legacy=" << legacyZones.size() << " value=" << valueZones.size() << "\n";
+  }
+}
+
+std::string describeSf2Sample(const Sf2Sample& sample) {
+  std::ostringstream out;
+  out << "length=" << sample.length << " loop=" << sample.loopStart << "-" << sample.loopEnd
+      << " rate=" << sample.sampleRate << " pitch=" << static_cast<int>(sample.originalPitch)
+      << " tune=" << static_cast<int>(sample.pitchCorrection) << " type=" << sample.sampleType
+      << " hash=0x" << std::hex << sample.pcmHash;
+  return out.str();
+}
+
+std::string describeDlsCounts(const NormalizedDls& dls) {
+  std::ostringstream out;
+  out << "instruments=" << dls.instruments.size() << " waves=" << dls.waves.size();
+  return out.str();
+}
+
+bool compareSf2(std::span<const u8> legacyBytes, std::span<const u8> valueBytes, std::ostream& out) {
+  const auto legacy = normalizeSf2(legacyBytes);
+  const auto value = normalizeSf2(valueBytes);
+  if (legacy == value) {
+    out << "SF2 parity ok: " << describeSf2Counts(legacy) << "\n";
+    return true;
+  }
+
+  out << "SF2 parity mismatch\n";
+  out << "legacy: " << describeSf2Counts(legacy) << "\n";
+  out << "value:  " << describeSf2Counts(value) << "\n";
+  if (legacy.presets != value.presets) {
+    out << "preset structures differ\n";
+    const size_t shared = std::min(legacy.presets.size(), value.presets.size());
+    for (size_t i = 0; i < shared; ++i) {
+      if (!(legacy.presets[i] == value.presets[i])) {
+        out << "first preset mismatch at " << i << "\n";
+        out << "legacy: " << describeSf2Preset(legacy.presets[i]) << "\n";
+        out << "value:  " << describeSf2Preset(value.presets[i]) << "\n";
+        describeFirstZoneMismatch(out, legacy.presets[i].zones, value.presets[i].zones);
+        break;
+      }
+    }
+  } else if (legacy.instruments != value.instruments) {
+    out << "instrument zones/generators/modulators differ\n";
+    const size_t shared = std::min(legacy.instruments.size(), value.instruments.size());
+    for (size_t i = 0; i < shared; ++i) {
+      if (!(legacy.instruments[i] == value.instruments[i])) {
+        out << "first instrument mismatch at " << i << "\n";
+        out << "legacy: " << describeSf2Instrument(legacy.instruments[i]) << "\n";
+        out << "value:  " << describeSf2Instrument(value.instruments[i]) << "\n";
+        describeFirstZoneMismatch(out, legacy.instruments[i].zones, value.instruments[i].zones);
+        break;
+      }
+    }
+  } else if (legacy.samples != value.samples) {
+    out << "sample headers or PCM hashes differ\n";
+    const size_t shared = std::min(legacy.samples.size(), value.samples.size());
+    for (size_t i = 0; i < shared; ++i) {
+      if (!(legacy.samples[i] == value.samples[i])) {
+        out << "first sample mismatch at " << i << "\n";
+        out << "legacy: " << describeSf2Sample(legacy.samples[i]) << "\n";
+        out << "value:  " << describeSf2Sample(value.samples[i]) << "\n";
+        break;
+      }
+    }
+  }
+  return false;
+}
+
+bool compareDls(std::span<const u8> legacyBytes, std::span<const u8> valueBytes, std::ostream& out) {
+  const auto legacy = normalizeDls(legacyBytes);
+  const auto value = normalizeDls(valueBytes);
+  if (legacy == value) {
+    out << "DLS parity ok: " << describeDlsCounts(legacy) << "\n";
+    return true;
+  }
+
+  out << "DLS parity mismatch\n";
+  out << "legacy: " << describeDlsCounts(legacy) << "\n";
+  out << "value:  " << describeDlsCounts(value) << "\n";
+  if (legacy.instruments != value.instruments) {
+    out << "instrument regions/articulations differ\n";
+  } else if (legacy.waves != value.waves) {
+    out << "wave format/sample data differ\n";
+  }
+  return false;
 }
 
 class MidiReader {
@@ -1685,6 +2390,37 @@ int compareCapcomSnesRsnDirectMidi(const std::filesystem::path& path) {
   return 0;
 }
 
+int compareCapcomSnesRsnDirectSynth(const std::filesystem::path& path) {
+  const auto legacyExports = legacyCapcomSnesRsnSynthExports(path);
+  const auto valueExports = valueCapcomSnesRsnSynthExports(path);
+  if (valueExports.size() != legacyExports.size()) {
+    std::cout << "value RSN synth collection count differs: legacy=" << legacyExports.size()
+              << " value=" << valueExports.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacy] : legacyExports) {
+    const auto found = valueExports.find(collectionName);
+    if (found == valueExports.end()) {
+      std::cout << "value RSN scan did not produce synth exports for collection '" << collectionName << "'\n";
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " SF2 via direct RSN value scan\n";
+    if (!compareSf2(legacy.sf2, found->second.sf2, std::cout)) {
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " DLS via direct RSN value scan\n";
+    if (!compareDls(legacy.dls, found->second.dls, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "CapcomSnes direct RSN SF2/DLS parity ok: collections=" << legacyExports.size() << "\n";
+  return 0;
+}
+
 int compareCapcomSnesRsnDirectSummary(const std::filesystem::path& path) {
   const auto legacySummaries = legacyCapcomSnesRsnSummaries(path);
   const auto valueSummaries = valueCapcomSnesRsnSummaries(path);
@@ -1867,6 +2603,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-rsn-midi <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-export <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-midi <rsn-file>\n"
+      << "  vgmtrans-parity capcom-snes-rsn-direct-synth <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n";
 }
@@ -1893,6 +2630,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-export") {
       return compareCapcomSnesRsnDirectExport(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-synth") {
+      return compareCapcomSnesRsnDirectSynth(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-summary") {

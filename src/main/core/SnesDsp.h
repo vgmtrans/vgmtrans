@@ -12,6 +12,7 @@
 namespace vgmtrans::core {
 
 [[nodiscard]] Envelope snesDspEnvelope(u8 adsr1, u8 adsr2, u8 gain);
+[[nodiscard]] double snesDspGainEnvelopeSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo);
 [[nodiscard]] u32 snesDspGainEnvelopeMicros(u8 gain, s16 envelopeFrom, s16 envelopeTo);
 
 }  // namespace vgmtrans::core
