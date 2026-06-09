@@ -40,6 +40,26 @@ const ItemNode* itemById(const ItemTree& tree, ItemId id) {
   return &*found;
 }
 
+Asset* assetById(Project& project, AssetId id) {
+  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
+    return metadata(asset).id == id;
+  });
+  if (found == project.assets.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
+const Asset* assetById(const Project& project, AssetId id) {
+  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
+    return metadata(asset).id == id;
+  });
+  if (found == project.assets.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
 const Collection* collectionById(const Project& project, CollectionId id) {
   const auto found = std::ranges::find_if(project.collections, [id](const Collection& collection) {
     return collection.id == id;

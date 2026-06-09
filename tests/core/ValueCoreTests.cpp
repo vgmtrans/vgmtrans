@@ -345,10 +345,14 @@ void projectSessionScansValuesAndVirtualSources() {
   const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
   expect(sequence != nullptr, "first asset should be a sequence");
   expect(sequence->metadata.id == AssetId{0}, "sequence should keep allocated asset id");
+  expect(assetById(project, sequence->metadata.id) == &project.assets[0],
+         "project snapshot should find an asset by stable id");
   expect(assetById<SequenceAsset>(project, sequence->metadata.id) == sequence,
          "project snapshot should find a sequence asset by stable id");
   expect(assetById<MiscAsset>(project, sequence->metadata.id) == nullptr,
          "project snapshot should reject asset id lookups with the wrong value type");
+  expect(assetById(project, AssetId{99}) == nullptr,
+         "project snapshot should return null for a missing asset id");
   expect(assetById<SequenceAsset>(project, AssetId{99}) == nullptr,
          "project snapshot should return null for a missing asset id");
   expect(sequence->metadata.items.nodes.size() == 2, "sequence should expose item tree");

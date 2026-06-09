@@ -209,17 +209,6 @@ const char* valueAssetKindName(const vgmtrans::core::Asset& asset) {
   return "misc";
 }
 
-const vgmtrans::core::Asset* valueAssetById(const vgmtrans::core::Project& project,
-                                            vgmtrans::core::AssetId id) {
-  const auto found = std::ranges::find_if(project.assets, [id](const vgmtrans::core::Asset& asset) {
-    return vgmtrans::core::metadata(asset).id == id;
-  });
-  if (found == project.assets.end()) {
-    return nullptr;
-  }
-  return &*found;
-}
-
 const char* valueSeverityName(vgmtrans::core::Severity severity) {
   using vgmtrans::core::Severity;
   switch (severity) {
@@ -670,7 +659,7 @@ void printValueCollectionAssetRef(const vgmtrans::core::Project& project,
                                   std::string_view label,
                                   size_t index,
                                   vgmtrans::core::AssetId id) {
-  const auto* asset = valueAssetById(project, id);
+  const auto* asset = vgmtrans::core::assetById(project, id);
   if (asset == nullptr) {
     fmt::println("  {} #{} id={} missing", label, index, id.value);
     return;

@@ -659,16 +659,16 @@ struct PerformanceSequence {
 [[nodiscard]] SourceRange commandRange(const SequencerCommand& command);
 [[nodiscard]] ItemNode* itemById(ItemTree& tree, ItemId id);
 [[nodiscard]] const ItemNode* itemById(const ItemTree& tree, ItemId id);
+[[nodiscard]] Asset* assetById(Project& project, AssetId id);
+[[nodiscard]] const Asset* assetById(const Project& project, AssetId id);
 
 template <typename T>
 [[nodiscard]] const T* assetById(const Project& project, AssetId id) {
-  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
-    return metadata(asset).id == id && std::holds_alternative<T>(asset);
-  });
-  if (found == project.assets.end()) {
+  const auto* asset = assetById(project, id);
+  if (asset == nullptr) {
     return nullptr;
   }
-  return std::get_if<T>(&*found);
+  return std::get_if<T>(asset);
 }
 
 [[nodiscard]] const Collection* collectionById(const Project& project, CollectionId id);
