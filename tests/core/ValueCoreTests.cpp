@@ -8,6 +8,7 @@
 #include "core/MidiExporter.h"
 #include "core/ProjectSession.h"
 #include "core/SampleDecoder.h"
+#include "core/WavExporter.h"
 
 #include <algorithm>
 #include <exception>
@@ -30,7 +31,7 @@ void expect(bool condition, const std::string& message) {
 }
 
 class ProbeSequenceModule final : public FormatModule {
- public:
+public:
   [[nodiscard]] std::string_view name() const override { return "ProbeSequence"; }
 
   [[nodiscard]] bool canScan(const SourceFile&, std::span<const u8> bytes) const override {
@@ -44,30 +45,33 @@ class ProbeSequenceModule final : public FormatModule {
     const auto assetRange = input.reader.range(0, input.reader.size());
 
     SequenceAsset sequence{
-        .metadata = AssetMetadata{
-            .id = assetId,
-            .format = std::string(name()),
-            .name = input.source.name,
-            .range = assetRange,
-            .items = ItemTree{
-                .root = itemId,
-                .nodes = {ItemNode{
-                    .id = itemId,
-                    .kind = ItemKind::Sequence,
-                    .detailKind = "probe-sequence",
-                    .name = input.source.name,
-                    .range = assetRange,
+        .metadata =
+            AssetMetadata{
+                .id = assetId,
+                .format = std::string(name()),
+                .name = input.source.name,
+                .range = assetRange,
+                .items =
+                    ItemTree{
+                        .root = itemId,
+                        .nodes = {ItemNode{
+                            .id = itemId,
+                            .kind = ItemKind::Sequence,
+                            .detailKind = "probe-sequence",
+                            .name = input.source.name,
+                            .range = assetRange,
+                        }},
+                    },
+            },
+        .program =
+            SequenceProgram{
+                .tracks = {TrackProgram{
+                    .id = TrackId{0},
+                    .sourceTrackNumber = 0,
+                    .startAddress = Address{0},
+                    .commands = {EndCommand{.range = input.reader.range(0, 1)}},
                 }},
             },
-        },
-        .program = SequenceProgram{
-            .tracks = {TrackProgram{
-                .id = TrackId{0},
-                .sourceTrackNumber = 0,
-                .startAddress = Address{0},
-                .commands = {EndCommand{.range = input.reader.range(0, 1)}},
-            }},
-        },
     };
 
     ScanResult result;
@@ -96,7 +100,7 @@ class ProbeSequenceModule final : public FormatModule {
 };
 
 class ProbeMiscModule final : public FormatModule {
- public:
+public:
   [[nodiscard]] std::string_view name() const override { return "ProbeMisc"; }
 
   [[nodiscard]] bool canScan(const SourceFile& source, std::span<const u8> bytes) const override {
@@ -106,11 +110,12 @@ class ProbeMiscModule final : public FormatModule {
   [[nodiscard]] ScanResult scan(const ScanInput& input) const override {
     return ScanResult{
         .assets = {MiscAsset{
-            .metadata = AssetMetadata{
-                .format = std::string(name()),
-                .name = input.source.name,
-                .range = input.reader.range(0, input.reader.size()),
-            },
+            .metadata =
+                AssetMetadata{
+                    .format = std::string(name()),
+                    .name = input.source.name,
+                    .range = input.reader.range(0, input.reader.size()),
+                },
             .payload = {input.reader.u8At(0), input.reader.u8At(1)},
         }},
     };
@@ -157,8 +162,7 @@ void projectSessionScansValuesAndVirtualSources() {
   expect(sequence != nullptr, "first asset should be a sequence");
   expect(sequence->metadata.id == AssetId{0}, "sequence should keep allocated asset id");
   expect(sequence->metadata.items.nodes.size() == 1, "sequence should expose item tree");
-  expect(project.collections[0].sequence == sequence->metadata.id,
-         "collection should reference sequence asset");
+  expect(project.collections[0].sequence == sequence->metadata.id, "collection should reference sequence asset");
 
   const auto* misc = std::get_if<MiscAsset>(&project.assets[1]);
   expect(misc != nullptr, "second asset should be misc from virtual source");
@@ -190,8 +194,7 @@ void snesBrrDecoderProducesPcm() {
       .codec = AudioCodec::SnesBrr,
       .encodedData = SourceRange{.source = SourceId{0}, .offset = 8, .size = 9},
   };
-  expect(!registry.decode(invalidRange, sourceBytes).has_value(),
-         "BRR decoder should reject invalid source ranges");
+  expect(!registry.decode(invalidRange, sourceBytes).has_value(), "BRR decoder should reject invalid source ranges");
 }
 
 void midiExporterWritesStandardMidiFile() {
@@ -199,32 +202,43 @@ void midiExporterWritesStandardMidiFile() {
       .timebase = Timebase{.ppqn = 48},
       .tracks = {PerformanceTrack{
           .name = "Lead",
-          .events = {
-              Tempo{.tick = 0, .microsecondsPerQuarter = 500000},
-              ProgramChange{.tick = 0, .channel = 0, .program = 5},
-              Volume{.tick = 0, .channel = 0, .value = 100},
-              NoteDuration{.tick = 0, .channel = 0, .key = 60, .velocity = 100, .duration = 24},
-              Pan{.tick = 12, .channel = 0, .value = 64},
-              EndOfTrack{.tick = 24},
-          },
+          .events =
+              {
+                  Tempo{.tick = 0, .microsecondsPerQuarter = 500000},
+                  ProgramChange{.tick = 0, .channel = 0, .program = 5},
+                  Volume{.tick = 0, .channel = 0, .value = 100},
+                  NoteDuration{.tick = 0, .channel = 0, .key = 60, .velocity = 100, .duration = 24},
+                  Pan{.tick = 12, .channel = 0, .value = 64},
+                  EndOfTrack{.tick = 24},
+              },
       }},
   };
 
   const std::vector<u8> expected{
-      'M',  'T',  'h',  'd',  0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x30,
-      'M',  'T',  'r',  'k',  0x00, 0x00, 0x00, 0x26,
-      0x00, 0xff, 0x03, 0x04, 'L',  'e',  'a',  'd',
-      0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
-      0x00, 0xc0, 0x05,
-      0x00, 0xb0, 0x07, 0x64,
-      0x00, 0x90, 0x3c, 0x64,
-      0x0c, 0xb0, 0x0a, 0x40,
-      0x0c, 0x80, 0x3c, 0x00,
-      0x00, 0xff, 0x2f, 0x00,
+      'M',  'T',  'h',  'd',  0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x30, 'M',
+      'T',  'r',  'k',  0x00, 0x00, 0x00, 0x26, 0x00, 0xff, 0x03, 0x04, 'L',  'e',  'a',  'd',
+      0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, 0x00, 0xc0, 0x05, 0x00, 0xb0, 0x07, 0x64, 0x00,
+      0x90, 0x3c, 0x64, 0x0c, 0xb0, 0x0a, 0x40, 0x0c, 0x80, 0x3c, 0x00, 0x00, 0xff, 0x2f, 0x00,
   };
 
   const auto exported = MidiExporter().exportMidi(performance);
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
+}
+
+void wavExporterWritesPcm16RiffFile() {
+  const DecodedSample sample{
+      .sampleRate = 8000,
+      .channels = 1,
+      .pcm = {-32768, 0, 32767},
+  };
+
+  const std::vector<u8> expected{
+      'R',  'I',  'F',  'F',  0x2a, 0x00, 0x00, 0x00, 'W',  'A',  'V',  'E',  'f',  'm',  't',  ' ',  0x10,
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x40, 0x1f, 0x00, 0x00, 0x80, 0x3e, 0x00, 0x00, 0x02, 0x00,
+      0x10, 0x00, 'd',  'a',  't',  'a',  0x06, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0xff, 0x7f,
+  };
+
+  expect(WavExporter().exportPcm16(sample) == expected, "WAV exporter should write expected PCM16 RIFF bytes");
 }
 
 }  // namespace
@@ -235,6 +249,7 @@ int main() {
     projectSessionScansValuesAndVirtualSources();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
+    wavExporterWritesPcm16RiffFile();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';

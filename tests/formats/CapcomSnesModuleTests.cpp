@@ -48,22 +48,20 @@ void writeBytes(std::vector<u8>& bytes, size_t offset, const std::array<u8, Size
 std::vector<u8> makeCapcomSnesAram() {
   std::vector<u8> bytes(0x10000);
 
-  constexpr std::array<u8, 16> readBgmAddressPattern{
-      0x6f, 0x3f, 0xef, 0x06, 0x8f, 0x0d, 0xa1, 0x8f,
-      0xaf, 0xa0, 0x3f, 0x82, 0x05, 0x8d, 0x00, 0xdd};
+  constexpr std::array<u8, 16> readBgmAddressPattern{0x6f, 0x3f, 0xef, 0x06, 0x8f, 0x0d, 0xa1, 0x8f,
+                                                     0xaf, 0xa0, 0x3f, 0x82, 0x05, 0x8d, 0x00, 0xdd};
   writeBytes(bytes, 0x0500, readBgmAddressPattern);
   bytes[0x0500 + 5] = 0x20;
   bytes[0x0500 + 8] = 0x00;
 
-  constexpr std::array<u8, 12> loadInstrTablePattern{
-      0x8d, 0x06, 0xcf, 0xda, 0xa0, 0x60, 0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
+  constexpr std::array<u8, 12> loadInstrTablePattern{0x8d, 0x06, 0xcf, 0xda, 0xa0, 0x60,
+                                                     0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
   writeBytes(bytes, 0x0600, loadInstrTablePattern);
   bytes[0x0600 + 7] = 0x00;
   bytes[0x0600 + 10] = 0x40;
 
-  constexpr std::array<u8, 16> dspRegInitPattern{
-      0x8d, 0x03, 0xf6, 0x63, 0x04, 0xc5, 0xf2, 0x00,
-      0xf6, 0x66, 0x04, 0xc5, 0xf3, 0x00, 0xfe, 0xf2};
+  constexpr std::array<u8, 16> dspRegInitPattern{0x8d, 0x03, 0xf6, 0x63, 0x04, 0xc5, 0xf2, 0x00,
+                                                 0xf6, 0x66, 0x04, 0xc5, 0xf3, 0x00, 0xfe, 0xf2};
   writeBytes(bytes, 0x0700, dspRegInitPattern);
   bytes[0x0700 + 1] = 1;
   writeLe16(bytes, 0x0700 + 3, 0x0800);
@@ -138,9 +136,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "track should decode end command");
 
   const PerformanceSequence performance = PerformanceLowerer().lower(
-      sequence->program,
-      CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation),
-      LoopPolicy::PlayOnce);
+      sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes lowering should not warn for linear fixture");
   expect(performance.tracks.size() == 8, "lowerer should preserve track count");
   expect(performance.tracks[0].events.size() == 9, "lowered track should include initial, command, and end events");
@@ -163,18 +159,30 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::get<EndOfTrack>(performance.tracks[0].events[8]).tick == 6,
          "lowerer should advance time before end of track");
 
-  const auto artifacts = session.exportCollection(
-      project.collections[0].id,
-      ExportRequest{
-          .kinds = {ExportKind::Midi},
-          .loopPolicy = LoopPolicy::PlayOnce,
-      });
+  const auto artifacts = session.exportCollection(project.collections[0].id, ExportRequest{
+                                                                                 .kinds = {ExportKind::Midi},
+                                                                                 .loopPolicy = LoopPolicy::PlayOnce,
+                                                                             });
   expect(artifacts.size() == 1, "value export should produce one MIDI artifact");
   expect(artifacts[0].filename == "Mega Man X.mid", "MIDI artifact should use collection name");
   expect(artifacts[0].mediaType == "audio/midi", "MIDI artifact should use audio/midi media type");
   expect(artifacts[0].diagnostics.empty(), "MIDI artifact should not carry diagnostics for linear fixture");
   expect(artifacts[0].bytes == MidiExporter().exportMidi(performance),
          "ProjectSession MIDI export should match direct lowerer/exporter output");
+
+  const auto wavArtifacts = session.exportCollection(project.collections[0].id, ExportRequest{
+                                                                                    .kinds = {ExportKind::Wav},
+                                                                                });
+  expect(wavArtifacts.size() == 1, "value export should produce one WAV artifact for one sample");
+  expect(wavArtifacts[0].filename == "Mega Man X-0-Sample 0.wav", "WAV artifact should include sample index and name");
+  expect(wavArtifacts[0].mediaType == "audio/wav", "WAV artifact should use audio/wav media type");
+  expect(wavArtifacts[0].diagnostics.empty(), "WAV artifact should not carry diagnostics for decodable sample");
+  expect(wavArtifacts[0].bytes.size() == 76, "one BRR block should export as 44-byte header plus 32 PCM bytes");
+  expect(std::vector<u8>(wavArtifacts[0].bytes.begin(), wavArtifacts[0].bytes.begin() + 4) ==
+             std::vector<u8>{'R', 'I', 'F', 'F'},
+         "WAV artifact should start with a RIFF header");
+  expect(wavArtifacts[0].bytes[24] == 0x00 && wavArtifacts[0].bytes[25] == 0x7d,
+         "WAV artifact should preserve the CapcomSnes sample rate");
 
   const auto* instruments = std::get_if<InstrumentBankAsset>(&project.assets[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument bank");

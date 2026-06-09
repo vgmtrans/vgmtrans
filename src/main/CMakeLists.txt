@@ -117,6 +117,7 @@ target_sources(vgmtransvaluecore
     core/ProjectSession.cpp
     core/SampleDecoder.cpp
     core/Source.cpp
+    core/WavExporter.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS .
@@ -130,6 +131,7 @@ target_sources(vgmtransvaluecore
       core/ProjectSession.h
       core/SampleDecoder.h
       core/Source.h
+      core/WavExporter.h
 )
 target_include_directories(vgmtransvaluecore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(vgmtransvaluecore PUBLIC cxx_std_20)
