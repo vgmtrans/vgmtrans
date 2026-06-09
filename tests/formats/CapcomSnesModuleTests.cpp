@@ -241,6 +241,21 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instruments->bank.instruments.size() == 1, "instrument bank should parse one valid instrument");
   expect(instruments->bank.instruments[0].program == 0, "instrument program should match table index");
   expect(instruments->bank.instruments[0].regions.size() == 1, "instrument should expose one region");
+  expect(instruments->bank.instruments[0].regions[0].range.offset == 0x4000 &&
+             instruments->bank.instruments[0].regions[0].range.size == 6,
+         "region should preserve the instrument header source range");
+
+  const auto& instrumentItems = instruments->metadata.items.nodes;
+  const auto instrumentItem =
+      std::ranges::find_if(instrumentItems, [](const ItemNode& item) { return item.kind == ItemKind::Instrument; });
+  expect(instrumentItem != instrumentItems.end(), "instrument bank item tree should expose instrument nodes");
+  const auto regionItem = std::ranges::find_if(instrumentItems, [](const ItemNode& item) {
+    return item.kind == ItemKind::Region && item.detailKind == "capcom-snes-region";
+  });
+  expect(regionItem != instrumentItems.end(), "instrument bank item tree should expose region nodes");
+  expect(regionItem->parent == instrumentItem->id, "region item should point back to its instrument item");
+  expect(regionItem->range.offset == 0x4000 && regionItem->range.size == 6,
+         "region item should preserve the instrument header source range");
 
   const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets[2]);
   expect(samples != nullptr, "third CapcomSnes asset should be sample collection");

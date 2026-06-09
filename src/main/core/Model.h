@@ -307,6 +307,7 @@ struct Region {
   KeyRange keyRange;
   VelocityRange velocityRange;
   SampleRef sample;
+  SourceRange range;
   Tuning tuning;
   Envelope envelope;
   double pan = 0.5;

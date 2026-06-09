@@ -1157,6 +1157,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
             .collection = sampleCollectionId,
             .index = sampleIndex->second,
         },
+        .range = input.reader.range(info.address, 6),
         .tuning = capcomInstrumentTuning(info.pitchScale),
         .envelope = Envelope{
             .attack = info.adsr1,
@@ -1166,14 +1167,22 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
     });
 
     bank.instruments.push_back(std::move(instrument));
+    const auto instrumentItem = addItem(items,
+                                        input.ids,
+                                        root,
+                                        ItemKind::Instrument,
+                                        "capcom-snes-instrument",
+                                        "Instrument " + std::to_string(info.index),
+                                        input.reader.range(info.address, 6),
+                                        "SRCN " + std::to_string(info.srcn));
     static_cast<void>(addItem(items,
                               input.ids,
-                              root,
-                              ItemKind::Instrument,
-                              "capcom-snes-instrument",
-                              "Instrument " + std::to_string(info.index),
+                              instrumentItem,
+                              ItemKind::Region,
+                              "capcom-snes-region",
+                              "Region",
                               input.reader.range(info.address, 6),
-                              "SRCN " + std::to_string(info.srcn)));
+                              "Sample " + std::to_string(sampleIndex->second)));
   }
 
   return InstrumentBankAsset{

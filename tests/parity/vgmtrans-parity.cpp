@@ -251,6 +251,7 @@ struct SampleSummary {
 struct RegionSummary {
   u32 bank = 0;
   u32 program = 0;
+  u32 sourceOffset = 0;
   u8 keyLow = 0;
   u8 keyHigh = 0;
   u8 velocityLow = 0;
@@ -379,6 +380,7 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
         summary.regions.push_back(RegionSummary{
             .bank = instrument->bank,
             .program = instrument->instrNum,
+            .sourceOffset = region->offset(),
             .keyLow = region->keyLow,
             .keyHigh = region->keyHigh,
             .velocityLow = region->velLow,
@@ -394,10 +396,10 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
   std::ranges::sort(summary.trackCounts);
   std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
   std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
-    return std::tie(lhs.bank, lhs.program, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh, lhs.velocityLow,
-                    lhs.velocityHigh, lhs.tuningCents) < std::tie(rhs.bank, rhs.program, rhs.sampleSourceOffset,
-                                                                  rhs.keyLow, rhs.keyHigh, rhs.velocityLow,
-                                                                  rhs.velocityHigh, rhs.tuningCents);
+    return std::tie(lhs.bank, lhs.program, lhs.sourceOffset, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh,
+                    lhs.velocityLow, lhs.velocityHigh, lhs.tuningCents) <
+           std::tie(rhs.bank, rhs.program, rhs.sourceOffset, rhs.sampleSourceOffset, rhs.keyLow, rhs.keyHigh,
+                    rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents);
   });
   for (u32 i = 0; i < summary.samples.size(); ++i) {
     summary.samples[i].index = i;
@@ -467,6 +469,7 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
         summary.regions.push_back(RegionSummary{
             .bank = instrument.bank,
             .program = instrument.program,
+            .sourceOffset = static_cast<u32>(region.range.offset),
             .keyLow = region.keyRange.low,
             .keyHigh = region.keyRange.high,
             .velocityLow = region.velocityRange.low,
@@ -481,10 +484,10 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
   std::ranges::sort(summary.trackCounts);
   std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
   std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
-    return std::tie(lhs.bank, lhs.program, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh, lhs.velocityLow,
-                    lhs.velocityHigh, lhs.tuningCents) < std::tie(rhs.bank, rhs.program, rhs.sampleSourceOffset,
-                                                                  rhs.keyLow, rhs.keyHigh, rhs.velocityLow,
-                                                                  rhs.velocityHigh, rhs.tuningCents);
+    return std::tie(lhs.bank, lhs.program, lhs.sourceOffset, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh,
+                    lhs.velocityLow, lhs.velocityHigh, lhs.tuningCents) <
+           std::tie(rhs.bank, rhs.program, rhs.sourceOffset, rhs.sampleSourceOffset, rhs.keyLow, rhs.keyHigh,
+                    rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents);
   });
   for (u32 i = 0; i < summary.samples.size(); ++i) {
     summary.samples[i].index = i;
@@ -504,10 +507,11 @@ std::string describeSample(const SampleSummary& sample) {
 
 std::string describeRegion(const RegionSummary& region) {
   std::ostringstream out;
-  out << "region bank=" << region.bank << " program=" << region.program << " sampleOffset=0x" << std::hex
-      << region.sampleSourceOffset << std::dec << " key=" << static_cast<int>(region.keyLow) << "-"
-      << static_cast<int>(region.keyHigh) << " vel=" << static_cast<int>(region.velocityLow) << "-"
-      << static_cast<int>(region.velocityHigh) << " tuning=" << region.tuningCents;
+  out << "region bank=" << region.bank << " program=" << region.program << " offset=0x" << std::hex
+      << region.sourceOffset << " sampleOffset=0x" << region.sampleSourceOffset << std::dec
+      << " key=" << static_cast<int>(region.keyLow) << "-" << static_cast<int>(region.keyHigh)
+      << " vel=" << static_cast<int>(region.velocityLow) << "-" << static_cast<int>(region.velocityHigh)
+      << " tuning=" << region.tuningCents;
   return out.str();
 }
 
