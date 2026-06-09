@@ -250,6 +250,9 @@ Envelope snesDspEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
     const u8 sustainLevel = (adsr2 & 0xe0) >> 5;
     if (sustainLevel == 7) {
       envelope.decay = envelope.sustain;
+      if (envelope.sustain != -1.0) {
+        envelope.sustainLevel = 0.0;
+      }
     } else if (envelope.sustain != -1.0) {
       const double dbAtSustainStart = ampToDb(envelope.sustainLevel);
       const double decayTimeRate = dbAtSustainStart / 100.0;

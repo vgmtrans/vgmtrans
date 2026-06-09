@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -258,6 +259,10 @@ struct RegionSummary {
   u8 velocityHigh = 0;
   u32 sampleSourceOffset = 0;
   s32 tuningCents = 0;
+  u32 envelopeAttack = 0;
+  u32 envelopeDecay = 0;
+  u32 envelopeSustain = 0;
+  u32 envelopeRelease = 0;
 
   friend bool operator==(const RegionSummary&, const RegionSummary&) = default;
 };
@@ -300,6 +305,22 @@ u32 loopFramesFromLegacyBytes(const VGMSamp& sample, u32 byteOffset) {
   }
   const auto bytesPerFrame = std::max<int>(1, sample.bytesPerSample() * sample.channels);
   return byteOffset / static_cast<u32>(bytesPerFrame);
+}
+
+u32 envelopeMicros(double seconds) {
+  if (seconds < 0.0 || !std::isfinite(seconds)) {
+    return kEnvelopeInfinite;
+  }
+  constexpr double microsPerSecond = 1000000.0;
+  const double micros = seconds * microsPerSecond;
+  if (micros >= static_cast<double>(std::numeric_limits<u32>::max())) {
+    return std::numeric_limits<u32>::max();
+  }
+  return static_cast<u32>(std::lround(std::max(0.0, micros)));
+}
+
+u32 envelopePermille(double level) {
+  return static_cast<u32>(std::lround(std::clamp(level, 0.0, 1.0) * 1000.0));
 }
 
 std::optional<u32> legacyRegionSampleOffset(const VGMRgn& region, std::span<VGMSamp* const> samples) {
@@ -388,6 +409,10 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
             .sampleSourceOffset = legacyRegionSampleOffset(*region, samples).value_or(0),
             .tuningCents = region->unityKey >= 0 ? static_cast<s32>((region->unityKey - 96) * 100 + region->fineTune)
                                                  : region->fineTune,
+            .envelopeAttack = envelopeMicros(region->attack_time),
+            .envelopeDecay = envelopeMicros(region->decay_time),
+            .envelopeSustain = envelopePermille(region->sustain_level),
+            .envelopeRelease = envelopeMicros(region->release_time),
         });
       }
     }
@@ -397,9 +422,11 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
   std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
   std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
     return std::tie(lhs.bank, lhs.program, lhs.sourceOffset, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh,
-                    lhs.velocityLow, lhs.velocityHigh, lhs.tuningCents) <
+                    lhs.velocityLow, lhs.velocityHigh, lhs.tuningCents, lhs.envelopeAttack, lhs.envelopeDecay,
+                    lhs.envelopeSustain, lhs.envelopeRelease) <
            std::tie(rhs.bank, rhs.program, rhs.sourceOffset, rhs.sampleSourceOffset, rhs.keyLow, rhs.keyHigh,
-                    rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents);
+                    rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents, rhs.envelopeAttack, rhs.envelopeDecay,
+                    rhs.envelopeSustain, rhs.envelopeRelease);
   });
   for (u32 i = 0; i < summary.samples.size(); ++i) {
     summary.samples[i].index = i;
@@ -476,6 +503,10 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
             .velocityHigh = region.velocityRange.high,
             .sampleSourceOffset = sampleSourceOffset,
             .tuningCents = region.tuning.cents,
+            .envelopeAttack = region.envelope.attack,
+            .envelopeDecay = region.envelope.decay,
+            .envelopeSustain = region.envelope.sustain,
+            .envelopeRelease = region.envelope.release,
         });
       }
     }
@@ -485,9 +516,11 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
   std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
   std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
     return std::tie(lhs.bank, lhs.program, lhs.sourceOffset, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh,
-                    lhs.velocityLow, lhs.velocityHigh, lhs.tuningCents) <
+                    lhs.velocityLow, lhs.velocityHigh, lhs.tuningCents, lhs.envelopeAttack, lhs.envelopeDecay,
+                    lhs.envelopeSustain, lhs.envelopeRelease) <
            std::tie(rhs.bank, rhs.program, rhs.sourceOffset, rhs.sampleSourceOffset, rhs.keyLow, rhs.keyHigh,
-                    rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents);
+                    rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents, rhs.envelopeAttack, rhs.envelopeDecay,
+                    rhs.envelopeSustain, rhs.envelopeRelease);
   });
   for (u32 i = 0; i < summary.samples.size(); ++i) {
     summary.samples[i].index = i;
@@ -511,7 +544,9 @@ std::string describeRegion(const RegionSummary& region) {
       << region.sourceOffset << " sampleOffset=0x" << region.sampleSourceOffset << std::dec
       << " key=" << static_cast<int>(region.keyLow) << "-" << static_cast<int>(region.keyHigh)
       << " vel=" << static_cast<int>(region.velocityLow) << "-" << static_cast<int>(region.velocityHigh)
-      << " tuning=" << region.tuningCents;
+      << " tuning=" << region.tuningCents << " envelope={attack=" << region.envelopeAttack
+      << ", decay=" << region.envelopeDecay << ", sustain=" << region.envelopeSustain
+      << ", release=" << region.envelopeRelease << "}";
   return out.str();
 }
 
