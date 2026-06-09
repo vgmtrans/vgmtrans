@@ -8,6 +8,7 @@
 
 #include "core/MidiExporter.h"
 #include "core/SampleDecoder.h"
+#include "core/SoundFontExporter.h"
 #include "core/WavExporter.h"
 
 #include <algorithm>
@@ -55,6 +56,16 @@ namespace {
     return nullptr;
   }
   return std::get_if<SampleCollectionAsset>(&*found);
+}
+
+[[nodiscard]] const InstrumentBankAsset* findInstrumentBankAsset(const Project& project, AssetId id) {
+  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
+    return metadata(asset).id == id && std::holds_alternative<InstrumentBankAsset>(asset);
+  });
+  if (found == project.assets.end()) {
+    return nullptr;
+  }
+  return std::get_if<InstrumentBankAsset>(&*found);
 }
 
 [[nodiscard]] std::string artifactBaseName(const Collection& collection) {
@@ -190,6 +201,48 @@ namespace {
   return artifacts;
 }
 
+[[nodiscard]] Artifact exportSoundFont2(const Project& project, const SourceStore& sources,
+                                        const Collection& collection) {
+  std::vector<const InstrumentBankAsset*> instrumentBanks;
+  instrumentBanks.reserve(collection.instrumentBanks.size());
+  std::vector<const SampleCollectionAsset*> sampleCollections;
+  sampleCollections.reserve(collection.sampleCollections.size());
+  std::vector<Diagnostic> diagnostics;
+
+  for (const auto id : collection.instrumentBanks) {
+    if (const auto* instrumentBank = findInstrumentBankAsset(project, id)) {
+      instrumentBanks.push_back(instrumentBank);
+    } else {
+      diagnostics.push_back(exportError("Collection instrument bank asset was not found"));
+    }
+  }
+
+  for (const auto id : collection.sampleCollections) {
+    if (const auto* sampleCollection = findSampleCollectionAsset(project, id)) {
+      sampleCollections.push_back(sampleCollection);
+    } else {
+      diagnostics.push_back(exportError("Collection sample collection asset was not found"));
+    }
+  }
+
+  auto result = SoundFontExporter().exportSoundFont(
+      SoundFontInput{
+          .name = artifactBaseName(collection),
+          .instrumentBanks = instrumentBanks,
+          .sampleCollections = sampleCollections,
+      },
+      sources);
+  diagnostics.insert(diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
+                     std::make_move_iterator(result.diagnostics.end()));
+
+  return Artifact{
+      .filename = filenamePart(artifactBaseName(collection)) + ".sf2",
+      .mediaType = "audio/soundfont",
+      .bytes = std::move(result.bytes),
+      .diagnostics = std::move(diagnostics),
+  };
+}
+
 }  // namespace
 
 std::vector<Artifact> ExportService::exportCollection(const Project& project, const SourceStore& sources,
@@ -222,6 +275,8 @@ std::vector<Artifact> ExportService::exportCollection(const Project& project, co
         break;
       }
       case ExportKind::SoundFont2:
+        artifacts.push_back(exportSoundFont2(project, sources, *found));
+        break;
       case ExportKind::Dls:
         artifacts.push_back(Artifact{
             .filename = artifactBaseName(*found) + "-export-unimplemented.txt",

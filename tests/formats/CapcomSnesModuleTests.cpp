@@ -184,6 +184,21 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(wavArtifacts[0].bytes[24] == 0x00 && wavArtifacts[0].bytes[25] == 0x7d,
          "WAV artifact should preserve the CapcomSnes sample rate");
 
+  const auto sf2Artifacts = session.exportCollection(project.collections[0].id, ExportRequest{
+                                                                                    .kinds = {ExportKind::SoundFont2},
+                                                                                });
+  expect(sf2Artifacts.size() == 1, "value export should produce one SoundFont artifact");
+  expect(sf2Artifacts[0].filename == "Mega Man X.sf2", "SoundFont artifact should use collection name");
+  expect(sf2Artifacts[0].mediaType == "audio/soundfont", "SoundFont artifact should use audio/soundfont media type");
+  expect(sf2Artifacts[0].diagnostics.empty(), "SoundFont artifact should not carry diagnostics for complete fixture");
+  expect(sf2Artifacts[0].bytes.size() > 44, "SoundFont artifact should contain RIFF bytes");
+  expect(std::vector<u8>(sf2Artifacts[0].bytes.begin(), sf2Artifacts[0].bytes.begin() + 4) ==
+             std::vector<u8>{'R', 'I', 'F', 'F'},
+         "SoundFont artifact should start with a RIFF header");
+  expect(std::vector<u8>(sf2Artifacts[0].bytes.begin() + 8, sf2Artifacts[0].bytes.begin() + 12) ==
+             std::vector<u8>{'s', 'f', 'b', 'k'},
+         "SoundFont artifact should use sfbk RIFF type");
+
   const auto* instruments = std::get_if<InstrumentBankAsset>(&project.assets[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument bank");
   expect(instruments->bank.instruments.size() == 1, "instrument bank should parse one valid instrument");

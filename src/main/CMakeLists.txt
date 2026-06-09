@@ -116,6 +116,7 @@ target_sources(vgmtransvaluecore
     core/PerformanceLowerer.cpp
     core/ProjectSession.cpp
     core/SampleDecoder.cpp
+    core/SoundFontExporter.cpp
     core/Source.cpp
     core/WavExporter.cpp
   PUBLIC
@@ -130,6 +131,7 @@ target_sources(vgmtransvaluecore
       core/PerformanceLowerer.h
       core/ProjectSession.h
       core/SampleDecoder.h
+      core/SoundFontExporter.h
       core/Source.h
       core/WavExporter.h
 )

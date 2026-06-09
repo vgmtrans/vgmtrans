@@ -8,14 +8,17 @@
 #include "core/MidiExporter.h"
 #include "core/ProjectSession.h"
 #include "core/SampleDecoder.h"
+#include "core/SoundFontExporter.h"
 #include "core/WavExporter.h"
 
 #include <algorithm>
+#include <array>
 #include <exception>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace vgmtrans::core;
@@ -28,6 +31,27 @@ void expect(bool condition, const std::string& message) {
   if (!condition) {
     throw std::runtime_error(message);
   }
+}
+
+u32 readLe32(const std::vector<u8>& bytes, size_t offset) {
+  return static_cast<u32>(bytes[offset]) | (static_cast<u32>(bytes[offset + 1]) << 8) |
+         (static_cast<u32>(bytes[offset + 2]) << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);
+}
+
+bool containsAscii(const std::vector<u8>& bytes, std::string_view text) {
+  return std::search(bytes.begin(), bytes.end(), text.begin(), text.end()) != bytes.end();
+}
+
+size_t asciiOffset(const std::vector<u8>& bytes, std::string_view text) {
+  const auto found = std::search(bytes.begin(), bytes.end(), text.begin(), text.end());
+  if (found == bytes.end()) {
+    throw std::runtime_error("expected ASCII marker was not found");
+  }
+  return static_cast<size_t>(std::distance(bytes.begin(), found));
+}
+
+u32 chunkSize(const std::vector<u8>& bytes, std::string_view chunkId) {
+  return readLe32(bytes, asciiOffset(bytes, chunkId) + 4);
 }
 
 class ProbeSequenceModule final : public FormatModule {
@@ -241,6 +265,81 @@ void wavExporterWritesPcm16RiffFile() {
   expect(WavExporter().exportPcm16(sample) == expected, "WAV exporter should write expected PCM16 RIFF bytes");
 }
 
+void soundFontExporterWritesSfbkRiffFile() {
+  SourceStore sources;
+  const auto sourceId = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
+
+  SampleCollectionAsset sampleCollection{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{2},
+              .format = "Probe",
+              .name = "Probe Samples",
+          },
+      .samples =
+          SampleCollection{
+              .samples = {Sample{
+                  .name = "Zero",
+                  .codec = AudioCodec::SnesBrr,
+                  .encodedData = SourceRange{.source = sourceId, .offset = 0, .size = 9},
+                  .sampleRate = 16000,
+                  .loop = Loop{.enabled = true, .start = 0, .length = 16},
+              }},
+          },
+  };
+  InstrumentBankAsset instrumentBank{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{1},
+              .format = "Probe",
+              .name = "Probe Instruments",
+          },
+      .bank =
+          InstrumentBank{
+              .instruments = {Instrument{
+                  .bank = 1,
+                  .program = 5,
+                  .name = "Lead",
+                  .regions = {Region{
+                      .keyRange = KeyRange{.low = 24, .high = 96},
+                      .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
+                      .tuning = Tuning{.cents = 125},
+                      .pan = 1.0,
+                  }},
+              }},
+          },
+  };
+
+  const std::array<const InstrumentBankAsset*, 1> banks{&instrumentBank};
+  const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
+  const auto result = SoundFontExporter().exportSoundFont(
+      SoundFontInput{
+          .name = "Probe",
+          .instrumentBanks = banks,
+          .sampleCollections = samples,
+      },
+      sources);
+
+  expect(result.diagnostics.empty(), "SoundFont export should not report diagnostics for valid values");
+  expect(result.bytes.size() > 44, "SoundFont export should produce RIFF bytes");
+  expect(std::vector<u8>(result.bytes.begin(), result.bytes.begin() + 4) == std::vector<u8>{'R', 'I', 'F', 'F'},
+         "SoundFont export should start with RIFF");
+  expect(readLe32(result.bytes, 4) == result.bytes.size() - 8, "SoundFont RIFF size should match file size");
+  expect(std::vector<u8>(result.bytes.begin() + 8, result.bytes.begin() + 12) == std::vector<u8>{'s', 'f', 'b', 'k'},
+         "SoundFont RIFF type should be sfbk");
+  expect(containsAscii(result.bytes, "INFO"), "SoundFont export should include INFO list");
+  expect(containsAscii(result.bytes, "sdta"), "SoundFont export should include sample data list");
+  expect(containsAscii(result.bytes, "pdta"), "SoundFont export should include preset data list");
+  expect(containsAscii(result.bytes, "smpl"), "SoundFont export should include smpl chunk");
+  expect(containsAscii(result.bytes, "phdr"), "SoundFont export should include phdr chunk");
+  expect(containsAscii(result.bytes, "inst"), "SoundFont export should include inst chunk");
+  expect(containsAscii(result.bytes, "shdr"), "SoundFont export should include shdr chunk");
+  expect(containsAscii(result.bytes, "Lead"), "SoundFont export should include instrument name");
+  expect(containsAscii(result.bytes, "Zero"), "SoundFont export should include sample name");
+  expect(chunkSize(result.bytes, "smpl") == 124, "SoundFont smpl chunk should include PCM and SF2 padding samples");
+  expect(chunkSize(result.bytes, "shdr") == 92, "SoundFont shdr chunk should include one sample and terminal record");
+}
+
 }  // namespace
 
 int main() {
@@ -250,6 +349,7 @@ int main() {
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
     wavExporterWritesPcm16RiffFile();
+    soundFontExporterWritesSfbkRiffFile();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
