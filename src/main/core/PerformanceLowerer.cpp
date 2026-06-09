@@ -58,10 +58,6 @@ void extendPendingNotes(
   }
 }
 
-[[nodiscard]] SourceRange commandRange(const SequencerCommand& command) {
-  return std::visit([](const auto& typedCommand) { return typedCommand.range; }, command);
-}
-
 [[nodiscard]] Diagnostic warning(std::string message, SourceRange range) {
   return Diagnostic{
       .severity = Severity::Warning,

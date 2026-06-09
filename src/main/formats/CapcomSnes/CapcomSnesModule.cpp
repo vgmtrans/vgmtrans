@@ -377,10 +377,6 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   };
 }
 
-[[nodiscard]] SourceRange commandRange(const SequencerCommand& command) {
-  return std::visit([](const auto& typedCommand) { return typedCommand.range; }, command);
-}
-
 [[nodiscard]] std::string commandDetailKind(const SequencerCommand& command) {
   return std::visit(
       [](const auto& typedCommand) -> std::string {

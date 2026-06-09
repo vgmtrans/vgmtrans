@@ -301,6 +301,27 @@ void byteReaderChecksBoundsAndEndian() {
   expect(threw, "reader should throw on out-of-range access");
 }
 
+void sequencerCommandExposesSourceRange() {
+  const SourceRange noteRange{.source = SourceId{3}, .offset = 0x1200, .size = 1};
+  const SourceRange driverRange{.source = SourceId{3}, .offset = 0x1204, .size = 3};
+
+  const SequencerCommand note = NoteCommand{
+      .key = 64,
+      .rawVelocity = 90,
+      .rawDuration = 4,
+      .range = noteRange,
+  };
+  const SequencerCommand driver = DriverSpecificCommand{
+      .name = "Probe",
+      .bytes = {0x01, 0x02, 0x03},
+      .range = driverRange,
+  };
+
+  expect(sameRange(commandRange(note), noteRange), "command range should come from typed note command");
+  expect(sameRange(commandRange(driver), driverRange),
+         "command range should come from typed driver-specific command");
+}
+
 void projectSessionScansValuesAndVirtualSources() {
   ProjectSession session;
   session.formats().add(std::make_unique<ProbeSequenceModule>());
@@ -926,6 +947,7 @@ void exportDiagnosticsPreserveSourceRanges() {
 int main() {
   try {
     byteReaderChecksBoundsAndEndian();
+    sequencerCommandExposesSourceRange();
     projectSessionScansValuesAndVirtualSources();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();

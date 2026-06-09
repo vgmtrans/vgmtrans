@@ -16,6 +16,10 @@ const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
 }
 
+SourceRange commandRange(const SequencerCommand& command) {
+  return std::visit([](const auto& typedCommand) { return typedCommand.range; }, command);
+}
+
 const Collection* collectionById(const Project& project, CollectionId id) {
   const auto found = std::ranges::find_if(project.collections, [id](const Collection& collection) {
     return collection.id == id;
