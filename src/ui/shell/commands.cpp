@@ -30,8 +30,10 @@
 #include <fstream>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 
 #include <fmt/color.h>
 #include <fmt/format.h>
@@ -233,6 +235,29 @@ std::vector<u8> valueBytesForRawFile(const RawFile& file) {
   return std::vector<u8>(begin, begin + file.size());
 }
 
+std::vector<u8> valueBytesForPath(const std::filesystem::path& path) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    throw std::runtime_error("failed to open source path");
+  }
+
+  file.seekg(0, std::ios::end);
+  const auto size = file.tellg();
+  if (size < 0) {
+    throw std::runtime_error("failed to stat source path");
+  }
+  file.seekg(0, std::ios::beg);
+
+  std::vector<u8> bytes(static_cast<size_t>(size));
+  if (!bytes.empty()) {
+    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+  }
+  if (!file) {
+    throw std::runtime_error("failed to read source path");
+  }
+  return bytes;
+}
+
 vgmtrans::core::ProjectSession valueSessionForRawFile(const RawFile& file) {
   vgmtrans::core::ProjectSession session;
   vgmtrans::formats::registerValueFormats(session);
@@ -242,6 +267,19 @@ vgmtrans::core::ProjectSession valueSessionForRawFile(const RawFile& file) {
                         .size = static_cast<u64>(file.size()),
                     },
                     valueBytesForRawFile(file));
+  return session;
+}
+
+vgmtrans::core::ProjectSession valueSessionForPath(const std::filesystem::path& path) {
+  auto bytes = valueBytesForPath(path);
+  vgmtrans::core::ProjectSession session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(vgmtrans::core::SourceFile{
+                        .name = path.filename().string(),
+                        .path = path,
+                        .size = static_cast<u64>(bytes.size()),
+                    },
+                    std::move(bytes));
   return session;
 }
 
@@ -398,6 +436,41 @@ size_t writeValueArtifacts(const std::filesystem::path& dir, std::span<const vgm
     if (writeValueArtifact(dir / artifact.filename, artifact.bytes)) {
       ++written;
     }
+  }
+  return written;
+}
+
+bool printValueNoCollections(const vgmtrans::core::Project& project) {
+  if (!project.collections.empty()) {
+    return false;
+  }
+
+  fmt::println("Value scan did not discover any collections.");
+  for (const auto& diagnostic : project.diagnostics) {
+    printValueDiagnostic(diagnostic);
+  }
+  return true;
+}
+
+size_t exportValueCollectionsToDirectory(const vgmtrans::core::Project& project,
+                                         std::span<const vgmtrans::core::CollectionExport> exports,
+                                         const std::filesystem::path& dir) {
+  size_t written = 0;
+  for (size_t i = 0; i < exports.size(); ++i) {
+    const auto& collectionExport = exports[i];
+    const auto* collection = vgmtrans::core::collectionById(project, collectionExport.collection);
+    if (collection == nullptr) {
+      fmt::println("Export skipped missing collection id {}", collectionExport.collection.value);
+      continue;
+    }
+
+    const auto collectionDir = dir / valueCollectionDirectoryName(i, *collection);
+    if (!ensureDirectory(collectionDir)) {
+      continue;
+    }
+
+    fmt::println("Exporting value collection '{}' to {}...", collection->name, collectionDir.string());
+    written += writeValueArtifacts(collectionDir, collectionExport.artifacts);
   }
   return written;
 }
@@ -958,6 +1031,16 @@ void value_scan(const std::vector<std::string>& args) {
   printValueProjectSummary(project);
 }
 
+void value_scan_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    const auto project = session.scan();
+    printValueProjectSummary(project);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-scan {}: {}", args[2], ex.what());
+  }
+}
+
 void value_tree(const std::vector<std::string>& args) {
   RawFile* file = getRawFile(args[2]);
   if (!file) {
@@ -999,11 +1082,7 @@ void value_export(const std::vector<std::string>& args) {
 
   auto session = valueSessionForRawFile(*file);
   const auto project = session.scan();
-  if (project.collections.empty()) {
-    fmt::println("Value scan did not discover any collections.");
-    for (const auto& diagnostic : project.diagnostics) {
-      printValueDiagnostic(diagnostic);
-    }
+  if (printValueNoCollections(project)) {
     return;
   }
 
@@ -1042,11 +1121,7 @@ void value_export_all(const std::vector<std::string>& args) {
 
   auto session = valueSessionForRawFile(*file);
   const auto project = session.scan();
-  if (project.collections.empty()) {
-    fmt::println("Value scan did not discover any collections.");
-    for (const auto& diagnostic : project.diagnostics) {
-      printValueDiagnostic(diagnostic);
-    }
+  if (printValueNoCollections(project)) {
     return;
   }
 
@@ -1061,25 +1136,35 @@ void value_export_all(const std::vector<std::string>& args) {
   }
 
   const auto exports = session.exportAllCollections(*request);
-  size_t written = 0;
-  for (size_t i = 0; i < exports.size(); ++i) {
-    const auto& collectionExport = exports[i];
-    const auto* collection = vgmtrans::core::collectionById(project, collectionExport.collection);
-    if (collection == nullptr) {
-      fmt::println("Export skipped missing collection id {}", collectionExport.collection.value);
-      continue;
-    }
-
-    const auto collectionDir = dir / valueCollectionDirectoryName(i, *collection);
-    if (!ensureDirectory(collectionDir)) {
-      continue;
-    }
-
-    fmt::println("Exporting value collection '{}' to {}...", collection->name, collectionDir.string());
-    written += writeValueArtifacts(collectionDir, collectionExport.artifacts);
-  }
+  const auto written = exportValueCollectionsToDirectory(project, exports, dir);
 
   fmt::println("Exported {} value artifacts from {} collections.", written, exports.size());
+}
+
+void value_export_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    const auto project = session.scan();
+    if (printValueNoCollections(project)) {
+      return;
+    }
+
+    std::filesystem::path dir = args[3];
+    if (!ensureDirectory(dir)) {
+      return;
+    }
+
+    const auto request = valueExportRequestFromArgs(args, 4);
+    if (!request) {
+      return;
+    }
+
+    const auto exports = session.exportAllCollections(*request);
+    const auto written = exportValueCollectionsToDirectory(project, exports, dir);
+    fmt::println("Exported {} value artifacts from {} collections.", written, exports.size());
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-export {}: {}", args[2], ex.what());
+  }
 }
 
 void cmd_load(const std::vector<std::string>& args) {
@@ -1211,11 +1296,14 @@ void registerCommands() {
       "value",
       "Run the value-oriented scan/export pipeline",
       {{"scan", "<rawfile_idx>", "Scan a raw file with value modules", 3, value_scan},
+       {"scan-path", "<path>", "Scan a filesystem path with value modules", 3, value_scan_path},
        {"tree", "<rawfile_idx> <asset_idx> [depth]", "Show a value asset ItemTree", 4, value_tree},
        {"export", "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav]",
         "Export value artifacts for a collection", 5, value_export},
        {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav]",
-        "Export value artifacts for all collections", 4, value_export_all}}};
+        "Export value artifacts for all collections", 4, value_export_all},
+       {"export-path", "<path> <dir> [all|midi|sf2|dls|wav]",
+        "Scan a filesystem path and export all value collections", 4, value_export_path}}};
 
   commandRegistry["help"] = {"help", "Show this help", {}};
   commandRegistry["exit"] = {"exit", "Exit the shell", {}};
