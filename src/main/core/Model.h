@@ -10,6 +10,7 @@
 #include "core/CoreTypes.h"
 #include "core/Source.h"
 
+#include <limits>
 #include <optional>
 #include <string>
 #include <variant>
@@ -279,9 +280,13 @@ struct Tuning {
   s32 cents = 0;
 };
 
+inline constexpr u32 kEnvelopeInfinite = std::numeric_limits<u32>::max();
+
 struct Envelope {
+  // Time fields are microseconds. kEnvelopeInfinite means the stage has no finite duration.
   u32 attack = 0;
   u32 decay = 0;
+  // Linear amplitude level, where 1000 is full scale.
   u32 sustain = 0;
   u32 release = 0;
 };

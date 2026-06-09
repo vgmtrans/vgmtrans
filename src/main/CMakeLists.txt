@@ -118,6 +118,7 @@ target_sources(vgmtransvaluecore
     core/ProjectSession.cpp
     core/SampleDecoder.cpp
     core/SoundFontExporter.cpp
+    core/SnesDsp.cpp
     core/Source.cpp
     core/WavExporter.cpp
   PUBLIC
@@ -134,6 +135,7 @@ target_sources(vgmtransvaluecore
       core/ProjectSession.h
       core/SampleDecoder.h
       core/SoundFontExporter.h
+      core/SnesDsp.h
       core/Source.h
       core/WavExporter.h
 )

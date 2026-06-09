@@ -282,6 +282,11 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instruments->bank.instruments[0].regions[0].range.offset == 0x4000 &&
              instruments->bank.instruments[0].regions[0].range.size == 6,
          "region should preserve the instrument header source range");
+  const auto& envelope = instruments->bank.instruments[0].regions[0].envelope;
+  expect(envelope.attack == 63, "instrument envelope should convert SNES attack to microseconds");
+  expect(envelope.decay == kEnvelopeInfinite, "instrument envelope should preserve infinite SNES sustain decay");
+  expect(envelope.sustain == 1000, "instrument envelope should convert SNES sustain to a linear amplitude level");
+  expect(envelope.release == 0, "instrument envelope should match Capcom legacy gain-based release handling");
 
   const auto& instrumentItems = instruments->metadata.items.nodes;
   const auto instrumentItem =

@@ -6,6 +6,8 @@
 
 #include "formats/CapcomSnes/CapcomSnesModule.h"
 
+#include "core/SnesDsp.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -1113,6 +1115,13 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   return Tuning{.cents = unityKeyShift * 100 + fine};
 }
 
+[[nodiscard]] Envelope capcomInstrumentEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
+  Envelope envelope = snesDspEnvelope(adsr1, adsr2, gain);
+  const u8 sustainLevel = adsr2 >> 5;
+  envelope.release = snesDspGainEnvelopeMicros(gain, static_cast<s16>((sustainLevel << 8) | 0xff), 0);
+  return envelope;
+}
+
 [[nodiscard]] SampleCollectionAsset parseSamples(
     const ScanInput& input,
     AssetId sampleCollectionId,
@@ -1222,11 +1231,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
         },
         .range = input.reader.range(info.address, 6),
         .tuning = capcomInstrumentTuning(info.pitchScale),
-        .envelope = Envelope{
-            .attack = info.adsr1,
-            .decay = info.adsr2,
-            .sustain = info.gain,
-        },
+        .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
     });
 
     bank.instruments.push_back(std::move(instrument));
