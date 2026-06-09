@@ -177,6 +177,39 @@ std::unique_ptr<HeadlessRoot> scanLegacyCapcomSnes(std::span<const u8> aramBytes
   return root;
 }
 
+std::unique_ptr<HeadlessRoot> scanLegacyFile(const std::filesystem::path& path) {
+  auto root = std::make_unique<HeadlessRoot>();
+  root->init();
+  if (!root->openRawFile(path)) {
+    throw std::runtime_error("legacy scanner did not discover any files in: " + path.string());
+  }
+  return root;
+}
+
+struct NamedBytes {
+  std::string name;
+  std::vector<u8> bytes;
+};
+
+std::vector<NamedBytes> legacyExtractedArams(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  std::vector<NamedBytes> arams;
+
+  for (const auto* rawFile : root->rawFiles()) {
+    if (rawFile == nullptr || rawFile->size() != 0x10000) {
+      continue;
+    }
+    const auto* begin = reinterpret_cast<const u8*>(rawFile->data());
+    arams.push_back(NamedBytes{
+        .name = rawFile->name(),
+        .bytes = std::vector<u8>(begin, begin + rawFile->size()),
+    });
+  }
+
+  std::ranges::sort(arams, {}, &NamedBytes::name);
+  return arams;
+}
+
 std::vector<u8> legacyCapcomSnesMidi(std::span<const u8> aramBytes, const std::string& name) {
   const auto root = scanLegacyCapcomSnes(aramBytes, name);
 
@@ -280,6 +313,14 @@ std::optional<u32> legacyRegionSampleOffset(const VGMRgn& region, std::span<VGMS
     });
     if (found != samples.end()) {
       return (*found)->dataOff;
+    }
+
+    const auto relativeFound = std::ranges::find_if(samples, [&region](const VGMSamp* sample) {
+      return sample != nullptr && sample->parSampColl != nullptr &&
+             sample->dataOff == sample->parSampColl->offset() + static_cast<u32>(region.sampOffset);
+    });
+    if (relativeFound != samples.end()) {
+      return (*relativeFound)->dataOff;
     }
   }
 
@@ -1005,11 +1046,29 @@ int compareCapcomSnesAramSummary(const std::filesystem::path& path) {
   return compareCapcomSnesSummary(aramBytes, path.filename().string(), std::cout) ? 0 : 1;
 }
 
+int compareCapcomSnesRsnSummary(const std::filesystem::path& path) {
+  const auto arams = legacyExtractedArams(path);
+  if (arams.empty()) {
+    throw std::runtime_error("legacy loader did not extract any 64 KiB ARAM files from: " + path.string());
+  }
+
+  for (const auto& aram : arams) {
+    std::cout << "checking " << aram.name << "\n";
+    if (!compareCapcomSnesSummary(aram.bytes, aram.name, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "CapcomSnes RSN summary parity ok: files=" << arams.size() << "\n";
+  return 0;
+}
+
 void printUsage(std::ostream& out) {
   out << "usage:\n"
       << "  vgmtrans-parity --self-test\n"
       << "  vgmtrans-parity capcom-snes-aram-midi <raw-aram-file>\n"
-      << "  vgmtrans-parity capcom-snes-aram-summary <raw-aram-file>\n";
+      << "  vgmtrans-parity capcom-snes-aram-summary <raw-aram-file>\n"
+      << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n";
 }
 
 }  // namespace
@@ -1026,6 +1085,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-aram-summary") {
       return compareCapcomSnesAramSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-summary") {
+      return compareCapcomSnesRsnSummary(argv[2]);
     }
 
     printUsage(std::cerr);
