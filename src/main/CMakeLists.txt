@@ -110,6 +110,7 @@ vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
     core/Export.cpp
+    core/DlsExporter.cpp
     core/FormatModule.cpp
     core/MidiExporter.cpp
     core/Model.cpp
@@ -124,6 +125,7 @@ target_sources(vgmtransvaluecore
     BASE_DIRS .
     FILES
       core/CoreTypes.h
+      core/DlsExporter.h
       core/Export.h
       core/FormatModule.h
       core/MidiExporter.h

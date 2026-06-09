@@ -6,6 +6,7 @@
 
 #include "core/Export.h"
 
+#include "core/DlsExporter.h"
 #include "core/MidiExporter.h"
 #include "core/SampleDecoder.h"
 #include "core/SoundFontExporter.h"
@@ -27,13 +28,6 @@ namespace {
 [[nodiscard]] Diagnostic exportError(std::string message) {
   return Diagnostic{
       .severity = Severity::Error,
-      .message = std::move(message),
-  };
-}
-
-[[nodiscard]] Diagnostic exportWarning(std::string message) {
-  return Diagnostic{
-      .severity = Severity::Warning,
       .message = std::move(message),
   };
 }
@@ -243,6 +237,47 @@ namespace {
   };
 }
 
+[[nodiscard]] Artifact exportDls(const Project& project, const SourceStore& sources, const Collection& collection) {
+  std::vector<const InstrumentBankAsset*> instrumentBanks;
+  instrumentBanks.reserve(collection.instrumentBanks.size());
+  std::vector<const SampleCollectionAsset*> sampleCollections;
+  sampleCollections.reserve(collection.sampleCollections.size());
+  std::vector<Diagnostic> diagnostics;
+
+  for (const auto id : collection.instrumentBanks) {
+    if (const auto* instrumentBank = findInstrumentBankAsset(project, id)) {
+      instrumentBanks.push_back(instrumentBank);
+    } else {
+      diagnostics.push_back(exportError("Collection instrument bank asset was not found"));
+    }
+  }
+
+  for (const auto id : collection.sampleCollections) {
+    if (const auto* sampleCollection = findSampleCollectionAsset(project, id)) {
+      sampleCollections.push_back(sampleCollection);
+    } else {
+      diagnostics.push_back(exportError("Collection sample collection asset was not found"));
+    }
+  }
+
+  auto result = DlsExporter().exportDls(
+      DlsInput{
+          .name = artifactBaseName(collection),
+          .instrumentBanks = instrumentBanks,
+          .sampleCollections = sampleCollections,
+      },
+      sources);
+  diagnostics.insert(diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
+                     std::make_move_iterator(result.diagnostics.end()));
+
+  return Artifact{
+      .filename = filenamePart(artifactBaseName(collection)) + ".dls",
+      .mediaType = "audio/dls",
+      .bytes = std::move(result.bytes),
+      .diagnostics = std::move(diagnostics),
+  };
+}
+
 }  // namespace
 
 std::vector<Artifact> ExportService::exportCollection(const Project& project, const SourceStore& sources,
@@ -278,11 +313,7 @@ std::vector<Artifact> ExportService::exportCollection(const Project& project, co
         artifacts.push_back(exportSoundFont2(project, sources, *found));
         break;
       case ExportKind::Dls:
-        artifacts.push_back(Artifact{
-            .filename = artifactBaseName(*found) + "-export-unimplemented.txt",
-            .mediaType = "text/plain",
-            .diagnostics = {exportWarning("Requested export kind is not implemented in the value pipeline yet")},
-        });
+        artifacts.push_back(exportDls(project, sources, *found));
         break;
     }
   }

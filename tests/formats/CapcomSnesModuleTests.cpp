@@ -199,6 +199,21 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::vector<u8>{'s', 'f', 'b', 'k'},
          "SoundFont artifact should use sfbk RIFF type");
 
+  const auto dlsArtifacts = session.exportCollection(project.collections[0].id, ExportRequest{
+                                                                                    .kinds = {ExportKind::Dls},
+                                                                                });
+  expect(dlsArtifacts.size() == 1, "value export should produce one DLS artifact");
+  expect(dlsArtifacts[0].filename == "Mega Man X.dls", "DLS artifact should use collection name");
+  expect(dlsArtifacts[0].mediaType == "audio/dls", "DLS artifact should use audio/dls media type");
+  expect(dlsArtifacts[0].diagnostics.empty(), "DLS artifact should not carry diagnostics for complete fixture");
+  expect(dlsArtifacts[0].bytes.size() > 44, "DLS artifact should contain RIFF bytes");
+  expect(std::vector<u8>(dlsArtifacts[0].bytes.begin(), dlsArtifacts[0].bytes.begin() + 4) ==
+             std::vector<u8>{'R', 'I', 'F', 'F'},
+         "DLS artifact should start with a RIFF header");
+  expect(std::vector<u8>(dlsArtifacts[0].bytes.begin() + 8, dlsArtifacts[0].bytes.begin() + 12) ==
+             std::vector<u8>{'D', 'L', 'S', ' '},
+         "DLS artifact should use DLS RIFF type");
+
   const auto* instruments = std::get_if<InstrumentBankAsset>(&project.assets[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument bank");
   expect(instruments->bank.instruments.size() == 1, "instrument bank should parse one valid instrument");

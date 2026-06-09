@@ -5,6 +5,7 @@
  */
 
 #include "core/FormatModule.h"
+#include "core/DlsExporter.h"
 #include "core/MidiExporter.h"
 #include "core/ProjectSession.h"
 #include "core/SampleDecoder.h"
@@ -340,6 +341,83 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(chunkSize(result.bytes, "shdr") == 92, "SoundFont shdr chunk should include one sample and terminal record");
 }
 
+void dlsExporterWritesDlsRiffFile() {
+  SourceStore sources;
+  const auto sourceId = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
+
+  SampleCollectionAsset sampleCollection{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{2},
+              .format = "Probe",
+              .name = "Probe Samples",
+          },
+      .samples =
+          SampleCollection{
+              .samples = {Sample{
+                  .name = "Zero",
+                  .codec = AudioCodec::SnesBrr,
+                  .encodedData = SourceRange{.source = sourceId, .offset = 0, .size = 9},
+                  .sampleRate = 16000,
+                  .loop = Loop{.enabled = true, .start = 0, .length = 16},
+              }},
+          },
+  };
+  InstrumentBankAsset instrumentBank{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{1},
+              .format = "Probe",
+              .name = "Probe Instruments",
+          },
+      .bank =
+          InstrumentBank{
+              .instruments = {Instrument{
+                  .bank = 1,
+                  .program = 5,
+                  .name = "Lead",
+                  .regions = {Region{
+                      .keyRange = KeyRange{.low = 24, .high = 96},
+                      .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
+                      .tuning = Tuning{.cents = 125},
+                      .pan = 1.0,
+                  }},
+              }},
+          },
+  };
+
+  const std::array<const InstrumentBankAsset*, 1> banks{&instrumentBank};
+  const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
+  const auto result = DlsExporter().exportDls(
+      DlsInput{
+          .name = "Probe",
+          .instrumentBanks = banks,
+          .sampleCollections = samples,
+      },
+      sources);
+
+  expect(result.diagnostics.empty(), "DLS export should not report diagnostics for valid values");
+  expect(result.bytes.size() > 44, "DLS export should produce RIFF bytes");
+  expect(std::vector<u8>(result.bytes.begin(), result.bytes.begin() + 4) == std::vector<u8>{'R', 'I', 'F', 'F'},
+         "DLS export should start with RIFF");
+  expect(readLe32(result.bytes, 4) == result.bytes.size() - 8, "DLS RIFF size should match file size");
+  expect(std::vector<u8>(result.bytes.begin() + 8, result.bytes.begin() + 12) == std::vector<u8>{'D', 'L', 'S', ' '},
+         "DLS RIFF type should be DLS");
+  expect(containsAscii(result.bytes, "colh"), "DLS export should include collection header");
+  expect(containsAscii(result.bytes, "lins"), "DLS export should include instrument list");
+  expect(containsAscii(result.bytes, "ptbl"), "DLS export should include pool table");
+  expect(containsAscii(result.bytes, "wvpl"), "DLS export should include wave pool");
+  expect(containsAscii(result.bytes, "wave"), "DLS export should include wave list");
+  expect(containsAscii(result.bytes, "rgnh"), "DLS export should include region header");
+  expect(containsAscii(result.bytes, "wsmp"), "DLS export should include sample metadata");
+  expect(containsAscii(result.bytes, "wlnk"), "DLS export should include wave link");
+  expect(containsAscii(result.bytes, "Lead"), "DLS export should include instrument name");
+  expect(containsAscii(result.bytes, "Zero"), "DLS export should include sample name");
+  expect(chunkSize(result.bytes, "colh") == 4, "DLS colh chunk should store one u32 count");
+  expect(chunkSize(result.bytes, "ptbl") == 12, "DLS ptbl chunk should include one pool cue");
+  expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
+}
+
 }  // namespace
 
 int main() {
@@ -350,6 +428,7 @@ int main() {
     midiExporterWritesStandardMidiFile();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
+    dlsExporterWritesDlsRiffFile();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
