@@ -134,6 +134,25 @@ bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 source, u16 des
   return false;
 }
 
+bool dlsArt2ContainsConnection(
+    const std::vector<u8>& bytes,
+    u16 source,
+    u16 control,
+    u16 destination,
+    s32 expectedScale) {
+  const auto chunkOffset = asciiOffset(bytes, "art2");
+  const auto payloadOffset = chunkOffset + 8;
+  const auto connectionCount = readLe32(bytes, payloadOffset + 4);
+  for (u32 i = 0; i < connectionCount; ++i) {
+    const auto offset = payloadOffset + 8 + (static_cast<size_t>(i) * 12);
+    if (readLe16(bytes, offset) == source && readLe16(bytes, offset + 2) == control &&
+        readLe16(bytes, offset + 4) == destination && readLeS32(bytes, offset + 8) == expectedScale) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool sameRange(SourceRange lhs, SourceRange rhs) {
   return lhs.source == rhs.source && lhs.offset == rhs.offset && lhs.size == rhs.size;
 }
@@ -690,6 +709,13 @@ void dlsExporterWritesDlsRiffFile() {
                       SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
                       SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
                   },
+                  .modulators = {
+                      SynthModulator{
+                          .source = SynthSource::NoteOnVelocity,
+                          .destination = SynthDestination::VibratoDepth,
+                          .amount = 300,
+                      },
+                  },
               }},
           },
   };
@@ -725,7 +751,8 @@ void dlsExporterWritesDlsRiffFile() {
   expect(chunkSize(result.bytes, "colh") == 4, "DLS colh chunk should store one u32 count");
   expect(chunkSize(result.bytes, "ptbl") == 12, "DLS ptbl chunk should include one pool cue");
   expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
-  expect(chunkSize(result.bytes, "art2") == 92, "DLS art2 chunk should include pan, envelope, and generator connections");
+  expect(chunkSize(result.bytes, "art2") == 104,
+         "DLS art2 chunk should include pan, envelope, generator, and modulator connections");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0206, 0),
          "DLS export should write EG1 attack time from Region envelope");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 78643200),
@@ -738,6 +765,8 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should write instrument vibrato depth generator");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0000, 0x0114, 15728640),
          "DLS export should write instrument vibrato rate generator");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0009, 0x0002, 0x0003, 19660800),
+         "DLS export should write explicit velocity-to-vibrato modulator");
 }
 
 void exportDiagnosticsPreserveSourceRanges() {
