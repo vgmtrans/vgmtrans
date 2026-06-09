@@ -283,6 +283,7 @@ struct Tuning {
 inline constexpr u32 kEnvelopeInfinite = std::numeric_limits<u32>::max();
 
 struct Envelope {
+  // The all-zero default means no explicit envelope was parsed.
   // Time fields are microseconds. kEnvelopeInfinite means the stage has no finite duration.
   u32 attack = 0;
   u32 decay = 0;
@@ -290,6 +291,10 @@ struct Envelope {
   u32 sustain = 0;
   u32 release = 0;
 };
+
+[[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
+  return envelope.attack != 0 || envelope.decay != 0 || envelope.sustain != 0 || envelope.release != 0;
+}
 
 enum class SynthDestination {
   Pitch,

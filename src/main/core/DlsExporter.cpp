@@ -196,10 +196,6 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return static_cast<s32>(std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb));
 }
 
-[[nodiscard]] bool hasEnvelope(const Envelope& envelope) {
-  return envelope.attack != 0 || envelope.decay != 0 || envelope.sustain != 0 || envelope.release != 0;
-}
-
 [[nodiscard]] s32 dlsEnvelopeTimecents(u32 microseconds) {
   if (microseconds == 0) {
     return std::numeric_limits<s32>::min();
@@ -399,7 +395,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 
   std::vector<u8> connections;
   writeConnection(connections, kDlsConnDstPan, panScale);
-  if (hasEnvelope(region.envelope)) {
+  if (hasExplicitEnvelope(region.envelope)) {
     writeConnection(connections, kDlsConnDstEg1AttackTime, dlsEnvelopeTimecents(region.envelope.attack));
     writeConnection(connections, kDlsConnDstEg1DecayTime, dlsEnvelopeTimecents(region.envelope.decay));
     writeConnection(connections, kDlsConnDstEg1SustainLevel, dlsSustainLevel(region.envelope));
