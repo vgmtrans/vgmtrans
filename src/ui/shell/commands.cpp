@@ -26,9 +26,12 @@
 
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <optional>
+#include <span>
 #include <string>
+#include <system_error>
 
 #include <fmt/color.h>
 #include <fmt/format.h>
@@ -152,8 +155,35 @@ void writeToFile(const std::string& path, const char* data, size_t size) {
   }
 }
 
-void writeToFile(const std::filesystem::path& path, const std::vector<u8>& bytes) {
-  writeToFile(path.string(), reinterpret_cast<const char*>(bytes.data()), bytes.size());
+bool ensureDirectory(const std::filesystem::path& dir) {
+  std::error_code error;
+  std::filesystem::create_directories(dir, error);
+  if (error) {
+    fmt::println("Failed to create {}: {}", dir.string(), error.message());
+    return false;
+  }
+  if (!std::filesystem::is_directory(dir, error)) {
+    fmt::println("{} is not a directory", dir.string());
+    return false;
+  }
+  return true;
+}
+
+bool writeValueArtifact(const std::filesystem::path& path, std::span<const u8> bytes) {
+  std::ofstream file(path, std::ios::binary);
+  if (!file) {
+    fmt::println("Failed to open {} for writing", path.string());
+    return false;
+  }
+
+  file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+  if (!file) {
+    fmt::println("Failed to write {}", path.string());
+    return false;
+  }
+
+  fmt::println("Wrote {} bytes to {}", bytes.size(), path.string());
+  return true;
 }
 
 void printChildren(VGMItem* item) {
@@ -296,6 +326,80 @@ std::optional<vgmtrans::core::ExportKind> valueExportKindFromString(std::string 
     return vgmtrans::core::ExportKind::Wav;
   }
   return std::nullopt;
+}
+
+std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(
+    const std::vector<std::string>& args,
+    size_t kindArgIndex) {
+  vgmtrans::core::ExportRequest request{
+      .kinds = {
+          vgmtrans::core::ExportKind::Midi,
+          vgmtrans::core::ExportKind::SoundFont2,
+          vgmtrans::core::ExportKind::Dls,
+          vgmtrans::core::ExportKind::Wav,
+      },
+      .loopPolicy = vgmtrans::core::LoopPolicy::PlayOnce,
+  };
+
+  if (args.size() <= kindArgIndex) {
+    return request;
+  }
+
+  std::string kindName = args[kindArgIndex];
+  std::transform(kindName.begin(), kindName.end(), kindName.begin(), [](unsigned char ch) {
+    return static_cast<char>(std::tolower(ch));
+  });
+  if (kindName == "all") {
+    return request;
+  }
+
+  const auto kind = valueExportKindFromString(kindName);
+  if (!kind) {
+    fmt::println("Unknown value export kind '{}'. Use all, midi, sf2, dls, or wav.", args[kindArgIndex]);
+    return std::nullopt;
+  }
+
+  request.kinds = {*kind};
+  return request;
+}
+
+std::string valueSafePathPart(std::string name) {
+  if (name.empty()) {
+    return "unnamed";
+  }
+
+  for (char& ch : name) {
+    const auto value = static_cast<unsigned char>(ch);
+    if (std::iscntrl(value) || ch == '/' || ch == '\\' || ch == ':' || ch == '*' || ch == '?' || ch == '"' ||
+        ch == '<' || ch == '>' || ch == '|') {
+      ch = '_';
+    }
+  }
+  return name;
+}
+
+std::string valueCollectionDirectoryName(size_t index, const vgmtrans::core::Collection& collection) {
+  return fmt::format("{:03}-collection-{}-{}", index, collection.id.value,
+                     valueSafePathPart(collection.name));
+}
+
+size_t writeValueArtifacts(const std::filesystem::path& dir, std::span<const vgmtrans::core::Artifact> artifacts) {
+  size_t written = 0;
+  for (const auto& artifact : artifacts) {
+    for (const auto& diagnostic : artifact.diagnostics) {
+      printValueDiagnostic(diagnostic);
+    }
+
+    if (artifact.bytes.empty()) {
+      fmt::println("Skipped empty artifact {}", artifact.filename);
+      continue;
+    }
+
+    if (writeValueArtifact(dir / artifact.filename, artifact.bytes)) {
+      ++written;
+    }
+  }
+  return written;
 }
 
 }  // namespace
@@ -911,53 +1015,71 @@ void value_export(const std::vector<std::string>& args) {
     }
 
     std::filesystem::path dir = args[4];
-    if (!std::filesystem::exists(dir)) {
-      std::filesystem::create_directories(dir);
+    if (!ensureDirectory(dir)) {
+      return;
     }
 
-    vgmtrans::core::ExportRequest request{
-        .kinds = {
-            vgmtrans::core::ExportKind::Midi,
-            vgmtrans::core::ExportKind::SoundFont2,
-            vgmtrans::core::ExportKind::Dls,
-            vgmtrans::core::ExportKind::Wav,
-        },
-        .loopPolicy = vgmtrans::core::LoopPolicy::PlayOnce,
-    };
-
-    if (args.size() > 5) {
-      std::string kindName = args[5];
-      std::transform(kindName.begin(), kindName.end(), kindName.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-      });
-      if (kindName != "all") {
-        const auto kind = valueExportKindFromString(kindName);
-        if (!kind) {
-          fmt::println("Unknown value export kind '{}'. Use all, midi, sf2, dls, or wav.", args[5]);
-          return;
-        }
-        request.kinds = {*kind};
-      }
+    const auto request = valueExportRequestFromArgs(args, 5);
+    if (!request) {
+      return;
     }
 
     const auto collectionId = project.collections[static_cast<size_t>(collectionIndex)].id;
-    const auto artifacts = session.exportCollection(collectionId, request);
-    for (const auto& artifact : artifacts) {
-      for (const auto& diagnostic : artifact.diagnostics) {
-        printValueDiagnostic(diagnostic);
-      }
-
-      if (artifact.bytes.empty()) {
-        fmt::println("Skipped empty artifact {}", artifact.filename);
-        continue;
-      }
-
-      const auto path = dir / artifact.filename;
-      writeToFile(path, artifact.bytes);
-    }
+    const auto artifacts = session.exportCollection(collectionId, *request);
+    const auto written = writeValueArtifacts(dir, artifacts);
+    fmt::println("Exported {} value artifacts for collection '{}'.", written,
+                 project.collections[static_cast<size_t>(collectionIndex)].name);
   } catch (...) {
     fmt::println("Invalid arguments");
   }
+}
+
+void value_export_all(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  const auto project = session.scan();
+  if (project.collections.empty()) {
+    fmt::println("Value scan did not discover any collections.");
+    for (const auto& diagnostic : project.diagnostics) {
+      printValueDiagnostic(diagnostic);
+    }
+    return;
+  }
+
+  std::filesystem::path dir = args[3];
+  if (!ensureDirectory(dir)) {
+    return;
+  }
+
+  const auto request = valueExportRequestFromArgs(args, 4);
+  if (!request) {
+    return;
+  }
+
+  const auto exports = session.exportAllCollections(*request);
+  size_t written = 0;
+  for (size_t i = 0; i < exports.size(); ++i) {
+    const auto& collectionExport = exports[i];
+    const auto* collection = vgmtrans::core::collectionById(project, collectionExport.collection);
+    if (collection == nullptr) {
+      fmt::println("Export skipped missing collection id {}", collectionExport.collection.value);
+      continue;
+    }
+
+    const auto collectionDir = dir / valueCollectionDirectoryName(i, *collection);
+    if (!ensureDirectory(collectionDir)) {
+      continue;
+    }
+
+    fmt::println("Exporting value collection '{}' to {}...", collection->name, collectionDir.string());
+    written += writeValueArtifacts(collectionDir, collectionExport.artifacts);
+  }
+
+  fmt::println("Exported {} value artifacts from {} collections.", written, exports.size());
 }
 
 void cmd_load(const std::vector<std::string>& args) {
@@ -1091,7 +1213,9 @@ void registerCommands() {
       {{"scan", "<rawfile_idx>", "Scan a raw file with value modules", 3, value_scan},
        {"tree", "<rawfile_idx> <asset_idx> [depth]", "Show a value asset ItemTree", 4, value_tree},
        {"export", "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav]",
-        "Export value artifacts for a collection", 5, value_export}}};
+        "Export value artifacts for a collection", 5, value_export},
+       {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav]",
+        "Export value artifacts for all collections", 4, value_export_all}}};
 
   commandRegistry["help"] = {"help", "Show this help", {}};
   commandRegistry["exit"] = {"exit", "Exit the shell", {}};
