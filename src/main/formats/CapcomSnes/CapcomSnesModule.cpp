@@ -519,7 +519,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
                  std::to_string(typedCommand.rawAttributes) + ", destination $" +
                  std::to_string(typedCommand.destination.value);
         } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
-          return "Destination $" + std::to_string(typedCommand.destination.value);
+          return "Destination $" + std::to_string(typedCommand.destination.value) +
+                 ", trigger $" + std::to_string(typedCommand.trigger.value);
         } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
           return "Opcode " + std::to_string(typedCommand.opcode);
         } else if constexpr (std::is_same_v<Command, DriverSpecificCommand>) {
@@ -544,17 +545,20 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 
   std::set<u32> visitedOffsets;
   u32 offset = startAddress;
+  u32 lastCommandOffset = startAddress;
 
   while (reader.has(offset, 1) && track.commands.size() < 4096) {
     if (!visitedOffsets.insert(offset).second) {
       track.commands.push_back(LoopBoundaryCommand{
           .destination = Address{offset},
+          .trigger = Address{lastCommandOffset},
           .range = reader.range(offset, 0),
       });
       break;
     }
 
     const u32 beginOffset = offset;
+    lastCommandOffset = beginOffset;
     const u8 status = reader.u8At(offset++);
 
     if (status >= 0x20) {

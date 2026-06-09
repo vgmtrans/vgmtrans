@@ -187,6 +187,7 @@ struct RepeatBreakCommand {
 
 struct LoopBoundaryCommand {
   Address destination;
+  Address trigger;
   SourceRange range;
 };
 

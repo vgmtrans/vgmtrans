@@ -296,7 +296,7 @@ void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
           .startAddress = Address{0},
           .commands = {
               NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-              LoopBoundaryCommand{.destination = Address{1}, .range = range(1, 0)},
+              LoopBoundaryCommand{.destination = Address{1}, .trigger = Address{0}, .range = range(1, 0)},
               VolumeCommand{.rawValue = 99, .range = range(2, 1)},
           },
       }},
