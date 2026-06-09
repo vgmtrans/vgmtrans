@@ -7,6 +7,7 @@
 #include "core/FormatModule.h"
 #include "core/DlsExporter.h"
 #include "core/MidiExporter.h"
+#include "core/PerformanceLowerer.h"
 #include "core/ProjectSession.h"
 #include "core/SampleDecoder.h"
 #include "core/SoundFontExporter.h"
@@ -251,6 +252,38 @@ void midiExporterWritesStandardMidiFile() {
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
 }
 
+void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
+  const auto range = [](u64 offset, u64 size) {
+    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
+  };
+  const SequenceProgram program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {TrackProgram{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .startAddress = Address{0},
+          .commands = {
+              NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
+              VolumeCommand{.rawValue = 99, .range = range(1, 1)},
+              JumpCommand{.destination = Address{0}, .range = range(2, 3)},
+              EndCommand{.range = range(5, 1)},
+          },
+      }},
+  };
+
+  const PerformanceSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const auto& events = performance.tracks[0].events;
+  expect(std::ranges::any_of(events, [](const PerformanceEvent& event) {
+           const auto* note = std::get_if<NoteDuration>(&event);
+           return note != nullptr && note->tick == 0 && note->duration == 12;
+         }),
+         "play-once loop fixture should emit the note before the loop boundary");
+  expect(std::ranges::none_of(events, [](const PerformanceEvent& event) {
+           return std::holds_alternative<Volume>(event);
+         }),
+         "play-once lowering should skip commands exactly at the loop boundary");
+}
+
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -427,6 +460,7 @@ int main() {
     projectSessionScansValuesAndVirtualSources();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
+    performanceLowererSkipsCommandsAtPlayOnceLoopBoundary();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();

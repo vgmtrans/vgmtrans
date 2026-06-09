@@ -369,12 +369,14 @@ PerformanceSequence PerformanceLowerer::lower(
   };
 
   std::optional<u64> playOnceStopTick;
+  std::vector<std::optional<u64>> firstLoopTicks(program.tracks.size());
   if (loopPolicy == LoopPolicy::PlayOnce) {
     for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
       const auto loopTick = firstLoopTick(program,
                                          program.tracks[trackIndex],
                                          profile,
                                          static_cast<u8>(trackIndex % 16));
+      firstLoopTicks[trackIndex] = loopTick;
       if (loopTick.has_value() && (!playOnceStopTick.has_value() || *loopTick > *playOnceStopTick)) {
         playOnceStopTick = loopTick;
       }
@@ -413,8 +415,16 @@ PerformanceSequence PerformanceLowerer::lower(
     size_t executedCommands = 0;
     bool ended = false;
     std::optional<u64> loopPlaybackStopTick;
+    if (loopPolicy == LoopPolicy::PlayOnce && playOnceStopTick.has_value() && firstLoopTicks[trackIndex].has_value()) {
+      loopPlaybackStopTick = playOnceStopTick;
+    }
     std::vector<size_t> pendingNoteIndexes;
     while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
+      if (loopPlaybackStopTick.has_value() && state.tick >= *loopPlaybackStopTick) {
+        ended = true;
+        break;
+      }
+
       const auto& command = track.commands[pc];
       bool incrementPc = true;
 
