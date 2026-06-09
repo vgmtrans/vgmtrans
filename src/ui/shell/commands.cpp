@@ -315,6 +315,36 @@ void printValueItemTree(const vgmtrans::core::ItemTree& tree,
   }
 }
 
+bool printValueAssetTree(const vgmtrans::core::Project& project,
+                         const std::vector<std::string>& args,
+                         size_t assetArgIndex) {
+  try {
+    const int assetIndex = std::stoi(args[assetArgIndex]);
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets.size()) {
+      fmt::println("Asset index out of bounds");
+      return false;
+    }
+
+    int maxDepth = 4;
+    const size_t depthArgIndex = assetArgIndex + 1;
+    if (args.size() > depthArgIndex) {
+      maxDepth = std::stoi(args[depthArgIndex]);
+    }
+
+    const auto& items = vgmtrans::core::metadata(project.assets[static_cast<size_t>(assetIndex)]).items;
+    if (!items.root) {
+      fmt::println("Asset has no item tree");
+      return false;
+    }
+
+    printValueItemTree(items, *items.root, 0, maxDepth);
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+}
+
 std::optional<vgmtrans::core::ExportKind> valueExportKindFromString(std::string kind) {
   std::transform(kind.begin(), kind.end(), kind.begin(), [](unsigned char ch) {
     return static_cast<char>(std::tolower(ch));
@@ -1018,28 +1048,16 @@ void value_tree(const std::vector<std::string>& args) {
 
   auto session = valueSessionForRawFile(*file);
   const auto project = session.scan();
+  printValueAssetTree(project, args, 3);
+}
 
+void value_tree_path(const std::vector<std::string>& args) {
   try {
-    const int assetIndex = std::stoi(args[3]);
-    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets.size()) {
-      fmt::println("Asset index out of bounds");
-      return;
-    }
-
-    int maxDepth = 4;
-    if (args.size() > 4) {
-      maxDepth = std::stoi(args[4]);
-    }
-
-    const auto& items = vgmtrans::core::metadata(project.assets[static_cast<size_t>(assetIndex)]).items;
-    if (!items.root) {
-      fmt::println("Asset has no item tree");
-      return;
-    }
-
-    printValueItemTree(items, *items.root, 0, maxDepth);
-  } catch (...) {
-    fmt::println("Invalid arguments");
+    auto session = valueSessionForPath(args[2]);
+    const auto project = session.scan();
+    printValueAssetTree(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-tree {}: {}", args[2], ex.what());
   }
 }
 
@@ -1267,6 +1285,8 @@ void registerCommands() {
       {{"scan", "<rawfile_idx>", "Scan a raw file with value modules", 3, value_scan},
        {"scan-path", "<path>", "Scan a filesystem path with value modules", 3, value_scan_path},
        {"tree", "<rawfile_idx> <asset_idx> [depth]", "Show a value asset ItemTree", 4, value_tree},
+       {"tree-path", "<path> <asset_idx> [depth]", "Show a value asset ItemTree from a filesystem path",
+        4, value_tree_path},
        {"export", "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav]",
         "Export value artifacts for a collection", 5, value_export},
        {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav]",
