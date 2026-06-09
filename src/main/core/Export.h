@@ -35,12 +35,23 @@ struct Artifact {
   std::vector<Diagnostic> diagnostics;
 };
 
+struct CollectionExport {
+  CollectionId collection;
+  std::vector<Artifact> artifacts;
+};
+
 class ExportService {
  public:
   [[nodiscard]] std::vector<Artifact> exportCollection(
       const Project& project,
       const SourceStore& sources,
       CollectionId collection,
+      const ExportRequest& request,
+      const SequencerProfileRegistry& profiles) const;
+
+  [[nodiscard]] std::vector<CollectionExport> exportAllCollections(
+      const Project& project,
+      const SourceStore& sources,
       const ExportRequest& request,
       const SequencerProfileRegistry& profiles) const;
 };

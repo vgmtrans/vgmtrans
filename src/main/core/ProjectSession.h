@@ -25,6 +25,9 @@ class ProjectSession {
       CollectionId id,
       const ExportRequest& request) const;
 
+  [[nodiscard]] std::vector<CollectionExport> exportAllCollections(
+      const ExportRequest& request) const;
+
   [[nodiscard]] const SourceStore& sources() const noexcept { return sources_; }
   [[nodiscard]] SourceStore& sources() noexcept { return sources_; }
   [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }

@@ -374,6 +374,32 @@ void projectSessionScansValuesAndVirtualSources() {
   expect(project.sources.size() == 2, "rescan should replace, not duplicate, virtual tail sources");
 }
 
+void projectSessionExportsAllCollections() {
+  ProjectSession session;
+  session.formats().add(std::make_unique<ProbeSequenceModule>());
+
+  session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
+  session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
+  const Project project = session.scan();
+  expect(project.collections.size() == 2, "probe sources should produce two collections");
+
+  const auto exports = session.exportAllCollections(ExportRequest{
+      .kinds = {ExportKind::Midi},
+  });
+  expect(exports.size() == project.collections.size(), "all-collection export should cover every collection");
+
+  for (size_t i = 0; i < exports.size(); ++i) {
+    expect(exports[i].collection == project.collections[i].id,
+           "all-collection export should preserve collection ids in project order");
+    expect(exports[i].artifacts.size() == 1, "probe MIDI export should return one artifact per collection");
+    expect(exports[i].artifacts[0].filename == project.collections[i].name + ".mid",
+           "collection export should keep collection-derived artifact names");
+    expect(exports[i].artifacts[0].mediaType == "audio/midi", "collection export should keep artifact media types");
+    expect(!exports[i].artifacts[0].diagnostics.empty(),
+           "collection export diagnostics should stay attached to the artifact");
+  }
+}
+
 void snesBrrDecoderProducesPcm() {
   const std::vector<u8> sourceBytes{0x01, 0, 0, 0, 0, 0, 0, 0, 0};
   const Sample sample{
@@ -955,6 +981,7 @@ int main() {
     byteReaderChecksBoundsAndEndian();
     sequencerCommandExposesSourceRange();
     projectSessionScansValuesAndVirtualSources();
+    projectSessionExportsAllCollections();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
     performanceLowererSkipsCommandsAtPlayOnceLoopBoundary();

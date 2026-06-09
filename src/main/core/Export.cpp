@@ -299,4 +299,18 @@ std::vector<Artifact> ExportService::exportCollection(const Project& project, co
   return artifacts;
 }
 
+std::vector<CollectionExport> ExportService::exportAllCollections(const Project& project, const SourceStore& sources,
+                                                                  const ExportRequest& request,
+                                                                  const SequencerProfileRegistry& profiles) const {
+  std::vector<CollectionExport> exports;
+  exports.reserve(project.collections.size());
+  for (const auto& collection : project.collections) {
+    exports.push_back(CollectionExport{
+        .collection = collection.id,
+        .artifacts = exportCollection(project, sources, collection.id, request, profiles),
+    });
+  }
+  return exports;
+}
+
 }  // namespace vgmtrans::core

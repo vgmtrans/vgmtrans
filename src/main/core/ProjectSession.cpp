@@ -27,4 +27,9 @@ std::vector<Artifact> ProjectSession::exportCollection(
   return exporter_.exportCollection(project_, sources_, id, request, profiles_);
 }
 
+std::vector<CollectionExport> ProjectSession::exportAllCollections(
+    const ExportRequest& request) const {
+  return exporter_.exportAllCollections(project_, sources_, request, profiles_);
+}
+
 }  // namespace vgmtrans::core

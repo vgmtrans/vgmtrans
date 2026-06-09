@@ -1654,19 +1654,9 @@ int compareCapcomSnesRsnDirectSummary(const std::filesystem::path& path) {
   return 0;
 }
 
-bool validateValueCollectionExports(ProjectSession& session, const Project& project, const Collection& collection,
-                                    u32 expectedWavs, std::ostream& out, u64& totalArtifacts) {
-  const auto artifacts = session.exportCollection(collection.id, ExportRequest{
-                                                                     .kinds =
-                                                                         {
-                                                                             ExportKind::Midi,
-                                                                             ExportKind::SoundFont2,
-                                                                             ExportKind::Dls,
-                                                                             ExportKind::Wav,
-                                                                         },
-                                                                     .loopPolicy = LoopPolicy::PlayOnce,
-                                                                 });
-
+bool validateValueCollectionExports(const Project& project, const Collection& collection,
+                                    std::span<const Artifact> artifacts, u32 expectedWavs, std::ostream& out,
+                                    u64& totalArtifacts) {
   ExportSmokeCounts counts;
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1739,23 +1729,48 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
     return 1;
   }
 
+  const auto collectionExports = session.exportAllCollections(ExportRequest{
+      .kinds = {ExportKind::Midi, ExportKind::SoundFont2, ExportKind::Dls, ExportKind::Wav},
+      .loopPolicy = LoopPolicy::PlayOnce,
+  });
+  if (collectionExports.size() != project.collections.size()) {
+    std::cout << "value all-collection export count differs: collections=" << project.collections.size()
+              << " exports=" << collectionExports.size() << "\n";
+    return 1;
+  }
+
   u64 totalArtifacts = 0;
-  for (const auto& collection : project.collections) {
-    const auto found = legacySummaries.find(collection.name);
-    if (found == legacySummaries.end()) {
-      std::cout << "value RSN scan produced collection not found in legacy scan: '" << collection.name << "'\n";
+  std::vector<CollectionId> exportedCollections;
+  for (const auto& collectionExport : collectionExports) {
+    if (std::ranges::find(exportedCollections, collectionExport.collection) != exportedCollections.end()) {
+      std::cout << "value all-collection export repeated collection id " << collectionExport.collection.value << "\n";
+      return 1;
+    }
+    exportedCollections.push_back(collectionExport.collection);
+
+    const auto* collection = collectionById(project, collectionExport.collection);
+    if (collection == nullptr) {
+      std::cout << "value all-collection export referenced missing collection id "
+                << collectionExport.collection.value << "\n";
       return 1;
     }
 
-    const auto expectedWavs = valueSampleCount(project, collection);
+    const auto found = legacySummaries.find(collection->name);
+    if (found == legacySummaries.end()) {
+      std::cout << "value RSN scan produced collection not found in legacy scan: '" << collection->name << "'\n";
+      return 1;
+    }
+
+    const auto expectedWavs = valueSampleCount(project, *collection);
     const auto legacySampleCount = static_cast<u32>(found->second.samples.size());
     if (expectedWavs != legacySampleCount) {
-      std::cout << "value sample count differs for '" << collection.name << "': legacy=" << legacySampleCount
+      std::cout << "value sample count differs for '" << collection->name << "': legacy=" << legacySampleCount
                 << " value=" << expectedWavs << "\n";
       return 1;
     }
 
-    if (!validateValueCollectionExports(session, project, collection, expectedWavs, std::cout, totalArtifacts)) {
+    if (!validateValueCollectionExports(project, *collection, collectionExport.artifacts, expectedWavs, std::cout,
+                                        totalArtifacts)) {
       return 1;
     }
   }
