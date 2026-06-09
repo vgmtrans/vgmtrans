@@ -560,7 +560,11 @@ PerformanceSequence PerformanceLowerer::lower(
               loweredTrack.events.push_back(EndOfTrack{.tick = state.tick});
               ended = true;
             } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
-              result.diagnostics.push_back(warning("Unknown sequencer command was skipped", typedCommand.range));
+              result.diagnostics.push_back(warning("Unknown sequencer command " +
+                                                       std::to_string(typedCommand.opcode) +
+                                                       " was skipped at source offset " +
+                                                       std::to_string(typedCommand.range.offset),
+                                                   typedCommand.range));
             }
           },
           command);

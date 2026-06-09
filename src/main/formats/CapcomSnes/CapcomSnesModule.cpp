@@ -541,10 +541,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 
   while (reader.has(offset, 1) && track.commands.size() < 4096) {
     if (!visitedOffsets.insert(offset).second) {
-      track.commands.push_back(UnknownCommand{
-          .opcode = 0,
-          .range = reader.range(offset, 0),
-      });
+      track.commands.push_back(driverCommand("Decoded Loop", reader, offset, 0));
       break;
     }
 
