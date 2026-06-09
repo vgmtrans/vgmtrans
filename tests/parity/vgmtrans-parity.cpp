@@ -36,6 +36,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <variant>
@@ -1071,6 +1072,70 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
   return midis;
 }
 
+bool bytesMatch(std::span<const u8> bytes, size_t offset, std::string_view expected) {
+  if (offset > bytes.size() || expected.size() > bytes.size() - offset) {
+    return false;
+  }
+
+  for (size_t i = 0; i < expected.size(); ++i) {
+    if (bytes[offset + i] != static_cast<u8>(expected[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool endsWith(std::string_view text, std::string_view suffix) {
+  return text.size() >= suffix.size() && text.substr(text.size() - suffix.size()) == suffix;
+}
+
+u32 valueSampleCount(const Project& project, const Collection& collection) {
+  u32 sampleCount = 0;
+  for (const auto sampleCollectionId : collection.sampleCollections) {
+    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, sampleCollectionId)) {
+      sampleCount += static_cast<u32>(sampleCollection->samples.samples.size());
+    }
+  }
+  return sampleCount;
+}
+
+struct ExportSmokeCounts {
+  u32 midi = 0;
+  u32 soundFont2 = 0;
+  u32 dls = 0;
+  u32 wav = 0;
+};
+
+bool validateExportArtifact(const Artifact& artifact, std::string_view expectedExtension, std::string_view header,
+                            std::string_view formatTag, std::ostream& out) {
+  if (!artifact.diagnostics.empty()) {
+    out << "artifact '" << artifact.filename << "' reported: " << artifact.diagnostics.front().message << "\n";
+    return false;
+  }
+
+  if (artifact.bytes.empty()) {
+    out << "artifact '" << artifact.filename << "' was empty\n";
+    return false;
+  }
+
+  if (!endsWith(artifact.filename, expectedExtension)) {
+    out << "artifact '" << artifact.filename << "' did not end with " << expectedExtension << "\n";
+    return false;
+  }
+
+  if (!bytesMatch(artifact.bytes, 0, header)) {
+    out << "artifact '" << artifact.filename << "' did not start with " << header << "\n";
+    return false;
+  }
+
+  if (!formatTag.empty() && !bytesMatch(artifact.bytes, 8, formatTag)) {
+    out << "artifact '" << artifact.filename << "' did not contain " << formatTag << " at offset 8\n";
+    return false;
+  }
+
+  return true;
+}
+
 class MidiReader {
 public:
   explicit MidiReader(std::span<const u8> bytes) : bytes_(bytes) {}
@@ -1589,6 +1654,117 @@ int compareCapcomSnesRsnDirectSummary(const std::filesystem::path& path) {
   return 0;
 }
 
+bool validateValueCollectionExports(ProjectSession& session, const Project& project, const Collection& collection,
+                                    u32 expectedWavs, std::ostream& out, u64& totalArtifacts) {
+  const auto artifacts = session.exportCollection(collection.id, ExportRequest{
+                                                                     .kinds =
+                                                                         {
+                                                                             ExportKind::Midi,
+                                                                             ExportKind::SoundFont2,
+                                                                             ExportKind::Dls,
+                                                                             ExportKind::Wav,
+                                                                         },
+                                                                     .loopPolicy = LoopPolicy::PlayOnce,
+                                                                 });
+
+  ExportSmokeCounts counts;
+  for (const auto& artifact : artifacts) {
+    if (artifact.mediaType == "audio/midi") {
+      ++counts.midi;
+      if (!validateExportArtifact(artifact, ".mid", "MThd", std::string_view{}, out)) {
+        return false;
+      }
+    } else if (artifact.mediaType == "audio/soundfont") {
+      ++counts.soundFont2;
+      if (!validateExportArtifact(artifact, ".sf2", "RIFF", "sfbk", out)) {
+        return false;
+      }
+    } else if (artifact.mediaType == "audio/dls") {
+      ++counts.dls;
+      if (!validateExportArtifact(artifact, ".dls", "RIFF", "DLS ", out)) {
+        return false;
+      }
+    } else if (artifact.mediaType == "audio/wav") {
+      ++counts.wav;
+      if (!validateExportArtifact(artifact, ".wav", "RIFF", "WAVE", out)) {
+        return false;
+      }
+    } else {
+      out << "collection '" << collection.name << "' produced unexpected media type '" << artifact.mediaType
+          << "' in artifact '" << artifact.filename << "'\n";
+      return false;
+    }
+  }
+
+  if (counts.midi != 1 || counts.soundFont2 != 1 || counts.dls != 1 || counts.wav != expectedWavs) {
+    out << "unexpected export counts for '" << collection.name << "': midi=" << counts.midi
+        << " sf2=" << counts.soundFont2 << " dls=" << counts.dls << " wav=" << counts.wav
+        << " expectedWav=" << expectedWavs << "\n";
+    return false;
+  }
+
+  const auto valueWavs = valueSampleCount(project, collection);
+  if (valueWavs != expectedWavs) {
+    out << "collection '" << collection.name << "' value sample count changed during export: before=" << expectedWavs
+        << " after=" << valueWavs << "\n";
+    return false;
+  }
+
+  totalArtifacts += artifacts.size();
+  out << "exported " << collection.name << " via direct RSN value scan: artifacts=" << artifacts.size()
+      << " wavs=" << counts.wav << "\n";
+  return true;
+}
+
+int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
+  const auto legacySummaries = legacyCapcomSnesRsnSummaries(path);
+
+  ProjectSession session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+  const Project project = session.scan();
+
+  if (project.collections.empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover collections from RSN";
+    if (!project.diagnostics.empty()) {
+      message << ": " << project.diagnostics.front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  if (project.collections.size() != legacySummaries.size()) {
+    std::cout << "value RSN collection count differs: legacy=" << legacySummaries.size()
+              << " value=" << project.collections.size() << "\n";
+    return 1;
+  }
+
+  u64 totalArtifacts = 0;
+  for (const auto& collection : project.collections) {
+    const auto found = legacySummaries.find(collection.name);
+    if (found == legacySummaries.end()) {
+      std::cout << "value RSN scan produced collection not found in legacy scan: '" << collection.name << "'\n";
+      return 1;
+    }
+
+    const auto expectedWavs = valueSampleCount(project, collection);
+    const auto legacySampleCount = static_cast<u32>(found->second.samples.size());
+    if (expectedWavs != legacySampleCount) {
+      std::cout << "value sample count differs for '" << collection.name << "': legacy=" << legacySampleCount
+                << " value=" << expectedWavs << "\n";
+      return 1;
+    }
+
+    if (!validateValueCollectionExports(session, project, collection, expectedWavs, std::cout, totalArtifacts)) {
+      return 1;
+    }
+  }
+
+  std::cout << "CapcomSnes direct RSN export smoke ok: collections=" << project.collections.size()
+            << " artifacts=" << totalArtifacts << "\n";
+  return 0;
+}
+
 int compareCapcomSnesAramSummary(const std::filesystem::path& path) {
   const auto aramBytes = readFile(path);
   return compareCapcomSnesSummary(aramBytes, path.filename().string(), std::cout) ? 0 : 1;
@@ -1617,6 +1793,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-aram-midi <raw-aram-file>\n"
       << "  vgmtrans-parity capcom-snes-aram-summary <raw-aram-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-midi <rsn-file>\n"
+      << "  vgmtrans-parity capcom-snes-rsn-direct-export <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-midi <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n";
@@ -1640,6 +1817,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-midi") {
       return compareCapcomSnesRsnDirectMidi(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-export") {
+      return compareCapcomSnesRsnDirectExport(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-summary") {
