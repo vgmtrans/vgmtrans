@@ -35,6 +35,7 @@ void capcomSnesNoteStateCommandsAreTypedAndLowered();
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
 void capcomSnesPanLoweringDoesNotRecurveMidiPan();
 void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
+void capcomSnesMidiExportUsesSequenceProfileKey();
 
 namespace {
 
@@ -348,6 +349,10 @@ void sequencerCommandExposesSourceRange() {
   expect(defaultCommandName(noteState) == "Note Attributes",
          "default command name should describe typed note-state actions");
   expect(defaultCommandName(driver) == "Probe", "default command name should preserve driver-specific names");
+  expect(defaultCommandDetailKind(noteState) == "note-attributes",
+         "default command detail kind should describe typed note-state actions");
+  expect(defaultCommandDescription(note) == "Key 64, length index 4",
+         "default command description should describe typed note commands");
 }
 
 void projectSessionScansValuesAndVirtualSources() {
@@ -1068,6 +1073,7 @@ int main() {
     capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
     capcomSnesPanLoweringDoesNotRecurveMidiPan();
     capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
+    capcomSnesMidiExportUsesSequenceProfileKey();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;

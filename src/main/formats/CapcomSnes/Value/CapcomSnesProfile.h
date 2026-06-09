@@ -8,13 +8,18 @@
 
 #include "core/PerformanceLowerer.h"
 
+#include <string_view>
+
 namespace vgmtrans::formats::capcom_snes {
 
 enum class CapcomSnesEngineVersion : u8 {
+  none,
   v1BgmInList,
   v2BgmUsuallyAtFixedLocation,
   v3BgmFixedLocation,
 };
+
+[[nodiscard]] std::string_view capcomSnesProfileName(CapcomSnesEngineVersion version);
 
 class CapcomSnesProfile final : public core::SequencerProfile {
  public:

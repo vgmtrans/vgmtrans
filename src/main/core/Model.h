@@ -252,6 +252,8 @@ using SequencerCommand = std::variant<
     DriverSpecificCommand>;
 
 [[nodiscard]] std::string defaultCommandName(const SequencerCommand& command);
+[[nodiscard]] std::string defaultCommandDetailKind(const SequencerCommand& command);
+[[nodiscard]] std::string defaultCommandDescription(const SequencerCommand& command);
 
 struct TrackProgram {
   TrackId id;
@@ -275,6 +277,7 @@ struct SequenceProgram {
   std::vector<TrackProgram> tracks;
   std::vector<InstrumentRef> referencedInstruments;
   SequenceBehavior behavior;
+  std::string sequencerProfile;
 };
 
 struct SequenceAsset {

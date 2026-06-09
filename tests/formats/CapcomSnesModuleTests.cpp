@@ -6,6 +6,7 @@
 
 #include "formats/CapcomSnes/Value/CapcomSnesModule.h"
 
+#include "core/Export.h"
 #include "core/MidiExporter.h"
 #include "core/PerformanceLowerer.h"
 #include "core/ProjectSession.h"
@@ -142,6 +143,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->program.behavior.writeInitialMonoMode, "sequence should carry mono mode behavior");
   expect(sequence->program.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
          "sequence should carry CapcomSnes default loop policy");
+  expect(sequence->program.sequencerProfile == capcomSnesProfileName(CapcomSnesEngineVersion::v3BgmFixedLocation),
+         "sequence should carry the detected CapcomSnes profile key");
   expect(sequence->program.tracks.size() == 8, "sequence should decode all nonzero track pointers");
   expect(std::holds_alternative<TempoCommand>(sequence->program.tracks[0].commands[0]),
          "track should decode tempo command");
@@ -623,4 +626,57 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
   expect(masterVolume != events.end(), "CapcomSnes V1 master volume should lower to MIDI master volume");
   expect(std::get<MasterVolume>(*masterVolume).value == 1777,
          "CapcomSnes V1 master volume should apply the amplitude curve before MIDI quantization");
+}
+
+void capcomSnesMidiExportUsesSequenceProfileKey() {
+  const SequenceProgram program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {TrackProgram{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .startAddress = Address{0x3000},
+          .commands = {
+              PanCommand{.rawValue = 0x01},
+              EndCommand{},
+          },
+      }},
+      .sequencerProfile = std::string(capcomSnesProfileName(CapcomSnesEngineVersion::v1BgmInList)),
+  };
+
+  Project project;
+  project.assets.emplace_back(SequenceAsset{
+      .metadata = AssetMetadata{
+          .id = AssetId{0},
+          .format = "CapcomSnes",
+          .name = "V1",
+      },
+      .program = program,
+  });
+  project.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "V1",
+      .sequence = AssetId{0},
+  });
+
+  SourceStore sources;
+  SequencerProfileRegistry profiles;
+  registerCapcomSnesProfile(profiles);
+
+  const auto artifacts = ExportService().exportCollection(project,
+                                                          sources,
+                                                          CollectionId{0},
+                                                          ExportRequest{
+                                                              .kinds = {ExportKind::Midi},
+                                                              .loopPolicy = LoopPolicy::PlayOnce,
+                                                          },
+                                                          profiles);
+  expect(artifacts.size() == 1, "CapcomSnes profile-key export should produce one MIDI artifact");
+  expect(artifacts[0].diagnostics.empty(), "CapcomSnes profile-key export should not report diagnostics");
+
+  const auto v1Bytes = MidiExporter().exportMidi(PerformanceLowerer().lower(
+      program, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce));
+  const auto v3Bytes = MidiExporter().exportMidi(PerformanceLowerer().lower(
+      program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce));
+  expect(artifacts[0].bytes == v1Bytes, "MIDI export should use the sequence's explicit CapcomSnes profile key");
+  expect(artifacts[0].bytes != v3Bytes, "MIDI export should not fall back to the default CapcomSnes profile");
 }

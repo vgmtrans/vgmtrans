@@ -152,6 +152,10 @@ target_sources(vgmtransvalueformats
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
     formats/CapcomSnes/Value/CapcomSnesModule.cpp
     formats/CapcomSnes/Value/CapcomSnesProfile.cpp
+    formats/CapcomSnes/Value/CapcomSnesValueItems.cpp
+    formats/CapcomSnes/Value/CapcomSnesValueScan.cpp
+    formats/CapcomSnes/Value/CapcomSnesValueSequence.cpp
+    formats/CapcomSnes/Value/CapcomSnesValueSynth.cpp
     formats/SnesRsn/SnesRsnModule.cpp
     formats/SnesSpc/SnesSpcModule.cpp
   PUBLIC
@@ -162,6 +166,10 @@ target_sources(vgmtransvalueformats
       formats/CapcomSnes/CapcomSnesDriverMath.h
       formats/CapcomSnes/Value/CapcomSnesModule.h
       formats/CapcomSnes/Value/CapcomSnesProfile.h
+      formats/CapcomSnes/Value/CapcomSnesValueItems.h
+      formats/CapcomSnes/Value/CapcomSnesValueScan.h
+      formats/CapcomSnes/Value/CapcomSnesValueSequence.h
+      formats/CapcomSnes/Value/CapcomSnesValueSynth.h
       formats/SnesRsn/SnesRsnModule.h
       formats/SnesSpc/SnesSpcModule.h
 )

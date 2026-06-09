@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -36,6 +37,23 @@ struct ScanInput {
   SourceFile source;
   ByteReader reader;
   ScanIdAllocator& ids;
+};
+
+class ItemTreeBuilder {
+ public:
+  ItemTreeBuilder(ItemTree& tree, ScanIdAllocator& ids);
+
+  [[nodiscard]] ItemId add(
+      std::optional<ItemId> parent,
+      ItemKind kind,
+      std::string detailKind,
+      std::string name,
+      SourceRange range,
+      std::string description = {});
+
+ private:
+  ItemTree& tree_;
+  ScanIdAllocator& ids_;
 };
 
 struct ScanResult {

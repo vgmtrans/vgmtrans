@@ -114,6 +114,36 @@ void ScanIdAllocator::reserveAfter(ItemId id) noexcept {
   }
 }
 
+ItemTreeBuilder::ItemTreeBuilder(ItemTree& tree, ScanIdAllocator& ids) : tree_(tree), ids_(ids) {
+}
+
+ItemId ItemTreeBuilder::add(
+    std::optional<ItemId> parent,
+    ItemKind kind,
+    std::string detailKind,
+    std::string name,
+    SourceRange range,
+    std::string description) {
+  const auto id = ids_.nextItemId();
+  tree_.nodes.push_back(ItemNode{
+      .id = id,
+      .parent = parent,
+      .kind = kind,
+      .detailKind = std::move(detailKind),
+      .name = std::move(name),
+      .description = std::move(description),
+      .range = range,
+  });
+  if (parent) {
+    if (auto* parentItem = itemById(tree_, *parent)) {
+      parentItem->children.push_back(id);
+    }
+  } else {
+    tree_.root = id;
+  }
+  return id;
+}
+
 void FormatRegistry::add(std::unique_ptr<FormatModule> module) {
   if (!module) {
     throw std::invalid_argument("Cannot register a null FormatModule");

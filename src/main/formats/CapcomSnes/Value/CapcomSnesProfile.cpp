@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <string>
+#include <string_view>
 
 namespace vgmtrans::formats::capcom_snes {
 
@@ -25,15 +27,25 @@ constexpr u8 kNoteDottedMask = 0x10;
 constexpr u8 kNoteTripletMask = 0x20;
 constexpr u8 kNoteSlurredMask = 0x40;
 
-[[nodiscard]] u32 capcomLength(u32 rawDuration) {
+constexpr std::string_view kDefaultProfileName = "CapcomSnes";
+constexpr std::string_view kV1ProfileName = "CapcomSnes:v1";
+constexpr std::string_view kV2ProfileName = "CapcomSnes:v2";
+constexpr std::string_view kV3ProfileName = "CapcomSnes:v3";
+
+struct PanLowering {
+  u8 pan = 64;
+  u8 expression = 127;
+};
+
+[[nodiscard]] u32 baseNoteTicks(u32 rawDuration) {
   if (rawDuration == 0 || rawDuration > 7) {
     return 0;
   }
   return 192u >> (7u - rawDuration);
 }
 
-[[nodiscard]] u32 capcomLength(u32 rawDuration, TrackState& state) {
-  u32 length = capcomLength(rawDuration);
+[[nodiscard]] u32 noteTicks(u32 rawDuration, TrackState& state) {
+  u32 length = baseNoteTicks(rawDuration);
   if (state.noteDotted) {
     if (length % 2 == 0 && length < 0x80) {
       length += length / 2;
@@ -45,6 +57,25 @@ constexpr u8 kNoteSlurredMask = 0x40;
     length = length * 2 / 3;
   }
   return length;
+}
+
+[[nodiscard]] u32 soundingTicks(u32 length, const TrackState& state) {
+  u32 duration = length * state.durationRate;
+  if (state.noteSlurred || duration == 0) {
+    duration = length << 8;
+  }
+  duration = (duration + 0x80) >> 8;
+  return duration == 0 ? 1 : duration;
+}
+
+[[nodiscard]] s32 sourceKey(const NoteCommand& command, const TrackState& state) {
+  return static_cast<s32>(command.key) - 1 +
+         static_cast<s32>(state.noteOctave * 12) +
+         (state.noteOctaveUp ? 24 : 0);
+}
+
+[[nodiscard]] u8 midiKey(s32 key, const TrackState& state) {
+  return static_cast<u8>(std::clamp<s32>(key + state.globalTranspose + state.transpose, 0, 127));
 }
 
 void applyNoteAttributes(u8 attributes, TrackState& state) {
@@ -72,35 +103,73 @@ void addLfoDepthEvents(std::vector<PerformanceEvent>& events, const TrackState& 
   }
 }
 
+[[nodiscard]] u32 tempoMicrosecondsPerQuarter(u32 rawTempo) {
+  if (rawTempo == 0) {
+    return 60000000;
+  }
+  return static_cast<u32>(std::round(kPpqn * (125 * 0x40) * 2 * 256.0 / rawTempo));
+}
+
+[[nodiscard]] u16 volume14(CapcomSnesEngineVersion version, u8 rawValue) {
+  const double volume = version == CapcomSnesEngineVersion::v1BgmInList
+                            ? ::capcom_snes::calculateVolumeV1(rawValue)
+                            : ::capcom_snes::calculateVolumeV2(rawValue);
+  return ::capcom_snes::percentAmpTo14BitMidi(volume);
+}
+
+[[nodiscard]] PanLowering panLowering(CapcomSnesEngineVersion version, u32 rawValue) {
+  const auto biasedPan = static_cast<u8>(rawValue + 0x80);
+  const auto pan = version == CapcomSnesEngineVersion::v1BgmInList
+                       ? ::capcom_snes::linear8BitPanToMidi(biasedPan)
+                       : ::capcom_snes::calculatePanV2(biasedPan);
+  return PanLowering{
+      .pan = pan.midiPan,
+      .expression = ::capcom_snes::percentAmpTo7BitMidi(pan.volumeScale),
+  };
+}
+
+[[nodiscard]] double tuningCents(s32 rawValue) {
+  return rawValue * 100.0 / 256.0;
+}
+
+[[nodiscard]] double portamentoMillisecondsPerCent(u32 rawTime) {
+  const u8 step = static_cast<u8>((rawTime << 1) & 0xff);
+  const double centsPerUpdate = step * (100.0 / 256.0);
+  return centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
+}
+
 }  // namespace
+
+std::string_view capcomSnesProfileName(CapcomSnesEngineVersion version) {
+  switch (version) {
+    case CapcomSnesEngineVersion::v1BgmInList:
+      return kV1ProfileName;
+    case CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation:
+      return kV2ProfileName;
+    case CapcomSnesEngineVersion::v3BgmFixedLocation:
+      return kV3ProfileName;
+    case CapcomSnesEngineVersion::none:
+      return kDefaultProfileName;
+  }
+  return kDefaultProfileName;
+}
 
 CapcomSnesProfile::CapcomSnesProfile(CapcomSnesEngineVersion version) : version_(version) {
 }
 
 u32 CapcomSnesProfile::restTicks(const RestCommand& command, TrackState& state) const {
   state.didRest = true;
-  return capcomLength(command.rawDuration, state);
+  return noteTicks(command.rawDuration, state);
 }
 
 NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState& state) const {
-  const u32 length = capcomLength(command.rawDuration, state);
-  u32 duration = length * state.durationRate;
-  if (state.noteSlurred || duration == 0) {
-    duration = length << 8;
-  }
-  duration = (duration + 0x80) >> 8;
-  if (duration == 0) {
-    duration = 1;
-  }
-
-  const s32 sourceKey = static_cast<s32>(command.key) - 1 +
-                        static_cast<s32>(state.noteOctave * 12) +
-                        (state.noteOctaveUp ? 24 : 0);
-  const s32 midiKey = std::clamp<s32>(sourceKey + state.globalTranspose + state.transpose, 0, 127);
-  const bool extendsPrevious = state.lastNoteSlurred && sourceKey == state.lastKey && !state.didRest;
+  const u32 length = noteTicks(command.rawDuration, state);
+  const u32 duration = soundingTicks(length, state);
+  const s32 key = sourceKey(command, state);
+  const bool extendsPrevious = state.lastNoteSlurred && key == state.lastKey && !state.didRest;
   std::vector<PerformanceEvent> beforeEvents;
   if (!extendsPrevious && state.portamentoMillisecondsPerCent > 0.0 && state.lastKey >= 0) {
-    const auto keyDistance = static_cast<u32>(std::abs(sourceKey - state.lastKey));
+    const auto keyDistance = static_cast<u32>(std::abs(key - state.lastKey));
     const auto portamentoTime =
         static_cast<u16>((keyDistance * 100) * state.portamentoMillisecondsPerCent);
     if (portamentoTime != state.lastPortamentoTime) {
@@ -118,12 +187,12 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
     });
   }
   if (!extendsPrevious) {
-    state.lastKey = sourceKey;
+    state.lastKey = key;
     state.didRest = false;
   }
   state.lastNoteSlurred = state.noteSlurred;
   return NoteTiming{
-      .key = static_cast<u8>(midiKey),
+      .key = midiKey(key, state),
       .velocity = 127,
       .soundingTicks = duration + (!extendsPrevious && state.noteSlurred ? 1 : 0),
       .advanceTicks = length,
@@ -187,33 +256,19 @@ void CapcomSnesProfile::applyDuration(const DurationCommand& command, TrackState
 std::vector<PerformanceEvent> CapcomSnesProfile::lowerTempo(
     const TempoCommand& command,
     const TrackState& state) const {
-  const u32 microsecondsPerQuarter = command.rawValue == 0
-                                         ? 60000000
-                                         : static_cast<u32>(std::round(kPpqn * (125 * 0x40) * 2 * 256.0 /
-                                                                       command.rawValue));
   return {Tempo{
       .tick = state.tick,
-      .microsecondsPerQuarter = microsecondsPerQuarter,
+      .microsecondsPerQuarter = tempoMicrosecondsPerQuarter(command.rawValue),
   }};
 }
 
 std::vector<PerformanceEvent> CapcomSnesProfile::lowerVolume(
     const VolumeCommand& command,
     const TrackState& state) const {
-  if (version_ == CapcomSnesEngineVersion::v1BgmInList) {
-    return {Volume14{
-        .tick = state.tick,
-        .channel = state.channel,
-        .value = ::capcom_snes::percentAmpTo14BitMidi(
-            ::capcom_snes::calculateVolumeV1(static_cast<u8>(command.rawValue))),
-    }};
-  }
-
   return {Volume14{
       .tick = state.tick,
       .channel = state.channel,
-      .value = ::capcom_snes::percentAmpTo14BitMidi(
-          ::capcom_snes::calculateVolumeV2(static_cast<u8>(command.rawValue))),
+      .value = volume14(version_, static_cast<u8>(command.rawValue)),
   }};
 }
 
@@ -238,24 +293,18 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerProgram(
 std::vector<PerformanceEvent> CapcomSnesProfile::lowerPan(
     const PanCommand& command,
     const TrackState& state) const {
-  const auto biasedPan = static_cast<u8>(command.rawValue + 0x80);
-  ::capcom_snes::PanConversionResult pan;
-  if (version_ == CapcomSnesEngineVersion::v1BgmInList) {
-    pan = ::capcom_snes::linear8BitPanToMidi(biasedPan);
-  } else {
-    pan = ::capcom_snes::calculatePanV2(biasedPan);
-  }
+  const auto lowered = panLowering(version_, command.rawValue);
 
   return {
       Pan{
           .tick = state.tick,
           .channel = state.channel,
-          .value = pan.midiPan,
+          .value = lowered.pan,
       },
       Expression{
           .tick = state.tick,
           .channel = state.channel,
-          .value = ::capcom_snes::percentAmpTo7BitMidi(pan.volumeScale),
+          .value = lowered.expression,
       },
   };
 }
@@ -263,18 +312,9 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerPan(
 std::vector<PerformanceEvent> CapcomSnesProfile::lowerMasterVolume(
     const MasterVolumeCommand& command,
     const TrackState& state) const {
-  if (version_ == CapcomSnesEngineVersion::v1BgmInList) {
-    return {MasterVolume{
-        .tick = state.tick,
-        .value = ::capcom_snes::percentAmpTo14BitMidi(
-            ::capcom_snes::calculateVolumeV1(static_cast<u8>(command.rawValue))),
-    }};
-  }
-
   return {MasterVolume{
       .tick = state.tick,
-      .value = ::capcom_snes::percentAmpTo14BitMidi(
-          ::capcom_snes::calculateVolumeV2(static_cast<u8>(command.rawValue))),
+      .value = volume14(version_, static_cast<u8>(command.rawValue)),
   }};
 }
 
@@ -294,16 +334,14 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerTuning(
   return {FineTune{
       .tick = state.tick,
       .channel = state.channel,
-      .cents = command.rawValue * 100.0 / 256.0,
+      .cents = tuningCents(command.rawValue),
   }};
 }
 
 std::vector<PerformanceEvent> CapcomSnesProfile::lowerPortamento(
     const PortamentoCommand& command,
     TrackState& state) const {
-  const u8 step = static_cast<u8>((command.rawTime << 1) & 0xff);
-  const double centsPerUpdate = step * (100.0 / 256.0);
-  state.portamentoMillisecondsPerCent = centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
+  state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(command.rawTime);
   return {};
 }
 
@@ -372,7 +410,16 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerRepeatBreak(
 }
 
 void registerCapcomSnesProfile(SequencerProfileRegistry& registry) {
-  registry.add("CapcomSnes", [] {
+  registry.add(std::string(kDefaultProfileName), [] {
+    return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  });
+  registry.add(std::string(kV1ProfileName), [] {
+    return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v1BgmInList);
+  });
+  registry.add(std::string(kV2ProfileName), [] {
+    return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation);
+  });
+  registry.add(std::string(kV3ProfileName), [] {
     return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v3BgmFixedLocation);
   });
 }

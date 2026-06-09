@@ -94,12 +94,15 @@ namespace {
     };
   }
 
-  auto profile = profiles.create(sequence->metadata.format);
+  const std::string profileName = sequence->program.sequencerProfile.empty()
+                                      ? sequence->metadata.format
+                                      : sequence->program.sequencerProfile;
+  auto profile = profiles.create(profileName);
   if (!profile) {
     return Artifact{
         .filename = artifactBaseName(collection) + ".mid",
         .mediaType = "audio/midi",
-        .diagnostics = {exportError("No sequencer profile registered for format '" + sequence->metadata.format + "'")},
+        .diagnostics = {exportError("No sequencer profile registered for '" + profileName + "'")},
     };
   }
 

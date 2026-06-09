@@ -29,6 +29,10 @@ u8 ByteReader::u8At(u64 offset) const {
   return bytes_[offset];
 }
 
+s8 ByteReader::s8At(u64 offset) const {
+  return static_cast<s8>(u8At(offset));
+}
+
 u16 ByteReader::le16(u64 offset) const {
   require(offset, 2);
   return static_cast<u16>(bytes_[offset] | (bytes_[offset + 1] << 8));

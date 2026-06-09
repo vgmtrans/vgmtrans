@@ -39,6 +39,7 @@ class ByteReader {
   [[nodiscard]] SourceRange range(u64 offset, u64 size) const noexcept;
 
   [[nodiscard]] u8 u8At(u64 offset) const;
+  [[nodiscard]] s8 s8At(u64 offset) const;
   [[nodiscard]] u16 le16(u64 offset) const;
   [[nodiscard]] u16 be16(u64 offset) const;
   [[nodiscard]] u32 le32(u64 offset) const;
