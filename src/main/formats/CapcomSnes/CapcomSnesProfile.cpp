@@ -275,6 +275,23 @@ void midiPanToVolumeBalance(u8 midiPan, double& left, double& right) {
   return midiValueForHertzInRange(static_cast<double>(rate) * kLfoStepHz, kVibratoBaseHz, kVibratoMaxHz);
 }
 
+void addLfoDepthEvents(std::vector<PerformanceEvent>& events, const TrackState& state, bool enabled) {
+  if (state.vibratoDepth != 0) {
+    events.push_back(VibratoDepth{
+        .tick = state.tick,
+        .channel = state.channel,
+        .value = static_cast<u8>(enabled ? state.vibratoDepth : 0),
+    });
+  }
+  if (state.tremoloDepth != 0) {
+    events.push_back(TremoloDepth{
+        .tick = state.tick,
+        .channel = state.channel,
+        .value = static_cast<u8>(enabled ? state.tremoloDepth : 0),
+    });
+  }
+}
+
 }  // namespace
 
 CapcomSnesProfile::CapcomSnesProfile(CapcomSnesEngineVersion version) : version_(version) {
@@ -299,10 +316,30 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
   const s32 key = std::clamp<s32>(static_cast<s32>(command.key) - 1 +
                                       static_cast<s32>(state.noteOctave * 12) +
                                       (state.noteOctaveUp ? 24 : 0) +
+                                      state.globalTranspose +
                                       state.transpose,
                                   0,
                                   127);
   const bool extendsPrevious = state.lastNoteSlurred && key == state.lastKey && !state.didRest;
+  std::vector<PerformanceEvent> beforeEvents;
+  if (!extendsPrevious && state.portamentoMillisecondsPerCent > 0.0 && state.lastKey >= 0) {
+    const auto keyDistance = static_cast<u32>(std::abs(key - state.lastKey));
+    const auto portamentoTime =
+        static_cast<u16>((keyDistance * 100) * state.portamentoMillisecondsPerCent);
+    if (portamentoTime != state.lastPortamentoTime) {
+      beforeEvents.push_back(PortamentoTime14{
+          .tick = state.tick,
+          .channel = state.channel,
+          .value = portamentoTime,
+      });
+      state.lastPortamentoTime = portamentoTime;
+    }
+    beforeEvents.push_back(PortamentoControl{
+        .tick = state.tick,
+        .channel = state.channel,
+        .key = static_cast<u8>(state.lastKey),
+    });
+  }
   if (!extendsPrevious) {
     state.lastKey = key;
     state.didRest = false;
@@ -314,6 +351,7 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
       .soundingTicks = duration + (!extendsPrevious && state.noteSlurred ? 1 : 0),
       .advanceTicks = length,
       .extendsPrevious = extendsPrevious,
+      .beforeEvents = std::move(beforeEvents),
   };
 }
 
@@ -431,36 +469,56 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerTuning(
   }};
 }
 
+std::vector<PerformanceEvent> CapcomSnesProfile::lowerPortamento(
+    const PortamentoCommand& command,
+    TrackState& state) const {
+  const u8 step = static_cast<u8>((command.rawTime << 1) & 0xff);
+  const double centsPerUpdate = step * (100.0 / 256.0);
+  state.portamentoMillisecondsPerCent = centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
+  return {};
+}
+
 std::vector<PerformanceEvent> CapcomSnesProfile::lowerLfo(
     const LfoCommand& command,
-    const TrackState& state) const {
+    TrackState& state) const {
   switch (command.rawType) {
     case 0:
+      state.vibratoDepth = static_cast<u8>(command.rawAmount & 0x7f);
       return {VibratoDepth{
           .tick = state.tick,
           .channel = state.channel,
-          .value = static_cast<u8>(command.rawAmount & 0x7f),
+          .value = static_cast<u8>(state.lfoRate != 0 ? state.vibratoDepth : 0),
       }};
     case 1:
+      state.tremoloDepth = tremoloDepthToMidiValue(static_cast<int>(command.rawAmount), version_);
       return {TremoloDepth{
           .tick = state.tick,
           .channel = state.channel,
-          .value = tremoloDepthToMidiValue(static_cast<int>(command.rawAmount), version_),
+          .value = static_cast<u8>(state.lfoRate != 0 ? state.tremoloDepth : 0),
       }};
     case 2: {
+      std::vector<PerformanceEvent> events;
+      const bool wasEnabled = state.lfoRate != 0;
+      state.lfoRate = command.rawAmount;
+      const bool isEnabled = state.lfoRate != 0;
+      if (!isEnabled && wasEnabled) {
+        addLfoDepthEvents(events, state, false);
+      } else if (isEnabled && !wasEnabled) {
+        addLfoDepthEvents(events, state, true);
+      }
+
       const u8 rate = lfoRateByteToMidiValue(static_cast<u8>(command.rawAmount));
-      return {
-          VibratoFrequency{
-              .tick = state.tick,
-              .channel = state.channel,
-              .value = rate,
-          },
-          TremoloFrequency{
-              .tick = state.tick,
-              .channel = state.channel,
-              .value = rate,
-          },
-      };
+      events.push_back(VibratoFrequency{
+          .tick = state.tick,
+          .channel = state.channel,
+          .value = rate,
+      });
+      events.push_back(TremoloFrequency{
+          .tick = state.tick,
+          .channel = state.channel,
+          .value = rate,
+      });
+      return events;
     }
     default:
       return {};
@@ -504,6 +562,22 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerDriverSpecific(
     state.noteOctave = command.bytes[1] & kNoteOctaveMask;
   }
 
+  return events;
+}
+
+std::vector<PerformanceEvent> CapcomSnesProfile::lowerRepeatBreak(
+    const RepeatBreakCommand& command,
+    TrackState& state) const {
+  std::vector<PerformanceEvent> events;
+  const bool wasSlurred = state.noteSlurred;
+  applyNoteAttributes(command.rawAttributes, state);
+  if (state.noteSlurred != wasSlurred) {
+    events.push_back(LegatoPedal{
+        .tick = state.tick,
+        .channel = state.channel,
+        .enabled = state.noteSlurred,
+    });
+  }
   return events;
 }
 

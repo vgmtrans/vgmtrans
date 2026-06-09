@@ -216,7 +216,7 @@ void addPerformanceEventMessages(std::vector<MidiMessage>& messages, const Perfo
           addController(messages, typedEvent.tick, typedEvent.channel, 92, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<Event, TremoloFrequency>) {
-          addController(messages, typedEvent.tick, typedEvent.channel, 77, typedEvent.value);
+          addController(messages, typedEvent.tick, typedEvent.channel, 75, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<Event, TremoloDelay>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 79, data7(typedEvent.ticks));

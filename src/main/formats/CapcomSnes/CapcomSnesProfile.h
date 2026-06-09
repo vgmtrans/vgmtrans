@@ -47,11 +47,17 @@ class CapcomSnesProfile final : public core::SequencerProfile {
   [[nodiscard]] std::vector<core::PerformanceEvent> lowerTuning(
       const core::TuningCommand& command,
       const core::TrackState& state) const override;
+  [[nodiscard]] std::vector<core::PerformanceEvent> lowerPortamento(
+      const core::PortamentoCommand& command,
+      core::TrackState& state) const override;
   [[nodiscard]] std::vector<core::PerformanceEvent> lowerLfo(
       const core::LfoCommand& command,
-      const core::TrackState& state) const override;
+      core::TrackState& state) const override;
   [[nodiscard]] std::vector<core::PerformanceEvent> lowerDriverSpecific(
       const core::DriverSpecificCommand& command,
+      core::TrackState& state) const override;
+  [[nodiscard]] std::vector<core::PerformanceEvent> lowerRepeatBreak(
+      const core::RepeatBreakCommand& command,
       core::TrackState& state) const override;
 
  private:

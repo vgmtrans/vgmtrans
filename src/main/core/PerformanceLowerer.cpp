@@ -78,6 +78,123 @@ bool extendPreviousNote(std::vector<PerformanceEvent>& events, u8 channel, u8 ke
   return found->second;
 }
 
+[[nodiscard]] std::optional<u64> firstLoopTick(
+    const SequenceProgram& program,
+    const TrackProgram& track,
+    const SequencerProfile& profile,
+    u8 channel) {
+  const auto indexes = commandIndexByOffset(track);
+  TrackState state{
+      .trackIndex = track.sourceTrackNumber,
+      .channel = channel,
+      .globalTranspose = program.behavior.initialGlobalTranspose,
+  };
+  size_t pc = 0;
+  size_t executedCommands = 0;
+
+  while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
+    const auto& command = track.commands[pc];
+    bool incrementPc = true;
+    bool ended = false;
+    std::optional<u64> loopTick;
+
+    std::visit(
+        [&](const auto& typedCommand) {
+          using Command = std::decay_t<decltype(typedCommand)>;
+          if constexpr (std::is_same_v<Command, NoteCommand>) {
+            state.tick += profile.noteTiming(typedCommand, state).advanceTicks;
+          } else if constexpr (std::is_same_v<Command, RestCommand>) {
+            state.tick += profile.restTicks(typedCommand, state);
+          } else if constexpr (std::is_same_v<Command, DurationCommand>) {
+            profile.applyDuration(typedCommand, state);
+          } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
+            profile.applyTranspose(typedCommand, state);
+          } else if constexpr (std::is_same_v<Command, GlobalTransposeCommand>) {
+            state.globalTranspose = typedCommand.rawSemitones;
+          } else if constexpr (std::is_same_v<Command, PortamentoCommand>) {
+            static_cast<void>(profile.lowerPortamento(typedCommand, state));
+          } else if constexpr (std::is_same_v<Command, LfoCommand>) {
+            static_cast<void>(profile.lowerLfo(typedCommand, state));
+          } else if constexpr (std::is_same_v<Command, DriverSpecificCommand>) {
+            static_cast<void>(profile.lowerDriverSpecific(typedCommand, state));
+          } else if constexpr (std::is_same_v<Command, RepeatCommand>) {
+            if (typedCommand.slot >= state.repeatCounters.size()) {
+              ended = true;
+              return;
+            }
+            auto& counter = state.repeatCounters[typedCommand.slot];
+            if (typedCommand.count == 0 && counter == 0) {
+              loopTick = state.tick;
+              ended = true;
+              return;
+            }
+            if (counter == 0) {
+              counter = typedCommand.count;
+              if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                pc = *target;
+                incrementPc = false;
+              } else {
+                ended = true;
+              }
+            } else {
+              --counter;
+              if (counter != 0) {
+                if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                  pc = *target;
+                  incrementPc = false;
+                } else {
+                  ended = true;
+                }
+              }
+            }
+          } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
+            if (typedCommand.slot >= state.repeatCounters.size()) {
+              ended = true;
+              return;
+            }
+            auto& counter = state.repeatCounters[typedCommand.slot];
+            if (counter == 1) {
+              counter = 0;
+              static_cast<void>(profile.lowerRepeatBreak(typedCommand, state));
+              if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                pc = *target;
+                incrementPc = false;
+              } else {
+                ended = true;
+              }
+            }
+          } else if constexpr (std::is_same_v<Command, JumpCommand>) {
+            if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+              if (*target <= pc) {
+                loopTick = state.tick;
+                ended = true;
+                return;
+              }
+              pc = *target;
+              incrementPc = false;
+            } else {
+              ended = true;
+            }
+          } else if constexpr (std::is_same_v<Command, EndCommand>) {
+            ended = true;
+          }
+        },
+        command);
+
+    if (loopTick.has_value()) {
+      return loopTick;
+    }
+    if (ended) {
+      return std::nullopt;
+    }
+    if (incrementPc) {
+      ++pc;
+    }
+  }
+
+  return std::nullopt;
+}
+
 }  // namespace
 
 void SequencerProfile::beginTrack(
@@ -92,7 +209,7 @@ u32 SequencerProfile::restTicks(const RestCommand& command, TrackState&) const {
 }
 
 NoteTiming SequencerProfile::noteTiming(const NoteCommand& command, TrackState& state) const {
-  const auto key = std::clamp<s32>(static_cast<s32>(command.key) + state.transpose, 0, 127);
+  const auto key = std::clamp<s32>(static_cast<s32>(command.key) + state.transpose + state.globalTranspose, 0, 127);
   const auto ticks = command.rawDuration;
   return NoteTiming{
       .key = static_cast<u8>(key),
@@ -181,7 +298,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerTuning(
 
 std::vector<PerformanceEvent> SequencerProfile::lowerPortamento(
     const PortamentoCommand& command,
-    const TrackState& state) const {
+    TrackState& state) const {
   return {PortamentoTime{
       .tick = state.tick,
       .channel = state.channel,
@@ -191,7 +308,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerPortamento(
 
 std::vector<PerformanceEvent> SequencerProfile::lowerLfo(
     const LfoCommand& command,
-    const TrackState& state) const {
+    TrackState& state) const {
   if (command.target == LfoTarget::Pitch) {
     return {VibratoDepth{
         .tick = state.tick,
@@ -221,6 +338,12 @@ std::vector<PerformanceEvent> SequencerProfile::lowerDriverSpecific(
   return {};
 }
 
+std::vector<PerformanceEvent> SequencerProfile::lowerRepeatBreak(
+    const RepeatBreakCommand&,
+    TrackState&) const {
+  return {};
+}
+
 PerformanceSequence PerformanceLowerer::lower(
     const SequenceProgram& program,
     const SequencerProfile& profile,
@@ -233,11 +356,25 @@ PerformanceSequence PerformanceLowerer::lower(
       .timebase = program.timebase,
   };
 
+  std::optional<u64> playOnceStopTick;
+  if (loopPolicy == LoopPolicy::PlayOnce) {
+    for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
+      const auto loopTick = firstLoopTick(program,
+                                         program.tracks[trackIndex],
+                                         profile,
+                                         static_cast<u8>(trackIndex % 16));
+      if (loopTick.has_value() && (!playOnceStopTick.has_value() || *loopTick > *playOnceStopTick)) {
+        playOnceStopTick = loopTick;
+      }
+    }
+  }
+
   for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
     const auto& track = program.tracks[trackIndex];
     TrackState state{
         .trackIndex = static_cast<u32>(trackIndex),
         .channel = static_cast<u8>(trackIndex % 16),
+        .globalTranspose = program.behavior.initialGlobalTranspose,
     };
     PerformanceTrack loweredTrack{
         .name = "Track " + std::to_string(track.sourceTrackNumber),
@@ -263,6 +400,7 @@ PerformanceSequence PerformanceLowerer::lower(
     size_t pc = 0;
     size_t executedCommands = 0;
     bool ended = false;
+    std::optional<u64> loopPlaybackStopTick;
     while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
       const auto& command = track.commands[pc];
       bool incrementPc = true;
@@ -271,18 +409,26 @@ PerformanceSequence PerformanceLowerer::lower(
           [&](const auto& typedCommand) {
             using Command = std::decay_t<decltype(typedCommand)>;
             if constexpr (std::is_same_v<Command, NoteCommand>) {
-              const auto timing = profile.noteTiming(typedCommand, state);
+              auto timing = profile.noteTiming(typedCommand, state);
+              u32 soundingTicks = timing.soundingTicks;
+              if (loopPlaybackStopTick.has_value() && soundingTicks > timing.advanceTicks + 1) {
+                const u64 stopEndTick = *loopPlaybackStopTick + 1;
+                if (state.tick < stopEndTick && state.tick + soundingTicks > stopEndTick) {
+                  soundingTicks = static_cast<u32>(stopEndTick - state.tick);
+                }
+              }
+              appendEvents(loweredTrack.events, std::move(timing.beforeEvents));
               if (!timing.extendsPrevious ||
                   !extendPreviousNote(loweredTrack.events,
                                       state.channel,
                                       timing.key,
-                                      state.tick + timing.soundingTicks)) {
+                                      state.tick + soundingTicks)) {
                 loweredTrack.events.push_back(NoteDuration{
                     .tick = state.tick,
                     .channel = state.channel,
                     .key = timing.key,
                     .velocity = timing.velocity,
-                    .duration = timing.soundingTicks,
+                    .duration = soundingTicks,
                 });
               }
               state.tick += timing.advanceTicks;
@@ -292,6 +438,8 @@ PerformanceSequence PerformanceLowerer::lower(
               profile.applyDuration(typedCommand, state);
             } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
               profile.applyTranspose(typedCommand, state);
+            } else if constexpr (std::is_same_v<Command, GlobalTransposeCommand>) {
+              state.globalTranspose = typedCommand.rawSemitones;
             } else if constexpr (std::is_same_v<Command, TempoCommand>) {
               appendEvents(loweredTrack.events, profile.lowerTempo(typedCommand, state));
             } else if constexpr (std::is_same_v<Command, ProgramCommand>) {
@@ -315,26 +463,20 @@ PerformanceSequence PerformanceLowerer::lower(
             } else if constexpr (std::is_same_v<Command, DriverSpecificCommand>) {
               appendEvents(loweredTrack.events, profile.lowerDriverSpecific(typedCommand, state));
             } else if constexpr (std::is_same_v<Command, RepeatCommand>) {
-              if (loopPolicy == LoopPolicy::PlayOnce) {
-                return;
-              }
               if (typedCommand.slot >= state.repeatCounters.size()) {
                 result.diagnostics.push_back(warning("Repeat command uses an unsupported repeat slot",
                                                      typedCommand.range));
                 return;
               }
-              if (typedCommand.count == 0) {
+              auto& counter = state.repeatCounters[typedCommand.slot];
+              if (typedCommand.count == 0 && counter == 0) {
                 loweredTrack.events.push_back(Marker{.tick = state.tick, .text = "Loop"});
                 ended = true;
                 return;
               }
 
-              auto& counter = state.repeatCounters[typedCommand.slot];
               if (counter == 0) {
                 counter = typedCommand.count;
-              }
-              if (counter > 1) {
-                --counter;
                 if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
                   pc = *target;
                   incrementPc = false;
@@ -343,19 +485,47 @@ PerformanceSequence PerformanceLowerer::lower(
                                                        typedCommand.range));
                 }
               } else {
-                counter = 0;
+                --counter;
+                if (counter != 0) {
+                  if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                    pc = *target;
+                    incrementPc = false;
+                  } else {
+                    result.diagnostics.push_back(warning("Repeat destination was not decoded",
+                                                         typedCommand.range));
+                  }
+                }
               }
             } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
-              if (loopPolicy != LoopPolicy::PlayOnce) {
-                result.diagnostics.push_back(warning("Repeat break command requires driver-specific state",
+              if (typedCommand.slot >= state.repeatCounters.size()) {
+                result.diagnostics.push_back(warning("Repeat break command uses an unsupported repeat slot",
                                                      typedCommand.range));
-              }
-            } else if constexpr (std::is_same_v<Command, JumpCommand>) {
-              if (loopPolicy == LoopPolicy::PlayOnce) {
                 return;
               }
-              loweredTrack.events.push_back(Marker{.tick = state.tick, .text = "Jump"});
+              auto& counter = state.repeatCounters[typedCommand.slot];
+              if (counter == 1) {
+                counter = 0;
+                appendEvents(loweredTrack.events, profile.lowerRepeatBreak(typedCommand, state));
+                if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                  pc = *target;
+                  incrementPc = false;
+                } else {
+                  result.diagnostics.push_back(warning("Repeat break destination was not decoded",
+                                                       typedCommand.range));
+                }
+              }
+            } else if constexpr (std::is_same_v<Command, JumpCommand>) {
               if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                if (loopPolicy == LoopPolicy::PlayOnce && *target <= pc) {
+                  if (state.tick == 0 || !playOnceStopTick.has_value() || state.tick >= *playOnceStopTick) {
+                    ended = true;
+                    return;
+                  }
+                  loopPlaybackStopTick = playOnceStopTick;
+                }
+                if (loopPolicy != LoopPolicy::PlayOnce) {
+                  loweredTrack.events.push_back(Marker{.tick = state.tick, .text = "Jump"});
+                }
                 pc = *target;
                 incrementPc = false;
               } else {
@@ -371,6 +541,9 @@ PerformanceSequence PerformanceLowerer::lower(
           },
           command);
 
+      if (loopPlaybackStopTick.has_value() && state.tick >= *loopPlaybackStopTick) {
+        ended = true;
+      }
       if (ended) {
         break;
       }

@@ -125,6 +125,11 @@ struct TransposeCommand {
   SourceRange range;
 };
 
+struct GlobalTransposeCommand {
+  s32 rawSemitones = 0;
+  SourceRange range;
+};
+
 struct TuningCommand {
   s32 rawValue = 0;
   SourceRange range;
@@ -175,6 +180,7 @@ struct RepeatCommand {
 
 struct RepeatBreakCommand {
   u8 slot = 0;
+  u8 rawAttributes = 0;
   Address destination;
   SourceRange range;
 };
@@ -204,6 +210,7 @@ using SequencerCommand = std::variant<
     PanCommand,
     TempoCommand,
     TransposeCommand,
+    GlobalTransposeCommand,
     TuningCommand,
     PortamentoCommand,
     LfoCommand,
@@ -230,6 +237,7 @@ struct SequenceBehavior {
   bool writeInitialReverb = false;
   u8 initialReverb = 0;
   bool writeInitialMonoMode = false;
+  s32 initialGlobalTranspose = 0;
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
 };
 

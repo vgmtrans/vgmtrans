@@ -394,6 +394,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "capcom-snes-tempo";
         } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
           return "capcom-snes-transpose";
+        } else if constexpr (std::is_same_v<Command, GlobalTransposeCommand>) {
+          return "capcom-snes-global-transpose";
         } else if constexpr (std::is_same_v<Command, TuningCommand>) {
           return "capcom-snes-tuning";
         } else if constexpr (std::is_same_v<Command, PortamentoCommand>) {
@@ -443,6 +445,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "Tempo";
         } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
           return "Transpose";
+        } else if constexpr (std::is_same_v<Command, GlobalTransposeCommand>) {
+          return "Global Transpose";
         } else if constexpr (std::is_same_v<Command, TuningCommand>) {
           return "Tuning";
         } else if constexpr (std::is_same_v<Command, PortamentoCommand>) {
@@ -491,6 +495,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "Raw " + std::to_string(typedCommand.rawValue);
         } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
           return "Semitones " + std::to_string(typedCommand.rawSemitones);
+        } else if constexpr (std::is_same_v<Command, GlobalTransposeCommand>) {
+          return "Semitones " + std::to_string(typedCommand.rawSemitones);
         } else if constexpr (std::is_same_v<Command, TuningCommand>) {
           return "Raw " + std::to_string(typedCommand.rawValue);
         } else if constexpr (std::is_same_v<Command, PortamentoCommand>) {
@@ -505,7 +511,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "Slot " + std::to_string(typedCommand.slot) + ", count " + std::to_string(typedCommand.count) +
                  ", destination $" + std::to_string(typedCommand.destination.value);
         } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
-          return "Slot " + std::to_string(typedCommand.slot) + ", destination $" +
+          return "Slot " + std::to_string(typedCommand.slot) + ", attributes " +
+                 std::to_string(typedCommand.rawAttributes) + ", destination $" +
                  std::to_string(typedCommand.destination.value);
         } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
           return "Opcode " + std::to_string(typedCommand.opcode);
@@ -637,6 +644,16 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
         track.commands.push_back(driverCommand("Octave", reader, beginOffset, 2));
         break;
       case 0x0a:
+        if (!need(1)) {
+          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
+          return track;
+        }
+        track.commands.push_back(GlobalTransposeCommand{
+            .rawSemitones = readS8(reader.slice(0, reader.size()), offset),
+            .range = reader.range(beginOffset, 2),
+        });
+        ++offset;
+        break;
       case 0x0b:
         if (!need(1)) {
           track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
@@ -695,21 +712,25 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
         }
         track.commands.push_back(RepeatBreakCommand{
             .slot = static_cast<u8>(status - 0x12),
+            .rawAttributes = reader.u8At(offset),
             .destination = Address{reader.be16(offset + 1)},
             .range = reader.range(beginOffset, 4),
         });
         offset += 3;
         break;
-      case 0x16:
+      case 0x16: {
         if (!need(2)) {
           track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
           return track;
         }
+        const Address destination{reader.be16(offset)};
         track.commands.push_back(JumpCommand{
-            .destination = Address{reader.be16(offset)},
+            .destination = destination,
             .range = reader.range(beginOffset, 3),
         });
-        return track;
+        offset = static_cast<u32>(destination.value);
+        break;
+      }
       case 0x17:
         track.commands.push_back(EndCommand{
             .range = reader.range(beginOffset, 1),
@@ -876,6 +897,22 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
       }
     }
     program.tracks.push_back(std::move(track));
+  }
+
+  for (const auto& track : program.tracks) {
+    for (const auto& command : track.commands) {
+      if (const auto* globalTranspose = std::get_if<GlobalTransposeCommand>(&command)) {
+        program.behavior.initialGlobalTranspose = globalTranspose->rawSemitones;
+        break;
+      }
+      if (std::holds_alternative<NoteCommand>(command) || std::holds_alternative<RestCommand>(command) ||
+          std::holds_alternative<EndCommand>(command)) {
+        break;
+      }
+    }
+    if (program.behavior.initialGlobalTranspose != 0) {
+      break;
+    }
   }
 
   return SequenceAsset{

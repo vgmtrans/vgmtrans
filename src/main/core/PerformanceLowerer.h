@@ -24,6 +24,12 @@ struct TrackState {
   u64 tick = 0;
   u32 durationRate = 0;
   s32 transpose = 0;
+  s32 globalTranspose = 0;
+  u8 lfoRate = 0;
+  u8 vibratoDepth = 0;
+  u8 tremoloDepth = 0;
+  double portamentoMillisecondsPerCent = 0.0;
+  u16 lastPortamentoTime = 0;
   u32 noteOctave = 0;
   bool noteDotted = false;
   bool noteTriplet = false;
@@ -41,6 +47,7 @@ struct NoteTiming {
   u32 soundingTicks = 0;
   u32 advanceTicks = 0;
   bool extendsPrevious = false;
+  std::vector<PerformanceEvent> beforeEvents;
 };
 
 class SequencerProfile {
@@ -69,13 +76,15 @@ class SequencerProfile {
   [[nodiscard]] virtual std::vector<PerformanceEvent> lowerTuning(
       const TuningCommand& command, const TrackState& state) const;
   [[nodiscard]] virtual std::vector<PerformanceEvent> lowerPortamento(
-      const PortamentoCommand& command, const TrackState& state) const;
+      const PortamentoCommand& command, TrackState& state) const;
   [[nodiscard]] virtual std::vector<PerformanceEvent> lowerLfo(
-      const LfoCommand& command, const TrackState& state) const;
+      const LfoCommand& command, TrackState& state) const;
   [[nodiscard]] virtual std::vector<PerformanceEvent> lowerEnvelope(
       const EnvelopeCommand& command, const TrackState& state) const;
   [[nodiscard]] virtual std::vector<PerformanceEvent> lowerDriverSpecific(
       const DriverSpecificCommand& command, TrackState& state) const;
+  [[nodiscard]] virtual std::vector<PerformanceEvent> lowerRepeatBreak(
+      const RepeatBreakCommand& command, TrackState& state) const;
 };
 
 class PerformanceLowerer {

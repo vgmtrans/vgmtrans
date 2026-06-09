@@ -85,8 +85,11 @@ std::vector<u8> makeCapcomSnesAram() {
   bytes[0x3009] = 0x1a;
   bytes[0x300a] = 0x00;
   bytes[0x300b] = 0x20;
-  bytes[0x300c] = 0x41;
-  bytes[0x300d] = 0x17;
+  bytes[0x300c] = 0x1a;
+  bytes[0x300d] = 0x02;
+  bytes[0x300e] = 0x20;
+  bytes[0x300f] = 0x41;
+  bytes[0x3010] = 0x17;
 
   bytes[0x4000] = 0x00;
   bytes[0x4001] = 0x8f;
@@ -134,9 +137,11 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "track should decode pan command");
   expect(std::holds_alternative<LfoCommand>(sequence->program.tracks[0].commands[4]),
          "track should decode LFO command");
-  expect(std::holds_alternative<NoteCommand>(sequence->program.tracks[0].commands[5]),
+  expect(std::holds_alternative<LfoCommand>(sequence->program.tracks[0].commands[5]),
+         "track should decode LFO rate command");
+  expect(std::holds_alternative<NoteCommand>(sequence->program.tracks[0].commands[6]),
          "track should decode note command");
-  expect(std::holds_alternative<EndCommand>(sequence->program.tracks[0].commands[6]),
+  expect(std::holds_alternative<EndCommand>(sequence->program.tracks[0].commands[7]),
          "track should decode end command");
   expect(sequence->program.referencedInstruments.size() == 1,
          "sequence should expose unique referenced instruments");
@@ -174,7 +179,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes lowering should not warn for linear fixture");
   expect(performance.tracks.size() == 8, "lowerer should preserve track count");
-  expect(performance.tracks[0].events.size() == 11, "lowered track should include initial, command, and end events");
+  expect(performance.tracks[0].events.size() == 14, "lowered track should include initial, command, and end events");
   expect(std::holds_alternative<MonoMode>(performance.tracks[0].events[0]),
          "lowerer should emit initial mono mode from sequence behavior");
   expect(std::get<MonoMode>(performance.tracks[0].events[0]).channels == 0,
@@ -195,11 +200,17 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "CapcomSnes center pan should lower to MIDI center pan");
   expect(std::holds_alternative<Expression>(performance.tracks[0].events[7]),
          "CapcomSnes pan lowering should include expression compensation");
-  expect(std::get<VibratoDepth>(performance.tracks[0].events[8]).value == 0x20,
-         "CapcomSnes LFO type 0 should lower to vibrato depth");
-  expect(std::get<NoteDuration>(performance.tracks[0].events[9]).duration == 6,
+  expect(std::get<VibratoDepth>(performance.tracks[0].events[8]).value == 0,
+         "CapcomSnes LFO type 0 should store vibrato depth but emit zero while rate is disabled");
+  expect(std::get<VibratoDepth>(performance.tracks[0].events[9]).value == 0x20,
+         "CapcomSnes LFO rate should emit stored vibrato depth when output becomes enabled");
+  expect(std::holds_alternative<VibratoFrequency>(performance.tracks[0].events[10]),
+         "CapcomSnes LFO rate should lower to vibrato frequency");
+  expect(std::holds_alternative<TremoloFrequency>(performance.tracks[0].events[11]),
+         "CapcomSnes LFO rate should lower to tremolo frequency");
+  expect(std::get<NoteDuration>(performance.tracks[0].events[12]).duration == 6,
          "CapcomSnes note length index should lower to ticks");
-  expect(std::get<EndOfTrack>(performance.tracks[0].events[10]).tick == 6,
+  expect(std::get<EndOfTrack>(performance.tracks[0].events[13]).tick == 6,
          "lowerer should advance time before end of track");
 
   const auto artifacts = session.exportCollection(project.collections[0].id, ExportRequest{
