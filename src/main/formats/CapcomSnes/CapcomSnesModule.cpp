@@ -7,6 +7,7 @@
 #include "formats/CapcomSnes/CapcomSnesModule.h"
 
 #include "core/SnesDsp.h"
+#include "formats/CapcomSnes/CapcomSnesConstants.h"
 
 #include <algorithm>
 #include <array>
@@ -1122,6 +1123,65 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   return envelope;
 }
 
+[[nodiscard]] s32 synthAmountFromHertz(double hertz) {
+  constexpr double kSf2LfoReferenceHz = 8.176;
+  return static_cast<s32>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
+}
+
+[[nodiscard]] s32 synthAmountFromHertzRange(double minHertz, double maxHertz) {
+  const double minCents = static_cast<double>(synthAmountFromHertz(minHertz));
+  const double maxCents = static_cast<double>(synthAmountFromHertz(maxHertz));
+  return static_cast<s32>(std::lround((maxCents - minCents) * 128.0 / 127.0));
+}
+
+[[nodiscard]] std::vector<SynthGenerator> capcomInstrumentGenerators() {
+  return {
+      SynthGenerator{
+          .destination = SynthDestination::VibratoRate,
+          .amount = synthAmountFromHertz(::capcom_snes::kVibratoBaseHz),
+      },
+      SynthGenerator{
+          .destination = SynthDestination::TremoloRate,
+          .amount = synthAmountFromHertz(::capcom_snes::kTremoloBaseHz),
+      },
+  };
+}
+
+[[nodiscard]] std::vector<SynthModulator> capcomInstrumentModulators() {
+  const s32 vibratoRange =
+      synthAmountFromHertzRange(::capcom_snes::kVibratoBaseHz, ::capcom_snes::kVibratoMaxHz);
+  const s32 tremoloRange =
+      synthAmountFromHertzRange(::capcom_snes::kTremoloBaseHz, ::capcom_snes::kTremoloMaxHz);
+
+  return {
+      SynthModulator{
+          .source = SynthSource::ChannelPressure,
+          .destination = SynthDestination::VibratoDepth,
+          .amount = 0,
+      },
+      SynthModulator{
+          .destination = SynthDestination::VibratoDepth,
+          .amount = 1200,
+      },
+      SynthModulator{
+          .destination = SynthDestination::VibratoRate,
+          .amount = vibratoRange,
+      },
+      SynthModulator{
+          .destination = SynthDestination::TremoloRate,
+          .amount = tremoloRange,
+      },
+      SynthModulator{
+          .destination = SynthDestination::TremoloDepth,
+          .amount = static_cast<s32>(::capcom_snes::kTremoloHalfDepthCentibels),
+      },
+      SynthModulator{
+          .destination = SynthDestination::Volume,
+          .amount = static_cast<s32>(::capcom_snes::kTremoloHalfDepthCentibels),
+      },
+  };
+}
+
 [[nodiscard]] SampleCollectionAsset parseSamples(
     const ScanInput& input,
     AssetId sampleCollectionId,
@@ -1233,6 +1293,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
         .tuning = capcomInstrumentTuning(info.pitchScale),
         .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
     });
+    instrument.generators = capcomInstrumentGenerators();
+    instrument.modulators = capcomInstrumentModulators();
 
     bank.instruments.push_back(std::move(instrument));
     const auto instrumentItem = addItem(items,

@@ -41,6 +41,15 @@ constexpr u16 kSfGenSampleModes = 54;
 constexpr u16 kSfGenOverridingRootKey = 58;
 constexpr u16 kSfModNoteOnVelocity = 2;
 constexpr u16 kSfModKeyNumber = 3;
+constexpr u16 kSfModPolyPressure = 10;
+constexpr u16 kSfModChannelPressure = 13;
+constexpr u16 kSfModMidiContinuousController = 1u << 7;
+constexpr u16 kSfModBipolar = 1u << 9;
+constexpr u16 kSfModPitchWheel = kSfModBipolar | 14;
+constexpr u16 kSfModModWheel = kSfModMidiContinuousController | 1;
+constexpr u16 kSfModSoundController6 = kSfModMidiContinuousController | 75;
+constexpr u16 kSfModVibratoRate = kSfModMidiContinuousController | 76;
+constexpr u16 kSfModTremoloDepth = kSfModMidiContinuousController | 92;
 constexpr u16 kSfTransformLinear = 0;
 
 constexpr u32 kSf2SamplePaddingFrames = 46;
@@ -269,6 +278,13 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     case SynthSource::Lfo:
     case SynthSource::Envelope:
     case SynthSource::MidiController:
+      return std::nullopt;
+    case SynthSource::ChannelPressure:
+      return kSfModChannelPressure;
+    case SynthSource::PolyPressure:
+      return kSfModPolyPressure;
+    case SynthSource::PitchWheel:
+      return kSfModPitchWheel;
     case SynthSource::Unknown:
       return std::nullopt;
   }
@@ -276,12 +292,30 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(const SynthModulator& modulator) {
-  if (!modulator.source) {
-    return std::nullopt;
+[[nodiscard]] std::optional<u16> sf2DefaultSourceForDestination(SynthDestination destination) {
+  switch (destination) {
+    case SynthDestination::VibratoDepth:
+      return kSfModModWheel;
+    case SynthDestination::VibratoRate:
+      return kSfModVibratoRate;
+    case SynthDestination::TremoloDepth:
+    case SynthDestination::Volume:
+      return kSfModTremoloDepth;
+    case SynthDestination::TremoloRate:
+      return kSfModSoundController6;
+    case SynthDestination::Pitch:
+    case SynthDestination::FilterCutoff:
+    case SynthDestination::Pan:
+    case SynthDestination::Unknown:
+      return std::nullopt;
   }
 
-  const auto source = sf2SourceForSynthSource(*modulator.source);
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(const SynthModulator& modulator) {
+  const auto source = modulator.source ? sf2SourceForSynthSource(*modulator.source)
+                                       : sf2DefaultSourceForDestination(modulator.destination);
   const auto destination = sf2GeneratorForDestination(modulator.destination);
   if (!source || !destination) {
     return std::nullopt;

@@ -275,18 +275,45 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto* instruments = std::get_if<InstrumentBankAsset>(&project.assets[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument bank");
   expect(instruments->bank.instruments.size() == 1, "instrument bank should parse one valid instrument");
-  expect(instruments->bank.instruments[0].program == 0, "instrument program should match table index");
-  expect(instruments->bank.instruments[0].range.offset == 0x4000 && instruments->bank.instruments[0].range.size == 6,
+  const auto& instrument = instruments->bank.instruments[0];
+  expect(instrument.program == 0, "instrument program should match table index");
+  expect(instrument.range.offset == 0x4000 && instrument.range.size == 6,
          "instrument should preserve the table entry source range");
-  expect(instruments->bank.instruments[0].regions.size() == 1, "instrument should expose one region");
-  expect(instruments->bank.instruments[0].regions[0].range.offset == 0x4000 &&
-             instruments->bank.instruments[0].regions[0].range.size == 6,
+  expect(instrument.regions.size() == 1, "instrument should expose one region");
+  expect(instrument.regions[0].range.offset == 0x4000 && instrument.regions[0].range.size == 6,
          "region should preserve the instrument header source range");
-  const auto& envelope = instruments->bank.instruments[0].regions[0].envelope;
+  const auto& envelope = instrument.regions[0].envelope;
   expect(envelope.attack == 63, "instrument envelope should convert SNES attack to microseconds");
   expect(envelope.decay == kEnvelopeInfinite, "instrument envelope should preserve infinite SNES sustain decay");
   expect(envelope.sustain == 1000, "instrument envelope should convert SNES sustain to a linear amplitude level");
   expect(envelope.release == 0, "instrument envelope should match Capcom legacy gain-based release handling");
+  expect(instrument.generators.size() == 2, "instrument should carry legacy LFO generator settings");
+  expect(instrument.generators[0].destination == SynthDestination::VibratoRate &&
+             instrument.generators[0].amount == -8479,
+         "instrument should carry legacy vibrato base frequency");
+  expect(instrument.generators[1].destination == SynthDestination::TremoloRate &&
+             instrument.generators[1].amount == -7279,
+         "instrument should carry legacy tremolo base frequency");
+  expect(instrument.modulators.size() == 6, "instrument should carry legacy synth modulators");
+  expect(instrument.modulators[0].source == SynthSource::ChannelPressure &&
+             instrument.modulators[0].destination == SynthDestination::VibratoDepth &&
+             instrument.modulators[0].amount == 0,
+         "instrument should nullify channel-pressure vibrato depth like legacy export");
+  expect(!instrument.modulators[1].source && instrument.modulators[1].destination == SynthDestination::VibratoDepth &&
+             instrument.modulators[1].amount == 1200,
+         "instrument should carry legacy vibrato depth range");
+  expect(!instrument.modulators[2].source && instrument.modulators[2].destination == SynthDestination::VibratoRate &&
+             instrument.modulators[2].amount == 9669,
+         "instrument should carry legacy vibrato rate range");
+  expect(!instrument.modulators[3].source && instrument.modulators[3].destination == SynthDestination::TremoloRate &&
+             instrument.modulators[3].amount == 9669,
+         "instrument should carry legacy tremolo rate range");
+  expect(!instrument.modulators[4].source && instrument.modulators[4].destination == SynthDestination::TremoloDepth &&
+             instrument.modulators[4].amount == 484,
+         "instrument should carry legacy tremolo depth range");
+  expect(!instrument.modulators[5].source && instrument.modulators[5].destination == SynthDestination::Volume &&
+             instrument.modulators[5].amount == 484,
+         "instrument should carry legacy no-boost attenuation modulator");
 
   const auto& instrumentItems = instruments->metadata.items.nodes;
   const auto instrumentItem =

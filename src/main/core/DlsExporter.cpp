@@ -30,7 +30,12 @@ constexpr u16 kDlsConnSrcLfo = 0x0001;
 constexpr u16 kDlsConnSrcKeyOnVelocity = 0x0002;
 constexpr u16 kDlsConnSrcKeyNumber = 0x0003;
 constexpr u16 kDlsConnSrcEg1 = 0x0004;
+constexpr u16 kDlsConnSrcPitchWheel = 0x0006;
+constexpr u16 kDlsConnSrcPolyPressure = 0x0007;
+constexpr u16 kDlsConnSrcChannelPressure = 0x0008;
 constexpr u16 kDlsConnSrcVibrato = 0x0009;
+constexpr u16 kDlsConnSrcCc1 = 0x0081;
+constexpr u16 kDlsConnSrcCc93 = 0x00dd;
 constexpr u16 kDlsConnDstAttenuation = 0x0001;
 constexpr u16 kDlsConnDstPitch = 0x0003;
 constexpr u16 kDlsConnDstPan = 0x0004;
@@ -268,6 +273,13 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     case SynthSource::Envelope:
       return kDlsConnSrcEg1;
     case SynthSource::MidiController:
+      return std::nullopt;
+    case SynthSource::ChannelPressure:
+      return kDlsConnSrcChannelPressure;
+    case SynthSource::PolyPressure:
+      return kDlsConnSrcPolyPressure;
+    case SynthSource::PitchWheel:
+      return kDlsConnSrcPitchWheel;
     case SynthSource::Unknown:
       return std::nullopt;
   }
@@ -275,12 +287,29 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<DlsConnection> dlsConnectionForModulator(const SynthModulator& modulator) {
-  if (!modulator.source) {
-    return std::nullopt;
+[[nodiscard]] std::optional<u16> dlsDefaultSourceForDestination(SynthDestination destination) {
+  switch (destination) {
+    case SynthDestination::VibratoDepth:
+      return kDlsConnSrcCc1;
+    case SynthDestination::VibratoRate:
+    case SynthDestination::TremoloRate:
+      return kDlsConnSrcChannelPressure;
+    case SynthDestination::TremoloDepth:
+    case SynthDestination::Volume:
+      return kDlsConnSrcCc93;
+    case SynthDestination::Pitch:
+    case SynthDestination::FilterCutoff:
+    case SynthDestination::Pan:
+    case SynthDestination::Unknown:
+      return std::nullopt;
   }
 
-  const auto source = dlsSourceForSynthSource(*modulator.source);
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<DlsConnection> dlsConnectionForModulator(const SynthModulator& modulator) {
+  const auto source = modulator.source ? dlsSourceForSynthSource(*modulator.source)
+                                       : dlsDefaultSourceForDestination(modulator.destination);
   if (!source) {
     return std::nullopt;
   }

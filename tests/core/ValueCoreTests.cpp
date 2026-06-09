@@ -601,6 +601,15 @@ void soundFontExporterWritesSfbkRiffFile() {
                           .destination = SynthDestination::VibratoDepth,
                           .amount = 300,
                       },
+                      SynthModulator{
+                          .source = SynthSource::ChannelPressure,
+                          .destination = SynthDestination::VibratoRate,
+                          .amount = 0,
+                      },
+                      SynthModulator{
+                          .destination = SynthDestination::TremoloRate,
+                          .amount = 180,
+                      },
                   },
               }},
           },
@@ -635,13 +644,17 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(chunkSize(result.bytes, "smpl") == 124, "SoundFont smpl chunk should include PCM and SF2 padding samples");
   expect(chunkSize(result.bytes, "ibag") == 12, "SoundFont ibag chunk should include a global generator zone");
   expect(soundFontBagAt(result.bytes, "ibag", 0, 0, 0), "SoundFont global zone should start at generator index 0");
-  expect(soundFontBagAt(result.bytes, "ibag", 1, 2, 1),
+  expect(soundFontBagAt(result.bytes, "ibag", 1, 2, 3),
          "SoundFont region zone should start after instrument generators and modulators");
-  expect(soundFontBagAt(result.bytes, "ibag", 2, 15, 1),
+  expect(soundFontBagAt(result.bytes, "ibag", 2, 15, 3),
          "SoundFont terminal bag should include all generators and modulators");
-  expect(chunkSize(result.bytes, "imod") == 20, "SoundFont imod chunk should include one modulator plus terminal");
+  expect(chunkSize(result.bytes, "imod") == 40, "SoundFont imod chunk should include modulators plus terminal");
   expect(soundFontImodContains(result.bytes, 2, 6, 300),
          "SoundFont export should write explicit velocity-to-vibrato modulator");
+  expect(soundFontImodContains(result.bytes, 13, 24, 0),
+         "SoundFont export should write explicit channel-pressure-to-vibrato-rate modulator");
+  expect(soundFontImodContains(result.bytes, 203, 22, 180),
+         "SoundFont export should resolve default tremolo-rate source from the destination");
   expect(chunkSize(result.bytes, "igen") == 64, "SoundFont igen chunk should include global and region generators");
   expect(chunkSize(result.bytes, "shdr") == 92, "SoundFont shdr chunk should include one sample and terminal record");
   expect(soundFontIgenContainsAmount(result.bytes, 6, 120),
@@ -715,6 +728,15 @@ void dlsExporterWritesDlsRiffFile() {
                           .destination = SynthDestination::VibratoDepth,
                           .amount = 300,
                       },
+                      SynthModulator{
+                          .source = SynthSource::ChannelPressure,
+                          .destination = SynthDestination::VibratoRate,
+                          .amount = 0,
+                      },
+                      SynthModulator{
+                          .destination = SynthDestination::TremoloRate,
+                          .amount = 180,
+                      },
                   },
               }},
           },
@@ -751,7 +773,7 @@ void dlsExporterWritesDlsRiffFile() {
   expect(chunkSize(result.bytes, "colh") == 4, "DLS colh chunk should store one u32 count");
   expect(chunkSize(result.bytes, "ptbl") == 12, "DLS ptbl chunk should include one pool cue");
   expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
-  expect(chunkSize(result.bytes, "art2") == 104,
+  expect(chunkSize(result.bytes, "art2") == 128,
          "DLS art2 chunk should include pan, envelope, generator, and modulator connections");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0206, 0),
          "DLS export should write EG1 attack time from Region envelope");
@@ -767,6 +789,10 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should write instrument vibrato rate generator");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0009, 0x0002, 0x0003, 19660800),
          "DLS export should write explicit velocity-to-vibrato modulator");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0114, 0),
+         "DLS export should write explicit channel-pressure-to-vibrato-rate modulator");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0104, 11796480),
+         "DLS export should resolve default tremolo-rate source from the destination");
 }
 
 void exportDiagnosticsPreserveSourceRanges() {

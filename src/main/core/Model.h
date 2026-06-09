@@ -314,6 +314,9 @@ enum class SynthSource {
   Lfo,
   Envelope,
   MidiController,
+  ChannelPressure,
+  PolyPressure,
+  PitchWheel,
   Unknown,
 };
 
