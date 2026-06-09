@@ -94,12 +94,61 @@ if(USE_SYSTEM_LIBCHDR)
 else()
   message(STATUS "Using vendored libchdr library")
   set(WITH_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
+  set(VGMTRANS_SAVED_BUILD_TESTING "${BUILD_TESTING}")
+  set(BUILD_TESTING OFF CACHE BOOL "[VGMTrans] Disable vendored libchdr tests" FORCE)
   add_subdirectory(${PROJECT_SOURCE_DIR}/lib/libchdr ${CMAKE_CURRENT_BINARY_DIR}/lib/libchdr EXCLUDE_FROM_ALL SYSTEM)
+  set(BUILD_TESTING "${VGMTRANS_SAVED_BUILD_TESTING}" CACHE BOOL "Build the testing tree." FORCE)
+  unset(VGMTRANS_SAVED_BUILD_TESTING)
 endif()
 
 # ~~~
 # Build
 # ~~~
+
+add_library(vgmtransvaluecore STATIC)
+vgmtrans_enable_project_warnings(vgmtransvaluecore)
+target_sources(vgmtransvaluecore
+  PRIVATE
+    core/Export.cpp
+    core/FormatModule.cpp
+    core/MidiExporter.cpp
+    core/Model.cpp
+    core/PerformanceLowerer.cpp
+    core/ProjectSession.cpp
+    core/SampleDecoder.cpp
+    core/Source.cpp
+  PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS .
+    FILES
+      core/CoreTypes.h
+      core/Export.h
+      core/FormatModule.h
+      core/MidiExporter.h
+      core/Model.h
+      core/PerformanceLowerer.h
+      core/ProjectSession.h
+      core/SampleDecoder.h
+      core/Source.h
+)
+target_include_directories(vgmtransvaluecore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(vgmtransvaluecore PUBLIC cxx_std_20)
+
+add_library(vgmtransvalueformats STATIC)
+vgmtrans_enable_project_warnings(vgmtransvalueformats)
+target_sources(vgmtransvalueformats
+  PRIVATE
+    formats/CapcomSnes/CapcomSnesModule.cpp
+    formats/CapcomSnes/CapcomSnesProfile.cpp
+  PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS .
+    FILES
+      formats/CapcomSnes/CapcomSnesModule.h
+      formats/CapcomSnes/CapcomSnesProfile.h
+)
+target_link_libraries(vgmtransvalueformats PUBLIC vgmtransvaluecore)
+target_compile_features(vgmtransvalueformats PUBLIC cxx_std_20)
 
 add_library(vgmtranscore OBJECT)
 vgmtrans_enable_project_warnings(vgmtranscore)
@@ -562,7 +611,7 @@ configure_file("version.h.in" "version.h")
 target_include_directories(vgmtranscore PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
+  PUBLIC vgmtransvalueformats vgmtransvaluecore spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
 )
 target_compile_features(vgmtranscore PUBLIC cxx_std_20)
 
