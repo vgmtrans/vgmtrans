@@ -145,11 +145,9 @@ void midiPanToVolumeBalance(u8 midiPan, double& left, double& right) {
   return midiPan;
 }
 
-[[nodiscard]] u8 linear7BitPanToMidi(u8 rawPan, double* volumeScale) {
-  if (rawPan == 127) {
-    ++rawPan;
-  }
-  return linearPercentPanToMidi(rawPan / 128.0, volumeScale);
+[[nodiscard]] u8 linear8BitPanToMidi(u8 biasedPan, double* volumeScale) {
+  const double percent = biasedPan == 255 ? 1.0 : biasedPan / 256.0;
+  return linearPercentPanToMidi(percent, volumeScale);
 }
 
 [[nodiscard]] u8 volumeBalanceToMidiPan(double left, double right, double* volumeScale) {
@@ -411,7 +409,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerPan(
   const auto biasedPan = static_cast<u8>(command.rawValue + 0x80);
   PanConversionResult pan;
   if (version_ == CapcomSnesEngineVersion::v1BgmInList) {
-    pan.midiPan = linear7BitPanToMidi(biasedPan >> 1, &pan.volumeScale);
+    pan.midiPan = linear8BitPanToMidi(biasedPan, &pan.volumeScale);
   } else {
     pan = calculatePanV2(biasedPan);
   }
@@ -420,13 +418,11 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerPan(
       Pan{
           .tick = state.tick,
           .channel = state.channel,
-          .value = linear7BitPanToMidi(pan.midiPan, nullptr),
+          .value = pan.midiPan,
       },
       Expression{
           .tick = state.tick,
           .channel = state.channel,
-          // Keep pan volume compensation as a continuous amplitude value. Quantizing before the
-          // amplitude curve loses precision.
           .value = percentAmpTo7BitMidi(pan.volumeScale),
       },
   };

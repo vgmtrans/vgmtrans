@@ -27,6 +27,7 @@ using namespace vgmtrans::core;
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
+void capcomSnesPanLoweringDoesNotRecurveMidiPan();
 
 namespace {
 
@@ -594,6 +595,7 @@ int main() {
     dlsExporterWritesDlsRiffFile();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
     capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
+    capcomSnesPanLoweringDoesNotRecurveMidiPan();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;

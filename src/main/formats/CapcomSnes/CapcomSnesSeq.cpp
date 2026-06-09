@@ -783,15 +783,13 @@ bool CapcomSnesTrack::readEvent() {
         u8 newPan = readByte(curOffset++) + 0x80; // signed -> unsigned
         PanConversionResult pan{};
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
-          pan.midiPan = convert7bitLinearPercentPanValToStdMidiVal(newPan >> 1, &pan.volumeScale);
+          pan.midiPan = convert8bitLinearPercentPanValToStdMidiVal(newPan, &pan.volumeScale);
         }
         else {
           pan = calculatePanV2(newPan);
         }
 
-        addPan(beginOffset, curOffset - beginOffset, pan.midiPan);
-        // Keep pan volume compensation as a continuous amplitude value. Quantizing to a raw
-        // 7-bit expression before the amplitude curve loses precision.
+        addMidiPan(beginOffset, curOffset - beginOffset, pan.midiPan);
         addExpressionNoItem(pan.volumeScale, Resolution::SevenBit);
         break;
       }

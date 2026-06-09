@@ -355,3 +355,65 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
   expect(std::get<NoteDuration>(*secondNote).key == 14,
          "CapcomSnes note pitch should still include active global and local transpose");
 }
+
+void capcomSnesPanLoweringDoesNotRecurveMidiPan() {
+  const SequenceProgram v3Program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {TrackProgram{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .startAddress = Address{0x3000},
+          .commands = {
+              PanCommand{.rawValue = 0x40},
+              EndCommand{},
+          },
+      }},
+  };
+
+  const PerformanceSequence performance = PerformanceLowerer().lower(
+      v3Program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+  expect(performance.diagnostics.empty(), "CapcomSnes pan fixture should lower without diagnostics");
+  expect(!performance.tracks.empty(), "CapcomSnes pan fixture should emit one track");
+
+  const auto& events = performance.tracks[0].events;
+  const auto pan = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* typed = std::get_if<Pan>(&event);
+    return typed != nullptr && typed->tick == 0;
+  });
+  expect(pan != events.end(), "CapcomSnes pan fixture should emit a pan controller");
+  expect(std::get<Pan>(*pan).value == 113,
+         "CapcomSnes pan lowering should emit the computed MIDI pan without applying the linear pan curve again");
+
+  const auto expression = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* typed = std::get_if<Expression>(&event);
+    return typed != nullptr && typed->tick == 0;
+  });
+  expect(expression != events.end(), "CapcomSnes pan fixture should emit expression compensation");
+  expect(std::get<Expression>(*expression).value == 123,
+         "CapcomSnes pan compensation should quantize after the amplitude curve");
+
+  const SequenceProgram v1Program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {TrackProgram{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .startAddress = Address{0x3000},
+          .commands = {
+              PanCommand{.rawValue = 0x01},
+              EndCommand{},
+          },
+      }},
+  };
+
+  const PerformanceSequence v1Performance = PerformanceLowerer().lower(
+      v1Program, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
+  expect(v1Performance.diagnostics.empty(), "CapcomSnes V1 pan fixture should lower without diagnostics");
+  const auto& v1Events = v1Performance.tracks[0].events;
+  const auto v1Pan = std::ranges::find_if(v1Events, [](const PerformanceEvent& event) {
+    const auto* typed = std::get_if<Pan>(&event);
+    return typed != nullptr && typed->tick == 0;
+  });
+  expect(v1Pan != v1Events.end(), "CapcomSnes V1 pan fixture should emit a pan controller");
+  expect(std::get<Pan>(*v1Pan).value == 65,
+         "CapcomSnes V1 pan lowering should apply the pan curve before reducing to a MIDI controller value");
+}

@@ -1219,6 +1219,20 @@ void SeqTrack::addPanNoItem(u8 pan) {
   prevPan = pan;
 }
 
+void SeqTrack::addMidiPan(u32 offset, u32 length, u8 pan, const std::string &sEventName) {
+  bool isNewOffset = onEvent(offset, length);
+
+  recordSeqEvent<PanSeqEvent>(isNewOffset, getTime(), pan, offset, length, sEventName);
+  addMidiPanNoItem(pan);
+}
+
+void SeqTrack::addMidiPanNoItem(u8 pan) {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    pMidiTrack->addPan(channel, pan);
+  }
+  prevPan = pan;
+}
+
 void SeqTrack::addPanSlide(u32 offset,
                            u32 length,
                            u32 dur,

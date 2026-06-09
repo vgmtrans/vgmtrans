@@ -265,6 +265,8 @@ private:
 
   void addPan(u32 offset, u32 length, u8 pan, const std::string &sEventName = "Pan");
   void addPanNoItem(u8 pan);
+  void addMidiPan(u32 offset, u32 length, u8 pan, const std::string &sEventName = "Pan");
+  void addMidiPanNoItem(u8 pan);
   void addPanSlide(u32 offset, u32 length, u32 dur, u8 targPan, const std::string &sEventName = "Pan Slide");
   void insertPan(u32 offset, u32 length, u8 pan, u32 absTime, const std::string &sEventName = "Pan");
   void addReverb(u32 offset, u32 length, u8 reverb, const std::string &sEventName = "Reverb");

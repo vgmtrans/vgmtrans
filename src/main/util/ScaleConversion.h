@@ -24,6 +24,7 @@ s32 centsToDlsPitchScale(double cents);
 s32 hertzToDlsPitch(double hz);
 u8 convertPercentPanValToStdMidiVal(double percent);
 u8 convertLinearPercentPanValToStdMidiVal(double percent, double *ptrVolumeScale = nullptr);
+u8 convert8bitLinearPercentPanValToStdMidiVal(u8 percentVal, double *ptrVolumeScale = nullptr);
 u8 convert7bitLinearPercentPanValToStdMidiVal(u8 percentVal, double *ptrVolumeScale = nullptr);
 void convertStdMidiPanToVolumeBalance(u8 midiPan, double &percentLeft, double &percentRight);
 u8 convertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight, double *ptrVolumeScale = nullptr);
