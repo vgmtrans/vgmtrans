@@ -152,6 +152,7 @@ target_sources(vgmtransvalueformats
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
     formats/CapcomSnes/CapcomSnesModule.cpp
     formats/CapcomSnes/CapcomSnesProfile.cpp
+    formats/SnesSpc/SnesSpcModule.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS .
@@ -160,6 +161,7 @@ target_sources(vgmtransvalueformats
       formats/CapcomSnes/CapcomSnesDriverMath.h
       formats/CapcomSnes/CapcomSnesModule.h
       formats/CapcomSnes/CapcomSnesProfile.h
+      formats/SnesSpc/SnesSpcModule.h
 )
 target_link_libraries(vgmtransvalueformats PUBLIC vgmtransvaluecore)
 target_compile_features(vgmtransvalueformats PUBLIC cxx_std_20)

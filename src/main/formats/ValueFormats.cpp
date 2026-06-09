@@ -8,10 +8,12 @@
 
 #include "formats/CapcomSnes/CapcomSnesModule.h"
 #include "formats/CapcomSnes/CapcomSnesProfile.h"
+#include "formats/SnesSpc/SnesSpcModule.h"
 
 namespace vgmtrans::formats {
 
 void registerValueFormatModules(core::FormatRegistry& registry) {
+  snes_spc::registerSnesSpcModule(registry);
   capcom_snes::registerCapcomSnesModule(registry);
 }
 

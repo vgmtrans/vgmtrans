@@ -105,6 +105,20 @@ std::vector<u8> makeCapcomSnesAram() {
   return bytes;
 }
 
+std::vector<u8> makeCapcomSnesSpc() {
+  std::vector<u8> bytes(0x10180);
+  constexpr std::string_view signature = "SNES-SPC700 Sound File Data";
+  std::ranges::copy(signature, bytes.begin());
+  bytes[0x21] = 0x1a;
+  bytes[0x22] = 0x1a;
+  bytes[0x23] = 0x1a;
+  bytes[0x24] = 0x30;
+
+  const auto aram = makeCapcomSnesAram();
+  std::ranges::copy(aram, bytes.begin() + 0x100);
+  return bytes;
+}
+
 }  // namespace
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
@@ -355,6 +369,36 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "collection should reference instrument bank");
   expect(project.collections[0].sampleCollections == std::vector<AssetId>{samples->metadata.id},
          "collection should reference sample collection");
+}
+
+void capcomSnesModuleScansSpcThroughVirtualAramSource() {
+  ProjectSession session;
+  vgmtrans::formats::registerValueFormats(session);
+  const auto sourceId = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesSpc());
+
+  const Project project = session.scan();
+  expect(project.diagnostics.empty(), "SPC-backed CapcomSnes scan should not report diagnostics");
+  expect(project.sources.size() == 2, "SPC scan should preserve original source plus extracted ARAM");
+  expect(!project.sources[0].virtualized, "original SPC source should not be virtualized");
+  expect(project.sources[1].virtualized, "SPC RAM source should be virtualized");
+  expect(project.sources[1].name == "Mega Man X.spc - ram", "virtual ARAM source should match legacy naming");
+  expect(project.sources[1].origin.has_value(), "virtual ARAM source should preserve origin range");
+  expect(project.sources[1].origin->source == sourceId, "virtual ARAM origin should point at the SPC source");
+  expect(project.sources[1].origin->offset == 0x100 && project.sources[1].origin->size == 0x10000,
+         "virtual ARAM origin should point at SPC RAM bytes");
+
+  expect(project.collections.size() == 1, "SPC-backed scan should produce one collection");
+  expect(project.assets.size() == 3, "SPC-backed scan should produce CapcomSnes assets from virtual ARAM");
+  const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
+  expect(sequence != nullptr, "SPC-backed scan should produce a sequence");
+  expect(sequence->metadata.range.source == SourceId{1}, "sequence range should point at virtual ARAM source");
+  expect(sequence->metadata.range.offset == 0x2001, "sequence range should preserve ARAM-relative address");
+
+  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets[2]);
+  expect(samples != nullptr, "SPC-backed scan should produce samples");
+  expect(!samples->samples.samples.empty(), "SPC-backed scan should discover sample data");
+  expect(samples->samples.samples[0].encodedData.source == SourceId{1},
+         "sample encoded data should point at virtual ARAM source");
 }
 
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
