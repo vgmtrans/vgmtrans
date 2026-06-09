@@ -414,6 +414,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "capcom-snes-repeat";
         } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
           return "capcom-snes-repeat-break";
+        } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
+          return "capcom-snes-loop-boundary";
         } else if constexpr (std::is_same_v<Command, EndCommand>) {
           return "capcom-snes-end";
         } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
@@ -465,6 +467,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "Repeat";
         } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
           return "Repeat Break";
+        } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
+          return "Loop Boundary";
         } else if constexpr (std::is_same_v<Command, EndCommand>) {
           return "End";
         } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
@@ -514,6 +518,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "Slot " + std::to_string(typedCommand.slot) + ", attributes " +
                  std::to_string(typedCommand.rawAttributes) + ", destination $" +
                  std::to_string(typedCommand.destination.value);
+        } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
+          return "Destination $" + std::to_string(typedCommand.destination.value);
         } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
           return "Opcode " + std::to_string(typedCommand.opcode);
         } else if constexpr (std::is_same_v<Command, DriverSpecificCommand>) {
@@ -541,7 +547,10 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 
   while (reader.has(offset, 1) && track.commands.size() < 4096) {
     if (!visitedOffsets.insert(offset).second) {
-      track.commands.push_back(driverCommand("Decoded Loop", reader, offset, 0));
+      track.commands.push_back(LoopBoundaryCommand{
+          .destination = Address{offset},
+          .range = reader.range(offset, 0),
+      });
       break;
     }
 

@@ -284,6 +284,37 @@ void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
          "play-once lowering should skip commands exactly at the loop boundary");
 }
 
+void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
+  const auto range = [](u64 offset, u64 size) {
+    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
+  };
+  const SequenceProgram program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {TrackProgram{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .startAddress = Address{0},
+          .commands = {
+              NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
+              LoopBoundaryCommand{.destination = Address{1}, .range = range(1, 0)},
+              VolumeCommand{.rawValue = 99, .range = range(2, 1)},
+          },
+      }},
+  };
+
+  const PerformanceSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const auto& events = performance.tracks[0].events;
+  expect(std::ranges::any_of(events, [](const PerformanceEvent& event) {
+           const auto* note = std::get_if<NoteDuration>(&event);
+           return note != nullptr && note->tick == 0 && note->duration == 12;
+         }),
+         "loop-boundary fixture should emit events before the boundary");
+  expect(std::ranges::none_of(events, [](const PerformanceEvent& event) {
+           return std::holds_alternative<Volume>(event);
+         }),
+         "loop-boundary fixture should not lower commands after the boundary");
+}
+
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -461,6 +492,7 @@ int main() {
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
     performanceLowererSkipsCommandsAtPlayOnceLoopBoundary();
+    performanceLowererTreatsLoopBoundaryAsAStopPoint();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();

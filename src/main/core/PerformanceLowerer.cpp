@@ -187,6 +187,9 @@ void extendPendingNotes(
             } else {
               ended = true;
             }
+          } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
+            loopTick = state.tick;
+            ended = true;
           } else if constexpr (std::is_same_v<Command, EndCommand>) {
             ended = true;
           }
@@ -556,6 +559,11 @@ PerformanceSequence PerformanceLowerer::lower(
                 result.diagnostics.push_back(warning("Jump destination was not decoded", typedCommand.range));
                 ended = true;
               }
+            } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
+              if (loopPolicy != LoopPolicy::PlayOnce) {
+                loweredTrack.events.push_back(Marker{.tick = state.tick, .text = "Loop"});
+              }
+              ended = true;
             } else if constexpr (std::is_same_v<Command, EndCommand>) {
               loweredTrack.events.push_back(EndOfTrack{.tick = state.tick});
               ended = true;

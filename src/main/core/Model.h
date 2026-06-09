@@ -185,6 +185,11 @@ struct RepeatBreakCommand {
   SourceRange range;
 };
 
+struct LoopBoundaryCommand {
+  Address destination;
+  SourceRange range;
+};
+
 struct EndCommand {
   SourceRange range;
 };
@@ -220,6 +225,7 @@ using SequencerCommand = std::variant<
     JumpCommand,
     RepeatCommand,
     RepeatBreakCommand,
+    LoopBoundaryCommand,
     EndCommand,
     UnknownCommand,
     DriverSpecificCommand>;
