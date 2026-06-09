@@ -380,10 +380,13 @@ private:
   u8 octave;
   u16 vol;
   Resolution volResolution;
+  double volLevel;
   u16 expression;
   Resolution expressionResolution;
+  double expressionLevel;
   u16 mastVol;
   Resolution masterVolResolution;
+  double masterVolLevel;
   double panVolumeCorrectionRate; // as percentage of original volume (default: 1.0)
   u16 prevPan;
   u8 prevReverb;

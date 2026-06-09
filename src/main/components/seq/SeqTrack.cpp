@@ -20,10 +20,6 @@ namespace {
 constexpr u16 maxLevelForResolution(Resolution res) {
   return res == Resolution::FourteenBit ? 16383 : 127;
 }
-
-double normalizedLevelFromRaw(u16 rawLevel, Resolution res) {
-  return rawLevel / static_cast<double>(maxLevelForResolution(res));
-}
 }  // namespace
 
 SeqTrack::SeqTrack(VGMSeq *parentFile, u32 offset, u32 length, std::string name)
@@ -56,10 +52,13 @@ void SeqTrack::resetVars() {
   deltaTime = 0;
   vol = 100;
   volResolution = Resolution::SevenBit;
+  volLevel = vol / static_cast<double>(maxLevelForResolution(volResolution));
   expression = 127;
   expressionResolution = Resolution::SevenBit;
+  expressionLevel = 1.0;
   mastVol = 127;
   masterVolResolution = Resolution::SevenBit;
+  masterVolLevel = 1.0;
   prevPan = 64;
   prevReverb = 40;
   channelGroup = 0;
@@ -930,14 +929,17 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
     case LevelController::Volume:
       vol = origLevel;
       volResolution = res;
+      volLevel = level;
       break;
     case LevelController::Expression:
       expression = origLevel;
       expressionResolution = res;
+      expressionLevel = level;
       break;
     case LevelController::MasterVolume:
       mastVol = origLevel;
       masterVolResolution = res;
+      masterVolLevel = level;
       break;
   }
 
@@ -1024,26 +1026,26 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
 }
 
 void SeqTrack::reapplyStoredLevelNoItem(LevelController controller, int absTime) {
-  u16 rawLevel;
+  double level;
   Resolution resolution;
   switch (controller) {
     case LevelController::Volume:
-      rawLevel = vol;
+      level = volLevel;
       resolution = volResolution;
       break;
     case LevelController::Expression:
-      rawLevel = expression;
+      level = expressionLevel;
       resolution = expressionResolution;
       break;
     case LevelController::MasterVolume:
-      rawLevel = mastVol;
+      level = masterVolLevel;
       resolution = masterVolResolution;
       break;
     default:
       return;
   }
 
-  addLevelNoItem(normalizedLevelFromRaw(rawLevel, resolution), controller, resolution, absTime);
+  addLevelNoItem(level, controller, resolution, absTime);
 }
 
 void SeqTrack::addVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName) {

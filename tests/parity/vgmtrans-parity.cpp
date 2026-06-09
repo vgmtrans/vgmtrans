@@ -1528,6 +1528,62 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
   return false;
 }
 
+class LegacyLevelPrecisionTrack final : public SeqTrack {
+public:
+  explicit LegacyLevelPrecisionTrack(VGMSeq* parentFile, u32 offset, u32 length)
+      : SeqTrack(parentFile, offset, length, "LegacyLevelPrecisionTrack") {}
+
+  bool readEvent() override {
+    constexpr double kPreciseExpression = 0.93039;
+    addExpressionNoItem(kPreciseExpression, Resolution::SevenBit);
+    addPanNoItem(0);
+    addTime(1);
+    addEndOfTrackNoItem();
+    curOffset = offset() + length();
+    return false;
+  }
+};
+
+class LegacyLevelPrecisionSeq final : public VGMSeq {
+public:
+  explicit LegacyLevelPrecisionSeq(RawFile* file)
+      : VGMSeq("LegacyLevelPrecision", file, 0, 1, "LegacyLevelPrecision") {
+    setUseLinearAmplitudeScale(true);
+    setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustExpressionController);
+    setPPQN(48);
+  }
+
+  void prepare() {
+    clearTracks();
+    addTrack<LegacyLevelPrecisionTrack>(this, 0, 1);
+    nNumTracks = static_cast<u32>(trackCount());
+  }
+};
+
+void legacyLevelReapplicationKeepsPreCurvePrecision() {
+  std::array<u8, 1> bytes{};
+  VirtFile raw(bytes.data(), static_cast<u32>(bytes.size()), "legacy-level-precision.bin");
+  LegacyLevelPrecisionSeq sequence(&raw);
+  sequence.prepare();
+
+  auto midi = sequence.convertToMidi(nullptr);
+  expect(midi != nullptr, "legacy precision fixture should convert to MIDI");
+
+  std::vector<u8> midiBytes;
+  midi->writeMidiToBuffer(midiBytes);
+  const auto events = normalizeMidi(midiBytes);
+
+  int expressionEvents = 0;
+  for (const auto& event : events) {
+    if (event.kind == "control" && event.a == 11) {
+      ++expressionEvents;
+      expect(event.b == 123, "legacy expression reapplication should apply the curve before 7-bit quantization");
+    }
+  }
+
+  expect(expressionEvents == 2, "legacy precision fixture should emit original and reapplied expression events");
+}
+
 int selfTest() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -1570,6 +1626,7 @@ int selfTest() {
   std::ostringstream summaryOutput;
   expect(compareCapcomSnesSummary(aramBytes, "synthetic.spc", summaryOutput),
          "self-test should compare CapcomSnes summary parity: " + summaryOutput.str());
+  legacyLevelReapplicationKeepsPreCurvePrecision();
 
   std::cout << "vgmtrans-parity self-test ok\n";
   return 0;
