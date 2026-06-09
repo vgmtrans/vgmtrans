@@ -385,6 +385,22 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "capcom-snes-note";
         } else if constexpr (std::is_same_v<Command, RestCommand>) {
           return "capcom-snes-rest";
+        } else if constexpr (std::is_same_v<Command, NoteStateCommand>) {
+          switch (typedCommand.action) {
+            case NoteStateAction::ToggleTriplet:
+              return "capcom-snes-toggle-triplet";
+            case NoteStateAction::ToggleSlur:
+              return "capcom-snes-toggle-slur";
+            case NoteStateAction::EnableDotted:
+              return "capcom-snes-enable-dotted";
+            case NoteStateAction::ToggleOctaveUp:
+              return "capcom-snes-toggle-octave-up";
+            case NoteStateAction::Attributes:
+              return "capcom-snes-note-attributes";
+            case NoteStateAction::Octave:
+              return "capcom-snes-octave";
+          }
+          return "capcom-snes-note-state";
         } else if constexpr (std::is_same_v<Command, DurationCommand>) {
           return "capcom-snes-duration";
         } else if constexpr (std::is_same_v<Command, ProgramCommand>) {
@@ -438,6 +454,22 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           return "Note";
         } else if constexpr (std::is_same_v<Command, RestCommand>) {
           return "Rest";
+        } else if constexpr (std::is_same_v<Command, NoteStateCommand>) {
+          switch (typedCommand.action) {
+            case NoteStateAction::ToggleTriplet:
+              return "Toggle Triplet";
+            case NoteStateAction::ToggleSlur:
+              return "Toggle Slur";
+            case NoteStateAction::EnableDotted:
+              return "Dotted Note";
+            case NoteStateAction::ToggleOctaveUp:
+              return "Toggle 2-Octave Up";
+            case NoteStateAction::Attributes:
+              return "Note Attributes";
+            case NoteStateAction::Octave:
+              return "Octave";
+          }
+          return "Note State";
         } else if constexpr (std::is_same_v<Command, DurationCommand>) {
           return "Duration";
         } else if constexpr (std::is_same_v<Command, ProgramCommand>) {
@@ -492,6 +524,22 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
                  std::to_string(typedCommand.rawDuration);
         } else if constexpr (std::is_same_v<Command, RestCommand>) {
           return "Length index " + std::to_string(typedCommand.rawDuration);
+        } else if constexpr (std::is_same_v<Command, NoteStateCommand>) {
+          switch (typedCommand.action) {
+            case NoteStateAction::ToggleTriplet:
+              return "Toggle triplet";
+            case NoteStateAction::ToggleSlur:
+              return "Toggle slur";
+            case NoteStateAction::EnableDotted:
+              return "Enable dotted note";
+            case NoteStateAction::ToggleOctaveUp:
+              return "Toggle 2-octave up";
+            case NoteStateAction::Attributes:
+              return "Raw " + std::to_string(typedCommand.rawValue);
+            case NoteStateAction::Octave:
+              return "Octave " + std::to_string(typedCommand.rawValue);
+          }
+          return "Raw " + std::to_string(typedCommand.rawValue);
         } else if constexpr (std::is_same_v<Command, DurationCommand>) {
           return "Raw " + std::to_string(typedCommand.rawValue);
         } else if constexpr (std::is_same_v<Command, ProgramCommand>) {
@@ -588,24 +636,39 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 
     switch (status) {
       case 0x00:
-        track.commands.push_back(driverCommand("Toggle Triplet", reader, beginOffset, 1));
+        track.commands.push_back(NoteStateCommand{
+            .action = NoteStateAction::ToggleTriplet,
+            .range = reader.range(beginOffset, 1),
+        });
         break;
       case 0x01:
-        track.commands.push_back(driverCommand("Toggle Slur", reader, beginOffset, 1));
+        track.commands.push_back(NoteStateCommand{
+            .action = NoteStateAction::ToggleSlur,
+            .range = reader.range(beginOffset, 1),
+        });
         break;
       case 0x02:
-        track.commands.push_back(driverCommand("Dotted Note On", reader, beginOffset, 1));
+        track.commands.push_back(NoteStateCommand{
+            .action = NoteStateAction::EnableDotted,
+            .range = reader.range(beginOffset, 1),
+        });
         break;
       case 0x03:
-        track.commands.push_back(driverCommand("Toggle 2-Octave Up", reader, beginOffset, 1));
+        track.commands.push_back(NoteStateCommand{
+            .action = NoteStateAction::ToggleOctaveUp,
+            .range = reader.range(beginOffset, 1),
+        });
         break;
       case 0x04:
         if (!need(1)) {
           track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
           return track;
         }
-        ++offset;
-        track.commands.push_back(driverCommand("Note Attributes", reader, beginOffset, 2));
+        track.commands.push_back(NoteStateCommand{
+            .action = NoteStateAction::Attributes,
+            .rawValue = reader.u8At(offset++),
+            .range = reader.range(beginOffset, 2),
+        });
         break;
       case 0x05:
         if (!need(2)) {
@@ -653,8 +716,11 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
           return track;
         }
-        ++offset;
-        track.commands.push_back(driverCommand("Octave", reader, beginOffset, 2));
+        track.commands.push_back(NoteStateCommand{
+            .action = NoteStateAction::Octave,
+            .rawValue = reader.u8At(offset++),
+            .range = reader.range(beginOffset, 2),
+        });
         break;
       case 0x0a:
         if (!need(1)) {

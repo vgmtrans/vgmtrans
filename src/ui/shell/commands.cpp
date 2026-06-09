@@ -434,6 +434,24 @@ std::string_view valueLfoTargetName(vgmtrans::core::LfoTarget target) {
   return "unknown";
 }
 
+std::string_view valueNoteStateActionName(vgmtrans::core::NoteStateAction action) {
+  switch (action) {
+    case vgmtrans::core::NoteStateAction::ToggleTriplet:
+      return "toggle-triplet";
+    case vgmtrans::core::NoteStateAction::ToggleSlur:
+      return "toggle-slur";
+    case vgmtrans::core::NoteStateAction::EnableDotted:
+      return "enable-dotted";
+    case vgmtrans::core::NoteStateAction::ToggleOctaveUp:
+      return "toggle-octave-up";
+    case vgmtrans::core::NoteStateAction::Attributes:
+      return "attributes";
+    case vgmtrans::core::NoteStateAction::Octave:
+      return "octave";
+  }
+  return "unknown";
+}
+
 std::string valueCommandDescription(const vgmtrans::core::SequencerCommand& command) {
   return std::visit([](const auto& typedCommand) -> std::string {
     using Command = std::decay_t<decltype(typedCommand)>;
@@ -442,6 +460,9 @@ std::string valueCommandDescription(const vgmtrans::core::SequencerCommand& comm
                          typedCommand.key, typedCommand.rawVelocity, typedCommand.rawDuration);
     } else if constexpr (std::is_same_v<Command, vgmtrans::core::RestCommand>) {
       return fmt::format("rest rawDuration={}", typedCommand.rawDuration);
+    } else if constexpr (std::is_same_v<Command, vgmtrans::core::NoteStateCommand>) {
+      return fmt::format("note-state action={} rawValue={}",
+                         valueNoteStateActionName(typedCommand.action), typedCommand.rawValue);
     } else if constexpr (std::is_same_v<Command, vgmtrans::core::DurationCommand>) {
       return fmt::format("duration rawValue={}", typedCommand.rawValue);
     } else if constexpr (std::is_same_v<Command, vgmtrans::core::ProgramCommand>) {

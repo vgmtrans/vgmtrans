@@ -132,6 +132,54 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
   };
 }
 
+std::vector<PerformanceEvent> CapcomSnesProfile::lowerNoteState(
+    const NoteStateCommand& command,
+    TrackState& state) const {
+  std::vector<PerformanceEvent> events;
+  auto setSlur = [&](bool enabled) {
+    if (state.noteSlurred != enabled) {
+      state.noteSlurred = enabled;
+      events.push_back(LegatoPedal{
+          .tick = state.tick,
+          .channel = state.channel,
+          .enabled = enabled,
+      });
+    }
+  };
+
+  switch (command.action) {
+    case NoteStateAction::ToggleTriplet:
+      state.noteTriplet = !state.noteTriplet;
+      break;
+    case NoteStateAction::ToggleSlur:
+      setSlur(!state.noteSlurred);
+      break;
+    case NoteStateAction::EnableDotted:
+      state.noteDotted = true;
+      break;
+    case NoteStateAction::ToggleOctaveUp:
+      state.noteOctaveUp = !state.noteOctaveUp;
+      break;
+    case NoteStateAction::Attributes: {
+      const bool wasSlurred = state.noteSlurred;
+      applyNoteAttributes(static_cast<u8>(command.rawValue), state);
+      if (state.noteSlurred != wasSlurred) {
+        events.push_back(LegatoPedal{
+            .tick = state.tick,
+            .channel = state.channel,
+            .enabled = state.noteSlurred,
+        });
+      }
+      break;
+    }
+    case NoteStateAction::Octave:
+      state.noteOctave = command.rawValue & kNoteOctaveMask;
+      break;
+  }
+
+  return events;
+}
+
 void CapcomSnesProfile::applyDuration(const DurationCommand& command, TrackState& state) const {
   state.durationRate = command.rawValue;
 }
@@ -305,46 +353,6 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerLfo(
     default:
       return {};
   }
-}
-
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerDriverSpecific(
-    const DriverSpecificCommand& command,
-    TrackState& state) const {
-  std::vector<PerformanceEvent> events;
-  auto setSlur = [&](bool enabled) {
-    if (state.noteSlurred != enabled) {
-      state.noteSlurred = enabled;
-      events.push_back(LegatoPedal{
-          .tick = state.tick,
-          .channel = state.channel,
-          .enabled = enabled,
-      });
-    }
-  };
-
-  if (command.name == "Toggle Triplet") {
-    state.noteTriplet = !state.noteTriplet;
-  } else if (command.name == "Toggle Slur") {
-    setSlur(!state.noteSlurred);
-  } else if (command.name == "Dotted Note On") {
-    state.noteDotted = true;
-  } else if (command.name == "Toggle 2-Octave Up") {
-    state.noteOctaveUp = !state.noteOctaveUp;
-  } else if (command.name == "Note Attributes" && command.bytes.size() >= 2) {
-    const bool wasSlurred = state.noteSlurred;
-    applyNoteAttributes(command.bytes[1], state);
-    if (state.noteSlurred != wasSlurred) {
-      events.push_back(LegatoPedal{
-          .tick = state.tick,
-          .channel = state.channel,
-          .enabled = state.noteSlurred,
-      });
-    }
-  } else if (command.name == "Octave" && command.bytes.size() >= 2) {
-    state.noteOctave = command.bytes[1] & kNoteOctaveMask;
-  }
-
-  return events;
 }
 
 std::vector<PerformanceEvent> CapcomSnesProfile::lowerRepeatBreak(

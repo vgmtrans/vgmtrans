@@ -97,6 +97,21 @@ struct RestCommand {
   SourceRange range;
 };
 
+enum class NoteStateAction {
+  ToggleTriplet,
+  ToggleSlur,
+  EnableDotted,
+  ToggleOctaveUp,
+  Attributes,
+  Octave,
+};
+
+struct NoteStateCommand {
+  NoteStateAction action = NoteStateAction::Attributes;
+  u32 rawValue = 0;
+  SourceRange range;
+};
+
 struct DurationCommand {
   u32 rawValue = 0;
   SourceRange range;
@@ -212,6 +227,7 @@ struct DriverSpecificCommand {
 using SequencerCommand = std::variant<
     NoteCommand,
     RestCommand,
+    NoteStateCommand,
     DurationCommand,
     ProgramCommand,
     VolumeCommand,

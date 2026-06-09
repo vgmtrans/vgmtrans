@@ -406,6 +406,78 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
          "sample encoded data should point at virtual ARAM source");
 }
 
+void capcomSnesNoteStateCommandsAreTypedAndLowered() {
+  auto bytes = makeCapcomSnesAram();
+  bytes[0x3000] = 0x09;
+  bytes[0x3001] = 0x04;
+  bytes[0x3002] = 0x04;
+  bytes[0x3003] = 0x48;
+  bytes[0x3004] = 0x41;
+  bytes[0x3005] = 0x17;
+
+  ProjectSession session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = "Mega Man X.spc"}, std::move(bytes));
+
+  const Project project = session.scan();
+  expect(project.diagnostics.empty(), "CapcomSnes note-state scan should not report diagnostics");
+  expect(!project.assets.empty(), "CapcomSnes note-state scan should produce assets");
+
+  const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
+  expect(sequence != nullptr, "CapcomSnes note-state scan should produce a sequence");
+  expect(!sequence->program.tracks.empty(), "CapcomSnes note-state scan should decode tracks");
+
+  const auto& commands = sequence->program.tracks[0].commands;
+  expect(commands.size() == 4, "CapcomSnes note-state fixture should decode four commands");
+
+  const auto* octave = std::get_if<NoteStateCommand>(&commands[0]);
+  expect(octave != nullptr, "CapcomSnes octave opcode should decode as a typed note-state command");
+  expect(octave->action == NoteStateAction::Octave && octave->rawValue == 4,
+         "CapcomSnes octave command should preserve its raw octave operand");
+  expect(octave->range.offset == 0x3000 && octave->range.size == 2,
+         "CapcomSnes octave command should preserve its source range");
+
+  const auto* attributes = std::get_if<NoteStateCommand>(&commands[1]);
+  expect(attributes != nullptr, "CapcomSnes attributes opcode should decode as a typed note-state command");
+  expect(attributes->action == NoteStateAction::Attributes && attributes->rawValue == 0x48,
+         "CapcomSnes note attributes should preserve their raw attribute byte");
+  expect(attributes->range.offset == 0x3002 && attributes->range.size == 2,
+         "CapcomSnes note attributes should preserve their source range");
+
+  const auto attributeItem = std::ranges::find_if(sequence->metadata.items.nodes, [](const ItemNode& item) {
+    return item.kind == ItemKind::Command && item.detailKind == "capcom-snes-note-attributes" &&
+           item.range.offset == 0x3002;
+  });
+  expect(attributeItem != sequence->metadata.items.nodes.end(),
+         "CapcomSnes item tree should expose typed note-attribute command nodes");
+  expect(attributeItem->name == "Note Attributes", "note-attribute item should carry a readable name");
+  expect(attributeItem->description == "Raw 72", "note-attribute item should preserve raw command values");
+
+  const PerformanceSequence performance = PerformanceLowerer().lower(
+      sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+  expect(performance.diagnostics.empty(), "CapcomSnes note-state lowering should not report diagnostics");
+  expect(!performance.tracks.empty(), "CapcomSnes note-state lowering should preserve tracks");
+
+  const auto& events = performance.tracks[0].events;
+  const auto legato = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* typed = std::get_if<LegatoPedal>(&event);
+    return typed != nullptr && typed->tick == 0 && typed->enabled;
+  });
+  expect(legato != events.end(), "CapcomSnes note attributes should lower slur state to legato pedal");
+
+  const auto note = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* typed = std::get_if<NoteDuration>(&event);
+    return typed != nullptr && typed->tick == 0;
+  });
+  expect(note != events.end(), "CapcomSnes note-state fixture should emit a note");
+  expect(std::get<NoteDuration>(*note).key == 72,
+         "CapcomSnes note-state lowering should apply octave and 2-octave-up attributes");
+  expect(std::get<NoteDuration>(*note).duration == 7,
+         "CapcomSnes slurred note-state lowering should preserve legacy note extension");
+  expect(std::get<EndOfTrack>(events.back()).tick == 6,
+         "CapcomSnes note-state lowering should still advance by the decoded note length");
+}
+
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
   const SequenceProgram program{
       .timebase = Timebase{.ppqn = 48},

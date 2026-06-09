@@ -24,6 +24,9 @@ class CapcomSnesProfile final : public core::SequencerProfile {
   [[nodiscard]] core::NoteTiming noteTiming(
       const core::NoteCommand& command,
       core::TrackState& state) const override;
+  [[nodiscard]] std::vector<core::PerformanceEvent> lowerNoteState(
+      const core::NoteStateCommand& command,
+      core::TrackState& state) const override;
   void applyDuration(const core::DurationCommand& command, core::TrackState& state) const override;
 
   [[nodiscard]] std::vector<core::PerformanceEvent> lowerTempo(
@@ -52,9 +55,6 @@ class CapcomSnesProfile final : public core::SequencerProfile {
       core::TrackState& state) const override;
   [[nodiscard]] std::vector<core::PerformanceEvent> lowerLfo(
       const core::LfoCommand& command,
-      core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerDriverSpecific(
-      const core::DriverSpecificCommand& command,
       core::TrackState& state) const override;
   [[nodiscard]] std::vector<core::PerformanceEvent> lowerRepeatBreak(
       const core::RepeatBreakCommand& command,

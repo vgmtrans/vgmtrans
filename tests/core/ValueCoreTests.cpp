@@ -30,6 +30,7 @@ using namespace vgmtrans::core;
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void capcomSnesModuleScansSpcThroughVirtualAramSource();
+void capcomSnesNoteStateCommandsAreTypedAndLowered();
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
 void capcomSnesPanLoweringDoesNotRecurveMidiPan();
 void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
@@ -305,6 +306,7 @@ void byteReaderChecksBoundsAndEndian() {
 
 void sequencerCommandExposesSourceRange() {
   const SourceRange noteRange{.source = SourceId{3}, .offset = 0x1200, .size = 1};
+  const SourceRange noteStateRange{.source = SourceId{3}, .offset = 0x1201, .size = 2};
   const SourceRange driverRange{.source = SourceId{3}, .offset = 0x1204, .size = 3};
 
   const SequencerCommand note = NoteCommand{
@@ -313,6 +315,11 @@ void sequencerCommandExposesSourceRange() {
       .rawDuration = 4,
       .range = noteRange,
   };
+  const SequencerCommand noteState = NoteStateCommand{
+      .action = NoteStateAction::Attributes,
+      .rawValue = 0x48,
+      .range = noteStateRange,
+  };
   const SequencerCommand driver = DriverSpecificCommand{
       .name = "Probe",
       .bytes = {0x01, 0x02, 0x03},
@@ -320,6 +327,8 @@ void sequencerCommandExposesSourceRange() {
   };
 
   expect(sameRange(commandRange(note), noteRange), "command range should come from typed note command");
+  expect(sameRange(commandRange(noteState), noteStateRange),
+         "command range should come from typed note-state command");
   expect(sameRange(commandRange(driver), driverRange),
          "command range should come from typed driver-specific command");
 }
@@ -1030,6 +1039,7 @@ int main() {
     exportDiagnosticsPreserveSourceRanges();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
     capcomSnesModuleScansSpcThroughVirtualAramSource();
+    capcomSnesNoteStateCommandsAreTypedAndLowered();
     capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
     capcomSnesPanLoweringDoesNotRecurveMidiPan();
     capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();

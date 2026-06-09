@@ -58,6 +58,9 @@ class SequencerProfile {
                           TrackState& state, std::vector<PerformanceEvent>& events) const;
   [[nodiscard]] virtual u32 restTicks(const RestCommand& command, TrackState& state) const;
   [[nodiscard]] virtual NoteTiming noteTiming(const NoteCommand& command, TrackState& state) const;
+  [[nodiscard]] virtual std::vector<PerformanceEvent> lowerNoteState(
+      const NoteStateCommand& command,
+      TrackState& state) const;
   virtual void applyDuration(const DurationCommand& command, TrackState& state) const;
   virtual void applyTranspose(const TransposeCommand& command, TrackState& state) const;
 

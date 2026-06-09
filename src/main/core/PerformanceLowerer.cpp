@@ -126,6 +126,8 @@ void rememberExecutedCommand(const SequencerCommand& command, std::unordered_set
             state.tick += profile.noteTiming(typedCommand, state).advanceTicks;
           } else if constexpr (std::is_same_v<Command, RestCommand>) {
             state.tick += profile.restTicks(typedCommand, state);
+          } else if constexpr (std::is_same_v<Command, NoteStateCommand>) {
+            static_cast<void>(profile.lowerNoteState(typedCommand, state));
           } else if constexpr (std::is_same_v<Command, DurationCommand>) {
             profile.applyDuration(typedCommand, state);
           } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
@@ -241,6 +243,12 @@ void SequencerProfile::beginTrack(
 
 u32 SequencerProfile::restTicks(const RestCommand& command, TrackState&) const {
   return command.rawDuration;
+}
+
+std::vector<PerformanceEvent> SequencerProfile::lowerNoteState(
+    const NoteStateCommand&,
+    TrackState&) const {
+  return {};
 }
 
 NoteTiming SequencerProfile::noteTiming(const NoteCommand& command, TrackState& state) const {
@@ -485,6 +493,8 @@ PerformanceSequence PerformanceLowerer::lower(
               state.tick += timing.advanceTicks;
             } else if constexpr (std::is_same_v<Command, RestCommand>) {
               state.tick += profile.restTicks(typedCommand, state);
+            } else if constexpr (std::is_same_v<Command, NoteStateCommand>) {
+              appendEvents(loweredTrack.events, profile.lowerNoteState(typedCommand, state));
             } else if constexpr (std::is_same_v<Command, DurationCommand>) {
               profile.applyDuration(typedCommand, state);
             } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
