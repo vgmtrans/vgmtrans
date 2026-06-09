@@ -6,7 +6,7 @@
 
 #include "formats/CapcomSnes/Value/CapcomSnesModule.h"
 
-#include "formats/CapcomSnes/Value/CapcomSnesValueScan.h"
+#include "formats/CapcomSnes/Value/CapcomSnesValueLayout.h"
 #include "formats/CapcomSnes/Value/CapcomSnesValueSequence.h"
 #include "formats/CapcomSnes/Value/CapcomSnesValueSynth.h"
 

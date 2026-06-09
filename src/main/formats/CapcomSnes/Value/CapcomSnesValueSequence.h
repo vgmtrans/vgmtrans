@@ -7,7 +7,7 @@
 #pragma once
 
 #include "core/FormatModule.h"
-#include "formats/CapcomSnes/Value/CapcomSnesValueScan.h"
+#include "formats/CapcomSnes/Value/CapcomSnesValueLayout.h"
 
 #include <optional>
 #include <string_view>
