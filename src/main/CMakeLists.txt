@@ -149,6 +149,7 @@ vgmtrans_enable_project_warnings(vgmtransvalueformats)
 target_sources(vgmtransvalueformats
   PRIVATE
     formats/ValueFormats.cpp
+    formats/CapcomSnes/CapcomSnesDriverMath.cpp
     formats/CapcomSnes/CapcomSnesModule.cpp
     formats/CapcomSnes/CapcomSnesProfile.cpp
   PUBLIC
@@ -156,6 +157,7 @@ target_sources(vgmtransvalueformats
     BASE_DIRS .
     FILES
       formats/ValueFormats.h
+      formats/CapcomSnes/CapcomSnesDriverMath.h
       formats/CapcomSnes/CapcomSnesModule.h
       formats/CapcomSnes/CapcomSnesProfile.h
 )
