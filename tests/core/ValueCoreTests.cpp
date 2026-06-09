@@ -69,6 +69,7 @@ public:
     const auto assetId = input.ids.nextAssetId();
     const auto collectionId = input.ids.nextCollectionId();
     const auto itemId = input.ids.nextItemId();
+    const auto childItemId = input.ids.nextItemId();
     const auto assetRange = input.reader.range(0, input.reader.size());
 
     SequenceAsset sequence{
@@ -87,6 +88,15 @@ public:
                             .detailKind = "probe-sequence",
                             .name = input.source.name,
                             .range = assetRange,
+                            .children = {ItemId{9999}},
+                        },
+                        ItemNode{
+                            .id = childItemId,
+                            .parent = itemId,
+                            .kind = ItemKind::Header,
+                            .detailKind = "probe-header",
+                            .name = "Header",
+                            .range = input.reader.range(0, 1),
                         }},
                     },
             },
@@ -191,7 +201,11 @@ void projectSessionScansValuesAndVirtualSources() {
   const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
   expect(sequence != nullptr, "first asset should be a sequence");
   expect(sequence->metadata.id == AssetId{0}, "sequence should keep allocated asset id");
-  expect(sequence->metadata.items.nodes.size() == 1, "sequence should expose item tree");
+  expect(sequence->metadata.items.nodes.size() == 2, "sequence should expose item tree");
+  expect(sequence->metadata.items.root == sequence->metadata.items.nodes[0].id,
+         "scanner should preserve valid item tree root");
+  expect(sequence->metadata.items.nodes[0].children == std::vector<ItemId>{sequence->metadata.items.nodes[1].id},
+         "scanner should rebuild item children from parent links");
   expect(project.collections[0].sequence == sequence->metadata.id, "collection should reference sequence asset");
 
   const auto* misc = std::get_if<MiscAsset>(&project.assets[1]);
