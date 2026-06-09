@@ -322,12 +322,22 @@ void projectSessionScansValuesAndVirtualSources() {
   const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
   expect(sequence != nullptr, "first asset should be a sequence");
   expect(sequence->metadata.id == AssetId{0}, "sequence should keep allocated asset id");
+  expect(assetById<SequenceAsset>(project, sequence->metadata.id) == sequence,
+         "project snapshot should find a sequence asset by stable id");
+  expect(assetById<MiscAsset>(project, sequence->metadata.id) == nullptr,
+         "project snapshot should reject asset id lookups with the wrong value type");
+  expect(assetById<SequenceAsset>(project, AssetId{99}) == nullptr,
+         "project snapshot should return null for a missing asset id");
   expect(sequence->metadata.items.nodes.size() == 2, "sequence should expose item tree");
   expect(sequence->metadata.items.root == sequence->metadata.items.nodes[0].id,
          "scanner should preserve valid item tree root");
   expect(sequence->metadata.items.nodes[0].children == std::vector<ItemId>{sequence->metadata.items.nodes[1].id},
          "scanner should rebuild item children from parent links");
   expect(project.collections[0].sequence == sequence->metadata.id, "collection should reference sequence asset");
+  expect(collectionById(project, project.collections[0].id) == &project.collections[0],
+         "project snapshot should find a collection by stable id");
+  expect(collectionById(project, CollectionId{99}) == nullptr,
+         "project snapshot should return null for a missing collection id");
 
   const auto* misc = std::get_if<MiscAsset>(&project.assets[1]);
   expect(misc != nullptr, "second asset should be misc from virtual source");

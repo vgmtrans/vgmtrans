@@ -10,6 +10,7 @@
 #include "core/CoreTypes.h"
 #include "core/Source.h"
 
+#include <algorithm>
 #include <limits>
 #include <optional>
 #include <string>
@@ -655,5 +656,18 @@ struct PerformanceSequence {
 
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
+
+template <typename T>
+[[nodiscard]] const T* assetById(const Project& project, AssetId id) {
+  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
+    return metadata(asset).id == id && std::holds_alternative<T>(asset);
+  });
+  if (found == project.assets.end()) {
+    return nullptr;
+  }
+  return std::get_if<T>(&*found);
+}
+
+[[nodiscard]] const Collection* collectionById(const Project& project, CollectionId id);
 
 }  // namespace vgmtrans::core

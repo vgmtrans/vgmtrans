@@ -16,4 +16,14 @@ const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
 }
 
+const Collection* collectionById(const Project& project, CollectionId id) {
+  const auto found = std::ranges::find_if(project.collections, [id](const Collection& collection) {
+    return collection.id == id;
+  });
+  if (found == project.collections.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
 }  // namespace vgmtrans::core

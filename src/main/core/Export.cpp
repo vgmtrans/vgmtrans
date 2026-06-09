@@ -40,36 +40,6 @@ namespace {
   };
 }
 
-[[nodiscard]] const SequenceAsset* findSequenceAsset(const Project& project, AssetId id) {
-  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
-    return metadata(asset).id == id && std::holds_alternative<SequenceAsset>(asset);
-  });
-  if (found == project.assets.end()) {
-    return nullptr;
-  }
-  return std::get_if<SequenceAsset>(&*found);
-}
-
-[[nodiscard]] const SampleCollectionAsset* findSampleCollectionAsset(const Project& project, AssetId id) {
-  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
-    return metadata(asset).id == id && std::holds_alternative<SampleCollectionAsset>(asset);
-  });
-  if (found == project.assets.end()) {
-    return nullptr;
-  }
-  return std::get_if<SampleCollectionAsset>(&*found);
-}
-
-[[nodiscard]] const InstrumentBankAsset* findInstrumentBankAsset(const Project& project, AssetId id) {
-  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
-    return metadata(asset).id == id && std::holds_alternative<InstrumentBankAsset>(asset);
-  });
-  if (found == project.assets.end()) {
-    return nullptr;
-  }
-  return std::get_if<InstrumentBankAsset>(&*found);
-}
-
 [[nodiscard]] std::string artifactBaseName(const Collection& collection) {
   if (!collection.name.empty()) {
     return collection.name;
@@ -115,7 +85,7 @@ namespace {
     };
   }
 
-  const auto* sequence = findSequenceAsset(project, *collection.sequence);
+  const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence);
   if (sequence == nullptr) {
     return Artifact{
         .filename = artifactBaseName(collection) + ".mid",
@@ -160,7 +130,7 @@ namespace {
   u32 sampleIndex = 0;
 
   for (const auto sampleCollectionId : collection.sampleCollections) {
-    const auto* sampleCollection = findSampleCollectionAsset(project, sampleCollectionId);
+    const auto* sampleCollection = assetById<SampleCollectionAsset>(project, sampleCollectionId);
     if (sampleCollection == nullptr) {
       artifacts.push_back(Artifact{
           .filename = filenamePart(artifactBaseName(collection)) + "-samples.wav",
@@ -214,7 +184,7 @@ namespace {
   std::vector<Diagnostic> diagnostics;
 
   for (const auto id : collection.instrumentBanks) {
-    if (const auto* instrumentBank = findInstrumentBankAsset(project, id)) {
+    if (const auto* instrumentBank = assetById<InstrumentBankAsset>(project, id)) {
       instrumentBanks.push_back(instrumentBank);
     } else {
       diagnostics.push_back(exportError("Collection instrument bank asset was not found"));
@@ -222,7 +192,7 @@ namespace {
   }
 
   for (const auto id : collection.sampleCollections) {
-    if (const auto* sampleCollection = findSampleCollectionAsset(project, id)) {
+    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, id)) {
       sampleCollections.push_back(sampleCollection);
     } else {
       diagnostics.push_back(exportError("Collection sample collection asset was not found"));
@@ -255,7 +225,7 @@ namespace {
   std::vector<Diagnostic> diagnostics;
 
   for (const auto id : collection.instrumentBanks) {
-    if (const auto* instrumentBank = findInstrumentBankAsset(project, id)) {
+    if (const auto* instrumentBank = assetById<InstrumentBankAsset>(project, id)) {
       instrumentBanks.push_back(instrumentBank);
     } else {
       diagnostics.push_back(exportError("Collection instrument bank asset was not found"));
@@ -263,7 +233,7 @@ namespace {
   }
 
   for (const auto id : collection.sampleCollections) {
-    if (const auto* sampleCollection = findSampleCollectionAsset(project, id)) {
+    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, id)) {
       sampleCollections.push_back(sampleCollection);
     } else {
       diagnostics.push_back(exportError("Collection sample collection asset was not found"));
@@ -293,10 +263,8 @@ namespace {
 std::vector<Artifact> ExportService::exportCollection(const Project& project, const SourceStore& sources,
                                                       CollectionId collection, const ExportRequest& request,
                                                       const SequencerProfileRegistry& profiles) const {
-  const auto found = std::ranges::find_if(
-      project.collections, [collection](const Collection& candidate) { return candidate.id == collection; });
-
-  if (found == project.collections.end()) {
+  const auto* found = collectionById(project, collection);
+  if (found == nullptr) {
     return {Artifact{
         .filename = "export-error.txt",
         .mediaType = "text/plain",

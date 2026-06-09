@@ -726,17 +726,6 @@ std::map<std::string, CapcomSnesSummary> legacyCapcomSnesRsnSummaries(const std:
   return summaries;
 }
 
-template <typename T>
-[[nodiscard]] const T* findAsset(const Project& project, AssetId id) {
-  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
-    return metadata(asset).id == id && std::holds_alternative<T>(asset);
-  });
-  if (found == project.assets.end()) {
-    return nullptr;
-  }
-  return std::get_if<T>(&*found);
-}
-
 CapcomSnesSummary valueCapcomSnesSummary(
     const Project& project,
     const SourceStore& sources,
@@ -747,14 +736,14 @@ CapcomSnesSummary valueCapcomSnesSummary(
   std::map<u32, const SampleCollectionAsset*> sampleCollectionsById;
 
   if (collection.sequence) {
-    if (const auto* sequence = findAsset<SequenceAsset>(project, *collection.sequence)) {
+    if (const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence)) {
       ++summary.sequenceCount;
       summary.trackCounts.push_back(static_cast<u32>(sequence->program.tracks.size()));
     }
   }
 
   for (const auto sampleCollectionId : collection.sampleCollections) {
-    const auto* sampleCollection = findAsset<SampleCollectionAsset>(project, sampleCollectionId);
+    const auto* sampleCollection = assetById<SampleCollectionAsset>(project, sampleCollectionId);
     if (sampleCollection == nullptr) {
       continue;
     }
@@ -781,7 +770,7 @@ CapcomSnesSummary valueCapcomSnesSummary(
   }
 
   for (const auto instrumentBankId : collection.instrumentBanks) {
-    const auto* instrumentBank = findAsset<InstrumentBankAsset>(project, instrumentBankId);
+    const auto* instrumentBank = assetById<InstrumentBankAsset>(project, instrumentBankId);
     if (instrumentBank == nullptr) {
       continue;
     }
