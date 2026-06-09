@@ -25,6 +25,7 @@ struct BytePatternView {
   std::string_view mask;
 };
 
+// These signatures identify driver routines whose operands reveal runtime table addresses.
 constexpr std::array<u8, 16> kReadSongListPattern{
     0x1c, 0x5d, 0xf5, 0x03, 0x0e, 0xc4, 0xc0, 0xf5,
     0x02, 0x0e, 0xc4, 0xc1, 0x04, 0xc0, 0xf0, 0xdd};
@@ -124,6 +125,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
     ByteReader reader,
     CapcomSnesEngineVersion version,
     u16 songListAddress) {
+  // Song-list SPC dumps only expose the current playback cursor, so choose the nearest valid header.
   std::optional<u8> guessedSongIndex;
   int bestScore = std::numeric_limits<int>::max();
 
@@ -166,6 +168,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 [[nodiscard]] std::map<u8, u8> initialDspRegisterMap(ByteReader reader) {
   std::map<u8, u8> registers;
 
+  // The DIR base is usually written through the driver's DSP register initialization table.
   u32 registerCount = 0;
   u32 registerListAddress = 0;
   u32 valueListAddress = 0;
@@ -230,6 +233,7 @@ std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
       layout.version = CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation;
       const bool bgmHeaderCoversSongList =
           layout.bgmHeaderAddress <= layout.songListAddress && layout.bgmHeaderAddress + 17 > layout.songListAddress;
+      // Some v2 drivers contain both patterns, but the fixed-header operand can point into the song list.
       if (bgmHeaderCoversSongList || !isValidBgmHeader(reader, layout.bgmHeaderAddress)) {
         layout.bgmAtFixedAddress = false;
       }
@@ -246,6 +250,7 @@ std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
     layout.sequenceHeaderAddress = layout.bgmHeaderAddress + 1;
     layout.priorityInHeader = false;
   } else if (layout.hasSongList) {
+    // Song-list entries point at headers that include a one-byte priority before track pointers.
     const auto currentSong = guessCurrentSong(reader, layout.version, static_cast<u16>(layout.songListAddress));
     if (!currentSong) {
       return std::nullopt;

@@ -97,6 +97,7 @@ namespace {
   const std::string profileName = sequence->program.sequencerProfile.empty()
                                       ? sequence->metadata.format
                                       : sequence->program.sequencerProfile;
+  // Some formats scan as one asset format but need a dialect-specific sequencer profile.
   auto profile = profiles.create(profileName);
   if (!profile) {
     return Artifact{
@@ -150,6 +151,7 @@ namespace {
       };
 
       try {
+        // Sample bytes stay in SourceStore so WAV export can report source-backed decode errors.
         if (!sources.contains(sample.encodedData.source)) {
           artifact.diagnostics.push_back(
               exportError("Sample source was not found", diagnosticRange(sample.encodedData)));

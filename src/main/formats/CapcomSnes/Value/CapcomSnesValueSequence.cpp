@@ -51,6 +51,7 @@ TrackProgram decodeCapcomSnesTrack(
 
   while (reader.has(offset, 1) && track.commands.size() < 4096) {
     if (!visitedOffsets.insert(offset).second) {
+      // Preserve decoded loop intent as data; the shared lowerer decides playback policy.
       track.commands.push_back(LoopBoundaryCommand{
           .destination = Address{offset},
           .trigger = Address{lastCommandOffset},
@@ -64,6 +65,7 @@ TrackProgram decodeCapcomSnesTrack(
     const u8 status = reader.u8At(offset++);
 
     if (status >= 0x20) {
+      // High opcodes pack note/rest identity and duration into one byte.
       const u8 keyIndex = status & 0x1f;
       const u8 lengthIndex = status >> 5;
       if (keyIndex == 0) {
@@ -329,6 +331,7 @@ TrackProgram decodeCapcomSnesTrack(
       case 0x1e:
       case 0x1f:
         if (version == CapcomSnesEngineVersion::v1BgmInList) {
+          // In the oldest driver these bytes are consumed commands; newer drivers treat them as NOPs.
           if (!need(1)) {
             track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
             return track;
@@ -385,6 +388,7 @@ SequenceAsset parseCapcomSnesSequence(
 
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   std::set<std::pair<u32, u32>> referencedInstruments;
+  // Capcom stores track pointers in reverse channel order.
   for (int trackIndex = static_cast<int>(kCapcomSnesMaxTracks) - 1; trackIndex >= 0; --trackIndex) {
     const auto pointerOffset = pointerBase + static_cast<u32>(trackIndex) * 2;
     const u16 trackAddress = input.reader.be16(pointerOffset);
@@ -426,6 +430,7 @@ SequenceAsset parseCapcomSnesSequence(
   }
 
   for (const auto& track : program.tracks) {
+    // Legacy playback applies an initial global transpose if it appears before audible data.
     for (const auto& command : track.commands) {
       if (const auto* globalTranspose = std::get_if<GlobalTransposeCommand>(&command)) {
         program.behavior.initialGlobalTranspose = globalTranspose->rawSemitones;

@@ -19,6 +19,7 @@ inline constexpr u32 kCapcomSnesMaxTracks = 8;
 inline constexpr u32 kCapcomSnesPpqn = 48;
 
 struct CapcomSnesLayout {
+  // Addresses are ARAM offsets discovered from driver code patterns and DSP initialization.
   CapcomSnesEngineVersion version = CapcomSnesEngineVersion::none;
   bool hasSongList = false;
   bool bgmAtFixedAddress = false;

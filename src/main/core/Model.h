@@ -47,6 +47,7 @@ struct ItemNode {
 };
 
 struct ItemTree {
+  // Item trees are a source-backed presentation index, not ownership of parsed data.
   std::optional<ItemId> root;
   std::vector<ItemNode> nodes;
 };
@@ -251,6 +252,7 @@ using SequencerCommand = std::variant<
     UnknownCommand,
     DriverSpecificCommand>;
 
+// These defaults let formats name only commands whose display differs from the shared model.
 [[nodiscard]] std::string defaultCommandName(const SequencerCommand& command);
 [[nodiscard]] std::string defaultCommandDetailKind(const SequencerCommand& command);
 [[nodiscard]] std::string defaultCommandDescription(const SequencerCommand& command);
@@ -277,6 +279,7 @@ struct SequenceProgram {
   std::vector<TrackProgram> tracks;
   std::vector<InstrumentRef> referencedInstruments;
   SequenceBehavior behavior;
+  // Empty means use metadata.format; formats set this when one parser has multiple sequencer dialects.
   std::string sequencerProfile;
 };
 

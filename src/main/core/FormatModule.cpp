@@ -18,6 +18,7 @@ namespace vgmtrans::core {
 namespace {
 
 void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
+  // Modules can return hand-authored or builder-created trees; normalize them before publishing.
   for (auto& item : items.nodes) {
     if (item.id.valid()) {
       ids.reserveAfter(item.id);
@@ -44,6 +45,7 @@ void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
     if (auto* parent = itemById(items, *item.parent)) {
       parent->children.push_back(item.id);
     } else {
+      // Keep orphaned nodes inspectable instead of dropping source context.
       item.parent = std::nullopt;
       if (!firstRoot.has_value()) {
         firstRoot = item.id;
@@ -195,6 +197,7 @@ Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) c
                                    std::make_move_iterator(result.diagnostics.end()));
 
         for (auto& extracted : result.extractedSources) {
+          // Extracted sources are appended and scanned by later loop iterations.
           extracted.file.virtualized = true;
           extracted.file.origin = extracted.origin;
           sources.add(std::move(extracted.file), std::move(extracted.bytes));

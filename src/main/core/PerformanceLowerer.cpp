@@ -103,6 +103,7 @@ void rememberExecutedCommand(const SequencerCommand& command, std::unordered_set
     const TrackProgram& track,
     const SequencerProfile& profile,
     u8 channel) {
+  // Dry-run the track state to find the first musical loop without emitting events.
   const auto indexes = commandIndexByOffset(track);
   TrackState state{
       .trackIndex = track.sourceTrackNumber,
@@ -405,6 +406,7 @@ PerformanceSequence PerformanceLowerer::lower(
   std::optional<u64> playOnceStopTick;
   std::vector<std::optional<u64>> firstLoopTicks(program.tracks.size());
   if (loopPolicy == LoopPolicy::PlayOnce) {
+    // All tracks stop at the latest first-loop tick so short tracks do not truncate the song.
     for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
       const auto loopTick = firstLoopTick(program,
                                          program.tracks[trackIndex],
@@ -477,6 +479,7 @@ PerformanceSequence PerformanceLowerer::lower(
               }
               appendEvents(loweredTrack.events, std::move(timing.beforeEvents));
               if (timing.extendsPrevious) {
+                // Slurred notes extend the existing note event instead of starting a new note.
                 extendPendingNotes(loweredTrack.events, pendingNoteIndexes, state.tick + soundingTicks);
               } else {
                 purgeEndedPendingNotes(loweredTrack.events, pendingNoteIndexes, state.tick);
@@ -580,6 +583,7 @@ PerformanceSequence PerformanceLowerer::lower(
               rememberExecutedCommand(command, executedOffsets);
               if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
                 if (loopPolicy == LoopPolicy::PlayOnce && destinationWasExecuted) {
+                  // A backward jump to an executed command marks loop playback, not another pass forever.
                   if (state.tick == 0 || !playOnceStopTick.has_value() || state.tick >= *playOnceStopTick) {
                     ended = true;
                     return;

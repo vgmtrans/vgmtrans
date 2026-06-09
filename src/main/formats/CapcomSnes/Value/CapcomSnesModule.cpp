@@ -34,6 +34,7 @@ ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
     return {};
   }
 
+  // The module only orchestrates value construction; layout, sequence, and synth parsing stay isolated.
   const std::string displayName = capcomSnesSourceDisplayName(input.source);
   const auto sequenceId = input.ids.nextAssetId();
   const auto instrumentBankId = input.ids.nextAssetId();

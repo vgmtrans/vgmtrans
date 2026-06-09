@@ -28,6 +28,7 @@ class ScanIdAllocator {
   void reserveAfter(ItemId id) noexcept;
 
  private:
+  // Scan results may provide stable IDs explicitly; generated IDs advance past them.
   u32 nextAssetId_ = 0;
   u32 nextCollectionId_ = 0;
   u32 nextItemId_ = 0;
@@ -43,6 +44,7 @@ class ItemTreeBuilder {
  public:
   ItemTreeBuilder(ItemTree& tree, ScanIdAllocator& ids);
 
+  // Keeps parent child-lists current while format parsers build source-backed UI trees.
   [[nodiscard]] ItemId add(
       std::optional<ItemId> parent,
       ItemKind kind,
@@ -68,6 +70,7 @@ class FormatModule {
   virtual ~FormatModule() = default;
 
   [[nodiscard]] virtual std::string_view name() const = 0;
+  // canScan should be cheap and non-mutating; scan does the full parse once selected.
   [[nodiscard]] virtual bool canScan(const SourceFile& source, std::span<const u8> bytes) const = 0;
   [[nodiscard]] virtual ScanResult scan(const ScanInput& input) const = 0;
 };

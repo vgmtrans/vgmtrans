@@ -47,6 +47,7 @@ struct PanLowering {
 [[nodiscard]] u32 noteTicks(u32 rawDuration, TrackState& state) {
   u32 length = baseNoteTicks(rawDuration);
   if (state.noteDotted) {
+    // Dotted applies once, while triplet mode persists until toggled by command.
     if (length % 2 == 0 && length < 0x80) {
       length += length / 2;
     } else {
@@ -69,6 +70,7 @@ struct PanLowering {
 }
 
 [[nodiscard]] s32 sourceKey(const NoteCommand& command, const TrackState& state) {
+  // Keep source pitch separate so portamento distance ignores active transpose like the driver.
   return static_cast<s32>(command.key) - 1 +
          static_cast<s32>(state.noteOctave * 12) +
          (state.noteOctaveUp ? 24 : 0);
@@ -107,10 +109,12 @@ void addLfoDepthEvents(std::vector<PerformanceEvent>& events, const TrackState& 
   if (rawTempo == 0) {
     return 60000000;
   }
+  // Capcom's timer math is driver-rate based, not a direct BPM value.
   return static_cast<u32>(std::round(kPpqn * (125 * 0x40) * 2 * 256.0 / rawTempo));
 }
 
 [[nodiscard]] u16 volume14(CapcomSnesEngineVersion version, u8 rawValue) {
+  // Convert through the amplitude curve before quantizing to MIDI resolution.
   const double volume = version == CapcomSnesEngineVersion::v1BgmInList
                             ? ::capcom_snes::calculateVolumeV1(rawValue)
                             : ::capcom_snes::calculateVolumeV2(rawValue);
@@ -141,6 +145,7 @@ void addLfoDepthEvents(std::vector<PerformanceEvent>& events, const TrackState& 
 }  // namespace
 
 std::string_view capcomSnesProfileName(CapcomSnesEngineVersion version) {
+  // Export lookup uses these keys to preserve version-specific pan/volume math.
   switch (version) {
     case CapcomSnesEngineVersion::v1BgmInList:
       return kV1ProfileName;
@@ -369,6 +374,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerLfo(
       const bool wasEnabled = state.lfoRate != 0;
       state.lfoRate = command.rawAmount;
       const bool isEnabled = state.lfoRate != 0;
+      // Depth commands latch silently until a nonzero LFO rate enables output.
       if (!isEnabled && wasEnabled) {
         addLfoDepthEvents(events, state, false);
       } else if (isEnabled && !wasEnabled) {

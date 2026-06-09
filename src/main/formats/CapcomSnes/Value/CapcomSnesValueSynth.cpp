@@ -37,6 +37,7 @@ struct InstrumentPitch {
     const u8 flag = reader.u8At(offset);
     offset += 9;
     if ((flag & 1) != 0) {
+      // BRR end blocks carry the loop flag in bit 1 of the same header byte.
       loop = (flag & 2) != 0;
       break;
     }
@@ -56,6 +57,7 @@ struct InstrumentPitch {
   }
 
   if (validateSample) {
+    // Fast table probing can skip BRR walking; committed instruments validate the encoded stream.
     bool loops = false;
     const u32 length = sampleLength(reader, sampleStart, loops);
     if (length == 0) {
@@ -112,6 +114,7 @@ struct InstrumentPitch {
   constexpr int baseUnityKey = 96;
   constexpr double referencePitch = 0x10b0 / 4096.0;
 
+  // Legacy export models Capcom pitch scale as root-key displacement plus fine tuning.
   const double ratio = pitchScale != 0 ? (static_cast<double>(pitchScale) / 256.0) * referencePitch : 1.0;
   const double semitones = 12.0 * std::log2(ratio);
   int coarse = static_cast<int>(std::lround(semitones));
@@ -207,6 +210,7 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(
       continue;
     }
     if (!instrumentHeaderIsValid(reader, address, spcDirAddress, false)) {
+      // The table is contiguous; the first impossible nonblank header ends discovery.
       break;
     }
     if (!instrumentHeaderIsValid(reader, address, spcDirAddress, true)) {
@@ -240,6 +244,7 @@ std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(
   }
   std::ranges::sort(srcns);
 
+  // Multiple instruments can point at the same SRCN; samples are emitted once.
   std::vector<CapcomSnesSampleInfo> samples;
   samples.reserve(srcns.size());
   for (const u8 srcn : srcns) {
@@ -289,6 +294,7 @@ SampleCollectionAsset parseCapcomSnesSamples(
   SampleCollection collection;
   collection.samples.reserve(sampleInfos.size());
   for (const auto& sampleInfo : sampleInfos) {
+    // SNES BRR decodes 9-byte blocks into 16 PCM frames.
     const u32 loopStart = sampleInfo.loopAddress >= sampleInfo.startAddress
                               ? ((sampleInfo.loopAddress - sampleInfo.startAddress) / 9) * 16
                               : 0;
@@ -342,6 +348,7 @@ InstrumentBankAsset parseCapcomSnesInstrumentBank(
   std::map<u32, u32> sampleIndexByStartAddress;
   std::map<u8, u32> sampleIndexBySrcn;
   for (u32 index = 0; index < sampleInfos.size(); ++index) {
+    // Canonicalize duplicate sample starts so shared BRR data exports as one sample.
     const auto [canonical, _] = sampleIndexByStartAddress.emplace(sampleInfos[index].startAddress, index);
     sampleIndexBySrcn[sampleInfos[index].srcn] = canonical->second;
   }

@@ -38,6 +38,7 @@ class ByteReader {
   [[nodiscard]] bool has(u64 offset, u64 size) const noexcept;
   [[nodiscard]] SourceRange range(u64 offset, u64 size) const noexcept;
 
+  // Reads are bounds-checked; callers use has() when malformed data should stop parsing.
   [[nodiscard]] u8 u8At(u64 offset) const;
   [[nodiscard]] s8 s8At(u64 offset) const;
   [[nodiscard]] u16 le16(u64 offset) const;
@@ -50,6 +51,7 @@ class ByteReader {
  private:
   void require(u64 offset, u64 size) const;
 
+  // ByteReader does not own bytes; SourceStore owns storage for the reader lifetime.
   SourceId source_;
   std::span<const u8> bytes_;
 };

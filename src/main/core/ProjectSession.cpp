@@ -13,6 +13,7 @@
 namespace vgmtrans::core {
 
 SourceId ProjectSession::addSource(SourceFile file, std::vector<u8> bytes) {
+  // User-added sources invalidate virtual extractions from the previous scan.
   sources_.discardVirtualizedTail();
   project_ = {};
   return sources_.add(std::move(file), std::move(bytes));
