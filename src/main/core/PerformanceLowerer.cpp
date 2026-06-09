@@ -14,6 +14,7 @@
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -90,6 +91,17 @@ void extendPendingNotes(
   return found->second;
 }
 
+void rememberExecutedCommand(const SequencerCommand& command, std::unordered_set<u64>& offsets) {
+  if (std::holds_alternative<LoopBoundaryCommand>(command)) {
+    return;
+  }
+
+  const auto range = commandRange(command);
+  if (range.valid()) {
+    offsets.insert(range.offset);
+  }
+}
+
 [[nodiscard]] std::optional<u64> firstLoopTick(
     const SequenceProgram& program,
     const TrackProgram& track,
@@ -103,6 +115,7 @@ void extendPendingNotes(
   };
   size_t pc = 0;
   size_t executedCommands = 0;
+  std::unordered_set<u64> executedOffsets;
 
   while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
     const auto& command = track.commands[pc];
@@ -176,8 +189,10 @@ void extendPendingNotes(
               }
             }
           } else if constexpr (std::is_same_v<Command, JumpCommand>) {
+            const bool destinationWasExecuted = executedOffsets.contains(typedCommand.destination.value);
+            rememberExecutedCommand(command, executedOffsets);
             if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
-              if (*target <= pc) {
+              if (destinationWasExecuted) {
                 loopTick = state.tick;
                 ended = true;
                 return;
@@ -188,8 +203,14 @@ void extendPendingNotes(
               ended = true;
             }
           } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
-            loopTick = state.tick;
-            ended = true;
+            if (const auto target = destinationIndex(indexes, typedCommand.destination);
+                target.has_value() && *target < pc) {
+              pc = *target;
+              incrementPc = false;
+            } else {
+              loopTick = state.tick;
+              ended = true;
+            }
           } else if constexpr (std::is_same_v<Command, EndCommand>) {
             ended = true;
           }
@@ -204,6 +225,9 @@ void extendPendingNotes(
     }
     if (incrementPc) {
       ++pc;
+    }
+    if (incrementPc || !std::holds_alternative<JumpCommand>(command)) {
+      rememberExecutedCommand(command, executedOffsets);
     }
   }
 
@@ -422,6 +446,7 @@ PerformanceSequence PerformanceLowerer::lower(
       loopPlaybackStopTick = playOnceStopTick;
     }
     std::vector<size_t> pendingNoteIndexes;
+    std::unordered_set<u64> executedOffsets;
     while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
       if (loopPlaybackStopTick.has_value() && state.tick >= *loopPlaybackStopTick) {
         ended = true;
@@ -542,8 +567,10 @@ PerformanceSequence PerformanceLowerer::lower(
                 }
               }
             } else if constexpr (std::is_same_v<Command, JumpCommand>) {
+              const bool destinationWasExecuted = executedOffsets.contains(typedCommand.destination.value);
+              rememberExecutedCommand(command, executedOffsets);
               if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
-                if (loopPolicy == LoopPolicy::PlayOnce && *target <= pc) {
+                if (loopPolicy == LoopPolicy::PlayOnce && destinationWasExecuted) {
                   if (state.tick == 0 || !playOnceStopTick.has_value() || state.tick >= *playOnceStopTick) {
                     ended = true;
                     return;
@@ -560,6 +587,16 @@ PerformanceSequence PerformanceLowerer::lower(
                 ended = true;
               }
             } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
+              if (loopPolicy == LoopPolicy::PlayOnce) {
+                if (const auto target = destinationIndex(indexes, typedCommand.destination);
+                    target.has_value() && playOnceStopTick.has_value() && state.tick < *playOnceStopTick &&
+                    *target < pc) {
+                  loopPlaybackStopTick = playOnceStopTick;
+                  pc = *target;
+                  incrementPc = false;
+                  return;
+                }
+              }
               if (loopPolicy != LoopPolicy::PlayOnce) {
                 loweredTrack.events.push_back(Marker{.tick = state.tick, .text = "Loop"});
               }
@@ -585,6 +622,9 @@ PerformanceSequence PerformanceLowerer::lower(
       }
       if (incrementPc) {
         ++pc;
+      }
+      if (incrementPc || !std::holds_alternative<JumpCommand>(command)) {
+        rememberExecutedCommand(command, executedOffsets);
       }
     }
 

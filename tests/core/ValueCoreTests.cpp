@@ -315,6 +315,55 @@ void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
          "loop-boundary fixture should not lower commands after the boundary");
 }
 
+void performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop() {
+  const auto range = [](u64 offset, u64 size) {
+    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
+  };
+  const SequenceProgram program{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {
+          TrackProgram{
+              .id = TrackId{0},
+              .sourceTrackNumber = 0,
+              .startAddress = Address{0},
+              .commands = {
+                  NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
+                  JumpCommand{.destination = Address{0}, .range = range(1, 3)},
+              },
+          },
+          TrackProgram{
+              .id = TrackId{1},
+              .sourceTrackNumber = 1,
+              .startAddress = Address{10},
+              .commands = {
+                  NoteCommand{.key = 64, .rawDuration = 12, .range = range(10, 1)},
+                  JumpCommand{.destination = Address{20}, .range = range(11, 3)},
+                  NoteCommand{.key = 65, .rawDuration = 12, .range = range(20, 1)},
+                  LoopBoundaryCommand{.destination = Address{10}, .trigger = Address{20}, .range = range(21, 0)},
+              },
+          },
+      },
+  };
+
+  const PerformanceSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const auto countNotesAt = [](const PerformanceTrack& track, u64 tick) {
+    return std::ranges::count_if(track.events, [tick](const PerformanceEvent& event) {
+      const auto* note = std::get_if<NoteDuration>(&event);
+      return note != nullptr && note->tick == tick;
+    });
+  };
+
+  expect(countNotesAt(performance.tracks[0], 0) == 1 && countNotesAt(performance.tracks[0], 12) == 1 &&
+             countNotesAt(performance.tracks[0], 24) == 1,
+         "play-once lowering should replay earlier looped tracks until the shared stop tick");
+  expect(countNotesAt(performance.tracks[1], 0) == 1 && countNotesAt(performance.tracks[1], 12) == 1 &&
+             countNotesAt(performance.tracks[1], 24) == 1,
+         "decoded loop boundaries should continue to their destination before the shared stop tick");
+  expect(std::get<EndOfTrack>(performance.tracks[0].events.back()).tick == 36 &&
+             std::get<EndOfTrack>(performance.tracks[1].events.back()).tick == 36,
+         "replayed loop-boundary fixture should end both tracks at the shared stop tick");
+}
+
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -493,6 +542,7 @@ int main() {
     midiExporterWritesStandardMidiFile();
     performanceLowererSkipsCommandsAtPlayOnceLoopBoundary();
     performanceLowererTreatsLoopBoundaryAsAStopPoint();
+    performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();
