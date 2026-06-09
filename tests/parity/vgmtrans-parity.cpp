@@ -5,23 +5,29 @@
  */
 
 #include "Root.h"
+#include "components/VGMSampColl.h"
+#include "components/instr/VGMInstrSet.h"
+#include "components/instr/VGMRgn.h"
 #include "components/seq/VGMSeq.h"
 #include "conversion/MidiFile.h"
 #include "core/Export.h"
 #include "core/MidiExporter.h"
 #include "core/Model.h"
 #include "core/ProjectSession.h"
+#include "core/SampleDecoder.h"
 #include "formats/CapcomSnes/CapcomSnesModule.h"
 #include "formats/CapcomSnes/CapcomSnesProfile.h"
 #include "io/RawFile.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <memory>
 #include <optional>
 #include <span>
 #include <sstream>
@@ -66,19 +72,86 @@ std::vector<u8> readFile(const std::filesystem::path& path) {
   return bytes;
 }
 
+void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
+  bytes[offset] = static_cast<u8>(value & 0xff);
+  bytes[offset + 1] = static_cast<u8>((value >> 8) & 0xff);
+}
+
+void writeBe16(std::vector<u8>& bytes, size_t offset, u16 value) {
+  bytes[offset] = static_cast<u8>((value >> 8) & 0xff);
+  bytes[offset + 1] = static_cast<u8>(value & 0xff);
+}
+
+template <size_t Size>
+void writeBytes(std::vector<u8>& bytes, size_t offset, const std::array<u8, Size>& values) {
+  std::ranges::copy(values, bytes.begin() + static_cast<std::ptrdiff_t>(offset));
+}
+
+std::vector<u8> makeCapcomSnesAram() {
+  std::vector<u8> bytes(0x10000);
+
+  constexpr std::array<u8, 16> readBgmAddressPattern{0x6f, 0x3f, 0xef, 0x06, 0x8f, 0x0d, 0xa1, 0x8f,
+                                                     0xaf, 0xa0, 0x3f, 0x82, 0x05, 0x8d, 0x00, 0xdd};
+  writeBytes(bytes, 0x0500, readBgmAddressPattern);
+  bytes[0x0500 + 5] = 0x20;
+  bytes[0x0500 + 8] = 0x00;
+
+  constexpr std::array<u8, 12> loadInstrTablePattern{0x8d, 0x06, 0xcf, 0xda, 0xa0, 0x60,
+                                                     0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
+  writeBytes(bytes, 0x0600, loadInstrTablePattern);
+  bytes[0x0600 + 7] = 0x00;
+  bytes[0x0600 + 10] = 0x40;
+
+  constexpr std::array<u8, 16> dspRegInitPattern{0x8d, 0x03, 0xf6, 0x63, 0x04, 0xc5, 0xf2, 0x00,
+                                                 0xf6, 0x66, 0x04, 0xc5, 0xf3, 0x00, 0xfe, 0xf2};
+  writeBytes(bytes, 0x0700, dspRegInitPattern);
+  bytes[0x0700 + 1] = 1;
+  writeLe16(bytes, 0x0700 + 3, 0x0800);
+  writeLe16(bytes, 0x0700 + 9, 0x0810);
+  bytes[0x0801] = 0x5d;
+  bytes[0x0811] = 0x50;
+
+  for (int track = 0; track < 8; ++track) {
+    writeBe16(bytes, 0x2001 + track * 2, 0x3000);
+  }
+
+  bytes[0x3000] = 0x05;
+  bytes[0x3001] = 0x12;
+  bytes[0x3002] = 0x34;
+  bytes[0x3003] = 0x07;
+  bytes[0x3004] = 0x40;
+  bytes[0x3005] = 0x18;
+  bytes[0x3006] = 0x00;
+  bytes[0x3007] = 0x1a;
+  bytes[0x3008] = 0x00;
+  bytes[0x3009] = 0x20;
+  bytes[0x300a] = 0x41;
+  bytes[0x300b] = 0x17;
+
+  bytes[0x4000] = 0x00;
+  bytes[0x4001] = 0x8f;
+  bytes[0x4002] = 0xe0;
+  bytes[0x4003] = 0x00;
+  writeBe16(bytes, 0x4004, 0x0100);
+
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  bytes[0x6000] = 0x01;
+
+  return bytes;
+}
+
 class HeadlessRoot final : public VGMRoot {
- public:
+public:
   void UI_setRootPtr(VGMRoot** root) override { *root = this; }
   void UI_log(LogItem*) override {}
 
-  std::filesystem::path UI_getSaveFilePath(
-      const std::string& suggestedFilename,
-      const std::string& extension = "") override {
+  std::filesystem::path UI_getSaveFilePath(const std::string& suggestedFilename,
+                                           const std::string& extension = "") override {
     return std::filesystem::path(suggestedFilename).replace_extension(extension);
   }
 
-  std::filesystem::path UI_getSaveDirPath(
-      const std::filesystem::path& suggestedDir = {}) override {
+  std::filesystem::path UI_getSaveDirPath(const std::filesystem::path& suggestedDir = {}) override {
     if (!suggestedDir.empty()) {
       return suggestedDir;
     }
@@ -86,25 +159,28 @@ class HeadlessRoot final : public VGMRoot {
   }
 };
 
-std::vector<u8> legacyCapcomSnesMidi(std::span<const u8> aramBytes, const std::string& name) {
+std::unique_ptr<HeadlessRoot> scanLegacyCapcomSnes(std::span<const u8> aramBytes, const std::string& name) {
   if (aramBytes.size() > std::numeric_limits<u32>::max()) {
     throw std::runtime_error("input is too large for legacy VirtFile");
   }
 
-  HeadlessRoot root;
-  root.init();
+  auto root = std::make_unique<HeadlessRoot>();
+  root->init();
 
-  auto rawFile = std::make_unique<VirtFile>(
-      aramBytes.data(),
-      static_cast<u32>(aramBytes.size()),
-      name);
+  auto rawFile = std::make_unique<VirtFile>(aramBytes.data(), static_cast<u32>(aramBytes.size()), name);
   rawFile->setUseLoaders(false);
 
-  if (!root.loadRawFile(std::move(rawFile))) {
+  if (!root->loadRawFile(std::move(rawFile))) {
     throw std::runtime_error("legacy scanner did not discover any files");
   }
 
-  for (const auto& file : root.vgmFiles()) {
+  return root;
+}
+
+std::vector<u8> legacyCapcomSnesMidi(std::span<const u8> aramBytes, const std::string& name) {
+  const auto root = scanLegacyCapcomSnes(aramBytes, name);
+
+  for (const auto& file : root->vgmFiles()) {
     const auto* sequenceSlot = std::get_if<VGMSeq*>(&file);
     if (sequenceSlot == nullptr || *sequenceSlot == nullptr) {
       continue;
@@ -124,6 +200,333 @@ std::vector<u8> legacyCapcomSnesMidi(std::span<const u8> aramBytes, const std::s
   throw std::runtime_error("legacy scanner did not discover a sequence");
 }
 
+struct SampleSummary {
+  u32 index = 0;
+  u32 sourceOffset = 0;
+  u32 sourceSize = 0;
+  u32 sampleRate = 0;
+  u8 channels = 0;
+  u32 frameCount = 0;
+  bool loopEnabled = false;
+  u32 loopStart = 0;
+  u32 loopLength = 0;
+  u64 pcmHash = 0;
+
+  friend bool operator==(const SampleSummary&, const SampleSummary&) = default;
+};
+
+struct RegionSummary {
+  u32 bank = 0;
+  u32 program = 0;
+  u8 keyLow = 0;
+  u8 keyHigh = 0;
+  u8 velocityLow = 0;
+  u8 velocityHigh = 0;
+  u32 sampleSourceOffset = 0;
+  s32 tuningCents = 0;
+
+  friend bool operator==(const RegionSummary&, const RegionSummary&) = default;
+};
+
+struct CapcomSnesSummary {
+  u32 sequenceCount = 0;
+  std::vector<u32> trackCounts;
+  u32 instrumentBankCount = 0;
+  u32 sampleCollectionCount = 0;
+  std::vector<SampleSummary> samples;
+  std::vector<RegionSummary> regions;
+
+  friend bool operator==(const CapcomSnesSummary&, const CapcomSnesSummary&) = default;
+};
+
+u64 fnv1a(std::span<const u8> bytes) {
+  u64 hash = 14695981039346656037ull;
+  for (const u8 byte : bytes) {
+    hash ^= byte;
+    hash *= 1099511628211ull;
+  }
+  return hash;
+}
+
+u64 fnv1aPcm16(std::span<const s16> samples) {
+  u64 hash = 14695981039346656037ull;
+  for (const s16 sample : samples) {
+    const auto value = static_cast<u16>(sample);
+    hash ^= static_cast<u8>(value & 0xff);
+    hash *= 1099511628211ull;
+    hash ^= static_cast<u8>((value >> 8) & 0xff);
+    hash *= 1099511628211ull;
+  }
+  return hash;
+}
+
+u32 loopFramesFromLegacyBytes(const VGMSamp& sample, u32 byteOffset) {
+  if (sample.dataLength % 9 == 0) {
+    return (byteOffset / 9) * 16;
+  }
+  const auto bytesPerFrame = std::max<int>(1, sample.bytesPerSample() * sample.channels);
+  return byteOffset / static_cast<u32>(bytesPerFrame);
+}
+
+std::optional<u32> legacyRegionSampleOffset(const VGMRgn& region, std::span<VGMSamp* const> samples) {
+  if (region.sampOffset >= 0) {
+    const auto baseOffset = region.sampCollPtr ? region.sampCollPtr->offset()
+                            : region.parInstr->parInstrSet->sampColl()
+                                ? region.parInstr->parInstrSet->sampColl()->offset()
+                                : 0;
+    const auto sourceOffset = baseOffset + static_cast<u32>(region.sampOffset);
+    const auto found = std::ranges::find_if(samples, [sourceOffset](const VGMSamp* sample) {
+      return sample != nullptr && sample->dataOff == sourceOffset;
+    });
+    if (found != samples.end()) {
+      return (*found)->dataOff;
+    }
+  }
+
+  if (region.sampNum < samples.size() && samples[region.sampNum] != nullptr) {
+    return samples[region.sampNum]->dataOff;
+  }
+  return std::nullopt;
+}
+
+CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const std::string& name) {
+  const auto root = scanLegacyCapcomSnes(aramBytes, name);
+
+  CapcomSnesSummary summary;
+  std::vector<VGMSamp*> samples;
+
+  for (const auto& file : root->vgmFiles()) {
+    if (const auto* sequenceSlot = std::get_if<VGMSeq*>(&file); sequenceSlot != nullptr && *sequenceSlot != nullptr) {
+      ++summary.sequenceCount;
+      summary.trackCounts.push_back(static_cast<u32>((*sequenceSlot)->trackCount()));
+    } else if (const auto* sampleSlot = std::get_if<VGMSampColl*>(&file);
+               sampleSlot != nullptr && *sampleSlot != nullptr) {
+      ++summary.sampleCollectionCount;
+      for (auto* sample : (*sampleSlot)->samples()) {
+        samples.push_back(sample);
+      }
+    }
+  }
+
+  for (u32 i = 0; i < samples.size(); ++i) {
+    auto* sample = samples[i];
+    auto pcm = sample->toPcm(Signedness::Signed, Endianness::Little, BPS::PCM16);
+    summary.samples.push_back(SampleSummary{
+        .index = i,
+        .sourceOffset = sample->dataOff,
+        .sourceSize = sample->dataLength,
+        .sampleRate = sample->rate,
+        .channels = sample->channels,
+        .frameCount = static_cast<u32>(pcm.size() / std::max<int>(1, sample->bytesPerSample() * sample->channels)),
+        .loopEnabled = sample->loop.loopStatus > 0,
+        .loopStart = sample->loop.loopStatus > 0 ? loopFramesFromLegacyBytes(*sample, sample->loop.loopStart) : 0,
+        .loopLength = sample->loop.loopStatus > 0 ? loopFramesFromLegacyBytes(*sample, sample->loop.loopLength) : 0,
+        .pcmHash = fnv1a(pcm),
+    });
+  }
+
+  for (const auto& file : root->vgmFiles()) {
+    const auto* instrumentSlot = std::get_if<VGMInstrSet*>(&file);
+    if (instrumentSlot == nullptr || *instrumentSlot == nullptr) {
+      continue;
+    }
+
+    ++summary.instrumentBankCount;
+    const auto* instrumentBank = *instrumentSlot;
+    for (const auto* instrument : instrumentBank->instrs()) {
+      for (const auto* region : instrument->regions()) {
+        summary.regions.push_back(RegionSummary{
+            .bank = instrument->bank,
+            .program = instrument->instrNum,
+            .keyLow = region->keyLow,
+            .keyHigh = region->keyHigh,
+            .velocityLow = region->velLow,
+            .velocityHigh = region->velHigh,
+            .sampleSourceOffset = legacyRegionSampleOffset(*region, samples).value_or(0),
+            .tuningCents = region->unityKey >= 0 ? static_cast<s32>((region->unityKey - 96) * 100 + region->fineTune)
+                                                 : region->fineTune,
+        });
+      }
+    }
+  }
+
+  std::ranges::sort(summary.trackCounts);
+  std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
+  std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
+    return std::tie(lhs.bank, lhs.program, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh, lhs.velocityLow,
+                    lhs.velocityHigh, lhs.tuningCents) < std::tie(rhs.bank, rhs.program, rhs.sampleSourceOffset,
+                                                                  rhs.keyLow, rhs.keyHigh, rhs.velocityLow,
+                                                                  rhs.velocityHigh, rhs.tuningCents);
+  });
+  for (u32 i = 0; i < summary.samples.size(); ++i) {
+    summary.samples[i].index = i;
+  }
+
+  return summary;
+}
+
+CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::string& name) {
+  ProjectSession session;
+  registerCapcomSnesModule(session.formats());
+  registerCapcomSnesProfile(session.profiles());
+  session.addSource(SourceFile{.name = name}, std::move(aramBytes));
+
+  const Project project = session.scan();
+  const auto decoders = SampleDecoderRegistry::withDefaultDecoders();
+
+  CapcomSnesSummary summary;
+  std::map<u32, const SampleCollectionAsset*> sampleCollectionsById;
+
+  for (const auto& asset : project.assets) {
+    if (const auto* sequence = std::get_if<SequenceAsset>(&asset)) {
+      ++summary.sequenceCount;
+      summary.trackCounts.push_back(static_cast<u32>(sequence->program.tracks.size()));
+    } else if (const auto* sampleCollection = std::get_if<SampleCollectionAsset>(&asset)) {
+      ++summary.sampleCollectionCount;
+      sampleCollectionsById[sampleCollection->metadata.id.value] = sampleCollection;
+      for (u32 i = 0; i < sampleCollection->samples.samples.size(); ++i) {
+        const auto& sample = sampleCollection->samples.samples[i];
+        const auto decoded = decoders.decode(sample, session.sources().bytes(sample.encodedData.source));
+        expect(decoded.has_value(), "value sample summary expected decodable sample");
+        summary.samples.push_back(SampleSummary{
+            .index = i,
+            .sourceOffset = static_cast<u32>(sample.encodedData.offset),
+            .sourceSize = static_cast<u32>(sample.encodedData.size),
+            .sampleRate = decoded->sampleRate,
+            .channels = decoded->channels,
+            .frameCount = static_cast<u32>(decoded->pcm.size() / std::max<u8>(1, decoded->channels)),
+            .loopEnabled = decoded->loop.enabled,
+            .loopStart = decoded->loop.enabled ? decoded->loop.start : 0,
+            .loopLength = decoded->loop.enabled ? decoded->loop.length : 0,
+            .pcmHash = fnv1aPcm16(decoded->pcm),
+        });
+      }
+    }
+  }
+
+  for (const auto& asset : project.assets) {
+    const auto* instrumentBank = std::get_if<InstrumentBankAsset>(&asset);
+    if (instrumentBank == nullptr) {
+      continue;
+    }
+
+    ++summary.instrumentBankCount;
+    for (const auto& instrument : instrumentBank->bank.instruments) {
+      for (const auto& region : instrument.regions) {
+        u32 sampleSourceOffset = 0;
+        if (region.sample.collection) {
+          const auto sampleCollection = sampleCollectionsById.find(region.sample.collection->value);
+          if (sampleCollection != sampleCollectionsById.end() &&
+              region.sample.index < sampleCollection->second->samples.samples.size()) {
+            sampleSourceOffset =
+                static_cast<u32>(sampleCollection->second->samples.samples[region.sample.index].encodedData.offset);
+          }
+        }
+
+        summary.regions.push_back(RegionSummary{
+            .bank = instrument.bank,
+            .program = instrument.program,
+            .keyLow = region.keyRange.low,
+            .keyHigh = region.keyRange.high,
+            .velocityLow = region.velocityRange.low,
+            .velocityHigh = region.velocityRange.high,
+            .sampleSourceOffset = sampleSourceOffset,
+            .tuningCents = region.tuning.cents,
+        });
+      }
+    }
+  }
+
+  std::ranges::sort(summary.trackCounts);
+  std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
+  std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
+    return std::tie(lhs.bank, lhs.program, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh, lhs.velocityLow,
+                    lhs.velocityHigh, lhs.tuningCents) < std::tie(rhs.bank, rhs.program, rhs.sampleSourceOffset,
+                                                                  rhs.keyLow, rhs.keyHigh, rhs.velocityLow,
+                                                                  rhs.velocityHigh, rhs.tuningCents);
+  });
+  for (u32 i = 0; i < summary.samples.size(); ++i) {
+    summary.samples[i].index = i;
+  }
+
+  return summary;
+}
+
+std::string describeSample(const SampleSummary& sample) {
+  std::ostringstream out;
+  out << "sample offset=0x" << std::hex << sample.sourceOffset << std::dec << " size=" << sample.sourceSize
+      << " rate=" << sample.sampleRate << " channels=" << static_cast<int>(sample.channels)
+      << " frames=" << sample.frameCount << " loop=" << sample.loopEnabled << " loopStart=" << sample.loopStart
+      << " loopLength=" << sample.loopLength << " hash=0x" << std::hex << sample.pcmHash;
+  return out.str();
+}
+
+std::string describeRegion(const RegionSummary& region) {
+  std::ostringstream out;
+  out << "region bank=" << region.bank << " program=" << region.program << " sampleOffset=0x" << std::hex
+      << region.sampleSourceOffset << std::dec << " key=" << static_cast<int>(region.keyLow) << "-"
+      << static_cast<int>(region.keyHigh) << " vel=" << static_cast<int>(region.velocityLow) << "-"
+      << static_cast<int>(region.velocityHigh) << " tuning=" << region.tuningCents;
+  return out.str();
+}
+
+bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& value, std::ostream& out) {
+  if (legacy == value) {
+    out << "CapcomSnes summary parity ok: sequences=" << legacy.sequenceCount
+        << " instruments=" << legacy.regions.size() << " samples=" << legacy.samples.size() << "\n";
+    return true;
+  }
+
+  out << "CapcomSnes summary parity mismatch\n";
+  out << "legacy counts: sequences=" << legacy.sequenceCount << " trackCounts=" << legacy.trackCounts.size()
+      << " instrumentBanks=" << legacy.instrumentBankCount << " sampleCollections=" << legacy.sampleCollectionCount
+      << " regions=" << legacy.regions.size() << " samples=" << legacy.samples.size() << "\n";
+  out << "value counts:  sequences=" << value.sequenceCount << " trackCounts=" << value.trackCounts.size()
+      << " instrumentBanks=" << value.instrumentBankCount << " sampleCollections=" << value.sampleCollectionCount
+      << " regions=" << value.regions.size() << " samples=" << value.samples.size() << "\n";
+
+  if (legacy.trackCounts != value.trackCounts) {
+    out << "track count vectors differ\n";
+    return false;
+  }
+
+  const size_t sharedSamples = std::min(legacy.samples.size(), value.samples.size());
+  for (size_t i = 0; i < sharedSamples; ++i) {
+    if (!(legacy.samples[i] == value.samples[i])) {
+      out << "first sample mismatch at " << i << "\n";
+      out << "legacy: " << describeSample(legacy.samples[i]) << "\n";
+      out << "value:  " << describeSample(value.samples[i]) << "\n";
+      return false;
+    }
+  }
+  if (legacy.samples.size() != value.samples.size()) {
+    out << "sample count differs\n";
+    return false;
+  }
+
+  const size_t sharedRegions = std::min(legacy.regions.size(), value.regions.size());
+  for (size_t i = 0; i < sharedRegions; ++i) {
+    if (!(legacy.regions[i] == value.regions[i])) {
+      out << "first region mismatch at " << i << "\n";
+      out << "legacy: " << describeRegion(legacy.regions[i]) << "\n";
+      out << "value:  " << describeRegion(value.regions[i]) << "\n";
+      return false;
+    }
+  }
+  if (legacy.regions.size() != value.regions.size()) {
+    out << "region count differs\n";
+    return false;
+  }
+
+  return false;
+}
+
+bool compareCapcomSnesSummary(std::span<const u8> aramBytes, const std::string& name, std::ostream& out) {
+  const auto legacy = legacyCapcomSnesSummary(aramBytes, name);
+  const auto value = valueCapcomSnesSummary(std::vector<u8>(aramBytes.begin(), aramBytes.end()), name);
+  return compareSummary(legacy, value, out);
+}
+
 std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string& name) {
   ProjectSession session;
   registerCapcomSnesModule(session.formats());
@@ -140,12 +543,11 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
     throw std::runtime_error(message.str());
   }
 
-  const auto artifacts = session.exportCollection(
-      project.collections.front().id,
-      ExportRequest{
-          .kinds = {ExportKind::Midi},
-          .loopPolicy = LoopPolicy::PlayOnce,
-      });
+  const auto artifacts =
+      session.exportCollection(project.collections.front().id, ExportRequest{
+                                                                   .kinds = {ExportKind::Midi},
+                                                                   .loopPolicy = LoopPolicy::PlayOnce,
+                                                               });
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -160,7 +562,7 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
 }
 
 class MidiReader {
- public:
+public:
   explicit MidiReader(std::span<const u8> bytes) : bytes_(bytes) {}
 
   [[nodiscard]] bool empty() const noexcept { return position_ >= bytes_.size(); }
@@ -223,7 +625,7 @@ class MidiReader {
     position_ += count;
   }
 
- private:
+private:
   std::span<const u8> bytes_;
   size_t position_ = 0;
 };
@@ -258,14 +660,9 @@ std::string hexByte(u8 value) {
 
 std::string describeEvent(const NormalizedMidiEvent& event) {
   std::ostringstream out;
-  out << "track=" << event.track
-      << " tick=" << event.tick
-      << " kind=" << event.kind;
+  out << "track=" << event.track << " tick=" << event.tick << " kind=" << event.kind;
   if (!event.kind.empty()) {
-    out << " channel=" << static_cast<int>(event.channel)
-        << " a=" << event.a
-        << " b=" << event.b
-        << " c=" << event.c;
+    out << " channel=" << static_cast<int>(event.channel) << " a=" << event.a << " b=" << event.b << " c=" << event.c;
   }
   if (!event.text.empty()) {
     out << " text=\"" << event.text << "\"";
@@ -277,13 +674,8 @@ void addEvent(std::vector<NormalizedMidiEvent>& events, NormalizedMidiEvent even
   events.push_back(std::move(event));
 }
 
-void addNoteOff(std::vector<NormalizedMidiEvent>& events,
-                std::map<ActiveNoteKey, std::vector<ActiveNote>>& activeNotes,
-                u32 track,
-                u64 tick,
-                u8 channel,
-                u8 key,
-                u8 releaseVelocity) {
+void addNoteOff(std::vector<NormalizedMidiEvent>& events, std::map<ActiveNoteKey, std::vector<ActiveNote>>& activeNotes,
+                u32 track, u64 tick, u8 channel, u8 key, u8 releaseVelocity) {
   const ActiveNoteKey activeKey{track, channel, key};
   auto active = activeNotes.find(activeKey);
   if (active == activeNotes.end() || active->second.empty()) {
@@ -328,11 +720,7 @@ void finishActiveNotes(std::vector<NormalizedMidiEvent>& events,
   }
 }
 
-void addMetaEvent(std::vector<NormalizedMidiEvent>& events,
-                  u32 track,
-                  u64 tick,
-                  u8 type,
-                  std::vector<u8> payload) {
+void addMetaEvent(std::vector<NormalizedMidiEvent>& events, u32 track, u64 tick, u8 type, std::vector<u8> payload) {
   if (type == 0x2f) {
     addEvent(events, NormalizedMidiEvent{
                          .track = track,
@@ -353,9 +741,8 @@ void addMetaEvent(std::vector<NormalizedMidiEvent>& events,
   }
 
   if (type == 0x51 && payload.size() == 3) {
-    const u32 tempo = (static_cast<u32>(payload[0]) << 16) |
-                      (static_cast<u32>(payload[1]) << 8) |
-                      static_cast<u32>(payload[2]);
+    const u32 tempo =
+        (static_cast<u32>(payload[0]) << 16) | (static_cast<u32>(payload[1]) << 8) | static_cast<u32>(payload[2]);
     addEvent(events, NormalizedMidiEvent{
                          .track = track,
                          .tick = tick,
@@ -563,33 +950,44 @@ int selfTest() {
       .timebase = Timebase{.ppqn = 48},
       .tracks = {PerformanceTrack{
           .name = "Parity",
-          .events = {
-              Tempo{.tick = 0, .microsecondsPerQuarter = 500000},
-              ProgramChange{.tick = 0, .channel = 2, .program = 12},
-              Volume{.tick = 0, .channel = 2, .value = 80},
-              Pan{.tick = 12, .channel = 2, .value = 32},
-              NoteDuration{.tick = 24, .channel = 2, .key = 64, .velocity = 100, .duration = 36},
-              EndOfTrack{.tick = 60},
-          },
+          .events =
+              {
+                  Tempo{.tick = 0, .microsecondsPerQuarter = 500000},
+                  ProgramChange{.tick = 0, .channel = 2, .program = 12},
+                  Volume{.tick = 0, .channel = 2, .value = 80},
+                  Pan{.tick = 12, .channel = 2, .value = 32},
+                  NoteDuration{.tick = 24, .channel = 2, .key = 64, .velocity = 100, .duration = 36},
+                  EndOfTrack{.tick = 60},
+              },
       }},
   };
 
   const auto midi = MidiExporter().exportMidi(performance);
   const auto normalized = normalizeMidi(midi);
 
-  expect(std::ranges::any_of(normalized, [](const auto& event) {
-    return event.kind == "tempo" && event.tick == 0 && event.a == 500000;
-  }), "self-test should normalize tempo events");
-  expect(std::ranges::any_of(normalized, [](const auto& event) {
-    return event.kind == "program" && event.channel == 2 && event.a == 12;
-  }), "self-test should normalize program changes");
-  expect(std::ranges::any_of(normalized, [](const auto& event) {
-    return event.kind == "note" && event.tick == 24 && event.channel == 2 &&
-           event.a == 64 && event.b == 100 && event.c == 36;
-  }), "self-test should pair note durations");
+  expect(
+      std::ranges::any_of(
+          normalized, [](const auto& event) { return event.kind == "tempo" && event.tick == 0 && event.a == 500000; }),
+      "self-test should normalize tempo events");
+  expect(
+      std::ranges::any_of(
+          normalized, [](const auto& event) { return event.kind == "program" && event.channel == 2 && event.a == 12; }),
+      "self-test should normalize program changes");
+  expect(std::ranges::any_of(normalized,
+                             [](const auto& event) {
+                               return event.kind == "note" && event.tick == 24 && event.channel == 2 && event.a == 64 &&
+                                      event.b == 100 && event.c == 36;
+                             }),
+         "self-test should pair note durations");
 
   std::ostringstream parityOutput;
   expect(compareMidi(midi, midi, parityOutput), "self-test should compare identical MIDI");
+
+  const auto aramBytes = makeCapcomSnesAram();
+  std::ostringstream summaryOutput;
+  expect(compareCapcomSnesSummary(aramBytes, "synthetic.spc", summaryOutput),
+         "self-test should compare CapcomSnes summary parity: " + summaryOutput.str());
+
   std::cout << "vgmtrans-parity self-test ok\n";
   return 0;
 }
@@ -602,10 +1000,16 @@ int compareCapcomSnesAramMidi(const std::filesystem::path& path) {
   return compareMidi(legacyMidi, valueMidi, std::cout) ? 0 : 1;
 }
 
+int compareCapcomSnesAramSummary(const std::filesystem::path& path) {
+  const auto aramBytes = readFile(path);
+  return compareCapcomSnesSummary(aramBytes, path.filename().string(), std::cout) ? 0 : 1;
+}
+
 void printUsage(std::ostream& out) {
   out << "usage:\n"
       << "  vgmtrans-parity --self-test\n"
-      << "  vgmtrans-parity capcom-snes-aram-midi <raw-aram-file>\n";
+      << "  vgmtrans-parity capcom-snes-aram-midi <raw-aram-file>\n"
+      << "  vgmtrans-parity capcom-snes-aram-summary <raw-aram-file>\n";
 }
 
 }  // namespace
@@ -618,6 +1022,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-aram-midi") {
       return compareCapcomSnesAramMidi(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "capcom-snes-aram-summary") {
+      return compareCapcomSnesAramSummary(argv[2]);
     }
 
     printUsage(std::cerr);
