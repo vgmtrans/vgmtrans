@@ -767,21 +767,10 @@ void finishActiveNotes(std::vector<NormalizedMidiEvent>& events,
 
 void addMetaEvent(std::vector<NormalizedMidiEvent>& events, u32 track, u64 tick, u8 type, std::vector<u8> payload) {
   if (type == 0x2f) {
-    addEvent(events, NormalizedMidiEvent{
-                         .track = track,
-                         .tick = tick,
-                         .kind = "end",
-                     });
     return;
   }
 
   if (type == 0x03) {
-    addEvent(events, NormalizedMidiEvent{
-                         .track = track,
-                         .tick = tick,
-                         .kind = "track-name",
-                         .text = std::string(payload.begin(), payload.end()),
-                     });
     return;
   }
 
@@ -789,7 +778,7 @@ void addMetaEvent(std::vector<NormalizedMidiEvent>& events, u32 track, u64 tick,
     const u32 tempo =
         (static_cast<u32>(payload[0]) << 16) | (static_cast<u32>(payload[1]) << 8) | static_cast<u32>(payload[2]);
     addEvent(events, NormalizedMidiEvent{
-                         .track = track,
+                         .track = 0,
                          .tick = tick,
                          .kind = "tempo",
                          .a = tempo,
@@ -805,6 +794,10 @@ void addMetaEvent(std::vector<NormalizedMidiEvent>& events, u32 track, u64 tick,
                          .a = type,
                          .text = std::string(payload.begin(), payload.end()),
                      });
+    return;
+  }
+
+  if (type == 0x21) {
     return;
   }
 
@@ -872,7 +865,11 @@ std::vector<NormalizedMidiEvent> normalizeMidi(std::span<const u8> bytes) {
         if (length > std::numeric_limits<size_t>::max()) {
           throw std::runtime_error("MIDI sysex event is too large");
         }
-        reader.skip(static_cast<size_t>(length), trackEnd);
+        const auto payload = reader.bytes(static_cast<size_t>(length), trackEnd);
+        if (tick == 0 && status == 0xf0 && payload.size() == 5 && payload[0] == 0x7e && payload[1] == 0x7f &&
+            payload[2] == 0x09 && (payload[3] == 0x01 || payload[3] == 0x03) && payload[4] == 0xf7) {
+          continue;
+        }
         addEvent(events, NormalizedMidiEvent{
                              .track = track,
                              .tick = tick,
@@ -978,6 +975,17 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
       out << "first mismatch at normalized event " << i << "\n";
       out << "legacy: " << describeEvent(legacy[i]) << "\n";
       out << "value:  " << describeEvent(value[i]) << "\n";
+      const size_t begin = i > 3 ? i - 3 : 0;
+      const size_t legacyEnd = std::min(legacy.size(), i + 4);
+      const size_t valueEnd = std::min(value.size(), i + 4);
+      out << "legacy context:\n";
+      for (size_t context = begin; context < legacyEnd; ++context) {
+        out << "  [" << context << "] " << describeEvent(legacy[context]) << "\n";
+      }
+      out << "value context:\n";
+      for (size_t context = begin; context < valueEnd; ++context) {
+        out << "  [" << context << "] " << describeEvent(value[context]) << "\n";
+      }
       return false;
     }
   }
@@ -1045,6 +1053,25 @@ int compareCapcomSnesAramMidi(const std::filesystem::path& path) {
   return compareMidi(legacyMidi, valueMidi, std::cout) ? 0 : 1;
 }
 
+int compareCapcomSnesRsnMidi(const std::filesystem::path& path) {
+  const auto arams = legacyExtractedArams(path);
+  if (arams.empty()) {
+    throw std::runtime_error("legacy loader did not extract any 64 KiB ARAM files from: " + path.string());
+  }
+
+  for (const auto& aram : arams) {
+    std::cout << "checking " << aram.name << "\n";
+    const auto legacyMidi = legacyCapcomSnesMidi(aram.bytes, aram.name);
+    const auto valueMidi = valueCapcomSnesMidi(aram.bytes, aram.name);
+    if (!compareMidi(legacyMidi, valueMidi, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "CapcomSnes RSN MIDI parity ok: files=" << arams.size() << "\n";
+  return 0;
+}
+
 int compareCapcomSnesAramSummary(const std::filesystem::path& path) {
   const auto aramBytes = readFile(path);
   return compareCapcomSnesSummary(aramBytes, path.filename().string(), std::cout) ? 0 : 1;
@@ -1072,6 +1099,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity --self-test\n"
       << "  vgmtrans-parity capcom-snes-aram-midi <raw-aram-file>\n"
       << "  vgmtrans-parity capcom-snes-aram-summary <raw-aram-file>\n"
+      << "  vgmtrans-parity capcom-snes-rsn-midi <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n";
 }
 
@@ -1085,6 +1113,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-aram-midi") {
       return compareCapcomSnesAramMidi(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-midi") {
+      return compareCapcomSnesRsnMidi(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-aram-summary") {

@@ -439,6 +439,7 @@ struct BankSelect {
   u64 tick = 0;
   u8 channel = 0;
   u16 bank = 0;
+  bool writeLsb = true;
 };
 
 struct Volume {
@@ -479,7 +480,7 @@ struct Reverb {
 struct FineTune {
   u64 tick = 0;
   u8 channel = 0;
-  s16 cents = 0;
+  double cents = 0.0;
 };
 
 struct CoarseTune {
@@ -560,6 +561,12 @@ struct PortamentoControl {
   u8 key = 0;
 };
 
+struct LegatoPedal {
+  u64 tick = 0;
+  u8 channel = 0;
+  bool enabled = false;
+};
+
 struct MonoMode {
   u64 tick = 0;
   u8 channel = 0;
@@ -602,6 +609,7 @@ using PerformanceEvent = std::variant<
     PortamentoTime,
     PortamentoTime14,
     PortamentoControl,
+    LegatoPedal,
     MonoMode,
     EndOfTrack,
     Marker>;

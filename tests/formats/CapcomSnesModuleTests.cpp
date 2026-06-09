@@ -174,26 +174,32 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes lowering should not warn for linear fixture");
   expect(performance.tracks.size() == 8, "lowerer should preserve track count");
-  expect(performance.tracks[0].events.size() == 10, "lowered track should include initial, command, and end events");
+  expect(performance.tracks[0].events.size() == 11, "lowered track should include initial, command, and end events");
   expect(std::holds_alternative<MonoMode>(performance.tracks[0].events[0]),
          "lowerer should emit initial mono mode from sequence behavior");
+  expect(std::get<MonoMode>(performance.tracks[0].events[0]).channels == 0,
+         "initial mono mode should match legacy MIDI controller payload");
   expect(std::holds_alternative<Reverb>(performance.tracks[0].events[1]),
          "lowerer should emit initial reverb from sequence behavior");
-  expect(std::get<Tempo>(performance.tracks[0].events[2]).microsecondsPerQuarter == 26369,
+  expect(std::get<Tempo>(performance.tracks[0].events[2]).microsecondsPerQuarter == 42191,
          "CapcomSnes profile should lower tempo with legacy timing math");
-  expect(std::holds_alternative<ProgramChange>(performance.tracks[0].events[3]),
+  expect(std::holds_alternative<BankSelect>(performance.tracks[0].events[3]),
+         "CapcomSnes lowering should include bank select before program changes");
+  expect(!std::get<BankSelect>(performance.tracks[0].events[3]).writeLsb,
+         "CapcomSnes bank select should match legacy MSB-only output");
+  expect(std::holds_alternative<ProgramChange>(performance.tracks[0].events[4]),
          "CapcomSnes lowering should include program changes");
-  expect(std::holds_alternative<Volume14>(performance.tracks[0].events[4]),
+  expect(std::holds_alternative<Volume14>(performance.tracks[0].events[5]),
          "CapcomSnes V3 profile should lower volume to 14-bit volume");
-  expect(std::get<Pan>(performance.tracks[0].events[5]).value == 64,
+  expect(std::get<Pan>(performance.tracks[0].events[6]).value == 64,
          "CapcomSnes center pan should lower to MIDI center pan");
-  expect(std::holds_alternative<Expression>(performance.tracks[0].events[6]),
+  expect(std::holds_alternative<Expression>(performance.tracks[0].events[7]),
          "CapcomSnes pan lowering should include expression compensation");
-  expect(std::get<VibratoDepth>(performance.tracks[0].events[7]).value == 0x20,
+  expect(std::get<VibratoDepth>(performance.tracks[0].events[8]).value == 0x20,
          "CapcomSnes LFO type 0 should lower to vibrato depth");
-  expect(std::get<NoteDuration>(performance.tracks[0].events[8]).duration == 6,
+  expect(std::get<NoteDuration>(performance.tracks[0].events[9]).duration == 6,
          "CapcomSnes note length index should lower to ticks");
-  expect(std::get<EndOfTrack>(performance.tracks[0].events[9]).tick == 6,
+  expect(std::get<EndOfTrack>(performance.tracks[0].events[10]).tick == 6,
          "lowerer should advance time before end of track");
 
   const auto artifacts = session.exportCollection(project.collections[0].id, ExportRequest{

@@ -24,6 +24,14 @@ struct TrackState {
   u64 tick = 0;
   u32 durationRate = 0;
   s32 transpose = 0;
+  u32 noteOctave = 0;
+  bool noteDotted = false;
+  bool noteTriplet = false;
+  bool noteSlurred = false;
+  bool noteOctaveUp = false;
+  bool lastNoteSlurred = false;
+  bool didRest = false;
+  s32 lastKey = -1;
   std::array<u32, 4> repeatCounters{};
 };
 
@@ -32,6 +40,7 @@ struct NoteTiming {
   u8 velocity = 127;
   u32 soundingTicks = 0;
   u32 advanceTicks = 0;
+  bool extendsPrevious = false;
 };
 
 class SequencerProfile {
@@ -40,8 +49,8 @@ class SequencerProfile {
 
   virtual void beginTrack(const SequenceProgram& program, const TrackProgram& track,
                           TrackState& state, std::vector<PerformanceEvent>& events) const;
-  [[nodiscard]] virtual u32 restTicks(const RestCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual NoteTiming noteTiming(const NoteCommand& command, const TrackState& state) const;
+  [[nodiscard]] virtual u32 restTicks(const RestCommand& command, TrackState& state) const;
+  [[nodiscard]] virtual NoteTiming noteTiming(const NoteCommand& command, TrackState& state) const;
   virtual void applyDuration(const DurationCommand& command, TrackState& state) const;
   virtual void applyTranspose(const TransposeCommand& command, TrackState& state) const;
 
@@ -66,7 +75,7 @@ class SequencerProfile {
   [[nodiscard]] virtual std::vector<PerformanceEvent> lowerEnvelope(
       const EnvelopeCommand& command, const TrackState& state) const;
   [[nodiscard]] virtual std::vector<PerformanceEvent> lowerDriverSpecific(
-      const DriverSpecificCommand& command, const TrackState& state) const;
+      const DriverSpecificCommand& command, TrackState& state) const;
 };
 
 class PerformanceLowerer {

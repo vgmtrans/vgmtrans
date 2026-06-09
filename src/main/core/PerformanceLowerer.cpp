@@ -29,6 +29,22 @@ void appendEvents(std::vector<PerformanceEvent>& destination, std::vector<T> eve
                      std::make_move_iterator(events.end()));
 }
 
+bool extendPreviousNote(std::vector<PerformanceEvent>& events, u8 channel, u8 key, u64 endTick) {
+  for (auto event = events.rbegin(); event != events.rend(); ++event) {
+    auto* note = std::get_if<NoteDuration>(&*event);
+    if (note == nullptr) {
+      continue;
+    }
+    if (note->channel == channel && note->key == key) {
+      if (endTick > note->tick) {
+        note->duration = static_cast<u32>(std::max<u64>(note->duration, endTick - note->tick));
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 [[nodiscard]] SourceRange commandRange(const SequencerCommand& command) {
   return std::visit([](const auto& typedCommand) { return typedCommand.range; }, command);
 }
@@ -71,11 +87,11 @@ void SequencerProfile::beginTrack(
     std::vector<PerformanceEvent>&) const {
 }
 
-u32 SequencerProfile::restTicks(const RestCommand& command, const TrackState&) const {
+u32 SequencerProfile::restTicks(const RestCommand& command, TrackState&) const {
   return command.rawDuration;
 }
 
-NoteTiming SequencerProfile::noteTiming(const NoteCommand& command, const TrackState& state) const {
+NoteTiming SequencerProfile::noteTiming(const NoteCommand& command, TrackState& state) const {
   const auto key = std::clamp<s32>(static_cast<s32>(command.key) + state.transpose, 0, 127);
   const auto ticks = command.rawDuration;
   return NoteTiming{
@@ -159,7 +175,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerTuning(
   return {FineTune{
       .tick = state.tick,
       .channel = state.channel,
-      .cents = static_cast<s16>(std::clamp<s32>(command.rawValue, -8192, 8191)),
+      .cents = static_cast<double>(std::clamp<s32>(command.rawValue, -8192, 8191)),
   }};
 }
 
@@ -201,7 +217,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerEnvelope(
 
 std::vector<PerformanceEvent> SequencerProfile::lowerDriverSpecific(
     const DriverSpecificCommand&,
-    const TrackState&) const {
+    TrackState&) const {
   return {};
 }
 
@@ -231,7 +247,7 @@ PerformanceSequence PerformanceLowerer::lower(
       loweredTrack.events.push_back(MonoMode{
           .tick = 0,
           .channel = state.channel,
-          .channels = 1,
+          .channels = 0,
       });
     }
     if (program.behavior.writeInitialReverb) {
@@ -256,13 +272,19 @@ PerformanceSequence PerformanceLowerer::lower(
             using Command = std::decay_t<decltype(typedCommand)>;
             if constexpr (std::is_same_v<Command, NoteCommand>) {
               const auto timing = profile.noteTiming(typedCommand, state);
-              loweredTrack.events.push_back(NoteDuration{
-                  .tick = state.tick,
-                  .channel = state.channel,
-                  .key = timing.key,
-                  .velocity = timing.velocity,
-                  .duration = timing.soundingTicks,
-              });
+              if (!timing.extendsPrevious ||
+                  !extendPreviousNote(loweredTrack.events,
+                                      state.channel,
+                                      timing.key,
+                                      state.tick + timing.soundingTicks)) {
+                loweredTrack.events.push_back(NoteDuration{
+                    .tick = state.tick,
+                    .channel = state.channel,
+                    .key = timing.key,
+                    .velocity = timing.velocity,
+                    .duration = timing.soundingTicks,
+                });
+              }
               state.tick += timing.advanceTicks;
             } else if constexpr (std::is_same_v<Command, RestCommand>) {
               state.tick += profile.restTicks(typedCommand, state);

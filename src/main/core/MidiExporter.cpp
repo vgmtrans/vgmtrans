@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <span>
 #include <string>
 #include <string_view>
@@ -86,8 +87,6 @@ void addRpn(std::vector<MidiMessage>& messages, u64 tick, u8 channel, u8 paramet
   addController(messages, tick, channel, 100, parameterLsb, priority + 1);
   addController(messages, tick, channel, 6, static_cast<u8>((value >> 7) & 0x7f), priority + 2);
   addController(messages, tick, channel, 38, static_cast<u8>(value & 0x7f), priority + 3);
-  addController(messages, tick, channel, 101, 127, priority + 4);
-  addController(messages, tick, channel, 100, 127, priority + 5);
 }
 
 [[nodiscard]] std::vector<u8> metaEvent(u8 type, std::span<const u8> payload) {
@@ -151,7 +150,9 @@ void addPerformanceEventMessages(std::vector<MidiMessage>& messages, const Perfo
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<Event, BankSelect>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 0, static_cast<u8>((typedEvent.bank >> 7) & 0x7f), 10);
-          addController(messages, typedEvent.tick, typedEvent.channel, 32, static_cast<u8>(typedEvent.bank & 0x7f), 11);
+          if (typedEvent.writeLsb) {
+            addController(messages, typedEvent.tick, typedEvent.channel, 32, static_cast<u8>(typedEvent.bank & 0x7f), 11);
+          }
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<Event, Volume>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 7, typedEvent.value);
@@ -182,7 +183,8 @@ void addPerformanceEventMessages(std::vector<MidiMessage>& messages, const Perfo
           addController(messages, typedEvent.tick, typedEvent.channel, 91, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<Event, FineTune>) {
-          const s32 value = std::clamp<s32>(8192 + (typedEvent.cents * 8192 / 100), 0, 16383);
+          const double semitones = std::clamp(typedEvent.cents / 100.0, -1.0, 1.0);
+          const s32 value = std::min(static_cast<int>(std::lround(8192 * semitones)), 8191) + 8192;
           addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 1, static_cast<u16>(value));
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<Event, CoarseTune>) {
@@ -231,6 +233,9 @@ void addPerformanceEventMessages(std::vector<MidiMessage>& messages, const Perfo
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<Event, PortamentoControl>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 84, typedEvent.key);
+          endTick = std::max(endTick, typedEvent.tick);
+        } else if constexpr (std::is_same_v<Event, LegatoPedal>) {
+          addController(messages, typedEvent.tick, typedEvent.channel, 68, typedEvent.enabled ? 127 : 0);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<Event, MonoMode>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 126, typedEvent.channels);
