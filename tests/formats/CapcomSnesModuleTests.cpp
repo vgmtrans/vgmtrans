@@ -307,6 +307,22 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(samples->samples.samples[0].encodedData.offset == 0x6000, "sample should point at encoded BRR bytes");
   expect(samples->samples.samples[0].encodedData.size == 9, "sample should preserve encoded BRR byte length");
 
+  const auto& sampleItems = samples->metadata.items.nodes;
+  const auto sampleCollectionItem = std::ranges::find_if(sampleItems, [](const ItemNode& item) {
+    return item.kind == ItemKind::SampleCollection && item.detailKind == "snes-sample-dir";
+  });
+  expect(sampleCollectionItem != sampleItems.end(), "sample collection item tree should expose the sample DIR root");
+  expect(sampleCollectionItem->range.offset == 0x5000 && sampleCollectionItem->range.size == 4,
+         "sample collection root should preserve the DIR table source range");
+  const auto sampleItem = std::ranges::find_if(sampleItems, [](const ItemNode& item) {
+    return item.kind == ItemKind::Sample && item.detailKind == "snes-brr-sample";
+  });
+  expect(sampleItem != sampleItems.end(), "sample collection item tree should expose sample nodes");
+  expect(sampleItem->parent == sampleCollectionItem->id, "sample item should point back to the sample collection root");
+  expect(sampleItem->range.offset == 0x6000 && sampleItem->range.size == 9,
+         "sample item should preserve the encoded BRR source range");
+  expect(sampleItem->description == "DIR entry $20480", "sample item should retain its source DIR entry address");
+
   expect(project.collections[0].sequence == sequence->metadata.id, "collection should reference sequence");
   expect(project.collections[0].instrumentBanks == std::vector<AssetId>{instruments->metadata.id},
          "collection should reference instrument bank");
