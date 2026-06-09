@@ -124,6 +124,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->program.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
   expect(sequence->program.behavior.linearAmplitudeScale, "sequence should carry linear amplitude behavior");
   expect(sequence->program.behavior.writeInitialMonoMode, "sequence should carry mono mode behavior");
+  expect(sequence->program.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
+         "sequence should carry CapcomSnes default loop policy");
   expect(sequence->program.tracks.size() == 8, "sequence should decode all nonzero track pointers");
   expect(std::holds_alternative<TempoCommand>(sequence->program.tracks[0].commands[0]),
          "track should decode tempo command");

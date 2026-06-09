@@ -861,6 +861,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
           .writeInitialReverb = true,
           .initialReverb = 0,
           .writeInitialMonoMode = true,
+          .defaultLoopPolicy = LoopPolicy::PlayOnce,
       },
   };
 
