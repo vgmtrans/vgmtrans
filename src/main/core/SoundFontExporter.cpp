@@ -21,6 +21,10 @@ namespace vgmtrans::core {
 namespace {
 
 constexpr u16 kSfGenPan = 17;
+constexpr u16 kSfGenAttackVolEnv = 34;
+constexpr u16 kSfGenDecayVolEnv = 36;
+constexpr u16 kSfGenSustainVolEnv = 37;
+constexpr u16 kSfGenReleaseVolEnv = 38;
 constexpr u16 kSfGenInstrument = 41;
 constexpr u16 kSfGenKeyRange = 43;
 constexpr u16 kSfGenVelRange = 44;
@@ -33,7 +37,8 @@ constexpr u16 kSfGenOverridingRootKey = 58;
 
 constexpr u32 kSf2SamplePaddingFrames = 46;
 constexpr u8 kDefaultRootKey = 60;
-constexpr u32 kInstrumentRegionGenerators = 9;
+constexpr u32 kBaseInstrumentRegionGenerators = 9;
+constexpr u32 kEnvelopeInstrumentRegionGenerators = 4;
 
 struct Chunk {
   std::string id;
@@ -217,6 +222,40 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   constexpr double maxInitialAttenuation = 1440.0;
   return static_cast<u16>(std::clamp(std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb), 0l,
                                      static_cast<long>(maxInitialAttenuation)));
+}
+
+[[nodiscard]] bool hasEnvelope(const Envelope& envelope) {
+  return envelope.attack != 0 || envelope.decay != 0 || envelope.sustain != 0 || envelope.release != 0;
+}
+
+[[nodiscard]] s16 sf2EnvelopeTimecents(u32 microseconds) {
+  if (microseconds == 0) {
+    return std::numeric_limits<s16>::min();
+  }
+  if (microseconds == kEnvelopeInfinite) {
+    return std::numeric_limits<s16>::max();
+  }
+
+  const double seconds = static_cast<double>(microseconds) / 1'000'000.0;
+  return clampS16(static_cast<s32>(std::lround(1200.0 * std::log2(seconds))));
+}
+
+[[nodiscard]] s16 sf2SustainAttenuation(const Envelope& envelope) {
+  constexpr long maxSustainAttenuationCentibels = 1000;
+  if (envelope.sustain == 0) {
+    return static_cast<s16>(maxSustainAttenuationCentibels);
+  }
+
+  const double amplitude = std::clamp(static_cast<double>(envelope.sustain) / 1000.0, 0.0, 1.0);
+  if (amplitude >= 1.0) {
+    return 0;
+  }
+
+  return static_cast<s16>(std::clamp(std::lround(-200.0 * std::log10(amplitude)), 0l, maxSustainAttenuationCentibels));
+}
+
+[[nodiscard]] u32 instrumentRegionGeneratorCount(const Region& region) {
+  return kBaseInstrumentRegionGenerators + (hasEnvelope(region.envelope) ? kEnvelopeInstrumentRegionGenerators : 0);
 }
 
 [[nodiscard]] std::vector<Chunk> infoChunks(const std::string& name) {
@@ -446,7 +485,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
     for (size_t i = 0; i < instrument.regions.size(); ++i) {
       writeLe16(payload, clampU16(generatorIndex));
       writeLe16(payload, 0);
-      generatorIndex += kInstrumentRegionGenerators;
+      generatorIndex += instrumentRegionGeneratorCount(*instrument.regions[i].region);
     }
   }
 
@@ -471,6 +510,12 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
       writeAmountGen(payload, kSfGenPan, sf2Pan(region.pan));
       writeAmountGen(payload, kSfGenCoarseTune, coarseTune);
       writeAmountGen(payload, kSfGenFineTune, fineTune);
+      if (hasEnvelope(region.envelope)) {
+        writeAmountGen(payload, kSfGenAttackVolEnv, sf2EnvelopeTimecents(region.envelope.attack));
+        writeAmountGen(payload, kSfGenDecayVolEnv, sf2EnvelopeTimecents(region.envelope.decay));
+        writeAmountGen(payload, kSfGenSustainVolEnv, sf2SustainAttenuation(region.envelope));
+        writeAmountGen(payload, kSfGenReleaseVolEnv, sf2EnvelopeTimecents(region.envelope.release));
+      }
       writeWordGen(payload, kSfGenOverridingRootKey, kDefaultRootKey);
       writeWordGen(payload, kSfGenSampleModes, sample.decoded.loop.enabled ? 1 : 0);
       writeWordGen(payload, kSfGenSampleId, sfRegion.sampleIndex);

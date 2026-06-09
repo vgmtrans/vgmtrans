@@ -43,6 +43,14 @@ u32 readLe32(const std::vector<u8>& bytes, size_t offset) {
          (static_cast<u32>(bytes[offset + 2]) << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);
 }
 
+u16 readLe16(const std::vector<u8>& bytes, size_t offset) {
+  return static_cast<u16>(bytes[offset]) | (static_cast<u16>(bytes[offset + 1]) << 8);
+}
+
+s16 readLeS16(const std::vector<u8>& bytes, size_t offset) {
+  return static_cast<s16>(readLe16(bytes, offset));
+}
+
 bool containsAscii(const std::vector<u8>& bytes, std::string_view text) {
   return std::search(bytes.begin(), bytes.end(), text.begin(), text.end()) != bytes.end();
 }
@@ -57,6 +65,18 @@ size_t asciiOffset(const std::vector<u8>& bytes, std::string_view text) {
 
 u32 chunkSize(const std::vector<u8>& bytes, std::string_view chunkId) {
   return readLe32(bytes, asciiOffset(bytes, chunkId) + 4);
+}
+
+bool soundFontIgenContainsAmount(const std::vector<u8>& bytes, u16 generator, s16 expectedAmount) {
+  const auto chunkOffset = asciiOffset(bytes, "igen");
+  const auto size = chunkSize(bytes, "igen");
+  const auto payloadOffset = chunkOffset + 8;
+  for (size_t offset = payloadOffset; offset + 4 <= payloadOffset + size; offset += 4) {
+    if (readLe16(bytes, offset) == generator && readLeS16(bytes, offset + 2) == expectedAmount) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool sameRange(SourceRange lhs, SourceRange rhs) {
@@ -489,6 +509,12 @@ void soundFontExporterWritesSfbkRiffFile() {
                       .keyRange = KeyRange{.low = 24, .high = 96},
                       .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
                       .tuning = Tuning{.cents = 125},
+                      .envelope = Envelope{
+                          .attack = 1'000'000,
+                          .decay = 2'000'000,
+                          .sustain = 500,
+                          .release = 250'000,
+                      },
                       .pan = 1.0,
                   }},
               }},
@@ -522,7 +548,16 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(containsAscii(result.bytes, "Lead"), "SoundFont export should include instrument name");
   expect(containsAscii(result.bytes, "Zero"), "SoundFont export should include sample name");
   expect(chunkSize(result.bytes, "smpl") == 124, "SoundFont smpl chunk should include PCM and SF2 padding samples");
+  expect(chunkSize(result.bytes, "igen") == 56, "SoundFont igen chunk should include envelope generators");
   expect(chunkSize(result.bytes, "shdr") == 92, "SoundFont shdr chunk should include one sample and terminal record");
+  expect(soundFontIgenContainsAmount(result.bytes, 34, 0),
+         "SoundFont export should write attackVolEnv from Region envelope");
+  expect(soundFontIgenContainsAmount(result.bytes, 36, 1200),
+         "SoundFont export should write decayVolEnv from Region envelope");
+  expect(soundFontIgenContainsAmount(result.bytes, 37, 60),
+         "SoundFont export should write sustainVolEnv from Region envelope");
+  expect(soundFontIgenContainsAmount(result.bytes, 38, -2400),
+         "SoundFont export should write releaseVolEnv from Region envelope");
 }
 
 void dlsExporterWritesDlsRiffFile() {
