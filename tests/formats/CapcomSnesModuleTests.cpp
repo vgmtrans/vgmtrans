@@ -4,12 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "formats/CapcomSnes/CapcomSnesModule.h"
+#include "formats/CapcomSnes/Value/CapcomSnesModule.h"
 
 #include "core/MidiExporter.h"
 #include "core/PerformanceLowerer.h"
 #include "core/ProjectSession.h"
-#include "formats/CapcomSnes/CapcomSnesProfile.h"
+#include "formats/CapcomSnes/Value/CapcomSnesProfile.h"
 #include "formats/ValueFormats.h"
 
 #include <algorithm>

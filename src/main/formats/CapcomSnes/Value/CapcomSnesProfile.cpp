@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "formats/CapcomSnes/CapcomSnesProfile.h"
+#include "formats/CapcomSnes/Value/CapcomSnesProfile.h"
 
 #include "formats/CapcomSnes/CapcomSnesDriverMath.h"
 

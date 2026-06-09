@@ -21,8 +21,8 @@
 #include "core/Model.h"
 #include "core/ProjectSession.h"
 #include "core/SampleDecoder.h"
-#include "formats/CapcomSnes/CapcomSnesModule.h"
-#include "formats/CapcomSnes/CapcomSnesProfile.h"
+#include "formats/CapcomSnes/Value/CapcomSnesModule.h"
+#include "formats/CapcomSnes/Value/CapcomSnesProfile.h"
 #include "formats/ValueFormats.h"
 #include "io/RawFile.h"
 

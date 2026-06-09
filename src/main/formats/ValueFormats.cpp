@@ -6,8 +6,8 @@
 
 #include "formats/ValueFormats.h"
 
-#include "formats/CapcomSnes/CapcomSnesModule.h"
-#include "formats/CapcomSnes/CapcomSnesProfile.h"
+#include "formats/CapcomSnes/Value/CapcomSnesModule.h"
+#include "formats/CapcomSnes/Value/CapcomSnesProfile.h"
 #include "formats/SnesRsn/SnesRsnModule.h"
 #include "formats/SnesSpc/SnesSpcModule.h"
 

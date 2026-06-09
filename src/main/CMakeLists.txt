@@ -150,8 +150,8 @@ target_sources(vgmtransvalueformats
   PRIVATE
     formats/ValueFormats.cpp
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
-    formats/CapcomSnes/CapcomSnesModule.cpp
-    formats/CapcomSnes/CapcomSnesProfile.cpp
+    formats/CapcomSnes/Value/CapcomSnesModule.cpp
+    formats/CapcomSnes/Value/CapcomSnesProfile.cpp
     formats/SnesRsn/SnesRsnModule.cpp
     formats/SnesSpc/SnesSpcModule.cpp
   PUBLIC
@@ -160,8 +160,8 @@ target_sources(vgmtransvalueformats
     FILES
       formats/ValueFormats.h
       formats/CapcomSnes/CapcomSnesDriverMath.h
-      formats/CapcomSnes/CapcomSnesModule.h
-      formats/CapcomSnes/CapcomSnesProfile.h
+      formats/CapcomSnes/Value/CapcomSnesModule.h
+      formats/CapcomSnes/Value/CapcomSnesProfile.h
       formats/SnesRsn/SnesRsnModule.h
       formats/SnesSpc/SnesSpcModule.h
 )
