@@ -452,75 +452,6 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
       command);
 }
 
-[[nodiscard]] std::string commandName(const SequencerCommand& command) {
-  return std::visit(
-      [](const auto& typedCommand) -> std::string {
-        using Command = std::decay_t<decltype(typedCommand)>;
-        if constexpr (std::is_same_v<Command, NoteCommand>) {
-          return "Note";
-        } else if constexpr (std::is_same_v<Command, RestCommand>) {
-          return "Rest";
-        } else if constexpr (std::is_same_v<Command, NoteStateCommand>) {
-          switch (typedCommand.action) {
-            case NoteStateAction::ToggleTriplet:
-              return "Toggle Triplet";
-            case NoteStateAction::ToggleSlur:
-              return "Toggle Slur";
-            case NoteStateAction::EnableDotted:
-              return "Dotted Note";
-            case NoteStateAction::ToggleOctaveUp:
-              return "Toggle 2-Octave Up";
-            case NoteStateAction::Attributes:
-              return "Note Attributes";
-            case NoteStateAction::Octave:
-              return "Octave";
-          }
-          return "Note State";
-        } else if constexpr (std::is_same_v<Command, DurationCommand>) {
-          return "Duration";
-        } else if constexpr (std::is_same_v<Command, ProgramCommand>) {
-          return "Program";
-        } else if constexpr (std::is_same_v<Command, VolumeCommand>) {
-          return "Volume";
-        } else if constexpr (std::is_same_v<Command, PanCommand>) {
-          return "Pan";
-        } else if constexpr (std::is_same_v<Command, TempoCommand>) {
-          return "Tempo";
-        } else if constexpr (std::is_same_v<Command, TransposeCommand>) {
-          return "Transpose";
-        } else if constexpr (std::is_same_v<Command, GlobalTransposeCommand>) {
-          return "Global Transpose";
-        } else if constexpr (std::is_same_v<Command, TuningCommand>) {
-          return "Tuning";
-        } else if constexpr (std::is_same_v<Command, PortamentoCommand>) {
-          return "Portamento";
-        } else if constexpr (std::is_same_v<Command, LfoCommand>) {
-          return "LFO";
-        } else if constexpr (std::is_same_v<Command, ReverbCommand>) {
-          return "Reverb";
-        } else if constexpr (std::is_same_v<Command, EnvelopeCommand>) {
-          return "Envelope";
-        } else if constexpr (std::is_same_v<Command, MasterVolumeCommand>) {
-          return "Master Volume";
-        } else if constexpr (std::is_same_v<Command, JumpCommand>) {
-          return "Jump";
-        } else if constexpr (std::is_same_v<Command, RepeatCommand>) {
-          return "Repeat";
-        } else if constexpr (std::is_same_v<Command, RepeatBreakCommand>) {
-          return "Repeat Break";
-        } else if constexpr (std::is_same_v<Command, LoopBoundaryCommand>) {
-          return "Loop Boundary";
-        } else if constexpr (std::is_same_v<Command, EndCommand>) {
-          return "End";
-        } else if constexpr (std::is_same_v<Command, UnknownCommand>) {
-          return "Unknown";
-        } else {
-          return typedCommand.name;
-        }
-      },
-      command);
-}
-
 [[nodiscard]] std::string commandDescription(const SequencerCommand& command) {
   return std::visit(
       [](const auto& typedCommand) -> std::string {
@@ -968,7 +899,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
                                 trackItem,
                                 ItemKind::Command,
                                 commandDetailKind(command),
-                                commandName(command),
+                                defaultCommandName(command),
                                 commandRange(command),
                                 commandDescription(command)));
       if (const auto* programCommand = std::get_if<ProgramCommand>(&command)) {

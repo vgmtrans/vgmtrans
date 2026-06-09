@@ -251,6 +251,8 @@ using SequencerCommand = std::variant<
     UnknownCommand,
     DriverSpecificCommand>;
 
+[[nodiscard]] std::string defaultCommandName(const SequencerCommand& command);
+
 struct TrackProgram {
   TrackId id;
   u32 sourceTrackNumber = 0;

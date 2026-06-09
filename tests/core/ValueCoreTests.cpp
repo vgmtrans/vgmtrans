@@ -344,6 +344,10 @@ void sequencerCommandExposesSourceRange() {
          "command range should come from typed note-state command");
   expect(sameRange(commandRange(driver), driverRange),
          "command range should come from typed driver-specific command");
+  expect(defaultCommandName(note) == "Note", "default command name should describe typed note commands");
+  expect(defaultCommandName(noteState) == "Note Attributes",
+         "default command name should describe typed note-state actions");
+  expect(defaultCommandName(driver) == "Probe", "default command name should preserve driver-specific names");
 }
 
 void projectSessionScansValuesAndVirtualSources() {
