@@ -219,7 +219,7 @@ struct SynthExportAssets {
 }
 
 [[nodiscard]] Artifact exportSoundFont2(const Project& project, const SourceStore& sources,
-                                        const Collection& collection) {
+                                        const Collection& collection, const ExportRequest& request) {
   auto assets = collectSynthExportAssets(project, collection);
   auto modulationUsage = collectionModulationUsage(project, collection);
 
@@ -229,6 +229,7 @@ struct SynthExportAssets {
           .instrumentSets = assets.instrumentSets,
           .sampleCollections = assets.sampleCollections,
           .modulationUsage = modulationUsage ? &*modulationUsage : nullptr,
+          .modulationScaling = request.synthModulationScaling,
       },
       sources);
   assets.diagnostics.insert(assets.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
@@ -242,7 +243,8 @@ struct SynthExportAssets {
   };
 }
 
-[[nodiscard]] Artifact exportDls(const Project& project, const SourceStore& sources, const Collection& collection) {
+[[nodiscard]] Artifact exportDls(const Project& project, const SourceStore& sources, const Collection& collection,
+                                 const ExportRequest& request) {
   auto assets = collectSynthExportAssets(project, collection);
   auto modulationUsage = collectionModulationUsage(project, collection);
 
@@ -252,6 +254,7 @@ struct SynthExportAssets {
           .instrumentSets = assets.instrumentSets,
           .sampleCollections = assets.sampleCollections,
           .modulationUsage = modulationUsage ? &*modulationUsage : nullptr,
+          .modulationScaling = request.synthModulationScaling,
       },
       sources);
   assets.diagnostics.insert(assets.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
@@ -295,10 +298,10 @@ std::vector<Artifact> ExportService::exportCollection(const Project& project, co
         break;
       }
       case ExportKind::SoundFont2:
-        artifacts.push_back(exportSoundFont2(project, sources, *found));
+        artifacts.push_back(exportSoundFont2(project, sources, *found, request));
         break;
       case ExportKind::Dls:
-        artifacts.push_back(exportDls(project, sources, *found));
+        artifacts.push_back(exportDls(project, sources, *found, request));
         break;
     }
   }

@@ -10,6 +10,7 @@
 #include "value/core/Model.h"
 #include "value/core/SampleDecoder.h"
 #include "value/core/Source.h"
+#include "value/export/ExportPolicy.h"
 
 #include <span>
 #include <string>
@@ -24,6 +25,7 @@ struct SoundFontInput {
   std::span<const InstrumentSetAsset* const> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
   const ModulationUsage* modulationUsage = nullptr;
+  ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
 };
 
 struct SoundFontResult {

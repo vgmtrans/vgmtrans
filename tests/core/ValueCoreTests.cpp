@@ -804,6 +804,7 @@ void soundFontExporterWritesSfbkRiffFile() {
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
           .modulationUsage = &modulationUsage,
+          .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
       },
       sources);
 
@@ -940,6 +941,7 @@ void dlsExporterWritesDlsRiffFile() {
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
           .modulationUsage = &modulationUsage,
+          .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
       },
       sources);
 

@@ -10,6 +10,7 @@
 #include "value/core/Model.h"
 #include "value/core/MidiSequenceBuilder.h"
 #include "value/core/Source.h"
+#include "value/export/ExportPolicy.h"
 
 #include <string>
 #include <vector>
@@ -26,6 +27,7 @@ enum class ExportKind {
 struct ExportRequest {
   std::vector<ExportKind> kinds;
   LoopPolicy loopPolicy = LoopPolicy::Default;
+  ModulationScalingPolicy synthModulationScaling = ModulationScalingPolicy::FullFormatRange;
 };
 
 struct Artifact {

@@ -9,6 +9,7 @@
 #include "base/Types.h"
 #include "value/core/Model.h"
 #include "value/core/Source.h"
+#include "value/export/ExportPolicy.h"
 
 #include <span>
 #include <string>
@@ -23,6 +24,7 @@ struct DlsInput {
   std::span<const InstrumentSetAsset* const> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
   const ModulationUsage* modulationUsage = nullptr;
+  ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
 };
 
 struct DlsResult {
