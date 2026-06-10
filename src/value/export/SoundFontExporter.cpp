@@ -7,6 +7,7 @@
 #include "value/export/SoundFontExporter.h"
 
 #include "value/export/ExportDiagnostics.h"
+#include "value/export/ModulationScaling.h"
 #include "value/export/SynthExportData.h"
 
 #include <algorithm>
@@ -341,7 +342,9 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(const SynthModulator& modulator) {
+[[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(
+    const SynthModulator& modulator, const MidiModulationUsage* midiModulationUsage = nullptr,
+    ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange) {
   const auto source = modulator.source ? sf2SourceForSynthSource(*modulator.source)
                                        : sf2DefaultSourceForDestination(modulator.destination);
   const auto destination = sf2GeneratorForDestination(modulator.destination);
@@ -352,7 +355,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return SfModulatorRecord{
       .source = *source,
       .destination = *destination,
-      .amount = clampS16(modulator.amount),
+      .amount = clampS16(scaledSynthModulatorAmount(modulator, midiModulationUsage, modulationScaling)),
   };
 }
 
@@ -418,9 +421,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] u32 instrumentGlobalModulatorCount(const Instrument& instrument) {
-  return static_cast<u32>(std::ranges::count_if(instrument.modulators, [](const SynthModulator& modulator) {
-    return sf2ModulatorFor(modulator).has_value();
-  }));
+  return static_cast<u32>(std::ranges::count_if(
+      instrument.modulators, [](const SynthModulator& modulator) { return sf2ModulatorFor(modulator).has_value(); }));
 }
 
 [[nodiscard]] bool hasInstrumentGlobalZone(const Instrument& instrument) {
@@ -620,11 +622,12 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("ibag", std::move(payload));
 }
 
-[[nodiscard]] Chunk imodChunk(std::span<const SfInstrument> instruments) {
+[[nodiscard]] Chunk imodChunk(std::span<const SfInstrument> instruments, const MidiModulationUsage* midiModulationUsage,
+                              ModulationScalingPolicy modulationScaling) {
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
     for (const auto& modulator : instrument.instrument->modulators) {
-      const auto record = sf2ModulatorFor(modulator);
+      const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling);
       if (!record) {
         continue;
       }
@@ -696,7 +699,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
         continue;
       }
       const auto pitch = sf2RegionPitch(*sfRegion.region, samples[sfRegion.sampleIndex]);
-      pitches[sfRegion.sampleIndex] = sf2SampleHeaderPitch(pitch.rootKey, clampS16(samples[sfRegion.sampleIndex].pitch.cents));
+      pitches[sfRegion.sampleIndex] =
+          sf2SampleHeaderPitch(pitch.rootKey, clampS16(samples[sfRegion.sampleIndex].pitch.cents));
       assigned[sfRegion.sampleIndex] = true;
     }
   }
@@ -737,11 +741,19 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }
 
 [[nodiscard]] std::vector<Chunk> pdtaChunks(std::span<const SfInstrument> instruments,
-                                            std::span<const DecodedSfSample> samples) {
+                                            std::span<const DecodedSfSample> samples,
+                                            const MidiModulationUsage* midiModulationUsage,
+                                            ModulationScalingPolicy modulationScaling) {
   return {
-      phdrChunk(instruments),   pbagChunk(instruments),          terminalModChunk("pmod"),
-      pgenChunk(instruments),   instChunk(instruments),          ibagChunk(instruments),
-      imodChunk(instruments),   igenChunk(instruments, samples), shdrChunk(samples, instruments),
+      phdrChunk(instruments),
+      pbagChunk(instruments),
+      terminalModChunk("pmod"),
+      pgenChunk(instruments),
+      instChunk(instruments),
+      ibagChunk(instruments),
+      imodChunk(instruments, midiModulationUsage, modulationScaling),
+      igenChunk(instruments, samples),
+      shdrChunk(samples, instruments),
   };
 }
 
@@ -750,9 +762,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, const SourceStore& sources) const {
   SoundFontResult result;
 
-  auto decodedSamples = decodeSynthSamples(input.sampleCollections,
-                                           sources,
-                                           result.diagnostics,
+  auto decodedSamples = decodeSynthSamples(input.sampleCollections, sources, result.diagnostics,
                                            SynthSampleDecodeOptions{
                                                .requireMono = true,
                                                .nonMonoWarning = "Skipping non-mono sample for SoundFont2 export",
@@ -774,7 +784,7 @@ SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, 
   result.bytes = riffSoundFont({
       makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
       makeListChunk("sdta", {smplChunk(samples)}),
-      makeListChunk("pdta", pdtaChunks(instruments, samples)),
+      makeListChunk("pdta", pdtaChunks(instruments, samples, input.midiModulationUsage, input.modulationScaling)),
   });
   return result;
 }

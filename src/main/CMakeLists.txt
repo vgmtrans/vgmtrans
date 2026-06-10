@@ -121,6 +121,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/DlsExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/Export.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/ModulationScaling.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/SynthExportData.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/WavExporter.cpp
@@ -143,6 +144,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
       ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/ModulationScaling.h
       ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/SynthExportData.h
       ${PROJECT_SOURCE_DIR}/src/value/export/WavExporter.h

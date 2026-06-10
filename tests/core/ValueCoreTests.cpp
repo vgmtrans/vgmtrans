@@ -12,6 +12,7 @@
 #include "value/core/ModulationAnalysis.h"
 #include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
+#include "value/export/ModulationScaling.h"
 #include "value/export/SoundFontExporter.h"
 #include "value/export/WavExporter.h"
 
@@ -154,12 +155,8 @@ bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 source, u16 des
   return false;
 }
 
-bool dlsArt2ContainsConnection(
-    const std::vector<u8>& bytes,
-    u16 source,
-    u16 control,
-    u16 destination,
-    s32 expectedScale) {
+bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 source, u16 control, u16 destination,
+                               s32 expectedScale) {
   const auto chunkOffset = asciiOffset(bytes, "art2");
   const auto payloadOffset = chunkOffset + 8;
   const auto connectionCount = readLe32(bytes, payloadOffset + 4);
@@ -178,19 +175,16 @@ bool sameRange(SourceRange lhs, SourceRange rhs) {
 }
 
 const Diagnostic& diagnosticWithMessage(const std::vector<Diagnostic>& diagnostics, std::string_view message) {
-  const auto found = std::ranges::find_if(diagnostics, [message](const Diagnostic& diagnostic) {
-    return diagnostic.message == message;
-  });
+  const auto found = std::ranges::find_if(
+      diagnostics, [message](const Diagnostic& diagnostic) { return diagnostic.message == message; });
   if (found == diagnostics.end()) {
     throw std::runtime_error("expected diagnostic was not found");
   }
   return *found;
 }
 
-void expectDiagnosticRange(
-    const std::vector<Diagnostic>& diagnostics,
-    std::string_view message,
-    SourceRange expectedRange) {
+void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::string_view message,
+                           SourceRange expectedRange) {
   const auto& diagnostic = diagnosticWithMessage(diagnostics, message);
   expect(diagnostic.range.has_value(), "diagnostic should preserve a source range");
   expect(sameRange(*diagnostic.range, expectedRange), "diagnostic should preserve the expected source range");
@@ -222,21 +216,21 @@ public:
                     ItemTree{
                         .root = itemId,
                         .nodes = {ItemNode{
-                            .id = itemId,
-                            .kind = ItemKind::Sequence,
-                            .detailKind = "probe-sequence",
-                            .name = input.source.name,
-                            .range = assetRange,
-                            .children = {ItemId{9999}},
-                        },
-                        ItemNode{
-                            .id = childItemId,
-                            .parent = itemId,
-                            .kind = ItemKind::Header,
-                            .detailKind = "probe-header",
-                            .name = "Header",
-                            .range = input.reader.range(0, 1),
-                        }},
+                                      .id = itemId,
+                                      .kind = ItemKind::Sequence,
+                                      .detailKind = "probe-sequence",
+                                      .name = input.source.name,
+                                      .range = assetRange,
+                                      .children = {ItemId{9999}},
+                                  },
+                                  ItemNode{
+                                      .id = childItemId,
+                                      .parent = itemId,
+                                      .kind = ItemKind::Header,
+                                      .detailKind = "probe-header",
+                                      .name = "Header",
+                                      .range = input.reader.range(0, 1),
+                                  }},
                     },
             },
         .commandSequence =
@@ -342,10 +336,8 @@ void sequencerCommandExposesSourceRange() {
   };
 
   expect(sameRange(commandRange(note), noteRange), "command range should come from typed note command");
-  expect(sameRange(commandRange(noteState), noteStateRange),
-         "command range should come from typed note-state command");
-  expect(sameRange(commandRange(driver), driverRange),
-         "command range should come from typed driver-specific command");
+  expect(sameRange(commandRange(noteState), noteStateRange), "command range should come from typed note-state command");
+  expect(sameRange(commandRange(driver), driverRange), "command range should come from typed driver-specific command");
   expect(defaultCommandName(note) == "Note", "default command name should describe typed note commands");
   expect(defaultCommandName(noteState) == "Note Attributes",
          "default command name should describe typed note-state actions");
@@ -383,8 +375,7 @@ void projectSessionScansValuesAndVirtualSources() {
          "project snapshot should find a sequence asset by stable id");
   expect(assetById<MiscAsset>(project, sequence->metadata.id) == nullptr,
          "project snapshot should reject asset id lookups with the wrong value type");
-  expect(assetById(project, AssetId{99}) == nullptr,
-         "project snapshot should return null for a missing asset id");
+  expect(assetById(project, AssetId{99}) == nullptr, "project snapshot should return null for a missing asset id");
   expect(assetById<SequenceAsset>(project, AssetId{99}) == nullptr,
          "project snapshot should return null for a missing asset id");
   expect(sequence->metadata.items.nodes.size() == 2, "sequence should expose item tree");
@@ -530,25 +521,26 @@ void midiSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
           .id = TrackId{0},
           .sourceTrackNumber = 0,
           .startAddress = Address{0},
-          .commands = {
-              NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-              VolumeCommand{.rawValue = 99, .range = range(1, 1)},
-              JumpCommand{.destination = Address{0}, .range = range(2, 3)},
-              EndCommand{.range = range(5, 1)},
-          },
+          .commands =
+              {
+                  NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
+                  VolumeCommand{.rawValue = 99, .range = range(1, 1)},
+                  JumpCommand{.destination = Address{0}, .range = range(2, 3)},
+                  EndCommand{.range = range(5, 1)},
+              },
       }},
   };
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const MidiSequence midiSequence =
+      MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
   const auto& events = midiSequence.tracks[0].events;
-  expect(std::ranges::any_of(events, [](const MidiEvent& event) {
-           const auto* note = std::get_if<NoteDuration>(&event);
-           return note != nullptr && note->tick == 0 && note->duration == 12;
-         }),
+  expect(std::ranges::any_of(events,
+                             [](const MidiEvent& event) {
+                               const auto* note = std::get_if<NoteDuration>(&event);
+                               return note != nullptr && note->tick == 0 && note->duration == 12;
+                             }),
          "play-once loop fixture should emit the note before the loop boundary");
-  expect(std::ranges::none_of(events, [](const MidiEvent& event) {
-           return std::holds_alternative<Volume>(event);
-         }),
+  expect(std::ranges::none_of(events, [](const MidiEvent& event) { return std::holds_alternative<Volume>(event); }),
          "play-once event build should skip commands exactly at the loop boundary");
 }
 
@@ -562,19 +554,20 @@ void midiSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
           .id = TrackId{0},
           .sourceTrackNumber = 0,
           .startAddress = Address{0},
-          .commands = {
-              NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-              JumpCommand{.destination = Address{0}, .range = range(1, 3)},
-          },
+          .commands =
+              {
+                  NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
+                  JumpCommand{.destination = Address{0}, .range = range(1, 3)},
+              },
       }},
   };
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::Default);
+  const MidiSequence midiSequence =
+      MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::Default);
   const auto& events = midiSequence.tracks[0].events;
   expect(midiSequence.diagnostics.empty(), "unset default loop policy should not run until command cap");
-  expect(std::ranges::count_if(events, [](const MidiEvent& event) {
-           return std::holds_alternative<NoteDuration>(event);
-         }) == 1,
+  expect(std::ranges::count_if(events,
+                               [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); }) == 1,
          "unset default loop policy should build self-looping tracks once");
   expect(std::get<EndOfTrack>(events.back()).tick == 12,
          "unset default loop policy should end at the first playthrough boundary");
@@ -590,24 +583,25 @@ void midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
           .id = TrackId{0},
           .sourceTrackNumber = 0,
           .startAddress = Address{0},
-          .commands = {
-              NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-              LoopBoundaryCommand{.destination = Address{1}, .trigger = Address{0}, .range = range(1, 0)},
-              VolumeCommand{.rawValue = 99, .range = range(2, 1)},
-          },
+          .commands =
+              {
+                  NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
+                  LoopBoundaryCommand{.destination = Address{1}, .trigger = Address{0}, .range = range(1, 0)},
+                  VolumeCommand{.rawValue = 99, .range = range(2, 1)},
+              },
       }},
   };
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const MidiSequence midiSequence =
+      MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
   const auto& events = midiSequence.tracks[0].events;
-  expect(std::ranges::any_of(events, [](const MidiEvent& event) {
-           const auto* note = std::get_if<NoteDuration>(&event);
-           return note != nullptr && note->tick == 0 && note->duration == 12;
-         }),
+  expect(std::ranges::any_of(events,
+                             [](const MidiEvent& event) {
+                               const auto* note = std::get_if<NoteDuration>(&event);
+                               return note != nullptr && note->tick == 0 && note->duration == 12;
+                             }),
          "loop-boundary fixture should emit events before the boundary");
-  expect(std::ranges::none_of(events, [](const MidiEvent& event) {
-           return std::holds_alternative<Volume>(event);
-         }),
+  expect(std::ranges::none_of(events, [](const MidiEvent& event) { return std::holds_alternative<Volume>(event); }),
          "loop-boundary fixture should not build commands after the boundary");
 }
 
@@ -617,31 +611,36 @@ void midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
   };
   const CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {
-          CommandTrack{
-              .id = TrackId{0},
-              .sourceTrackNumber = 0,
-              .startAddress = Address{0},
-              .commands = {
-                  NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-                  JumpCommand{.destination = Address{0}, .range = range(1, 3)},
+      .tracks =
+          {
+              CommandTrack{
+                  .id = TrackId{0},
+                  .sourceTrackNumber = 0,
+                  .startAddress = Address{0},
+                  .commands =
+                      {
+                          NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
+                          JumpCommand{.destination = Address{0}, .range = range(1, 3)},
+                      },
+              },
+              CommandTrack{
+                  .id = TrackId{1},
+                  .sourceTrackNumber = 1,
+                  .startAddress = Address{10},
+                  .commands =
+                      {
+                          NoteCommand{.key = 64, .rawDuration = 12, .range = range(10, 1)},
+                          JumpCommand{.destination = Address{20}, .range = range(11, 3)},
+                          NoteCommand{.key = 65, .rawDuration = 12, .range = range(20, 1)},
+                          LoopBoundaryCommand{
+                              .destination = Address{10}, .trigger = Address{20}, .range = range(21, 0)},
+                      },
               },
           },
-          CommandTrack{
-              .id = TrackId{1},
-              .sourceTrackNumber = 1,
-              .startAddress = Address{10},
-              .commands = {
-                  NoteCommand{.key = 64, .rawDuration = 12, .range = range(10, 1)},
-                  JumpCommand{.destination = Address{20}, .range = range(11, 3)},
-                  NoteCommand{.key = 65, .rawDuration = 12, .range = range(20, 1)},
-                  LoopBoundaryCommand{.destination = Address{10}, .trigger = Address{20}, .range = range(21, 0)},
-              },
-          },
-      },
   };
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const MidiSequence midiSequence =
+      MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
   const auto countNotesAt = [](const MidiTrack& track, u64 tick) {
     return std::ranges::count_if(track.events, [tick](const MidiEvent& event) {
       const auto* note = std::get_if<NoteDuration>(&event);
@@ -665,27 +664,30 @@ void modulationAnalysisReportsObservedSourceRanges() {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
   const CommandSequence commandSequence{
-      .tracks = {
-          CommandTrack{
-              .id = TrackId{0},
-              .sourceTrackNumber = 7,
-              .startAddress = Address{0},
-              .commands = {
-                  VibratoCommand{.rawDepth = 38, .range = range(0x10, 3)},
-                  VibratoCommand{.rawDepth = 0, .range = range(0x13, 3)},
-                  ModulationRateCommand{.rawRate = 9, .range = range(0x16, 3)},
+      .tracks =
+          {
+              CommandTrack{
+                  .id = TrackId{0},
+                  .sourceTrackNumber = 7,
+                  .startAddress = Address{0},
+                  .commands =
+                      {
+                          VibratoCommand{.rawDepth = 38, .range = range(0x10, 3)},
+                          VibratoCommand{.rawDepth = 0, .range = range(0x13, 3)},
+                          ModulationRateCommand{.rawRate = 9, .range = range(0x16, 3)},
+                      },
+              },
+              CommandTrack{
+                  .id = TrackId{1},
+                  .sourceTrackNumber = 3,
+                  .startAddress = Address{0x20},
+                  .commands =
+                      {
+                          TremoloCommand{.rawDepth = 24, .range = range(0x20, 3)},
+                          ModulationRateCommand{.rawRate = 12, .range = range(0x23, 3)},
+                      },
               },
           },
-          CommandTrack{
-              .id = TrackId{1},
-              .sourceTrackNumber = 3,
-              .startAddress = Address{0x20},
-              .commands = {
-                  TremoloCommand{.rawDepth = 24, .range = range(0x20, 3)},
-                  ModulationRateCommand{.rawRate = 12, .range = range(0x23, 3)},
-              },
-          },
-      },
   };
 
   const auto usage = analyzeModulationUsage(commandSequence);
@@ -710,27 +712,28 @@ void modulationAnalysisReportsObservedSourceRanges() {
 void modulationAnalysisReportsObservedMidiControllerRanges() {
   const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {
-          MidiTrack{
-              .name = "Lead",
-              .events =
-                  {
-                      VibratoDepth{.tick = 0, .channel = 0, .value = 0},
-                      VibratoDepth{.tick = 12, .channel = 0, .value = 82},
-                      VibratoFrequency{.tick = 12, .channel = 0, .value = 17},
-                      TremoloDepth{.tick = 24, .channel = 0, .value = 40},
-                      TremoloFrequency{.tick = 24, .channel = 0, .value = 5},
-                  },
+      .tracks =
+          {
+              MidiTrack{
+                  .name = "Lead",
+                  .events =
+                      {
+                          VibratoDepth{.tick = 0, .channel = 0, .value = 0},
+                          VibratoDepth{.tick = 12, .channel = 0, .value = 82},
+                          VibratoFrequency{.tick = 12, .channel = 0, .value = 17},
+                          TremoloDepth{.tick = 24, .channel = 0, .value = 40},
+                          TremoloFrequency{.tick = 24, .channel = 0, .value = 5},
+                      },
+              },
+              MidiTrack{
+                  .name = "Pad",
+                  .events =
+                      {
+                          VibratoFrequency{.tick = 0, .channel = 1, .value = 29},
+                          TremoloFrequency{.tick = 0, .channel = 1, .value = 9},
+                      },
+              },
           },
-          MidiTrack{
-              .name = "Pad",
-              .events =
-                  {
-                      VibratoFrequency{.tick = 0, .channel = 1, .value = 29},
-                      TremoloFrequency{.tick = 0, .channel = 1, .value = 9},
-                  },
-          },
-      },
   };
 
   const auto usage = analyzeMidiModulationUsage(midiSequence);
@@ -750,6 +753,71 @@ void modulationAnalysisReportsObservedMidiControllerRanges() {
   expect(usage.tracks[1].trackIndex == 1 && !usage.tracks[1].vibratoDepth.observed &&
              usage.tracks[1].vibratoRate.max == 29,
          "MIDI modulation analysis should keep second track modulation ranges separate");
+}
+
+void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators() {
+  MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks =
+          {
+              MidiTrack{
+                  .name = "Lead",
+                  .events =
+                      {
+                          VibratoDepth{.tick = 0, .channel = 0, .value = 0},
+                          VibratoDepth{.tick = 6, .channel = 0, .value = 41},
+                          VibratoDepth{.tick = 12, .channel = 0, .value = 82},
+                          VibratoFrequency{.tick = 18, .channel = 0, .value = 17},
+                          TremoloDepth{.tick = 24, .channel = 0, .value = 40},
+                          TremoloFrequency{.tick = 30, .channel = 0, .value = 5},
+                          TremoloFrequency{.tick = 36, .channel = 0, .value = 9},
+                      },
+              },
+              MidiTrack{
+                  .name = "Pad",
+                  .events =
+                      {
+                          VibratoFrequency{.tick = 0, .channel = 1, .value = 29},
+                      },
+              },
+          },
+  };
+
+  const auto usage = analyzeMidiModulationUsage(midiSequence);
+  expect(scaledMidiModulationControllerValue(41, &usage.vibratoDepth, ModulationScalingPolicy::FullFormatRange) == 41,
+         "full-range modulation scaling should leave MIDI controller values unchanged");
+
+  applyMidiModulationScaling(midiSequence, usage, ModulationScalingPolicy::ObservedSequenceRange);
+
+  const auto& leadEvents = midiSequence.tracks[0].events;
+  expect(std::get<VibratoDepth>(leadEvents[0]).value == 0,
+         "observed modulation scaling should preserve zero controller values");
+  expect(std::get<VibratoDepth>(leadEvents[1]).value == 64,
+         "observed modulation scaling should expand intermediate controller values");
+  expect(std::get<VibratoDepth>(leadEvents[2]).value == 127,
+         "observed modulation scaling should expand the observed maximum to full MIDI controller range");
+  expect(std::get<VibratoFrequency>(leadEvents[3]).value == 74,
+         "observed modulation scaling should use global rate range across tracks");
+  expect(std::get<TremoloDepth>(leadEvents[4]).value == 127,
+         "observed modulation scaling should expand tremolo depth controllers");
+  expect(
+      std::get<TremoloFrequency>(leadEvents[5]).value == 71 && std::get<TremoloFrequency>(leadEvents[6]).value == 127,
+      "observed modulation scaling should expand tremolo rate controllers");
+
+  const SynthModulator defaultTremoloRate{
+      .destination = SynthDestination::TremoloRate,
+      .amount = 180,
+  };
+  const SynthModulator explicitVibratoDepth{
+      .source = SynthSource::NoteOnVelocity,
+      .destination = SynthDestination::VibratoDepth,
+      .amount = 300,
+  };
+  expect(scaledSynthModulatorAmount(defaultTremoloRate, &usage, ModulationScalingPolicy::ObservedSequenceRange) == 13,
+         "observed modulation scaling should reduce default synth modulator amounts");
+  expect(
+      scaledSynthModulatorAmount(explicitVibratoDepth, &usage, ModulationScalingPolicy::ObservedSequenceRange) == 300,
+      "observed modulation scaling should not change explicit-source synth modulator amounts");
 }
 
 void wavExporterWritesPcm16RiffFile() {
@@ -805,34 +873,37 @@ void soundFontExporterWritesSfbkRiffFile() {
               .keyRange = KeyRange{.low = 24, .high = 96},
               .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
               .tuning = Tuning{.cents = 125},
-              .envelope = Envelope{
-                  .attack = 1'000'000,
-                  .decay = 2'000'000,
-                  .sustain = 500,
-                  .release = 250'000,
-              },
+              .envelope =
+                  Envelope{
+                      .attack = 1'000'000,
+                      .decay = 2'000'000,
+                      .sustain = 500,
+                      .release = 250'000,
+                  },
               .pan = 1.0,
           }},
-          .generators = {
-              SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
-              SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
-          },
-          .modulators = {
-              SynthModulator{
-                  .source = SynthSource::NoteOnVelocity,
-                  .destination = SynthDestination::VibratoDepth,
-                  .amount = 300,
+          .generators =
+              {
+                  SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
+                  SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
               },
-              SynthModulator{
-                  .source = SynthSource::ChannelPressure,
-                  .destination = SynthDestination::VibratoRate,
-                  .amount = 0,
+          .modulators =
+              {
+                  SynthModulator{
+                      .source = SynthSource::NoteOnVelocity,
+                      .destination = SynthDestination::VibratoDepth,
+                      .amount = 300,
+                  },
+                  SynthModulator{
+                      .source = SynthSource::ChannelPressure,
+                      .destination = SynthDestination::VibratoRate,
+                      .amount = 0,
+                  },
+                  SynthModulator{
+                      .destination = SynthDestination::TremoloRate,
+                      .amount = 180,
+                  },
               },
-              SynthModulator{
-                  .destination = SynthDestination::TremoloRate,
-                  .amount = 180,
-              },
-          },
       }},
   };
 
@@ -871,8 +942,10 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(containsAscii(result.bytes, "Lead"), "SoundFont export should include instrument name");
   expect(containsAscii(result.bytes, "Zero"), "SoundFont export should include sample name");
   expect(chunkSize(result.bytes, "smpl") == 124, "SoundFont smpl chunk should include PCM and SF2 padding samples");
-  expect(chunkSize(result.bytes, "pgen") == 12, "SoundFont pgen chunk should include reverb, instrument, and terminal generators");
-  expect(soundFontBagAt(result.bytes, "pbag", 1, 2, 0), "SoundFont terminal preset bag should include both preset generators");
+  expect(chunkSize(result.bytes, "pgen") == 12,
+         "SoundFont pgen chunk should include reverb, instrument, and terminal generators");
+  expect(soundFontBagAt(result.bytes, "pbag", 1, 2, 0),
+         "SoundFont terminal preset bag should include both preset generators");
   expect(soundFontPgenContainsAmount(result.bytes, 16, 250),
          "SoundFont export should write default preset reverb send");
   expect(chunkSize(result.bytes, "ibag") == 12, "SoundFont ibag chunk should include a global generator zone");
@@ -886,8 +959,8 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write explicit velocity-to-vibrato modulator");
   expect(soundFontImodContains(result.bytes, 13, 24, 0),
          "SoundFont export should write explicit channel-pressure-to-vibrato-rate modulator");
-  expect(soundFontImodContains(result.bytes, 203, 22, 180),
-         "SoundFont export should resolve default tremolo-rate source from the destination");
+  expect(soundFontImodContains(result.bytes, 203, 22, 17),
+         "SoundFont export should scale default tremolo-rate modulator from observed MIDI usage");
   expect(chunkSize(result.bytes, "igen") == 68, "SoundFont igen chunk should include global and region generators");
   expect(chunkSize(result.bytes, "shdr") == 92, "SoundFont shdr chunk should include one sample and terminal record");
   expect(soundFontIgenContainsAmount(result.bytes, 6, 120),
@@ -943,34 +1016,37 @@ void dlsExporterWritesDlsRiffFile() {
               .keyRange = KeyRange{.low = 24, .high = 96},
               .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
               .tuning = Tuning{.cents = 125},
-              .envelope = Envelope{
-                  .attack = 1'000'000,
-                  .decay = 2'000'000,
-                  .sustain = 500,
-                  .release = 250'000,
-              },
+              .envelope =
+                  Envelope{
+                      .attack = 1'000'000,
+                      .decay = 2'000'000,
+                      .sustain = 500,
+                      .release = 250'000,
+                  },
               .pan = 1.0,
           }},
-          .generators = {
-              SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
-              SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
-          },
-          .modulators = {
-              SynthModulator{
-                  .source = SynthSource::NoteOnVelocity,
-                  .destination = SynthDestination::VibratoDepth,
-                  .amount = 300,
+          .generators =
+              {
+                  SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
+                  SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
               },
-              SynthModulator{
-                  .source = SynthSource::ChannelPressure,
-                  .destination = SynthDestination::VibratoRate,
-                  .amount = 0,
+          .modulators =
+              {
+                  SynthModulator{
+                      .source = SynthSource::NoteOnVelocity,
+                      .destination = SynthDestination::VibratoDepth,
+                      .amount = 300,
+                  },
+                  SynthModulator{
+                      .source = SynthSource::ChannelPressure,
+                      .destination = SynthDestination::VibratoRate,
+                      .amount = 0,
+                  },
+                  SynthModulator{
+                      .destination = SynthDestination::TremoloRate,
+                      .amount = 180,
+                  },
               },
-              SynthModulator{
-                  .destination = SynthDestination::TremoloRate,
-                  .amount = 180,
-              },
-          },
       }},
   };
 
@@ -1033,8 +1109,8 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should write explicit velocity-to-vibrato modulator");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0114, 0),
          "DLS export should write explicit channel-pressure-to-vibrato-rate modulator");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0104, 11796480),
-         "DLS export should resolve default tremolo-rate source from the destination");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0104, 1114112),
+         "DLS export should scale default tremolo-rate modulator from observed MIDI usage");
 }
 
 void exportDiagnosticsPreserveSourceRanges() {
@@ -1068,8 +1144,8 @@ void exportDiagnosticsPreserveSourceRanges() {
   });
 
   MidiSequenceProfileRegistry profiles;
-  const auto wavArtifacts = ExportService().exportCollection(
-      project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, profiles);
+  const auto wavArtifacts = ExportService().exportCollection(project, sources, CollectionId{0},
+                                                             ExportRequest{.kinds = {ExportKind::Wav}}, profiles);
   expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
   expectDiagnosticRange(wavArtifacts[0].diagnostics, "Sample source was not found", missingSampleRange);
 
@@ -1165,6 +1241,7 @@ int main() {
     midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop();
     modulationAnalysisReportsObservedSourceRanges();
     modulationAnalysisReportsObservedMidiControllerRanges();
+    observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();

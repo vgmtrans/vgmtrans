@@ -11,6 +11,7 @@
 #include "value/export/MidiExporter.h"
 #include "value/core/ModulationAnalysis.h"
 #include "value/core/SampleDecoder.h"
+#include "value/export/ModulationScaling.h"
 #include "value/export/SoundFontExporter.h"
 #include "value/export/WavExporter.h"
 
@@ -68,9 +69,7 @@ struct SynthExportAssets {
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] SynthExportAssets collectSynthExportAssets(
-    const Project& project,
-    const Collection& collection) {
+[[nodiscard]] SynthExportAssets collectSynthExportAssets(const Project& project, const Collection& collection) {
   SynthExportAssets assets;
   assets.instrumentSets.reserve(collection.instrumentSets.size());
   assets.sampleCollections.reserve(collection.sampleCollections.size());
@@ -94,9 +93,7 @@ struct SynthExportAssets {
   return assets;
 }
 
-[[nodiscard]] const SequenceAsset* collectionSequence(
-    const Project& project,
-    const Collection& collection) {
+[[nodiscard]] const SequenceAsset* collectionSequence(const Project& project, const Collection& collection) {
   if (!collection.sequence) {
     return nullptr;
   }
@@ -105,15 +102,12 @@ struct SynthExportAssets {
 }
 
 [[nodiscard]] std::string midiSequenceProfileName(const SequenceAsset& sequence) {
-  return sequence.commandSequence.midiSequenceProfile.empty()
-             ? sequence.metadata.format
-             : sequence.commandSequence.midiSequenceProfile;
+  return sequence.commandSequence.midiSequenceProfile.empty() ? sequence.metadata.format
+                                                              : sequence.commandSequence.midiSequenceProfile;
 }
 
 [[nodiscard]] std::optional<MidiModulationUsage> collectionMidiModulationUsage(
-    const Project& project,
-    const Collection& collection,
-    const MidiSequenceProfileRegistry& profiles,
+    const Project& project, const Collection& collection, const MidiSequenceProfileRegistry& profiles,
     LoopPolicy loopPolicy) {
   const auto* sequence = collectionSequence(project, collection);
   if (sequence == nullptr) {
@@ -164,6 +158,12 @@ struct SynthExportAssets {
   }
 
   auto midiSequence = MidiSequenceBuilder().build(sequence->commandSequence, *profile, request.loopPolicy);
+  if (request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
+    const auto usage = analyzeMidiModulationUsage(midiSequence);
+    if (hasMidiModulationUsage(usage)) {
+      applyMidiModulationScaling(midiSequence, usage, request.synthModulationScaling);
+    }
+  }
   auto bytes = MidiExporter().exportMidi(midiSequence);
 
   return Artifact{
