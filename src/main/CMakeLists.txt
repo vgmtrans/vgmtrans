@@ -131,13 +131,18 @@ target_sources(vgmtransvaluecore
     FILES
       ${PROJECT_SOURCE_DIR}/src/value/core/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/MetadataModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/MidiModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Model.h
       ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceBuilder.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Session.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Source.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SynthModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SynthMath.h
       ${PROJECT_SOURCE_DIR}/src/value/export/DlsExporter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
