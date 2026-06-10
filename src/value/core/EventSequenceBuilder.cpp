@@ -233,6 +233,68 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
   return std::nullopt;
 }
 
+// Immediate commands apply at the current tick without advancing time or changing track position.
+template <typename T>
+inline constexpr bool kImmediateCommand =
+    std::is_same_v<T, NoteStateCommand> ||
+    std::is_same_v<T, DurationCommand> ||
+    std::is_same_v<T, TransposeCommand> ||
+    std::is_same_v<T, GlobalTransposeCommand> ||
+    std::is_same_v<T, TempoCommand> ||
+    std::is_same_v<T, ProgramCommand> ||
+    std::is_same_v<T, VolumeCommand> ||
+    std::is_same_v<T, PanCommand> ||
+    std::is_same_v<T, MasterVolumeCommand> ||
+    std::is_same_v<T, ReverbCommand> ||
+    std::is_same_v<T, TuningCommand> ||
+    std::is_same_v<T, PortamentoCommand> ||
+    std::is_same_v<T, LfoCommand> ||
+    std::is_same_v<T, EnvelopeCommand> ||
+    std::is_same_v<T, DriverSpecificCommand>;
+
+template <typename T>
+[[nodiscard]] std::vector<Event> interpretImmediateCommand(
+    const T& command,
+    const SequencerProfile& profile,
+    TrackState& state) {
+  if constexpr (std::is_same_v<T, NoteStateCommand>) {
+    return profile.interpretNoteState(command, state);
+  } else if constexpr (std::is_same_v<T, DurationCommand>) {
+    profile.applyDuration(command, state);
+    return {};
+  } else if constexpr (std::is_same_v<T, TransposeCommand>) {
+    profile.applyTranspose(command, state);
+    return {};
+  } else if constexpr (std::is_same_v<T, GlobalTransposeCommand>) {
+    state.globalTranspose = command.rawSemitones;
+    return {};
+  } else if constexpr (std::is_same_v<T, TempoCommand>) {
+    return profile.interpretTempo(command, state);
+  } else if constexpr (std::is_same_v<T, ProgramCommand>) {
+    return profile.interpretProgram(command, state);
+  } else if constexpr (std::is_same_v<T, VolumeCommand>) {
+    return profile.interpretVolume(command, state);
+  } else if constexpr (std::is_same_v<T, PanCommand>) {
+    return profile.interpretPan(command, state);
+  } else if constexpr (std::is_same_v<T, MasterVolumeCommand>) {
+    return profile.interpretMasterVolume(command, state);
+  } else if constexpr (std::is_same_v<T, ReverbCommand>) {
+    return profile.interpretReverb(command, state);
+  } else if constexpr (std::is_same_v<T, TuningCommand>) {
+    return profile.interpretTuning(command, state);
+  } else if constexpr (std::is_same_v<T, PortamentoCommand>) {
+    return profile.interpretPortamento(command, state);
+  } else if constexpr (std::is_same_v<T, LfoCommand>) {
+    return profile.interpretLfo(command, state);
+  } else if constexpr (std::is_same_v<T, EnvelopeCommand>) {
+    return profile.interpretEnvelope(command, state);
+  } else if constexpr (std::is_same_v<T, DriverSpecificCommand>) {
+    return profile.interpretDriverSpecific(command, state);
+  } else {
+    static_assert(kImmediateCommand<T>, "unhandled immediate command type");
+  }
+}
+
 }  // namespace
 
 void SequencerProfile::beginTrack(
@@ -496,36 +558,8 @@ EventSequence EventSequenceBuilder::build(
               state.tick += timing.advanceTicks;
             } else if constexpr (std::is_same_v<TypedCommand, RestCommand>) {
               state.tick += profile.restTicks(typedCommand, state);
-            } else if constexpr (std::is_same_v<TypedCommand, NoteStateCommand>) {
-              appendEvents(eventTrack.events, profile.interpretNoteState(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, DurationCommand>) {
-              profile.applyDuration(typedCommand, state);
-            } else if constexpr (std::is_same_v<TypedCommand, TransposeCommand>) {
-              profile.applyTranspose(typedCommand, state);
-            } else if constexpr (std::is_same_v<TypedCommand, GlobalTransposeCommand>) {
-              state.globalTranspose = typedCommand.rawSemitones;
-            } else if constexpr (std::is_same_v<TypedCommand, TempoCommand>) {
-              appendEvents(eventTrack.events, profile.interpretTempo(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, ProgramCommand>) {
-              appendEvents(eventTrack.events, profile.interpretProgram(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, VolumeCommand>) {
-              appendEvents(eventTrack.events, profile.interpretVolume(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, PanCommand>) {
-              appendEvents(eventTrack.events, profile.interpretPan(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, MasterVolumeCommand>) {
-              appendEvents(eventTrack.events, profile.interpretMasterVolume(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, ReverbCommand>) {
-              appendEvents(eventTrack.events, profile.interpretReverb(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, TuningCommand>) {
-              appendEvents(eventTrack.events, profile.interpretTuning(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, PortamentoCommand>) {
-              appendEvents(eventTrack.events, profile.interpretPortamento(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, LfoCommand>) {
-              appendEvents(eventTrack.events, profile.interpretLfo(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, EnvelopeCommand>) {
-              appendEvents(eventTrack.events, profile.interpretEnvelope(typedCommand, state));
-            } else if constexpr (std::is_same_v<TypedCommand, DriverSpecificCommand>) {
-              appendEvents(eventTrack.events, profile.interpretDriverSpecific(typedCommand, state));
+            } else if constexpr (kImmediateCommand<TypedCommand>) {
+              appendEvents(eventTrack.events, interpretImmediateCommand(typedCommand, profile, state));
             } else if constexpr (std::is_same_v<TypedCommand, RepeatCommand>) {
               if (typedCommand.slot >= state.repeatCounters.size()) {
                 result.diagnostics.push_back(warning("Repeat command uses an unsupported repeat slot",
