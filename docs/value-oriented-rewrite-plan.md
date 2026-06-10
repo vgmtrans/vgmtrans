@@ -189,8 +189,8 @@ prefer adding a source-level command or a small analysis pass over making
 
 ## Modulation
 
-Vibrato and tremolo need a more explicit model than the current generic
-`LfoCommand`.
+Vibrato and tremolo should stay explicit in the source command model rather than
+being hidden behind a generic LFO command.
 
 The source model should represent modulation as driver-level intent:
 
@@ -403,7 +403,8 @@ The branch should not be considered ready until:
 
 ### Phase 3: Add Modulation Policy And Analysis
 
-- Replace or extend `LfoCommand` with explicit vibrato/tremolo source commands.
+- Continue refining explicit vibrato/tremolo/rate source commands where formats
+  need more detail.
 - Add `ModulationUsage` analysis.
 - Thread modulation analysis into SF2/DLS synth export.
 - Add export policy for synth modulators versus explicit MIDI events.

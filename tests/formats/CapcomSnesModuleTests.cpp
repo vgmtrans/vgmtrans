@@ -156,10 +156,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "track should decode volume command");
   expect(std::holds_alternative<PanCommand>(sequence->commandSequence.tracks[0].commands[3]),
          "track should decode pan command");
-  expect(std::holds_alternative<LfoCommand>(sequence->commandSequence.tracks[0].commands[4]),
-         "track should decode LFO command");
-  expect(std::holds_alternative<LfoCommand>(sequence->commandSequence.tracks[0].commands[5]),
-         "track should decode LFO rate command");
+  expect(std::holds_alternative<VibratoCommand>(sequence->commandSequence.tracks[0].commands[4]),
+         "track should decode vibrato command");
+  expect(std::holds_alternative<ModulationRateCommand>(sequence->commandSequence.tracks[0].commands[5]),
+         "track should decode modulation rate command");
   expect(std::holds_alternative<NoteCommand>(sequence->commandSequence.tracks[0].commands[6]),
          "track should decode note command");
   expect(std::holds_alternative<EndCommand>(sequence->commandSequence.tracks[0].commands[7]),
@@ -224,13 +224,13 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::holds_alternative<Expression>(midiSequence.tracks[0].events[7]),
          "CapcomSnes pan emission should include expression compensation");
   expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[8]).value == 0,
-         "CapcomSnes LFO type 0 should store vibrato depth but emit zero while rate is disabled");
+         "CapcomSnes vibrato command should store depth but emit zero while modulation rate is disabled");
   expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[9]).value == 0x20,
-         "CapcomSnes LFO rate should emit stored vibrato depth when output becomes enabled");
+         "CapcomSnes modulation rate should emit stored vibrato depth when output becomes enabled");
   expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[10]),
-         "CapcomSnes LFO rate should map to vibrato frequency");
+         "CapcomSnes modulation rate should map to vibrato frequency");
   expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[11]),
-         "CapcomSnes LFO rate should map to tremolo frequency");
+         "CapcomSnes modulation rate should map to tremolo frequency");
   expect(std::get<NoteDuration>(midiSequence.tracks[0].events[12]).duration == 6,
          "CapcomSnes note length index should map to ticks");
   expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[13]).tick == 6,
@@ -306,7 +306,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(envelope.decay == kEnvelopeInfinite, "instrument envelope should preserve infinite SNES sustain decay");
   expect(envelope.sustain == 1000, "instrument envelope should convert SNES sustain to a linear amplitude level");
   expect(envelope.release == 0, "instrument envelope should match Capcom legacy gain-based release handling");
-  expect(instrument.generators.size() == 2, "instrument should carry legacy LFO generator settings");
+  expect(instrument.generators.size() == 2, "instrument should carry legacy modulation generator settings");
   expect(instrument.generators[0].destination == SynthDestination::VibratoRate &&
              instrument.generators[0].amount == -8479,
          "instrument should carry legacy vibrato base frequency");

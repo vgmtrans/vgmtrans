@@ -322,16 +322,31 @@ CommandTrack decodeCapcomSnesTrack(
         if (!cursor.has(2)) {
           return finishTruncated();
         }
-        const u8 lfoType = cursor.readU8();
-        const u8 lfoAmount = cursor.readU8();
-        track.commands.push_back(LfoCommand{
-            .target = lfoType == 0 ? LfoTarget::Pitch
-                      : lfoType == 1 ? LfoTarget::Volume
-                                     : LfoTarget::Unknown,
-            .rawType = lfoType,
-            .rawAmount = lfoAmount,
-            .range = cursor.rangeFrom(beginOffset),
-        });
+        const u8 modulationType = cursor.readU8();
+        const u8 modulationValue = cursor.readU8();
+        switch (modulationType) {
+          case 0:
+            track.commands.push_back(VibratoCommand{
+                .rawDepth = modulationValue,
+                .range = cursor.rangeFrom(beginOffset),
+            });
+            break;
+          case 1:
+            track.commands.push_back(TremoloCommand{
+                .rawDepth = modulationValue,
+                .range = cursor.rangeFrom(beginOffset),
+            });
+            break;
+          case 2:
+            track.commands.push_back(ModulationRateCommand{
+                .rawRate = modulationValue,
+                .range = cursor.rangeFrom(beginOffset),
+            });
+            break;
+          default:
+            track.commands.push_back(driverCommand("Unknown Modulation", reader, beginOffset, 3));
+            break;
+        }
         break;
       }
       case 0x1b:

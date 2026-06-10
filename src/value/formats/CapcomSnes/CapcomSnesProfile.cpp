@@ -88,7 +88,7 @@ void applyNoteAttributes(u8 attributes, MidiTrackState& state) {
   state.noteSlurred = (attributes & kNoteSlurredMask) != 0;
 }
 
-void addLfoDepthEvents(std::vector<MidiEvent>& events, const MidiTrackState& state, bool enabled) {
+void addModulationDepthEvents(std::vector<MidiEvent>& events, const MidiTrackState& state, bool enabled) {
   if (state.vibratoDepth != 0) {
     events.push_back(VibratoDepth{
         .tick = state.tick,
@@ -350,53 +350,55 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretPortamento(
   return {};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretLfo(
-    const LfoCommand& command,
+std::vector<MidiEvent> CapcomSnesProfile::interpretVibrato(
+    const VibratoCommand& command,
     MidiTrackState& state) const {
-  switch (command.rawType) {
-    case 0:
-      state.vibratoDepth = static_cast<u8>(command.rawAmount & 0x7f);
-      return {VibratoDepth{
-          .tick = state.tick,
-          .channel = state.channel,
-          .value = static_cast<u8>(state.lfoRate != 0 ? state.vibratoDepth : 0),
-      }};
-    case 1:
-      state.tremoloDepth = ::capcom_snes::tremoloDepthToMidiValue(
-          static_cast<int>(command.rawAmount), version_ == CapcomSnesEngineVersion::v1BgmInList);
-      return {TremoloDepth{
-          .tick = state.tick,
-          .channel = state.channel,
-          .value = static_cast<u8>(state.lfoRate != 0 ? state.tremoloDepth : 0),
-      }};
-    case 2: {
-      std::vector<MidiEvent> events;
-      const bool wasEnabled = state.lfoRate != 0;
-      state.lfoRate = command.rawAmount;
-      const bool isEnabled = state.lfoRate != 0;
-      // Depth commands latch silently until a nonzero LFO rate enables output.
-      if (!isEnabled && wasEnabled) {
-        addLfoDepthEvents(events, state, false);
-      } else if (isEnabled && !wasEnabled) {
-        addLfoDepthEvents(events, state, true);
-      }
+  state.vibratoDepth = static_cast<u8>(command.rawDepth & 0x7f);
+  return {VibratoDepth{
+      .tick = state.tick,
+      .channel = state.channel,
+      .value = static_cast<u8>(state.modulationRate != 0 ? state.vibratoDepth : 0),
+  }};
+}
 
-      const u8 rate = ::capcom_snes::lfoRateByteToMidiValue(static_cast<u8>(command.rawAmount));
-      events.push_back(VibratoFrequency{
-          .tick = state.tick,
-          .channel = state.channel,
-          .value = rate,
-      });
-      events.push_back(TremoloFrequency{
-          .tick = state.tick,
-          .channel = state.channel,
-          .value = rate,
-      });
-      return events;
-    }
-    default:
-      return {};
+std::vector<MidiEvent> CapcomSnesProfile::interpretTremolo(
+    const TremoloCommand& command,
+    MidiTrackState& state) const {
+  state.tremoloDepth = ::capcom_snes::tremoloDepthToMidiValue(
+      static_cast<int>(command.rawDepth), version_ == CapcomSnesEngineVersion::v1BgmInList);
+  return {TremoloDepth{
+      .tick = state.tick,
+      .channel = state.channel,
+      .value = static_cast<u8>(state.modulationRate != 0 ? state.tremoloDepth : 0),
+  }};
+}
+
+std::vector<MidiEvent> CapcomSnesProfile::interpretModulationRate(
+    const ModulationRateCommand& command,
+    MidiTrackState& state) const {
+  std::vector<MidiEvent> events;
+  const bool wasEnabled = state.modulationRate != 0;
+  state.modulationRate = static_cast<u8>(command.rawRate);
+  const bool isEnabled = state.modulationRate != 0;
+  // Depth commands latch silently until a nonzero modulation rate enables output.
+  if (!isEnabled && wasEnabled) {
+    addModulationDepthEvents(events, state, false);
+  } else if (isEnabled && !wasEnabled) {
+    addModulationDepthEvents(events, state, true);
   }
+
+  const u8 rate = ::capcom_snes::lfoRateByteToMidiValue(static_cast<u8>(command.rawRate));
+  events.push_back(VibratoFrequency{
+      .tick = state.tick,
+      .channel = state.channel,
+      .value = rate,
+  });
+  events.push_back(TremoloFrequency{
+      .tick = state.tick,
+      .channel = state.channel,
+      .value = rate,
+  });
+  return events;
 }
 
 std::vector<MidiEvent> CapcomSnesProfile::interpretRepeatBreak(

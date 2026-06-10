@@ -76,8 +76,16 @@ namespace {
   return "Portamento";
 }
 
-[[nodiscard]] std::string_view defaultCommandName(const LfoCommand&) {
-  return "LFO";
+[[nodiscard]] std::string_view defaultCommandName(const VibratoCommand&) {
+  return "Vibrato";
+}
+
+[[nodiscard]] std::string_view defaultCommandName(const TremoloCommand&) {
+  return "Tremolo";
+}
+
+[[nodiscard]] std::string_view defaultCommandName(const ModulationRateCommand&) {
+  return "Modulation Rate";
 }
 
 [[nodiscard]] std::string_view defaultCommandName(const ReverbCommand&) {
@@ -182,8 +190,16 @@ namespace {
   return "portamento";
 }
 
-[[nodiscard]] std::string_view defaultCommandDetailKind(const LfoCommand&) {
-  return "lfo";
+[[nodiscard]] std::string_view defaultCommandDetailKind(const VibratoCommand&) {
+  return "vibrato";
+}
+
+[[nodiscard]] std::string_view defaultCommandDetailKind(const TremoloCommand&) {
+  return "tremolo";
+}
+
+[[nodiscard]] std::string_view defaultCommandDetailKind(const ModulationRateCommand&) {
+  return "modulation-rate";
 }
 
 [[nodiscard]] std::string_view defaultCommandDetailKind(const ReverbCommand&) {
@@ -288,8 +304,16 @@ namespace {
   return fmt::format("Time {}", command.rawTime);
 }
 
-[[nodiscard]] std::string defaultCommandDescription(const LfoCommand& command) {
-  return fmt::format("Type {}, amount {}", command.rawType, command.rawAmount);
+[[nodiscard]] std::string defaultCommandDescription(const VibratoCommand& command) {
+  return fmt::format("Depth {}", command.rawDepth);
+}
+
+[[nodiscard]] std::string defaultCommandDescription(const TremoloCommand& command) {
+  return fmt::format("Depth {}", command.rawDepth);
+}
+
+[[nodiscard]] std::string defaultCommandDescription(const ModulationRateCommand& command) {
+  return fmt::format("Rate {}", command.rawRate);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const ReverbCommand& command) {

@@ -81,13 +81,6 @@ struct InstrumentRef {
   std::optional<SourceRange> range;
 };
 
-enum class LfoTarget {
-  Pitch,
-  Volume,
-  Pan,
-  Unknown,
-};
-
 struct NoteCommand {
   u32 key = 0;
   u32 rawVelocity = 0;
@@ -161,10 +154,18 @@ struct PortamentoCommand {
   SourceRange range;
 };
 
-struct LfoCommand {
-  LfoTarget target = LfoTarget::Unknown;
-  u32 rawType = 0;
-  u32 rawAmount = 0;
+struct VibratoCommand {
+  u32 rawDepth = 0;
+  SourceRange range;
+};
+
+struct TremoloCommand {
+  u32 rawDepth = 0;
+  SourceRange range;
+};
+
+struct ModulationRateCommand {
+  u32 rawRate = 0;
   SourceRange range;
 };
 
@@ -240,7 +241,9 @@ using Command = std::variant<
     GlobalTransposeCommand,
     TuningCommand,
     PortamentoCommand,
-    LfoCommand,
+    VibratoCommand,
+    TremoloCommand,
+    ModulationRateCommand,
     ReverbCommand,
     EnvelopeCommand,
     MasterVolumeCommand,

@@ -137,8 +137,12 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
             state.globalTranspose = typedCommand.rawSemitones;
           } else if constexpr (std::is_same_v<TypedCommand, PortamentoCommand>) {
             static_cast<void>(profile.interpretPortamento(typedCommand, state));
-          } else if constexpr (std::is_same_v<TypedCommand, LfoCommand>) {
-            static_cast<void>(profile.interpretLfo(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, VibratoCommand>) {
+            static_cast<void>(profile.interpretVibrato(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, TremoloCommand>) {
+            static_cast<void>(profile.interpretTremolo(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, ModulationRateCommand>) {
+            static_cast<void>(profile.interpretModulationRate(typedCommand, state));
           } else if constexpr (std::is_same_v<TypedCommand, DriverSpecificCommand>) {
             static_cast<void>(profile.interpretDriverSpecific(typedCommand, state));
           } else if constexpr (std::is_same_v<TypedCommand, RepeatCommand>) {
@@ -248,7 +252,9 @@ inline constexpr bool kImmediateCommand =
     std::is_same_v<T, ReverbCommand> ||
     std::is_same_v<T, TuningCommand> ||
     std::is_same_v<T, PortamentoCommand> ||
-    std::is_same_v<T, LfoCommand> ||
+    std::is_same_v<T, VibratoCommand> ||
+    std::is_same_v<T, TremoloCommand> ||
+    std::is_same_v<T, ModulationRateCommand> ||
     std::is_same_v<T, EnvelopeCommand> ||
     std::is_same_v<T, DriverSpecificCommand>;
 
@@ -284,8 +290,12 @@ template <typename T>
     return profile.interpretTuning(command, state);
   } else if constexpr (std::is_same_v<T, PortamentoCommand>) {
     return profile.interpretPortamento(command, state);
-  } else if constexpr (std::is_same_v<T, LfoCommand>) {
-    return profile.interpretLfo(command, state);
+  } else if constexpr (std::is_same_v<T, VibratoCommand>) {
+    return profile.interpretVibrato(command, state);
+  } else if constexpr (std::is_same_v<T, TremoloCommand>) {
+    return profile.interpretTremolo(command, state);
+  } else if constexpr (std::is_same_v<T, ModulationRateCommand>) {
+    return profile.interpretModulationRate(command, state);
   } else if constexpr (std::is_same_v<T, EnvelopeCommand>) {
     return profile.interpretEnvelope(command, state);
   } else if constexpr (std::is_same_v<T, DriverSpecificCommand>) {
@@ -412,24 +422,42 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretPortamento(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretLfo(
-    const LfoCommand& command,
+std::vector<MidiEvent> MidiSequenceProfile::interpretVibrato(
+    const VibratoCommand& command,
     MidiTrackState& state) const {
-  if (command.target == LfoTarget::Pitch) {
-    return {VibratoDepth{
-        .tick = state.tick,
-        .channel = state.channel,
-        .value = static_cast<u8>(std::min<u32>(command.rawAmount, 127)),
-    }};
-  }
-  if (command.target == LfoTarget::Volume) {
-    return {TremoloDepth{
-        .tick = state.tick,
-        .channel = state.channel,
-        .value = static_cast<u8>(std::min<u32>(command.rawAmount, 127)),
-    }};
-  }
-  return {};
+  return {VibratoDepth{
+      .tick = state.tick,
+      .channel = state.channel,
+      .value = static_cast<u8>(std::min<u32>(command.rawDepth, 127)),
+  }};
+}
+
+std::vector<MidiEvent> MidiSequenceProfile::interpretTremolo(
+    const TremoloCommand& command,
+    MidiTrackState& state) const {
+  return {TremoloDepth{
+      .tick = state.tick,
+      .channel = state.channel,
+      .value = static_cast<u8>(std::min<u32>(command.rawDepth, 127)),
+  }};
+}
+
+std::vector<MidiEvent> MidiSequenceProfile::interpretModulationRate(
+    const ModulationRateCommand& command,
+    MidiTrackState& state) const {
+  const auto value = static_cast<u8>(std::min<u32>(command.rawRate, 127));
+  return {
+      VibratoFrequency{
+          .tick = state.tick,
+          .channel = state.channel,
+          .value = value,
+      },
+      TremoloFrequency{
+          .tick = state.tick,
+          .channel = state.channel,
+          .value = value,
+      },
+  };
 }
 
 std::vector<MidiEvent> MidiSequenceProfile::interpretEnvelope(

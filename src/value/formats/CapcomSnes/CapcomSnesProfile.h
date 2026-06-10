@@ -58,8 +58,14 @@ class CapcomSnesProfile final : public core::MidiSequenceProfile {
   [[nodiscard]] std::vector<core::MidiEvent> interpretPortamento(
       const core::PortamentoCommand& command,
       core::MidiTrackState& state) const override;
-  [[nodiscard]] std::vector<core::MidiEvent> interpretLfo(
-      const core::LfoCommand& command,
+  [[nodiscard]] std::vector<core::MidiEvent> interpretVibrato(
+      const core::VibratoCommand& command,
+      core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretTremolo(
+      const core::TremoloCommand& command,
+      core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretModulationRate(
+      const core::ModulationRateCommand& command,
       core::MidiTrackState& state) const override;
   [[nodiscard]] std::vector<core::MidiEvent> interpretRepeatBreak(
       const core::RepeatBreakCommand& command,

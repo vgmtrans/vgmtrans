@@ -25,7 +25,7 @@ struct MidiTrackState {
   u32 durationRate = 0;
   s32 transpose = 0;
   s32 globalTranspose = 0;
-  u8 lfoRate = 0;
+  u8 modulationRate = 0;
   u8 vibratoDepth = 0;
   u8 tremoloDepth = 0;
   double portamentoMillisecondsPerCent = 0.0;
@@ -80,8 +80,12 @@ class MidiSequenceProfile {
       const TuningCommand& command, const MidiTrackState& state) const;
   [[nodiscard]] virtual std::vector<MidiEvent> interpretPortamento(
       const PortamentoCommand& command, MidiTrackState& state) const;
-  [[nodiscard]] virtual std::vector<MidiEvent> interpretLfo(
-      const LfoCommand& command, MidiTrackState& state) const;
+  [[nodiscard]] virtual std::vector<MidiEvent> interpretVibrato(
+      const VibratoCommand& command, MidiTrackState& state) const;
+  [[nodiscard]] virtual std::vector<MidiEvent> interpretTremolo(
+      const TremoloCommand& command, MidiTrackState& state) const;
+  [[nodiscard]] virtual std::vector<MidiEvent> interpretModulationRate(
+      const ModulationRateCommand& command, MidiTrackState& state) const;
   [[nodiscard]] virtual std::vector<MidiEvent> interpretEnvelope(
       const EnvelopeCommand& command, const MidiTrackState& state) const;
   [[nodiscard]] virtual std::vector<MidiEvent> interpretDriverSpecific(
