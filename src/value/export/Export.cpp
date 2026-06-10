@@ -7,6 +7,7 @@
 #include "value/export/Export.h"
 
 #include "value/export/DlsExporter.h"
+#include "value/export/ExportDiagnostics.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/SampleDecoder.h"
 #include "value/export/SoundFontExporter.h"
@@ -17,28 +18,12 @@
 #include <exception>
 #include <filesystem>
 #include <iterator>
-#include <optional>
 #include <string>
 #include <utility>
 
 namespace vgmtrans::core {
 
 namespace {
-
-[[nodiscard]] std::optional<SourceRange> diagnosticRange(SourceRange range) {
-  if (!range.valid()) {
-    return std::nullopt;
-  }
-  return range;
-}
-
-[[nodiscard]] Diagnostic exportError(std::string message, std::optional<SourceRange> range = std::nullopt) {
-  return Diagnostic{
-      .severity = Severity::Error,
-      .message = std::move(message),
-      .range = range,
-  };
-}
 
 [[nodiscard]] std::string artifactBaseName(const Collection& collection) {
   if (!collection.name.empty()) {
@@ -186,15 +171,15 @@ struct SynthExportAssets {
         // Sample bytes stay in SourceStore so WAV export can report source-backed decode errors.
         if (!sources.contains(sample.encodedData.source)) {
           artifact.diagnostics.push_back(
-              exportError("Sample source was not found", diagnosticRange(sample.encodedData)));
+              exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
         } else if (auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source))) {
           artifact.bytes = exporter.exportPcm16(*decoded);
         } else {
           artifact.diagnostics.push_back(
-              exportError("No decoder registered for sample codec", diagnosticRange(sample.encodedData)));
+              exportError("No decoder registered for sample codec", validDiagnosticRange(sample.encodedData)));
         }
       } catch (const std::exception& ex) {
-        artifact.diagnostics.push_back(exportError(ex.what(), diagnosticRange(sample.encodedData)));
+        artifact.diagnostics.push_back(exportError(ex.what(), validDiagnosticRange(sample.encodedData)));
       }
 
       artifacts.push_back(std::move(artifact));

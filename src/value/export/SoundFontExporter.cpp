@@ -6,6 +6,8 @@
 
 #include "value/export/SoundFontExporter.h"
 
+#include "value/export/ExportDiagnostics.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -103,29 +105,6 @@ struct SfModulatorRecord {
   u16 destination = 0;
   s16 amount = 0;
 };
-
-[[nodiscard]] std::optional<SourceRange> diagnosticRange(SourceRange range) {
-  if (!range.valid()) {
-    return std::nullopt;
-  }
-  return range;
-}
-
-[[nodiscard]] Diagnostic exportError(std::string message, std::optional<SourceRange> range = std::nullopt) {
-  return Diagnostic{
-      .severity = Severity::Error,
-      .message = std::move(message),
-      .range = range,
-  };
-}
-
-[[nodiscard]] Diagnostic exportWarning(std::string message, std::optional<SourceRange> range = std::nullopt) {
-  return Diagnostic{
-      .severity = Severity::Warning,
-      .message = std::move(message),
-      .range = range,
-  };
-}
 
 void writeAscii(std::vector<u8>& bytes, std::string_view text) {
   bytes.insert(bytes.end(), text.begin(), text.end());
@@ -474,18 +453,18 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     for (u32 sampleIndex = 0; sampleIndex < collection->samples.samples.size(); ++sampleIndex) {
       const auto& sample = collection->samples.samples[sampleIndex];
       if (!sources.contains(sample.encodedData.source)) {
-        diagnostics.push_back(exportError("Sample source was not found", diagnosticRange(sample.encodedData)));
+        diagnostics.push_back(exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
         continue;
       }
 
       auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source));
       if (!decoded) {
-        diagnostics.push_back(exportError("No decoder registered for sample codec", diagnosticRange(sample.encodedData)));
+        diagnostics.push_back(exportError("No decoder registered for sample codec", validDiagnosticRange(sample.encodedData)));
         continue;
       }
       if (decoded->channels != 1) {
         diagnostics.push_back(
-            exportWarning("Skipping non-mono sample for SoundFont2 export", diagnosticRange(sample.encodedData)));
+            exportWarning("Skipping non-mono sample for SoundFont2 export", validDiagnosticRange(sample.encodedData)));
         continue;
       }
 
@@ -552,13 +531,13 @@ using SampleIndexKey = std::pair<u32, u32>;
         const std::optional<AssetId> collectionId =
             region.sample.collection ? region.sample.collection : fallbackCollection;
         if (!collectionId) {
-          diagnostics.push_back(exportError("Region does not reference a sample collection", diagnosticRange(region.range)));
+          diagnostics.push_back(exportError("Region does not reference a sample collection", validDiagnosticRange(region.range)));
           continue;
         }
 
         const auto found = samples.find({collectionId->value, region.sample.index});
         if (found == samples.end()) {
-          diagnostics.push_back(exportError("Region sample reference was not found", diagnosticRange(region.range)));
+          diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
           continue;
         }
 
