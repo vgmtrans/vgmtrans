@@ -2290,9 +2290,9 @@ void legacyLevelReapplicationKeepsPreCurvePrecision() {
 }
 
 int selfTest() {
-  const EventSequence eventSequence{
+  const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {EventTrack{
+      .tracks = {vgmtrans::core::MidiTrack{
           .name = "Parity",
           .events =
               {
@@ -2306,7 +2306,7 @@ int selfTest() {
       }},
   };
 
-  const auto midi = MidiExporter().exportMidi(eventSequence);
+  const auto midi = MidiExporter().exportMidi(midiSequence);
   const auto normalized = normalizeMidi(midi);
 
   expect(

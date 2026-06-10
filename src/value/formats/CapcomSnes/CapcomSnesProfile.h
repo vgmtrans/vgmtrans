@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/EventSequenceBuilder.h"
+#include "value/core/MidiSequenceBuilder.h"
 
 #include <string_view>
 
@@ -21,54 +21,54 @@ enum class CapcomSnesEngineVersion : u8 {
 
 [[nodiscard]] std::string_view capcomSnesProfileName(CapcomSnesEngineVersion version);
 
-class CapcomSnesProfile final : public core::SequencerProfile {
+class CapcomSnesProfile final : public core::MidiSequenceProfile {
  public:
   explicit CapcomSnesProfile(CapcomSnesEngineVersion version = CapcomSnesEngineVersion::v3BgmFixedLocation);
 
-  [[nodiscard]] u32 restTicks(const core::RestCommand& command, core::TrackState& state) const override;
-  [[nodiscard]] core::NoteTiming noteTiming(
+  [[nodiscard]] u32 restTicks(const core::RestCommand& command, core::MidiTrackState& state) const override;
+  [[nodiscard]] core::MidiNoteTiming noteTiming(
       const core::NoteCommand& command,
-      core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretNoteState(
+      core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretNoteState(
       const core::NoteStateCommand& command,
-      core::TrackState& state) const override;
-  void applyDuration(const core::DurationCommand& command, core::TrackState& state) const override;
+      core::MidiTrackState& state) const override;
+  void applyDuration(const core::DurationCommand& command, core::MidiTrackState& state) const override;
 
-  [[nodiscard]] std::vector<core::Event> interpretTempo(
+  [[nodiscard]] std::vector<core::MidiEvent> interpretTempo(
       const core::TempoCommand& command,
-      const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretVolume(
+      const core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretVolume(
       const core::VolumeCommand& command,
-      const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretProgram(
+      const core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretProgram(
       const core::ProgramCommand& command,
-      const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretPan(
+      const core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretPan(
       const core::PanCommand& command,
-      const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretMasterVolume(
+      const core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretMasterVolume(
       const core::MasterVolumeCommand& command,
-      const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretReverb(
+      const core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretReverb(
       const core::ReverbCommand& command,
-      const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretTuning(
+      const core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretTuning(
       const core::TuningCommand& command,
-      const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretPortamento(
+      const core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretPortamento(
       const core::PortamentoCommand& command,
-      core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretLfo(
+      core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretLfo(
       const core::LfoCommand& command,
-      core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> interpretRepeatBreak(
+      core::MidiTrackState& state) const override;
+  [[nodiscard]] std::vector<core::MidiEvent> interpretRepeatBreak(
       const core::RepeatBreakCommand& command,
-      core::TrackState& state) const override;
+      core::MidiTrackState& state) const override;
 
  private:
   CapcomSnesEngineVersion version_;
 };
 
-void registerCapcomSnesProfile(core::SequencerProfileRegistry& registry);
+void registerCapcomSnesProfile(core::MidiSequenceProfileRegistry& registry);
 
 }  // namespace vgmtrans::formats::capcom_snes

@@ -413,7 +413,7 @@ SequenceAsset parseCapcomSnesSequence(
           .writeInitialMonoMode = true,
           .defaultLoopPolicy = LoopPolicy::PlayOnce,
       },
-      .sequencerProfile = std::string(capcomSnesProfileName(layout.version)),
+      .midiSequenceProfile = std::string(capcomSnesProfileName(layout.version)),
   };
 
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);

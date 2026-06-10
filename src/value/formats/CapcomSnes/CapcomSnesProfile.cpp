@@ -44,7 +44,7 @@ struct PanControllerValues {
   return 192u >> (7u - rawDuration);
 }
 
-[[nodiscard]] u32 noteTicks(u32 rawDuration, TrackState& state) {
+[[nodiscard]] u32 noteTicks(u32 rawDuration, MidiTrackState& state) {
   u32 length = baseNoteTicks(rawDuration);
   if (state.noteDotted) {
     // Dotted applies once, while triplet mode persists until toggled by command.
@@ -60,7 +60,7 @@ struct PanControllerValues {
   return length;
 }
 
-[[nodiscard]] u32 soundingTicks(u32 length, const TrackState& state) {
+[[nodiscard]] u32 soundingTicks(u32 length, const MidiTrackState& state) {
   u32 duration = length * state.durationRate;
   if (state.noteSlurred || duration == 0) {
     duration = length << 8;
@@ -69,18 +69,18 @@ struct PanControllerValues {
   return duration == 0 ? 1 : duration;
 }
 
-[[nodiscard]] s32 sourceKey(const NoteCommand& command, const TrackState& state) {
+[[nodiscard]] s32 sourceKey(const NoteCommand& command, const MidiTrackState& state) {
   // Keep source pitch separate so portamento distance ignores active transpose like the driver.
   return static_cast<s32>(command.key) - 1 +
          static_cast<s32>(state.noteOctave * 12) +
          (state.noteOctaveUp ? 24 : 0);
 }
 
-[[nodiscard]] u8 midiKey(s32 key, const TrackState& state) {
+[[nodiscard]] u8 midiKey(s32 key, const MidiTrackState& state) {
   return static_cast<u8>(std::clamp<s32>(key + state.globalTranspose + state.transpose, 0, 127));
 }
 
-void applyNoteAttributes(u8 attributes, TrackState& state) {
+void applyNoteAttributes(u8 attributes, MidiTrackState& state) {
   state.noteOctave |= attributes & kNoteOctaveMask;
   state.noteDotted = state.noteDotted || ((attributes & kNoteDottedMask) != 0);
   state.noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
@@ -88,7 +88,7 @@ void applyNoteAttributes(u8 attributes, TrackState& state) {
   state.noteSlurred = (attributes & kNoteSlurredMask) != 0;
 }
 
-void addLfoDepthEvents(std::vector<Event>& events, const TrackState& state, bool enabled) {
+void addLfoDepthEvents(std::vector<MidiEvent>& events, const MidiTrackState& state, bool enabled) {
   if (state.vibratoDepth != 0) {
     events.push_back(VibratoDepth{
         .tick = state.tick,
@@ -162,17 +162,17 @@ std::string_view capcomSnesProfileName(CapcomSnesEngineVersion version) {
 CapcomSnesProfile::CapcomSnesProfile(CapcomSnesEngineVersion version) : version_(version) {
 }
 
-u32 CapcomSnesProfile::restTicks(const RestCommand& command, TrackState& state) const {
+u32 CapcomSnesProfile::restTicks(const RestCommand& command, MidiTrackState& state) const {
   state.didRest = true;
   return noteTicks(command.rawDuration, state);
 }
 
-NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState& state) const {
+MidiNoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, MidiTrackState& state) const {
   const u32 length = noteTicks(command.rawDuration, state);
   const u32 duration = soundingTicks(length, state);
   const s32 key = sourceKey(command, state);
   const bool extendsPrevious = state.lastNoteSlurred && key == state.lastKey && !state.didRest;
-  std::vector<Event> beforeEvents;
+  std::vector<MidiEvent> beforeEvents;
   if (!extendsPrevious && state.portamentoMillisecondsPerCent > 0.0 && state.lastKey >= 0) {
     const auto keyDistance = static_cast<u32>(std::abs(key - state.lastKey));
     const auto portamentoTime =
@@ -196,7 +196,7 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
     state.didRest = false;
   }
   state.lastNoteSlurred = state.noteSlurred;
-  return NoteTiming{
+  return MidiNoteTiming{
       .key = midiKey(key, state),
       .velocity = 127,
       .soundingTicks = duration + (!extendsPrevious && state.noteSlurred ? 1 : 0),
@@ -206,10 +206,10 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
   };
 }
 
-std::vector<Event> CapcomSnesProfile::interpretNoteState(
+std::vector<MidiEvent> CapcomSnesProfile::interpretNoteState(
     const NoteStateCommand& command,
-    TrackState& state) const {
-  std::vector<Event> events;
+    MidiTrackState& state) const {
+  std::vector<MidiEvent> events;
   auto setSlur = [&](bool enabled) {
     if (state.noteSlurred != enabled) {
       state.noteSlurred = enabled;
@@ -254,22 +254,22 @@ std::vector<Event> CapcomSnesProfile::interpretNoteState(
   return events;
 }
 
-void CapcomSnesProfile::applyDuration(const DurationCommand& command, TrackState& state) const {
+void CapcomSnesProfile::applyDuration(const DurationCommand& command, MidiTrackState& state) const {
   state.durationRate = command.rawValue;
 }
 
-std::vector<Event> CapcomSnesProfile::interpretTempo(
+std::vector<MidiEvent> CapcomSnesProfile::interpretTempo(
     const TempoCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {Tempo{
       .tick = state.tick,
       .microsecondsPerQuarter = tempoMicrosecondsPerQuarter(command.rawValue),
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::interpretVolume(
+std::vector<MidiEvent> CapcomSnesProfile::interpretVolume(
     const VolumeCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {Volume14{
       .tick = state.tick,
       .channel = state.channel,
@@ -277,9 +277,9 @@ std::vector<Event> CapcomSnesProfile::interpretVolume(
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::interpretProgram(
+std::vector<MidiEvent> CapcomSnesProfile::interpretProgram(
     const ProgramCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {
       BankSelect{
           .tick = state.tick,
@@ -295,9 +295,9 @@ std::vector<Event> CapcomSnesProfile::interpretProgram(
   };
 }
 
-std::vector<Event> CapcomSnesProfile::interpretPan(
+std::vector<MidiEvent> CapcomSnesProfile::interpretPan(
     const PanCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   const auto panValues = panControllerValues(version_, command.rawValue);
 
   return {
@@ -314,18 +314,18 @@ std::vector<Event> CapcomSnesProfile::interpretPan(
   };
 }
 
-std::vector<Event> CapcomSnesProfile::interpretMasterVolume(
+std::vector<MidiEvent> CapcomSnesProfile::interpretMasterVolume(
     const MasterVolumeCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {MasterVolume{
       .tick = state.tick,
       .value = volume14(version_, static_cast<u8>(command.rawValue)),
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::interpretReverb(
+std::vector<MidiEvent> CapcomSnesProfile::interpretReverb(
     const ReverbCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {Reverb{
       .tick = state.tick,
       .channel = state.channel,
@@ -333,9 +333,9 @@ std::vector<Event> CapcomSnesProfile::interpretReverb(
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::interpretTuning(
+std::vector<MidiEvent> CapcomSnesProfile::interpretTuning(
     const TuningCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {FineTune{
       .tick = state.tick,
       .channel = state.channel,
@@ -343,16 +343,16 @@ std::vector<Event> CapcomSnesProfile::interpretTuning(
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::interpretPortamento(
+std::vector<MidiEvent> CapcomSnesProfile::interpretPortamento(
     const PortamentoCommand& command,
-    TrackState& state) const {
+    MidiTrackState& state) const {
   state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(command.rawTime);
   return {};
 }
 
-std::vector<Event> CapcomSnesProfile::interpretLfo(
+std::vector<MidiEvent> CapcomSnesProfile::interpretLfo(
     const LfoCommand& command,
-    TrackState& state) const {
+    MidiTrackState& state) const {
   switch (command.rawType) {
     case 0:
       state.vibratoDepth = static_cast<u8>(command.rawAmount & 0x7f);
@@ -370,7 +370,7 @@ std::vector<Event> CapcomSnesProfile::interpretLfo(
           .value = static_cast<u8>(state.lfoRate != 0 ? state.tremoloDepth : 0),
       }};
     case 2: {
-      std::vector<Event> events;
+      std::vector<MidiEvent> events;
       const bool wasEnabled = state.lfoRate != 0;
       state.lfoRate = command.rawAmount;
       const bool isEnabled = state.lfoRate != 0;
@@ -399,10 +399,10 @@ std::vector<Event> CapcomSnesProfile::interpretLfo(
   }
 }
 
-std::vector<Event> CapcomSnesProfile::interpretRepeatBreak(
+std::vector<MidiEvent> CapcomSnesProfile::interpretRepeatBreak(
     const RepeatBreakCommand& command,
-    TrackState& state) const {
-  std::vector<Event> events;
+    MidiTrackState& state) const {
+  std::vector<MidiEvent> events;
   const bool wasSlurred = state.noteSlurred;
   applyNoteAttributes(command.rawAttributes, state);
   if (state.noteSlurred != wasSlurred) {
@@ -415,7 +415,7 @@ std::vector<Event> CapcomSnesProfile::interpretRepeatBreak(
   return events;
 }
 
-void registerCapcomSnesProfile(SequencerProfileRegistry& registry) {
+void registerCapcomSnesProfile(MidiSequenceProfileRegistry& registry) {
   registry.add(std::string(kDefaultProfileName), [] {
     return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v3BgmFixedLocation);
   });

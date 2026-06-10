@@ -108,7 +108,7 @@ void addRpn(std::vector<MidiMessage>& messages, u64 tick, u8 channel, u8 paramet
   return bytes;
 }
 
-void addEventMessages(std::vector<MidiMessage>& messages, const Event& event, u64& endTick) {
+void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event, u64& endTick) {
   std::visit(
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
@@ -250,7 +250,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const Event& event, u6
       event);
 }
 
-[[nodiscard]] std::vector<u8> writeTrack(const EventTrack& track) {
+[[nodiscard]] std::vector<u8> writeTrack(const MidiTrack& track) {
   std::vector<MidiMessage> messages;
   u64 endTick = 0;
 
@@ -291,7 +291,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const Event& event, u6
 
 }  // namespace
 
-std::vector<u8> MidiExporter::exportMidi(const EventSequence& sequence) const {
+std::vector<u8> MidiExporter::exportMidi(const MidiSequence& sequence) const {
   std::vector<u8> bytes;
   writeAscii(bytes, "MThd");
   writeBe32(bytes, 6);

@@ -93,7 +93,7 @@ struct SynthExportAssets {
 }
 
 [[nodiscard]] Artifact exportMidi(const Project& project, const Collection& collection, const ExportRequest& request,
-                                  const SequencerProfileRegistry& profiles) {
+                                  const MidiSequenceProfileRegistry& profiles) {
   if (!collection.sequence) {
     return Artifact{
         .filename = artifactBaseName(collection) + ".mid",
@@ -111,27 +111,27 @@ struct SynthExportAssets {
     };
   }
 
-  const std::string profileName = sequence->commandSequence.sequencerProfile.empty()
+  const std::string profileName = sequence->commandSequence.midiSequenceProfile.empty()
                                       ? sequence->metadata.format
-                                      : sequence->commandSequence.sequencerProfile;
-  // Some formats scan as one asset format but need a dialect-specific sequencer profile.
+                                      : sequence->commandSequence.midiSequenceProfile;
+  // Some formats scan as one asset format but need a dialect-specific MIDI sequence profile.
   auto profile = profiles.create(profileName);
   if (!profile) {
     return Artifact{
         .filename = artifactBaseName(collection) + ".mid",
         .mediaType = "audio/midi",
-        .diagnostics = {exportError("No sequencer profile registered for '" + profileName + "'")},
+        .diagnostics = {exportError("No MIDI sequence profile registered for '" + profileName + "'")},
     };
   }
 
-  auto eventSequence = EventSequenceBuilder().build(sequence->commandSequence, *profile, request.loopPolicy);
-  auto bytes = MidiExporter().exportMidi(eventSequence);
+  auto midiSequence = MidiSequenceBuilder().build(sequence->commandSequence, *profile, request.loopPolicy);
+  auto bytes = MidiExporter().exportMidi(midiSequence);
 
   return Artifact{
       .filename = artifactBaseName(collection) + ".mid",
       .mediaType = "audio/midi",
       .bytes = std::move(bytes),
-      .diagnostics = std::move(eventSequence.diagnostics),
+      .diagnostics = std::move(midiSequence.diagnostics),
   };
 }
 
@@ -244,7 +244,7 @@ struct SynthExportAssets {
 
 std::vector<Artifact> ExportService::exportCollection(const Project& project, const SourceStore& sources,
                                                       CollectionId collection, const ExportRequest& request,
-                                                      const SequencerProfileRegistry& profiles) const {
+                                                      const MidiSequenceProfileRegistry& profiles) const {
   const auto* found = collectionById(project, collection);
   if (found == nullptr) {
     return {Artifact{
@@ -283,7 +283,7 @@ std::vector<Artifact> ExportService::exportCollection(const Project& project, co
 
 std::vector<CollectionExport> ExportService::exportAllCollections(const Project& project, const SourceStore& sources,
                                                                   const ExportRequest& request,
-                                                                  const SequencerProfileRegistry& profiles) const {
+                                                                  const MidiSequenceProfileRegistry& profiles) const {
   std::vector<CollectionExport> exports;
   exports.reserve(project.collections.size());
   for (const auto& collection : project.collections) {

@@ -8,7 +8,7 @@
 #include "value/export/Export.h"
 #include "value/core/FormatModule.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/EventSequenceBuilder.h"
+#include "value/core/MidiSequenceBuilder.h"
 #include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
 #include "value/export/SoundFontExporter.h"
@@ -492,9 +492,9 @@ void snesBrrDecoderProducesPcm() {
 }
 
 void midiExporterWritesStandardMidiFile() {
-  const EventSequence eventSequence{
+  const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {EventTrack{
+      .tracks = {MidiTrack{
           .name = "Lead",
           .events =
               {
@@ -515,11 +515,11 @@ void midiExporterWritesStandardMidiFile() {
       0x90, 0x3c, 0x64, 0x0c, 0xb0, 0x0a, 0x40, 0x0c, 0x80, 0x3c, 0x00, 0x00, 0xff, 0x2f, 0x00,
   };
 
-  const auto exported = MidiExporter().exportMidi(eventSequence);
+  const auto exported = MidiExporter().exportMidi(midiSequence);
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
 }
 
-void eventSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
+void midiSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -538,20 +538,20 @@ void eventSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
       }},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(commandSequence, SequencerProfile{}, LoopPolicy::PlayOnce);
-  const auto& events = eventSequence.tracks[0].events;
-  expect(std::ranges::any_of(events, [](const Event& event) {
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const auto& events = midiSequence.tracks[0].events;
+  expect(std::ranges::any_of(events, [](const MidiEvent& event) {
            const auto* note = std::get_if<NoteDuration>(&event);
            return note != nullptr && note->tick == 0 && note->duration == 12;
          }),
          "play-once loop fixture should emit the note before the loop boundary");
-  expect(std::ranges::none_of(events, [](const Event& event) {
+  expect(std::ranges::none_of(events, [](const MidiEvent& event) {
            return std::holds_alternative<Volume>(event);
          }),
          "play-once event build should skip commands exactly at the loop boundary");
 }
 
-void eventSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
+void midiSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -568,10 +568,10 @@ void eventSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
       }},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(commandSequence, SequencerProfile{}, LoopPolicy::Default);
-  const auto& events = eventSequence.tracks[0].events;
-  expect(eventSequence.diagnostics.empty(), "unset default loop policy should not run until command cap");
-  expect(std::ranges::count_if(events, [](const Event& event) {
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::Default);
+  const auto& events = midiSequence.tracks[0].events;
+  expect(midiSequence.diagnostics.empty(), "unset default loop policy should not run until command cap");
+  expect(std::ranges::count_if(events, [](const MidiEvent& event) {
            return std::holds_alternative<NoteDuration>(event);
          }) == 1,
          "unset default loop policy should build self-looping tracks once");
@@ -579,7 +579,7 @@ void eventSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
          "unset default loop policy should end at the first playthrough boundary");
 }
 
-void eventSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
+void midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -597,20 +597,20 @@ void eventSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
       }},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(commandSequence, SequencerProfile{}, LoopPolicy::PlayOnce);
-  const auto& events = eventSequence.tracks[0].events;
-  expect(std::ranges::any_of(events, [](const Event& event) {
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const auto& events = midiSequence.tracks[0].events;
+  expect(std::ranges::any_of(events, [](const MidiEvent& event) {
            const auto* note = std::get_if<NoteDuration>(&event);
            return note != nullptr && note->tick == 0 && note->duration == 12;
          }),
          "loop-boundary fixture should emit events before the boundary");
-  expect(std::ranges::none_of(events, [](const Event& event) {
+  expect(std::ranges::none_of(events, [](const MidiEvent& event) {
            return std::holds_alternative<Volume>(event);
          }),
          "loop-boundary fixture should not build commands after the boundary");
 }
 
-void eventSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
+void midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -640,22 +640,22 @@ void eventSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
       },
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(commandSequence, SequencerProfile{}, LoopPolicy::PlayOnce);
-  const auto countNotesAt = [](const EventTrack& track, u64 tick) {
-    return std::ranges::count_if(track.events, [tick](const Event& event) {
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const auto countNotesAt = [](const MidiTrack& track, u64 tick) {
+    return std::ranges::count_if(track.events, [tick](const MidiEvent& event) {
       const auto* note = std::get_if<NoteDuration>(&event);
       return note != nullptr && note->tick == tick;
     });
   };
 
-  expect(countNotesAt(eventSequence.tracks[0], 0) == 1 && countNotesAt(eventSequence.tracks[0], 12) == 1 &&
-             countNotesAt(eventSequence.tracks[0], 24) == 1,
+  expect(countNotesAt(midiSequence.tracks[0], 0) == 1 && countNotesAt(midiSequence.tracks[0], 12) == 1 &&
+             countNotesAt(midiSequence.tracks[0], 24) == 1,
          "play-once event build should replay earlier looped tracks until the shared stop tick");
-  expect(countNotesAt(eventSequence.tracks[1], 0) == 1 && countNotesAt(eventSequence.tracks[1], 12) == 1 &&
-             countNotesAt(eventSequence.tracks[1], 24) == 1,
+  expect(countNotesAt(midiSequence.tracks[1], 0) == 1 && countNotesAt(midiSequence.tracks[1], 12) == 1 &&
+             countNotesAt(midiSequence.tracks[1], 24) == 1,
          "decoded loop boundaries should continue to their destination before the shared stop tick");
-  expect(std::get<EndOfTrack>(eventSequence.tracks[0].events.back()).tick == 36 &&
-             std::get<EndOfTrack>(eventSequence.tracks[1].events.back()).tick == 36,
+  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events.back()).tick == 36 &&
+             std::get<EndOfTrack>(midiSequence.tracks[1].events.back()).tick == 36,
          "replayed loop-boundary fixture should end both tracks at the shared stop tick");
 }
 
@@ -958,7 +958,7 @@ void exportDiagnosticsPreserveSourceRanges() {
       .sampleCollections = {missingSampleCollection.metadata.id},
   });
 
-  SequencerProfileRegistry profiles;
+  MidiSequenceProfileRegistry profiles;
   const auto wavArtifacts = ExportService().exportCollection(
       project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, profiles);
   expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
@@ -1050,10 +1050,10 @@ int main() {
     projectSessionExportsAllCollections();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
-    eventSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary();
-    eventSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce();
-    eventSequenceBuilderTreatsLoopBoundaryAsAStopPoint();
-    eventSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop();
+    midiSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary();
+    midiSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce();
+    midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint();
+    midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();

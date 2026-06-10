@@ -8,7 +8,7 @@
 
 #include "value/export/Export.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/EventSequenceBuilder.h"
+#include "value/core/MidiSequenceBuilder.h"
 #include "value/core/Session.h"
 #include "value/formats/CapcomSnes/CapcomSnesProfile.h"
 #include "value/formats/ValueFormats.h"
@@ -143,7 +143,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->commandSequence.behavior.writeInitialMonoMode, "sequence should carry mono mode behavior");
   expect(sequence->commandSequence.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
          "sequence should carry CapcomSnes default loop policy");
-  expect(sequence->commandSequence.sequencerProfile == capcomSnesProfileName(CapcomSnesEngineVersion::v3BgmFixedLocation),
+  expect(sequence->commandSequence.midiSequenceProfile == capcomSnesProfileName(CapcomSnesEngineVersion::v3BgmFixedLocation),
          "sequence should carry the detected CapcomSnes profile key");
   expect(sequence->commandSequence.tracks.size() == 8, "sequence should decode all nonzero track pointers");
   expect(std::holds_alternative<TempoCommand>(sequence->commandSequence.tracks[0].commands[0]),
@@ -198,42 +198,42 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(firstTempoItem->range.offset == 0x3000 && firstTempoItem->range.size == 3,
          "command item should preserve command source range");
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(
       sequence->commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
-  expect(eventSequence.diagnostics.empty(), "CapcomSnes event sequence build should not warn for linear fixture");
-  expect(eventSequence.tracks.size() == 8, "builder should preserve track count");
-  expect(eventSequence.tracks[0].events.size() == 14, "built track should include initial, command, and end events");
-  expect(std::holds_alternative<MonoMode>(eventSequence.tracks[0].events[0]),
+  expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
+  expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
+  expect(midiSequence.tracks[0].events.size() == 14, "built track should include initial, command, and end events");
+  expect(std::holds_alternative<MonoMode>(midiSequence.tracks[0].events[0]),
          "builder should emit initial mono mode from sequence behavior");
-  expect(std::get<MonoMode>(eventSequence.tracks[0].events[0]).channels == 0,
+  expect(std::get<MonoMode>(midiSequence.tracks[0].events[0]).channels == 0,
          "initial mono mode should match legacy MIDI controller payload");
-  expect(std::holds_alternative<Reverb>(eventSequence.tracks[0].events[1]),
+  expect(std::holds_alternative<Reverb>(midiSequence.tracks[0].events[1]),
          "builder should emit initial reverb from sequence behavior");
-  expect(std::get<Tempo>(eventSequence.tracks[0].events[2]).microsecondsPerQuarter == 42191,
+  expect(std::get<Tempo>(midiSequence.tracks[0].events[2]).microsecondsPerQuarter == 42191,
          "CapcomSnes profile should interpret tempo with legacy timing math");
-  expect(std::holds_alternative<BankSelect>(eventSequence.tracks[0].events[3]),
-         "CapcomSnes event sequence build should include bank select before program changes");
-  expect(!std::get<BankSelect>(eventSequence.tracks[0].events[3]).writeLsb,
+  expect(std::holds_alternative<BankSelect>(midiSequence.tracks[0].events[3]),
+         "CapcomSnes MIDI sequence build should include bank select before program changes");
+  expect(!std::get<BankSelect>(midiSequence.tracks[0].events[3]).writeLsb,
          "CapcomSnes bank select should match legacy MSB-only output");
-  expect(std::holds_alternative<ProgramChange>(eventSequence.tracks[0].events[4]),
-         "CapcomSnes event sequence build should include program changes");
-  expect(std::holds_alternative<Volume14>(eventSequence.tracks[0].events[5]),
+  expect(std::holds_alternative<ProgramChange>(midiSequence.tracks[0].events[4]),
+         "CapcomSnes MIDI sequence build should include program changes");
+  expect(std::holds_alternative<Volume14>(midiSequence.tracks[0].events[5]),
          "CapcomSnes V3 profile should interpret volume to 14-bit volume");
-  expect(std::get<Pan>(eventSequence.tracks[0].events[6]).value == 64,
+  expect(std::get<Pan>(midiSequence.tracks[0].events[6]).value == 64,
          "CapcomSnes center pan should map to MIDI center pan");
-  expect(std::holds_alternative<Expression>(eventSequence.tracks[0].events[7]),
+  expect(std::holds_alternative<Expression>(midiSequence.tracks[0].events[7]),
          "CapcomSnes pan emission should include expression compensation");
-  expect(std::get<VibratoDepth>(eventSequence.tracks[0].events[8]).value == 0,
+  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[8]).value == 0,
          "CapcomSnes LFO type 0 should store vibrato depth but emit zero while rate is disabled");
-  expect(std::get<VibratoDepth>(eventSequence.tracks[0].events[9]).value == 0x20,
+  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[9]).value == 0x20,
          "CapcomSnes LFO rate should emit stored vibrato depth when output becomes enabled");
-  expect(std::holds_alternative<VibratoFrequency>(eventSequence.tracks[0].events[10]),
+  expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[10]),
          "CapcomSnes LFO rate should map to vibrato frequency");
-  expect(std::holds_alternative<TremoloFrequency>(eventSequence.tracks[0].events[11]),
+  expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[11]),
          "CapcomSnes LFO rate should map to tremolo frequency");
-  expect(std::get<NoteDuration>(eventSequence.tracks[0].events[12]).duration == 6,
+  expect(std::get<NoteDuration>(midiSequence.tracks[0].events[12]).duration == 6,
          "CapcomSnes note length index should map to ticks");
-  expect(std::get<EndOfTrack>(eventSequence.tracks[0].events[13]).tick == 6,
+  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[13]).tick == 6,
          "builder should advance time before end of track");
 
   const auto artifacts = session.exportCollection(project.collections[0].id, ExportRequest{
@@ -244,7 +244,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(artifacts[0].filename == "Mega Man X.mid", "MIDI artifact should use collection name");
   expect(artifacts[0].mediaType == "audio/midi", "MIDI artifact should use audio/midi media type");
   expect(artifacts[0].diagnostics.empty(), "MIDI artifact should not carry diagnostics for linear fixture");
-  expect(artifacts[0].bytes == MidiExporter().exportMidi(eventSequence),
+  expect(artifacts[0].bytes == MidiExporter().exportMidi(midiSequence),
          "Session MIDI export should match direct builder/exporter output");
 
   const auto wavArtifacts = session.exportCollection(project.collections[0].id, ExportRequest{
@@ -456,19 +456,19 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   expect(attributeItem->name == "Note Attributes", "note-attribute item should carry a readable name");
   expect(attributeItem->description == "Raw 72", "note-attribute item should preserve raw command values");
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(
       sequence->commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
-  expect(eventSequence.diagnostics.empty(), "CapcomSnes note-state emission should not report diagnostics");
-  expect(!eventSequence.tracks.empty(), "CapcomSnes note-state emission should preserve tracks");
+  expect(midiSequence.diagnostics.empty(), "CapcomSnes note-state emission should not report diagnostics");
+  expect(!midiSequence.tracks.empty(), "CapcomSnes note-state emission should preserve tracks");
 
-  const auto& events = eventSequence.tracks[0].events;
-  const auto legato = std::ranges::find_if(events, [](const Event& event) {
+  const auto& events = midiSequence.tracks[0].events;
+  const auto legato = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* typed = std::get_if<LegatoPedal>(&event);
     return typed != nullptr && typed->tick == 0 && typed->enabled;
   });
   expect(legato != events.end(), "CapcomSnes note attributes should interpret slur state to legato pedal");
 
-  const auto note = std::ranges::find_if(events, [](const Event& event) {
+  const auto note = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* typed = std::get_if<NoteDuration>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -499,11 +499,11 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
       .behavior = SequenceBehavior{.initialGlobalTranspose = 6},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(
       commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
-  const auto& events = eventSequence.tracks[0].events;
+  const auto& events = midiSequence.tracks[0].events;
 
-  const auto portamentoTime = std::ranges::find_if(events, [](const Event& event) {
+  const auto portamentoTime = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* time = std::get_if<PortamentoTime14>(&event);
     return time != nullptr && time->tick == 192;
   });
@@ -511,7 +511,7 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
   expect(std::get<PortamentoTime14>(*portamentoTime).value == 96,
          "CapcomSnes portamento distance should use source keys, ignoring active transpose");
 
-  const auto portamentoControl = std::ranges::find_if(events, [](const Event& event) {
+  const auto portamentoControl = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* control = std::get_if<PortamentoControl>(&event);
     return control != nullptr && control->tick == 192;
   });
@@ -519,7 +519,7 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
   expect(std::get<PortamentoControl>(*portamentoControl).key == 10,
          "CapcomSnes portamento control should include global but not local transpose");
 
-  const auto secondNote = std::ranges::find_if(events, [](const Event& event) {
+  const auto secondNote = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* note = std::get_if<NoteDuration>(&event);
     return note != nullptr && note->tick == 192;
   });
@@ -542,13 +542,13 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
       }},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(
       v3CommandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
-  expect(eventSequence.diagnostics.empty(), "CapcomSnes pan fixture should build without diagnostics");
-  expect(!eventSequence.tracks.empty(), "CapcomSnes pan fixture should emit one track");
+  expect(midiSequence.diagnostics.empty(), "CapcomSnes pan fixture should build without diagnostics");
+  expect(!midiSequence.tracks.empty(), "CapcomSnes pan fixture should emit one track");
 
-  const auto& events = eventSequence.tracks[0].events;
-  const auto pan = std::ranges::find_if(events, [](const Event& event) {
+  const auto& events = midiSequence.tracks[0].events;
+  const auto pan = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* typed = std::get_if<Pan>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -556,7 +556,7 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
   expect(std::get<Pan>(*pan).value == 113,
          "CapcomSnes pan emission should emit the computed MIDI pan without applying the linear pan curve again");
 
-  const auto expression = std::ranges::find_if(events, [](const Event& event) {
+  const auto expression = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* typed = std::get_if<Expression>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -577,11 +577,11 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
       }},
   };
 
-  const EventSequence v1EventSequence = EventSequenceBuilder().build(
+  const MidiSequence v1MidiSequence = MidiSequenceBuilder().build(
       v1CommandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
-  expect(v1EventSequence.diagnostics.empty(), "CapcomSnes V1 pan fixture should build without diagnostics");
-  const auto& v1Events = v1EventSequence.tracks[0].events;
-  const auto v1Pan = std::ranges::find_if(v1Events, [](const Event& event) {
+  expect(v1MidiSequence.diagnostics.empty(), "CapcomSnes V1 pan fixture should build without diagnostics");
+  const auto& v1Events = v1MidiSequence.tracks[0].events;
+  const auto v1Pan = std::ranges::find_if(v1Events, [](const MidiEvent& event) {
     const auto* typed = std::get_if<Pan>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -605,13 +605,13 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
       }},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(
+  const MidiSequence midiSequence = MidiSequenceBuilder().build(
       commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
-  expect(eventSequence.diagnostics.empty(), "CapcomSnes V1 volume fixture should build without diagnostics");
-  expect(!eventSequence.tracks.empty(), "CapcomSnes V1 volume fixture should emit one track");
+  expect(midiSequence.diagnostics.empty(), "CapcomSnes V1 volume fixture should build without diagnostics");
+  expect(!midiSequence.tracks.empty(), "CapcomSnes V1 volume fixture should emit one track");
 
-  const auto& events = eventSequence.tracks[0].events;
-  const auto volume = std::ranges::find_if(events, [](const Event& event) {
+  const auto& events = midiSequence.tracks[0].events;
+  const auto volume = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* typed = std::get_if<Volume14>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -619,7 +619,7 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
   expect(std::get<Volume14>(*volume).value == 1026,
          "CapcomSnes V1 volume should apply the amplitude curve before MIDI quantization");
 
-  const auto masterVolume = std::ranges::find_if(events, [](const Event& event) {
+  const auto masterVolume = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* typed = std::get_if<MasterVolume>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -640,7 +640,7 @@ void capcomSnesMidiExportUsesSequenceProfileKey() {
               EndCommand{},
           },
       }},
-      .sequencerProfile = std::string(capcomSnesProfileName(CapcomSnesEngineVersion::v1BgmInList)),
+      .midiSequenceProfile = std::string(capcomSnesProfileName(CapcomSnesEngineVersion::v1BgmInList)),
   };
 
   Project project;
@@ -659,7 +659,7 @@ void capcomSnesMidiExportUsesSequenceProfileKey() {
   });
 
   SourceStore sources;
-  SequencerProfileRegistry profiles;
+  MidiSequenceProfileRegistry profiles;
   registerCapcomSnesProfile(profiles);
 
   const auto artifacts = ExportService().exportCollection(project,
@@ -673,9 +673,9 @@ void capcomSnesMidiExportUsesSequenceProfileKey() {
   expect(artifacts.size() == 1, "CapcomSnes profile-key export should produce one MIDI artifact");
   expect(artifacts[0].diagnostics.empty(), "CapcomSnes profile-key export should not report diagnostics");
 
-  const auto v1Bytes = MidiExporter().exportMidi(EventSequenceBuilder().build(
+  const auto v1Bytes = MidiExporter().exportMidi(MidiSequenceBuilder().build(
       commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce));
-  const auto v3Bytes = MidiExporter().exportMidi(EventSequenceBuilder().build(
+  const auto v3Bytes = MidiExporter().exportMidi(MidiSequenceBuilder().build(
       commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce));
   expect(artifacts[0].bytes == v1Bytes, "MIDI export should use the sequence's explicit CapcomSnes profile key");
   expect(artifacts[0].bytes != v3Bytes, "MIDI export should not fall back to the default CapcomSnes profile");

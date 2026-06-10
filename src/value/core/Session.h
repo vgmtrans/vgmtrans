@@ -34,14 +34,14 @@ class Session {
   [[nodiscard]] SourceStore& sources() noexcept { return sources_; }
   [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }
   [[nodiscard]] FormatRegistry& formats() noexcept { return formats_; }
-  [[nodiscard]] const SequencerProfileRegistry& profiles() const noexcept { return profiles_; }
-  [[nodiscard]] SequencerProfileRegistry& profiles() noexcept { return profiles_; }
+  [[nodiscard]] const MidiSequenceProfileRegistry& profiles() const noexcept { return profiles_; }
+  [[nodiscard]] MidiSequenceProfileRegistry& profiles() noexcept { return profiles_; }
   [[nodiscard]] const Project& project() const noexcept { return project_; }
 
  private:
   SourceStore sources_;
   FormatRegistry formats_;
-  SequencerProfileRegistry profiles_;
+  MidiSequenceProfileRegistry profiles_;
   Project project_;
   ScanService scanner_;
   ExportService exporter_;

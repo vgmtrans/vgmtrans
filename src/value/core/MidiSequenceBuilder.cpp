@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/core/EventSequenceBuilder.h"
+#include "value/core/MidiSequenceBuilder.h"
 
 #include <algorithm>
 #include <cmath>
@@ -24,14 +24,14 @@ namespace {
 constexpr size_t kMaxExecutedCommandsPerTrack = 65536;
 
 template <typename T>
-void appendEvents(std::vector<Event>& destination, std::vector<T> events) {
+void appendEvents(std::vector<MidiEvent>& destination, std::vector<T> events) {
   destination.insert(destination.end(),
                      std::make_move_iterator(events.begin()),
                      std::make_move_iterator(events.end()));
 }
 
 void purgeEndedPendingNotes(
-    const std::vector<Event>& events,
+    const std::vector<MidiEvent>& events,
     std::vector<size_t>& pendingNoteIndexes,
     u64 tick) {
   std::erase_if(pendingNoteIndexes, [&](size_t index) {
@@ -44,7 +44,7 @@ void purgeEndedPendingNotes(
 }
 
 void extendPendingNotes(
-    std::vector<Event>& events,
+    std::vector<MidiEvent>& events,
     const std::vector<size_t>& pendingNoteIndexes,
     u64 endTick) {
   for (const size_t index : pendingNoteIndexes) {
@@ -101,11 +101,11 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
 [[nodiscard]] std::optional<u64> firstLoopTick(
     const CommandSequence& commandSequence,
     const CommandTrack& track,
-    const SequencerProfile& profile,
+    const MidiSequenceProfile& profile,
     u8 channel) {
   // Dry-run the track state to find the first musical loop without emitting events.
   const auto indexes = commandIndexByOffset(track);
-  TrackState state{
+  MidiTrackState state{
       .trackIndex = track.sourceTrackNumber,
       .channel = channel,
       .globalTranspose = commandSequence.behavior.initialGlobalTranspose,
@@ -253,10 +253,10 @@ inline constexpr bool kImmediateCommand =
     std::is_same_v<T, DriverSpecificCommand>;
 
 template <typename T>
-[[nodiscard]] std::vector<Event> interpretImmediateCommand(
+[[nodiscard]] std::vector<MidiEvent> interpretImmediateCommand(
     const T& command,
-    const SequencerProfile& profile,
-    TrackState& state) {
+    const MidiSequenceProfile& profile,
+    MidiTrackState& state) {
   if constexpr (std::is_same_v<T, NoteStateCommand>) {
     return profile.interpretNoteState(command, state);
   } else if constexpr (std::is_same_v<T, DurationCommand>) {
@@ -297,27 +297,27 @@ template <typename T>
 
 }  // namespace
 
-void SequencerProfile::beginTrack(
+void MidiSequenceProfile::beginTrack(
     const CommandSequence&,
     const CommandTrack&,
-    TrackState&,
-    std::vector<Event>&) const {
+    MidiTrackState&,
+    std::vector<MidiEvent>&) const {
 }
 
-u32 SequencerProfile::restTicks(const RestCommand& command, TrackState&) const {
+u32 MidiSequenceProfile::restTicks(const RestCommand& command, MidiTrackState&) const {
   return command.rawDuration;
 }
 
-std::vector<Event> SequencerProfile::interpretNoteState(
+std::vector<MidiEvent> MidiSequenceProfile::interpretNoteState(
     const NoteStateCommand&,
-    TrackState&) const {
+    MidiTrackState&) const {
   return {};
 }
 
-NoteTiming SequencerProfile::noteTiming(const NoteCommand& command, TrackState& state) const {
+MidiNoteTiming MidiSequenceProfile::noteTiming(const NoteCommand& command, MidiTrackState& state) const {
   const auto key = std::clamp<s32>(static_cast<s32>(command.key) + state.transpose + state.globalTranspose, 0, 127);
   const auto ticks = command.rawDuration;
-  return NoteTiming{
+  return MidiNoteTiming{
       .key = static_cast<u8>(key),
       .velocity = command.rawVelocity == 0 ? static_cast<u8>(127)
                                            : static_cast<u8>(std::min<u32>(command.rawVelocity, 127)),
@@ -326,26 +326,26 @@ NoteTiming SequencerProfile::noteTiming(const NoteCommand& command, TrackState& 
   };
 }
 
-void SequencerProfile::applyDuration(const DurationCommand& command, TrackState& state) const {
+void MidiSequenceProfile::applyDuration(const DurationCommand& command, MidiTrackState& state) const {
   state.durationRate = command.rawValue;
 }
 
-void SequencerProfile::applyTranspose(const TransposeCommand& command, TrackState& state) const {
+void MidiSequenceProfile::applyTranspose(const TransposeCommand& command, MidiTrackState& state) const {
   state.transpose = command.rawSemitones;
 }
 
-std::vector<Event> SequencerProfile::interpretTempo(
+std::vector<MidiEvent> MidiSequenceProfile::interpretTempo(
     const TempoCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {Tempo{
       .tick = state.tick,
       .microsecondsPerQuarter = command.rawValue == 0 ? 500000 : command.rawValue,
   }};
 }
 
-std::vector<Event> SequencerProfile::interpretProgram(
+std::vector<MidiEvent> MidiSequenceProfile::interpretProgram(
     const ProgramCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {ProgramChange{
       .tick = state.tick,
       .channel = state.channel,
@@ -353,9 +353,9 @@ std::vector<Event> SequencerProfile::interpretProgram(
   }};
 }
 
-std::vector<Event> SequencerProfile::interpretVolume(
+std::vector<MidiEvent> MidiSequenceProfile::interpretVolume(
     const VolumeCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {Volume{
       .tick = state.tick,
       .channel = state.channel,
@@ -363,9 +363,9 @@ std::vector<Event> SequencerProfile::interpretVolume(
   }};
 }
 
-std::vector<Event> SequencerProfile::interpretPan(
+std::vector<MidiEvent> MidiSequenceProfile::interpretPan(
     const PanCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {Pan{
       .tick = state.tick,
       .channel = state.channel,
@@ -373,18 +373,18 @@ std::vector<Event> SequencerProfile::interpretPan(
   }};
 }
 
-std::vector<Event> SequencerProfile::interpretMasterVolume(
+std::vector<MidiEvent> MidiSequenceProfile::interpretMasterVolume(
     const MasterVolumeCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {MasterVolume{
       .tick = state.tick,
       .value = static_cast<u16>(std::min<u32>(command.rawValue, 0x3fff)),
   }};
 }
 
-std::vector<Event> SequencerProfile::interpretReverb(
+std::vector<MidiEvent> MidiSequenceProfile::interpretReverb(
     const ReverbCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {Reverb{
       .tick = state.tick,
       .channel = state.channel,
@@ -392,9 +392,9 @@ std::vector<Event> SequencerProfile::interpretReverb(
   }};
 }
 
-std::vector<Event> SequencerProfile::interpretTuning(
+std::vector<MidiEvent> MidiSequenceProfile::interpretTuning(
     const TuningCommand& command,
-    const TrackState& state) const {
+    const MidiTrackState& state) const {
   return {FineTune{
       .tick = state.tick,
       .channel = state.channel,
@@ -402,9 +402,9 @@ std::vector<Event> SequencerProfile::interpretTuning(
   }};
 }
 
-std::vector<Event> SequencerProfile::interpretPortamento(
+std::vector<MidiEvent> MidiSequenceProfile::interpretPortamento(
     const PortamentoCommand& command,
-    TrackState& state) const {
+    MidiTrackState& state) const {
   return {PortamentoTime{
       .tick = state.tick,
       .channel = state.channel,
@@ -412,9 +412,9 @@ std::vector<Event> SequencerProfile::interpretPortamento(
   }};
 }
 
-std::vector<Event> SequencerProfile::interpretLfo(
+std::vector<MidiEvent> MidiSequenceProfile::interpretLfo(
     const LfoCommand& command,
-    TrackState& state) const {
+    MidiTrackState& state) const {
   if (command.target == LfoTarget::Pitch) {
     return {VibratoDepth{
         .tick = state.tick,
@@ -432,27 +432,27 @@ std::vector<Event> SequencerProfile::interpretLfo(
   return {};
 }
 
-std::vector<Event> SequencerProfile::interpretEnvelope(
+std::vector<MidiEvent> MidiSequenceProfile::interpretEnvelope(
     const EnvelopeCommand&,
-    const TrackState&) const {
+    const MidiTrackState&) const {
   return {};
 }
 
-std::vector<Event> SequencerProfile::interpretDriverSpecific(
+std::vector<MidiEvent> MidiSequenceProfile::interpretDriverSpecific(
     const DriverSpecificCommand&,
-    TrackState&) const {
+    MidiTrackState&) const {
   return {};
 }
 
-std::vector<Event> SequencerProfile::interpretRepeatBreak(
+std::vector<MidiEvent> MidiSequenceProfile::interpretRepeatBreak(
     const RepeatBreakCommand&,
-    TrackState&) const {
+    MidiTrackState&) const {
   return {};
 }
 
-EventSequence EventSequenceBuilder::build(
+MidiSequence MidiSequenceBuilder::build(
     const CommandSequence& commandSequence,
-    const SequencerProfile& profile,
+    const MidiSequenceProfile& profile,
     LoopPolicy loopPolicy) const {
   if (loopPolicy == LoopPolicy::Default) {
     loopPolicy = commandSequence.behavior.defaultLoopPolicy;
@@ -461,7 +461,7 @@ EventSequence EventSequenceBuilder::build(
     loopPolicy = LoopPolicy::PlayOnce;
   }
 
-  EventSequence result{
+  MidiSequence result{
       .timebase = commandSequence.timebase,
   };
 
@@ -483,30 +483,30 @@ EventSequence EventSequenceBuilder::build(
 
   for (size_t trackIndex = 0; trackIndex < commandSequence.tracks.size(); ++trackIndex) {
     const auto& track = commandSequence.tracks[trackIndex];
-    TrackState state{
+    MidiTrackState state{
         .trackIndex = static_cast<u32>(trackIndex),
         .channel = static_cast<u8>(trackIndex % 16),
         .globalTranspose = commandSequence.behavior.initialGlobalTranspose,
     };
-    EventTrack eventTrack{
+    MidiTrack midiTrack{
         .name = "Track " + std::to_string(track.sourceTrackNumber),
     };
 
     if (commandSequence.behavior.writeInitialMonoMode) {
-      eventTrack.events.push_back(MonoMode{
+      midiTrack.events.push_back(MonoMode{
           .tick = 0,
           .channel = state.channel,
           .channels = 0,
       });
     }
     if (commandSequence.behavior.writeInitialReverb) {
-      eventTrack.events.push_back(Reverb{
+      midiTrack.events.push_back(Reverb{
           .tick = 0,
           .channel = state.channel,
           .value = commandSequence.behavior.initialReverb,
       });
     }
-    profile.beginTrack(commandSequence, track, state, eventTrack.events);
+    profile.beginTrack(commandSequence, track, state, midiTrack.events);
 
     const auto indexes = commandIndexByOffset(track);
     size_t pc = 0;
@@ -539,14 +539,14 @@ EventSequence EventSequenceBuilder::build(
                   soundingTicks = static_cast<u32>(stopEndTick - state.tick);
                 }
               }
-              appendEvents(eventTrack.events, std::move(timing.beforeEvents));
+              appendEvents(midiTrack.events, std::move(timing.beforeEvents));
               if (timing.extendsPrevious) {
                 // Slurred notes extend the existing note event instead of starting a new note.
-                extendPendingNotes(eventTrack.events, pendingNoteIndexes, state.tick + soundingTicks);
+                extendPendingNotes(midiTrack.events, pendingNoteIndexes, state.tick + soundingTicks);
               } else {
-                purgeEndedPendingNotes(eventTrack.events, pendingNoteIndexes, state.tick);
-                const size_t noteIndex = eventTrack.events.size();
-                eventTrack.events.push_back(NoteDuration{
+                purgeEndedPendingNotes(midiTrack.events, pendingNoteIndexes, state.tick);
+                const size_t noteIndex = midiTrack.events.size();
+                midiTrack.events.push_back(NoteDuration{
                     .tick = state.tick,
                     .channel = state.channel,
                     .key = timing.key,
@@ -559,7 +559,7 @@ EventSequence EventSequenceBuilder::build(
             } else if constexpr (std::is_same_v<TypedCommand, RestCommand>) {
               state.tick += profile.restTicks(typedCommand, state);
             } else if constexpr (kImmediateCommand<TypedCommand>) {
-              appendEvents(eventTrack.events, interpretImmediateCommand(typedCommand, profile, state));
+              appendEvents(midiTrack.events, interpretImmediateCommand(typedCommand, profile, state));
             } else if constexpr (std::is_same_v<TypedCommand, RepeatCommand>) {
               if (typedCommand.slot >= state.repeatCounters.size()) {
                 result.diagnostics.push_back(warning("Repeat command uses an unsupported repeat slot",
@@ -568,7 +568,7 @@ EventSequence EventSequenceBuilder::build(
               }
               auto& counter = state.repeatCounters[typedCommand.slot];
               if (typedCommand.count == 0 && counter == 0) {
-                eventTrack.events.push_back(Marker{.tick = state.tick, .text = "Loop"});
+                midiTrack.events.push_back(Marker{.tick = state.tick, .text = "Loop"});
                 ended = true;
                 return;
               }
@@ -603,7 +603,7 @@ EventSequence EventSequenceBuilder::build(
               auto& counter = state.repeatCounters[typedCommand.slot];
               if (counter == 1) {
                 counter = 0;
-                appendEvents(eventTrack.events, profile.interpretRepeatBreak(typedCommand, state));
+                appendEvents(midiTrack.events, profile.interpretRepeatBreak(typedCommand, state));
                 if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
                   pc = *target;
                   incrementPc = false;
@@ -625,7 +625,7 @@ EventSequence EventSequenceBuilder::build(
                   loopPlaybackStopTick = playOnceStopTick;
                 }
                 if (loopPolicy != LoopPolicy::PlayOnce) {
-                  eventTrack.events.push_back(Marker{.tick = state.tick, .text = "Jump"});
+                  midiTrack.events.push_back(Marker{.tick = state.tick, .text = "Jump"});
                 }
                 pc = *target;
                 incrementPc = false;
@@ -645,11 +645,11 @@ EventSequence EventSequenceBuilder::build(
                 }
               }
               if (loopPolicy != LoopPolicy::PlayOnce) {
-                eventTrack.events.push_back(Marker{.tick = state.tick, .text = "Loop"});
+                midiTrack.events.push_back(Marker{.tick = state.tick, .text = "Loop"});
               }
               ended = true;
             } else if constexpr (std::is_same_v<TypedCommand, EndCommand>) {
-              eventTrack.events.push_back(EndOfTrack{.tick = state.tick});
+              midiTrack.events.push_back(EndOfTrack{.tick = state.tick});
               ended = true;
             } else if constexpr (std::is_same_v<TypedCommand, UnknownCommand>) {
               result.diagnostics.push_back(warning("Unknown sequencer command " +
@@ -677,28 +677,28 @@ EventSequence EventSequenceBuilder::build(
 
     if (executedCommands >= kMaxExecutedCommandsPerTrack) {
       const auto range = track.commands.empty() ? SourceRange{} : commandRange(track.commands.back());
-      result.diagnostics.push_back(warning("Event sequence building stopped after too many executed commands", range));
+      result.diagnostics.push_back(warning("MIDI sequence building stopped after too many executed commands", range));
     }
-    if (eventTrack.events.empty() || !std::holds_alternative<EndOfTrack>(eventTrack.events.back())) {
-      eventTrack.events.push_back(EndOfTrack{.tick = state.tick});
+    if (midiTrack.events.empty() || !std::holds_alternative<EndOfTrack>(midiTrack.events.back())) {
+      midiTrack.events.push_back(EndOfTrack{.tick = state.tick});
     }
-    result.tracks.push_back(std::move(eventTrack));
+    result.tracks.push_back(std::move(midiTrack));
   }
 
   return result;
 }
 
-void SequencerProfileRegistry::add(std::string format, Factory factory) {
+void MidiSequenceProfileRegistry::add(std::string format, Factory factory) {
   if (format.empty()) {
-    throw std::invalid_argument("Cannot register a SequencerProfile with an empty format name");
+    throw std::invalid_argument("Cannot register a MidiSequenceProfile with an empty format name");
   }
   if (!factory) {
-    throw std::invalid_argument("Cannot register an empty SequencerProfile factory");
+    throw std::invalid_argument("Cannot register an empty MidiSequenceProfile factory");
   }
   factories_[std::move(format)] = std::move(factory);
 }
 
-std::unique_ptr<SequencerProfile> SequencerProfileRegistry::create(std::string_view format) const {
+std::unique_ptr<MidiSequenceProfile> MidiSequenceProfileRegistry::create(std::string_view format) const {
   const auto found = factories_.find(std::string(format));
   if (found == factories_.end()) {
     return nullptr;
@@ -706,7 +706,7 @@ std::unique_ptr<SequencerProfile> SequencerProfileRegistry::create(std::string_v
   return found->second();
 }
 
-bool SequencerProfileRegistry::contains(std::string_view format) const {
+bool MidiSequenceProfileRegistry::contains(std::string_view format) const {
   return factories_.contains(std::string(format));
 }
 

@@ -8,7 +8,7 @@
 
 #include "base/Types.h"
 #include "value/core/Model.h"
-#include "value/core/EventSequenceBuilder.h"
+#include "value/core/MidiSequenceBuilder.h"
 #include "value/core/Source.h"
 
 #include <string>
@@ -47,13 +47,13 @@ class ExportService {
       const SourceStore& sources,
       CollectionId collection,
       const ExportRequest& request,
-      const SequencerProfileRegistry& profiles) const;
+      const MidiSequenceProfileRegistry& profiles) const;
 
   [[nodiscard]] std::vector<CollectionExport> exportAllCollections(
       const Project& project,
       const SourceStore& sources,
       const ExportRequest& request,
-      const SequencerProfileRegistry& profiles) const;
+      const MidiSequenceProfileRegistry& profiles) const;
 };
 
 }  // namespace vgmtrans::core

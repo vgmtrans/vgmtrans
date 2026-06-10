@@ -111,7 +111,7 @@ target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Model.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/EventSequenceBuilder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.cpp
@@ -130,7 +130,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/core/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Model.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/EventSequenceBuilder.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceBuilder.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Session.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.h

@@ -279,8 +279,8 @@ struct CommandSequence {
   std::vector<CommandTrack> tracks;
   std::vector<InstrumentRef> referencedInstruments;
   SequenceBehavior behavior;
-  // Empty means use metadata.format; formats set this when one parser has multiple sequencer dialects.
-  std::string sequencerProfile;
+  // Empty means use metadata.format; formats set this when one parser has multiple MIDI sequence dialects.
+  std::string midiSequenceProfile;
 };
 
 struct SequenceAsset {
@@ -644,7 +644,7 @@ struct Marker {
   std::string text;
 };
 
-using Event = std::variant<
+using MidiEvent = std::variant<
     NoteOn,
     NoteOff,
     NoteDuration,
@@ -676,14 +676,14 @@ using Event = std::variant<
     EndOfTrack,
     Marker>;
 
-struct EventTrack {
+struct MidiTrack {
   std::string name;
-  std::vector<Event> events;
+  std::vector<MidiEvent> events;
 };
 
-struct EventSequence {
+struct MidiSequence {
   Timebase timebase;
-  std::vector<EventTrack> tracks;
+  std::vector<MidiTrack> tracks;
   std::vector<Diagnostic> diagnostics;
 };
 
