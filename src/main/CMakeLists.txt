@@ -147,6 +147,7 @@ target_include_directories(
     ${PROJECT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(vgmtransvaluecore PUBLIC cxx_std_20)
+target_link_libraries(vgmtransvaluecore PRIVATE fmt::fmt)
 
 add_library(vgmtransvalueformats STATIC)
 vgmtrans_enable_project_warnings(vgmtransvalueformats)

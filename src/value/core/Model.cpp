@@ -6,6 +6,8 @@
 
 #include "value/core/Model.h"
 
+#include <fmt/format.h>
+
 #include <string_view>
 
 namespace vgmtrans::core {
@@ -225,11 +227,11 @@ namespace {
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const NoteCommand& command) {
-  return "Key " + std::to_string(command.key) + ", length index " + std::to_string(command.rawDuration);
+  return fmt::format("Key {}, length index {}", command.key, command.rawDuration);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const RestCommand& command) {
-  return "Length index " + std::to_string(command.rawDuration);
+  return fmt::format("Length index {}", command.rawDuration);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const NoteStateCommand& command) {
@@ -243,82 +245,85 @@ namespace {
     case NoteStateAction::ToggleOctaveUp:
       return "Toggle 2-octave up";
     case NoteStateAction::Attributes:
-      return "Raw " + std::to_string(command.rawValue);
+      return fmt::format("Raw {}", command.rawValue);
     case NoteStateAction::Octave:
-      return "Octave " + std::to_string(command.rawValue);
+      return fmt::format("Octave {}", command.rawValue);
   }
-  return "Raw " + std::to_string(command.rawValue);
+  return fmt::format("Raw {}", command.rawValue);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const DurationCommand& command) {
-  return "Raw " + std::to_string(command.rawValue);
+  return fmt::format("Raw {}", command.rawValue);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const ProgramCommand& command) {
-  return "Program " + std::to_string(command.rawProgram);
+  return fmt::format("Program {}", command.rawProgram);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const VolumeCommand& command) {
-  return "Raw " + std::to_string(command.rawValue);
+  return fmt::format("Raw {}", command.rawValue);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const PanCommand& command) {
-  return "Raw " + std::to_string(command.rawValue);
+  return fmt::format("Raw {}", command.rawValue);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const TempoCommand& command) {
-  return "Raw " + std::to_string(command.rawValue);
+  return fmt::format("Raw {}", command.rawValue);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const TransposeCommand& command) {
-  return "Semitones " + std::to_string(command.rawSemitones);
+  return fmt::format("Semitones {}", command.rawSemitones);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const GlobalTransposeCommand& command) {
-  return "Semitones " + std::to_string(command.rawSemitones);
+  return fmt::format("Semitones {}", command.rawSemitones);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const TuningCommand& command) {
-  return "Raw " + std::to_string(command.rawValue);
+  return fmt::format("Raw {}", command.rawValue);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const PortamentoCommand& command) {
-  return "Time " + std::to_string(command.rawTime);
+  return fmt::format("Time {}", command.rawTime);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const LfoCommand& command) {
-  return "Type " + std::to_string(command.rawType) + ", amount " + std::to_string(command.rawAmount);
+  return fmt::format("Type {}, amount {}", command.rawType, command.rawAmount);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const ReverbCommand& command) {
-  return "Raw " + std::to_string(command.rawValue);
+  return fmt::format("Raw {}", command.rawValue);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const EnvelopeCommand& command) {
-  return "Release " + std::to_string(command.rawRelease);
+  return fmt::format("Release {}", command.rawRelease);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const MasterVolumeCommand& command) {
-  return "Raw " + std::to_string(command.rawValue);
+  return fmt::format("Raw {}", command.rawValue);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const JumpCommand& command) {
-  return "Destination $" + std::to_string(command.destination.value);
+  return fmt::format("Destination ${}", command.destination.value);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const RepeatCommand& command) {
-  return "Slot " + std::to_string(command.slot) + ", count " + std::to_string(command.count) +
-         ", destination $" + std::to_string(command.destination.value);
+  return fmt::format("Slot {}, count {}, destination ${}",
+                     static_cast<u32>(command.slot),
+                     command.count,
+                     command.destination.value);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const RepeatBreakCommand& command) {
-  return "Slot " + std::to_string(command.slot) + ", attributes " + std::to_string(command.rawAttributes) +
-         ", destination $" + std::to_string(command.destination.value);
+  return fmt::format("Slot {}, attributes {}, destination ${}",
+                     static_cast<u32>(command.slot),
+                     static_cast<u32>(command.rawAttributes),
+                     command.destination.value);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const LoopBoundaryCommand& command) {
-  return "Destination $" + std::to_string(command.destination.value) + ", trigger $" +
-         std::to_string(command.trigger.value);
+  return fmt::format("Destination ${}, trigger ${}", command.destination.value, command.trigger.value);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const EndCommand&) {
@@ -326,11 +331,11 @@ namespace {
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const UnknownCommand& command) {
-  return "Opcode " + std::to_string(command.opcode);
+  return fmt::format("Opcode {}", command.opcode);
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const DriverSpecificCommand& command) {
-  return "Bytes " + std::to_string(command.bytes.size());
+  return fmt::format("Bytes {}", command.bytes.size());
 }
 
 }  // namespace
