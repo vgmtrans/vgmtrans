@@ -171,7 +171,10 @@ target_sources(vgmtransvalueformats
       formats/SnesRsn/SnesRsnModule.h
       formats/SnesSpc/SnesSpcModule.h
 )
-target_link_libraries(vgmtransvalueformats PUBLIC vgmtransvaluecore unarr)
+target_link_libraries(
+  vgmtransvalueformats
+  PUBLIC vgmtransvaluecore unarr
+  PRIVATE fmt::fmt)
 target_compile_features(vgmtransvalueformats PUBLIC cxx_std_20)
 
 add_library(vgmtranscore OBJECT)

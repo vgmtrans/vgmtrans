@@ -10,6 +10,8 @@
 #include "core/SynthMath.h"
 #include "formats/CapcomSnes/CapcomSnesConstants.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -305,7 +307,7 @@ SampleCollectionAsset parseCapcomSnesSamples(
     const bool loopEnabled = sampleInfo.loops && sampleInfo.loopAddress >= sampleInfo.startAddress &&
                              sampleInfo.loopAddress <= lastBlockAddress;
     collection.samples.push_back(Sample{
-        .name = "Sample " + std::to_string(sampleInfo.srcn),
+        .name = fmt::format("Sample {}", static_cast<unsigned>(sampleInfo.srcn)),
         .codec = AudioCodec::SnesBrr,
         .encodedData = input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength),
         .sampleRate = 32000,
@@ -321,16 +323,16 @@ SampleCollectionAsset parseCapcomSnesSamples(
     static_cast<void>(itemBuilder.add(root,
                                       ItemKind::Sample,
                                       "snes-brr-sample",
-                                      "Sample " + std::to_string(sampleInfo.srcn),
+                                      fmt::format("Sample {}", static_cast<unsigned>(sampleInfo.srcn)),
                                       input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength),
-                                      "DIR entry $" + std::to_string(sampleInfo.dirEntryAddress)));
+                                      fmt::format("DIR entry ${}", sampleInfo.dirEntryAddress)));
   }
 
   return SampleCollectionAsset{
       .metadata = AssetMetadata{
           .id = sampleCollectionId,
           .format = "CapcomSnes",
-          .name = std::string(displayName) + " Samples",
+          .name = fmt::format("{} Samples", displayName),
           .range = input.reader.range(rootOffset, rootSize),
           .items = std::move(items),
       },
@@ -375,7 +377,7 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(
     Instrument instrument{
         .bank = info.index >> 7,
         .program = info.index & 0x7f,
-        .name = "Instrument " + std::to_string(info.index),
+        .name = fmt::format("Instrument {}", info.index),
         .range = input.reader.range(info.address, 6),
     };
     instrument.regions.push_back(Region{
@@ -396,22 +398,22 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(
     const auto instrumentItem = itemBuilder.add(root,
                                                 ItemKind::Instrument,
                                                 "capcom-snes-instrument",
-                                                "Instrument " + std::to_string(info.index),
+                                                fmt::format("Instrument {}", info.index),
                                                 input.reader.range(info.address, 6),
-                                                "SRCN " + std::to_string(info.srcn));
+                                                fmt::format("SRCN {}", static_cast<unsigned>(info.srcn)));
     static_cast<void>(itemBuilder.add(instrumentItem,
                                       ItemKind::Region,
                                       "capcom-snes-region",
                                       "Region",
                                       input.reader.range(info.address, 6),
-                                      "Sample " + std::to_string(sampleIndex->second)));
+                                      fmt::format("Sample {}", sampleIndex->second)));
   }
 
   return InstrumentSetAsset{
       .metadata = AssetMetadata{
           .id = instrumentSetId,
           .format = "CapcomSnes",
-          .name = std::string(displayName) + " Instruments",
+          .name = fmt::format("{} Instruments", displayName),
           .range = input.reader.range(rootOffset, rootSize),
           .items = std::move(items),
       },
