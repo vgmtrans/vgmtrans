@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/PerformanceLowerer.h"
+#include "value/core/EventSequenceBuilder.h"
 
 #include <string_view>
 
@@ -29,39 +29,39 @@ class CapcomSnesProfile final : public core::SequencerProfile {
   [[nodiscard]] core::NoteTiming noteTiming(
       const core::NoteCommand& command,
       core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerNoteState(
+  [[nodiscard]] std::vector<core::Event> interpretNoteState(
       const core::NoteStateCommand& command,
       core::TrackState& state) const override;
   void applyDuration(const core::DurationCommand& command, core::TrackState& state) const override;
 
-  [[nodiscard]] std::vector<core::Event> lowerTempo(
+  [[nodiscard]] std::vector<core::Event> interpretTempo(
       const core::TempoCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerVolume(
+  [[nodiscard]] std::vector<core::Event> interpretVolume(
       const core::VolumeCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerProgram(
+  [[nodiscard]] std::vector<core::Event> interpretProgram(
       const core::ProgramCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerPan(
+  [[nodiscard]] std::vector<core::Event> interpretPan(
       const core::PanCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerMasterVolume(
+  [[nodiscard]] std::vector<core::Event> interpretMasterVolume(
       const core::MasterVolumeCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerReverb(
+  [[nodiscard]] std::vector<core::Event> interpretReverb(
       const core::ReverbCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerTuning(
+  [[nodiscard]] std::vector<core::Event> interpretTuning(
       const core::TuningCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerPortamento(
+  [[nodiscard]] std::vector<core::Event> interpretPortamento(
       const core::PortamentoCommand& command,
       core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerLfo(
+  [[nodiscard]] std::vector<core::Event> interpretLfo(
       const core::LfoCommand& command,
       core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::Event> lowerRepeatBreak(
+  [[nodiscard]] std::vector<core::Event> interpretRepeatBreak(
       const core::RepeatBreakCommand& command,
       core::TrackState& state) const override;
 

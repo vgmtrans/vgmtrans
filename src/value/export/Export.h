@@ -8,7 +8,7 @@
 
 #include "base/Types.h"
 #include "value/core/Model.h"
-#include "value/core/PerformanceLowerer.h"
+#include "value/core/EventSequenceBuilder.h"
 #include "value/core/Source.h"
 
 #include <string>

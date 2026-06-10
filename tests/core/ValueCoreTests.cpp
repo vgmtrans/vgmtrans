@@ -8,7 +8,7 @@
 #include "value/export/Export.h"
 #include "value/core/FormatModule.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/PerformanceLowerer.h"
+#include "value/core/EventSequenceBuilder.h"
 #include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
 #include "value/export/SoundFontExporter.h"
@@ -33,7 +33,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void capcomSnesModuleScansSpcThroughVirtualAramSource();
 void capcomSnesNoteStateCommandsAreTypedAndLowered();
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
-void capcomSnesPanLoweringDoesNotRecurveMidiPan();
+void capcomSnesPanEventsDoNotRecurveMidiPan();
 void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
 void capcomSnesMidiExportUsesSequenceProfileKey();
 
@@ -538,7 +538,7 @@ void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
       }},
   };
 
-  const EventSequence eventSequence = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const EventSequence eventSequence = EventSequenceBuilder().build(program, SequencerProfile{}, LoopPolicy::PlayOnce);
   const auto& events = eventSequence.tracks[0].events;
   expect(std::ranges::any_of(events, [](const Event& event) {
            const auto* note = std::get_if<NoteDuration>(&event);
@@ -548,7 +548,7 @@ void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
   expect(std::ranges::none_of(events, [](const Event& event) {
            return std::holds_alternative<Volume>(event);
          }),
-         "play-once lowering should skip commands exactly at the loop boundary");
+         "play-once event build should skip commands exactly at the loop boundary");
 }
 
 void performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce() {
@@ -568,13 +568,13 @@ void performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce() {
       }},
   };
 
-  const EventSequence eventSequence = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::Default);
+  const EventSequence eventSequence = EventSequenceBuilder().build(program, SequencerProfile{}, LoopPolicy::Default);
   const auto& events = eventSequence.tracks[0].events;
   expect(eventSequence.diagnostics.empty(), "unset default loop policy should not run until command cap");
   expect(std::ranges::count_if(events, [](const Event& event) {
            return std::holds_alternative<NoteDuration>(event);
          }) == 1,
-         "unset default loop policy should lower self-looping tracks once");
+         "unset default loop policy should build self-looping tracks once");
   expect(std::get<EndOfTrack>(events.back()).tick == 12,
          "unset default loop policy should end at the first playthrough boundary");
 }
@@ -597,7 +597,7 @@ void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
       }},
   };
 
-  const EventSequence eventSequence = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const EventSequence eventSequence = EventSequenceBuilder().build(program, SequencerProfile{}, LoopPolicy::PlayOnce);
   const auto& events = eventSequence.tracks[0].events;
   expect(std::ranges::any_of(events, [](const Event& event) {
            const auto* note = std::get_if<NoteDuration>(&event);
@@ -607,7 +607,7 @@ void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
   expect(std::ranges::none_of(events, [](const Event& event) {
            return std::holds_alternative<Volume>(event);
          }),
-         "loop-boundary fixture should not lower commands after the boundary");
+         "loop-boundary fixture should not build commands after the boundary");
 }
 
 void performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop() {
@@ -640,7 +640,7 @@ void performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop() {
       },
   };
 
-  const EventSequence eventSequence = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const EventSequence eventSequence = EventSequenceBuilder().build(program, SequencerProfile{}, LoopPolicy::PlayOnce);
   const auto countNotesAt = [](const EventTrack& track, u64 tick) {
     return std::ranges::count_if(track.events, [tick](const Event& event) {
       const auto* note = std::get_if<NoteDuration>(&event);
@@ -650,7 +650,7 @@ void performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop() {
 
   expect(countNotesAt(eventSequence.tracks[0], 0) == 1 && countNotesAt(eventSequence.tracks[0], 12) == 1 &&
              countNotesAt(eventSequence.tracks[0], 24) == 1,
-         "play-once lowering should replay earlier looped tracks until the shared stop tick");
+         "play-once event build should replay earlier looped tracks until the shared stop tick");
   expect(countNotesAt(eventSequence.tracks[1], 0) == 1 && countNotesAt(eventSequence.tracks[1], 12) == 1 &&
              countNotesAt(eventSequence.tracks[1], 24) == 1,
          "decoded loop boundaries should continue to their destination before the shared stop tick");
@@ -1062,7 +1062,7 @@ int main() {
     capcomSnesModuleScansSpcThroughVirtualAramSource();
     capcomSnesNoteStateCommandsAreTypedAndLowered();
     capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
-    capcomSnesPanLoweringDoesNotRecurveMidiPan();
+    capcomSnesPanEventsDoNotRecurveMidiPan();
     capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
     capcomSnesMidiExportUsesSequenceProfileKey();
   } catch (const std::exception& ex) {

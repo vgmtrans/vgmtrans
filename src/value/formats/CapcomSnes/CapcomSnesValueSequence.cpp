@@ -94,7 +94,7 @@ CommandTrack decodeCapcomSnesTrack(
 
   while (reader.has(offset, 1) && track.commands.size() < 4096) {
     if (!visitedOffsets.insert(offset).second) {
-      // Preserve decoded loop intent as data; the shared lowerer decides playback policy.
+      // Preserve decoded loop intent as data; the shared builder decides playback policy.
       track.commands.push_back(LoopBoundaryCommand{
           .destination = Address{offset},
           .trigger = Address{lastCommandOffset},

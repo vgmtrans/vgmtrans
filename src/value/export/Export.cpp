@@ -107,7 +107,7 @@ namespace {
     };
   }
 
-  auto eventSequence = PerformanceLowerer().lower(sequence->program, *profile, request.loopPolicy);
+  auto eventSequence = EventSequenceBuilder().build(sequence->program, *profile, request.loopPolicy);
   auto bytes = MidiExporter().exportMidi(eventSequence);
 
   return Artifact{

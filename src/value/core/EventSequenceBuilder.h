@@ -58,41 +58,41 @@ class SequencerProfile {
                           TrackState& state, std::vector<Event>& events) const;
   [[nodiscard]] virtual u32 restTicks(const RestCommand& command, TrackState& state) const;
   [[nodiscard]] virtual NoteTiming noteTiming(const NoteCommand& command, TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerNoteState(
+  [[nodiscard]] virtual std::vector<Event> interpretNoteState(
       const NoteStateCommand& command,
       TrackState& state) const;
   virtual void applyDuration(const DurationCommand& command, TrackState& state) const;
   virtual void applyTranspose(const TransposeCommand& command, TrackState& state) const;
 
-  [[nodiscard]] virtual std::vector<Event> lowerTempo(
+  [[nodiscard]] virtual std::vector<Event> interpretTempo(
       const TempoCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerProgram(
+  [[nodiscard]] virtual std::vector<Event> interpretProgram(
       const ProgramCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerVolume(
+  [[nodiscard]] virtual std::vector<Event> interpretVolume(
       const VolumeCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerPan(
+  [[nodiscard]] virtual std::vector<Event> interpretPan(
       const PanCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerMasterVolume(
+  [[nodiscard]] virtual std::vector<Event> interpretMasterVolume(
       const MasterVolumeCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerReverb(
+  [[nodiscard]] virtual std::vector<Event> interpretReverb(
       const ReverbCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerTuning(
+  [[nodiscard]] virtual std::vector<Event> interpretTuning(
       const TuningCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerPortamento(
+  [[nodiscard]] virtual std::vector<Event> interpretPortamento(
       const PortamentoCommand& command, TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerLfo(
+  [[nodiscard]] virtual std::vector<Event> interpretLfo(
       const LfoCommand& command, TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerEnvelope(
+  [[nodiscard]] virtual std::vector<Event> interpretEnvelope(
       const EnvelopeCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerDriverSpecific(
+  [[nodiscard]] virtual std::vector<Event> interpretDriverSpecific(
       const DriverSpecificCommand& command, TrackState& state) const;
-  [[nodiscard]] virtual std::vector<Event> lowerRepeatBreak(
+  [[nodiscard]] virtual std::vector<Event> interpretRepeatBreak(
       const RepeatBreakCommand& command, TrackState& state) const;
 };
 
-class PerformanceLowerer {
+class EventSequenceBuilder {
  public:
-  [[nodiscard]] EventSequence lower(
+  [[nodiscard]] EventSequence build(
       const CommandSequence& program,
       const SequencerProfile& profile,
       LoopPolicy loopPolicy) const;

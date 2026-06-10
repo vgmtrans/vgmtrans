@@ -32,7 +32,7 @@ constexpr std::string_view kV1ProfileName = "CapcomSnes:v1";
 constexpr std::string_view kV2ProfileName = "CapcomSnes:v2";
 constexpr std::string_view kV3ProfileName = "CapcomSnes:v3";
 
-struct PanLowering {
+struct PanControllerValues {
   u8 pan = 64;
   u8 expression = 127;
 };
@@ -121,12 +121,12 @@ void addLfoDepthEvents(std::vector<Event>& events, const TrackState& state, bool
   return ::capcom_snes::percentAmpTo14BitMidi(volume);
 }
 
-[[nodiscard]] PanLowering panLowering(CapcomSnesEngineVersion version, u32 rawValue) {
+[[nodiscard]] PanControllerValues panControllerValues(CapcomSnesEngineVersion version, u32 rawValue) {
   const auto biasedPan = static_cast<u8>(rawValue + 0x80);
   const auto pan = version == CapcomSnesEngineVersion::v1BgmInList
                        ? ::capcom_snes::linear8BitPanToMidi(biasedPan)
                        : ::capcom_snes::calculatePanV2(biasedPan);
-  return PanLowering{
+  return PanControllerValues{
       .pan = pan.midiPan,
       .expression = ::capcom_snes::percentAmpTo7BitMidi(pan.volumeScale),
   };
@@ -206,7 +206,7 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
   };
 }
 
-std::vector<Event> CapcomSnesProfile::lowerNoteState(
+std::vector<Event> CapcomSnesProfile::interpretNoteState(
     const NoteStateCommand& command,
     TrackState& state) const {
   std::vector<Event> events;
@@ -258,7 +258,7 @@ void CapcomSnesProfile::applyDuration(const DurationCommand& command, TrackState
   state.durationRate = command.rawValue;
 }
 
-std::vector<Event> CapcomSnesProfile::lowerTempo(
+std::vector<Event> CapcomSnesProfile::interpretTempo(
     const TempoCommand& command,
     const TrackState& state) const {
   return {Tempo{
@@ -267,7 +267,7 @@ std::vector<Event> CapcomSnesProfile::lowerTempo(
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::lowerVolume(
+std::vector<Event> CapcomSnesProfile::interpretVolume(
     const VolumeCommand& command,
     const TrackState& state) const {
   return {Volume14{
@@ -277,7 +277,7 @@ std::vector<Event> CapcomSnesProfile::lowerVolume(
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::lowerProgram(
+std::vector<Event> CapcomSnesProfile::interpretProgram(
     const ProgramCommand& command,
     const TrackState& state) const {
   return {
@@ -295,26 +295,26 @@ std::vector<Event> CapcomSnesProfile::lowerProgram(
   };
 }
 
-std::vector<Event> CapcomSnesProfile::lowerPan(
+std::vector<Event> CapcomSnesProfile::interpretPan(
     const PanCommand& command,
     const TrackState& state) const {
-  const auto lowered = panLowering(version_, command.rawValue);
+  const auto panValues = panControllerValues(version_, command.rawValue);
 
   return {
       Pan{
           .tick = state.tick,
           .channel = state.channel,
-          .value = lowered.pan,
+          .value = panValues.pan,
       },
       Expression{
           .tick = state.tick,
           .channel = state.channel,
-          .value = lowered.expression,
+          .value = panValues.expression,
       },
   };
 }
 
-std::vector<Event> CapcomSnesProfile::lowerMasterVolume(
+std::vector<Event> CapcomSnesProfile::interpretMasterVolume(
     const MasterVolumeCommand& command,
     const TrackState& state) const {
   return {MasterVolume{
@@ -323,7 +323,7 @@ std::vector<Event> CapcomSnesProfile::lowerMasterVolume(
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::lowerReverb(
+std::vector<Event> CapcomSnesProfile::interpretReverb(
     const ReverbCommand& command,
     const TrackState& state) const {
   return {Reverb{
@@ -333,7 +333,7 @@ std::vector<Event> CapcomSnesProfile::lowerReverb(
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::lowerTuning(
+std::vector<Event> CapcomSnesProfile::interpretTuning(
     const TuningCommand& command,
     const TrackState& state) const {
   return {FineTune{
@@ -343,14 +343,14 @@ std::vector<Event> CapcomSnesProfile::lowerTuning(
   }};
 }
 
-std::vector<Event> CapcomSnesProfile::lowerPortamento(
+std::vector<Event> CapcomSnesProfile::interpretPortamento(
     const PortamentoCommand& command,
     TrackState& state) const {
   state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(command.rawTime);
   return {};
 }
 
-std::vector<Event> CapcomSnesProfile::lowerLfo(
+std::vector<Event> CapcomSnesProfile::interpretLfo(
     const LfoCommand& command,
     TrackState& state) const {
   switch (command.rawType) {
@@ -399,7 +399,7 @@ std::vector<Event> CapcomSnesProfile::lowerLfo(
   }
 }
 
-std::vector<Event> CapcomSnesProfile::lowerRepeatBreak(
+std::vector<Event> CapcomSnesProfile::interpretRepeatBreak(
     const RepeatBreakCommand& command,
     TrackState& state) const {
   std::vector<Event> events;

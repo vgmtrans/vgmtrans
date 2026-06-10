@@ -6,7 +6,7 @@
 #pragma once
 
 #include "value/core/FormatModule.h"
-#include "value/core/PerformanceLowerer.h"
+#include "value/core/EventSequenceBuilder.h"
 #include "value/core/Session.h"
 
 namespace vgmtrans::formats {
