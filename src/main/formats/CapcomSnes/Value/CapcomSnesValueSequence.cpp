@@ -40,6 +40,41 @@ namespace {
   };
 }
 
+struct TrackDecodeCursor {
+  ByteReader reader;
+  u32& offset;
+
+  [[nodiscard]] bool has(u32 count) const {
+    return reader.has(offset, count);
+  }
+
+  [[nodiscard]] UnknownCommand truncated(u8 opcode, u32 beginOffset) const {
+    return UnknownCommand{.opcode = opcode, .range = reader.range(beginOffset, 1)};
+  }
+
+  [[nodiscard]] SourceRange rangeFrom(u32 beginOffset) const {
+    return reader.range(beginOffset, offset - beginOffset);
+  }
+
+  [[nodiscard]] u8 readU8() {
+    return reader.u8At(offset++);
+  }
+
+  [[nodiscard]] s8 readS8() {
+    return reader.s8At(offset++);
+  }
+
+  [[nodiscard]] u16 readBe16() {
+    const u16 value = reader.be16(offset);
+    offset += 2;
+    return value;
+  }
+
+  void skip(u32 count) {
+    offset += count;
+  }
+};
+
 }  // namespace
 
 TrackProgram decodeCapcomSnesTrack(
@@ -91,8 +126,10 @@ TrackProgram decodeCapcomSnesTrack(
       continue;
     }
 
-    auto need = [&](u32 count) {
-      return reader.has(offset, count);
+    TrackDecodeCursor cursor{reader, offset};
+    auto finishTruncated = [&] {
+      track.commands.push_back(cursor.truncated(status, beginOffset));
+      return track;
     };
 
     switch (status) {
@@ -121,149 +158,139 @@ TrackProgram decodeCapcomSnesTrack(
         });
         break;
       case 0x04:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(NoteStateCommand{
             .action = NoteStateAction::Attributes,
-            .rawValue = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawValue = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x05:
-        if (!need(2)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(2)) {
+          return finishTruncated();
         }
         track.commands.push_back(TempoCommand{
-            .rawValue = reader.be16(offset),
-            .range = reader.range(beginOffset, 3),
+            .rawValue = cursor.readBe16(),
+            .range = cursor.rangeFrom(beginOffset),
         });
-        offset += 2;
         break;
       case 0x06:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(DurationCommand{
-            .rawValue = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawValue = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x07:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(VolumeCommand{
-            .rawValue = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawValue = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x08:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(ProgramCommand{
-            .rawProgram = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawProgram = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x09:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(NoteStateCommand{
             .action = NoteStateAction::Octave,
-            .rawValue = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawValue = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x0a:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(GlobalTransposeCommand{
-            .rawSemitones = reader.s8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawSemitones = cursor.readS8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x0b:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(TransposeCommand{
-            .rawSemitones = reader.s8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawSemitones = cursor.readS8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x0c:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(TuningCommand{
-            .rawValue = reader.s8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawValue = cursor.readS8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x0d:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(PortamentoCommand{
-            .rawTime = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawTime = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x0e:
       case 0x0f:
       case 0x10:
-      case 0x11:
-        if (!need(3)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+      case 0x11: {
+        if (!cursor.has(3)) {
+          return finishTruncated();
         }
+        const u8 repeatCount = cursor.readU8();
+        const Address repeatDestination{cursor.readBe16()};
         track.commands.push_back(RepeatCommand{
             .slot = static_cast<u8>(status - 0x0e),
-            .count = reader.u8At(offset),
-            .destination = Address{reader.be16(offset + 1)},
-            .range = reader.range(beginOffset, 4),
+            .count = repeatCount,
+            .destination = repeatDestination,
+            .range = cursor.rangeFrom(beginOffset),
         });
-        offset += 3;
         break;
+      }
       case 0x12:
       case 0x13:
       case 0x14:
-      case 0x15:
-        if (!need(3)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+      case 0x15: {
+        if (!cursor.has(3)) {
+          return finishTruncated();
         }
+        const u8 rawAttributes = cursor.readU8();
+        const Address breakDestination{cursor.readBe16()};
         track.commands.push_back(RepeatBreakCommand{
             .slot = static_cast<u8>(status - 0x12),
-            .rawAttributes = reader.u8At(offset),
-            .destination = Address{reader.be16(offset + 1)},
-            .range = reader.range(beginOffset, 4),
+            .rawAttributes = rawAttributes,
+            .destination = breakDestination,
+            .range = cursor.rangeFrom(beginOffset),
         });
-        offset += 3;
         break;
+      }
       case 0x16: {
-        if (!need(2)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(2)) {
+          return finishTruncated();
         }
-        const Address destination{reader.be16(offset)};
+        const Address destination{cursor.readBe16()};
         track.commands.push_back(JumpCommand{
             .destination = destination,
-            .range = reader.range(beginOffset, 3),
+            .range = cursor.rangeFrom(beginOffset),
         });
         offset = static_cast<u32>(destination.value);
         break;
@@ -274,83 +301,78 @@ TrackProgram decodeCapcomSnesTrack(
         });
         return track;
       case 0x18:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(PanCommand{
-            .rawValue = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawValue = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x19:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(MasterVolumeCommand{
-            .rawValue = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawValue = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
-      case 0x1a:
-        if (!need(2)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+      case 0x1a: {
+        if (!cursor.has(2)) {
+          return finishTruncated();
         }
+        const u8 lfoType = cursor.readU8();
+        const u8 lfoAmount = cursor.readU8();
         track.commands.push_back(LfoCommand{
-            .target = reader.u8At(offset) == 0 ? LfoTarget::Pitch
-                      : reader.u8At(offset) == 1 ? LfoTarget::Volume
-                                                 : LfoTarget::Unknown,
-            .rawType = reader.u8At(offset),
-            .rawAmount = reader.u8At(offset + 1),
-            .range = reader.range(beginOffset, 3),
+            .target = lfoType == 0 ? LfoTarget::Pitch
+                      : lfoType == 1 ? LfoTarget::Volume
+                                     : LfoTarget::Unknown,
+            .rawType = lfoType,
+            .rawAmount = lfoAmount,
+            .range = cursor.rangeFrom(beginOffset),
         });
-        offset += 2;
         break;
+      }
       case 0x1b:
-        if (!need(2)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(2)) {
+          return finishTruncated();
         }
-        offset += 2;
+        cursor.skip(2);
         track.commands.push_back(driverCommand("Echo Param", reader, beginOffset, 3));
         break;
       case 0x1c:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(ReverbCommand{
-            .rawValue = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawValue = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x1d:
-        if (!need(1)) {
-          track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-          return track;
+        if (!cursor.has(1)) {
+          return finishTruncated();
         }
         track.commands.push_back(EnvelopeCommand{
-            .rawRelease = reader.u8At(offset++),
-            .range = reader.range(beginOffset, 2),
+            .rawRelease = cursor.readU8(),
+            .range = cursor.rangeFrom(beginOffset),
         });
         break;
       case 0x1e:
       case 0x1f:
         if (version == CapcomSnesEngineVersion::v1BgmInList) {
           // In the oldest driver these bytes are consumed commands; newer drivers treat them as NOPs.
-          if (!need(1)) {
-            track.commands.push_back(UnknownCommand{.opcode = status, .range = reader.range(beginOffset, 1)});
-            return track;
+          if (!cursor.has(1)) {
+            return finishTruncated();
           }
+          cursor.skip(1);
           const auto bytes = reader.slice(beginOffset, 2);
           track.commands.push_back(UnknownCommand{
               .opcode = status,
               .bytes = {bytes.begin(), bytes.end()},
-              .range = reader.range(beginOffset, 2),
+              .range = cursor.rangeFrom(beginOffset),
           });
-          ++offset;
         } else {
           track.commands.push_back(driverCommand("Nop", reader, beginOffset, 1));
         }
