@@ -200,8 +200,8 @@ const char* valueAssetKindName(const vgmtrans::core::Asset& asset) {
   if (std::holds_alternative<SequenceAsset>(asset)) {
     return "sequence";
   }
-  if (std::holds_alternative<InstrumentBankAsset>(asset)) {
-    return "instrument-bank";
+  if (std::holds_alternative<InstrumentSetAsset>(asset)) {
+    return "instrument-set";
   }
   if (std::holds_alternative<SampleCollectionAsset>(asset)) {
     return "sample-collection";
@@ -273,9 +273,9 @@ void printValueProjectSummary(const vgmtrans::core::Project& project) {
     if (std::holds_alternative<vgmtrans::core::SequenceAsset>(asset)) {
       const auto& sequence = std::get<vgmtrans::core::SequenceAsset>(asset);
       fmt::print(" tracks={}", sequence.program.tracks.size());
-    } else if (std::holds_alternative<vgmtrans::core::InstrumentBankAsset>(asset)) {
-      const auto& bank = std::get<vgmtrans::core::InstrumentBankAsset>(asset);
-      fmt::print(" instruments={}", bank.bank.instruments.size());
+    } else if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(asset)) {
+      const auto& instrumentSet = std::get<vgmtrans::core::InstrumentSetAsset>(asset);
+      fmt::print(" instruments={}", instrumentSet.instruments.size());
     } else if (std::holds_alternative<vgmtrans::core::SampleCollectionAsset>(asset)) {
       const auto& samples = std::get<vgmtrans::core::SampleCollectionAsset>(asset);
       fmt::print(" samples={}", samples.samples.samples.size());
@@ -285,10 +285,10 @@ void printValueProjectSummary(const vgmtrans::core::Project& project) {
 
   for (size_t i = 0; i < project.collections.size(); ++i) {
     const auto& collection = project.collections[i];
-    fmt::println("collection #{} id={} name='{}' sequence={} instrumentBanks={} sampleCollections={}",
+    fmt::println("collection #{} id={} name='{}' sequence={} instrumentSets={} sampleCollections={}",
                  i, collection.id.value, collection.name,
                  collection.sequence ? std::to_string(collection.sequence->value) : std::string("-"),
-                 collection.instrumentBanks.size(), collection.sampleCollections.size());
+                 collection.instrumentSets.size(), collection.sampleCollections.size());
   }
 }
 
@@ -702,8 +702,8 @@ void printValueCollectionInfo(const vgmtrans::core::Project& project,
     fmt::println("  Sequence: none");
   }
 
-  for (size_t i = 0; i < collection.instrumentBanks.size(); ++i) {
-    printValueCollectionAssetRef(project, "InstrumentBank", i, collection.instrumentBanks[i]);
+  for (size_t i = 0; i < collection.instrumentSets.size(); ++i) {
+    printValueCollectionAssetRef(project, "InstrumentSet", i, collection.instrumentSets[i]);
   }
   for (size_t i = 0; i < collection.sampleCollections.size(); ++i) {
     printValueCollectionAssetRef(project, "SampleCollection", i, collection.sampleCollections[i]);
@@ -723,10 +723,10 @@ bool printValueCollections(const vgmtrans::core::Project& project,
   if (args.size() <= collectionArgIndex) {
     for (size_t i = 0; i < project.collections.size(); ++i) {
       const auto& collection = project.collections[i];
-      fmt::println("collection #{} id={} name='{}' sequence={} instrumentBanks={} sampleCollections={} misc={}",
+      fmt::println("collection #{} id={} name='{}' sequence={} instrumentSets={} sampleCollections={} misc={}",
                    i, collection.id.value, collection.name,
                    collection.sequence ? std::to_string(collection.sequence->value) : std::string("-"),
-                   collection.instrumentBanks.size(), collection.sampleCollections.size(),
+                   collection.instrumentSets.size(), collection.sampleCollections.size(),
                    collection.miscAssets.size());
     }
     return true;
@@ -795,22 +795,22 @@ bool printValueInstruments(const vgmtrans::core::Project& project,
       return false;
     }
 
-    const auto* bankAsset = std::get_if<vgmtrans::core::InstrumentBankAsset>(
+    const auto* instrumentSetAsset = std::get_if<vgmtrans::core::InstrumentSetAsset>(
         &project.assets[static_cast<size_t>(assetIndex)]);
-    if (bankAsset == nullptr) {
-      fmt::println("Asset is not an instrument bank");
+    if (instrumentSetAsset == nullptr) {
+      fmt::println("Asset is not an instrument set");
       return false;
     }
 
-    const auto& meta = bankAsset->metadata;
-    fmt::println("instrument-bank asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} instruments={}",
+    const auto& meta = instrumentSetAsset->metadata;
+    fmt::println("instrument-set asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} instruments={}",
                  assetIndex, meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size,
-                 bankAsset->bank.instruments.size());
+                 instrumentSetAsset->instruments.size());
 
     const size_t instrumentArgIndex = assetArgIndex + 1;
     if (args.size() <= instrumentArgIndex) {
-      for (size_t i = 0; i < bankAsset->bank.instruments.size(); ++i) {
-        const auto& instrument = bankAsset->bank.instruments[i];
+      for (size_t i = 0; i < instrumentSetAsset->instruments.size(); ++i) {
+        const auto& instrument = instrumentSetAsset->instruments[i];
         fmt::println("  instrument #{} bank={} program={} regions={} name='{}' range=0x{:x}:0x{:x}",
                      i, instrument.bank, instrument.program, instrument.regions.size(), instrument.name,
                      instrument.range.offset, instrument.range.size);
@@ -820,12 +820,12 @@ bool printValueInstruments(const vgmtrans::core::Project& project,
 
     const int instrumentIndex = std::stoi(args[instrumentArgIndex]);
     if (instrumentIndex < 0 ||
-        static_cast<size_t>(instrumentIndex) >= bankAsset->bank.instruments.size()) {
+        static_cast<size_t>(instrumentIndex) >= instrumentSetAsset->instruments.size()) {
       fmt::println("Instrument index out of bounds");
       return false;
     }
 
-    printValueInstrument(bankAsset->bank.instruments[static_cast<size_t>(instrumentIndex)],
+    printValueInstrument(instrumentSetAsset->instruments[static_cast<size_t>(instrumentIndex)],
                          static_cast<size_t>(instrumentIndex));
     return true;
   } catch (...) {
@@ -1889,10 +1889,10 @@ void registerCommands() {
         value_collections},
        {"collections-path", "<path> [collection_idx]", "List or inspect value collections from a filesystem path",
         3, value_collections_path},
-       {"instruments", "<rawfile_idx> <asset_idx> [instrument_idx]", "List or inspect a value instrument bank",
+       {"instruments", "<rawfile_idx> <asset_idx> [instrument_idx]", "List or inspect a value instrument set",
         4, value_instruments},
        {"instruments-path", "<path> <asset_idx> [instrument_idx]",
-        "List or inspect a value instrument bank from a filesystem path", 4, value_instruments_path},
+        "List or inspect a value instrument set from a filesystem path", 4, value_instruments_path},
        {"samples", "<rawfile_idx> <asset_idx> [sample_idx]", "List or inspect a value sample collection",
         4, value_samples},
        {"samples-path", "<path> <asset_idx> [sample_idx]",

@@ -325,7 +325,7 @@ SampleCollectionAsset parseCapcomSnesSamples(
                                       "snes-brr-sample",
                                       fmt::format("Sample {}", static_cast<unsigned>(sampleInfo.srcn)),
                                       input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength),
-                                      fmt::format("DIR entry ${}", sampleInfo.dirEntryAddress)));
+                                      fmt::format("DIR entry ${:04X}", sampleInfo.dirEntryAddress)));
   }
 
   return SampleCollectionAsset{

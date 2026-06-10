@@ -367,7 +367,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sampleItem->parent == sampleCollectionItem->id, "sample item should point back to the sample collection root");
   expect(sampleItem->range.offset == 0x6000 && sampleItem->range.size == 9,
          "sample item should preserve the encoded BRR source range");
-  expect(sampleItem->description == "DIR entry $20480", "sample item should retain its source DIR entry address");
+  expect(sampleItem->description == "DIR entry $5000", "sample item should retain its source DIR entry address");
 
   expect(project.collections[0].sequence == sequence->metadata.id, "collection should reference sequence");
   expect(project.collections[0].instrumentSets == std::vector<AssetId>{instruments->metadata.id},

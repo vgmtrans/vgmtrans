@@ -6,6 +6,8 @@
 
 #include "formats/CapcomSnes/Value/CapcomSnesValueSequence.h"
 
+#include <fmt/format.h>
+
 #include <set>
 #include <string>
 #include <utility>
@@ -407,7 +409,7 @@ SequenceAsset parseCapcomSnesSequence(
                                            "capcom-snes-track-pointer",
                                            "Track Pointer",
                                            input.reader.range(pointerOffset, 2),
-                                           "Track starts at $" + std::to_string(trackAddress));
+                                           fmt::format("Track starts at ${:04X}", trackAddress));
     auto track = decodeCapcomSnesTrack(input.reader,
                                        layout.version,
                                        static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex),
