@@ -6,14 +6,13 @@
 
 #include "value/export/DlsExporter.h"
 
-#include "value/core/SampleDecoder.h"
 #include "value/export/ExportDiagnostics.h"
+#include "value/export/SynthExportData.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
-#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -56,14 +55,7 @@ struct Chunk {
   std::vector<u8> payload;
 };
 
-struct DecodedDlsSample {
-  AssetId collectionId;
-  u32 localIndex = 0;
-  std::string name;
-  Tuning pitch;
-  double attenuationDb = 0.0;
-  DecodedSample decoded;
-};
+using DecodedDlsSample = DecodedSynthSample;
 
 struct DlsRegion {
   const Region* region = nullptr;
@@ -81,8 +73,6 @@ struct DlsConnection {
   u16 destination = 0;
   s32 scale = 0;
 };
-
-using SampleIndexKey = std::pair<u32, u32>;
 
 void writeAscii(std::vector<u8>& bytes, std::string_view text) {
   bytes.insert(bytes.end(), text.begin(), text.end());
@@ -176,10 +166,6 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     return std::string(fallback);
   }
   return name;
-}
-
-[[nodiscard]] u16 clampU16(u32 value) {
-  return static_cast<u16>(std::min<u32>(value, std::numeric_limits<u16>::max()));
 }
 
 [[nodiscard]] u8 clampU7(s32 value) {
@@ -406,65 +392,11 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return static_cast<s32>(std::clamp(std::lround(scaledLevel), 0l, static_cast<long>(kDlsSustainLevelFullScale)));
 }
 
-[[nodiscard]] std::vector<DecodedDlsSample> decodeSamples(const DlsInput& input, const SourceStore& sources,
-                                                          std::vector<Diagnostic>& diagnostics) {
-  std::vector<DecodedDlsSample> samples;
-  auto decoders = SampleDecoderRegistry::withDefaultDecoders();
-
-  for (const auto* collection : input.sampleCollections) {
-    if (collection == nullptr) {
-      continue;
-    }
-
-    for (u32 sampleIndex = 0; sampleIndex < collection->samples.samples.size(); ++sampleIndex) {
-      const auto& sample = collection->samples.samples[sampleIndex];
-      if (!sources.contains(sample.encodedData.source)) {
-        diagnostics.push_back(exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
-        continue;
-      }
-
-      auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source));
-      if (!decoded) {
-        diagnostics.push_back(exportError("No decoder registered for sample codec", validDiagnosticRange(sample.encodedData)));
-        continue;
-      }
-
-      samples.push_back(DecodedDlsSample{
-          .collectionId = collection->metadata.id,
-          .localIndex = sampleIndex,
-          .name = dlsName(sample.name, "Wave"),
-          .pitch = sample.pitch,
-          .attenuationDb = sample.attenuationDb,
-          .decoded = std::move(*decoded),
-      });
-    }
-  }
-
-  return samples;
-}
-
-[[nodiscard]] std::map<SampleIndexKey, u16> sampleIndexMap(std::span<const DecodedDlsSample> samples) {
-  std::map<SampleIndexKey, u16> indexes;
-  for (u32 i = 0; i < samples.size(); ++i) {
-    indexes[{samples[i].collectionId.value, samples[i].localIndex}] = clampU16(i);
-  }
-  return indexes;
-}
-
-[[nodiscard]] std::optional<AssetId> defaultSampleCollection(const DlsInput& input) {
-  for (const auto* collection : input.sampleCollections) {
-    if (collection != nullptr) {
-      return collection->metadata.id;
-    }
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] std::vector<DlsInstrument> collectInstruments(const DlsInput& input,
-                                                            const std::map<SampleIndexKey, u16>& samples,
+                                                            const SynthSampleIndexMap& samples,
                                                             std::vector<Diagnostic>& diagnostics) {
   std::vector<DlsInstrument> instruments;
-  const auto fallbackCollection = defaultSampleCollection(input);
+  const auto fallbackCollection = firstSampleCollectionId(input.sampleCollections);
 
   for (const auto* instrumentSet : input.instrumentSets) {
     if (instrumentSet == nullptr) {
@@ -474,22 +406,14 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     for (const auto& instrument : instrumentSet->instruments) {
       DlsInstrument dlsInstrument{.instrument = &instrument};
       for (const auto& region : instrument.regions) {
-        const std::optional<AssetId> collectionId =
-            region.sample.collection ? region.sample.collection : fallbackCollection;
-        if (!collectionId) {
-          diagnostics.push_back(exportError("Region does not reference a sample collection", validDiagnosticRange(region.range)));
-          continue;
-        }
-
-        const auto found = samples.find({collectionId->value, region.sample.index});
-        if (found == samples.end()) {
-          diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
+        const auto waveIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
+        if (!waveIndex) {
           continue;
         }
 
         dlsInstrument.regions.push_back(DlsRegion{
             .region = &region,
-            .waveIndex = found->second,
+            .waveIndex = *waveIndex,
         });
       }
 
@@ -723,8 +647,11 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 DlsResult DlsExporter::exportDls(const DlsInput& input, const SourceStore& sources) const {
   DlsResult result;
 
-  auto samples = decodeSamples(input, sources, result.diagnostics);
-  const auto samplesByReference = sampleIndexMap(samples);
+  auto samples = decodeSynthSamples(input.sampleCollections, sources, result.diagnostics);
+  for (auto& sample : samples) {
+    sample.name = dlsName(std::move(sample.name), "Wave");
+  }
+  const auto samplesByReference = synthSampleIndexMap(samples);
   auto instruments = collectInstruments(input, samplesByReference, result.diagnostics);
 
   if (samples.empty()) {

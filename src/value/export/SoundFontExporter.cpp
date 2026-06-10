@@ -7,12 +7,12 @@
 #include "value/export/SoundFontExporter.h"
 
 #include "value/export/ExportDiagnostics.h"
+#include "value/export/SynthExportData.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
-#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -440,43 +440,18 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   };
 }
 
-[[nodiscard]] std::vector<DecodedSfSample> decodeSamples(const SoundFontInput& input, const SourceStore& sources,
-                                                         std::vector<Diagnostic>& diagnostics) {
+[[nodiscard]] std::vector<DecodedSfSample> sf2Samples(std::vector<DecodedSynthSample> decodedSamples) {
   std::vector<DecodedSfSample> samples;
-  auto decoders = SampleDecoderRegistry::withDefaultDecoders();
-
-  for (const auto* collection : input.sampleCollections) {
-    if (collection == nullptr) {
-      continue;
-    }
-
-    for (u32 sampleIndex = 0; sampleIndex < collection->samples.samples.size(); ++sampleIndex) {
-      const auto& sample = collection->samples.samples[sampleIndex];
-      if (!sources.contains(sample.encodedData.source)) {
-        diagnostics.push_back(exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
-        continue;
-      }
-
-      auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source));
-      if (!decoded) {
-        diagnostics.push_back(exportError("No decoder registered for sample codec", validDiagnosticRange(sample.encodedData)));
-        continue;
-      }
-      if (decoded->channels != 1) {
-        diagnostics.push_back(
-            exportWarning("Skipping non-mono sample for SoundFont2 export", validDiagnosticRange(sample.encodedData)));
-        continue;
-      }
-
-      samples.push_back(DecodedSfSample{
-          .collectionId = collection->metadata.id,
-          .localIndex = sampleIndex,
-          .name = sf2Name(sample.name, "Sample"),
-          .pitch = sample.pitch,
-          .attenuationDb = sample.attenuationDb,
-          .decoded = std::move(*decoded),
-      });
-    }
+  samples.reserve(decodedSamples.size());
+  for (auto& sample : decodedSamples) {
+    samples.push_back(DecodedSfSample{
+        .collectionId = sample.collectionId,
+        .localIndex = sample.localIndex,
+        .name = sf2Name(std::move(sample.name), "Sample"),
+        .pitch = sample.pitch,
+        .attenuationDb = sample.attenuationDb,
+        .decoded = std::move(sample.decoded),
+    });
   }
 
   u32 frameCursor = 0;
@@ -495,30 +470,11 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return samples;
 }
 
-using SampleIndexKey = std::pair<u32, u32>;
-
-[[nodiscard]] std::map<SampleIndexKey, u16> sampleIndexMap(std::span<const DecodedSfSample> samples) {
-  std::map<SampleIndexKey, u16> indexes;
-  for (u32 i = 0; i < samples.size(); ++i) {
-    indexes[{samples[i].collectionId.value, samples[i].localIndex}] = clampU16(i);
-  }
-  return indexes;
-}
-
-[[nodiscard]] std::optional<AssetId> defaultSampleCollection(const SoundFontInput& input) {
-  for (const auto* collection : input.sampleCollections) {
-    if (collection != nullptr) {
-      return collection->metadata.id;
-    }
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] std::vector<SfInstrument> collectInstruments(const SoundFontInput& input,
-                                                           const std::map<SampleIndexKey, u16>& samples,
+                                                           const SynthSampleIndexMap& samples,
                                                            std::vector<Diagnostic>& diagnostics) {
   std::vector<SfInstrument> instruments;
-  const auto fallbackCollection = defaultSampleCollection(input);
+  const auto fallbackCollection = firstSampleCollectionId(input.sampleCollections);
 
   for (const auto* instrumentSet : input.instrumentSets) {
     if (instrumentSet == nullptr) {
@@ -528,22 +484,14 @@ using SampleIndexKey = std::pair<u32, u32>;
     for (const auto& instrument : instrumentSet->instruments) {
       SfInstrument sfInstrument{.instrument = &instrument};
       for (const auto& region : instrument.regions) {
-        const std::optional<AssetId> collectionId =
-            region.sample.collection ? region.sample.collection : fallbackCollection;
-        if (!collectionId) {
-          diagnostics.push_back(exportError("Region does not reference a sample collection", validDiagnosticRange(region.range)));
-          continue;
-        }
-
-        const auto found = samples.find({collectionId->value, region.sample.index});
-        if (found == samples.end()) {
-          diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
+        const auto sampleIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
+        if (!sampleIndex) {
           continue;
         }
 
         sfInstrument.regions.push_back(SfRegion{
             .region = &region,
-            .sampleIndex = found->second,
+            .sampleIndex = *sampleIndex,
         });
       }
 
@@ -802,8 +750,15 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, const SourceStore& sources) const {
   SoundFontResult result;
 
-  auto samples = decodeSamples(input, sources, result.diagnostics);
-  const auto samplesByReference = sampleIndexMap(samples);
+  auto decodedSamples = decodeSynthSamples(input.sampleCollections,
+                                           sources,
+                                           result.diagnostics,
+                                           SynthSampleDecodeOptions{
+                                               .requireMono = true,
+                                               .nonMonoWarning = "Skipping non-mono sample for SoundFont2 export",
+                                           });
+  const auto samplesByReference = synthSampleIndexMap(decodedSamples);
+  auto samples = sf2Samples(std::move(decodedSamples));
   auto instruments = collectInstruments(input, samplesByReference, result.diagnostics);
 
   if (samples.empty()) {
