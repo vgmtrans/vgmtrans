@@ -99,7 +99,7 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
 }
 
 [[nodiscard]] std::optional<u64> firstLoopTick(
-    const CommandSequence& program,
+    const CommandSequence& commandSequence,
     const CommandTrack& track,
     const SequencerProfile& profile,
     u8 channel) {
@@ -108,7 +108,7 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
   TrackState state{
       .trackIndex = track.sourceTrackNumber,
       .channel = channel,
-      .globalTranspose = program.behavior.initialGlobalTranspose,
+      .globalTranspose = commandSequence.behavior.initialGlobalTranspose,
   };
   size_t pc = 0;
   size_t executedCommands = 0;
@@ -389,27 +389,27 @@ std::vector<Event> SequencerProfile::interpretRepeatBreak(
 }
 
 EventSequence EventSequenceBuilder::build(
-    const CommandSequence& program,
+    const CommandSequence& commandSequence,
     const SequencerProfile& profile,
     LoopPolicy loopPolicy) const {
   if (loopPolicy == LoopPolicy::Default) {
-    loopPolicy = program.behavior.defaultLoopPolicy;
+    loopPolicy = commandSequence.behavior.defaultLoopPolicy;
   }
   if (loopPolicy == LoopPolicy::Default) {
     loopPolicy = LoopPolicy::PlayOnce;
   }
 
   EventSequence result{
-      .timebase = program.timebase,
+      .timebase = commandSequence.timebase,
   };
 
   std::optional<u64> playOnceStopTick;
-  std::vector<std::optional<u64>> firstLoopTicks(program.tracks.size());
+  std::vector<std::optional<u64>> firstLoopTicks(commandSequence.tracks.size());
   if (loopPolicy == LoopPolicy::PlayOnce) {
     // All tracks stop at the latest first-loop tick so short tracks do not truncate the song.
-    for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
-      const auto loopTick = firstLoopTick(program,
-                                         program.tracks[trackIndex],
+    for (size_t trackIndex = 0; trackIndex < commandSequence.tracks.size(); ++trackIndex) {
+      const auto loopTick = firstLoopTick(commandSequence,
+                                         commandSequence.tracks[trackIndex],
                                          profile,
                                          static_cast<u8>(trackIndex % 16));
       firstLoopTicks[trackIndex] = loopTick;
@@ -419,32 +419,32 @@ EventSequence EventSequenceBuilder::build(
     }
   }
 
-  for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
-    const auto& track = program.tracks[trackIndex];
+  for (size_t trackIndex = 0; trackIndex < commandSequence.tracks.size(); ++trackIndex) {
+    const auto& track = commandSequence.tracks[trackIndex];
     TrackState state{
         .trackIndex = static_cast<u32>(trackIndex),
         .channel = static_cast<u8>(trackIndex % 16),
-        .globalTranspose = program.behavior.initialGlobalTranspose,
+        .globalTranspose = commandSequence.behavior.initialGlobalTranspose,
     };
     EventTrack eventTrack{
         .name = "Track " + std::to_string(track.sourceTrackNumber),
     };
 
-    if (program.behavior.writeInitialMonoMode) {
+    if (commandSequence.behavior.writeInitialMonoMode) {
       eventTrack.events.push_back(MonoMode{
           .tick = 0,
           .channel = state.channel,
           .channels = 0,
       });
     }
-    if (program.behavior.writeInitialReverb) {
+    if (commandSequence.behavior.writeInitialReverb) {
       eventTrack.events.push_back(Reverb{
           .tick = 0,
           .channel = state.channel,
-          .value = program.behavior.initialReverb,
+          .value = commandSequence.behavior.initialReverb,
       });
     }
-    profile.beginTrack(program, track, state, eventTrack.events);
+    profile.beginTrack(commandSequence, track, state, eventTrack.events);
 
     const auto indexes = commandIndexByOffset(track);
     size_t pc = 0;

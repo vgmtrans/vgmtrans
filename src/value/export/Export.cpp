@@ -94,9 +94,9 @@ namespace {
     };
   }
 
-  const std::string profileName = sequence->program.sequencerProfile.empty()
+  const std::string profileName = sequence->commandSequence.sequencerProfile.empty()
                                       ? sequence->metadata.format
-                                      : sequence->program.sequencerProfile;
+                                      : sequence->commandSequence.sequencerProfile;
   // Some formats scan as one asset format but need a dialect-specific sequencer profile.
   auto profile = profiles.create(profileName);
   if (!profile) {
@@ -107,7 +107,7 @@ namespace {
     };
   }
 
-  auto eventSequence = EventSequenceBuilder().build(sequence->program, *profile, request.loopPolicy);
+  auto eventSequence = EventSequenceBuilder().build(sequence->commandSequence, *profile, request.loopPolicy);
   auto bytes = MidiExporter().exportMidi(eventSequence);
 
   return Artifact{

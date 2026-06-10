@@ -54,7 +54,7 @@ class SequencerProfile {
  public:
   virtual ~SequencerProfile() = default;
 
-  virtual void beginTrack(const CommandSequence& program, const CommandTrack& track,
+  virtual void beginTrack(const CommandSequence& commandSequence, const CommandTrack& track,
                           TrackState& state, std::vector<Event>& events) const;
   [[nodiscard]] virtual u32 restTicks(const RestCommand& command, TrackState& state) const;
   [[nodiscard]] virtual NoteTiming noteTiming(const NoteCommand& command, TrackState& state) const;
@@ -93,7 +93,7 @@ class SequencerProfile {
 class EventSequenceBuilder {
  public:
   [[nodiscard]] EventSequence build(
-      const CommandSequence& program,
+      const CommandSequence& commandSequence,
       const SequencerProfile& profile,
       LoopPolicy loopPolicy) const;
 };

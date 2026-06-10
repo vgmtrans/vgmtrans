@@ -138,54 +138,54 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence != nullptr, "first CapcomSnes asset should be sequence");
   expect(sequence->metadata.format == "CapcomSnes", "sequence should retain format name");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should point at fixed BGM header body");
-  expect(sequence->program.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
-  expect(sequence->program.behavior.linearAmplitudeScale, "sequence should carry linear amplitude behavior");
-  expect(sequence->program.behavior.writeInitialMonoMode, "sequence should carry mono mode behavior");
-  expect(sequence->program.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
+  expect(sequence->commandSequence.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
+  expect(sequence->commandSequence.behavior.linearAmplitudeScale, "sequence should carry linear amplitude behavior");
+  expect(sequence->commandSequence.behavior.writeInitialMonoMode, "sequence should carry mono mode behavior");
+  expect(sequence->commandSequence.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
          "sequence should carry CapcomSnes default loop policy");
-  expect(sequence->program.sequencerProfile == capcomSnesProfileName(CapcomSnesEngineVersion::v3BgmFixedLocation),
+  expect(sequence->commandSequence.sequencerProfile == capcomSnesProfileName(CapcomSnesEngineVersion::v3BgmFixedLocation),
          "sequence should carry the detected CapcomSnes profile key");
-  expect(sequence->program.tracks.size() == 8, "sequence should decode all nonzero track pointers");
-  expect(std::holds_alternative<TempoCommand>(sequence->program.tracks[0].commands[0]),
+  expect(sequence->commandSequence.tracks.size() == 8, "sequence should decode all nonzero track pointers");
+  expect(std::holds_alternative<TempoCommand>(sequence->commandSequence.tracks[0].commands[0]),
          "track should decode tempo command");
-  expect(std::get<TempoCommand>(sequence->program.tracks[0].commands[0]).rawValue == 0x1234,
+  expect(std::get<TempoCommand>(sequence->commandSequence.tracks[0].commands[0]).rawValue == 0x1234,
          "tempo command should preserve raw big-endian value");
-  expect(std::holds_alternative<ProgramCommand>(sequence->program.tracks[0].commands[1]),
+  expect(std::holds_alternative<ProgramCommand>(sequence->commandSequence.tracks[0].commands[1]),
          "track should decode program command");
-  expect(std::holds_alternative<VolumeCommand>(sequence->program.tracks[0].commands[2]),
+  expect(std::holds_alternative<VolumeCommand>(sequence->commandSequence.tracks[0].commands[2]),
          "track should decode volume command");
-  expect(std::holds_alternative<PanCommand>(sequence->program.tracks[0].commands[3]),
+  expect(std::holds_alternative<PanCommand>(sequence->commandSequence.tracks[0].commands[3]),
          "track should decode pan command");
-  expect(std::holds_alternative<LfoCommand>(sequence->program.tracks[0].commands[4]),
+  expect(std::holds_alternative<LfoCommand>(sequence->commandSequence.tracks[0].commands[4]),
          "track should decode LFO command");
-  expect(std::holds_alternative<LfoCommand>(sequence->program.tracks[0].commands[5]),
+  expect(std::holds_alternative<LfoCommand>(sequence->commandSequence.tracks[0].commands[5]),
          "track should decode LFO rate command");
-  expect(std::holds_alternative<NoteCommand>(sequence->program.tracks[0].commands[6]),
+  expect(std::holds_alternative<NoteCommand>(sequence->commandSequence.tracks[0].commands[6]),
          "track should decode note command");
-  expect(std::holds_alternative<EndCommand>(sequence->program.tracks[0].commands[7]),
+  expect(std::holds_alternative<EndCommand>(sequence->commandSequence.tracks[0].commands[7]),
          "track should decode end command");
-  expect(sequence->program.referencedInstruments.size() == 1,
+  expect(sequence->commandSequence.referencedInstruments.size() == 1,
          "sequence should expose unique referenced instruments");
-  expect(sequence->program.referencedInstruments[0].bank == 0 &&
-             sequence->program.referencedInstruments[0].program == 0,
+  expect(sequence->commandSequence.referencedInstruments[0].bank == 0 &&
+             sequence->commandSequence.referencedInstruments[0].program == 0,
          "instrument reference should preserve decoded bank and program");
-  expect(sequence->program.referencedInstruments[0].asset == project.collections[0].instrumentSets[0],
+  expect(sequence->commandSequence.referencedInstruments[0].asset == project.collections[0].instrumentSets[0],
          "instrument reference should point at the decoded instrument set asset");
-  expect(sequence->program.referencedInstruments[0].range.has_value() &&
-             sequence->program.referencedInstruments[0].range->offset == 0x3003 &&
-             sequence->program.referencedInstruments[0].range->size == 2,
+  expect(sequence->commandSequence.referencedInstruments[0].range.has_value() &&
+             sequence->commandSequence.referencedInstruments[0].range->offset == 0x3003 &&
+             sequence->commandSequence.referencedInstruments[0].range->size == 2,
          "instrument reference should preserve the program command source range");
 
   const auto& sequenceItems = sequence->metadata.items.nodes;
   const auto commandItemCount =
       std::ranges::count_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Command; });
-  expect(commandItemCount == sequence->program.tracks.size() * sequence->program.tracks[0].commands.size(),
+  expect(commandItemCount == sequence->commandSequence.tracks.size() * sequence->commandSequence.tracks[0].commands.size(),
          "sequence item tree should expose decoded command nodes for every track");
 
   const auto firstTrackItem =
       std::ranges::find_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Track; });
   expect(firstTrackItem != sequenceItems.end(), "sequence item tree should expose track nodes");
-  expect(firstTrackItem->children.size() == sequence->program.tracks[0].commands.size(),
+  expect(firstTrackItem->children.size() == sequence->commandSequence.tracks[0].commands.size(),
          "track item should parent its decoded command nodes");
 
   const auto firstTempoItem = std::ranges::find_if(sequenceItems, [](const ItemNode& item) {
@@ -199,7 +199,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "command item should preserve command source range");
 
   const EventSequence eventSequence = EventSequenceBuilder().build(
-      sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+      sequence->commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(eventSequence.diagnostics.empty(), "CapcomSnes event sequence build should not warn for linear fixture");
   expect(eventSequence.tracks.size() == 8, "builder should preserve track count");
   expect(eventSequence.tracks[0].events.size() == 14, "built track should include initial, command, and end events");
@@ -428,9 +428,9 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
 
   const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
   expect(sequence != nullptr, "CapcomSnes note-state scan should produce a sequence");
-  expect(!sequence->program.tracks.empty(), "CapcomSnes note-state scan should decode tracks");
+  expect(!sequence->commandSequence.tracks.empty(), "CapcomSnes note-state scan should decode tracks");
 
-  const auto& commands = sequence->program.tracks[0].commands;
+  const auto& commands = sequence->commandSequence.tracks[0].commands;
   expect(commands.size() == 4, "CapcomSnes note-state fixture should decode four commands");
 
   const auto* octave = std::get_if<NoteStateCommand>(&commands[0]);
@@ -457,7 +457,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   expect(attributeItem->description == "Raw 72", "note-attribute item should preserve raw command values");
 
   const EventSequence eventSequence = EventSequenceBuilder().build(
-      sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+      sequence->commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(eventSequence.diagnostics.empty(), "CapcomSnes note-state emission should not report diagnostics");
   expect(!eventSequence.tracks.empty(), "CapcomSnes note-state emission should preserve tracks");
 
@@ -482,7 +482,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
 }
 
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
-  const CommandSequence program{
+  const CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {CommandTrack{
           .id = TrackId{0},
@@ -500,7 +500,7 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
   };
 
   const EventSequence eventSequence = EventSequenceBuilder().build(
-      program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+      commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   const auto& events = eventSequence.tracks[0].events;
 
   const auto portamentoTime = std::ranges::find_if(events, [](const Event& event) {
@@ -529,7 +529,7 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
 }
 
 void capcomSnesPanEventsDoNotRecurveMidiPan() {
-  const CommandSequence v3Program{
+  const CommandSequence v3CommandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {CommandTrack{
           .id = TrackId{0},
@@ -543,7 +543,7 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
   };
 
   const EventSequence eventSequence = EventSequenceBuilder().build(
-      v3Program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+      v3CommandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(eventSequence.diagnostics.empty(), "CapcomSnes pan fixture should build without diagnostics");
   expect(!eventSequence.tracks.empty(), "CapcomSnes pan fixture should emit one track");
 
@@ -564,7 +564,7 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
   expect(std::get<Expression>(*expression).value == 123,
          "CapcomSnes pan compensation should quantize after the amplitude curve");
 
-  const CommandSequence v1Program{
+  const CommandSequence v1CommandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {CommandTrack{
           .id = TrackId{0},
@@ -578,7 +578,7 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
   };
 
   const EventSequence v1EventSequence = EventSequenceBuilder().build(
-      v1Program, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
+      v1CommandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
   expect(v1EventSequence.diagnostics.empty(), "CapcomSnes V1 pan fixture should build without diagnostics");
   const auto& v1Events = v1EventSequence.tracks[0].events;
   const auto v1Pan = std::ranges::find_if(v1Events, [](const Event& event) {
@@ -591,7 +591,7 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
 }
 
 void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
-  const CommandSequence program{
+  const CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {CommandTrack{
           .id = TrackId{0},
@@ -606,7 +606,7 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
   };
 
   const EventSequence eventSequence = EventSequenceBuilder().build(
-      program, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
+      commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
   expect(eventSequence.diagnostics.empty(), "CapcomSnes V1 volume fixture should build without diagnostics");
   expect(!eventSequence.tracks.empty(), "CapcomSnes V1 volume fixture should emit one track");
 
@@ -629,7 +629,7 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
 }
 
 void capcomSnesMidiExportUsesSequenceProfileKey() {
-  const CommandSequence program{
+  const CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {CommandTrack{
           .id = TrackId{0},
@@ -650,7 +650,7 @@ void capcomSnesMidiExportUsesSequenceProfileKey() {
           .format = "CapcomSnes",
           .name = "V1",
       },
-      .program = program,
+      .commandSequence = commandSequence,
   });
   project.collections.push_back(Collection{
       .id = CollectionId{0},
@@ -674,9 +674,9 @@ void capcomSnesMidiExportUsesSequenceProfileKey() {
   expect(artifacts[0].diagnostics.empty(), "CapcomSnes profile-key export should not report diagnostics");
 
   const auto v1Bytes = MidiExporter().exportMidi(EventSequenceBuilder().build(
-      program, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce));
+      commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce));
   const auto v3Bytes = MidiExporter().exportMidi(EventSequenceBuilder().build(
-      program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce));
+      commandSequence, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce));
   expect(artifacts[0].bytes == v1Bytes, "MIDI export should use the sequence's explicit CapcomSnes profile key");
   expect(artifacts[0].bytes != v3Bytes, "MIDI export should not fall back to the default CapcomSnes profile");
 }

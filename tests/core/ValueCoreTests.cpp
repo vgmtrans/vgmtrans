@@ -238,7 +238,7 @@ public:
                         }},
                     },
             },
-        .program =
+        .commandSequence =
             CommandSequence{
                 .tracks = {CommandTrack{
                     .id = TrackId{0},
@@ -523,7 +523,7 @@ void eventSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
-  const CommandSequence program{
+  const CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {CommandTrack{
           .id = TrackId{0},
@@ -538,7 +538,7 @@ void eventSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
       }},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const EventSequence eventSequence = EventSequenceBuilder().build(commandSequence, SequencerProfile{}, LoopPolicy::PlayOnce);
   const auto& events = eventSequence.tracks[0].events;
   expect(std::ranges::any_of(events, [](const Event& event) {
            const auto* note = std::get_if<NoteDuration>(&event);
@@ -555,7 +555,7 @@ void eventSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
-  const CommandSequence program{
+  const CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {CommandTrack{
           .id = TrackId{0},
@@ -568,7 +568,7 @@ void eventSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
       }},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(program, SequencerProfile{}, LoopPolicy::Default);
+  const EventSequence eventSequence = EventSequenceBuilder().build(commandSequence, SequencerProfile{}, LoopPolicy::Default);
   const auto& events = eventSequence.tracks[0].events;
   expect(eventSequence.diagnostics.empty(), "unset default loop policy should not run until command cap");
   expect(std::ranges::count_if(events, [](const Event& event) {
@@ -583,7 +583,7 @@ void eventSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
-  const CommandSequence program{
+  const CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {CommandTrack{
           .id = TrackId{0},
@@ -597,7 +597,7 @@ void eventSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
       }},
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const EventSequence eventSequence = EventSequenceBuilder().build(commandSequence, SequencerProfile{}, LoopPolicy::PlayOnce);
   const auto& events = eventSequence.tracks[0].events;
   expect(std::ranges::any_of(events, [](const Event& event) {
            const auto* note = std::get_if<NoteDuration>(&event);
@@ -614,7 +614,7 @@ void eventSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
-  const CommandSequence program{
+  const CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {
           CommandTrack{
@@ -640,7 +640,7 @@ void eventSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
       },
   };
 
-  const EventSequence eventSequence = EventSequenceBuilder().build(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const EventSequence eventSequence = EventSequenceBuilder().build(commandSequence, SequencerProfile{}, LoopPolicy::PlayOnce);
   const auto countNotesAt = [](const EventTrack& track, u64 tick) {
     return std::ranges::count_if(track.events, [tick](const Event& event) {
       const auto* note = std::get_if<NoteDuration>(&event);

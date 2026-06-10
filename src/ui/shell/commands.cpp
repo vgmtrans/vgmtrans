@@ -272,7 +272,7 @@ void printValueProjectSummary(const vgmtrans::core::Project& project) {
                meta.range.size);
     if (std::holds_alternative<vgmtrans::core::SequenceAsset>(asset)) {
       const auto& sequence = std::get<vgmtrans::core::SequenceAsset>(asset);
-      fmt::print(" tracks={}", sequence.program.tracks.size());
+      fmt::print(" tracks={}", sequence.commandSequence.tracks.size());
     } else if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(asset)) {
       const auto& instrumentSet = std::get<vgmtrans::core::InstrumentSetAsset>(asset);
       fmt::print(" instruments={}", instrumentSet.instruments.size());
@@ -535,12 +535,12 @@ bool printValueSequenceEvents(const vgmtrans::core::Project& project,
     }
 
     const int trackIndex = std::stoi(args[assetArgIndex + 1]);
-    if (trackIndex < 0 || static_cast<size_t>(trackIndex) >= sequence->program.tracks.size()) {
+    if (trackIndex < 0 || static_cast<size_t>(trackIndex) >= sequence->commandSequence.tracks.size()) {
       fmt::println("Track index out of bounds");
       return false;
     }
 
-    size_t limit = sequence->program.tracks[static_cast<size_t>(trackIndex)].commands.size();
+    size_t limit = sequence->commandSequence.tracks[static_cast<size_t>(trackIndex)].commands.size();
     const size_t limitArgIndex = assetArgIndex + 2;
     if (args.size() > limitArgIndex) {
       const int parsedLimit = std::stoi(args[limitArgIndex]);
@@ -551,7 +551,7 @@ bool printValueSequenceEvents(const vgmtrans::core::Project& project,
       limit = static_cast<size_t>(parsedLimit);
     }
 
-    const auto& track = sequence->program.tracks[static_cast<size_t>(trackIndex)];
+    const auto& track = sequence->commandSequence.tracks[static_cast<size_t>(trackIndex)];
     fmt::println("Commands for value sequence asset #{} track #{} (source track {}, start 0x{:x}):",
                  assetIndex, trackIndex, track.sourceTrackNumber, track.startAddress.value);
     const size_t count = std::min(limit, track.commands.size());

@@ -404,7 +404,7 @@ SequenceAsset parseCapcomSnesSequence(
                                     "Sequence Header",
                                     input.reader.range(layout.sequenceHeaderAddress, headerSize));
 
-  CommandSequence program{
+  CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
       .behavior = SequenceBehavior{
           .linearAmplitudeScale = true,
@@ -447,7 +447,7 @@ SequenceAsset parseCapcomSnesSequence(
         const u32 bank = programCommand->rawProgram >> 7;
         const u32 programNumber = programCommand->rawProgram & 0x7f;
         if (referencedInstruments.insert({bank, programNumber}).second) {
-          program.referencedInstruments.push_back(InstrumentRef{
+          commandSequence.referencedInstruments.push_back(InstrumentRef{
               .asset = instrumentSetId,
               .bank = bank,
               .program = programNumber,
@@ -456,14 +456,14 @@ SequenceAsset parseCapcomSnesSequence(
         }
       }
     }
-    program.tracks.push_back(std::move(track));
+    commandSequence.tracks.push_back(std::move(track));
   }
 
-  for (const auto& track : program.tracks) {
+  for (const auto& track : commandSequence.tracks) {
     // Legacy playback applies an initial global transpose if it appears before audible data.
     for (const auto& command : track.commands) {
       if (const auto* globalTranspose = std::get_if<GlobalTransposeCommand>(&command)) {
-        program.behavior.initialGlobalTranspose = globalTranspose->rawSemitones;
+        commandSequence.behavior.initialGlobalTranspose = globalTranspose->rawSemitones;
         break;
       }
       if (std::holds_alternative<NoteCommand>(command) || std::holds_alternative<RestCommand>(command) ||
@@ -471,7 +471,7 @@ SequenceAsset parseCapcomSnesSequence(
         break;
       }
     }
-    if (program.behavior.initialGlobalTranspose != 0) {
+    if (commandSequence.behavior.initialGlobalTranspose != 0) {
       break;
     }
   }
@@ -484,7 +484,7 @@ SequenceAsset parseCapcomSnesSequence(
           .range = input.reader.range(layout.sequenceHeaderAddress, headerSize),
           .items = std::move(items),
       },
-      .program = std::move(program),
+      .commandSequence = std::move(commandSequence),
   };
 }
 

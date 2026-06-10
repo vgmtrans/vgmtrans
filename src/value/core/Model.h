@@ -285,7 +285,7 @@ struct CommandSequence {
 
 struct SequenceAsset {
   AssetMetadata metadata;
-  CommandSequence program;
+  CommandSequence commandSequence;
 };
 
 struct KeyRange {

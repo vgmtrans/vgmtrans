@@ -788,7 +788,7 @@ CapcomSnesSummary valueCapcomSnesSummary(
   if (collection.sequence) {
     if (const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence)) {
       ++summary.sequenceCount;
-      summary.trackCounts.push_back(static_cast<u32>(sequence->program.tracks.size()));
+      summary.trackCounts.push_back(static_cast<u32>(sequence->commandSequence.tracks.size()));
     }
   }
 
