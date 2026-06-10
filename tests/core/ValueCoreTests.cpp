@@ -793,11 +793,17 @@ void soundFontExporterWritesSfbkRiffFile() {
 
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
   const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
+  const ModulationUsage modulationUsage{
+      .vibratoDepth = ObservedValueRange{.observed = true, .min = 4, .max = 38},
+      .tremoloDepth = ObservedValueRange{.observed = true, .min = 2, .max = 24},
+      .modulationRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
+  };
   const auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
+          .modulationUsage = &modulationUsage,
       },
       sources);
 
@@ -923,11 +929,17 @@ void dlsExporterWritesDlsRiffFile() {
 
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
   const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
+  const ModulationUsage modulationUsage{
+      .vibratoDepth = ObservedValueRange{.observed = true, .min = 4, .max = 38},
+      .tremoloDepth = ObservedValueRange{.observed = true, .min = 2, .max = 24},
+      .modulationRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
+  };
   const auto result = DlsExporter().exportDls(
       DlsInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
+          .modulationUsage = &modulationUsage,
       },
       sources);
 

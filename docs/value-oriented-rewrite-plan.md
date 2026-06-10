@@ -237,7 +237,8 @@ Use the value-layer `ModulationUsage` result to carry:
 The analysis should run before synth export when SF2/DLS modulators are needed.
 It should not mutate the parsed collection or instrument set. The synth exporter
 receives the parsed `InstrumentSetAsset`, decoded samples, and
-`ModulationUsage`, then writes the correct SF2/DLS representation.
+`ModulationUsage`; the remaining policy work is to use that usage data when
+choosing controller scaling and modulator amounts.
 
 This solves the controller-resolution problem: if CapcomSnes only uses a narrow
 vibrato depth range in a song, the exported modulator can map the observed range
@@ -406,7 +407,7 @@ The branch should not be considered ready until:
 - Continue refining explicit vibrato/tremolo/rate source commands where formats
   need more detail.
 - Expand `ModulationUsage` as additional formats expose modulation details.
-- Thread modulation analysis into SF2/DLS synth export.
+- Use the threaded `ModulationUsage` data for SF2/DLS controller scaling.
 - Add export policy for synth modulators versus explicit MIDI events.
 - Keep default behavior matching legacy output.
 

@@ -9,6 +9,7 @@
 #include "value/export/DlsExporter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/MidiExporter.h"
+#include "value/core/ModulationAnalysis.h"
 #include "value/core/SampleDecoder.h"
 #include "value/export/SoundFontExporter.h"
 #include "value/export/WavExporter.h"
@@ -18,6 +19,7 @@
 #include <exception>
 #include <filesystem>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -90,6 +92,25 @@ struct SynthExportAssets {
   }
 
   return assets;
+}
+
+[[nodiscard]] std::optional<ModulationUsage> collectionModulationUsage(
+    const Project& project,
+    const Collection& collection) {
+  if (!collection.sequence) {
+    return std::nullopt;
+  }
+
+  const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence);
+  if (sequence == nullptr) {
+    return std::nullopt;
+  }
+
+  auto usage = analyzeModulationUsage(sequence->commandSequence);
+  if (!hasModulationUsage(usage)) {
+    return std::nullopt;
+  }
+  return usage;
 }
 
 [[nodiscard]] Artifact exportMidi(const Project& project, const Collection& collection, const ExportRequest& request,
@@ -200,12 +221,14 @@ struct SynthExportAssets {
 [[nodiscard]] Artifact exportSoundFont2(const Project& project, const SourceStore& sources,
                                         const Collection& collection) {
   auto assets = collectSynthExportAssets(project, collection);
+  auto modulationUsage = collectionModulationUsage(project, collection);
 
   auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = artifactBaseName(collection),
           .instrumentSets = assets.instrumentSets,
           .sampleCollections = assets.sampleCollections,
+          .modulationUsage = modulationUsage ? &*modulationUsage : nullptr,
       },
       sources);
   assets.diagnostics.insert(assets.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
@@ -221,12 +244,14 @@ struct SynthExportAssets {
 
 [[nodiscard]] Artifact exportDls(const Project& project, const SourceStore& sources, const Collection& collection) {
   auto assets = collectSynthExportAssets(project, collection);
+  auto modulationUsage = collectionModulationUsage(project, collection);
 
   auto result = DlsExporter().exportDls(
       DlsInput{
           .name = artifactBaseName(collection),
           .instrumentSets = assets.instrumentSets,
           .sampleCollections = assets.sampleCollections,
+          .modulationUsage = modulationUsage ? &*modulationUsage : nullptr,
       },
       sources);
   assets.diagnostics.insert(assets.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),

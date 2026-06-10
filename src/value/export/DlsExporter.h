@@ -16,10 +16,13 @@
 
 namespace vgmtrans::core {
 
+struct ModulationUsage;
+
 struct DlsInput {
   std::string name;
   std::span<const InstrumentSetAsset* const> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
+  const ModulationUsage* modulationUsage = nullptr;
 };
 
 struct DlsResult {
