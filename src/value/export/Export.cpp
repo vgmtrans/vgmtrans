@@ -75,6 +75,38 @@ namespace {
   return {ExportKind::Midi};
 }
 
+struct SynthExportAssets {
+  std::vector<const InstrumentSetAsset*> instrumentSets;
+  std::vector<const SampleCollectionAsset*> sampleCollections;
+  std::vector<Diagnostic> diagnostics;
+};
+
+[[nodiscard]] SynthExportAssets collectSynthExportAssets(
+    const Project& project,
+    const Collection& collection) {
+  SynthExportAssets assets;
+  assets.instrumentSets.reserve(collection.instrumentSets.size());
+  assets.sampleCollections.reserve(collection.sampleCollections.size());
+
+  for (const auto id : collection.instrumentSets) {
+    if (const auto* instrumentSet = assetById<InstrumentSetAsset>(project, id)) {
+      assets.instrumentSets.push_back(instrumentSet);
+    } else {
+      assets.diagnostics.push_back(exportError("Collection instrument set asset was not found"));
+    }
+  }
+
+  for (const auto id : collection.sampleCollections) {
+    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, id)) {
+      assets.sampleCollections.push_back(sampleCollection);
+    } else {
+      assets.diagnostics.push_back(exportError("Collection sample collection asset was not found"));
+    }
+  }
+
+  return assets;
+}
+
 [[nodiscard]] Artifact exportMidi(const Project& project, const Collection& collection, const ExportRequest& request,
                                   const SequencerProfileRegistry& profiles) {
   if (!collection.sequence) {
@@ -182,84 +214,44 @@ namespace {
 
 [[nodiscard]] Artifact exportSoundFont2(const Project& project, const SourceStore& sources,
                                         const Collection& collection) {
-  std::vector<const InstrumentSetAsset*> instrumentSets;
-  instrumentSets.reserve(collection.instrumentSets.size());
-  std::vector<const SampleCollectionAsset*> sampleCollections;
-  sampleCollections.reserve(collection.sampleCollections.size());
-  std::vector<Diagnostic> diagnostics;
-
-  for (const auto id : collection.instrumentSets) {
-    if (const auto* instrumentSet = assetById<InstrumentSetAsset>(project, id)) {
-      instrumentSets.push_back(instrumentSet);
-    } else {
-      diagnostics.push_back(exportError("Collection instrument set asset was not found"));
-    }
-  }
-
-  for (const auto id : collection.sampleCollections) {
-    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, id)) {
-      sampleCollections.push_back(sampleCollection);
-    } else {
-      diagnostics.push_back(exportError("Collection sample collection asset was not found"));
-    }
-  }
+  auto assets = collectSynthExportAssets(project, collection);
 
   auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = artifactBaseName(collection),
-          .instrumentSets = instrumentSets,
-          .sampleCollections = sampleCollections,
+          .instrumentSets = assets.instrumentSets,
+          .sampleCollections = assets.sampleCollections,
       },
       sources);
-  diagnostics.insert(diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
-                     std::make_move_iterator(result.diagnostics.end()));
+  assets.diagnostics.insert(assets.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
+                            std::make_move_iterator(result.diagnostics.end()));
 
   return Artifact{
       .filename = filenamePart(artifactBaseName(collection)) + ".sf2",
       .mediaType = "audio/soundfont",
       .bytes = std::move(result.bytes),
-      .diagnostics = std::move(diagnostics),
+      .diagnostics = std::move(assets.diagnostics),
   };
 }
 
 [[nodiscard]] Artifact exportDls(const Project& project, const SourceStore& sources, const Collection& collection) {
-  std::vector<const InstrumentSetAsset*> instrumentSets;
-  instrumentSets.reserve(collection.instrumentSets.size());
-  std::vector<const SampleCollectionAsset*> sampleCollections;
-  sampleCollections.reserve(collection.sampleCollections.size());
-  std::vector<Diagnostic> diagnostics;
-
-  for (const auto id : collection.instrumentSets) {
-    if (const auto* instrumentSet = assetById<InstrumentSetAsset>(project, id)) {
-      instrumentSets.push_back(instrumentSet);
-    } else {
-      diagnostics.push_back(exportError("Collection instrument set asset was not found"));
-    }
-  }
-
-  for (const auto id : collection.sampleCollections) {
-    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, id)) {
-      sampleCollections.push_back(sampleCollection);
-    } else {
-      diagnostics.push_back(exportError("Collection sample collection asset was not found"));
-    }
-  }
+  auto assets = collectSynthExportAssets(project, collection);
 
   auto result = DlsExporter().exportDls(
       DlsInput{
           .name = artifactBaseName(collection),
-          .instrumentSets = instrumentSets,
-          .sampleCollections = sampleCollections,
+          .instrumentSets = assets.instrumentSets,
+          .sampleCollections = assets.sampleCollections,
       },
       sources);
-  diagnostics.insert(diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
-                     std::make_move_iterator(result.diagnostics.end()));
+  assets.diagnostics.insert(assets.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
+                            std::make_move_iterator(result.diagnostics.end()));
 
   return Artifact{
       .filename = filenamePart(artifactBaseName(collection)) + ".dls",
       .mediaType = "audio/dls",
       .bytes = std::move(result.bytes),
-      .diagnostics = std::move(diagnostics),
+      .diagnostics = std::move(assets.diagnostics),
   };
 }
 
