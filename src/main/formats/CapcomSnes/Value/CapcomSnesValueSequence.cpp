@@ -6,8 +6,6 @@
 
 #include "formats/CapcomSnes/Value/CapcomSnesValueSequence.h"
 
-#include "formats/CapcomSnes/Value/CapcomSnesValueItems.h"
-
 #include <set>
 #include <string>
 #include <utility>
@@ -18,6 +16,14 @@ namespace vgmtrans::formats::capcom_snes {
 using namespace core;
 
 namespace {
+
+[[nodiscard]] std::string capcomSnesCommandDetailKind(const SequencerCommand& command) {
+  return "capcom-snes-" + defaultCommandDetailKind(command);
+}
+
+[[nodiscard]] std::string capcomSnesCommandDescription(const SequencerCommand& command) {
+  return defaultCommandDescription(command);
+}
 
 [[nodiscard]] DriverSpecificCommand driverCommand(
     std::string name,
