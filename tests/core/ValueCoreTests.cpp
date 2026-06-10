@@ -239,7 +239,7 @@ public:
                     },
             },
         .program =
-            SequenceProgram{
+            DriverSequence{
                 .tracks = {TrackProgram{
                     .id = TrackId{0},
                     .sourceTrackNumber = 0,
@@ -492,9 +492,9 @@ void snesBrrDecoderProducesPcm() {
 }
 
 void midiExporterWritesStandardMidiFile() {
-  const PerformanceSequence performance{
+  const TimelineSequence performance{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {PerformanceTrack{
+      .tracks = {TimelineTrack{
           .name = "Lead",
           .events =
               {
@@ -523,7 +523,7 @@ void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
-  const SequenceProgram program{
+  const DriverSequence program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {TrackProgram{
           .id = TrackId{0},
@@ -538,14 +538,14 @@ void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
       }},
   };
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const TimelineSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
   const auto& events = performance.tracks[0].events;
-  expect(std::ranges::any_of(events, [](const PerformanceEvent& event) {
+  expect(std::ranges::any_of(events, [](const TimelineEvent& event) {
            const auto* note = std::get_if<NoteDuration>(&event);
            return note != nullptr && note->tick == 0 && note->duration == 12;
          }),
          "play-once loop fixture should emit the note before the loop boundary");
-  expect(std::ranges::none_of(events, [](const PerformanceEvent& event) {
+  expect(std::ranges::none_of(events, [](const TimelineEvent& event) {
            return std::holds_alternative<Volume>(event);
          }),
          "play-once lowering should skip commands exactly at the loop boundary");
@@ -555,7 +555,7 @@ void performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
-  const SequenceProgram program{
+  const DriverSequence program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {TrackProgram{
           .id = TrackId{0},
@@ -568,10 +568,10 @@ void performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce() {
       }},
   };
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::Default);
+  const TimelineSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::Default);
   const auto& events = performance.tracks[0].events;
   expect(performance.diagnostics.empty(), "unset default loop policy should not run until command cap");
-  expect(std::ranges::count_if(events, [](const PerformanceEvent& event) {
+  expect(std::ranges::count_if(events, [](const TimelineEvent& event) {
            return std::holds_alternative<NoteDuration>(event);
          }) == 1,
          "unset default loop policy should lower self-looping tracks once");
@@ -583,7 +583,7 @@ void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
-  const SequenceProgram program{
+  const DriverSequence program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {TrackProgram{
           .id = TrackId{0},
@@ -597,14 +597,14 @@ void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
       }},
   };
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const TimelineSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
   const auto& events = performance.tracks[0].events;
-  expect(std::ranges::any_of(events, [](const PerformanceEvent& event) {
+  expect(std::ranges::any_of(events, [](const TimelineEvent& event) {
            const auto* note = std::get_if<NoteDuration>(&event);
            return note != nullptr && note->tick == 0 && note->duration == 12;
          }),
          "loop-boundary fixture should emit events before the boundary");
-  expect(std::ranges::none_of(events, [](const PerformanceEvent& event) {
+  expect(std::ranges::none_of(events, [](const TimelineEvent& event) {
            return std::holds_alternative<Volume>(event);
          }),
          "loop-boundary fixture should not lower commands after the boundary");
@@ -614,7 +614,7 @@ void performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
-  const SequenceProgram program{
+  const DriverSequence program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {
           TrackProgram{
@@ -640,9 +640,9 @@ void performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop() {
       },
   };
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
-  const auto countNotesAt = [](const PerformanceTrack& track, u64 tick) {
-    return std::ranges::count_if(track.events, [tick](const PerformanceEvent& event) {
+  const TimelineSequence performance = PerformanceLowerer().lower(program, SequencerProfile{}, LoopPolicy::PlayOnce);
+  const auto countNotesAt = [](const TimelineTrack& track, u64 tick) {
+    return std::ranges::count_if(track.events, [tick](const TimelineEvent& event) {
       const auto* note = std::get_if<NoteDuration>(&event);
       return note != nullptr && note->tick == tick;
     });

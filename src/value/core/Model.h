@@ -274,7 +274,7 @@ struct SequenceBehavior {
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
 };
 
-struct SequenceProgram {
+struct DriverSequence {
   Timebase timebase;
   std::vector<TrackProgram> tracks;
   std::vector<InstrumentRef> referencedInstruments;
@@ -285,7 +285,7 @@ struct SequenceProgram {
 
 struct SequenceAsset {
   AssetMetadata metadata;
-  SequenceProgram program;
+  DriverSequence program;
 };
 
 struct KeyRange {
@@ -644,7 +644,7 @@ struct Marker {
   std::string text;
 };
 
-using PerformanceEvent = std::variant<
+using TimelineEvent = std::variant<
     NoteOn,
     NoteOff,
     NoteDuration,
@@ -676,14 +676,14 @@ using PerformanceEvent = std::variant<
     EndOfTrack,
     Marker>;
 
-struct PerformanceTrack {
+struct TimelineTrack {
   std::string name;
-  std::vector<PerformanceEvent> events;
+  std::vector<TimelineEvent> events;
 };
 
-struct PerformanceSequence {
+struct TimelineSequence {
   Timebase timebase;
-  std::vector<PerformanceTrack> tracks;
+  std::vector<TimelineTrack> tracks;
   std::vector<Diagnostic> diagnostics;
 };
 

@@ -29,39 +29,39 @@ class CapcomSnesProfile final : public core::SequencerProfile {
   [[nodiscard]] core::NoteTiming noteTiming(
       const core::NoteCommand& command,
       core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerNoteState(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerNoteState(
       const core::NoteStateCommand& command,
       core::TrackState& state) const override;
   void applyDuration(const core::DurationCommand& command, core::TrackState& state) const override;
 
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerTempo(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerTempo(
       const core::TempoCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerVolume(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerVolume(
       const core::VolumeCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerProgram(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerProgram(
       const core::ProgramCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerPan(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerPan(
       const core::PanCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerMasterVolume(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerMasterVolume(
       const core::MasterVolumeCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerReverb(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerReverb(
       const core::ReverbCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerTuning(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerTuning(
       const core::TuningCommand& command,
       const core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerPortamento(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerPortamento(
       const core::PortamentoCommand& command,
       core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerLfo(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerLfo(
       const core::LfoCommand& command,
       core::TrackState& state) const override;
-  [[nodiscard]] std::vector<core::PerformanceEvent> lowerRepeatBreak(
+  [[nodiscard]] std::vector<core::TimelineEvent> lowerRepeatBreak(
       const core::RepeatBreakCommand& command,
       core::TrackState& state) const override;
 

@@ -24,14 +24,14 @@ namespace {
 constexpr size_t kMaxExecutedCommandsPerTrack = 65536;
 
 template <typename T>
-void appendEvents(std::vector<PerformanceEvent>& destination, std::vector<T> events) {
+void appendEvents(std::vector<TimelineEvent>& destination, std::vector<T> events) {
   destination.insert(destination.end(),
                      std::make_move_iterator(events.begin()),
                      std::make_move_iterator(events.end()));
 }
 
 void purgeEndedPendingNotes(
-    const std::vector<PerformanceEvent>& events,
+    const std::vector<TimelineEvent>& events,
     std::vector<size_t>& pendingNoteIndexes,
     u64 tick) {
   std::erase_if(pendingNoteIndexes, [&](size_t index) {
@@ -44,7 +44,7 @@ void purgeEndedPendingNotes(
 }
 
 void extendPendingNotes(
-    std::vector<PerformanceEvent>& events,
+    std::vector<TimelineEvent>& events,
     const std::vector<size_t>& pendingNoteIndexes,
     u64 endTick) {
   for (const size_t index : pendingNoteIndexes) {
@@ -99,7 +99,7 @@ void rememberExecutedCommand(const SequencerCommand& command, std::unordered_set
 }
 
 [[nodiscard]] std::optional<u64> firstLoopTick(
-    const SequenceProgram& program,
+    const DriverSequence& program,
     const TrackProgram& track,
     const SequencerProfile& profile,
     u8 channel) {
@@ -236,17 +236,17 @@ void rememberExecutedCommand(const SequencerCommand& command, std::unordered_set
 }  // namespace
 
 void SequencerProfile::beginTrack(
-    const SequenceProgram&,
+    const DriverSequence&,
     const TrackProgram&,
     TrackState&,
-    std::vector<PerformanceEvent>&) const {
+    std::vector<TimelineEvent>&) const {
 }
 
 u32 SequencerProfile::restTicks(const RestCommand& command, TrackState&) const {
   return command.rawDuration;
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerNoteState(
+std::vector<TimelineEvent> SequencerProfile::lowerNoteState(
     const NoteStateCommand&,
     TrackState&) const {
   return {};
@@ -272,7 +272,7 @@ void SequencerProfile::applyTranspose(const TransposeCommand& command, TrackStat
   state.transpose = command.rawSemitones;
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerTempo(
+std::vector<TimelineEvent> SequencerProfile::lowerTempo(
     const TempoCommand& command,
     const TrackState& state) const {
   return {Tempo{
@@ -281,7 +281,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerTempo(
   }};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerProgram(
+std::vector<TimelineEvent> SequencerProfile::lowerProgram(
     const ProgramCommand& command,
     const TrackState& state) const {
   return {ProgramChange{
@@ -291,7 +291,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerProgram(
   }};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerVolume(
+std::vector<TimelineEvent> SequencerProfile::lowerVolume(
     const VolumeCommand& command,
     const TrackState& state) const {
   return {Volume{
@@ -301,7 +301,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerVolume(
   }};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerPan(
+std::vector<TimelineEvent> SequencerProfile::lowerPan(
     const PanCommand& command,
     const TrackState& state) const {
   return {Pan{
@@ -311,7 +311,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerPan(
   }};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerMasterVolume(
+std::vector<TimelineEvent> SequencerProfile::lowerMasterVolume(
     const MasterVolumeCommand& command,
     const TrackState& state) const {
   return {MasterVolume{
@@ -320,7 +320,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerMasterVolume(
   }};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerReverb(
+std::vector<TimelineEvent> SequencerProfile::lowerReverb(
     const ReverbCommand& command,
     const TrackState& state) const {
   return {Reverb{
@@ -330,7 +330,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerReverb(
   }};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerTuning(
+std::vector<TimelineEvent> SequencerProfile::lowerTuning(
     const TuningCommand& command,
     const TrackState& state) const {
   return {FineTune{
@@ -340,7 +340,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerTuning(
   }};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerPortamento(
+std::vector<TimelineEvent> SequencerProfile::lowerPortamento(
     const PortamentoCommand& command,
     TrackState& state) const {
   return {PortamentoTime{
@@ -350,7 +350,7 @@ std::vector<PerformanceEvent> SequencerProfile::lowerPortamento(
   }};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerLfo(
+std::vector<TimelineEvent> SequencerProfile::lowerLfo(
     const LfoCommand& command,
     TrackState& state) const {
   if (command.target == LfoTarget::Pitch) {
@@ -370,26 +370,26 @@ std::vector<PerformanceEvent> SequencerProfile::lowerLfo(
   return {};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerEnvelope(
+std::vector<TimelineEvent> SequencerProfile::lowerEnvelope(
     const EnvelopeCommand&,
     const TrackState&) const {
   return {};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerDriverSpecific(
+std::vector<TimelineEvent> SequencerProfile::lowerDriverSpecific(
     const DriverSpecificCommand&,
     TrackState&) const {
   return {};
 }
 
-std::vector<PerformanceEvent> SequencerProfile::lowerRepeatBreak(
+std::vector<TimelineEvent> SequencerProfile::lowerRepeatBreak(
     const RepeatBreakCommand&,
     TrackState&) const {
   return {};
 }
 
-PerformanceSequence PerformanceLowerer::lower(
-    const SequenceProgram& program,
+TimelineSequence PerformanceLowerer::lower(
+    const DriverSequence& program,
     const SequencerProfile& profile,
     LoopPolicy loopPolicy) const {
   if (loopPolicy == LoopPolicy::Default) {
@@ -399,7 +399,7 @@ PerformanceSequence PerformanceLowerer::lower(
     loopPolicy = LoopPolicy::PlayOnce;
   }
 
-  PerformanceSequence result{
+  TimelineSequence result{
       .timebase = program.timebase,
   };
 
@@ -426,7 +426,7 @@ PerformanceSequence PerformanceLowerer::lower(
         .channel = static_cast<u8>(trackIndex % 16),
         .globalTranspose = program.behavior.initialGlobalTranspose,
     };
-    PerformanceTrack loweredTrack{
+    TimelineTrack loweredTrack{
         .name = "Track " + std::to_string(track.sourceTrackNumber),
     };
 

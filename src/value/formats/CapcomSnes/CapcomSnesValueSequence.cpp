@@ -404,7 +404,7 @@ SequenceAsset parseCapcomSnesSequence(
                                     "Sequence Header",
                                     input.reader.range(layout.sequenceHeaderAddress, headerSize));
 
-  SequenceProgram program{
+  DriverSequence program{
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
       .behavior = SequenceBehavior{
           .linearAmplitudeScale = true,

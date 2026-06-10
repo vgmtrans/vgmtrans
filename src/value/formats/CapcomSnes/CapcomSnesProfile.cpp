@@ -88,7 +88,7 @@ void applyNoteAttributes(u8 attributes, TrackState& state) {
   state.noteSlurred = (attributes & kNoteSlurredMask) != 0;
 }
 
-void addLfoDepthEvents(std::vector<PerformanceEvent>& events, const TrackState& state, bool enabled) {
+void addLfoDepthEvents(std::vector<TimelineEvent>& events, const TrackState& state, bool enabled) {
   if (state.vibratoDepth != 0) {
     events.push_back(VibratoDepth{
         .tick = state.tick,
@@ -172,7 +172,7 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
   const u32 duration = soundingTicks(length, state);
   const s32 key = sourceKey(command, state);
   const bool extendsPrevious = state.lastNoteSlurred && key == state.lastKey && !state.didRest;
-  std::vector<PerformanceEvent> beforeEvents;
+  std::vector<TimelineEvent> beforeEvents;
   if (!extendsPrevious && state.portamentoMillisecondsPerCent > 0.0 && state.lastKey >= 0) {
     const auto keyDistance = static_cast<u32>(std::abs(key - state.lastKey));
     const auto portamentoTime =
@@ -206,10 +206,10 @@ NoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, TrackState&
   };
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerNoteState(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerNoteState(
     const NoteStateCommand& command,
     TrackState& state) const {
-  std::vector<PerformanceEvent> events;
+  std::vector<TimelineEvent> events;
   auto setSlur = [&](bool enabled) {
     if (state.noteSlurred != enabled) {
       state.noteSlurred = enabled;
@@ -258,7 +258,7 @@ void CapcomSnesProfile::applyDuration(const DurationCommand& command, TrackState
   state.durationRate = command.rawValue;
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerTempo(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerTempo(
     const TempoCommand& command,
     const TrackState& state) const {
   return {Tempo{
@@ -267,7 +267,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerTempo(
   }};
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerVolume(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerVolume(
     const VolumeCommand& command,
     const TrackState& state) const {
   return {Volume14{
@@ -277,7 +277,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerVolume(
   }};
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerProgram(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerProgram(
     const ProgramCommand& command,
     const TrackState& state) const {
   return {
@@ -295,7 +295,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerProgram(
   };
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerPan(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerPan(
     const PanCommand& command,
     const TrackState& state) const {
   const auto lowered = panLowering(version_, command.rawValue);
@@ -314,7 +314,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerPan(
   };
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerMasterVolume(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerMasterVolume(
     const MasterVolumeCommand& command,
     const TrackState& state) const {
   return {MasterVolume{
@@ -323,7 +323,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerMasterVolume(
   }};
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerReverb(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerReverb(
     const ReverbCommand& command,
     const TrackState& state) const {
   return {Reverb{
@@ -333,7 +333,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerReverb(
   }};
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerTuning(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerTuning(
     const TuningCommand& command,
     const TrackState& state) const {
   return {FineTune{
@@ -343,14 +343,14 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerTuning(
   }};
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerPortamento(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerPortamento(
     const PortamentoCommand& command,
     TrackState& state) const {
   state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(command.rawTime);
   return {};
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerLfo(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerLfo(
     const LfoCommand& command,
     TrackState& state) const {
   switch (command.rawType) {
@@ -370,7 +370,7 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerLfo(
           .value = static_cast<u8>(state.lfoRate != 0 ? state.tremoloDepth : 0),
       }};
     case 2: {
-      std::vector<PerformanceEvent> events;
+      std::vector<TimelineEvent> events;
       const bool wasEnabled = state.lfoRate != 0;
       state.lfoRate = command.rawAmount;
       const bool isEnabled = state.lfoRate != 0;
@@ -399,10 +399,10 @@ std::vector<PerformanceEvent> CapcomSnesProfile::lowerLfo(
   }
 }
 
-std::vector<PerformanceEvent> CapcomSnesProfile::lowerRepeatBreak(
+std::vector<TimelineEvent> CapcomSnesProfile::lowerRepeatBreak(
     const RepeatBreakCommand& command,
     TrackState& state) const {
-  std::vector<PerformanceEvent> events;
+  std::vector<TimelineEvent> events;
   const bool wasSlurred = state.noteSlurred;
   applyNoteAttributes(command.rawAttributes, state);
   if (state.noteSlurred != wasSlurred) {

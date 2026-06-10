@@ -107,14 +107,14 @@ namespace {
     };
   }
 
-  auto lowered = PerformanceLowerer().lower(sequence->program, *profile, request.loopPolicy);
-  auto bytes = MidiExporter().exportMidi(lowered);
+  auto timeline = PerformanceLowerer().lower(sequence->program, *profile, request.loopPolicy);
+  auto bytes = MidiExporter().exportMidi(timeline);
 
   return Artifact{
       .filename = artifactBaseName(collection) + ".mid",
       .mediaType = "audio/midi",
       .bytes = std::move(bytes),
-      .diagnostics = std::move(lowered.diagnostics),
+      .diagnostics = std::move(timeline.diagnostics),
   };
 }
 

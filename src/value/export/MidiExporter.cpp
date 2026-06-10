@@ -108,7 +108,7 @@ void addRpn(std::vector<MidiMessage>& messages, u64 tick, u8 channel, u8 paramet
   return bytes;
 }
 
-void addPerformanceEventMessages(std::vector<MidiMessage>& messages, const PerformanceEvent& event, u64& endTick) {
+void addTimelineEventMessages(std::vector<MidiMessage>& messages, const TimelineEvent& event, u64& endTick) {
   std::visit(
       [&](const auto& typedEvent) {
         using Event = std::decay_t<decltype(typedEvent)>;
@@ -250,7 +250,7 @@ void addPerformanceEventMessages(std::vector<MidiMessage>& messages, const Perfo
       event);
 }
 
-[[nodiscard]] std::vector<u8> writeTrack(const PerformanceTrack& track) {
+[[nodiscard]] std::vector<u8> writeTrack(const TimelineTrack& track) {
   std::vector<MidiMessage> messages;
   u64 endTick = 0;
 
@@ -259,7 +259,7 @@ void addPerformanceEventMessages(std::vector<MidiMessage>& messages, const Perfo
   }
 
   for (const auto& event : track.events) {
-    addPerformanceEventMessages(messages, event, endTick);
+    addTimelineEventMessages(messages, event, endTick);
   }
 
   addMessage(messages, endTick, 1000, metaEvent(0x2f, std::span<const u8>()));
@@ -291,7 +291,7 @@ void addPerformanceEventMessages(std::vector<MidiMessage>& messages, const Perfo
 
 }  // namespace
 
-std::vector<u8> MidiExporter::exportMidi(const PerformanceSequence& sequence) const {
+std::vector<u8> MidiExporter::exportMidi(const TimelineSequence& sequence) const {
   std::vector<u8> bytes;
   writeAscii(bytes, "MThd");
   writeBe32(bytes, 6);

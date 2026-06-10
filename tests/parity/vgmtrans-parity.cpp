@@ -2290,9 +2290,9 @@ void legacyLevelReapplicationKeepsPreCurvePrecision() {
 }
 
 int selfTest() {
-  const PerformanceSequence performance{
+  const TimelineSequence performance{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {PerformanceTrack{
+      .tracks = {TimelineTrack{
           .name = "Parity",
           .events =
               {

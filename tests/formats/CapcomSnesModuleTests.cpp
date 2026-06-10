@@ -198,7 +198,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(firstTempoItem->range.offset == 0x3000 && firstTempoItem->range.size == 3,
          "command item should preserve command source range");
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(
+  const TimelineSequence performance = PerformanceLowerer().lower(
       sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes lowering should not warn for linear fixture");
   expect(performance.tracks.size() == 8, "lowerer should preserve track count");
@@ -456,19 +456,19 @@ void capcomSnesNoteStateCommandsAreTypedAndLowered() {
   expect(attributeItem->name == "Note Attributes", "note-attribute item should carry a readable name");
   expect(attributeItem->description == "Raw 72", "note-attribute item should preserve raw command values");
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(
+  const TimelineSequence performance = PerformanceLowerer().lower(
       sequence->program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes note-state lowering should not report diagnostics");
   expect(!performance.tracks.empty(), "CapcomSnes note-state lowering should preserve tracks");
 
   const auto& events = performance.tracks[0].events;
-  const auto legato = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto legato = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* typed = std::get_if<LegatoPedal>(&event);
     return typed != nullptr && typed->tick == 0 && typed->enabled;
   });
   expect(legato != events.end(), "CapcomSnes note attributes should lower slur state to legato pedal");
 
-  const auto note = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto note = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* typed = std::get_if<NoteDuration>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -482,7 +482,7 @@ void capcomSnesNoteStateCommandsAreTypedAndLowered() {
 }
 
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
-  const SequenceProgram program{
+  const DriverSequence program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {TrackProgram{
           .id = TrackId{0},
@@ -499,11 +499,11 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
       .behavior = SequenceBehavior{.initialGlobalTranspose = 6},
   };
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(
+  const TimelineSequence performance = PerformanceLowerer().lower(
       program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   const auto& events = performance.tracks[0].events;
 
-  const auto portamentoTime = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto portamentoTime = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* time = std::get_if<PortamentoTime14>(&event);
     return time != nullptr && time->tick == 192;
   });
@@ -511,7 +511,7 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
   expect(std::get<PortamentoTime14>(*portamentoTime).value == 96,
          "CapcomSnes portamento distance should use source keys, ignoring active transpose");
 
-  const auto portamentoControl = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto portamentoControl = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* control = std::get_if<PortamentoControl>(&event);
     return control != nullptr && control->tick == 192;
   });
@@ -519,7 +519,7 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
   expect(std::get<PortamentoControl>(*portamentoControl).key == 10,
          "CapcomSnes portamento control should include global but not local transpose");
 
-  const auto secondNote = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto secondNote = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* note = std::get_if<NoteDuration>(&event);
     return note != nullptr && note->tick == 192;
   });
@@ -529,7 +529,7 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
 }
 
 void capcomSnesPanLoweringDoesNotRecurveMidiPan() {
-  const SequenceProgram v3Program{
+  const DriverSequence v3Program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {TrackProgram{
           .id = TrackId{0},
@@ -542,13 +542,13 @@ void capcomSnesPanLoweringDoesNotRecurveMidiPan() {
       }},
   };
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(
+  const TimelineSequence performance = PerformanceLowerer().lower(
       v3Program, CapcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes pan fixture should lower without diagnostics");
   expect(!performance.tracks.empty(), "CapcomSnes pan fixture should emit one track");
 
   const auto& events = performance.tracks[0].events;
-  const auto pan = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto pan = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* typed = std::get_if<Pan>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -556,7 +556,7 @@ void capcomSnesPanLoweringDoesNotRecurveMidiPan() {
   expect(std::get<Pan>(*pan).value == 113,
          "CapcomSnes pan lowering should emit the computed MIDI pan without applying the linear pan curve again");
 
-  const auto expression = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto expression = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* typed = std::get_if<Expression>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -564,7 +564,7 @@ void capcomSnesPanLoweringDoesNotRecurveMidiPan() {
   expect(std::get<Expression>(*expression).value == 123,
          "CapcomSnes pan compensation should quantize after the amplitude curve");
 
-  const SequenceProgram v1Program{
+  const DriverSequence v1Program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {TrackProgram{
           .id = TrackId{0},
@@ -577,11 +577,11 @@ void capcomSnesPanLoweringDoesNotRecurveMidiPan() {
       }},
   };
 
-  const PerformanceSequence v1Performance = PerformanceLowerer().lower(
+  const TimelineSequence v1Performance = PerformanceLowerer().lower(
       v1Program, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
   expect(v1Performance.diagnostics.empty(), "CapcomSnes V1 pan fixture should lower without diagnostics");
   const auto& v1Events = v1Performance.tracks[0].events;
-  const auto v1Pan = std::ranges::find_if(v1Events, [](const PerformanceEvent& event) {
+  const auto v1Pan = std::ranges::find_if(v1Events, [](const TimelineEvent& event) {
     const auto* typed = std::get_if<Pan>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -591,7 +591,7 @@ void capcomSnesPanLoweringDoesNotRecurveMidiPan() {
 }
 
 void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
-  const SequenceProgram program{
+  const DriverSequence program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {TrackProgram{
           .id = TrackId{0},
@@ -605,13 +605,13 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
       }},
   };
 
-  const PerformanceSequence performance = PerformanceLowerer().lower(
+  const TimelineSequence performance = PerformanceLowerer().lower(
       program, CapcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
   expect(performance.diagnostics.empty(), "CapcomSnes V1 volume fixture should lower without diagnostics");
   expect(!performance.tracks.empty(), "CapcomSnes V1 volume fixture should emit one track");
 
   const auto& events = performance.tracks[0].events;
-  const auto volume = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto volume = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* typed = std::get_if<Volume14>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -619,7 +619,7 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
   expect(std::get<Volume14>(*volume).value == 1026,
          "CapcomSnes V1 volume should apply the amplitude curve before MIDI quantization");
 
-  const auto masterVolume = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+  const auto masterVolume = std::ranges::find_if(events, [](const TimelineEvent& event) {
     const auto* typed = std::get_if<MasterVolume>(&event);
     return typed != nullptr && typed->tick == 0;
   });
@@ -629,7 +629,7 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
 }
 
 void capcomSnesMidiExportUsesSequenceProfileKey() {
-  const SequenceProgram program{
+  const DriverSequence program{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {TrackProgram{
           .id = TrackId{0},
