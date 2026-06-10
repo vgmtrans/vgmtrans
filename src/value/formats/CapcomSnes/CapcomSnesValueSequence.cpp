@@ -19,11 +19,11 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] std::string capcomSnesCommandDetailKind(const SequencerCommand& command) {
+[[nodiscard]] std::string capcomSnesCommandDetailKind(const Command& command) {
   return "capcom-snes-" + defaultCommandDetailKind(command);
 }
 
-[[nodiscard]] std::string capcomSnesCommandDescription(const SequencerCommand& command) {
+[[nodiscard]] std::string capcomSnesCommandDescription(const Command& command) {
   return defaultCommandDescription(command);
 }
 
@@ -77,12 +77,12 @@ struct TrackDecodeCursor {
 
 }  // namespace
 
-TrackProgram decodeCapcomSnesTrack(
+CommandTrack decodeCapcomSnesTrack(
     ByteReader reader,
     CapcomSnesEngineVersion version,
     u32 sourceTrackNumber,
     u32 startAddress) {
-  TrackProgram track{
+  CommandTrack track{
       .id = TrackId{sourceTrackNumber},
       .sourceTrackNumber = sourceTrackNumber,
       .startAddress = Address{startAddress},
@@ -404,7 +404,7 @@ SequenceAsset parseCapcomSnesSequence(
                                     "Sequence Header",
                                     input.reader.range(layout.sequenceHeaderAddress, headerSize));
 
-  DriverSequence program{
+  CommandSequence program{
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
       .behavior = SequenceBehavior{
           .linearAmplitudeScale = true,

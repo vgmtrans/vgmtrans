@@ -15,7 +15,7 @@ namespace vgmtrans::core {
 
 class MidiExporter {
  public:
-  [[nodiscard]] std::vector<u8> exportMidi(const TimelineSequence& sequence) const;
+  [[nodiscard]] std::vector<u8> exportMidi(const EventSequence& sequence) const;
 };
 
 }  // namespace vgmtrans::core

@@ -343,21 +343,21 @@ const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
 }
 
-SourceRange commandRange(const SequencerCommand& command) {
+SourceRange commandRange(const Command& command) {
   return std::visit([](const auto& typedCommand) { return typedCommand.range; }, command);
 }
 
-std::string defaultCommandName(const SequencerCommand& command) {
+std::string defaultCommandName(const Command& command) {
   return std::visit([](const auto& typedCommand) { return std::string(defaultCommandName(typedCommand)); }, command);
 }
 
-std::string defaultCommandDetailKind(const SequencerCommand& command) {
+std::string defaultCommandDetailKind(const Command& command) {
   return std::visit([](const auto& typedCommand) {
     return std::string(defaultCommandDetailKind(typedCommand));
   }, command);
 }
 
-std::string defaultCommandDescription(const SequencerCommand& command) {
+std::string defaultCommandDescription(const Command& command) {
   return std::visit([](const auto& typedCommand) { return defaultCommandDescription(typedCommand); }, command);
 }
 

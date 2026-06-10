@@ -14,7 +14,7 @@
 
 namespace vgmtrans::formats::capcom_snes {
 
-[[nodiscard]] core::TrackProgram decodeCapcomSnesTrack(
+[[nodiscard]] core::CommandTrack decodeCapcomSnesTrack(
     core::ByteReader reader,
     CapcomSnesEngineVersion version,
     u32 sourceTrackNumber,

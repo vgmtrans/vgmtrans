@@ -108,23 +108,23 @@ void addRpn(std::vector<MidiMessage>& messages, u64 tick, u8 channel, u8 paramet
   return bytes;
 }
 
-void addTimelineEventMessages(std::vector<MidiMessage>& messages, const TimelineEvent& event, u64& endTick) {
+void addEventMessages(std::vector<MidiMessage>& messages, const Event& event, u64& endTick) {
   std::visit(
       [&](const auto& typedEvent) {
-        using Event = std::decay_t<decltype(typedEvent)>;
-        if constexpr (std::is_same_v<Event, NoteOn>) {
+        using TypedEvent = std::decay_t<decltype(typedEvent)>;
+        if constexpr (std::is_same_v<TypedEvent, NoteOn>) {
           addMessage(messages,
                      typedEvent.tick,
                      50,
                      {static_cast<u8>(0x90 | channel4(typedEvent.channel)), data7(typedEvent.key), data7(typedEvent.velocity)});
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, NoteOff>) {
+        } else if constexpr (std::is_same_v<TypedEvent, NoteOff>) {
           addMessage(messages,
                      typedEvent.tick,
                      40,
                      {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), data7(typedEvent.velocity)});
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, NoteDuration>) {
+        } else if constexpr (std::is_same_v<TypedEvent, NoteDuration>) {
           addMessage(messages,
                      typedEvent.tick,
                      50,
@@ -134,7 +134,7 @@ void addTimelineEventMessages(std::vector<MidiMessage>& messages, const Timeline
                      40,
                      {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), 0});
           endTick = std::max(endTick, typedEvent.tick + typedEvent.duration);
-        } else if constexpr (std::is_same_v<Event, Tempo>) {
+        } else if constexpr (std::is_same_v<TypedEvent, Tempo>) {
           const std::array<u8, 3> tempoBytes{
               static_cast<u8>((typedEvent.microsecondsPerQuarter >> 16) & 0xff),
               static_cast<u8>((typedEvent.microsecondsPerQuarter >> 8) & 0xff),
@@ -142,32 +142,32 @@ void addTimelineEventMessages(std::vector<MidiMessage>& messages, const Timeline
           };
           addMessage(messages, typedEvent.tick, 0, metaEvent(0x51, tempoBytes));
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, ProgramChange>) {
+        } else if constexpr (std::is_same_v<TypedEvent, ProgramChange>) {
           addMessage(messages,
                      typedEvent.tick,
                      15,
                      {static_cast<u8>(0xc0 | channel4(typedEvent.channel)), data7(typedEvent.program)});
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, BankSelect>) {
+        } else if constexpr (std::is_same_v<TypedEvent, BankSelect>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 0, static_cast<u8>((typedEvent.bank >> 7) & 0x7f), 10);
           if (typedEvent.writeLsb) {
             addController(messages, typedEvent.tick, typedEvent.channel, 32, static_cast<u8>(typedEvent.bank & 0x7f), 11);
           }
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, Volume>) {
+        } else if constexpr (std::is_same_v<TypedEvent, Volume>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 7, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, Volume14>) {
+        } else if constexpr (std::is_same_v<TypedEvent, Volume14>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 7, static_cast<u8>((typedEvent.value >> 7) & 0x7f), 20);
           addController(messages, typedEvent.tick, typedEvent.channel, 39, static_cast<u8>(typedEvent.value & 0x7f), 21);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, Pan>) {
+        } else if constexpr (std::is_same_v<TypedEvent, Pan>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 10, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, Expression>) {
+        } else if constexpr (std::is_same_v<TypedEvent, Expression>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 11, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, MasterVolume>) {
+        } else if constexpr (std::is_same_v<TypedEvent, MasterVolume>) {
           const std::array<u8, 7> payload{
               0x7f,
               0x7f,
@@ -179,19 +179,19 @@ void addTimelineEventMessages(std::vector<MidiMessage>& messages, const Timeline
           };
           addMessage(messages, typedEvent.tick, 5, sysexEvent(payload));
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, Reverb>) {
+        } else if constexpr (std::is_same_v<TypedEvent, Reverb>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 91, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, FineTune>) {
+        } else if constexpr (std::is_same_v<TypedEvent, FineTune>) {
           const double semitones = std::clamp(typedEvent.cents / 100.0, -1.0, 1.0);
           const s32 value = std::min(static_cast<int>(std::lround(8192 * semitones)), 8191) + 8192;
           addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 1, static_cast<u16>(value));
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, CoarseTune>) {
+        } else if constexpr (std::is_same_v<TypedEvent, CoarseTune>) {
           const s32 value = std::clamp<s32>((typedEvent.semitones + 64) << 7, 0, 16383);
           addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 2, static_cast<u16>(value));
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, PitchBend>) {
+        } else if constexpr (std::is_same_v<TypedEvent, PitchBend>) {
           const s32 value = std::clamp<s32>(typedEvent.value + 0x2000, 0, 0x3fff);
           addMessage(messages,
                      typedEvent.tick,
@@ -200,49 +200,49 @@ void addTimelineEventMessages(std::vector<MidiMessage>& messages, const Timeline
                       static_cast<u8>(value & 0x7f),
                       static_cast<u8>((value >> 7) & 0x7f)});
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, PitchBendRange>) {
+        } else if constexpr (std::is_same_v<TypedEvent, PitchBendRange>) {
           addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 0, static_cast<u16>(typedEvent.semitones << 7));
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, VibratoDepth>) {
+        } else if constexpr (std::is_same_v<TypedEvent, VibratoDepth>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 1, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, VibratoFrequency>) {
+        } else if constexpr (std::is_same_v<TypedEvent, VibratoFrequency>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 76, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, VibratoDelay>) {
+        } else if constexpr (std::is_same_v<TypedEvent, VibratoDelay>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 78, data7(typedEvent.ticks));
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, TremoloDepth>) {
+        } else if constexpr (std::is_same_v<TypedEvent, TremoloDepth>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 92, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, TremoloFrequency>) {
+        } else if constexpr (std::is_same_v<TypedEvent, TremoloFrequency>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 75, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, TremoloDelay>) {
+        } else if constexpr (std::is_same_v<TypedEvent, TremoloDelay>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 79, data7(typedEvent.ticks));
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, PortamentoEnable>) {
+        } else if constexpr (std::is_same_v<TypedEvent, PortamentoEnable>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 65, typedEvent.enabled ? 127 : 0);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, PortamentoTime>) {
+        } else if constexpr (std::is_same_v<TypedEvent, PortamentoTime>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 5, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, PortamentoTime14>) {
+        } else if constexpr (std::is_same_v<TypedEvent, PortamentoTime14>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 5, static_cast<u8>((typedEvent.value >> 7) & 0x7f), 20);
           addController(messages, typedEvent.tick, typedEvent.channel, 37, static_cast<u8>(typedEvent.value & 0x7f), 21);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, PortamentoControl>) {
+        } else if constexpr (std::is_same_v<TypedEvent, PortamentoControl>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 84, typedEvent.key);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, LegatoPedal>) {
+        } else if constexpr (std::is_same_v<TypedEvent, LegatoPedal>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 68, typedEvent.enabled ? 127 : 0);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, MonoMode>) {
+        } else if constexpr (std::is_same_v<TypedEvent, MonoMode>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 126, typedEvent.channels);
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, EndOfTrack>) {
+        } else if constexpr (std::is_same_v<TypedEvent, EndOfTrack>) {
           endTick = std::max(endTick, typedEvent.tick);
-        } else if constexpr (std::is_same_v<Event, Marker>) {
+        } else if constexpr (std::is_same_v<TypedEvent, Marker>) {
           addMessage(messages, typedEvent.tick, 90, textMetaEvent(0x06, typedEvent.text));
           endTick = std::max(endTick, typedEvent.tick);
         }
@@ -250,7 +250,7 @@ void addTimelineEventMessages(std::vector<MidiMessage>& messages, const Timeline
       event);
 }
 
-[[nodiscard]] std::vector<u8> writeTrack(const TimelineTrack& track) {
+[[nodiscard]] std::vector<u8> writeTrack(const EventTrack& track) {
   std::vector<MidiMessage> messages;
   u64 endTick = 0;
 
@@ -259,7 +259,7 @@ void addTimelineEventMessages(std::vector<MidiMessage>& messages, const Timeline
   }
 
   for (const auto& event : track.events) {
-    addTimelineEventMessages(messages, event, endTick);
+    addEventMessages(messages, event, endTick);
   }
 
   addMessage(messages, endTick, 1000, metaEvent(0x2f, std::span<const u8>()));
@@ -291,7 +291,7 @@ void addTimelineEventMessages(std::vector<MidiMessage>& messages, const Timeline
 
 }  // namespace
 
-std::vector<u8> MidiExporter::exportMidi(const TimelineSequence& sequence) const {
+std::vector<u8> MidiExporter::exportMidi(const EventSequence& sequence) const {
   std::vector<u8> bytes;
   writeAscii(bytes, "MThd");
   writeBe32(bytes, 6);

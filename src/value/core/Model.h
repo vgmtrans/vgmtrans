@@ -227,7 +227,7 @@ struct DriverSpecificCommand {
   SourceRange range;
 };
 
-using SequencerCommand = std::variant<
+using Command = std::variant<
     NoteCommand,
     RestCommand,
     NoteStateCommand,
@@ -253,15 +253,15 @@ using SequencerCommand = std::variant<
     DriverSpecificCommand>;
 
 // These defaults let formats name only commands whose display differs from the shared model.
-[[nodiscard]] std::string defaultCommandName(const SequencerCommand& command);
-[[nodiscard]] std::string defaultCommandDetailKind(const SequencerCommand& command);
-[[nodiscard]] std::string defaultCommandDescription(const SequencerCommand& command);
+[[nodiscard]] std::string defaultCommandName(const Command& command);
+[[nodiscard]] std::string defaultCommandDetailKind(const Command& command);
+[[nodiscard]] std::string defaultCommandDescription(const Command& command);
 
-struct TrackProgram {
+struct CommandTrack {
   TrackId id;
   u32 sourceTrackNumber = 0;
   Address startAddress;
-  std::vector<SequencerCommand> commands;
+  std::vector<Command> commands;
 };
 
 struct SequenceBehavior {
@@ -274,9 +274,9 @@ struct SequenceBehavior {
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
 };
 
-struct DriverSequence {
+struct CommandSequence {
   Timebase timebase;
-  std::vector<TrackProgram> tracks;
+  std::vector<CommandTrack> tracks;
   std::vector<InstrumentRef> referencedInstruments;
   SequenceBehavior behavior;
   // Empty means use metadata.format; formats set this when one parser has multiple sequencer dialects.
@@ -285,7 +285,7 @@ struct DriverSequence {
 
 struct SequenceAsset {
   AssetMetadata metadata;
-  DriverSequence program;
+  CommandSequence program;
 };
 
 struct KeyRange {
@@ -644,7 +644,7 @@ struct Marker {
   std::string text;
 };
 
-using TimelineEvent = std::variant<
+using Event = std::variant<
     NoteOn,
     NoteOff,
     NoteDuration,
@@ -676,20 +676,20 @@ using TimelineEvent = std::variant<
     EndOfTrack,
     Marker>;
 
-struct TimelineTrack {
+struct EventTrack {
   std::string name;
-  std::vector<TimelineEvent> events;
+  std::vector<Event> events;
 };
 
-struct TimelineSequence {
+struct EventSequence {
   Timebase timebase;
-  std::vector<TimelineTrack> tracks;
+  std::vector<EventTrack> tracks;
   std::vector<Diagnostic> diagnostics;
 };
 
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
-[[nodiscard]] SourceRange commandRange(const SequencerCommand& command);
+[[nodiscard]] SourceRange commandRange(const Command& command);
 [[nodiscard]] ItemNode* itemById(ItemTree& tree, ItemId id);
 [[nodiscard]] const ItemNode* itemById(const ItemTree& tree, ItemId id);
 [[nodiscard]] Asset* assetById(Project& project, AssetId id);

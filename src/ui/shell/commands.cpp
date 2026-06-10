@@ -452,64 +452,64 @@ std::string_view valueNoteStateActionName(vgmtrans::core::NoteStateAction action
   return "unknown";
 }
 
-std::string valueCommandDescription(const vgmtrans::core::SequencerCommand& command) {
+std::string valueCommandDescription(const vgmtrans::core::Command& command) {
   return std::visit([](const auto& typedCommand) -> std::string {
-    using Command = std::decay_t<decltype(typedCommand)>;
-    if constexpr (std::is_same_v<Command, vgmtrans::core::NoteCommand>) {
+    using TypedCommand = std::decay_t<decltype(typedCommand)>;
+    if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::NoteCommand>) {
       return fmt::format("note key={} rawVelocity={} rawDuration={}",
                          typedCommand.key, typedCommand.rawVelocity, typedCommand.rawDuration);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::RestCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::RestCommand>) {
       return fmt::format("rest rawDuration={}", typedCommand.rawDuration);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::NoteStateCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::NoteStateCommand>) {
       return fmt::format("note-state action={} rawValue={}",
                          valueNoteStateActionName(typedCommand.action), typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::DurationCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::DurationCommand>) {
       return fmt::format("duration rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::ProgramCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ProgramCommand>) {
       return fmt::format("program rawProgram={}", typedCommand.rawProgram);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::VolumeCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::VolumeCommand>) {
       return fmt::format("volume rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::PanCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::PanCommand>) {
       return fmt::format("pan rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::TempoCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::TempoCommand>) {
       return fmt::format("tempo rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::TransposeCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::TransposeCommand>) {
       return fmt::format("transpose rawSemitones={}", typedCommand.rawSemitones);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::GlobalTransposeCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::GlobalTransposeCommand>) {
       return fmt::format("global-transpose rawSemitones={}", typedCommand.rawSemitones);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::TuningCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::TuningCommand>) {
       return fmt::format("tuning rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::PortamentoCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::PortamentoCommand>) {
       return typedCommand.rawTargetKey
                ? fmt::format("portamento rawTime={} rawTargetKey={}", typedCommand.rawTime, *typedCommand.rawTargetKey)
                : fmt::format("portamento rawTime={}", typedCommand.rawTime);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::LfoCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::LfoCommand>) {
       return fmt::format("lfo target={} rawType={} rawAmount={}",
                          valueLfoTargetName(typedCommand.target), typedCommand.rawType, typedCommand.rawAmount);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::ReverbCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ReverbCommand>) {
       return fmt::format("reverb rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::EnvelopeCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::EnvelopeCommand>) {
       return fmt::format("envelope rawAttack={} rawDecay={} rawSustain={} rawRelease={}",
                          typedCommand.rawAttack, typedCommand.rawDecay, typedCommand.rawSustain,
                          typedCommand.rawRelease);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::MasterVolumeCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::MasterVolumeCommand>) {
       return fmt::format("master-volume rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::JumpCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::JumpCommand>) {
       return fmt::format("jump destination=0x{:x}", typedCommand.destination.value);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::RepeatCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::RepeatCommand>) {
       return fmt::format("repeat slot={} count={} destination=0x{:x}",
                          typedCommand.slot, typedCommand.count, typedCommand.destination.value);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::RepeatBreakCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::RepeatBreakCommand>) {
       return fmt::format("repeat-break slot={} rawAttributes={} destination=0x{:x}",
                          typedCommand.slot, typedCommand.rawAttributes, typedCommand.destination.value);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::LoopBoundaryCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::LoopBoundaryCommand>) {
       return fmt::format("loop-boundary destination=0x{:x} trigger=0x{:x}",
                          typedCommand.destination.value, typedCommand.trigger.value);
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::EndCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::EndCommand>) {
       return "end";
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::UnknownCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::UnknownCommand>) {
       return fmt::format("unknown opcode=0x{:x} bytes={}", typedCommand.opcode, typedCommand.bytes.size());
-    } else if constexpr (std::is_same_v<Command, vgmtrans::core::DriverSpecificCommand>) {
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::DriverSpecificCommand>) {
       return fmt::format("driver-specific '{}' bytes={}", typedCommand.name, typedCommand.bytes.size());
     } else {
       return "command";

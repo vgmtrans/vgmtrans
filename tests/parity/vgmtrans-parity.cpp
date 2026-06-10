@@ -2290,9 +2290,9 @@ void legacyLevelReapplicationKeepsPreCurvePrecision() {
 }
 
 int selfTest() {
-  const TimelineSequence performance{
+  const EventSequence eventSequence{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {TimelineTrack{
+      .tracks = {EventTrack{
           .name = "Parity",
           .events =
               {
@@ -2306,7 +2306,7 @@ int selfTest() {
       }},
   };
 
-  const auto midi = MidiExporter().exportMidi(performance);
+  const auto midi = MidiExporter().exportMidi(eventSequence);
   const auto normalized = normalizeMidi(midi);
 
   expect(

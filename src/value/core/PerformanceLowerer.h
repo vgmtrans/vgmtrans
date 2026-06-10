@@ -47,53 +47,53 @@ struct NoteTiming {
   u32 soundingTicks = 0;
   u32 advanceTicks = 0;
   bool extendsPrevious = false;
-  std::vector<TimelineEvent> beforeEvents;
+  std::vector<Event> beforeEvents;
 };
 
 class SequencerProfile {
  public:
   virtual ~SequencerProfile() = default;
 
-  virtual void beginTrack(const DriverSequence& program, const TrackProgram& track,
-                          TrackState& state, std::vector<TimelineEvent>& events) const;
+  virtual void beginTrack(const CommandSequence& program, const CommandTrack& track,
+                          TrackState& state, std::vector<Event>& events) const;
   [[nodiscard]] virtual u32 restTicks(const RestCommand& command, TrackState& state) const;
   [[nodiscard]] virtual NoteTiming noteTiming(const NoteCommand& command, TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerNoteState(
+  [[nodiscard]] virtual std::vector<Event> lowerNoteState(
       const NoteStateCommand& command,
       TrackState& state) const;
   virtual void applyDuration(const DurationCommand& command, TrackState& state) const;
   virtual void applyTranspose(const TransposeCommand& command, TrackState& state) const;
 
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerTempo(
+  [[nodiscard]] virtual std::vector<Event> lowerTempo(
       const TempoCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerProgram(
+  [[nodiscard]] virtual std::vector<Event> lowerProgram(
       const ProgramCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerVolume(
+  [[nodiscard]] virtual std::vector<Event> lowerVolume(
       const VolumeCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerPan(
+  [[nodiscard]] virtual std::vector<Event> lowerPan(
       const PanCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerMasterVolume(
+  [[nodiscard]] virtual std::vector<Event> lowerMasterVolume(
       const MasterVolumeCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerReverb(
+  [[nodiscard]] virtual std::vector<Event> lowerReverb(
       const ReverbCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerTuning(
+  [[nodiscard]] virtual std::vector<Event> lowerTuning(
       const TuningCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerPortamento(
+  [[nodiscard]] virtual std::vector<Event> lowerPortamento(
       const PortamentoCommand& command, TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerLfo(
+  [[nodiscard]] virtual std::vector<Event> lowerLfo(
       const LfoCommand& command, TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerEnvelope(
+  [[nodiscard]] virtual std::vector<Event> lowerEnvelope(
       const EnvelopeCommand& command, const TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerDriverSpecific(
+  [[nodiscard]] virtual std::vector<Event> lowerDriverSpecific(
       const DriverSpecificCommand& command, TrackState& state) const;
-  [[nodiscard]] virtual std::vector<TimelineEvent> lowerRepeatBreak(
+  [[nodiscard]] virtual std::vector<Event> lowerRepeatBreak(
       const RepeatBreakCommand& command, TrackState& state) const;
 };
 
 class PerformanceLowerer {
  public:
-  [[nodiscard]] TimelineSequence lower(
-      const DriverSequence& program,
+  [[nodiscard]] EventSequence lower(
+      const CommandSequence& program,
       const SequencerProfile& profile,
       LoopPolicy loopPolicy) const;
 };
