@@ -16,7 +16,7 @@
 
 namespace vgmtrans::core {
 
-class ProjectSession {
+class Session {
  public:
   SourceId addSource(SourceFile file, std::vector<u8> bytes);
   SourceId addSourceFromPath(std::filesystem::path path);

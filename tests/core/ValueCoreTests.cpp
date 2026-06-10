@@ -9,7 +9,7 @@
 #include "value/core/FormatModule.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/PerformanceLowerer.h"
-#include "value/core/ProjectSession.h"
+#include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
 #include "value/export/SoundFontExporter.h"
 #include "value/export/WavExporter.h"
@@ -356,7 +356,7 @@ void sequencerCommandExposesSourceRange() {
 }
 
 void projectSessionScansValuesAndVirtualSources() {
-  ProjectSession session;
+  Session session;
   session.formats().add(std::make_unique<ProbeSequenceModule>());
   session.formats().add(std::make_unique<ProbeMiscModule>());
 
@@ -421,7 +421,7 @@ void projectSessionAddsSourceFromPath() {
     out.put(static_cast<char>(0x12));
   }
 
-  ProjectSession session;
+  Session session;
   session.formats().add(std::make_unique<ProbeSequenceModule>());
 
   const auto sourceId = session.addSourceFromPath(path);
@@ -441,7 +441,7 @@ void projectSessionAddsSourceFromPath() {
 }
 
 void projectSessionExportsAllCollections() {
-  ProjectSession session;
+  Session session;
   session.formats().add(std::make_unique<ProbeSequenceModule>());
 
   session.addSource(SourceFile{.name = "first.probe"}, {0xaa});

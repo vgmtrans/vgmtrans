@@ -9,7 +9,7 @@
 #include "value/export/Export.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/PerformanceLowerer.h"
-#include "value/core/ProjectSession.h"
+#include "value/core/Session.h"
 #include "value/formats/CapcomSnes/CapcomSnesProfile.h"
 #include "value/formats/ValueFormats.h"
 
@@ -125,7 +125,7 @@ std::vector<u8> makeCapcomSnesSpc() {
 }  // namespace
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
@@ -245,7 +245,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(artifacts[0].mediaType == "audio/midi", "MIDI artifact should use audio/midi media type");
   expect(artifacts[0].diagnostics.empty(), "MIDI artifact should not carry diagnostics for linear fixture");
   expect(artifacts[0].bytes == MidiExporter().exportMidi(eventSequence),
-         "ProjectSession MIDI export should match direct lowerer/exporter output");
+         "Session MIDI export should match direct lowerer/exporter output");
 
   const auto wavArtifacts = session.exportCollection(project.collections[0].id, ExportRequest{
                                                                                     .kinds = {ExportKind::Wav},
@@ -377,7 +377,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 }
 
 void capcomSnesModuleScansSpcThroughVirtualAramSource() {
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   const auto sourceId = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesSpc());
 
@@ -418,7 +418,7 @@ void capcomSnesNoteStateCommandsAreTypedAndLowered() {
   bytes[0x3004] = 0x41;
   bytes[0x3005] = 0x17;
 
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, std::move(bytes));
 

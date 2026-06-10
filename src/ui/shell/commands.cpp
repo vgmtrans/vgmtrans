@@ -9,7 +9,7 @@
 #include "base/Types.h"
 #include "DBGVGMRoot.h"
 #include "value/core/Model.h"
-#include "value/core/ProjectSession.h"
+#include "value/core/Session.h"
 #include "value/formats/ValueFormats.h"
 #include "RawFile.h"
 #include "SeqTrack.h"
@@ -236,8 +236,8 @@ std::vector<u8> valueBytesForRawFile(const RawFile& file) {
   return std::vector<u8>(begin, begin + file.size());
 }
 
-vgmtrans::core::ProjectSession valueSessionForRawFile(const RawFile& file) {
-  vgmtrans::core::ProjectSession session;
+vgmtrans::core::Session valueSessionForRawFile(const RawFile& file) {
+  vgmtrans::core::Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(vgmtrans::core::SourceFile{
                         .name = file.name(),
@@ -248,8 +248,8 @@ vgmtrans::core::ProjectSession valueSessionForRawFile(const RawFile& file) {
   return session;
 }
 
-vgmtrans::core::ProjectSession valueSessionForPath(const std::filesystem::path& path) {
-  vgmtrans::core::ProjectSession session;
+vgmtrans::core::Session valueSessionForPath(const std::filesystem::path& path) {
+  vgmtrans::core::Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSourceFromPath(path);
   return session;

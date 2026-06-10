@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/core/ProjectSession.h"
+#include "value/core/Session.h"
 
 #include <fstream>
 #include <stdexcept>
@@ -12,14 +12,14 @@
 
 namespace vgmtrans::core {
 
-SourceId ProjectSession::addSource(SourceFile file, std::vector<u8> bytes) {
+SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
   // User-added sources invalidate virtual extractions from the previous scan.
   sources_.discardVirtualizedTail();
   project_ = {};
   return sources_.add(std::move(file), std::move(bytes));
 }
 
-SourceId ProjectSession::addSourceFromPath(std::filesystem::path path) {
+SourceId Session::addSourceFromPath(std::filesystem::path path) {
   std::ifstream file(path, std::ios::binary);
   if (!file) {
     throw std::runtime_error("failed to open source file: " + path.string());
@@ -47,18 +47,18 @@ SourceId ProjectSession::addSourceFromPath(std::filesystem::path path) {
                    std::move(bytes));
 }
 
-Project ProjectSession::scan() {
+Project Session::scan() {
   project_ = scanner_.scan(sources_, formats_);
   return project_;
 }
 
-std::vector<Artifact> ProjectSession::exportCollection(
+std::vector<Artifact> Session::exportCollection(
     CollectionId id,
     const ExportRequest& request) const {
   return exporter_.exportCollection(project_, sources_, id, request, profiles_);
 }
 
-std::vector<CollectionExport> ProjectSession::exportAllCollections(
+std::vector<CollectionExport> Session::exportAllCollections(
     const ExportRequest& request) const {
   return exporter_.exportAllCollections(project_, sources_, request, profiles_);
 }

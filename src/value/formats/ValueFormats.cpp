@@ -23,7 +23,7 @@ void registerValueSequencerProfiles(core::SequencerProfileRegistry& registry) {
   capcom_snes::registerCapcomSnesProfile(registry);
 }
 
-void registerValueFormats(core::ProjectSession& session) {
+void registerValueFormats(core::Session& session) {
   registerValueFormatModules(session.formats());
   registerValueSequencerProfiles(session.profiles());
 }

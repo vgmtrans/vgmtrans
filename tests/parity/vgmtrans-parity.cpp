@@ -19,7 +19,7 @@
 #include "value/export/Export.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/Model.h"
-#include "value/core/ProjectSession.h"
+#include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
 #include "value/formats/CapcomSnes/CapcomSnesProfile.h"
@@ -875,7 +875,7 @@ CapcomSnesSummary valueCapcomSnesSummary(
 }
 
 CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::string& name) {
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
@@ -885,7 +885,7 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
 }
 
 std::map<std::string, CapcomSnesSummary> valueCapcomSnesRsnSummaries(const std::filesystem::path& path) {
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
@@ -1045,7 +1045,7 @@ bool compareCapcomSnesSummary(std::span<const u8> aramBytes, const std::string& 
 }
 
 std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string& name) {
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
@@ -1077,7 +1077,7 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
   throw std::runtime_error("value exporter did not produce a MIDI artifact");
 }
 
-std::vector<u8> valueCapcomSnesMidi(ProjectSession& session, CollectionId collection) {
+std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
   const auto artifacts =
       session.exportCollection(collection, ExportRequest{
                                              .kinds = {ExportKind::Midi},
@@ -1097,7 +1097,7 @@ std::vector<u8> valueCapcomSnesMidi(ProjectSession& session, CollectionId collec
 }
 
 std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesystem::path& path) {
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
@@ -1121,7 +1121,7 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
   return midis;
 }
 
-SynthExportBytes valueCapcomSnesSynthExports(ProjectSession& session, CollectionId collection) {
+SynthExportBytes valueCapcomSnesSynthExports(Session& session, CollectionId collection) {
   const auto artifacts =
       session.exportCollection(collection, ExportRequest{
                                              .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
@@ -1149,7 +1149,7 @@ SynthExportBytes valueCapcomSnesSynthExports(ProjectSession& session, Collection
 }
 
 std::map<std::string, SynthExportBytes> valueCapcomSnesRsnSynthExports(const std::filesystem::path& path) {
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
@@ -2502,7 +2502,7 @@ bool validateValueCollectionExports(const Project& project, const Collection& co
 int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
   const auto legacySummaries = legacyCapcomSnesRsnSummaries(path);
 
-  ProjectSession session;
+  Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
   const Project project = session.scan();

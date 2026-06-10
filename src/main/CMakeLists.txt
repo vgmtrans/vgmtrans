@@ -112,7 +112,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Model.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/PerformanceLowerer.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/ProjectSession.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Source.cpp
@@ -130,7 +130,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Model.h
       ${PROJECT_SOURCE_DIR}/src/value/core/PerformanceLowerer.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/ProjectSession.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/Session.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Source.h

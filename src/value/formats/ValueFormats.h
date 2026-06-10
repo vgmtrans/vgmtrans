@@ -7,12 +7,12 @@
 
 #include "value/core/FormatModule.h"
 #include "value/core/PerformanceLowerer.h"
-#include "value/core/ProjectSession.h"
+#include "value/core/Session.h"
 
 namespace vgmtrans::formats {
 
 void registerValueFormatModules(core::FormatRegistry& registry);
 void registerValueSequencerProfiles(core::SequencerProfileRegistry& registry);
-void registerValueFormats(core::ProjectSession& session);
+void registerValueFormats(core::Session& session);
 
 }  // namespace vgmtrans::formats
