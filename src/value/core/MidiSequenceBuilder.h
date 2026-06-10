@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include "value/core/Model.h"
+#include "value/core/MidiModel.h"
+#include "value/core/SequenceModel.h"
 
 #include <array>
 #include <functional>

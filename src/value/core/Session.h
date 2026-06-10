@@ -8,7 +8,6 @@
 
 #include "value/export/Export.h"
 #include "value/core/FormatModule.h"
-#include "value/core/Model.h"
 #include "value/core/Source.h"
 
 #include <filesystem>

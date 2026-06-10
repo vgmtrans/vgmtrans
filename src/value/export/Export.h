@@ -7,8 +7,8 @@
 #pragma once
 
 #include "base/Types.h"
-#include "value/core/Model.h"
 #include "value/core/MidiSequenceBuilder.h"
+#include "value/core/ProjectModel.h"
 #include "value/core/Source.h"
 #include "value/export/ExportPolicy.h"
 

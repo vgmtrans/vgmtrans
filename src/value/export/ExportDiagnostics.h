@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/Model.h"
+#include "value/core/CoreTypes.h"
 
 #include <optional>
 #include <string>

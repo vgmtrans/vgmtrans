@@ -7,7 +7,7 @@
 #pragma once
 
 #include "base/Types.h"
-#include "value/core/Model.h"
+#include "value/core/SynthModel.h"
 
 #include <vector>
 

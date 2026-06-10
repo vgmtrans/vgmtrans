@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/core/ModulationAnalysis.h"
+#include "value/core/SynthModel.h"
 #include "value/export/ExportPolicy.h"
 
 namespace vgmtrans::core {

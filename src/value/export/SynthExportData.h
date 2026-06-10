@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "value/core/Model.h"
 #include "value/core/Source.h"
+#include "value/core/SynthModel.h"
 
 #include <map>
 #include <optional>

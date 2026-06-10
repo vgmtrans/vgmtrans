@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/Model.h"
+#include "value/core/SynthModel.h"
 
 #include <memory>
 #include <optional>
