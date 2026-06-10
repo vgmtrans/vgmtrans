@@ -27,7 +27,7 @@ enum class ItemKind {
   Sequence,
   Track,
   Command,
-  InstrumentBank,
+  InstrumentSet,
   Instrument,
   Region,
   SampleCollection,
@@ -390,13 +390,9 @@ struct Instrument {
   std::vector<SynthModulator> modulators;
 };
 
-struct InstrumentBank {
-  std::vector<Instrument> instruments;
-};
-
-struct InstrumentBankAsset {
+struct InstrumentSetAsset {
   AssetMetadata metadata;
-  InstrumentBank bank;
+  std::vector<Instrument> instruments;
 };
 
 enum class AudioCodec {
@@ -441,7 +437,7 @@ struct MiscAsset {
 
 using Asset = std::variant<
     SequenceAsset,
-    InstrumentBankAsset,
+    InstrumentSetAsset,
     SampleCollectionAsset,
     MiscAsset>;
 
@@ -449,7 +445,7 @@ struct Collection {
   CollectionId id;
   std::string name;
   std::optional<AssetId> sequence;
-  std::vector<AssetId> instrumentBanks;
+  std::vector<AssetId> instrumentSets;
   std::vector<AssetId> sampleCollections;
   std::vector<AssetId> miscAssets;
 };

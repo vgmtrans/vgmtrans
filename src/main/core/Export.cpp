@@ -182,17 +182,17 @@ namespace {
 
 [[nodiscard]] Artifact exportSoundFont2(const Project& project, const SourceStore& sources,
                                         const Collection& collection) {
-  std::vector<const InstrumentBankAsset*> instrumentBanks;
-  instrumentBanks.reserve(collection.instrumentBanks.size());
+  std::vector<const InstrumentSetAsset*> instrumentSets;
+  instrumentSets.reserve(collection.instrumentSets.size());
   std::vector<const SampleCollectionAsset*> sampleCollections;
   sampleCollections.reserve(collection.sampleCollections.size());
   std::vector<Diagnostic> diagnostics;
 
-  for (const auto id : collection.instrumentBanks) {
-    if (const auto* instrumentBank = assetById<InstrumentBankAsset>(project, id)) {
-      instrumentBanks.push_back(instrumentBank);
+  for (const auto id : collection.instrumentSets) {
+    if (const auto* instrumentSet = assetById<InstrumentSetAsset>(project, id)) {
+      instrumentSets.push_back(instrumentSet);
     } else {
-      diagnostics.push_back(exportError("Collection instrument bank asset was not found"));
+      diagnostics.push_back(exportError("Collection instrument set asset was not found"));
     }
   }
 
@@ -207,7 +207,7 @@ namespace {
   auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = artifactBaseName(collection),
-          .instrumentBanks = instrumentBanks,
+          .instrumentSets = instrumentSets,
           .sampleCollections = sampleCollections,
       },
       sources);
@@ -223,17 +223,17 @@ namespace {
 }
 
 [[nodiscard]] Artifact exportDls(const Project& project, const SourceStore& sources, const Collection& collection) {
-  std::vector<const InstrumentBankAsset*> instrumentBanks;
-  instrumentBanks.reserve(collection.instrumentBanks.size());
+  std::vector<const InstrumentSetAsset*> instrumentSets;
+  instrumentSets.reserve(collection.instrumentSets.size());
   std::vector<const SampleCollectionAsset*> sampleCollections;
   sampleCollections.reserve(collection.sampleCollections.size());
   std::vector<Diagnostic> diagnostics;
 
-  for (const auto id : collection.instrumentBanks) {
-    if (const auto* instrumentBank = assetById<InstrumentBankAsset>(project, id)) {
-      instrumentBanks.push_back(instrumentBank);
+  for (const auto id : collection.instrumentSets) {
+    if (const auto* instrumentSet = assetById<InstrumentSetAsset>(project, id)) {
+      instrumentSets.push_back(instrumentSet);
     } else {
-      diagnostics.push_back(exportError("Collection instrument bank asset was not found"));
+      diagnostics.push_back(exportError("Collection instrument set asset was not found"));
     }
   }
 
@@ -248,7 +248,7 @@ namespace {
   auto result = DlsExporter().exportDls(
       DlsInput{
           .name = artifactBaseName(collection),
-          .instrumentBanks = instrumentBanks,
+          .instrumentSets = instrumentSets,
           .sampleCollections = sampleCollections,
       },
       sources);

@@ -369,7 +369,7 @@ SequenceAsset parseCapcomSnesSequence(
     const ScanInput& input,
     const CapcomSnesLayout& layout,
     AssetId sequenceId,
-    std::optional<AssetId> instrumentBankId,
+    std::optional<AssetId> instrumentSetId,
     std::string_view displayName) {
   const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
   ItemTree items;
@@ -424,7 +424,7 @@ SequenceAsset parseCapcomSnesSequence(
         const u32 programNumber = programCommand->rawProgram & 0x7f;
         if (referencedInstruments.insert({bank, programNumber}).second) {
           program.referencedInstruments.push_back(InstrumentRef{
-              .asset = instrumentBankId,
+              .asset = instrumentSetId,
               .bank = bank,
               .program = programNumber,
               .range = programCommand->range,

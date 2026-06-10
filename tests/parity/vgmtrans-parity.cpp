@@ -375,7 +375,7 @@ struct InstrumentSynthSummary {
 struct CapcomSnesSummary {
   u32 sequenceCount = 0;
   std::vector<u32> trackCounts;
-  u32 instrumentBankCount = 0;
+  u32 instrumentSetCount = 0;
   u32 sampleCollectionCount = 0;
   std::vector<SampleSummary> samples;
   std::vector<RegionSummary> regions;
@@ -634,15 +634,15 @@ void appendLegacySamples(
 
 void appendLegacyInstruments(
     CapcomSnesSummary& summary,
-    std::span<VGMInstrSet* const> instrumentBanks,
+    std::span<VGMInstrSet* const> instrumentSets,
     std::span<VGMSamp* const> samples) {
-  for (const auto* instrumentBank : instrumentBanks) {
-    if (instrumentBank == nullptr) {
+  for (const auto* instrumentSet : instrumentSets) {
+    if (instrumentSet == nullptr) {
       continue;
     }
 
-    ++summary.instrumentBankCount;
-    for (const auto* instrument : instrumentBank->instrs()) {
+    ++summary.instrumentSetCount;
+    for (const auto* instrument : instrumentSet->instrs()) {
       InstrumentSynthSummary synth{
           .bank = instrument->bank,
           .program = instrument->instrNum,
@@ -707,18 +707,18 @@ CapcomSnesSummary legacyCapcomSnesCollectionSummary(const VGMColl& collection) {
     summary.trackCounts.push_back(static_cast<u32>(sequence->trackCount()));
   }
 
-  std::vector<VGMInstrSet*> instrumentBanks;
-  appendUnique(instrumentBanks, collection.instrSets());
+  std::vector<VGMInstrSet*> instrumentSets;
+  appendUnique(instrumentSets, collection.instrSets());
 
   std::vector<VGMSampColl*> sampleCollections;
   appendUnique(sampleCollections, collection.sampColls());
-  for (const auto* instrumentBank : instrumentBanks) {
-    appendUnique(sampleCollections, instrumentBank->sampColl());
+  for (const auto* instrumentSet : instrumentSets) {
+    appendUnique(sampleCollections, instrumentSet->sampColl());
   }
 
   std::vector<VGMSamp*> samples;
   appendLegacySamples(summary, samples, sampleCollections);
-  appendLegacyInstruments(summary, instrumentBanks, samples);
+  appendLegacyInstruments(summary, instrumentSets, samples);
   normalizeSummary(summary);
 
   return summary;
@@ -728,7 +728,7 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
   const auto root = scanLegacyCapcomSnes(aramBytes, name);
 
   CapcomSnesSummary summary;
-  std::vector<VGMInstrSet*> instrumentBanks;
+  std::vector<VGMInstrSet*> instrumentSets;
   std::vector<VGMSampColl*> sampleCollections;
 
   for (const auto& file : root->vgmFiles()) {
@@ -740,17 +740,17 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
       appendUnique(sampleCollections, *sampleSlot);
     } else if (const auto* instrumentSlot = std::get_if<VGMInstrSet*>(&file);
                instrumentSlot != nullptr && *instrumentSlot != nullptr) {
-      appendUnique(instrumentBanks, *instrumentSlot);
+      appendUnique(instrumentSets, *instrumentSlot);
     }
   }
 
-  for (const auto* instrumentBank : instrumentBanks) {
-    appendUnique(sampleCollections, instrumentBank->sampColl());
+  for (const auto* instrumentSet : instrumentSets) {
+    appendUnique(sampleCollections, instrumentSet->sampColl());
   }
 
   std::vector<VGMSamp*> samples;
   appendLegacySamples(summary, samples, sampleCollections);
-  appendLegacyInstruments(summary, instrumentBanks, samples);
+  appendLegacyInstruments(summary, instrumentSets, samples);
   normalizeSummary(summary);
   return summary;
 }
@@ -819,14 +819,14 @@ CapcomSnesSummary valueCapcomSnesSummary(
     }
   }
 
-  for (const auto instrumentBankId : collection.instrumentBanks) {
-    const auto* instrumentBank = assetById<InstrumentBankAsset>(project, instrumentBankId);
-    if (instrumentBank == nullptr) {
+  for (const auto instrumentSetId : collection.instrumentSets) {
+    const auto* instrumentSet = assetById<InstrumentSetAsset>(project, instrumentSetId);
+    if (instrumentSet == nullptr) {
       continue;
     }
 
-    ++summary.instrumentBankCount;
-    for (const auto& instrument : instrumentBank->bank.instruments) {
+    ++summary.instrumentSetCount;
+    for (const auto& instrument : instrumentSet->instruments) {
       InstrumentSynthSummary synth{
           .bank = instrument.bank,
           .program = instrument.program,
@@ -980,11 +980,11 @@ bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& va
 
   out << "CapcomSnes summary parity mismatch\n";
   out << "legacy counts: sequences=" << legacy.sequenceCount << " trackCounts=" << legacy.trackCounts.size()
-      << " instrumentBanks=" << legacy.instrumentBankCount << " sampleCollections=" << legacy.sampleCollectionCount
+      << " instrumentSets=" << legacy.instrumentSetCount << " sampleCollections=" << legacy.sampleCollectionCount
       << " regions=" << legacy.regions.size() << " synths=" << legacy.instrumentSynths.size()
       << " samples=" << legacy.samples.size() << "\n";
   out << "value counts:  sequences=" << value.sequenceCount << " trackCounts=" << value.trackCounts.size()
-      << " instrumentBanks=" << value.instrumentBankCount << " sampleCollections=" << value.sampleCollectionCount
+      << " instrumentSets=" << value.instrumentSetCount << " sampleCollections=" << value.sampleCollectionCount
       << " regions=" << value.regions.size() << " synths=" << value.instrumentSynths.size()
       << " samples=" << value.samples.size() << "\n";
 

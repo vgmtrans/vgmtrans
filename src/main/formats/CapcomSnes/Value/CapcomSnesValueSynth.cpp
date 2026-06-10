@@ -338,9 +338,9 @@ SampleCollectionAsset parseCapcomSnesSamples(
   };
 }
 
-InstrumentBankAsset parseCapcomSnesInstrumentBank(
+InstrumentSetAsset parseCapcomSnesInstrumentSet(
     const ScanInput& input,
-    AssetId instrumentBankId,
+    AssetId instrumentSetId,
     AssetId sampleCollectionId,
     const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
     const std::vector<CapcomSnesSampleInfo>& sampleInfos,
@@ -358,13 +358,13 @@ InstrumentBankAsset parseCapcomSnesInstrumentBank(
   u32 rootSize = instrumentInfos.empty() ? 0 : (instrumentInfos.back().address + 6) - rootOffset;
   ItemTreeBuilder itemBuilder(items, input.ids);
   const auto root = itemBuilder.add(std::nullopt,
-                                    ItemKind::InstrumentBank,
+                                    ItemKind::InstrumentSet,
                                     "capcom-snes-instrument-table",
                                     "Instrument Table",
                                     input.reader.range(rootOffset, rootSize));
 
-  InstrumentBank bank;
-  bank.instruments.reserve(instrumentInfos.size());
+  std::vector<Instrument> instruments;
+  instruments.reserve(instrumentInfos.size());
   for (const auto& info : instrumentInfos) {
     const auto sampleIndex = sampleIndexBySrcn.find(info.srcn);
     if (sampleIndex == sampleIndexBySrcn.end()) {
@@ -392,7 +392,7 @@ InstrumentBankAsset parseCapcomSnesInstrumentBank(
     instrument.generators = capcomInstrumentGenerators();
     instrument.modulators = capcomInstrumentModulators();
 
-    bank.instruments.push_back(std::move(instrument));
+    instruments.push_back(std::move(instrument));
     const auto instrumentItem = itemBuilder.add(root,
                                                 ItemKind::Instrument,
                                                 "capcom-snes-instrument",
@@ -407,15 +407,15 @@ InstrumentBankAsset parseCapcomSnesInstrumentBank(
                                       "Sample " + std::to_string(sampleIndex->second)));
   }
 
-  return InstrumentBankAsset{
+  return InstrumentSetAsset{
       .metadata = AssetMetadata{
-          .id = instrumentBankId,
+          .id = instrumentSetId,
           .format = "CapcomSnes",
           .name = std::string(displayName) + " Instruments",
           .range = input.reader.range(rootOffset, rootSize),
           .items = std::move(items),
       },
-      .bank = std::move(bank),
+      .instruments = std::move(instruments),
   };
 }
 

@@ -24,7 +24,7 @@ namespace vgmtrans::formats::capcom_snes {
     const core::ScanInput& input,
     const CapcomSnesLayout& layout,
     core::AssetId sequenceId,
-    std::optional<core::AssetId> instrumentBankId,
+    std::optional<core::AssetId> instrumentSetId,
     std::string_view displayName);
 
 }  // namespace vgmtrans::formats::capcom_snes

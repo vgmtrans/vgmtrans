@@ -480,12 +480,12 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   std::vector<DlsInstrument> instruments;
   const auto fallbackCollection = defaultSampleCollection(input);
 
-  for (const auto* bank : input.instrumentBanks) {
-    if (bank == nullptr) {
+  for (const auto* instrumentSet : input.instrumentSets) {
+    if (instrumentSet == nullptr) {
       continue;
     }
 
-    for (const auto& instrument : bank->bank.instruments) {
+    for (const auto& instrument : instrumentSet->instruments) {
       DlsInstrument dlsInstrument{.instrument = &instrument};
       for (const auto& region : instrument.regions) {
         const std::optional<AssetId> collectionId =

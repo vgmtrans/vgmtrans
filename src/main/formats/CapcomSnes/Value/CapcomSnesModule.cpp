@@ -37,7 +37,7 @@ ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
   // The module only orchestrates value construction; layout, sequence, and synth parsing stay isolated.
   const std::string displayName = capcomSnesSourceDisplayName(input.source);
   const auto sequenceId = input.ids.nextAssetId();
-  const auto instrumentBankId = input.ids.nextAssetId();
+  const auto instrumentSetId = input.ids.nextAssetId();
   const auto sampleCollectionId = input.ids.nextAssetId();
 
   ScanResult result;
@@ -51,17 +51,17 @@ ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
     sampleInfos = parseCapcomSnesSampleInfos(input.reader, *layout->spcDirAddress, instrumentInfos);
   }
 
-  const bool hasInstrumentBank = !instrumentInfos.empty() && !sampleInfos.empty();
+  const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
   result.assets.emplace_back(parseCapcomSnesSequence(input,
                                                      *layout,
                                                      sequenceId,
-                                                     hasInstrumentBank ? std::optional<AssetId>{instrumentBankId}
+                                                     hasInstrumentSet ? std::optional<AssetId>{instrumentSetId}
                                                                        : std::nullopt,
                                                      displayName));
 
-  if (hasInstrumentBank) {
-    result.assets.emplace_back(parseCapcomSnesInstrumentBank(input,
-                                                             instrumentBankId,
+  if (hasInstrumentSet) {
+    result.assets.emplace_back(parseCapcomSnesInstrumentSet(input,
+                                                             instrumentSetId,
                                                              sampleCollectionId,
                                                              instrumentInfos,
                                                              sampleInfos,
@@ -74,8 +74,8 @@ ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
       .name = displayName,
       .sequence = sequenceId,
   };
-  if (hasInstrumentBank) {
-    collection.instrumentBanks.push_back(instrumentBankId);
+  if (hasInstrumentSet) {
+    collection.instrumentSets.push_back(instrumentSetId);
     collection.sampleCollections.push_back(sampleCollectionId);
   }
   result.collections.push_back(std::move(collection));

@@ -18,7 +18,7 @@ namespace vgmtrans::core {
 
 struct DlsInput {
   std::string name;
-  std::span<const InstrumentBankAsset* const> instrumentBanks;
+  std::span<const InstrumentSetAsset* const> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
 };
 

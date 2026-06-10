@@ -132,7 +132,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const Project project = session.scan();
   expect(project.diagnostics.empty(), "CapcomSnes scan should not report diagnostics for complete fixture");
   expect(project.collections.size() == 1, "CapcomSnes scan should produce one collection");
-  expect(project.assets.size() == 3, "CapcomSnes scan should produce sequence, instrument bank, and samples");
+  expect(project.assets.size() == 3, "CapcomSnes scan should produce sequence, instrument set, and samples");
 
   const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
   expect(sequence != nullptr, "first CapcomSnes asset should be sequence");
@@ -169,8 +169,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->program.referencedInstruments[0].bank == 0 &&
              sequence->program.referencedInstruments[0].program == 0,
          "instrument reference should preserve decoded bank and program");
-  expect(sequence->program.referencedInstruments[0].asset == project.collections[0].instrumentBanks[0],
-         "instrument reference should point at the decoded instrument bank asset");
+  expect(sequence->program.referencedInstruments[0].asset == project.collections[0].instrumentSets[0],
+         "instrument reference should point at the decoded instrument set asset");
   expect(sequence->program.referencedInstruments[0].range.has_value() &&
              sequence->program.referencedInstruments[0].range->offset == 0x3003 &&
              sequence->program.referencedInstruments[0].range->size == 2,
@@ -291,10 +291,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::vector<u8>{'D', 'L', 'S', ' '},
          "DLS artifact should use DLS RIFF type");
 
-  const auto* instruments = std::get_if<InstrumentBankAsset>(&project.assets[1]);
-  expect(instruments != nullptr, "second CapcomSnes asset should be instrument bank");
-  expect(instruments->bank.instruments.size() == 1, "instrument bank should parse one valid instrument");
-  const auto& instrument = instruments->bank.instruments[0];
+  const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets[1]);
+  expect(instruments != nullptr, "second CapcomSnes asset should be instrument set");
+  expect(instruments->instruments.size() == 1, "instrument set should parse one valid instrument");
+  const auto& instrument = instruments->instruments[0];
   expect(instrument.program == 0, "instrument program should match table index");
   expect(instrument.range.offset == 0x4000 && instrument.range.size == 6,
          "instrument should preserve the table entry source range");
@@ -337,11 +337,11 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto& instrumentItems = instruments->metadata.items.nodes;
   const auto instrumentItem =
       std::ranges::find_if(instrumentItems, [](const ItemNode& item) { return item.kind == ItemKind::Instrument; });
-  expect(instrumentItem != instrumentItems.end(), "instrument bank item tree should expose instrument nodes");
+  expect(instrumentItem != instrumentItems.end(), "instrument set item tree should expose instrument nodes");
   const auto regionItem = std::ranges::find_if(instrumentItems, [](const ItemNode& item) {
     return item.kind == ItemKind::Region && item.detailKind == "capcom-snes-region";
   });
-  expect(regionItem != instrumentItems.end(), "instrument bank item tree should expose region nodes");
+  expect(regionItem != instrumentItems.end(), "instrument set item tree should expose region nodes");
   expect(regionItem->parent == instrumentItem->id, "region item should point back to its instrument item");
   expect(regionItem->range.offset == 0x4000 && regionItem->range.size == 6,
          "region item should preserve the instrument header source range");
@@ -370,8 +370,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sampleItem->description == "DIR entry $20480", "sample item should retain its source DIR entry address");
 
   expect(project.collections[0].sequence == sequence->metadata.id, "collection should reference sequence");
-  expect(project.collections[0].instrumentBanks == std::vector<AssetId>{instruments->metadata.id},
-         "collection should reference instrument bank");
+  expect(project.collections[0].instrumentSets == std::vector<AssetId>{instruments->metadata.id},
+         "collection should reference instrument set");
   expect(project.collections[0].sampleCollections == std::vector<AssetId>{samples->metadata.id},
          "collection should reference sample collection");
 }

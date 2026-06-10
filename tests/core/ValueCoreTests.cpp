@@ -697,61 +697,58 @@ void soundFontExporterWritesSfbkRiffFile() {
               }},
           },
   };
-  InstrumentBankAsset instrumentBank{
+  InstrumentSetAsset instrumentSet{
       .metadata =
           AssetMetadata{
               .id = AssetId{1},
               .format = "Probe",
               .name = "Probe Instruments",
           },
-      .bank =
-          InstrumentBank{
-              .instruments = {Instrument{
-                  .bank = 1,
-                  .program = 5,
-                  .name = "Lead",
-                  .regions = {Region{
-                      .keyRange = KeyRange{.low = 24, .high = 96},
-                      .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
-                      .tuning = Tuning{.cents = 125},
-                      .envelope = Envelope{
-                          .attack = 1'000'000,
-                          .decay = 2'000'000,
-                          .sustain = 500,
-                          .release = 250'000,
-                      },
-                      .pan = 1.0,
-                  }},
-                  .generators = {
-                      SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
-                      SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
-                  },
-                  .modulators = {
-                      SynthModulator{
-                          .source = SynthSource::NoteOnVelocity,
-                          .destination = SynthDestination::VibratoDepth,
-                          .amount = 300,
-                      },
-                      SynthModulator{
-                          .source = SynthSource::ChannelPressure,
-                          .destination = SynthDestination::VibratoRate,
-                          .amount = 0,
-                      },
-                      SynthModulator{
-                          .destination = SynthDestination::TremoloRate,
-                          .amount = 180,
-                      },
-                  },
-              }},
+      .instruments = {Instrument{
+          .bank = 1,
+          .program = 5,
+          .name = "Lead",
+          .regions = {Region{
+              .keyRange = KeyRange{.low = 24, .high = 96},
+              .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
+              .tuning = Tuning{.cents = 125},
+              .envelope = Envelope{
+                  .attack = 1'000'000,
+                  .decay = 2'000'000,
+                  .sustain = 500,
+                  .release = 250'000,
+              },
+              .pan = 1.0,
+          }},
+          .generators = {
+              SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
+              SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
           },
+          .modulators = {
+              SynthModulator{
+                  .source = SynthSource::NoteOnVelocity,
+                  .destination = SynthDestination::VibratoDepth,
+                  .amount = 300,
+              },
+              SynthModulator{
+                  .source = SynthSource::ChannelPressure,
+                  .destination = SynthDestination::VibratoRate,
+                  .amount = 0,
+              },
+              SynthModulator{
+                  .destination = SynthDestination::TremoloRate,
+                  .amount = 180,
+              },
+          },
+      }},
   };
 
-  const std::array<const InstrumentBankAsset*, 1> banks{&instrumentBank};
+  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
   const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
   const auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = "Probe",
-          .instrumentBanks = banks,
+          .instrumentSets = instrumentSets,
           .sampleCollections = samples,
       },
       sources);
@@ -830,61 +827,58 @@ void dlsExporterWritesDlsRiffFile() {
               }},
           },
   };
-  InstrumentBankAsset instrumentBank{
+  InstrumentSetAsset instrumentSet{
       .metadata =
           AssetMetadata{
               .id = AssetId{1},
               .format = "Probe",
               .name = "Probe Instruments",
           },
-      .bank =
-          InstrumentBank{
-              .instruments = {Instrument{
-                  .bank = 1,
-                  .program = 5,
-                  .name = "Lead",
-                  .regions = {Region{
-                      .keyRange = KeyRange{.low = 24, .high = 96},
-                      .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
-                      .tuning = Tuning{.cents = 125},
-                      .envelope = Envelope{
-                          .attack = 1'000'000,
-                          .decay = 2'000'000,
-                          .sustain = 500,
-                          .release = 250'000,
-                      },
-                      .pan = 1.0,
-                  }},
-                  .generators = {
-                      SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
-                      SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
-                  },
-                  .modulators = {
-                      SynthModulator{
-                          .source = SynthSource::NoteOnVelocity,
-                          .destination = SynthDestination::VibratoDepth,
-                          .amount = 300,
-                      },
-                      SynthModulator{
-                          .source = SynthSource::ChannelPressure,
-                          .destination = SynthDestination::VibratoRate,
-                          .amount = 0,
-                      },
-                      SynthModulator{
-                          .destination = SynthDestination::TremoloRate,
-                          .amount = 180,
-                      },
-                  },
-              }},
+      .instruments = {Instrument{
+          .bank = 1,
+          .program = 5,
+          .name = "Lead",
+          .regions = {Region{
+              .keyRange = KeyRange{.low = 24, .high = 96},
+              .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
+              .tuning = Tuning{.cents = 125},
+              .envelope = Envelope{
+                  .attack = 1'000'000,
+                  .decay = 2'000'000,
+                  .sustain = 500,
+                  .release = 250'000,
+              },
+              .pan = 1.0,
+          }},
+          .generators = {
+              SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
+              SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
           },
+          .modulators = {
+              SynthModulator{
+                  .source = SynthSource::NoteOnVelocity,
+                  .destination = SynthDestination::VibratoDepth,
+                  .amount = 300,
+              },
+              SynthModulator{
+                  .source = SynthSource::ChannelPressure,
+                  .destination = SynthDestination::VibratoRate,
+                  .amount = 0,
+              },
+              SynthModulator{
+                  .destination = SynthDestination::TremoloRate,
+                  .amount = 180,
+              },
+          },
+      }},
   };
 
-  const std::array<const InstrumentBankAsset*, 1> banks{&instrumentBank};
+  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
   const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
   const auto result = DlsExporter().exportDls(
       DlsInput{
           .name = "Probe",
-          .instrumentBanks = banks,
+          .instrumentSets = instrumentSets,
           .sampleCollections = samples,
       },
       sources);
@@ -1006,33 +1000,30 @@ void exportDiagnosticsPreserveSourceRanges() {
               }},
           },
   };
-  InstrumentBankAsset badRegionBank{
+  InstrumentSetAsset badRegionSet{
       .metadata =
           AssetMetadata{
               .id = AssetId{1},
               .format = "Probe",
-              .name = "Bad Region Bank",
+              .name = "Bad Region Set",
           },
-      .bank =
-          InstrumentBank{
-              .instruments = {Instrument{
-                  .bank = 0,
-                  .program = 0,
-                  .name = "Lead",
-                  .regions = {Region{
-                      .sample = SampleRef{.collection = validSampleCollection.metadata.id, .index = 9},
-                      .range = regionRange,
-                  }},
-              }},
-          },
+      .instruments = {Instrument{
+          .bank = 0,
+          .program = 0,
+          .name = "Lead",
+          .regions = {Region{
+              .sample = SampleRef{.collection = validSampleCollection.metadata.id, .index = 9},
+              .range = regionRange,
+          }},
+      }},
   };
 
-  const std::array<const InstrumentBankAsset*, 1> banks{&badRegionBank};
+  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&badRegionSet};
   const std::array<const SampleCollectionAsset*, 1> validSamples{&validSampleCollection};
   const auto sf2BadRegion = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = "Probe",
-          .instrumentBanks = banks,
+          .instrumentSets = instrumentSets,
           .sampleCollections = validSamples,
       },
       sources);
@@ -1041,7 +1032,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   const auto dlsBadRegion = DlsExporter().exportDls(
       DlsInput{
           .name = "Probe",
-          .instrumentBanks = banks,
+          .instrumentSets = instrumentSets,
           .sampleCollections = validSamples,
       },
       sources);

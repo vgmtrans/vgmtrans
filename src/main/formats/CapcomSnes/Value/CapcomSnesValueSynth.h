@@ -48,9 +48,9 @@ struct CapcomSnesInstrumentInfo {
     const std::vector<CapcomSnesSampleInfo>& sampleInfos,
     std::string_view displayName);
 
-[[nodiscard]] core::InstrumentBankAsset parseCapcomSnesInstrumentBank(
+[[nodiscard]] core::InstrumentSetAsset parseCapcomSnesInstrumentSet(
     const core::ScanInput& input,
-    core::AssetId instrumentBankId,
+    core::AssetId instrumentSetId,
     core::AssetId sampleCollectionId,
     const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
     const std::vector<CapcomSnesSampleInfo>& sampleInfos,
