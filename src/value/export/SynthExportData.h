@@ -33,6 +33,16 @@ struct DecodedSynthSample {
   DecodedSample decoded;
 };
 
+struct ResolvedSynthRegion {
+  const Region* region = nullptr;
+  u16 sampleIndex = 0;
+};
+
+struct ResolvedSynthInstrument {
+  const Instrument* instrument = nullptr;
+  std::vector<ResolvedSynthRegion> regions;
+};
+
 using SynthSampleIndexKey = std::pair<u32, u32>;
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 
@@ -51,6 +61,12 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 [[nodiscard]] std::optional<u16> resolveRegionSampleIndex(
     const Region& region,
     std::optional<AssetId> fallbackCollection,
+    const SynthSampleIndexMap& samples,
+    std::vector<Diagnostic>& diagnostics);
+
+[[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
+    std::span<const InstrumentSetAsset* const> instrumentSets,
+    std::span<const SampleCollectionAsset* const> sampleCollections,
     const SynthSampleIndexMap& samples,
     std::vector<Diagnostic>& diagnostics);
 

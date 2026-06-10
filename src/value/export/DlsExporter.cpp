@@ -58,16 +58,6 @@ struct Chunk {
 
 using DecodedDlsSample = DecodedSynthSample;
 
-struct DlsRegion {
-  const Region* region = nullptr;
-  u16 waveIndex = 0;
-};
-
-struct DlsInstrument {
-  const Instrument* instrument = nullptr;
-  std::vector<DlsRegion> regions;
-};
-
 struct DlsConnection {
   u16 source = kDlsConnSrcNone;
   u16 control = kDlsConnSrcNone;
@@ -395,40 +385,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return static_cast<s32>(std::clamp(std::lround(scaledLevel), 0l, static_cast<long>(kDlsSustainLevelFullScale)));
 }
 
-[[nodiscard]] std::vector<DlsInstrument> collectInstruments(const DlsInput& input, const SynthSampleIndexMap& samples,
-                                                            std::vector<Diagnostic>& diagnostics) {
-  std::vector<DlsInstrument> instruments;
-  const auto fallbackCollection = firstSampleCollectionId(input.sampleCollections);
-
-  for (const auto* instrumentSet : input.instrumentSets) {
-    if (instrumentSet == nullptr) {
-      continue;
-    }
-
-    for (const auto& instrument : instrumentSet->instruments) {
-      DlsInstrument dlsInstrument{.instrument = &instrument};
-      for (const auto& region : instrument.regions) {
-        const auto waveIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
-        if (!waveIndex) {
-          continue;
-        }
-
-        dlsInstrument.regions.push_back(DlsRegion{
-            .region = &region,
-            .waveIndex = *waveIndex,
-        });
-      }
-
-      if (!dlsInstrument.regions.empty()) {
-        instruments.push_back(std::move(dlsInstrument));
-      }
-    }
-  }
-
-  return instruments;
-}
-
-[[nodiscard]] Chunk colhChunk(std::span<const DlsInstrument> instruments) {
+[[nodiscard]] Chunk colhChunk(std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<u8> payload;
   writeLe32(payload, static_cast<u32>(instruments.size()));
   return makeChunk("colh", std::move(payload));
@@ -440,7 +397,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return makeListChunk("INFO", {makeChunk("INAM", std::move(inam))});
 }
 
-[[nodiscard]] Chunk inshChunk(const DlsInstrument& instrument) {
+[[nodiscard]] Chunk inshChunk(const ResolvedSynthInstrument& instrument) {
   std::vector<u8> payload;
   writeLe32(payload, static_cast<u32>(instrument.regions.size()));
   writeLe32(payload, instrument.instrument->bank);
@@ -549,20 +506,20 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("lar2", {makeChunk("art2", std::move(art))});
 }
 
-[[nodiscard]] Chunk rgn2Chunk(const Instrument& instrument, const DlsRegion& dlsRegion,
+[[nodiscard]] Chunk rgn2Chunk(const Instrument& instrument, const ResolvedSynthRegion& resolvedRegion,
                               std::span<const DecodedDlsSample> samples, const MidiModulationUsage* midiModulationUsage,
                               ModulationScalingPolicy modulationScaling) {
-  const auto& region = *dlsRegion.region;
-  const auto& sample = samples[dlsRegion.waveIndex];
+  const auto& region = *resolvedRegion.region;
+  const auto& sample = samples[resolvedRegion.sampleIndex];
   return makeListChunk("rgn2", {
                                    rgnhChunk(region),
                                    wsmpChunk(region, sample),
-                                   wlnkChunk(dlsRegion.waveIndex),
+                                   wlnkChunk(resolvedRegion.sampleIndex),
                                    art2Chunk(instrument, region, midiModulationUsage, modulationScaling),
                                });
 }
 
-[[nodiscard]] Chunk lrgnList(const DlsInstrument& instrument, std::span<const DecodedDlsSample> samples,
+[[nodiscard]] Chunk lrgnList(const ResolvedSynthInstrument& instrument, std::span<const DecodedDlsSample> samples,
                              const MidiModulationUsage* midiModulationUsage,
                              ModulationScalingPolicy modulationScaling) {
   std::vector<Chunk> regions;
@@ -573,7 +530,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("lrgn", std::move(regions));
 }
 
-[[nodiscard]] Chunk insList(const DlsInstrument& instrument, std::span<const DecodedDlsSample> samples,
+[[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedDlsSample> samples,
                             const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling) {
   return makeListChunk("ins ", {
                                    inshChunk(instrument),
@@ -582,7 +539,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
                                });
 }
 
-[[nodiscard]] Chunk linsList(std::span<const DlsInstrument> instruments, std::span<const DecodedDlsSample> samples,
+[[nodiscard]] Chunk linsList(std::span<const ResolvedSynthInstrument> instruments,
+                             std::span<const DecodedDlsSample> samples,
                              const MidiModulationUsage* midiModulationUsage,
                              ModulationScalingPolicy modulationScaling) {
   std::vector<Chunk> instrumentChunks;
@@ -660,7 +618,8 @@ DlsResult DlsExporter::exportDls(const DlsInput& input, const SourceStore& sourc
     sample.name = dlsName(std::move(sample.name), "Wave");
   }
   const auto samplesByReference = synthSampleIndexMap(samples);
-  auto instruments = collectInstruments(input, samplesByReference, result.diagnostics);
+  auto instruments =
+      resolveSynthInstruments(input.instrumentSets, input.sampleCollections, samplesByReference, result.diagnostics);
 
   if (samples.empty()) {
     result.diagnostics.push_back(exportError("No decodable samples available for DLS export"));

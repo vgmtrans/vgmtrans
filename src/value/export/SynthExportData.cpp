@@ -109,4 +109,40 @@ std::optional<u16> resolveRegionSampleIndex(
   return found->second;
 }
 
+std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
+    std::span<const InstrumentSetAsset* const> instrumentSets,
+    std::span<const SampleCollectionAsset* const> sampleCollections,
+    const SynthSampleIndexMap& samples,
+    std::vector<Diagnostic>& diagnostics) {
+  std::vector<ResolvedSynthInstrument> instruments;
+  const auto fallbackCollection = firstSampleCollectionId(sampleCollections);
+
+  for (const auto* instrumentSet : instrumentSets) {
+    if (instrumentSet == nullptr) {
+      continue;
+    }
+
+    for (const auto& instrument : instrumentSet->instruments) {
+      ResolvedSynthInstrument resolvedInstrument{.instrument = &instrument};
+      for (const auto& region : instrument.regions) {
+        const auto sampleIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
+        if (!sampleIndex) {
+          continue;
+        }
+
+        resolvedInstrument.regions.push_back(ResolvedSynthRegion{
+            .region = &region,
+            .sampleIndex = *sampleIndex,
+        });
+      }
+
+      if (!resolvedInstrument.regions.empty()) {
+        instruments.push_back(std::move(resolvedInstrument));
+      }
+    }
+  }
+
+  return instruments;
+}
+
 }  // namespace vgmtrans::core

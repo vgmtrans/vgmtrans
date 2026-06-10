@@ -80,16 +80,6 @@ struct DecodedSfSample {
   u32 endFrame = 0;
 };
 
-struct SfRegion {
-  const Region* region = nullptr;
-  u16 sampleIndex = 0;
-};
-
-struct SfInstrument {
-  const Instrument* instrument = nullptr;
-  std::vector<SfRegion> regions;
-};
-
 struct SfRegionPitch {
   u8 rootKey = kDefaultRootKey;
   s16 coarseTune = 0;
@@ -472,40 +462,6 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return samples;
 }
 
-[[nodiscard]] std::vector<SfInstrument> collectInstruments(const SoundFontInput& input,
-                                                           const SynthSampleIndexMap& samples,
-                                                           std::vector<Diagnostic>& diagnostics) {
-  std::vector<SfInstrument> instruments;
-  const auto fallbackCollection = firstSampleCollectionId(input.sampleCollections);
-
-  for (const auto* instrumentSet : input.instrumentSets) {
-    if (instrumentSet == nullptr) {
-      continue;
-    }
-
-    for (const auto& instrument : instrumentSet->instruments) {
-      SfInstrument sfInstrument{.instrument = &instrument};
-      for (const auto& region : instrument.regions) {
-        const auto sampleIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
-        if (!sampleIndex) {
-          continue;
-        }
-
-        sfInstrument.regions.push_back(SfRegion{
-            .region = &region,
-            .sampleIndex = *sampleIndex,
-        });
-      }
-
-      if (!sfInstrument.regions.empty()) {
-        instruments.push_back(std::move(sfInstrument));
-      }
-    }
-  }
-
-  return instruments;
-}
-
 [[nodiscard]] Chunk smplChunk(std::span<const DecodedSfSample> samples) {
   std::vector<u8> payload;
   for (const auto& sample : samples) {
@@ -535,7 +491,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   writeLe16(bytes, value);
 }
 
-[[nodiscard]] Chunk phdrChunk(std::span<const SfInstrument> instruments) {
+[[nodiscard]] Chunk phdrChunk(std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<u8> payload;
   for (u32 i = 0; i < instruments.size(); ++i) {
     const auto& instrument = *instruments[i].instrument;
@@ -558,7 +514,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("phdr", std::move(payload));
 }
 
-[[nodiscard]] Chunk pbagChunk(std::span<const SfInstrument> instruments) {
+[[nodiscard]] Chunk pbagChunk(std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<u8> payload;
   for (u32 i = 0; i < instruments.size(); ++i) {
     writeLe16(payload, clampU16(i * kPresetGeneratorsPerInstrument));
@@ -569,7 +525,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("pbag", std::move(payload));
 }
 
-[[nodiscard]] Chunk pgenChunk(std::span<const SfInstrument> instruments) {
+[[nodiscard]] Chunk pgenChunk(std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<u8> payload;
   for (u32 i = 0; i < instruments.size(); ++i) {
     writeAmountGen(payload, kSfGenReverbEffectsSend, sf2ReverbSend(instruments[i].instrument->reverb));
@@ -584,7 +540,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk(std::move(id), std::move(payload));
 }
 
-[[nodiscard]] Chunk instChunk(std::span<const SfInstrument> instruments) {
+[[nodiscard]] Chunk instChunk(std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<u8> payload;
   u32 bagIndex = 0;
   for (const auto& instrument : instruments) {
@@ -598,7 +554,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("inst", std::move(payload));
 }
 
-[[nodiscard]] Chunk ibagChunk(std::span<const SfInstrument> instruments) {
+[[nodiscard]] Chunk ibagChunk(std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<u8> payload;
   u32 generatorIndex = 0;
   u32 modulatorIndex = 0;
@@ -622,7 +578,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("ibag", std::move(payload));
 }
 
-[[nodiscard]] Chunk imodChunk(std::span<const SfInstrument> instruments, const MidiModulationUsage* midiModulationUsage,
+[[nodiscard]] Chunk imodChunk(std::span<const ResolvedSynthInstrument> instruments,
+                              const MidiModulationUsage* midiModulationUsage,
                               ModulationScalingPolicy modulationScaling) {
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
@@ -643,7 +600,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("imod", std::move(payload));
 }
 
-[[nodiscard]] Chunk igenChunk(std::span<const SfInstrument> instruments,
+[[nodiscard]] Chunk igenChunk(std::span<const ResolvedSynthInstrument> instruments,
                               std::span<const DecodedSfSample> samplesByIndex) {
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
@@ -690,7 +647,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }
 
 [[nodiscard]] std::vector<SfSampleHeaderPitch> sampleHeaderPitches(std::span<const DecodedSfSample> samples,
-                                                                   std::span<const SfInstrument> instruments) {
+                                                                   std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<SfSampleHeaderPitch> pitches(samples.size());
   std::vector<bool> assigned(samples.size(), false);
   for (const auto& instrument : instruments) {
@@ -707,7 +664,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return pitches;
 }
 
-[[nodiscard]] Chunk shdrChunk(std::span<const DecodedSfSample> samples, std::span<const SfInstrument> instruments) {
+[[nodiscard]] Chunk shdrChunk(std::span<const DecodedSfSample> samples,
+                              std::span<const ResolvedSynthInstrument> instruments) {
   const auto pitches = sampleHeaderPitches(samples, instruments);
   std::vector<u8> payload;
   for (size_t i = 0; i < samples.size(); ++i) {
@@ -740,7 +698,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("shdr", std::move(payload));
 }
 
-[[nodiscard]] std::vector<Chunk> pdtaChunks(std::span<const SfInstrument> instruments,
+[[nodiscard]] std::vector<Chunk> pdtaChunks(std::span<const ResolvedSynthInstrument> instruments,
                                             std::span<const DecodedSfSample> samples,
                                             const MidiModulationUsage* midiModulationUsage,
                                             ModulationScalingPolicy modulationScaling) {
@@ -769,7 +727,8 @@ SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, 
                                            });
   const auto samplesByReference = synthSampleIndexMap(decodedSamples);
   auto samples = sf2Samples(std::move(decodedSamples));
-  auto instruments = collectInstruments(input, samplesByReference, result.diagnostics);
+  auto instruments =
+      resolveSynthInstruments(input.instrumentSets, input.sampleCollections, samplesByReference, result.diagnostics);
 
   if (samples.empty()) {
     result.diagnostics.push_back(exportError("No decodable samples available for SoundFont2 export"));
