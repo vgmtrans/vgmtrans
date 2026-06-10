@@ -388,7 +388,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     return clampS16(static_cast<s32>(std::clamp(attenuationDb * 10.0, 0.0, 1000.0)));
   }
   if (envelope.sustain == 0) {
-    return static_cast<s16>(maxSustainAttenuationCentibels);
+    return 0;
   }
 
   const double amplitude = std::clamp(static_cast<double>(envelope.sustain) / 1000.0, 0.0, 1.0);
@@ -400,8 +400,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] u32 instrumentRegionGeneratorCount(const Region& region) {
-  return kBaseInstrumentRegionGenerators +
-         (hasExplicitEnvelope(region.envelope) ? kEnvelopeInstrumentRegionGenerators : 0);
+  static_cast<void>(region);
+  return kBaseInstrumentRegionGenerators + kEnvelopeInstrumentRegionGenerators;
 }
 
 [[nodiscard]] u32 instrumentGlobalGeneratorCount(const Instrument& instrument) {
@@ -625,17 +625,16 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
       writeAmountGen(payload, kSfGenPan, sf2Pan(region.pan));
       writeAmountGen(payload, kSfGenCoarseTune, pitch.coarseTune);
       writeAmountGen(payload, kSfGenFineTune, pitch.fineTune);
-      if (hasExplicitEnvelope(region.envelope)) {
-        writeAmountGen(payload, kSfGenAttackVolEnv,
-                       sf2EnvelopeTimecents(region.envelope.attack, region.envelope.attackSeconds));
-        writeAmountGen(payload, kSfGenHoldVolEnv,
-                       sf2EnvelopeTimecents(region.envelope.hold, region.envelope.holdSeconds));
-        writeAmountGen(payload, kSfGenDecayVolEnv,
-                       sf2EnvelopeTimecents(region.envelope.decay, region.envelope.decaySeconds));
-        writeAmountGen(payload, kSfGenSustainVolEnv, sf2SustainAttenuation(region.envelope));
-        writeAmountGen(payload, kSfGenReleaseVolEnv,
-                       sf2EnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
-      }
+      const bool explicitEnvelope = hasExplicitEnvelope(region.envelope);
+      writeAmountGen(payload, kSfGenAttackVolEnv,
+                     sf2EnvelopeTimecents(region.envelope.attack, region.envelope.attackSeconds));
+      writeAmountGen(payload, kSfGenHoldVolEnv,
+                     sf2EnvelopeTimecents(region.envelope.hold, region.envelope.holdSeconds));
+      writeAmountGen(payload, kSfGenDecayVolEnv,
+                     sf2EnvelopeTimecents(region.envelope.decay, region.envelope.decaySeconds));
+      writeAmountGen(payload, kSfGenSustainVolEnv, explicitEnvelope ? sf2SustainAttenuation(region.envelope) : 0);
+      writeAmountGen(payload, kSfGenReleaseVolEnv,
+                     sf2EnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
       writeWordGen(payload, kSfGenOverridingRootKey, pitch.rootKey);
       writeWordGen(payload, kSfGenSampleModes, sample.decoded.loop.enabled ? 1 : 0);
       writeWordGen(payload, kSfGenSampleId, sfRegion.sampleIndex);

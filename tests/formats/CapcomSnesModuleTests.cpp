@@ -11,6 +11,7 @@
 #include "value/core/MidiSequenceBuilder.h"
 #include "value/core/Session.h"
 #include "value/formats/CapcomSnes/CapcomSnesProfile.h"
+#include "value/formats/CapcomSnes/CapcomSnesValueSynth.h"
 #include "value/formats/ValueFormats.h"
 
 #include <algorithm>
@@ -407,6 +408,41 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
   expect(!samples->samples.samples.empty(), "SPC-backed scan should discover sample data");
   expect(samples->samples.samples[0].encodedData.source == SourceId{1},
          "sample encoded data should point at virtual ARAM source");
+}
+
+void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy() {
+  auto bytes = makeCapcomSnesAram();
+  bytes[0x400c] = 0x00;
+  bytes[0x400d] = 0x8f;
+  bytes[0x400e] = 0xe0;
+  bytes[0x400f] = 0x00;
+  writeBe16(bytes, 0x4010, 0x0200);
+
+  SourceStore sources;
+  const auto sourceId = sources.add(SourceFile{.name = "blank-terminated.spc"}, std::move(bytes));
+  const auto infos = parseCapcomSnesInstrumentInfos(sources.reader(sourceId), 0x4000, 0x5000);
+  expect(infos.size() == 2, "CapcomSnes instrument parsing should skip blank table slots like legacy");
+  expect(infos[0].index == 0 && infos[1].index == 2,
+         "CapcomSnes instrument parsing should preserve sparse instrument indexes");
+
+  std::vector<u8> fullTable(0x10000);
+  writeLe16(fullTable, 0x5000, 0x6000);
+  writeLe16(fullTable, 0x5002, 0x6000);
+  fullTable[0x6000] = 0x01;
+  for (u32 index = 0; index <= 0x80; ++index) {
+    const size_t address = 0x3000 + index * 6;
+    fullTable[address] = 0x00;
+    fullTable[address + 1] = 0x8f;
+    fullTable[address + 2] = 0xe0;
+    fullTable[address + 3] = 0x00;
+    writeBe16(fullTable, address + 4, 0x0100);
+  }
+
+  SourceStore limitSources;
+  const auto limitSourceId = limitSources.add(SourceFile{.name = "program-limit.spc"}, std::move(fullTable));
+  const auto limitedInfos = parseCapcomSnesInstrumentInfos(limitSources.reader(limitSourceId), 0x3000, 0x5000);
+  expect(limitedInfos.size() == 0x81, "CapcomSnes instrument parsing should match legacy banked program scanning");
+  expect(limitedInfos.back().index == 0x80, "CapcomSnes instrument parsing should emit bank-1 programs");
 }
 
 void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {

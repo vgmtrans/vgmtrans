@@ -138,7 +138,11 @@ struct InstrumentPitch {
 }
 
 [[nodiscard]] Envelope capcomInstrumentEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
-  Envelope envelope = snesDspEnvelope(adsr1, adsr2, gain);
+  Envelope envelope;
+  if ((adsr1 & 0x80) != 0) {
+    envelope = snesDspEnvelope(adsr1, adsr2, gain);
+  }
+
   const u8 sustainLevel = adsr2 >> 5;
   const double releaseSeconds = snesDspGainEnvelopeSeconds(gain, static_cast<s16>((sustainLevel << 8) | 0xff), 0);
   envelope.release = static_cast<u32>(std::lround(std::max(0.0, releaseSeconds) * 1'000'000.0));

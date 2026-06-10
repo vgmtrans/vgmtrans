@@ -851,6 +851,11 @@ CapcomSnesSummary valueCapcomSnesSummary(
           }
         }
 
+        s32 tuningCents = region.tuning.cents;
+        if (region.rootKey) {
+          tuningCents = static_cast<s32>((static_cast<s32>(*region.rootKey) - 96) * 100 + region.fineTuneCents);
+        }
+
         summary.regions.push_back(RegionSummary{
             .bank = instrument.bank,
             .program = instrument.program,
@@ -860,7 +865,7 @@ CapcomSnesSummary valueCapcomSnesSummary(
             .velocityLow = region.velocityRange.low,
             .velocityHigh = region.velocityRange.high,
             .sampleSourceOffset = sampleSourceOffset,
-            .tuningCents = region.tuning.cents,
+            .tuningCents = tuningCents,
             .envelopeAttack = region.envelope.attack,
             .envelopeDecay = region.envelope.decay,
             .envelopeSustain = region.envelope.sustain,

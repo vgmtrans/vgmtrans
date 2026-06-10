@@ -33,6 +33,7 @@ using namespace vgmtrans::core;
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void capcomSnesModuleScansSpcThroughVirtualAramSource();
+void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
 void capcomSnesNoteStateCommandsAreTypedAndInterpreted();
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
 void capcomSnesPanEventsDoNotRecurveMidiPan();
@@ -1248,6 +1249,7 @@ int main() {
     exportDiagnosticsPreserveSourceRanges();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
     capcomSnesModuleScansSpcThroughVirtualAramSource();
+    capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
     capcomSnesNoteStateCommandsAreTypedAndInterpreted();
     capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
     capcomSnesPanEventsDoNotRecurveMidiPan();

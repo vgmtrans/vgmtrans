@@ -473,17 +473,18 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 
   std::vector<u8> connections;
   writeConnection(connections, kDlsConnDstPan, panScale);
-  if (hasExplicitEnvelope(region.envelope)) {
-    writeConnection(connections, kDlsConnDstEg1AttackTime,
-                    dlsEnvelopeTimecents(region.envelope.attack, region.envelope.attackSeconds));
-    writeConnection(connections, kDlsConnDstEg1HoldTime,
-                    dlsEnvelopeTimecents(region.envelope.hold, region.envelope.holdSeconds));
-    writeConnection(connections, kDlsConnDstEg1DecayTime,
-                    dlsEnvelopeTimecents(region.envelope.decay, region.envelope.decaySeconds));
-    writeConnection(connections, kDlsConnDstEg1SustainLevel, dlsSustainLevel(region.envelope));
-    writeConnection(connections, kDlsConnDstEg1ReleaseTime,
-                    dlsEnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
-  }
+  const bool explicitEnvelope = hasExplicitEnvelope(region.envelope);
+  writeConnection(connections, kDlsConnDstEg1AttackTime,
+                  dlsEnvelopeTimecents(region.envelope.attack, region.envelope.attackSeconds));
+  writeConnection(connections, kDlsConnDstEg1HoldTime,
+                  dlsEnvelopeTimecents(region.envelope.hold, region.envelope.holdSeconds));
+  writeConnection(connections, kDlsConnDstEg1DecayTime,
+                  dlsEnvelopeTimecents(region.envelope.decay, region.envelope.decaySeconds));
+  writeConnection(connections,
+                  kDlsConnDstEg1SustainLevel,
+                  explicitEnvelope ? dlsSustainLevel(region.envelope) : kDlsSustainLevelFullScale);
+  writeConnection(connections, kDlsConnDstEg1ReleaseTime,
+                  dlsEnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
   for (const auto& generator : instrument.generators) {
     const auto connection = dlsConnectionForGenerator(generator);
     if (!connection) {
