@@ -409,7 +409,7 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
          "sample encoded data should point at virtual ARAM source");
 }
 
-void capcomSnesNoteStateCommandsAreTypedAndLowered() {
+void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   auto bytes = makeCapcomSnesAram();
   bytes[0x3000] = 0x09;
   bytes[0x3001] = 0x04;

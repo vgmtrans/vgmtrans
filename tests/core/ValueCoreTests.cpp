@@ -31,7 +31,7 @@ using namespace vgmtrans::core;
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void capcomSnesModuleScansSpcThroughVirtualAramSource();
-void capcomSnesNoteStateCommandsAreTypedAndLowered();
+void capcomSnesNoteStateCommandsAreTypedAndInterpreted();
 void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
 void capcomSnesPanEventsDoNotRecurveMidiPan();
 void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
@@ -519,7 +519,7 @@ void midiExporterWritesStandardMidiFile() {
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
 }
 
-void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
+void eventSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -551,7 +551,7 @@ void performanceLowererSkipsCommandsAtPlayOnceLoopBoundary() {
          "play-once event build should skip commands exactly at the loop boundary");
 }
 
-void performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce() {
+void eventSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -579,7 +579,7 @@ void performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce() {
          "unset default loop policy should end at the first playthrough boundary");
 }
 
-void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
+void eventSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -610,7 +610,7 @@ void performanceLowererTreatsLoopBoundaryAsAStopPoint() {
          "loop-boundary fixture should not build commands after the boundary");
 }
 
-void performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop() {
+void eventSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -1050,17 +1050,17 @@ int main() {
     projectSessionExportsAllCollections();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
-    performanceLowererSkipsCommandsAtPlayOnceLoopBoundary();
-    performanceLowererResolvesUnsetDefaultLoopPolicyToPlayOnce();
-    performanceLowererTreatsLoopBoundaryAsAStopPoint();
-    performanceLowererReplaysDecodedBoundaryUntilPlayOnceStop();
+    eventSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary();
+    eventSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce();
+    eventSequenceBuilderTreatsLoopBoundaryAsAStopPoint();
+    eventSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();
     exportDiagnosticsPreserveSourceRanges();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
     capcomSnesModuleScansSpcThroughVirtualAramSource();
-    capcomSnesNoteStateCommandsAreTypedAndLowered();
+    capcomSnesNoteStateCommandsAreTypedAndInterpreted();
     capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
     capcomSnesPanEventsDoNotRecurveMidiPan();
     capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
