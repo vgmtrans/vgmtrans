@@ -18,13 +18,13 @@
 
 namespace vgmtrans::core {
 
-struct ModulationUsage;
+struct MidiModulationUsage;
 
 struct SoundFontInput {
   std::string name;
   std::span<const InstrumentSetAsset* const> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
-  const ModulationUsage* modulationUsage = nullptr;
+  const MidiModulationUsage* midiModulationUsage = nullptr;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
 };
 

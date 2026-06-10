@@ -222,24 +222,25 @@ sequence commands.
 
 The legacy `useColl()` behavior should become a pure analysis pass.
 
-Use the value-layer `ModulationUsage` result to carry:
+Use the value-layer `ModulationUsage` result to carry source-command observations:
 
 - Per collection.
 - Per sequence/profile.
 - Per referenced instrument set where needed.
-- Actual observed vibrato depth range.
-- Actual observed vibrato rate range.
-- Actual observed tremolo depth range.
-- Actual observed tremolo rate range.
-- Controller mapping chosen for SF2/DLS modulators.
+- Actual observed raw vibrato depth range.
+- Actual observed raw tremolo depth range.
+- Actual observed raw modulation rate range.
 - Diagnostics for unsupported or ambiguous modulation.
 
-The analysis should run before synth export when SF2/DLS modulators are needed.
-It should not mutate the parsed collection or instrument set. The synth exporter
-receives the parsed `InstrumentSetAsset`, decoded samples, and
-`ModulationUsage`; `ModulationScalingPolicy` selects whether synth export keeps
-legacy full-format ranges or uses observed sequence ranges. The remaining work is
-to apply that policy when choosing controller scaling and modulator amounts.
+SF2/DLS modulation scaling should use `MidiModulationUsage`, because synth
+modulators respond to MIDI controller values after sequence lowering rather than
+raw driver bytes. The analysis should run before synth export when observed
+controller scaling is requested. It should not mutate the parsed collection or
+instrument set. The synth exporter receives the parsed `InstrumentSetAsset`,
+decoded samples, and `MidiModulationUsage`; `ModulationScalingPolicy` selects
+whether synth export keeps legacy full-format ranges or uses observed sequence
+ranges. The remaining work is to apply that policy when choosing controller
+scaling and modulator amounts.
 
 This solves the controller-resolution problem: if CapcomSnes only uses a narrow
 vibrato depth range in a song, the exported modulator can map the observed range
@@ -407,8 +408,9 @@ The branch should not be considered ready until:
 
 - Continue refining explicit vibrato/tremolo/rate source commands where formats
   need more detail.
-- Expand `ModulationUsage` as additional formats expose modulation details.
-- Use the threaded `ModulationUsage` and `ModulationScalingPolicy` data for
+- Expand `ModulationUsage` and `MidiModulationUsage` as additional formats expose
+  modulation details.
+- Use the threaded `MidiModulationUsage` and `ModulationScalingPolicy` data for
   SF2/DLS controller scaling.
 - Add export policy for synth modulators versus explicit MIDI events.
 - Keep default behavior matching legacy output.

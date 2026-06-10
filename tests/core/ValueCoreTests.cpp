@@ -707,6 +707,51 @@ void modulationAnalysisReportsObservedSourceRanges() {
          "modulation analysis should keep independent track usage");
 }
 
+void modulationAnalysisReportsObservedMidiControllerRanges() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {
+          MidiTrack{
+              .name = "Lead",
+              .events =
+                  {
+                      VibratoDepth{.tick = 0, .channel = 0, .value = 0},
+                      VibratoDepth{.tick = 12, .channel = 0, .value = 82},
+                      VibratoFrequency{.tick = 12, .channel = 0, .value = 17},
+                      TremoloDepth{.tick = 24, .channel = 0, .value = 40},
+                      TremoloFrequency{.tick = 24, .channel = 0, .value = 5},
+                  },
+          },
+          MidiTrack{
+              .name = "Pad",
+              .events =
+                  {
+                      VibratoFrequency{.tick = 0, .channel = 1, .value = 29},
+                      TremoloFrequency{.tick = 0, .channel = 1, .value = 9},
+                  },
+          },
+      },
+  };
+
+  const auto usage = analyzeMidiModulationUsage(midiSequence);
+  expect(hasMidiModulationUsage(usage), "MIDI modulation analysis should report observed controller modulation");
+  expect(usage.tracks.size() == 2, "MIDI modulation analysis should preserve track-level results");
+  expect(usage.vibratoDepth.observed && usage.vibratoDepth.min == 0 && usage.vibratoDepth.max == 82,
+         "MIDI modulation analysis should report global vibrato depth controller range");
+  expect(usage.vibratoRate.observed && usage.vibratoRate.min == 17 && usage.vibratoRate.max == 29,
+         "MIDI modulation analysis should report global vibrato rate controller range");
+  expect(usage.tremoloDepth.observed && usage.tremoloDepth.min == 40 && usage.tremoloDepth.max == 40,
+         "MIDI modulation analysis should report global tremolo depth controller range");
+  expect(usage.tremoloRate.observed && usage.tremoloRate.min == 5 && usage.tremoloRate.max == 9,
+         "MIDI modulation analysis should report global tremolo rate controller range");
+  expect(usage.tracks[0].trackIndex == 0 && usage.tracks[0].vibratoDepth.max == 82 &&
+             usage.tracks[0].vibratoRate.max == 17,
+         "MIDI modulation analysis should keep first track modulation ranges separate");
+  expect(usage.tracks[1].trackIndex == 1 && !usage.tracks[1].vibratoDepth.observed &&
+             usage.tracks[1].vibratoRate.max == 29,
+         "MIDI modulation analysis should keep second track modulation ranges separate");
+}
+
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -793,17 +838,18 @@ void soundFontExporterWritesSfbkRiffFile() {
 
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
   const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
-  const ModulationUsage modulationUsage{
+  const MidiModulationUsage midiModulationUsage{
       .vibratoDepth = ObservedValueRange{.observed = true, .min = 4, .max = 38},
+      .vibratoRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
       .tremoloDepth = ObservedValueRange{.observed = true, .min = 2, .max = 24},
-      .modulationRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
+      .tremoloRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
   };
   const auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
-          .modulationUsage = &modulationUsage,
+          .midiModulationUsage = &midiModulationUsage,
           .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
       },
       sources);
@@ -930,17 +976,18 @@ void dlsExporterWritesDlsRiffFile() {
 
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
   const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
-  const ModulationUsage modulationUsage{
+  const MidiModulationUsage midiModulationUsage{
       .vibratoDepth = ObservedValueRange{.observed = true, .min = 4, .max = 38},
+      .vibratoRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
       .tremoloDepth = ObservedValueRange{.observed = true, .min = 2, .max = 24},
-      .modulationRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
+      .tremoloRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
   };
   const auto result = DlsExporter().exportDls(
       DlsInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
-          .modulationUsage = &modulationUsage,
+          .midiModulationUsage = &midiModulationUsage,
           .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
       },
       sources);
@@ -1117,6 +1164,7 @@ int main() {
     midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint();
     midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop();
     modulationAnalysisReportsObservedSourceRanges();
+    modulationAnalysisReportsObservedMidiControllerRanges();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();

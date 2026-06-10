@@ -94,20 +94,40 @@ struct SynthExportAssets {
   return assets;
 }
 
-[[nodiscard]] std::optional<ModulationUsage> collectionModulationUsage(
+[[nodiscard]] const SequenceAsset* collectionSequence(
     const Project& project,
     const Collection& collection) {
   if (!collection.sequence) {
-    return std::nullopt;
+    return nullptr;
   }
 
-  const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence);
+  return assetById<SequenceAsset>(project, *collection.sequence);
+}
+
+[[nodiscard]] std::string midiSequenceProfileName(const SequenceAsset& sequence) {
+  return sequence.commandSequence.midiSequenceProfile.empty()
+             ? sequence.metadata.format
+             : sequence.commandSequence.midiSequenceProfile;
+}
+
+[[nodiscard]] std::optional<MidiModulationUsage> collectionMidiModulationUsage(
+    const Project& project,
+    const Collection& collection,
+    const MidiSequenceProfileRegistry& profiles,
+    LoopPolicy loopPolicy) {
+  const auto* sequence = collectionSequence(project, collection);
   if (sequence == nullptr) {
     return std::nullopt;
   }
 
-  auto usage = analyzeModulationUsage(sequence->commandSequence);
-  if (!hasModulationUsage(usage)) {
+  auto profile = profiles.create(midiSequenceProfileName(*sequence));
+  if (!profile) {
+    return std::nullopt;
+  }
+
+  auto midiSequence = MidiSequenceBuilder().build(sequence->commandSequence, *profile, loopPolicy);
+  auto usage = analyzeMidiModulationUsage(midiSequence);
+  if (!hasMidiModulationUsage(usage)) {
     return std::nullopt;
   }
   return usage;
@@ -123,7 +143,7 @@ struct SynthExportAssets {
     };
   }
 
-  const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence);
+  const auto* sequence = collectionSequence(project, collection);
   if (sequence == nullptr) {
     return Artifact{
         .filename = artifactBaseName(collection) + ".mid",
@@ -132,9 +152,7 @@ struct SynthExportAssets {
     };
   }
 
-  const std::string profileName = sequence->commandSequence.midiSequenceProfile.empty()
-                                      ? sequence->metadata.format
-                                      : sequence->commandSequence.midiSequenceProfile;
+  const std::string profileName = midiSequenceProfileName(*sequence);
   // Some formats scan as one asset format but need a dialect-specific MIDI sequence profile.
   auto profile = profiles.create(profileName);
   if (!profile) {
@@ -219,16 +237,19 @@ struct SynthExportAssets {
 }
 
 [[nodiscard]] Artifact exportSoundFont2(const Project& project, const SourceStore& sources,
-                                        const Collection& collection, const ExportRequest& request) {
+                                        const Collection& collection, const ExportRequest& request,
+                                        const MidiSequenceProfileRegistry& profiles) {
   auto assets = collectSynthExportAssets(project, collection);
-  auto modulationUsage = collectionModulationUsage(project, collection);
+  auto midiModulationUsage = request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange
+                                 ? collectionMidiModulationUsage(project, collection, profiles, request.loopPolicy)
+                                 : std::optional<MidiModulationUsage>{};
 
   auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = artifactBaseName(collection),
           .instrumentSets = assets.instrumentSets,
           .sampleCollections = assets.sampleCollections,
-          .modulationUsage = modulationUsage ? &*modulationUsage : nullptr,
+          .midiModulationUsage = midiModulationUsage ? &*midiModulationUsage : nullptr,
           .modulationScaling = request.synthModulationScaling,
       },
       sources);
@@ -244,16 +265,18 @@ struct SynthExportAssets {
 }
 
 [[nodiscard]] Artifact exportDls(const Project& project, const SourceStore& sources, const Collection& collection,
-                                 const ExportRequest& request) {
+                                 const ExportRequest& request, const MidiSequenceProfileRegistry& profiles) {
   auto assets = collectSynthExportAssets(project, collection);
-  auto modulationUsage = collectionModulationUsage(project, collection);
+  auto midiModulationUsage = request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange
+                                 ? collectionMidiModulationUsage(project, collection, profiles, request.loopPolicy)
+                                 : std::optional<MidiModulationUsage>{};
 
   auto result = DlsExporter().exportDls(
       DlsInput{
           .name = artifactBaseName(collection),
           .instrumentSets = assets.instrumentSets,
           .sampleCollections = assets.sampleCollections,
-          .modulationUsage = modulationUsage ? &*modulationUsage : nullptr,
+          .midiModulationUsage = midiModulationUsage ? &*midiModulationUsage : nullptr,
           .modulationScaling = request.synthModulationScaling,
       },
       sources);
@@ -298,10 +321,10 @@ std::vector<Artifact> ExportService::exportCollection(const Project& project, co
         break;
       }
       case ExportKind::SoundFont2:
-        artifacts.push_back(exportSoundFont2(project, sources, *found, request));
+        artifacts.push_back(exportSoundFont2(project, sources, *found, request, profiles));
         break;
       case ExportKind::Dls:
-        artifacts.push_back(exportDls(project, sources, *found, request));
+        artifacts.push_back(exportDls(project, sources, *found, request, profiles));
         break;
     }
   }

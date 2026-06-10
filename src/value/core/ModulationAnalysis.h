@@ -34,9 +34,28 @@ struct ModulationUsage {
   std::vector<TrackModulationUsage> tracks;
 };
 
+struct MidiTrackModulationUsage {
+  u32 trackIndex = 0;
+  ObservedValueRange vibratoDepth;
+  ObservedValueRange vibratoRate;
+  ObservedValueRange tremoloDepth;
+  ObservedValueRange tremoloRate;
+};
+
+struct MidiModulationUsage {
+  ObservedValueRange vibratoDepth;
+  ObservedValueRange vibratoRate;
+  ObservedValueRange tremoloDepth;
+  ObservedValueRange tremoloRate;
+  std::vector<MidiTrackModulationUsage> tracks;
+};
+
 [[nodiscard]] bool hasObservedValue(const ObservedValueRange& range) noexcept;
 [[nodiscard]] bool hasModulationUsage(const TrackModulationUsage& usage) noexcept;
 [[nodiscard]] bool hasModulationUsage(const ModulationUsage& usage) noexcept;
+[[nodiscard]] bool hasMidiModulationUsage(const MidiTrackModulationUsage& usage) noexcept;
+[[nodiscard]] bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept;
 [[nodiscard]] ModulationUsage analyzeModulationUsage(const CommandSequence& sequence);
+[[nodiscard]] MidiModulationUsage analyzeMidiModulationUsage(const MidiSequence& sequence);
 
 }  // namespace vgmtrans::core
