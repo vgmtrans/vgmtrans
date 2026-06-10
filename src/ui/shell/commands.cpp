@@ -8,9 +8,9 @@
 
 #include "base/Types.h"
 #include "DBGVGMRoot.h"
-#include "core/Model.h"
-#include "core/ProjectSession.h"
-#include "formats/ValueFormats.h"
+#include "value/core/Model.h"
+#include "value/core/ProjectSession.h"
+#include "value/formats/ValueFormats.h"
 #include "RawFile.h"
 #include "SeqTrack.h"
 #include "StitchExport.h"

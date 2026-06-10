@@ -109,67 +109,71 @@ add_library(vgmtransvaluecore STATIC)
 vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
-    core/Export.cpp
-    core/DlsExporter.cpp
-    core/FormatModule.cpp
-    core/MidiExporter.cpp
-    core/Model.cpp
-    core/PerformanceLowerer.cpp
-    core/ProjectSession.cpp
-    core/SampleDecoder.cpp
-    core/SoundFontExporter.cpp
-    core/SnesDsp.cpp
-    core/Source.cpp
-    core/SynthMath.cpp
-    core/WavExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/Model.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/PerformanceLowerer.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/ProjectSession.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/Source.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/SynthMath.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/DlsExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/Export.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/WavExporter.cpp
   PUBLIC
     FILE_SET HEADERS
-    BASE_DIRS .
+    BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
-      core/CoreTypes.h
-      core/DlsExporter.h
-      core/Export.h
-      core/FormatModule.h
-      core/MidiExporter.h
-      core/Model.h
-      core/PerformanceLowerer.h
-      core/ProjectSession.h
-      core/SampleDecoder.h
-      core/SoundFontExporter.h
-      core/SnesDsp.h
-      core/Source.h
-      core/SynthMath.h
-      core/WavExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/CoreTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/Model.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/PerformanceLowerer.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/ProjectSession.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/Source.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SynthMath.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/DlsExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/WavExporter.h
 )
-target_include_directories(vgmtransvaluecore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(
+  vgmtransvaluecore
+  PUBLIC
+    ${PROJECT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(vgmtransvaluecore PUBLIC cxx_std_20)
 
 add_library(vgmtransvalueformats STATIC)
 vgmtrans_enable_project_warnings(vgmtransvalueformats)
 target_sources(vgmtransvalueformats
   PRIVATE
-    formats/ValueFormats.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesProfile.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSynth.cpp
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
-    formats/CapcomSnes/Value/CapcomSnesModule.cpp
-    formats/CapcomSnes/Value/CapcomSnesProfile.cpp
-    formats/CapcomSnes/Value/CapcomSnesValueLayout.cpp
-    formats/CapcomSnes/Value/CapcomSnesValueSequence.cpp
-    formats/CapcomSnes/Value/CapcomSnesValueSynth.cpp
-    formats/SnesRsn/SnesRsnModule.cpp
-    formats/SnesSpc/SnesSpcModule.cpp
   PUBLIC
     FILE_SET HEADERS
-    BASE_DIRS .
+    BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
-      formats/ValueFormats.h
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.h
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesProfile.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSequence.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSynth.h
       formats/CapcomSnes/CapcomSnesDriverMath.h
-      formats/CapcomSnes/Value/CapcomSnesModule.h
-      formats/CapcomSnes/Value/CapcomSnesProfile.h
-      formats/CapcomSnes/Value/CapcomSnesValueLayout.h
-      formats/CapcomSnes/Value/CapcomSnesValueSequence.h
-      formats/CapcomSnes/Value/CapcomSnesValueSynth.h
-      formats/SnesRsn/SnesRsnModule.h
-      formats/SnesSpc/SnesSpcModule.h
 )
 target_link_libraries(
   vgmtransvalueformats

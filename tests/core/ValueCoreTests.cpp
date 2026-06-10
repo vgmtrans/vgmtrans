@@ -4,15 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "core/DlsExporter.h"
-#include "core/Export.h"
-#include "core/FormatModule.h"
-#include "core/MidiExporter.h"
-#include "core/PerformanceLowerer.h"
-#include "core/ProjectSession.h"
-#include "core/SampleDecoder.h"
-#include "core/SoundFontExporter.h"
-#include "core/WavExporter.h"
+#include "value/export/DlsExporter.h"
+#include "value/export/Export.h"
+#include "value/core/FormatModule.h"
+#include "value/export/MidiExporter.h"
+#include "value/core/PerformanceLowerer.h"
+#include "value/core/ProjectSession.h"
+#include "value/core/SampleDecoder.h"
+#include "value/export/SoundFontExporter.h"
+#include "value/export/WavExporter.h"
 
 #include <algorithm>
 #include <array>

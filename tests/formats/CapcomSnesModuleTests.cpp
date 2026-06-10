@@ -4,14 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "formats/CapcomSnes/Value/CapcomSnesModule.h"
+#include "value/formats/CapcomSnes/CapcomSnesModule.h"
 
-#include "core/Export.h"
-#include "core/MidiExporter.h"
-#include "core/PerformanceLowerer.h"
-#include "core/ProjectSession.h"
-#include "formats/CapcomSnes/Value/CapcomSnesProfile.h"
-#include "formats/ValueFormats.h"
+#include "value/export/Export.h"
+#include "value/export/MidiExporter.h"
+#include "value/core/PerformanceLowerer.h"
+#include "value/core/ProjectSession.h"
+#include "value/formats/CapcomSnes/CapcomSnesProfile.h"
+#include "value/formats/ValueFormats.h"
 
 #include <algorithm>
 #include <array>

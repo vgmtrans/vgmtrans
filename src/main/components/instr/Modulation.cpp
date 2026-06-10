@@ -7,7 +7,7 @@
 #include "Modulation.h"
 
 #include "base/Types.h"
-#include "core/SynthMath.h"
+#include "value/core/SynthMath.h"
 #include "LogManager.h"
 #include "ScaleConversion.h"
 
