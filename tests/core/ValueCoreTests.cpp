@@ -9,6 +9,7 @@
 #include "value/core/FormatModule.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/MidiSequenceBuilder.h"
+#include "value/core/ModulationAnalysis.h"
 #include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
 #include "value/export/SoundFontExporter.h"
@@ -659,6 +660,53 @@ void midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
          "replayed loop-boundary fixture should end both tracks at the shared stop tick");
 }
 
+void modulationAnalysisReportsObservedSourceRanges() {
+  const auto range = [](u64 offset, u64 size) {
+    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
+  };
+  const CommandSequence commandSequence{
+      .tracks = {
+          CommandTrack{
+              .id = TrackId{0},
+              .sourceTrackNumber = 7,
+              .startAddress = Address{0},
+              .commands = {
+                  VibratoCommand{.rawDepth = 38, .range = range(0x10, 3)},
+                  VibratoCommand{.rawDepth = 0, .range = range(0x13, 3)},
+                  ModulationRateCommand{.rawRate = 9, .range = range(0x16, 3)},
+              },
+          },
+          CommandTrack{
+              .id = TrackId{1},
+              .sourceTrackNumber = 3,
+              .startAddress = Address{0x20},
+              .commands = {
+                  TremoloCommand{.rawDepth = 24, .range = range(0x20, 3)},
+                  ModulationRateCommand{.rawRate = 12, .range = range(0x23, 3)},
+              },
+          },
+      },
+  };
+
+  const auto usage = analyzeModulationUsage(commandSequence);
+  expect(hasModulationUsage(usage), "modulation analysis should report observed sequence modulation");
+  expect(usage.tracks.size() == 2, "modulation analysis should preserve track-level results");
+  expect(usage.vibratoDepth.observed && usage.vibratoDepth.min == 0 && usage.vibratoDepth.max == 38,
+         "modulation analysis should report global vibrato depth range");
+  expect(usage.tremoloDepth.observed && usage.tremoloDepth.min == 24 && usage.tremoloDepth.max == 24,
+         "modulation analysis should report global tremolo depth range");
+  expect(usage.modulationRate.observed && usage.modulationRate.min == 9 && usage.modulationRate.max == 12,
+         "modulation analysis should report global modulation rate range");
+  expect(usage.vibratoDepth.firstRange && usage.vibratoDepth.firstRange->offset == 0x10,
+         "modulation analysis should retain the first observed vibrato source range");
+  expect(usage.tracks[0].sourceTrackNumber == 7 && usage.tracks[0].vibratoDepth.max == 38 &&
+             !usage.tracks[0].tremoloDepth.observed,
+         "modulation analysis should keep track-local vibrato and tremolo ranges separate");
+  expect(usage.tracks[1].sourceTrackNumber == 3 && usage.tracks[1].tremoloDepth.max == 24 &&
+             !usage.tracks[1].vibratoDepth.observed,
+         "modulation analysis should keep independent track usage");
+}
+
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -1054,6 +1102,7 @@ int main() {
     midiSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce();
     midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint();
     midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop();
+    modulationAnalysisReportsObservedSourceRanges();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
     dlsExporterWritesDlsRiffFile();

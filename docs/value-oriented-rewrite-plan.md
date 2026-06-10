@@ -222,7 +222,7 @@ sequence commands.
 
 The legacy `useColl()` behavior should become a pure analysis pass.
 
-Add a value result such as `ModulationUsage`:
+Use the value-layer `ModulationUsage` result to carry:
 
 - Per collection.
 - Per sequence/profile.
@@ -405,7 +405,7 @@ The branch should not be considered ready until:
 
 - Continue refining explicit vibrato/tremolo/rate source commands where formats
   need more detail.
-- Add `ModulationUsage` analysis.
+- Expand `ModulationUsage` as additional formats expose modulation details.
 - Thread modulation analysis into SF2/DLS synth export.
 - Add export policy for synth modulators versus explicit MIDI events.
 - Keep default behavior matching legacy output.
