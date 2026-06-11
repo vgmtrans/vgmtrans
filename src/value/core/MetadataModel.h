@@ -15,6 +15,8 @@
 
 namespace vgmtrans::core {
 
+// Item nodes are a UI/debug navigation index over source bytes. They should
+// point at the parsed model, not become the parsed model themselves.
 enum class ItemKind {
   Source,
   Header,
@@ -46,6 +48,9 @@ struct ItemTree {
   std::vector<ItemNode> nodes;
 };
 
+// Asset metadata is the common envelope for sequences, synth sets, and sample
+// collections. Format scanners fill this in once, and exporters can remain
+// focused on model data instead of rediscovering names/ranges.
 struct AssetMetadata {
   AssetId id;
   std::string format;
@@ -54,6 +59,8 @@ struct AssetMetadata {
   ItemTree items;
 };
 
+// Address is a driver/source address, not necessarily a file offset after a
+// source has been extracted or virtualized.
 struct Address {
   u64 value = 0;
 };
@@ -62,6 +69,8 @@ struct Timebase {
   u32 ppqn = 48;
 };
 
+// Loop policy describes export/playback interpretation. The parsed sequence
+// still keeps the original loop commands so richer exports can use them later.
 enum class LoopPolicy {
   Default,
   PlayOnce,

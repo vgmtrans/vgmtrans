@@ -13,14 +13,14 @@
 namespace vgmtrans::core {
 
 class FormatRegistry {
- public:
+public:
+  // Registry order matters: scanners are asked in registration order for every source,
+  // including virtual sources extracted by earlier scanners.
   void add(FormatModule module);
 
-  [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept {
-    return modules_;
-  }
+  [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept { return modules_; }
 
- private:
+private:
   std::vector<FormatModule> modules_;
 };
 

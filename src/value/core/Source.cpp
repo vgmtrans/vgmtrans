@@ -45,18 +45,14 @@ u16 ByteReader::be16(u64 offset) const {
 
 u32 ByteReader::le32(u64 offset) const {
   require(offset, 4);
-  return static_cast<u32>(bytes_[offset]) |
-         (static_cast<u32>(bytes_[offset + 1]) << 8) |
-         (static_cast<u32>(bytes_[offset + 2]) << 16) |
-         (static_cast<u32>(bytes_[offset + 3]) << 24);
+  return static_cast<u32>(bytes_[offset]) | (static_cast<u32>(bytes_[offset + 1]) << 8) |
+         (static_cast<u32>(bytes_[offset + 2]) << 16) | (static_cast<u32>(bytes_[offset + 3]) << 24);
 }
 
 u32 ByteReader::be32(u64 offset) const {
   require(offset, 4);
-  return (static_cast<u32>(bytes_[offset]) << 24) |
-         (static_cast<u32>(bytes_[offset + 1]) << 16) |
-         (static_cast<u32>(bytes_[offset + 2]) << 8) |
-         static_cast<u32>(bytes_[offset + 3]);
+  return (static_cast<u32>(bytes_[offset]) << 24) | (static_cast<u32>(bytes_[offset + 1]) << 16) |
+         (static_cast<u32>(bytes_[offset + 2]) << 8) | static_cast<u32>(bytes_[offset + 3]);
 }
 
 std::span<const u8> ByteReader::slice(SourceRange range) const {
@@ -122,6 +118,8 @@ std::vector<SourceFile> SourceStore::sourceFiles() const {
 }
 
 void SourceStore::discardVirtualizedTail() {
+  // Extracted sources are appended after user sources, so a tail pop is enough to return
+  // to the stable user-provided input set before rescanning.
   while (!entries_.empty() && entries_.back().file.virtualized) {
     entries_.pop_back();
   }

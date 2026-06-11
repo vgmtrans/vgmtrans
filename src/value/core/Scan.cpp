@@ -61,6 +61,8 @@ void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
 }
 
 void assignMissingAssetIds(std::vector<Asset>& assets, ScanIdAllocator& ids) {
+  // Format modules may assign IDs when cross-references are known during parsing. If
+  // they do not, the shared scanner fills them in consistently before publishing assets.
   for (auto& asset : assets) {
     auto& meta = metadata(asset);
     if (meta.id.valid()) {
@@ -89,6 +91,8 @@ Diagnostic errorDiagnostic(std::string message, std::optional<SourceRange> range
 }  // namespace
 
 Project scanProject(SourceStore& sources, const FormatRegistry& formats) {
+  // A rescan starts from the user-provided sources. Any previously extracted sources are
+  // regenerated so stale archive members or SPC RAM dumps cannot survive source changes.
   sources.discardVirtualizedTail();
 
   Project project;
@@ -101,6 +105,8 @@ Project scanProject(SourceStore& sources, const FormatRegistry& formats) {
     for (const auto& module : formats.modules()) {
       bool shouldScan = false;
       try {
+        // Probe failures are reported as diagnostics instead of aborting the whole scan;
+        // one bad module should not hide assets that another module can still parse.
         shouldScan = module.canScan(source, bytes);
       } catch (const std::exception& ex) {
         project.diagnostics.push_back(errorDiagnostic(std::string(module.name) + " canScan failed: " + ex.what()));
@@ -111,6 +117,8 @@ Project scanProject(SourceStore& sources, const FormatRegistry& formats) {
       }
 
       try {
+        // The ScanInput passes a shared ID allocator by reference so extracted child
+        // sources and later modules can still receive project-wide stable IDs.
         ScanResult result = module.scan(ScanInput{
             .source = source,
             .reader = sources.reader(source.id),

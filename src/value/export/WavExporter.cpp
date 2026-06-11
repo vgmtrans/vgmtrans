@@ -38,6 +38,8 @@ void writeLe32(std::vector<u8>& bytes, u32 value) {
 }  // namespace
 
 std::vector<u8> WavExporter::exportPcm16(const DecodedSample& sample) const {
+  // WAV export is intentionally minimal: decoded samples are already interleaved PCM16,
+  // so this only writes a canonical RIFF/WAVE header and the sample payload.
   constexpr u16 bitsPerSample = 16;
   constexpr u16 bytesPerSample = bitsPerSample / 8;
   constexpr u32 riffHeaderBytesAfterSize = 36;

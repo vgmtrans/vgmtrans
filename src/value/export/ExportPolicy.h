@@ -8,6 +8,8 @@
 
 namespace vgmtrans::core {
 
+// Controls whether synth modulators keep the full theoretical format range or
+// are scaled to the controller values actually observed in the parsed sequence.
 enum class ModulationScalingPolicy {
   FullFormatRange,
   ObservedSequenceRange,

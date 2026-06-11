@@ -86,11 +86,9 @@ struct InstrumentPitch {
   return true;
 }
 
-[[nodiscard]] bool instrumentHeaderIsValid(
-    ByteReader reader,
-    u32 address,
-    u32 spcDirAddress,
-    bool validateSample) {
+[[nodiscard]] bool instrumentHeaderIsValid(ByteReader reader, u32 address, u32 spcDirAddress, bool validateSample) {
+  // A plausible instrument header must reference a valid SRCN and carry usable ADSR/gain
+  // data. Full validation additionally walks the BRR stream.
   if (!reader.has(address, 6)) {
     return false;
   }
@@ -164,10 +162,10 @@ struct InstrumentPitch {
 }
 
 [[nodiscard]] std::vector<SynthModulator> capcomInstrumentModulators() {
-  const s32 vibratoRange =
-      synthAmountFromHertzRange(::capcom_snes::kVibratoBaseHz, ::capcom_snes::kVibratoMaxHz);
-  const s32 tremoloRange =
-      synthAmountFromHertzRange(::capcom_snes::kTremoloBaseHz, ::capcom_snes::kTremoloMaxHz);
+  // Capcom drives vibrato/tremolo from sequence controllers. These default modulators
+  // describe the maximum synth response; export-time scaling can narrow it to observed use.
+  const s32 vibratoRange = synthAmountFromHertzRange(::capcom_snes::kVibratoBaseHz, ::capcom_snes::kVibratoMaxHz);
+  const s32 tremoloRange = synthAmountFromHertzRange(::capcom_snes::kTremoloBaseHz, ::capcom_snes::kTremoloMaxHz);
 
   return {
       SynthModulator{
@@ -200,10 +198,10 @@ struct InstrumentPitch {
 
 }  // namespace
 
-std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(
-    ByteReader reader,
-    u32 instrumentTableAddress,
-    u32 spcDirAddress) {
+std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader reader, u32 instrumentTableAddress,
+                                                                     u32 spcDirAddress) {
+  // Instrument table length is inferred, not explicitly stored. Blank slots are skipped,
+  // but the first impossible nonblank entry terminates discovery like legacy scanning.
   std::vector<CapcomSnesInstrumentInfo> instruments;
 
   for (u32 instrumentIndex = 0; instrumentIndex <= 0xff; ++instrumentIndex) {
@@ -237,10 +235,8 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(
   return instruments;
 }
 
-std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(
-    ByteReader reader,
-    u32 spcDirAddress,
-    const std::vector<CapcomSnesInstrumentInfo>& instruments) {
+std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(ByteReader reader, u32 spcDirAddress,
+                                                             const std::vector<CapcomSnesInstrumentInfo>& instruments) {
   std::vector<u8> srcns;
   srcns.reserve(instruments.size());
   for (const auto& instrument : instruments) {
@@ -276,11 +272,9 @@ std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(
   return samples;
 }
 
-SampleCollectionAsset parseCapcomSnesSamples(
-    const ScanInput& input,
-    AssetId sampleCollectionId,
-    const std::vector<CapcomSnesSampleInfo>& sampleInfos,
-    std::string_view displayName) {
+SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sampleCollectionId,
+                                             const std::vector<CapcomSnesSampleInfo>& sampleInfos,
+                                             std::string_view displayName) {
   ItemTree items;
   u32 rootOffset = 0;
   u32 rootSize = 0;
@@ -291,10 +285,7 @@ SampleCollectionAsset parseCapcomSnesSamples(
   }
 
   ItemTreeBuilder itemBuilder(items, input.ids);
-  const auto root = itemBuilder.add(std::nullopt,
-                                    ItemKind::SampleCollection,
-                                    "snes-sample-dir",
-                                    "Sample DIR",
+  const auto root = itemBuilder.add(std::nullopt, ItemKind::SampleCollection, "snes-sample-dir", "Sample DIR",
                                     input.reader.range(rootOffset, rootSize));
 
   SampleCollection collection;
@@ -305,9 +296,8 @@ SampleCollectionAsset parseCapcomSnesSamples(
                               ? ((sampleInfo.loopAddress - sampleInfo.startAddress) / 9) * 16
                               : 0;
     const u32 decodedLength = (sampleInfo.encodedLength / 9) * 16;
-    const u32 lastBlockAddress = sampleInfo.encodedLength >= 9
-                                     ? sampleInfo.startAddress + sampleInfo.encodedLength - 9
-                                     : sampleInfo.startAddress;
+    const u32 lastBlockAddress = sampleInfo.encodedLength >= 9 ? sampleInfo.startAddress + sampleInfo.encodedLength - 9
+                                                               : sampleInfo.startAddress;
     const bool loopEnabled = sampleInfo.loops && sampleInfo.loopAddress >= sampleInfo.startAddress &&
                              sampleInfo.loopAddress <= lastBlockAddress;
     collection.samples.push_back(Sample{
@@ -317,40 +307,40 @@ SampleCollectionAsset parseCapcomSnesSamples(
         .sampleRate = 32000,
         .channels = 1,
         .bitsPerSample = 16,
-        .loop = Loop{
-            .enabled = loopEnabled,
-            .start = loopStart,
-            .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
-        },
+        .loop =
+            Loop{
+                .enabled = loopEnabled,
+                .start = loopStart,
+                .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
+            },
     });
 
-    static_cast<void>(itemBuilder.add(root,
-                                      ItemKind::Sample,
-                                      "snes-brr-sample",
+    static_cast<void>(itemBuilder.add(root, ItemKind::Sample, "snes-brr-sample",
                                       fmt::format("Sample {}", static_cast<unsigned>(sampleInfo.srcn)),
                                       input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength),
                                       fmt::format("DIR entry ${:04X}", sampleInfo.dirEntryAddress)));
   }
 
   return SampleCollectionAsset{
-      .metadata = AssetMetadata{
-          .id = sampleCollectionId,
-          .format = "CapcomSnes",
-          .name = fmt::format("{} Samples", displayName),
-          .range = input.reader.range(rootOffset, rootSize),
-          .items = std::move(items),
-      },
+      .metadata =
+          AssetMetadata{
+              .id = sampleCollectionId,
+              .format = "CapcomSnes",
+              .name = fmt::format("{} Samples", displayName),
+              .range = input.reader.range(rootOffset, rootSize),
+              .items = std::move(items),
+          },
       .samples = std::move(collection),
   };
 }
 
-InstrumentSetAsset parseCapcomSnesInstrumentSet(
-    const ScanInput& input,
-    AssetId instrumentSetId,
-    AssetId sampleCollectionId,
-    const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
-    const std::vector<CapcomSnesSampleInfo>& sampleInfos,
-    std::string_view displayName) {
+InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, AssetId instrumentSetId,
+                                                AssetId sampleCollectionId,
+                                                const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
+                                                const std::vector<CapcomSnesSampleInfo>& sampleInfos,
+                                                std::string_view displayName) {
+  // Instruments refer to samples by SRCN, while exported regions need flat sample indexes.
+  // Build both SRCN and start-address maps so duplicate BRR data stays canonical.
   std::map<u32, u32> sampleIndexByStartAddress;
   std::map<u8, u32> sampleIndexBySrcn;
   for (u32 index = 0; index < sampleInfos.size(); ++index) {
@@ -363,11 +353,8 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(
   u32 rootOffset = instrumentInfos.empty() ? 0 : instrumentInfos.front().address;
   u32 rootSize = instrumentInfos.empty() ? 0 : (instrumentInfos.back().address + 6) - rootOffset;
   ItemTreeBuilder itemBuilder(items, input.ids);
-  const auto root = itemBuilder.add(std::nullopt,
-                                    ItemKind::InstrumentSet,
-                                    "capcom-snes-instrument-table",
-                                    "Instrument Table",
-                                    input.reader.range(rootOffset, rootSize));
+  const auto root = itemBuilder.add(std::nullopt, ItemKind::InstrumentSet, "capcom-snes-instrument-table",
+                                    "Instrument Table", input.reader.range(rootOffset, rootSize));
 
   std::vector<Instrument> instruments;
   instruments.reserve(instrumentInfos.size());
@@ -385,10 +372,11 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(
         .range = input.reader.range(info.address, 6),
     };
     instrument.regions.push_back(Region{
-        .sample = SampleRef{
-            .collection = sampleCollectionId,
-            .index = sampleIndex->second,
-        },
+        .sample =
+            SampleRef{
+                .collection = sampleCollectionId,
+                .index = sampleIndex->second,
+            },
         .range = input.reader.range(info.address, 6),
         .tuning = pitch.aggregate,
         .rootKey = pitch.rootKey,
@@ -399,28 +387,23 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(
     instrument.modulators = capcomInstrumentModulators();
 
     instruments.push_back(std::move(instrument));
-    const auto instrumentItem = itemBuilder.add(root,
-                                                ItemKind::Instrument,
-                                                "capcom-snes-instrument",
-                                                fmt::format("Instrument {}", info.index),
-                                                input.reader.range(info.address, 6),
-                                                fmt::format("SRCN {}", static_cast<unsigned>(info.srcn)));
-    static_cast<void>(itemBuilder.add(instrumentItem,
-                                      ItemKind::Region,
-                                      "capcom-snes-region",
-                                      "Region",
+    const auto instrumentItem =
+        itemBuilder.add(root, ItemKind::Instrument, "capcom-snes-instrument", fmt::format("Instrument {}", info.index),
+                        input.reader.range(info.address, 6), fmt::format("SRCN {}", static_cast<unsigned>(info.srcn)));
+    static_cast<void>(itemBuilder.add(instrumentItem, ItemKind::Region, "capcom-snes-region", "Region",
                                       input.reader.range(info.address, 6),
                                       fmt::format("Sample {}", sampleIndex->second)));
   }
 
   return InstrumentSetAsset{
-      .metadata = AssetMetadata{
-          .id = instrumentSetId,
-          .format = "CapcomSnes",
-          .name = fmt::format("{} Instruments", displayName),
-          .range = input.reader.range(rootOffset, rootSize),
-          .items = std::move(items),
-      },
+      .metadata =
+          AssetMetadata{
+              .id = instrumentSetId,
+              .format = "CapcomSnes",
+              .name = fmt::format("{} Instruments", displayName),
+              .range = input.reader.range(rootOffset, rootSize),
+              .items = std::move(items),
+          },
       .instruments = std::move(instruments),
   };
 }

@@ -23,12 +23,14 @@ struct SourceFile {
   std::optional<std::string> title;
   std::filesystem::path path;
   u64 size = 0;
+  // Virtualized sources are derived from earlier sources, such as archive members or
+  // SPC RAM. They are discarded and regenerated on every rescan.
   bool virtualized = false;
   std::optional<SourceRange> origin;
 };
 
 class ByteReader {
- public:
+public:
   ByteReader() = default;
   ByteReader(SourceId source, std::span<const u8> bytes);
 
@@ -48,7 +50,7 @@ class ByteReader {
   [[nodiscard]] std::span<const u8> slice(SourceRange range) const;
   [[nodiscard]] std::span<const u8> slice(u64 offset, u64 size) const;
 
- private:
+private:
   void require(u64 offset, u64 size) const;
 
   // ByteReader does not own bytes; SourceStore owns storage for the reader lifetime.
@@ -57,13 +59,17 @@ class ByteReader {
 };
 
 struct ExtractedSource {
+  // Format modules return extracted bytes here; Scan.cpp appends them to SourceStore so
+  // normal modules can scan the child source on a later loop iteration.
   SourceFile file;
   std::vector<u8> bytes;
   std::optional<SourceRange> origin;
 };
 
 class SourceStore {
- public:
+public:
+  // SourceStore owns all bytes referenced by SourceRange. Assets copy only SourceRange
+  // values, which keeps Project snapshots small and source-backed diagnostics precise.
   SourceId add(SourceFile file, std::vector<u8> bytes);
 
   [[nodiscard]] bool contains(SourceId id) const noexcept;
@@ -76,7 +82,7 @@ class SourceStore {
 
   void discardVirtualizedTail();
 
- private:
+private:
   struct Entry {
     SourceFile file;
     std::vector<u8> bytes;

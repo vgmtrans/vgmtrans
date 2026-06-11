@@ -15,6 +15,10 @@
 
 namespace vgmtrans::core {
 
+// SynthModel represents sample-backed instruments before choosing an output container
+// such as SF2, DLS, or eventually a tracker instrument format. Values are normalized
+// enough to share exporters, but source ranges and codec metadata remain available.
+
 constexpr double kDefaultInstrumentReverbSend = 0.25;
 
 struct KeyRange {
@@ -28,6 +32,8 @@ struct VelocityRange {
 };
 
 struct SampleRef {
+  // Region sample indexes are local to the referenced SampleCollectionAsset. Keeping the
+  // collection optional lets incomplete scans report diagnostics instead of crashing.
   std::optional<AssetId> collection;
   u32 index = 0;
 };
@@ -84,17 +90,22 @@ enum class SynthSource {
 };
 
 struct SynthGenerator {
+  // A generator is an unconditional contribution, such as a base vibrato depth/rate.
   SynthDestination destination = SynthDestination::Unknown;
   s32 amount = 0;
 };
 
 struct SynthModulator {
+  // Missing source means a constant/default modulator. Exporters map these to the closest
+  // concept available in SF2/DLS rather than inventing per-format parser code.
   std::optional<SynthSource> source;
   SynthDestination destination = SynthDestination::Unknown;
   s32 amount = 0;
 };
 
 struct Region {
+  // Region is the common zone abstraction: key/velocity selection, sample reference,
+  // tuning, envelope, and per-zone placement.
   KeyRange keyRange;
   VelocityRange velocityRange;
   SampleRef sample;
@@ -109,6 +120,8 @@ struct Region {
 };
 
 struct Instrument {
+  // Bank/program are the public selection identity. The vectors below describe how the
+  // instrument sounds once selected.
   u32 bank = 0;
   u32 program = 0;
   double reverb = kDefaultInstrumentReverbSend;
@@ -144,6 +157,8 @@ struct Loop {
 struct Sample {
   std::string name;
   AudioCodec codec = AudioCodec::Unknown;
+  // Encoded bytes stay in SourceStore. That keeps assets cheap to copy and lets exporters
+  // decode with source-aware diagnostics.
   SourceRange encodedData;
   u32 sampleRate = 0;
   u8 channels = 1;
@@ -164,6 +179,7 @@ struct SampleCollectionAsset {
 };
 
 struct DecodedSample {
+  // Decoders return interleaved signed PCM16, the common handoff format for WAV/SF2/DLS.
   u32 sampleRate = 0;
   u8 channels = 1;
   std::vector<s16> pcm;

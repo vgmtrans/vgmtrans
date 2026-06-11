@@ -14,6 +14,8 @@
 namespace vgmtrans::core {
 
 struct FormatModule {
+  // A format module is a copyable descriptor, not an inherited plugin object. Registration
+  // is therefore cheap, deterministic, and free of lifetime concerns.
   using CanScan = bool (*)(const SourceFile& source, std::span<const u8> bytes);
   using Scan = ScanResult (*)(const ScanInput& input);
 

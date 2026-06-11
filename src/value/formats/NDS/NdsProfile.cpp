@@ -28,10 +28,13 @@ constexpr auto kExpression = "nds-expression";
 }  // namespace
 
 void ndsBeginTrack(const CommandSequence&, const CommandTrack&, MidiTrackState& state, std::vector<MidiEvent>&) {
+  // SSEQ starts in "no wait" mode; notes sound but do not advance time until the driver
+  // sees a notewait command.
   state.noteWait = false;
 }
 
 MidiNoteTiming ndsNoteTiming(const NoteCommand& command, MidiTrackState& state) {
+  // Note-wait is a mutable track mode, so sounding length and time advancement can differ.
   const auto key = std::clamp<s32>(static_cast<s32>(command.key) + state.transpose + state.globalTranspose, 0, 127);
   return MidiNoteTiming{
       .key = static_cast<u8>(key),
@@ -53,6 +56,8 @@ std::vector<MidiEvent> ndsInterpretTempo(const TempoCommand& command, const Midi
 }
 
 std::vector<MidiEvent> ndsInterpretDriverSpecific(const DriverSpecificCommand& command, MidiTrackState& state) {
+  // The parser uses DriverSpecificCommand for SSEQ opcodes that have no shared command
+  // equivalent but still lower cleanly to MIDI controller events.
   if (command.name == kPitchBend) {
     return {PitchBend{
         .tick = state.tick,

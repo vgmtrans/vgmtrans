@@ -15,6 +15,8 @@
 namespace vgmtrans::core {
 
 struct ObservedValueRange {
+  // Stores the actual values seen in a sequence. Synth exporters use this to avoid
+  // mapping a tiny real vibrato range across the full theoretical controller range.
   bool observed = false;
   u32 min = 0;
   u32 max = 0;
@@ -29,6 +31,8 @@ struct TrackModulationUsage {
 };
 
 struct ModulationUsage {
+  // Command-level usage keeps source ranges, useful for diagnostics and future format
+  // decisions before MIDI lowering has quantized values.
   ObservedValueRange vibratoDepth;
   ObservedValueRange tremoloDepth;
   ObservedValueRange modulationRate;
@@ -44,6 +48,8 @@ struct MidiTrackModulationUsage {
 };
 
 struct MidiModulationUsage {
+  // MIDI-level usage reflects the final controller values that will be written to a MIDI
+  // file and consumed by SF2/DLS modulators.
   ObservedValueRange vibratoDepth;
   ObservedValueRange vibratoRate;
   ObservedValueRange tremoloDepth;

@@ -60,6 +60,8 @@ namespace {
 }
 
 [[nodiscard]] std::vector<ExportKind> requestedKinds(const ExportRequest& request) {
+  // MIDI remains the default single artifact because it only requires a sequence asset.
+  // Synth/sample exports must be requested explicitly.
   if (!request.kinds.empty()) {
     return request.kinds;
   }
@@ -77,6 +79,8 @@ struct MidiLoweringResult {
 };
 
 [[nodiscard]] PreparedCollectionExport prepareCollectionExport(CollectionAssets assets) {
+  // Prepare once per collection so all requested artifacts share names, resolved assets,
+  // and reference diagnostics.
   const std::string baseName = assets.collection != nullptr ? artifactBaseName(*assets.collection) : "collection";
   return PreparedCollectionExport{
       .baseName = baseName,
@@ -91,6 +95,8 @@ struct MidiLoweringResult {
 
 [[nodiscard]] MidiLoweringResult lowerMidiSequence(const PreparedCollectionExport& prepared,
                                                    const MidiSequenceProfileRegistry& profiles, LoopPolicy loopPolicy) {
+  // MIDI lowering is needed both for .mid output and for observed modulation scaling in
+  // synth exports. Keep failures as diagnostics so non-MIDI artifacts can still be built.
   if (!prepared.assets.diagnostics.collection.empty()) {
     return MidiLoweringResult{
         .diagnostics = prepared.assets.diagnostics.collection,
@@ -121,6 +127,8 @@ struct MidiLoweringResult {
 }
 
 [[nodiscard]] std::optional<MidiModulationUsage> midiModulationUsage(const MidiLoweringResult& lowering) {
+  // SF2/DLS modulators often have only 7-bit controller inputs. Observed ranges let us
+  // trade theoretical format coverage for better practical resolution when requested.
   if (!lowering.sequence) {
     return std::nullopt;
   }
@@ -144,6 +152,8 @@ struct MidiLoweringResult {
 
   auto midiSequence = *lowering.sequence;
   if (request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
+    // MIDI export also applies the same scaling so controller values and synth modulators
+    // agree when a user asks for observed-range modulation.
     const auto usage = analyzeMidiModulationUsage(midiSequence);
     if (hasMidiModulationUsage(usage)) {
       applyMidiModulationScaling(midiSequence, usage, request.synthModulationScaling);
@@ -229,6 +239,8 @@ struct MidiLoweringResult {
           .modulationScaling = request.synthModulationScaling,
       },
       sources);
+  // Asset-resolution diagnostics describe missing references; exporter diagnostics
+  // describe failures encountered while materializing the container.
   auto diagnostics = prepared.assets.diagnostics.instrumentSets;
   diagnostics.insert(diagnostics.end(), prepared.assets.diagnostics.sampleCollections.begin(),
                      prepared.assets.diagnostics.sampleCollections.end());
@@ -254,6 +266,8 @@ struct MidiLoweringResult {
           .modulationScaling = request.synthModulationScaling,
       },
       sources);
+  // Keep DLS diagnostic merging parallel to SF2 so callers can compare both exports
+  // without learning two error-reporting conventions.
   auto diagnostics = prepared.assets.diagnostics.instrumentSets;
   diagnostics.insert(diagnostics.end(), prepared.assets.diagnostics.sampleCollections.begin(),
                      prepared.assets.diagnostics.sampleCollections.end());
@@ -292,6 +306,8 @@ std::vector<Artifact> exportCollection(const Project& project, const SourceStore
   bool midiUsageAnalyzed = false;
 
   const auto requireMidiLowering = [&]() -> const MidiLoweringResult& {
+    // Several requested artifacts can depend on the same lowered MIDI sequence. Lower it
+    // once so diagnostics and modulation analysis all refer to identical playback data.
     if (!midiLowering) {
       midiLowering = lowerMidiSequence(prepared, profiles, request.loopPolicy);
     }
@@ -299,6 +315,8 @@ std::vector<Artifact> exportCollection(const Project& project, const SourceStore
   };
 
   const auto requireMidiModulationUsage = [&]() -> const MidiModulationUsage* {
+    // Synth exporters only need observed MIDI modulation when the policy asks for it.
+    // WAV and plain MIDI export should not pay that analysis cost.
     if (request.synthModulationScaling != ModulationScalingPolicy::ObservedSequenceRange) {
       return nullptr;
     }

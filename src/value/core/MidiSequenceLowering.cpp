@@ -20,6 +20,8 @@ namespace vgmtrans::core {
 
 namespace {
 
+// Guardrail for malformed or intentionally infinite driver control flow. Real songs
+// should terminate, hit a loop, or be bounded by playback policy long before this.
 constexpr size_t kMaxExecutedCommandsPerTrack = 262144;
 
 template <typename T>
@@ -28,6 +30,8 @@ void appendEvents(std::vector<MidiEvent>& destination, std::vector<T> events) {
 }
 
 void purgeEndedPendingNotes(const std::vector<MidiEvent>& events, std::vector<size_t>& pendingNoteIndexes, u64 tick) {
+  // Pending notes are stored by event index so later slurred notes can extend them in
+  // place without searching by pitch/channel.
   std::erase_if(pendingNoteIndexes, [&](size_t index) {
     if (index >= events.size()) {
       return true;
@@ -38,6 +42,8 @@ void purgeEndedPendingNotes(const std::vector<MidiEvent>& events, std::vector<si
 }
 
 void extendPendingNotes(std::vector<MidiEvent>& events, const std::vector<size_t>& pendingNoteIndexes, u64 endTick) {
+  // Some drivers encode a tied/slurred continuation as another note command. MIDI wants
+  // one longer note event, so extend every currently sounding note to the requested end.
   for (const size_t index : pendingNoteIndexes) {
     if (index >= events.size()) {
       continue;
@@ -58,6 +64,8 @@ void extendPendingNotes(std::vector<MidiEvent>& events, const std::vector<size_t
 }
 
 [[nodiscard]] std::unordered_map<u64, size_t> commandIndexByOffset(const CommandTrack& track) {
+  // Control-flow commands target source addresses. Build a small lookup table once per
+  // interpretation pass so the common loop does not know format-specific pointer details.
   std::unordered_map<u64, size_t> indexes;
   for (size_t i = 0; i < track.commands.size(); ++i) {
     const auto range = commandRange(track.commands[i]);
@@ -82,6 +90,8 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
     return;
   }
 
+  // LoopBoundaryCommand is synthetic; remember only real source-backed commands so a
+  // backward jump can identify the first musical loop.
   const auto range = commandRange(command);
   if (range.valid()) {
     offsets.insert(range.offset);
@@ -89,6 +99,8 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
 }
 
 [[nodiscard]] u8 midiChannelForTrack(size_t trackIndex, const CommandSequence& commandSequence) {
+  // Channel 10 is percussion in General MIDI. Most VGM formats do not mean percussion
+  // by "track 9", so the default policy skips it unless the scanner opts out.
   constexpr size_t kChannelsPerBank = 16;
   constexpr size_t kSkippedChannel = 9;
   if (!commandSequence.behavior.skipChannel10) {
@@ -103,6 +115,8 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
 [[nodiscard]] std::optional<u64> firstLoopTick(const CommandSequence& commandSequence, const CommandTrack& track,
                                                const MidiSequenceProfile& profile, u8 channel) {
   // Dry-run the track state to find the first musical loop without emitting events.
+  // This pass is separate from the real build because PlayOnce needs the latest first
+  // loop across all tracks before any track can be truncated safely.
   const auto indexes = commandIndexByOffset(track);
   MidiTrackState state{
       .trackIndex = track.sourceTrackNumber,
@@ -257,6 +271,8 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
 
 [[nodiscard]] u64 trackStopTick(const CommandSequence& commandSequence, const CommandTrack& track,
                                 const MidiSequenceProfile& profile, u8 channel) {
+  // A second dry-run finds the natural stop tick for loop-unaware control flow. This
+  // prevents tracks with no detected loop from running past the rest of the collection.
   const auto indexes = commandIndexByOffset(track);
   MidiTrackState state{
       .trackIndex = track.sourceTrackNumber,
@@ -416,6 +432,8 @@ inline constexpr bool kImmediateCommand =
 template <typename T>
 [[nodiscard]] std::vector<MidiEvent> interpretImmediateCommand(const T& command, const MidiSequenceProfile& profile,
                                                                MidiTrackState& state) {
+  // The shared loop handles timing and control flow; profile hooks own all driver-specific
+  // musical interpretation. That keeps per-format MIDI conversion localized.
   if constexpr (std::is_same_v<T, NoteStateCommand>) {
     return profile.interpretNoteState(command, state);
   } else if constexpr (std::is_same_v<T, DurationCommand>) {
@@ -462,6 +480,8 @@ template <typename T>
 
 MidiSequence buildMidiSequence(const CommandSequence& commandSequence, const MidiSequenceProfile& profile,
                                LoopPolicy loopPolicy) {
+  // Default policy is intentionally resolved here, not in scanners, so exported playback
+  // behavior can be changed without rewriting the parsed CommandSequence.
   if (loopPolicy == LoopPolicy::Default) {
     loopPolicy = commandSequence.behavior.defaultLoopPolicy;
   }
@@ -482,6 +502,8 @@ MidiSequence buildMidiSequence(const CommandSequence& commandSequence, const Mid
   }
   if (commandSequence.behavior.maxPlaybackTicks.has_value() &&
       globalStopTick > *commandSequence.behavior.maxPlaybackTicks) {
+    // Scanner-provided limits are a last-resort driver guard, commonly used for formats
+    // with nonmusical dummy tracks or playback modes that never emit audible data.
     globalStopTick = *commandSequence.behavior.maxPlaybackTicks;
   }
   if (loopPolicy == LoopPolicy::PlayOnce) {
@@ -524,6 +546,8 @@ MidiSequence buildMidiSequence(const CommandSequence& commandSequence, const Mid
     profile.beginTrack(commandSequence, track, state, midiTrack.events);
 
     if (commandSequence.behavior.suppressEventsWhenPlaybackTicksZero && globalStopTick == 0) {
+      // Some pseudo-sequences exist only as padding or driver data. Preserve the track
+      // shape but avoid emitting misleading initialization events.
       if (midiTrack.events.empty() || !std::holds_alternative<EndOfTrack>(midiTrack.events.back())) {
         midiTrack.events.push_back(EndOfTrack{.tick = state.tick});
       }
@@ -559,6 +583,8 @@ MidiSequence buildMidiSequence(const CommandSequence& commandSequence, const Mid
               u32 soundingTicks = timing.soundingTicks;
               if (commandSequence.behavior.truncateSustainedNotesAtLoopBoundary && playbackStopTick.has_value() &&
                   soundingTicks > timing.advanceTicks + 1) {
+                // Long releases can cross the chosen loop boundary. Truncate only when
+                // the format says loop exports should not sustain into the next pass.
                 const u64 stopEndTick = *playbackStopTick + 1;
                 if (state.tick < stopEndTick && state.tick + soundingTicks > stopEndTick) {
                   soundingTicks = static_cast<u32>(stopEndTick - state.tick);
@@ -593,6 +619,8 @@ MidiSequence buildMidiSequence(const CommandSequence& commandSequence, const Mid
               }
               auto& counter = state.repeatCounters[typedCommand.slot];
               if (typedCommand.count == 0 && counter == 0) {
+                // A zero-count repeat with no active counter is treated as an infinite
+                // loop marker by legacy sequence converters.
                 midiTrack.events.push_back(Marker{.tick = state.tick, .text = "Loop"});
                 ended = true;
                 return;
@@ -683,6 +711,8 @@ MidiSequence buildMidiSequence(const CommandSequence& commandSequence, const Mid
                 if (const auto target = destinationIndex(indexes, typedCommand.destination);
                     target.has_value() && playbackStopTick.has_value() && state.tick < *playbackStopTick &&
                     *target < pc) {
+                  // Synthetic loop boundaries let parsers expose loops that are not a
+                  // literal jump opcode in the decoded command stream.
                   pc = *target;
                   incrementPc = false;
                   return;

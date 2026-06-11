@@ -18,14 +18,13 @@ namespace vgmtrans::core {
 namespace {
 
 constexpr unsigned kNdsAdpcmTable[89] = {
-    0x0007, 0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x0010, 0x0011, 0x0013, 0x0015,
-    0x0017, 0x0019, 0x001C, 0x001F, 0x0022, 0x0025, 0x0029, 0x002D, 0x0032, 0x0037, 0x003C, 0x0042,
-    0x0049, 0x0050, 0x0058, 0x0061, 0x006B, 0x0076, 0x0082, 0x008F, 0x009D, 0x00AD, 0x00BE, 0x00D1,
-    0x00E6, 0x00FD, 0x0117, 0x0133, 0x0151, 0x0173, 0x0198, 0x01C1, 0x01EE, 0x0220, 0x0256, 0x0292,
-    0x02D4, 0x031C, 0x036C, 0x03C3, 0x0424, 0x048E, 0x0502, 0x0583, 0x0610, 0x06AB, 0x0756, 0x0812,
-    0x08E0, 0x09C3, 0x0ABD, 0x0BD0, 0x0CFF, 0x0E4C, 0x0FBA, 0x114C, 0x1307, 0x14EE, 0x1706, 0x1954,
-    0x1BDC, 0x1EA5, 0x21B6, 0x2515, 0x28CA, 0x2CDF, 0x315B, 0x364B, 0x3BB9, 0x41B2, 0x4844, 0x4F7E,
-    0x5771, 0x602F, 0x69CE, 0x7462, 0x7FFF};
+    0x0007, 0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x0010, 0x0011, 0x0013, 0x0015, 0x0017,
+    0x0019, 0x001C, 0x001F, 0x0022, 0x0025, 0x0029, 0x002D, 0x0032, 0x0037, 0x003C, 0x0042, 0x0049, 0x0050,
+    0x0058, 0x0061, 0x006B, 0x0076, 0x0082, 0x008F, 0x009D, 0x00AD, 0x00BE, 0x00D1, 0x00E6, 0x00FD, 0x0117,
+    0x0133, 0x0151, 0x0173, 0x0198, 0x01C1, 0x01EE, 0x0220, 0x0256, 0x0292, 0x02D4, 0x031C, 0x036C, 0x03C3,
+    0x0424, 0x048E, 0x0502, 0x0583, 0x0610, 0x06AB, 0x0756, 0x0812, 0x08E0, 0x09C3, 0x0ABD, 0x0BD0, 0x0CFF,
+    0x0E4C, 0x0FBA, 0x114C, 0x1307, 0x14EE, 0x1706, 0x1954, 0x1BDC, 0x1EA5, 0x21B6, 0x2515, 0x28CA, 0x2CDF,
+    0x315B, 0x364B, 0x3BB9, 0x41B2, 0x4844, 0x4F7E, 0x5771, 0x602F, 0x69CE, 0x7462, 0x7FFF};
 
 constexpr int kNdsImaIndexTable[9] = {-1, -1, -1, -1, 2, 4, 6, 8};
 constexpr double kPi = 3.14159265358979323846264338327950288;
@@ -38,8 +37,10 @@ s32 clampSigned16(s32 x) {
   return std::clamp<s32>(x, -32768, 32767);
 }
 
-void decodeBrrBlock(std::span<s16, 16> output, u8 header, std::span<const u8, 8> payload,
-                    s32& previous1, s32& previous2) {
+void decodeBrrBlock(std::span<s16, 16> output, u8 header, std::span<const u8, 8> payload, s32& previous1,
+                    s32& previous2) {
+  // SNES BRR packs sixteen 4-bit deltas per block. The two previous decoded samples are
+  // part of the predictor state and must carry across block boundaries.
   const auto range = static_cast<u8>((header & 0xf0) >> 4);
   const auto filter = static_cast<u8>((header & 0x0c) >> 2);
   const bool validHeader = range < 0x0d;
@@ -65,8 +66,7 @@ void decodeBrrBlock(std::span<s16, 16> output, u8 header, std::span<const u8, 8>
           out += (s1 << 1) + ((-((s1 << 1) + s1)) >> 5) - s2 + (s2 >> 4);
           break;
         case 3:
-          out += (s1 << 1) + ((-(s1 + (s1 << 2) + (s1 << 3))) >> 6) - s2 +
-                 (((s2 << 1) + s2) >> 4);
+          out += (s1 << 1) + ((-(s1 + (s1 << 2) + (s1 << 3))) >> 6) - s2 + (((s2 << 1) + s2) >> 4);
           break;
         default:
           break;
@@ -94,6 +94,8 @@ void decodeBrrBlock(std::span<s16, 16> output, u8 header, std::span<const u8, 8>
 }
 
 void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
+  // Nintendo DS ADPCM is IMA-style but uses the console's step/index tables and stores
+  // the initial PCM/index immediately before the encoded payload.
   int diff = static_cast<int>(kNdsAdpcmTable[index] / 8);
   if ((data4Bit & 1) != 0) {
     diff += static_cast<int>(kNdsAdpcmTable[index] / 4);
@@ -135,8 +137,9 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
   return 0.5;
 }
 
-[[nodiscard]] std::vector<s16> synthesizeLfsrNoisePcm16(u32 sampleCount, u16 lfsrSeed = 0x7fff,
-                                                        u16 lfsrTap = 0x6000) {
+[[nodiscard]] std::vector<s16> synthesizeLfsrNoisePcm16(u32 sampleCount, u16 lfsrSeed = 0x7fff, u16 lfsrTap = 0x6000) {
+  // PSG noise is not sample data in ROM. Emit a deterministic loopable waveform so synth
+  // exporters have a concrete sample to reference.
   std::vector<s16> samples(sampleCount);
   if (samples.empty()) {
     return samples;
@@ -157,9 +160,10 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
   return samples;
 }
 
-[[nodiscard]] std::vector<s16> synthesizeBandLimitedPulsePcm16(double dutyCycle, u32 sampleRate,
-                                                               u32 sampleCount,
+[[nodiscard]] std::vector<s16> synthesizeBandLimitedPulsePcm16(double dutyCycle, u32 sampleRate, u32 sampleCount,
                                                                double baseFrequencyHz = 440.0) {
+  // PSG pulse instruments likewise have no source PCM. Band-limiting the generated
+  // waveform avoids the harsh aliasing that a naive square wave would introduce.
   std::vector<s16> samples(sampleCount);
   if (samples.empty() || sampleRate == 0 || baseFrequencyHz <= 0.0) {
     return samples;
@@ -223,17 +227,17 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodeNdsImaAdpcm(
-    const Sample& sample,
-    std::span<const u8> sourceBytes) {
+[[nodiscard]] std::optional<DecodedSample> decodeNdsImaAdpcm(const Sample& sample, std::span<const u8> sourceBytes) {
   if (!rangeIsValid(sample, sourceBytes) || sample.encodedData.offset < 4) {
     return std::nullopt;
   }
 
+  // The value model points encodedData at the nibble stream. The four-byte ADPCM predictor
+  // header lives immediately before that range in SWAV data.
   const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
   const u32 headerOffset = static_cast<u32>(sample.encodedData.offset - 4);
-  const u32 header = static_cast<u32>(le16(sourceBytes, headerOffset)) |
-                     (static_cast<u32>(le16(sourceBytes, headerOffset + 2)) << 16);
+  const u32 header =
+      static_cast<u32>(le16(sourceBytes, headerOffset)) | (static_cast<u32>(le16(sourceBytes, headerOffset + 2)) << 16);
   int pcm16 = static_cast<s16>(header & 0xffff);
   int index = static_cast<int>((header >> 16) & 0x7f);
 
@@ -261,10 +265,8 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
       .loop = sample.loop,
   };
   decoded.pcm = sample.codecParameter == 8 ? synthesizeLfsrNoisePcm16(sampleCount)
-                                           : synthesizeBandLimitedPulsePcm16(
-                                                 ndsPsgDutyCycle(sample.codecParameter),
-                                                 decoded.sampleRate,
-                                                 sampleCount);
+                                           : synthesizeBandLimitedPulsePcm16(ndsPsgDutyCycle(sample.codecParameter),
+                                                                             decoded.sampleRate, sampleCount);
   return decoded;
 }
 
@@ -285,15 +287,14 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
   s32 previous1 = 0;
   s32 previous2 = 0;
   for (size_t blockOffset = 0; blockOffset + 9 <= encoded.size(); blockOffset += 9) {
+    // BRR block bit 0 marks the terminal block. Some scanners already trim encodedData,
+    // but respecting the flag here keeps the decoder robust for larger source ranges.
     const auto header = encoded[blockOffset];
     const auto payload = encoded.subspan(blockOffset + 1, 8);
     const auto outputOffset = decoded.pcm.size();
     decoded.pcm.resize(outputOffset + 16);
-    decodeBrrBlock(std::span<s16, 16>(decoded.pcm.data() + outputOffset, 16),
-                   header,
-                   std::span<const u8, 8>(payload.data(), 8),
-                   previous1,
-                   previous2);
+    decodeBrrBlock(std::span<s16, 16>(decoded.pcm.data() + outputOffset, 16), header,
+                   std::span<const u8, 8>(payload.data(), 8), previous1, previous2);
 
     if ((header & 0x01) != 0) {
       break;
@@ -322,12 +323,10 @@ void SampleDecoderRegistry::add(SampleDecoder decoder) {
   decoders_.push_back(decoder);
 }
 
-std::optional<DecodedSample> SampleDecoderRegistry::decode(
-    const Sample& sample,
-    std::span<const u8> sourceBytes) const {
-  const auto decoder = std::ranges::find_if(decoders_, [&sample](const auto& candidate) {
-    return candidate.codec == sample.codec;
-  });
+std::optional<DecodedSample> SampleDecoderRegistry::decode(const Sample& sample,
+                                                           std::span<const u8> sourceBytes) const {
+  const auto decoder =
+      std::ranges::find_if(decoders_, [&sample](const auto& candidate) { return candidate.codec == sample.codec; });
   if (decoder == decoders_.end()) {
     return std::nullopt;
   }

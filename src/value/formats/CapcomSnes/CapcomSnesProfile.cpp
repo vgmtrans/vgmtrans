@@ -60,6 +60,8 @@ struct PanControllerValues {
 }
 
 [[nodiscard]] u32 soundingTicks(u32 length, const MidiTrackState& state) {
+  // Duration rate is an 8-bit fraction. Slur mode forces full-length sounding notes,
+  // which the lowering pass can merge with the following note.
   u32 duration = length * state.durationRate;
   if (state.noteSlurred || duration == 0) {
     duration = length << 8;
@@ -78,6 +80,8 @@ struct PanControllerValues {
 }
 
 void applyNoteAttributes(u8 attributes, MidiTrackState& state) {
+  // Attribute bytes are packed state updates, not standalone events. They replace some
+  // modes while accumulating one-shot dotted state.
   state.noteOctave |= attributes & kNoteOctaveMask;
   state.noteDotted = state.noteDotted || ((attributes & kNoteDottedMask) != 0);
   state.noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
@@ -162,6 +166,8 @@ u32 capcomRestTicks(const RestCommand& command, MidiTrackState& state) {
 }
 
 MidiNoteTiming capcomNoteTiming(const NoteCommand& command, MidiTrackState& state) {
+  // The profile keeps enough previous-note state to emulate the driver portamento and
+  // slur behavior before the shared lowering code emits note events.
   const u32 length = noteTicks(command.rawDuration, state);
   const u32 duration = soundingTicks(length, state);
   const s32 key = sourceKey(command, state);
@@ -324,6 +330,8 @@ std::vector<MidiEvent> capcomInterpretTuning(const TuningCommand& command, const
 }
 
 std::vector<MidiEvent> capcomInterpretPortamento(const PortamentoCommand& command, MidiTrackState& state) {
+  // Capcom stores portamento as a speed. Convert it into time-per-cent so the next note
+  // can compute a distance-dependent MIDI portamento time.
   state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(command.rawTime);
   return {};
 }
@@ -399,6 +407,8 @@ void applyVersionProfileFunctions(MidiSequenceProfile& profile) {
 }  // namespace
 
 MidiSequenceProfile capcomSnesProfile(CapcomSnesEngineVersion version) {
+  // Most profile hooks are shared across Capcom driver versions. Version-specific hooks
+  // capture the differences in volume, pan, master volume, and tremolo math.
   MidiSequenceProfile profile;
   profile.restTicks = capcomRestTicks;
   profile.noteTiming = capcomNoteTiming;

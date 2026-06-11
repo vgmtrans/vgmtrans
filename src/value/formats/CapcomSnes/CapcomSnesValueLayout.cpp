@@ -26,28 +26,24 @@ struct BytePatternView {
 };
 
 // These signatures identify driver routines whose operands reveal runtime table addresses.
-constexpr std::array<u8, 16> kReadSongListPattern{
-    0x1c, 0x5d, 0xf5, 0x03, 0x0e, 0xc4, 0xc0, 0xf5,
-    0x02, 0x0e, 0xc4, 0xc1, 0x04, 0xc0, 0xf0, 0xdd};
+constexpr std::array<u8, 16> kReadSongListPattern{0x1c, 0x5d, 0xf5, 0x03, 0x0e, 0xc4, 0xc0, 0xf5,
+                                                  0x02, 0x0e, 0xc4, 0xc1, 0x04, 0xc0, 0xf0, 0xdd};
 constexpr std::string_view kReadSongListMask = "xxx??x?x??x?x?x?";
 
-constexpr std::array<u8, 16> kReadBgmAddressPattern{
-    0x6f, 0x3f, 0xef, 0x06, 0x8f, 0x0d, 0xa1, 0x8f,
-    0xaf, 0xa0, 0x3f, 0x82, 0x05, 0x8d, 0x00, 0xdd};
+constexpr std::array<u8, 16> kReadBgmAddressPattern{0x6f, 0x3f, 0xef, 0x06, 0x8f, 0x0d, 0xa1, 0x8f,
+                                                    0xaf, 0xa0, 0x3f, 0x82, 0x05, 0x8d, 0x00, 0xdd};
 constexpr std::string_view kReadBgmAddressMask = "xx??x??x??x??xxx";
 
-constexpr std::array<u8, 16> kDspRegInitPattern{
-    0x8d, 0x03, 0xf6, 0x63, 0x04, 0xc5, 0xf2, 0x00,
-    0xf6, 0x66, 0x04, 0xc5, 0xf3, 0x00, 0xfe, 0xf2};
+constexpr std::array<u8, 16> kDspRegInitPattern{0x8d, 0x03, 0xf6, 0x63, 0x04, 0xc5, 0xf2, 0x00,
+                                                0xf6, 0x66, 0x04, 0xc5, 0xf3, 0x00, 0xfe, 0xf2};
 constexpr std::string_view kDspRegInitMask = "x?x??xxxx??xxxx?";
 
-constexpr std::array<u8, 15> kDspRegInitOldPattern{
-    0xf5, 0xf9, 0x0b, 0xfd, 0xf5, 0x05, 0x0c, 0x3f,
-    0xf2, 0x0b, 0x3d, 0xc8, 0x0c, 0xd0, 0xf1};
+constexpr std::array<u8, 15> kDspRegInitOldPattern{0xf5, 0xf9, 0x0b, 0xfd, 0xf5, 0x05, 0x0c, 0x3f,
+                                                   0xf2, 0x0b, 0x3d, 0xc8, 0x0c, 0xd0, 0xf1};
 constexpr std::string_view kDspRegInitOldMask = "x??xx??x??xx?x?";
 
-constexpr std::array<u8, 12> kLoadInstrTablePattern{
-    0x8d, 0x06, 0xcf, 0xda, 0xa0, 0x60, 0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
+constexpr std::array<u8, 12> kLoadInstrTablePattern{0x8d, 0x06, 0xcf, 0xda, 0xa0, 0x60,
+                                                    0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
 constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 
 [[nodiscard]] bool matchPattern(ByteReader reader, u64 offset, BytePatternView pattern) {
@@ -64,6 +60,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 }
 
 [[nodiscard]] std::optional<u32> searchPattern(ByteReader reader, BytePatternView pattern) {
+  // The mask lets one signature match several ROM variants where operands differ but the
+  // instruction sequence is stable.
   if (pattern.bytes.size() != pattern.mask.size() || pattern.bytes.size() > reader.size()) {
     return std::nullopt;
   }
@@ -115,16 +113,13 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 
 [[nodiscard]] u16 currentPlayAddress(ByteReader reader, CapcomSnesEngineVersion version, u8 channel) {
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
-    return static_cast<u16>(reader.u8At(0x00 + channel * 2 + 1) |
-                            (reader.u8At(0x10 + channel * 2 + 1) << 8));
+    return static_cast<u16>(reader.u8At(0x00 + channel * 2 + 1) | (reader.u8At(0x10 + channel * 2 + 1) << 8));
   }
   return static_cast<u16>(reader.u8At(0x00 + channel) | (reader.u8At(0x08 + channel) << 8));
 }
 
-[[nodiscard]] std::optional<u8> guessCurrentSong(
-    ByteReader reader,
-    CapcomSnesEngineVersion version,
-    u16 songListAddress) {
+[[nodiscard]] std::optional<u8> guessCurrentSong(ByteReader reader, CapcomSnesEngineVersion version,
+                                                 u16 songListAddress) {
   // Song-list SPC dumps only expose the current playback cursor, so choose the nearest valid header.
   std::optional<u8> guessedSongIndex;
   int bestScore = std::numeric_limits<int>::max();
@@ -212,6 +207,8 @@ std::string capcomSnesSourceDisplayName(const SourceFile& source) {
 }
 
 std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
+  // CapcomSnes SPC dumps have no declarative header. Layout discovery reconstructs the
+  // current driver's table addresses by recognizing small snippets of SPC700 code.
   if (reader.size() != kCapcomSnesAramSize) {
     return std::nullopt;
   }
@@ -259,11 +256,13 @@ std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
     layout.priorityInHeader = true;
   }
 
-  if (!isValidBgmHeader(reader, layout.priorityInHeader ? layout.sequenceHeaderAddress : layout.sequenceHeaderAddress - 1)) {
+  if (!isValidBgmHeader(reader,
+                        layout.priorityInHeader ? layout.sequenceHeaderAddress : layout.sequenceHeaderAddress - 1)) {
     return std::nullopt;
   }
 
   if (const auto offset = searchPattern(reader, BytePatternView{kLoadInstrTablePattern, kLoadInstrTableMask})) {
+    // The instrument table address is embedded as split operands in the loader routine.
     layout.instrumentTableAddress = static_cast<u32>(reader.u8At(*offset + 7) | (reader.u8At(*offset + 10) << 8));
   }
 

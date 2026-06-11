@@ -15,6 +15,8 @@
 namespace vgmtrans::core {
 
 struct SampleDecoder {
+  // Decode functions receive the whole source span and the Sample's encodedData range.
+  // That lets them validate ranges and share code for samples packed into one source file.
   using Decode = std::optional<DecodedSample> (*)(const Sample& sample, std::span<const u8> sourceBytes);
 
   AudioCodec codec = AudioCodec::Unknown;
@@ -22,16 +24,16 @@ struct SampleDecoder {
 };
 
 class SampleDecoderRegistry {
- public:
+public:
+  // The default registry covers codecs used by current value formats. Tests and future
+  // formats can still build custom registries from the same value descriptor type.
   static SampleDecoderRegistry withDefaultDecoders();
 
   void add(SampleDecoder decoder);
 
-  [[nodiscard]] std::optional<DecodedSample> decode(
-      const Sample& sample,
-      std::span<const u8> sourceBytes) const;
+  [[nodiscard]] std::optional<DecodedSample> decode(const Sample& sample, std::span<const u8> sourceBytes) const;
 
- private:
+private:
   std::vector<SampleDecoder> decoders_;
 };
 

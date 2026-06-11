@@ -51,6 +51,8 @@ constexpr u16 kDlsConnTrnNone = 0;
 constexpr s32 kDlsSustainLevelFullScale = 0x03e80000;
 
 struct Chunk {
+  // RIFF chunk size excludes the optional pad byte; payload is stored padded for direct
+  // append into parent LIST/RIFF chunks.
   std::string id;
   u32 size = 0;
   std::vector<u8> payload;
@@ -59,6 +61,8 @@ struct Chunk {
 using DecodedDlsSample = DecodedSynthSample;
 
 struct DlsConnection {
+  // DLS articulation is a list of source/control/destination/scale connections. This is
+  // the DLS equivalent of SF2 generators and modulators.
   u16 source = kDlsConnSrcNone;
   u16 control = kDlsConnSrcNone;
   u16 destination = 0;
@@ -126,6 +130,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] Chunk makeListChunk(std::string type, std::vector<Chunk> children) {
+  // LIST chunks carry a four-byte type tag followed by child chunks. DLS uses this for
+  // instrument, region, wave, and metadata containers.
   std::vector<u8> payload;
   writeAscii(payload, type);
   for (const auto& child : children) {
@@ -185,6 +191,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] s32 dls16Dot16Scale(s32 value) {
+  // DLS articulation scales are signed 16.16 fixed-point values.
   return clampS32(static_cast<s64>(value) * 65536);
 }
 
@@ -198,6 +205,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] std::optional<DlsConnection> dlsConnectionForGenerator(const SynthGenerator& generator) {
+  // Unconditional normalized generators become source-less DLS connections.
   switch (generator.destination) {
     case SynthDestination::Pitch:
       return DlsConnection{.destination = kDlsConnDstPitch, .scale = dlsPitchScale(generator.amount)};
@@ -277,6 +285,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 [[nodiscard]] std::optional<DlsConnection> dlsConnectionForModulator(
     const SynthModulator& modulator, const MidiModulationUsage* midiModulationUsage = nullptr,
     ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange) {
+  // DLS represents vibrato/tremolo depth as LFO or vibrato sources controlled by another
+  // source. That is why depth destinations set source/control separately below.
   const auto source = modulator.source ? dlsSourceForSynthSource(*modulator.source)
                                        : dlsDefaultSourceForDestination(modulator.destination);
   if (!source) {
@@ -418,6 +428,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] Chunk wsmpChunk(const Region& region, const DecodedDlsSample& sample) {
+  // wsmp carries sample playback metadata for a region: unity key, fine tune,
+  // attenuation, and loop points.
   u8 unityKey = kDefaultRootKey;
   s16 fineTune = 0;
   if (region.rootKey) {
@@ -469,6 +481,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 [[nodiscard]] Chunk art2Chunk(const Instrument& instrument, const Region& region,
                               const MidiModulationUsage* midiModulationUsage,
                               ModulationScalingPolicy modulationScaling) {
+  // Each region gets a DLS2 articulation list. Region envelope/pan is always written;
+  // instrument generators/modulators are appended as additional connections.
   const auto panScale = static_cast<s32>(std::lround((std::clamp(region.pan, 0.0, 1.0) - 0.5) * 65536.0));
 
   std::vector<u8> connections;
@@ -480,8 +494,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
                   dlsEnvelopeTimecents(region.envelope.hold, region.envelope.holdSeconds));
   writeConnection(connections, kDlsConnDstEg1DecayTime,
                   dlsEnvelopeTimecents(region.envelope.decay, region.envelope.decaySeconds));
-  writeConnection(connections,
-                  kDlsConnDstEg1SustainLevel,
+  writeConnection(connections, kDlsConnDstEg1SustainLevel,
                   explicitEnvelope ? dlsSustainLevel(region.envelope) : kDlsSustainLevelFullScale);
   writeConnection(connections, kDlsConnDstEg1ReleaseTime,
                   dlsEnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
@@ -541,8 +554,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }
 
 [[nodiscard]] Chunk linsList(std::span<const ResolvedSynthInstrument> instruments,
-                             std::span<const DecodedDlsSample> samples,
-                             const MidiModulationUsage* midiModulationUsage,
+                             std::span<const DecodedDlsSample> samples, const MidiModulationUsage* midiModulationUsage,
                              ModulationScalingPolicy modulationScaling) {
   std::vector<Chunk> instrumentChunks;
   instrumentChunks.reserve(instruments.size());
@@ -587,6 +599,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }
 
 [[nodiscard]] Chunk ptblChunk(std::span<const Chunk> waveChunks) {
+  // The pool table points to each wave chunk inside wvpl by byte offset, not by sample id.
   std::vector<u8> payload;
   writeLe32(payload, 8);
   writeLe32(payload, static_cast<u32>(waveChunks.size()));
@@ -614,6 +627,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 DlsResult DlsExporter::exportDls(const DlsInput& input, const SourceStore& sources) const {
   DlsResult result;
 
+  // DLS accepts the decoded PCM view directly. After shared sample/instrument resolution,
+  // this function is mostly RIFF table assembly.
   auto samples = decodeSynthSamples(input.sampleCollections, sources, result.diagnostics);
   for (auto& sample : samples) {
     sample.name = dlsName(std::move(sample.name), "Wave");

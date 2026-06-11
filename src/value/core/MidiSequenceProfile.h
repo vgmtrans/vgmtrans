@@ -17,6 +17,9 @@
 
 namespace vgmtrans::core {
 
+// MidiTrackState is the mutable interpreter state used while lowering one CommandTrack.
+// Profiles own the meaning of these fields; the shared lowering loop only advances
+// control flow and calls profile hooks at the right time.
 struct MidiTrackState {
   u32 trackIndex = 0;
   u8 channel = 0;
@@ -42,6 +45,8 @@ struct MidiTrackState {
 };
 
 struct MidiNoteTiming {
+  // soundingTicks is note length; advanceTicks is how far the driver's time cursor moves.
+  // They differ for slurs, legato, note-wait modes, and other driver-specific behavior.
   u8 key = 0;
   u8 velocity = 127;
   u32 soundingTicks = 0;
@@ -50,6 +55,8 @@ struct MidiNoteTiming {
   std::vector<MidiEvent> beforeEvents;
 };
 
+// Default hooks implement a plain MIDI-ish interpretation. Format profiles override only
+// the hooks whose driver math or state differs from the shared fallback.
 void defaultBeginTrack(const CommandSequence& commandSequence, const CommandTrack& track, MidiTrackState& state,
                        std::vector<MidiEvent>& events);
 [[nodiscard]] u32 defaultRestTicks(const RestCommand& command, MidiTrackState& state);
@@ -80,6 +87,8 @@ void defaultApplyTranspose(const TransposeCommand& command, MidiTrackState& stat
                                                                  MidiTrackState& state);
 
 struct MidiSequenceProfile {
+  // Function pointers keep the profile copyable and allocation-free. They are intentionally
+  // narrow: format code describes driver semantics as a small table of behavior hooks.
   using BeginTrack = void (*)(const CommandSequence& commandSequence, const CommandTrack& track, MidiTrackState& state,
                               std::vector<MidiEvent>& events);
   using RestTicks = u32 (*)(const RestCommand& command, MidiTrackState& state);
@@ -129,6 +138,8 @@ struct MidiSequenceProfile {
 
 class MidiSequenceProfileRegistry {
 public:
+  // The registry stores descriptors by value. Sessions can be copied or rebuilt without
+  // retaining hidden factory objects or profile lifetimes.
   void add(std::string format, MidiSequenceProfile profile);
   [[nodiscard]] const MidiSequenceProfile* find(std::string_view format) const;
   [[nodiscard]] bool contains(std::string_view format) const;

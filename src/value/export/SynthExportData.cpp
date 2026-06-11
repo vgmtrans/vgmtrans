@@ -22,11 +22,11 @@ namespace {
 
 }  // namespace
 
-std::vector<DecodedSynthSample> decodeSynthSamples(
-    std::span<const SampleCollectionAsset* const> sampleCollections,
-    const SourceStore& sources,
-    std::vector<Diagnostic>& diagnostics,
-    const SynthSampleDecodeOptions& options) {
+std::vector<DecodedSynthSample> decodeSynthSamples(std::span<const SampleCollectionAsset* const> sampleCollections,
+                                                   const SourceStore& sources, std::vector<Diagnostic>& diagnostics,
+                                                   const SynthSampleDecodeOptions& options) {
+  // Decode once into a flat vector. Container exporters then decide how to lay out that
+  // PCM, but all of them share the same source-range diagnostics.
   std::vector<DecodedSynthSample> samples;
   auto decoders = SampleDecoderRegistry::withDefaultDecoders();
 
@@ -50,9 +50,9 @@ std::vector<DecodedSynthSample> decodeSynthSamples(
       }
 
       if (options.requireMono && decoded->channels != 1) {
-        diagnostics.push_back(exportWarning(options.nonMonoWarning.empty() ? "Skipping non-mono sample for synth export"
-                                                                          : options.nonMonoWarning,
-                                            validDiagnosticRange(sample.encodedData)));
+        diagnostics.push_back(exportWarning(
+            options.nonMonoWarning.empty() ? "Skipping non-mono sample for synth export" : options.nonMonoWarning,
+            validDiagnosticRange(sample.encodedData)));
         continue;
       }
 
@@ -71,6 +71,8 @@ std::vector<DecodedSynthSample> decodeSynthSamples(
 }
 
 SynthSampleIndexMap synthSampleIndexMap(std::span<const DecodedSynthSample> samples) {
+  // Region references use collection-local sample indexes. Export containers need a flat
+  // sample table, so keep a map from original reference identity to flat index.
   SynthSampleIndexMap indexes;
   for (u32 i = 0; i < samples.size(); ++i) {
     indexes[{samples[i].collectionId.value, samples[i].localIndex}] = clampU16(i);
@@ -78,8 +80,7 @@ SynthSampleIndexMap synthSampleIndexMap(std::span<const DecodedSynthSample> samp
   return indexes;
 }
 
-std::optional<AssetId> firstSampleCollectionId(
-    std::span<const SampleCollectionAsset* const> sampleCollections) {
+std::optional<AssetId> firstSampleCollectionId(std::span<const SampleCollectionAsset* const> sampleCollections) {
   for (const auto* collection : sampleCollections) {
     if (collection != nullptr) {
       return collection->metadata.id;
@@ -88,11 +89,10 @@ std::optional<AssetId> firstSampleCollectionId(
   return std::nullopt;
 }
 
-std::optional<u16> resolveRegionSampleIndex(
-    const Region& region,
-    std::optional<AssetId> fallbackCollection,
-    const SynthSampleIndexMap& samples,
-    std::vector<Diagnostic>& diagnostics) {
+std::optional<u16> resolveRegionSampleIndex(const Region& region, std::optional<AssetId> fallbackCollection,
+                                            const SynthSampleIndexMap& samples, std::vector<Diagnostic>& diagnostics) {
+  // Older formats often imply "the first sample collection in the collection" rather than
+  // storing an explicit collection id on every region.
   const std::optional<AssetId> collectionId = region.sample.collection ? region.sample.collection : fallbackCollection;
   if (!collectionId) {
     diagnostics.push_back(
@@ -111,9 +111,10 @@ std::optional<u16> resolveRegionSampleIndex(
 
 std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     std::span<const InstrumentSetAsset* const> instrumentSets,
-    std::span<const SampleCollectionAsset* const> sampleCollections,
-    const SynthSampleIndexMap& samples,
+    std::span<const SampleCollectionAsset* const> sampleCollections, const SynthSampleIndexMap& samples,
     std::vector<Diagnostic>& diagnostics) {
+  // Drop only regions whose samples cannot be resolved. The rest of the instrument can
+  // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
   const auto fallbackCollection = firstSampleCollectionId(sampleCollections);
 

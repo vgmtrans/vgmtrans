@@ -64,6 +64,8 @@ constexpr u32 kBaseInstrumentRegionGenerators = 9;
 constexpr u32 kEnvelopeInstrumentRegionGenerators = 5;
 
 struct Chunk {
+  // RIFF chunk size excludes the optional pad byte. payload is already padded so appending
+  // chunks can stay mechanical.
   std::string id;
   u32 size = 0;
   std::vector<u8> payload;
@@ -160,6 +162,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] Chunk makeListChunk(std::string type, std::vector<Chunk> children) {
+  // SF2 stores most tables inside RIFF LIST chunks whose first four payload bytes name
+  // the list type, such as INFO, sdta, or pdta.
   std::vector<u8> payload;
   writeAscii(payload, type);
   for (const auto& child : children) {
@@ -232,6 +236,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] SfRegionPitch sf2RegionPitch(const Region& region, const DecodedSfSample& sample) {
+  // If a region provides an explicit root key, trust its coarse/fine tuning fields. When
+  // it does not, fold region and sample pitch into the default-key tuning generators.
   if (region.rootKey) {
     return SfRegionPitch{
         .rootKey = *region.rootKey,
@@ -335,6 +341,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 [[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(
     const SynthModulator& modulator, const MidiModulationUsage* midiModulationUsage = nullptr,
     ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange) {
+  // The normalized SynthModulator omits SF2 source-generator encodings. This function is
+  // the only place that knows the SF2 controller ids chosen for shared modulation concepts.
   const auto source = modulator.source ? sf2SourceForSynthSource(*modulator.source)
                                        : sf2DefaultSourceForDestination(modulator.destination);
   const auto destination = sf2GeneratorForDestination(modulator.destination);
@@ -357,6 +365,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] std::optional<double> envelopeSeconds(u32 microseconds, std::optional<double> preciseSeconds) {
+  // Formats can provide precise seconds when legacy math is not exactly representable as
+  // integer microseconds. Prefer that for SF2 timecent conversion.
   if (preciseSeconds && *preciseSeconds >= 0.0 && std::isfinite(*preciseSeconds)) {
     return *preciseSeconds;
   }
@@ -433,6 +443,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] std::vector<DecodedSfSample> sf2Samples(std::vector<DecodedSynthSample> decodedSamples) {
+  // SF2 stores all sample PCM in one smpl chunk. startFrame/endFrame are offsets into
+  // that concatenated stream, including the mandatory pad after each sample.
   std::vector<DecodedSfSample> samples;
   samples.reserve(decodedSamples.size());
   for (auto& sample : decodedSamples) {
@@ -492,6 +504,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }
 
 [[nodiscard]] Chunk phdrChunk(std::span<const ResolvedSynthInstrument> instruments) {
+  // Each value Instrument becomes one SF2 preset pointing at the matching SF2 instrument
+  // by index. The terminal EOP record is required by the SF2 table format.
   std::vector<u8> payload;
   for (u32 i = 0; i < instruments.size(); ++i) {
     const auto& instrument = *instruments[i].instrument;
@@ -541,6 +555,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }
 
 [[nodiscard]] Chunk instChunk(std::span<const ResolvedSynthInstrument> instruments) {
+  // SF2 instruments point into bag tables. Instruments with global generators/modulators
+  // get one global bag before their sample regions.
   std::vector<u8> payload;
   u32 bagIndex = 0;
   for (const auto& instrument : instruments) {
@@ -555,6 +571,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }
 
 [[nodiscard]] Chunk ibagChunk(std::span<const ResolvedSynthInstrument> instruments) {
+  // Bags are index pairs into generator/modulator arrays. Counts must be predicted before
+  // writing igen/imod so the table offsets line up exactly.
   std::vector<u8> payload;
   u32 generatorIndex = 0;
   u32 modulatorIndex = 0;
@@ -602,6 +620,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 
 [[nodiscard]] Chunk igenChunk(std::span<const ResolvedSynthInstrument> instruments,
                               std::span<const DecodedSfSample> samplesByIndex) {
+  // Region generators are written in SF2's required order: ranges and placement first,
+  // then envelope/tuning/sample linkage. Unsupported normalized generators are skipped.
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
     for (const auto& generator : instrument.instrument->generators) {
@@ -645,8 +665,10 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("igen", std::move(payload));
 }
 
-[[nodiscard]] std::vector<SfSampleHeaderPitch> sampleHeaderPitches(std::span<const DecodedSfSample> samples,
-                                                                   std::span<const ResolvedSynthInstrument> instruments) {
+[[nodiscard]] std::vector<SfSampleHeaderPitch> sampleHeaderPitches(
+    std::span<const DecodedSfSample> samples, std::span<const ResolvedSynthInstrument> instruments) {
+  // SF2 sample headers have their own original-key/correction fields. Pick the first
+  // region that references each sample so sample headers stay consistent with zones.
   std::vector<SfSampleHeaderPitch> pitches(samples.size());
   std::vector<bool> assigned(samples.size(), false);
   for (const auto& instrument : instruments) {
@@ -718,6 +740,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, const SourceStore& sources) const {
   SoundFontResult result;
 
+  // SoundFont 2 sample data is mono PCM16. Shared decode/resolve helpers do the expensive
+  // source work once before this file-specific table writer assembles RIFF chunks.
   auto decodedSamples = decodeSynthSamples(input.sampleCollections, sources, result.diagnostics,
                                            SynthSampleDecodeOptions{
                                                .requireMono = true,

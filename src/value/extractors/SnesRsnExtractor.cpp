@@ -60,6 +60,8 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
 }
 
 [[nodiscard]] ScanResult scanSnesRsn(const ScanInput& input) {
+  // RSN is a RAR archive convention for SPC sets. Extract every entry as a virtual source
+  // so the SPC extractor and SNES format scanners can process them normally.
   ScanResult result;
   const auto bytes = input.reader.slice(0, input.reader.size());
   const auto sourceRange = input.reader.range(0, input.reader.size());
@@ -86,8 +88,8 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
     const size_t entrySize = ar_entry_get_size(archive.get());
     std::vector<u8> entryBytes(entrySize);
     if (!ar_entry_uncompress(archive.get(), entryBytes.data(), entryBytes.size())) {
-      result.diagnostics.push_back(warning("RSN archive entry could not be decompressed: " + std::string(rawName),
-                                           sourceRange));
+      result.diagnostics.push_back(
+          warning("RSN archive entry could not be decompressed: " + std::string(rawName), sourceRange));
       continue;
     }
 

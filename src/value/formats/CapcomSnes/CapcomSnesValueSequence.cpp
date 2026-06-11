@@ -27,11 +27,7 @@ namespace {
   return defaultCommandDescription(command);
 }
 
-[[nodiscard]] DriverSpecificCommand driverCommand(
-    std::string name,
-    ByteReader reader,
-    u32 offset,
-    u32 size) {
+[[nodiscard]] DriverSpecificCommand driverCommand(std::string name, ByteReader reader, u32 offset, u32 size) {
   const auto bytes = reader.slice(offset, size);
   return DriverSpecificCommand{
       .name = std::move(name),
@@ -41,28 +37,22 @@ namespace {
 }
 
 struct TrackDecodeCursor {
+  // Small cursor wrapper keeps operand parsing readable while preserving accurate
+  // SourceRange values for every decoded command.
   ByteReader reader;
   u32& offset;
 
-  [[nodiscard]] bool has(u32 count) const {
-    return reader.has(offset, count);
-  }
+  [[nodiscard]] bool has(u32 count) const { return reader.has(offset, count); }
 
   [[nodiscard]] UnknownCommand truncated(u8 opcode, u32 beginOffset) const {
     return UnknownCommand{.opcode = opcode, .range = reader.range(beginOffset, 1)};
   }
 
-  [[nodiscard]] SourceRange rangeFrom(u32 beginOffset) const {
-    return reader.range(beginOffset, offset - beginOffset);
-  }
+  [[nodiscard]] SourceRange rangeFrom(u32 beginOffset) const { return reader.range(beginOffset, offset - beginOffset); }
 
-  [[nodiscard]] u8 readU8() {
-    return reader.u8At(offset++);
-  }
+  [[nodiscard]] u8 readU8() { return reader.u8At(offset++); }
 
-  [[nodiscard]] s8 readS8() {
-    return reader.s8At(offset++);
-  }
+  [[nodiscard]] s8 readS8() { return reader.s8At(offset++); }
 
   [[nodiscard]] u16 readBe16() {
     const u16 value = reader.be16(offset);
@@ -70,18 +60,13 @@ struct TrackDecodeCursor {
     return value;
   }
 
-  void skip(u32 count) {
-    offset += count;
-  }
+  void skip(u32 count) { offset += count; }
 };
 
 }  // namespace
 
-CommandTrack decodeCapcomSnesTrack(
-    ByteReader reader,
-    CapcomSnesEngineVersion version,
-    u32 sourceTrackNumber,
-    u32 startAddress) {
+CommandTrack decodeCapcomSnesTrack(ByteReader reader, CapcomSnesEngineVersion version, u32 sourceTrackNumber,
+                                   u32 startAddress) {
   CommandTrack track{
       .id = TrackId{sourceTrackNumber},
       .sourceTrackNumber = sourceTrackNumber,
@@ -324,6 +309,8 @@ CommandTrack decodeCapcomSnesTrack(
         }
         const u8 modulationType = cursor.readU8();
         const u8 modulationValue = cursor.readU8();
+        // The same opcode controls vibrato depth, tremolo depth, or shared LFO rate.
+        // Preserve those as distinct shared commands so modulation analysis can see them.
         switch (modulationType) {
           case 0:
             track.commands.push_back(VibratoCommand{
@@ -404,36 +391,31 @@ CommandTrack decodeCapcomSnesTrack(
   return track;
 }
 
-SequenceAsset parseCapcomSnesSequence(
-    const ScanInput& input,
-    const CapcomSnesLayout& layout,
-    AssetId sequenceId,
-    std::optional<AssetId> instrumentSetId,
-    std::string_view displayName) {
+SequenceAsset parseCapcomSnesSequence(const ScanInput& input, const CapcomSnesLayout& layout, AssetId sequenceId,
+                                      std::optional<AssetId> instrumentSetId, std::string_view displayName) {
   const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
   ItemTree items;
   ItemTreeBuilder itemBuilder(items, input.ids);
-  const auto root = itemBuilder.add(std::nullopt,
-                                    ItemKind::Sequence,
-                                    "capcom-snes-sequence-header",
-                                    "Sequence Header",
+  const auto root = itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes-sequence-header", "Sequence Header",
                                     input.reader.range(layout.sequenceHeaderAddress, headerSize));
 
   CommandSequence commandSequence{
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
-      .behavior = SequenceBehavior{
-          .linearAmplitudeScale = true,
-          .writeInitialReverb = true,
-          .initialReverb = 0,
-          .writeInitialMonoMode = true,
-          .defaultLoopPolicy = LoopPolicy::PlayOnce,
-      },
+      .behavior =
+          SequenceBehavior{
+              .linearAmplitudeScale = true,
+              .writeInitialReverb = true,
+              .initialReverb = 0,
+              .writeInitialMonoMode = true,
+              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+          },
       .midiSequenceProfile = std::string(capcomSnesProfileName(layout.version)),
   };
 
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   std::set<std::pair<u32, u32>> referencedInstruments;
   // Capcom stores track pointers in reverse channel order.
+  // The sourceTrackNumber is normalized back to playback order for MIDI channel mapping.
   for (int trackIndex = static_cast<int>(kCapcomSnesMaxTracks) - 1; trackIndex >= 0; --trackIndex) {
     const auto pointerOffset = pointerBase + static_cast<u32>(trackIndex) * 2;
     const u16 trackAddress = input.reader.be16(pointerOffset);
@@ -441,22 +423,14 @@ SequenceAsset parseCapcomSnesSequence(
       continue;
     }
 
-    const auto trackItem = itemBuilder.add(root,
-                                           ItemKind::Track,
-                                           "capcom-snes-track-pointer",
-                                           "Track Pointer",
-                                           input.reader.range(pointerOffset, 2),
-                                           fmt::format("Track starts at ${:04X}", trackAddress));
-    auto track = decodeCapcomSnesTrack(input.reader,
-                                       layout.version,
-                                       static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex),
-                                       trackAddress);
+    const auto trackItem =
+        itemBuilder.add(root, ItemKind::Track, "capcom-snes-track-pointer", "Track Pointer",
+                        input.reader.range(pointerOffset, 2), fmt::format("Track starts at ${:04X}", trackAddress));
+    auto track = decodeCapcomSnesTrack(input.reader, layout.version,
+                                       static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex), trackAddress);
     for (const auto& command : track.commands) {
-      static_cast<void>(itemBuilder.add(trackItem,
-                                        ItemKind::Command,
-                                        capcomSnesCommandDetailKind(command),
-                                        defaultCommandName(command),
-                                        commandRange(command),
+      static_cast<void>(itemBuilder.add(trackItem, ItemKind::Command, capcomSnesCommandDetailKind(command),
+                                        defaultCommandName(command), commandRange(command),
                                         capcomSnesCommandDescription(command)));
       if (const auto* programCommand = std::get_if<ProgramCommand>(&command)) {
         const u32 bank = programCommand->rawProgram >> 7;
@@ -492,13 +466,14 @@ SequenceAsset parseCapcomSnesSequence(
   }
 
   return SequenceAsset{
-      .metadata = AssetMetadata{
-          .id = sequenceId,
-          .format = "CapcomSnes",
-          .name = std::string(displayName),
-          .range = input.reader.range(layout.sequenceHeaderAddress, headerSize),
-          .items = std::move(items),
-      },
+      .metadata =
+          AssetMetadata{
+              .id = sequenceId,
+              .format = "CapcomSnes",
+              .name = std::string(displayName),
+              .range = input.reader.range(layout.sequenceHeaderAddress, headerSize),
+              .items = std::move(items),
+          },
       .commandSequence = std::move(commandSequence),
   };
 }

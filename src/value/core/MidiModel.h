@@ -14,6 +14,10 @@
 
 namespace vgmtrans::core {
 
+// MidiModel is the performance layer used by MIDI-like exports. It is intentionally
+// lower-level than CommandSequence: driver loops have been resolved according to policy,
+// and controller values are already quantized to MIDI-friendly units.
+
 struct NoteOn {
   u64 tick = 0;
   u8 channel = 0;
@@ -33,6 +37,8 @@ struct NoteDuration {
   u8 channel = 0;
   u8 key = 0;
   u8 velocity = 0;
+  // Duration form is easier for lowerings to manipulate; MidiExporter expands it to
+  // note-on/note-off events when writing a Standard MIDI File.
   u32 duration = 0;
 };
 
@@ -63,6 +69,8 @@ struct Volume {
 struct Volume14 {
   u64 tick = 0;
   u8 channel = 0;
+  // Some source drivers have finer resolution or nonlinear amplitude curves. Keep a
+  // 14-bit event here so exporters can write MSB/LSB controller pairs when useful.
   u16 value = 0;
 };
 
@@ -201,6 +209,7 @@ using MidiEvent =
                  PortamentoTime14, PortamentoControl, LegatoPedal, MonoMode, EndOfTrack, Marker>;
 
 struct MidiTrack {
+  // Empty names are valid; the exporter will omit track-name meta events.
   std::string name;
   std::vector<MidiEvent> events;
 };
@@ -208,6 +217,8 @@ struct MidiTrack {
 struct MidiSequence {
   Timebase timebase;
   std::vector<MidiTrack> tracks;
+  // Diagnostics are kept with the lowered sequence so MIDI export can still return a
+  // usable artifact with warnings rather than forcing scan-time failure.
   std::vector<Diagnostic> diagnostics;
 };
 

@@ -35,8 +35,8 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
   if (bytes.size() < kMinimumSpcSize || bytes.size() < kSpcSignature.size()) {
     return false;
   }
-  return std::ranges::equal(kSpcSignature, bytes.subspan(0, kSpcSignature.size())) &&
-         bytes[0x21] == 0x1a && bytes[0x22] == 0x1a;
+  return std::ranges::equal(kSpcSignature, bytes.subspan(0, kSpcSignature.size())) && bytes[0x21] == 0x1a &&
+         bytes[0x22] == 0x1a;
 }
 
 [[nodiscard]] std::string sourceName(const SourceFile& source) {
@@ -73,20 +73,18 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
 }
 
 [[nodiscard]] u32 le32(std::span<const u8> bytes, u64 offset) {
-  return static_cast<u32>(bytes[offset]) |
-         (static_cast<u32>(bytes[offset + 1]) << 8) |
-         (static_cast<u32>(bytes[offset + 2]) << 16) |
-         (static_cast<u32>(bytes[offset + 3]) << 24);
+  return static_cast<u32>(bytes[offset]) | (static_cast<u32>(bytes[offset + 1]) << 8) |
+         (static_cast<u32>(bytes[offset + 2]) << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);
 }
 
 [[nodiscard]] std::optional<std::string> spcTitle(std::span<const u8> bytes) {
+  // Prefer extended ID666 titles when present, but fall back to the fixed SPC title field.
   std::string title;
   if (bytes.size() > 0x23 && bytes[0x23] == 0x1a) {
     title = nullTerminatedString(bytes, kId666TitleOffset, kId666TitleSize);
   }
 
-  if (matches(bytes, kExtendedId666Offset, kExtendedId666Signature) &&
-      bytes.size() >= kExtendedId666Offset + 8) {
+  if (matches(bytes, kExtendedId666Offset, kExtendedId666Signature) && bytes.size() >= kExtendedId666Offset + 8) {
     const u32 chunkSize = le32(bytes, kExtendedId666Offset + 4);
     const u64 chunkBegin = kExtendedId666Offset + 8;
     const u64 remaining = bytes.size() - chunkBegin;
@@ -128,6 +126,8 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
 }
 
 [[nodiscard]] ScanResult scanSnesSpc(const ScanInput& input) {
+  // SPC files are snapshots. The actual format scanners want the 64 KiB ARAM image, so
+  // expose RAM as a virtual child source and let normal SNES modules scan that.
   const auto spcBytes = input.reader.slice(0, input.reader.size());
   const auto ramBytes = input.reader.slice(kSpcRamOffset, kSpcRamSize);
   std::vector<u8> ram(ramBytes.begin(), ramBytes.end());

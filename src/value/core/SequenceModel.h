@@ -15,6 +15,10 @@
 
 namespace vgmtrans::core {
 
+// SequenceModel is the parsed, format-preserving layer. Commands keep raw driver values
+// and source ranges so later lowerings can choose MIDI, tracker, or another target without
+// forcing every format parser to pre-bake MIDI controller semantics.
+
 struct InstrumentRef {
   std::optional<AssetId> asset;
   u32 bank = 0;
@@ -22,6 +26,9 @@ struct InstrumentRef {
   std::optional<SourceRange> range;
 };
 
+// Notes store source key/velocity/duration values, not final MIDI values. A
+// MidiSequenceProfile applies per-driver octave state, duration rate, transpose,
+// portamento, and slur behavior when building a MidiSequence.
 struct NoteCommand {
   u32 key = 0;
   u32 rawVelocity = 0;
@@ -34,6 +41,8 @@ struct RestCommand {
   SourceRange range;
 };
 
+// These are common note-state concepts seen across drivers. The raw byte is preserved
+// because the meaning of each bit is still profile-specific.
 enum class NoteStateAction {
   ToggleTriplet,
   ToggleSlur,
@@ -128,6 +137,9 @@ struct MasterVolumeCommand {
   SourceRange range;
 };
 
+// Control-flow commands keep source addresses rather than resolved indexes. The lowering
+// pass resolves addresses against the decoded command list so diagnostics can still point
+// back to the original bytes.
 struct JumpCommand {
   Address destination;
   SourceRange range;
@@ -173,18 +185,20 @@ struct UnknownCommand {
   SourceRange range;
 };
 
+// Escape hatch for driver features that are too specific for the shared command set
+// but should still pass through the generic sequence lowering pipeline.
 struct DriverSpecificCommand {
   std::string name;
   std::vector<u8> bytes;
   SourceRange range;
 };
 
-using Command = std::variant<NoteCommand, RestCommand, NoteStateCommand, DurationCommand, ProgramCommand, VolumeCommand,
-                             PanCommand, TempoCommand, TransposeCommand, GlobalTransposeCommand, TuningCommand,
-                             PortamentoCommand, VibratoCommand, TremoloCommand, ModulationRateCommand, ReverbCommand,
-                             EnvelopeCommand, MasterVolumeCommand, JumpCommand, CallCommand, ReturnCommand,
-                             RepeatCommand, RepeatBreakCommand, LoopBoundaryCommand, EndCommand, UnknownCommand,
-                             DriverSpecificCommand>;
+using Command =
+    std::variant<NoteCommand, RestCommand, NoteStateCommand, DurationCommand, ProgramCommand, VolumeCommand, PanCommand,
+                 TempoCommand, TransposeCommand, GlobalTransposeCommand, TuningCommand, PortamentoCommand,
+                 VibratoCommand, TremoloCommand, ModulationRateCommand, ReverbCommand, EnvelopeCommand,
+                 MasterVolumeCommand, JumpCommand, CallCommand, ReturnCommand, RepeatCommand, RepeatBreakCommand,
+                 LoopBoundaryCommand, EndCommand, UnknownCommand, DriverSpecificCommand>;
 
 // These defaults let formats name only commands whose display differs from the shared model.
 [[nodiscard]] std::string defaultCommandName(const Command& command);
@@ -194,12 +208,16 @@ using Command = std::variant<NoteCommand, RestCommand, NoteStateCommand, Duratio
 
 struct CommandTrack {
   TrackId id;
+  // Logical driver track/channel number. It may differ from vector index after filtering
+  // empty tracks or reordering source track pointers.
   u32 sourceTrackNumber = 0;
   Address startAddress;
   std::vector<Command> commands;
 };
 
 struct SequenceBehavior {
+  // Behavior flags describe playback conventions discovered by the scanner, not export
+  // policy. Exporters consume them only after the shared lowering stage.
   bool monophonicTracks = false;
   bool linearAmplitudeScale = false;
   bool writeInitialReverb = false;
@@ -216,6 +234,8 @@ struct SequenceBehavior {
 struct CommandSequence {
   Timebase timebase;
   std::vector<CommandTrack> tracks;
+  // References are advisory: they help build complete collections even when a sequence
+  // can name instruments that are stored in a separate asset.
   std::vector<InstrumentRef> referencedInstruments;
   SequenceBehavior behavior;
   // Empty means use metadata.format; formats set this when one parser has multiple MIDI sequence dialects.

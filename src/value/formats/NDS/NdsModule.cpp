@@ -30,6 +30,9 @@ using namespace core;
 
 namespace {
 
+// NDS SDAT containers hold several related tables: SSEQ sequences, SBNK banks, and
+// SWAR wave archives. The scanner resolves that graph into value assets and collections.
+
 constexpr std::string_view kFormatName = "NDS";
 constexpr std::string_view kSdatSignature = "SDAT\xff\xfe\x00\x01";
 constexpr std::string_view kSseqSignature = "SSEQ\xff\xfe\x00\x01";
@@ -39,18 +42,16 @@ constexpr size_t kMaxTrackCommands = 262144;
 constexpr double kEnvelopeIntervalSeconds = (2728.0 * 64.0) / 33513982.0;
 
 constexpr std::array<s16, 128> kDecibelSquareTable = {
-    -481, -480, -480, -480, -480, -480, -480, -480, -480, -460, -442, -425, -410, -396, -383, -371,
-    -360, -349, -339, -330, -321, -313, -305, -297, -289, -282, -276, -269, -263, -257, -251, -245,
-    -239, -234, -229, -224, -219, -214, -210, -205, -201, -196, -192, -188, -184, -180, -176, -173,
-    -169, -165, -162, -158, -155, -152, -149, -145, -142, -139, -136, -133, -130, -127, -125, -122,
-    -119, -116, -114, -111, -109, -106, -103, -101, -99,  -96,  -94,  -91,  -89,  -87,  -85,  -82,
-    -80,  -78,  -76,  -74,  -72,  -70,  -68,  -66,  -64,  -62,  -60,  -58,  -56,  -54,  -52,  -50,
-    -49,  -47,  -45,  -43,  -42,  -40,  -38,  -36,  -35,  -33,  -31,  -30,  -28,  -27,  -25,  -23,
-    -22,  -20,  -19,  -17,  -16,  -14,  -13,  -11,  -10,  -8,   -7,   -6,   -4,   -3,   -1,   0};
+    -481, -480, -480, -480, -480, -480, -480, -480, -480, -460, -442, -425, -410, -396, -383, -371, -360, -349, -339,
+    -330, -321, -313, -305, -297, -289, -282, -276, -269, -263, -257, -251, -245, -239, -234, -229, -224, -219, -214,
+    -210, -205, -201, -196, -192, -188, -184, -180, -176, -173, -169, -165, -162, -158, -155, -152, -149, -145, -142,
+    -139, -136, -133, -130, -127, -125, -122, -119, -116, -114, -111, -109, -106, -103, -101, -99,  -96,  -94,  -91,
+    -89,  -87,  -85,  -82,  -80,  -78,  -76,  -74,  -72,  -70,  -68,  -66,  -64,  -62,  -60,  -58,  -56,  -54,  -52,
+    -50,  -49,  -47,  -45,  -43,  -42,  -40,  -38,  -36,  -35,  -33,  -31,  -30,  -28,  -27,  -25,  -23,  -22,  -20,
+    -19,  -17,  -16,  -14,  -13,  -11,  -10,  -8,   -7,   -6,   -4,   -3,   -1,   0};
 
-constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33,
-                                                 0x3F, 0x49, 0x54, 0x5C, 0x64, 0x6D, 0x74,
-                                                 0x7B, 0x7F, 0x84, 0x89, 0x8F};
+constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33, 0x3F, 0x49, 0x54,
+                                                 0x5C, 0x64, 0x6D, 0x74, 0x7B, 0x7F, 0x84, 0x89, 0x8F};
 
 constexpr auto kPitchBend = "nds-pitch-bend";
 constexpr auto kPitchBendRange = "nds-pitch-bend-range";
@@ -81,6 +82,8 @@ struct WaveArchiveInfo {
 };
 
 struct SdatInfo {
+  // Parsed SDAT table-of-contents. File IDs refer into FAT; sequence/bank/wave indexes
+  // refer into INFO/SYMB tables.
   u32 baseOffset = 0;
   u32 length = 0;
   u32 symbOffset = 0;
@@ -115,8 +118,8 @@ struct DecodedCommand {
 
 [[nodiscard]] std::optional<u32> nearbySseqHeader(ByteReader reader, FileRange range) {
   constexpr u32 kMaxPaddingBeforeSseq = 0x200;
-  const u64 searchEnd = std::min<u64>(reader.size(),
-                                      static_cast<u64>(range.offset) + range.size + kMaxPaddingBeforeSseq);
+  const u64 searchEnd =
+      std::min<u64>(reader.size(), static_cast<u64>(range.offset) + range.size + kMaxPaddingBeforeSseq);
   for (u64 offset = range.offset + 1; offset + kSseqSignature.size() <= searchEnd; ++offset) {
     if (matches(reader, offset, kSseqSignature)) {
       return static_cast<u32>(offset);
@@ -187,8 +190,8 @@ struct DecodedCommand {
   return reader.le32(listOffset);
 }
 
-[[nodiscard]] std::vector<std::string> readNames(ByteReader reader, u32 symbOffset, u32 pointerListField,
-                                                 u32 count, std::string_view fallbackPrefix, bool hasSymb) {
+[[nodiscard]] std::vector<std::string> readNames(ByteReader reader, u32 symbOffset, u32 pointerListField, u32 count,
+                                                 std::string_view fallbackPrefix, bool hasSymb) {
   std::vector<std::string> names;
   names.reserve(count);
   std::optional<u32> pointerList;
@@ -208,6 +211,8 @@ struct DecodedCommand {
 }
 
 [[nodiscard]] std::optional<SdatInfo> parseSdatInfo(ByteReader reader, u32 baseOffset) {
+  // SDAT stores most offsets relative to section starts. Normalize them to source offsets
+  // immediately so later parsers can use SourceRange directly.
   if (!matches(reader, baseOffset, kSdatSignature) || !reader.has(baseOffset + 0x24, 4)) {
     return std::nullopt;
   }
@@ -331,6 +336,8 @@ struct DecodedCommand {
 }
 
 [[nodiscard]] Envelope ndsEnvelope(ByteReader reader, u32 offset) {
+  // NDS envelopes use driver rate tables rather than SF2/DLS units. Preserve both rounded
+  // microseconds and precise seconds so exporters can choose the most accurate conversion.
   const u8 attackTime = reader.u8At(offset + 1);
   const u8 decayTime = reader.u8At(offset + 2);
   const u8 sustainLevel = reader.u8At(offset + 3);
@@ -402,6 +409,8 @@ struct DecodedCommand {
 }
 
 [[nodiscard]] SampleCollectionAsset parsePsgSamples(const ScanInput& input, AssetId id) {
+  // PSG wave/noise instruments do not reference SWAR sample data. Emit a synthetic sample
+  // collection so they can still participate in the same Instrument/Region model.
   SampleCollectionAsset asset{
       .metadata =
           AssetMetadata{
@@ -412,8 +421,8 @@ struct DecodedCommand {
           },
   };
   ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root = items.add(std::nullopt, ItemKind::SampleCollection, "nds-psg", "NDS PSG samples",
-                              input.reader.range(0, 0));
+  const auto root =
+      items.add(std::nullopt, ItemKind::SampleCollection, "nds-psg", "NDS PSG samples", input.reader.range(0, 0));
 
   for (u32 i = 0; i <= 8; ++i) {
     asset.samples.samples.push_back(Sample{
@@ -435,6 +444,8 @@ struct DecodedCommand {
 
 [[nodiscard]] SampleCollectionAsset parseWaveArchive(const ScanInput& input, AssetId id, FileRange range,
                                                      const std::string& name) {
+  // SWAR samples are compact wave records. ADPCM entries point encodedData after their
+  // four-byte predictor header; SampleDecoder knows to read that header.
   SampleCollectionAsset asset{
       .metadata =
           AssetMetadata{
@@ -445,8 +456,8 @@ struct DecodedCommand {
           },
   };
   ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root = items.add(std::nullopt, ItemKind::SampleCollection, "swar", name,
-                              input.reader.range(range.offset, range.size));
+  const auto root =
+      items.add(std::nullopt, ItemKind::SampleCollection, "swar", name, input.reader.range(range.offset, range.size));
 
   if (!matches(input.reader, range.offset, kSwarSignature) || !input.reader.has(range.offset + 0x3c, 4)) {
     return asset;
@@ -493,10 +504,10 @@ struct DecodedCommand {
     }
 
     const u32 bytesPerFrame = waveType == 1 ? 2 : 1;
-    const Loop loop = waveType == 2 ? Loop{.enabled = loops, .start = loopOffset, .length = nonLoopLength}
-                                    : Loop{.enabled = loops,
-                                           .start = loopOffset / bytesPerFrame,
-                                           .length = nonLoopLength / bytesPerFrame};
+    const Loop loop =
+        waveType == 2
+            ? Loop{.enabled = loops, .start = loopOffset, .length = nonLoopLength}
+            : Loop{.enabled = loops, .start = loopOffset / bytesPerFrame, .length = nonLoopLength / bytesPerFrame};
     const std::string sampleName = fmt::format("Sample {}", asset.samples.samples.size());
     asset.samples.samples.push_back(Sample{
         .name = sampleName,
@@ -514,9 +525,8 @@ struct DecodedCommand {
   return asset;
 }
 
-[[nodiscard]] std::optional<AssetId> bankWaveCollection(
-    const std::array<std::optional<AssetId>, 4>& collections,
-    u16 index) {
+[[nodiscard]] std::optional<AssetId> bankWaveCollection(const std::array<std::optional<AssetId>, 4>& collections,
+                                                        u16 index) {
   if (index >= collections.size()) {
     return std::nullopt;
   }
@@ -526,6 +536,8 @@ struct DecodedCommand {
 [[nodiscard]] InstrumentSetAsset parseInstrumentSet(const ScanInput& input, AssetId id, FileRange range,
                                                     const std::string& name, AssetId psgCollection,
                                                     const std::array<std::optional<AssetId>, 4>& waveCollections) {
+  // SBNK instruments fan out by type: single region, PSG pulse/noise, drumset, or
+  // key-split multi-region. Each case fills the same value Instrument shape.
   InstrumentSetAsset asset{
       .metadata =
           AssetMetadata{
@@ -536,8 +548,8 @@ struct DecodedCommand {
           },
   };
   ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root = items.add(std::nullopt, ItemKind::InstrumentSet, "sbnk", name,
-                              input.reader.range(range.offset, range.size));
+  const auto root =
+      items.add(std::nullopt, ItemKind::InstrumentSet, "sbnk", name, input.reader.range(range.offset, range.size));
 
   if (!input.reader.has(range.offset + 0x3c, 4)) {
     return asset;
@@ -586,7 +598,8 @@ struct DecodedCommand {
                                                                "62.5%", "75%", "87.5%", "0%"};
         instrument.name = "PSG Wave (" + std::string(dutyNames[dutyCycle]) + ")";
         instrument.range = input.reader.range(instrumentOffset, 10);
-        instrument.regions.push_back(ndsRegion(input.reader, instrumentOffset, 10, dutyCycle, psgCollection, 0, 127, 69));
+        instrument.regions.push_back(
+            ndsRegion(input.reader, instrumentOffset, 10, dutyCycle, psgCollection, 0, 127, 69));
         break;
       }
       case 0x03: {
@@ -599,6 +612,7 @@ struct DecodedCommand {
         break;
       }
       case 0x10: {
+        // Drumsets encode one region per key in a contiguous key range.
         if (!input.reader.has(instrumentOffset, 2)) {
           break;
         }
@@ -621,6 +635,7 @@ struct DecodedCommand {
         break;
       }
       case 0x11: {
+        // Multi-region instruments store high-key boundaries followed by region records.
         if (!input.reader.has(instrumentOffset, 8)) {
           break;
         }
@@ -654,7 +669,8 @@ struct DecodedCommand {
     }
 
     if (!instrument.regions.empty()) {
-      const auto instrumentItem = items.add(root, ItemKind::Instrument, "instrument", instrument.name, instrument.range);
+      const auto instrumentItem =
+          items.add(root, ItemKind::Instrument, "instrument", instrument.name, instrument.range);
       for (const auto& region : instrument.regions) {
         static_cast<void>(items.add(instrumentItem, ItemKind::Region, "region", "Region", region.range));
       }
@@ -670,6 +686,8 @@ struct DecodedCommand {
 }
 
 [[nodiscard]] u32 readVarLen(ByteReader reader, u32& offset, u32 sequenceEnd) {
+  // SSEQ durations and programs use 7-bit continuation integers, similar to SMF varlen
+  // but parsed from absolute source offsets.
   u32 value = 0;
   while (hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
     const u8 byte = reader.u8At(offset++);
@@ -686,8 +704,8 @@ struct DecodedCommand {
   if (!hasSequenceBytes(reader, operandOffset, 3, sequenceEnd)) {
     return std::nullopt;
   }
-  return reader.u8At(operandOffset) + (reader.u8At(operandOffset + 1) << 8) +
-         (reader.u8At(operandOffset + 2) << 16) + sequenceOffset + 0x1c;
+  return reader.u8At(operandOffset) + (reader.u8At(operandOffset + 1) << 8) + (reader.u8At(operandOffset + 2) << 16) +
+         sequenceOffset + 0x1c;
 }
 
 [[nodiscard]] DriverSpecificCommand driverCommand(std::string name, std::vector<u8> bytes, SourceRange range) {
@@ -703,6 +721,8 @@ struct DecodedCommand {
 }
 
 [[nodiscard]] DecodedCommand decodeCommand(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd, u32 offset) {
+  // Decode exactly one SSEQ opcode and describe both the value command and its control-flow
+  // edges. The graph walk in parseTrack decides which targets to visit.
   const u32 begin = offset;
   const u8 status = reader.u8At(offset++);
   auto range = [&] { return reader.range(begin, offset - begin); };
@@ -756,11 +776,11 @@ struct DecodedCommand {
         return terminal();
       }
       offset += 3;
-      return DecodedCommand{.command = CallCommand{.destination = Address{*destination},
-                                                  .returnAddress = Address{offset},
-                                                  .range = range()},
-                            .fallthrough = offset,
-                            .targets = {*destination}};
+      return DecodedCommand{
+          .command =
+              CallCommand{.destination = Address{*destination}, .returnAddress = Address{offset}, .range = range()},
+          .fallthrough = offset,
+          .targets = {*destination}};
     }
     case 0x96:
       return DecodedCommand{.command = terminalDriverCommand(status, range())};
@@ -895,8 +915,8 @@ struct DecodedCommand {
       offset += 2;
       return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
     default:
-      if ((status >= 0xc2 && status <= 0xd6) && status != 0xc3 && status != 0xc4 && status != 0xc5 &&
-          status != 0xc7 && status != 0xca && status != 0xce && status != 0xcf && status != 0xd5) {
+      if ((status >= 0xc2 && status <= 0xd6) && status != 0xc3 && status != 0xc4 && status != 0xc5 && status != 0xc7 &&
+          status != 0xca && status != 0xce && status != 0xcf && status != 0xd5) {
         if (!operand(1)) {
           return terminal();
         }
@@ -909,6 +929,8 @@ struct DecodedCommand {
 
 [[nodiscard]] CommandTrack parseTrack(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
                                       u32 trackIndex) {
+  // Normal SSEQ tracks are decoded as a reachable command graph so calls/jumps can expose
+  // code that does not appear in linear byte order.
   std::map<u32, Command> commandsByOffset;
   std::vector<u32> pendingBlocks{startOffset};
 
@@ -943,8 +965,11 @@ struct DecodedCommand {
   return track;
 }
 
-[[nodiscard]] CommandTrack parseMalformedTrack(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd,
-                                               u32 startOffset, u32 trackIndex) {
+[[nodiscard]] CommandTrack parseMalformedTrack(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
+                                               u32 trackIndex) {
+  // Some commercial files contain legacy-malformed pseudo-sequences. Legacy VGMTrans
+  // follows them linearly while neutralizing control-flow opcodes; mirror that behavior
+  // so value output stays comparable without pretending the data is a valid SSEQ graph.
   CommandTrack track{
       .id = TrackId{trackIndex},
       .sourceTrackNumber = trackIndex,
@@ -1008,6 +1033,8 @@ struct DecodedCommand {
 }
 
 [[nodiscard]] std::vector<u32> trackStarts(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
+  // SSEQ can bootstrap extra tracks through opcodes near the beginning of the sequence.
+  // Return the primary start plus any discovered secondary starts.
   std::vector<u32> extraStarts;
   u32 offset = sequenceOffset + 0x1c;
   if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
@@ -1053,6 +1080,8 @@ struct DecodedCommand {
 
 [[nodiscard]] SequenceAsset parseSequence(const ScanInput& input, AssetId id, FileRange range, const std::string& name,
                                           std::optional<AssetId> instrumentSet) {
+  // Sequence assets keep a profile key so NDS-specific note-wait, tempo, and driver
+  // command behavior stays outside the generic MIDI lowering loop.
   SequenceAsset asset{
       .metadata =
           AssetMetadata{
@@ -1064,11 +1093,12 @@ struct DecodedCommand {
       .commandSequence =
           CommandSequence{
               .timebase = Timebase{.ppqn = 0x30},
-              .behavior = SequenceBehavior{
-                  .truncateSustainedNotesAtLoopBoundary = false,
-                  .suppressEventsWhenPlaybackTicksZero = true,
-                  .maxPlaybackTicks = 1'000'000,
-              },
+              .behavior =
+                  SequenceBehavior{
+                      .truncateSustainedNotesAtLoopBoundary = false,
+                      .suppressEventsWhenPlaybackTicksZero = true,
+                      .maxPlaybackTicks = 1'000'000,
+                  },
               .midiSequenceProfile = std::string(kNdsProfileName),
           },
   };
@@ -1077,18 +1107,18 @@ struct DecodedCommand {
   }
 
   ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root = items.add(std::nullopt, ItemKind::Sequence, "sseq", name,
-                              input.reader.range(range.offset, range.size));
+  const auto root =
+      items.add(std::nullopt, ItemKind::Sequence, "sseq", name, input.reader.range(range.offset, range.size));
 
   u32 trackIndex = 0;
   const bool hasSseqHeader = matches(input.reader, range.offset, kSseqSignature);
   const bool parseLegacyMalformedFallthrough =
       !hasSseqHeader && shouldParseLegacyMalformedFallthrough(input.reader, range);
   const bool extendMalformedPastFatRange = parseLegacyMalformedFallthrough && range.size <= 0x100;
-  const u32 sequenceEnd = hasSseqHeader || !extendMalformedPastFatRange
-                              ? static_cast<u32>(std::min<u64>(input.reader.size(),
-                                                               static_cast<u64>(range.offset) + range.size))
-                              : static_cast<u32>(input.reader.size());
+  const u32 sequenceEnd =
+      hasSseqHeader || !extendMalformedPastFatRange
+          ? static_cast<u32>(std::min<u64>(input.reader.size(), static_cast<u64>(range.offset) + range.size))
+          : static_cast<u32>(input.reader.size());
   for (const u32 start : trackStarts(input.reader, range.offset, sequenceEnd)) {
     auto track = parseLegacyMalformedFallthrough
                      ? parseMalformedTrack(input.reader, range.offset, sequenceEnd, start, trackIndex++)
@@ -1109,7 +1139,8 @@ struct DecodedCommand {
 [[nodiscard]] std::vector<u32> findSdatOffsets(ByteReader reader) {
   std::vector<u32> offsets;
   for (u64 offset = 0; offset + kSdatSignature.size() <= reader.size(); ++offset) {
-    if (matches(reader, offset, kSdatSignature) && reader.has(offset + 0x10, 4) && reader.le32(offset + 0x10) < 0x10000) {
+    if (matches(reader, offset, kSdatSignature) && reader.has(offset + 0x10, 4) &&
+        reader.le32(offset + 0x10) < 0x10000) {
       offsets.push_back(static_cast<u32>(offset));
     }
   }
@@ -1117,6 +1148,8 @@ struct DecodedCommand {
 }
 
 void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) {
+  // Build dependencies before dependents: PSG samples are universal, SWAR collections feed
+  // banks, banks feed sequences, and sequences finally become exportable collections.
   const auto psgId = input.ids.nextAssetId();
   result.assets.emplace_back(parsePsgSamples(input, psgId));
 
@@ -1137,8 +1170,8 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
     }
     const auto range = fileRange(input.reader, sdat, waveArchive.fileId);
     if (!range) {
-      result.diagnostics.push_back(warning("NDS wave archive FAT entry was invalid",
-                                           input.reader.range(sdat.baseOffset, sdat.length)));
+      result.diagnostics.push_back(
+          warning("NDS wave archive FAT entry was invalid", input.reader.range(sdat.baseOffset, sdat.length)));
       continue;
     }
     if (!matches(input.reader, range->offset, kSwarSignature)) {
@@ -1164,8 +1197,8 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
     }
     const auto range = fileRange(input.reader, sdat, bank.fileId);
     if (!range) {
-      result.diagnostics.push_back(warning("NDS instrument bank FAT entry was invalid",
-                                           input.reader.range(sdat.baseOffset, sdat.length)));
+      result.diagnostics.push_back(
+          warning("NDS instrument bank FAT entry was invalid", input.reader.range(sdat.baseOffset, sdat.length)));
       continue;
     }
 
@@ -1179,8 +1212,8 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
 
     const auto id = input.ids.nextAssetId();
     bankAssetIds.emplace(bankIndex, id);
-    result.assets.emplace_back(parseInstrumentSet(input, id, *range, sdat.bankNames[bankIndex], psgId,
-                                                  waveCollections));
+    result.assets.emplace_back(
+        parseInstrumentSet(input, id, *range, sdat.bankNames[bankIndex], psgId, waveCollections));
   }
 
   for (u32 sequenceIndex = 0; sequenceIndex < sdat.sequences.size(); ++sequenceIndex) {
@@ -1190,15 +1223,14 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
     }
     const auto sequenceRange = fileRange(input.reader, sdat, sequence.fileId);
     if (!sequenceRange) {
-      result.diagnostics.push_back(warning("NDS sequence FAT entry was invalid",
-                                           input.reader.range(sdat.baseOffset, sdat.length)));
+      result.diagnostics.push_back(
+          warning("NDS sequence FAT entry was invalid", input.reader.range(sdat.baseOffset, sdat.length)));
       continue;
     }
 
     const auto bankAsset = bankAssetIds.find(sequence.bank);
-    const std::optional<AssetId> instrumentSet = bankAsset == bankAssetIds.end()
-                                                     ? std::nullopt
-                                                     : std::optional<AssetId>{bankAsset->second};
+    const std::optional<AssetId> instrumentSet =
+        bankAsset == bankAssetIds.end() ? std::nullopt : std::optional<AssetId>{bankAsset->second};
     const auto sequenceId = input.ids.nextAssetId();
     const std::string& name = sdat.sequenceNames[sequenceIndex];
     result.assets.emplace_back(parseSequence(input, sequenceId, *sequenceRange, name, instrumentSet));

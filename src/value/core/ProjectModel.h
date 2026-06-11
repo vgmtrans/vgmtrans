@@ -17,6 +17,10 @@
 
 namespace vgmtrans::core {
 
+// ProjectModel is a snapshot of everything discovered from the current SourceStore.
+// It deliberately stores assets by value and references them by stable IDs so scans,
+// UI inspection, and exports can share one immutable-looking result.
+
 struct MiscAsset {
   AssetMetadata metadata;
   std::vector<u8> payload;
@@ -27,6 +31,8 @@ using Asset = std::variant<SequenceAsset, InstrumentSetAsset, SampleCollectionAs
 struct Collection {
   CollectionId id;
   std::string name;
+  // Collections are the export units. A sequence can be paired with zero or more synth
+  // and sample assets because some games store those banks separately or share them.
   std::optional<AssetId> sequence;
   std::vector<AssetId> instrumentSets;
   std::vector<AssetId> sampleCollections;
@@ -34,6 +40,8 @@ struct Collection {
 };
 
 struct Project {
+  // Sources includes user-added files plus extracted virtual files such as SPC RAM or
+  // archive members. Asset ranges refer back into this list.
   std::vector<SourceFile> sources;
   std::vector<Asset> assets;
   std::vector<Collection> collections;
@@ -51,6 +59,8 @@ struct CollectionAssetDiagnostics {
 };
 
 struct CollectionAssets {
+  // Resolved pointer view over a Project. It is intentionally non-owning so exporters can
+  // work without copying large sample/instrument assets.
   const Collection* collection = nullptr;
   const SequenceAsset* sequence = nullptr;
   std::vector<const InstrumentSetAsset*> instrumentSets;

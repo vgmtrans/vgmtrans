@@ -16,6 +16,8 @@ namespace vgmtrans::core {
 namespace {
 
 [[nodiscard]] bool shouldScale(const ObservedValueRange* range, ModulationScalingPolicy policy) noexcept {
+  // Only scale when the observed maximum leaves unused controller headroom. Full-range
+  // data already has the best available 7-bit resolution.
   return policy == ModulationScalingPolicy::ObservedSequenceRange && range != nullptr && range->observed &&
          range->max < 127;
 }
@@ -95,6 +97,8 @@ s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModula
     return modulator.amount;
   }
 
+  // If MIDI controller values are expanded upward, the synth-side modulator amount must
+  // shrink by the same ratio so the audible depth stays unchanged.
   return static_cast<s32>(std::lround((static_cast<double>(modulator.amount) * range->max) / 127.0));
 }
 

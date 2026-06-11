@@ -45,9 +45,7 @@ const AssetMetadata& metadata(const Asset& asset) {
 }
 
 ItemNode* itemById(ItemTree& tree, ItemId id) {
-  const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) {
-    return item.id == id;
-  });
+  const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) { return item.id == id; });
   if (found == tree.nodes.end()) {
     return nullptr;
   }
@@ -55,9 +53,7 @@ ItemNode* itemById(ItemTree& tree, ItemId id) {
 }
 
 const ItemNode* itemById(const ItemTree& tree, ItemId id) {
-  const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) {
-    return item.id == id;
-  });
+  const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) { return item.id == id; });
   if (found == tree.nodes.end()) {
     return nullptr;
   }
@@ -65,9 +61,8 @@ const ItemNode* itemById(const ItemTree& tree, ItemId id) {
 }
 
 Asset* assetById(Project& project, AssetId id) {
-  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
-    return metadata(asset).id == id;
-  });
+  const auto found =
+      std::ranges::find_if(project.assets, [id](const Asset& asset) { return metadata(asset).id == id; });
   if (found == project.assets.end()) {
     return nullptr;
   }
@@ -75,9 +70,8 @@ Asset* assetById(Project& project, AssetId id) {
 }
 
 const Asset* assetById(const Project& project, AssetId id) {
-  const auto found = std::ranges::find_if(project.assets, [id](const Asset& asset) {
-    return metadata(asset).id == id;
-  });
+  const auto found =
+      std::ranges::find_if(project.assets, [id](const Asset& asset) { return metadata(asset).id == id; });
   if (found == project.assets.end()) {
     return nullptr;
   }
@@ -85,9 +79,8 @@ const Asset* assetById(const Project& project, AssetId id) {
 }
 
 const Collection* collectionById(const Project& project, CollectionId id) {
-  const auto found = std::ranges::find_if(project.collections, [id](const Collection& collection) {
-    return collection.id == id;
-  });
+  const auto found =
+      std::ranges::find_if(project.collections, [id](const Collection& collection) { return collection.id == id; });
   if (found == project.collections.end()) {
     return nullptr;
   }
@@ -105,6 +98,8 @@ CollectionAssets resolveCollectionAssets(const Project& project, CollectionId id
 }
 
 CollectionAssets resolveCollectionAssets(const Project& project, const Collection& collection) {
+  // Export code should not have to duplicate ID lookup and diagnostic policy. Resolve all
+  // optional references once and return the usable assets plus any broken-reference errors.
   CollectionAssets resolved{
       .collection = &collection,
   };

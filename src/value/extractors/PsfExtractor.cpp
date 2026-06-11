@@ -41,6 +41,8 @@ struct PsfData {
 };
 
 struct Image {
+  // PSF libraries overlay byte ranges into an executable image. start/end track the
+  // address span represented by data.
   u32 start = 0;
   u32 end = 0;
   std::vector<u8> data;
@@ -62,8 +64,7 @@ struct Image {
 }
 
 [[nodiscard]] bool hasPsfSignature(std::span<const u8> bytes) {
-  return bytes.size() >= 16 && bytes[0] == 'P' && bytes[1] == 'S' && bytes[2] == 'F' &&
-         supportedVersion(bytes[3]);
+  return bytes.size() >= 16 && bytes[0] == 'P' && bytes[1] == 'S' && bytes[2] == 'F' && supportedVersion(bytes[3]);
 }
 
 [[nodiscard]] u32 le32(std::span<const u8> bytes, size_t offset) {
@@ -105,16 +106,15 @@ struct Image {
 }
 
 void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
-  if (offset > bytes.size() || bytes.size() - offset < 5 || !std::equal(bytes.begin() + offset,
-                                                                        bytes.begin() + offset + 5,
-                                                                        std::string_view("[TAG]").begin())) {
+  if (offset > bytes.size() || bytes.size() - offset < 5 ||
+      !std::equal(bytes.begin() + offset, bytes.begin() + offset + 5, std::string_view("[TAG]").begin())) {
     return;
   }
 
   size_t cursor = offset + 5;
   while (cursor < bytes.size()) {
-    const size_t lineEnd = std::find(bytes.begin() + static_cast<std::ptrdiff_t>(cursor), bytes.end(), u8{'\n'}) -
-                           bytes.begin();
+    const size_t lineEnd =
+        std::find(bytes.begin() + static_cast<std::ptrdiff_t>(cursor), bytes.end(), u8{'\n'}) - bytes.begin();
     const size_t equals = std::find(bytes.begin() + static_cast<std::ptrdiff_t>(cursor),
                                     bytes.begin() + static_cast<std::ptrdiff_t>(lineEnd), u8{'='}) -
                           bytes.begin();
@@ -138,9 +138,8 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
 
       std::string name(reinterpret_cast<const char*>(bytes.data() + nameBegin), nameEnd - nameBegin);
       std::string value(reinterpret_cast<const char*>(bytes.data() + valueBegin), valueEnd - valueBegin);
-      std::transform(name.begin(), name.end(), name.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-      });
+      std::transform(name.begin(), name.end(), name.begin(),
+                     [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
       auto [it, inserted] = psf.tags.emplace(std::move(name), std::move(value));
       if (!inserted) {
         it->second += "\n";
@@ -152,6 +151,8 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
 }
 
 [[nodiscard]] PsfData parsePsf(std::span<const u8> bytes) {
+  // PSF stores a compressed executable payload followed by text tags. The version byte
+  // determines how to interpret the decompressed payload header.
   if (!hasPsfSignature(bytes)) {
     throw std::runtime_error("Unsupported or invalid PSF file");
   }
@@ -188,6 +189,8 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
 }
 
 void overlay(Image& image, u32 address, const u8* data, size_t size) {
+  // Libraries can extend the image before or after previous payloads. Resize and zero-fill
+  // so later overlays land at their emulated addresses.
   if (size == 0) {
     return;
   }
@@ -235,6 +238,8 @@ void overlay(Image& image, u32 address, const u8* data, size_t size) {
 }
 
 void overlayPsfExe(const PsfData& psf, Image& image) {
+  // The first word of the decompressed executable gives the load address. The playable
+  // data begins after a version-specific mini-header.
   if (psf.exe.empty()) {
     return;
   }
@@ -268,6 +273,8 @@ void tryOpenLib(const std::filesystem::path& basePath, const std::string& libNam
 
 void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,
                   std::vector<Diagnostic>& diagnostics, SourceRange range, int depth) {
+  // Load _lib first, overlay the current file, then load numbered libraries. This matches
+  // common PSF dependency ordering where the track file patches a shared driver image.
   if (depth >= kMaxRecursion) {
     diagnostics.push_back(warning("PSF library recursion limit was reached", range));
     return;
@@ -306,13 +313,15 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
 }
 
 [[nodiscard]] ScanResult scanPsf(const ScanInput& input) {
+  // The scanner emits one virtual executable image. Platform-specific format modules then
+  // inspect that image exactly as if it came from a ROM/container file.
   ScanResult result;
   const auto range = input.reader.range(0, input.reader.size());
   const auto psf = parsePsf(input.reader.slice(0, input.reader.size()));
 
   Image image;
-  const std::filesystem::path basePath = input.source.path.empty() ? std::filesystem::path{}
-                                                                   : input.source.path.parent_path();
+  const std::filesystem::path basePath =
+      input.source.path.empty() ? std::filesystem::path{} : input.source.path.parent_path();
   loadWithLibs(psf, basePath, image, result.diagnostics, range);
   if (image.data.empty()) {
     result.diagnostics.push_back(warning("PSF file did not produce an executable image", range));
