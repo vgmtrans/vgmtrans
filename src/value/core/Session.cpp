@@ -57,11 +57,11 @@ Project Session::scan() {
 }
 
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
-  return core::exportCollection(project_, sources_, id, request, profiles_);
+  return core::exportCollection(project_, sources_, id, request, dialects_);
 }
 
 std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest& request) const {
-  return core::exportAllCollections(project_, sources_, request, profiles_);
+  return core::exportAllCollections(project_, sources_, request, dialects_);
 }
 
 }  // namespace vgmtrans::core

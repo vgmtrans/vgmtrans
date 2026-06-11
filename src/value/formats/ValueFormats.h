@@ -8,7 +8,7 @@
 namespace vgmtrans::core {
 
 class FormatRegistry;
-class MidiSequenceProfileRegistry;
+class SequenceDialectRegistry;
 class Session;
 
 }  // namespace vgmtrans::core
@@ -16,7 +16,7 @@ class Session;
 namespace vgmtrans::formats {
 
 void registerValueFormatModules(core::FormatRegistry& registry);
-void registerValueMidiSequenceProfiles(core::MidiSequenceProfileRegistry& registry);
+void registerValueSequenceDialects(core::SequenceDialectRegistry& registry);
 void registerValueFormats(core::Session& session);
 
 }  // namespace vgmtrans::formats

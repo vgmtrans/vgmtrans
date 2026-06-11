@@ -15,8 +15,8 @@
 namespace vgmtrans::core {
 
 // MidiModel is the performance layer used by MIDI-like exports. It is intentionally
-// lower-level than CommandSequence: driver loops have been resolved according to policy,
-// and controller values are already quantized to MIDI-friendly units.
+// lower-level than PerformanceSequence: driver loops have been resolved according to
+// policy, and controller values are already quantized to MIDI-friendly units.
 
 struct NoteOn {
   u64 tick = 0;

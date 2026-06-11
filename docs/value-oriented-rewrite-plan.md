@@ -82,7 +82,7 @@ SourceStore
   -> FormatModule scan
   -> Project
       -> Collection
-      -> SequenceAsset(SequenceProgram)
+      -> SequenceProgramAsset
       -> InstrumentSetAsset
       -> SampleCollectionAsset
       -> MiscAsset
@@ -414,10 +414,9 @@ SequenceProgram + SequenceDialect
   -> MidiExporter
 ```
 
-`MidiSequenceProfile` should be removed as a target architecture. It can remain
-temporarily only as old-code reference, not as a bridge that new sequence code
-depends on. New driver behavior should move into local command `execute()`
-methods and shared music helpers.
+`MidiSequenceProfile` should be removed as a target architecture. New driver
+behavior should move into local command `execute()` methods and shared music
+helpers, not through profile hooks.
 
 The MIDI renderer owns:
 
@@ -489,7 +488,8 @@ struct SequenceDialect {
 ```
 
 A format module that creates a `SequenceProgram` must register the dialect that
-can interpret it. A `SequenceAsset` stores `DialectId`, not `midiSequenceProfile`.
+can interpret it. A `SequenceProgramAsset` stores `DialectId`, not a MIDI profile
+key.
 
 Builder example:
 
@@ -689,9 +689,8 @@ sequence command/profile model from seeping into the replacement.
 - Create the new sequence model files for `SequenceProgram`, `TrackProgram`,
   `SourceCommand`, command IDs, command byte/operand storage, and dialect IDs.
 - Keep this code separate from the old `CommandSequence` and
-  `MidiSequenceProfile` files.
-- Add compile-time or review-visible boundaries so new code cannot casually
-  include old profile headers.
+  `MidiSequenceProfile` design while those files exist.
+- Delete obsolete profile/lowering files once the new path owns the behavior.
 - Add helpers to derive command UI rows from `SourceCommand`.
 
 ### Phase 2: Add Dialect Registration
@@ -738,8 +737,8 @@ Implement CapcomSnes behavior in local command structs and helpers in this order
 10. Reverb, envelope, and unknown/no-op commands.
 
 Do not move this behavior through a compatibility profile first. If old
-`CapcomSnesProfile` remains in the tree, treat it as reference code until it can
-be deleted.
+`CapcomSnesProfile` code is needed for reference, consult it outside the active
+new implementation rather than keeping it wired into the build.
 
 ### Phase 6: Remove Or Quarantine Old Sequence Code
 

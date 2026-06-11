@@ -2,6 +2,7 @@ add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
+    formats/NdsModuleTests.cpp
     core/ValueCoreTests.cpp
 )
 target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)

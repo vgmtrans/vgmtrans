@@ -8,11 +8,13 @@
 #include "value/export/Export.h"
 #include "value/core/FormatModule.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/MidiSequenceLowering.h"
 #include "value/core/ModulationAnalysis.h"
+#include "value/core/SequenceDialect.h"
+#include "value/core/SequenceVm.h"
 #include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
 #include "value/export/ModulationScaling.h"
+#include "value/export/PerformanceMidiRenderer.h"
 #include "value/export/SoundFontExporter.h"
 #include "value/export/WavExporter.h"
 
@@ -34,10 +36,16 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void capcomSnesModuleScansSpcThroughVirtualAramSource();
 void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
 void capcomSnesNoteStateCommandsAreTypedAndInterpreted();
-void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
-void capcomSnesPanEventsDoNotRecurveMidiPan();
-void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
-void capcomSnesMidiExportUsesSequenceProfileKey();
+void capcomSnesSourceDialectDecodesAndRendersDriverCommands();
+void capcomSnesPanPerformanceCarriesGainCompensation();
+void capcomSnesDialectEmitsSourceOnlyDriverSemantics();
+void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey();
+void capcomSnesDialectExecutesRepeatUntilCommand();
+void capcomSnesV1DialectPreservesUnknownOneByteEvents();
+void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
+void ndsSequenceDialectExecutesCallAndReturn();
+void ndsSequenceDialectDiscoversSecondaryTrackStarts();
+void ndsSequenceDialectPreservesIgnoredNoOpOperands();
 
 namespace {
 
@@ -201,7 +209,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   const auto childItemId = input.ids.nextItemId();
   const auto assetRange = input.reader.range(0, input.reader.size());
 
-  SequenceAsset sequence{
+  SequenceProgramAsset sequence{
       .metadata =
           AssetMetadata{
               .id = assetId,
@@ -229,14 +237,10 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
                                 }},
                   },
           },
-      .commandSequence =
-          CommandSequence{
-              .tracks = {CommandTrack{
-                  .id = TrackId{0},
-                  .sourceTrackNumber = 0,
-                  .startAddress = Address{0},
-                  .commands = {EndCommand{.range = input.reader.range(0, 1)}},
-              }},
+      .program =
+          SequenceProgram{
+              .dialect = DialectId{.value = "probe"},
+              .timebase = Timebase{.ppqn = 48},
           },
   };
 
@@ -298,6 +302,183 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
+struct ProbeSequenceContext {
+  double velocity = 0.75;
+};
+
+struct ProbeTrackState {
+  u32 program = 0;
+};
+
+struct ProbeProgramCommand {
+  u8 program = 0;
+
+  static constexpr std::string_view kind = "probe.program";
+  static constexpr std::string_view name = "Program";
+
+  static ProbeProgramCommand parse(CommandReader& in) {
+    return ProbeProgramCommand{.program = in.u8("program")};
+  }
+
+  void describe(CommandInfo& out) const {
+    out.field("program", static_cast<u64>(program));
+  }
+
+  Effects execute(ProbeTrackState& state, Emit& out, VmApi&, const ProbeSequenceContext&) const {
+    state.program = program;
+    out.instrument(InstrumentPerformanceEvent{
+        .program = program,
+    });
+    return Effects::none();
+  }
+};
+
+struct ProbeNoteCommand {
+  u8 key = 0;
+  u8 duration = 0;
+
+  static constexpr std::string_view kind = "probe.note";
+  static constexpr std::string_view name = "Note";
+
+  static ProbeNoteCommand parse(CommandReader& in) {
+    return ProbeNoteCommand{
+        .key = in.u8("key"),
+        .duration = in.u8("duration"),
+    };
+  }
+
+  void describe(CommandInfo& out) const {
+    out.field("key", static_cast<u64>(key));
+    out.field("duration", static_cast<u64>(duration));
+  }
+
+  Effects execute(ProbeTrackState& state, Emit& out, VmApi&, const ProbeSequenceContext& context) const {
+    // This mirrors a source driver using the current track program as a key bank.
+    out.note(NotePerformanceEvent{
+        .key = static_cast<double>(state.program * 12 + key),
+        .velocity = context.velocity,
+        .durationTicks = duration,
+    });
+    return Effects::wait(duration);
+  }
+};
+
+struct ProbeJumpCommand {
+  Address destination;
+
+  static constexpr std::string_view kind = "probe.jump";
+  static constexpr std::string_view name = "Jump";
+
+  static ProbeJumpCommand parse(CommandReader& in) {
+    return ProbeJumpCommand{.destination = in.le16Address("destination")};
+  }
+
+  void describe(CommandInfo& out) const {
+    out.field("destination", destination);
+  }
+
+  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+    return Effects{.step = vm.jump(destination)};
+  }
+};
+
+struct ProbeCallCommand {
+  Address destination;
+
+  static constexpr std::string_view kind = "probe.call";
+  static constexpr std::string_view name = "Call";
+
+  static ProbeCallCommand parse(CommandReader& in) {
+    return ProbeCallCommand{.destination = in.le16Address("destination")};
+  }
+
+  void describe(CommandInfo& out) const {
+    out.field("destination", destination);
+  }
+
+  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+    return Effects{.step = vm.call(destination)};
+  }
+};
+
+struct ProbeReturnCommand {
+  static constexpr std::string_view kind = "probe.return";
+  static constexpr std::string_view name = "Return";
+
+  static ProbeReturnCommand parse(CommandReader&) {
+    return ProbeReturnCommand{};
+  }
+
+  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+    return Effects{.step = vm.return_()};
+  }
+};
+
+struct ProbeRepeatCommand {
+  u8 slot = 0;
+  u8 count = 0;
+  Address destination;
+
+  static constexpr std::string_view kind = "probe.repeat";
+  static constexpr std::string_view name = "Repeat";
+
+  static ProbeRepeatCommand parse(CommandReader& in) {
+    return ProbeRepeatCommand{
+        .slot = in.u8("slot"),
+        .count = in.u8("count"),
+        .destination = in.le16Address("destination"),
+    };
+  }
+
+  void describe(CommandInfo& out) const {
+    out.field("slot", static_cast<u64>(slot));
+    out.field("count", static_cast<u64>(count));
+    out.field("destination", destination);
+  }
+
+  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+    return Effects{.step = vm.repeatUntil(slot, count, destination)};
+  }
+};
+
+struct ProbeEndCommand {
+  static constexpr std::string_view kind = "probe.end";
+  static constexpr std::string_view name = "End";
+
+  static ProbeEndCommand parse(CommandReader&) {
+    return ProbeEndCommand{};
+  }
+
+  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+    return Effects{.step = vm.end()};
+  }
+};
+
+[[nodiscard]] SequenceDialect probeSequenceDialect() {
+  return SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext>("probe", ProbeSequenceContext{.velocity = 0.5})
+      .timebase(Timebase{.ppqn = 48})
+      .commands<ProbeProgramCommand, ProbeNoteCommand, ProbeJumpCommand, ProbeCallCommand, ProbeReturnCommand,
+                ProbeRepeatCommand, ProbeEndCommand>();
+}
+
+[[nodiscard]] SourceRange probeRange(u64 offset, u64 size) {
+  return SourceRange{
+      .source = SourceId{0},
+      .offset = offset,
+      .size = size,
+  };
+}
+
+template <class Command, size_t Size>
+const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, Address address,
+                                     SourceRange range, const std::array<u8, Size>& bytes) {
+  const auto* handler = dialect.handlerForKind(Command::kind);
+  if (handler == nullptr) {
+    throw std::runtime_error("probe command handler was not registered");
+  }
+  return builder.add<Command>(handler->id, handler->kind, address, range, std::span<const u8>{bytes});
+}
+
 void formatRegistryStoresCopyableModuleValues() {
   FormatRegistry registry;
   registry.add(probeSequenceModule());
@@ -321,28 +502,25 @@ void formatRegistryStoresCopyableModuleValues() {
   expect(threw, "format registry should reject incomplete module values");
 }
 
-void midiSequenceProfileRegistryStoresCopyableProfileValues() {
-  MidiSequenceProfileRegistry registry;
-  registry.add("Probe", MidiSequenceProfile{});
+void sequenceDialectRegistryStoresCopyableDialectValues() {
+  SequenceDialectRegistry registry;
+  registry.add(probeSequenceDialect());
 
-  const MidiSequenceProfileRegistry copy = registry;
-  const auto* profile = copy.find("Probe");
-  MidiTrackState state;
-  expect(profile != nullptr, "MIDI sequence profile registry should copy registered profile values");
-  expect(profile->restTicks(RestCommand{.rawDuration = 7}, state) == 7,
-         "MIDI sequence profile registry should preserve copied profile hooks");
-  expect(copy.find("Missing") == nullptr, "MIDI sequence profile registry should return null for a missing profile");
-  expect(copy.contains("Probe"), "MIDI sequence profile registry should report copied profile keys");
+  const SequenceDialectRegistry copy = registry;
+  const auto* dialect = copy.find("probe");
+  expect(dialect != nullptr, "sequence dialect registry should copy registered dialect values");
+  expect(dialect->handlerForKind(ProbeNoteCommand::kind) != nullptr,
+         "sequence dialect registry should preserve copied command handlers");
+  expect(copy.find("Missing") == nullptr, "sequence dialect registry should return null for a missing dialect");
+  expect(copy.contains("probe"), "sequence dialect registry should report copied dialect keys");
 
-  auto incomplete = MidiSequenceProfile{};
-  incomplete.noteTiming = nullptr;
   bool threw = false;
   try {
-    registry.add("Broken", incomplete);
+    registry.add(SequenceDialect{});
   } catch (const std::invalid_argument&) {
     threw = true;
   }
-  expect(threw, "MIDI sequence profile registry should reject incomplete profile values");
+  expect(threw, "sequence dialect registry should reject dialects with empty IDs");
 }
 
 void byteReaderChecksBoundsAndEndian() {
@@ -366,39 +544,183 @@ void byteReaderChecksBoundsAndEndian() {
   expect(threw, "reader should throw on out-of-range access");
 }
 
-void sequencerCommandExposesSourceRange() {
-  const SourceRange noteRange{.source = SourceId{3}, .offset = 0x1200, .size = 1};
-  const SourceRange noteStateRange{.source = SourceId{3}, .offset = 0x1201, .size = 2};
-  const SourceRange driverRange{.source = SourceId{3}, .offset = 0x1204, .size = 3};
+void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+  const std::array<u8, 2> programBytes{0x80, 0x05};
+  const SourceCommand& command =
+      addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
+                                           programBytes);
 
-  const Command note = NoteCommand{
-      .key = 64,
-      .rawVelocity = 90,
-      .rawDuration = 4,
-      .range = noteRange,
+  expect(track.commands.size() == 1, "track builder should append one source command");
+  expect(track.commandBytes.size() == programBytes.size(), "track builder should pool command bytes");
+  expect(track.bytesFor(command)[0] == 0x80 && track.bytesFor(command)[1] == 0x05,
+         "source command should point back to its stored bytes");
+
+  const auto operands = track.operandsFor(command);
+  expect(operands.size() == 1, "source command should retain decoded operands");
+  expect(operands[0].name == "program", "decoded operand should preserve its source name");
+  expect(std::get<u64>(operands[0].value) == 5, "decoded operand should preserve its raw value");
+  expect(operands[0].range.offset == 1 && operands[0].range.size == 1,
+         "decoded operand should preserve its source range");
+
+  const CommandInfo info = dialect.describe(track, command);
+  expect(info.name == "Program", "dialect display should use the registered command name");
+  expect(info.detailKind == "probe.program", "dialect display should use the registered command kind");
+  expect(info.fields.size() == 1 && info.fields[0].name == "program" && info.fields[0].value == "5",
+         "dialect display should be derived by replaying the format-local command parser");
+
+  ItemTree itemTree;
+  ScanIdAllocator ids;
+  ItemTreeBuilder items(itemTree, ids);
+  const ItemId root = items.add(std::nullopt, ItemKind::Track, "probe.track", "Track", probeRange(0, 0));
+  const ItemId commandItem = addSourceCommandItem(items, root, dialect, track, command);
+  const auto* item = itemById(itemTree, commandItem);
+  expect(item != nullptr && item->kind == ItemKind::Command, "source command helper should add a command item");
+  expect(item->detailKind == "probe.program" && item->name == "Program",
+         "source command helper should reuse dialect display metadata");
+  expect(item->description == "program 5", "source command helper should format command fields consistently");
+  expect(sameRange(item->range, command.range), "source command helper should preserve the command source range");
+  expect(itemById(itemTree, root)->children == std::vector<ItemId>{commandItem},
+         "source command helper should attach command items under the requested parent");
+
+  bool rejectedTrailingBytes = false;
+  try {
+    const std::array<u8, 3> trailingProgramBytes{0x80, 0x05, 0xaa};
+    static_cast<void>(addProbeCommand<ProbeProgramCommand>(
+        builder, dialect, Address{2}, probeRange(2, trailingProgramBytes.size()), trailingProgramBytes));
+  } catch (const std::invalid_argument&) {
+    rejectedTrailingBytes = true;
+  }
+  expect(rejectedTrailingBytes, "track builder should reject command bytes not consumed by the local parser");
+  expect(track.commands.size() == 1, "rejected command bytes should not mutate the track program");
+}
+
+void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{2},
+      .sourceTrackNumber = 7,
+      .startAddress = Address{0},
   };
-  const Command noteState = NoteStateCommand{
-      .action = NoteStateAction::Attributes,
-      .rawValue = 0x48,
-      .range = noteStateRange,
-  };
-  const Command driver = DriverSpecificCommand{
-      .name = "Probe",
-      .bytes = {0x01, 0x02, 0x03},
-      .range = driverRange,
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 2> programBytes{0x80, 0x05};
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
+                                       programBytes);
+  const CommandId noteCommandId =
+      addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes).id;
+  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeEndCommand>(builder, dialect, Address{8}, probeRange(8, endBytes.size()), endBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
   };
 
-  expect(sameRange(commandRange(note), noteRange), "command range should come from typed note command");
-  expect(sameRange(commandRange(noteState), noteStateRange), "command range should come from typed note-state command");
-  expect(sameRange(commandRange(driver), driverRange), "command range should come from typed driver-specific command");
-  expect(defaultCommandName(note) == "Note", "default command name should describe typed note commands");
-  expect(defaultCommandName(noteState) == "Note Attributes",
-         "default command name should describe typed note-state actions");
-  expect(defaultCommandName(driver) == "Probe", "default command name should preserve driver-specific names");
-  expect(defaultCommandDetailKind(noteState) == "note-attributes",
-         "default command detail kind should describe typed note-state actions");
-  expect(defaultCommandDescription(note) == "Key 64, length index 4",
-         "default command description should describe typed note commands");
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "sequence VM should render the probe sequence without diagnostics");
+  expect(performance.tracks.size() == 1, "sequence VM should render one performance track");
+  const PerformanceTrack& renderedTrack = performance.tracks[0];
+  expect(renderedTrack.id == TrackId{2} && renderedTrack.sourceTrackNumber == 7,
+         "performance track should preserve source track identity");
+  expect(renderedTrack.endTick == 12, "default play-once loop policy should stop at the first repeated command");
+  expect(renderedTrack.events.size() == 2, "VM should emit program and note events before the loop repeats");
+
+  const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&renderedTrack.events[0]);
+  expect(instrument != nullptr && instrument->program == 5,
+         "program command should emit a target-neutral instrument event");
+  expect(instrument->header.sourceCommand == CommandId{0} && instrument->header.tick == 0,
+         "instrument event should link to the source command and tick");
+
+  const auto* note = std::get_if<NotePerformanceEvent>(&renderedTrack.events[1]);
+  expect(note != nullptr, "note command should emit a target-neutral note event");
+  expect(note->key == 64.0 && note->velocity == 0.5 && note->durationTicks == 12,
+         "note event should use driver state and dialect context while staying MIDI-neutral");
+  expect(note->header.sourceCommand == noteCommandId && note->header.tick == 0,
+         "note event should link back to the source command that emitted it");
+}
+
+void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> callBytes{0xc0, 0x0a, 0x00};
+  const std::array<u8, 1> endBytes{0xff};
+  const std::array<u8, 3> noteBytes{0x90, 0x05, 0x04};
+  const std::array<u8, 1> returnBytes{0xfd};
+  addProbeCommand<ProbeCallCommand>(builder, dialect, Address{0}, probeRange(0, callBytes.size()), callBytes);
+  addProbeCommand<ProbeCallCommand>(builder, dialect, Address{3}, probeRange(3, callBytes.size()), callBytes);
+  addProbeCommand<ProbeEndCommand>(builder, dialect, Address{6}, probeRange(6, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{10}, probeRange(10, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeReturnCommand>(builder, dialect, Address{13}, probeRange(13, returnBytes.size()), returnBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "sequence VM repeated-call fixture should not report diagnostics");
+  expect(performance.tracks[0].events.size() == 2,
+         "sequence VM should allow two call sites to reuse the same subroutine");
+  expect(performance.tracks[0].endTick == 8, "sequence VM should return from both subroutine calls");
+
+  for (u64 tick : {0ULL, 4ULL}) {
+    const bool found = std::ranges::any_of(performance.tracks[0].events, [tick](const PerformanceEvent& event) {
+      const auto* note = std::get_if<NotePerformanceEvent>(&event);
+      return note != nullptr && note->header.tick == tick && note->durationTicks == 4;
+    });
+    expect(found, "sequence VM should emit the shared subroutine note at tick " + std::to_string(tick));
+  }
+}
+
+void sequenceVmReplaysFiniteRepeatBlocks() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
+  const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x03, 0x00, 0x00};
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeRepeatCommand>(builder, dialect, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
+  addProbeCommand<ProbeEndCommand>(builder, dialect, Address{8}, probeRange(8, endBytes.size()), endBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "sequence VM finite repeat fixture should not report diagnostics");
+  expect(performance.tracks[0].events.size() == 3, "sequence VM should replay a finite repeat block");
+  expect(performance.tracks[0].endTick == 36, "sequence VM should advance through each repeated note");
+
+  for (u64 tick : {0ULL, 12ULL, 24ULL}) {
+    const bool found = std::ranges::any_of(performance.tracks[0].events, [tick](const PerformanceEvent& event) {
+      const auto* note = std::get_if<NotePerformanceEvent>(&event);
+      return note != nullptr && note->header.tick == tick;
+    });
+    expect(found, "sequence VM should emit repeated notes at each playback tick");
+  }
 }
 
 void projectSessionScansValuesAndVirtualSources() {
@@ -419,17 +741,17 @@ void projectSessionScansValuesAndVirtualSources() {
   expect(project.collections.size() == 1, "scan should produce one collection");
   expect(project.diagnostics.size() == 1, "scan should preserve module diagnostics");
 
-  const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
+  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
   expect(sequence != nullptr, "first asset should be a sequence");
   expect(sequence->metadata.id == AssetId{0}, "sequence should keep allocated asset id");
   expect(assetById(project, sequence->metadata.id) == &project.assets[0],
          "project snapshot should find an asset by stable id");
-  expect(assetById<SequenceAsset>(project, sequence->metadata.id) == sequence,
-         "project snapshot should find a sequence asset by stable id");
+  expect(assetById<SequenceProgramAsset>(project, sequence->metadata.id) == sequence,
+         "project snapshot should find a sequence program asset by stable id");
   expect(assetById<MiscAsset>(project, sequence->metadata.id) == nullptr,
          "project snapshot should reject asset id lookups with the wrong value type");
   expect(assetById(project, AssetId{99}) == nullptr, "project snapshot should return null for a missing asset id");
-  expect(assetById<SequenceAsset>(project, AssetId{99}) == nullptr,
+  expect(assetById<SequenceProgramAsset>(project, AssetId{99}) == nullptr,
          "project snapshot should return null for a missing asset id");
   expect(sequence->metadata.items.nodes.size() == 2, "sequence should expose item tree");
   expect(sequence->metadata.items.root == sequence->metadata.items.nodes[0].id,
@@ -458,12 +780,17 @@ void projectSessionScansValuesAndVirtualSources() {
 
 void projectCollectionAssetResolutionProvidesTypedExportInputs() {
   Project project;
-  project.assets.emplace_back(SequenceAsset{
+  project.assets.emplace_back(SequenceProgramAsset{
       .metadata =
           AssetMetadata{
               .id = AssetId{0},
               .format = "Probe",
               .name = "Sequence",
+          },
+      .program =
+          SequenceProgram{
+              .dialect = DialectId{.value = "probe"},
+              .timebase = Timebase{.ppqn = 48},
           },
   });
   project.assets.emplace_back(InstrumentSetAsset{
@@ -506,8 +833,8 @@ void projectCollectionAssetResolutionProvidesTypedExportInputs() {
 
   const auto full = resolveCollectionAssets(project, CollectionId{0});
   expect(full.collection == &project.collections[0], "collection asset resolver should preserve the collection");
-  expect(full.sequence == std::get_if<SequenceAsset>(&project.assets[0]),
-         "collection asset resolver should resolve the typed sequence asset");
+  expect(full.sequenceProgram == std::get_if<SequenceProgramAsset>(&project.assets[0]),
+         "collection asset resolver should resolve the typed sequence program asset");
   expect(
       full.instrumentSets.size() == 1 && full.instrumentSets[0] == std::get_if<InstrumentSetAsset>(&project.assets[1]),
       "collection asset resolver should resolve typed instrument set assets");
@@ -528,7 +855,7 @@ void projectCollectionAssetResolutionProvidesTypedExportInputs() {
   const auto samplesOnly = resolveCollectionAssets(project, CollectionId{1});
   expect(samplesOnly.collection == &project.collections[1],
          "collection asset resolver should resolve sample-only collections");
-  expect(samplesOnly.sequence == nullptr, "sample-only collections should not report a sequence asset");
+  expect(samplesOnly.sequenceProgram == nullptr, "sample-only collections should not report a sequence asset");
   expect(samplesOnly.diagnostics.sequence.empty(),
          "absent optional sequence references should not be treated as broken references");
   expect(samplesOnly.sampleCollections.size() == 1,
@@ -658,198 +985,49 @@ void midiExporterWritesStandardMidiFile() {
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
 }
 
-void midiSequenceLoweringSkipsCommandsAtPlayOnceLoopBoundary() {
-  const auto range = [](u64 offset, u64 size) {
-    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
-  };
-  const CommandSequence commandSequence{
+void performanceMidiRendererExtendsPreviousSameKeyNotes() {
+  const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {CommandTrack{
+      .tracks = {PerformanceTrack{
           .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .startAddress = Address{0},
-          .commands =
+          .sourceTrackNumber = 2,
+          .endTick = 24,
+          .events =
               {
-                  NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-                  VolumeCommand{.rawValue = 99, .range = range(1, 1)},
-                  JumpCommand{.destination = Address{0}, .range = range(2, 3)},
-                  EndCommand{.range = range(5, 1)},
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .key = 60.0,
+                      .velocity = 0.75,
+                      .durationTicks = 12,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 12},
+                      .key = 60.0,
+                      .velocity = 0.5,
+                      .durationTicks = 6,
+                      .extendsPrevious = true,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 18},
+                      .key = 62.0,
+                      .velocity = 0.5,
+                      .durationTicks = 6,
+                      .extendsPrevious = true,
+                  },
               },
       }},
   };
 
-  const MidiSequence midiSequence = buildMidiSequence(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  expect(midiSequence.tracks.size() == 1, "performance renderer should preserve tracks");
   const auto& events = midiSequence.tracks[0].events;
-  expect(std::ranges::any_of(events,
-                             [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 0 && note->duration == 12;
-                             }),
-         "play-once loop fixture should emit the note before the loop boundary");
-  expect(std::ranges::none_of(events, [](const MidiEvent& event) { return std::holds_alternative<Volume>(event); }),
-         "play-once event build should skip commands exactly at the loop boundary");
-}
-
-void midiSequenceLoweringResolvesUnsetDefaultLoopPolicyToPlayOnce() {
-  const auto range = [](u64 offset, u64 size) {
-    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
-  };
-  const CommandSequence commandSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {CommandTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .startAddress = Address{0},
-          .commands =
-              {
-                  NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-                  JumpCommand{.destination = Address{0}, .range = range(1, 3)},
-              },
-      }},
-  };
-
-  const MidiSequence midiSequence = buildMidiSequence(commandSequence, MidiSequenceProfile{}, LoopPolicy::Default);
-  const auto& events = midiSequence.tracks[0].events;
-  expect(midiSequence.diagnostics.empty(), "unset default loop policy should not run until command cap");
-  expect(std::ranges::count_if(events,
-                               [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); }) == 1,
-         "unset default loop policy should build self-looping tracks once");
-  expect(std::get<EndOfTrack>(events.back()).tick == 12,
-         "unset default loop policy should end at the first playthrough boundary");
-}
-
-void midiSequenceLoweringTreatsLoopBoundaryAsAStopPoint() {
-  const auto range = [](u64 offset, u64 size) {
-    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
-  };
-  const CommandSequence commandSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {CommandTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .startAddress = Address{0},
-          .commands =
-              {
-                  NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-                  LoopBoundaryCommand{.destination = Address{1}, .trigger = Address{0}, .range = range(1, 0)},
-                  VolumeCommand{.rawValue = 99, .range = range(2, 1)},
-              },
-      }},
-  };
-
-  const MidiSequence midiSequence = buildMidiSequence(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
-  const auto& events = midiSequence.tracks[0].events;
-  expect(std::ranges::any_of(events,
-                             [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 0 && note->duration == 12;
-                             }),
-         "loop-boundary fixture should emit events before the boundary");
-  expect(std::ranges::none_of(events, [](const MidiEvent& event) { return std::holds_alternative<Volume>(event); }),
-         "loop-boundary fixture should not build commands after the boundary");
-}
-
-void midiSequenceLoweringReplaysDecodedBoundaryUntilPlayOnceStop() {
-  const auto range = [](u64 offset, u64 size) {
-    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
-  };
-  const CommandSequence commandSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks =
-          {
-              CommandTrack{
-                  .id = TrackId{0},
-                  .sourceTrackNumber = 0,
-                  .startAddress = Address{0},
-                  .commands =
-                      {
-                          NoteCommand{.key = 60, .rawDuration = 12, .range = range(0, 1)},
-                          JumpCommand{.destination = Address{0}, .range = range(1, 3)},
-                      },
-              },
-              CommandTrack{
-                  .id = TrackId{1},
-                  .sourceTrackNumber = 1,
-                  .startAddress = Address{10},
-                  .commands =
-                      {
-                          NoteCommand{.key = 64, .rawDuration = 12, .range = range(10, 1)},
-                          JumpCommand{.destination = Address{20}, .range = range(11, 3)},
-                          NoteCommand{.key = 65, .rawDuration = 12, .range = range(20, 1)},
-                          LoopBoundaryCommand{
-                              .destination = Address{10}, .trigger = Address{20}, .range = range(21, 0)},
-                      },
-              },
-          },
-  };
-
-  const MidiSequence midiSequence = buildMidiSequence(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
-  const auto countNotesAt = [](const MidiTrack& track, u64 tick) {
-    return std::ranges::count_if(track.events, [tick](const MidiEvent& event) {
-      const auto* note = std::get_if<NoteDuration>(&event);
-      return note != nullptr && note->tick == tick;
-    });
-  };
-
-  expect(countNotesAt(midiSequence.tracks[0], 0) == 1 && countNotesAt(midiSequence.tracks[0], 12) == 1 &&
-             countNotesAt(midiSequence.tracks[0], 24) == 1,
-         "play-once event build should replay earlier looped tracks until the shared stop tick");
-  expect(countNotesAt(midiSequence.tracks[1], 0) == 1 && countNotesAt(midiSequence.tracks[1], 12) == 1 &&
-             countNotesAt(midiSequence.tracks[1], 24) == 1,
-         "decoded loop boundaries should continue to their destination before the shared stop tick");
-  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events.back()).tick == 36 &&
-             std::get<EndOfTrack>(midiSequence.tracks[1].events.back()).tick == 36,
-         "replayed loop-boundary fixture should end both tracks at the shared stop tick");
-}
-
-void modulationAnalysisReportsObservedSourceRanges() {
-  const auto range = [](u64 offset, u64 size) {
-    return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
-  };
-  const CommandSequence commandSequence{
-      .tracks =
-          {
-              CommandTrack{
-                  .id = TrackId{0},
-                  .sourceTrackNumber = 7,
-                  .startAddress = Address{0},
-                  .commands =
-                      {
-                          VibratoCommand{.rawDepth = 38, .range = range(0x10, 3)},
-                          VibratoCommand{.rawDepth = 0, .range = range(0x13, 3)},
-                          ModulationRateCommand{.rawRate = 9, .range = range(0x16, 3)},
-                      },
-              },
-              CommandTrack{
-                  .id = TrackId{1},
-                  .sourceTrackNumber = 3,
-                  .startAddress = Address{0x20},
-                  .commands =
-                      {
-                          TremoloCommand{.rawDepth = 24, .range = range(0x20, 3)},
-                          ModulationRateCommand{.rawRate = 12, .range = range(0x23, 3)},
-                      },
-              },
-          },
-  };
-
-  const auto usage = analyzeModulationUsage(commandSequence);
-  expect(hasModulationUsage(usage), "modulation analysis should report observed sequence modulation");
-  expect(usage.tracks.size() == 2, "modulation analysis should preserve track-level results");
-  expect(usage.vibratoDepth.observed && usage.vibratoDepth.min == 0 && usage.vibratoDepth.max == 38,
-         "modulation analysis should report global vibrato depth range");
-  expect(usage.tremoloDepth.observed && usage.tremoloDepth.min == 24 && usage.tremoloDepth.max == 24,
-         "modulation analysis should report global tremolo depth range");
-  expect(usage.modulationRate.observed && usage.modulationRate.min == 9 && usage.modulationRate.max == 12,
-         "modulation analysis should report global modulation rate range");
-  expect(usage.vibratoDepth.firstRange && usage.vibratoDepth.firstRange->offset == 0x10,
-         "modulation analysis should retain the first observed vibrato source range");
-  expect(usage.tracks[0].sourceTrackNumber == 7 && usage.tracks[0].vibratoDepth.max == 38 &&
-             !usage.tracks[0].tremoloDepth.observed,
-         "modulation analysis should keep track-local vibrato and tremolo ranges separate");
-  expect(usage.tracks[1].sourceTrackNumber == 3 && usage.tracks[1].tremoloDepth.max == 24 &&
-             !usage.tracks[1].vibratoDepth.observed,
-         "modulation analysis should keep independent track usage");
+  const auto firstNote = std::get_if<NoteDuration>(&events[0]);
+  const auto secondNote = std::get_if<NoteDuration>(&events[1]);
+  expect(firstNote != nullptr && firstNote->tick == 0 && firstNote->key == 60 && firstNote->duration == 18,
+         "performance renderer should extend a previous same-key note");
+  expect(secondNote != nullptr && secondNote->tick == 18 && secondNote->key == 62 && secondNote->duration == 6,
+         "performance renderer should emit a new note when no matching previous key exists");
+  expect(std::get<EndOfTrack>(events.back()).tick == 24, "performance renderer should preserve track end ticks");
 }
 
 void modulationAnalysisReportsObservedMidiControllerRanges() {
@@ -896,6 +1074,82 @@ void modulationAnalysisReportsObservedMidiControllerRanges() {
   expect(usage.tracks[1].trackIndex == 1 && !usage.tracks[1].vibratoDepth.observed &&
              usage.tracks[1].vibratoRate.max == 29,
          "MIDI modulation analysis should keep second track modulation ranges separate");
+}
+
+void modulationAnalysisReportsObservedPerformanceRanges() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks =
+          {
+              PerformanceTrack{
+                  .id = TrackId{0},
+                  .sourceTrackNumber = 0,
+                  .events =
+                      {
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 0},
+                              .target = ModulationPerformanceTarget::VibratoDepth,
+                              .amount = 0.0,
+                          },
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 12},
+                              .target = ModulationPerformanceTarget::VibratoDepth,
+                              .amount = 82.0 / 127.0,
+                          },
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 12},
+                              .target = ModulationPerformanceTarget::VibratoRate,
+                              .amount = 17.0 / 127.0,
+                          },
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 24},
+                              .target = ModulationPerformanceTarget::TremoloDepth,
+                              .amount = 40.0 / 127.0,
+                          },
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 24},
+                              .target = ModulationPerformanceTarget::TremoloRate,
+                              .amount = 5.0 / 127.0,
+                          },
+                      },
+              },
+              PerformanceTrack{
+                  .id = TrackId{1},
+                  .sourceTrackNumber = 1,
+                  .events =
+                      {
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 0},
+                              .target = ModulationPerformanceTarget::VibratoRate,
+                              .amount = 29.0 / 127.0,
+                          },
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 0},
+                              .target = ModulationPerformanceTarget::TremoloRate,
+                              .amount = 9.0 / 127.0,
+                          },
+                      },
+              },
+          },
+  };
+
+  const auto usage = analyzePerformanceModulationUsage(performance);
+  expect(hasMidiModulationUsage(usage), "performance modulation analysis should report observed driver modulation");
+  expect(usage.tracks.size() == 2, "performance modulation analysis should preserve track-level results");
+  expect(usage.vibratoDepth.observed && usage.vibratoDepth.min == 0 && usage.vibratoDepth.max == 82,
+         "performance modulation analysis should report global vibrato depth range");
+  expect(usage.vibratoRate.observed && usage.vibratoRate.min == 17 && usage.vibratoRate.max == 29,
+         "performance modulation analysis should report global vibrato rate range");
+  expect(usage.tremoloDepth.observed && usage.tremoloDepth.min == 40 && usage.tremoloDepth.max == 40,
+         "performance modulation analysis should report global tremolo depth range");
+  expect(usage.tremoloRate.observed && usage.tremoloRate.min == 5 && usage.tremoloRate.max == 9,
+         "performance modulation analysis should report global tremolo rate range");
+  expect(usage.tracks[0].trackIndex == 0 && usage.tracks[0].vibratoDepth.max == 82 &&
+             usage.tracks[0].vibratoRate.max == 17,
+         "performance modulation analysis should keep first track modulation ranges separate");
+  expect(usage.tracks[1].trackIndex == 1 && !usage.tracks[1].vibratoDepth.observed &&
+             usage.tracks[1].vibratoRate.max == 29,
+         "performance modulation analysis should keep second track modulation ranges separate");
 }
 
 void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators() {
@@ -1286,9 +1540,9 @@ void exportDiagnosticsPreserveSourceRanges() {
       .sampleCollections = {missingSampleCollection.metadata.id},
   });
 
-  MidiSequenceProfileRegistry profiles;
+  SequenceDialectRegistry dialects;
   const auto wavArtifacts =
-      exportCollection(project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, profiles);
+      exportCollection(project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, dialects);
   expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
   expectDiagnosticRange(wavArtifacts[0].diagnostics, "Sample source was not found", missingSampleRange);
 
@@ -1372,21 +1626,21 @@ void exportDiagnosticsPreserveSourceRanges() {
 int main() {
   try {
     formatRegistryStoresCopyableModuleValues();
-    midiSequenceProfileRegistryStoresCopyableProfileValues();
+    sequenceDialectRegistryStoresCopyableDialectValues();
     byteReaderChecksBoundsAndEndian();
-    sequencerCommandExposesSourceRange();
+    sourceCommandsPreserveBytesOperandsAndDialectDisplay();
+    sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
+    sequenceVmAllowsRepeatedCallsToSameSubroutine();
+    sequenceVmReplaysFiniteRepeatBlocks();
     projectSessionScansValuesAndVirtualSources();
     projectCollectionAssetResolutionProvidesTypedExportInputs();
     projectSessionAddsSourceFromPath();
     projectSessionExportsAllCollections();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
-    midiSequenceLoweringSkipsCommandsAtPlayOnceLoopBoundary();
-    midiSequenceLoweringResolvesUnsetDefaultLoopPolicyToPlayOnce();
-    midiSequenceLoweringTreatsLoopBoundaryAsAStopPoint();
-    midiSequenceLoweringReplaysDecodedBoundaryUntilPlayOnceStop();
-    modulationAnalysisReportsObservedSourceRanges();
+    performanceMidiRendererExtendsPreviousSameKeyNotes();
     modulationAnalysisReportsObservedMidiControllerRanges();
+    modulationAnalysisReportsObservedPerformanceRanges();
     observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
     wavExporterWritesPcm16RiffFile();
     soundFontExporterWritesSfbkRiffFile();
@@ -1396,10 +1650,16 @@ int main() {
     capcomSnesModuleScansSpcThroughVirtualAramSource();
     capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
     capcomSnesNoteStateCommandsAreTypedAndInterpreted();
-    capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose();
-    capcomSnesPanEventsDoNotRecurveMidiPan();
-    capcomSnesV1VolumeQuantizesAfterAmplitudeCurve();
-    capcomSnesMidiExportUsesSequenceProfileKey();
+    capcomSnesSourceDialectDecodesAndRendersDriverCommands();
+    capcomSnesPanPerformanceCarriesGainCompensation();
+    capcomSnesDialectEmitsSourceOnlyDriverSemantics();
+    capcomSnesDialectEmitsPortamentoFromPreviousSourceKey();
+    capcomSnesDialectExecutesRepeatUntilCommand();
+    capcomSnesV1DialectPreservesUnknownOneByteEvents();
+    ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
+    ndsSequenceDialectExecutesCallAndReturn();
+    ndsSequenceDialectDiscoversSecondaryTrackStarts();
+    ndsSequenceDialectPreservesIgnoredNoOpOperands();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;

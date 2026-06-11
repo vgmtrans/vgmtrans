@@ -7,8 +7,8 @@
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
 
 #include "value/core/FormatRegistry.h"
+#include "value/formats/CapcomSnes/CapcomSnesSequenceProgram.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueLayout.h"
-#include "value/formats/CapcomSnes/CapcomSnesValueSequence.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueSynth.h"
 
 #include <optional>
@@ -48,12 +48,12 @@ using namespace core;
   }
 
   const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
-  result.assets.emplace_back(parseCapcomSnesSequence(input,
-                                                     *layout,
-                                                     sequenceId,
-                                                     hasInstrumentSet ? std::optional<AssetId>{instrumentSetId}
-                                                                       : std::nullopt,
-                                                     displayName));
+  result.assets.emplace_back(parseCapcomSnesSequenceProgram(input,
+                                                            *layout,
+                                                            sequenceId,
+                                                            hasInstrumentSet ? std::optional<AssetId>{instrumentSetId}
+                                                                              : std::nullopt,
+                                                            displayName));
 
   if (hasInstrumentSet) {
     result.assets.emplace_back(parseCapcomSnesInstrumentSet(input,

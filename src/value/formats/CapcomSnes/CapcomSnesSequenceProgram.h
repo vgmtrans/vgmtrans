@@ -14,13 +14,7 @@
 
 namespace vgmtrans::formats::capcom_snes {
 
-[[nodiscard]] core::CommandTrack decodeCapcomSnesTrack(
-    core::ByteReader reader,
-    CapcomSnesEngineVersion version,
-    u32 sourceTrackNumber,
-    u32 startAddress);
-
-[[nodiscard]] core::SequenceAsset parseCapcomSnesSequence(
+[[nodiscard]] core::SequenceProgramAsset parseCapcomSnesSequenceProgram(
     const core::ScanInput& input,
     const CapcomSnesLayout& layout,
     core::AssetId sequenceId,

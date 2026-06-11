@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/SequenceModel.h"
+#include "value/core/SequenceProgram.h"
 #include "value/core/Source.h"
 #include "value/core/SynthModel.h"
 
@@ -26,7 +26,7 @@ struct MiscAsset {
   std::vector<u8> payload;
 };
 
-using Asset = std::variant<SequenceAsset, InstrumentSetAsset, SampleCollectionAsset, MiscAsset>;
+using Asset = std::variant<SequenceProgramAsset, InstrumentSetAsset, SampleCollectionAsset, MiscAsset>;
 
 struct Collection {
   CollectionId id;
@@ -62,7 +62,7 @@ struct CollectionAssets {
   // Resolved pointer view over a Project. It is intentionally non-owning so exporters can
   // work without copying large sample/instrument assets.
   const Collection* collection = nullptr;
-  const SequenceAsset* sequence = nullptr;
+  const SequenceProgramAsset* sequenceProgram = nullptr;
   std::vector<const InstrumentSetAsset*> instrumentSets;
   std::vector<const SampleCollectionAsset*> sampleCollections;
   std::vector<const MiscAsset*> miscAssets;

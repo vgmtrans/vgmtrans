@@ -7,6 +7,7 @@
 #include "value/core/ModulationAnalysis.h"
 
 #include <algorithm>
+#include <cmath>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -42,18 +43,39 @@ void merge(ObservedValueRange& destination, const ObservedValueRange& source) {
   destination.max = std::max(destination.max, source.max);
 }
 
+[[nodiscard]] u32 midiControllerValue(double normalized) {
+  return static_cast<u32>(std::clamp<int>(static_cast<int>(std::lround(std::clamp(normalized, 0.0, 1.0) * 127.0)), 0,
+                                          127));
+}
+
+void observePerformanceModulation(MidiTrackModulationUsage& usage, const ModulationPerformanceEvent& event) {
+  switch (event.target) {
+    case ModulationPerformanceTarget::VibratoDepth:
+      observe(usage.vibratoDepth, midiControllerValue(event.amount), SourceRange{});
+      break;
+    case ModulationPerformanceTarget::VibratoRate:
+      observe(usage.vibratoRate, midiControllerValue(event.amount), SourceRange{});
+      break;
+    case ModulationPerformanceTarget::TremoloDepth:
+      observe(usage.tremoloDepth, midiControllerValue(event.amount), SourceRange{});
+      break;
+    case ModulationPerformanceTarget::TremoloRate:
+      observe(usage.tremoloRate, midiControllerValue(event.amount), SourceRange{});
+      break;
+  }
+}
+
+void mergeTrackUsage(MidiModulationUsage& result, const MidiTrackModulationUsage& trackUsage) {
+  merge(result.vibratoDepth, trackUsage.vibratoDepth);
+  merge(result.vibratoRate, trackUsage.vibratoRate);
+  merge(result.tremoloDepth, trackUsage.tremoloDepth);
+  merge(result.tremoloRate, trackUsage.tremoloRate);
+}
+
 }  // namespace
 
 bool hasObservedValue(const ObservedValueRange& range) noexcept {
   return range.observed;
-}
-
-bool hasModulationUsage(const TrackModulationUsage& usage) noexcept {
-  return usage.vibratoDepth.observed || usage.tremoloDepth.observed || usage.modulationRate.observed;
-}
-
-bool hasModulationUsage(const ModulationUsage& usage) noexcept {
-  return usage.vibratoDepth.observed || usage.tremoloDepth.observed || usage.modulationRate.observed;
 }
 
 bool hasMidiModulationUsage(const MidiTrackModulationUsage& usage) noexcept {
@@ -66,33 +88,23 @@ bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept {
          usage.tremoloDepth.observed || usage.tremoloRate.observed;
 }
 
-ModulationUsage analyzeModulationUsage(const CommandSequence& sequence) {
-  ModulationUsage result;
+MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence& sequence) {
+  MidiModulationUsage result;
   result.tracks.reserve(sequence.tracks.size());
 
-  for (const auto& track : sequence.tracks) {
-    TrackModulationUsage trackUsage{
-        .sourceTrackNumber = track.sourceTrackNumber,
+  for (u32 trackIndex = 0; trackIndex < sequence.tracks.size(); ++trackIndex) {
+    const auto& track = sequence.tracks[trackIndex];
+    MidiTrackModulationUsage trackUsage{
+        .trackIndex = trackIndex,
     };
 
-    for (const auto& command : track.commands) {
-      std::visit(
-          [&](const auto& typedCommand) {
-            using TypedCommand = std::decay_t<decltype(typedCommand)>;
-            if constexpr (std::is_same_v<TypedCommand, VibratoCommand>) {
-              observe(trackUsage.vibratoDepth, typedCommand.rawDepth, typedCommand.range);
-            } else if constexpr (std::is_same_v<TypedCommand, TremoloCommand>) {
-              observe(trackUsage.tremoloDepth, typedCommand.rawDepth, typedCommand.range);
-            } else if constexpr (std::is_same_v<TypedCommand, ModulationRateCommand>) {
-              observe(trackUsage.modulationRate, typedCommand.rawRate, typedCommand.range);
-            }
-          },
-          command);
+    for (const auto& event : track.events) {
+      if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
+        observePerformanceModulation(trackUsage, *modulation);
+      }
     }
 
-    merge(result.vibratoDepth, trackUsage.vibratoDepth);
-    merge(result.tremoloDepth, trackUsage.tremoloDepth);
-    merge(result.modulationRate, trackUsage.modulationRate);
+    mergeTrackUsage(result, trackUsage);
     result.tracks.push_back(std::move(trackUsage));
   }
 
@@ -126,10 +138,7 @@ MidiModulationUsage analyzeMidiModulationUsage(const MidiSequence& sequence) {
           event);
     }
 
-    merge(result.vibratoDepth, trackUsage.vibratoDepth);
-    merge(result.vibratoRate, trackUsage.vibratoRate);
-    merge(result.tremoloDepth, trackUsage.tremoloDepth);
-    merge(result.tremoloRate, trackUsage.tremoloRate);
+    mergeTrackUsage(result, trackUsage);
     result.tracks.push_back(std::move(trackUsage));
   }
 

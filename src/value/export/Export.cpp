@@ -9,12 +9,13 @@
 #include "value/export/DlsExporter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/MidiSequenceLowering.h"
 #include "value/core/ModulationAnalysis.h"
 #include "value/core/ProjectModel.h"
 #include "value/core/SampleDecoder.h"
+#include "value/core/SequenceVm.h"
 #include "value/core/Source.h"
 #include "value/export/ModulationScaling.h"
+#include "value/export/PerformanceMidiRenderer.h"
 #include "value/export/SoundFontExporter.h"
 #include "value/export/WavExporter.h"
 
@@ -74,6 +75,7 @@ struct PreparedCollectionExport {
 };
 
 struct MidiLoweringResult {
+  std::optional<PerformanceSequence> performance;
   std::optional<MidiSequence> sequence;
   std::vector<Diagnostic> diagnostics;
 };
@@ -88,21 +90,16 @@ struct MidiLoweringResult {
   };
 }
 
-[[nodiscard]] std::string midiSequenceProfileName(const SequenceAsset& sequence) {
-  return sequence.commandSequence.midiSequenceProfile.empty() ? sequence.metadata.format
-                                                              : sequence.commandSequence.midiSequenceProfile;
-}
-
 [[nodiscard]] MidiLoweringResult lowerMidiSequence(const PreparedCollectionExport& prepared,
-                                                   const MidiSequenceProfileRegistry& profiles, LoopPolicy loopPolicy) {
-  // MIDI lowering is needed both for .mid output and for observed modulation scaling in
-  // synth exports. Keep failures as diagnostics so non-MIDI artifacts can still be built.
+                                                   const SequenceDialectRegistry& dialects, LoopPolicy loopPolicy) {
+  // Sequence rendering is needed both for .mid output and for observed modulation scaling
+  // in synth exports. Keep failures as diagnostics so non-MIDI artifacts can still be built.
   if (!prepared.assets.diagnostics.collection.empty()) {
     return MidiLoweringResult{
         .diagnostics = prepared.assets.diagnostics.collection,
     };
   }
-  if (prepared.assets.sequence == nullptr) {
+  if (prepared.assets.sequenceProgram == nullptr) {
     auto diagnostics = prepared.assets.diagnostics.sequence;
     if (diagnostics.empty()) {
       diagnostics.push_back(exportError("Collection does not reference a sequence asset"));
@@ -112,28 +109,30 @@ struct MidiLoweringResult {
     };
   }
 
-  const std::string profileName = midiSequenceProfileName(*prepared.assets.sequence);
-  // Some formats scan as one asset format but need a dialect-specific MIDI sequence profile.
-  const auto* profile = profiles.find(profileName);
-  if (profile == nullptr) {
+  const auto& sequence = *prepared.assets.sequenceProgram;
+  const auto* dialect = dialects.find(sequence.program.dialect.value);
+  if (dialect == nullptr) {
     return MidiLoweringResult{
-        .diagnostics = {exportError("No MIDI sequence profile registered for '" + profileName + "'")},
+        .diagnostics = {exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'")},
     };
   }
 
+  auto performance = SequenceVm(loopPolicy).render(sequence.program, *dialect);
+  auto midi = PerformanceMidiRenderer().render(performance);
   return MidiLoweringResult{
-      .sequence = buildMidiSequence(prepared.assets.sequence->commandSequence, *profile, loopPolicy),
+      .performance = std::move(performance),
+      .sequence = std::move(midi),
   };
 }
 
 [[nodiscard]] std::optional<MidiModulationUsage> midiModulationUsage(const MidiLoweringResult& lowering) {
   // SF2/DLS modulators often have only 7-bit controller inputs. Observed ranges let us
   // trade theoretical format coverage for better practical resolution when requested.
-  if (!lowering.sequence) {
+  if (!lowering.performance) {
     return std::nullopt;
   }
 
-  auto usage = analyzeMidiModulationUsage(*lowering.sequence);
+  auto usage = analyzePerformanceModulationUsage(*lowering.performance);
   if (!hasMidiModulationUsage(usage)) {
     return std::nullopt;
   }
@@ -154,7 +153,8 @@ struct MidiLoweringResult {
   if (request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
     // MIDI export also applies the same scaling so controller values and synth modulators
     // agree when a user asks for observed-range modulation.
-    const auto usage = analyzeMidiModulationUsage(midiSequence);
+    const auto usage = lowering.performance ? analyzePerformanceModulationUsage(*lowering.performance)
+                                            : analyzeMidiModulationUsage(midiSequence);
     if (hasMidiModulationUsage(usage)) {
       applyMidiModulationScaling(midiSequence, usage, request.synthModulationScaling);
     }
@@ -285,7 +285,7 @@ struct MidiLoweringResult {
 }  // namespace
 
 std::vector<Artifact> exportCollection(const Project& project, const SourceStore& sources, CollectionId collection,
-                                       const ExportRequest& request, const MidiSequenceProfileRegistry& profiles) {
+                                       const ExportRequest& request, const SequenceDialectRegistry& dialects) {
   auto resolved = resolveCollectionAssets(project, collection);
   if (resolved.collection == nullptr) {
     auto diagnostics = resolved.diagnostics.collection;
@@ -309,7 +309,7 @@ std::vector<Artifact> exportCollection(const Project& project, const SourceStore
     // Several requested artifacts can depend on the same lowered MIDI sequence. Lower it
     // once so diagnostics and modulation analysis all refer to identical playback data.
     if (!midiLowering) {
-      midiLowering = lowerMidiSequence(prepared, profiles, request.loopPolicy);
+      midiLowering = lowerMidiSequence(prepared, dialects, request.loopPolicy);
     }
     return *midiLowering;
   };
@@ -352,13 +352,13 @@ std::vector<Artifact> exportCollection(const Project& project, const SourceStore
 
 std::vector<CollectionExport> exportAllCollections(const Project& project, const SourceStore& sources,
                                                    const ExportRequest& request,
-                                                   const MidiSequenceProfileRegistry& profiles) {
+                                                   const SequenceDialectRegistry& dialects) {
   std::vector<CollectionExport> exports;
   exports.reserve(project.collections.size());
   for (const auto& collection : project.collections) {
     exports.push_back(CollectionExport{
         .collection = collection.id,
-        .artifacts = exportCollection(project, sources, collection.id, request, profiles),
+        .artifacts = exportCollection(project, sources, collection.id, request, dialects),
     });
   }
   return exports;

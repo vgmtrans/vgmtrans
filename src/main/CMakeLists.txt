@@ -110,15 +110,15 @@ vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceLowering.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Scan.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ScanTypes.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/SequenceModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/SequenceDialect.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/SequenceProgram.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/SequenceVm.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Source.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SynthMath.cpp
@@ -126,6 +126,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/Export.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/ModulationScaling.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/PerformanceMidiRenderer.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/SynthExportData.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/WavExporter.cpp
@@ -138,14 +139,15 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/core/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/MidiModel.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceLowering.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceProfile.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/PerformanceModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Session.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Scan.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ScanTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceProgram.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceVm.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Source.h
@@ -158,6 +160,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ModulationScaling.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/PerformanceMidiRenderer.h
       ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/SynthExportData.h
       ${PROJECT_SOURCE_DIR}/src/value/export/WavExporter.h
@@ -179,12 +182,13 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesProfile.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceDialect.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceProgram.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsProfile.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.cpp
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
   PUBLIC
     FILE_SET HEADERS
@@ -194,12 +198,14 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesProfile.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceProgram.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSequence.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSynth.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsProfile.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.h
       formats/CapcomSnes/CapcomSnesDriverMath.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )

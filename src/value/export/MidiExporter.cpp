@@ -116,7 +116,7 @@ void addRpn(std::vector<MidiMessage>& messages, u64 tick, u8 channel, u8 paramet
 
 void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event, u64& endTick) {
   // This is the final conversion from the value MIDI event vocabulary to raw SMF bytes.
-  // Keep it mechanical; driver interpretation should already be done by lowering profiles.
+  // Keep it mechanical; driver interpretation should already be done before MIDI rendering.
   std::visit(
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;

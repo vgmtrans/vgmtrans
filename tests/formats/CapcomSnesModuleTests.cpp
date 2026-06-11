@@ -8,9 +8,10 @@
 
 #include "value/export/Export.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/MidiSequenceLowering.h"
+#include "value/export/PerformanceMidiRenderer.h"
+#include "value/core/SequenceVm.h"
 #include "value/core/Session.h"
-#include "value/formats/CapcomSnes/CapcomSnesProfile.h"
+#include "value/formats/CapcomSnes/CapcomSnesSequenceDialect.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueSynth.h"
 #include "value/formats/ValueFormats.h"
 
@@ -128,6 +129,8 @@ std::vector<u8> makeCapcomSnesSpc() {
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
+  expect(session.dialects().contains("capcom-snes:v3"),
+         "value format registration should include CapcomSnes sequence dialects");
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
   const Project project = session.scan();
@@ -135,108 +138,100 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(project.collections.size() == 1, "CapcomSnes scan should produce one collection");
   expect(project.assets.size() == 3, "CapcomSnes scan should produce sequence, instrument set, and samples");
 
-  const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
+  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
   expect(sequence != nullptr, "first CapcomSnes asset should be sequence");
   expect(sequence->metadata.format == "CapcomSnes", "sequence should retain format name");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should point at fixed BGM header body");
-  expect(sequence->commandSequence.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
-  expect(sequence->commandSequence.behavior.linearAmplitudeScale, "sequence should carry linear amplitude behavior");
-  expect(sequence->commandSequence.behavior.writeInitialMonoMode, "sequence should carry mono mode behavior");
-  expect(sequence->commandSequence.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
+  expect(sequence->program.dialect.value == "capcom-snes:v3", "sequence should carry the detected CapcomSnes dialect");
+  expect(sequence->program.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
+  expect(sequence->program.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
          "sequence should carry CapcomSnes default loop policy");
-  expect(sequence->commandSequence.midiSequenceProfile ==
-             capcomSnesProfileName(CapcomSnesEngineVersion::v3BgmFixedLocation),
-         "sequence should carry the detected CapcomSnes profile key");
-  expect(sequence->commandSequence.tracks.size() == 8, "sequence should decode all nonzero track pointers");
-  expect(std::holds_alternative<TempoCommand>(sequence->commandSequence.tracks[0].commands[0]),
+  expect(sequence->program.tracks.size() == 8, "sequence should decode all nonzero track pointers");
+
+  const auto* dialect = session.dialects().find(sequence->program.dialect.value);
+  expect(dialect != nullptr, "registered dialect should interpret the scanned sequence program");
+  const auto& firstTrack = sequence->program.tracks[0];
+  expect(firstTrack.commands.size() == 8, "track should decode all fixture commands");
+  expect(dialect->describe(firstTrack, firstTrack.commands[0]).detailKind == "capcom-snes.tempo",
          "track should decode tempo command");
-  expect(std::get<TempoCommand>(sequence->commandSequence.tracks[0].commands[0]).rawValue == 0x1234,
+  expect(firstTrack.bytesFor(firstTrack.commands[0])[1] == 0x12 && firstTrack.bytesFor(firstTrack.commands[0])[2] == 0x34,
          "tempo command should preserve raw big-endian value");
-  expect(std::holds_alternative<ProgramCommand>(sequence->commandSequence.tracks[0].commands[1]),
+  expect(dialect->describe(firstTrack, firstTrack.commands[1]).detailKind == "capcom-snes.program",
          "track should decode program command");
-  expect(std::holds_alternative<VolumeCommand>(sequence->commandSequence.tracks[0].commands[2]),
+  expect(dialect->describe(firstTrack, firstTrack.commands[2]).detailKind == "capcom-snes.volume",
          "track should decode volume command");
-  expect(std::holds_alternative<PanCommand>(sequence->commandSequence.tracks[0].commands[3]),
+  expect(dialect->describe(firstTrack, firstTrack.commands[3]).detailKind == "capcom-snes.pan",
          "track should decode pan command");
-  expect(std::holds_alternative<VibratoCommand>(sequence->commandSequence.tracks[0].commands[4]),
-         "track should decode vibrato command");
-  expect(std::holds_alternative<ModulationRateCommand>(sequence->commandSequence.tracks[0].commands[5]),
-         "track should decode modulation rate command");
-  expect(std::holds_alternative<NoteCommand>(sequence->commandSequence.tracks[0].commands[6]),
+  expect(dialect->describe(firstTrack, firstTrack.commands[4]).detailKind == "capcom-snes.lfo",
+         "track should decode vibrato/LFO command");
+  expect(dialect->describe(firstTrack, firstTrack.commands[5]).detailKind == "capcom-snes.lfo",
+         "track should decode modulation-rate/LFO command");
+  expect(dialect->describe(firstTrack, firstTrack.commands[6]).detailKind == "capcom-snes.note",
          "track should decode note command");
-  expect(std::holds_alternative<EndCommand>(sequence->commandSequence.tracks[0].commands[7]),
+  expect(dialect->describe(firstTrack, firstTrack.commands[7]).detailKind == "capcom-snes.end",
          "track should decode end command");
-  expect(sequence->commandSequence.referencedInstruments.size() == 1,
+  expect(sequence->program.referencedInstruments.size() == 1,
          "sequence should expose unique referenced instruments");
-  expect(sequence->commandSequence.referencedInstruments[0].bank == 0 &&
-             sequence->commandSequence.referencedInstruments[0].program == 0,
+  expect(sequence->program.referencedInstruments[0].bank == 0 &&
+             sequence->program.referencedInstruments[0].program == 0,
          "instrument reference should preserve decoded bank and program");
-  expect(sequence->commandSequence.referencedInstruments[0].asset == project.collections[0].instrumentSets[0],
+  expect(sequence->program.referencedInstruments[0].asset == project.collections[0].instrumentSets[0],
          "instrument reference should point at the decoded instrument set asset");
-  expect(sequence->commandSequence.referencedInstruments[0].range.has_value() &&
-             sequence->commandSequence.referencedInstruments[0].range->offset == 0x3003 &&
-             sequence->commandSequence.referencedInstruments[0].range->size == 2,
+  expect(sequence->program.referencedInstruments[0].range.has_value() &&
+             sequence->program.referencedInstruments[0].range->offset == 0x3003 &&
+             sequence->program.referencedInstruments[0].range->size == 2,
          "instrument reference should preserve the program command source range");
 
   const auto& sequenceItems = sequence->metadata.items.nodes;
   const auto commandItemCount =
       std::ranges::count_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Command; });
   expect(
-      commandItemCount == sequence->commandSequence.tracks.size() * sequence->commandSequence.tracks[0].commands.size(),
+      commandItemCount == sequence->program.tracks.size() * sequence->program.tracks[0].commands.size(),
       "sequence item tree should expose decoded command nodes for every track");
 
   const auto firstTrackItem =
       std::ranges::find_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Track; });
   expect(firstTrackItem != sequenceItems.end(), "sequence item tree should expose track nodes");
-  expect(firstTrackItem->children.size() == sequence->commandSequence.tracks[0].commands.size(),
+  expect(firstTrackItem->children.size() == sequence->program.tracks[0].commands.size(),
          "track item should parent its decoded command nodes");
 
   const auto firstTempoItem = std::ranges::find_if(sequenceItems, [](const ItemNode& item) {
-    return item.kind == ItemKind::Command && item.detailKind == "capcom-snes-tempo";
+    return item.kind == ItemKind::Command && item.detailKind == "capcom-snes.tempo";
   });
   expect(firstTempoItem != sequenceItems.end(), "sequence item tree should expose typed command nodes");
   expect(firstTempoItem->parent == firstTrackItem->id, "command item should point back to its track item");
   expect(firstTempoItem->name == "Tempo", "command item should carry a readable command name");
-  expect(firstTempoItem->description == "Raw 4660", "command item should preserve raw command values");
+  expect(firstTempoItem->description == "raw 4660, microseconds_per_quarter 42191",
+         "command item should preserve raw and interpreted command values");
   expect(firstTempoItem->range.offset == 0x3000 && firstTempoItem->range.size == 3,
          "command item should preserve command source range");
 
-  const MidiSequence midiSequence = buildMidiSequence(
-      sequence->commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
-  expect(midiSequence.tracks[0].events.size() == 14, "built track should include initial, command, and end events");
-  expect(std::holds_alternative<MonoMode>(midiSequence.tracks[0].events[0]),
-         "builder should emit initial mono mode from sequence behavior");
-  expect(std::get<MonoMode>(midiSequence.tracks[0].events[0]).channels == 0,
-         "initial mono mode should match legacy MIDI controller payload");
-  expect(std::holds_alternative<Reverb>(midiSequence.tracks[0].events[1]),
-         "builder should emit initial reverb from sequence behavior");
-  expect(std::get<Tempo>(midiSequence.tracks[0].events[2]).microsecondsPerQuarter == 42191,
-         "CapcomSnes profile should interpret tempo with legacy timing math");
-  expect(std::holds_alternative<BankSelect>(midiSequence.tracks[0].events[3]),
-         "CapcomSnes MIDI sequence build should include bank select before program changes");
-  expect(!std::get<BankSelect>(midiSequence.tracks[0].events[3]).writeLsb,
-         "CapcomSnes bank select should match legacy MSB-only output");
-  expect(std::holds_alternative<ProgramChange>(midiSequence.tracks[0].events[4]),
-         "CapcomSnes MIDI sequence build should include program changes");
-  expect(std::holds_alternative<Volume14>(midiSequence.tracks[0].events[5]),
-         "CapcomSnes V3 profile should interpret volume to 14-bit volume");
-  expect(std::get<Pan>(midiSequence.tracks[0].events[6]).value == 64,
+  expect(midiSequence.tracks[0].events.size() == 11, "built track should include command and end events");
+  expect(std::get<Tempo>(midiSequence.tracks[0].events[0]).microsecondsPerQuarter == 42191,
+         "CapcomSnes source command should interpret tempo with driver timing math");
+  expect(std::holds_alternative<ProgramChange>(midiSequence.tracks[0].events[1]),
+         "CapcomSnes source command should emit program changes");
+  expect(std::holds_alternative<Volume>(midiSequence.tracks[0].events[2]),
+         "CapcomSnes source command should emit target-quantized volume");
+  expect(std::get<Pan>(midiSequence.tracks[0].events[3]).value == 64,
          "CapcomSnes center pan should map to MIDI center pan");
-  expect(std::holds_alternative<Expression>(midiSequence.tracks[0].events[7]),
-         "CapcomSnes pan emission should include expression compensation");
-  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[8]).value == 0,
-         "CapcomSnes vibrato command should store depth but emit zero while modulation rate is disabled");
-  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[9]).value == 0x20,
-         "CapcomSnes modulation rate should emit stored vibrato depth when output becomes enabled");
-  expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[10]),
-         "CapcomSnes modulation rate should map to vibrato frequency");
-  expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[11]),
-         "CapcomSnes modulation rate should map to tremolo frequency");
-  expect(std::get<NoteDuration>(midiSequence.tracks[0].events[12]).duration == 6,
+  expect(std::holds_alternative<Expression>(midiSequence.tracks[0].events[4]),
+         "CapcomSnes pan should emit expression compensation for the source pan law");
+  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[5]).value == 0,
+         "CapcomSnes vibrato depth should stay silent until the LFO rate enables output");
+  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[6]).value == 32,
+         "CapcomSnes LFO rate should enable the latched vibrato depth");
+  expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[7]),
+         "CapcomSnes LFO rate should emit vibrato frequency");
+  expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[8]),
+         "CapcomSnes LFO rate should emit tremolo frequency");
+  expect(std::get<NoteDuration>(midiSequence.tracks[0].events[9]).duration == 6,
          "CapcomSnes note length index should map to ticks");
-  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[13]).tick == 6,
+  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[10]).tick == 6,
          "builder should advance time before end of track");
 
   const auto artifacts = session.exportCollection(project.collections[0].id, ExportRequest{
@@ -399,7 +394,7 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
   expect(project.collections.size() == 1, "SPC-backed scan should produce one collection");
   expect(project.collections[0].name == "Capcom Logo", "SPC-backed collection should use the SPC title tag");
   expect(project.assets.size() == 3, "SPC-backed scan should produce CapcomSnes assets from virtual ARAM");
-  const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
+  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
   expect(sequence != nullptr, "SPC-backed scan should produce a sequence");
   expect(sequence->metadata.name == "Capcom Logo", "SPC-backed sequence should use the SPC title tag");
   expect(sequence->metadata.range.source == SourceId{1}, "sequence range should point at virtual ARAM source");
@@ -464,48 +459,46 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   expect(project.diagnostics.empty(), "CapcomSnes note-state scan should not report diagnostics");
   expect(!project.assets.empty(), "CapcomSnes note-state scan should produce assets");
 
-  const auto* sequence = std::get_if<SequenceAsset>(&project.assets[0]);
+  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
   expect(sequence != nullptr, "CapcomSnes note-state scan should produce a sequence");
-  expect(!sequence->commandSequence.tracks.empty(), "CapcomSnes note-state scan should decode tracks");
+  expect(!sequence->program.tracks.empty(), "CapcomSnes note-state scan should decode tracks");
 
-  const auto& commands = sequence->commandSequence.tracks[0].commands;
+  const auto* dialect = session.dialects().find(sequence->program.dialect.value);
+  expect(dialect != nullptr, "CapcomSnes note-state scan should have a registered dialect");
+  const auto& track = sequence->program.tracks[0];
+  const auto& commands = track.commands;
   expect(commands.size() == 4, "CapcomSnes note-state fixture should decode four commands");
 
-  const auto* octave = std::get_if<NoteStateCommand>(&commands[0]);
-  expect(octave != nullptr, "CapcomSnes octave opcode should decode as a typed note-state command");
-  expect(octave->action == NoteStateAction::Octave && octave->rawValue == 4,
+  const CommandInfo octave = dialect->describe(track, commands[0]);
+  expect(octave.detailKind == "capcom-snes.octave", "CapcomSnes octave opcode should decode as a local command");
+  expect(track.operandsFor(commands[0]).size() == 1 && std::get<u64>(track.operandsFor(commands[0])[0].value) == 4,
          "CapcomSnes octave command should preserve its raw octave operand");
-  expect(octave->range.offset == 0x3000 && octave->range.size == 2,
+  expect(commands[0].range.offset == 0x3000 && commands[0].range.size == 2,
          "CapcomSnes octave command should preserve its source range");
 
-  const auto* attributes = std::get_if<NoteStateCommand>(&commands[1]);
-  expect(attributes != nullptr, "CapcomSnes attributes opcode should decode as a typed note-state command");
-  expect(attributes->action == NoteStateAction::Attributes && attributes->rawValue == 0x48,
+  const CommandInfo attributes = dialect->describe(track, commands[1]);
+  expect(attributes.detailKind == "capcom-snes.note-attributes",
+         "CapcomSnes attributes opcode should decode as a local command");
+  expect(track.operandsFor(commands[1]).size() == 1 && std::get<u64>(track.operandsFor(commands[1])[0].value) == 0x48,
          "CapcomSnes note attributes should preserve their raw attribute byte");
-  expect(attributes->range.offset == 0x3002 && attributes->range.size == 2,
+  expect(commands[1].range.offset == 0x3002 && commands[1].range.size == 2,
          "CapcomSnes note attributes should preserve their source range");
 
   const auto attributeItem = std::ranges::find_if(sequence->metadata.items.nodes, [](const ItemNode& item) {
-    return item.kind == ItemKind::Command && item.detailKind == "capcom-snes-note-attributes" &&
+    return item.kind == ItemKind::Command && item.detailKind == "capcom-snes.note-attributes" &&
            item.range.offset == 0x3002;
   });
   expect(attributeItem != sequence->metadata.items.nodes.end(),
          "CapcomSnes item tree should expose typed note-attribute command nodes");
   expect(attributeItem->name == "Note Attributes", "note-attribute item should carry a readable name");
-  expect(attributeItem->description == "Raw 72", "note-attribute item should preserve raw command values");
+  expect(attributeItem->description == "raw 72", "note-attribute item should preserve raw command values");
 
-  const MidiSequence midiSequence = buildMidiSequence(
-      sequence->commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes note-state emission should not report diagnostics");
   expect(!midiSequence.tracks.empty(), "CapcomSnes note-state emission should preserve tracks");
 
   const auto& events = midiSequence.tracks[0].events;
-  const auto legato = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* typed = std::get_if<LegatoPedal>(&event);
-    return typed != nullptr && typed->tick == 0 && typed->enabled;
-  });
-  expect(legato != events.end(), "CapcomSnes note attributes should interpret slur state to legato pedal");
-
   const auto note = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* typed = std::get_if<NoteDuration>(&event);
     return typed != nullptr && typed->tick == 0;
@@ -519,206 +512,287 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
          "CapcomSnes note-state emission should still advance by the decoded note length");
 }
 
-void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
-  const CommandSequence commandSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {CommandTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .startAddress = Address{0x3000},
-          .commands =
-              {
-                  PortamentoCommand{.rawTime = 0x40},
-                  NoteCommand{.key = 5, .rawDuration = 7},
-                  TransposeCommand{.rawSemitones = 1},
-                  NoteCommand{.key = 8, .rawDuration = 7},
-                  EndCommand{},
-              },
-      }},
-      .behavior = SequenceBehavior{.initialGlobalTranspose = 6},
+void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x05;
+  bytes[0x3001] = 0x12;
+  bytes[0x3002] = 0x00;
+  bytes[0x3003] = 0x08;
+  bytes[0x3004] = 0x85;
+  bytes[0x3005] = 0x07;
+  bytes[0x3006] = 0x80;
+  bytes[0x3007] = 0x04;
+  bytes[0x3008] = 0x10;
+  bytes[0x3009] = 0x64;
+  bytes[0x300a] = 0x18;
+  bytes[0x300b] = 0x00;
+  bytes[0x300c] = 0x16;
+  bytes[0x300d] = 0x30;
+  bytes[0x300e] = 0x09;
+
+  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 2, 0x3000);
+  expect(track.commands.size() == 7,
+         "CapcomSnes source dialect should decode the fixture commands, got " + std::to_string(track.commands.size()));
+  expect(track.addressIndex.find(Address{0x3009}).has_value(),
+         "CapcomSnes source dialect should index decoded command addresses");
+
+  const auto programOperands = track.operandsFor(track.commands[1]);
+  expect(programOperands.size() == 1 && programOperands[0].name == "program" &&
+             std::get<u64>(programOperands[0].value) == 0x85,
+         "CapcomSnes source command should preserve decoded program operands");
+
+  const CommandInfo programInfo = dialect.describe(track, track.commands[1]);
+  expect(programInfo.name == "Program", "CapcomSnes dialect should describe commands through local command code");
+  expect(programInfo.fields.size() == 2 && programInfo.fields[0].value == "1" && programInfo.fields[1].value == "5",
+         "CapcomSnes program display should decode bank and program together");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
   };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes source dialect fixture should render without diagnostics");
+  expect(performance.tracks.size() == 1, "CapcomSnes source dialect fixture should render one track");
+  expect(performance.tracks[0].endTick == 18,
+         "CapcomSnes source dialect should apply one-shot dotted timing before the loop repeats");
 
-  const MidiSequence midiSequence = buildMidiSequence(
-      commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
-  const auto& events = midiSequence.tracks[0].events;
-
-  const auto portamentoTime = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* time = std::get_if<PortamentoTime14>(&event);
-    return time != nullptr && time->tick == 192;
+  const auto note = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* typed = std::get_if<NotePerformanceEvent>(&event);
+    return typed != nullptr;
   });
-  expect(portamentoTime != events.end(), "CapcomSnes portamento should emit 14-bit time before the next note");
-  expect(std::get<PortamentoTime14>(*portamentoTime).value == 96,
-         "CapcomSnes portamento distance should use source keys, ignoring active transpose");
+  expect(note != performance.tracks[0].events.end(), "CapcomSnes source dialect should emit a note event");
+  const auto& noteEvent = std::get<NotePerformanceEvent>(*note);
+  expect(noteEvent.key == 3.0 && noteEvent.durationTicks == 18,
+         "CapcomSnes note event should reflect source key and dotted duration");
+  expect(noteEvent.header.sourceCommand == CommandId{4} && noteEvent.header.tick == 0,
+         "CapcomSnes note event should link back to the source command");
 
-  const auto portamentoControl = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* control = std::get_if<PortamentoControl>(&event);
-    return control != nullptr && control->tick == 192;
+  const auto pan = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<PanPerformanceEvent>(event);
   });
-  expect(portamentoControl != events.end(), "CapcomSnes portamento should emit previous-key control");
-  expect(std::get<PortamentoControl>(*portamentoControl).key == 10,
-         "CapcomSnes portamento control should include global but not local transpose");
-
-  const auto secondNote = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* note = std::get_if<NoteDuration>(&event);
-    return note != nullptr && note->tick == 192;
-  });
-  expect(secondNote != events.end(), "CapcomSnes portamento fixture should emit the second note");
-  expect(std::get<NoteDuration>(*secondNote).key == 14,
-         "CapcomSnes note pitch should still include active global and local transpose");
+  expect(pan != performance.tracks[0].events.end(), "CapcomSnes pan command should emit a target-neutral pan event");
+  expect(std::get<PanPerformanceEvent>(*pan).header.tick == 18,
+         "CapcomSnes pan event should occur after the note advances the VM clock");
 }
 
-void capcomSnesPanEventsDoNotRecurveMidiPan() {
-  const CommandSequence v3CommandSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {CommandTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .startAddress = Address{0x3000},
-          .commands =
-              {
-                  PanCommand{.rawValue = 0x40},
-                  EndCommand{},
-              },
-      }},
+void capcomSnesPanPerformanceCarriesGainCompensation() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x18;
+  bytes[0x3001] = 0x40;
+  bytes[0x3002] = 0x17;
+
+  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  expect(track.commands.size() == 2, "CapcomSnes pan fixture should decode pan and end");
+
+  const CommandInfo panInfo = dialect.describe(track, track.commands[0]);
+  expect(panInfo.fields.size() == 3 && panInfo.fields[2].name == "linear_gain",
+         "CapcomSnes pan display should expose the source pan law gain compensation");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
   };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes pan fixture should render without diagnostics");
+  expect(performance.tracks[0].events.size() == 1, "CapcomSnes pan fixture should emit one performance event");
+  const auto* performancePan = std::get_if<PanPerformanceEvent>(&performance.tracks[0].events[0]);
+  expect(performancePan != nullptr && performancePan->linearGain < 1.0,
+         "CapcomSnes pan performance should retain target-neutral gain compensation");
 
-  const MidiSequence midiSequence = buildMidiSequence(
-      v3CommandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
-  expect(midiSequence.diagnostics.empty(), "CapcomSnes pan fixture should build without diagnostics");
-  expect(!midiSequence.tracks.empty(), "CapcomSnes pan fixture should emit one track");
-
-  const auto& events = midiSequence.tracks[0].events;
-  const auto pan = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* typed = std::get_if<Pan>(&event);
-    return typed != nullptr && typed->tick == 0;
-  });
-  expect(pan != events.end(), "CapcomSnes pan fixture should emit a pan controller");
-  expect(std::get<Pan>(*pan).value == 113,
-         "CapcomSnes pan emission should emit the computed MIDI pan without applying the linear pan curve again");
-
-  const auto expression = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* typed = std::get_if<Expression>(&event);
-    return typed != nullptr && typed->tick == 0;
-  });
-  expect(expression != events.end(), "CapcomSnes pan fixture should emit expression compensation");
-  expect(std::get<Expression>(*expression).value == 123,
-         "CapcomSnes pan compensation should quantize after the amplitude curve");
-
-  const CommandSequence v1CommandSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {CommandTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .startAddress = Address{0x3000},
-          .commands =
-              {
-                  PanCommand{.rawValue = 0x01},
-                  EndCommand{},
-              },
-      }},
-  };
-
-  const MidiSequence v1MidiSequence = buildMidiSequence(
-      v1CommandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
-  expect(v1MidiSequence.diagnostics.empty(), "CapcomSnes V1 pan fixture should build without diagnostics");
-  const auto& v1Events = v1MidiSequence.tracks[0].events;
-  const auto v1Pan = std::ranges::find_if(v1Events, [](const MidiEvent& event) {
-    const auto* typed = std::get_if<Pan>(&event);
-    return typed != nullptr && typed->tick == 0;
-  });
-  expect(v1Pan != v1Events.end(), "CapcomSnes V1 pan fixture should emit a pan controller");
-  expect(std::get<Pan>(*v1Pan).value == 65,
-         "CapcomSnes V1 pan emission should apply the pan curve before reducing to a MIDI controller value");
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  expect(midi.tracks[0].events.size() == 3, "CapcomSnes compensated pan should render pan, expression, and end");
+  expect(std::get<Pan>(midi.tracks[0].events[0]).value == 113,
+         "CapcomSnes pan renderer should emit the driver-computed MIDI pan");
+  expect(std::get<Expression>(midi.tracks[0].events[1]).value == 123,
+         "CapcomSnes pan renderer should quantize the source gain compensation as expression");
 }
 
-void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
-  const CommandSequence commandSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {CommandTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .startAddress = Address{0x3000},
-          .commands =
-              {
-                  VolumeCommand{.rawValue = 0x01},
-                  MasterVolumeCommand{.rawValue = 0x03},
-                  EndCommand{},
-              },
-      }},
+void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x0c;
+  bytes[0x3001] = 0x80;
+  bytes[0x3002] = 0x0d;
+  bytes[0x3003] = 0x20;
+  bytes[0x3004] = 0x19;
+  bytes[0x3005] = 0x40;
+  bytes[0x3006] = 0x1b;
+  bytes[0x3007] = 0x01;
+  bytes[0x3008] = 0x02;
+  bytes[0x3009] = 0x1c;
+  bytes[0x300a] = 0x01;
+  bytes[0x300b] = 0x1d;
+  bytes[0x300c] = 0x05;
+  bytes[0x300d] = 0x1e;
+  bytes[0x300e] = 0x1f;
+  bytes[0x300f] = 0x41;
+  bytes[0x3010] = 0x17;
+
+  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  expect(track.commands.size() == 10, "CapcomSnes source-only commands should not truncate track decoding");
+
+  const std::vector<std::string> expectedKinds{
+      "capcom-snes.tuning",
+      "capcom-snes.portamento-time",
+      "capcom-snes.master-volume",
+      "capcom-snes.echo-param",
+      "capcom-snes.echo-on-off",
+      "capcom-snes.release-rate",
+      "capcom-snes.nop",
+      "capcom-snes.nop",
+      "capcom-snes.note",
+      "capcom-snes.end",
   };
+  for (size_t index = 0; index < expectedKinds.size(); ++index) {
+    expect(dialect.describe(track, track.commands[index]).detailKind == expectedKinds[index],
+           "CapcomSnes source-only fixture should decode typed command " + std::to_string(index));
+  }
 
-  const MidiSequence midiSequence =
-      buildMidiSequence(commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
-  expect(midiSequence.diagnostics.empty(), "CapcomSnes V1 volume fixture should build without diagnostics");
-  expect(!midiSequence.tracks.empty(), "CapcomSnes V1 volume fixture should emit one track");
+  const auto tuningOperands = track.operandsFor(track.commands[0]);
+  expect(tuningOperands.size() == 1 && tuningOperands[0].name == "tuning" &&
+             std::get<s64>(tuningOperands[0].value) == -128,
+         "CapcomSnes tuning command should preserve its signed operand");
+  const CommandInfo release = dialect.describe(track, track.commands[5]);
+  expect(release.fields.size() == 2 && release.fields[1].name == "gain" && release.fields[1].value == "165",
+         "CapcomSnes release command should describe the driver GAIN value");
 
-  const auto& events = midiSequence.tracks[0].events;
-  const auto volume = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* typed = std::get_if<Volume14>(&event);
-    return typed != nullptr && typed->tick == 0;
-  });
-  expect(volume != events.end(), "CapcomSnes V1 volume should map to a 14-bit MIDI volume controller");
-  expect(std::get<Volume14>(*volume).value == 1026,
-         "CapcomSnes V1 volume should apply the amplitude curve before MIDI quantization");
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes source-only commands should render without diagnostics");
+  expect(performance.tracks[0].events.size() == 4,
+         "CapcomSnes source-only commands should emit semantic performance events where possible");
+  expect(std::holds_alternative<TuningPerformanceEvent>(performance.tracks[0].events[0]),
+         "CapcomSnes tuning should emit a target-neutral tuning event");
+  expect(std::holds_alternative<MasterLevelPerformanceEvent>(performance.tracks[0].events[1]),
+         "CapcomSnes master volume should emit a target-neutral master level event");
+  expect(std::holds_alternative<ReverbPerformanceEvent>(performance.tracks[0].events[2]),
+         "CapcomSnes echo on/off should emit a target-neutral reverb event");
+  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[3]),
+         "CapcomSnes source-only fixture should still reach the later note");
+  expect(performance.tracks[0].endTick == 6, "CapcomSnes source-only fixture should advance through the later note");
 
-  const auto masterVolume = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* typed = std::get_if<MasterVolume>(&event);
-    return typed != nullptr && typed->tick == 0;
-  });
-  expect(masterVolume != events.end(), "CapcomSnes V1 master volume should map to MIDI master volume");
-  expect(std::get<MasterVolume>(*masterVolume).value == 1777,
-         "CapcomSnes V1 master volume should apply the amplitude curve before MIDI quantization");
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  expect(std::holds_alternative<FineTune>(midi.tracks[0].events[0]),
+         "CapcomSnes tuning performance should render as MIDI fine tuning");
+  expect(std::holds_alternative<MasterVolume>(midi.tracks[0].events[1]),
+         "CapcomSnes master level performance should render as MIDI master volume");
+  expect(std::get<Reverb>(midi.tracks[0].events[2]).value == 40,
+         "CapcomSnes reverb performance should preserve the legacy echo send");
 }
 
-void capcomSnesMidiExportUsesSequenceProfileKey() {
-  const CommandSequence commandSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {CommandTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .startAddress = Address{0x3000},
-          .commands =
-              {
-                  PanCommand{.rawValue = 0x01},
-                  EndCommand{},
-              },
-      }},
-      .midiSequenceProfile = std::string(capcomSnesProfileName(CapcomSnesEngineVersion::v1BgmInList)),
+void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x0d;
+  bytes[0x3001] = 0x40;
+  bytes[0x3002] = 0x41;
+  bytes[0x3003] = 0x46;
+  bytes[0x3004] = 0x17;
+
+  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  expect(track.commands.size() == 4, "CapcomSnes portamento fixture should decode portamento, notes, and end");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
   };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes portamento fixture should render without diagnostics");
+  expect(performance.tracks[0].events.size() == 3,
+         "CapcomSnes portamento fixture should emit two notes plus one portamento event");
+  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[0]),
+         "CapcomSnes portamento fixture should emit the first note before portamento");
+  const auto* portamento = std::get_if<PortamentoPerformanceEvent>(&performance.tracks[0].events[1]);
+  expect(portamento != nullptr && portamento->timeMilliseconds == 160.0 && portamento->previousKey == 0.0,
+         "CapcomSnes portamento should use source-key distance and previous source key");
 
-  Project project;
-  project.assets.emplace_back(SequenceAsset{
-      .metadata =
-          AssetMetadata{
-              .id = AssetId{0},
-              .format = "CapcomSnes",
-              .name = "V1",
-          },
-      .commandSequence = commandSequence,
-  });
-  project.collections.push_back(Collection{
-      .id = CollectionId{0},
-      .name = "V1",
-      .sequence = AssetId{0},
-  });
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[0]),
+         "CapcomSnes portamento fixture should render the first note");
+  expect(std::get<PortamentoTime14>(midi.tracks[0].events[1]).value == 160,
+         "CapcomSnes portamento performance should render as 14-bit MIDI portamento time");
+  expect(std::get<PortamentoControl>(midi.tracks[0].events[2]).key == 0,
+         "CapcomSnes portamento performance should render the previous-key controller");
+  expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[3]),
+         "CapcomSnes portamento fixture should render the second note after portamento controllers");
+}
 
-  SourceStore sources;
-  MidiSequenceProfileRegistry profiles;
-  registerCapcomSnesProfile(profiles);
+void capcomSnesDialectExecutesRepeatUntilCommand() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x41;
+  bytes[0x3001] = 0x0e;
+  bytes[0x3002] = 0x02;
+  bytes[0x3003] = 0x30;
+  bytes[0x3004] = 0x00;
+  bytes[0x3005] = 0x17;
 
-  const auto artifacts = exportCollection(project, sources, CollectionId{0},
-                                          ExportRequest{
-                                              .kinds = {ExportKind::Midi},
-                                              .loopPolicy = LoopPolicy::PlayOnce,
-                                          },
-                                          profiles);
-  expect(artifacts.size() == 1, "CapcomSnes profile-key export should produce one MIDI artifact");
-  expect(artifacts[0].diagnostics.empty(), "CapcomSnes profile-key export should not report diagnostics");
+  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  expect(track.commands.size() == 3, "CapcomSnes repeat fixture should decode note, repeat, and end");
 
-  const auto v1Bytes = MidiExporter().exportMidi(buildMidiSequence(
-      commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce));
-  const auto v3Bytes = MidiExporter().exportMidi(buildMidiSequence(
-      commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce));
-  expect(artifacts[0].bytes == v1Bytes, "MIDI export should use the sequence's explicit CapcomSnes profile key");
-  expect(artifacts[0].bytes != v3Bytes, "MIDI export should not fall back to the default CapcomSnes profile");
+  const CommandInfo repeat = dialect.describe(track, track.commands[1]);
+  expect(repeat.detailKind == "capcom-snes.repeat-until", "CapcomSnes repeat opcode should decode as Repeat Until");
+  expect(repeat.fields.size() == 3 && repeat.fields[0].value == "1" && repeat.fields[1].value == "2" &&
+             repeat.fields[2].value == "$3000",
+         "CapcomSnes repeat display should preserve slot, count, and destination");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes finite repeat should render without diagnostics");
+  expect(performance.tracks[0].events.size() == 3, "CapcomSnes repeat count should replay the loop body");
+  expect(performance.tracks[0].endTick == 18, "CapcomSnes repeat count should include the original pass plus replays");
+
+  for (u64 tick : {0ULL, 6ULL, 12ULL}) {
+    const bool found = std::ranges::any_of(performance.tracks[0].events, [tick](const PerformanceEvent& event) {
+      const auto* note = std::get_if<NotePerformanceEvent>(&event);
+      return note != nullptr && note->header.tick == tick;
+    });
+    expect(found, "CapcomSnes repeat fixture should emit a note at tick " + std::to_string(tick));
+  }
+}
+
+void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x1e;
+  bytes[0x3001] = 0xab;
+  bytes[0x3002] = 0x1f;
+  bytes[0x3003] = 0xcd;
+  bytes[0x3004] = 0x41;
+  bytes[0x3005] = 0x17;
+
+  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v1BgmInList);
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  expect(track.commands.size() == 4, "CapcomSnes V1 unknown one-byte events should not truncate track decoding");
+  expect(dialect.describe(track, track.commands[0]).detailKind == "capcom-snes.unknown-one-byte",
+         "CapcomSnes V1 opcode $1E should decode as a one-byte unknown event");
+  expect(dialect.describe(track, track.commands[1]).detailKind == "capcom-snes.unknown-one-byte",
+         "CapcomSnes V1 opcode $1F should decode as a one-byte unknown event");
+  expect(track.commands[0].range.offset == 0x3000 && track.commands[0].range.size == 2,
+         "CapcomSnes V1 unknown one-byte event should preserve its source range");
+
+  const auto operands = track.operandsFor(track.commands[0]);
+  expect(operands.size() == 1 && operands[0].name == "value" && std::get<u64>(operands[0].value) == 0xab,
+         "CapcomSnes V1 unknown one-byte event should preserve its operand");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes V1 unknown one-byte events should render without diagnostics");
+  expect(performance.tracks[0].events.size() == 1, "CapcomSnes V1 fixture should still reach the later note");
 }

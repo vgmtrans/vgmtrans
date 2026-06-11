@@ -7,9 +7,9 @@
 #include "value/formats/ValueFormats.h"
 
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
-#include "value/formats/CapcomSnes/CapcomSnesProfile.h"
+#include "value/formats/CapcomSnes/CapcomSnesSequenceDialect.h"
 #include "value/formats/NDS/NdsModule.h"
-#include "value/formats/NDS/NdsProfile.h"
+#include "value/formats/NDS/NdsSequenceDialect.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/extractors/SnesRsnExtractor.h"
 #include "value/extractors/SnesSpcExtractor.h"
@@ -25,14 +25,14 @@ void registerValueFormatModules(core::FormatRegistry& registry) {
   capcom_snes::registerCapcomSnesModule(registry);
 }
 
-void registerValueMidiSequenceProfiles(core::MidiSequenceProfileRegistry& registry) {
-  nds::registerNdsProfile(registry);
-  capcom_snes::registerCapcomSnesProfile(registry);
+void registerValueSequenceDialects(core::SequenceDialectRegistry& registry) {
+  capcom_snes::registerCapcomSnesSequenceDialects(registry);
+  nds::registerNdsSequenceDialect(registry);
 }
 
 void registerValueFormats(core::Session& session) {
   registerValueFormatModules(session.formats());
-  registerValueMidiSequenceProfiles(session.profiles());
+  registerValueSequenceDialects(session.dialects());
 }
 
 }  // namespace vgmtrans::formats

@@ -105,8 +105,8 @@ CollectionAssets resolveCollectionAssets(const Project& project, const Collectio
   };
 
   if (collection.sequence) {
-    if (const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence)) {
-      resolved.sequence = sequence;
+    if (const auto* sequenceProgram = assetById<SequenceProgramAsset>(project, *collection.sequence)) {
+      resolved.sequenceProgram = sequenceProgram;
     } else {
       resolved.diagnostics.sequence.push_back(projectError("Collection sequence asset was not found"));
     }

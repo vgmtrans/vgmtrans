@@ -22,7 +22,6 @@
 #include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
-#include "value/formats/CapcomSnes/CapcomSnesProfile.h"
 #include "value/formats/ValueFormats.h"
 #include "io/RawFile.h"
 
@@ -803,9 +802,9 @@ CapcomSnesSummary valueCapcomSnesSummary(
   std::map<u32, const SampleCollectionAsset*> sampleCollectionsById;
 
   if (collection.sequence) {
-    if (const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence)) {
+    if (const auto* sequenceProgram = assetById<SequenceProgramAsset>(project, *collection.sequence)) {
       ++summary.sequenceCount;
-      summary.trackCounts.push_back(static_cast<u32>(sequence->commandSequence.tracks.size()));
+      summary.trackCounts.push_back(static_cast<u32>(sequenceProgram->program.tracks.size()));
     }
   }
 

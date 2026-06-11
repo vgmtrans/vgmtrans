@@ -7,8 +7,8 @@
 #pragma once
 
 #include "value/core/FormatRegistry.h"
-#include "value/core/MidiSequenceProfile.h"
 #include "value/core/ProjectModel.h"
+#include "value/core/SequenceDialect.h"
 #include "value/core/Source.h"
 #include "value/export/ExportTypes.h"
 
@@ -41,14 +41,14 @@ public:
   [[nodiscard]] SourceStore& sources() noexcept { return sources_; }
   [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }
   [[nodiscard]] FormatRegistry& formats() noexcept { return formats_; }
-  [[nodiscard]] const MidiSequenceProfileRegistry& profiles() const noexcept { return profiles_; }
-  [[nodiscard]] MidiSequenceProfileRegistry& profiles() noexcept { return profiles_; }
+  [[nodiscard]] const SequenceDialectRegistry& dialects() const noexcept { return dialects_; }
+  [[nodiscard]] SequenceDialectRegistry& dialects() noexcept { return dialects_; }
   [[nodiscard]] const Project& project() const noexcept { return project_; }
 
 private:
   SourceStore sources_;
   FormatRegistry formats_;
-  MidiSequenceProfileRegistry profiles_;
+  SequenceDialectRegistry dialects_;
   Project project_;
 };
 

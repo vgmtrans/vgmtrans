@@ -10,16 +10,16 @@
 
 namespace vgmtrans::core {
 
-class MidiSequenceProfileRegistry;
+class SequenceDialectRegistry;
 class SourceStore;
 struct Project;
 
 [[nodiscard]] std::vector<Artifact> exportCollection(const Project& project, const SourceStore& sources,
                                                      CollectionId collection, const ExportRequest& request,
-                                                     const MidiSequenceProfileRegistry& profiles);
+                                                     const SequenceDialectRegistry& dialects);
 
 [[nodiscard]] std::vector<CollectionExport> exportAllCollections(const Project& project, const SourceStore& sources,
                                                                  const ExportRequest& request,
-                                                                 const MidiSequenceProfileRegistry& profiles);
+                                                                 const SequenceDialectRegistry& dialects);
 
 }  // namespace vgmtrans::core

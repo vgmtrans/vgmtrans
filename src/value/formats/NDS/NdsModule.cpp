@@ -8,7 +8,7 @@
 
 #include "value/core/FormatRegistry.h"
 #include "value/core/SynthMath.h"
-#include "value/formats/NDS/NdsProfile.h"
+#include "value/formats/NDS/NdsSequenceProgram.h"
 
 #include <fmt/format.h>
 
@@ -38,7 +38,6 @@ constexpr std::string_view kSdatSignature = "SDAT\xff\xfe\x00\x01";
 constexpr std::string_view kSseqSignature = "SSEQ\xff\xfe\x00\x01";
 constexpr std::string_view kSwarSignature = "SWAR\xff\xfe\x00\x01";
 constexpr u32 kMaxNameLength = 128;
-constexpr size_t kMaxTrackCommands = 262144;
 constexpr double kEnvelopeIntervalSeconds = (2728.0 * 64.0) / 33513982.0;
 
 constexpr std::array<s16, 128> kDecibelSquareTable = {
@@ -52,12 +51,6 @@ constexpr std::array<s16, 128> kDecibelSquareTable = {
 
 constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33, 0x3F, 0x49, 0x54,
                                                  0x5C, 0x64, 0x6D, 0x74, 0x7B, 0x7F, 0x84, 0x89, 0x8F};
-
-constexpr auto kPitchBend = "nds-pitch-bend";
-constexpr auto kPitchBendRange = "nds-pitch-bend-range";
-constexpr auto kNotewait = "nds-notewait";
-constexpr auto kPortamentoEnable = "nds-portamento-enable";
-constexpr auto kExpression = "nds-expression";
 
 struct FileRange {
   u32 offset = 0;
@@ -96,12 +89,6 @@ struct SdatInfo {
   std::vector<SequenceInfo> sequences;
   std::vector<BankInfo> banks;
   std::vector<WaveArchiveInfo> waveArchives;
-};
-
-struct DecodedCommand {
-  Command command;
-  std::optional<u32> fallthrough;
-  std::vector<u32> targets;
 };
 
 [[nodiscard]] bool matches(ByteReader reader, u64 offset, std::string_view signature) {
@@ -681,461 +668,6 @@ struct DecodedCommand {
   return asset;
 }
 
-[[nodiscard]] bool hasSequenceBytes(ByteReader reader, u32 offset, u32 size, u32 sequenceEnd) {
-  return offset <= sequenceEnd && size <= sequenceEnd - offset && reader.has(offset, size);
-}
-
-[[nodiscard]] u32 readVarLen(ByteReader reader, u32& offset, u32 sequenceEnd) {
-  // SSEQ durations and programs use 7-bit continuation integers, similar to SMF varlen
-  // but parsed from absolute source offsets.
-  u32 value = 0;
-  while (hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
-    const u8 byte = reader.u8At(offset++);
-    value = (value << 7) + (byte & 0x7f);
-    if ((byte & 0x80) == 0) {
-      break;
-    }
-  }
-  return value;
-}
-
-[[nodiscard]] std::optional<u32> readSseqAddress(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd,
-                                                 u32 operandOffset) {
-  if (!hasSequenceBytes(reader, operandOffset, 3, sequenceEnd)) {
-    return std::nullopt;
-  }
-  return reader.u8At(operandOffset) + (reader.u8At(operandOffset + 1) << 8) + (reader.u8At(operandOffset + 2) << 16) +
-         sequenceOffset + 0x1c;
-}
-
-[[nodiscard]] DriverSpecificCommand driverCommand(std::string name, std::vector<u8> bytes, SourceRange range) {
-  return DriverSpecificCommand{.name = std::move(name), .bytes = std::move(bytes), .range = range};
-}
-
-[[nodiscard]] DriverSpecificCommand noOpCommand(u8 status, SourceRange range) {
-  return driverCommand("nds-no-op", {status}, range);
-}
-
-[[nodiscard]] DriverSpecificCommand terminalDriverCommand(u8 status, SourceRange range) {
-  return driverCommand("nds-terminal-driver-command", {status}, range);
-}
-
-[[nodiscard]] DecodedCommand decodeCommand(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd, u32 offset) {
-  // Decode exactly one SSEQ opcode and describe both the value command and its control-flow
-  // edges. The graph walk in parseTrack decides which targets to visit.
-  const u32 begin = offset;
-  const u8 status = reader.u8At(offset++);
-  auto range = [&] { return reader.range(begin, offset - begin); };
-  auto terminal = [&] { return DecodedCommand{.command = terminalDriverCommand(status, range())}; };
-  auto operand = [&](u32 size) {
-    if (!hasSequenceBytes(reader, offset, size, sequenceEnd)) {
-      return false;
-    }
-    return true;
-  };
-
-  if (status < 0x80) {
-    if (!operand(1)) {
-      return terminal();
-    }
-    const u8 velocity = reader.u8At(offset++);
-    const u32 duration = readVarLen(reader, offset, sequenceEnd);
-    return DecodedCommand{
-        .command = NoteCommand{.key = status, .rawVelocity = velocity, .rawDuration = duration, .range = range()},
-        .fallthrough = offset,
-    };
-  }
-
-  switch (status) {
-    case 0x80: {
-      const u32 duration = readVarLen(reader, offset, sequenceEnd);
-      return DecodedCommand{.command = RestCommand{.rawDuration = duration, .range = range()}, .fallthrough = offset};
-    }
-    case 0x81: {
-      const u32 program = readVarLen(reader, offset, sequenceEnd);
-      return DecodedCommand{.command = ProgramCommand{.rawProgram = program, .range = range()}, .fallthrough = offset};
-    }
-    case 0x93:
-      if (!operand(4)) {
-        return terminal();
-      }
-      offset += 4;
-      return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-    case 0x94: {
-      const auto destination = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset);
-      if (!destination || *destination >= sequenceEnd) {
-        return terminal();
-      }
-      offset += 3;
-      return DecodedCommand{.command = JumpCommand{.destination = Address{*destination}, .range = range()},
-                            .targets = {*destination}};
-    }
-    case 0x95: {
-      const auto destination = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset);
-      if (!destination || *destination >= sequenceEnd) {
-        return terminal();
-      }
-      offset += 3;
-      return DecodedCommand{
-          .command =
-              CallCommand{.destination = Address{*destination}, .returnAddress = Address{offset}, .range = range()},
-          .fallthrough = offset,
-          .targets = {*destination}};
-    }
-    case 0x96:
-      return DecodedCommand{.command = terminalDriverCommand(status, range())};
-    case 0xa0:
-      if (!operand(5)) {
-        return terminal();
-      }
-      offset += 5;
-      return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-    case 0xa1:
-      if (!operand(2)) {
-        return terminal();
-      }
-      offset += 2;
-      return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-    case 0xa2:
-      return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-    case 0xb0:
-    case 0xb1:
-    case 0xb2:
-    case 0xb3:
-    case 0xb4:
-    case 0xb5:
-    case 0xb6:
-    case 0xb8:
-    case 0xb9:
-    case 0xba:
-    case 0xbb:
-    case 0xbc:
-    case 0xbd:
-      if (!operand(3)) {
-        return terminal();
-      }
-      offset += 3;
-      return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-    case 0xc0: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = PanCommand{.rawValue = value, .range = range()}, .fallthrough = offset};
-    }
-    case 0xc1: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = VolumeCommand{.rawValue = value, .range = range()}, .fallthrough = offset};
-    }
-    case 0xc3: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const s8 value = reader.s8At(offset++);
-      return DecodedCommand{.command = TransposeCommand{.rawSemitones = value, .range = range()},
-                            .fallthrough = offset};
-    }
-    case 0xc4: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = driverCommand(kPitchBend, {value}, range()), .fallthrough = offset};
-    }
-    case 0xc5: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = driverCommand(kPitchBendRange, {value}, range()), .fallthrough = offset};
-    }
-    case 0xc7: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = driverCommand(kNotewait, {value}, range()), .fallthrough = offset};
-    }
-    case 0xca: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = VibratoCommand{.rawDepth = value, .range = range()}, .fallthrough = offset};
-    }
-    case 0xce: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = driverCommand(kPortamentoEnable, {value}, range()), .fallthrough = offset};
-    }
-    case 0xcf: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = PortamentoCommand{.rawTime = value, .range = range()}, .fallthrough = offset};
-    }
-    case 0xd5: {
-      if (!operand(1)) {
-        return terminal();
-      }
-      const u8 value = reader.u8At(offset++);
-      return DecodedCommand{.command = driverCommand(kExpression, {value}, range()), .fallthrough = offset};
-    }
-    case 0xe1: {
-      if (!operand(2)) {
-        return terminal();
-      }
-      const u16 bpm = reader.le16(offset);
-      offset += 2;
-      return DecodedCommand{.command = TempoCommand{.rawValue = bpm, .range = range()}, .fallthrough = offset};
-    }
-    case 0xe0:
-    case 0xe3:
-      if (!operand(2)) {
-        return terminal();
-      }
-      offset += 2;
-      return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-    case 0xfd:
-      return DecodedCommand{.command = ReturnCommand{.range = range()}};
-    case 0xff:
-      return DecodedCommand{.command = EndCommand{.range = range()}};
-    case 0xfc:
-      return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-    case 0xfe:
-      if (!operand(2)) {
-        return terminal();
-      }
-      offset += 2;
-      return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-    default:
-      if ((status >= 0xc2 && status <= 0xd6) && status != 0xc3 && status != 0xc4 && status != 0xc5 && status != 0xc7 &&
-          status != 0xca && status != 0xce && status != 0xcf && status != 0xd5) {
-        if (!operand(1)) {
-          return terminal();
-        }
-        offset += 1;
-        return DecodedCommand{.command = noOpCommand(status, range()), .fallthrough = offset};
-      }
-      return DecodedCommand{.command = UnknownCommand{.opcode = status, .range = range()}};
-  }
-}
-
-[[nodiscard]] CommandTrack parseTrack(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
-                                      u32 trackIndex) {
-  // Normal SSEQ tracks are decoded as a reachable command graph so calls/jumps can expose
-  // code that does not appear in linear byte order.
-  std::map<u32, Command> commandsByOffset;
-  std::vector<u32> pendingBlocks{startOffset};
-
-  while (!pendingBlocks.empty()) {
-    u32 offset = pendingBlocks.back();
-    pendingBlocks.pop_back();
-    while (hasSequenceBytes(reader, offset, 1, sequenceEnd) && !commandsByOffset.contains(offset)) {
-      auto decoded = decodeCommand(reader, sequenceOffset, sequenceEnd, offset);
-      const u32 commandOffset = static_cast<u32>(commandRange(decoded.command).offset);
-      for (const u32 target : decoded.targets) {
-        if (target < sequenceEnd && !commandsByOffset.contains(target)) {
-          pendingBlocks.push_back(target);
-        }
-      }
-      commandsByOffset.emplace(commandOffset, std::move(decoded.command));
-      if (!decoded.fallthrough) {
-        break;
-      }
-      offset = *decoded.fallthrough;
-    }
-  }
-
-  CommandTrack track{
-      .id = TrackId{trackIndex},
-      .sourceTrackNumber = trackIndex,
-      .startAddress = Address{startOffset},
-  };
-  track.commands.reserve(commandsByOffset.size());
-  for (auto& [_, command] : commandsByOffset) {
-    track.commands.push_back(std::move(command));
-  }
-  return track;
-}
-
-[[nodiscard]] CommandTrack parseMalformedTrack(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
-                                               u32 trackIndex) {
-  // Some commercial files contain legacy-malformed pseudo-sequences. Legacy VGMTrans
-  // follows them linearly while neutralizing control-flow opcodes; mirror that behavior
-  // so value output stays comparable without pretending the data is a valid SSEQ graph.
-  CommandTrack track{
-      .id = TrackId{trackIndex},
-      .sourceTrackNumber = trackIndex,
-      .startAddress = Address{startOffset},
-  };
-
-  u32 offset = startOffset;
-  size_t decodedCommands = 0;
-  std::vector<u32> returnStack;
-  std::set<u32> visitedControlDestinations;
-
-  while (hasSequenceBytes(reader, offset, 1, sequenceEnd) && decodedCommands++ < kMaxTrackCommands) {
-    auto decoded = decodeCommand(reader, sequenceOffset, sequenceEnd, offset);
-    auto command = std::move(decoded.command);
-
-    if (const auto* jump = std::get_if<JumpCommand>(&command)) {
-      const u32 destination = static_cast<u32>(jump->destination.value);
-      if (visitedControlDestinations.contains(destination)) {
-        track.commands.push_back(EndCommand{.range = jump->range});
-        break;
-      }
-      visitedControlDestinations.insert(destination);
-      track.commands.push_back(noOpCommand(0x94, jump->range));
-      offset = destination;
-      continue;
-    }
-
-    if (const auto* call = std::get_if<CallCommand>(&command)) {
-      const u32 destination = static_cast<u32>(call->destination.value);
-      returnStack.push_back(static_cast<u32>(call->returnAddress.value));
-      track.commands.push_back(noOpCommand(0x95, call->range));
-      offset = destination;
-      continue;
-    }
-
-    if (const auto* ret = std::get_if<ReturnCommand>(&command)) {
-      if (returnStack.empty()) {
-        track.commands.push_back(std::move(command));
-        break;
-      }
-      offset = returnStack.back();
-      returnStack.pop_back();
-      track.commands.push_back(noOpCommand(0xfd, ret->range));
-      continue;
-    }
-
-    if (const auto* unknown = std::get_if<UnknownCommand>(&command)) {
-      track.commands.push_back(terminalDriverCommand(unknown->opcode, unknown->range));
-      break;
-    }
-
-    const bool ended = std::holds_alternative<EndCommand>(command);
-    track.commands.push_back(std::move(command));
-    if (ended || !decoded.fallthrough) {
-      break;
-    }
-    offset = *decoded.fallthrough;
-  }
-
-  return track;
-}
-
-[[nodiscard]] std::vector<u32> trackStarts(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
-  // SSEQ can bootstrap extra tracks through opcodes near the beginning of the sequence.
-  // Return the primary start plus any discovered secondary starts.
-  std::vector<u32> extraStarts;
-  u32 offset = sequenceOffset + 0x1c;
-  if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
-    return {};
-  }
-
-  if (reader.u8At(offset) == 0xfe) {
-    if (!hasSequenceBytes(reader, offset, 3, sequenceEnd)) {
-      return {offset};
-    }
-    offset += 3;
-    if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
-      return {offset};
-    }
-    u8 status = reader.u8At(offset);
-    while (status == 0x80) {
-      ++offset;
-      (void)readVarLen(reader, offset, sequenceEnd);
-      if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
-        return {offset};
-      }
-      status = reader.u8At(offset);
-      break;
-    }
-
-    while (status == 0x93 && hasSequenceBytes(reader, offset, 5, sequenceEnd)) {
-      if (const auto start = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset + 2);
-          start && *start < sequenceEnd) {
-        extraStarts.push_back(*start);
-      }
-      offset += 5;
-      if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
-        break;
-      }
-      status = reader.u8At(offset);
-    }
-  }
-
-  std::vector<u32> starts{offset};
-  starts.insert(starts.end(), extraStarts.begin(), extraStarts.end());
-  return starts;
-}
-
-[[nodiscard]] SequenceAsset parseSequence(const ScanInput& input, AssetId id, FileRange range, const std::string& name,
-                                          std::optional<AssetId> instrumentSet) {
-  // Sequence assets keep a profile key so NDS-specific note-wait, tempo, and driver
-  // command behavior stays outside the generic MIDI lowering loop.
-  SequenceAsset asset{
-      .metadata =
-          AssetMetadata{
-              .id = id,
-              .format = std::string(kFormatName),
-              .name = name,
-              .range = input.reader.range(range.offset, range.size),
-          },
-      .commandSequence =
-          CommandSequence{
-              .timebase = Timebase{.ppqn = 0x30},
-              .behavior =
-                  SequenceBehavior{
-                      .truncateSustainedNotesAtLoopBoundary = false,
-                      .suppressEventsWhenPlaybackTicksZero = true,
-                      .maxPlaybackTicks = 1'000'000,
-                  },
-              .midiSequenceProfile = std::string(kNdsProfileName),
-          },
-  };
-  if (instrumentSet) {
-    asset.commandSequence.referencedInstruments.push_back(InstrumentRef{.asset = instrumentSet});
-  }
-
-  ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root =
-      items.add(std::nullopt, ItemKind::Sequence, "sseq", name, input.reader.range(range.offset, range.size));
-
-  u32 trackIndex = 0;
-  const bool hasSseqHeader = matches(input.reader, range.offset, kSseqSignature);
-  const bool parseLegacyMalformedFallthrough =
-      !hasSseqHeader && shouldParseLegacyMalformedFallthrough(input.reader, range);
-  const bool extendMalformedPastFatRange = parseLegacyMalformedFallthrough && range.size <= 0x100;
-  const u32 sequenceEnd =
-      hasSseqHeader || !extendMalformedPastFatRange
-          ? static_cast<u32>(std::min<u64>(input.reader.size(), static_cast<u64>(range.offset) + range.size))
-          : static_cast<u32>(input.reader.size());
-  for (const u32 start : trackStarts(input.reader, range.offset, sequenceEnd)) {
-    auto track = parseLegacyMalformedFallthrough
-                     ? parseMalformedTrack(input.reader, range.offset, sequenceEnd, start, trackIndex++)
-                     : parseTrack(input.reader, range.offset, sequenceEnd, start, trackIndex++);
-    const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
-                                     input.reader.range(start, 0));
-    for (const auto& command : track.commands) {
-      static_cast<void>(items.add(trackItem, ItemKind::Command, defaultCommandDetailKind(command),
-                                  defaultCommandName(command), commandRange(command),
-                                  defaultCommandDescription(command)));
-    }
-    asset.commandSequence.tracks.push_back(std::move(track));
-  }
-
-  return asset;
-}
-
 [[nodiscard]] std::vector<u32> findSdatOffsets(ByteReader reader) {
   std::vector<u32> offsets;
   for (u64 offset = 0; offset + kSdatSignature.size() <= reader.size(); ++offset) {
@@ -1233,7 +765,26 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
         bankAsset == bankAssetIds.end() ? std::nullopt : std::optional<AssetId>{bankAsset->second};
     const auto sequenceId = input.ids.nextAssetId();
     const std::string& name = sdat.sequenceNames[sequenceIndex];
-    result.assets.emplace_back(parseSequence(input, sequenceId, *sequenceRange, name, instrumentSet));
+    const bool hasSseqHeader = matches(input.reader, sequenceRange->offset, kSseqSignature);
+    const bool parseLegacyMalformedFallthrough =
+        !hasSseqHeader && shouldParseLegacyMalformedFallthrough(input.reader, *sequenceRange);
+    const bool extendMalformedPastFatRange = parseLegacyMalformedFallthrough && sequenceRange->size <= 0x100;
+    const u32 sequenceEnd =
+        hasSseqHeader || !extendMalformedPastFatRange
+            ? static_cast<u32>(
+                  std::min<u64>(input.reader.size(), static_cast<u64>(sequenceRange->offset) + sequenceRange->size))
+            : static_cast<u32>(input.reader.size());
+    result.assets.emplace_back(parseNdsSequenceProgram(input,
+                                                       sequenceId,
+                                                       NdsSequenceRange{
+                                                           .offset = sequenceRange->offset,
+                                                           .size = sequenceRange->size,
+                                                           .sequenceEnd = sequenceEnd,
+                                                           .linearizeMalformedControlFlow =
+                                                               parseLegacyMalformedFallthrough,
+                                                       },
+                                                       name,
+                                                       instrumentSet));
 
     Collection collection{
         .id = input.ids.nextCollectionId(),

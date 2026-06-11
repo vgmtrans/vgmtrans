@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/core/MidiModel.h"
-#include "value/core/SequenceModel.h"
+#include "value/core/PerformanceModel.h"
 
 #include <optional>
 #include <vector>
@@ -23,22 +23,6 @@ struct ObservedValueRange {
   std::optional<SourceRange> firstRange;
 };
 
-struct TrackModulationUsage {
-  u32 sourceTrackNumber = 0;
-  ObservedValueRange vibratoDepth;
-  ObservedValueRange tremoloDepth;
-  ObservedValueRange modulationRate;
-};
-
-struct ModulationUsage {
-  // Command-level usage keeps source ranges, useful for diagnostics and future format
-  // decisions before MIDI lowering has quantized values.
-  ObservedValueRange vibratoDepth;
-  ObservedValueRange tremoloDepth;
-  ObservedValueRange modulationRate;
-  std::vector<TrackModulationUsage> tracks;
-};
-
 struct MidiTrackModulationUsage {
   u32 trackIndex = 0;
   ObservedValueRange vibratoDepth;
@@ -48,8 +32,9 @@ struct MidiTrackModulationUsage {
 };
 
 struct MidiModulationUsage {
-  // MIDI-level usage reflects the final controller values that will be written to a MIDI
-  // file and consumed by SF2/DLS modulators.
+  // Controller-level usage reflects the MIDI controller range consumed by SF2/DLS
+  // modulators. Prefer deriving it from PerformanceSequence when possible so source
+  // driver semantics stay above MIDI rendering.
   ObservedValueRange vibratoDepth;
   ObservedValueRange vibratoRate;
   ObservedValueRange tremoloDepth;
@@ -58,11 +43,9 @@ struct MidiModulationUsage {
 };
 
 [[nodiscard]] bool hasObservedValue(const ObservedValueRange& range) noexcept;
-[[nodiscard]] bool hasModulationUsage(const TrackModulationUsage& usage) noexcept;
-[[nodiscard]] bool hasModulationUsage(const ModulationUsage& usage) noexcept;
 [[nodiscard]] bool hasMidiModulationUsage(const MidiTrackModulationUsage& usage) noexcept;
 [[nodiscard]] bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept;
-[[nodiscard]] ModulationUsage analyzeModulationUsage(const CommandSequence& sequence);
+[[nodiscard]] MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence& sequence);
 [[nodiscard]] MidiModulationUsage analyzeMidiModulationUsage(const MidiSequence& sequence);
 
 }  // namespace vgmtrans::core

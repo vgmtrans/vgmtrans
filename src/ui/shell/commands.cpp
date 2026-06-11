@@ -196,7 +196,7 @@ void printChildren(VGMItem* item) {
 
 const char* valueAssetKindName(const vgmtrans::core::Asset& asset) {
   using namespace vgmtrans::core;
-  if (std::holds_alternative<SequenceAsset>(asset)) {
+  if (std::holds_alternative<SequenceProgramAsset>(asset)) {
     return "sequence";
   }
   if (std::holds_alternative<InstrumentSetAsset>(asset)) {
@@ -269,9 +269,9 @@ void printValueProjectSummary(const vgmtrans::core::Project& project) {
     fmt::print("asset #{} [{}] id={} format={} name='{}' range=0x{:x}:0x{:x}",
                i, valueAssetKindName(asset), meta.id.value, meta.format, meta.name, meta.range.offset,
                meta.range.size);
-    if (std::holds_alternative<vgmtrans::core::SequenceAsset>(asset)) {
-      const auto& sequence = std::get<vgmtrans::core::SequenceAsset>(asset);
-      fmt::print(" tracks={}", sequence.commandSequence.tracks.size());
+    if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(asset)) {
+      const auto& sequence = std::get<vgmtrans::core::SequenceProgramAsset>(asset);
+      fmt::print(" tracks={}", sequence.program.tracks.size());
     } else if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(asset)) {
       const auto& instrumentSet = std::get<vgmtrans::core::InstrumentSetAsset>(asset);
       fmt::print(" instruments={}", instrumentSet.instruments.size());
@@ -419,98 +419,8 @@ bool printValueAssetTree(const vgmtrans::core::Project& project,
   }
 }
 
-std::string_view valueNoteStateActionName(vgmtrans::core::NoteStateAction action) {
-  switch (action) {
-    case vgmtrans::core::NoteStateAction::ToggleTriplet:
-      return "toggle-triplet";
-    case vgmtrans::core::NoteStateAction::ToggleSlur:
-      return "toggle-slur";
-    case vgmtrans::core::NoteStateAction::EnableDotted:
-      return "enable-dotted";
-    case vgmtrans::core::NoteStateAction::ToggleOctaveUp:
-      return "toggle-octave-up";
-    case vgmtrans::core::NoteStateAction::Attributes:
-      return "attributes";
-    case vgmtrans::core::NoteStateAction::Octave:
-      return "octave";
-  }
-  return "unknown";
-}
-
-std::string valueCommandDescription(const vgmtrans::core::Command& command) {
-  return std::visit([](const auto& typedCommand) -> std::string {
-    using TypedCommand = std::decay_t<decltype(typedCommand)>;
-    if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::NoteCommand>) {
-      return fmt::format("note key={} rawVelocity={} rawDuration={}",
-                         typedCommand.key, typedCommand.rawVelocity, typedCommand.rawDuration);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::RestCommand>) {
-      return fmt::format("rest rawDuration={}", typedCommand.rawDuration);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::NoteStateCommand>) {
-      return fmt::format("note-state action={} rawValue={}",
-                         valueNoteStateActionName(typedCommand.action), typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::DurationCommand>) {
-      return fmt::format("duration rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ProgramCommand>) {
-      return fmt::format("program rawProgram={}", typedCommand.rawProgram);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::VolumeCommand>) {
-      return fmt::format("volume rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::PanCommand>) {
-      return fmt::format("pan rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::TempoCommand>) {
-      return fmt::format("tempo rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::TransposeCommand>) {
-      return fmt::format("transpose rawSemitones={}", typedCommand.rawSemitones);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::GlobalTransposeCommand>) {
-      return fmt::format("global-transpose rawSemitones={}", typedCommand.rawSemitones);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::TuningCommand>) {
-      return fmt::format("tuning rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::PortamentoCommand>) {
-      return typedCommand.rawTargetKey
-               ? fmt::format("portamento rawTime={} rawTargetKey={}", typedCommand.rawTime, *typedCommand.rawTargetKey)
-               : fmt::format("portamento rawTime={}", typedCommand.rawTime);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::VibratoCommand>) {
-      return fmt::format("vibrato rawDepth={}", typedCommand.rawDepth);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::TremoloCommand>) {
-      return fmt::format("tremolo rawDepth={}", typedCommand.rawDepth);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ModulationRateCommand>) {
-      return fmt::format("modulation-rate rawRate={}", typedCommand.rawRate);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ReverbCommand>) {
-      return fmt::format("reverb rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::EnvelopeCommand>) {
-      return fmt::format("envelope rawAttack={} rawDecay={} rawSustain={} rawRelease={}",
-                         typedCommand.rawAttack, typedCommand.rawDecay, typedCommand.rawSustain,
-                         typedCommand.rawRelease);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::MasterVolumeCommand>) {
-      return fmt::format("master-volume rawValue={}", typedCommand.rawValue);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::JumpCommand>) {
-      return fmt::format("jump destination=0x{:x}", typedCommand.destination.value);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::CallCommand>) {
-      return fmt::format("call destination=0x{:x} return=0x{:x}",
-                         typedCommand.destination.value, typedCommand.returnAddress.value);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ReturnCommand>) {
-      return "return";
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::RepeatCommand>) {
-      return fmt::format("repeat slot={} count={} destination=0x{:x}",
-                         typedCommand.slot, typedCommand.count, typedCommand.destination.value);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::RepeatBreakCommand>) {
-      return fmt::format("repeat-break slot={} rawAttributes={} destination=0x{:x}",
-                         typedCommand.slot, typedCommand.rawAttributes, typedCommand.destination.value);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::LoopBoundaryCommand>) {
-      return fmt::format("loop-boundary destination=0x{:x} trigger=0x{:x}",
-                         typedCommand.destination.value, typedCommand.trigger.value);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::EndCommand>) {
-      return "end";
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::UnknownCommand>) {
-      return fmt::format("unknown opcode=0x{:x} bytes={}", typedCommand.opcode, typedCommand.bytes.size());
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::DriverSpecificCommand>) {
-      return fmt::format("driver-specific '{}' bytes={}", typedCommand.name, typedCommand.bytes.size());
-    } else {
-      return "command";
-    }
-  }, command);
-}
-
 bool printValueSequenceEvents(const vgmtrans::core::Project& project,
+                              const vgmtrans::core::SequenceDialectRegistry& dialects,
                               const std::vector<std::string>& args,
                               size_t assetArgIndex) {
   try {
@@ -520,20 +430,22 @@ bool printValueSequenceEvents(const vgmtrans::core::Project& project,
       return false;
     }
 
-    const auto* sequence = std::get_if<vgmtrans::core::SequenceAsset>(
-        &project.assets[static_cast<size_t>(assetIndex)]);
-    if (sequence == nullptr) {
+    const auto& asset = project.assets[static_cast<size_t>(assetIndex)];
+    const auto* sequenceProgram = std::get_if<vgmtrans::core::SequenceProgramAsset>(&asset);
+    if (sequenceProgram == nullptr) {
       fmt::println("Asset is not a sequence");
       return false;
     }
 
     const int trackIndex = std::stoi(args[assetArgIndex + 1]);
-    if (trackIndex < 0 || static_cast<size_t>(trackIndex) >= sequence->commandSequence.tracks.size()) {
+    const size_t trackCount = sequenceProgram->program.tracks.size();
+    if (trackIndex < 0 || static_cast<size_t>(trackIndex) >= trackCount) {
       fmt::println("Track index out of bounds");
       return false;
     }
 
-    size_t limit = sequence->commandSequence.tracks[static_cast<size_t>(trackIndex)].commands.size();
+    const auto* dialect = dialects.find(sequenceProgram->program.dialect.value);
+    size_t limit = sequenceProgram->program.tracks[static_cast<size_t>(trackIndex)].commands.size();
     const size_t limitArgIndex = assetArgIndex + 2;
     if (args.size() > limitArgIndex) {
       const int parsedLimit = std::stoi(args[limitArgIndex]);
@@ -544,14 +456,24 @@ bool printValueSequenceEvents(const vgmtrans::core::Project& project,
       limit = static_cast<size_t>(parsedLimit);
     }
 
-    const auto& track = sequence->commandSequence.tracks[static_cast<size_t>(trackIndex)];
+    const auto& track = sequenceProgram->program.tracks[static_cast<size_t>(trackIndex)];
     fmt::println("Commands for value sequence asset #{} track #{} (source track {}, start 0x{:x}):",
                  assetIndex, trackIndex, track.sourceTrackNumber, track.startAddress.value);
+    if (dialect == nullptr) {
+      fmt::println("No registered dialect for '{}'; showing raw command ids.", sequenceProgram->program.dialect.value);
+    }
     const size_t count = std::min(limit, track.commands.size());
     for (size_t i = 0; i < count; ++i) {
-      const auto range = vgmtrans::core::commandRange(track.commands[i]);
-      fmt::println("#{} 0x{:x}:0x{:x} {}", i, range.offset, range.size,
-                   valueCommandDescription(track.commands[i]));
+      const auto& command = track.commands[i];
+      if (dialect != nullptr) {
+        const auto info = dialect->describe(track, command);
+        const auto description = vgmtrans::core::commandInfoDescription(info);
+        fmt::println("#{} 0x{:x}:0x{:x} opcode=0x{:02x} {}{}{}", i, command.range.offset, command.range.size,
+                     command.opcode, info.name, description.empty() ? "" : " - ", description);
+      } else {
+        fmt::println("#{} 0x{:x}:0x{:x} kind={} opcode=0x{:02x}", i, command.range.offset, command.range.size,
+                     command.kind.value, command.opcode);
+      }
     }
     if (count < track.commands.size()) {
       fmt::println("... {} more commands", track.commands.size() - count);
@@ -1633,14 +1555,14 @@ void value_events(const std::vector<std::string>& args) {
 
   auto session = valueSessionForRawFile(*file);
   const auto project = session.scan();
-  printValueSequenceEvents(project, args, 3);
+  printValueSequenceEvents(project, session.dialects(), args, 3);
 }
 
 void value_events_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
     const auto project = session.scan();
-    printValueSequenceEvents(project, args, 3);
+    printValueSequenceEvents(project, session.dialects(), args, 3);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-events {}: {}", args[2], ex.what());
   }
