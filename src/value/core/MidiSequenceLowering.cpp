@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/core/MidiSequenceBuilder.h"
+#include "value/core/MidiSequenceLowering.h"
 
 #include <algorithm>
 #include <cmath>
@@ -24,15 +24,10 @@ constexpr size_t kMaxExecutedCommandsPerTrack = 262144;
 
 template <typename T>
 void appendEvents(std::vector<MidiEvent>& destination, std::vector<T> events) {
-  destination.insert(destination.end(),
-                     std::make_move_iterator(events.begin()),
-                     std::make_move_iterator(events.end()));
+  destination.insert(destination.end(), std::make_move_iterator(events.begin()), std::make_move_iterator(events.end()));
 }
 
-void purgeEndedPendingNotes(
-    const std::vector<MidiEvent>& events,
-    std::vector<size_t>& pendingNoteIndexes,
-    u64 tick) {
+void purgeEndedPendingNotes(const std::vector<MidiEvent>& events, std::vector<size_t>& pendingNoteIndexes, u64 tick) {
   std::erase_if(pendingNoteIndexes, [&](size_t index) {
     if (index >= events.size()) {
       return true;
@@ -42,10 +37,7 @@ void purgeEndedPendingNotes(
   });
 }
 
-void extendPendingNotes(
-    std::vector<MidiEvent>& events,
-    const std::vector<size_t>& pendingNoteIndexes,
-    u64 endTick) {
+void extendPendingNotes(std::vector<MidiEvent>& events, const std::vector<size_t>& pendingNoteIndexes, u64 endTick) {
   for (const size_t index : pendingNoteIndexes) {
     if (index >= events.size()) {
       continue;
@@ -76,9 +68,8 @@ void extendPendingNotes(
   return indexes;
 }
 
-[[nodiscard]] std::optional<size_t> destinationIndex(
-    const std::unordered_map<u64, size_t>& indexes,
-    Address destination) {
+[[nodiscard]] std::optional<size_t> destinationIndex(const std::unordered_map<u64, size_t>& indexes,
+                                                     Address destination) {
   const auto found = indexes.find(destination.value);
   if (found == indexes.end()) {
     return std::nullopt;
@@ -109,11 +100,8 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
   return static_cast<u8>(slot < kSkippedChannel ? slot : slot + 1);
 }
 
-[[nodiscard]] std::optional<u64> firstLoopTick(
-    const CommandSequence& commandSequence,
-    const CommandTrack& track,
-    const MidiSequenceProfile& profile,
-    u8 channel) {
+[[nodiscard]] std::optional<u64> firstLoopTick(const CommandSequence& commandSequence, const CommandTrack& track,
+                                               const MidiSequenceProfile& profile, u8 channel) {
   // Dry-run the track state to find the first musical loop without emitting events.
   const auto indexes = commandIndexByOffset(track);
   MidiTrackState state{
@@ -267,11 +255,8 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
   return std::nullopt;
 }
 
-[[nodiscard]] u64 trackStopTick(
-    const CommandSequence& commandSequence,
-    const CommandTrack& track,
-    const MidiSequenceProfile& profile,
-    u8 channel) {
+[[nodiscard]] u64 trackStopTick(const CommandSequence& commandSequence, const CommandTrack& track,
+                                const MidiSequenceProfile& profile, u8 channel) {
   const auto indexes = commandIndexByOffset(track);
   MidiTrackState state{
       .trackIndex = track.sourceTrackNumber,
@@ -420,29 +405,17 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
 // Immediate commands apply at the current tick without advancing time or changing track position.
 template <typename T>
 inline constexpr bool kImmediateCommand =
-    std::is_same_v<T, NoteStateCommand> ||
-    std::is_same_v<T, DurationCommand> ||
-    std::is_same_v<T, TransposeCommand> ||
-    std::is_same_v<T, GlobalTransposeCommand> ||
-    std::is_same_v<T, TempoCommand> ||
-    std::is_same_v<T, ProgramCommand> ||
-    std::is_same_v<T, VolumeCommand> ||
-    std::is_same_v<T, PanCommand> ||
-    std::is_same_v<T, MasterVolumeCommand> ||
-    std::is_same_v<T, ReverbCommand> ||
-    std::is_same_v<T, TuningCommand> ||
-    std::is_same_v<T, PortamentoCommand> ||
-    std::is_same_v<T, VibratoCommand> ||
-    std::is_same_v<T, TremoloCommand> ||
-    std::is_same_v<T, ModulationRateCommand> ||
-    std::is_same_v<T, EnvelopeCommand> ||
+    std::is_same_v<T, NoteStateCommand> || std::is_same_v<T, DurationCommand> || std::is_same_v<T, TransposeCommand> ||
+    std::is_same_v<T, GlobalTransposeCommand> || std::is_same_v<T, TempoCommand> || std::is_same_v<T, ProgramCommand> ||
+    std::is_same_v<T, VolumeCommand> || std::is_same_v<T, PanCommand> || std::is_same_v<T, MasterVolumeCommand> ||
+    std::is_same_v<T, ReverbCommand> || std::is_same_v<T, TuningCommand> || std::is_same_v<T, PortamentoCommand> ||
+    std::is_same_v<T, VibratoCommand> || std::is_same_v<T, TremoloCommand> ||
+    std::is_same_v<T, ModulationRateCommand> || std::is_same_v<T, EnvelopeCommand> ||
     std::is_same_v<T, DriverSpecificCommand>;
 
 template <typename T>
-[[nodiscard]] std::vector<MidiEvent> interpretImmediateCommand(
-    const T& command,
-    const MidiSequenceProfile& profile,
-    MidiTrackState& state) {
+[[nodiscard]] std::vector<MidiEvent> interpretImmediateCommand(const T& command, const MidiSequenceProfile& profile,
+                                                               MidiTrackState& state) {
   if constexpr (std::is_same_v<T, NoteStateCommand>) {
     return profile.interpretNoteState(command, state);
   } else if constexpr (std::is_same_v<T, DurationCommand>) {
@@ -487,10 +460,8 @@ template <typename T>
 
 }  // namespace
 
-MidiSequence MidiSequenceBuilder::build(
-    const CommandSequence& commandSequence,
-    const MidiSequenceProfile& profile,
-    LoopPolicy loopPolicy) const {
+MidiSequence buildMidiSequence(const CommandSequence& commandSequence, const MidiSequenceProfile& profile,
+                               LoopPolicy loopPolicy) {
   if (loopPolicy == LoopPolicy::Default) {
     loopPolicy = commandSequence.behavior.defaultLoopPolicy;
   }
@@ -506,11 +477,8 @@ MidiSequence MidiSequenceBuilder::build(
   std::vector<std::optional<u64>> firstLoopTicks(commandSequence.tracks.size());
   u64 globalStopTick = 0;
   for (size_t trackIndex = 0; trackIndex < commandSequence.tracks.size(); ++trackIndex) {
-    globalStopTick = std::max(globalStopTick,
-                              trackStopTick(commandSequence,
-                                            commandSequence.tracks[trackIndex],
-                                            profile,
-                                            midiChannelForTrack(trackIndex, commandSequence)));
+    globalStopTick = std::max(globalStopTick, trackStopTick(commandSequence, commandSequence.tracks[trackIndex],
+                                                            profile, midiChannelForTrack(trackIndex, commandSequence)));
   }
   if (commandSequence.behavior.maxPlaybackTicks.has_value() &&
       globalStopTick > *commandSequence.behavior.maxPlaybackTicks) {
@@ -519,10 +487,8 @@ MidiSequence MidiSequenceBuilder::build(
   if (loopPolicy == LoopPolicy::PlayOnce) {
     // All tracks stop at the latest first-loop tick so short tracks do not truncate the song.
     for (size_t trackIndex = 0; trackIndex < commandSequence.tracks.size(); ++trackIndex) {
-      const auto loopTick = firstLoopTick(commandSequence,
-                                         commandSequence.tracks[trackIndex],
-                                         profile,
-                                         midiChannelForTrack(trackIndex, commandSequence));
+      const auto loopTick = firstLoopTick(commandSequence, commandSequence.tracks[trackIndex], profile,
+                                          midiChannelForTrack(trackIndex, commandSequence));
       firstLoopTicks[trackIndex] = loopTick;
       if (loopTick.has_value() && (!playOnceStopTick.has_value() || *loopTick > *playOnceStopTick)) {
         playOnceStopTick = loopTick;
@@ -591,8 +557,8 @@ MidiSequence MidiSequenceBuilder::build(
             if constexpr (std::is_same_v<TypedCommand, NoteCommand>) {
               auto timing = profile.noteTiming(typedCommand, state);
               u32 soundingTicks = timing.soundingTicks;
-              if (commandSequence.behavior.truncateSustainedNotesAtLoopBoundary &&
-                  playbackStopTick.has_value() && soundingTicks > timing.advanceTicks + 1) {
+              if (commandSequence.behavior.truncateSustainedNotesAtLoopBoundary && playbackStopTick.has_value() &&
+                  soundingTicks > timing.advanceTicks + 1) {
                 const u64 stopEndTick = *playbackStopTick + 1;
                 if (state.tick < stopEndTick && state.tick + soundingTicks > stopEndTick) {
                   soundingTicks = static_cast<u32>(stopEndTick - state.tick);
@@ -621,8 +587,8 @@ MidiSequence MidiSequenceBuilder::build(
               appendEvents(midiTrack.events, interpretImmediateCommand(typedCommand, profile, state));
             } else if constexpr (std::is_same_v<TypedCommand, RepeatCommand>) {
               if (typedCommand.slot >= state.repeatCounters.size()) {
-                result.diagnostics.push_back(warning("Repeat command uses an unsupported repeat slot",
-                                                     typedCommand.range));
+                result.diagnostics.push_back(
+                    warning("Repeat command uses an unsupported repeat slot", typedCommand.range));
                 return;
               }
               auto& counter = state.repeatCounters[typedCommand.slot];
@@ -638,8 +604,7 @@ MidiSequence MidiSequenceBuilder::build(
                   pc = *target;
                   incrementPc = false;
                 } else {
-                  result.diagnostics.push_back(warning("Repeat destination was not decoded",
-                                                       typedCommand.range));
+                  result.diagnostics.push_back(warning("Repeat destination was not decoded", typedCommand.range));
                 }
               } else {
                 --counter;
@@ -648,15 +613,14 @@ MidiSequence MidiSequenceBuilder::build(
                     pc = *target;
                     incrementPc = false;
                   } else {
-                    result.diagnostics.push_back(warning("Repeat destination was not decoded",
-                                                         typedCommand.range));
+                    result.diagnostics.push_back(warning("Repeat destination was not decoded", typedCommand.range));
                   }
                 }
               }
             } else if constexpr (std::is_same_v<TypedCommand, RepeatBreakCommand>) {
               if (typedCommand.slot >= state.repeatCounters.size()) {
-                result.diagnostics.push_back(warning("Repeat break command uses an unsupported repeat slot",
-                                                     typedCommand.range));
+                result.diagnostics.push_back(
+                    warning("Repeat break command uses an unsupported repeat slot", typedCommand.range));
                 return;
               }
               auto& counter = state.repeatCounters[typedCommand.slot];
@@ -667,8 +631,7 @@ MidiSequence MidiSequenceBuilder::build(
                   pc = *target;
                   incrementPc = false;
                 } else {
-                  result.diagnostics.push_back(warning("Repeat break destination was not decoded",
-                                                       typedCommand.range));
+                  result.diagnostics.push_back(warning("Repeat break destination was not decoded", typedCommand.range));
                 }
               }
             } else if constexpr (std::is_same_v<TypedCommand, JumpCommand>) {
@@ -733,8 +696,7 @@ MidiSequence MidiSequenceBuilder::build(
               midiTrack.events.push_back(EndOfTrack{.tick = state.tick});
               ended = true;
             } else if constexpr (std::is_same_v<TypedCommand, UnknownCommand>) {
-              result.diagnostics.push_back(warning("Unknown sequencer command " +
-                                                       std::to_string(typedCommand.opcode) +
+              result.diagnostics.push_back(warning("Unknown sequencer command " + std::to_string(typedCommand.opcode) +
                                                        " was skipped at source offset " +
                                                        std::to_string(typedCommand.range.offset),
                                                    typedCommand.range));

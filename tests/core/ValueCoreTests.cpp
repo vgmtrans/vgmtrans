@@ -8,7 +8,7 @@
 #include "value/export/Export.h"
 #include "value/core/FormatModule.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/MidiSequenceBuilder.h"
+#include "value/core/MidiSequenceLowering.h"
 #include "value/core/ModulationAnalysis.h"
 #include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
@@ -658,7 +658,7 @@ void midiExporterWritesStandardMidiFile() {
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
 }
 
-void midiSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
+void midiSequenceLoweringSkipsCommandsAtPlayOnceLoopBoundary() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -678,8 +678,7 @@ void midiSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
       }},
   };
 
-  const MidiSequence midiSequence =
-      MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const MidiSequence midiSequence = buildMidiSequence(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
   const auto& events = midiSequence.tracks[0].events;
   expect(std::ranges::any_of(events,
                              [](const MidiEvent& event) {
@@ -691,7 +690,7 @@ void midiSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary() {
          "play-once event build should skip commands exactly at the loop boundary");
 }
 
-void midiSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
+void midiSequenceLoweringResolvesUnsetDefaultLoopPolicyToPlayOnce() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -709,8 +708,7 @@ void midiSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
       }},
   };
 
-  const MidiSequence midiSequence =
-      MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::Default);
+  const MidiSequence midiSequence = buildMidiSequence(commandSequence, MidiSequenceProfile{}, LoopPolicy::Default);
   const auto& events = midiSequence.tracks[0].events;
   expect(midiSequence.diagnostics.empty(), "unset default loop policy should not run until command cap");
   expect(std::ranges::count_if(events,
@@ -720,7 +718,7 @@ void midiSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce() {
          "unset default loop policy should end at the first playthrough boundary");
 }
 
-void midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
+void midiSequenceLoweringTreatsLoopBoundaryAsAStopPoint() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -739,8 +737,7 @@ void midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
       }},
   };
 
-  const MidiSequence midiSequence =
-      MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const MidiSequence midiSequence = buildMidiSequence(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
   const auto& events = midiSequence.tracks[0].events;
   expect(std::ranges::any_of(events,
                              [](const MidiEvent& event) {
@@ -752,7 +749,7 @@ void midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint() {
          "loop-boundary fixture should not build commands after the boundary");
 }
 
-void midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
+void midiSequenceLoweringReplaysDecodedBoundaryUntilPlayOnceStop() {
   const auto range = [](u64 offset, u64 size) {
     return SourceRange{.source = SourceId{0}, .offset = offset, .size = size};
   };
@@ -786,8 +783,7 @@ void midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop() {
           },
   };
 
-  const MidiSequence midiSequence =
-      MidiSequenceBuilder().build(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
+  const MidiSequence midiSequence = buildMidiSequence(commandSequence, MidiSequenceProfile{}, LoopPolicy::PlayOnce);
   const auto countNotesAt = [](const MidiTrack& track, u64 tick) {
     return std::ranges::count_if(track.events, [tick](const MidiEvent& event) {
       const auto* note = std::get_if<NoteDuration>(&event);
@@ -1291,8 +1287,8 @@ void exportDiagnosticsPreserveSourceRanges() {
   });
 
   MidiSequenceProfileRegistry profiles;
-  const auto wavArtifacts = ExportService().exportCollection(project, sources, CollectionId{0},
-                                                             ExportRequest{.kinds = {ExportKind::Wav}}, profiles);
+  const auto wavArtifacts =
+      exportCollection(project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, profiles);
   expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
   expectDiagnosticRange(wavArtifacts[0].diagnostics, "Sample source was not found", missingSampleRange);
 
@@ -1385,10 +1381,10 @@ int main() {
     projectSessionExportsAllCollections();
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
-    midiSequenceBuilderSkipsCommandsAtPlayOnceLoopBoundary();
-    midiSequenceBuilderResolvesUnsetDefaultLoopPolicyToPlayOnce();
-    midiSequenceBuilderTreatsLoopBoundaryAsAStopPoint();
-    midiSequenceBuilderReplaysDecodedBoundaryUntilPlayOnceStop();
+    midiSequenceLoweringSkipsCommandsAtPlayOnceLoopBoundary();
+    midiSequenceLoweringResolvesUnsetDefaultLoopPolicyToPlayOnce();
+    midiSequenceLoweringTreatsLoopBoundaryAsAStopPoint();
+    midiSequenceLoweringReplaysDecodedBoundaryUntilPlayOnceStop();
     modulationAnalysisReportsObservedSourceRanges();
     modulationAnalysisReportsObservedMidiControllerRanges();
     observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();

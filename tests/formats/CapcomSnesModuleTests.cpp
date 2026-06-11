@@ -8,7 +8,7 @@
 
 #include "value/export/Export.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/MidiSequenceBuilder.h"
+#include "value/core/MidiSequenceLowering.h"
 #include "value/core/Session.h"
 #include "value/formats/CapcomSnes/CapcomSnesProfile.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueSynth.h"
@@ -201,7 +201,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(firstTempoItem->range.offset == 0x3000 && firstTempoItem->range.size == 3,
          "command item should preserve command source range");
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(
+  const MidiSequence midiSequence = buildMidiSequence(
       sequence->commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
@@ -494,7 +494,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   expect(attributeItem->name == "Note Attributes", "note-attribute item should carry a readable name");
   expect(attributeItem->description == "Raw 72", "note-attribute item should preserve raw command values");
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(
+  const MidiSequence midiSequence = buildMidiSequence(
       sequence->commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes note-state emission should not report diagnostics");
   expect(!midiSequence.tracks.empty(), "CapcomSnes note-state emission should preserve tracks");
@@ -538,7 +538,7 @@ void capcomSnesPortamentoUsesSourceKeyDistanceUnderTranspose() {
       .behavior = SequenceBehavior{.initialGlobalTranspose = 6},
   };
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(
+  const MidiSequence midiSequence = buildMidiSequence(
       commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   const auto& events = midiSequence.tracks[0].events;
 
@@ -582,7 +582,7 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
       }},
   };
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(
+  const MidiSequence midiSequence = buildMidiSequence(
       v3CommandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes pan fixture should build without diagnostics");
   expect(!midiSequence.tracks.empty(), "CapcomSnes pan fixture should emit one track");
@@ -618,7 +618,7 @@ void capcomSnesPanEventsDoNotRecurveMidiPan() {
       }},
   };
 
-  const MidiSequence v1MidiSequence = MidiSequenceBuilder().build(
+  const MidiSequence v1MidiSequence = buildMidiSequence(
       v1CommandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
   expect(v1MidiSequence.diagnostics.empty(), "CapcomSnes V1 pan fixture should build without diagnostics");
   const auto& v1Events = v1MidiSequence.tracks[0].events;
@@ -647,8 +647,8 @@ void capcomSnesV1VolumeQuantizesAfterAmplitudeCurve() {
       }},
   };
 
-  const MidiSequence midiSequence = MidiSequenceBuilder().build(
-      commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
+  const MidiSequence midiSequence =
+      buildMidiSequence(commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes V1 volume fixture should build without diagnostics");
   expect(!midiSequence.tracks.empty(), "CapcomSnes V1 volume fixture should emit one track");
 
@@ -706,18 +706,18 @@ void capcomSnesMidiExportUsesSequenceProfileKey() {
   MidiSequenceProfileRegistry profiles;
   registerCapcomSnesProfile(profiles);
 
-  const auto artifacts = ExportService().exportCollection(project, sources, CollectionId{0},
-                                                          ExportRequest{
-                                                              .kinds = {ExportKind::Midi},
-                                                              .loopPolicy = LoopPolicy::PlayOnce,
-                                                          },
-                                                          profiles);
+  const auto artifacts = exportCollection(project, sources, CollectionId{0},
+                                          ExportRequest{
+                                              .kinds = {ExportKind::Midi},
+                                              .loopPolicy = LoopPolicy::PlayOnce,
+                                          },
+                                          profiles);
   expect(artifacts.size() == 1, "CapcomSnes profile-key export should produce one MIDI artifact");
   expect(artifacts[0].diagnostics.empty(), "CapcomSnes profile-key export should not report diagnostics");
 
-  const auto v1Bytes = MidiExporter().exportMidi(MidiSequenceBuilder().build(
+  const auto v1Bytes = MidiExporter().exportMidi(buildMidiSequence(
       commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList), LoopPolicy::PlayOnce));
-  const auto v3Bytes = MidiExporter().exportMidi(MidiSequenceBuilder().build(
+  const auto v3Bytes = MidiExporter().exportMidi(buildMidiSequence(
       commandSequence, capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation), LoopPolicy::PlayOnce));
   expect(artifacts[0].bytes == v1Bytes, "MIDI export should use the sequence's explicit CapcomSnes profile key");
   expect(artifacts[0].bytes != v3Bytes, "MIDI export should not fall back to the default CapcomSnes profile");

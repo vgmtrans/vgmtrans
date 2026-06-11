@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/core/ScanService.h"
+#include "value/core/Scan.h"
 
 #include "value/core/FormatModule.h"
 #include "value/core/ScanTypes.h"
@@ -88,7 +88,7 @@ Diagnostic errorDiagnostic(std::string message, std::optional<SourceRange> range
 
 }  // namespace
 
-Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) const {
+Project scanProject(SourceStore& sources, const FormatRegistry& formats) {
   sources.discardVirtualizedTail();
 
   Project project;
@@ -103,8 +103,7 @@ Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) c
       try {
         shouldScan = module.canScan(source, bytes);
       } catch (const std::exception& ex) {
-        project.diagnostics.push_back(
-            errorDiagnostic(std::string(module.name) + " canScan failed: " + ex.what()));
+        project.diagnostics.push_back(errorDiagnostic(std::string(module.name) + " canScan failed: " + ex.what()));
       }
 
       if (!shouldScan) {
@@ -121,14 +120,11 @@ Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) c
         assignMissingAssetIds(result.assets, ids);
         assignMissingCollectionIds(result.collections, ids);
 
-        project.assets.insert(project.assets.end(),
-                              std::make_move_iterator(result.assets.begin()),
+        project.assets.insert(project.assets.end(), std::make_move_iterator(result.assets.begin()),
                               std::make_move_iterator(result.assets.end()));
-        project.collections.insert(project.collections.end(),
-                                   std::make_move_iterator(result.collections.begin()),
+        project.collections.insert(project.collections.end(), std::make_move_iterator(result.collections.begin()),
                                    std::make_move_iterator(result.collections.end()));
-        project.diagnostics.insert(project.diagnostics.end(),
-                                   std::make_move_iterator(result.diagnostics.begin()),
+        project.diagnostics.insert(project.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
                                    std::make_move_iterator(result.diagnostics.end()));
 
         for (auto& extracted : result.extractedSources) {

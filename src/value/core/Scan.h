@@ -12,9 +12,6 @@
 
 namespace vgmtrans::core {
 
-class ScanService {
- public:
-  [[nodiscard]] Project scan(SourceStore& sources, const FormatRegistry& formats) const;
-};
+[[nodiscard]] Project scanProject(SourceStore& sources, const FormatRegistry& formats);
 
 }  // namespace vgmtrans::core

@@ -14,20 +14,12 @@ class MidiSequenceProfileRegistry;
 class SourceStore;
 struct Project;
 
-class ExportService {
- public:
-  [[nodiscard]] std::vector<Artifact> exportCollection(
-      const Project& project,
-      const SourceStore& sources,
-      CollectionId collection,
-      const ExportRequest& request,
-      const MidiSequenceProfileRegistry& profiles) const;
+[[nodiscard]] std::vector<Artifact> exportCollection(const Project& project, const SourceStore& sources,
+                                                     CollectionId collection, const ExportRequest& request,
+                                                     const MidiSequenceProfileRegistry& profiles);
 
-  [[nodiscard]] std::vector<CollectionExport> exportAllCollections(
-      const Project& project,
-      const SourceStore& sources,
-      const ExportRequest& request,
-      const MidiSequenceProfileRegistry& profiles) const;
-};
+[[nodiscard]] std::vector<CollectionExport> exportAllCollections(const Project& project, const SourceStore& sources,
+                                                                 const ExportRequest& request,
+                                                                 const MidiSequenceProfileRegistry& profiles);
 
 }  // namespace vgmtrans::core

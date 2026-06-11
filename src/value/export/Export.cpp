@@ -9,7 +9,7 @@
 #include "value/export/DlsExporter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/MidiSequenceBuilder.h"
+#include "value/core/MidiSequenceLowering.h"
 #include "value/core/ModulationAnalysis.h"
 #include "value/core/ProjectModel.h"
 #include "value/core/SampleDecoder.h"
@@ -116,7 +116,7 @@ struct MidiLoweringResult {
   }
 
   return MidiLoweringResult{
-      .sequence = MidiSequenceBuilder().build(prepared.assets.sequence->commandSequence, *profile, loopPolicy),
+      .sequence = buildMidiSequence(prepared.assets.sequence->commandSequence, *profile, loopPolicy),
   };
 }
 
@@ -270,9 +270,8 @@ struct MidiLoweringResult {
 
 }  // namespace
 
-std::vector<Artifact> ExportService::exportCollection(const Project& project, const SourceStore& sources,
-                                                      CollectionId collection, const ExportRequest& request,
-                                                      const MidiSequenceProfileRegistry& profiles) const {
+std::vector<Artifact> exportCollection(const Project& project, const SourceStore& sources, CollectionId collection,
+                                       const ExportRequest& request, const MidiSequenceProfileRegistry& profiles) {
   auto resolved = resolveCollectionAssets(project, collection);
   if (resolved.collection == nullptr) {
     auto diagnostics = resolved.diagnostics.collection;
@@ -333,9 +332,9 @@ std::vector<Artifact> ExportService::exportCollection(const Project& project, co
   return artifacts;
 }
 
-std::vector<CollectionExport> ExportService::exportAllCollections(const Project& project, const SourceStore& sources,
-                                                                  const ExportRequest& request,
-                                                                  const MidiSequenceProfileRegistry& profiles) const {
+std::vector<CollectionExport> exportAllCollections(const Project& project, const SourceStore& sources,
+                                                   const ExportRequest& request,
+                                                   const MidiSequenceProfileRegistry& profiles) {
   std::vector<CollectionExport> exports;
   exports.reserve(project.collections.size());
   for (const auto& collection : project.collections) {

@@ -6,7 +6,7 @@
 
 #include "value/core/Session.h"
 
-#include "value/core/ScanService.h"
+#include "value/core/Scan.h"
 #include "value/export/Export.h"
 
 #include <fstream>
@@ -43,27 +43,25 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
     throw std::runtime_error("failed to read source file: " + path.string());
   }
 
-  return addSource(SourceFile{
-                       .name = path.filename().string(),
-                       .path = std::move(path),
-                   },
-                   std::move(bytes));
+  return addSource(
+      SourceFile{
+          .name = path.filename().string(),
+          .path = std::move(path),
+      },
+      std::move(bytes));
 }
 
 Project Session::scan() {
-  project_ = ScanService{}.scan(sources_, formats_);
+  project_ = scanProject(sources_, formats_);
   return project_;
 }
 
-std::vector<Artifact> Session::exportCollection(
-    CollectionId id,
-    const ExportRequest& request) const {
-  return ExportService{}.exportCollection(project_, sources_, id, request, profiles_);
+std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
+  return core::exportCollection(project_, sources_, id, request, profiles_);
 }
 
-std::vector<CollectionExport> Session::exportAllCollections(
-    const ExportRequest& request) const {
-  return ExportService{}.exportAllCollections(project_, sources_, request, profiles_);
+std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest& request) const {
+  return core::exportAllCollections(project_, sources_, request, profiles_);
 }
 
 }  // namespace vgmtrans::core

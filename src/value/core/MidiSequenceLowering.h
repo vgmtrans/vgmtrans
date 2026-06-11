@@ -10,12 +10,7 @@
 
 namespace vgmtrans::core {
 
-class MidiSequenceBuilder {
- public:
-  [[nodiscard]] MidiSequence build(
-      const CommandSequence& commandSequence,
-      const MidiSequenceProfile& profile,
-      LoopPolicy loopPolicy) const;
-};
+[[nodiscard]] MidiSequence buildMidiSequence(const CommandSequence& commandSequence, const MidiSequenceProfile& profile,
+                                             LoopPolicy loopPolicy);
 
 }  // namespace vgmtrans::core
