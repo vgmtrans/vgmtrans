@@ -9,6 +9,7 @@
 #include "value/export/DlsExporter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/MidiExporter.h"
+#include "value/core/MidiSequenceBuilder.h"
 #include "value/core/ModulationAnalysis.h"
 #include "value/core/SampleDecoder.h"
 #include "value/export/ModulationScaling.h"

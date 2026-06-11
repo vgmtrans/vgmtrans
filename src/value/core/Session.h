@@ -8,6 +8,7 @@
 
 #include "value/export/Export.h"
 #include "value/core/FormatModule.h"
+#include "value/core/MidiSequenceProfile.h"
 #include "value/core/Source.h"
 
 #include <filesystem>

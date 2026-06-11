@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/MidiSequenceBuilder.h"
+#include "value/core/MidiSequenceProfile.h"
 
 #include <string_view>
 

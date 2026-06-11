@@ -135,6 +135,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/core/MidiModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Model.h
       ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceBuilder.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceProfile.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Session.h

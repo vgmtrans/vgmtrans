@@ -6,7 +6,7 @@
 #pragma once
 
 #include "value/core/FormatModule.h"
-#include "value/core/MidiSequenceBuilder.h"
+#include "value/core/MidiSequenceProfile.h"
 #include "value/core/Session.h"
 
 namespace vgmtrans::formats {
