@@ -5,9 +5,13 @@
  */
 #pragma once
 
-#include "value/core/FormatRegistry.h"
-#include "value/core/MidiSequenceProfile.h"
-#include "value/core/Session.h"
+namespace vgmtrans::core {
+
+class FormatRegistry;
+class MidiSequenceProfileRegistry;
+class Session;
+
+}  // namespace vgmtrans::core
 
 namespace vgmtrans::formats {
 

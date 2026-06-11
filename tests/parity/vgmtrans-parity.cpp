@@ -19,7 +19,6 @@
 #include "formats/NDS/NDSInstrSet.h"
 #include "value/export/ExportTypes.h"
 #include "value/export/MidiExporter.h"
-#include "value/core/Model.h"
 #include "value/core/Session.h"
 #include "value/core/SampleDecoder.h"
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"

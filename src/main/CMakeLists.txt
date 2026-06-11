@@ -110,14 +110,15 @@ vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/Model.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ScanService.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ScanTypes.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/SequenceModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Source.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SynthMath.cpp

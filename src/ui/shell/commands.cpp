@@ -8,7 +8,6 @@
 
 #include "base/Types.h"
 #include "DBGVGMRoot.h"
-#include "value/core/Model.h"
 #include "value/core/Session.h"
 #include "value/formats/ValueFormats.h"
 #include "RawFile.h"
