@@ -6,9 +6,7 @@
 
 #pragma once
 
-#include "base/Types.h"
-#include "value/core/ProjectModel.h"
-#include "value/core/Source.h"
+#include "value/core/MetadataModel.h"
 #include "value/export/ExportPolicy.h"
 
 #include <string>
@@ -17,6 +15,8 @@
 namespace vgmtrans::core {
 
 class MidiSequenceProfileRegistry;
+class SourceStore;
+struct Project;
 
 enum class ExportKind {
   Midi,
