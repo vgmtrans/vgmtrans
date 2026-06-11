@@ -126,8 +126,11 @@ struct InstrumentSetAsset {
 
 enum class AudioCodec {
   Unknown,
+  PcmS8,
   PcmS16,
   SnesBrr,
+  NdsImaAdpcm,
+  NdsPsg,
   PsxAdpcm,
   OkiAdpcm,
 };
@@ -147,6 +150,7 @@ struct Sample {
   u16 bitsPerSample = 16;
   Loop loop;
   Tuning pitch;
+  u32 codecParameter = 0;
   double attenuationDb = 0.0;
 };
 

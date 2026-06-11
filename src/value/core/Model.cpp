@@ -104,6 +104,14 @@ namespace {
   return "Jump";
 }
 
+[[nodiscard]] std::string_view defaultCommandName(const CallCommand&) {
+  return "Call";
+}
+
+[[nodiscard]] std::string_view defaultCommandName(const ReturnCommand&) {
+  return "Return";
+}
+
 [[nodiscard]] std::string_view defaultCommandName(const RepeatCommand&) {
   return "Repeat";
 }
@@ -218,6 +226,14 @@ namespace {
   return "jump";
 }
 
+[[nodiscard]] std::string_view defaultCommandDetailKind(const CallCommand&) {
+  return "call";
+}
+
+[[nodiscard]] std::string_view defaultCommandDetailKind(const ReturnCommand&) {
+  return "return";
+}
+
 [[nodiscard]] std::string_view defaultCommandDetailKind(const RepeatCommand&) {
   return "repeat";
 }
@@ -330,6 +346,14 @@ namespace {
 
 [[nodiscard]] std::string defaultCommandDescription(const JumpCommand& command) {
   return fmt::format("Destination ${}", command.destination.value);
+}
+
+[[nodiscard]] std::string defaultCommandDescription(const CallCommand& command) {
+  return fmt::format("Destination ${}, return ${}", command.destination.value, command.returnAddress.value);
+}
+
+[[nodiscard]] std::string defaultCommandDescription(const ReturnCommand&) {
+  return {};
 }
 
 [[nodiscard]] std::string defaultCommandDescription(const RepeatCommand& command) {

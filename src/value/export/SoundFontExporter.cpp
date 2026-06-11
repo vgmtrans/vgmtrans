@@ -672,9 +672,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
     writeFixedString(payload, sf2Name(sample.name, "Sample"), 20);
     writeLe32(payload, sample.startFrame);
     writeLe32(payload, sample.endFrame);
-    const u32 loopStart =
-        sample.decoded.loop.enabled ? sample.startFrame + sample.decoded.loop.start : sample.startFrame;
-    const u32 loopEnd = sample.decoded.loop.enabled ? loopStart + sample.decoded.loop.length : sample.startFrame;
+    const u32 loopStart = sample.startFrame + sample.decoded.loop.start;
+    const u32 loopEnd = loopStart + sample.decoded.loop.length;
     writeLe32(payload, loopStart);
     writeLe32(payload, std::min(loopEnd, sample.endFrame));
     writeLe32(payload, sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate);
@@ -731,11 +730,6 @@ SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, 
 
   if (samples.empty()) {
     result.diagnostics.push_back(exportError("No decodable samples available for SoundFont2 export"));
-    return result;
-  }
-  if (instruments.empty()) {
-    result.diagnostics.push_back(
-        exportError("No instruments with valid sample regions available for SoundFont2 export"));
     return result;
   }
 

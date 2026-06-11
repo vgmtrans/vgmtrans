@@ -33,6 +33,7 @@ struct MidiTrackState {
   u16 lastPortamentoTime = 0;
   u32 noteOctave = 0;
   bool noteDotted = false;
+  bool noteWait = true;
   bool noteTriplet = false;
   bool noteSlurred = false;
   bool noteOctaveUp = false;

@@ -133,6 +133,16 @@ struct JumpCommand {
   SourceRange range;
 };
 
+struct CallCommand {
+  Address destination;
+  Address returnAddress;
+  SourceRange range;
+};
+
+struct ReturnCommand {
+  SourceRange range;
+};
+
 struct RepeatCommand {
   u8 slot = 0;
   u32 count = 0;
@@ -172,8 +182,9 @@ struct DriverSpecificCommand {
 using Command = std::variant<NoteCommand, RestCommand, NoteStateCommand, DurationCommand, ProgramCommand, VolumeCommand,
                              PanCommand, TempoCommand, TransposeCommand, GlobalTransposeCommand, TuningCommand,
                              PortamentoCommand, VibratoCommand, TremoloCommand, ModulationRateCommand, ReverbCommand,
-                             EnvelopeCommand, MasterVolumeCommand, JumpCommand, RepeatCommand, RepeatBreakCommand,
-                             LoopBoundaryCommand, EndCommand, UnknownCommand, DriverSpecificCommand>;
+                             EnvelopeCommand, MasterVolumeCommand, JumpCommand, CallCommand, ReturnCommand,
+                             RepeatCommand, RepeatBreakCommand, LoopBoundaryCommand, EndCommand, UnknownCommand,
+                             DriverSpecificCommand>;
 
 // These defaults let formats name only commands whose display differs from the shared model.
 [[nodiscard]] std::string defaultCommandName(const Command& command);
@@ -194,6 +205,9 @@ struct SequenceBehavior {
   bool writeInitialReverb = false;
   u8 initialReverb = 0;
   bool writeInitialMonoMode = false;
+  bool skipChannel10 = true;
+  bool truncateSustainedNotesAtLoopBoundary = true;
+  std::optional<u64> maxPlaybackTicks;
   s32 initialGlobalTranspose = 0;
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
 };

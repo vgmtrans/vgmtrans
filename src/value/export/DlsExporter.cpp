@@ -626,10 +626,6 @@ DlsResult DlsExporter::exportDls(const DlsInput& input, const SourceStore& sourc
     result.diagnostics.push_back(exportError("No decodable samples available for DLS export"));
     return result;
   }
-  if (instruments.empty()) {
-    result.diagnostics.push_back(exportError("No instruments with valid sample regions available for DLS export"));
-    return result;
-  }
 
   auto waves = waveChunks(samples);
   result.bytes = riffDls({

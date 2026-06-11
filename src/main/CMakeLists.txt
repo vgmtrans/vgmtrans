@@ -166,6 +166,7 @@ add_library(vgmtransvalueformats STATIC)
 vgmtrans_enable_project_warnings(vgmtransvalueformats)
 target_sources(vgmtransvalueformats
   PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
@@ -174,6 +175,8 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsProfile.cpp
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
   PUBLIC
     FILE_SET HEADERS
@@ -187,12 +190,15 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSequence.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsProfile.h
       formats/CapcomSnes/CapcomSnesDriverMath.h
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )
 target_link_libraries(
   vgmtransvalueformats
   PUBLIC vgmtransvaluecore unarr
-  PRIVATE fmt::fmt)
+  PRIVATE fmt::fmt ZLIB::ZLIB)
 target_compile_features(vgmtransvalueformats PUBLIC cxx_std_20)
 
 add_library(vgmtranscore OBJECT)

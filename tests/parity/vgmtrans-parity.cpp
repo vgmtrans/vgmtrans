@@ -16,6 +16,7 @@
 #include "conversion/MidiFile.h"
 #include "conversion/SF2Conversion.h"
 #include "conversion/SF2File.h"
+#include "formats/NDS/NDSInstrSet.h"
 #include "value/export/Export.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/Model.h"
@@ -405,12 +406,15 @@ u64 fnv1aPcm16(std::span<const s16> samples) {
   return hash;
 }
 
-u32 loopFramesFromLegacyBytes(const VGMSamp& sample, u32 byteOffset) {
+u32 loopFramesFromLegacyValue(const VGMSamp& sample, u32 value, LoopMeasure measure) {
+  if (measure == LM_SAMPLES) {
+    return value;
+  }
   if (sample.dataLength % 9 == 0) {
-    return (byteOffset / 9) * 16;
+    return (value / 9) * 16;
   }
   const auto bytesPerFrame = std::max<int>(1, sample.bytesPerSample() * sample.channels);
-  return byteOffset / static_cast<u32>(bytesPerFrame);
+  return value / static_cast<u32>(bytesPerFrame);
 }
 
 u32 envelopeMicros(double seconds) {
@@ -579,6 +583,11 @@ std::optional<u32> legacyRegionSampleOffset(const VGMRgn& region, std::span<VGMS
     }
   }
 
+  if (region.sampCollPtr != nullptr && region.sampNum < region.sampCollPtr->samples().size() &&
+      region.sampCollPtr->sample(region.sampNum) != nullptr) {
+    return region.sampCollPtr->sample(region.sampNum)->dataOff;
+  }
+
   if (region.sampNum < samples.size() && samples[region.sampNum] != nullptr) {
     return samples[region.sampNum]->dataOff;
   }
@@ -625,8 +634,12 @@ void appendLegacySamples(
         .channels = sample->channels,
         .frameCount = static_cast<u32>(pcm.size() / std::max<int>(1, sample->bytesPerSample() * sample->channels)),
         .loopEnabled = sample->loop.loopStatus > 0,
-        .loopStart = sample->loop.loopStatus > 0 ? loopFramesFromLegacyBytes(*sample, sample->loop.loopStart) : 0,
-        .loopLength = sample->loop.loopStatus > 0 ? loopFramesFromLegacyBytes(*sample, sample->loop.loopLength) : 0,
+        .loopStart = sample->loop.loopStatus > 0
+                         ? loopFramesFromLegacyValue(*sample, sample->loop.loopStart, sample->loop.loopStartMeasure)
+                         : 0,
+        .loopLength = sample->loop.loopStatus > 0
+                          ? loopFramesFromLegacyValue(*sample, sample->loop.loopLength, sample->loop.loopLengthMeasure)
+                          : 0,
         .pcmHash = fnv1a(pcm),
     });
   }
@@ -680,7 +693,12 @@ void appendLegacyInstruments(
 
 void normalizeSummary(CapcomSnesSummary& summary) {
   std::ranges::sort(summary.trackCounts);
-  std::ranges::sort(summary.samples, {}, &SampleSummary::sourceOffset);
+  std::ranges::sort(summary.samples, [](const SampleSummary& lhs, const SampleSummary& rhs) {
+    return std::tie(lhs.sourceOffset, lhs.sourceSize, lhs.sampleRate, lhs.channels, lhs.frameCount,
+                    lhs.loopEnabled, lhs.loopStart, lhs.loopLength, lhs.pcmHash) <
+           std::tie(rhs.sourceOffset, rhs.sourceSize, rhs.sampleRate, rhs.channels, rhs.frameCount,
+                    rhs.loopEnabled, rhs.loopStart, rhs.loopLength, rhs.pcmHash);
+  });
   std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
     return std::tie(lhs.bank, lhs.program, lhs.sourceOffset, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh,
                     lhs.velocityLow, lhs.velocityHigh, lhs.tuningCents, lhs.envelopeAttack, lhs.envelopeDecay,
@@ -975,15 +993,16 @@ std::string describeInstrumentSynth(const InstrumentSynthSummary& synth) {
   return out.str();
 }
 
-bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& value, std::ostream& out) {
+bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& value, std::ostream& out,
+                    std::string_view label = "CapcomSnes") {
   if (legacy == value) {
-    out << "CapcomSnes summary parity ok: sequences=" << legacy.sequenceCount
+    out << label << " summary parity ok: sequences=" << legacy.sequenceCount
         << " instruments=" << legacy.regions.size() << " synths=" << legacy.instrumentSynths.size()
         << " samples=" << legacy.samples.size() << "\n";
     return true;
   }
 
-  out << "CapcomSnes summary parity mismatch\n";
+  out << label << " summary parity mismatch\n";
   out << "legacy counts: sequences=" << legacy.sequenceCount << " trackCounts=" << legacy.trackCounts.size()
       << " instrumentSets=" << legacy.instrumentSetCount << " sampleCollections=" << legacy.sampleCollectionCount
       << " regions=" << legacy.regions.size() << " synths=" << legacy.instrumentSynths.size()
@@ -1174,6 +1193,180 @@ std::map<std::string, SynthExportBytes> valueCapcomSnesRsnSynthExports(const std
     if (!inserted) {
       throw std::runtime_error("duplicate value collection name from RSN: " + collection.name);
     }
+  }
+  return exports;
+}
+
+std::map<std::string, CapcomSnesSummary> legacyCollectionSummaries(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, CapcomSnesSummary> summaries;
+
+  for (const auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr) {
+      continue;
+    }
+    auto [_, inserted] = summaries.emplace(collection->name(), legacyCapcomSnesCollectionSummary(*collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy collection name: " + collection->name());
+    }
+  }
+
+  if (summaries.empty()) {
+    throw std::runtime_error("legacy scanner did not discover collections in: " + path.string());
+  }
+  return summaries;
+}
+
+std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::filesystem::path& path) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const Project project = session.scan();
+  if (project.collections.empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover collections";
+    if (!project.diagnostics.empty()) {
+      message << ": " << project.diagnostics.front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, CapcomSnesSummary> summaries;
+  for (const auto& collection : project.collections) {
+    auto [_, inserted] =
+        summaries.emplace(collection.name, valueCapcomSnesSummary(project, session.sources(), collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value collection name: " + collection.name);
+    }
+  }
+  return summaries;
+}
+
+std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, std::vector<u8>> midis;
+
+  for (auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr) {
+      continue;
+    }
+    auto midi = collection->seq()->convertToMidi(collection);
+    if (!midi) {
+      throw std::runtime_error("legacy collection failed to convert to MIDI: " + collection->name());
+    }
+    std::vector<u8> bytes;
+    midi->writeMidiToBuffer(bytes);
+    auto [_, inserted] = midis.emplace(collection->name(), std::move(bytes));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy MIDI collection name: " + collection->name());
+    }
+  }
+
+  if (midis.empty()) {
+    throw std::runtime_error("legacy scanner did not discover MIDI collections in: " + path.string());
+  }
+  return midis;
+}
+
+std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection) {
+  const auto artifacts =
+      session.exportCollection(collection, ExportRequest{
+                                             .kinds = {ExportKind::Midi},
+                                             .loopPolicy = LoopPolicy::PlayOnce,
+                                         });
+
+  for (const auto& artifact : artifacts) {
+    if (artifact.mediaType == "audio/midi") {
+      if (!artifact.diagnostics.empty()) {
+        throw std::runtime_error("value MIDI export reported: " + artifact.diagnostics.front().message);
+      }
+      return artifact.bytes;
+    }
+  }
+
+  throw std::runtime_error("value exporter did not produce a MIDI artifact");
+}
+
+std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesystem::path& path) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const Project project = session.scan();
+  if (project.collections.empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover MIDI collections";
+    if (!project.diagnostics.empty()) {
+      message << ": " << project.diagnostics.front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, std::vector<u8>> midis;
+  for (const auto& collection : project.collections) {
+    std::vector<u8> midi;
+    try {
+      midi = valueCollectionMidi(session, collection.id);
+    } catch (const std::exception& ex) {
+      throw std::runtime_error("value MIDI export failed for collection '" + collection.name + "': " + ex.what());
+    }
+    auto [_, inserted] = midis.emplace(collection.name, std::move(midi));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value MIDI collection name: " + collection.name);
+    }
+  }
+  return midis;
+}
+
+std::map<std::string, SynthExportBytes> legacyCollectionSynthExports(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, SynthExportBytes> exports;
+
+  for (auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->instrSets().empty() || collection->sampColls().empty()) {
+      continue;
+    }
+    auto [_, inserted] = exports.emplace(collection->name(), legacyCollectionSynthExports(*collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy synth collection name: " + collection->name());
+    }
+  }
+
+  if (exports.empty()) {
+    throw std::runtime_error("legacy scanner did not discover synth-exportable collections in: " + path.string());
+  }
+  return exports;
+}
+
+std::map<std::string, SynthExportBytes> valueCollectionSynthExports(const std::filesystem::path& path) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const Project project = session.scan();
+  if (project.collections.empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover synth collections";
+    if (!project.diagnostics.empty()) {
+      message << ": " << project.diagnostics.front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, SynthExportBytes> exports;
+  for (const auto& collection : project.collections) {
+    if (collection.instrumentSets.empty() || collection.sampleCollections.empty()) {
+      continue;
+    }
+    auto [_, inserted] = exports.emplace(collection.name, valueCapcomSnesSynthExports(session, collection.id));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value synth collection name: " + collection.name);
+    }
+  }
+
+  if (exports.empty()) {
+    throw std::runtime_error("value scanner did not discover synth-exportable collections in: " + path.string());
   }
   return exports;
 }
@@ -2452,6 +2645,87 @@ int compareCapcomSnesRsnDirectSummary(const std::filesystem::path& path) {
   return 0;
 }
 
+int compareNdsDirectSummary(const std::filesystem::path& path) {
+  const auto legacySummaries = legacyCollectionSummaries(path);
+  const auto valueSummaries = valueCollectionSummaries(path);
+  if (valueSummaries.size() != legacySummaries.size()) {
+    std::cout << "value NDS collection count differs: legacy=" << legacySummaries.size()
+              << " value=" << valueSummaries.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacySummary] : legacySummaries) {
+    const auto found = valueSummaries.find(collectionName);
+    if (found == valueSummaries.end()) {
+      std::cout << "value NDS scan did not produce collection '" << collectionName << "'\n";
+      return 1;
+    }
+    std::cout << "checking " << collectionName << " via direct NDS value summary\n";
+    if (!compareSummary(legacySummary, found->second, std::cout, "NDS")) {
+      return 1;
+    }
+  }
+
+  std::cout << "NDS direct summary parity ok: collections=" << legacySummaries.size() << "\n";
+  return 0;
+}
+
+int compareNdsDirectMidi(const std::filesystem::path& path) {
+  const auto legacyMidis = legacyCollectionMidis(path);
+  const auto valueMidis = valueCollectionMidis(path);
+  if (valueMidis.size() != legacyMidis.size()) {
+    std::cout << "value NDS MIDI collection count differs: legacy=" << legacyMidis.size()
+              << " value=" << valueMidis.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacyMidi] : legacyMidis) {
+    const auto found = valueMidis.find(collectionName);
+    if (found == valueMidis.end()) {
+      std::cout << "value NDS scan did not produce MIDI for collection '" << collectionName << "'\n";
+      return 1;
+    }
+    std::cout << "checking " << collectionName << " MIDI via direct NDS value scan\n";
+    if (!compareMidi(legacyMidi, found->second, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "NDS direct MIDI parity ok: collections=" << legacyMidis.size() << "\n";
+  return 0;
+}
+
+int compareNdsDirectSynth(const std::filesystem::path& path) {
+  const auto legacyExports = legacyCollectionSynthExports(path);
+  const auto valueExports = valueCollectionSynthExports(path);
+  if (valueExports.size() != legacyExports.size()) {
+    std::cout << "value NDS synth collection count differs: legacy=" << legacyExports.size()
+              << " value=" << valueExports.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacy] : legacyExports) {
+    const auto found = valueExports.find(collectionName);
+    if (found == valueExports.end()) {
+      std::cout << "value NDS scan did not produce synth exports for collection '" << collectionName << "'\n";
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " SF2 via direct NDS value scan\n";
+    if (!compareSf2(legacy.sf2, found->second.sf2, std::cout)) {
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " DLS via direct NDS value scan\n";
+    if (!compareDls(legacy.dls, found->second.dls, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "NDS direct SF2/DLS parity ok: collections=" << legacyExports.size() << "\n";
+  return 0;
+}
+
 bool validateValueCollectionExports(const Project& project, const Collection& collection,
                                     std::span<const Artifact> artifacts, u32 expectedWavs, std::ostream& out,
                                     u64& totalArtifacts) {
@@ -2610,7 +2884,10 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-rsn-direct-midi <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-synth <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
-      << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n";
+      << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n"
+      << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file>\n"
+      << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
+      << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
 }
 
 }  // namespace
@@ -2651,6 +2928,18 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-summary") {
       return compareCapcomSnesRsnSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "nds-direct-summary") {
+      return compareNdsDirectSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "nds-direct-midi") {
+      return compareNdsDirectMidi(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "nds-direct-synth") {
+      return compareNdsDirectSynth(argv[2]);
     }
 
     printUsage(std::cerr);

@@ -116,23 +116,23 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           addMessage(messages,
                      typedEvent.tick,
                      50,
-                     {static_cast<u8>(0x90 | channel4(typedEvent.channel)), data7(typedEvent.key), data7(typedEvent.velocity)});
+                     {static_cast<u8>(0x90 | channel4(typedEvent.channel)), data7(typedEvent.key), typedEvent.velocity});
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, NoteOff>) {
           addMessage(messages,
                      typedEvent.tick,
                      40,
-                     {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), data7(typedEvent.velocity)});
+                     {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), typedEvent.velocity});
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, NoteDuration>) {
           addMessage(messages,
                      typedEvent.tick,
                      50,
-                     {static_cast<u8>(0x90 | channel4(typedEvent.channel)), data7(typedEvent.key), data7(typedEvent.velocity)});
+                     {static_cast<u8>(0x90 | channel4(typedEvent.channel)), data7(typedEvent.key), typedEvent.velocity});
           addMessage(messages,
                      typedEvent.tick + typedEvent.duration,
-                     40,
-                     {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), 0});
+                     50,
+                     {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), 64});
           endTick = std::max(endTick, typedEvent.tick + typedEvent.duration);
         } else if constexpr (std::is_same_v<TypedEvent, Tempo>) {
           const std::array<u8, 3> tempoBytes{

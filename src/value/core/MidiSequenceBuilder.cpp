@@ -21,7 +21,7 @@ namespace vgmtrans::core {
 
 namespace {
 
-constexpr size_t kMaxExecutedCommandsPerTrack = 65536;
+constexpr size_t kMaxExecutedCommandsPerTrack = 262144;
 
 template <typename T>
 void appendEvents(std::vector<MidiEvent>& destination, std::vector<T> events) {
@@ -98,6 +98,18 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
   }
 }
 
+[[nodiscard]] u8 midiChannelForTrack(size_t trackIndex, const CommandSequence& commandSequence) {
+  constexpr size_t kChannelsPerBank = 16;
+  constexpr size_t kSkippedChannel = 9;
+  if (!commandSequence.behavior.skipChannel10) {
+    return static_cast<u8>(trackIndex % kChannelsPerBank);
+  }
+
+  constexpr size_t kUsableChannelsPerBank = kChannelsPerBank - 1;
+  const size_t slot = trackIndex % kUsableChannelsPerBank;
+  return static_cast<u8>(slot < kSkippedChannel ? slot : slot + 1);
+}
+
 [[nodiscard]] std::optional<u64> firstLoopTick(
     const CommandSequence& commandSequence,
     const CommandTrack& track,
@@ -113,6 +125,7 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
   size_t pc = 0;
   size_t executedCommands = 0;
   std::unordered_set<u64> executedOffsets;
+  std::vector<size_t> returnStack;
 
   while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
     const auto& command = track.commands[pc];
@@ -205,6 +218,24 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
             } else {
               ended = true;
             }
+          } else if constexpr (std::is_same_v<TypedCommand, CallCommand>) {
+            const auto returnTarget = destinationIndex(indexes, typedCommand.returnAddress);
+            const auto callTarget = destinationIndex(indexes, typedCommand.destination);
+            if (!returnTarget || !callTarget) {
+              ended = true;
+              return;
+            }
+            returnStack.push_back(*returnTarget);
+            pc = *callTarget;
+            incrementPc = false;
+          } else if constexpr (std::is_same_v<TypedCommand, ReturnCommand>) {
+            if (returnStack.empty()) {
+              ended = true;
+              return;
+            }
+            pc = returnStack.back();
+            returnStack.pop_back();
+            incrementPc = false;
           } else if constexpr (std::is_same_v<TypedCommand, LoopBoundaryCommand>) {
             if (const auto target = destinationIndex(indexes, typedCommand.destination);
                 target.has_value() && *target < pc) {
@@ -235,6 +266,156 @@ void rememberExecutedCommand(const Command& command, std::unordered_set<u64>& of
   }
 
   return std::nullopt;
+}
+
+[[nodiscard]] u64 trackStopTick(
+    const CommandSequence& commandSequence,
+    const CommandTrack& track,
+    const MidiSequenceProfile& profile,
+    u8 channel) {
+  const auto indexes = commandIndexByOffset(track);
+  MidiTrackState state{
+      .trackIndex = track.sourceTrackNumber,
+      .channel = channel,
+      .globalTranspose = commandSequence.behavior.initialGlobalTranspose,
+  };
+  size_t pc = 0;
+  size_t executedCommands = 0;
+  std::unordered_set<u64> executedOffsets;
+  std::vector<size_t> returnStack;
+
+  while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
+    const auto& command = track.commands[pc];
+    bool incrementPc = true;
+    bool ended = false;
+
+    std::visit(
+        [&](const auto& typedCommand) {
+          using TypedCommand = std::decay_t<decltype(typedCommand)>;
+          if constexpr (std::is_same_v<TypedCommand, NoteCommand>) {
+            state.tick += profile.noteTiming(typedCommand, state).advanceTicks;
+          } else if constexpr (std::is_same_v<TypedCommand, RestCommand>) {
+            state.tick += profile.restTicks(typedCommand, state);
+          } else if constexpr (std::is_same_v<TypedCommand, NoteStateCommand>) {
+            static_cast<void>(profile.interpretNoteState(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, DurationCommand>) {
+            profile.applyDuration(typedCommand, state);
+          } else if constexpr (std::is_same_v<TypedCommand, TransposeCommand>) {
+            profile.applyTranspose(typedCommand, state);
+          } else if constexpr (std::is_same_v<TypedCommand, GlobalTransposeCommand>) {
+            state.globalTranspose = typedCommand.rawSemitones;
+          } else if constexpr (std::is_same_v<TypedCommand, PortamentoCommand>) {
+            static_cast<void>(profile.interpretPortamento(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, VibratoCommand>) {
+            static_cast<void>(profile.interpretVibrato(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, TremoloCommand>) {
+            static_cast<void>(profile.interpretTremolo(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, ModulationRateCommand>) {
+            static_cast<void>(profile.interpretModulationRate(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, DriverSpecificCommand>) {
+            static_cast<void>(profile.interpretDriverSpecific(typedCommand, state));
+          } else if constexpr (std::is_same_v<TypedCommand, RepeatCommand>) {
+            if (typedCommand.slot >= state.repeatCounters.size()) {
+              ended = true;
+              return;
+            }
+            auto& counter = state.repeatCounters[typedCommand.slot];
+            if (typedCommand.count == 0 && counter == 0) {
+              ended = true;
+              return;
+            }
+            if (counter == 0) {
+              counter = typedCommand.count;
+              if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                pc = *target;
+                incrementPc = false;
+              } else {
+                ended = true;
+              }
+            } else {
+              --counter;
+              if (counter != 0) {
+                if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                  pc = *target;
+                  incrementPc = false;
+                } else {
+                  ended = true;
+                }
+              }
+            }
+          } else if constexpr (std::is_same_v<TypedCommand, RepeatBreakCommand>) {
+            if (typedCommand.slot >= state.repeatCounters.size()) {
+              ended = true;
+              return;
+            }
+            auto& counter = state.repeatCounters[typedCommand.slot];
+            if (counter == 1) {
+              counter = 0;
+              static_cast<void>(profile.interpretRepeatBreak(typedCommand, state));
+              if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+                pc = *target;
+                incrementPc = false;
+              } else {
+                ended = true;
+              }
+            }
+          } else if constexpr (std::is_same_v<TypedCommand, JumpCommand>) {
+            const bool destinationWasExecuted = executedOffsets.contains(typedCommand.destination.value);
+            rememberExecutedCommand(command, executedOffsets);
+            if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
+              if (destinationWasExecuted) {
+                ended = true;
+                return;
+              }
+              pc = *target;
+              incrementPc = false;
+            } else {
+              ended = true;
+            }
+          } else if constexpr (std::is_same_v<TypedCommand, CallCommand>) {
+            const auto returnTarget = destinationIndex(indexes, typedCommand.returnAddress);
+            const auto callTarget = destinationIndex(indexes, typedCommand.destination);
+            if (!returnTarget || !callTarget) {
+              ended = true;
+              return;
+            }
+            returnStack.push_back(*returnTarget);
+            pc = *callTarget;
+            incrementPc = false;
+          } else if constexpr (std::is_same_v<TypedCommand, ReturnCommand>) {
+            if (returnStack.empty()) {
+              ended = true;
+              return;
+            }
+            pc = returnStack.back();
+            returnStack.pop_back();
+            incrementPc = false;
+          } else if constexpr (std::is_same_v<TypedCommand, LoopBoundaryCommand>) {
+            if (const auto target = destinationIndex(indexes, typedCommand.destination);
+                target.has_value() && *target < pc) {
+              pc = *target;
+              incrementPc = false;
+            } else {
+              ended = true;
+            }
+          } else if constexpr (std::is_same_v<TypedCommand, EndCommand>) {
+            ended = true;
+          }
+        },
+        command);
+
+    if (ended) {
+      return state.tick;
+    }
+    if (incrementPc) {
+      ++pc;
+    }
+    if (incrementPc || !std::holds_alternative<JumpCommand>(command)) {
+      rememberExecutedCommand(command, executedOffsets);
+    }
+  }
+
+  return state.tick;
 }
 
 // Immediate commands apply at the current tick without advancing time or changing track position.
@@ -495,13 +676,25 @@ MidiSequence MidiSequenceBuilder::build(
 
   std::optional<u64> playOnceStopTick;
   std::vector<std::optional<u64>> firstLoopTicks(commandSequence.tracks.size());
+  u64 globalStopTick = 0;
+  for (size_t trackIndex = 0; trackIndex < commandSequence.tracks.size(); ++trackIndex) {
+    globalStopTick = std::max(globalStopTick,
+                              trackStopTick(commandSequence,
+                                            commandSequence.tracks[trackIndex],
+                                            profile,
+                                            midiChannelForTrack(trackIndex, commandSequence)));
+  }
+  if (commandSequence.behavior.maxPlaybackTicks.has_value() &&
+      globalStopTick > *commandSequence.behavior.maxPlaybackTicks) {
+    globalStopTick = *commandSequence.behavior.maxPlaybackTicks;
+  }
   if (loopPolicy == LoopPolicy::PlayOnce) {
     // All tracks stop at the latest first-loop tick so short tracks do not truncate the song.
     for (size_t trackIndex = 0; trackIndex < commandSequence.tracks.size(); ++trackIndex) {
       const auto loopTick = firstLoopTick(commandSequence,
                                          commandSequence.tracks[trackIndex],
                                          profile,
-                                         static_cast<u8>(trackIndex % 16));
+                                         midiChannelForTrack(trackIndex, commandSequence));
       firstLoopTicks[trackIndex] = loopTick;
       if (loopTick.has_value() && (!playOnceStopTick.has_value() || *loopTick > *playOnceStopTick)) {
         playOnceStopTick = loopTick;
@@ -513,7 +706,7 @@ MidiSequence MidiSequenceBuilder::build(
     const auto& track = commandSequence.tracks[trackIndex];
     MidiTrackState state{
         .trackIndex = static_cast<u32>(trackIndex),
-        .channel = static_cast<u8>(trackIndex % 16),
+        .channel = midiChannelForTrack(trackIndex, commandSequence),
         .globalTranspose = commandSequence.behavior.initialGlobalTranspose,
     };
     MidiTrack midiTrack{
@@ -536,18 +729,27 @@ MidiSequence MidiSequenceBuilder::build(
     }
     profile.beginTrack(commandSequence, track, state, midiTrack.events);
 
+    if (globalStopTick == 0) {
+      if (midiTrack.events.empty() || !std::holds_alternative<EndOfTrack>(midiTrack.events.back())) {
+        midiTrack.events.push_back(EndOfTrack{.tick = state.tick});
+      }
+      result.tracks.push_back(std::move(midiTrack));
+      continue;
+    }
+
     const auto indexes = commandIndexByOffset(track);
     size_t pc = 0;
     size_t executedCommands = 0;
     bool ended = false;
-    std::optional<u64> loopPlaybackStopTick;
-    if (loopPolicy == LoopPolicy::PlayOnce && playOnceStopTick.has_value() && firstLoopTicks[trackIndex].has_value()) {
-      loopPlaybackStopTick = playOnceStopTick;
+    std::optional<u64> playbackStopTick;
+    if (globalStopTick > 0) {
+      playbackStopTick = globalStopTick;
     }
     std::vector<size_t> pendingNoteIndexes;
     std::unordered_set<u64> executedOffsets;
+    std::vector<size_t> returnStack;
     while (pc < track.commands.size() && executedCommands++ < kMaxExecutedCommandsPerTrack) {
-      if (loopPlaybackStopTick.has_value() && state.tick >= *loopPlaybackStopTick) {
+      if (playbackStopTick.has_value() && state.tick >= *playbackStopTick) {
         ended = true;
         break;
       }
@@ -561,8 +763,9 @@ MidiSequence MidiSequenceBuilder::build(
             if constexpr (std::is_same_v<TypedCommand, NoteCommand>) {
               auto timing = profile.noteTiming(typedCommand, state);
               u32 soundingTicks = timing.soundingTicks;
-              if (loopPlaybackStopTick.has_value() && soundingTicks > timing.advanceTicks + 1) {
-                const u64 stopEndTick = *loopPlaybackStopTick + 1;
+              if (commandSequence.behavior.truncateSustainedNotesAtLoopBoundary &&
+                  playbackStopTick.has_value() && soundingTicks > timing.advanceTicks + 1) {
+                const u64 stopEndTick = *playbackStopTick + 1;
                 if (state.tick < stopEndTick && state.tick + soundingTicks > stopEndTick) {
                   soundingTicks = static_cast<u32>(stopEndTick - state.tick);
                 }
@@ -646,11 +849,10 @@ MidiSequence MidiSequenceBuilder::build(
               if (const auto target = destinationIndex(indexes, typedCommand.destination)) {
                 if (loopPolicy == LoopPolicy::PlayOnce && destinationWasExecuted) {
                   // A backward jump to an executed command marks loop playback, not another pass forever.
-                  if (state.tick == 0 || !playOnceStopTick.has_value() || state.tick >= *playOnceStopTick) {
+                  if (state.tick == 0 || !playbackStopTick.has_value() || state.tick >= *playbackStopTick) {
                     ended = true;
                     return;
                   }
-                  loopPlaybackStopTick = playOnceStopTick;
                 }
                 if (loopPolicy != LoopPolicy::PlayOnce) {
                   midiTrack.events.push_back(Marker{.tick = state.tick, .text = "Jump"});
@@ -661,12 +863,35 @@ MidiSequence MidiSequenceBuilder::build(
                 result.diagnostics.push_back(warning("Jump destination was not decoded", typedCommand.range));
                 ended = true;
               }
+            } else if constexpr (std::is_same_v<TypedCommand, CallCommand>) {
+              const auto returnTarget = destinationIndex(indexes, typedCommand.returnAddress);
+              const auto callTarget = destinationIndex(indexes, typedCommand.destination);
+              if (!returnTarget) {
+                result.diagnostics.push_back(warning("Call return address was not decoded", typedCommand.range));
+                ended = true;
+                return;
+              }
+              if (!callTarget) {
+                result.diagnostics.push_back(warning("Call destination was not decoded", typedCommand.range));
+                ended = true;
+                return;
+              }
+              returnStack.push_back(*returnTarget);
+              pc = *callTarget;
+              incrementPc = false;
+            } else if constexpr (std::is_same_v<TypedCommand, ReturnCommand>) {
+              if (returnStack.empty()) {
+                ended = true;
+                return;
+              }
+              pc = returnStack.back();
+              returnStack.pop_back();
+              incrementPc = false;
             } else if constexpr (std::is_same_v<TypedCommand, LoopBoundaryCommand>) {
               if (loopPolicy == LoopPolicy::PlayOnce) {
                 if (const auto target = destinationIndex(indexes, typedCommand.destination);
-                    target.has_value() && playOnceStopTick.has_value() && state.tick < *playOnceStopTick &&
+                    target.has_value() && playbackStopTick.has_value() && state.tick < *playbackStopTick &&
                     *target < pc) {
-                  loopPlaybackStopTick = playOnceStopTick;
                   pc = *target;
                   incrementPc = false;
                   return;
@@ -689,7 +914,7 @@ MidiSequence MidiSequenceBuilder::build(
           },
           command);
 
-      if (loopPlaybackStopTick.has_value() && state.tick >= *loopPlaybackStopTick) {
+      if (playbackStopTick.has_value() && state.tick >= *playbackStopTick) {
         ended = true;
       }
       if (ended) {
@@ -703,7 +928,7 @@ MidiSequence MidiSequenceBuilder::build(
       }
     }
 
-    if (executedCommands >= kMaxExecutedCommandsPerTrack) {
+    if (pc < track.commands.size() && executedCommands > kMaxExecutedCommandsPerTrack) {
       const auto range = track.commands.empty() ? SourceRange{} : commandRange(track.commands.back());
       result.diagnostics.push_back(warning("MIDI sequence building stopped after too many executed commands", range));
     }

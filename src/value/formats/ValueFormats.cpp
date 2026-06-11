@@ -8,6 +8,9 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
 #include "value/formats/CapcomSnes/CapcomSnesProfile.h"
+#include "value/formats/NDS/NdsModule.h"
+#include "value/formats/NDS/NdsProfile.h"
+#include "value/extractors/PsfExtractor.h"
 #include "value/extractors/SnesRsnExtractor.h"
 #include "value/extractors/SnesSpcExtractor.h"
 
@@ -16,10 +19,13 @@ namespace vgmtrans::formats {
 void registerValueFormatModules(core::FormatRegistry& registry) {
   snes_rsn::registerSnesRsnExtractor(registry);
   snes_spc::registerSnesSpcExtractor(registry);
+  psf::registerPsfExtractor(registry);
+  nds::registerNdsModule(registry);
   capcom_snes::registerCapcomSnesModule(registry);
 }
 
 void registerValueMidiSequenceProfiles(core::MidiSequenceProfileRegistry& registry) {
+  nds::registerNdsProfile(registry);
   capcom_snes::registerCapcomSnesProfile(registry);
 }
 
