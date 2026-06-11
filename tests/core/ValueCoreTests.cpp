@@ -844,6 +844,7 @@ void projectSessionScansValuesAndVirtualSources() {
   Session session;
   session.formats().add(probeSequenceModule());
   session.formats().add(probeMiscModule());
+  session.dialects().add(probeSequenceDialect());
 
   const auto sourceId = session.addSource(SourceFile{.name = "probe.spc"}, {0xaa, 0x34, 0x12});
   expect(sourceId == SourceId{0}, "first source should get SourceId 0");
@@ -893,6 +894,30 @@ void projectSessionScansValuesAndVirtualSources() {
 
   project = session.scan();
   expect(project.sources.size() == 2, "rescan should replace, not duplicate, virtual tail sources");
+}
+
+void projectSessionReportsUnregisteredSequenceDialect() {
+  Session session;
+  session.formats().add(probeSequenceModule());
+
+  session.addSource(SourceFile{.name = "missing-dialect.probe"}, {0xaa});
+  const Project project = session.scan();
+  expect(project.collections.size() == 1, "missing dialect fixture should still scan sequence collections");
+  expect(project.diagnostics.size() == 2, "missing dialect fixture should keep scan and registration diagnostics");
+
+  const auto& diagnostic = diagnosticWithMessage(project.diagnostics, "No sequence dialect registered for 'probe'");
+  expect(diagnostic.severity == Severity::Error, "missing sequence dialect should be reported as an error");
+  expect(diagnostic.range && diagnostic.range->source == SourceId{0} && diagnostic.range->offset == 0 &&
+             diagnostic.range->size == 1,
+         "missing sequence dialect diagnostic should point at the sequence asset range");
+
+  const auto exports = session.exportAllCollections(ExportRequest{
+      .kinds = {ExportKind::Midi},
+  });
+  expect(exports.size() == 1, "missing dialect fixture should still attempt collection export");
+  expect(exports[0].artifacts.size() == 1, "missing dialect fixture should still return one MIDI artifact");
+  expectDiagnosticRange(exports[0].artifacts[0].diagnostics, "No sequence dialect registered for 'probe'",
+                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
 void projectCollectionAssetResolutionProvidesTypedExportInputs() {
@@ -996,6 +1021,7 @@ void projectSessionAddsSourceFromPath() {
 
   Session session;
   session.formats().add(probeSequenceModule());
+  session.dialects().add(probeSequenceDialect());
 
   const auto sourceId = session.addSourceFromPath(path);
   expect(sourceId == SourceId{0}, "path source should get SourceId 0");
@@ -1016,6 +1042,7 @@ void projectSessionAddsSourceFromPath() {
 void projectSessionExportsAllCollections() {
   Session session;
   session.formats().add(probeSequenceModule());
+  session.dialects().add(probeSequenceDialect());
 
   session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
@@ -1034,8 +1061,8 @@ void projectSessionExportsAllCollections() {
     expect(exports[i].artifacts[0].filename == project.collections[i].name + ".mid",
            "collection export should keep collection-derived artifact names");
     expect(exports[i].artifacts[0].mediaType == "audio/midi", "collection export should keep artifact media types");
-    expect(!exports[i].artifacts[0].diagnostics.empty(),
-           "collection export diagnostics should stay attached to the artifact");
+    expect(exports[i].artifacts[0].diagnostics.empty(),
+           "registered probe sequence exports should not report missing dialect diagnostics");
   }
 }
 
@@ -1752,6 +1779,7 @@ int main() {
     sequenceVmAllowsRepeatedCallsToSameSubroutine();
     sequenceVmReplaysFiniteRepeatBlocks();
     projectSessionScansValuesAndVirtualSources();
+    projectSessionReportsUnregisteredSequenceDialect();
     projectCollectionAssetResolutionProvidesTypedExportInputs();
     projectSessionAddsSourceFromPath();
     projectSessionExportsAllCollections();

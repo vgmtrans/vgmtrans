@@ -15,6 +15,26 @@
 
 namespace vgmtrans::core {
 
+namespace {
+
+void addMissingSequenceDialectDiagnostics(Project& project, const SequenceDialectRegistry& dialects) {
+  for (const auto& asset : project.assets) {
+    const auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
+    if (sequence == nullptr || dialects.contains(sequence->program.dialect.value)) {
+      continue;
+    }
+
+    project.diagnostics.push_back(Diagnostic{
+        .severity = Severity::Error,
+        .message = "No sequence dialect registered for '" + sequence->program.dialect.value + "'",
+        .range = sequence->metadata.range.valid() ? std::optional<SourceRange>{sequence->metadata.range}
+                                                  : std::nullopt,
+    });
+  }
+}
+
+}  // namespace
+
 SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
   // User-added sources invalidate virtual extractions from the previous scan.
   sources_.discardVirtualizedTail();
@@ -53,6 +73,7 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
 
 Project Session::scan() {
   project_ = scanProject(sources_, formats_);
+  addMissingSequenceDialectDiagnostics(project_, dialects_);
   return project_;
 }
 

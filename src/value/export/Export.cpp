@@ -113,7 +113,8 @@ struct MidiLoweringResult {
   const auto* dialect = dialects.find(sequence.program.dialect.value);
   if (dialect == nullptr) {
     return MidiLoweringResult{
-        .diagnostics = {exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'")},
+        .diagnostics = {exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'",
+                                    validDiagnosticRange(sequence.metadata.range))},
     };
   }
 
