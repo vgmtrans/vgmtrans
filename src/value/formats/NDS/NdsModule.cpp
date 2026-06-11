@@ -17,7 +17,6 @@
 #include <cmath>
 #include <limits>
 #include <map>
-#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -1226,15 +1225,11 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
 
 }  // namespace
 
-std::string_view NdsModule::name() const {
-  return kFormatName;
-}
-
-bool NdsModule::canScan(const SourceFile&, std::span<const u8> bytes) const {
+[[nodiscard]] bool canScanNds(const SourceFile&, std::span<const u8> bytes) {
   return !findSdatOffsets(ByteReader(SourceId{}, bytes)).empty();
 }
 
-ScanResult NdsModule::scan(const ScanInput& input) const {
+[[nodiscard]] ScanResult scanNds(const ScanInput& input) {
   ScanResult result;
   for (const u32 offset : findSdatOffsets(input.reader)) {
     const auto sdat = parseSdatInfo(input.reader, offset);
@@ -1248,7 +1243,11 @@ ScanResult NdsModule::scan(const ScanInput& input) const {
 }
 
 void registerNdsModule(FormatRegistry& registry) {
-  registry.add(std::make_unique<NdsModule>());
+  registry.add(FormatModule{
+      .name = kFormatName,
+      .canScan = canScanNds,
+      .scan = scanNds,
+  });
 }
 
 }  // namespace vgmtrans::formats::nds

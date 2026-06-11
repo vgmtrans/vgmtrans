@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -124,15 +123,11 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
 
 }  // namespace
 
-std::string_view SnesSpcExtractor::name() const {
-  return "SnesSpc";
-}
-
-bool SnesSpcExtractor::canScan(const SourceFile&, std::span<const u8> bytes) const {
+[[nodiscard]] bool canScanSnesSpc(const SourceFile&, std::span<const u8> bytes) {
   return hasSpcSignature(bytes);
 }
 
-ScanResult SnesSpcExtractor::scan(const ScanInput& input) const {
+[[nodiscard]] ScanResult scanSnesSpc(const ScanInput& input) {
   const auto spcBytes = input.reader.slice(0, input.reader.size());
   const auto ramBytes = input.reader.slice(kSpcRamOffset, kSpcRamSize);
   std::vector<u8> ram(ramBytes.begin(), ramBytes.end());
@@ -153,7 +148,11 @@ ScanResult SnesSpcExtractor::scan(const ScanInput& input) const {
 }
 
 void registerSnesSpcExtractor(FormatRegistry& registry) {
-  registry.add(std::make_unique<SnesSpcExtractor>());
+  registry.add(FormatModule{
+      .name = "SnesSpc",
+      .canScan = canScanSnesSpc,
+      .scan = scanSnesSpc,
+  });
 }
 
 }  // namespace vgmtrans::formats::snes_spc

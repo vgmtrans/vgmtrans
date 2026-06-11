@@ -23,7 +23,6 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
-#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -191,107 +190,136 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   expect(sameRange(*diagnostic.range, expectedRange), "diagnostic should preserve the expected source range");
 }
 
-class ProbeSequenceModule final : public FormatModule {
-public:
-  [[nodiscard]] std::string_view name() const override { return "ProbeSequence"; }
+[[nodiscard]] bool canScanProbeSequence(const SourceFile&, std::span<const u8> bytes) {
+  return !bytes.empty() && bytes[0] == 0xaa;
+}
 
-  [[nodiscard]] bool canScan(const SourceFile&, std::span<const u8> bytes) const override {
-    return !bytes.empty() && bytes[0] == 0xaa;
-  }
+[[nodiscard]] ScanResult scanProbeSequence(const ScanInput& input) {
+  const auto assetId = input.ids.nextAssetId();
+  const auto collectionId = input.ids.nextCollectionId();
+  const auto itemId = input.ids.nextItemId();
+  const auto childItemId = input.ids.nextItemId();
+  const auto assetRange = input.reader.range(0, input.reader.size());
 
-  [[nodiscard]] ScanResult scan(const ScanInput& input) const override {
-    const auto assetId = input.ids.nextAssetId();
-    const auto collectionId = input.ids.nextCollectionId();
-    const auto itemId = input.ids.nextItemId();
-    const auto childItemId = input.ids.nextItemId();
-    const auto assetRange = input.reader.range(0, input.reader.size());
+  SequenceAsset sequence{
+      .metadata =
+          AssetMetadata{
+              .id = assetId,
+              .format = "ProbeSequence",
+              .name = input.source.name,
+              .range = assetRange,
+              .items =
+                  ItemTree{
+                      .root = itemId,
+                      .nodes = {ItemNode{
+                                    .id = itemId,
+                                    .kind = ItemKind::Sequence,
+                                    .detailKind = "probe-sequence",
+                                    .name = input.source.name,
+                                    .range = assetRange,
+                                    .children = {ItemId{9999}},
+                                },
+                                ItemNode{
+                                    .id = childItemId,
+                                    .parent = itemId,
+                                    .kind = ItemKind::Header,
+                                    .detailKind = "probe-header",
+                                    .name = "Header",
+                                    .range = input.reader.range(0, 1),
+                                }},
+                  },
+          },
+      .commandSequence =
+          CommandSequence{
+              .tracks = {CommandTrack{
+                  .id = TrackId{0},
+                  .sourceTrackNumber = 0,
+                  .startAddress = Address{0},
+                  .commands = {EndCommand{.range = input.reader.range(0, 1)}},
+              }},
+          },
+  };
 
-    SequenceAsset sequence{
-        .metadata =
-            AssetMetadata{
-                .id = assetId,
-                .format = std::string(name()),
-                .name = input.source.name,
-                .range = assetRange,
-                .items =
-                    ItemTree{
-                        .root = itemId,
-                        .nodes = {ItemNode{
-                                      .id = itemId,
-                                      .kind = ItemKind::Sequence,
-                                      .detailKind = "probe-sequence",
-                                      .name = input.source.name,
-                                      .range = assetRange,
-                                      .children = {ItemId{9999}},
-                                  },
-                                  ItemNode{
-                                      .id = childItemId,
-                                      .parent = itemId,
-                                      .kind = ItemKind::Header,
-                                      .detailKind = "probe-header",
-                                      .name = "Header",
-                                      .range = input.reader.range(0, 1),
-                                  }},
-                    },
-            },
-        .commandSequence =
-            CommandSequence{
-                .tracks = {CommandTrack{
-                    .id = TrackId{0},
-                    .sourceTrackNumber = 0,
-                    .startAddress = Address{0},
-                    .commands = {EndCommand{.range = input.reader.range(0, 1)}},
-                }},
-            },
-    };
+  ScanResult result;
+  result.assets.emplace_back(std::move(sequence));
+  result.collections.push_back(Collection{
+      .id = collectionId,
+      .name = input.source.name,
+      .sequence = assetId,
+  });
+  result.diagnostics.push_back(Diagnostic{
+      .severity = Severity::Info,
+      .message = "probe sequence scanned",
+      .range = assetRange,
+  });
 
-    ScanResult result;
-    result.assets.emplace_back(std::move(sequence));
-    result.collections.push_back(Collection{
-        .id = collectionId,
-        .name = input.source.name,
-        .sequence = assetId,
+  if (!input.source.virtualized) {
+    result.extractedSources.push_back(ExtractedSource{
+        .file = SourceFile{.name = input.source.name + ".child"},
+        .bytes = {0xbb, 0x01},
+        .origin = input.reader.range(0, 1),
     });
-    result.diagnostics.push_back(Diagnostic{
-        .severity = Severity::Info,
-        .message = "probe sequence scanned",
-        .range = assetRange,
+  }
+
+  return result;
+}
+
+[[nodiscard]] FormatModule probeSequenceModule() {
+  return FormatModule{
+      .name = "ProbeSequence",
+      .canScan = canScanProbeSequence,
+      .scan = scanProbeSequence,
+  };
+}
+
+[[nodiscard]] bool canScanProbeMisc(const SourceFile& source, std::span<const u8> bytes) {
+  return source.virtualized && !bytes.empty() && bytes[0] == 0xbb;
+}
+
+[[nodiscard]] ScanResult scanProbeMisc(const ScanInput& input) {
+  return ScanResult{
+      .assets = {MiscAsset{
+          .metadata =
+              AssetMetadata{
+                  .format = "ProbeMisc",
+                  .name = input.source.name,
+                  .range = input.reader.range(0, input.reader.size()),
+              },
+          .payload = {input.reader.u8At(0), input.reader.u8At(1)},
+      }},
+  };
+}
+
+[[nodiscard]] FormatModule probeMiscModule() {
+  return FormatModule{
+      .name = "ProbeMisc",
+      .canScan = canScanProbeMisc,
+      .scan = scanProbeMisc,
+  };
+}
+
+void formatRegistryStoresCopyableModuleValues() {
+  FormatRegistry registry;
+  registry.add(probeSequenceModule());
+
+  const FormatRegistry copy = registry;
+  const std::array<u8, 1> probeBytes{0xaa};
+  expect(copy.modules().size() == 1, "format registry should copy registered module values");
+  expect(copy.modules()[0].name == std::string_view("ProbeSequence"),
+         "format registry should preserve copied module names");
+  expect(copy.modules()[0].canScan(SourceFile{}, probeBytes),
+         "format registry should preserve copied module scan predicates");
+
+  bool threw = false;
+  try {
+    registry.add(FormatModule{
+        .name = "Broken",
     });
-
-    if (!input.source.virtualized) {
-      result.extractedSources.push_back(ExtractedSource{
-          .file = SourceFile{.name = input.source.name + ".child"},
-          .bytes = {0xbb, 0x01},
-          .origin = input.reader.range(0, 1),
-      });
-    }
-
-    return result;
+  } catch (const std::invalid_argument&) {
+    threw = true;
   }
-};
-
-class ProbeMiscModule final : public FormatModule {
-public:
-  [[nodiscard]] std::string_view name() const override { return "ProbeMisc"; }
-
-  [[nodiscard]] bool canScan(const SourceFile& source, std::span<const u8> bytes) const override {
-    return source.virtualized && !bytes.empty() && bytes[0] == 0xbb;
-  }
-
-  [[nodiscard]] ScanResult scan(const ScanInput& input) const override {
-    return ScanResult{
-        .assets = {MiscAsset{
-            .metadata =
-                AssetMetadata{
-                    .format = std::string(name()),
-                    .name = input.source.name,
-                    .range = input.reader.range(0, input.reader.size()),
-                },
-            .payload = {input.reader.u8At(0), input.reader.u8At(1)},
-        }},
-    };
-  }
-};
+  expect(threw, "format registry should reject incomplete module values");
+}
 
 void byteReaderChecksBoundsAndEndian() {
   const std::vector<u8> bytes{0x00, 0x34, 0x12, 0x78, 0x56};
@@ -351,8 +379,8 @@ void sequencerCommandExposesSourceRange() {
 
 void projectSessionScansValuesAndVirtualSources() {
   Session session;
-  session.formats().add(std::make_unique<ProbeSequenceModule>());
-  session.formats().add(std::make_unique<ProbeMiscModule>());
+  session.formats().add(probeSequenceModule());
+  session.formats().add(probeMiscModule());
 
   const auto sourceId = session.addSource(SourceFile{.name = "probe.spc"}, {0xaa, 0x34, 0x12});
   expect(sourceId == SourceId{0}, "first source should get SourceId 0");
@@ -499,7 +527,7 @@ void projectSessionAddsSourceFromPath() {
   }
 
   Session session;
-  session.formats().add(std::make_unique<ProbeSequenceModule>());
+  session.formats().add(probeSequenceModule());
 
   const auto sourceId = session.addSourceFromPath(path);
   expect(sourceId == SourceId{0}, "path source should get SourceId 0");
@@ -519,7 +547,7 @@ void projectSessionAddsSourceFromPath() {
 
 void projectSessionExportsAllCollections() {
   Session session;
-  session.formats().add(std::make_unique<ProbeSequenceModule>());
+  session.formats().add(probeSequenceModule());
 
   session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
@@ -1313,6 +1341,7 @@ void exportDiagnosticsPreserveSourceRanges() {
 
 int main() {
   try {
+    formatRegistryStoresCopyableModuleValues();
     byteReaderChecksBoundsAndEndian();
     sequencerCommandExposesSourceRange();
     projectSessionScansValuesAndVirtualSources();

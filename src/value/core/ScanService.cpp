@@ -101,10 +101,10 @@ Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) c
     for (const auto& module : formats.modules()) {
       bool shouldScan = false;
       try {
-        shouldScan = module->canScan(source, bytes);
+        shouldScan = module.canScan(source, bytes);
       } catch (const std::exception& ex) {
         project.diagnostics.push_back(
-            errorDiagnostic(std::string(module->name()) + " canScan failed: " + ex.what()));
+            errorDiagnostic(std::string(module.name) + " canScan failed: " + ex.what()));
       }
 
       if (!shouldScan) {
@@ -112,7 +112,7 @@ Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) c
       }
 
       try {
-        ScanResult result = module->scan(ScanInput{
+        ScanResult result = module.scan(ScanInput{
             .source = source,
             .reader = sources.reader(source.id),
             .ids = ids,
@@ -139,7 +139,7 @@ Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) c
         }
       } catch (const std::exception& ex) {
         project.diagnostics.push_back(
-            errorDiagnostic(std::string(module->name()) + " scan failed: " + ex.what(),
+            errorDiagnostic(std::string(module.name) + " scan failed: " + ex.what(),
                             SourceRange{.source = source.id, .offset = 0, .size = source.size}));
       }
     }

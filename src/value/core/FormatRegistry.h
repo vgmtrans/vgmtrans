@@ -6,31 +6,22 @@
 
 #pragma once
 
-#include <memory>
+#include "value/core/FormatModule.h"
+
 #include <vector>
 
 namespace vgmtrans::core {
 
-class FormatModule;
-
 class FormatRegistry {
  public:
-  FormatRegistry();
-  ~FormatRegistry();
+  void add(FormatModule module);
 
-  FormatRegistry(FormatRegistry&&) noexcept;
-  FormatRegistry& operator=(FormatRegistry&&) noexcept;
-  FormatRegistry(const FormatRegistry&) = delete;
-  FormatRegistry& operator=(const FormatRegistry&) = delete;
-
-  void add(std::unique_ptr<FormatModule> module);
-
-  [[nodiscard]] const std::vector<std::unique_ptr<FormatModule>>& modules() const noexcept {
+  [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept {
     return modules_;
   }
 
  private:
-  std::vector<std::unique_ptr<FormatModule>> modules_;
+  std::vector<FormatModule> modules_;
 };
 
 }  // namespace vgmtrans::core

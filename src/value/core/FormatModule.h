@@ -13,14 +13,14 @@
 
 namespace vgmtrans::core {
 
-class FormatModule {
- public:
-  virtual ~FormatModule() = default;
+struct FormatModule {
+  using CanScan = bool (*)(const SourceFile& source, std::span<const u8> bytes);
+  using Scan = ScanResult (*)(const ScanInput& input);
 
-  [[nodiscard]] virtual std::string_view name() const = 0;
+  std::string_view name;
   // canScan should be cheap and non-mutating; scan does the full parse once selected.
-  [[nodiscard]] virtual bool canScan(const SourceFile& source, std::span<const u8> bytes) const = 0;
-  [[nodiscard]] virtual ScanResult scan(const ScanInput& input) const = 0;
+  CanScan canScan = nullptr;
+  Scan scan = nullptr;
 };
 
 }  // namespace vgmtrans::core

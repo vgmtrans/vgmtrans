@@ -16,7 +16,6 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
-#include <memory>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -302,15 +301,11 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
 
 }  // namespace
 
-std::string_view PsfExtractor::name() const {
-  return "PSF";
-}
-
-bool PsfExtractor::canScan(const SourceFile&, std::span<const u8> bytes) const {
+[[nodiscard]] bool canScanPsf(const SourceFile&, std::span<const u8> bytes) {
   return hasPsfSignature(bytes);
 }
 
-ScanResult PsfExtractor::scan(const ScanInput& input) const {
+[[nodiscard]] ScanResult scanPsf(const ScanInput& input) {
   ScanResult result;
   const auto range = input.reader.range(0, input.reader.size());
   const auto psf = parsePsf(input.reader.slice(0, input.reader.size()));
@@ -340,7 +335,11 @@ ScanResult PsfExtractor::scan(const ScanInput& input) const {
 }
 
 void registerPsfExtractor(FormatRegistry& registry) {
-  registry.add(std::make_unique<PsfExtractor>());
+  registry.add(FormatModule{
+      .name = "PSF",
+      .canScan = canScanPsf,
+      .scan = scanPsf,
+  });
 }
 
 }  // namespace vgmtrans::formats::psf

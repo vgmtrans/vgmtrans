@@ -6,20 +6,11 @@
 
 #pragma once
 
-#include "value/core/FormatModule.h"
-
 namespace vgmtrans::core {
 class FormatRegistry;
 }
 
 namespace vgmtrans::formats::nds {
-
-class NdsModule final : public core::FormatModule {
- public:
-  [[nodiscard]] std::string_view name() const override;
-  [[nodiscard]] bool canScan(const core::SourceFile& source, std::span<const u8> bytes) const override;
-  [[nodiscard]] core::ScanResult scan(const core::ScanInput& input) const override;
-};
 
 void registerNdsModule(core::FormatRegistry& registry);
 

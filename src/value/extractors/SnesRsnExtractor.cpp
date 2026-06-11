@@ -55,15 +55,11 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
 
 }  // namespace
 
-std::string_view SnesRsnExtractor::name() const {
-  return "SnesRsn";
-}
-
-bool SnesRsnExtractor::canScan(const SourceFile&, std::span<const u8> bytes) const {
+[[nodiscard]] bool canScanSnesRsn(const SourceFile&, std::span<const u8> bytes) {
   return hasRarSignature(bytes);
 }
 
-ScanResult SnesRsnExtractor::scan(const ScanInput& input) const {
+[[nodiscard]] ScanResult scanSnesRsn(const ScanInput& input) {
   ScanResult result;
   const auto bytes = input.reader.slice(0, input.reader.size());
   const auto sourceRange = input.reader.range(0, input.reader.size());
@@ -110,7 +106,11 @@ ScanResult SnesRsnExtractor::scan(const ScanInput& input) const {
 }
 
 void registerSnesRsnExtractor(FormatRegistry& registry) {
-  registry.add(std::make_unique<SnesRsnExtractor>());
+  registry.add(FormatModule{
+      .name = "SnesRsn",
+      .canScan = canScanSnesRsn,
+      .scan = scanSnesRsn,
+  });
 }
 
 }  // namespace vgmtrans::formats::snes_rsn

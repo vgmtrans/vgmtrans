@@ -5,23 +5,11 @@
  */
 #pragma once
 
-#include "value/core/FormatModule.h"
-
-#include <span>
-#include <string_view>
-
 namespace vgmtrans::core {
 class FormatRegistry;
 }
 
 namespace vgmtrans::formats::snes_spc {
-
-class SnesSpcExtractor final : public core::FormatModule {
- public:
-  [[nodiscard]] std::string_view name() const override;
-  [[nodiscard]] bool canScan(const core::SourceFile& source, std::span<const u8> bytes) const override;
-  [[nodiscard]] core::ScanResult scan(const core::ScanInput& input) const override;
-};
 
 void registerSnesSpcExtractor(core::FormatRegistry& registry);
 

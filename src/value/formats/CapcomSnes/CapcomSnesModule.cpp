@@ -11,7 +11,6 @@
 #include "value/formats/CapcomSnes/CapcomSnesValueSequence.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueSynth.h"
 
-#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -21,15 +20,11 @@ namespace vgmtrans::formats::capcom_snes {
 
 using namespace core;
 
-std::string_view CapcomSnesModule::name() const {
-  return "CapcomSnes";
-}
-
-bool CapcomSnesModule::canScan(const SourceFile&, std::span<const u8> bytes) const {
+[[nodiscard]] bool canScanCapcomSnes(const SourceFile&, std::span<const u8> bytes) {
   return findCapcomSnesLayout(ByteReader(SourceId{}, bytes)).has_value();
 }
 
-ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
+[[nodiscard]] ScanResult scanCapcomSnes(const ScanInput& input) {
   const auto layout = findCapcomSnesLayout(input.reader);
   if (!layout) {
     return {};
@@ -93,7 +88,11 @@ ScanResult CapcomSnesModule::scan(const ScanInput& input) const {
 }
 
 void registerCapcomSnesModule(FormatRegistry& registry) {
-  registry.add(std::make_unique<CapcomSnesModule>());
+  registry.add(FormatModule{
+      .name = "CapcomSnes",
+      .canScan = canScanCapcomSnes,
+      .scan = scanCapcomSnes,
+  });
 }
 
 }  // namespace vgmtrans::formats::capcom_snes
