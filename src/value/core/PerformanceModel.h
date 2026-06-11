@@ -37,11 +37,18 @@ struct InstrumentPerformanceEvent {
   PerformanceEventHeader header;
   u32 bank = 0;
   u32 program = 0;
+  bool forceBankSelect = false;
+};
+
+enum class LevelResolution {
+  SevenBit,
+  FourteenBit,
 };
 
 struct LevelPerformanceEvent {
   PerformanceEventHeader header;
   double linearGain = 1.0;
+  LevelResolution resolution = LevelResolution::SevenBit;
 };
 
 struct PanPerformanceEvent {
@@ -63,15 +70,35 @@ struct ReverbPerformanceEvent {
   double send = 0.0;
 };
 
+struct MonoModePerformanceEvent {
+  PerformanceEventHeader header;
+  u8 channels = 0;
+};
+
 struct TuningPerformanceEvent {
   PerformanceEventHeader header;
   double cents = 0.0;
+};
+
+struct GlobalTransposePerformanceEvent {
+  PerformanceEventHeader header;
+  s32 semitones = 0;
 };
 
 struct PortamentoPerformanceEvent {
   PerformanceEventHeader header;
   double timeMilliseconds = 0.0;
   double previousKey = 0.0;
+};
+
+struct PortamentoControlPerformanceEvent {
+  PerformanceEventHeader header;
+  double previousKey = 0.0;
+};
+
+struct LegatoPedalPerformanceEvent {
+  PerformanceEventHeader header;
+  bool enabled = false;
 };
 
 enum class ModulationPerformanceTarget {
@@ -95,7 +122,9 @@ struct MarkerPerformanceEvent {
 
 using PerformanceEvent = std::variant<NotePerformanceEvent, TempoPerformanceEvent, InstrumentPerformanceEvent,
                                       LevelPerformanceEvent, PanPerformanceEvent, MasterLevelPerformanceEvent,
-                                      ReverbPerformanceEvent, TuningPerformanceEvent, PortamentoPerformanceEvent,
+                                      ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
+                                      GlobalTransposePerformanceEvent, PortamentoPerformanceEvent,
+                                      PortamentoControlPerformanceEvent, LegatoPedalPerformanceEvent,
                                       ModulationPerformanceEvent, MarkerPerformanceEvent>;
 
 struct PerformanceTrack {

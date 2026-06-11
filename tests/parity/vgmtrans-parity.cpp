@@ -228,7 +228,8 @@ std::vector<u8> legacyCapcomSnesMidi(std::span<const u8> aramBytes, const std::s
     }
     auto* sequence = *sequenceSlot;
 
-    auto midi = sequence->convertToMidi(nullptr);
+    const ConversionContext playOnceContext;
+    auto midi = sequence->convertToMidi(nullptr, playOnceContext);
     if (!midi) {
       throw std::runtime_error("legacy sequence failed to convert to MIDI");
     }
@@ -250,7 +251,8 @@ std::map<std::string, std::vector<u8>> legacyCapcomSnesRsnMidis(const std::files
       continue;
     }
 
-    auto midi = collection->seq()->convertToMidi(collection);
+    const ConversionContext playOnceContext;
+    auto midi = collection->seq()->convertToMidi(collection, playOnceContext);
     if (!midi) {
       throw std::runtime_error("legacy collection failed to convert to MIDI: " + collection->name());
     }

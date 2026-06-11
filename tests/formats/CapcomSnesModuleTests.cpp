@@ -210,28 +210,34 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
-  expect(midiSequence.tracks[0].events.size() == 11, "built track should include command and end events");
-  expect(std::get<Tempo>(midiSequence.tracks[0].events[0]).microsecondsPerQuarter == 42191,
+  expect(midiSequence.tracks[0].events.size() == 14, "built track should include initial, command, and end events");
+  expect(std::get<Reverb>(midiSequence.tracks[0].events[0]).value == 0,
+         "CapcomSnes should emit the legacy initial reverb controller");
+  expect(std::get<MonoMode>(midiSequence.tracks[0].events[1]).channels == 0,
+         "CapcomSnes should emit the legacy initial mono-mode controller");
+  expect(std::get<Tempo>(midiSequence.tracks[0].events[2]).microsecondsPerQuarter == 42191,
          "CapcomSnes source command should interpret tempo with driver timing math");
-  expect(std::holds_alternative<ProgramChange>(midiSequence.tracks[0].events[1]),
+  expect(std::holds_alternative<BankSelect>(midiSequence.tracks[0].events[3]),
+         "CapcomSnes source command should force bank select like the legacy converter");
+  expect(std::holds_alternative<ProgramChange>(midiSequence.tracks[0].events[4]),
          "CapcomSnes source command should emit program changes");
-  expect(std::holds_alternative<Volume>(midiSequence.tracks[0].events[2]),
-         "CapcomSnes source command should emit target-quantized volume");
-  expect(std::get<Pan>(midiSequence.tracks[0].events[3]).value == 64,
+  expect(std::holds_alternative<Volume14>(midiSequence.tracks[0].events[5]),
+         "CapcomSnes source command should emit high-resolution target-quantized volume");
+  expect(std::get<Pan>(midiSequence.tracks[0].events[6]).value == 64,
          "CapcomSnes center pan should map to MIDI center pan");
-  expect(std::holds_alternative<Expression>(midiSequence.tracks[0].events[4]),
+  expect(std::holds_alternative<Expression>(midiSequence.tracks[0].events[7]),
          "CapcomSnes pan should emit expression compensation for the source pan law");
-  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[5]).value == 0,
+  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[8]).value == 0,
          "CapcomSnes vibrato depth should stay silent until the LFO rate enables output");
-  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[6]).value == 32,
+  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[9]).value == 32,
          "CapcomSnes LFO rate should enable the latched vibrato depth");
-  expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[7]),
+  expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[10]),
          "CapcomSnes LFO rate should emit vibrato frequency");
-  expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[8]),
+  expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[11]),
          "CapcomSnes LFO rate should emit tremolo frequency");
-  expect(std::get<NoteDuration>(midiSequence.tracks[0].events[9]).duration == 6,
+  expect(std::get<NoteDuration>(midiSequence.tracks[0].events[12]).duration == 6,
          "CapcomSnes note length index should map to ticks");
-  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[10]).tick == 6,
+  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[13]).tick == 6,
          "builder should advance time before end of track");
 
   const auto artifacts = session.exportCollection(project.collections[0].id, ExportRequest{
@@ -526,9 +532,7 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   bytes[0x3009] = 0x64;
   bytes[0x300a] = 0x18;
   bytes[0x300b] = 0x00;
-  bytes[0x300c] = 0x16;
-  bytes[0x300d] = 0x30;
-  bytes[0x300e] = 0x09;
+  bytes[0x300c] = 0x17;
 
   const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 2, 0x3000);
@@ -556,7 +560,7 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   expect(performance.diagnostics.empty(), "CapcomSnes source dialect fixture should render without diagnostics");
   expect(performance.tracks.size() == 1, "CapcomSnes source dialect fixture should render one track");
   expect(performance.tracks[0].endTick == 18,
-         "CapcomSnes source dialect should apply one-shot dotted timing before the loop repeats");
+         "CapcomSnes source dialect should apply one-shot dotted timing before the end command");
 
   const auto note = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* typed = std::get_if<NotePerformanceEvent>(&event);
@@ -598,16 +602,18 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "CapcomSnes pan fixture should render without diagnostics");
-  expect(performance.tracks[0].events.size() == 1, "CapcomSnes pan fixture should emit one performance event");
-  const auto* performancePan = std::get_if<PanPerformanceEvent>(&performance.tracks[0].events[0]);
+  expect(performance.tracks[0].events.size() == 3,
+         "CapcomSnes pan fixture should emit initial defaults and one pan event");
+  const auto* performancePan = std::get_if<PanPerformanceEvent>(&performance.tracks[0].events[2]);
   expect(performancePan != nullptr && performancePan->linearGain < 1.0,
          "CapcomSnes pan performance should retain target-neutral gain compensation");
 
   const MidiSequence midi = PerformanceMidiRenderer().render(performance);
-  expect(midi.tracks[0].events.size() == 3, "CapcomSnes compensated pan should render pan, expression, and end");
-  expect(std::get<Pan>(midi.tracks[0].events[0]).value == 113,
+  expect(midi.tracks[0].events.size() == 5,
+         "CapcomSnes compensated pan should render initial defaults, pan, expression, and end");
+  expect(std::get<Pan>(midi.tracks[0].events[2]).value == 113,
          "CapcomSnes pan renderer should emit the driver-computed MIDI pan");
-  expect(std::get<Expression>(midi.tracks[0].events[1]).value == 123,
+  expect(std::get<Expression>(midi.tracks[0].events[3]).value == 123,
          "CapcomSnes pan renderer should quantize the source gain compensation as expression");
 }
 
@@ -667,24 +673,28 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "CapcomSnes source-only commands should render without diagnostics");
-  expect(performance.tracks[0].events.size() == 4,
+  expect(performance.tracks[0].events.size() == 6,
          "CapcomSnes source-only commands should emit semantic performance events where possible");
-  expect(std::holds_alternative<TuningPerformanceEvent>(performance.tracks[0].events[0]),
+  expect(std::holds_alternative<ReverbPerformanceEvent>(performance.tracks[0].events[0]),
+         "CapcomSnes should emit initial reverb before source command events");
+  expect(std::holds_alternative<MonoModePerformanceEvent>(performance.tracks[0].events[1]),
+         "CapcomSnes should emit initial mono mode before source command events");
+  expect(std::holds_alternative<TuningPerformanceEvent>(performance.tracks[0].events[2]),
          "CapcomSnes tuning should emit a target-neutral tuning event");
-  expect(std::holds_alternative<MasterLevelPerformanceEvent>(performance.tracks[0].events[1]),
+  expect(std::holds_alternative<MasterLevelPerformanceEvent>(performance.tracks[0].events[3]),
          "CapcomSnes master volume should emit a target-neutral master level event");
-  expect(std::holds_alternative<ReverbPerformanceEvent>(performance.tracks[0].events[2]),
+  expect(std::holds_alternative<ReverbPerformanceEvent>(performance.tracks[0].events[4]),
          "CapcomSnes echo on/off should emit a target-neutral reverb event");
-  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[3]),
+  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[5]),
          "CapcomSnes source-only fixture should still reach the later note");
   expect(performance.tracks[0].endTick == 6, "CapcomSnes source-only fixture should advance through the later note");
 
   const MidiSequence midi = PerformanceMidiRenderer().render(performance);
-  expect(std::holds_alternative<FineTune>(midi.tracks[0].events[0]),
+  expect(std::holds_alternative<FineTune>(midi.tracks[0].events[2]),
          "CapcomSnes tuning performance should render as MIDI fine tuning");
-  expect(std::holds_alternative<MasterVolume>(midi.tracks[0].events[1]),
+  expect(std::holds_alternative<MasterVolume>(midi.tracks[0].events[3]),
          "CapcomSnes master level performance should render as MIDI master volume");
-  expect(std::get<Reverb>(midi.tracks[0].events[2]).value == 40,
+  expect(std::get<Reverb>(midi.tracks[0].events[4]).value == 40,
          "CapcomSnes reverb performance should preserve the legacy echo send");
 }
 
@@ -707,22 +717,22 @@ void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey() {
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "CapcomSnes portamento fixture should render without diagnostics");
-  expect(performance.tracks[0].events.size() == 3,
-         "CapcomSnes portamento fixture should emit two notes plus one portamento event");
-  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[0]),
+  expect(performance.tracks[0].events.size() == 5,
+         "CapcomSnes portamento fixture should emit initial defaults, two notes, and one portamento event");
+  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[2]),
          "CapcomSnes portamento fixture should emit the first note before portamento");
-  const auto* portamento = std::get_if<PortamentoPerformanceEvent>(&performance.tracks[0].events[1]);
+  const auto* portamento = std::get_if<PortamentoPerformanceEvent>(&performance.tracks[0].events[3]);
   expect(portamento != nullptr && portamento->timeMilliseconds == 160.0 && portamento->previousKey == 0.0,
          "CapcomSnes portamento should use source-key distance and previous source key");
 
   const MidiSequence midi = PerformanceMidiRenderer().render(performance);
-  expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[0]),
+  expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[2]),
          "CapcomSnes portamento fixture should render the first note");
-  expect(std::get<PortamentoTime14>(midi.tracks[0].events[1]).value == 160,
+  expect(std::get<PortamentoTime14>(midi.tracks[0].events[3]).value == 160,
          "CapcomSnes portamento performance should render as 14-bit MIDI portamento time");
-  expect(std::get<PortamentoControl>(midi.tracks[0].events[2]).key == 0,
+  expect(std::get<PortamentoControl>(midi.tracks[0].events[4]).key == 0,
          "CapcomSnes portamento performance should render the previous-key controller");
-  expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[3]),
+  expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[5]),
          "CapcomSnes portamento fixture should render the second note after portamento controllers");
 }
 
@@ -752,7 +762,8 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "CapcomSnes finite repeat should render without diagnostics");
-  expect(performance.tracks[0].events.size() == 3, "CapcomSnes repeat count should replay the loop body");
+  expect(performance.tracks[0].events.size() == 5,
+         "CapcomSnes repeat count should emit initial defaults and replay the loop body");
   expect(performance.tracks[0].endTick == 18, "CapcomSnes repeat count should include the original pass plus replays");
 
   for (u64 tick : {0ULL, 6ULL, 12ULL}) {
@@ -794,5 +805,6 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "CapcomSnes V1 unknown one-byte events should render without diagnostics");
-  expect(performance.tracks[0].events.size() == 1, "CapcomSnes V1 fixture should still reach the later note");
+  expect(performance.tracks[0].events.size() == 3,
+         "CapcomSnes V1 fixture should emit initial defaults and still reach the later note");
 }

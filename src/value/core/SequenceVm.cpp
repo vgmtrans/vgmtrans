@@ -7,19 +7,28 @@
 #include "value/core/SequenceVm.h"
 
 #include <any>
+#include <algorithm>
 #include <fmt/format.h>
 #include <map>
 #include <optional>
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 
 namespace vgmtrans::core {
+
+struct RepeatReplayWindow {
+  u32 stopIndex = 0;
+  bool hasSourceWindow = false;
+  u64 beginOffset = 0;
+  u64 endOffset = 0;
+};
 
 struct VmTrackRuntime {
   u64 tick = 0;
   std::vector<u32> callStack;
   std::map<u8, u32> repeatRemaining;
-  std::optional<u32> repeatReplayStopIndex;
+  std::optional<RepeatReplayWindow> repeatReplayWindow;
   CommandId lastCommand;
 };
 
@@ -36,6 +45,15 @@ constexpr u32 kFallbackCommandLimit = 100000;
 }
 
 [[nodiscard]] std::optional<u32> nextCommandIndex(const TrackProgram& track, u32 index) {
+  if (index < track.commands.size()) {
+    const SourceCommand& command = track.commands[index];
+    if (command.range.valid()) {
+      if (const auto byAddress = track.addressIndex.find(Address{static_cast<u32>(command.range.endOffset())})) {
+        return byAddress;
+      }
+    }
+  }
+
   const u32 next = index + 1;
   if (next >= track.commands.size()) {
     return std::nullopt;
@@ -47,7 +65,32 @@ constexpr u32 kFallbackCommandLimit = 100000;
   return track.addressIndex.find(destination);
 }
 
-using VisitState = std::pair<u32, std::vector<u32>>;
+[[nodiscard]] bool isReplayingRepeat(const VmTrackRuntime& runtime, u32 currentIndex, const SourceCommand& command) {
+  if (!runtime.repeatReplayWindow) {
+    return false;
+  }
+
+  const RepeatReplayWindow& window = *runtime.repeatReplayWindow;
+  if (window.hasSourceWindow && command.range.valid()) {
+    return command.range.offset >= window.beginOffset && command.range.offset < window.endOffset;
+  }
+
+  // Synthetic tests do not always use source ranges. Keep the older index
+  // fallback for those programs, but real bytecode should use the source window
+  // because decoded command order can differ from source-address order.
+  return currentIndex <= window.stopIndex;
+}
+
+struct VisitState {
+  u32 commandIndex = 0;
+  std::vector<u32> callStack;
+  std::map<u8, u32> repeatRemaining;
+
+  friend bool operator<(const VisitState& lhs, const VisitState& rhs) {
+    return std::tie(lhs.commandIndex, lhs.callStack, lhs.repeatRemaining) <
+           std::tie(rhs.commandIndex, rhs.callStack, rhs.repeatRemaining);
+  }
+};
 
 struct VisitRecord {
   u64 tick = 0;
@@ -64,6 +107,26 @@ void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, s
           },
       .text = std::move(text),
   });
+}
+
+void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavior& behavior) {
+  const PerformanceEventHeader header{
+      .track = track.id,
+      .tick = 0,
+  };
+
+  if (behavior.initialReverbSend) {
+    track.events.emplace_back(ReverbPerformanceEvent{
+        .header = header,
+        .send = *behavior.initialReverbSend,
+    });
+  }
+  if (behavior.initialMonoModeChannels) {
+    track.events.emplace_back(MonoModePerformanceEvent{
+        .header = header,
+        .channels = *behavior.initialMonoModeChannels,
+    });
+  }
 }
 
 }  // namespace
@@ -112,7 +175,22 @@ void Emit::tuning(TuningPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void Emit::globalTranspose(GlobalTransposePerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
 void Emit::portamento(PortamentoPerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void Emit::portamentoControl(PortamentoControlPerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void Emit::legatoPedal(LegatoPedalPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
 }
@@ -165,19 +243,27 @@ Step VmApi::repeatUntil(u8 slot, u32 count, Address destination) {
 
   if (remaining > 1) {
     --remaining;
-    runtime_.repeatReplayStopIndex = currentIndex_;
+    RepeatReplayWindow window{.stopIndex = currentIndex_};
+    if (commandRange_.valid()) {
+      const u64 destinationOffset = destination.value;
+      window.hasSourceWindow = true;
+      window.beginOffset = std::min(destinationOffset, commandRange_.offset);
+      window.endOffset = std::max(destinationOffset + 1, commandRange_.endOffset());
+    }
+    runtime_.repeatReplayWindow = window;
     return jump(destination);
   }
 
   runtime_.repeatRemaining.erase(slot);
-  runtime_.repeatReplayStopIndex.reset();
+  runtime_.repeatReplayWindow.reset();
   return next();
 }
 
 Step VmApi::repeatBreak(u8 slot, Address destination) {
   const auto found = runtime_.repeatRemaining.find(slot);
-  if (found == runtime_.repeatRemaining.end() || found->second <= 1) {
-    runtime_.repeatReplayStopIndex.reset();
+  if (found != runtime_.repeatRemaining.end() && found->second == 1) {
+    runtime_.repeatRemaining.erase(found);
+    runtime_.repeatReplayWindow.reset();
     return jump(destination);
   }
   return next();
@@ -208,17 +294,27 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
   const SequenceProgramBehavior behavior = resolvedBehavior(program, dialect);
   const LoopPolicy loopPolicy = behavior.defaultLoopPolicy;
-  for (const TrackProgram& track : program.tracks) {
+
+  struct RenderedTrack {
+    PerformanceTrack track;
+    std::optional<u64> loopTick;
+  };
+
+  const auto renderTrack = [&](const TrackProgram& track,
+                               PerformanceSequence& targetSequence,
+                               std::optional<u64> stopTick) -> RenderedTrack {
     PerformanceTrack performanceTrack{
         .id = track.id,
         .sourceTrackNumber = track.sourceTrackNumber,
     };
+    addInitialTrackEvents(performanceTrack, behavior);
 
     std::any trackState = dialect.createTrackState != nullptr ? dialect.createTrackState(program, track, dialect.context)
                                                               : std::any{};
     VmTrackRuntime runtime;
-    // A command reached through a different return stack is a distinct playback
-    // state. This keeps repeated subroutine calls from looking like loops.
+    // A command reached through a different return stack or repeat-counter state
+    // is distinct playback. This keeps normal calls/repeats from looking like
+    // infinite loops while still stopping true control-flow cycles.
     std::map<VisitState, VisitRecord> visited;
     std::optional<u32> current = destinationIndex(track, track.startAddress);
     if (!current && !track.commands.empty()) {
@@ -226,41 +322,56 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     }
 
     u32 executedCommands = 0;
+    std::optional<u64> firstLoopTick;
+    bool arrivedByControlFlow = true;
     while (current) {
       if (executedCommands >= behavior.commandLimit) {
-        sequence.diagnostics.push_back(vmWarning("Sequence VM command limit reached", SourceRange{}));
+        targetSequence.diagnostics.push_back(vmWarning("Sequence VM command limit reached", SourceRange{}));
         break;
       }
-
-      const bool replayingRepeat =
-          runtime.repeatReplayStopIndex && *current <= *runtime.repeatReplayStopIndex;
+      if (stopTick && runtime.tick >= *stopTick) {
+        break;
+      }
       const SourceCommand& command = track.commands.at(*current);
-      const auto visitState = VisitState{*current, runtime.callStack};
+      const bool replayingRepeat = isReplayingRepeat(runtime, *current, command);
+      const auto visitState = VisitState{
+          .commandIndex = *current,
+          .callStack = runtime.callStack,
+          .repeatRemaining = runtime.repeatRemaining,
+      };
       if (!replayingRepeat) {
         if (const auto previous = visited.find(visitState); previous != visited.end()) {
-          if (loopPolicy == LoopPolicy::Preserve) {
-            // Preserve-mode exports one pass plus neutral loop markers instead of
-            // replaying until the safety command limit.
-            addLoopMarker(performanceTrack, previous->second.command, previous->second.tick, "Loop Start");
-            addLoopMarker(performanceTrack,
-                          runtime.lastCommand.valid() ? runtime.lastCommand : command.id,
-                          runtime.tick,
-                          "Loop End");
+          if (arrivedByControlFlow) {
+            if (!firstLoopTick) {
+              firstLoopTick = runtime.tick;
+            }
+            if (loopPolicy == LoopPolicy::Preserve) {
+              // Preserve-mode exports one pass plus neutral loop markers instead of
+              // replaying until the safety command limit.
+              addLoopMarker(performanceTrack, previous->second.command, previous->second.tick, "Loop Start");
+              addLoopMarker(performanceTrack,
+                            runtime.lastCommand.valid() ? runtime.lastCommand : command.id,
+                            runtime.tick,
+                            "Loop End");
+              break;
+            }
+
+            break;
           }
-          break;
+        } else {
+          visited.emplace(visitState, VisitRecord{.tick = runtime.tick, .command = command.id});
         }
-        visited.emplace(visitState, VisitRecord{.tick = runtime.tick, .command = command.id});
       }
 
       const CommandHandler* handler = dialect.handler(command.handler);
       if (handler == nullptr || handler->execute == nullptr) {
-        sequence.diagnostics.push_back(vmWarning(fmt::format("Missing sequence command handler {}", command.handler.value),
-                                                 command.range));
+        targetSequence.diagnostics.push_back(
+            vmWarning(fmt::format("Missing sequence command handler {}", command.handler.value), command.range));
         break;
       }
 
       Emit emit{performanceTrack, command.id, runtime.tick};
-      VmApi vm{runtime, sequence, command.range, *current};
+      VmApi vm{runtime, targetSequence, command.range, *current};
       const Effects effects = handler->execute(command, track, trackState, emit, vm, dialect.context);
       runtime.tick += effects.advanceTicks;
       runtime.lastCommand = command.id;
@@ -268,16 +379,19 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
       switch (effects.step.kind) {
         case Step::Kind::Next:
           current = nextCommandIndex(track, *current);
+          arrivedByControlFlow = false;
           break;
 
         case Step::Kind::End:
           current = std::nullopt;
+          arrivedByControlFlow = false;
           break;
 
         case Step::Kind::Jump:
           current = destinationIndex(track, effects.step.destination);
+          arrivedByControlFlow = true;
           if (!current) {
-            sequence.diagnostics.push_back(
+            targetSequence.diagnostics.push_back(
                 vmWarning(fmt::format("Sequence jump target ${:04X} was not decoded", effects.step.destination.value),
                           command.range));
           }
@@ -288,8 +402,9 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
             runtime.callStack.push_back(*returnIndex);
           }
           current = destinationIndex(track, effects.step.destination);
+          arrivedByControlFlow = true;
           if (!current) {
-            sequence.diagnostics.push_back(
+            targetSequence.diagnostics.push_back(
                 vmWarning(fmt::format("Sequence call target ${:04X} was not decoded", effects.step.destination.value),
                           command.range));
           }
@@ -298,11 +413,13 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
         case Step::Kind::Return:
           if (runtime.callStack.empty()) {
-            sequence.diagnostics.push_back(vmWarning("Sequence return had no active call", command.range));
+            targetSequence.diagnostics.push_back(vmWarning("Sequence return had no active call", command.range));
             current = std::nullopt;
+            arrivedByControlFlow = false;
           } else {
             current = runtime.callStack.back();
             runtime.callStack.pop_back();
+            arrivedByControlFlow = true;
           }
           break;
       }
@@ -311,7 +428,24 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     }
 
     performanceTrack.endTick = runtime.tick;
-    sequence.tracks.push_back(std::move(performanceTrack));
+    return RenderedTrack{.track = std::move(performanceTrack), .loopTick = firstLoopTick};
+  };
+
+  std::optional<u64> synchronizedStopTick;
+  if (loopPolicy == LoopPolicy::PlayOnce && behavior.stopAllTracksAtFirstLoop) {
+    PerformanceSequence dryRunSequence{
+        .timebase = program.timebase,
+    };
+    for (const TrackProgram& track : program.tracks) {
+      const auto rendered = renderTrack(track, dryRunSequence, std::nullopt);
+      if (rendered.loopTick && (!synchronizedStopTick || *rendered.loopTick > *synchronizedStopTick)) {
+        synchronizedStopTick = rendered.loopTick;
+      }
+    }
+  }
+
+  for (size_t i = 0; i < program.tracks.size(); ++i) {
+    sequence.tracks.push_back(renderTrack(program.tracks[i], sequence, synchronizedStopTick).track);
   }
 
   return sequence;
@@ -338,6 +472,21 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
   } else if (dialect.defaultBehavior.commandLimit != 0) {
     behavior.commandLimit = dialect.defaultBehavior.commandLimit;
   }
+
+  if (program.behavior.initialReverbSend) {
+    behavior.initialReverbSend = program.behavior.initialReverbSend;
+  } else if (dialect.defaultBehavior.initialReverbSend) {
+    behavior.initialReverbSend = dialect.defaultBehavior.initialReverbSend;
+  }
+
+  if (program.behavior.initialMonoModeChannels) {
+    behavior.initialMonoModeChannels = program.behavior.initialMonoModeChannels;
+  } else if (dialect.defaultBehavior.initialMonoModeChannels) {
+    behavior.initialMonoModeChannels = dialect.defaultBehavior.initialMonoModeChannels;
+  }
+
+  behavior.stopAllTracksAtFirstLoop =
+      program.behavior.stopAllTracksAtFirstLoop || dialect.defaultBehavior.stopAllTracksAtFirstLoop;
 
   return behavior;
 }

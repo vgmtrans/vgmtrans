@@ -316,6 +316,12 @@ void MidiTrack::purgePrevNoteOffs() {
   m_prevDurNoteOffs.clear();
 }
 
+void MidiTrack::purgePrevNoteOffsBefore(u32 absTime) {
+  m_prevDurNoteOffs.erase(std::remove_if(m_prevDurNoteOffs.begin(), m_prevDurNoteOffs.end(),
+    [absTime](const NoteEvent *e) { return e && e->absTime < absTime; }),
+    m_prevDurNoteOffs.end());
+}
+
 void MidiTrack::purgePrevNoteOffs(u32 absTime) {
   m_prevDurNoteOffs.erase(std::remove_if(m_prevDurNoteOffs.begin(), m_prevDurNoteOffs.end(),
     [absTime](const NoteEvent *e) { return e && e->absTime <= absTime; }),

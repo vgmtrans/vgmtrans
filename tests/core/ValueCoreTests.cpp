@@ -766,6 +766,88 @@ void sequenceVmUsesDialectCommandLimitDefault() {
   expect(performance.tracks[0].endTick == 12, "command-limit stop should preserve ticks from commands already run");
 }
 
+void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 2> programBytes{0x80, 0x05};
+  const std::array<u8, 1> endBytes{0xff};
+  const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
+
+  // Jump/call decoding often discovers a later source block first. Fallthrough
+  // must still use source addresses, not command-vector order.
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{11}, probeRange(11, programBytes.size()),
+                                       programBytes);
+  addProbeCommand<ProbeEndCommand>(builder, dialect, Address{13}, probeRange(13, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{3}, probeRange(3, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{6}, probeRange(6, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{9}, probeRange(9, programBytes.size()),
+                                       programBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "out-of-order source fallthrough fixture should not report diagnostics");
+  expect(performance.tracks[0].events.size() == 5,
+         "VM should execute source-contiguous commands across decoded-block order");
+
+  const auto* finalProgram = std::get_if<InstrumentPerformanceEvent>(&performance.tracks[0].events[4]);
+  expect(finalProgram != nullptr && finalProgram->header.tick == 36,
+         "source-address fallthrough should reach the earlier-decoded program command");
+}
+
+void sequenceVmEmitsDialectInitialChannelDefaults() {
+  const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{
+      .defaultLoopPolicy = LoopPolicy::Default,
+      .initialReverbSend = 0.0,
+      .initialMonoModeChannels = 0,
+  });
+  TrackProgram track{
+      .id = TrackId{3},
+      .sourceTrackNumber = 4,
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeEndCommand>(builder, dialect, Address{0}, probeRange(0, endBytes.size()), endBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.tracks.size() == 1, "initial-default fixture should render one track");
+  const auto& events = performance.tracks[0].events;
+  expect(events.size() == 2, "VM should emit dialect initial channel defaults before source commands");
+
+  const auto* reverb = std::get_if<ReverbPerformanceEvent>(&events[0]);
+  expect(reverb != nullptr && reverb->send == 0.0 && !reverb->header.sourceCommand.valid(),
+         "initial reverb should preserve explicit zero and should not pretend to come from a source command");
+  const auto* mono = std::get_if<MonoModePerformanceEvent>(&events[1]);
+  expect(mono != nullptr && mono->channels == 0 && !mono->header.sourceCommand.valid(),
+         "initial mono mode should preserve explicit zero and should not pretend to come from a source command");
+
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const auto* midiReverb = std::get_if<Reverb>(&midi.tracks[0].events[0]);
+  expect(midiReverb != nullptr && midiReverb->channel == 0 && midiReverb->value == 0,
+         "performance renderer should lower initial reverb to MIDI CC91");
+  const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[1]);
+  expect(midiMono != nullptr && midiMono->channel == 0 && midiMono->channels == 0,
+         "performance renderer should lower initial mono mode to MIDI CC126");
+}
+
 void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -1776,6 +1858,8 @@ int main() {
     sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
     sequenceVmPreservesLoopsAsPerformanceMarkers();
     sequenceVmUsesDialectCommandLimitDefault();
+    sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
+    sequenceVmEmitsDialectInitialChannelDefaults();
     sequenceVmAllowsRepeatedCallsToSameSubroutine();
     sequenceVmReplaysFiniteRepeatBlocks();
     projectSessionScansValuesAndVirtualSources();

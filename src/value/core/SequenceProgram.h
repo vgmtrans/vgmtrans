@@ -147,6 +147,15 @@ struct SequenceProgramBehavior {
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
   // Zero means "use the next default": program -> dialect -> VM fallback.
   u32 commandLimit = 0;
+  // Some legacy drivers rely on channel defaults that are not source opcodes.
+  // Keep them in behavior so formats opt in explicitly and exporters can emit
+  // stable initialization without attaching it to a fake source command.
+  std::optional<double> initialReverbSend;
+  std::optional<u8> initialMonoModeChannels;
+  // Some tick-by-tick drivers stop every track as soon as any track exhausts
+  // the export loop budget. Formats opt in when that global stop is part of
+  // the source driver's playback model.
+  bool stopAllTracksAtFirstLoop = false;
 };
 
 struct SequenceProgram {

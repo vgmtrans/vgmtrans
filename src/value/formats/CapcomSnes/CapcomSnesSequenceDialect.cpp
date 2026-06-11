@@ -35,7 +35,6 @@ struct Context {
 
 struct TrackState {
   u32 durationRate = 0xff;
-  s32 globalTranspose = 0;
   s32 transpose = 0;
   u32 noteOctave = 0;
   bool noteDotted = false;
@@ -48,6 +47,8 @@ struct TrackState {
   double portamentoMillisecondsPerCent = 0.0;
   u16 lastPortamentoTime = 0;
   std::optional<s32> lastSourceKey;
+  bool lastNoteSlurred = false;
+  bool didRest = false;
 };
 
 [[nodiscard]] double tuningSemitones(s8 tuning) {
@@ -99,7 +100,7 @@ struct TrackState {
 }
 
 [[nodiscard]] double performedKey(s32 key, const TrackState& state) {
-  return static_cast<double>(key + state.globalTranspose + state.transpose);
+  return static_cast<double>(key + state.transpose);
 }
 
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(u32 rawTempo) {
@@ -122,10 +123,23 @@ struct TrackState {
 }
 
 [[nodiscard]] double stereoPosition(const ::capcom_snes::PanConversionResult& converted) {
-  return std::clamp((static_cast<double>(converted.midiPan) - 64.0) / 63.0, -1.0, 1.0);
+  // Store the pan on the same 0..127 lattice the MIDI renderer uses so legacy
+  // Capcom pan values survive the neutral stereo-position hop without shifting
+  // left-side values down by one.
+  return std::clamp((static_cast<double>(converted.midiPan) / 127.0) * 2.0 - 1.0, -1.0, 1.0);
 }
 
-void applyNoteAttributes(u8 attributes, TrackState& state) {
+void emitLegatoChangeIfNeeded(bool wasSlurred, const TrackState& state, Emit& out) {
+  if (state.noteSlurred == wasSlurred) {
+    return;
+  }
+  out.legatoPedal(LegatoPedalPerformanceEvent{
+      .enabled = state.noteSlurred,
+  });
+}
+
+void applyNoteAttributes(u8 attributes, TrackState& state, Emit* out = nullptr) {
+  const bool wasSlurred = state.noteSlurred;
   // The driver ORs octave bits instead of replacing them. Preserve that quirk until
   // parity proves a specific version behaves differently.
   state.noteOctave |= attributes & kNoteOctaveMask;
@@ -133,6 +147,9 @@ void applyNoteAttributes(u8 attributes, TrackState& state) {
   state.noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
   state.noteTriplet = (attributes & kNoteTripletMask) != 0;
   state.noteSlurred = (attributes & kNoteSlurredMask) != 0;
+  if (out != nullptr) {
+    emitLegatoChangeIfNeeded(wasSlurred, state, *out);
+  }
 }
 
 void emitModulationDepths(const TrackState& state, Emit& out, bool enabled) {
@@ -165,7 +182,9 @@ struct Rest {
   }
 
   Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    return Effects::wait(noteTicks(rawDuration, state));
+    const u32 length = noteTicks(rawDuration, state);
+    state.didRest = true;
+    return Effects::wait(length);
   }
 };
 
@@ -191,24 +210,46 @@ struct Note {
   Effects execute(TrackState& state, Emit& out, VmApi&, const Context&) const {
     const u32 length = noteTicks(rawDuration, state);
     const s32 key = driverSourceKey(keyIndex, state);
+    const u32 duration = soundingTicks(length, state);
+
+    if (state.lastNoteSlurred && state.lastSourceKey && key == *state.lastSourceKey && !state.didRest) {
+      // The Capcom driver treats repeated keys after a slurred note as a tie.
+      // Legacy VGMTrans extends the previous MIDI note even if this note has
+      // already cleared the slur bit, so the state must look at the previous note.
+      out.note(NotePerformanceEvent{
+          .key = performedKey(key, state),
+          .velocity = 1.0,
+          .durationTicks = duration,
+          .extendsPrevious = true,
+      });
+      state.lastNoteSlurred = state.noteSlurred;
+      return Effects::wait(length);
+    }
+
     if (state.portamentoMillisecondsPerCent > 0.0 && state.lastSourceKey) {
       const auto keyDistance = static_cast<u32>(std::abs(key - *state.lastSourceKey));
       const auto portamentoTime = static_cast<u16>(keyDistance * 100 * state.portamentoMillisecondsPerCent);
       if (portamentoTime != state.lastPortamentoTime) {
         out.portamento(PortamentoPerformanceEvent{
             .timeMilliseconds = static_cast<double>(portamentoTime),
-            .previousKey = static_cast<double>(*state.lastSourceKey + state.globalTranspose),
+            .previousKey = static_cast<double>(*state.lastSourceKey + state.transpose),
         });
         state.lastPortamentoTime = portamentoTime;
+      } else {
+        out.portamentoControl(PortamentoControlPerformanceEvent{
+            .previousKey = static_cast<double>(*state.lastSourceKey + state.transpose),
+        });
       }
     }
     out.note(NotePerformanceEvent{
         .key = performedKey(key, state),
         .velocity = 1.0,
-        .durationTicks = soundingTicks(length, state) + (state.noteSlurred ? 1u : 0u),
-        .extendsPrevious = state.noteSlurred,
+        // Slur is modeled as a one-tick overlap into the next source note.
+        .durationTicks = duration + (state.noteSlurred ? 1u : 0u),
     });
     state.lastSourceKey = key;
+    state.didRest = false;
+    state.lastNoteSlurred = state.noteSlurred;
     return Effects::wait(length);
   }
 };
@@ -227,8 +268,8 @@ struct NoteAttributes {
     out.field("raw", static_cast<u64>(raw));
   }
 
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    applyNoteAttributes(raw, state);
+  Effects execute(TrackState& state, Emit& out, VmApi&, const Context&) const {
+    applyNoteAttributes(raw, state, &out);
     return Effects::none();
   }
 };
@@ -275,8 +316,10 @@ struct ToggleSlur {
     return ToggleSlur{};
   }
 
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
+  Effects execute(TrackState& state, Emit& out, VmApi&, const Context&) const {
+    const bool wasSlurred = state.noteSlurred;
     state.noteSlurred = !state.noteSlurred;
+    emitLegatoChangeIfNeeded(wasSlurred, state, out);
     return Effects::none();
   }
 };
@@ -323,8 +366,10 @@ struct GlobalTranspose {
     out.field("semitones", static_cast<s64>(semitones));
   }
 
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.globalTranspose = semitones;
+  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
+    out.globalTranspose(GlobalTransposePerformanceEvent{
+        .semitones = semitones,
+    });
     return Effects::none();
   }
 };
@@ -491,10 +536,10 @@ struct RepeatBreak {
     out.field("destination", destination);
   }
 
-  Effects execute(TrackState& state, Emit&, VmApi& vm, const Context&) const {
+  Effects execute(TrackState& state, Emit& out, VmApi& vm, const Context&) const {
     const Step step = vm.repeatBreak(slot, destination);
     if (step.kind == Step::Kind::Jump) {
-      applyNoteAttributes(attributes, state);
+      applyNoteAttributes(attributes, state, &out);
     }
     return Effects{.step = step};
   }
@@ -518,6 +563,7 @@ struct Volume {
   Effects execute(TrackState&, Emit& out, VmApi&, const Context& context) const {
     out.level(LevelPerformanceEvent{
         .linearGain = volumeGain(context.version, raw),
+        .resolution = LevelResolution::FourteenBit,
     });
     return Effects::none();
   }
@@ -542,6 +588,7 @@ struct Program {
     out.instrument(InstrumentPerformanceEvent{
         .bank = static_cast<u32>(raw >> 7),
         .program = static_cast<u32>(raw & 0x7f),
+        .forceBankSelect = true,
     });
     return Effects::none();
   }
@@ -868,7 +915,12 @@ bool appendCommandIfPresent(TrackProgramBuilder& builder, const SequenceDialect&
 SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version) {
   return SequenceDialectBuilder<TrackState, Context>(dialectId(version), Context{.version = version})
       .timebase(Timebase{.ppqn = kCapcomSnesPpqn})
-      .defaultBehavior(SequenceProgramBehavior{.defaultLoopPolicy = LoopPolicy::PlayOnce})
+      .defaultBehavior(SequenceProgramBehavior{
+          .defaultLoopPolicy = LoopPolicy::PlayOnce,
+          .initialReverbSend = 0.0,
+          .initialMonoModeChannels = 0,
+          .stopAllTracksAtFirstLoop = true,
+      })
       .commands<Rest, Note, ToggleTriplet, ToggleSlur, DottedNote, ToggleOctaveUp, NoteAttributes, Octave,
                 GlobalTranspose, Transpose, Tuning, PortamentoTime, Tempo, DurationRate, Volume, Program, RepeatUntil,
                 RepeatBreak, Jump, End, Pan, MasterVolume, Lfo, EchoParam, EchoOnOff, ReleaseRate, Nop, UnknownOneByte,
