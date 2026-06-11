@@ -6,10 +6,13 @@
 #pragma once
 
 #include "value/core/FormatModule.h"
-#include "value/core/FormatRegistry.h"
 
 #include <span>
 #include <string_view>
+
+namespace vgmtrans::core {
+class FormatRegistry;
+}
 
 namespace vgmtrans::formats::snes_spc {
 

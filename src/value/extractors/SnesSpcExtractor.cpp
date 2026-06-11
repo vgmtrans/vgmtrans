@@ -6,6 +6,8 @@
 
 #include "value/extractors/SnesSpcExtractor.h"
 
+#include "value/core/FormatRegistry.h"
+
 #include <algorithm>
 #include <filesystem>
 #include <memory>

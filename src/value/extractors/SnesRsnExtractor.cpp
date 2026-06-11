@@ -6,6 +6,8 @@
 
 #include "value/extractors/SnesRsnExtractor.h"
 
+#include "value/core/FormatRegistry.h"
+
 #include "unarr.h"
 
 #include <algorithm>

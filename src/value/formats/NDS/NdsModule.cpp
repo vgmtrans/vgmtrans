@@ -6,6 +6,7 @@
 
 #include "value/formats/NDS/NdsModule.h"
 
+#include "value/core/FormatRegistry.h"
 #include "value/core/SynthMath.h"
 #include "value/formats/NDS/NdsProfile.h"
 

@@ -6,6 +6,8 @@
 
 #include "value/extractors/PsfExtractor.h"
 
+#include "value/core/FormatRegistry.h"
+
 #include <zlib.h>
 
 #include <algorithm>
