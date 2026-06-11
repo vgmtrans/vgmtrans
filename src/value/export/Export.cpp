@@ -50,10 +50,10 @@ namespace {
   return name;
 }
 
-[[nodiscard]] std::string sampleArtifactName(const Collection& collection, const Sample& sample, u32 sampleIndex) {
+[[nodiscard]] std::string sampleArtifactName(const std::string& baseName, const Sample& sample, u32 sampleIndex) {
   std::string sampleName = sample.name.empty() ? "sample-" + std::to_string(sampleIndex) : sample.name;
-  return filenamePart(artifactBaseName(collection)) + "-" + std::to_string(sampleIndex) + "-" +
-         filenamePart(std::move(sampleName)) + ".wav";
+  return filenamePart(baseName) + "-" + std::to_string(sampleIndex) + "-" + filenamePart(std::move(sampleName)) +
+         ".wav";
 }
 
 [[nodiscard]] std::vector<ExportKind> requestedKinds(const ExportRequest& request) {
@@ -63,16 +63,58 @@ namespace {
   return {ExportKind::Midi};
 }
 
-struct SynthExportAssets {
+struct InstrumentSetExportAssets {
   std::vector<const InstrumentSetAsset*> instrumentSets;
-  std::vector<const SampleCollectionAsset*> sampleCollections;
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] SynthExportAssets collectSynthExportAssets(const Project& project, const Collection& collection) {
-  SynthExportAssets assets;
+struct SampleCollectionExportAssets {
+  std::vector<const SampleCollectionAsset*> sampleCollections;
+  std::vector<Diagnostic> diagnostics;
+  bool referenced = false;
+};
+
+struct SequenceExportAssets {
+  const SequenceAsset* sequence = nullptr;
+  std::vector<Diagnostic> diagnostics;
+};
+
+struct PreparedCollectionExport {
+  std::string baseName;
+  SequenceExportAssets sequence;
+  InstrumentSetExportAssets instruments;
+  SampleCollectionExportAssets samples;
+};
+
+struct MidiLoweringResult {
+  std::optional<MidiSequence> sequence;
+  std::vector<Diagnostic> diagnostics;
+};
+
+[[nodiscard]] SequenceExportAssets collectSequenceExportAssets(const Project& project, const Collection& collection) {
+  if (!collection.sequence) {
+    return SequenceExportAssets{
+        .diagnostics = {exportError("Collection does not reference a sequence asset")},
+    };
+  }
+
+  const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence);
+  if (sequence == nullptr) {
+    return SequenceExportAssets{
+        .diagnostics = {exportError("Collection sequence asset was not found")},
+    };
+  }
+
+  return SequenceExportAssets{
+      .sequence = sequence,
+  };
+}
+
+[[nodiscard]] InstrumentSetExportAssets collectInstrumentSetExportAssets(
+    const Project& project,
+    const Collection& collection) {
+  InstrumentSetExportAssets assets;
   assets.instrumentSets.reserve(collection.instrumentSets.size());
-  assets.sampleCollections.reserve(collection.sampleCollections.size());
 
   for (const auto id : collection.instrumentSets) {
     if (const auto* instrumentSet = assetById<InstrumentSetAsset>(project, id)) {
@@ -81,6 +123,17 @@ struct SynthExportAssets {
       assets.diagnostics.push_back(exportError("Collection instrument set asset was not found"));
     }
   }
+
+  return assets;
+}
+
+[[nodiscard]] SampleCollectionExportAssets collectSampleCollectionExportAssets(
+    const Project& project,
+    const Collection& collection) {
+  SampleCollectionExportAssets assets{
+      .referenced = !collection.sampleCollections.empty(),
+  };
+  assets.sampleCollections.reserve(collection.sampleCollections.size());
 
   for (const auto id : collection.sampleCollections) {
     if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, id)) {
@@ -93,12 +146,13 @@ struct SynthExportAssets {
   return assets;
 }
 
-[[nodiscard]] const SequenceAsset* collectionSequence(const Project& project, const Collection& collection) {
-  if (!collection.sequence) {
-    return nullptr;
-  }
-
-  return assetById<SequenceAsset>(project, *collection.sequence);
+[[nodiscard]] PreparedCollectionExport prepareCollectionExport(const Project& project, const Collection& collection) {
+  return PreparedCollectionExport{
+      .baseName = artifactBaseName(collection),
+      .sequence = collectSequenceExportAssets(project, collection),
+      .instruments = collectInstrumentSetExportAssets(project, collection),
+      .samples = collectSampleCollectionExportAssets(project, collection),
+  };
 }
 
 [[nodiscard]] std::string midiSequenceProfileName(const SequenceAsset& sequence) {
@@ -106,58 +160,58 @@ struct SynthExportAssets {
                                                               : sequence.commandSequence.midiSequenceProfile;
 }
 
-[[nodiscard]] std::optional<MidiModulationUsage> collectionMidiModulationUsage(
-    const Project& project, const Collection& collection, const MidiSequenceProfileRegistry& profiles,
+[[nodiscard]] MidiLoweringResult lowerMidiSequence(
+    const PreparedCollectionExport& prepared,
+    const MidiSequenceProfileRegistry& profiles,
     LoopPolicy loopPolicy) {
-  const auto* sequence = collectionSequence(project, collection);
-  if (sequence == nullptr) {
-    return std::nullopt;
+  if (!prepared.sequence.diagnostics.empty()) {
+    return MidiLoweringResult{
+        .diagnostics = prepared.sequence.diagnostics,
+    };
+  }
+  if (prepared.sequence.sequence == nullptr) {
+    return MidiLoweringResult{
+        .diagnostics = {exportError("Collection sequence asset was not found")},
+    };
   }
 
-  auto profile = profiles.create(midiSequenceProfileName(*sequence));
+  const std::string profileName = midiSequenceProfileName(*prepared.sequence.sequence);
+  // Some formats scan as one asset format but need a dialect-specific MIDI sequence profile.
+  auto profile = profiles.create(profileName);
   if (!profile) {
+    return MidiLoweringResult{
+        .diagnostics = {exportError("No MIDI sequence profile registered for '" + profileName + "'")},
+    };
+  }
+
+  return MidiLoweringResult{
+      .sequence = MidiSequenceBuilder().build(prepared.sequence.sequence->commandSequence, *profile, loopPolicy),
+  };
+}
+
+[[nodiscard]] std::optional<MidiModulationUsage> midiModulationUsage(const MidiLoweringResult& lowering) {
+  if (!lowering.sequence) {
     return std::nullopt;
   }
 
-  auto midiSequence = MidiSequenceBuilder().build(sequence->commandSequence, *profile, loopPolicy);
-  auto usage = analyzeMidiModulationUsage(midiSequence);
+  auto usage = analyzeMidiModulationUsage(*lowering.sequence);
   if (!hasMidiModulationUsage(usage)) {
     return std::nullopt;
   }
   return usage;
 }
 
-[[nodiscard]] Artifact exportMidi(const Project& project, const Collection& collection, const ExportRequest& request,
-                                  const MidiSequenceProfileRegistry& profiles) {
-  if (!collection.sequence) {
+[[nodiscard]] Artifact exportMidi(const PreparedCollectionExport& prepared, const ExportRequest& request,
+                                  const MidiLoweringResult& lowering) {
+  if (!lowering.sequence) {
     return Artifact{
-        .filename = artifactBaseName(collection) + ".mid",
+        .filename = prepared.baseName + ".mid",
         .mediaType = "audio/midi",
-        .diagnostics = {exportError("Collection does not reference a sequence asset")},
+        .diagnostics = lowering.diagnostics,
     };
   }
 
-  const auto* sequence = collectionSequence(project, collection);
-  if (sequence == nullptr) {
-    return Artifact{
-        .filename = artifactBaseName(collection) + ".mid",
-        .mediaType = "audio/midi",
-        .diagnostics = {exportError("Collection sequence asset was not found")},
-    };
-  }
-
-  const std::string profileName = midiSequenceProfileName(*sequence);
-  // Some formats scan as one asset format but need a dialect-specific MIDI sequence profile.
-  auto profile = profiles.create(profileName);
-  if (!profile) {
-    return Artifact{
-        .filename = artifactBaseName(collection) + ".mid",
-        .mediaType = "audio/midi",
-        .diagnostics = {exportError("No MIDI sequence profile registered for '" + profileName + "'")},
-    };
-  }
-
-  auto midiSequence = MidiSequenceBuilder().build(sequence->commandSequence, *profile, request.loopPolicy);
+  auto midiSequence = *lowering.sequence;
   if (request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
     const auto usage = analyzeMidiModulationUsage(midiSequence);
     if (hasMidiModulationUsage(usage)) {
@@ -167,18 +221,17 @@ struct SynthExportAssets {
   auto bytes = MidiExporter().exportMidi(midiSequence);
 
   return Artifact{
-      .filename = artifactBaseName(collection) + ".mid",
+      .filename = prepared.baseName + ".mid",
       .mediaType = "audio/midi",
       .bytes = std::move(bytes),
       .diagnostics = std::move(midiSequence.diagnostics),
   };
 }
 
-[[nodiscard]] std::vector<Artifact> exportWav(const Project& project, const SourceStore& sources,
-                                              const Collection& collection) {
-  if (collection.sampleCollections.empty()) {
+[[nodiscard]] std::vector<Artifact> exportWav(const PreparedCollectionExport& prepared, const SourceStore& sources) {
+  if (!prepared.samples.referenced) {
     return {Artifact{
-        .filename = filenamePart(artifactBaseName(collection)) + "-samples.wav",
+        .filename = filenamePart(prepared.baseName) + "-samples.wav",
         .mediaType = "audio/wav",
         .diagnostics = {exportError("Collection does not reference a sample collection asset")},
     }};
@@ -189,20 +242,18 @@ struct SynthExportAssets {
   const WavExporter exporter;
   u32 sampleIndex = 0;
 
-  for (const auto sampleCollectionId : collection.sampleCollections) {
-    const auto* sampleCollection = assetById<SampleCollectionAsset>(project, sampleCollectionId);
-    if (sampleCollection == nullptr) {
-      artifacts.push_back(Artifact{
-          .filename = filenamePart(artifactBaseName(collection)) + "-samples.wav",
-          .mediaType = "audio/wav",
-          .diagnostics = {exportError("Collection sample collection asset was not found")},
-      });
-      continue;
-    }
+  for (const auto& diagnostic : prepared.samples.diagnostics) {
+    artifacts.push_back(Artifact{
+        .filename = filenamePart(prepared.baseName) + "-samples.wav",
+        .mediaType = "audio/wav",
+        .diagnostics = {diagnostic},
+    });
+  }
 
+  for (const auto* sampleCollection : prepared.samples.sampleCollections) {
     for (const auto& sample : sampleCollection->samples.samples) {
       Artifact artifact{
-          .filename = sampleArtifactName(collection, sample, sampleIndex++),
+          .filename = sampleArtifactName(prepared.baseName, sample, sampleIndex++),
           .mediaType = "audio/wav",
       };
 
@@ -227,7 +278,7 @@ struct SynthExportAssets {
 
   if (artifacts.empty()) {
     artifacts.push_back(Artifact{
-        .filename = filenamePart(artifactBaseName(collection)) + "-samples.wav",
+        .filename = filenamePart(prepared.baseName) + "-samples.wav",
         .mediaType = "audio/wav",
         .diagnostics = {exportError("Collection sample collection assets did not contain samples")},
     });
@@ -236,58 +287,51 @@ struct SynthExportAssets {
   return artifacts;
 }
 
-[[nodiscard]] Artifact exportSoundFont2(const Project& project, const SourceStore& sources,
-                                        const Collection& collection, const ExportRequest& request,
-                                        const MidiSequenceProfileRegistry& profiles) {
-  auto assets = collectSynthExportAssets(project, collection);
-  auto midiModulationUsage = request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange
-                                 ? collectionMidiModulationUsage(project, collection, profiles, request.loopPolicy)
-                                 : std::optional<MidiModulationUsage>{};
-
+[[nodiscard]] Artifact exportSoundFont2(const PreparedCollectionExport& prepared, const SourceStore& sources,
+                                        const ExportRequest& request, const MidiModulationUsage* midiModulation) {
   auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
-          .name = artifactBaseName(collection),
-          .instrumentSets = assets.instrumentSets,
-          .sampleCollections = assets.sampleCollections,
-          .midiModulationUsage = midiModulationUsage ? &*midiModulationUsage : nullptr,
+          .name = prepared.baseName,
+          .instrumentSets = prepared.instruments.instrumentSets,
+          .sampleCollections = prepared.samples.sampleCollections,
+          .midiModulationUsage = midiModulation,
           .modulationScaling = request.synthModulationScaling,
       },
       sources);
-  assets.diagnostics.insert(assets.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
-                            std::make_move_iterator(result.diagnostics.end()));
+  auto diagnostics = prepared.instruments.diagnostics;
+  diagnostics.insert(diagnostics.end(), prepared.samples.diagnostics.begin(), prepared.samples.diagnostics.end());
+  diagnostics.insert(diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
+                     std::make_move_iterator(result.diagnostics.end()));
 
   return Artifact{
-      .filename = filenamePart(artifactBaseName(collection)) + ".sf2",
+      .filename = filenamePart(prepared.baseName) + ".sf2",
       .mediaType = "audio/soundfont",
       .bytes = std::move(result.bytes),
-      .diagnostics = std::move(assets.diagnostics),
+      .diagnostics = std::move(diagnostics),
   };
 }
 
-[[nodiscard]] Artifact exportDls(const Project& project, const SourceStore& sources, const Collection& collection,
-                                 const ExportRequest& request, const MidiSequenceProfileRegistry& profiles) {
-  auto assets = collectSynthExportAssets(project, collection);
-  auto midiModulationUsage = request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange
-                                 ? collectionMidiModulationUsage(project, collection, profiles, request.loopPolicy)
-                                 : std::optional<MidiModulationUsage>{};
-
+[[nodiscard]] Artifact exportDls(const PreparedCollectionExport& prepared, const SourceStore& sources,
+                                 const ExportRequest& request, const MidiModulationUsage* midiModulation) {
   auto result = DlsExporter().exportDls(
       DlsInput{
-          .name = artifactBaseName(collection),
-          .instrumentSets = assets.instrumentSets,
-          .sampleCollections = assets.sampleCollections,
-          .midiModulationUsage = midiModulationUsage ? &*midiModulationUsage : nullptr,
+          .name = prepared.baseName,
+          .instrumentSets = prepared.instruments.instrumentSets,
+          .sampleCollections = prepared.samples.sampleCollections,
+          .midiModulationUsage = midiModulation,
           .modulationScaling = request.synthModulationScaling,
       },
       sources);
-  assets.diagnostics.insert(assets.diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
-                            std::make_move_iterator(result.diagnostics.end()));
+  auto diagnostics = prepared.instruments.diagnostics;
+  diagnostics.insert(diagnostics.end(), prepared.samples.diagnostics.begin(), prepared.samples.diagnostics.end());
+  diagnostics.insert(diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
+                     std::make_move_iterator(result.diagnostics.end()));
 
   return Artifact{
-      .filename = filenamePart(artifactBaseName(collection)) + ".dls",
+      .filename = filenamePart(prepared.baseName) + ".dls",
       .mediaType = "audio/dls",
       .bytes = std::move(result.bytes),
-      .diagnostics = std::move(assets.diagnostics),
+      .diagnostics = std::move(diagnostics),
   };
 }
 
@@ -309,22 +353,45 @@ std::vector<Artifact> ExportService::exportCollection(const Project& project, co
   }
 
   std::vector<Artifact> artifacts;
+  const auto prepared = prepareCollectionExport(project, *found);
+  std::optional<MidiLoweringResult> midiLowering;
+  std::optional<MidiModulationUsage> midiUsage;
+  bool midiUsageAnalyzed = false;
+
+  const auto requireMidiLowering = [&]() -> const MidiLoweringResult& {
+    if (!midiLowering) {
+      midiLowering = lowerMidiSequence(prepared, profiles, request.loopPolicy);
+    }
+    return *midiLowering;
+  };
+
+  const auto requireMidiModulationUsage = [&]() -> const MidiModulationUsage* {
+    if (request.synthModulationScaling != ModulationScalingPolicy::ObservedSequenceRange) {
+      return nullptr;
+    }
+    if (!midiUsageAnalyzed) {
+      midiUsage = midiModulationUsage(requireMidiLowering());
+      midiUsageAnalyzed = true;
+    }
+    return midiUsage ? &*midiUsage : nullptr;
+  };
+
   for (const auto kind : requestedKinds(request)) {
     switch (kind) {
       case ExportKind::Midi:
-        artifacts.push_back(exportMidi(project, *found, request, profiles));
+        artifacts.push_back(exportMidi(prepared, request, requireMidiLowering()));
         break;
       case ExportKind::Wav: {
-        auto wavArtifacts = exportWav(project, sources, *found);
+        auto wavArtifacts = exportWav(prepared, sources);
         artifacts.insert(artifacts.end(), std::make_move_iterator(wavArtifacts.begin()),
                          std::make_move_iterator(wavArtifacts.end()));
         break;
       }
       case ExportKind::SoundFont2:
-        artifacts.push_back(exportSoundFont2(project, sources, *found, request, profiles));
+        artifacts.push_back(exportSoundFont2(prepared, sources, request, requireMidiModulationUsage()));
         break;
       case ExportKind::Dls:
-        artifacts.push_back(exportDls(project, sources, *found, request, profiles));
+        artifacts.push_back(exportDls(prepared, sources, request, requireMidiModulationUsage()));
         break;
     }
   }
