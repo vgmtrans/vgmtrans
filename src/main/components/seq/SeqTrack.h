@@ -242,8 +242,8 @@ private:
   void insertNoteByDur(u32 offset, u32 length, s8 key, s8 vel, u32 dur, u32 absTime, const std::string &sEventName = "Note On With Duration");
   void insertNoteByDurNoItem(s8 key, s8 vel, u32 dur, u32 absTime);
 
-  void makePrevDurNoteEnd() const;
-  void makePrevDurNoteEnd(u32 absTime) const;
+  void makePrevDurNoteEnd();
+  void makePrevDurNoteEnd(u32 absTime);
   void limitPrevDurNoteEnd() const;
   void limitPrevDurNoteEnd(u32 absTime) const;
   void addVol(u32 offset, u32 length, u8 vol, const std::string &sEventName = "Volume");

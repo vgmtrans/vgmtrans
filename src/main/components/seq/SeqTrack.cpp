@@ -852,12 +852,26 @@ void SeqTrack::insertNoteByDurNoItem(s8 key, s8 vel, u32 dur, u32 absTime) {
   prevVel = vel;
 }
 
-void SeqTrack::makePrevDurNoteEnd() const {
+void SeqTrack::makePrevDurNoteEnd() {
   makePrevDurNoteEnd(getTime() + (parentSeq->bLoadTickByTick ? deltaTime : 0));
 }
 
-void SeqTrack::makePrevDurNoteEnd(u32 absTime) const {
+void SeqTrack::makePrevDurNoteEnd(u32 absTime) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
+    if (parentSeq->bLoadTickByTick) {
+      // Tick-by-tick parsers can leave expired duration-note ends in the
+      // pending list until another note is emitted. A tie at this exact tick is
+      // still eligible for extension; notes that ended earlier are stale.
+      const u32 currentTick = getTime();
+      pMidiTrack->purgePrevNoteOffsBefore(currentTick);
+      auto& timeline = parentSeq->timedEventIndex();
+      prevDurEventIndices.erase(
+        std::remove_if(prevDurEventIndices.begin(), prevDurEventIndices.end(),
+          [&timeline, currentTick](SeqEventTimeIndex::Index idx) {
+            return timeline.endTickExclusive(idx) < currentTick;
+          }),
+        prevDurEventIndices.end());
+    }
     for (auto* prevDurNoteOff : pMidiTrack->previousDurNoteOffs()) {
       prevDurNoteOff->absTime = absTime;
     }
@@ -2010,6 +2024,8 @@ bool SeqTrack::checkControlStateForInfiniteLoop(u32 offset) {
     // Workaround for tracks that never increment the time - exit on first infinite loop point
     if (getTime() == 0)
       return false;
+    if (parentSeq->conversionContext().sequenceLoops == 0)
+      return false;
     return true;
   }
 
@@ -2090,6 +2106,12 @@ bool SeqTrack::addLoopForever(u32 offset, u32 length, const std::string &sEventN
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
     totalTicks = getTime();
+    return (this->infiniteLoops <= parentSeq->conversionContext().sequenceLoops);
+  }
+  else if (readMode == READMODE_CONVERT_TO_MIDI) {
+    // Stop immediately when the requested loop budget is exhausted. Waiting for
+    // VGMSeq's tick-end loop check lets same-tick setup events from the loop
+    // target leak into play-once exports.
     return (this->infiniteLoops <= parentSeq->conversionContext().sequenceLoops);
   }
   return true;

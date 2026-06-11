@@ -28,7 +28,10 @@ public:
   void masterLevel(MasterLevelPerformanceEvent event);
   void reverb(ReverbPerformanceEvent event);
   void tuning(TuningPerformanceEvent event);
+  void globalTranspose(GlobalTransposePerformanceEvent event);
   void portamento(PortamentoPerformanceEvent event);
+  void portamentoControl(PortamentoControlPerformanceEvent event);
+  void legatoPedal(LegatoPedalPerformanceEvent event);
   void modulation(ModulationPerformanceEvent event);
   void marker(MarkerPerformanceEvent event);
 

@@ -11,6 +11,7 @@
 #include "CapcomSnesDriverMath.h"
 #include "Modulation.h"
 
+#include <algorithm>
 #include <sstream>
 
 DECLARE_FORMAT(CapcomSnes);
@@ -367,8 +368,13 @@ bool CapcomSnesTrack::readEvent() {
             addPortamentoTime14BitNoItem(portamentoDurInMillis);
             lastPortamentoTime = portamentoDurInMillis;
           }
-          addPortamentoControlNoItem(lastKey);
+          // CC84 is the MIDI start key for the portamento. Match the previous
+          // note's rendered pitch by applying the track-local transpose here;
+          // global transpose is still added later by PortamentoControlEvent.
+          addPortamentoControlNoItem(static_cast<u8>(std::clamp<int>(lastKey + transpose, 0, 127)));
         }
+        // Slur keeps the prior voice alive just long enough to overlap the next
+        // note; the track clock still advances by the source note length.
         addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur + (isNoteSlurred() ? 1 : 0));
         addTime(len);
         lastKey = key;
