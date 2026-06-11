@@ -321,6 +321,30 @@ void formatRegistryStoresCopyableModuleValues() {
   expect(threw, "format registry should reject incomplete module values");
 }
 
+void midiSequenceProfileRegistryStoresCopyableProfileValues() {
+  MidiSequenceProfileRegistry registry;
+  registry.add("Probe", MidiSequenceProfile{});
+
+  const MidiSequenceProfileRegistry copy = registry;
+  const auto* profile = copy.find("Probe");
+  MidiTrackState state;
+  expect(profile != nullptr, "MIDI sequence profile registry should copy registered profile values");
+  expect(profile->restTicks(RestCommand{.rawDuration = 7}, state) == 7,
+         "MIDI sequence profile registry should preserve copied profile hooks");
+  expect(copy.find("Missing") == nullptr, "MIDI sequence profile registry should return null for a missing profile");
+  expect(copy.contains("Probe"), "MIDI sequence profile registry should report copied profile keys");
+
+  auto incomplete = MidiSequenceProfile{};
+  incomplete.noteTiming = nullptr;
+  bool threw = false;
+  try {
+    registry.add("Broken", incomplete);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw, "MIDI sequence profile registry should reject incomplete profile values");
+}
+
 void byteReaderChecksBoundsAndEndian() {
   const std::vector<u8> bytes{0x00, 0x34, 0x12, 0x78, 0x56};
   const ByteReader reader(SourceId{7}, bytes);
@@ -484,9 +508,9 @@ void projectCollectionAssetResolutionProvidesTypedExportInputs() {
   expect(full.collection == &project.collections[0], "collection asset resolver should preserve the collection");
   expect(full.sequence == std::get_if<SequenceAsset>(&project.assets[0]),
          "collection asset resolver should resolve the typed sequence asset");
-  expect(full.instrumentSets.size() == 1 &&
-             full.instrumentSets[0] == std::get_if<InstrumentSetAsset>(&project.assets[1]),
-         "collection asset resolver should resolve typed instrument set assets");
+  expect(
+      full.instrumentSets.size() == 1 && full.instrumentSets[0] == std::get_if<InstrumentSetAsset>(&project.assets[1]),
+      "collection asset resolver should resolve typed instrument set assets");
   expect(full.sampleCollections.size() == 1 &&
              full.sampleCollections[0] == std::get_if<SampleCollectionAsset>(&project.assets[2]),
          "collection asset resolver should resolve typed sample collection assets");
@@ -1352,6 +1376,7 @@ void exportDiagnosticsPreserveSourceRanges() {
 int main() {
   try {
     formatRegistryStoresCopyableModuleValues();
+    midiSequenceProfileRegistryStoresCopyableProfileValues();
     byteReaderChecksBoundsAndEndian();
     sequencerCommandExposesSourceRange();
     projectSessionScansValuesAndVirtualSources();

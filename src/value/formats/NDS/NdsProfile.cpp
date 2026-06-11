@@ -8,8 +8,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <memory>
-#include <string>
 
 namespace vgmtrans::formats::nds {
 
@@ -29,12 +27,11 @@ constexpr auto kExpression = "nds-expression";
 
 }  // namespace
 
-void NdsProfile::beginTrack(const CommandSequence&, const CommandTrack&, MidiTrackState& state,
-                            std::vector<MidiEvent>&) const {
+void ndsBeginTrack(const CommandSequence&, const CommandTrack&, MidiTrackState& state, std::vector<MidiEvent>&) {
   state.noteWait = false;
 }
 
-MidiNoteTiming NdsProfile::noteTiming(const NoteCommand& command, MidiTrackState& state) const {
+MidiNoteTiming ndsNoteTiming(const NoteCommand& command, MidiTrackState& state) {
   const auto key = std::clamp<s32>(static_cast<s32>(command.key) + state.transpose + state.globalTranspose, 0, 127);
   return MidiNoteTiming{
       .key = static_cast<u8>(key),
@@ -44,9 +41,7 @@ MidiNoteTiming NdsProfile::noteTiming(const NoteCommand& command, MidiTrackState
   };
 }
 
-std::vector<MidiEvent> NdsProfile::interpretTempo(
-    const TempoCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> ndsInterpretTempo(const TempoCommand& command, const MidiTrackState& state) {
   if (command.rawValue == 0) {
     return {};
   }
@@ -57,9 +52,7 @@ std::vector<MidiEvent> NdsProfile::interpretTempo(
   }};
 }
 
-std::vector<MidiEvent> NdsProfile::interpretDriverSpecific(
-    const DriverSpecificCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> ndsInterpretDriverSpecific(const DriverSpecificCommand& command, MidiTrackState& state) {
   if (command.name == kPitchBend) {
     return {PitchBend{
         .tick = state.tick,
@@ -96,8 +89,17 @@ std::vector<MidiEvent> NdsProfile::interpretDriverSpecific(
   return {};
 }
 
+MidiSequenceProfile ndsProfile() {
+  MidiSequenceProfile profile;
+  profile.beginTrack = ndsBeginTrack;
+  profile.noteTiming = ndsNoteTiming;
+  profile.interpretTempo = ndsInterpretTempo;
+  profile.interpretDriverSpecific = ndsInterpretDriverSpecific;
+  return profile;
+}
+
 void registerNdsProfile(MidiSequenceProfileRegistry& registry) {
-  registry.add(kNdsProfileName, [] { return std::make_unique<NdsProfile>(); });
+  registry.add(kNdsProfileName, ndsProfile());
 }
 
 }  // namespace vgmtrans::formats::nds

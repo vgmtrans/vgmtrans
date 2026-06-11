@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <memory>
 #include <string>
 #include <string_view>
 
@@ -71,9 +70,7 @@ struct PanControllerValues {
 
 [[nodiscard]] s32 sourceKey(const NoteCommand& command, const MidiTrackState& state) {
   // Keep source pitch separate so portamento distance ignores active transpose like the driver.
-  return static_cast<s32>(command.key) - 1 +
-         static_cast<s32>(state.noteOctave * 12) +
-         (state.noteOctaveUp ? 24 : 0);
+  return static_cast<s32>(command.key) - 1 + static_cast<s32>(state.noteOctave * 12) + (state.noteOctaveUp ? 24 : 0);
 }
 
 [[nodiscard]] u8 midiKey(s32 key, const MidiTrackState& state) {
@@ -115,17 +112,15 @@ void addModulationDepthEvents(std::vector<MidiEvent>& events, const MidiTrackSta
 
 [[nodiscard]] u16 volume14(CapcomSnesEngineVersion version, u8 rawValue) {
   // Convert through the amplitude curve before quantizing to MIDI resolution.
-  const double volume = version == CapcomSnesEngineVersion::v1BgmInList
-                            ? ::capcom_snes::calculateVolumeV1(rawValue)
-                            : ::capcom_snes::calculateVolumeV2(rawValue);
+  const double volume = version == CapcomSnesEngineVersion::v1BgmInList ? ::capcom_snes::calculateVolumeV1(rawValue)
+                                                                        : ::capcom_snes::calculateVolumeV2(rawValue);
   return ::capcom_snes::percentAmpTo14BitMidi(volume);
 }
 
 [[nodiscard]] PanControllerValues panControllerValues(CapcomSnesEngineVersion version, u32 rawValue) {
   const auto biasedPan = static_cast<u8>(rawValue + 0x80);
-  const auto pan = version == CapcomSnesEngineVersion::v1BgmInList
-                       ? ::capcom_snes::linear8BitPanToMidi(biasedPan)
-                       : ::capcom_snes::calculatePanV2(biasedPan);
+  const auto pan = version == CapcomSnesEngineVersion::v1BgmInList ? ::capcom_snes::linear8BitPanToMidi(biasedPan)
+                                                                   : ::capcom_snes::calculatePanV2(biasedPan);
   return PanControllerValues{
       .pan = pan.midiPan,
       .expression = ::capcom_snes::percentAmpTo7BitMidi(pan.volumeScale),
@@ -159,15 +154,14 @@ std::string_view capcomSnesProfileName(CapcomSnesEngineVersion version) {
   return kDefaultProfileName;
 }
 
-CapcomSnesProfile::CapcomSnesProfile(CapcomSnesEngineVersion version) : version_(version) {
-}
+namespace {
 
-u32 CapcomSnesProfile::restTicks(const RestCommand& command, MidiTrackState& state) const {
+u32 capcomRestTicks(const RestCommand& command, MidiTrackState& state) {
   state.didRest = true;
   return noteTicks(command.rawDuration, state);
 }
 
-MidiNoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, MidiTrackState& state) const {
+MidiNoteTiming capcomNoteTiming(const NoteCommand& command, MidiTrackState& state) {
   const u32 length = noteTicks(command.rawDuration, state);
   const u32 duration = soundingTicks(length, state);
   const s32 key = sourceKey(command, state);
@@ -175,8 +169,7 @@ MidiNoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, MidiTra
   std::vector<MidiEvent> beforeEvents;
   if (!extendsPrevious && state.portamentoMillisecondsPerCent > 0.0 && state.lastKey >= 0) {
     const auto keyDistance = static_cast<u32>(std::abs(key - state.lastKey));
-    const auto portamentoTime =
-        static_cast<u16>((keyDistance * 100) * state.portamentoMillisecondsPerCent);
+    const auto portamentoTime = static_cast<u16>((keyDistance * 100) * state.portamentoMillisecondsPerCent);
     if (portamentoTime != state.lastPortamentoTime) {
       beforeEvents.push_back(PortamentoTime14{
           .tick = state.tick,
@@ -206,9 +199,7 @@ MidiNoteTiming CapcomSnesProfile::noteTiming(const NoteCommand& command, MidiTra
   };
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretNoteState(
-    const NoteStateCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretNoteState(const NoteStateCommand& command, MidiTrackState& state) {
   std::vector<MidiEvent> events;
   auto setSlur = [&](bool enabled) {
     if (state.noteSlurred != enabled) {
@@ -254,32 +245,27 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretNoteState(
   return events;
 }
 
-void CapcomSnesProfile::applyDuration(const DurationCommand& command, MidiTrackState& state) const {
+void capcomApplyDuration(const DurationCommand& command, MidiTrackState& state) {
   state.durationRate = command.rawValue;
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretTempo(
-    const TempoCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretTempo(const TempoCommand& command, const MidiTrackState& state) {
   return {Tempo{
       .tick = state.tick,
       .microsecondsPerQuarter = tempoMicrosecondsPerQuarter(command.rawValue),
   }};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretVolume(
-    const VolumeCommand& command,
-    const MidiTrackState& state) const {
+template <CapcomSnesEngineVersion Version>
+std::vector<MidiEvent> capcomInterpretVolume(const VolumeCommand& command, const MidiTrackState& state) {
   return {Volume14{
       .tick = state.tick,
       .channel = state.channel,
-      .value = volume14(version_, static_cast<u8>(command.rawValue)),
+      .value = volume14(Version, static_cast<u8>(command.rawValue)),
   }};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretProgram(
-    const ProgramCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretProgram(const ProgramCommand& command, const MidiTrackState& state) {
   return {
       BankSelect{
           .tick = state.tick,
@@ -295,10 +281,9 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretProgram(
   };
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretPan(
-    const PanCommand& command,
-    const MidiTrackState& state) const {
-  const auto panValues = panControllerValues(version_, command.rawValue);
+template <CapcomSnesEngineVersion Version>
+std::vector<MidiEvent> capcomInterpretPan(const PanCommand& command, const MidiTrackState& state) {
+  const auto panValues = panControllerValues(Version, command.rawValue);
 
   return {
       Pan{
@@ -314,18 +299,15 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretPan(
   };
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretMasterVolume(
-    const MasterVolumeCommand& command,
-    const MidiTrackState& state) const {
+template <CapcomSnesEngineVersion Version>
+std::vector<MidiEvent> capcomInterpretMasterVolume(const MasterVolumeCommand& command, const MidiTrackState& state) {
   return {MasterVolume{
       .tick = state.tick,
-      .value = volume14(version_, static_cast<u8>(command.rawValue)),
+      .value = volume14(Version, static_cast<u8>(command.rawValue)),
   }};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretReverb(
-    const ReverbCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretReverb(const ReverbCommand& command, const MidiTrackState& state) {
   return {Reverb{
       .tick = state.tick,
       .channel = state.channel,
@@ -333,9 +315,7 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretReverb(
   }};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretTuning(
-    const TuningCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretTuning(const TuningCommand& command, const MidiTrackState& state) {
   return {FineTune{
       .tick = state.tick,
       .channel = state.channel,
@@ -343,16 +323,12 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretTuning(
   }};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretPortamento(
-    const PortamentoCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretPortamento(const PortamentoCommand& command, MidiTrackState& state) {
   state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(command.rawTime);
   return {};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretVibrato(
-    const VibratoCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretVibrato(const VibratoCommand& command, MidiTrackState& state) {
   state.vibratoDepth = static_cast<u8>(command.rawDepth & 0x7f);
   return {VibratoDepth{
       .tick = state.tick,
@@ -361,11 +337,10 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretVibrato(
   }};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretTremolo(
-    const TremoloCommand& command,
-    MidiTrackState& state) const {
-  state.tremoloDepth = ::capcom_snes::tremoloDepthToMidiValue(
-      static_cast<int>(command.rawDepth), version_ == CapcomSnesEngineVersion::v1BgmInList);
+template <CapcomSnesEngineVersion Version>
+std::vector<MidiEvent> capcomInterpretTremolo(const TremoloCommand& command, MidiTrackState& state) {
+  state.tremoloDepth = ::capcom_snes::tremoloDepthToMidiValue(static_cast<int>(command.rawDepth),
+                                                              Version == CapcomSnesEngineVersion::v1BgmInList);
   return {TremoloDepth{
       .tick = state.tick,
       .channel = state.channel,
@@ -373,9 +348,7 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretTremolo(
   }};
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretModulationRate(
-    const ModulationRateCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretModulationRate(const ModulationRateCommand& command, MidiTrackState& state) {
   std::vector<MidiEvent> events;
   const bool wasEnabled = state.modulationRate != 0;
   state.modulationRate = static_cast<u8>(command.rawRate);
@@ -401,9 +374,7 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretModulationRate(
   return events;
 }
 
-std::vector<MidiEvent> CapcomSnesProfile::interpretRepeatBreak(
-    const RepeatBreakCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> capcomInterpretRepeatBreak(const RepeatBreakCommand& command, MidiTrackState& state) {
   std::vector<MidiEvent> events;
   const bool wasSlurred = state.noteSlurred;
   applyNoteAttributes(command.rawAttributes, state);
@@ -417,19 +388,52 @@ std::vector<MidiEvent> CapcomSnesProfile::interpretRepeatBreak(
   return events;
 }
 
+template <CapcomSnesEngineVersion Version>
+void applyVersionProfileFunctions(MidiSequenceProfile& profile) {
+  profile.interpretVolume = capcomInterpretVolume<Version>;
+  profile.interpretPan = capcomInterpretPan<Version>;
+  profile.interpretMasterVolume = capcomInterpretMasterVolume<Version>;
+  profile.interpretTremolo = capcomInterpretTremolo<Version>;
+}
+
+}  // namespace
+
+MidiSequenceProfile capcomSnesProfile(CapcomSnesEngineVersion version) {
+  MidiSequenceProfile profile;
+  profile.restTicks = capcomRestTicks;
+  profile.noteTiming = capcomNoteTiming;
+  profile.interpretNoteState = capcomInterpretNoteState;
+  profile.applyDuration = capcomApplyDuration;
+  profile.interpretTempo = capcomInterpretTempo;
+  profile.interpretProgram = capcomInterpretProgram;
+  profile.interpretReverb = capcomInterpretReverb;
+  profile.interpretTuning = capcomInterpretTuning;
+  profile.interpretPortamento = capcomInterpretPortamento;
+  profile.interpretVibrato = capcomInterpretVibrato;
+  profile.interpretModulationRate = capcomInterpretModulationRate;
+  profile.interpretRepeatBreak = capcomInterpretRepeatBreak;
+
+  switch (version) {
+    case CapcomSnesEngineVersion::v1BgmInList:
+      applyVersionProfileFunctions<CapcomSnesEngineVersion::v1BgmInList>(profile);
+      break;
+    case CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation:
+      applyVersionProfileFunctions<CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation>(profile);
+      break;
+    case CapcomSnesEngineVersion::none:
+    case CapcomSnesEngineVersion::v3BgmFixedLocation:
+      applyVersionProfileFunctions<CapcomSnesEngineVersion::v3BgmFixedLocation>(profile);
+      break;
+  }
+
+  return profile;
+}
+
 void registerCapcomSnesProfile(MidiSequenceProfileRegistry& registry) {
-  registry.add(std::string(kDefaultProfileName), [] {
-    return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  });
-  registry.add(std::string(kV1ProfileName), [] {
-    return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v1BgmInList);
-  });
-  registry.add(std::string(kV2ProfileName), [] {
-    return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation);
-  });
-  registry.add(std::string(kV3ProfileName), [] {
-    return std::make_unique<CapcomSnesProfile>(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  });
+  registry.add(std::string(kDefaultProfileName), capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation));
+  registry.add(std::string(kV1ProfileName), capcomSnesProfile(CapcomSnesEngineVersion::v1BgmInList));
+  registry.add(std::string(kV2ProfileName), capcomSnesProfile(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation));
+  registry.add(std::string(kV3ProfileName), capcomSnesProfile(CapcomSnesEngineVersion::v3BgmFixedLocation));
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

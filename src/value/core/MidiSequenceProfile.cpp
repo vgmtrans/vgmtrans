@@ -13,55 +13,61 @@
 
 namespace vgmtrans::core {
 
-void MidiSequenceProfile::beginTrack(
-    const CommandSequence&,
-    const CommandTrack&,
-    MidiTrackState&,
-    std::vector<MidiEvent>&) const {
+namespace {
+
+[[nodiscard]] bool profileComplete(const MidiSequenceProfile& profile) {
+  return profile.beginTrack != nullptr && profile.restTicks != nullptr && profile.noteTiming != nullptr &&
+         profile.interpretNoteState != nullptr && profile.applyDuration != nullptr &&
+         profile.applyTranspose != nullptr && profile.interpretTempo != nullptr &&
+         profile.interpretProgram != nullptr && profile.interpretVolume != nullptr && profile.interpretPan != nullptr &&
+         profile.interpretMasterVolume != nullptr && profile.interpretReverb != nullptr &&
+         profile.interpretTuning != nullptr && profile.interpretPortamento != nullptr &&
+         profile.interpretVibrato != nullptr && profile.interpretTremolo != nullptr &&
+         profile.interpretModulationRate != nullptr && profile.interpretEnvelope != nullptr &&
+         profile.interpretDriverSpecific != nullptr && profile.interpretRepeatBreak != nullptr;
 }
 
-u32 MidiSequenceProfile::restTicks(const RestCommand& command, MidiTrackState&) const {
+}  // namespace
+
+void defaultBeginTrack(const CommandSequence&, const CommandTrack&, MidiTrackState&, std::vector<MidiEvent>&) {
+}
+
+u32 defaultRestTicks(const RestCommand& command, MidiTrackState&) {
   return command.rawDuration;
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretNoteState(
-    const NoteStateCommand&,
-    MidiTrackState&) const {
+std::vector<MidiEvent> defaultInterpretNoteState(const NoteStateCommand&, MidiTrackState&) {
   return {};
 }
 
-MidiNoteTiming MidiSequenceProfile::noteTiming(const NoteCommand& command, MidiTrackState& state) const {
+MidiNoteTiming defaultNoteTiming(const NoteCommand& command, MidiTrackState& state) {
   const auto key = std::clamp<s32>(static_cast<s32>(command.key) + state.transpose + state.globalTranspose, 0, 127);
   const auto ticks = command.rawDuration;
   return MidiNoteTiming{
       .key = static_cast<u8>(key),
-      .velocity = command.rawVelocity == 0 ? static_cast<u8>(127)
-                                           : static_cast<u8>(std::min<u32>(command.rawVelocity, 127)),
+      .velocity =
+          command.rawVelocity == 0 ? static_cast<u8>(127) : static_cast<u8>(std::min<u32>(command.rawVelocity, 127)),
       .soundingTicks = ticks,
       .advanceTicks = ticks,
   };
 }
 
-void MidiSequenceProfile::applyDuration(const DurationCommand& command, MidiTrackState& state) const {
+void defaultApplyDuration(const DurationCommand& command, MidiTrackState& state) {
   state.durationRate = command.rawValue;
 }
 
-void MidiSequenceProfile::applyTranspose(const TransposeCommand& command, MidiTrackState& state) const {
+void defaultApplyTranspose(const TransposeCommand& command, MidiTrackState& state) {
   state.transpose = command.rawSemitones;
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretTempo(
-    const TempoCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretTempo(const TempoCommand& command, const MidiTrackState& state) {
   return {Tempo{
       .tick = state.tick,
       .microsecondsPerQuarter = command.rawValue == 0 ? 500000 : command.rawValue,
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretProgram(
-    const ProgramCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretProgram(const ProgramCommand& command, const MidiTrackState& state) {
   return {ProgramChange{
       .tick = state.tick,
       .channel = state.channel,
@@ -69,9 +75,7 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretProgram(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretVolume(
-    const VolumeCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretVolume(const VolumeCommand& command, const MidiTrackState& state) {
   return {Volume{
       .tick = state.tick,
       .channel = state.channel,
@@ -79,9 +83,7 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretVolume(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretPan(
-    const PanCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretPan(const PanCommand& command, const MidiTrackState& state) {
   return {Pan{
       .tick = state.tick,
       .channel = state.channel,
@@ -89,18 +91,14 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretPan(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretMasterVolume(
-    const MasterVolumeCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretMasterVolume(const MasterVolumeCommand& command, const MidiTrackState& state) {
   return {MasterVolume{
       .tick = state.tick,
       .value = static_cast<u16>(std::min<u32>(command.rawValue, 0x3fff)),
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretReverb(
-    const ReverbCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretReverb(const ReverbCommand& command, const MidiTrackState& state) {
   return {Reverb{
       .tick = state.tick,
       .channel = state.channel,
@@ -108,9 +106,7 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretReverb(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretTuning(
-    const TuningCommand& command,
-    const MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretTuning(const TuningCommand& command, const MidiTrackState& state) {
   return {FineTune{
       .tick = state.tick,
       .channel = state.channel,
@@ -118,9 +114,7 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretTuning(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretPortamento(
-    const PortamentoCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretPortamento(const PortamentoCommand& command, MidiTrackState& state) {
   return {PortamentoTime{
       .tick = state.tick,
       .channel = state.channel,
@@ -128,9 +122,7 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretPortamento(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretVibrato(
-    const VibratoCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretVibrato(const VibratoCommand& command, MidiTrackState& state) {
   return {VibratoDepth{
       .tick = state.tick,
       .channel = state.channel,
@@ -138,9 +130,7 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretVibrato(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretTremolo(
-    const TremoloCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretTremolo(const TremoloCommand& command, MidiTrackState& state) {
   return {TremoloDepth{
       .tick = state.tick,
       .channel = state.channel,
@@ -148,9 +138,7 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretTremolo(
   }};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretModulationRate(
-    const ModulationRateCommand& command,
-    MidiTrackState& state) const {
+std::vector<MidiEvent> defaultInterpretModulationRate(const ModulationRateCommand& command, MidiTrackState& state) {
   const auto value = static_cast<u8>(std::min<u32>(command.rawRate, 127));
   return {
       VibratoFrequency{
@@ -166,44 +154,38 @@ std::vector<MidiEvent> MidiSequenceProfile::interpretModulationRate(
   };
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretEnvelope(
-    const EnvelopeCommand&,
-    const MidiTrackState&) const {
+std::vector<MidiEvent> defaultInterpretEnvelope(const EnvelopeCommand&, const MidiTrackState&) {
   return {};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretDriverSpecific(
-    const DriverSpecificCommand&,
-    MidiTrackState&) const {
+std::vector<MidiEvent> defaultInterpretDriverSpecific(const DriverSpecificCommand&, MidiTrackState&) {
   return {};
 }
 
-std::vector<MidiEvent> MidiSequenceProfile::interpretRepeatBreak(
-    const RepeatBreakCommand&,
-    MidiTrackState&) const {
+std::vector<MidiEvent> defaultInterpretRepeatBreak(const RepeatBreakCommand&, MidiTrackState&) {
   return {};
 }
 
-void MidiSequenceProfileRegistry::add(std::string format, Factory factory) {
+void MidiSequenceProfileRegistry::add(std::string format, MidiSequenceProfile profile) {
   if (format.empty()) {
     throw std::invalid_argument("Cannot register a MidiSequenceProfile with an empty format name");
   }
-  if (!factory) {
-    throw std::invalid_argument("Cannot register an empty MidiSequenceProfile factory");
+  if (!profileComplete(profile)) {
+    throw std::invalid_argument("Cannot register an incomplete MidiSequenceProfile");
   }
-  factories_[std::move(format)] = std::move(factory);
+  profiles_[std::move(format)] = profile;
 }
 
-std::unique_ptr<MidiSequenceProfile> MidiSequenceProfileRegistry::create(std::string_view format) const {
-  const auto found = factories_.find(std::string(format));
-  if (found == factories_.end()) {
+const MidiSequenceProfile* MidiSequenceProfileRegistry::find(std::string_view format) const {
+  const auto found = profiles_.find(std::string(format));
+  if (found == profiles_.end()) {
     return nullptr;
   }
-  return found->second();
+  return &found->second;
 }
 
 bool MidiSequenceProfileRegistry::contains(std::string_view format) const {
-  return factories_.contains(std::string(format));
+  return profiles_.contains(std::string(format));
 }
 
 }  // namespace vgmtrans::core

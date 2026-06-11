@@ -89,10 +89,8 @@ struct MidiLoweringResult {
                                                               : sequence.commandSequence.midiSequenceProfile;
 }
 
-[[nodiscard]] MidiLoweringResult lowerMidiSequence(
-    const PreparedCollectionExport& prepared,
-    const MidiSequenceProfileRegistry& profiles,
-    LoopPolicy loopPolicy) {
+[[nodiscard]] MidiLoweringResult lowerMidiSequence(const PreparedCollectionExport& prepared,
+                                                   const MidiSequenceProfileRegistry& profiles, LoopPolicy loopPolicy) {
   if (!prepared.assets.diagnostics.collection.empty()) {
     return MidiLoweringResult{
         .diagnostics = prepared.assets.diagnostics.collection,
@@ -110,8 +108,8 @@ struct MidiLoweringResult {
 
   const std::string profileName = midiSequenceProfileName(*prepared.assets.sequence);
   // Some formats scan as one asset format but need a dialect-specific MIDI sequence profile.
-  auto profile = profiles.create(profileName);
-  if (!profile) {
+  const auto* profile = profiles.find(profileName);
+  if (profile == nullptr) {
     return MidiLoweringResult{
         .diagnostics = {exportError("No MIDI sequence profile registered for '" + profileName + "'")},
     };
