@@ -158,6 +158,8 @@ struct SequenceProgram {
   std::vector<SequenceInstrumentRef> referencedInstruments;
 };
 
+[[nodiscard]] const TrackProgram* trackById(const SequenceProgram& program, TrackId id);
+[[nodiscard]] const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id);
 [[nodiscard]] std::optional<u64> commandOperandU64(std::span<const CommandOperand> operands, std::string_view name);
 void addUniqueReferencedInstrument(SequenceProgram& program, std::optional<AssetId> asset, u32 bank, u32 programNumber,
                                    std::optional<SourceRange> range);

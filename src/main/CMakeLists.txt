@@ -111,6 +111,7 @@ target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/PerformanceModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp

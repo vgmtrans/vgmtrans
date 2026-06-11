@@ -111,4 +111,11 @@ struct PerformanceSequence {
   std::vector<Diagnostic> diagnostics;
 };
 
+[[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event);
+[[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
+[[nodiscard]] const SourceCommand* sourceCommandForEvent(const SequenceProgram& program,
+                                                         const PerformanceEventHeader& header);
+[[nodiscard]] std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,
+                                                                               CommandId command);
+
 }  // namespace vgmtrans::core

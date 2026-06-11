@@ -648,6 +648,21 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
          "note event should use driver state and dialect context while staying MIDI-neutral");
   expect(note->header.sourceCommand == noteCommandId && note->header.tick == 0,
          "note event should link back to the source command that emitted it");
+  expect(trackById(program, TrackId{2}) == &program.tracks[0],
+         "sequence program helper should resolve tracks by stable track id");
+  expect(sourceCommandById(program.tracks[0], noteCommandId) == &program.tracks[0].commands[1],
+         "sequence program helper should resolve source commands by stable command id");
+  expect(sourceCommandForEvent(program, note->header) == &program.tracks[0].commands[1],
+         "performance event source links should resolve back to source commands");
+
+  const auto noteEvents = performanceEventsForCommand(renderedTrack, noteCommandId);
+  expect(noteEvents.size() == 1 && noteEvents[0] == &renderedTrack.events[1],
+         "performance helper should collect events emitted by one source command");
+  expect(performanceTrackById(performance, TrackId{2}) == &performance.tracks[0],
+         "performance helper should resolve rendered tracks by stable track id");
+  expect(sourceCommandForEvent(program, PerformanceEventHeader{.sourceCommand = CommandId{99}, .track = TrackId{2}}) ==
+             nullptr,
+         "performance source-link helper should return null for a missing command");
 }
 
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
