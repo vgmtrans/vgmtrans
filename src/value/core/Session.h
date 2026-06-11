@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include "value/export/Export.h"
 #include "value/core/FormatModule.h"
 #include "value/core/MidiSequenceProfile.h"
 #include "value/core/Source.h"
+#include "value/export/ExportTypes.h"
 
 #include <filesystem>
 #include <vector>
@@ -43,8 +43,6 @@ class Session {
   FormatRegistry formats_;
   MidiSequenceProfileRegistry profiles_;
   Project project_;
-  ScanService scanner_;
-  ExportService exporter_;
 };
 
 }  // namespace vgmtrans::core

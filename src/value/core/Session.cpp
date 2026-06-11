@@ -6,6 +6,8 @@
 
 #include "value/core/Session.h"
 
+#include "value/export/Export.h"
+
 #include <fstream>
 #include <stdexcept>
 #include <utility>
@@ -48,19 +50,19 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
 }
 
 Project Session::scan() {
-  project_ = scanner_.scan(sources_, formats_);
+  project_ = ScanService{}.scan(sources_, formats_);
   return project_;
 }
 
 std::vector<Artifact> Session::exportCollection(
     CollectionId id,
     const ExportRequest& request) const {
-  return exporter_.exportCollection(project_, sources_, id, request, profiles_);
+  return ExportService{}.exportCollection(project_, sources_, id, request, profiles_);
 }
 
 std::vector<CollectionExport> Session::exportAllCollections(
     const ExportRequest& request) const {
-  return exporter_.exportAllCollections(project_, sources_, request, profiles_);
+  return ExportService{}.exportAllCollections(project_, sources_, request, profiles_);
 }
 
 }  // namespace vgmtrans::core

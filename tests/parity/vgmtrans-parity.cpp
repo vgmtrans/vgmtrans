@@ -17,7 +17,7 @@
 #include "conversion/SF2Conversion.h"
 #include "conversion/SF2File.h"
 #include "formats/NDS/NDSInstrSet.h"
-#include "value/export/Export.h"
+#include "value/export/ExportTypes.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/Model.h"
 #include "value/core/Session.h"

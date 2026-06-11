@@ -150,6 +150,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ModulationScaling.h
       ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.h
