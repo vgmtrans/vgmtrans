@@ -40,6 +40,25 @@ struct Project {
   std::vector<Diagnostic> diagnostics;
 };
 
+struct CollectionAssetDiagnostics {
+  std::vector<Diagnostic> collection;
+  std::vector<Diagnostic> sequence;
+  std::vector<Diagnostic> instrumentSets;
+  std::vector<Diagnostic> sampleCollections;
+  std::vector<Diagnostic> miscAssets;
+
+  [[nodiscard]] std::vector<Diagnostic> all() const;
+};
+
+struct CollectionAssets {
+  const Collection* collection = nullptr;
+  const SequenceAsset* sequence = nullptr;
+  std::vector<const InstrumentSetAsset*> instrumentSets;
+  std::vector<const SampleCollectionAsset*> sampleCollections;
+  std::vector<const MiscAsset*> miscAssets;
+  CollectionAssetDiagnostics diagnostics;
+};
+
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
 [[nodiscard]] ItemNode* itemById(ItemTree& tree, ItemId id);
@@ -57,5 +76,7 @@ template <typename T>
 }
 
 [[nodiscard]] const Collection* collectionById(const Project& project, CollectionId id);
+[[nodiscard]] CollectionAssets resolveCollectionAssets(const Project& project, CollectionId id);
+[[nodiscard]] CollectionAssets resolveCollectionAssets(const Project& project, const Collection& collection);
 
 }  // namespace vgmtrans::core

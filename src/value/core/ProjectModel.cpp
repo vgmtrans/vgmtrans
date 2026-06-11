@@ -7,9 +7,34 @@
 #include "value/core/ProjectModel.h"
 
 #include <algorithm>
+#include <string>
+#include <utility>
 #include <variant>
 
 namespace vgmtrans::core {
+
+namespace {
+
+[[nodiscard]] Diagnostic projectError(std::string message) {
+  return Diagnostic{
+      .severity = Severity::Error,
+      .message = std::move(message),
+  };
+}
+
+}  // namespace
+
+std::vector<Diagnostic> CollectionAssetDiagnostics::all() const {
+  std::vector<Diagnostic> diagnostics;
+  diagnostics.reserve(collection.size() + sequence.size() + instrumentSets.size() + sampleCollections.size() +
+                      miscAssets.size());
+  diagnostics.insert(diagnostics.end(), collection.begin(), collection.end());
+  diagnostics.insert(diagnostics.end(), sequence.begin(), sequence.end());
+  diagnostics.insert(diagnostics.end(), instrumentSets.begin(), instrumentSets.end());
+  diagnostics.insert(diagnostics.end(), sampleCollections.begin(), sampleCollections.end());
+  diagnostics.insert(diagnostics.end(), miscAssets.begin(), miscAssets.end());
+  return diagnostics;
+}
 
 AssetMetadata& metadata(Asset& asset) {
   return std::visit([](auto& typedAsset) -> AssetMetadata& { return typedAsset.metadata; }, asset);
@@ -67,6 +92,60 @@ const Collection* collectionById(const Project& project, CollectionId id) {
     return nullptr;
   }
   return &*found;
+}
+
+CollectionAssets resolveCollectionAssets(const Project& project, CollectionId id) {
+  if (const auto* collection = collectionById(project, id)) {
+    return resolveCollectionAssets(project, *collection);
+  }
+
+  CollectionAssets resolved;
+  resolved.diagnostics.collection.push_back(projectError("CollectionId was not found in the Project snapshot"));
+  return resolved;
+}
+
+CollectionAssets resolveCollectionAssets(const Project& project, const Collection& collection) {
+  CollectionAssets resolved{
+      .collection = &collection,
+  };
+
+  if (collection.sequence) {
+    if (const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence)) {
+      resolved.sequence = sequence;
+    } else {
+      resolved.diagnostics.sequence.push_back(projectError("Collection sequence asset was not found"));
+    }
+  }
+
+  resolved.instrumentSets.reserve(collection.instrumentSets.size());
+  for (const auto id : collection.instrumentSets) {
+    if (const auto* instrumentSet = assetById<InstrumentSetAsset>(project, id)) {
+      resolved.instrumentSets.push_back(instrumentSet);
+    } else {
+      resolved.diagnostics.instrumentSets.push_back(projectError("Collection instrument set asset was not found"));
+    }
+  }
+
+  resolved.sampleCollections.reserve(collection.sampleCollections.size());
+  for (const auto id : collection.sampleCollections) {
+    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, id)) {
+      resolved.sampleCollections.push_back(sampleCollection);
+    } else {
+      resolved.diagnostics.sampleCollections.push_back(
+          projectError("Collection sample collection asset was not found"));
+    }
+  }
+
+  resolved.miscAssets.reserve(collection.miscAssets.size());
+  for (const auto id : collection.miscAssets) {
+    if (const auto* misc = assetById<MiscAsset>(project, id)) {
+      resolved.miscAssets.push_back(misc);
+    } else {
+      resolved.diagnostics.miscAssets.push_back(projectError("Collection misc asset was not found"));
+    }
+  }
+
+  return resolved;
 }
 
 }  // namespace vgmtrans::core

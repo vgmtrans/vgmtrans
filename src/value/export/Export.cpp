@@ -66,27 +66,9 @@ namespace {
   return {ExportKind::Midi};
 }
 
-struct InstrumentSetExportAssets {
-  std::vector<const InstrumentSetAsset*> instrumentSets;
-  std::vector<Diagnostic> diagnostics;
-};
-
-struct SampleCollectionExportAssets {
-  std::vector<const SampleCollectionAsset*> sampleCollections;
-  std::vector<Diagnostic> diagnostics;
-  bool referenced = false;
-};
-
-struct SequenceExportAssets {
-  const SequenceAsset* sequence = nullptr;
-  std::vector<Diagnostic> diagnostics;
-};
-
 struct PreparedCollectionExport {
   std::string baseName;
-  SequenceExportAssets sequence;
-  InstrumentSetExportAssets instruments;
-  SampleCollectionExportAssets samples;
+  CollectionAssets assets;
 };
 
 struct MidiLoweringResult {
@@ -94,67 +76,11 @@ struct MidiLoweringResult {
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] SequenceExportAssets collectSequenceExportAssets(const Project& project, const Collection& collection) {
-  if (!collection.sequence) {
-    return SequenceExportAssets{
-        .diagnostics = {exportError("Collection does not reference a sequence asset")},
-    };
-  }
-
-  const auto* sequence = assetById<SequenceAsset>(project, *collection.sequence);
-  if (sequence == nullptr) {
-    return SequenceExportAssets{
-        .diagnostics = {exportError("Collection sequence asset was not found")},
-    };
-  }
-
-  return SequenceExportAssets{
-      .sequence = sequence,
-  };
-}
-
-[[nodiscard]] InstrumentSetExportAssets collectInstrumentSetExportAssets(
-    const Project& project,
-    const Collection& collection) {
-  InstrumentSetExportAssets assets;
-  assets.instrumentSets.reserve(collection.instrumentSets.size());
-
-  for (const auto id : collection.instrumentSets) {
-    if (const auto* instrumentSet = assetById<InstrumentSetAsset>(project, id)) {
-      assets.instrumentSets.push_back(instrumentSet);
-    } else {
-      assets.diagnostics.push_back(exportError("Collection instrument set asset was not found"));
-    }
-  }
-
-  return assets;
-}
-
-[[nodiscard]] SampleCollectionExportAssets collectSampleCollectionExportAssets(
-    const Project& project,
-    const Collection& collection) {
-  SampleCollectionExportAssets assets{
-      .referenced = !collection.sampleCollections.empty(),
-  };
-  assets.sampleCollections.reserve(collection.sampleCollections.size());
-
-  for (const auto id : collection.sampleCollections) {
-    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, id)) {
-      assets.sampleCollections.push_back(sampleCollection);
-    } else {
-      assets.diagnostics.push_back(exportError("Collection sample collection asset was not found"));
-    }
-  }
-
-  return assets;
-}
-
-[[nodiscard]] PreparedCollectionExport prepareCollectionExport(const Project& project, const Collection& collection) {
+[[nodiscard]] PreparedCollectionExport prepareCollectionExport(CollectionAssets assets) {
+  const std::string baseName = assets.collection != nullptr ? artifactBaseName(*assets.collection) : "collection";
   return PreparedCollectionExport{
-      .baseName = artifactBaseName(collection),
-      .sequence = collectSequenceExportAssets(project, collection),
-      .instruments = collectInstrumentSetExportAssets(project, collection),
-      .samples = collectSampleCollectionExportAssets(project, collection),
+      .baseName = baseName,
+      .assets = std::move(assets),
   };
 }
 
@@ -167,18 +93,22 @@ struct MidiLoweringResult {
     const PreparedCollectionExport& prepared,
     const MidiSequenceProfileRegistry& profiles,
     LoopPolicy loopPolicy) {
-  if (!prepared.sequence.diagnostics.empty()) {
+  if (!prepared.assets.diagnostics.collection.empty()) {
     return MidiLoweringResult{
-        .diagnostics = prepared.sequence.diagnostics,
+        .diagnostics = prepared.assets.diagnostics.collection,
     };
   }
-  if (prepared.sequence.sequence == nullptr) {
+  if (prepared.assets.sequence == nullptr) {
+    auto diagnostics = prepared.assets.diagnostics.sequence;
+    if (diagnostics.empty()) {
+      diagnostics.push_back(exportError("Collection does not reference a sequence asset"));
+    }
     return MidiLoweringResult{
-        .diagnostics = {exportError("Collection sequence asset was not found")},
+        .diagnostics = std::move(diagnostics),
     };
   }
 
-  const std::string profileName = midiSequenceProfileName(*prepared.sequence.sequence);
+  const std::string profileName = midiSequenceProfileName(*prepared.assets.sequence);
   // Some formats scan as one asset format but need a dialect-specific MIDI sequence profile.
   auto profile = profiles.create(profileName);
   if (!profile) {
@@ -188,7 +118,7 @@ struct MidiLoweringResult {
   }
 
   return MidiLoweringResult{
-      .sequence = MidiSequenceBuilder().build(prepared.sequence.sequence->commandSequence, *profile, loopPolicy),
+      .sequence = MidiSequenceBuilder().build(prepared.assets.sequence->commandSequence, *profile, loopPolicy),
   };
 }
 
@@ -232,7 +162,7 @@ struct MidiLoweringResult {
 }
 
 [[nodiscard]] std::vector<Artifact> exportWav(const PreparedCollectionExport& prepared, const SourceStore& sources) {
-  if (!prepared.samples.referenced) {
+  if (prepared.assets.collection == nullptr || prepared.assets.collection->sampleCollections.empty()) {
     return {Artifact{
         .filename = filenamePart(prepared.baseName) + "-samples.wav",
         .mediaType = "audio/wav",
@@ -245,7 +175,7 @@ struct MidiLoweringResult {
   const WavExporter exporter;
   u32 sampleIndex = 0;
 
-  for (const auto& diagnostic : prepared.samples.diagnostics) {
+  for (const auto& diagnostic : prepared.assets.diagnostics.sampleCollections) {
     artifacts.push_back(Artifact{
         .filename = filenamePart(prepared.baseName) + "-samples.wav",
         .mediaType = "audio/wav",
@@ -253,7 +183,7 @@ struct MidiLoweringResult {
     });
   }
 
-  for (const auto* sampleCollection : prepared.samples.sampleCollections) {
+  for (const auto* sampleCollection : prepared.assets.sampleCollections) {
     for (const auto& sample : sampleCollection->samples.samples) {
       Artifact artifact{
           .filename = sampleArtifactName(prepared.baseName, sample, sampleIndex++),
@@ -295,14 +225,15 @@ struct MidiLoweringResult {
   auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = prepared.baseName,
-          .instrumentSets = prepared.instruments.instrumentSets,
-          .sampleCollections = prepared.samples.sampleCollections,
+          .instrumentSets = prepared.assets.instrumentSets,
+          .sampleCollections = prepared.assets.sampleCollections,
           .midiModulationUsage = midiModulation,
           .modulationScaling = request.synthModulationScaling,
       },
       sources);
-  auto diagnostics = prepared.instruments.diagnostics;
-  diagnostics.insert(diagnostics.end(), prepared.samples.diagnostics.begin(), prepared.samples.diagnostics.end());
+  auto diagnostics = prepared.assets.diagnostics.instrumentSets;
+  diagnostics.insert(diagnostics.end(), prepared.assets.diagnostics.sampleCollections.begin(),
+                     prepared.assets.diagnostics.sampleCollections.end());
   diagnostics.insert(diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
                      std::make_move_iterator(result.diagnostics.end()));
 
@@ -319,14 +250,15 @@ struct MidiLoweringResult {
   auto result = DlsExporter().exportDls(
       DlsInput{
           .name = prepared.baseName,
-          .instrumentSets = prepared.instruments.instrumentSets,
-          .sampleCollections = prepared.samples.sampleCollections,
+          .instrumentSets = prepared.assets.instrumentSets,
+          .sampleCollections = prepared.assets.sampleCollections,
           .midiModulationUsage = midiModulation,
           .modulationScaling = request.synthModulationScaling,
       },
       sources);
-  auto diagnostics = prepared.instruments.diagnostics;
-  diagnostics.insert(diagnostics.end(), prepared.samples.diagnostics.begin(), prepared.samples.diagnostics.end());
+  auto diagnostics = prepared.assets.diagnostics.instrumentSets;
+  diagnostics.insert(diagnostics.end(), prepared.assets.diagnostics.sampleCollections.begin(),
+                     prepared.assets.diagnostics.sampleCollections.end());
   diagnostics.insert(diagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
                      std::make_move_iterator(result.diagnostics.end()));
 
@@ -343,20 +275,21 @@ struct MidiLoweringResult {
 std::vector<Artifact> ExportService::exportCollection(const Project& project, const SourceStore& sources,
                                                       CollectionId collection, const ExportRequest& request,
                                                       const MidiSequenceProfileRegistry& profiles) const {
-  const auto* found = collectionById(project, collection);
-  if (found == nullptr) {
+  auto resolved = resolveCollectionAssets(project, collection);
+  if (resolved.collection == nullptr) {
+    auto diagnostics = resolved.diagnostics.collection;
+    if (diagnostics.empty()) {
+      diagnostics.push_back(exportError("CollectionId was not found in the Project snapshot"));
+    }
     return {Artifact{
         .filename = "export-error.txt",
         .mediaType = "text/plain",
-        .diagnostics = {Diagnostic{
-            .severity = Severity::Error,
-            .message = "CollectionId was not found in the Project snapshot",
-        }},
+        .diagnostics = std::move(diagnostics),
     }};
   }
 
   std::vector<Artifact> artifacts;
-  const auto prepared = prepareCollectionExport(project, *found);
+  const auto prepared = prepareCollectionExport(std::move(resolved));
   std::optional<MidiLoweringResult> midiLowering;
   std::optional<MidiModulationUsage> midiUsage;
   bool midiUsageAnalyzed = false;

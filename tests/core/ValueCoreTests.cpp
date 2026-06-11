@@ -404,6 +404,90 @@ void projectSessionScansValuesAndVirtualSources() {
   expect(project.sources.size() == 2, "rescan should replace, not duplicate, virtual tail sources");
 }
 
+void projectCollectionAssetResolutionProvidesTypedExportInputs() {
+  Project project;
+  project.assets.emplace_back(SequenceAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{0},
+              .format = "Probe",
+              .name = "Sequence",
+          },
+  });
+  project.assets.emplace_back(InstrumentSetAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{1},
+              .format = "Probe",
+              .name = "Instruments",
+          },
+  });
+  project.assets.emplace_back(SampleCollectionAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{2},
+              .format = "Probe",
+              .name = "Samples",
+          },
+  });
+  project.assets.emplace_back(MiscAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{3},
+              .format = "Probe",
+              .name = "Misc",
+          },
+  });
+  project.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Full",
+      .sequence = AssetId{0},
+      .instrumentSets = {AssetId{1}, AssetId{41}},
+      .sampleCollections = {AssetId{2}, AssetId{42}},
+      .miscAssets = {AssetId{3}, AssetId{43}},
+  });
+  project.collections.push_back(Collection{
+      .id = CollectionId{1},
+      .name = "Samples Only",
+      .sampleCollections = {AssetId{2}},
+  });
+
+  const auto full = resolveCollectionAssets(project, CollectionId{0});
+  expect(full.collection == &project.collections[0], "collection asset resolver should preserve the collection");
+  expect(full.sequence == std::get_if<SequenceAsset>(&project.assets[0]),
+         "collection asset resolver should resolve the typed sequence asset");
+  expect(full.instrumentSets.size() == 1 &&
+             full.instrumentSets[0] == std::get_if<InstrumentSetAsset>(&project.assets[1]),
+         "collection asset resolver should resolve typed instrument set assets");
+  expect(full.sampleCollections.size() == 1 &&
+             full.sampleCollections[0] == std::get_if<SampleCollectionAsset>(&project.assets[2]),
+         "collection asset resolver should resolve typed sample collection assets");
+  expect(full.miscAssets.size() == 1 && full.miscAssets[0] == std::get_if<MiscAsset>(&project.assets[3]),
+         "collection asset resolver should resolve typed misc assets");
+  expect(full.diagnostics.sequence.empty(), "valid sequence references should not produce diagnostics");
+  expect(full.diagnostics.instrumentSets.size() == 1,
+         "collection asset resolver should report broken instrument references separately");
+  expect(full.diagnostics.sampleCollections.size() == 1,
+         "collection asset resolver should report broken sample references separately");
+  expect(full.diagnostics.miscAssets.size() == 1,
+         "collection asset resolver should report broken misc references separately");
+  expect(full.diagnostics.all().size() == 3, "collection asset resolver should aggregate reference diagnostics");
+
+  const auto samplesOnly = resolveCollectionAssets(project, CollectionId{1});
+  expect(samplesOnly.collection == &project.collections[1],
+         "collection asset resolver should resolve sample-only collections");
+  expect(samplesOnly.sequence == nullptr, "sample-only collections should not report a sequence asset");
+  expect(samplesOnly.diagnostics.sequence.empty(),
+         "absent optional sequence references should not be treated as broken references");
+  expect(samplesOnly.sampleCollections.size() == 1,
+         "sample-only collections should still resolve their sample collections");
+
+  const auto missing = resolveCollectionAssets(project, CollectionId{99});
+  expect(missing.collection == nullptr, "missing collection resolver result should not expose a collection");
+  expect(missing.diagnostics.collection.size() == 1,
+         "missing collection resolver result should report a collection diagnostic");
+}
+
 void projectSessionAddsSourceFromPath() {
   const auto path = std::filesystem::temp_directory_path() / "vgmtrans-value-core-source-load.bin";
   std::filesystem::remove(path);
@@ -1232,6 +1316,7 @@ int main() {
     byteReaderChecksBoundsAndEndian();
     sequencerCommandExposesSourceRange();
     projectSessionScansValuesAndVirtualSources();
+    projectCollectionAssetResolutionProvidesTypedExportInputs();
     projectSessionAddsSourceFromPath();
     projectSessionExportsAllCollections();
     snesBrrDecoderProducesPcm();
