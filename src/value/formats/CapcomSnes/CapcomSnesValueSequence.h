@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/FormatModule.h"
+#include "value/core/ScanTypes.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueLayout.h"
 
 #include <optional>

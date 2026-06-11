@@ -4,12 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "value/core/ScanService.h"
+
 #include "value/core/FormatModule.h"
+#include "value/core/ScanTypes.h"
 
 #include <algorithm>
 #include <exception>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -85,73 +87,6 @@ Diagnostic errorDiagnostic(std::string message, std::optional<SourceRange> range
 }
 
 }  // namespace
-
-AssetId ScanIdAllocator::nextAssetId() noexcept {
-  return AssetId{nextAssetId_++};
-}
-
-CollectionId ScanIdAllocator::nextCollectionId() noexcept {
-  return CollectionId{nextCollectionId_++};
-}
-
-ItemId ScanIdAllocator::nextItemId() noexcept {
-  return ItemId{nextItemId_++};
-}
-
-void ScanIdAllocator::reserveAfter(AssetId id) noexcept {
-  if (id.valid()) {
-    nextAssetId_ = std::max(nextAssetId_, id.value + 1);
-  }
-}
-
-void ScanIdAllocator::reserveAfter(CollectionId id) noexcept {
-  if (id.valid()) {
-    nextCollectionId_ = std::max(nextCollectionId_, id.value + 1);
-  }
-}
-
-void ScanIdAllocator::reserveAfter(ItemId id) noexcept {
-  if (id.valid()) {
-    nextItemId_ = std::max(nextItemId_, id.value + 1);
-  }
-}
-
-ItemTreeBuilder::ItemTreeBuilder(ItemTree& tree, ScanIdAllocator& ids) : tree_(tree), ids_(ids) {
-}
-
-ItemId ItemTreeBuilder::add(
-    std::optional<ItemId> parent,
-    ItemKind kind,
-    std::string detailKind,
-    std::string name,
-    SourceRange range,
-    std::string description) {
-  const auto id = ids_.nextItemId();
-  tree_.nodes.push_back(ItemNode{
-      .id = id,
-      .parent = parent,
-      .kind = kind,
-      .detailKind = std::move(detailKind),
-      .name = std::move(name),
-      .description = std::move(description),
-      .range = range,
-  });
-  if (parent) {
-    if (auto* parentItem = itemById(tree_, *parent)) {
-      parentItem->children.push_back(id);
-    }
-  } else {
-    tree_.root = id;
-  }
-  return id;
-}
-
-void FormatRegistry::add(std::unique_ptr<FormatModule> module) {
-  if (!module) {
-    throw std::invalid_argument("Cannot register a null FormatModule");
-  }
-  modules_.push_back(std::move(module));
-}
 
 Project ScanService::scan(SourceStore& sources, const FormatRegistry& formats) const {
   sources.discardVirtualizedTail();

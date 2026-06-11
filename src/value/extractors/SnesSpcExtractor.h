@@ -6,6 +6,7 @@
 #pragma once
 
 #include "value/core/FormatModule.h"
+#include "value/core/FormatRegistry.h"
 
 #include <span>
 #include <string_view>

@@ -6,6 +6,7 @@
 
 #include "value/core/Session.h"
 
+#include "value/core/ScanService.h"
 #include "value/export/Export.h"
 
 #include <fstream>

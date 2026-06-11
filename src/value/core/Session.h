@@ -6,8 +6,9 @@
 
 #pragma once
 
-#include "value/core/FormatModule.h"
+#include "value/core/FormatRegistry.h"
 #include "value/core/MidiSequenceProfile.h"
+#include "value/core/ProjectModel.h"
 #include "value/core/Source.h"
 #include "value/export/ExportTypes.h"
 

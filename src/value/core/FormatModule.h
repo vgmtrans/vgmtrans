@@ -6,64 +6,12 @@
 
 #pragma once
 
-#include "value/core/ProjectModel.h"
-#include "value/core/Source.h"
+#include "value/core/ScanTypes.h"
 
-#include <memory>
 #include <span>
-#include <string>
 #include <string_view>
-#include <vector>
 
 namespace vgmtrans::core {
-
-class ScanIdAllocator {
- public:
-  [[nodiscard]] AssetId nextAssetId() noexcept;
-  [[nodiscard]] CollectionId nextCollectionId() noexcept;
-  [[nodiscard]] ItemId nextItemId() noexcept;
-
-  void reserveAfter(AssetId id) noexcept;
-  void reserveAfter(CollectionId id) noexcept;
-  void reserveAfter(ItemId id) noexcept;
-
- private:
-  // Scan results may provide stable IDs explicitly; generated IDs advance past them.
-  u32 nextAssetId_ = 0;
-  u32 nextCollectionId_ = 0;
-  u32 nextItemId_ = 0;
-};
-
-struct ScanInput {
-  SourceFile source;
-  ByteReader reader;
-  ScanIdAllocator& ids;
-};
-
-class ItemTreeBuilder {
- public:
-  ItemTreeBuilder(ItemTree& tree, ScanIdAllocator& ids);
-
-  // Keeps parent child-lists current while format parsers build source-backed UI trees.
-  [[nodiscard]] ItemId add(
-      std::optional<ItemId> parent,
-      ItemKind kind,
-      std::string detailKind,
-      std::string name,
-      SourceRange range,
-      std::string description = {});
-
- private:
-  ItemTree& tree_;
-  ScanIdAllocator& ids_;
-};
-
-struct ScanResult {
-  std::vector<Asset> assets;
-  std::vector<Collection> collections;
-  std::vector<Diagnostic> diagnostics;
-  std::vector<ExtractedSource> extractedSources;
-};
 
 class FormatModule {
  public:
@@ -73,23 +21,6 @@ class FormatModule {
   // canScan should be cheap and non-mutating; scan does the full parse once selected.
   [[nodiscard]] virtual bool canScan(const SourceFile& source, std::span<const u8> bytes) const = 0;
   [[nodiscard]] virtual ScanResult scan(const ScanInput& input) const = 0;
-};
-
-class FormatRegistry {
- public:
-  void add(std::unique_ptr<FormatModule> module);
-
-  [[nodiscard]] const std::vector<std::unique_ptr<FormatModule>>& modules() const noexcept {
-    return modules_;
-  }
-
- private:
-  std::vector<std::unique_ptr<FormatModule>> modules_;
-};
-
-class ScanService {
- public:
-  [[nodiscard]] Project scan(SourceStore& sources, const FormatRegistry& formats) const;
 };
 
 }  // namespace vgmtrans::core

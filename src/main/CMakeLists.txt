@@ -109,13 +109,15 @@ add_library(vgmtransvaluecore STATIC)
 vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
-    ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Model.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/ScanService.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/ScanTypes.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Source.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SynthMath.cpp
@@ -132,6 +134,7 @@ target_sources(vgmtransvaluecore
     FILES
       ${PROJECT_SOURCE_DIR}/src/value/core/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/core/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/MidiModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Model.h
@@ -140,6 +143,8 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/Session.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/ScanService.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/ScanTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SequenceModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.h

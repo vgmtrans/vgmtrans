@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/core/FormatModule.h"
+#include "value/core/FormatRegistry.h"
 
 namespace vgmtrans::formats::psf {
 
