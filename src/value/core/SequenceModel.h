@@ -207,6 +207,7 @@ struct SequenceBehavior {
   bool writeInitialMonoMode = false;
   bool skipChannel10 = true;
   bool truncateSustainedNotesAtLoopBoundary = true;
+  bool suppressEventsWhenPlaybackTicksZero = false;
   std::optional<u64> maxPlaybackTicks;
   s32 initialGlobalTranspose = 0;
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;

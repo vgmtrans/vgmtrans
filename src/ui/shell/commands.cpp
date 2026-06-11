@@ -420,20 +420,6 @@ bool printValueAssetTree(const vgmtrans::core::Project& project,
   }
 }
 
-std::string_view valueLfoTargetName(vgmtrans::core::LfoTarget target) {
-  switch (target) {
-    case vgmtrans::core::LfoTarget::Pitch:
-      return "pitch";
-    case vgmtrans::core::LfoTarget::Volume:
-      return "volume";
-    case vgmtrans::core::LfoTarget::Pan:
-      return "pan";
-    case vgmtrans::core::LfoTarget::Unknown:
-      return "unknown";
-  }
-  return "unknown";
-}
-
 std::string_view valueNoteStateActionName(vgmtrans::core::NoteStateAction action) {
   switch (action) {
     case vgmtrans::core::NoteStateAction::ToggleTriplet:
@@ -483,9 +469,12 @@ std::string valueCommandDescription(const vgmtrans::core::Command& command) {
       return typedCommand.rawTargetKey
                ? fmt::format("portamento rawTime={} rawTargetKey={}", typedCommand.rawTime, *typedCommand.rawTargetKey)
                : fmt::format("portamento rawTime={}", typedCommand.rawTime);
-    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::LfoCommand>) {
-      return fmt::format("lfo target={} rawType={} rawAmount={}",
-                         valueLfoTargetName(typedCommand.target), typedCommand.rawType, typedCommand.rawAmount);
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::VibratoCommand>) {
+      return fmt::format("vibrato rawDepth={}", typedCommand.rawDepth);
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::TremoloCommand>) {
+      return fmt::format("tremolo rawDepth={}", typedCommand.rawDepth);
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ModulationRateCommand>) {
+      return fmt::format("modulation-rate rawRate={}", typedCommand.rawRate);
     } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ReverbCommand>) {
       return fmt::format("reverb rawValue={}", typedCommand.rawValue);
     } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::EnvelopeCommand>) {
@@ -496,6 +485,11 @@ std::string valueCommandDescription(const vgmtrans::core::Command& command) {
       return fmt::format("master-volume rawValue={}", typedCommand.rawValue);
     } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::JumpCommand>) {
       return fmt::format("jump destination=0x{:x}", typedCommand.destination.value);
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::CallCommand>) {
+      return fmt::format("call destination=0x{:x} return=0x{:x}",
+                         typedCommand.destination.value, typedCommand.returnAddress.value);
+    } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::ReturnCommand>) {
+      return "return";
     } else if constexpr (std::is_same_v<TypedCommand, vgmtrans::core::RepeatCommand>) {
       return fmt::format("repeat slot={} count={} destination=0x{:x}",
                          typedCommand.slot, typedCommand.count, typedCommand.destination.value);
@@ -590,6 +584,20 @@ std::optional<vgmtrans::core::ExportKind> valueExportKindFromString(std::string 
   return std::nullopt;
 }
 
+std::optional<vgmtrans::core::ModulationScalingPolicy> valueModulationScalingPolicyFromString(std::string policy) {
+  std::transform(policy.begin(), policy.end(), policy.begin(), [](unsigned char ch) {
+    return static_cast<char>(std::tolower(ch));
+  });
+
+  if (policy == "full" || policy == "full-range" || policy == "full-format-range") {
+    return vgmtrans::core::ModulationScalingPolicy::FullFormatRange;
+  }
+  if (policy == "observed" || policy == "observed-range" || policy == "observed-sequence-range") {
+    return vgmtrans::core::ModulationScalingPolicy::ObservedSequenceRange;
+  }
+  return std::nullopt;
+}
+
 std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(
     const std::vector<std::string>& args,
     size_t kindArgIndex) {
@@ -603,25 +611,72 @@ std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(
       .loopPolicy = vgmtrans::core::LoopPolicy::PlayOnce,
   };
 
-  if (args.size() <= kindArgIndex) {
-    return request;
+  bool sawKind = false;
+  for (size_t i = kindArgIndex; i < args.size(); ++i) {
+    std::string option = args[i];
+    std::transform(option.begin(), option.end(), option.begin(), [](unsigned char ch) {
+      return static_cast<char>(std::tolower(ch));
+    });
+
+    if (option == "--observed-modulation" || option == "--observed-modulation-scaling") {
+      request.synthModulationScaling = vgmtrans::core::ModulationScalingPolicy::ObservedSequenceRange;
+      continue;
+    }
+    if (option == "--full-modulation" || option == "--full-modulation-scaling") {
+      request.synthModulationScaling = vgmtrans::core::ModulationScalingPolicy::FullFormatRange;
+      continue;
+    }
+
+    std::string_view modulationPrefix = "--modulation-scaling=";
+    if (option.starts_with(modulationPrefix)) {
+      const auto policy = valueModulationScalingPolicyFromString(std::string(option.substr(modulationPrefix.size())));
+      if (!policy) {
+        fmt::println("Unknown modulation scaling policy '{}'. Use full or observed.",
+                     args[i].substr(modulationPrefix.size()));
+        return std::nullopt;
+      }
+      request.synthModulationScaling = *policy;
+      continue;
+    }
+    if (option == "--modulation-scaling") {
+      if (i + 1 >= args.size()) {
+        fmt::println("Missing value after --modulation-scaling. Use full or observed.");
+        return std::nullopt;
+      }
+      const auto policy = valueModulationScalingPolicyFromString(args[++i]);
+      if (!policy) {
+        fmt::println("Unknown modulation scaling policy '{}'. Use full or observed.", args[i]);
+        return std::nullopt;
+      }
+      request.synthModulationScaling = *policy;
+      continue;
+    }
+
+    if (option == "all") {
+      if (sawKind) {
+        fmt::println("Only one value export kind can be specified.");
+        return std::nullopt;
+      }
+      sawKind = true;
+      continue;
+    }
+
+    const auto kind = valueExportKindFromString(option);
+    if (!kind) {
+      fmt::println(
+          "Unknown value export option '{}'. Use all, midi, sf2, dls, wav, or --modulation-scaling full|observed.",
+          args[i]);
+      return std::nullopt;
+    }
+
+    if (sawKind) {
+      fmt::println("Only one value export kind can be specified.");
+      return std::nullopt;
+    }
+    request.kinds = {*kind};
+    sawKind = true;
   }
 
-  std::string kindName = args[kindArgIndex];
-  std::transform(kindName.begin(), kindName.end(), kindName.begin(), [](unsigned char ch) {
-    return static_cast<char>(std::tolower(ch));
-  });
-  if (kindName == "all") {
-    return request;
-  }
-
-  const auto kind = valueExportKindFromString(kindName);
-  if (!kind) {
-    fmt::println("Unknown value export kind '{}'. Use all, midi, sf2, dls, or wav.", args[kindArgIndex]);
-    return std::nullopt;
-  }
-
-  request.kinds = {*kind};
   return request;
 }
 
@@ -840,12 +895,18 @@ std::string_view valueAudioCodecName(vgmtrans::core::AudioCodec codec) {
       return "unknown";
     case vgmtrans::core::AudioCodec::PcmS16:
       return "pcm-s16";
+    case vgmtrans::core::AudioCodec::PcmS8:
+      return "pcm-s8";
     case vgmtrans::core::AudioCodec::SnesBrr:
       return "snes-brr";
     case vgmtrans::core::AudioCodec::PsxAdpcm:
       return "psx-adpcm";
     case vgmtrans::core::AudioCodec::OkiAdpcm:
       return "oki-adpcm";
+    case vgmtrans::core::AudioCodec::NdsImaAdpcm:
+      return "nds-ima-adpcm";
+    case vgmtrans::core::AudioCodec::NdsPsg:
+      return "nds-psg";
   }
   return "unknown";
 }
@@ -1897,11 +1958,11 @@ void registerCommands() {
         4, value_samples},
        {"samples-path", "<path> <asset_idx> [sample_idx]",
         "List or inspect a value sample collection from a filesystem path", 4, value_samples_path},
-       {"export", "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav]",
+       {"export", "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav] [--modulation-scaling full|observed]",
         "Export value artifacts for a collection", 5, value_export},
-       {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav]",
+       {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav] [--modulation-scaling full|observed]",
         "Export value artifacts for all collections", 4, value_export_all},
-       {"export-path", "<path> <dir> [all|midi|sf2|dls|wav]",
+       {"export-path", "<path> <dir> [all|midi|sf2|dls|wav] [--modulation-scaling full|observed]",
         "Scan a filesystem path and export all value collections", 4, value_export_path}}};
 
   commandRegistry["help"] = {"help", "Show this help", {}};

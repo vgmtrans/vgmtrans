@@ -729,7 +729,7 @@ MidiSequence MidiSequenceBuilder::build(
     }
     profile.beginTrack(commandSequence, track, state, midiTrack.events);
 
-    if (globalStopTick == 0) {
+    if (commandSequence.behavior.suppressEventsWhenPlaybackTicksZero && globalStopTick == 0) {
       if (midiTrack.events.empty() || !std::holds_alternative<EndOfTrack>(midiTrack.events.back())) {
         midiTrack.events.push_back(EndOfTrack{.tick = state.tick});
       }

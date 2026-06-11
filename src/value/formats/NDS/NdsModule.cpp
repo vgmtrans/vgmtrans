@@ -1067,6 +1067,7 @@ struct DecodedCommand {
               .timebase = Timebase{.ppqn = 0x30},
               .behavior = SequenceBehavior{
                   .truncateSustainedNotesAtLoopBoundary = false,
+                  .suppressEventsWhenPlaybackTicksZero = true,
                   .maxPlaybackTicks = 1'000'000,
               },
               .midiSequenceProfile = std::string(kNdsProfileName),
