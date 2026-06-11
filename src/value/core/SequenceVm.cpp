@@ -8,8 +8,8 @@
 
 #include <any>
 #include <fmt/format.h>
+#include <map>
 #include <optional>
-#include <set>
 #include <stdexcept>
 #include <utility>
 
@@ -20,6 +20,7 @@ struct VmTrackRuntime {
   std::vector<u32> callStack;
   std::map<u8, u32> repeatRemaining;
   std::optional<u32> repeatReplayStopIndex;
+  CommandId lastCommand;
 };
 
 namespace {
@@ -42,6 +43,25 @@ namespace {
 
 [[nodiscard]] std::optional<u32> destinationIndex(const TrackProgram& track, Address destination) {
   return track.addressIndex.find(destination);
+}
+
+using VisitState = std::pair<u32, std::vector<u32>>;
+
+struct VisitRecord {
+  u64 tick = 0;
+  CommandId command;
+};
+
+void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, std::string text) {
+  track.events.emplace_back(MarkerPerformanceEvent{
+      .header =
+          PerformanceEventHeader{
+              .sourceCommand = sourceCommand,
+              .track = track.id,
+              .tick = tick,
+          },
+      .text = std::move(text),
+  });
 }
 
 }  // namespace
@@ -196,7 +216,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     VmTrackRuntime runtime;
     // A command reached through a different return stack is a distinct playback
     // state. This keeps repeated subroutine calls from looking like loops.
-    std::set<std::pair<u32, std::vector<u32>>> visited;
+    std::map<VisitState, VisitRecord> visited;
     std::optional<u32> current = destinationIndex(track, track.startAddress);
     if (!current && !track.commands.empty()) {
       current = 0;
@@ -211,15 +231,24 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
       const bool replayingRepeat =
           runtime.repeatReplayStopIndex && *current <= *runtime.repeatReplayStopIndex;
-      const auto visitState = std::pair{*current, runtime.callStack};
-      if (loopPolicy != LoopPolicy::Preserve && visited.contains(visitState) && !replayingRepeat) {
-        break;
-      }
+      const SourceCommand& command = track.commands.at(*current);
+      const auto visitState = VisitState{*current, runtime.callStack};
       if (!replayingRepeat) {
-        visited.insert(visitState);
+        if (const auto previous = visited.find(visitState); previous != visited.end()) {
+          if (loopPolicy == LoopPolicy::Preserve) {
+            // Preserve-mode exports one pass plus neutral loop markers instead of
+            // replaying until the safety command limit.
+            addLoopMarker(performanceTrack, previous->second.command, previous->second.tick, "Loop Start");
+            addLoopMarker(performanceTrack,
+                          runtime.lastCommand.valid() ? runtime.lastCommand : command.id,
+                          runtime.tick,
+                          "Loop End");
+          }
+          break;
+        }
+        visited.emplace(visitState, VisitRecord{.tick = runtime.tick, .command = command.id});
       }
 
-      const SourceCommand& command = track.commands.at(*current);
       const CommandHandler* handler = dialect.handler(command.handler);
       if (handler == nullptr || handler->execute == nullptr) {
         sequence.diagnostics.push_back(vmWarning(fmt::format("Missing sequence command handler {}", command.handler.value),
@@ -231,6 +260,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
       VmApi vm{runtime, sequence, command.range, *current};
       const Effects effects = handler->execute(command, track, trackState, emit, vm, dialect.context);
       runtime.tick += effects.advanceTicks;
+      runtime.lastCommand = command.id;
 
       switch (effects.step.kind) {
         case Step::Kind::Next:

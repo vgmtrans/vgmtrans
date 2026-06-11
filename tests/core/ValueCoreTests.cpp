@@ -649,6 +649,73 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
          "note event should link back to the source command that emitted it");
 }
 
+void sequenceVmPreservesLoopsAsPerformanceMarkers() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{2},
+      .sourceTrackNumber = 7,
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 2> programBytes{0x80, 0x05};
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
+                                       programBytes);
+  const CommandId noteCommand =
+      addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes).id;
+  const CommandId jumpCommand =
+      addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes).id;
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
+  expect(performance.diagnostics.empty(), "preserve-loop VM fixture should not report diagnostics");
+  expect(performance.tracks.size() == 1, "preserve-loop VM fixture should render one track");
+  const PerformanceTrack& renderedTrack = performance.tracks[0];
+  expect(renderedTrack.endTick == 12, "preserve-loop VM should stop after discovering the first runtime loop");
+
+  const auto countNotesAt = [&](u64 tick) {
+    return std::ranges::count_if(renderedTrack.events, [tick](const PerformanceEvent& event) {
+      const auto* note = std::get_if<NotePerformanceEvent>(&event);
+      return note != nullptr && note->header.tick == tick;
+    });
+  };
+  expect(countNotesAt(0) == 1 && countNotesAt(12) == 0,
+         "preserve-loop VM should emit one pass without replaying the loop body");
+
+  const auto markerAt = [&](std::string_view text, u64 tick) -> const MarkerPerformanceEvent* {
+    for (const auto& event : renderedTrack.events) {
+      const auto* marker = std::get_if<MarkerPerformanceEvent>(&event);
+      if (marker != nullptr && marker->text == text && marker->header.tick == tick) {
+        return marker;
+      }
+    }
+    return nullptr;
+  };
+  const MarkerPerformanceEvent* loopStart = markerAt("Loop Start", 0);
+  const MarkerPerformanceEvent* loopEnd = markerAt("Loop End", 12);
+  expect(loopStart != nullptr && loopStart->header.sourceCommand == noteCommand,
+         "preserve-loop VM should link loop-start marker to the repeated command");
+  expect(loopEnd != nullptr && loopEnd->header.sourceCommand == jumpCommand,
+         "preserve-loop VM should link loop-end marker to the command that jumped back");
+
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const auto countMidiMarkers = [&](std::string_view text, u64 tick) {
+    return std::ranges::count_if(midi.tracks[0].events, [text, tick](const MidiEvent& event) {
+      const auto* marker = std::get_if<Marker>(&event);
+      return marker != nullptr && marker->text == text && marker->tick == tick;
+    });
+  };
+  expect(countMidiMarkers("Loop Start", 0) == 1 && countMidiMarkers("Loop End", 12) == 1,
+         "performance MIDI renderer should preserve neutral loop markers");
+}
+
 void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -1630,6 +1697,7 @@ int main() {
     byteReaderChecksBoundsAndEndian();
     sourceCommandsPreserveBytesOperandsAndDialectDisplay();
     sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
+    sequenceVmPreservesLoopsAsPerformanceMarkers();
     sequenceVmAllowsRepeatedCallsToSameSubroutine();
     sequenceVmReplaysFiniteRepeatBlocks();
     projectSessionScansValuesAndVirtualSources();
