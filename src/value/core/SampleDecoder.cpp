@@ -9,11 +9,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
-#include <memory>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
-#include <utility>
 
 namespace vgmtrans::core {
 
@@ -189,184 +187,151 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
   return samples;
 }
 
-class PcmS8Decoder final : public SampleDecoder {
- public:
-  [[nodiscard]] AudioCodec codec() const noexcept override { return AudioCodec::PcmS8; }
-
-  [[nodiscard]] std::optional<DecodedSample> decode(
-      const Sample& sample,
-      std::span<const u8> sourceBytes) const override {
-    if (!rangeIsValid(sample, sourceBytes)) {
-      return std::nullopt;
-    }
-
-    const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-    DecodedSample decoded{
-        .sampleRate = sample.sampleRate,
-        .channels = sample.channels,
-        .loop = sample.loop,
-    };
-    decoded.pcm.reserve(encoded.size());
-    for (const u8 value : encoded) {
-      decoded.pcm.push_back(static_cast<s16>(static_cast<s8>(value)) << 8);
-    }
-    return decoded;
+[[nodiscard]] std::optional<DecodedSample> decodePcmS8(const Sample& sample, std::span<const u8> sourceBytes) {
+  if (!rangeIsValid(sample, sourceBytes)) {
+    return std::nullopt;
   }
-};
 
-class PcmS16Decoder final : public SampleDecoder {
- public:
-  [[nodiscard]] AudioCodec codec() const noexcept override { return AudioCodec::PcmS16; }
-
-  [[nodiscard]] std::optional<DecodedSample> decode(
-      const Sample& sample,
-      std::span<const u8> sourceBytes) const override {
-    if (!rangeIsValid(sample, sourceBytes)) {
-      return std::nullopt;
-    }
-
-    const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-    DecodedSample decoded{
-        .sampleRate = sample.sampleRate,
-        .channels = sample.channels,
-        .loop = sample.loop,
-    };
-    decoded.pcm.reserve(encoded.size() / 2);
-    for (size_t offset = 0; offset + 1 < encoded.size(); offset += 2) {
-      decoded.pcm.push_back(static_cast<s16>(le16(encoded, offset)));
-    }
-    return decoded;
+  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  DecodedSample decoded{
+      .sampleRate = sample.sampleRate,
+      .channels = sample.channels,
+      .loop = sample.loop,
+  };
+  decoded.pcm.reserve(encoded.size());
+  for (const u8 value : encoded) {
+    decoded.pcm.push_back(static_cast<s16>(static_cast<s8>(value)) << 8);
   }
-};
+  return decoded;
+}
 
-class NdsImaAdpcmDecoder final : public SampleDecoder {
- public:
-  [[nodiscard]] AudioCodec codec() const noexcept override { return AudioCodec::NdsImaAdpcm; }
+[[nodiscard]] std::optional<DecodedSample> decodePcmS16(const Sample& sample, std::span<const u8> sourceBytes) {
+  if (!rangeIsValid(sample, sourceBytes)) {
+    return std::nullopt;
+  }
 
-  [[nodiscard]] std::optional<DecodedSample> decode(
-      const Sample& sample,
-      std::span<const u8> sourceBytes) const override {
-    if (!rangeIsValid(sample, sourceBytes) || sample.encodedData.offset < 4) {
-      return std::nullopt;
-    }
+  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  DecodedSample decoded{
+      .sampleRate = sample.sampleRate,
+      .channels = sample.channels,
+      .loop = sample.loop,
+  };
+  decoded.pcm.reserve(encoded.size() / 2);
+  for (size_t offset = 0; offset + 1 < encoded.size(); offset += 2) {
+    decoded.pcm.push_back(static_cast<s16>(le16(encoded, offset)));
+  }
+  return decoded;
+}
 
-    const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-    const u32 headerOffset = static_cast<u32>(sample.encodedData.offset - 4);
-    const u32 header = static_cast<u32>(le16(sourceBytes, headerOffset)) |
-                       (static_cast<u32>(le16(sourceBytes, headerOffset + 2)) << 16);
-    int pcm16 = static_cast<s16>(header & 0xffff);
-    int index = static_cast<int>((header >> 16) & 0x7f);
+[[nodiscard]] std::optional<DecodedSample> decodeNdsImaAdpcm(
+    const Sample& sample,
+    std::span<const u8> sourceBytes) {
+  if (!rangeIsValid(sample, sourceBytes) || sample.encodedData.offset < 4) {
+    return std::nullopt;
+  }
 
-    DecodedSample decoded{
-        .sampleRate = sample.sampleRate,
-        .channels = sample.channels,
-        .loop = sample.loop,
-    };
-    decoded.pcm.reserve(encoded.size() * 2 + 1);
+  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  const u32 headerOffset = static_cast<u32>(sample.encodedData.offset - 4);
+  const u32 header = static_cast<u32>(le16(sourceBytes, headerOffset)) |
+                     (static_cast<u32>(le16(sourceBytes, headerOffset + 2)) << 16);
+  int pcm16 = static_cast<s16>(header & 0xffff);
+  int index = static_cast<int>((header >> 16) & 0x7f);
+
+  DecodedSample decoded{
+      .sampleRate = sample.sampleRate,
+      .channels = sample.channels,
+      .loop = sample.loop,
+  };
+  decoded.pcm.reserve(encoded.size() * 2 + 1);
+  decoded.pcm.push_back(static_cast<s16>(pcm16));
+  for (const u8 byte : encoded) {
+    processNdsImaNibble(byte & 0x0f, index, pcm16);
     decoded.pcm.push_back(static_cast<s16>(pcm16));
-    for (const u8 byte : encoded) {
-      processNdsImaNibble(byte & 0x0f, index, pcm16);
-      decoded.pcm.push_back(static_cast<s16>(pcm16));
-      processNdsImaNibble((byte & 0xf0) >> 4, index, pcm16);
-      decoded.pcm.push_back(static_cast<s16>(pcm16));
-    }
-    return decoded;
+    processNdsImaNibble((byte & 0xf0) >> 4, index, pcm16);
+    decoded.pcm.push_back(static_cast<s16>(pcm16));
   }
-};
+  return decoded;
+}
 
-class NdsPsgDecoder final : public SampleDecoder {
- public:
-  [[nodiscard]] AudioCodec codec() const noexcept override { return AudioCodec::NdsPsg; }
+[[nodiscard]] std::optional<DecodedSample> decodeNdsPsg(const Sample& sample, std::span<const u8>) {
+  const u32 sampleCount = sample.loop.length != 0 ? sample.loop.length : 32768;
+  DecodedSample decoded{
+      .sampleRate = sample.sampleRate == 0 ? 32768 : sample.sampleRate,
+      .channels = sample.channels == 0 ? static_cast<u8>(1) : sample.channels,
+      .loop = sample.loop,
+  };
+  decoded.pcm = sample.codecParameter == 8 ? synthesizeLfsrNoisePcm16(sampleCount)
+                                           : synthesizeBandLimitedPulsePcm16(
+                                                 ndsPsgDutyCycle(sample.codecParameter),
+                                                 decoded.sampleRate,
+                                                 sampleCount);
+  return decoded;
+}
 
-  [[nodiscard]] std::optional<DecodedSample> decode(
-      const Sample& sample,
-      std::span<const u8>) const override {
-    const u32 sampleCount = sample.loop.length != 0 ? sample.loop.length : 32768;
-    DecodedSample decoded{
-        .sampleRate = sample.sampleRate == 0 ? 32768 : sample.sampleRate,
-        .channels = sample.channels == 0 ? static_cast<u8>(1) : sample.channels,
-        .loop = sample.loop,
-    };
-    decoded.pcm = sample.codecParameter == 8 ? synthesizeLfsrNoisePcm16(sampleCount)
-                                             : synthesizeBandLimitedPulsePcm16(
-                                                   ndsPsgDutyCycle(sample.codecParameter),
-                                                   decoded.sampleRate,
-                                                   sampleCount);
-    return decoded;
+[[nodiscard]] std::optional<DecodedSample> decodeSnesBrr(const Sample& sample, std::span<const u8> sourceBytes) {
+  const auto offset = sample.encodedData.offset;
+  const auto size = sample.encodedData.size;
+  if (offset > sourceBytes.size() || size > sourceBytes.size() - offset) {
+    return std::nullopt;
   }
-};
 
-class SnesBrrDecoder final : public SampleDecoder {
- public:
-  [[nodiscard]] AudioCodec codec() const noexcept override { return AudioCodec::SnesBrr; }
+  const auto encoded = sourceBytes.subspan(offset, size);
+  DecodedSample decoded{
+      .sampleRate = sample.sampleRate,
+      .channels = sample.channels,
+      .loop = sample.loop,
+  };
 
-  [[nodiscard]] std::optional<DecodedSample> decode(
-      const Sample& sample,
-      std::span<const u8> sourceBytes) const override {
-    const auto offset = sample.encodedData.offset;
-    const auto size = sample.encodedData.size;
-    if (offset > sourceBytes.size() || size > sourceBytes.size() - offset) {
-      return std::nullopt;
+  s32 previous1 = 0;
+  s32 previous2 = 0;
+  for (size_t blockOffset = 0; blockOffset + 9 <= encoded.size(); blockOffset += 9) {
+    const auto header = encoded[blockOffset];
+    const auto payload = encoded.subspan(blockOffset + 1, 8);
+    const auto outputOffset = decoded.pcm.size();
+    decoded.pcm.resize(outputOffset + 16);
+    decodeBrrBlock(std::span<s16, 16>(decoded.pcm.data() + outputOffset, 16),
+                   header,
+                   std::span<const u8, 8>(payload.data(), 8),
+                   previous1,
+                   previous2);
+
+    if ((header & 0x01) != 0) {
+      break;
     }
-
-    const auto encoded = sourceBytes.subspan(offset, size);
-    DecodedSample decoded{
-        .sampleRate = sample.sampleRate,
-        .channels = sample.channels,
-        .loop = sample.loop,
-    };
-
-    s32 previous1 = 0;
-    s32 previous2 = 0;
-    for (size_t blockOffset = 0; blockOffset + 9 <= encoded.size(); blockOffset += 9) {
-      const auto header = encoded[blockOffset];
-      const auto payload = encoded.subspan(blockOffset + 1, 8);
-      const auto outputOffset = decoded.pcm.size();
-      decoded.pcm.resize(outputOffset + 16);
-      decodeBrrBlock(std::span<s16, 16>(decoded.pcm.data() + outputOffset, 16),
-                     header,
-                     std::span<const u8, 8>(payload.data(), 8),
-                     previous1,
-                     previous2);
-
-      if ((header & 0x01) != 0) {
-        break;
-      }
-    }
-
-    return decoded;
   }
-};
+
+  return decoded;
+}
 
 }  // namespace
 
 SampleDecoderRegistry SampleDecoderRegistry::withDefaultDecoders() {
   SampleDecoderRegistry registry;
-  registry.add(std::make_unique<PcmS8Decoder>());
-  registry.add(std::make_unique<PcmS16Decoder>());
-  registry.add(std::make_unique<SnesBrrDecoder>());
-  registry.add(std::make_unique<NdsImaAdpcmDecoder>());
-  registry.add(std::make_unique<NdsPsgDecoder>());
+  registry.add(SampleDecoder{.codec = AudioCodec::PcmS8, .decode = decodePcmS8});
+  registry.add(SampleDecoder{.codec = AudioCodec::PcmS16, .decode = decodePcmS16});
+  registry.add(SampleDecoder{.codec = AudioCodec::SnesBrr, .decode = decodeSnesBrr});
+  registry.add(SampleDecoder{.codec = AudioCodec::NdsImaAdpcm, .decode = decodeNdsImaAdpcm});
+  registry.add(SampleDecoder{.codec = AudioCodec::NdsPsg, .decode = decodeNdsPsg});
   return registry;
 }
 
-void SampleDecoderRegistry::add(std::unique_ptr<SampleDecoder> decoder) {
-  if (!decoder) {
-    throw std::invalid_argument("Cannot register a null SampleDecoder");
+void SampleDecoderRegistry::add(SampleDecoder decoder) {
+  if (decoder.codec == AudioCodec::Unknown || decoder.decode == nullptr) {
+    throw std::invalid_argument("Cannot register an incomplete SampleDecoder");
   }
-  decoders_.push_back(std::move(decoder));
+  decoders_.push_back(decoder);
 }
 
 std::optional<DecodedSample> SampleDecoderRegistry::decode(
     const Sample& sample,
     std::span<const u8> sourceBytes) const {
   const auto decoder = std::ranges::find_if(decoders_, [&sample](const auto& candidate) {
-    return candidate->codec() == sample.codec;
+    return candidate.codec == sample.codec;
   });
   if (decoder == decoders_.end()) {
     return std::nullopt;
   }
-  return (*decoder)->decode(sample, sourceBytes);
+  return decoder->decode(sample, sourceBytes);
 }
 
 }  // namespace vgmtrans::core

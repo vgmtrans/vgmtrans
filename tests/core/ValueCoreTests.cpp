@@ -581,6 +581,7 @@ void snesBrrDecoderProducesPcm() {
   };
 
   const auto registry = SampleDecoderRegistry::withDefaultDecoders();
+  const auto copy = registry;
   const auto decoded = registry.decode(sample, sourceBytes);
   expect(decoded.has_value(), "BRR decoder should decode a valid sample");
   expect(decoded->sampleRate == 32000, "decoded sample should preserve sample rate");
@@ -593,7 +594,16 @@ void snesBrrDecoderProducesPcm() {
       .codec = AudioCodec::SnesBrr,
       .encodedData = SourceRange{.source = SourceId{0}, .offset = 8, .size = 9},
   };
-  expect(!registry.decode(invalidRange, sourceBytes).has_value(), "BRR decoder should reject invalid source ranges");
+  expect(!copy.decode(invalidRange, sourceBytes).has_value(), "BRR decoder should reject invalid source ranges");
+
+  bool threw = false;
+  try {
+    SampleDecoderRegistry custom;
+    custom.add(SampleDecoder{.codec = AudioCodec::SnesBrr});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw, "sample decoder registry should reject incomplete decoder values");
 }
 
 void midiExporterWritesStandardMidiFile() {

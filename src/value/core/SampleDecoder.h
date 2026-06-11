@@ -8,35 +8,31 @@
 
 #include "value/core/SynthModel.h"
 
-#include <memory>
 #include <optional>
 #include <span>
 #include <vector>
 
 namespace vgmtrans::core {
 
-class SampleDecoder {
- public:
-  virtual ~SampleDecoder() = default;
+struct SampleDecoder {
+  using Decode = std::optional<DecodedSample> (*)(const Sample& sample, std::span<const u8> sourceBytes);
 
-  [[nodiscard]] virtual AudioCodec codec() const noexcept = 0;
-  [[nodiscard]] virtual std::optional<DecodedSample> decode(
-      const Sample& sample,
-      std::span<const u8> sourceBytes) const = 0;
+  AudioCodec codec = AudioCodec::Unknown;
+  Decode decode = nullptr;
 };
 
 class SampleDecoderRegistry {
  public:
   static SampleDecoderRegistry withDefaultDecoders();
 
-  void add(std::unique_ptr<SampleDecoder> decoder);
+  void add(SampleDecoder decoder);
 
   [[nodiscard]] std::optional<DecodedSample> decode(
       const Sample& sample,
       std::span<const u8> sourceBytes) const;
 
  private:
-  std::vector<std::unique_ptr<SampleDecoder>> decoders_;
+  std::vector<SampleDecoder> decoders_;
 };
 
 }  // namespace vgmtrans::core
