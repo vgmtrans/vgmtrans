@@ -74,7 +74,8 @@ public:
   [[nodiscard]] PerformanceSequence render(const SequenceProgram& program, const SequenceDialect& dialect) const;
 
 private:
-  [[nodiscard]] LoopPolicy resolvedLoopPolicy(const SequenceProgram& program, const SequenceDialect& dialect) const;
+  [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program,
+                                                        const SequenceDialect& dialect) const;
 
   LoopPolicy loopPolicy_ = LoopPolicy::Default;
 };

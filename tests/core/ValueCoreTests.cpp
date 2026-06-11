@@ -454,9 +454,10 @@ struct ProbeEndCommand {
   }
 };
 
-[[nodiscard]] SequenceDialect probeSequenceDialect() {
+[[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior = {}) {
   return SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext>("probe", ProbeSequenceContext{.velocity = 0.5})
       .timebase(Timebase{.ppqn = 48})
+      .defaultBehavior(behavior)
       .commands<ProbeProgramCommand, ProbeNoteCommand, ProbeJumpCommand, ProbeCallCommand, ProbeReturnCommand,
                 ProbeRepeatCommand, ProbeEndCommand>();
 }
@@ -714,6 +715,40 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   };
   expect(countMidiMarkers("Loop Start", 0) == 1 && countMidiMarkers("Loop End", 12) == 1,
          "performance MIDI renderer should preserve neutral loop markers");
+}
+
+void sequenceVmUsesDialectCommandLimitDefault() {
+  const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{
+      .defaultLoopPolicy = LoopPolicy::Default,
+      .commandLimit = 2,
+  });
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 2> programBytes{0x80, 0x05};
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
+                                       programBytes);
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
+  expect(performance.diagnostics.size() == 1 &&
+             performance.diagnostics[0].message == "Sequence VM command limit reached",
+         "sequence VM should use dialect command limit when the program has no override");
+  expect(performance.tracks[0].events.size() == 2,
+         "dialect command limit should stop execution before the looping jump command");
+  expect(performance.tracks[0].endTick == 12, "command-limit stop should preserve ticks from commands already run");
 }
 
 void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
@@ -1698,6 +1733,7 @@ int main() {
     sourceCommandsPreserveBytesOperandsAndDialectDisplay();
     sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
     sequenceVmPreservesLoopsAsPerformanceMarkers();
+    sequenceVmUsesDialectCommandLimitDefault();
     sequenceVmAllowsRepeatedCallsToSameSubroutine();
     sequenceVmReplaysFiniteRepeatBlocks();
     projectSessionScansValuesAndVirtualSources();

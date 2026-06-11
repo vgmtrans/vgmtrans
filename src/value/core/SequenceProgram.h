@@ -145,7 +145,8 @@ struct SequenceInstrumentRef {
 
 struct SequenceProgramBehavior {
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
-  u32 commandLimit = 100000;
+  // Zero means "use the next default": program -> dialect -> VM fallback.
+  u32 commandLimit = 0;
 };
 
 struct SequenceProgram {

@@ -25,6 +25,8 @@ struct VmTrackRuntime {
 
 namespace {
 
+constexpr u32 kFallbackCommandLimit = 100000;
+
 [[nodiscard]] Diagnostic vmWarning(std::string message, SourceRange range) {
   return Diagnostic{
       .severity = Severity::Warning,
@@ -204,7 +206,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
       .timebase = program.timebase,
   };
 
-  const LoopPolicy loopPolicy = resolvedLoopPolicy(program, dialect);
+  const SequenceProgramBehavior behavior = resolvedBehavior(program, dialect);
+  const LoopPolicy loopPolicy = behavior.defaultLoopPolicy;
   for (const TrackProgram& track : program.tracks) {
     PerformanceTrack performanceTrack{
         .id = track.id,
@@ -224,7 +227,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
     u32 executedCommands = 0;
     while (current) {
-      if (executedCommands >= program.behavior.commandLimit) {
+      if (executedCommands >= behavior.commandLimit) {
         sequence.diagnostics.push_back(vmWarning("Sequence VM command limit reached", SourceRange{}));
         break;
       }
@@ -314,17 +317,29 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
   return sequence;
 }
 
-LoopPolicy SequenceVm::resolvedLoopPolicy(const SequenceProgram& program, const SequenceDialect& dialect) const {
-  if (loopPolicy_ != LoopPolicy::Default) {
-    return loopPolicy_;
-  }
+SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& program,
+                                                     const SequenceDialect& dialect) const {
+  SequenceProgramBehavior behavior{
+      .defaultLoopPolicy = LoopPolicy::PlayOnce,
+      .commandLimit = kFallbackCommandLimit,
+  };
+
   if (program.behavior.defaultLoopPolicy != LoopPolicy::Default) {
-    return program.behavior.defaultLoopPolicy;
+    behavior.defaultLoopPolicy = program.behavior.defaultLoopPolicy;
+  } else if (dialect.defaultBehavior.defaultLoopPolicy != LoopPolicy::Default) {
+    behavior.defaultLoopPolicy = dialect.defaultBehavior.defaultLoopPolicy;
   }
-  if (dialect.defaultBehavior.defaultLoopPolicy != LoopPolicy::Default) {
-    return dialect.defaultBehavior.defaultLoopPolicy;
+  if (loopPolicy_ != LoopPolicy::Default) {
+    behavior.defaultLoopPolicy = loopPolicy_;
   }
-  return LoopPolicy::PlayOnce;
+
+  if (program.behavior.commandLimit != 0) {
+    behavior.commandLimit = program.behavior.commandLimit;
+  } else if (dialect.defaultBehavior.commandLimit != 0) {
+    behavior.commandLimit = dialect.defaultBehavior.commandLimit;
+  }
+
+  return behavior;
 }
 
 }  // namespace vgmtrans::core
