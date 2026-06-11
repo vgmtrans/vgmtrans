@@ -112,6 +112,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Model.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceBuilder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/core/MidiSequenceProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp
