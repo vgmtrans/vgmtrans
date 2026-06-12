@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/core/LevelScale.h"
 #include "value/core/SequenceDialect.h"
 #include "value/core/PerformanceModel.h"
 #include "value/core/Source.h"
@@ -84,6 +85,22 @@ struct U8BoolStateCommand : U8Operand<Derived> {
   void execute(auto& rt) const { rt.state.*Member = this->raw != 0; }
 };
 
+template <class Derived, auto Member>
+struct ToggleBoolStateCommand : NoOperands<Derived> {
+  void execute(auto& rt) const { rt.state.*Member = !(rt.state.*Member); }
+};
+
+template <class Derived, auto Member, bool Value>
+struct SetBoolStateCommand : NoOperands<Derived> {
+  void execute(auto& rt) const { rt.state.*Member = Value; }
+};
+
+template <class Derived, auto Member>
+using SetTrueStateCommand = SetBoolStateCommand<Derived, Member, true>;
+
+template <class Derived, auto Member>
+using SetFalseStateCommand = SetBoolStateCommand<Derived, Member, false>;
+
 template <class Derived, void (Emit::*Method)(u8)>
 struct U8RawOutCommand : U8Operand<Derived> {
   void execute(auto& rt) const { (rt.out.*Method)(this->raw); }
@@ -92,6 +109,14 @@ struct U8RawOutCommand : U8Operand<Derived> {
 template <class Derived, void (Emit::*Method)(bool)>
 struct U8BoolOutCommand : U8Operand<Derived> {
   void execute(auto& rt) const { (rt.out.*Method)(this->raw != 0); }
+};
+
+// For source controls that are already MIDI-shaped. The performance model
+// stores linear gain, so the source byte is squared before emission.
+template <class Derived, void (Emit::*Method)(double, LevelResolution),
+          LevelResolution Resolution = LevelResolution::SevenBit>
+struct U8MidiLevelOutCommand : U8Operand<Derived> {
+  void execute(auto& rt) const { (rt.out.*Method)(LevelScale::linearFromMidi7(this->raw), Resolution); }
 };
 
 // Temporary decoded form used while a bytecode decoder is deciding control flow.

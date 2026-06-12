@@ -17,14 +17,11 @@ struct NdsSequenceRange {
   u32 offset = 0;
   u32 size = 0;
   u32 sequenceEnd = 0;
-  bool linearizeMalformedControlFlow = false;
+  bool recoverMalformedSdatRange = false;
 };
 
-[[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(
-    const core::ScanInput& input,
-    core::AssetId id,
-    NdsSequenceRange range,
-    const std::string& name,
-    std::optional<core::AssetId> instrumentSet);
+[[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(const core::ScanInput& input, core::AssetId id,
+                                                                 NdsSequenceRange range, const std::string& name,
+                                                                 std::optional<core::AssetId> instrumentSet);
 
 }  // namespace vgmtrans::formats::nds

@@ -9,11 +9,11 @@
 #include "value/core/BytecodeSequenceDecoder.h"
 #include "value/core/LevelScale.h"
 #include "value/core/SequenceVm.h"
+#include "value/formats/NDS/NdsSequenceRecovery.h"
 
 #include <algorithm>
 #include <cmath>
 #include <optional>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -64,6 +64,7 @@ using Runtime = CommandRuntime<TrackState, Context>;
          sequenceOffset + 0x1c;
 }
 
+// Notes, rests, and program selection.
 struct Note {
   u8 key = 0;
   u8 velocity = 0;
@@ -79,8 +80,6 @@ struct Note {
   }
 
   Effects execute(Runtime& rt) const {
-    // SSEQ note velocity is already MIDI-shaped. Store the interpreted linear
-    // loudness so MIDI rendering can apply its output curve once.
     rt.out.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
                 LevelScale::linearFromMidi7(velocity), duration);
     return rt.wait(rt.state.noteWait ? duration : 0);
@@ -111,6 +110,7 @@ struct Program {
   void execute(Runtime& rt) const { rt.out.instrument(bank(), program()); }
 };
 
+// Control flow.
 template <class Derived>
 struct RelativeAddressCommand {
   u32 relative = 0;
@@ -154,28 +154,19 @@ struct End : NoOperands<End> {
   Effects execute(Runtime& rt) const { return rt.end(); }
 };
 
+// Mixer, pitch, and performance controls.
 struct Pan : U8Operand<Pan> {
   static constexpr std::string_view operandName = "pan";
 
   void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
-struct Volume : U8Operand<Volume> {
+struct Volume : U8MidiLevelOutCommand<Volume, &Emit::level> {
   static constexpr std::string_view operandName = "volume";
-
-  void execute(Runtime& rt) const {
-    // SSEQ volume is MIDI-shaped, not linear amplitude.
-    rt.out.level(LevelScale::linearFromMidi7(raw), LevelResolution::SevenBit);
-  }
 };
 
-struct ExpressionLevel : U8Operand<ExpressionLevel> {
+struct ExpressionLevel : U8MidiLevelOutCommand<ExpressionLevel, &Emit::expression> {
   static constexpr std::string_view operandName = "expression";
-
-  void execute(Runtime& rt) const {
-    // SSEQ expression is MIDI-shaped, not linear amplitude.
-    rt.out.expression(LevelScale::linearFromMidi7(raw), LevelResolution::SevenBit);
-  }
 };
 
 struct Transpose {
@@ -228,6 +219,7 @@ struct Tempo {
   }
 };
 
+// Stop conditions and diagnostics.
 struct UnsupportedCommand : NoOperands<UnsupportedCommand> {
   Effects execute(Runtime& rt) const {
     rt.vm.diagnostic(Diagnostic{
@@ -266,11 +258,6 @@ struct TruncatedCommand : NoOperands<TruncatedCommand> {
 struct NdsBytecodeMap {
   BytecodeDispatchTable dispatch;
   BytecodeCommandSpec noOp;
-};
-
-struct PendingBlock {
-  u32 offset = 0;
-  bool callTarget = false;
 };
 
 template <class Registrar>
@@ -340,14 +327,6 @@ template <class Registrar>
   };
 }
 
-[[nodiscard]] TrackProgram makeTrack(u32 startOffset, u32 trackIndex) {
-  return TrackProgram{
-      .id = TrackId{trackIndex},
-      .sourceTrackNumber = trackIndex,
-      .startAddress = Address{startOffset},
-  };
-}
-
 // Normal SSEQ decode follows statically reachable bytecode blocks from the
 // track start, preserving calls and jumps as source commands.
 [[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const NdsBytecodeMap& bytecode, u32 sequenceOffset,
@@ -362,90 +341,6 @@ template <class Registrar>
                                             .sequenceEnd = sequenceEnd,
                                         });
       });
-}
-
-// Recovery decode for malformed SDAT ranges where control-flow bytes overlap.
-// It linearizes repeated jumps as no-ops and avoids consuming real call-target
-// bytes as fallthrough.
-[[nodiscard]] TrackProgram decodeMalformedLinearizedFallthrough(ByteReader reader, const NdsBytecodeMap& bytecode,
-                                                                u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
-                                                                u32 trackIndex) {
-  TrackProgram track = makeTrack(startOffset, trackIndex);
-  TrackProgramBuilder builder{track};
-  u32 offset = startOffset;
-  size_t decodedCommands = 0;
-  std::set<u32> visitedControlDestinations;
-  std::set<u32> decodedOffsets;
-  std::set<u32> callTargetOffsets;
-  std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
-  const BytecodeCommandSpec& endSpec = *bytecode.dispatch.opcodes[0xff];
-
-  while (!pendingBlocks.empty()) {
-    const PendingBlock block = pendingBlocks.back();
-    pendingBlocks.pop_back();
-    offset = block.offset;
-
-    while (hasBytecodeBytes(reader, offset, 1, sequenceEnd) && decodedCommands++ < kMaxTrackCommands) {
-      const u32 begin = offset;
-      if (decodedOffsets.contains(begin)) {
-        break;
-      }
-      decodedOffsets.insert(begin);
-
-      auto decoded = bytecode.dispatch.decode(reader, offset,
-                                              BytecodeDecodeContext{
-                                                  .bytecodeEnd = sequenceEnd,
-                                                  .sequenceOffset = sequenceOffset,
-                                                  .sequenceEnd = sequenceEnd,
-                                              });
-
-      if (!block.callTarget) {
-        const auto overlap = std::ranges::find_if(
-            callTargetOffsets, [&](u32 target) { return begin < target && target < decoded.range.endOffset(); });
-        if (overlap != callTargetOffsets.end()) {
-          // Some malformed FAT entries fall through one byte before a real call
-          // target. Stop the fallthrough interpretation before it consumes the
-          // overlapping subroutine bytes.
-          auto end = recordMappedSizedBytecodeCommand<End>(endSpec, reader, begin, begin + 1);
-          end.flow = DecodeFlow::terminalFlow();
-          appendDecodedBytecodeCommand(builder, end, begin);
-          break;
-        }
-      }
-
-      if (decoded.flow.unconditionalJump()) {
-        const u32 destination = decoded.flow.staticTargets.front().value;
-        if (visitedControlDestinations.contains(destination)) {
-          auto end = recordMappedSizedBytecodeCommand<End>(endSpec, reader, begin, begin + 1);
-          end.flow = DecodeFlow::terminalFlow();
-          appendDecodedBytecodeCommand(builder, end, begin);
-          break;
-        }
-        visitedControlDestinations.insert(destination);
-        auto noOp = recordSizedPreservedBytecodeCommand(bytecode.noOp, reader, begin,
-                                                        static_cast<u32>(decoded.range.endOffset()));
-        appendDecodedBytecodeCommand(builder, noOp, begin);
-        offset = destination;
-        continue;
-      }
-
-      if (decoded.flow.callTarget()) {
-        const u32 destination = decoded.flow.staticTargets.front().value;
-        if (!decodedOffsets.contains(destination) && callTargetOffsets.insert(destination).second) {
-          pendingBlocks.push_back(PendingBlock{.offset = destination, .callTarget = true});
-        }
-      }
-
-      const auto next = decoded.flow.fallthrough;
-      appendDecodedBytecodeCommand(builder, decoded, begin);
-      if (!next || decoded.flow.terminal) {
-        break;
-      }
-      offset = next->value;
-    }
-  }
-
-  return track;
 }
 
 }  // namespace
@@ -466,11 +361,11 @@ void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
 }
 
 TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
-                                    u32 sequenceEnd, u32 startOffset, u32 trackIndex,
-                                    bool linearizeMalformedControlFlow) {
+                                    u32 sequenceEnd, u32 startOffset, u32 trackIndex, bool recoverMalformedSdatRange) {
   const NdsBytecodeMap bytecode = ndsBytecodeMap(dialect);
-  if (linearizeMalformedControlFlow) {
-    return decodeMalformedLinearizedFallthrough(reader, bytecode, sequenceOffset, sequenceEnd, startOffset, trackIndex);
+  if (recoverMalformedSdatRange) {
+    return decodeMalformedSdatRangeTrack(reader, bytecode.dispatch, bytecode.noOp, *bytecode.dispatch.opcodes[0xff],
+                                         sequenceOffset, sequenceEnd, startOffset, trackIndex, kMaxTrackCommands);
   }
   return decodeReachableBlocks(reader, bytecode, sequenceOffset, sequenceEnd, startOffset, trackIndex);
 }

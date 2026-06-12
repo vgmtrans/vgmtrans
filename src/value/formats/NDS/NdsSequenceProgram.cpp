@@ -45,7 +45,7 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
   u32 trackIndex = 0;
   for (const u32 start : ndsSequenceTrackStarts(input.reader, range.offset, range.sequenceEnd)) {
     auto track = decodeNdsSequenceTrack(input.reader, dialect, range.offset, range.sequenceEnd, start, trackIndex++,
-                                        range.linearizeMalformedControlFlow);
+                                        range.recoverMalformedSdatRange);
     const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
                                      input.reader.range(start, 0));
     for (const auto& command : track.commands) {

@@ -185,6 +185,7 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceMath.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceProgram.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.cpp
@@ -192,6 +193,7 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRecovery.cpp
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
   PUBLIC
     FILE_SET HEADERS
@@ -202,6 +204,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceMath.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceProgram.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.h
@@ -209,6 +212,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRecovery.h
       formats/CapcomSnes/CapcomSnesDriverMath.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )
