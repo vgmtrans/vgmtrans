@@ -8,6 +8,7 @@
 #include "value/export/Export.h"
 #include "value/core/BytecodeSequenceDecoder.h"
 #include "value/core/FormatModule.h"
+#include "value/core/LevelScale.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/ModulationAnalysis.h"
 #include "value/core/SequenceDialect.h"
@@ -304,7 +305,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 }
 
 struct ProbeSequenceContext {
-  double velocity = 0.75;
+  double linearVelocity = 0.75;
 };
 
 struct ProbeTrackState {
@@ -346,7 +347,7 @@ struct ProbeNoteCommand {
     // This mirrors a source driver using the current track program as a key bank.
     out.note(NotePerformanceEvent{
         .key = static_cast<double>(state.program * 12 + key),
-        .velocity = context.velocity,
+        .linearVelocity = context.linearVelocity,
         .durationTicks = duration,
     });
     return Effects::wait(duration);
@@ -427,7 +428,8 @@ struct ProbeEndCommand {
 };
 
 [[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior = {}) {
-  return SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext>("probe", ProbeSequenceContext{.velocity = 0.5})
+  return SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext>("probe",
+                                                                       ProbeSequenceContext{.linearVelocity = 0.5})
       .timebase(Timebase{.ppqn = 48})
       .defaultBehavior(behavior)
       .commands<ProbeProgramCommand, ProbeNoteCommand, ProbeJumpCommand, ProbeCallCommand, ProbeReturnCommand,
@@ -497,6 +499,20 @@ void bytecodeMapRequiresFallbackCommand() {
     threw = true;
   }
   expect(threw, "bytecode map should require an unknown or truncated fallback command");
+}
+
+void levelScaleRoundTripsMidiValues() {
+  for (u32 value = 0; value <= 127; ++value) {
+    const auto midiValue = static_cast<u8>(value);
+    expect(LevelScale::midi7FromLinear(LevelScale::linearFromMidi7(midiValue)) == midiValue,
+           "MIDI-shaped 7-bit levels should round-trip through linear gain");
+  }
+
+  for (u32 value = 0; value <= 16383; ++value) {
+    const auto midiValue = static_cast<u16>(value);
+    expect(LevelScale::midi14FromLinear(LevelScale::linearFromMidi14(midiValue)) == midiValue,
+           "MIDI-shaped 14-bit levels should round-trip through linear gain");
+  }
 }
 
 void formatRegistryStoresCopyableModuleValues() {
@@ -661,7 +677,7 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
 
   const auto* note = std::get_if<NotePerformanceEvent>(&renderedTrack.events[1]);
   expect(note != nullptr, "note command should emit a target-neutral note event");
-  expect(note->key == 64.0 && note->velocity == 0.5 && note->durationTicks == 12,
+  expect(note->key == 64.0 && note->linearVelocity == 0.5 && note->durationTicks == 12,
          "note event should use driver state and dialect context while staying MIDI-neutral");
   expect(note->header.sourceCommand == noteCommandId && note->header.tick == 0,
          "note event should link back to the source command that emitted it");
@@ -1237,20 +1253,20 @@ void performanceMidiRendererExtendsPreviousSameKeyNotes() {
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
                       .key = 60.0,
-                      .velocity = 0.75,
+                      .linearVelocity = 0.75,
                       .durationTicks = 12,
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 12},
                       .key = 60.0,
-                      .velocity = 0.5,
+                      .linearVelocity = 0.5,
                       .durationTicks = 6,
                       .extendsPrevious = true,
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 18},
                       .key = 62.0,
-                      .velocity = 0.5,
+                      .linearVelocity = 0.5,
                       .durationTicks = 6,
                       .extendsPrevious = true,
                   },
@@ -1870,6 +1886,7 @@ int main() {
     bytecodeMapRejectsIncompatibleHandlerReuse();
     bytecodeMapRejectsOpcodeRangeOverlap();
     bytecodeMapRequiresFallbackCommand();
+    levelScaleRoundTripsMidiValues();
     byteReaderChecksBoundsAndEndian();
     sourceCommandsPreserveBytesOperandsAndDialectDisplay();
     sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();

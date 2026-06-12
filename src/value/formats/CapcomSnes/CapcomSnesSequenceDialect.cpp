@@ -8,6 +8,7 @@
 
 #include "formats/CapcomSnes/CapcomSnesDriverMath.h"
 #include "value/core/BytecodeSequenceDecoder.h"
+#include "value/core/LevelScale.h"
 #include "value/core/SequenceVm.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueLayout.h"
 
@@ -387,7 +388,11 @@ struct Volume : U8Operand<Volume> {
     out.field("linear_gain", volumeGain(context.version, raw));
   }
 
-  void execute(Runtime& rt) const { rt.out.level(volumeGain(rt.context.version, raw), LevelResolution::FourteenBit); }
+  void execute(Runtime& rt) const {
+    // Capcom volume is a linear amplitude gain. MIDI rendering applies the
+    // square-root MIDI controller curve later.
+    rt.out.level(LevelScale::linearFromLinear(volumeGain(rt.context.version, raw)), LevelResolution::FourteenBit);
+  }
 };
 
 struct Program : U8Operand<Program> {
@@ -431,7 +436,7 @@ struct Pan : U8Operand<Pan> {
 
   void execute(Runtime& rt) const {
     const auto pan = conversion(rt.context);
-    rt.out.pan(stereoPosition(pan), pan.volumeScale);
+    rt.out.pan(stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
   }
 };
 
@@ -442,7 +447,9 @@ struct MasterVolume : U8Operand<MasterVolume> {
     out.field("linear_gain", volumeGain(context.version, raw));
   }
 
-  void execute(Runtime& rt) const { rt.out.masterLevel(volumeGain(rt.context.version, raw)); }
+  void execute(Runtime& rt) const {
+    rt.out.masterLevel(LevelScale::linearFromLinear(volumeGain(rt.context.version, raw)));
+  }
 };
 
 struct Lfo {

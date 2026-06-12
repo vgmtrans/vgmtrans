@@ -94,15 +94,6 @@ struct U8BoolOutCommand : U8Operand<Derived> {
   void execute(auto& rt) const { (rt.out.*Method)(this->raw != 0); }
 };
 
-template <class Derived, void (Emit::*Method)(double, LevelResolution), u32 Divisor, LevelResolution Resolution>
-struct U8NormalizedOutCommand : U8Operand<Derived> {
-  static_assert(Divisor != 0);
-
-  void execute(auto& rt) const {
-    (rt.out.*Method)(std::clamp(static_cast<double>(this->raw) / Divisor, 0.0, 1.0), Resolution);
-  }
-};
-
 // Temporary decoded form used while a bytecode decoder is deciding control flow.
 // TrackProgramBuilder still owns the final immutable source-command snapshot.
 struct DecodedBytecodeCommand {

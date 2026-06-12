@@ -139,6 +139,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/core/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/LevelScale.h
       ${PROJECT_SOURCE_DIR}/src/value/core/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/MidiModel.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.h

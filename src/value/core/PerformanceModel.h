@@ -23,7 +23,9 @@ struct PerformanceEventHeader {
 struct NotePerformanceEvent {
   PerformanceEventHeader header;
   double key = 0.0;
-  double velocity = 1.0;
+  // Interpreted note loudness as linear amplitude/gain. MIDI velocity curves
+  // are applied only by MIDI-like renderers.
+  double linearVelocity = 1.0;
   u32 durationTicks = 0;
   bool extendsPrevious = false;
 };
@@ -47,13 +49,19 @@ enum class LevelResolution {
 
 struct LevelPerformanceEvent {
   PerformanceEventHeader header;
+  // Interpreted loudness as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
+  // Precision hint for current MIDI rendering. Future export options can
+  // override this without changing format code.
   LevelResolution resolution = LevelResolution::SevenBit;
 };
 
 struct ExpressionPerformanceEvent {
   PerformanceEventHeader header;
+  // Interpreted expression as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
+  // Precision hint for current MIDI rendering. Expression currently quantizes
+  // to 7-bit until the MIDI event model grows an Expression14 event.
   LevelResolution resolution = LevelResolution::SevenBit;
 };
 
@@ -68,6 +76,7 @@ struct PanPerformanceEvent {
 
 struct MasterLevelPerformanceEvent {
   PerformanceEventHeader header;
+  // Interpreted master loudness as linear amplitude/gain.
   double linearGain = 1.0;
 };
 

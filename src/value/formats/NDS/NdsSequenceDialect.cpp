@@ -7,6 +7,7 @@
 #include "value/formats/NDS/NdsSequenceDialect.h"
 
 #include "value/core/BytecodeSequenceDecoder.h"
+#include "value/core/LevelScale.h"
 #include "value/core/SequenceVm.h"
 
 #include <algorithm>
@@ -78,8 +79,10 @@ struct Note {
   }
 
   Effects execute(Runtime& rt) const {
+    // SSEQ note velocity is already MIDI-shaped. Store the interpreted linear
+    // loudness so MIDI rendering can apply its output curve once.
     rt.out.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
-                velocity / 127.0, duration);
+                LevelScale::linearFromMidi7(velocity), duration);
     return rt.wait(rt.state.noteWait ? duration : 0);
   }
 };
@@ -157,12 +160,22 @@ struct Pan : U8Operand<Pan> {
   void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
-struct Volume : U8NormalizedOutCommand<Volume, &Emit::level, 127, LevelResolution::SevenBit> {
+struct Volume : U8Operand<Volume> {
   static constexpr std::string_view operandName = "volume";
+
+  void execute(Runtime& rt) const {
+    // SSEQ volume is MIDI-shaped, not linear amplitude.
+    rt.out.level(LevelScale::linearFromMidi7(raw), LevelResolution::SevenBit);
+  }
 };
 
-struct ExpressionLevel : U8NormalizedOutCommand<ExpressionLevel, &Emit::expression, 127, LevelResolution::SevenBit> {
+struct ExpressionLevel : U8Operand<ExpressionLevel> {
   static constexpr std::string_view operandName = "expression";
+
+  void execute(Runtime& rt) const {
+    // SSEQ expression is MIDI-shaped, not linear amplitude.
+    rt.out.expression(LevelScale::linearFromMidi7(raw), LevelResolution::SevenBit);
+  }
 };
 
 struct Transpose {

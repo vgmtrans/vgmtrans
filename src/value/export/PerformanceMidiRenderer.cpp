@@ -6,6 +6,8 @@
 
 #include "value/export/PerformanceMidiRenderer.h"
 
+#include "value/core/LevelScale.h"
+
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -27,16 +29,12 @@ namespace {
   return static_cast<u16>(std::clamp<int>(static_cast<int>(std::lround(value)), 0, 16383));
 }
 
-[[nodiscard]] u16 midiAmplitude14(double linearGain) {
-  return data14(std::sqrt(std::clamp(linearGain, 0.0, 1.0)) * 16383.0);
-}
-
 [[nodiscard]] u8 midiKey(double key) {
   return data7(key);
 }
 
-[[nodiscard]] u8 midiVelocity(double velocity) {
-  return data7(velocity * 127.0);
+[[nodiscard]] u8 midiVelocity(double linearVelocity) {
+  return LevelScale::midi7FromLinear(linearVelocity);
 }
 
 [[nodiscard]] u8 midiChannel(size_t trackIndex) {
@@ -128,7 +126,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .tick = typedEvent.header.tick,
               .channel = channel,
               .key = key,
-              .velocity = midiVelocity(typedEvent.velocity),
+              .velocity = midiVelocity(typedEvent.linearVelocity),
               .duration = typedEvent.durationTicks,
           });
         } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
@@ -155,20 +153,22 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             track.events.push_back(Volume14{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
-                .value = midiAmplitude14(typedEvent.linearGain),
+                .value = LevelScale::midi14FromLinear(typedEvent.linearGain),
             });
           } else {
             track.events.push_back(Volume{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
-                .value = data7(typedEvent.linearGain * 127.0),
+                .value = LevelScale::midi7FromLinear(typedEvent.linearGain),
             });
           }
         } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
+          // The performance model may request higher precision later, but the
+          // MIDI event model currently has only a 7-bit expression event.
           track.events.push_back(Expression{
               .tick = typedEvent.header.tick,
               .channel = channel,
-              .value = data7(typedEvent.linearGain * 127.0),
+              .value = LevelScale::midi7FromLinear(typedEvent.linearGain),
           });
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
           track.events.push_back(Pan{
@@ -180,13 +180,13 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             track.events.push_back(Expression{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
-                .value = data7(std::sqrt(std::clamp(typedEvent.linearGain, 0.0, 1.0)) * 127.0),
+                .value = LevelScale::midi7FromLinear(typedEvent.linearGain),
             });
           }
         } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
           track.events.push_back(MasterVolume{
               .tick = typedEvent.header.tick,
-              .value = midiAmplitude14(typedEvent.linearGain),
+              .value = LevelScale::midi14FromLinear(typedEvent.linearGain),
           });
         } else if constexpr (std::is_same_v<TypedEvent, ReverbPerformanceEvent>) {
           track.events.push_back(Reverb{
