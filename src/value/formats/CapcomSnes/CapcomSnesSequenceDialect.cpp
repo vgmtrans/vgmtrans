@@ -16,12 +16,17 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace vgmtrans::formats::capcom_snes {
 
 using namespace core;
 
 namespace {
+
+#define CAPCOM_COMMAND(Suffix, DisplayName)                                      \
+  static constexpr std::string_view kind = "capcom-snes." Suffix;                \
+  static constexpr std::string_view name = DisplayName
 
 constexpr u8 kNoteOctaveMask = 0x07;
 constexpr u8 kNoteOctaveUpMask = 0x08;
@@ -49,6 +54,48 @@ struct TrackState {
   std::optional<s32> lastSourceKey;
   bool lastNoteSlurred = false;
   bool didRest = false;
+};
+
+using Runtime = CommandRuntime<TrackState, Context>;
+
+template <class Derived>
+struct EmptyParse {
+  static Derived parse(CommandReader&) {
+    return {};
+  }
+};
+
+template <class Derived>
+struct RawU8 {
+  u8 raw = 0;
+
+  static Derived parse(CommandReader& in) {
+    Derived result;
+    result.raw = in.u8(Derived::operandName);
+    return result;
+  }
+};
+
+template <class Derived>
+struct RawS8 {
+  s8 raw = 0;
+
+  static Derived parse(CommandReader& in) {
+    Derived result;
+    result.raw = in.s8(Derived::operandName);
+    return result;
+  }
+};
+
+template <class Derived>
+struct RawBe16 {
+  u16 raw = 0;
+
+  static Derived parse(CommandReader& in) {
+    Derived result;
+    result.raw = in.be16(Derived::operandName);
+    return result;
+  }
 };
 
 [[nodiscard]] double tuningSemitones(s8 tuning) {
@@ -133,9 +180,7 @@ void emitLegatoChangeIfNeeded(bool wasSlurred, const TrackState& state, Emit& ou
   if (state.noteSlurred == wasSlurred) {
     return;
   }
-  out.legatoPedal(LegatoPedalPerformanceEvent{
-      .enabled = state.noteSlurred,
-  });
+  out.legatoPedal(state.noteSlurred);
 }
 
 void applyNoteAttributes(u8 attributes, TrackState& state, Emit* out = nullptr) {
@@ -154,37 +199,30 @@ void applyNoteAttributes(u8 attributes, TrackState& state, Emit* out = nullptr) 
 
 void emitModulationDepths(const TrackState& state, Emit& out, bool enabled) {
   if (state.vibratoDepth != 0) {
-    out.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoDepth,
-        .amount = enabled ? static_cast<double>(state.vibratoDepth) / 127.0 : 0.0,
-    });
+    out.modulation(ModulationPerformanceTarget::VibratoDepth,
+                   enabled ? static_cast<double>(state.vibratoDepth) / 127.0 : 0.0);
   }
   if (state.tremoloDepth != 0) {
-    out.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::TremoloDepth,
-        .amount = enabled ? static_cast<double>(state.tremoloDepth) / 127.0 : 0.0,
-    });
+    out.modulation(ModulationPerformanceTarget::TremoloDepth,
+                   enabled ? static_cast<double>(state.tremoloDepth) / 127.0 : 0.0);
   }
 }
 
 struct Rest {
   u8 rawDuration = 0;
 
-  static constexpr std::string_view kind = "capcom-snes.rest";
-  static constexpr std::string_view name = "Rest";
+  CAPCOM_COMMAND("rest", "Rest");
 
   static Rest parse(CommandReader& in) {
-    return Rest{.rawDuration = static_cast<u8>(in.opcode() >> 5)};
+    const auto duration = static_cast<u8>(in.opcode() >> 5);
+    in.derived("duration_index", static_cast<u64>(duration));
+    return Rest{.rawDuration = duration};
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("duration_index", static_cast<u64>(rawDuration));
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    const u32 length = noteTicks(rawDuration, state);
-    state.didRest = true;
-    return Effects::wait(length);
+  Effects execute(Runtime& rt) const {
+    const u32 length = noteTicks(rawDuration, rt.state);
+    rt.state.didRest = true;
+    return rt.wait(length);
   }
 };
 
@@ -192,22 +230,21 @@ struct Note {
   u8 keyIndex = 0;
   u8 rawDuration = 0;
 
-  static constexpr std::string_view kind = "capcom-snes.note";
-  static constexpr std::string_view name = "Note";
+  CAPCOM_COMMAND("note", "Note");
 
   static Note parse(CommandReader& in) {
+    const auto keyIndex = static_cast<u8>(in.opcode() & 0x1f);
+    const auto duration = static_cast<u8>(in.opcode() >> 5);
+    in.derived("key_index", static_cast<u64>(keyIndex));
+    in.derived("duration_index", static_cast<u64>(duration));
     return Note{
-        .keyIndex = static_cast<u8>(in.opcode() & 0x1f),
-        .rawDuration = static_cast<u8>(in.opcode() >> 5),
+        .keyIndex = keyIndex,
+        .rawDuration = duration,
     };
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("key_index", static_cast<u64>(keyIndex));
-    out.field("duration_index", static_cast<u64>(rawDuration));
-  }
-
-  Effects execute(TrackState& state, Emit& out, VmApi&, const Context&) const {
+  Effects execute(Runtime& rt) const {
+    auto& state = rt.state;
     const u32 length = noteTicks(rawDuration, state);
     const s32 key = driverSourceKey(keyIndex, state);
     const u32 duration = soundingTicks(length, state);
@@ -216,269 +253,156 @@ struct Note {
       // The Capcom driver treats repeated keys after a slurred note as a tie.
       // Legacy VGMTrans extends the previous MIDI note even if this note has
       // already cleared the slur bit, so the state must look at the previous note.
-      out.note(NotePerformanceEvent{
-          .key = performedKey(key, state),
-          .velocity = 1.0,
-          .durationTicks = duration,
-          .extendsPrevious = true,
-      });
+      rt.out.note(performedKey(key, state), 1.0, duration, true);
       state.lastNoteSlurred = state.noteSlurred;
-      return Effects::wait(length);
+      return rt.wait(length);
     }
 
     if (state.portamentoMillisecondsPerCent > 0.0 && state.lastSourceKey) {
       const auto keyDistance = static_cast<u32>(std::abs(key - *state.lastSourceKey));
       const auto portamentoTime = static_cast<u16>(keyDistance * 100 * state.portamentoMillisecondsPerCent);
       if (portamentoTime != state.lastPortamentoTime) {
-        out.portamento(PortamentoPerformanceEvent{
-            .timeMilliseconds = static_cast<double>(portamentoTime),
-            .previousKey = static_cast<double>(*state.lastSourceKey + state.transpose),
-        });
+        rt.out.portamento(static_cast<double>(portamentoTime),
+                          static_cast<double>(*state.lastSourceKey + state.transpose));
         state.lastPortamentoTime = portamentoTime;
       } else {
-        out.portamentoControl(PortamentoControlPerformanceEvent{
-            .previousKey = static_cast<double>(*state.lastSourceKey + state.transpose),
-        });
+        rt.out.portamentoControl(static_cast<double>(*state.lastSourceKey + state.transpose));
       }
     }
-    out.note(NotePerformanceEvent{
-        .key = performedKey(key, state),
-        .velocity = 1.0,
-        // Slur is modeled as a one-tick overlap into the next source note.
-        .durationTicks = duration + (state.noteSlurred ? 1u : 0u),
-    });
+    // Slur is modeled as a one-tick overlap into the next source note.
+    rt.out.note(performedKey(key, state), 1.0, duration + (state.noteSlurred ? 1u : 0u));
     state.lastSourceKey = key;
     state.didRest = false;
     state.lastNoteSlurred = state.noteSlurred;
-    return Effects::wait(length);
+    return rt.wait(length);
   }
 };
 
-struct NoteAttributes {
-  u8 raw = 0;
+struct NoteAttributes : RawU8<NoteAttributes> {
+  CAPCOM_COMMAND("note-attributes", "Note Attributes");
+  static constexpr std::string_view operandName = "raw";
 
-  static constexpr std::string_view kind = "capcom-snes.note-attributes";
-  static constexpr std::string_view name = "Note Attributes";
-
-  static NoteAttributes parse(CommandReader& in) {
-    return NoteAttributes{.raw = in.u8("attributes")};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("raw", static_cast<u64>(raw));
-  }
-
-  Effects execute(TrackState& state, Emit& out, VmApi&, const Context&) const {
-    applyNoteAttributes(raw, state, &out);
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    applyNoteAttributes(raw, rt.state, &rt.out);
   }
 };
 
-struct Octave {
-  u8 raw = 0;
+struct Octave : RawU8<Octave> {
+  CAPCOM_COMMAND("octave", "Octave");
+  static constexpr std::string_view operandName = "octave";
 
-  static constexpr std::string_view kind = "capcom-snes.octave";
-  static constexpr std::string_view name = "Octave";
-
-  static Octave parse(CommandReader& in) {
-    return Octave{.raw = in.u8("octave")};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("octave", static_cast<u64>(raw));
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.noteOctave = raw;
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.state.noteOctave = raw;
   }
 };
 
-struct ToggleTriplet {
-  static constexpr std::string_view kind = "capcom-snes.toggle-triplet";
-  static constexpr std::string_view name = "Toggle Triplet";
+struct ToggleTriplet : EmptyParse<ToggleTriplet> {
+  CAPCOM_COMMAND("toggle-triplet", "Toggle Triplet");
 
-  static ToggleTriplet parse(CommandReader&) {
-    return ToggleTriplet{};
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.noteTriplet = !state.noteTriplet;
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.state.noteTriplet = !rt.state.noteTriplet;
   }
 };
 
-struct ToggleSlur {
-  static constexpr std::string_view kind = "capcom-snes.toggle-slur";
-  static constexpr std::string_view name = "Toggle Slur";
+struct ToggleSlur : EmptyParse<ToggleSlur> {
+  CAPCOM_COMMAND("toggle-slur", "Toggle Slur");
 
-  static ToggleSlur parse(CommandReader&) {
-    return ToggleSlur{};
-  }
-
-  Effects execute(TrackState& state, Emit& out, VmApi&, const Context&) const {
-    const bool wasSlurred = state.noteSlurred;
-    state.noteSlurred = !state.noteSlurred;
-    emitLegatoChangeIfNeeded(wasSlurred, state, out);
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    const bool wasSlurred = rt.state.noteSlurred;
+    rt.state.noteSlurred = !rt.state.noteSlurred;
+    emitLegatoChangeIfNeeded(wasSlurred, rt.state, rt.out);
   }
 };
 
-struct DottedNote {
-  static constexpr std::string_view kind = "capcom-snes.dotted-note";
-  static constexpr std::string_view name = "Dotted Note";
+struct DottedNote : EmptyParse<DottedNote> {
+  CAPCOM_COMMAND("dotted-note", "Dotted Note");
 
-  static DottedNote parse(CommandReader&) {
-    return DottedNote{};
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.noteDotted = true;
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.state.noteDotted = true;
   }
 };
 
-struct ToggleOctaveUp {
-  static constexpr std::string_view kind = "capcom-snes.toggle-octave-up";
-  static constexpr std::string_view name = "Toggle Octave Up";
+struct ToggleOctaveUp : EmptyParse<ToggleOctaveUp> {
+  CAPCOM_COMMAND("toggle-octave-up", "Toggle Octave Up");
 
-  static ToggleOctaveUp parse(CommandReader&) {
-    return ToggleOctaveUp{};
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.noteOctaveUp = !state.noteOctaveUp;
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.state.noteOctaveUp = !rt.state.noteOctaveUp;
   }
 };
 
 struct GlobalTranspose {
-  s8 semitones = 0;
+  s8 raw = 0;
 
-  static constexpr std::string_view kind = "capcom-snes.global-transpose";
-  static constexpr std::string_view name = "Global Transpose";
+  CAPCOM_COMMAND("global-transpose", "Global Transpose");
 
   static GlobalTranspose parse(CommandReader& in) {
-    return GlobalTranspose{.semitones = in.s8("semitones")};
+    return GlobalTranspose{.raw = in.s8("semitones")};
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("semitones", static_cast<s64>(semitones));
-  }
-
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
-    out.globalTranspose(GlobalTransposePerformanceEvent{
-        .semitones = semitones,
-    });
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.out.globalTranspose(raw);
   }
 };
 
 struct Transpose {
-  s8 semitones = 0;
-
-  static constexpr std::string_view kind = "capcom-snes.transpose";
-  static constexpr std::string_view name = "Transpose";
-
-  static Transpose parse(CommandReader& in) {
-    return Transpose{.semitones = in.s8("semitones")};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("semitones", static_cast<s64>(semitones));
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.transpose = semitones;
-    return Effects::none();
-  }
-};
-
-struct Tuning {
   s8 raw = 0;
 
-  static constexpr std::string_view kind = "capcom-snes.tuning";
-  static constexpr std::string_view name = "Tuning";
+  CAPCOM_COMMAND("transpose", "Transpose");
 
-  static Tuning parse(CommandReader& in) {
-    return Tuning{.raw = in.s8("tuning")};
+  static Transpose parse(CommandReader& in) {
+    return Transpose{.raw = in.s8("semitones")};
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("raw", static_cast<s64>(raw));
-    out.field("cents", std::to_string(tuningCents(raw)));
-  }
-
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
-    out.tuning(TuningPerformanceEvent{
-        .cents = tuningCents(raw),
-    });
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.state.transpose = raw;
   }
 };
 
-struct PortamentoTime {
-  u8 raw = 0;
-
-  static constexpr std::string_view kind = "capcom-snes.portamento-time";
-  static constexpr std::string_view name = "Portamento Time";
-
-  static PortamentoTime parse(CommandReader& in) {
-    return PortamentoTime{.raw = in.u8("time")};
-  }
+struct Tuning : RawS8<Tuning> {
+  CAPCOM_COMMAND("tuning", "Tuning");
+  static constexpr std::string_view operandName = "tuning";
 
   void describe(CommandInfo& out) const {
-    out.field("raw", static_cast<u64>(raw));
+    out.field("raw", raw);
+    out.field("cents", tuningCents(raw));
   }
 
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
+  void execute(Runtime& rt) const {
+    rt.out.tuning(tuningCents(raw));
+  }
+};
+
+struct PortamentoTime : RawU8<PortamentoTime> {
+  CAPCOM_COMMAND("portamento-time", "Portamento Time");
+  static constexpr std::string_view operandName = "time";
+
+  void execute(Runtime& rt) const {
     // The driver stores portamento as speed; the next note converts it to a
     // distance-dependent time using the previous source key.
-    state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(raw);
-    return Effects::none();
+    rt.state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(raw);
   }
 };
 
-struct Tempo {
-  u16 raw = 0;
-
-  static constexpr std::string_view kind = "capcom-snes.tempo";
-  static constexpr std::string_view name = "Tempo";
-
-  static Tempo parse(CommandReader& in) {
-    return Tempo{.raw = in.be16("tempo")};
-  }
+struct Tempo : RawBe16<Tempo> {
+  CAPCOM_COMMAND("tempo", "Tempo");
+  static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out) const {
-    out.field("raw", static_cast<u64>(raw));
-    out.field("microseconds_per_quarter", static_cast<u64>(tempoMicrosecondsPerQuarter(raw)));
+    out.field("raw", raw);
+    out.field("microseconds_per_quarter", tempoMicrosecondsPerQuarter(raw));
   }
 
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
-    out.tempo(TempoPerformanceEvent{
-        .microsecondsPerQuarter = tempoMicrosecondsPerQuarter(raw),
-    });
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.out.tempo(tempoMicrosecondsPerQuarter(raw));
   }
 };
 
-struct DurationRate {
-  u8 raw = 0;
+struct DurationRate : RawU8<DurationRate> {
+  CAPCOM_COMMAND("duration-rate", "Duration Rate");
+  static constexpr std::string_view operandName = "rate";
 
-  static constexpr std::string_view kind = "capcom-snes.duration-rate";
-  static constexpr std::string_view name = "Duration Rate";
-
-  static DurationRate parse(CommandReader& in) {
-    return DurationRate{.raw = in.u8("rate")};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("raw", static_cast<u64>(raw));
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.durationRate = raw;
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.state.durationRate = raw;
   }
 };
 
@@ -487,30 +411,25 @@ struct RepeatUntil {
   u8 count = 0;
   Address destination;
 
-  static constexpr std::string_view kind = "capcom-snes.repeat-until";
-  static constexpr std::string_view name = "Repeat Until";
+  CAPCOM_COMMAND("repeat-until", "Repeat Until");
 
   static RepeatUntil parse(CommandReader& in) {
+    const auto slot = static_cast<u8>(in.opcode() - 0x0e);
+    in.derived("slot", static_cast<u64>(slot + 1));
     return RepeatUntil{
-        .slot = static_cast<u8>(in.opcode() - 0x0e),
+        .slot = slot,
         .count = in.u8("count"),
         .destination = in.be16Address("destination"),
     };
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("slot", static_cast<u64>(slot + 1));
-    out.field("count", static_cast<u64>(count));
-    out.field("destination", destination);
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi& vm, const Context&) const {
+  Effects execute(Runtime& rt) const {
     if (count == 0) {
-      return Effects{.step = vm.jump(destination)};
+      return rt.jump(destination);
     }
 
     // Capcom stores the number of replays. The VM helper receives total plays.
-    return Effects{.step = vm.repeatUntil(slot, static_cast<u32>(count) + 1, destination)};
+    return Effects{.step = rt.vm.repeatUntil(slot, static_cast<u32>(count) + 1, destination)};
   }
 };
 
@@ -519,160 +438,112 @@ struct RepeatBreak {
   u8 attributes = 0;
   Address destination;
 
-  static constexpr std::string_view kind = "capcom-snes.repeat-break";
-  static constexpr std::string_view name = "Repeat Break";
+  CAPCOM_COMMAND("repeat-break", "Repeat Break");
 
   static RepeatBreak parse(CommandReader& in) {
+    const auto slot = static_cast<u8>(in.opcode() - 0x12);
+    in.derived("slot", static_cast<u64>(slot + 1));
     return RepeatBreak{
-        .slot = static_cast<u8>(in.opcode() - 0x12),
+        .slot = slot,
         .attributes = in.u8("attributes"),
         .destination = in.be16Address("destination"),
     };
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("slot", static_cast<u64>(slot + 1));
-    out.field("attributes", static_cast<u64>(attributes));
-    out.field("destination", destination);
-  }
-
-  Effects execute(TrackState& state, Emit& out, VmApi& vm, const Context&) const {
-    const Step step = vm.repeatBreak(slot, destination);
+  Effects execute(Runtime& rt) const {
+    const Step step = rt.vm.repeatBreak(slot, destination);
     if (step.kind == Step::Kind::Jump) {
-      applyNoteAttributes(attributes, state, &out);
+      applyNoteAttributes(attributes, rt.state, &rt.out);
     }
     return Effects{.step = step};
   }
 };
 
-struct Volume {
-  u8 raw = 0;
-
-  static constexpr std::string_view kind = "capcom-snes.volume";
-  static constexpr std::string_view name = "Volume";
-
-  static Volume parse(CommandReader& in) {
-    return Volume{.raw = in.u8("volume")};
-  }
+struct Volume : RawU8<Volume> {
+  CAPCOM_COMMAND("volume", "Volume");
+  static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out, const Context& context) const {
-    out.field("raw", static_cast<u64>(raw));
-    out.field("linear_gain", std::to_string(volumeGain(context.version, raw)));
+    out.field("raw", raw);
+    out.field("linear_gain", volumeGain(context.version, raw));
   }
 
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context& context) const {
-    out.level(LevelPerformanceEvent{
-        .linearGain = volumeGain(context.version, raw),
-        .resolution = LevelResolution::FourteenBit,
-    });
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.out.level(volumeGain(rt.context.version, raw), LevelResolution::FourteenBit);
   }
 };
 
-struct Program {
-  u8 raw = 0;
+struct Program : RawU8<Program> {
+  CAPCOM_COMMAND("program", "Program");
+  static constexpr std::string_view operandName = "program";
 
-  static constexpr std::string_view kind = "capcom-snes.program";
-  static constexpr std::string_view name = "Program";
-
-  static Program parse(CommandReader& in) {
-    return Program{.raw = in.u8("program")};
-  }
+  [[nodiscard]] u32 bank() const { return raw >> 7; }
+  [[nodiscard]] u32 program() const { return raw & 0x7f; }
 
   void describe(CommandInfo& out) const {
-    out.field("bank", static_cast<u64>(raw >> 7));
-    out.field("program", static_cast<u64>(raw & 0x7f));
+    out.field("bank", bank());
+    out.field("program", program());
   }
 
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
-    out.instrument(InstrumentPerformanceEvent{
-        .bank = static_cast<u32>(raw >> 7),
-        .program = static_cast<u32>(raw & 0x7f),
-        .forceBankSelect = true,
-    });
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.out.instrument(bank(), program(), true);
   }
 };
 
 struct Jump {
   Address destination;
 
-  static constexpr std::string_view kind = "capcom-snes.jump";
-  static constexpr std::string_view name = "Jump";
+  CAPCOM_COMMAND("jump", "Jump");
 
   static Jump parse(CommandReader& in) {
     return Jump{.destination = in.be16Address("destination")};
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("destination", destination);
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi& vm, const Context&) const {
-    return Effects{.step = vm.jump(destination)};
+  Effects execute(Runtime& rt) const {
+    return rt.jump(destination);
   }
 };
 
-struct End {
-  static constexpr std::string_view kind = "capcom-snes.end";
-  static constexpr std::string_view name = "End";
+struct End : EmptyParse<End> {
+  CAPCOM_COMMAND("end", "End");
 
-  static End parse(CommandReader&) {
-    return End{};
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi& vm, const Context&) const {
-    return Effects{.step = vm.end()};
+  Effects execute(Runtime& rt) const {
+    return rt.end();
   }
 };
 
-struct Pan {
-  u8 raw = 0;
+struct Pan : RawU8<Pan> {
+  CAPCOM_COMMAND("pan", "Pan");
+  static constexpr std::string_view operandName = "raw";
 
-  static constexpr std::string_view kind = "capcom-snes.pan";
-  static constexpr std::string_view name = "Pan";
-
-  static Pan parse(CommandReader& in) {
-    return Pan{.raw = in.u8("pan")};
+  [[nodiscard]] ::capcom_snes::PanConversionResult conversion(const Context& context) const {
+    return panConversion(context.version, raw);
   }
 
   void describe(CommandInfo& out, const Context& context) const {
-    const auto pan = panConversion(context.version, raw);
-    out.field("raw", static_cast<u64>(raw));
-    out.field("stereo_position", std::to_string(stereoPosition(pan)));
-    out.field("linear_gain", std::to_string(pan.volumeScale));
+    const auto pan = conversion(context);
+    out.field("raw", raw);
+    out.field("stereo_position", stereoPosition(pan));
+    out.field("linear_gain", pan.volumeScale);
   }
 
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context& context) const {
-    const auto pan = panConversion(context.version, raw);
-    out.pan(PanPerformanceEvent{
-        .stereoPosition = stereoPosition(pan),
-        .linearGain = pan.volumeScale,
-    });
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    const auto pan = conversion(rt.context);
+    rt.out.pan(stereoPosition(pan), pan.volumeScale);
   }
 };
 
-struct MasterVolume {
-  u8 raw = 0;
-
-  static constexpr std::string_view kind = "capcom-snes.master-volume";
-  static constexpr std::string_view name = "Master Volume";
-
-  static MasterVolume parse(CommandReader& in) {
-    return MasterVolume{.raw = in.u8("volume")};
-  }
+struct MasterVolume : RawU8<MasterVolume> {
+  CAPCOM_COMMAND("master-volume", "Master Volume");
+  static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out, const Context& context) const {
-    out.field("raw", static_cast<u64>(raw));
-    out.field("linear_gain", std::to_string(volumeGain(context.version, raw)));
+    out.field("raw", raw);
+    out.field("linear_gain", volumeGain(context.version, raw));
   }
 
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context& context) const {
-    out.masterLevel(MasterLevelPerformanceEvent{
-        .linearGain = volumeGain(context.version, raw),
-    });
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.out.masterLevel(volumeGain(rt.context.version, raw));
   }
 };
 
@@ -680,8 +551,7 @@ struct Lfo {
   u8 type = 0;
   u8 value = 0;
 
-  static constexpr std::string_view kind = "capcom-snes.lfo";
-  static constexpr std::string_view name = "LFO";
+  CAPCOM_COMMAND("lfo", "LFO");
 
   static Lfo parse(CommandReader& in) {
     return Lfo{
@@ -691,27 +561,25 @@ struct Lfo {
   }
 
   void describe(CommandInfo& out) const {
-    out.field("type", static_cast<u64>(type));
-    out.field("value", static_cast<u64>(value));
+    out.field("type", type);
+    out.field("value", value);
   }
 
-  Effects execute(TrackState& state, Emit& out, VmApi&, const Context& context) const {
+  void execute(Runtime& rt) const {
+    auto& state = rt.state;
     switch (type) {
       case 0:
         state.vibratoDepth = value & 0x7f;
-        out.modulation(ModulationPerformanceEvent{
-            .target = ModulationPerformanceTarget::VibratoDepth,
-            .amount = state.modulationRate != 0 ? static_cast<double>(state.vibratoDepth) / 127.0 : 0.0,
-        });
+        rt.out.modulation(ModulationPerformanceTarget::VibratoDepth,
+                          state.modulationRate != 0 ? static_cast<double>(state.vibratoDepth) / 127.0 : 0.0);
         break;
 
       case 1:
         state.tremoloDepth =
-            ::capcom_snes::tremoloDepthToMidiValue(value, context.version == CapcomSnesEngineVersion::v1BgmInList);
-        out.modulation(ModulationPerformanceEvent{
-            .target = ModulationPerformanceTarget::TremoloDepth,
-            .amount = state.modulationRate != 0 ? static_cast<double>(state.tremoloDepth) / 127.0 : 0.0,
-        });
+            ::capcom_snes::tremoloDepthToMidiValue(value,
+                                                   rt.context.version == CapcomSnesEngineVersion::v1BgmInList);
+        rt.out.modulation(ModulationPerformanceTarget::TremoloDepth,
+                          state.modulationRate != 0 ? static_cast<double>(state.tremoloDepth) / 127.0 : 0.0);
         break;
 
       case 2: {
@@ -719,20 +587,14 @@ struct Lfo {
         state.modulationRate = value;
         const bool isEnabled = state.modulationRate != 0;
         if (!isEnabled && wasEnabled) {
-          emitModulationDepths(state, out, false);
+          emitModulationDepths(state, rt.out, false);
         } else if (isEnabled && !wasEnabled) {
-          emitModulationDepths(state, out, true);
+          emitModulationDepths(state, rt.out, true);
         }
 
         const double rate = static_cast<double>(::capcom_snes::lfoRateByteToMidiValue(value)) / 127.0;
-        out.modulation(ModulationPerformanceEvent{
-            .target = ModulationPerformanceTarget::VibratoRate,
-            .amount = rate,
-        });
-        out.modulation(ModulationPerformanceEvent{
-            .target = ModulationPerformanceTarget::TremoloRate,
-            .amount = rate,
-        });
+        rt.out.modulation(ModulationPerformanceTarget::VibratoRate, rate);
+        rt.out.modulation(ModulationPerformanceTarget::TremoloRate, rate);
         break;
       }
 
@@ -741,7 +603,6 @@ struct Lfo {
         // on note activation, so there is no target-neutral performance event yet.
         break;
     }
-    return Effects::none();
   }
 };
 
@@ -749,8 +610,7 @@ struct EchoParam {
   u8 argument = 0;
   u8 preset = 0;
 
-  static constexpr std::string_view kind = "capcom-snes.echo-param";
-  static constexpr std::string_view name = "Echo Param";
+  CAPCOM_COMMAND("echo-param", "Echo Param");
 
   static EchoParam parse(CommandReader& in) {
     return EchoParam{
@@ -760,78 +620,43 @@ struct EchoParam {
   }
 
   void describe(CommandInfo& out) const {
-    out.field("argument", static_cast<u64>(argument));
-    out.field("preset", static_cast<u64>(preset));
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi&, const Context&) const {
-    // Reverb/echo is preserved as source state until the performance model has
-    // target-neutral reverb events.
-    return Effects::none();
+    out.field("argument", argument);
+    out.field("preset", preset);
   }
 };
 
-struct EchoOnOff {
-  u8 raw = 0;
-
-  static constexpr std::string_view kind = "capcom-snes.echo-on-off";
-  static constexpr std::string_view name = "Echo On/Off";
-
-  static EchoOnOff parse(CommandReader& in) {
-    return EchoOnOff{.raw = in.u8("enabled")};
-  }
+struct EchoOnOff : RawU8<EchoOnOff> {
+  CAPCOM_COMMAND("echo-on-off", "Echo On/Off");
+  static constexpr std::string_view operandName = "enabled";
 
   void describe(CommandInfo& out) const {
-    out.field("enabled", static_cast<u64>(raw & 1));
+    out.field("enabled", static_cast<u8>(raw & 1));
   }
 
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
-    out.reverb(ReverbPerformanceEvent{
-        .send = (raw & 1) != 0 ? 40.0 / 127.0 : 0.0,
-    });
-    return Effects::none();
+  void execute(Runtime& rt) const {
+    rt.out.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0);
   }
 };
 
-struct ReleaseRate {
-  u8 raw = 0;
-
-  static constexpr std::string_view kind = "capcom-snes.release-rate";
-  static constexpr std::string_view name = "Release Rate";
-
-  static ReleaseRate parse(CommandReader& in) {
-    return ReleaseRate{.raw = in.u8("rate")};
-  }
+struct ReleaseRate : RawU8<ReleaseRate> {
+  CAPCOM_COMMAND("release-rate", "Release Rate");
+  static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out) const {
-    out.field("raw", static_cast<u64>(raw));
-    out.field("gain", static_cast<u64>(raw | 0xa0));
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi&, const Context&) const {
-    return Effects::none();
+    out.field("raw", raw);
+    out.field("gain", static_cast<u8>(raw | 0xa0));
   }
 };
 
-struct Nop {
-  static constexpr std::string_view kind = "capcom-snes.nop";
-  static constexpr std::string_view name = "No Operation";
-
-  static Nop parse(CommandReader&) {
-    return Nop{};
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi&, const Context&) const {
-    return Effects::none();
-  }
+struct Nop : EmptyParse<Nop> {
+  CAPCOM_COMMAND("nop", "No Operation");
 };
 
 struct UnknownOneByte {
   u8 opcode = 0;
   u8 value = 0;
 
-  static constexpr std::string_view kind = "capcom-snes.unknown-one-byte";
-  static constexpr std::string_view name = "Unknown One-Byte Event";
+  CAPCOM_COMMAND("unknown-one-byte", "Unknown One-Byte Event");
 
   static UnknownOneByte parse(CommandReader& in) {
     return UnknownOneByte{
@@ -841,59 +666,78 @@ struct UnknownOneByte {
   }
 
   void describe(CommandInfo& out) const {
-    out.field("opcode", static_cast<u64>(opcode));
-    out.field("value", static_cast<u64>(value));
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi&, const Context&) const {
-    // V1 maps opcodes $1E/$1F to unknown one-byte events and then keeps reading.
-    return Effects::none();
+    out.field("opcode", opcode);
+    out.field("value", value);
   }
 };
 
 struct UnknownOpcode {
   u8 opcode = 0;
 
-  static constexpr std::string_view kind = "capcom-snes.unknown";
-  static constexpr std::string_view name = "Unknown Opcode";
+  CAPCOM_COMMAND("unknown", "Unknown Opcode");
 
   static UnknownOpcode parse(CommandReader& in) {
     return UnknownOpcode{.opcode = in.opcode()};
   }
 
   void describe(CommandInfo& out) const {
-    out.field("opcode", static_cast<u64>(opcode));
+    out.field("opcode", opcode);
   }
 
-  Effects execute(TrackState&, Emit&, VmApi& vm, const Context&) const {
-    vm.diagnostic(Diagnostic{
+  Effects execute(Runtime& rt) const {
+    rt.vm.diagnostic(Diagnostic{
         .severity = Severity::Warning,
         .message = "Unknown Capcom SNES sequence opcode",
     });
-    return Effects{.step = vm.end()};
+    return rt.end();
   }
 };
 
+struct AppendCommandResult {
+  bool ok = false;
+  u32 nextOffset = 0;
+};
+
 template <class Command>
-void appendCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, ByteReader reader, u32 beginOffset,
-                   u32 size) {
+[[nodiscard]] const CommandHandler& commandHandler(const SequenceDialect& dialect) {
   const auto* handler = dialect.handlerForKind(Command::kind);
   if (handler == nullptr) {
     throw std::logic_error("Capcom SNES sequence command was not registered in its dialect");
   }
-  builder.add<Command>(handler->id, handler->kind, Address{beginOffset}, reader.range(beginOffset, size),
+  return *handler;
+}
+
+template <class Command>
+void appendFixedCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, ByteReader reader,
+                        u32 beginOffset, u32 size) {
+  const CommandHandler& handler = commandHandler<Command>(dialect);
+  builder.add<Command>(handler.id, handler.kind, Address{beginOffset}, reader.range(beginOffset, size),
                        reader.slice(beginOffset, size));
 }
 
 template <class Command>
-bool appendCommandIfPresent(TrackProgramBuilder& builder, const SequenceDialect& dialect, ByteReader reader,
-                            u32 beginOffset, u32 size) {
-  if (!reader.has(beginOffset, size)) {
-    appendCommand<UnknownOpcode>(builder, dialect, reader, beginOffset, 1);
-    return false;
+AppendCommandResult appendCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, ByteReader reader,
+                                  u32 beginOffset) {
+  if (!reader.has(beginOffset, 1)) {
+    return AppendCommandResult{.ok = false, .nextOffset = beginOffset};
   }
-  appendCommand<Command>(builder, dialect, reader, beginOffset, size);
-  return true;
+
+  const CommandHandler& handler = commandHandler<Command>(dialect);
+  const auto availableSize = static_cast<u32>(reader.size() - beginOffset);
+  std::vector<CommandOperand> operands;
+  CommandReader commandReader{reader.range(beginOffset, availableSize), reader.slice(beginOffset, availableSize),
+                              &operands};
+  try {
+    static_cast<void>(Command::parse(commandReader));
+  } catch (const std::out_of_range&) {
+    appendFixedCommand<UnknownOpcode>(builder, dialect, reader, beginOffset, 1);
+    return AppendCommandResult{.ok = false, .nextOffset = beginOffset + 1};
+  }
+
+  const auto commandSize = static_cast<u32>(commandReader.position());
+  builder.addDecoded(handler.id, handler.kind, Address{beginOffset}, reader.range(beginOffset, commandSize),
+                     reader.slice(beginOffset, commandSize), operands);
+  return AppendCommandResult{.ok = true, .nextOffset = beginOffset + commandSize};
 }
 
 [[nodiscard]] std::string dialectId(CapcomSnesEngineVersion version) {
@@ -936,6 +780,19 @@ void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
 
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sourceTrackNumber,
                                          u32 startAddress) {
+#define CAPCOM_EMIT(Type)                                                        \
+  do {                                                                           \
+    const auto decoded = appendCommand<Type>(builder, dialect, reader, beginOffset); \
+    if (!decoded.ok) {                                                           \
+      return track;                                                              \
+    }                                                                            \
+    offset = decoded.nextOffset;                                                 \
+  } while (false)
+#define CAPCOM_CASE(Op, Type)                                                     \
+  case Op:                                                                        \
+    CAPCOM_EMIT(Type);                                                            \
+    break
+
   TrackProgram track{
       .id = TrackId{sourceTrackNumber},
       .sourceTrackNumber = sourceTrackNumber,
@@ -954,192 +811,81 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialec
     const u8 opcode = reader.u8At(offset++);
     if (opcode >= 0x20) {
       if ((opcode & 0x1f) == 0) {
-        appendCommand<Rest>(builder, dialect, reader, beginOffset, 1);
+        CAPCOM_EMIT(Rest);
       } else {
-        appendCommand<Note>(builder, dialect, reader, beginOffset, 1);
+        CAPCOM_EMIT(Note);
       }
       continue;
     }
 
     switch (opcode) {
-      case 0x00:
-        appendCommand<ToggleTriplet>(builder, dialect, reader, beginOffset, 1);
-        break;
-
-      case 0x01:
-        appendCommand<ToggleSlur>(builder, dialect, reader, beginOffset, 1);
-        break;
-
-      case 0x02:
-        appendCommand<DottedNote>(builder, dialect, reader, beginOffset, 1);
-        break;
-
-      case 0x03:
-        appendCommand<ToggleOctaveUp>(builder, dialect, reader, beginOffset, 1);
-        break;
-
-      case 0x04:
-        if (!appendCommandIfPresent<NoteAttributes>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x05:
-        if (!appendCommandIfPresent<Tempo>(builder, dialect, reader, beginOffset, 3)) {
-          return track;
-        }
-        offset = beginOffset + 3;
-        break;
-
-      case 0x06:
-        if (!appendCommandIfPresent<DurationRate>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x07:
-        if (!appendCommandIfPresent<Volume>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x08:
-        if (!appendCommandIfPresent<Program>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x09:
-        if (!appendCommandIfPresent<Octave>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x0a:
-        if (!appendCommandIfPresent<GlobalTranspose>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x0b:
-        if (!appendCommandIfPresent<Transpose>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x0c:
-        if (!appendCommandIfPresent<Tuning>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x0d:
-        if (!appendCommandIfPresent<PortamentoTime>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
+      CAPCOM_CASE(0x00, ToggleTriplet);
+      CAPCOM_CASE(0x01, ToggleSlur);
+      CAPCOM_CASE(0x02, DottedNote);
+      CAPCOM_CASE(0x03, ToggleOctaveUp);
+      CAPCOM_CASE(0x04, NoteAttributes);
+      CAPCOM_CASE(0x05, Tempo);
+      CAPCOM_CASE(0x06, DurationRate);
+      CAPCOM_CASE(0x07, Volume);
+      CAPCOM_CASE(0x08, Program);
+      CAPCOM_CASE(0x09, Octave);
+      CAPCOM_CASE(0x0a, GlobalTranspose);
+      CAPCOM_CASE(0x0b, Transpose);
+      CAPCOM_CASE(0x0c, Tuning);
+      CAPCOM_CASE(0x0d, PortamentoTime);
 
       case 0x0e:
       case 0x0f:
       case 0x10:
       case 0x11:
-        if (!appendCommandIfPresent<RepeatUntil>(builder, dialect, reader, beginOffset, 4)) {
-          return track;
-        }
-        offset = beginOffset + 4;
+        CAPCOM_EMIT(RepeatUntil);
         break;
 
       case 0x12:
       case 0x13:
       case 0x14:
       case 0x15:
-        if (!appendCommandIfPresent<RepeatBreak>(builder, dialect, reader, beginOffset, 4)) {
-          return track;
-        }
-        offset = beginOffset + 4;
+        CAPCOM_EMIT(RepeatBreak);
         break;
 
       case 0x16:
-        if (!appendCommandIfPresent<Jump>(builder, dialect, reader, beginOffset, 3)) {
+        if (const auto decoded = appendCommand<Jump>(builder, dialect, reader, beginOffset); !decoded.ok) {
           return track;
         }
         offset = reader.be16(beginOffset + 1);
         break;
 
       case 0x17:
-        appendCommand<End>(builder, dialect, reader, beginOffset, 1);
+        CAPCOM_EMIT(End);
         return track;
 
-      case 0x18:
-        if (!appendCommandIfPresent<Pan>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x19:
-        if (!appendCommandIfPresent<MasterVolume>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x1a:
-        if (!appendCommandIfPresent<Lfo>(builder, dialect, reader, beginOffset, 3)) {
-          return track;
-        }
-        offset = beginOffset + 3;
-        break;
-
-      case 0x1b:
-        if (!appendCommandIfPresent<EchoParam>(builder, dialect, reader, beginOffset, 3)) {
-          return track;
-        }
-        offset = beginOffset + 3;
-        break;
-
-      case 0x1c:
-        if (!appendCommandIfPresent<EchoOnOff>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
-
-      case 0x1d:
-        if (!appendCommandIfPresent<ReleaseRate>(builder, dialect, reader, beginOffset, 2)) {
-          return track;
-        }
-        offset = beginOffset + 2;
-        break;
+      CAPCOM_CASE(0x18, Pan);
+      CAPCOM_CASE(0x19, MasterVolume);
+      CAPCOM_CASE(0x1a, Lfo);
+      CAPCOM_CASE(0x1b, EchoParam);
+      CAPCOM_CASE(0x1c, EchoOnOff);
+      CAPCOM_CASE(0x1d, ReleaseRate);
 
       case 0x1e:
       case 0x1f:
         if (dialect.id.value == "capcom-snes:v1") {
-          if (!appendCommandIfPresent<UnknownOneByte>(builder, dialect, reader, beginOffset, 2)) {
-            return track;
-          }
-          offset = beginOffset + 2;
+          CAPCOM_EMIT(UnknownOneByte);
         } else {
-          appendCommand<Nop>(builder, dialect, reader, beginOffset, 1);
+          CAPCOM_EMIT(Nop);
         }
         break;
 
       default:
-        appendCommand<UnknownOpcode>(builder, dialect, reader, beginOffset, 1);
+        appendFixedCommand<UnknownOpcode>(builder, dialect, reader, beginOffset, 1);
         return track;
     }
   }
 
+#undef CAPCOM_EMIT
+#undef CAPCOM_CASE
   return track;
 }
+
+#undef CAPCOM_COMMAND
 
 }  // namespace vgmtrans::formats::capcom_snes

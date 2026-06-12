@@ -21,18 +21,31 @@ public:
   Emit(PerformanceTrack& track, CommandId sourceCommand, u64 tick);
 
   void note(NotePerformanceEvent event);
+  void note(double key, double velocity, u32 durationTicks, bool extendsPrevious = false);
   void tempo(TempoPerformanceEvent event);
+  void tempo(u32 microsecondsPerQuarter);
   void instrument(InstrumentPerformanceEvent event);
+  void instrument(u32 bank, u32 program, bool forceBankSelect = false);
   void level(LevelPerformanceEvent event);
+  void level(double linearGain, LevelResolution resolution = LevelResolution::SevenBit);
   void pan(PanPerformanceEvent event);
+  void pan(double stereoPosition, double linearGain = 1.0);
   void masterLevel(MasterLevelPerformanceEvent event);
+  void masterLevel(double linearGain);
   void reverb(ReverbPerformanceEvent event);
+  void reverb(double send);
   void tuning(TuningPerformanceEvent event);
+  void tuning(double cents);
   void globalTranspose(GlobalTransposePerformanceEvent event);
+  void globalTranspose(s32 semitones);
   void portamento(PortamentoPerformanceEvent event);
+  void portamento(double timeMilliseconds, double previousKey);
   void portamentoControl(PortamentoControlPerformanceEvent event);
+  void portamentoControl(double previousKey);
   void legatoPedal(LegatoPedalPerformanceEvent event);
+  void legatoPedal(bool enabled);
   void modulation(ModulationPerformanceEvent event);
+  void modulation(ModulationPerformanceTarget target, double amount);
   void marker(MarkerPerformanceEvent event);
 
 private:
