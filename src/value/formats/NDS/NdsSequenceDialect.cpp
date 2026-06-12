@@ -157,11 +157,11 @@ struct Pan : U8Operand<Pan> {
   void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
-struct Volume : U8NormalizedOutCommand<Volume, &Emit::level> {
+struct Volume : U8NormalizedOutCommand<Volume, &Emit::level, 127, LevelResolution::SevenBit> {
   static constexpr std::string_view operandName = "volume";
 };
 
-struct ExpressionLevel : U8NormalizedOutCommand<ExpressionLevel, &Emit::expression> {
+struct ExpressionLevel : U8NormalizedOutCommand<ExpressionLevel, &Emit::expression, 127, LevelResolution::SevenBit> {
   static constexpr std::string_view operandName = "expression";
 };
 
