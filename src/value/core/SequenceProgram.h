@@ -100,6 +100,7 @@ public:
   [[nodiscard]] Address be16Address(std::string_view name);
   [[nodiscard]] std::string rawBytes(std::string_view name, size_t size);
   [[nodiscard]] std::string rawRemainingBytes(std::string_view name);
+  void derived(std::string_view name, CommandOperandValue value);
 
 private:
   [[nodiscard]] ::u8 readByte();

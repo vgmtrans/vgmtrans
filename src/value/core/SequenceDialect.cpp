@@ -22,6 +22,34 @@ void CommandInfo::field(std::string fieldName, std::string value) {
   });
 }
 
+void CommandInfo::field(std::string fieldName, double value) {
+  field(std::move(fieldName), fmt::format("{}", value));
+}
+
+void CommandInfo::field(std::string fieldName, u8 value) {
+  field(std::move(fieldName), static_cast<u64>(value));
+}
+
+void CommandInfo::field(std::string fieldName, s8 value) {
+  field(std::move(fieldName), static_cast<s64>(value));
+}
+
+void CommandInfo::field(std::string fieldName, u16 value) {
+  field(std::move(fieldName), static_cast<u64>(value));
+}
+
+void CommandInfo::field(std::string fieldName, s16 value) {
+  field(std::move(fieldName), static_cast<s64>(value));
+}
+
+void CommandInfo::field(std::string fieldName, u32 value) {
+  field(std::move(fieldName), static_cast<u64>(value));
+}
+
+void CommandInfo::field(std::string fieldName, s32 value) {
+  field(std::move(fieldName), static_cast<s64>(value));
+}
+
 void CommandInfo::field(std::string fieldName, u64 value) {
   field(std::move(fieldName), fmt::format("{}", value));
 }

@@ -17,6 +17,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -67,6 +68,13 @@ struct CommandInfo {
   std::vector<CommandInfoField> fields;
 
   void field(std::string fieldName, std::string value);
+  void field(std::string fieldName, double value);
+  void field(std::string fieldName, u8 value);
+  void field(std::string fieldName, s8 value);
+  void field(std::string fieldName, u16 value);
+  void field(std::string fieldName, s16 value);
+  void field(std::string fieldName, u32 value);
+  void field(std::string fieldName, s32 value);
   void field(std::string fieldName, u64 value);
   void field(std::string fieldName, s64 value);
   void field(std::string fieldName, Address value);
@@ -101,6 +109,26 @@ struct SequenceDialect {
   [[nodiscard]] CommandInfo describe(const TrackProgram& track, const SourceCommand& command) const;
 };
 
+template <class TrackState, class Context>
+struct CommandRuntime {
+  TrackState& state;
+  Emit& out;
+  VmApi& vm;
+  const Context& context;
+
+  [[nodiscard]] static constexpr Effects none() noexcept { return Effects::none(); }
+  [[nodiscard]] static constexpr Effects wait(u32 ticks) noexcept { return Effects::wait(ticks); }
+  [[nodiscard]] static constexpr Effects next() noexcept { return Effects{.step = Step::next()}; }
+  [[nodiscard]] static constexpr Effects end() noexcept { return Effects{.step = Step::end()}; }
+  [[nodiscard]] static constexpr Effects jump(Address destination) noexcept {
+    return Effects{.step = Step::jump(destination)};
+  }
+  [[nodiscard]] static constexpr Effects call(Address destination) noexcept {
+    return Effects{.step = Step::call(destination)};
+  }
+  [[nodiscard]] static constexpr Effects return_() noexcept { return Effects{.step = Step::return_()}; }
+};
+
 [[nodiscard]] std::string commandInfoDescription(const CommandInfo& info);
 [[nodiscard]] ItemId addSourceCommandItem(ItemTreeBuilder& items, std::optional<ItemId> parent,
                                           const SequenceDialect& dialect, const TrackProgram& track,
@@ -125,6 +153,27 @@ template <class Command, class Context>
 concept HasDescribeWithContext =
     requires(const Command& command, CommandInfo& out, const Context& context) { command.describe(out, context); };
 
+template <class Command, class TrackState, class Context>
+concept HasRuntimeEffectsExecute =
+    requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
+      { command.execute(rt) } -> std::same_as<Effects>;
+    };
+
+template <class Command, class TrackState, class Context>
+concept HasRuntimeVoidExecute =
+    requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
+      { command.execute(rt) } -> std::same_as<void>;
+    };
+
+template <class Command, class TrackState, class Context>
+concept HasLegacyExecute = requires(const Command& command,
+                                    TrackState& state,
+                                    Emit& out,
+                                    VmApi& vm,
+                                    const Context& context) {
+  { command.execute(state, out, vm, context) } -> std::same_as<Effects>;
+};
+
 template <class TrackState, class Context>
 std::any createTrackState(const SequenceProgram& program, const TrackProgram& track, const std::any& context) {
   if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&, const Context&>) {
@@ -146,6 +195,10 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
     command.describe(out, std::any_cast<const Context&>(context));
   } else if constexpr (HasDescribe<Command>) {
     command.describe(out);
+  } else {
+    for (const CommandOperand& operand : track.operandsFor(record)) {
+      std::visit([&](const auto& value) { out.field(operand.name, value); }, operand.value);
+    }
   }
 }
 
@@ -154,7 +207,24 @@ Effects executeCommand(const SourceCommand& record, const TrackProgram& track, s
                        VmApi& vm, const std::any& context) {
   CommandReader reader{record.range, track.bytesFor(record)};
   const Command command = Command::parse(reader);
-  return command.execute(std::any_cast<TrackState&>(trackState), out, vm, std::any_cast<const Context&>(context));
+  auto& typedTrackState = std::any_cast<TrackState&>(trackState);
+  const auto& typedContext = std::any_cast<const Context&>(context);
+  CommandRuntime<TrackState, Context> rt{
+      .state = typedTrackState,
+      .out = out,
+      .vm = vm,
+      .context = typedContext,
+  };
+  if constexpr (HasRuntimeEffectsExecute<Command, TrackState, Context>) {
+    return command.execute(rt);
+  } else if constexpr (HasRuntimeVoidExecute<Command, TrackState, Context>) {
+    command.execute(rt);
+    return Effects::none();
+  } else if constexpr (HasLegacyExecute<Command, TrackState, Context>) {
+    return command.execute(typedTrackState, out, vm, typedContext);
+  } else {
+    return Effects::none();
+  }
 }
 
 }  // namespace detail

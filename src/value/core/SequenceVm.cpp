@@ -140,9 +140,24 @@ void Emit::note(NotePerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void Emit::note(double key, double velocity, u32 durationTicks, bool extendsPrevious) {
+  note(NotePerformanceEvent{
+      .key = key,
+      .velocity = velocity,
+      .durationTicks = durationTicks,
+      .extendsPrevious = extendsPrevious,
+  });
+}
+
 void Emit::tempo(TempoPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
+}
+
+void Emit::tempo(u32 microsecondsPerQuarter) {
+  tempo(TempoPerformanceEvent{
+      .microsecondsPerQuarter = microsecondsPerQuarter,
+  });
 }
 
 void Emit::instrument(InstrumentPerformanceEvent event) {
@@ -150,9 +165,24 @@ void Emit::instrument(InstrumentPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void Emit::instrument(u32 bank, u32 program, bool forceBankSelect) {
+  instrument(InstrumentPerformanceEvent{
+      .bank = bank,
+      .program = program,
+      .forceBankSelect = forceBankSelect,
+  });
+}
+
 void Emit::level(LevelPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
+}
+
+void Emit::level(double linearGain, LevelResolution resolution) {
+  level(LevelPerformanceEvent{
+      .linearGain = linearGain,
+      .resolution = resolution,
+  });
 }
 
 void Emit::pan(PanPerformanceEvent event) {
@@ -160,9 +190,22 @@ void Emit::pan(PanPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void Emit::pan(double stereoPosition, double linearGain) {
+  pan(PanPerformanceEvent{
+      .stereoPosition = stereoPosition,
+      .linearGain = linearGain,
+  });
+}
+
 void Emit::masterLevel(MasterLevelPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
+}
+
+void Emit::masterLevel(double linearGain) {
+  masterLevel(MasterLevelPerformanceEvent{
+      .linearGain = linearGain,
+  });
 }
 
 void Emit::reverb(ReverbPerformanceEvent event) {
@@ -170,9 +213,21 @@ void Emit::reverb(ReverbPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void Emit::reverb(double send) {
+  reverb(ReverbPerformanceEvent{
+      .send = send,
+  });
+}
+
 void Emit::tuning(TuningPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
+}
+
+void Emit::tuning(double cents) {
+  tuning(TuningPerformanceEvent{
+      .cents = cents,
+  });
 }
 
 void Emit::globalTranspose(GlobalTransposePerformanceEvent event) {
@@ -180,9 +235,22 @@ void Emit::globalTranspose(GlobalTransposePerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void Emit::globalTranspose(s32 semitones) {
+  globalTranspose(GlobalTransposePerformanceEvent{
+      .semitones = semitones,
+  });
+}
+
 void Emit::portamento(PortamentoPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
+}
+
+void Emit::portamento(double timeMilliseconds, double previousKey) {
+  portamento(PortamentoPerformanceEvent{
+      .timeMilliseconds = timeMilliseconds,
+      .previousKey = previousKey,
+  });
 }
 
 void Emit::portamentoControl(PortamentoControlPerformanceEvent event) {
@@ -190,14 +258,33 @@ void Emit::portamentoControl(PortamentoControlPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void Emit::portamentoControl(double previousKey) {
+  portamentoControl(PortamentoControlPerformanceEvent{
+      .previousKey = previousKey,
+  });
+}
+
 void Emit::legatoPedal(LegatoPedalPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
 }
 
+void Emit::legatoPedal(bool enabled) {
+  legatoPedal(LegatoPedalPerformanceEvent{
+      .enabled = enabled,
+  });
+}
+
 void Emit::modulation(ModulationPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
+}
+
+void Emit::modulation(ModulationPerformanceTarget target, double amount) {
+  modulation(ModulationPerformanceEvent{
+      .target = target,
+      .amount = amount,
+  });
 }
 
 void Emit::marker(MarkerPerformanceEvent event) {

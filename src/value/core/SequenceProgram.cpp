@@ -148,6 +148,10 @@ std::string CommandReader::rawRemainingBytes(std::string_view name) {
   return rawBytes(name, remainingBytes().size());
 }
 
+void CommandReader::derived(std::string_view name, CommandOperandValue value) {
+  operand(name, std::move(value), 0, 1);
+}
+
 ::u8 CommandReader::readByte() {
   require(1);
   const ::u8 value = bytes_[position_];
