@@ -55,10 +55,11 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS SSEQ dialect should decode note-wait as a local command");
   expect(dialect.describe(track, track.commands[1]).detailKind == "nds.note",
          "NDS SSEQ dialect should decode source note opcodes as local commands");
-  expect(track.operandsFor(track.commands[1]).size() == 2 &&
-             std::get<u64>(track.operandsFor(track.commands[1])[0].value) == 0x64 &&
-             std::get<u64>(track.operandsFor(track.commands[1])[1].value) == 0x18,
-         "NDS SSEQ note command should preserve velocity and duration operands");
+  expect(track.operandsFor(track.commands[1]).size() == 3 &&
+             std::get<u64>(track.operandsFor(track.commands[1])[0].value) == 0x3c &&
+             std::get<u64>(track.operandsFor(track.commands[1])[1].value) == 0x64 &&
+             std::get<u64>(track.operandsFor(track.commands[1])[2].value) == 0x18,
+         "NDS SSEQ note command should preserve key, velocity, and duration operands");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -90,15 +91,13 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
       .reader = ByteReader(SourceId{4}, bytes),
       .ids = ids,
   };
-  const auto asset = parseNdsSequenceProgram(input,
-                                             AssetId{7},
+  const auto asset = parseNdsSequenceProgram(input, AssetId{7},
                                              NdsSequenceRange{
                                                  .offset = sequenceOffset,
                                                  .size = 0x40,
                                                  .sequenceEnd = trackStart + 4,
                                              },
-                                             "Program",
-                                             AssetId{3});
+                                             "Program", AssetId{3});
   expect(asset.program.referencedInstruments.size() == 1,
          "NDS sequence program should reference instruments used by source program commands");
   const auto& ref = asset.program.referencedInstruments[0];
@@ -106,6 +105,25 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS program references should decode bank and program from the source varlen value");
   expect(ref.range && ref.range->offset == trackStart && ref.range->size == 3,
          "NDS program references should preserve the source program command range");
+
+  bytes[trackStart + 0] = 0xd5;
+  bytes[trackStart + 1] = 0x7f;
+  bytes[trackStart + 2] = 0xff;
+  const TrackProgram expressionTrack =
+      decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), dialect, sequenceOffset, trackStart + 3, trackStart, 0);
+  expect(expressionTrack.commands.size() == 2 &&
+             dialect.describe(expressionTrack, expressionTrack.commands[0]).detailKind == "nds.expression",
+         "NDS expression opcode should decode as a musical command");
+  const SequenceProgram expressionProgram{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .sourceBaseAddress = Address{trackStart},
+      .tracks = {expressionTrack},
+  };
+  const MidiSequence expressionMidi =
+      PerformanceMidiRenderer().render(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram, dialect));
+  expect(std::holds_alternative<Expression>(expressionMidi.tracks[0].events[0]),
+         "NDS expression opcode should render as MIDI expression");
 }
 
 void ndsSequenceDialectExecutesCallAndReturn() {
@@ -131,8 +149,8 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   bytes[subroutineOffset + 3] = 0xfd;
 
   const SequenceDialect dialect = ndsSequenceDialect();
-  const TrackProgram track = decodeNdsSequenceTrack(
-      ByteReader(SourceId{5}, bytes), dialect, sequenceOffset, subroutineOffset + 4, trackStart, 0);
+  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{5}, bytes), dialect, sequenceOffset,
+                                                    subroutineOffset + 4, trackStart, 0);
   expect(track.commands.size() == 6, "NDS call fixture should decode call target and fallthrough blocks");
 
   const auto call = std::ranges::find_if(track.commands, [&](const SourceCommand& command) {
@@ -161,6 +179,46 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   const auto& noteEvent = std::get<NotePerformanceEvent>(*note);
   expect(noteEvent.header.tick == 0 && noteEvent.key == 60.0 && noteEvent.durationTicks == 5,
          "NDS subroutine note should render at the call tick and use source duration");
+
+  const TrackProgram linearizedTrack = decodeNdsSequenceTrack(ByteReader(SourceId{5}, bytes), dialect, sequenceOffset,
+                                                              subroutineOffset + 4, trackStart, 0, true);
+  expect(linearizedTrack.commands.size() == 6,
+         "NDS linearized call fixture should still decode call target and fallthrough blocks");
+  const SequenceProgram linearizedProgram{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .sourceBaseAddress = Address{trackStart},
+      .tracks = {linearizedTrack},
+  };
+  const PerformanceSequence linearizedPerformance = SequenceVm(LoopPolicy::PlayOnce).render(linearizedProgram, dialect);
+  expect(linearizedPerformance.diagnostics.empty(),
+         "NDS linearized call fixture should render without missing-target diagnostics");
+
+  std::vector<u8> overlapBytes(0x140);
+  overlapBytes[trackStart + 0] = 0x95;
+  overlapBytes[trackStart + 1] = 0x05;
+  overlapBytes[trackStart + 2] = 0x00;
+  overlapBytes[trackStart + 3] = 0x00;
+  overlapBytes[trackStart + 4] = 0xc1;
+  overlapBytes[trackStart + 5] = 0x3c;
+  overlapBytes[trackStart + 6] = 0x64;
+  overlapBytes[trackStart + 7] = 0x01;
+  overlapBytes[trackStart + 8] = 0xfd;
+  const TrackProgram overlapTrack = decodeNdsSequenceTrack(ByteReader(SourceId{8}, overlapBytes), dialect,
+                                                           sequenceOffset, trackStart + 9, trackStart, 0, true);
+  expect(overlapTrack.commands.size() == 4,
+         "NDS linearized overlap fixture should split fallthrough from call-target bytes");
+  expect(dialect.describe(overlapTrack, overlapTrack.commands[1]).detailKind == "nds.end",
+         "NDS linearized overlap fixture should stop before overlapping a queued call target");
+  const SequenceProgram overlapProgram{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .sourceBaseAddress = Address{trackStart},
+      .tracks = {overlapTrack},
+  };
+  const PerformanceSequence overlapPerformance = SequenceVm(LoopPolicy::PlayOnce).render(overlapProgram, dialect);
+  expect(overlapPerformance.diagnostics.empty(),
+         "NDS linearized overlap fixture should render without unpaired-return diagnostics");
 }
 
 void ndsSequenceDialectDiscoversSecondaryTrackStarts() {
@@ -191,8 +249,7 @@ void ndsSequenceDialectDiscoversSecondaryTrackStarts() {
 
   const SequenceDialect dialect = ndsSequenceDialect();
   const TrackProgram secondary =
-      decodeNdsSequenceTrack(ByteReader(SourceId{6}, bytes), dialect, sequenceOffset, secondaryStart + 3,
-                             starts[1], 1);
+      decodeNdsSequenceTrack(ByteReader(SourceId{6}, bytes), dialect, sequenceOffset, secondaryStart + 3, starts[1], 1);
   expect(secondary.sourceTrackNumber == 1 && secondary.commands.size() == 2,
          "NDS secondary track should decode independently from the primary bootstrap");
   expect(dialect.describe(secondary, secondary.commands[0]).detailKind == "nds.rest",
@@ -221,8 +278,7 @@ void ndsSequenceDialectPreservesIgnoredNoOpOperands() {
          "NDS no-op should preserve the original command bytes");
 
   const auto operands = track.operandsFor(noOp);
-  expect(operands.size() == 1 && operands[0].name == "bytes" &&
-             std::get<std::string>(operands[0].value) == "12 34",
+  expect(operands.size() == 1 && operands[0].name == "bytes" && std::get<std::string>(operands[0].value) == "12 34",
          "NDS no-op should preserve ignored operand bytes as decoded command data");
   expect(operands[0].range.offset == trackStart + 1 && operands[0].range.size == 2,
          "NDS no-op ignored operand bytes should preserve their source range");

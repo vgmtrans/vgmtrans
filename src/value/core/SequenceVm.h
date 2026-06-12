@@ -28,6 +28,8 @@ public:
   void instrument(u32 bank, u32 program, bool forceBankSelect = false);
   void level(LevelPerformanceEvent event);
   void level(double linearGain, LevelResolution resolution = LevelResolution::SevenBit);
+  void expression(ExpressionPerformanceEvent event);
+  void expression(double linearGain, LevelResolution resolution = LevelResolution::SevenBit);
   void pan(PanPerformanceEvent event);
   void pan(double stereoPosition, double linearGain = 1.0);
   void masterLevel(MasterLevelPerformanceEvent event);
@@ -38,8 +40,16 @@ public:
   void tuning(double cents);
   void globalTranspose(GlobalTransposePerformanceEvent event);
   void globalTranspose(s32 semitones);
+  void pitchBend(PitchBendPerformanceEvent event);
+  void pitchBend(s16 value);
+  void pitchBendRange(PitchBendRangePerformanceEvent event);
+  void pitchBendRange(u8 semitones);
   void portamento(PortamentoPerformanceEvent event);
   void portamento(double timeMilliseconds, double previousKey);
+  void portamentoEnable(PortamentoEnablePerformanceEvent event);
+  void portamentoEnable(bool enabled);
+  void portamentoTime(PortamentoTimePerformanceEvent event);
+  void portamentoTime(u8 value);
   void portamentoControl(PortamentoControlPerformanceEvent event);
   void portamentoControl(double previousKey);
   void legatoPedal(LegatoPedalPerformanceEvent event);
@@ -91,7 +101,7 @@ public:
 
 private:
   [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program,
-                                                        const SequenceDialect& dialect) const;
+                                                         const SequenceDialect& dialect) const;
 
   LoopPolicy loopPolicy_ = LoopPolicy::Default;
 };
