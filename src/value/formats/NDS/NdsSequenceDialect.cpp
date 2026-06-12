@@ -223,11 +223,36 @@ struct Tempo {
   }
 };
 
-struct Terminal : NoOperands<Terminal> {
+struct UnsupportedCommand : NoOperands<UnsupportedCommand> {
   Effects execute(Runtime& rt) const {
     rt.vm.diagnostic(Diagnostic{
         .severity = Severity::Warning,
-        .message = "NDS SSEQ command stopped playback because it is unsupported or truncated",
+        .message = "Unsupported NDS SSEQ command stopped playback",
+    });
+    return rt.end();
+  }
+};
+
+struct UnknownOpcode {
+  static UnknownOpcode parse(CommandReader& in) {
+    in.derived("opcode", static_cast<u64>(in.opcode()));
+    return {};
+  }
+
+  Effects execute(Runtime& rt) const {
+    rt.vm.diagnostic(Diagnostic{
+        .severity = Severity::Warning,
+        .message = "Unknown NDS SSEQ opcode stopped playback",
+    });
+    return rt.end();
+  }
+};
+
+struct TruncatedCommand : NoOperands<TruncatedCommand> {
+  Effects execute(Runtime& rt) const {
+    rt.vm.diagnostic(Diagnostic{
+        .severity = Severity::Warning,
+        .message = "Truncated NDS SSEQ command stopped playback",
     });
     return rt.end();
   }
@@ -250,59 +275,60 @@ template <class Registrar>
   map.range<0x00, 0x7f, Note>("Note");
   map.op<0x80, Rest>("Rest");
   map.op<0x81, Program>("Program");
-  map.preserved(0x93, "Open Track", bytes(4));
+  map.preserved(0x93, "Open Track", operandBytes(4));
   map.op<0x94, Jump>("Jump");
   map.op<0x95, Call>("Call");
-  map.terminal<0x96, Terminal>("Terminal");
-  map.preserved(0xa0, "Cmd with Random Value", bytes(5), suffix("random-value"));
-  map.preserved(0xa1, "Cmd with Variable", bytes(2), suffix("variable-command"));
+  map.terminal<0x96, UnsupportedCommand>("Unsupported Command", suffix("unsupported"));
+  map.preserved(0xa0, "Cmd with Random Value", operandBytes(5), suffix("random-value"));
+  map.preserved(0xa1, "Cmd with Variable", operandBytes(2), suffix("variable-command"));
   map.preserved(0xa2, "If");
-  map.preserved(0xb0, "Set Variable", bytes(3));
-  map.preserved(0xb1, "Add Variable", bytes(3));
-  map.preserved(0xb2, "Sub Variable", bytes(3));
-  map.preserved(0xb3, "Mul Variable", bytes(3));
-  map.preserved(0xb4, "Div Variable", bytes(3));
-  map.preserved(0xb5, "Shift Variable", bytes(3));
-  map.preserved(0xb6, "Rand Variable", bytes(3));
-  map.preserved(0xb8, "If Variable ==", bytes(3), suffix("if-variable-equal"));
-  map.preserved(0xb9, "If Variable >=", bytes(3), suffix("if-variable-greater-equal"));
-  map.preserved(0xba, "If Variable >", bytes(3), suffix("if-variable-greater"));
-  map.preserved(0xbb, "If Variable <=", bytes(3), suffix("if-variable-less-equal"));
-  map.preserved(0xbc, "If Variable <", bytes(3), suffix("if-variable-less"));
-  map.preserved(0xbd, "If Variable !=", bytes(3), suffix("if-variable-not-equal"));
+  map.preserved(0xb0, "Set Variable", operandBytes(3));
+  map.preserved(0xb1, "Add Variable", operandBytes(3));
+  map.preserved(0xb2, "Sub Variable", operandBytes(3));
+  map.preserved(0xb3, "Mul Variable", operandBytes(3));
+  map.preserved(0xb4, "Div Variable", operandBytes(3));
+  map.preserved(0xb5, "Shift Variable", operandBytes(3));
+  map.preserved(0xb6, "Rand Variable", operandBytes(3));
+  map.preserved(0xb8, "If Variable ==", operandBytes(3), suffix("if-variable-equal"));
+  map.preserved(0xb9, "If Variable >=", operandBytes(3), suffix("if-variable-greater-equal"));
+  map.preserved(0xba, "If Variable >", operandBytes(3), suffix("if-variable-greater"));
+  map.preserved(0xbb, "If Variable <=", operandBytes(3), suffix("if-variable-less-equal"));
+  map.preserved(0xbc, "If Variable <", operandBytes(3), suffix("if-variable-less"));
+  map.preserved(0xbd, "If Variable !=", operandBytes(3), suffix("if-variable-not-equal"));
   map.op<0xc0, Pan>("Pan");
   map.op<0xc1, Volume>("Volume");
-  map.preserved(0xc2, "Master Volume", bytes(1));
+  map.preserved(0xc2, "Master Volume", operandBytes(1));
   map.op<0xc3, Transpose>("Transpose");
   map.op<0xc4, PitchBend>("Pitch Bend");
   map.op<0xc5, PitchBendRange>("Pitch Bend Range");
-  map.preserved(0xc6, "Priority", bytes(1));
+  map.preserved(0xc6, "Priority", operandBytes(1));
   map.op<0xc7, NoteWait>("Note Wait");
-  map.preserved(0xc8, "Tie", bytes(1));
-  map.preserved(0xc9, "Portamento Control", bytes(1));
+  map.preserved(0xc8, "Tie", operandBytes(1));
+  map.preserved(0xc9, "Portamento Control", operandBytes(1));
   map.op<0xca, ModulationDepth>("Modulation Depth");
-  map.preserved(0xcb, "Modulation Speed", bytes(1));
-  map.preserved(0xcc, "Modulation Type", bytes(1));
-  map.preserved(0xcd, "Modulation Range", bytes(1));
+  map.preserved(0xcb, "Modulation Speed", operandBytes(1));
+  map.preserved(0xcc, "Modulation Type", operandBytes(1));
+  map.preserved(0xcd, "Modulation Range", operandBytes(1));
   map.op<0xce, PortamentoSwitch>("Portamento");
   map.op<0xcf, PortamentoTime>("Portamento Time");
-  map.preserved(0xd0, "Attack Rate", bytes(1));
-  map.preserved(0xd1, "Decay Rate", bytes(1));
-  map.preserved(0xd2, "Sustain Level", bytes(1));
-  map.preserved(0xd3, "Release Rate", bytes(1));
-  map.preserved(0xd4, "Loop Start", bytes(1));
+  map.preserved(0xd0, "Attack Rate", operandBytes(1));
+  map.preserved(0xd1, "Decay Rate", operandBytes(1));
+  map.preserved(0xd2, "Sustain Level", operandBytes(1));
+  map.preserved(0xd3, "Release Rate", operandBytes(1));
+  map.preserved(0xd4, "Loop Start", operandBytes(1));
   map.op<0xd5, ExpressionLevel>("Expression");
-  map.preserved(0xd6, "Print Variable", bytes(1));
-  map.preserved(0xe0, "Modulation Delay", bytes(2));
+  map.preserved(0xd6, "Print Variable", operandBytes(1));
+  map.preserved(0xe0, "Modulation Delay", operandBytes(2));
   map.op<0xe1, Tempo>("Tempo");
-  map.preserved(0xe3, "Sweep Pitch", bytes(2));
+  map.preserved(0xe3, "Sweep Pitch", operandBytes(2));
   map.preserved(0xfc, "Loop End");
   map.returns<0xfd, Return>("Return");
-  map.preserved(0xfe, "Allocate Track", bytes(2));
+  map.preserved(0xfe, "Allocate Track", operandBytes(2));
   map.terminal<0xff, End>("End");
-  map.unknown<Terminal>("Terminal");
+  map.truncated<TruncatedCommand>("Truncated Command", suffix("truncated"));
+  map.unknown<UnknownOpcode>("Unknown Opcode", suffix("unknown"));
 
-  BytecodeCommandSpec noOp = map.preservedSpec("No-op", bytes(0), suffix("no-op"));
+  BytecodeCommandSpec noOp = map.preservedSpec("No-op", operandBytes(0), suffix("no-op"));
   return NdsBytecodeMap{
       .dispatch = map.finish(),
       .noOp = std::move(noOp),
