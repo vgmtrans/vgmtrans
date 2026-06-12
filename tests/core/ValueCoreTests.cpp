@@ -6,6 +6,7 @@
 
 #include "value/export/DlsExporter.h"
 #include "value/export/Export.h"
+#include "value/core/BytecodeSequenceDecoder.h"
 #include "value/core/FormatModule.h"
 #include "value/export/MidiExporter.h"
 #include "value/core/ModulationAnalysis.h"
@@ -449,6 +450,53 @@ const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const Sequenc
     throw std::runtime_error("probe command handler was not registered");
   }
   return builder.add<Command>(handler->id, handler->kind, address, range, std::span<const u8>{bytes});
+}
+
+void bytecodeMapRejectsIncompatibleHandlerReuse() {
+  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
+  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
+
+  map.op<0x10, ProbeProgramCommand>("Shared", suffix("shared"));
+
+  bool threw = false;
+  try {
+    map.op<0x11, ProbeNoteCommand>("Shared", suffix("shared"));
+  } catch (const std::logic_error&) {
+    threw = true;
+  }
+  expect(threw, "bytecode map should reject one kind reused for different command types");
+}
+
+void bytecodeMapRejectsOpcodeRangeOverlap() {
+  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
+  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
+
+  map.op<0x12, ProbeProgramCommand>("Program");
+  map.range<0x10, 0x20, ProbeNoteCommand>("Note");
+  map.unknown<ProbeEndCommand>("End");
+
+  bool threw = false;
+  try {
+    static_cast<void>(map.finish());
+  } catch (const std::logic_error&) {
+    threw = true;
+  }
+  expect(threw, "bytecode map should reject overlapping exact opcode and range declarations");
+}
+
+void bytecodeMapRequiresFallbackCommand() {
+  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
+  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
+
+  map.op<0x10, ProbeProgramCommand>("Program");
+
+  bool threw = false;
+  try {
+    static_cast<void>(map.finish());
+  } catch (const std::logic_error&) {
+    threw = true;
+  }
+  expect(threw, "bytecode map should require an unknown or truncated fallback command");
 }
 
 void formatRegistryStoresCopyableModuleValues() {
@@ -1819,6 +1867,9 @@ int main() {
   try {
     formatRegistryStoresCopyableModuleValues();
     sequenceDialectRegistryStoresCopyableDialectValues();
+    bytecodeMapRejectsIncompatibleHandlerReuse();
+    bytecodeMapRejectsOpcodeRangeOverlap();
+    bytecodeMapRequiresFallbackCommand();
     byteReaderChecksBoundsAndEndian();
     sourceCommandsPreserveBytesOperandsAndDialectDisplay();
     sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();

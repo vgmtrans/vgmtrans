@@ -108,7 +108,7 @@ struct BytecodeCommandOptions {
   std::optional<std::string_view> suffix;
 };
 
-struct FixedByteCount {
+struct FixedOperandByteCount {
   u32 value = 0;
 };
 
@@ -116,8 +116,8 @@ struct FixedByteCount {
   return BytecodeCommandOptions{.suffix = value};
 }
 
-[[nodiscard]] constexpr FixedByteCount bytes(u32 value) {
-  return FixedByteCount{.value = value};
+[[nodiscard]] constexpr FixedOperandByteCount operandBytes(u32 value) {
+  return FixedOperandByteCount{.value = value};
 }
 
 [[nodiscard]] inline std::string slugifyCommandName(std::string_view displayName) {
@@ -471,13 +471,13 @@ public:
     return addOpcode(Op, commandSpec<Command>(displayName, options, detail::decodeMappedTerminalCommand<Command>));
   }
 
-  BytecodeMapBuilder& preserved(u8 opcode, std::string_view displayName, FixedByteCount operandBytes = {},
+  BytecodeMapBuilder& preserved(u8 opcode, std::string_view displayName, FixedOperandByteCount operandBytes = {},
                                 BytecodeCommandOptions options = {}) {
     return addOpcode(opcode, preservedSpec(displayName, operandBytes, options));
   }
 
   BytecodeMapBuilder& preserved(u8 opcode, std::string_view displayName, BytecodeCommandOptions options) {
-    return preserved(opcode, displayName, FixedByteCount{}, options);
+    return preserved(opcode, displayName, FixedOperandByteCount{}, options);
   }
 
   template <class Command>
@@ -495,7 +495,7 @@ public:
     return *this;
   }
 
-  [[nodiscard]] BytecodeCommandSpec preservedSpec(std::string_view displayName, FixedByteCount operandBytes = {},
+  [[nodiscard]] BytecodeCommandSpec preservedSpec(std::string_view displayName, FixedOperandByteCount operandBytes = {},
                                                   BytecodeCommandOptions options = {}) {
     const std::string kindName = makeKind(displayName, options);
     const auto [handler, kind] = preservedHandler(kindName, displayName);
@@ -510,20 +510,58 @@ public:
   }
 
   [[nodiscard]] BytecodeDispatchTable finish() {
+    validateNoOverlaps();
     table_.ranges = std::move(ranges_);
     if (!table_.truncated && table_.unknown) {
       table_.truncated = table_.unknown;
+    }
+    if (!table_.truncated) {
+      throw std::logic_error("Bytecode dispatch table requires truncated() or unknown()");
     }
     return std::move(table_);
   }
 
 private:
+  using HandlerTypeToken = const void*;
+
+  struct HandlerCacheEntry {
+    CommandHandlerId handler;
+    CommandKindId kind;
+    HandlerTypeToken commandType = nullptr;
+    std::string name;
+    bool preserved = false;
+  };
+
+  template <class Command>
+  [[nodiscard]] static HandlerTypeToken commandTypeToken() {
+    static const int token = 0;
+    return &token;
+  }
+
   BytecodeMapBuilder& addOpcode(u8 opcode, BytecodeCommandSpec spec) {
     if (table_.opcodes[opcode]) {
       throw std::logic_error("Bytecode opcode was registered twice");
     }
     table_.opcodes[opcode] = std::move(spec);
     return *this;
+  }
+
+  void validateNoOverlaps() const {
+    std::array<bool, 256> occupied{};
+    for (u32 opcode = 0; opcode < table_.opcodes.size(); ++opcode) {
+      occupied[opcode] = table_.opcodes[opcode].has_value();
+    }
+
+    // Exact opcode entries and ranges are both source-driver declarations. Make
+    // ambiguity explicit instead of relying on dispatch precedence.
+    for (const BytecodeRangeSpec& range : ranges_) {
+      for (u32 opcode = range.first; opcode <= range.last; ++opcode) {
+        if (occupied[opcode]) {
+          throw std::logic_error("Bytecode opcode range overlaps another mapping");
+        }
+        occupied[opcode] = true;
+      }
+    }
   }
 
   [[nodiscard]] std::string makeKind(std::string_view displayName, const BytecodeCommandOptions& options) const {
@@ -548,8 +586,13 @@ private:
   template <class Command>
   [[nodiscard]] std::pair<CommandHandlerId, CommandKindId> commandHandler(const std::string& kindName,
                                                                           std::string_view displayName) {
+    const HandlerTypeToken commandType = commandTypeToken<Command>();
     if (const auto found = handlers_.find(kindName); found != handlers_.end()) {
-      return found->second;
+      const HandlerCacheEntry& entry = found->second;
+      if (entry.preserved || entry.commandType != commandType || entry.name != displayName) {
+        throw std::logic_error("Bytecode command kind reused with incompatible handler");
+      }
+      return {entry.handler, entry.kind};
     }
 
     CommandHandlerId handler;
@@ -565,14 +608,24 @@ private:
       handler = found->id;
       kind = found->kind;
     }
-    handlers_[kindName] = {handler, kind};
+    handlers_[kindName] = HandlerCacheEntry{
+        .handler = handler,
+        .kind = kind,
+        .commandType = commandType,
+        .name = std::string(displayName),
+        .preserved = false,
+    };
     return {handler, kind};
   }
 
   [[nodiscard]] std::pair<CommandHandlerId, CommandKindId> preservedHandler(const std::string& kindName,
                                                                             std::string_view displayName) {
     if (const auto found = handlers_.find(kindName); found != handlers_.end()) {
-      return found->second;
+      const HandlerCacheEntry& entry = found->second;
+      if (!entry.preserved || entry.name != displayName) {
+        throw std::logic_error("Preserved bytecode command kind reused with incompatible handler");
+      }
+      return {entry.handler, entry.kind};
     }
 
     CommandHandlerId handler;
@@ -588,7 +641,12 @@ private:
       handler = found->id;
       kind = found->kind;
     }
-    handlers_[kindName] = {handler, kind};
+    handlers_[kindName] = HandlerCacheEntry{
+        .handler = handler,
+        .kind = kind,
+        .name = std::string(displayName),
+        .preserved = true,
+    };
     return {handler, kind};
   }
 
@@ -597,7 +655,7 @@ private:
   const SequenceDialect* dialect_ = nullptr;
   BytecodeDispatchTable table_;
   std::vector<BytecodeRangeSpec> ranges_;
-  std::unordered_map<std::string, std::pair<CommandHandlerId, CommandKindId>> handlers_;
+  std::unordered_map<std::string, HandlerCacheEntry> handlers_;
 };
 
 // Common walkers own traversal mechanics and limits. Formats still own opcode
