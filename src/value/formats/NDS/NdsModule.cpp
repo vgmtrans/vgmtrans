@@ -124,7 +124,7 @@ struct SdatInfo {
   return true;
 }
 
-[[nodiscard]] bool shouldParseLegacyMalformedFallthrough(ByteReader reader, FileRange range) {
+[[nodiscard]] bool shouldParseMalformedFallthrough(ByteReader reader, FileRange range) {
   const auto sseqOffset = nearbySseqHeader(reader, range);
   if (!sseqOffset) {
     return false;
@@ -132,8 +132,8 @@ struct SdatInfo {
 
   const u32 trackStart = range.offset + 0x1c;
   const u32 paddingEnd = std::min(*sseqOffset, range.offset + range.size);
-  // Some zero-filled pseudo-sequences overlap a later SSEQ. If the padding would align
-  // the SSEQ signature as bogus note data, legacy leaves the pseudo-sequence empty.
+  // Some zero-filled pseudo-sequences overlap a later SSEQ. If the padding
+  // would align the SSEQ signature as bogus note data, leave it empty.
   if (range.size <= 0x100 && *sseqOffset >= trackStart && isZeroFilled(reader, range.offset, paddingEnd) &&
       ((*sseqOffset - trackStart) % 3) == 2) {
     return false;
@@ -766,25 +766,22 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
     const auto sequenceId = input.ids.nextAssetId();
     const std::string& name = sdat.sequenceNames[sequenceIndex];
     const bool hasSseqHeader = matches(input.reader, sequenceRange->offset, kSseqSignature);
-    const bool parseLegacyMalformedFallthrough =
-        !hasSseqHeader && shouldParseLegacyMalformedFallthrough(input.reader, *sequenceRange);
-    const bool extendMalformedPastFatRange = parseLegacyMalformedFallthrough && sequenceRange->size <= 0x100;
+    const bool parseMalformedFallthrough =
+        !hasSseqHeader && shouldParseMalformedFallthrough(input.reader, *sequenceRange);
+    const bool extendMalformedPastFatRange = parseMalformedFallthrough && sequenceRange->size <= 0x100;
     const u32 sequenceEnd =
         hasSseqHeader || !extendMalformedPastFatRange
             ? static_cast<u32>(
                   std::min<u64>(input.reader.size(), static_cast<u64>(sequenceRange->offset) + sequenceRange->size))
             : static_cast<u32>(input.reader.size());
-    result.assets.emplace_back(parseNdsSequenceProgram(input,
-                                                       sequenceId,
+    result.assets.emplace_back(parseNdsSequenceProgram(input, sequenceId,
                                                        NdsSequenceRange{
                                                            .offset = sequenceRange->offset,
                                                            .size = sequenceRange->size,
                                                            .sequenceEnd = sequenceEnd,
-                                                           .linearizeMalformedControlFlow =
-                                                               parseLegacyMalformedFallthrough,
+                                                           .linearizeMalformedControlFlow = parseMalformedFallthrough,
                                                        },
-                                                       name,
-                                                       instrumentSet));
+                                                       name, instrumentSet));
 
     Collection collection{
         .id = input.ids.nextCollectionId(),
