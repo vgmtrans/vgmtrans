@@ -96,11 +96,6 @@ struct CommandHandler {
   ExecuteSourceCommand execute = nullptr;
 };
 
-struct PreservedSourceCommandSpec {
-  std::string_view kind;
-  std::string_view name;
-};
-
 struct SequenceDialect {
   DialectId id;
   Timebase timebase;
@@ -198,8 +193,6 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
                      const std::any& context) {
   CommandReader reader{record.range, track.bytesFor(record)};
   const Command command = Command::parse(reader);
-  out.name = std::string(Command::name);
-  out.detailKind = std::string(Command::kind);
   if constexpr (HasDescribeWithContext<Command, Context>) {
     command.describe(out, std::any_cast<const Context&>(context));
   } else if constexpr (HasDescribe<Command>) {
@@ -253,23 +246,27 @@ public:
     return *this;
   }
 
-  template <class Spec>
-  SequenceDialectBuilder& preservedCommands(std::span<const Spec> specs) {
-    for (const Spec& spec : specs) {
-      addPreservedCommand(spec);
-    }
-    return *this;
-  }
-
   template <class... Commands>
   SequenceDialect commands() {
-    (addCommand<Commands>(), ...);
-    return std::move(dialect_);
+    (addCommand<Commands>(Commands::kind, Commands::name), ...);
+    return finish();
+  }
+
+  [[nodiscard]] SequenceDialect finish() { return std::move(dialect_); }
+
+  template <class Command>
+  CommandHandlerId addCommand(std::string_view kindName, std::string_view name) {
+    return addHandler(kindName, name, detail::describeCommand<Command, Context>,
+                      detail::executeCommand<Command, TrackState, Context>);
+  }
+
+  CommandHandlerId addPreservedCommand(std::string_view kindName, std::string_view name) {
+    return addHandler(kindName, name, detail::describePreservedSourceCommand, detail::executePreservedSourceCommand);
   }
 
 private:
-  void addHandler(std::string_view kindName, std::string_view name, DescribeSourceCommand describe,
-                  ExecuteSourceCommand execute) {
+  CommandHandlerId addHandler(std::string_view kindName, std::string_view name, DescribeSourceCommand describe,
+                              ExecuteSourceCommand execute) {
     const auto index = static_cast<u32>(dialect_.handlers.size());
     dialect_.handlers.push_back(CommandHandler{
         .id = CommandHandlerId{index},
@@ -280,17 +277,7 @@ private:
         .describe = describe,
         .execute = execute,
     });
-  }
-
-  template <class Spec>
-  void addPreservedCommand(const Spec& spec) {
-    addHandler(spec.kind, spec.name, detail::describePreservedSourceCommand, detail::executePreservedSourceCommand);
-  }
-
-  template <class Command>
-  void addCommand() {
-    addHandler(Command::kind, Command::name, detail::describeCommand<Command, Context>,
-               detail::executeCommand<Command, TrackState, Context>);
+    return CommandHandlerId{index};
   }
 
   SequenceDialect dialect_;

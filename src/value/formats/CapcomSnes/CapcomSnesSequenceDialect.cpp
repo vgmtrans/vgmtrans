@@ -23,40 +23,28 @@ using namespace core;
 
 namespace {
 
-#define CAPCOM_KIND(Suffix, DisplayName)                          \
-  static constexpr std::string_view kind = "capcom-snes." Suffix; \
-  static constexpr std::string_view name = DisplayName
-
-#define CAPCOM_COMMAND(Op, Suffix, DisplayName) \
-  static constexpr u8 opcode = Op;              \
-  CAPCOM_KIND(Suffix, DisplayName)
-
 // Keep the DSL limited to one-line state effects where the macro name carries
 // the whole source-driver meaning.
-#define CAPCOM_TOGGLE(Type, Op, Suffix, DisplayName, Member)                \
+#define CAPCOM_TOGGLE(Type, Member)                                         \
   struct Type : NoOperands<Type> {                                          \
-    CAPCOM_COMMAND(Op, Suffix, DisplayName);                                \
     void execute(Runtime& rt) const { rt.state.Member = !rt.state.Member; } \
   }
 
-#define CAPCOM_SET_TRUE(Type, Op, Suffix, DisplayName, Member)  \
+#define CAPCOM_SET_TRUE(Type, Member)                           \
   struct Type : NoOperands<Type> {                              \
-    CAPCOM_COMMAND(Op, Suffix, DisplayName);                    \
     void execute(Runtime& rt) const { rt.state.Member = true; } \
   }
 
-#define CAPCOM_U8_STATE(Type, Op, Suffix, DisplayName, Operand, Member) \
-  struct Type : U8Operand<Type> {                                       \
-    CAPCOM_COMMAND(Op, Suffix, DisplayName);                            \
-    static constexpr std::string_view operandName = Operand;            \
-    void execute(Runtime& rt) const { rt.state.Member = raw; }          \
+#define CAPCOM_U8_STATE(Type, Operand, Member)                 \
+  struct Type : U8Operand<Type> {                              \
+    static constexpr std::string_view operandName = Operand;   \
+    void execute(Runtime& rt) const { rt.state.Member = raw; } \
   }
 
-#define CAPCOM_S8_STATE(Type, Op, Suffix, DisplayName, Operand, Member) \
-  struct Type : S8Operand<Type> {                                       \
-    CAPCOM_COMMAND(Op, Suffix, DisplayName);                            \
-    static constexpr std::string_view operandName = Operand;            \
-    void execute(Runtime& rt) const { rt.state.Member = raw; }          \
+#define CAPCOM_S8_STATE(Type, Operand, Member)                 \
+  struct Type : S8Operand<Type> {                              \
+    static constexpr std::string_view operandName = Operand;   \
+    void execute(Runtime& rt) const { rt.state.Member = raw; } \
   }
 
 constexpr u8 kNoteOctaveMask = 0x07;
@@ -243,8 +231,6 @@ void TrackState::emitModulationDepths(Emit& out, bool enabled) const {
 struct Rest {
   u8 rawDuration = 0;
 
-  CAPCOM_KIND("rest", "Rest");
-
   static Rest parse(CommandReader& in) {
     const auto duration = static_cast<u8>(in.opcode() >> 5);
     in.derived("duration_index", static_cast<u64>(duration));
@@ -261,8 +247,6 @@ struct Rest {
 struct Note {
   u8 keyIndex = 0;
   u8 rawDuration = 0;
-
-  CAPCOM_KIND("note", "Note");
 
   static Note parse(CommandReader& in) {
     const auto keyIndex = static_cast<u8>(in.opcode() & 0x1f);
@@ -299,38 +283,32 @@ struct Note {
 };
 
 struct NoteAttributes : U8Operand<NoteAttributes> {
-  CAPCOM_COMMAND(0x04, "note-attributes", "Note Attributes");
   static constexpr std::string_view operandName = "raw";
 
   void execute(Runtime& rt) const { rt.state.applyAttributes(raw, &rt.out); }
 };
 
-CAPCOM_U8_STATE(Octave, 0x09, "octave", "Octave", "octave", noteOctave);
-CAPCOM_TOGGLE(ToggleTriplet, 0x00, "toggle-triplet", "Toggle Triplet", noteTriplet);
+CAPCOM_U8_STATE(Octave, "octave", noteOctave);
+CAPCOM_TOGGLE(ToggleTriplet, noteTriplet);
 
 struct ToggleSlur : NoOperands<ToggleSlur> {
-  CAPCOM_COMMAND(0x01, "toggle-slur", "Toggle Slur");
-
   void execute(Runtime& rt) const { rt.state.toggleSlur(rt.out); }
 };
 
-CAPCOM_SET_TRUE(DottedNote, 0x02, "dotted-note", "Dotted Note", noteDotted);
-CAPCOM_TOGGLE(ToggleOctaveUp, 0x03, "toggle-octave-up", "Toggle Octave Up", noteOctaveUp);
+CAPCOM_SET_TRUE(DottedNote, noteDotted);
+CAPCOM_TOGGLE(ToggleOctaveUp, noteOctaveUp);
 
 struct GlobalTranspose {
   s8 raw = 0;
-
-  CAPCOM_COMMAND(0x0a, "global-transpose", "Global Transpose");
 
   static GlobalTranspose parse(CommandReader& in) { return GlobalTranspose{.raw = in.s8("semitones")}; }
 
   void execute(Runtime& rt) const { rt.out.globalTranspose(raw); }
 };
 
-CAPCOM_S8_STATE(Transpose, 0x0b, "transpose", "Transpose", "semitones", transpose);
+CAPCOM_S8_STATE(Transpose, "semitones", transpose);
 
 struct Tuning : S8Operand<Tuning> {
-  CAPCOM_COMMAND(0x0c, "tuning", "Tuning");
   static constexpr std::string_view operandName = "tuning";
 
   void describe(CommandInfo& out) const { out.field("cents", tuningCents(raw)); }
@@ -339,7 +317,6 @@ struct Tuning : S8Operand<Tuning> {
 };
 
 struct PortamentoTime : U8Operand<PortamentoTime> {
-  CAPCOM_COMMAND(0x0d, "portamento-time", "Portamento Time");
   static constexpr std::string_view operandName = "time";
 
   void execute(Runtime& rt) const {
@@ -350,7 +327,6 @@ struct PortamentoTime : U8Operand<PortamentoTime> {
 };
 
 struct Tempo : Be16Operand<Tempo> {
-  CAPCOM_COMMAND(0x05, "tempo", "Tempo");
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out) const { out.field("microseconds_per_quarter", tempoMicrosecondsPerQuarter(raw)); }
@@ -358,14 +334,12 @@ struct Tempo : Be16Operand<Tempo> {
   void execute(Runtime& rt) const { rt.out.tempo(tempoMicrosecondsPerQuarter(raw)); }
 };
 
-CAPCOM_U8_STATE(DurationRate, 0x06, "duration-rate", "Duration Rate", "rate", durationRate);
+CAPCOM_U8_STATE(DurationRate, "rate", durationRate);
 
 struct RepeatUntil {
   u8 slot = 0;
   u8 count = 0;
   Address destination;
-
-  CAPCOM_KIND("repeat-until", "Repeat Until");
 
   static RepeatUntil parse(CommandReader& in) {
     const auto slot = static_cast<u8>(in.opcode() - 0x0e);
@@ -392,8 +366,6 @@ struct RepeatBreak {
   u8 attributes = 0;
   Address destination;
 
-  CAPCOM_KIND("repeat-break", "Repeat Break");
-
   static RepeatBreak parse(CommandReader& in) {
     const auto slot = static_cast<u8>(in.opcode() - 0x12);
     in.derived("slot", static_cast<u64>(slot + 1));
@@ -414,7 +386,6 @@ struct RepeatBreak {
 };
 
 struct Volume : U8Operand<Volume> {
-  CAPCOM_COMMAND(0x07, "volume", "Volume");
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out, const Context& context) const {
@@ -425,7 +396,6 @@ struct Volume : U8Operand<Volume> {
 };
 
 struct Program : U8Operand<Program> {
-  CAPCOM_COMMAND(0x08, "program", "Program");
   static constexpr std::string_view operandName = "raw";
 
   [[nodiscard]] u32 bank() const { return raw >> 7; }
@@ -442,21 +412,16 @@ struct Program : U8Operand<Program> {
 struct Jump {
   Address destination;
 
-  CAPCOM_COMMAND(0x16, "jump", "Jump");
-
   static Jump parse(CommandReader& in) { return Jump{.destination = in.be16Address("destination")}; }
 
   Effects execute(Runtime& rt) const { return rt.jump(destination); }
 };
 
 struct End : NoOperands<End> {
-  CAPCOM_COMMAND(0x17, "end", "End");
-
   Effects execute(Runtime& rt) const { return rt.end(); }
 };
 
 struct Pan : U8Operand<Pan> {
-  CAPCOM_COMMAND(0x18, "pan", "Pan");
   static constexpr std::string_view operandName = "raw";
 
   [[nodiscard]] ::capcom_snes::PanConversionResult conversion(const Context& context) const {
@@ -476,7 +441,6 @@ struct Pan : U8Operand<Pan> {
 };
 
 struct MasterVolume : U8Operand<MasterVolume> {
-  CAPCOM_COMMAND(0x19, "master-volume", "Master Volume");
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out, const Context& context) const {
@@ -489,8 +453,6 @@ struct MasterVolume : U8Operand<MasterVolume> {
 struct Lfo {
   u8 type = 0;
   u8 value = 0;
-
-  CAPCOM_COMMAND(0x1a, "lfo", "LFO");
 
   static Lfo parse(CommandReader& in) {
     return Lfo{
@@ -543,8 +505,6 @@ struct EchoParam {
   u8 argument = 0;
   u8 preset = 0;
 
-  CAPCOM_COMMAND(0x1b, "echo-param", "Echo Param");
-
   static EchoParam parse(CommandReader& in) {
     return EchoParam{
         .argument = in.u8("argument"),
@@ -556,8 +516,6 @@ struct EchoParam {
 struct EchoOnOff {
   u8 raw = 0;
 
-  CAPCOM_COMMAND(0x1c, "echo-on-off", "Echo On/Off");
-
   static EchoOnOff parse(CommandReader& in) {
     EchoOnOff result{.raw = in.u8("raw")};
     in.derived("enabled", static_cast<u64>(result.raw & 1));
@@ -568,21 +526,16 @@ struct EchoOnOff {
 };
 
 struct ReleaseRate : U8Operand<ReleaseRate> {
-  CAPCOM_COMMAND(0x1d, "release-rate", "Release Rate");
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out) const { out.field("gain", static_cast<u8>(raw | 0xa0)); }
 };
 
-struct Nop : NoOperands<Nop> {
-  CAPCOM_KIND("nop", "No Operation");
-};
+struct Nop : NoOperands<Nop> {};
 
 struct UnknownOneByte {
   u8 opcode = 0;
   u8 value = 0;
-
-  CAPCOM_KIND("unknown-one-byte", "Unknown One-Byte Event");
 
   static UnknownOneByte parse(CommandReader& in) {
     in.derived("opcode", static_cast<u64>(in.opcode()));
@@ -595,8 +548,6 @@ struct UnknownOneByte {
 
 struct UnknownOpcode {
   u8 opcode = 0;
-
-  CAPCOM_KIND("unknown", "Unknown Opcode");
 
   static UnknownOpcode parse(CommandReader& in) {
     in.derived("opcode", static_cast<u64>(in.opcode()));
@@ -612,109 +563,53 @@ struct UnknownOpcode {
   }
 };
 
-#define CAPCOM_FALLTHROUGH_COMMANDS(X) \
-  X(ToggleTriplet)                     \
-  X(ToggleSlur)                        \
-  X(DottedNote)                        \
-  X(ToggleOctaveUp)                    \
-  X(NoteAttributes)                    \
-  X(Tempo)                             \
-  X(DurationRate)                      \
-  X(Volume)                            \
-  X(Program)                           \
-  X(Octave)                            \
-  X(GlobalTranspose)                   \
-  X(Transpose)                         \
-  X(Tuning)                            \
-  X(PortamentoTime)                    \
-  X(Pan)                               \
-  X(MasterVolume)                      \
-  X(Lfo)                               \
-  X(EchoParam)                         \
-  X(EchoOnOff)                         \
-  X(ReleaseRate)
+template <class Registrar>
+[[nodiscard]] BytecodeDispatchTable capcomBytecodeMap(Registrar& registrar, CapcomSnesEngineVersion version) {
+  BytecodeMapBuilder<TrackState, Context> map{"capcom-snes", registrar};
 
-#define CAPCOM_TYPE(Type) Type,
-#define CAPCOM_COMMAND_TYPES                                                                                     \
-  Rest, Note, CAPCOM_FALLTHROUGH_COMMANDS(CAPCOM_TYPE) RepeatUntil, RepeatBreak, Jump, End, Nop, UnknownOneByte, \
-      UnknownOpcode
-
-template <class Command>
-[[nodiscard]] DecodedBytecodeCommand capcomFallthroughCommand(const SequenceDialect& dialect, ByteReader reader,
-                                                              u32 begin) {
-  return recordAutoFallthroughBytecodeCommand<Command, UnknownOpcode>(dialect, reader, begin,
-                                                                      static_cast<u32>(reader.size()));
-}
-
-[[nodiscard]] DecodedBytecodeCommand capcomJumpCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin) {
-  auto parsed = parseBytecodeCommand<Jump>(dialect, reader, begin, static_cast<u32>(reader.size()));
-  if (!parsed) {
-    return truncatedBytecodeCommand<UnknownOpcode>(dialect, reader, begin, static_cast<u32>(reader.size()));
-  }
-  auto decoded = std::move(parsed->decoded);
-  decoded.flow.staticTargets = {parsed->command.destination};
-  return decoded;
-}
-
-[[nodiscard]] DecodedBytecodeCommand capcomEndCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin) {
-  auto decoded = recordAutoBytecodeCommand<End, UnknownOpcode>(dialect, reader, begin, static_cast<u32>(reader.size()));
-  decoded.flow.terminal = true;
-  return decoded;
-}
-
-[[nodiscard]] DecodedBytecodeCommand capcomUnknownCommand(const SequenceDialect& dialect, ByteReader reader,
-                                                          u32 begin) {
-  return terminalBytecodeCommand<UnknownOpcode>(dialect, reader, begin, begin + 1);
-}
-
-[[nodiscard]] DecodedBytecodeCommand decodeCapcomCommand(ByteReader reader, const SequenceDialect& dialect, u32 begin) {
-#define CAPCOM_EMIT(Type) return capcomFallthroughCommand<Type>(dialect, reader, begin);
-#define CAPCOM_CASE(Type) \
-  case Type::opcode:      \
-    CAPCOM_EMIT(Type)
-
-  const u8 opcode = reader.u8At(begin);
-  if (opcode >= 0x20) {
+  for (u16 opcode = 0x20; opcode <= 0xff; ++opcode) {
     if ((opcode & 0x1f) == 0) {
-      CAPCOM_EMIT(Rest);
+      map.template op<Rest>(static_cast<u8>(opcode), "Rest");
+    } else {
+      map.template op<Note>(static_cast<u8>(opcode), "Note");
     }
-    CAPCOM_EMIT(Note);
   }
 
-  switch (opcode) {
-    CAPCOM_FALLTHROUGH_COMMANDS(CAPCOM_CASE)
+  map.template op<0x00, ToggleTriplet>("Toggle Triplet");
+  map.template op<0x01, ToggleSlur>("Toggle Slur");
+  map.template op<0x02, DottedNote>("Dotted Note");
+  map.template op<0x03, ToggleOctaveUp>("Toggle Octave Up");
+  map.template op<0x04, NoteAttributes>("Note Attributes");
+  map.template op<0x05, Tempo>("Tempo");
+  map.template op<0x06, DurationRate>("Duration Rate");
+  map.template op<0x07, Volume>("Volume");
+  map.template op<0x08, Program>("Program");
+  map.template op<0x09, Octave>("Octave");
+  map.template op<0x0a, GlobalTranspose>("Global Transpose");
+  map.template op<0x0b, Transpose>("Transpose");
+  map.template op<0x0c, Tuning>("Tuning");
+  map.template op<0x0d, PortamentoTime>("Portamento Time");
+  map.template range<0x0e, 0x11, RepeatUntil>("Repeat Until");
+  map.template range<0x12, 0x15, RepeatBreak>("Repeat Break");
+  map.template jump<0x16, Jump, &Jump::destination>("Jump");
+  map.template terminal<0x17, End>("End");
+  map.template op<0x18, Pan>("Pan");
+  map.template op<0x19, MasterVolume>("Master Volume");
+  map.template op<0x1a, Lfo>("LFO");
+  map.template op<0x1b, EchoParam>("Echo Param");
+  map.template op<0x1c, EchoOnOff>("Echo On/Off");
+  map.template op<0x1d, ReleaseRate>("Release Rate");
 
-    case 0x0e:
-    case 0x0f:
-    case 0x10:
-    case 0x11:
-      CAPCOM_EMIT(RepeatUntil);
-
-    case 0x12:
-    case 0x13:
-    case 0x14:
-    case 0x15:
-      CAPCOM_EMIT(RepeatBreak);
-
-    case Jump::opcode:
-      return capcomJumpCommand(dialect, reader, begin);
-
-    case End::opcode:
-      return capcomEndCommand(dialect, reader, begin);
-
-    case 0x1e:
-    case 0x1f:
-      if (dialect.id.value == "capcom-snes:v1") {
-        CAPCOM_EMIT(UnknownOneByte);
-      }
-      CAPCOM_EMIT(Nop);
-
-    default:
-      return capcomUnknownCommand(dialect, reader, begin);
+  if (version == CapcomSnesEngineVersion::v1BgmInList) {
+    map.template op<0x1e, UnknownOneByte>("Unknown One-Byte Event", suffix("unknown-one-byte"));
+    map.template op<0x1f, UnknownOneByte>("Unknown One-Byte Event", suffix("unknown-one-byte"));
+  } else {
+    map.template op<0x1e, Nop>("No Operation", suffix("nop"));
+    map.template op<0x1f, Nop>("No Operation", suffix("nop"));
   }
 
-#undef CAPCOM_CASE
-#undef CAPCOM_EMIT
+  map.template unknown<UnknownOpcode>("Unknown Opcode", suffix("unknown"));
+  return map.finish();
 }
 
 [[nodiscard]] std::string dialectId(CapcomSnesEngineVersion version) {
@@ -731,18 +626,32 @@ template <class Command>
   return "capcom-snes";
 }
 
+[[nodiscard]] CapcomSnesEngineVersion versionForDialect(const SequenceDialect& dialect) {
+  if (dialect.id.value == "capcom-snes:v1") {
+    return CapcomSnesEngineVersion::v1BgmInList;
+  }
+  if (dialect.id.value == "capcom-snes:v2") {
+    return CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation;
+  }
+  if (dialect.id.value == "capcom-snes:v3") {
+    return CapcomSnesEngineVersion::v3BgmFixedLocation;
+  }
+  return CapcomSnesEngineVersion::none;
+}
+
 }  // namespace
 
 SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version) {
-  return SequenceDialectBuilder<TrackState, Context>(dialectId(version), Context{.version = version})
-      .timebase(Timebase{.ppqn = kCapcomSnesPpqn})
+  SequenceDialectBuilder<TrackState, Context> builder{dialectId(version), Context{.version = version}};
+  builder.timebase(Timebase{.ppqn = kCapcomSnesPpqn})
       .defaultBehavior(SequenceProgramBehavior{
           .defaultLoopPolicy = LoopPolicy::PlayOnce,
           .initialReverbSend = 0.0,
           .initialMonoModeChannels = 0,
           .stopAllTracksAtFirstLoop = true,
-      })
-      .commands<CAPCOM_COMMAND_TYPES>();
+      });
+  static_cast<void>(capcomBytecodeMap(builder, version));
+  return builder.finish();
 }
 
 void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
@@ -754,19 +663,15 @@ void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
 
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sourceTrackNumber,
                                          u32 startAddress) {
+  const BytecodeDispatchTable bytecode = capcomBytecodeMap(dialect, versionForDialect(dialect));
   return decodeLinearBytecodeTrack(reader, sourceTrackNumber, startAddress,
                                    LinearBytecodeDecodePolicy{.maxCommands = 4096},
-                                   [&](u32 offset) { return decodeCapcomCommand(reader, dialect, offset); });
+                                   [&](u32 offset) { return bytecode.decode(reader, offset); });
 }
 
-#undef CAPCOM_COMMAND_TYPES
-#undef CAPCOM_TYPE
-#undef CAPCOM_FALLTHROUGH_COMMANDS
 #undef CAPCOM_S8_STATE
 #undef CAPCOM_U8_STATE
 #undef CAPCOM_SET_TRUE
 #undef CAPCOM_TOGGLE
-#undef CAPCOM_COMMAND
-#undef CAPCOM_KIND
 
 }  // namespace vgmtrans::formats::capcom_snes

@@ -75,9 +75,52 @@ struct SourceCommand {
 };
 
 struct DecodeFlow {
+  enum class Kind {
+    Fallthrough,
+    Jump,
+    Call,
+    Return,
+    Terminal,
+  };
+
+  Kind kind = Kind::Fallthrough;
   std::optional<Address> fallthrough;
   std::vector<Address> staticTargets;
   bool terminal = false;
+
+  [[nodiscard]] static DecodeFlow fallthroughTo(Address next) {
+    return DecodeFlow{
+        .kind = Kind::Fallthrough,
+        .fallthrough = next,
+    };
+  }
+
+  [[nodiscard]] static DecodeFlow jump(Address destination) {
+    return DecodeFlow{
+        .kind = Kind::Jump,
+        .staticTargets = {destination},
+    };
+  }
+
+  [[nodiscard]] static DecodeFlow call(Address destination, Address returnAddress) {
+    return DecodeFlow{
+        .kind = Kind::Call,
+        .fallthrough = returnAddress,
+        .staticTargets = {destination},
+    };
+  }
+
+  [[nodiscard]] static DecodeFlow return_() { return DecodeFlow{.kind = Kind::Return}; }
+
+  [[nodiscard]] static DecodeFlow terminalFlow() {
+    return DecodeFlow{
+        .kind = Kind::Terminal,
+        .terminal = true,
+    };
+  }
+
+  [[nodiscard]] bool unconditionalJump() const noexcept { return kind == Kind::Jump && !staticTargets.empty(); }
+  [[nodiscard]] bool callTarget() const noexcept { return kind == Kind::Call && !staticTargets.empty(); }
 };
 
 class CommandReader {
