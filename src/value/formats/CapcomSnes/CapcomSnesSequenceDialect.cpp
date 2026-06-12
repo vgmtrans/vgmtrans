@@ -569,46 +569,46 @@ template <class Registrar>
 
   for (u16 opcode = 0x20; opcode <= 0xff; ++opcode) {
     if ((opcode & 0x1f) == 0) {
-      map.template op<Rest>(static_cast<u8>(opcode), "Rest");
+      map.op<Rest>(static_cast<u8>(opcode), "Rest");
     } else {
-      map.template op<Note>(static_cast<u8>(opcode), "Note");
+      map.op<Note>(static_cast<u8>(opcode), "Note");
     }
   }
 
-  map.template op<0x00, ToggleTriplet>("Toggle Triplet");
-  map.template op<0x01, ToggleSlur>("Toggle Slur");
-  map.template op<0x02, DottedNote>("Dotted Note");
-  map.template op<0x03, ToggleOctaveUp>("Toggle Octave Up");
-  map.template op<0x04, NoteAttributes>("Note Attributes");
-  map.template op<0x05, Tempo>("Tempo");
-  map.template op<0x06, DurationRate>("Duration Rate");
-  map.template op<0x07, Volume>("Volume");
-  map.template op<0x08, Program>("Program");
-  map.template op<0x09, Octave>("Octave");
-  map.template op<0x0a, GlobalTranspose>("Global Transpose");
-  map.template op<0x0b, Transpose>("Transpose");
-  map.template op<0x0c, Tuning>("Tuning");
-  map.template op<0x0d, PortamentoTime>("Portamento Time");
-  map.template range<0x0e, 0x11, RepeatUntil>("Repeat Until");
-  map.template range<0x12, 0x15, RepeatBreak>("Repeat Break");
-  map.template jump<0x16, Jump, &Jump::destination>("Jump");
-  map.template terminal<0x17, End>("End");
-  map.template op<0x18, Pan>("Pan");
-  map.template op<0x19, MasterVolume>("Master Volume");
-  map.template op<0x1a, Lfo>("LFO");
-  map.template op<0x1b, EchoParam>("Echo Param");
-  map.template op<0x1c, EchoOnOff>("Echo On/Off");
-  map.template op<0x1d, ReleaseRate>("Release Rate");
+  map.op<0x00, ToggleTriplet>("Toggle Triplet");
+  map.op<0x01, ToggleSlur>("Toggle Slur");
+  map.op<0x02, DottedNote>("Dotted Note");
+  map.op<0x03, ToggleOctaveUp>("Toggle Octave Up");
+  map.op<0x04, NoteAttributes>("Note Attributes");
+  map.op<0x05, Tempo>("Tempo");
+  map.op<0x06, DurationRate>("Duration Rate");
+  map.op<0x07, Volume>("Volume");
+  map.op<0x08, Program>("Program");
+  map.op<0x09, Octave>("Octave");
+  map.op<0x0a, GlobalTranspose>("Global Transpose");
+  map.op<0x0b, Transpose>("Transpose");
+  map.op<0x0c, Tuning>("Tuning");
+  map.op<0x0d, PortamentoTime>("Portamento Time");
+  map.range<0x0e, 0x11, RepeatUntil>("Repeat Until");
+  map.range<0x12, 0x15, RepeatBreak>("Repeat Break");
+  map.jump<0x16, Jump, &Jump::destination>("Jump");
+  map.terminal<0x17, End>("End");
+  map.op<0x18, Pan>("Pan");
+  map.op<0x19, MasterVolume>("Master Volume");
+  map.op<0x1a, Lfo>("LFO");
+  map.op<0x1b, EchoParam>("Echo Param");
+  map.op<0x1c, EchoOnOff>("Echo On/Off");
+  map.op<0x1d, ReleaseRate>("Release Rate");
 
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
-    map.template op<0x1e, UnknownOneByte>("Unknown One-Byte Event", suffix("unknown-one-byte"));
-    map.template op<0x1f, UnknownOneByte>("Unknown One-Byte Event", suffix("unknown-one-byte"));
+    map.op<0x1e, UnknownOneByte>("Unknown One-Byte Event", suffix("unknown-one-byte"));
+    map.op<0x1f, UnknownOneByte>("Unknown One-Byte Event", suffix("unknown-one-byte"));
   } else {
-    map.template op<0x1e, Nop>("No Operation", suffix("nop"));
-    map.template op<0x1f, Nop>("No Operation", suffix("nop"));
+    map.op<0x1e, Nop>("No Operation", suffix("nop"));
+    map.op<0x1f, Nop>("No Operation", suffix("nop"));
   }
 
-  map.template unknown<UnknownOpcode>("Unknown Opcode", suffix("unknown"));
+  map.unknown<UnknownOpcode>("Unknown Opcode", suffix("unknown"));
   return map.finish();
 }
 
