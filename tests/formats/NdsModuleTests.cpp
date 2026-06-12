@@ -256,7 +256,7 @@ void ndsSequenceDialectDiscoversSecondaryTrackStarts() {
          "NDS secondary track should preserve decoded source commands");
 }
 
-void ndsSequenceDialectPreservesIgnoredNoOpOperands() {
+void ndsSequenceDialectPreservesIgnoredCommandOperands() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -269,17 +269,17 @@ void ndsSequenceDialectPreservesIgnoredNoOpOperands() {
   const SequenceDialect dialect = ndsSequenceDialect();
   const TrackProgram track =
       decodeNdsSequenceTrack(ByteReader(SourceId{7}, bytes), dialect, sequenceOffset, trackStart + 4, trackStart, 0);
-  expect(track.commands.size() == 2, "NDS no-op fixture should decode the ignored command and end command");
+  expect(track.commands.size() == 2, "NDS ignored-command fixture should decode the ignored command and end command");
 
-  const SourceCommand& noOp = track.commands[0];
-  expect(dialect.describe(track, noOp).detailKind == "nds.no-op",
-         "NDS ignored opcode should stay typed as a local no-op command");
-  expect(track.bytesFor(noOp).size() == 3 && track.bytesFor(noOp)[0] == 0xe0,
-         "NDS no-op should preserve the original command bytes");
+  const SourceCommand& ignored = track.commands[0];
+  expect(dialect.describe(track, ignored).detailKind == "nds.modulation-delay",
+         "NDS ignored opcode should stay typed as its source-driver command");
+  expect(track.bytesFor(ignored).size() == 3 && track.bytesFor(ignored)[0] == 0xe0,
+         "NDS ignored command should preserve the original command bytes");
 
-  const auto operands = track.operandsFor(noOp);
+  const auto operands = track.operandsFor(ignored);
   expect(operands.size() == 1 && operands[0].name == "bytes" && std::get<std::string>(operands[0].value) == "12 34",
-         "NDS no-op should preserve ignored operand bytes as decoded command data");
+         "NDS ignored command should preserve ignored operand bytes as decoded command data");
   expect(operands[0].range.offset == trackStart + 1 && operands[0].range.size == 2,
-         "NDS no-op ignored operand bytes should preserve their source range");
+         "NDS ignored command operand bytes should preserve their source range");
 }

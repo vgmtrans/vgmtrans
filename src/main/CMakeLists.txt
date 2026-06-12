@@ -135,6 +135,7 @@ target_sources(vgmtransvaluecore
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
+      ${PROJECT_SOURCE_DIR}/src/value/core/BytecodeSequenceDecoder.h
       ${PROJECT_SOURCE_DIR}/src/value/core/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.h

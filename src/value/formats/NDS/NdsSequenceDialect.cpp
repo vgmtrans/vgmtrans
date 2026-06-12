@@ -6,6 +6,7 @@
 
 #include "value/formats/NDS/NdsSequenceDialect.h"
 
+#include "value/core/BytecodeSequenceDecoder.h"
 #include "value/core/SequenceVm.h"
 
 #include <algorithm>
@@ -13,7 +14,6 @@
 #include <map>
 #include <optional>
 #include <set>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -24,9 +24,18 @@ using namespace core;
 
 namespace {
 
-#define NDS_COMMAND(Suffix, DisplayName)                  \
+#define NDS_KIND(Suffix, DisplayName)                     \
   static constexpr std::string_view kind = "nds." Suffix; \
   static constexpr std::string_view name = DisplayName
+
+#define NDS_COMMAND(Op, Suffix, DisplayName) \
+  static constexpr u8 opcode = Op;           \
+  NDS_KIND(Suffix, DisplayName)
+
+#define NDS_IGNORED_COMMAND(Op, Type, Suffix, DisplayName, OperandBytes) \
+  struct Type : RawBytesOperand<Type, OperandBytes> {                    \
+    NDS_COMMAND(Op, Suffix, DisplayName);                                \
+  }
 
 constexpr size_t kMaxTrackCommands = 262144;
 
@@ -43,44 +52,13 @@ struct TrackState {
 
 using Runtime = CommandRuntime<TrackState, Context>;
 
-template <class Derived>
-struct EmptyParse {
-  static Derived parse(CommandReader&) { return {}; }
-};
-
-template <class Derived>
-struct RawU8 {
-  u8 raw = 0;
-
-  static Derived parse(CommandReader& in) {
-    Derived result;
-    result.raw = in.u8(Derived::operandName);
-    return result;
-  }
-};
-
-template <class Derived>
-struct RawS8 {
-  s8 raw = 0;
-
-  static Derived parse(CommandReader& in) {
-    Derived result;
-    result.raw = in.s8(Derived::operandName);
-    return result;
-  }
-};
-
 [[nodiscard]] u32 absoluteAddress(const TrackState& state, u32 relative) {
   return static_cast<u32>(state.sequenceDataBase + relative);
 }
 
-[[nodiscard]] bool hasSequenceBytes(ByteReader reader, u32 offset, u32 size, u32 sequenceEnd) {
-  return offset <= sequenceEnd && size <= sequenceEnd - offset && reader.has(offset, size);
-}
-
 [[nodiscard]] u32 readVarLen(ByteReader reader, u32& offset, u32 sequenceEnd) {
   u32 value = 0;
-  while (hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
+  while (hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
     const u8 byte = reader.u8At(offset++);
     value = (value << 7) + (byte & 0x7f);
     if ((byte & 0x80) == 0) {
@@ -92,7 +70,7 @@ struct RawS8 {
 
 [[nodiscard]] std::optional<u32> readSseqAddress(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd,
                                                  u32 operandOffset) {
-  if (!hasSequenceBytes(reader, operandOffset, 3, sequenceEnd)) {
+  if (!hasBytecodeBytes(reader, operandOffset, 3, sequenceEnd)) {
     return std::nullopt;
   }
   return reader.u8At(operandOffset) + (reader.u8At(operandOffset + 1) << 8) + (reader.u8At(operandOffset + 2) << 16) +
@@ -100,11 +78,13 @@ struct RawS8 {
 }
 
 struct Note {
+  static constexpr u8 firstOpcode = 0x00;
+  static constexpr u8 lastOpcode = 0x7f;
   u8 key = 0;
   u8 velocity = 0;
   u32 duration = 0;
 
-  NDS_COMMAND("note", "Note");
+  NDS_KIND("note", "Note");
 
   static Note parse(CommandReader& in) {
     in.derived("key", static_cast<u64>(in.opcode()));
@@ -125,7 +105,7 @@ struct Note {
 struct Rest {
   u32 duration = 0;
 
-  NDS_COMMAND("rest", "Rest");
+  NDS_COMMAND(0x80, "rest", "Rest");
 
   static Rest parse(CommandReader& in) { return Rest{.duration = in.varLen("duration")}; }
 
@@ -135,7 +115,7 @@ struct Rest {
 struct Program {
   u32 raw = 0;
 
-  NDS_COMMAND("program", "Program");
+  NDS_COMMAND(0x81, "program", "Program");
 
   static Program parse(CommandReader& in) { return Program{.raw = in.varLen("program")}; }
 
@@ -162,45 +142,45 @@ struct RelativeAddressCommand {
 };
 
 struct Jump : RelativeAddressCommand<Jump> {
-  NDS_COMMAND("jump", "Jump");
+  NDS_COMMAND(0x94, "jump", "Jump");
 
   Effects execute(Runtime& rt) const { return rt.jump(Address{absoluteAddress(rt.state, relative)}); }
 };
 
 struct Call : RelativeAddressCommand<Call> {
-  NDS_COMMAND("call", "Call");
+  NDS_COMMAND(0x95, "call", "Call");
 
   Effects execute(Runtime& rt) const { return rt.call(Address{absoluteAddress(rt.state, relative)}); }
 };
 
-struct Return : EmptyParse<Return> {
-  NDS_COMMAND("return", "Return");
+struct Return : NoOperands<Return> {
+  NDS_COMMAND(0xfd, "return", "Return");
 
   Effects execute(Runtime& rt) const { return rt.return_(); }
 };
 
-struct End : EmptyParse<End> {
-  NDS_COMMAND("end", "End");
+struct End : NoOperands<End> {
+  NDS_COMMAND(0xff, "end", "End");
 
   Effects execute(Runtime& rt) const { return rt.end(); }
 };
 
-struct Pan : RawU8<Pan> {
-  NDS_COMMAND("pan", "Pan");
+struct Pan : U8Operand<Pan> {
+  NDS_COMMAND(0xc0, "pan", "Pan");
   static constexpr std::string_view operandName = "pan";
 
   void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
-struct Volume : RawU8<Volume> {
-  NDS_COMMAND("volume", "Volume");
+struct Volume : U8Operand<Volume> {
+  NDS_COMMAND(0xc1, "volume", "Volume");
   static constexpr std::string_view operandName = "volume";
 
   void execute(Runtime& rt) const { rt.out.level(std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0)); }
 };
 
-struct ExpressionLevel : RawU8<ExpressionLevel> {
-  NDS_COMMAND("expression", "Expression");
+struct ExpressionLevel : U8Operand<ExpressionLevel> {
+  NDS_COMMAND(0xd5, "expression", "Expression");
   static constexpr std::string_view operandName = "expression";
 
   void execute(Runtime& rt) const { rt.out.expression(std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0)); }
@@ -209,29 +189,29 @@ struct ExpressionLevel : RawU8<ExpressionLevel> {
 struct Transpose {
   s8 semitones = 0;
 
-  NDS_COMMAND("transpose", "Transpose");
+  NDS_COMMAND(0xc3, "transpose", "Transpose");
 
   static Transpose parse(CommandReader& in) { return Transpose{.semitones = in.s8("semitones")}; }
 
   void execute(Runtime& rt) const { rt.state.transpose = semitones; }
 };
 
-struct PitchBend : RawS8<PitchBend> {
-  NDS_COMMAND("pitch-bend", "Pitch Bend");
+struct PitchBend : S8Operand<PitchBend> {
+  NDS_COMMAND(0xc4, "pitch-bend", "Pitch Bend");
   static constexpr std::string_view operandName = "bend";
 
   void execute(Runtime& rt) const { rt.out.pitchBend(static_cast<s16>(raw * 64)); }
 };
 
-struct PitchBendRange : RawU8<PitchBendRange> {
-  NDS_COMMAND("pitch-bend-range", "Pitch Bend Range");
+struct PitchBendRange : U8Operand<PitchBendRange> {
+  NDS_COMMAND(0xc5, "pitch-bend-range", "Pitch Bend Range");
   static constexpr std::string_view operandName = "semitones";
 
   void execute(Runtime& rt) const { rt.out.pitchBendRange(raw); }
 };
 
-struct ModulationDepth : RawU8<ModulationDepth> {
-  NDS_COMMAND("modulation-depth", "Modulation Depth");
+struct ModulationDepth : U8Operand<ModulationDepth> {
+  NDS_COMMAND(0xca, "modulation-depth", "Modulation Depth");
   static constexpr std::string_view operandName = "depth";
 
   void execute(Runtime& rt) const {
@@ -239,22 +219,22 @@ struct ModulationDepth : RawU8<ModulationDepth> {
   }
 };
 
-struct PortamentoSwitch : RawU8<PortamentoSwitch> {
-  NDS_COMMAND("portamento", "Portamento");
+struct PortamentoSwitch : U8Operand<PortamentoSwitch> {
+  NDS_COMMAND(0xce, "portamento", "Portamento");
   static constexpr std::string_view operandName = "enabled";
 
   void execute(Runtime& rt) const { rt.out.portamentoEnable(raw != 0); }
 };
 
-struct PortamentoTime : RawU8<PortamentoTime> {
-  NDS_COMMAND("portamento-time", "Portamento Time");
+struct PortamentoTime : U8Operand<PortamentoTime> {
+  NDS_COMMAND(0xcf, "portamento-time", "Portamento Time");
   static constexpr std::string_view operandName = "time";
 
   void execute(Runtime& rt) const { rt.out.portamentoTime(raw); }
 };
 
-struct NoteWait : RawU8<NoteWait> {
-  NDS_COMMAND("note-wait", "Note Wait");
+struct NoteWait : U8Operand<NoteWait> {
+  NDS_COMMAND(0xc7, "note-wait", "Note Wait");
   static constexpr std::string_view operandName = "enabled";
 
   void execute(Runtime& rt) const { rt.state.noteWait = raw != 0; }
@@ -263,7 +243,7 @@ struct NoteWait : RawU8<NoteWait> {
 struct Tempo {
   u16 bpm = 0;
 
-  NDS_COMMAND("tempo", "Tempo");
+  NDS_COMMAND(0xe1, "tempo", "Tempo");
 
   static Tempo parse(CommandReader& in) { return Tempo{.bpm = in.le16("bpm")}; }
 
@@ -274,15 +254,45 @@ struct Tempo {
   }
 };
 
-struct OneByteNoOp : RawU8<OneByteNoOp> {
-  NDS_COMMAND("no-op-1", "No-op");
-  static constexpr std::string_view operandName = "value";
-};
+NDS_IGNORED_COMMAND(0x93, OpenTrack, "open-track", "Open Track", 4);
+NDS_IGNORED_COMMAND(0xa0, RandomValueCommand, "random-value", "Cmd with Random Value", 5);
+NDS_IGNORED_COMMAND(0xa1, VariableCommand, "variable-command", "Cmd with Variable", 2);
+NDS_IGNORED_COMMAND(0xa2, IfCommand, "if", "If", 0);
+NDS_IGNORED_COMMAND(0xb0, SetVariable, "set-variable", "Set Variable", 3);
+NDS_IGNORED_COMMAND(0xb1, AddVariable, "add-variable", "Add Variable", 3);
+NDS_IGNORED_COMMAND(0xb2, SubVariable, "sub-variable", "Sub Variable", 3);
+NDS_IGNORED_COMMAND(0xb3, MulVariable, "mul-variable", "Mul Variable", 3);
+NDS_IGNORED_COMMAND(0xb4, DivVariable, "div-variable", "Div Variable", 3);
+NDS_IGNORED_COMMAND(0xb5, ShiftVariable, "shift-variable", "Shift Variable", 3);
+NDS_IGNORED_COMMAND(0xb6, RandVariable, "rand-variable", "Rand Variable", 3);
+NDS_IGNORED_COMMAND(0xb8, IfVariableEqual, "if-variable-equal", "If Variable ==", 3);
+NDS_IGNORED_COMMAND(0xb9, IfVariableGreaterEqual, "if-variable-greater-equal", "If Variable >=", 3);
+NDS_IGNORED_COMMAND(0xba, IfVariableGreater, "if-variable-greater", "If Variable >", 3);
+NDS_IGNORED_COMMAND(0xbb, IfVariableLessEqual, "if-variable-less-equal", "If Variable <=", 3);
+NDS_IGNORED_COMMAND(0xbc, IfVariableLess, "if-variable-less", "If Variable <", 3);
+NDS_IGNORED_COMMAND(0xbd, IfVariableNotEqual, "if-variable-not-equal", "If Variable !=", 3);
+NDS_IGNORED_COMMAND(0xc2, MasterVolume, "master-volume", "Master Volume", 1);
+NDS_IGNORED_COMMAND(0xc6, Priority, "priority", "Priority", 1);
+NDS_IGNORED_COMMAND(0xc8, Tie, "tie", "Tie", 1);
+NDS_IGNORED_COMMAND(0xc9, PortamentoControl, "portamento-control", "Portamento Control", 1);
+NDS_IGNORED_COMMAND(0xcb, ModulationSpeed, "modulation-speed", "Modulation Speed", 1);
+NDS_IGNORED_COMMAND(0xcc, ModulationType, "modulation-type", "Modulation Type", 1);
+NDS_IGNORED_COMMAND(0xcd, ModulationRange, "modulation-range", "Modulation Range", 1);
+NDS_IGNORED_COMMAND(0xd0, AttackRate, "attack-rate", "Attack Rate", 1);
+NDS_IGNORED_COMMAND(0xd1, DecayRate, "decay-rate", "Decay Rate", 1);
+NDS_IGNORED_COMMAND(0xd2, SustainLevel, "sustain-level", "Sustain Level", 1);
+NDS_IGNORED_COMMAND(0xd3, ReleaseRate, "release-rate", "Release Rate", 1);
+NDS_IGNORED_COMMAND(0xd4, LoopStart, "loop-start", "Loop Start", 1);
+NDS_IGNORED_COMMAND(0xd6, PrintVariable, "print-variable", "Print Variable", 1);
+NDS_IGNORED_COMMAND(0xe0, ModulationDelay, "modulation-delay", "Modulation Delay", 2);
+NDS_IGNORED_COMMAND(0xe3, SweepPitch, "sweep-pitch", "Sweep Pitch", 2);
+NDS_IGNORED_COMMAND(0xfc, LoopEnd, "loop-end", "Loop End", 0);
+NDS_IGNORED_COMMAND(0xfe, AllocateTrack, "allocate-track", "Allocate Track", 2);
 
 struct NoOp {
   std::string bytes;
 
-  NDS_COMMAND("no-op", "No-op");
+  NDS_KIND("no-op", "No-op");
 
   static NoOp parse(CommandReader& in) {
     // Many SSEQ opcodes are currently preserved for UI/parity but have no
@@ -293,8 +303,8 @@ struct NoOp {
   }
 };
 
-struct Terminal : EmptyParse<Terminal> {
-  NDS_COMMAND("terminal", "Terminal");
+struct Terminal : NoOperands<Terminal> {
+  NDS_KIND("terminal", "Terminal");
 
   Effects execute(Runtime& rt) const {
     rt.vm.diagnostic(Diagnostic{
@@ -305,150 +315,33 @@ struct Terminal : EmptyParse<Terminal> {
   }
 };
 
-struct DecodedCommand {
-  CommandHandlerId handler;
-  CommandKindId kind;
-  SourceRange range;
-  std::vector<u8> bytes;
-  std::vector<CommandOperand> operands;
-  DecodeFlow flow;
-};
+#define NDS_COMMAND_TYPES                                                                                              \
+  Note, Rest, Program, OpenTrack, Jump, Call, Return, End, RandomValueCommand, VariableCommand, IfCommand,             \
+      SetVariable, AddVariable, SubVariable, MulVariable, DivVariable, ShiftVariable, RandVariable, IfVariableEqual,   \
+      IfVariableGreaterEqual, IfVariableGreater, IfVariableLessEqual, IfVariableLess, IfVariableNotEqual, Pan, Volume, \
+      MasterVolume, Transpose, PitchBend, PitchBendRange, Priority, NoteWait, Tie, PortamentoControl, ModulationDepth, \
+      ModulationSpeed, ModulationType, ModulationRange, PortamentoSwitch, PortamentoTime, AttackRate, DecayRate,       \
+      SustainLevel, ReleaseRate, LoopStart, ExpressionLevel, PrintVariable, ModulationDelay, Tempo, SweepPitch,        \
+      LoopEnd, AllocateTrack, NoOp, Terminal
+
+using DecodedCommand = DecodedBytecodeCommand;
 
 struct PendingBlock {
   u32 offset = 0;
   bool callTarget = false;
 };
 
-[[nodiscard]] const CommandHandler& handlerFor(const SequenceDialect& dialect, std::string_view kind) {
-  const auto* handler = dialect.handlerForKind(kind);
-  if (handler == nullptr) {
-    throw std::logic_error("NDS SSEQ command was not registered in its dialect");
-  }
-  return *handler;
-}
-
 template <class Command>
-struct ParsedCommand {
-  DecodedCommand decoded;
-  Command command;
-};
-
-template <class Command>
-[[nodiscard]] DecodedCommand recordSizedCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin, u32 end) {
-  const auto& handler = handlerFor(dialect, Command::kind);
-  const SourceRange range = reader.range(begin, end - begin);
-  const auto bytes = reader.slice(begin, end - begin);
-  std::vector<u8> ownedBytes{bytes.begin(), bytes.end()};
-  std::vector<CommandOperand> operands;
-  CommandReader commandReader{range, ownedBytes, &operands};
-  static_cast<void>(Command::parse(commandReader));
-  if (!commandReader.done()) {
-    throw std::invalid_argument("NDS SSEQ command parser left trailing source bytes");
-  }
-  return DecodedCommand{
-      .handler = handler.id,
-      .kind = handler.kind,
-      .range = range,
-      .bytes = std::move(ownedBytes),
-      .operands = std::move(operands),
-  };
-}
-
-template <class Command>
-[[nodiscard]] std::optional<ParsedCommand<Command>> parseCommandBytes(const SequenceDialect& dialect, ByteReader reader,
-                                                                      u32 begin, u32 sequenceEnd) {
-  if (!hasSequenceBytes(reader, begin, 1, sequenceEnd)) {
-    return std::nullopt;
-  }
-
-  const auto boundedEnd = static_cast<u32>(std::min<size_t>(reader.size(), sequenceEnd));
-  if (begin >= boundedEnd) {
-    return std::nullopt;
-  }
-
-  const auto& handler = handlerFor(dialect, Command::kind);
-  const u32 availableSize = boundedEnd - begin;
-  const SourceRange availableRange = reader.range(begin, availableSize);
-  const auto availableBytes = reader.slice(begin, availableSize);
-  std::vector<CommandOperand> operands;
-  CommandReader commandReader{availableRange, availableBytes, &operands};
-
-  Command command;
-  try {
-    command = Command::parse(commandReader);
-  } catch (const std::out_of_range&) {
-    return std::nullopt;
-  }
-
-  const auto commandSize = static_cast<u32>(commandReader.position());
-  const auto commandBytes = availableBytes.subspan(0, commandSize);
-  std::vector<u8> ownedBytes{commandBytes.begin(), commandBytes.end()};
-  return ParsedCommand<Command>{
-      .decoded =
-          DecodedCommand{
-              .handler = handler.id,
-              .kind = handler.kind,
-              .range = reader.range(begin, commandSize),
-              .bytes = std::move(ownedBytes),
-              .operands = std::move(operands),
-          },
-      .command = command,
-  };
-}
-
-[[nodiscard]] DecodedCommand terminalCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin, u32 end) {
-  auto decoded = recordSizedCommand<Terminal>(dialect, reader, begin, end);
-  decoded.flow.terminal = true;
-  return decoded;
-}
-
-[[nodiscard]] DecodedCommand truncatedCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin,
-                                              u32 sequenceEnd) {
-  const auto boundedEnd = static_cast<u32>(std::min<size_t>(reader.size(), sequenceEnd));
-  return terminalCommand(dialect, reader, begin, std::min(begin + 1, boundedEnd));
-}
-
-template <class Command>
-[[nodiscard]] DecodedCommand recordAutoCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin,
-                                               u32 sequenceEnd) {
-  auto parsed = parseCommandBytes<Command>(dialect, reader, begin, sequenceEnd);
+[[nodiscard]] DecodedBytecodeCommand ndsBranch(const SequenceDialect& dialect, ByteReader reader, u32 sequenceOffset,
+                                               u32 sequenceEnd, u32 begin, bool returns) {
+  auto parsed = parseBytecodeCommand<Command>(dialect, reader, begin, sequenceEnd);
   if (!parsed) {
-    return truncatedCommand(dialect, reader, begin, sequenceEnd);
-  }
-  return std::move(parsed->decoded);
-}
-
-template <class Command>
-[[nodiscard]] DecodedCommand recordAutoFallthrough(const SequenceDialect& dialect, ByteReader reader, u32 begin,
-                                                   u32 sequenceEnd) {
-  auto decoded = recordAutoCommand<Command>(dialect, reader, begin, sequenceEnd);
-  if (!decoded.flow.terminal) {
-    decoded.flow.fallthrough = Address{static_cast<u32>(decoded.range.endOffset())};
-  }
-  return decoded;
-}
-
-[[nodiscard]] DecodedCommand recordIgnored(const SequenceDialect& dialect, ByteReader reader, u32 sequenceEnd,
-                                           u32 begin, u32 operandOffset, u32 operandBytes) {
-  if (!hasSequenceBytes(reader, operandOffset, operandBytes, sequenceEnd)) {
-    return terminalCommand(dialect, reader, begin, operandOffset);
-  }
-  auto decoded = recordSizedCommand<NoOp>(dialect, reader, begin, operandOffset + operandBytes);
-  decoded.flow.fallthrough = Address{operandOffset + operandBytes};
-  return decoded;
-}
-
-template <class Command>
-[[nodiscard]] DecodedCommand recordBranch(const SequenceDialect& dialect, ByteReader reader, u32 sequenceOffset,
-                                          u32 sequenceEnd, u32 begin, bool returns) {
-  auto parsed = parseCommandBytes<Command>(dialect, reader, begin, sequenceEnd);
-  if (!parsed) {
-    return truncatedCommand(dialect, reader, begin, sequenceEnd);
+    return truncatedBytecodeCommand<Terminal>(dialect, reader, begin, sequenceEnd);
   }
 
   const u32 destination = static_cast<u32>(sequenceOffset + 0x1c + parsed->command.relative);
   if (destination >= sequenceEnd) {
-    return terminalCommand(dialect, reader, begin, begin + 1);
+    return terminalBytecodeCommand<Terminal>(dialect, reader, begin, begin + 1);
   }
 
   auto decoded = std::move(parsed->decoded);
@@ -459,98 +352,93 @@ template <class Command>
   return decoded;
 }
 
-[[nodiscard]] bool isUnhandledOneByteCommand(u8 status) {
-  switch (status) {
-    case 0xc3:
-    case 0xc4:
-    case 0xc5:
-    case 0xc7:
-    case 0xca:
-    case 0xce:
-    case 0xcf:
-    case 0xd5:
-      return false;
-    default:
-      return status >= 0xc2 && status <= 0xd6;
-  }
-}
-
-// Real SSEQ commands let parse() determine their length. Only ignored opcodes
-// name byte counts here, because they do not have source-driver command types yet.
-[[nodiscard]] DecodedCommand decodeCommand(const SequenceDialect& dialect, ByteReader reader, u32 sequenceOffset,
-                                           u32 sequenceEnd, u32 offset) {
-#define NDS_EMIT(Type) return recordAutoFallthrough<Type>(dialect, reader, begin, sequenceEnd)
-#define NDS_CASE(Op, Type) \
-  case Op:                 \
+// Performed SSEQ commands let parse() determine length. Ignored source-driver
+// commands keep their operand counts in the command declaration.
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(const SequenceDialect& dialect, ByteReader reader,
+                                                   u32 sequenceOffset, u32 sequenceEnd, u32 offset) {
+#define NDS_EMIT(Type) return recordAutoFallthroughBytecodeCommand<Type, Terminal>(dialect, reader, begin, sequenceEnd)
+#define NDS_CASE(Type) \
+  case Type::opcode:   \
     NDS_EMIT(Type)
-#define NDS_BRANCH(Op, Type) \
-  case Op:                   \
-    return recordBranch<Type>(dialect, reader, sequenceOffset, sequenceEnd, begin, false)
-#define NDS_CALL(Op, Type) \
-  case Op:                 \
-    return recordBranch<Type>(dialect, reader, sequenceOffset, sequenceEnd, begin, true)
-#define NDS_IGNORE(Op, OperandBytes) \
-  case Op:                           \
-    return recordIgnored(dialect, reader, sequenceEnd, begin, begin + 1, OperandBytes)
+#define NDS_BRANCH(Type) \
+  case Type::opcode:     \
+    return ndsBranch<Type>(dialect, reader, sequenceOffset, sequenceEnd, begin, false)
+#define NDS_CALL(Type) \
+  case Type::opcode:   \
+    return ndsBranch<Type>(dialect, reader, sequenceOffset, sequenceEnd, begin, true)
+#define NDS_IGNORE(Type)                                                                                \
+  case Type::opcode:                                                                                    \
+    return recordIgnoredBytecodeCommand<Type, Terminal>(dialect, reader, sequenceEnd, begin, begin + 1, \
+                                                        Type::operandBytes)
 #define NDS_TERMINAL(Op) \
   case Op:               \
-    return terminalCommand(dialect, reader, begin, begin + 1)
-#define NDS_EVENT(Op, Type) \
-  case Op:                  \
-    return recordAutoCommand<Type>(dialect, reader, begin, sequenceEnd)
+    return terminalBytecodeCommand<Terminal>(dialect, reader, begin, begin + 1)
+#define NDS_EVENT(Type) \
+  case Type::opcode:    \
+    return recordAutoBytecodeCommand<Type, Terminal>(dialect, reader, begin, sequenceEnd)
 
   const u32 begin = offset;
   const u8 status = reader.u8At(offset);
 
-  if (status < 0x80) {
+  if (status >= Note::firstOpcode && status <= Note::lastOpcode) {
     NDS_EMIT(Note);
   }
 
   switch (status) {
-    NDS_CASE(0x80, Rest);
-    NDS_CASE(0x81, Program);
-    NDS_IGNORE(0x93, 4);
-    NDS_BRANCH(0x94, Jump);
-    NDS_CALL(0x95, Call);
+    NDS_CASE(Rest);
+    NDS_CASE(Program);
+    NDS_IGNORE(OpenTrack);
+    NDS_BRANCH(Jump);
+    NDS_CALL(Call);
     NDS_TERMINAL(0x96);
-    NDS_IGNORE(0xa0, 5);
-    NDS_IGNORE(0xa1, 2);
-    NDS_IGNORE(0xa2, 0);
-    NDS_IGNORE(0xb0, 3);
-    NDS_IGNORE(0xb1, 3);
-    NDS_IGNORE(0xb2, 3);
-    NDS_IGNORE(0xb3, 3);
-    NDS_IGNORE(0xb4, 3);
-    NDS_IGNORE(0xb5, 3);
-    NDS_IGNORE(0xb6, 3);
-    NDS_IGNORE(0xb8, 3);
-    NDS_IGNORE(0xb9, 3);
-    NDS_IGNORE(0xba, 3);
-    NDS_IGNORE(0xbb, 3);
-    NDS_IGNORE(0xbc, 3);
-    NDS_IGNORE(0xbd, 3);
-    NDS_CASE(0xc0, Pan);
-    NDS_CASE(0xc1, Volume);
-    NDS_CASE(0xc3, Transpose);
-    NDS_CASE(0xc4, PitchBend);
-    NDS_CASE(0xc5, PitchBendRange);
-    NDS_CASE(0xc7, NoteWait);
-    NDS_CASE(0xca, ModulationDepth);
-    NDS_CASE(0xce, PortamentoSwitch);
-    NDS_CASE(0xcf, PortamentoTime);
-    NDS_CASE(0xd5, ExpressionLevel);
-    NDS_IGNORE(0xe0, 2);
-    NDS_CASE(0xe1, Tempo);
-    NDS_IGNORE(0xe3, 2);
-    NDS_IGNORE(0xfc, 0);
-    NDS_EVENT(0xfd, Return);
-    NDS_IGNORE(0xfe, 2);
-    NDS_EVENT(0xff, End);
+    NDS_IGNORE(RandomValueCommand);
+    NDS_IGNORE(VariableCommand);
+    NDS_IGNORE(IfCommand);
+    NDS_IGNORE(SetVariable);
+    NDS_IGNORE(AddVariable);
+    NDS_IGNORE(SubVariable);
+    NDS_IGNORE(MulVariable);
+    NDS_IGNORE(DivVariable);
+    NDS_IGNORE(ShiftVariable);
+    NDS_IGNORE(RandVariable);
+    NDS_IGNORE(IfVariableEqual);
+    NDS_IGNORE(IfVariableGreaterEqual);
+    NDS_IGNORE(IfVariableGreater);
+    NDS_IGNORE(IfVariableLessEqual);
+    NDS_IGNORE(IfVariableLess);
+    NDS_IGNORE(IfVariableNotEqual);
+    NDS_CASE(Pan);
+    NDS_CASE(Volume);
+    NDS_IGNORE(MasterVolume);
+    NDS_CASE(Transpose);
+    NDS_CASE(PitchBend);
+    NDS_CASE(PitchBendRange);
+    NDS_IGNORE(Priority);
+    NDS_CASE(NoteWait);
+    NDS_IGNORE(Tie);
+    NDS_IGNORE(PortamentoControl);
+    NDS_CASE(ModulationDepth);
+    NDS_IGNORE(ModulationSpeed);
+    NDS_IGNORE(ModulationType);
+    NDS_IGNORE(ModulationRange);
+    NDS_CASE(PortamentoSwitch);
+    NDS_CASE(PortamentoTime);
+    NDS_IGNORE(AttackRate);
+    NDS_IGNORE(DecayRate);
+    NDS_IGNORE(SustainLevel);
+    NDS_IGNORE(ReleaseRate);
+    NDS_IGNORE(LoopStart);
+    NDS_CASE(ExpressionLevel);
+    NDS_IGNORE(PrintVariable);
+    NDS_IGNORE(ModulationDelay);
+    NDS_CASE(Tempo);
+    NDS_IGNORE(SweepPitch);
+    NDS_IGNORE(LoopEnd);
+    NDS_EVENT(Return);
+    NDS_IGNORE(AllocateTrack);
+    NDS_EVENT(End);
     default:
-      if (isUnhandledOneByteCommand(status)) {
-        NDS_EMIT(OneByteNoOp);
-      }
-      return terminalCommand(dialect, reader, begin, begin + 1);
+      return terminalBytecodeCommand<Terminal>(dialect, reader, begin, begin + 1);
   }
 
 #undef NDS_IGNORE
@@ -562,83 +450,67 @@ template <class Command>
 #undef NDS_EMIT
 }
 
-void appendDecoded(TrackProgramBuilder& builder, const DecodedCommand& decoded, u32 offset) {
-  builder.addDecoded(decoded.handler, decoded.kind, Address{offset}, decoded.range, decoded.bytes, decoded.operands);
-}
-
-}  // namespace
-
-SequenceDialect ndsSequenceDialect() {
-  return SequenceDialectBuilder<TrackState, Context>(kNdsSequenceDialectId, Context{})
-      .timebase(Timebase{.ppqn = 0x30})
-      .defaultBehavior(SequenceProgramBehavior{
-          .defaultLoopPolicy = LoopPolicy::PlayOnce,
-          .commandLimit = static_cast<u32>(kMaxTrackCommands),
-      })
-      .commands<Note, Rest, Program, Jump, Call, Return, End, Pan, Volume, Transpose, NoteWait, Tempo, OneByteNoOp,
-                ExpressionLevel, PitchBend, PitchBendRange, ModulationDepth, PortamentoSwitch, PortamentoTime, NoOp,
-                Terminal>();
-}
-
-void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
-  registry.add(ndsSequenceDialect());
-}
-
-TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
-                                    u32 sequenceEnd, u32 startOffset, u32 trackIndex,
-                                    bool linearizeMalformedControlFlow) {
-  TrackProgram track{
+[[nodiscard]] TrackProgram makeTrack(u32 startOffset, u32 trackIndex) {
+  return TrackProgram{
       .id = TrackId{trackIndex},
       .sourceTrackNumber = trackIndex,
       .startAddress = Address{startOffset},
   };
+}
+
+[[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
+                                                 u32 sequenceEnd, u32 startOffset, u32 trackIndex) {
+  TrackProgram track = makeTrack(startOffset, trackIndex);
   TrackProgramBuilder builder{track};
+  std::map<u32, DecodedCommand> commandsByOffset;
+  std::vector<u32> pendingBlocks{startOffset};
 
-  if (!linearizeMalformedControlFlow) {
-    std::map<u32, DecodedCommand> commandsByOffset;
-    std::vector<u32> pendingBlocks{startOffset};
-
-    while (!pendingBlocks.empty()) {
-      u32 offset = pendingBlocks.back();
-      pendingBlocks.pop_back();
-      while (hasSequenceBytes(reader, offset, 1, sequenceEnd) && !commandsByOffset.contains(offset)) {
-        auto decoded = decodeCommand(dialect, reader, sequenceOffset, sequenceEnd, offset);
-        for (const Address target : decoded.flow.staticTargets) {
-          if (target.value < sequenceEnd && !commandsByOffset.contains(target.value)) {
-            pendingBlocks.push_back(target.value);
-          }
+  while (!pendingBlocks.empty()) {
+    u32 offset = pendingBlocks.back();
+    pendingBlocks.pop_back();
+    while (hasBytecodeBytes(reader, offset, 1, sequenceEnd) && !commandsByOffset.contains(offset)) {
+      auto decoded = decodeCommand(dialect, reader, sequenceOffset, sequenceEnd, offset);
+      for (const Address target : decoded.flow.staticTargets) {
+        if (target.value < sequenceEnd && !commandsByOffset.contains(target.value)) {
+          pendingBlocks.push_back(target.value);
         }
-        const auto next = decoded.flow.fallthrough;
-        commandsByOffset.emplace(offset, std::move(decoded));
-        if (!next) {
-          break;
-        }
-        offset = next->value;
       }
+      const auto next = decoded.flow.fallthrough;
+      commandsByOffset.emplace(offset, std::move(decoded));
+      if (!next) {
+        break;
+      }
+      offset = next->value;
     }
-
-    for (const auto& [offset, decoded] : commandsByOffset) {
-      appendDecoded(builder, decoded, offset);
-    }
-    return track;
   }
 
+  for (const auto& [offset, decoded] : commandsByOffset) {
+    appendDecodedBytecodeCommand(builder, decoded, offset);
+  }
+  return track;
+}
+
+[[nodiscard]] TrackProgram decodeLegacyMalformedFallthrough(ByteReader reader, const SequenceDialect& dialect,
+                                                            u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
+                                                            u32 trackIndex) {
+  TrackProgram track = makeTrack(startOffset, trackIndex);
+  TrackProgramBuilder builder{track};
   u32 offset = startOffset;
   size_t decodedCommands = 0;
   std::set<u32> visitedControlDestinations;
   std::set<u32> decodedOffsets;
   std::set<u32> callTargetOffsets;
   std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
-  const CommandKindId callKind = handlerFor(dialect, Call::kind).kind;
-  const CommandKindId endKind = handlerFor(dialect, End::kind).kind;
-  const CommandKindId jumpKind = handlerFor(dialect, Jump::kind).kind;
+  const CommandKindId callKind = bytecodeHandlerFor<Call>(dialect).kind;
+  const CommandKindId endKind = bytecodeHandlerFor<End>(dialect).kind;
+  const CommandKindId jumpKind = bytecodeHandlerFor<Jump>(dialect).kind;
 
   while (!pendingBlocks.empty()) {
     const PendingBlock block = pendingBlocks.back();
     pendingBlocks.pop_back();
     offset = block.offset;
 
-    while (hasSequenceBytes(reader, offset, 1, sequenceEnd) && decodedCommands++ < kMaxTrackCommands) {
+    while (hasBytecodeBytes(reader, offset, 1, sequenceEnd) && decodedCommands++ < kMaxTrackCommands) {
       const u32 begin = offset;
       if (decodedOffsets.contains(begin)) {
         break;
@@ -654,8 +526,8 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& di
           // Some malformed FAT entries fall through one byte before a real call
           // target. Stop the fallthrough interpretation before it consumes the
           // overlapping subroutine bytes.
-          auto end = recordSizedCommand<End>(dialect, reader, begin, begin + 1);
-          appendDecoded(builder, end, begin);
+          auto end = recordSizedBytecodeCommand<End>(dialect, reader, begin, begin + 1);
+          appendDecodedBytecodeCommand(builder, end, begin);
           break;
         }
       }
@@ -663,13 +535,14 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& di
       if (decoded.kind == jumpKind && !decoded.flow.staticTargets.empty()) {
         const u32 destination = decoded.flow.staticTargets.front().value;
         if (visitedControlDestinations.contains(destination)) {
-          auto end = recordSizedCommand<End>(dialect, reader, begin, begin + 1);
-          appendDecoded(builder, end, begin);
+          auto end = recordSizedBytecodeCommand<End>(dialect, reader, begin, begin + 1);
+          appendDecodedBytecodeCommand(builder, end, begin);
           break;
         }
         visitedControlDestinations.insert(destination);
-        auto noOp = recordSizedCommand<NoOp>(dialect, reader, begin, static_cast<u32>(decoded.range.endOffset()));
-        appendDecoded(builder, noOp, begin);
+        auto noOp =
+            recordSizedBytecodeCommand<NoOp>(dialect, reader, begin, static_cast<u32>(decoded.range.endOffset()));
+        appendDecodedBytecodeCommand(builder, noOp, begin);
         offset = destination;
         continue;
       }
@@ -682,7 +555,7 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& di
       }
 
       const auto next = decoded.flow.fallthrough;
-      appendDecoded(builder, decoded, begin);
+      appendDecodedBytecodeCommand(builder, decoded, begin);
       if (!next || decoded.flow.terminal || decoded.kind == endKind) {
         break;
       }
@@ -693,39 +566,64 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& di
   return track;
 }
 
+}  // namespace
+
+SequenceDialect ndsSequenceDialect() {
+  return SequenceDialectBuilder<TrackState, Context>(kNdsSequenceDialectId, Context{})
+      .timebase(Timebase{.ppqn = 0x30})
+      .defaultBehavior(SequenceProgramBehavior{
+          .defaultLoopPolicy = LoopPolicy::PlayOnce,
+          .commandLimit = static_cast<u32>(kMaxTrackCommands),
+      })
+      .commands<NDS_COMMAND_TYPES>();
+}
+
+void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
+  registry.add(ndsSequenceDialect());
+}
+
+TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
+                                    u32 sequenceEnd, u32 startOffset, u32 trackIndex,
+                                    bool linearizeMalformedControlFlow) {
+  if (linearizeMalformedControlFlow) {
+    return decodeLegacyMalformedFallthrough(reader, dialect, sequenceOffset, sequenceEnd, startOffset, trackIndex);
+  }
+  return decodeReachableBlocks(reader, dialect, sequenceOffset, sequenceEnd, startOffset, trackIndex);
+}
+
 std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
   std::vector<u32> extraStarts;
   u32 offset = sequenceOffset + 0x1c;
-  if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
+  if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
     return {};
   }
 
   if (reader.u8At(offset) == 0xfe) {
-    if (!hasSequenceBytes(reader, offset, 3, sequenceEnd)) {
+    if (!hasBytecodeBytes(reader, offset, 3, sequenceEnd)) {
       return {offset};
     }
     offset += 3;
-    if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
+    if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
       return {offset};
     }
     u8 status = reader.u8At(offset);
     while (status == 0x80) {
       ++offset;
       static_cast<void>(readVarLen(reader, offset, sequenceEnd));
-      if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
+      if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
         return {offset};
       }
       status = reader.u8At(offset);
       break;
     }
 
-    while (status == 0x93 && hasSequenceBytes(reader, offset, 5, sequenceEnd)) {
+    while (status == 0x93 && hasBytecodeBytes(reader, offset, 5, sequenceEnd)) {
       if (const auto start = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset + 2);
           start && *start < sequenceEnd) {
         extraStarts.push_back(*start);
       }
       offset += 5;
-      if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
+      if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
         break;
       }
       status = reader.u8At(offset);
@@ -737,6 +635,9 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
   return starts;
 }
 
+#undef NDS_COMMAND_TYPES
+#undef NDS_IGNORED_COMMAND
 #undef NDS_COMMAND
+#undef NDS_KIND
 
 }  // namespace vgmtrans::formats::nds

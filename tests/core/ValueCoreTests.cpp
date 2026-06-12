@@ -45,7 +45,7 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectExecutesCallAndReturn();
 void ndsSequenceDialectDiscoversSecondaryTrackStarts();
-void ndsSequenceDialectPreservesIgnoredNoOpOperands();
+void ndsSequenceDialectPreservesIgnoredCommandOperands();
 
 namespace {
 
@@ -1890,7 +1890,7 @@ int main() {
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
     ndsSequenceDialectExecutesCallAndReturn();
     ndsSequenceDialectDiscoversSecondaryTrackStarts();
-    ndsSequenceDialectPreservesIgnoredNoOpOperands();
+    ndsSequenceDialectPreservesIgnoredCommandOperands();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;
