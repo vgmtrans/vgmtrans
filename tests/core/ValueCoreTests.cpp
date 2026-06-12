@@ -316,13 +316,7 @@ struct ProbeProgramCommand {
   static constexpr std::string_view kind = "probe.program";
   static constexpr std::string_view name = "Program";
 
-  static ProbeProgramCommand parse(CommandReader& in) {
-    return ProbeProgramCommand{.program = in.u8("program")};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("program", static_cast<u64>(program));
-  }
+  static ProbeProgramCommand parse(CommandReader& in) { return ProbeProgramCommand{.program = in.u8("program")}; }
 
   Effects execute(ProbeTrackState& state, Emit& out, VmApi&, const ProbeSequenceContext&) const {
     state.program = program;
@@ -347,11 +341,6 @@ struct ProbeNoteCommand {
     };
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("key", static_cast<u64>(key));
-    out.field("duration", static_cast<u64>(duration));
-  }
-
   Effects execute(ProbeTrackState& state, Emit& out, VmApi&, const ProbeSequenceContext& context) const {
     // This mirrors a source driver using the current track program as a key bank.
     out.note(NotePerformanceEvent{
@@ -373,10 +362,6 @@ struct ProbeJumpCommand {
     return ProbeJumpCommand{.destination = in.le16Address("destination")};
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("destination", destination);
-  }
-
   Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.jump(destination)};
   }
@@ -392,10 +377,6 @@ struct ProbeCallCommand {
     return ProbeCallCommand{.destination = in.le16Address("destination")};
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("destination", destination);
-  }
-
   Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.call(destination)};
   }
@@ -405,9 +386,7 @@ struct ProbeReturnCommand {
   static constexpr std::string_view kind = "probe.return";
   static constexpr std::string_view name = "Return";
 
-  static ProbeReturnCommand parse(CommandReader&) {
-    return ProbeReturnCommand{};
-  }
+  static ProbeReturnCommand parse(CommandReader&) { return ProbeReturnCommand{}; }
 
   Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.return_()};
@@ -430,14 +409,8 @@ struct ProbeRepeatCommand {
     };
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("slot", static_cast<u64>(slot));
-    out.field("count", static_cast<u64>(count));
-    out.field("destination", destination);
-  }
-
   Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
-    return Effects{.step = vm.repeatUntil(slot, count, destination)};
+    return vm.repeatUntilEffect(slot, count, destination);
   }
 };
 
@@ -445,9 +418,7 @@ struct ProbeEndCommand {
   static constexpr std::string_view kind = "probe.end";
   static constexpr std::string_view name = "End";
 
-  static ProbeEndCommand parse(CommandReader&) {
-    return ProbeEndCommand{};
-  }
+  static ProbeEndCommand parse(CommandReader&) { return ProbeEndCommand{}; }
 
   Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.end()};
@@ -553,9 +524,8 @@ void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
   };
   TrackProgramBuilder builder{track};
   const std::array<u8, 2> programBytes{0x80, 0x05};
-  const SourceCommand& command =
-      addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
-                                           programBytes);
+  const SourceCommand& command = addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0},
+                                                                      probeRange(0, programBytes.size()), programBytes);
 
   expect(track.commands.size() == 1, "track builder should append one source command");
   expect(track.commandBytes.size() == programBytes.size(), "track builder should pool command bytes");
@@ -614,8 +584,7 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
-                                       programBytes);
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
   const CommandId noteCommandId =
       addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes).id;
   addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
@@ -677,8 +646,7 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
-  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
-                                       programBytes);
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
   const CommandId noteCommand =
       addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes).id;
   const CommandId jumpCommand =
@@ -746,8 +714,7 @@ void sequenceVmUsesDialectCommandLimitDefault() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
-  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
-                                       programBytes);
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
 
@@ -758,9 +725,9 @@ void sequenceVmUsesDialectCommandLimitDefault() {
   };
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
-  expect(performance.diagnostics.size() == 1 &&
-             performance.diagnostics[0].message == "Sequence VM command limit reached",
-         "sequence VM should use dialect command limit when the program has no override");
+  expect(
+      performance.diagnostics.size() == 1 && performance.diagnostics[0].message == "Sequence VM command limit reached",
+      "sequence VM should use dialect command limit when the program has no override");
   expect(performance.tracks[0].events.size() == 2,
          "dialect command limit should stop execution before the looping jump command");
   expect(performance.tracks[0].endTick == 12, "command-limit stop should preserve ticks from commands already run");
@@ -786,8 +753,7 @@ void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{3}, probeRange(3, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{6}, probeRange(6, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{9}, probeRange(9, programBytes.size()),
-                                       programBytes);
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{9}, probeRange(9, programBytes.size()), programBytes);
 
   const SequenceProgram program{
       .dialect = dialect.id,

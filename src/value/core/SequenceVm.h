@@ -16,6 +16,11 @@ namespace vgmtrans::core {
 
 struct VmTrackRuntime;
 
+struct BranchResult {
+  bool taken = false;
+  Effects effects;
+};
+
 class Emit {
 public:
   Emit(PerformanceTrack& track, CommandId sourceCommand, u64 tick);
@@ -78,6 +83,8 @@ public:
   // eventually reason about repeat commands without each format reimplementing it.
   [[nodiscard]] Step repeatUntil(u8 slot, u32 count, Address destination);
   [[nodiscard]] Step repeatBreak(u8 slot, Address destination);
+  [[nodiscard]] Effects repeatUntilEffect(u8 slot, u32 count, Address destination);
+  [[nodiscard]] BranchResult repeatBreakBranch(u8 slot, Address destination);
 
   [[nodiscard]] u64 tick() const noexcept;
   void diagnostic(Diagnostic diagnostic);

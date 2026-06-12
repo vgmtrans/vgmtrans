@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -32,6 +31,34 @@ namespace {
   static constexpr u8 opcode = Op;              \
   CAPCOM_KIND(Suffix, DisplayName)
 
+// Keep the DSL limited to one-line state effects where the macro name carries
+// the whole source-driver meaning.
+#define CAPCOM_TOGGLE(Type, Op, Suffix, DisplayName, Member)                \
+  struct Type : NoOperands<Type> {                                          \
+    CAPCOM_COMMAND(Op, Suffix, DisplayName);                                \
+    void execute(Runtime& rt) const { rt.state.Member = !rt.state.Member; } \
+  }
+
+#define CAPCOM_SET_TRUE(Type, Op, Suffix, DisplayName, Member)  \
+  struct Type : NoOperands<Type> {                              \
+    CAPCOM_COMMAND(Op, Suffix, DisplayName);                    \
+    void execute(Runtime& rt) const { rt.state.Member = true; } \
+  }
+
+#define CAPCOM_U8_STATE(Type, Op, Suffix, DisplayName, Operand, Member) \
+  struct Type : U8Operand<Type> {                                       \
+    CAPCOM_COMMAND(Op, Suffix, DisplayName);                            \
+    static constexpr std::string_view operandName = Operand;            \
+    void execute(Runtime& rt) const { rt.state.Member = raw; }          \
+  }
+
+#define CAPCOM_S8_STATE(Type, Op, Suffix, DisplayName, Operand, Member) \
+  struct Type : S8Operand<Type> {                                       \
+    CAPCOM_COMMAND(Op, Suffix, DisplayName);                            \
+    static constexpr std::string_view operandName = Operand;            \
+    void execute(Runtime& rt) const { rt.state.Member = raw; }          \
+  }
+
 constexpr u8 kNoteOctaveMask = 0x07;
 constexpr u8 kNoteOctaveUpMask = 0x08;
 constexpr u8 kNoteDottedMask = 0x10;
@@ -43,6 +70,18 @@ struct Context {
 };
 
 struct TrackState {
+  u32 consumeNoteTicks(u8 rawDuration);
+  [[nodiscard]] u32 soundingTicks(u32 length) const;
+  [[nodiscard]] s32 sourceKey(u8 keyIndex) const;
+  [[nodiscard]] double performedKey(s32 key) const;
+  [[nodiscard]] bool extendsPreviousSlurredNote(s32 key) const;
+  void finishExtendedNote();
+  void finishNote(s32 key);
+  void applyAttributes(u8 attributes, Emit* out = nullptr);
+  void toggleSlur(Emit& out);
+  void emitPortamentoIfNeeded(s32 key, Emit& out);
+  void emitModulationDepths(Emit& out, bool enabled) const;
+
   u32 durationRate = 0xff;
   s32 transpose = 0;
   u32 noteOctave = 0;
@@ -84,33 +123,33 @@ using Runtime = CommandRuntime<TrackState, Context>;
   return 192u >> (7u - rawDuration);
 }
 
-[[nodiscard]] u32 noteTicks(u32 rawDuration, TrackState& state) {
+u32 TrackState::consumeNoteTicks(u8 rawDuration) {
   u32 length = baseNoteTicks(rawDuration);
-  if (state.noteDotted) {
+  if (noteDotted) {
     // Dotted is consumed by the next note/rest; triplet mode persists until toggled.
     length = (length % 2 == 0 && length < 0x80) ? length + (length / 2) : 0;
-    state.noteDotted = false;
-  } else if (state.noteTriplet) {
+    noteDotted = false;
+  } else if (noteTriplet) {
     length = length * 2 / 3;
   }
   return length;
 }
 
-[[nodiscard]] u32 soundingTicks(u32 length, const TrackState& state) {
-  u32 duration = length * state.durationRate;
-  if (state.noteSlurred || duration == 0) {
+u32 TrackState::soundingTicks(u32 length) const {
+  u32 duration = length * durationRate;
+  if (noteSlurred || duration == 0) {
     duration = length << 8;
   }
   duration = (duration + 0x80) >> 8;
   return duration == 0 ? 1 : duration;
 }
 
-[[nodiscard]] s32 driverSourceKey(u32 keyIndex, const TrackState& state) {
-  return static_cast<s32>(keyIndex) - 1 + static_cast<s32>(state.noteOctave * 12) + (state.noteOctaveUp ? 24 : 0);
+s32 TrackState::sourceKey(u8 keyIndex) const {
+  return static_cast<s32>(keyIndex) - 1 + static_cast<s32>(noteOctave * 12) + (noteOctaveUp ? 24 : 0);
 }
 
-[[nodiscard]] double performedKey(s32 key, const TrackState& state) {
-  return static_cast<double>(key + state.transpose);
+double TrackState::performedKey(s32 key) const {
+  return static_cast<double>(key + transpose);
 }
 
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(u32 rawTempo) {
@@ -139,35 +178,65 @@ using Runtime = CommandRuntime<TrackState, Context>;
   return std::clamp((static_cast<double>(converted.midiPan) / 127.0) * 2.0 - 1.0, -1.0, 1.0);
 }
 
-void emitLegatoChangeIfNeeded(bool wasSlurred, const TrackState& state, Emit& out) {
-  if (state.noteSlurred == wasSlurred) {
-    return;
-  }
-  out.legatoPedal(state.noteSlurred);
-}
-
-void applyNoteAttributes(u8 attributes, TrackState& state, Emit* out = nullptr) {
-  const bool wasSlurred = state.noteSlurred;
+void TrackState::applyAttributes(u8 attributes, Emit* out) {
+  const bool wasSlurred = noteSlurred;
   // The driver ORs octave bits instead of replacing them. Preserve that quirk until
   // parity proves a specific version behaves differently.
-  state.noteOctave |= attributes & kNoteOctaveMask;
-  state.noteDotted = state.noteDotted || ((attributes & kNoteDottedMask) != 0);
-  state.noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
-  state.noteTriplet = (attributes & kNoteTripletMask) != 0;
-  state.noteSlurred = (attributes & kNoteSlurredMask) != 0;
-  if (out != nullptr) {
-    emitLegatoChangeIfNeeded(wasSlurred, state, *out);
+  noteOctave |= attributes & kNoteOctaveMask;
+  noteDotted = noteDotted || ((attributes & kNoteDottedMask) != 0);
+  noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
+  noteTriplet = (attributes & kNoteTripletMask) != 0;
+  noteSlurred = (attributes & kNoteSlurredMask) != 0;
+  if (out != nullptr && noteSlurred != wasSlurred) {
+    out->legatoPedal(noteSlurred);
   }
 }
 
-void emitModulationDepths(const TrackState& state, Emit& out, bool enabled) {
-  if (state.vibratoDepth != 0) {
-    out.modulation(ModulationPerformanceTarget::VibratoDepth,
-                   enabled ? static_cast<double>(state.vibratoDepth) / 127.0 : 0.0);
+void TrackState::toggleSlur(Emit& out) {
+  const bool wasSlurred = noteSlurred;
+  noteSlurred = !noteSlurred;
+  if (noteSlurred != wasSlurred) {
+    out.legatoPedal(noteSlurred);
   }
-  if (state.tremoloDepth != 0) {
+}
+
+bool TrackState::extendsPreviousSlurredNote(s32 key) const {
+  return lastNoteSlurred && lastSourceKey && key == *lastSourceKey && !didRest;
+}
+
+void TrackState::finishExtendedNote() {
+  lastNoteSlurred = noteSlurred;
+}
+
+void TrackState::finishNote(s32 key) {
+  lastSourceKey = key;
+  didRest = false;
+  lastNoteSlurred = noteSlurred;
+}
+
+void TrackState::emitPortamentoIfNeeded(s32 key, Emit& out) {
+  if (portamentoMillisecondsPerCent <= 0.0 || !lastSourceKey) {
+    return;
+  }
+
+  const auto keyDistance = static_cast<u32>(std::abs(key - *lastSourceKey));
+  const auto portamentoTime = static_cast<u16>(keyDistance * 100 * portamentoMillisecondsPerCent);
+  if (portamentoTime != lastPortamentoTime) {
+    out.portamento(static_cast<double>(portamentoTime), static_cast<double>(*lastSourceKey + transpose));
+    lastPortamentoTime = portamentoTime;
+  } else {
+    out.portamentoControl(static_cast<double>(*lastSourceKey + transpose));
+  }
+}
+
+void TrackState::emitModulationDepths(Emit& out, bool enabled) const {
+  if (vibratoDepth != 0) {
+    out.modulation(ModulationPerformanceTarget::VibratoDepth,
+                   enabled ? static_cast<double>(vibratoDepth) / 127.0 : 0.0);
+  }
+  if (tremoloDepth != 0) {
     out.modulation(ModulationPerformanceTarget::TremoloDepth,
-                   enabled ? static_cast<double>(state.tremoloDepth) / 127.0 : 0.0);
+                   enabled ? static_cast<double>(tremoloDepth) / 127.0 : 0.0);
   }
 }
 
@@ -183,7 +252,7 @@ struct Rest {
   }
 
   Effects execute(Runtime& rt) const {
-    const u32 length = noteTicks(rawDuration, rt.state);
+    const u32 length = rt.state.consumeNoteTicks(rawDuration);
     rt.state.didRest = true;
     return rt.wait(length);
   }
@@ -208,35 +277,23 @@ struct Note {
 
   Effects execute(Runtime& rt) const {
     auto& state = rt.state;
-    const u32 length = noteTicks(rawDuration, state);
-    const s32 key = driverSourceKey(keyIndex, state);
-    const u32 duration = soundingTicks(length, state);
+    const u32 length = state.consumeNoteTicks(rawDuration);
+    const s32 key = state.sourceKey(keyIndex);
+    const u32 duration = state.soundingTicks(length);
 
-    if (state.lastNoteSlurred && state.lastSourceKey && key == *state.lastSourceKey && !state.didRest) {
+    if (state.extendsPreviousSlurredNote(key)) {
       // The Capcom driver treats repeated keys after a slurred note as a tie.
       // Legacy VGMTrans extends the previous MIDI note even if this note has
       // already cleared the slur bit, so the state must look at the previous note.
-      rt.out.note(performedKey(key, state), 1.0, duration, true);
-      state.lastNoteSlurred = state.noteSlurred;
+      rt.out.note(state.performedKey(key), 1.0, duration, true);
+      state.finishExtendedNote();
       return rt.wait(length);
     }
 
-    if (state.portamentoMillisecondsPerCent > 0.0 && state.lastSourceKey) {
-      const auto keyDistance = static_cast<u32>(std::abs(key - *state.lastSourceKey));
-      const auto portamentoTime = static_cast<u16>(keyDistance * 100 * state.portamentoMillisecondsPerCent);
-      if (portamentoTime != state.lastPortamentoTime) {
-        rt.out.portamento(static_cast<double>(portamentoTime),
-                          static_cast<double>(*state.lastSourceKey + state.transpose));
-        state.lastPortamentoTime = portamentoTime;
-      } else {
-        rt.out.portamentoControl(static_cast<double>(*state.lastSourceKey + state.transpose));
-      }
-    }
+    state.emitPortamentoIfNeeded(key, rt.out);
     // Slur is modeled as a one-tick overlap into the next source note.
-    rt.out.note(performedKey(key, state), 1.0, duration + (state.noteSlurred ? 1u : 0u));
-    state.lastSourceKey = key;
-    state.didRest = false;
-    state.lastNoteSlurred = state.noteSlurred;
+    rt.out.note(state.performedKey(key), 1.0, duration + (state.noteSlurred ? 1u : 0u));
+    state.finishNote(key);
     return rt.wait(length);
   }
 };
@@ -245,43 +302,20 @@ struct NoteAttributes : U8Operand<NoteAttributes> {
   CAPCOM_COMMAND(0x04, "note-attributes", "Note Attributes");
   static constexpr std::string_view operandName = "raw";
 
-  void execute(Runtime& rt) const { applyNoteAttributes(raw, rt.state, &rt.out); }
+  void execute(Runtime& rt) const { rt.state.applyAttributes(raw, &rt.out); }
 };
 
-struct Octave : U8Operand<Octave> {
-  CAPCOM_COMMAND(0x09, "octave", "Octave");
-  static constexpr std::string_view operandName = "octave";
-
-  void execute(Runtime& rt) const { rt.state.noteOctave = raw; }
-};
-
-struct ToggleTriplet : NoOperands<ToggleTriplet> {
-  CAPCOM_COMMAND(0x00, "toggle-triplet", "Toggle Triplet");
-
-  void execute(Runtime& rt) const { rt.state.noteTriplet = !rt.state.noteTriplet; }
-};
+CAPCOM_U8_STATE(Octave, 0x09, "octave", "Octave", "octave", noteOctave);
+CAPCOM_TOGGLE(ToggleTriplet, 0x00, "toggle-triplet", "Toggle Triplet", noteTriplet);
 
 struct ToggleSlur : NoOperands<ToggleSlur> {
   CAPCOM_COMMAND(0x01, "toggle-slur", "Toggle Slur");
 
-  void execute(Runtime& rt) const {
-    const bool wasSlurred = rt.state.noteSlurred;
-    rt.state.noteSlurred = !rt.state.noteSlurred;
-    emitLegatoChangeIfNeeded(wasSlurred, rt.state, rt.out);
-  }
+  void execute(Runtime& rt) const { rt.state.toggleSlur(rt.out); }
 };
 
-struct DottedNote : NoOperands<DottedNote> {
-  CAPCOM_COMMAND(0x02, "dotted-note", "Dotted Note");
-
-  void execute(Runtime& rt) const { rt.state.noteDotted = true; }
-};
-
-struct ToggleOctaveUp : NoOperands<ToggleOctaveUp> {
-  CAPCOM_COMMAND(0x03, "toggle-octave-up", "Toggle Octave Up");
-
-  void execute(Runtime& rt) const { rt.state.noteOctaveUp = !rt.state.noteOctaveUp; }
-};
+CAPCOM_SET_TRUE(DottedNote, 0x02, "dotted-note", "Dotted Note", noteDotted);
+CAPCOM_TOGGLE(ToggleOctaveUp, 0x03, "toggle-octave-up", "Toggle Octave Up", noteOctaveUp);
 
 struct GlobalTranspose {
   s8 raw = 0;
@@ -293,24 +327,13 @@ struct GlobalTranspose {
   void execute(Runtime& rt) const { rt.out.globalTranspose(raw); }
 };
 
-struct Transpose {
-  s8 raw = 0;
-
-  CAPCOM_COMMAND(0x0b, "transpose", "Transpose");
-
-  static Transpose parse(CommandReader& in) { return Transpose{.raw = in.s8("semitones")}; }
-
-  void execute(Runtime& rt) const { rt.state.transpose = raw; }
-};
+CAPCOM_S8_STATE(Transpose, 0x0b, "transpose", "Transpose", "semitones", transpose);
 
 struct Tuning : S8Operand<Tuning> {
   CAPCOM_COMMAND(0x0c, "tuning", "Tuning");
   static constexpr std::string_view operandName = "tuning";
 
-  void describe(CommandInfo& out) const {
-    out.field("raw", raw);
-    out.field("cents", tuningCents(raw));
-  }
+  void describe(CommandInfo& out) const { out.field("cents", tuningCents(raw)); }
 
   void execute(Runtime& rt) const { rt.out.tuning(tuningCents(raw)); }
 };
@@ -330,20 +353,12 @@ struct Tempo : Be16Operand<Tempo> {
   CAPCOM_COMMAND(0x05, "tempo", "Tempo");
   static constexpr std::string_view operandName = "raw";
 
-  void describe(CommandInfo& out) const {
-    out.field("raw", raw);
-    out.field("microseconds_per_quarter", tempoMicrosecondsPerQuarter(raw));
-  }
+  void describe(CommandInfo& out) const { out.field("microseconds_per_quarter", tempoMicrosecondsPerQuarter(raw)); }
 
   void execute(Runtime& rt) const { rt.out.tempo(tempoMicrosecondsPerQuarter(raw)); }
 };
 
-struct DurationRate : U8Operand<DurationRate> {
-  CAPCOM_COMMAND(0x06, "duration-rate", "Duration Rate");
-  static constexpr std::string_view operandName = "rate";
-
-  void execute(Runtime& rt) const { rt.state.durationRate = raw; }
-};
+CAPCOM_U8_STATE(DurationRate, 0x06, "duration-rate", "Duration Rate", "rate", durationRate);
 
 struct RepeatUntil {
   u8 slot = 0;
@@ -368,7 +383,7 @@ struct RepeatUntil {
     }
 
     // Capcom stores the number of replays. The VM helper receives total plays.
-    return Effects{.step = rt.vm.repeatUntil(slot, static_cast<u32>(count) + 1, destination)};
+    return rt.vm.repeatUntilEffect(slot, static_cast<u32>(count) + 1, destination);
   }
 };
 
@@ -390,11 +405,11 @@ struct RepeatBreak {
   }
 
   Effects execute(Runtime& rt) const {
-    const Step step = rt.vm.repeatBreak(slot, destination);
-    if (step.kind == Step::Kind::Jump) {
-      applyNoteAttributes(attributes, rt.state, &rt.out);
+    const BranchResult branch = rt.vm.repeatBreakBranch(slot, destination);
+    if (branch.taken) {
+      rt.state.applyAttributes(attributes, &rt.out);
     }
-    return Effects{.step = step};
+    return branch.effects;
   }
 };
 
@@ -403,7 +418,6 @@ struct Volume : U8Operand<Volume> {
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out, const Context& context) const {
-    out.field("raw", raw);
     out.field("linear_gain", volumeGain(context.version, raw));
   }
 
@@ -412,7 +426,7 @@ struct Volume : U8Operand<Volume> {
 
 struct Program : U8Operand<Program> {
   CAPCOM_COMMAND(0x08, "program", "Program");
-  static constexpr std::string_view operandName = "program";
+  static constexpr std::string_view operandName = "raw";
 
   [[nodiscard]] u32 bank() const { return raw >> 7; }
   [[nodiscard]] u32 program() const { return raw & 0x7f; }
@@ -451,7 +465,6 @@ struct Pan : U8Operand<Pan> {
 
   void describe(CommandInfo& out, const Context& context) const {
     const auto pan = conversion(context);
-    out.field("raw", raw);
     out.field("stereo_position", stereoPosition(pan));
     out.field("linear_gain", pan.volumeScale);
   }
@@ -467,7 +480,6 @@ struct MasterVolume : U8Operand<MasterVolume> {
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out, const Context& context) const {
-    out.field("raw", raw);
     out.field("linear_gain", volumeGain(context.version, raw));
   }
 
@@ -485,11 +497,6 @@ struct Lfo {
         .type = in.u8("type"),
         .value = in.u8("value"),
     };
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("type", type);
-    out.field("value", value);
   }
 
   void execute(Runtime& rt) const {
@@ -513,9 +520,9 @@ struct Lfo {
         state.modulationRate = value;
         const bool isEnabled = state.modulationRate != 0;
         if (!isEnabled && wasEnabled) {
-          emitModulationDepths(state, rt.out, false);
+          state.emitModulationDepths(rt.out, false);
         } else if (isEnabled && !wasEnabled) {
-          emitModulationDepths(state, rt.out, true);
+          state.emitModulationDepths(rt.out, true);
         }
 
         const double rate = static_cast<double>(::capcom_snes::lfoRateByteToMidiValue(value)) / 127.0;
@@ -544,18 +551,18 @@ struct EchoParam {
         .preset = in.u8("preset"),
     };
   }
-
-  void describe(CommandInfo& out) const {
-    out.field("argument", argument);
-    out.field("preset", preset);
-  }
 };
 
-struct EchoOnOff : U8Operand<EchoOnOff> {
-  CAPCOM_COMMAND(0x1c, "echo-on-off", "Echo On/Off");
-  static constexpr std::string_view operandName = "enabled";
+struct EchoOnOff {
+  u8 raw = 0;
 
-  void describe(CommandInfo& out) const { out.field("enabled", static_cast<u8>(raw & 1)); }
+  CAPCOM_COMMAND(0x1c, "echo-on-off", "Echo On/Off");
+
+  static EchoOnOff parse(CommandReader& in) {
+    EchoOnOff result{.raw = in.u8("raw")};
+    in.derived("enabled", static_cast<u64>(result.raw & 1));
+    return result;
+  }
 
   void execute(Runtime& rt) const { rt.out.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0); }
 };
@@ -564,10 +571,7 @@ struct ReleaseRate : U8Operand<ReleaseRate> {
   CAPCOM_COMMAND(0x1d, "release-rate", "Release Rate");
   static constexpr std::string_view operandName = "raw";
 
-  void describe(CommandInfo& out) const {
-    out.field("raw", raw);
-    out.field("gain", static_cast<u8>(raw | 0xa0));
-  }
+  void describe(CommandInfo& out) const { out.field("gain", static_cast<u8>(raw | 0xa0)); }
 };
 
 struct Nop : NoOperands<Nop> {
@@ -581,15 +585,11 @@ struct UnknownOneByte {
   CAPCOM_KIND("unknown-one-byte", "Unknown One-Byte Event");
 
   static UnknownOneByte parse(CommandReader& in) {
+    in.derived("opcode", static_cast<u64>(in.opcode()));
     return UnknownOneByte{
         .opcode = in.opcode(),
         .value = in.u8("value"),
     };
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("opcode", opcode);
-    out.field("value", value);
   }
 };
 
@@ -598,9 +598,10 @@ struct UnknownOpcode {
 
   CAPCOM_KIND("unknown", "Unknown Opcode");
 
-  static UnknownOpcode parse(CommandReader& in) { return UnknownOpcode{.opcode = in.opcode()}; }
-
-  void describe(CommandInfo& out) const { out.field("opcode", opcode); }
+  static UnknownOpcode parse(CommandReader& in) {
+    in.derived("opcode", static_cast<u64>(in.opcode()));
+    return UnknownOpcode{.opcode = in.opcode()};
+  }
 
   Effects execute(Runtime& rt) const {
     rt.vm.diagnostic(Diagnostic{
@@ -611,38 +612,109 @@ struct UnknownOpcode {
   }
 };
 
-#define CAPCOM_COMMAND_TYPES                                                                                        \
-  Rest, Note, ToggleTriplet, ToggleSlur, DottedNote, ToggleOctaveUp, NoteAttributes, Octave, GlobalTranspose,       \
-      Transpose, Tuning, PortamentoTime, Tempo, DurationRate, Volume, Program, RepeatUntil, RepeatBreak, Jump, End, \
-      Pan, MasterVolume, Lfo, EchoParam, EchoOnOff, ReleaseRate, Nop, UnknownOneByte, UnknownOpcode
+#define CAPCOM_FALLTHROUGH_COMMANDS(X) \
+  X(ToggleTriplet)                     \
+  X(ToggleSlur)                        \
+  X(DottedNote)                        \
+  X(ToggleOctaveUp)                    \
+  X(NoteAttributes)                    \
+  X(Tempo)                             \
+  X(DurationRate)                      \
+  X(Volume)                            \
+  X(Program)                           \
+  X(Octave)                            \
+  X(GlobalTranspose)                   \
+  X(Transpose)                         \
+  X(Tuning)                            \
+  X(PortamentoTime)                    \
+  X(Pan)                               \
+  X(MasterVolume)                      \
+  X(Lfo)                               \
+  X(EchoParam)                         \
+  X(EchoOnOff)                         \
+  X(ReleaseRate)
 
-struct AppendCommandResult {
-  bool ok = false;
-  u32 nextOffset = 0;
-};
+#define CAPCOM_TYPE(Type) Type,
+#define CAPCOM_COMMAND_TYPES                                                                                     \
+  Rest, Note, CAPCOM_FALLTHROUGH_COMMANDS(CAPCOM_TYPE) RepeatUntil, RepeatBreak, Jump, End, Nop, UnknownOneByte, \
+      UnknownOpcode
 
 template <class Command>
-void appendFixedCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, ByteReader reader,
-                        u32 beginOffset, u32 size) {
-  const auto decoded = recordSizedBytecodeCommand<Command>(dialect, reader, beginOffset, beginOffset + size);
-  appendDecodedBytecodeCommand(builder, decoded, beginOffset);
+[[nodiscard]] DecodedBytecodeCommand capcomFallthroughCommand(const SequenceDialect& dialect, ByteReader reader,
+                                                              u32 begin) {
+  return recordAutoFallthroughBytecodeCommand<Command, UnknownOpcode>(dialect, reader, begin,
+                                                                      static_cast<u32>(reader.size()));
 }
 
-template <class Command>
-AppendCommandResult appendCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, ByteReader reader,
-                                  u32 beginOffset) {
-  if (!reader.has(beginOffset, 1)) {
-    return AppendCommandResult{.ok = false, .nextOffset = beginOffset};
-  }
-
-  const auto parsed = parseBytecodeCommand<Command>(dialect, reader, beginOffset, static_cast<u32>(reader.size()));
+[[nodiscard]] DecodedBytecodeCommand capcomJumpCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin) {
+  auto parsed = parseBytecodeCommand<Jump>(dialect, reader, begin, static_cast<u32>(reader.size()));
   if (!parsed) {
-    appendFixedCommand<UnknownOpcode>(builder, dialect, reader, beginOffset, 1);
-    return AppendCommandResult{.ok = false, .nextOffset = beginOffset + 1};
+    return truncatedBytecodeCommand<UnknownOpcode>(dialect, reader, begin, static_cast<u32>(reader.size()));
+  }
+  auto decoded = std::move(parsed->decoded);
+  decoded.flow.staticTargets = {parsed->command.destination};
+  return decoded;
+}
+
+[[nodiscard]] DecodedBytecodeCommand capcomEndCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin) {
+  auto decoded = recordAutoBytecodeCommand<End, UnknownOpcode>(dialect, reader, begin, static_cast<u32>(reader.size()));
+  decoded.flow.terminal = true;
+  return decoded;
+}
+
+[[nodiscard]] DecodedBytecodeCommand capcomUnknownCommand(const SequenceDialect& dialect, ByteReader reader,
+                                                          u32 begin) {
+  return terminalBytecodeCommand<UnknownOpcode>(dialect, reader, begin, begin + 1);
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeCapcomCommand(ByteReader reader, const SequenceDialect& dialect, u32 begin) {
+#define CAPCOM_EMIT(Type) return capcomFallthroughCommand<Type>(dialect, reader, begin);
+#define CAPCOM_CASE(Type) \
+  case Type::opcode:      \
+    CAPCOM_EMIT(Type)
+
+  const u8 opcode = reader.u8At(begin);
+  if (opcode >= 0x20) {
+    if ((opcode & 0x1f) == 0) {
+      CAPCOM_EMIT(Rest);
+    }
+    CAPCOM_EMIT(Note);
   }
 
-  appendDecodedBytecodeCommand(builder, parsed->decoded, beginOffset);
-  return AppendCommandResult{.ok = true, .nextOffset = static_cast<u32>(parsed->decoded.range.endOffset())};
+  switch (opcode) {
+    CAPCOM_FALLTHROUGH_COMMANDS(CAPCOM_CASE)
+
+    case 0x0e:
+    case 0x0f:
+    case 0x10:
+    case 0x11:
+      CAPCOM_EMIT(RepeatUntil);
+
+    case 0x12:
+    case 0x13:
+    case 0x14:
+    case 0x15:
+      CAPCOM_EMIT(RepeatBreak);
+
+    case Jump::opcode:
+      return capcomJumpCommand(dialect, reader, begin);
+
+    case End::opcode:
+      return capcomEndCommand(dialect, reader, begin);
+
+    case 0x1e:
+    case 0x1f:
+      if (dialect.id.value == "capcom-snes:v1") {
+        CAPCOM_EMIT(UnknownOneByte);
+      }
+      CAPCOM_EMIT(Nop);
+
+    default:
+      return capcomUnknownCommand(dialect, reader, begin);
+  }
+
+#undef CAPCOM_CASE
+#undef CAPCOM_EMIT
 }
 
 [[nodiscard]] std::string dialectId(CapcomSnesEngineVersion version) {
@@ -682,130 +754,18 @@ void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
 
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sourceTrackNumber,
                                          u32 startAddress) {
-#define CAPCOM_EMIT(Type)                                                            \
-  do {                                                                               \
-    const auto decoded = appendCommand<Type>(builder, dialect, reader, beginOffset); \
-    if (!decoded.ok) {                                                               \
-      return track;                                                                  \
-    }                                                                                \
-    offset = decoded.nextOffset;                                                     \
-  } while (false)
-#define CAPCOM_CASE(Type) \
-  case Type::opcode:      \
-    CAPCOM_EMIT(Type);    \
-    break
-
-  TrackProgram track{
-      .id = TrackId{sourceTrackNumber},
-      .sourceTrackNumber = sourceTrackNumber,
-      .startAddress = Address{startAddress},
-  };
-  TrackProgramBuilder builder{track};
-
-  std::set<u32> visitedOffsets;
-  u32 offset = startAddress;
-  while (reader.has(offset, 1) && track.commands.size() < 4096) {
-    if (!visitedOffsets.insert(offset).second) {
-      break;
-    }
-
-    const u32 beginOffset = offset;
-    const u8 opcode = reader.u8At(offset++);
-    if (opcode >= 0x20) {
-      if ((opcode & 0x1f) == 0) {
-        CAPCOM_EMIT(Rest);
-      } else {
-        CAPCOM_EMIT(Note);
-      }
-      continue;
-    }
-
-    switch (opcode) {
-      CAPCOM_CASE(ToggleTriplet);
-      CAPCOM_CASE(ToggleSlur);
-      CAPCOM_CASE(DottedNote);
-      CAPCOM_CASE(ToggleOctaveUp);
-      CAPCOM_CASE(NoteAttributes);
-      CAPCOM_CASE(Tempo);
-      CAPCOM_CASE(DurationRate);
-      CAPCOM_CASE(Volume);
-      CAPCOM_CASE(Program);
-      CAPCOM_CASE(Octave);
-      CAPCOM_CASE(GlobalTranspose);
-      CAPCOM_CASE(Transpose);
-      CAPCOM_CASE(Tuning);
-      CAPCOM_CASE(PortamentoTime);
-
-      case 0x0e:
-      case 0x0f:
-      case 0x10:
-      case 0x11:
-        CAPCOM_EMIT(RepeatUntil);
-        break;
-
-      case 0x12:
-      case 0x13:
-      case 0x14:
-      case 0x15:
-        CAPCOM_EMIT(RepeatBreak);
-        break;
-
-      case Jump::opcode:
-        if (const auto decoded = appendCommand<Jump>(builder, dialect, reader, beginOffset); !decoded.ok) {
-          return track;
-        }
-        offset = reader.be16(beginOffset + 1);
-        break;
-
-      case End::opcode:
-        CAPCOM_EMIT(End);
-        return track;
-
-      case Pan::opcode:
-        CAPCOM_EMIT(Pan);
-        break;
-
-      case MasterVolume::opcode:
-        CAPCOM_EMIT(MasterVolume);
-        break;
-
-      case Lfo::opcode:
-        CAPCOM_EMIT(Lfo);
-        break;
-
-      case EchoParam::opcode:
-        CAPCOM_EMIT(EchoParam);
-        break;
-
-      case EchoOnOff::opcode:
-        CAPCOM_EMIT(EchoOnOff);
-        break;
-
-      case ReleaseRate::opcode:
-        CAPCOM_EMIT(ReleaseRate);
-        break;
-
-      case 0x1e:
-      case 0x1f:
-        if (dialect.id.value == "capcom-snes:v1") {
-          CAPCOM_EMIT(UnknownOneByte);
-        } else {
-          CAPCOM_EMIT(Nop);
-        }
-        break;
-
-      default:
-        appendFixedCommand<UnknownOpcode>(builder, dialect, reader, beginOffset, 1);
-        return track;
-    }
-  }
-
-#undef CAPCOM_EMIT
-#undef CAPCOM_CASE
-  return track;
+  return decodeLinearBytecodeTrack(reader, sourceTrackNumber, startAddress,
+                                   LinearBytecodeDecodePolicy{.maxCommands = 4096},
+                                   [&](u32 offset) { return decodeCapcomCommand(reader, dialect, offset); });
 }
 
 #undef CAPCOM_COMMAND_TYPES
+#undef CAPCOM_TYPE
+#undef CAPCOM_FALLTHROUGH_COMMANDS
+#undef CAPCOM_S8_STATE
+#undef CAPCOM_U8_STATE
+#undef CAPCOM_SET_TRUE
+#undef CAPCOM_TOGGLE
 #undef CAPCOM_COMMAND
 #undef CAPCOM_KIND
 

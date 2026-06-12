@@ -80,8 +80,8 @@ struct CommandInfo {
   void field(std::string fieldName, Address value);
 };
 
-using DescribeSourceCommand =
-    void (*)(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any& context);
+using DescribeSourceCommand = void (*)(const SourceCommand&, const TrackProgram&, CommandInfo&,
+                                       const std::any& context);
 using ExecuteSourceCommand = Effects (*)(const SourceCommand&, const TrackProgram&, std::any& trackState, Emit& out,
                                          VmApi& vm, const std::any& context);
 using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&, const std::any& context);
@@ -94,6 +94,11 @@ struct CommandHandler {
   std::string detailKind;
   DescribeSourceCommand describe = nullptr;
   ExecuteSourceCommand execute = nullptr;
+};
+
+struct PreservedSourceCommandSpec {
+  std::string_view kind;
+  std::string_view name;
 };
 
 struct SequenceDialect {
@@ -154,25 +159,28 @@ concept HasDescribeWithContext =
     requires(const Command& command, CommandInfo& out, const Context& context) { command.describe(out, context); };
 
 template <class Command, class TrackState, class Context>
-concept HasRuntimeEffectsExecute =
-    requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
-      { command.execute(rt) } -> std::same_as<Effects>;
-    };
-
-template <class Command, class TrackState, class Context>
-concept HasRuntimeVoidExecute =
-    requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
-      { command.execute(rt) } -> std::same_as<void>;
-    };
-
-template <class Command, class TrackState, class Context>
-concept HasLegacyExecute = requires(const Command& command,
-                                    TrackState& state,
-                                    Emit& out,
-                                    VmApi& vm,
-                                    const Context& context) {
-  { command.execute(state, out, vm, context) } -> std::same_as<Effects>;
+concept HasRuntimeEffectsExecute = requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
+  { command.execute(rt) } -> std::same_as<Effects>;
 };
+
+template <class Command, class TrackState, class Context>
+concept HasRuntimeVoidExecute = requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
+  { command.execute(rt) } -> std::same_as<void>;
+};
+
+template <class Command, class TrackState, class Context>
+concept HasLegacyExecute =
+    requires(const Command& command, TrackState& state, Emit& out, VmApi& vm, const Context& context) {
+      { command.execute(state, out, vm, context) } -> std::same_as<Effects>;
+    };
+
+inline void describePreservedSourceCommand(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any&) {
+}
+
+inline Effects executePreservedSourceCommand(const SourceCommand&, const TrackProgram&, std::any&, Emit&, VmApi&,
+                                             const std::any&) {
+  return Effects::none();
+}
 
 template <class TrackState, class Context>
 std::any createTrackState(const SequenceProgram& program, const TrackProgram& track, const std::any& context) {
@@ -186,7 +194,8 @@ std::any createTrackState(const SequenceProgram& program, const TrackProgram& tr
 }
 
 template <class Command, class Context>
-void describeCommand(const SourceCommand& record, const TrackProgram& track, CommandInfo& out, const std::any& context) {
+void describeCommand(const SourceCommand& record, const TrackProgram& track, CommandInfo& out,
+                     const std::any& context) {
   CommandReader reader{record.range, track.bytesFor(record)};
   const Command command = Command::parse(reader);
   out.name = std::string(Command::name);
@@ -195,10 +204,6 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
     command.describe(out, std::any_cast<const Context&>(context));
   } else if constexpr (HasDescribe<Command>) {
     command.describe(out);
-  } else {
-    for (const CommandOperand& operand : track.operandsFor(record)) {
-      std::visit([&](const auto& value) { out.field(operand.name, value); }, operand.value);
-    }
   }
 }
 
@@ -248,6 +253,14 @@ public:
     return *this;
   }
 
+  template <class Spec>
+  SequenceDialectBuilder& preservedCommands(std::span<const Spec> specs) {
+    for (const Spec& spec : specs) {
+      addPreservedCommand(spec);
+    }
+    return *this;
+  }
+
   template <class... Commands>
   SequenceDialect commands() {
     (addCommand<Commands>(), ...);
@@ -255,18 +268,29 @@ public:
   }
 
 private:
-  template <class Command>
-  void addCommand() {
+  void addHandler(std::string_view kindName, std::string_view name, DescribeSourceCommand describe,
+                  ExecuteSourceCommand execute) {
     const auto index = static_cast<u32>(dialect_.handlers.size());
     dialect_.handlers.push_back(CommandHandler{
         .id = CommandHandlerId{index},
         .kind = CommandKindId{index},
-        .kindName = std::string(Command::kind),
-        .name = std::string(Command::name),
-        .detailKind = std::string(Command::kind),
-        .describe = detail::describeCommand<Command, Context>,
-        .execute = detail::executeCommand<Command, TrackState, Context>,
+        .kindName = std::string(kindName),
+        .name = std::string(name),
+        .detailKind = std::string(kindName),
+        .describe = describe,
+        .execute = execute,
     });
+  }
+
+  template <class Spec>
+  void addPreservedCommand(const Spec& spec) {
+    addHandler(spec.kind, spec.name, detail::describePreservedSourceCommand, detail::executePreservedSourceCommand);
+  }
+
+  template <class Command>
+  void addCommand() {
+    addHandler(Command::kind, Command::name, detail::describeCommand<Command, Context>,
+               detail::executeCommand<Command, TrackState, Context>);
   }
 
   SequenceDialect dialect_;

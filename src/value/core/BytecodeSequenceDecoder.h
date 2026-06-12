@@ -10,7 +10,9 @@
 #include "value/core/Source.h"
 
 #include <algorithm>
+#include <map>
 #include <optional>
+#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -59,18 +61,13 @@ struct Be16Operand {
   }
 };
 
-template <class Derived, size_t OperandBytes>
-struct RawBytesOperand {
-  static constexpr u32 operandBytes = OperandBytes;
-  std::string bytes;
-
-  static Derived parse(CommandReader& in) {
-    Derived result;
-    if constexpr (OperandBytes > 0) {
-      result.bytes = in.rawBytes("bytes", OperandBytes);
-    }
-    return result;
-  }
+// Preserve source-driver commands that should remain visible/clickable in the
+// source view even when they have no current performance effect.
+struct PreservedBytecodeCommandSpec {
+  u8 opcode = 0;
+  std::string_view kind;
+  std::string_view name;
+  u32 operandBytes = 0;
 };
 
 // Temporary decoded form used while a bytecode decoder is deciding control flow.
@@ -94,13 +91,41 @@ struct ParsedBytecodeCommand {
   return offset <= end && size <= end - offset && reader.has(offset, size);
 }
 
-template <class Command>
-[[nodiscard]] const CommandHandler& bytecodeHandlerFor(const SequenceDialect& dialect) {
-  const auto* handler = dialect.handlerForKind(Command::kind);
+[[nodiscard]] inline const CommandHandler& bytecodeHandlerForKind(const SequenceDialect& dialect,
+                                                                  std::string_view kind) {
+  const auto* handler = dialect.handlerForKind(kind);
   if (handler == nullptr) {
     throw std::logic_error("Sequence bytecode command was not registered in its dialect");
   }
   return *handler;
+}
+
+template <class Command>
+[[nodiscard]] const CommandHandler& bytecodeHandlerFor(const SequenceDialect& dialect) {
+  return bytecodeHandlerForKind(dialect, Command::kind);
+}
+
+[[nodiscard]] inline DecodedBytecodeCommand recordSizedPreservedBytecodeCommand(
+    const SequenceDialect& dialect, ByteReader reader, u32 begin, u32 end, const PreservedBytecodeCommandSpec& spec) {
+  const auto& handler = bytecodeHandlerForKind(dialect, spec.kind);
+  const SourceRange range = reader.range(begin, end - begin);
+  const auto bytes = reader.slice(begin, end - begin);
+  std::vector<u8> ownedBytes{bytes.begin(), bytes.end()};
+  std::vector<CommandOperand> operands;
+  CommandReader commandReader{range, ownedBytes, &operands};
+  if (spec.operandBytes > 0) {
+    static_cast<void>(commandReader.rawBytes("bytes", spec.operandBytes));
+  }
+  if (!commandReader.done()) {
+    throw std::invalid_argument("Preserved bytecode command left trailing source bytes");
+  }
+  return DecodedBytecodeCommand{
+      .handler = handler.id,
+      .kind = handler.kind,
+      .range = range,
+      .bytes = std::move(ownedBytes),
+      .operands = std::move(operands),
+  };
 }
 
 template <class Command>
@@ -205,23 +230,115 @@ template <class Command, class TerminalCommand>
   return decoded;
 }
 
-// Preserve an ignored source-driver command as its own typed command. It has no
-// performance effect, but the UI can still show its bytes and operand range.
-template <class IgnoredCommand, class TerminalCommand>
-[[nodiscard]] DecodedBytecodeCommand recordIgnoredBytecodeCommand(const SequenceDialect& dialect, ByteReader reader,
-                                                                  u32 bytecodeEnd, u32 begin, u32 operandOffset,
-                                                                  u32 operandBytes) {
-  if (!hasBytecodeBytes(reader, operandOffset, operandBytes, bytecodeEnd)) {
+template <class TerminalCommand>
+[[nodiscard]] DecodedBytecodeCommand recordPreservedBytecodeCommand(const SequenceDialect& dialect, ByteReader reader,
+                                                                    u32 bytecodeEnd, u32 begin, u32 operandOffset,
+                                                                    const PreservedBytecodeCommandSpec& spec) {
+  if (!hasBytecodeBytes(reader, operandOffset, spec.operandBytes, bytecodeEnd)) {
     return terminalBytecodeCommand<TerminalCommand>(dialect, reader, begin, operandOffset);
   }
-  auto decoded = recordSizedBytecodeCommand<IgnoredCommand>(dialect, reader, begin, operandOffset + operandBytes);
-  decoded.flow.fallthrough = Address{operandOffset + operandBytes};
+  auto decoded = recordSizedPreservedBytecodeCommand(dialect, reader, begin, operandOffset + spec.operandBytes, spec);
+  decoded.flow.fallthrough = Address{operandOffset + spec.operandBytes};
   return decoded;
 }
 
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
                                          u32 offset) {
   builder.addDecoded(decoded.handler, decoded.kind, Address{offset}, decoded.range, decoded.bytes, decoded.operands);
+}
+
+// Common walkers own traversal mechanics and limits. Formats still own opcode
+// decoding and control-flow classification for their source driver.
+struct LinearBytecodeDecodePolicy {
+  u32 maxCommands = 4096;
+  bool stopAtVisitedOffset = true;
+  bool followUnconditionalJumps = true;
+};
+
+template <class DecodeCommand>
+[[nodiscard]] TrackProgram decodeLinearBytecodeTrack(ByteReader reader, u32 sourceTrackNumber, u32 startAddress,
+                                                     LinearBytecodeDecodePolicy policy, DecodeCommand decodeCommand) {
+  TrackProgram track{
+      .id = TrackId{sourceTrackNumber},
+      .sourceTrackNumber = sourceTrackNumber,
+      .startAddress = Address{startAddress},
+  };
+  TrackProgramBuilder builder{track};
+  std::set<u32> visitedOffsets;
+  u32 offset = startAddress;
+
+  while (reader.has(offset, 1) && track.commands.size() < policy.maxCommands) {
+    if (policy.stopAtVisitedOffset && !visitedOffsets.insert(offset).second) {
+      break;
+    }
+
+    const u32 begin = offset;
+    auto decoded = decodeCommand(begin);
+    const auto next = decoded.flow.fallthrough;
+    const bool terminal = decoded.flow.terminal;
+    const auto targets = decoded.flow.staticTargets;
+    appendDecodedBytecodeCommand(builder, decoded, begin);
+
+    if (terminal) {
+      break;
+    }
+    if (next) {
+      offset = next->value;
+      continue;
+    }
+    if (policy.followUnconditionalJumps && targets.size() == 1) {
+      offset = targets.front().value;
+      continue;
+    }
+    break;
+  }
+
+  return track;
+}
+
+struct ReachableBytecodeDecodePolicy {
+  u32 maxCommands = 262144;
+};
+
+template <class DecodeCommand>
+[[nodiscard]] TrackProgram decodeReachableBytecodeBlocks(ByteReader reader, u32 bytecodeEnd, u32 startOffset,
+                                                         u32 trackIndex, ReachableBytecodeDecodePolicy policy,
+                                                         DecodeCommand decodeCommand) {
+  TrackProgram track{
+      .id = TrackId{trackIndex},
+      .sourceTrackNumber = trackIndex,
+      .startAddress = Address{startOffset},
+  };
+  TrackProgramBuilder builder{track};
+  std::map<u32, DecodedBytecodeCommand> commandsByOffset;
+  std::vector<u32> pendingBlocks{startOffset};
+  size_t decodedCommands = 0;
+
+  while (!pendingBlocks.empty() && decodedCommands < policy.maxCommands) {
+    u32 offset = pendingBlocks.back();
+    pendingBlocks.pop_back();
+    while (hasBytecodeBytes(reader, offset, 1, bytecodeEnd) && !commandsByOffset.contains(offset) &&
+           decodedCommands < policy.maxCommands) {
+      auto decoded = decodeCommand(offset);
+      ++decodedCommands;
+      for (const Address target : decoded.flow.staticTargets) {
+        if (target.value < bytecodeEnd && !commandsByOffset.contains(target.value)) {
+          pendingBlocks.push_back(target.value);
+        }
+      }
+      const auto next = decoded.flow.fallthrough;
+      commandsByOffset.emplace(offset, std::move(decoded));
+      if (!next) {
+        break;
+      }
+      offset = next->value;
+    }
+  }
+
+  for (const auto& [offset, decoded] : commandsByOffset) {
+    appendDecodedBytecodeCommand(builder, decoded, offset);
+  }
+  return track;
 }
 
 }  // namespace vgmtrans::core

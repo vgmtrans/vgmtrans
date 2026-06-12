@@ -402,6 +402,10 @@ Step VmApi::repeatUntil(u8 slot, u32 count, Address destination) {
   return next();
 }
 
+Effects VmApi::repeatUntilEffect(u8 slot, u32 count, Address destination) {
+  return Effects{.step = repeatUntil(slot, count, destination)};
+}
+
 Step VmApi::repeatBreak(u8 slot, Address destination) {
   const auto found = runtime_.repeatRemaining.find(slot);
   if (found != runtime_.repeatRemaining.end() && found->second == 1) {
@@ -410,6 +414,14 @@ Step VmApi::repeatBreak(u8 slot, Address destination) {
     return jump(destination);
   }
   return next();
+}
+
+BranchResult VmApi::repeatBreakBranch(u8 slot, Address destination) {
+  const Step step = repeatBreak(slot, destination);
+  return BranchResult{
+      .taken = step.kind == Step::Kind::Jump,
+      .effects = Effects{.step = step},
+  };
 }
 
 u64 VmApi::tick() const noexcept {
