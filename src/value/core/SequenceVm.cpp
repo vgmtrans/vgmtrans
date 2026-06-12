@@ -140,10 +140,10 @@ void Emit::note(NotePerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
-void Emit::note(double key, double velocity, u32 durationTicks, bool extendsPrevious) {
+void Emit::note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious) {
   note(NotePerformanceEvent{
       .key = key,
-      .velocity = velocity,
+      .linearVelocity = linearVelocity,
       .durationTicks = durationTicks,
       .extendsPrevious = extendsPrevious,
   });

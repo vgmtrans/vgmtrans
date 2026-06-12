@@ -26,7 +26,7 @@ public:
   Emit(PerformanceTrack& track, CommandId sourceCommand, u64 tick);
 
   void note(NotePerformanceEvent event);
-  void note(double key, double velocity, u32 durationTicks, bool extendsPrevious = false);
+  void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
   void tempo(TempoPerformanceEvent event);
   void tempo(u32 microsecondsPerQuarter);
   void instrument(InstrumentPerformanceEvent event);
