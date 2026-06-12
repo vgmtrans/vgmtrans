@@ -183,8 +183,12 @@ struct PitchBendRange : U8RawOutCommand<PitchBendRange, &Emit::pitchBendRange> {
   static constexpr std::string_view operandName = "semitones";
 };
 
-struct ModulationDepth : U8ModulationCommand<ModulationDepth, ModulationPerformanceTarget::VibratoDepth> {
+struct ModulationDepth : U8Operand<ModulationDepth> {
   static constexpr std::string_view operandName = "depth";
+
+  void execute(Runtime& rt) const {
+    rt.out.modulation(ModulationPerformanceTarget::VibratoDepth, static_cast<double>(raw) / 127.0);
+  }
 };
 
 struct PortamentoSwitch : U8BoolOutCommand<PortamentoSwitch, &Emit::portamentoEnable> {

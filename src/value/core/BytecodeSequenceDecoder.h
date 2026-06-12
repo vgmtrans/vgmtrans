@@ -103,11 +103,6 @@ struct U8NormalizedOutCommand : U8Operand<Derived> {
   }
 };
 
-template <class Derived, ModulationPerformanceTarget Target>
-struct U8ModulationCommand : U8Operand<Derived> {
-  void execute(auto& rt) const { rt.out.modulation(Target, static_cast<double>(this->raw) / 127.0); }
-};
-
 // Temporary decoded form used while a bytecode decoder is deciding control flow.
 // TrackProgramBuilder still owns the final immutable source-command snapshot.
 struct DecodedBytecodeCommand {
