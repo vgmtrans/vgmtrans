@@ -18,18 +18,10 @@ inline constexpr auto kNdsSequenceDialectId = "nds:sseq";
 [[nodiscard]] core::SequenceDialect ndsSequenceDialect();
 void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
 
-[[nodiscard]] core::TrackProgram decodeNdsSequenceTrack(
-    core::ByteReader reader,
-    const core::SequenceDialect& dialect,
-    u32 sequenceOffset,
-    u32 sequenceEnd,
-    u32 startOffset,
-    u32 trackIndex,
-    bool linearizeMalformedControlFlow = false);
+[[nodiscard]] core::TrackProgram decodeNdsSequenceTrack(core::ByteReader reader, const core::SequenceDialect& dialect,
+                                                        u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
+                                                        u32 trackIndex, bool recoverMalformedSdatRange = false);
 
-[[nodiscard]] std::vector<u32> ndsSequenceTrackStarts(
-    core::ByteReader reader,
-    u32 sequenceOffset,
-    u32 sequenceEnd);
+[[nodiscard]] std::vector<u32> ndsSequenceTrackStarts(core::ByteReader reader, u32 sequenceOffset, u32 sequenceEnd);
 
 }  // namespace vgmtrans::formats::nds

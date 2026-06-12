@@ -6,10 +6,10 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesSequenceDialect.h"
 
-#include "formats/CapcomSnes/CapcomSnesDriverMath.h"
 #include "value/core/BytecodeSequenceDecoder.h"
 #include "value/core/LevelScale.h"
 #include "value/core/SequenceVm.h"
+#include "value/formats/CapcomSnes/CapcomSnesSequenceMath.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueLayout.h"
 
 #include <algorithm>
@@ -21,20 +21,9 @@
 namespace vgmtrans::formats::capcom_snes {
 
 using namespace core;
+namespace math = sequence_math;
 
 namespace {
-
-// Keep the DSL limited to one-line state effects where the macro name carries
-// the whole source-driver meaning.
-#define CAPCOM_TOGGLE(Type, Member)                                         \
-  struct Type : NoOperands<Type> {                                          \
-    void execute(Runtime& rt) const { rt.state.Member = !rt.state.Member; } \
-  }
-
-#define CAPCOM_SET_TRUE(Type, Member)                           \
-  struct Type : NoOperands<Type> {                              \
-    void execute(Runtime& rt) const { rt.state.Member = true; } \
-  }
 
 constexpr u8 kNoteOctaveMask = 0x07;
 constexpr u8 kNoteOctaveUpMask = 0x08;
@@ -78,30 +67,23 @@ struct TrackState {
 
 using Runtime = CommandRuntime<TrackState, Context>;
 
-[[nodiscard]] double tuningSemitones(s8 tuning) {
-  return static_cast<double>(tuning) / 256.0;
+void emitLinearVolume(Runtime& rt, u8 raw) {
+  // Capcom volume is a linear amplitude gain. MIDI rendering applies the
+  // square-root MIDI controller curve later.
+  rt.out.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)), LevelResolution::FourteenBit);
 }
 
-[[nodiscard]] double tuningCents(s8 tuning) {
-  return tuningSemitones(tuning) * 100.0;
+void emitLinearMasterVolume(Runtime& rt, u8 raw) {
+  rt.out.masterLevel(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)));
 }
 
-[[nodiscard]] double portamentoMillisecondsPerCent(u8 rawTime) {
-  const u8 step = static_cast<u8>((rawTime << 1) & 0xff);
-  const double centsPerUpdate = step * (100.0 / 256.0);
-  // The Capcom voice/portamento update runs every other 8 ms timer tick.
-  return centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
-}
-
-[[nodiscard]] u32 baseNoteTicks(u32 rawDuration) {
-  if (rawDuration == 0 || rawDuration > 7) {
-    return 0;
-  }
-  return 192u >> (7u - rawDuration);
+void emitPan(Runtime& rt, u8 raw) {
+  const auto pan = math::panConversion(rt.context.version, raw);
+  rt.out.pan(math::stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
 }
 
 u32 TrackState::consumeNoteTicks(u8 rawDuration) {
-  u32 length = baseNoteTicks(rawDuration);
+  u32 length = math::baseNoteTicks(rawDuration);
   if (noteDotted) {
     // Dotted is consumed by the next note/rest; triplet mode persists until toggled.
     length = (length % 2 == 0 && length < 0x80) ? length + (length / 2) : 0;
@@ -127,32 +109,6 @@ s32 TrackState::sourceKey(u8 keyIndex) const {
 
 double TrackState::performedKey(s32 key) const {
   return static_cast<double>(key + transpose);
-}
-
-[[nodiscard]] u32 tempoMicrosecondsPerQuarter(u32 rawTempo) {
-  if (rawTempo == 0) {
-    return 60000000;
-  }
-  // Capcom tempo is derived from the SNES timer update rate, not stored as BPM.
-  return static_cast<u32>(std::round(kCapcomSnesPpqn * (125 * 0x40) * 2 * 256.0 / rawTempo));
-}
-
-[[nodiscard]] double volumeGain(CapcomSnesEngineVersion version, u8 rawVolume) {
-  return version == CapcomSnesEngineVersion::v1BgmInList ? ::capcom_snes::calculateVolumeV1(rawVolume)
-                                                         : ::capcom_snes::calculateVolumeV2(rawVolume);
-}
-
-[[nodiscard]] ::capcom_snes::PanConversionResult panConversion(CapcomSnesEngineVersion version, u8 rawPan) {
-  const auto biasedPan = static_cast<u8>(rawPan + 0x80);
-  return version == CapcomSnesEngineVersion::v1BgmInList ? ::capcom_snes::linear8BitPanToMidi(biasedPan)
-                                                         : ::capcom_snes::calculatePanV2(biasedPan);
-}
-
-[[nodiscard]] double stereoPosition(const ::capcom_snes::PanConversionResult& converted) {
-  // Store the pan on the same 0..127 lattice the MIDI renderer uses so legacy
-  // Capcom pan values survive the neutral stereo-position hop without shifting
-  // left-side values down by one.
-  return std::clamp((static_cast<double>(converted.midiPan) / 127.0) * 2.0 - 1.0, -1.0, 1.0);
 }
 
 void TrackState::applyAttributes(u8 attributes, Emit* out) {
@@ -208,15 +164,14 @@ void TrackState::emitPortamentoIfNeeded(s32 key, Emit& out) {
 
 void TrackState::emitModulationDepths(Emit& out, bool enabled) const {
   if (vibratoDepth != 0) {
-    out.modulation(ModulationPerformanceTarget::VibratoDepth,
-                   enabled ? static_cast<double>(vibratoDepth) / 127.0 : 0.0);
+    out.modulation(ModulationPerformanceTarget::VibratoDepth, enabled ? math::midi7Amount(vibratoDepth) : 0.0);
   }
   if (tremoloDepth != 0) {
-    out.modulation(ModulationPerformanceTarget::TremoloDepth,
-                   enabled ? static_cast<double>(tremoloDepth) / 127.0 : 0.0);
+    out.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? math::midi7Amount(tremoloDepth) : 0.0);
   }
 }
 
+// Notes and note-state commands.
 struct Rest {
   u8 rawDuration = 0;
 
@@ -281,15 +236,17 @@ struct Octave : U8StateCommand<Octave, &TrackState::noteOctave> {
   static constexpr std::string_view operandName = "octave";
 };
 
-CAPCOM_TOGGLE(ToggleTriplet, noteTriplet);
+struct ToggleTriplet : ToggleBoolStateCommand<ToggleTriplet, &TrackState::noteTriplet> {};
 
 struct ToggleSlur : NoOperands<ToggleSlur> {
   void execute(Runtime& rt) const { rt.state.toggleSlur(rt.out); }
 };
 
-CAPCOM_SET_TRUE(DottedNote, noteDotted);
-CAPCOM_TOGGLE(ToggleOctaveUp, noteOctaveUp);
+struct DottedNote : SetTrueStateCommand<DottedNote, &TrackState::noteDotted> {};
 
+struct ToggleOctaveUp : ToggleBoolStateCommand<ToggleOctaveUp, &TrackState::noteOctaveUp> {};
+
+// Pitch, tuning, and timing commands.
 struct GlobalTranspose {
   s8 raw = 0;
 
@@ -305,9 +262,9 @@ struct Transpose : S8StateCommand<Transpose, &TrackState::transpose> {
 struct Tuning : S8Operand<Tuning> {
   static constexpr std::string_view operandName = "tuning";
 
-  void describe(CommandInfo& out) const { out.field("cents", tuningCents(raw)); }
+  void describe(CommandInfo& out) const { out.field("cents", math::tuningCents(raw)); }
 
-  void execute(Runtime& rt) const { rt.out.tuning(tuningCents(raw)); }
+  void execute(Runtime& rt) const { rt.out.tuning(math::tuningCents(raw)); }
 };
 
 struct PortamentoTime : U8Operand<PortamentoTime> {
@@ -316,22 +273,25 @@ struct PortamentoTime : U8Operand<PortamentoTime> {
   void execute(Runtime& rt) const {
     // The driver stores portamento as speed; the next note converts it to a
     // distance-dependent time using the previous source key.
-    rt.state.portamentoMillisecondsPerCent = portamentoMillisecondsPerCent(raw);
+    rt.state.portamentoMillisecondsPerCent = math::portamentoMillisecondsPerCent(raw);
   }
 };
 
 struct Tempo : Be16Operand<Tempo> {
   static constexpr std::string_view operandName = "raw";
 
-  void describe(CommandInfo& out) const { out.field("microseconds_per_quarter", tempoMicrosecondsPerQuarter(raw)); }
+  void describe(CommandInfo& out) const {
+    out.field("microseconds_per_quarter", math::tempoMicrosecondsPerQuarter(raw));
+  }
 
-  void execute(Runtime& rt) const { rt.out.tempo(tempoMicrosecondsPerQuarter(raw)); }
+  void execute(Runtime& rt) const { rt.out.tempo(math::tempoMicrosecondsPerQuarter(raw)); }
 };
 
 struct DurationRate : U8StateCommand<DurationRate, &TrackState::durationRate> {
   static constexpr std::string_view operandName = "rate";
 };
 
+// Control flow.
 struct RepeatUntil {
   u8 slot = 0;
   u8 count = 0;
@@ -381,18 +341,15 @@ struct RepeatBreak {
   }
 };
 
+// Program and mixer controls.
 struct Volume : U8Operand<Volume> {
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out, const Context& context) const {
-    out.field("linear_gain", volumeGain(context.version, raw));
+    out.field("linear_gain", math::volumeGain(context.version, raw));
   }
 
-  void execute(Runtime& rt) const {
-    // Capcom volume is a linear amplitude gain. MIDI rendering applies the
-    // square-root MIDI controller curve later.
-    rt.out.level(LevelScale::linearFromLinear(volumeGain(rt.context.version, raw)), LevelResolution::FourteenBit);
-  }
+  void execute(Runtime& rt) const { emitLinearVolume(rt, raw); }
 };
 
 struct Program : U8Operand<Program> {
@@ -425,33 +382,29 @@ struct Pan : U8Operand<Pan> {
   static constexpr std::string_view operandName = "raw";
 
   [[nodiscard]] ::capcom_snes::PanConversionResult conversion(const Context& context) const {
-    return panConversion(context.version, raw);
+    return math::panConversion(context.version, raw);
   }
 
   void describe(CommandInfo& out, const Context& context) const {
     const auto pan = conversion(context);
-    out.field("stereo_position", stereoPosition(pan));
+    out.field("stereo_position", math::stereoPosition(pan));
     out.field("linear_gain", pan.volumeScale);
   }
 
-  void execute(Runtime& rt) const {
-    const auto pan = conversion(rt.context);
-    rt.out.pan(stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
-  }
+  void execute(Runtime& rt) const { emitPan(rt, raw); }
 };
 
 struct MasterVolume : U8Operand<MasterVolume> {
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out, const Context& context) const {
-    out.field("linear_gain", volumeGain(context.version, raw));
+    out.field("linear_gain", math::volumeGain(context.version, raw));
   }
 
-  void execute(Runtime& rt) const {
-    rt.out.masterLevel(LevelScale::linearFromLinear(volumeGain(rt.context.version, raw)));
-  }
+  void execute(Runtime& rt) const { emitLinearMasterVolume(rt, raw); }
 };
 
+// LFO and effects commands.
 struct Lfo {
   u8 type = 0;
   u8 value = 0;
@@ -469,14 +422,13 @@ struct Lfo {
       case 0:
         state.vibratoDepth = value & 0x7f;
         rt.out.modulation(ModulationPerformanceTarget::VibratoDepth,
-                          state.modulationRate != 0 ? static_cast<double>(state.vibratoDepth) / 127.0 : 0.0);
+                          state.modulationRate != 0 ? math::midi7Amount(state.vibratoDepth) : 0.0);
         break;
 
       case 1:
-        state.tremoloDepth =
-            ::capcom_snes::tremoloDepthToMidiValue(value, rt.context.version == CapcomSnesEngineVersion::v1BgmInList);
+        state.tremoloDepth = math::tremoloDepth(rt.context.version, value);
         rt.out.modulation(ModulationPerformanceTarget::TremoloDepth,
-                          state.modulationRate != 0 ? static_cast<double>(state.tremoloDepth) / 127.0 : 0.0);
+                          state.modulationRate != 0 ? math::midi7Amount(state.tremoloDepth) : 0.0);
         break;
 
       case 2: {
@@ -489,7 +441,7 @@ struct Lfo {
           state.emitModulationDepths(rt.out, true);
         }
 
-        const double rate = static_cast<double>(::capcom_snes::lfoRateByteToMidiValue(value)) / 127.0;
+        const double rate = math::lfoRateAmount(value);
         rt.out.modulation(ModulationPerformanceTarget::VibratoRate, rate);
         rt.out.modulation(ModulationPerformanceTarget::TremoloRate, rate);
         break;
@@ -503,6 +455,7 @@ struct Lfo {
   }
 };
 
+// Source-only and diagnostic commands.
 struct EchoParam {
   u8 argument = 0;
   u8 preset = 0;
@@ -670,8 +623,5 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialec
                                    LinearBytecodeDecodePolicy{.maxCommands = 4096},
                                    [&](u32 offset) { return bytecode.decode(reader, offset); });
 }
-
-#undef CAPCOM_SET_TRUE
-#undef CAPCOM_TOGGLE
 
 }  // namespace vgmtrans::formats::capcom_snes

@@ -124,7 +124,7 @@ struct SdatInfo {
   return true;
 }
 
-[[nodiscard]] bool shouldParseMalformedFallthrough(ByteReader reader, FileRange range) {
+[[nodiscard]] bool shouldRecoverMalformedSdatRange(ByteReader reader, FileRange range) {
   const auto sseqOffset = nearbySseqHeader(reader, range);
   if (!sseqOffset) {
     return false;
@@ -766,11 +766,11 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
     const auto sequenceId = input.ids.nextAssetId();
     const std::string& name = sdat.sequenceNames[sequenceIndex];
     const bool hasSseqHeader = matches(input.reader, sequenceRange->offset, kSseqSignature);
-    const bool parseMalformedFallthrough =
-        !hasSseqHeader && shouldParseMalformedFallthrough(input.reader, *sequenceRange);
-    const bool extendMalformedPastFatRange = parseMalformedFallthrough && sequenceRange->size <= 0x100;
+    const bool recoverMalformedSdatRange =
+        !hasSseqHeader && shouldRecoverMalformedSdatRange(input.reader, *sequenceRange);
+    const bool extendRecoveryPastFatRange = recoverMalformedSdatRange && sequenceRange->size <= 0x100;
     const u32 sequenceEnd =
-        hasSseqHeader || !extendMalformedPastFatRange
+        hasSseqHeader || !extendRecoveryPastFatRange
             ? static_cast<u32>(
                   std::min<u64>(input.reader.size(), static_cast<u64>(sequenceRange->offset) + sequenceRange->size))
             : static_cast<u32>(input.reader.size());
@@ -779,7 +779,7 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
                                                            .offset = sequenceRange->offset,
                                                            .size = sequenceRange->size,
                                                            .sequenceEnd = sequenceEnd,
-                                                           .linearizeMalformedControlFlow = parseMalformedFallthrough,
+                                                           .recoverMalformedSdatRange = recoverMalformedSdatRange,
                                                        },
                                                        name, instrumentSet));
 
