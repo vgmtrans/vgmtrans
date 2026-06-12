@@ -328,7 +328,13 @@ struct PendingBlock {
 }
 
 template <class Command>
-[[nodiscard]] DecodedCommand recordCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin, u32 end) {
+struct ParsedCommand {
+  DecodedCommand decoded;
+  Command command;
+};
+
+template <class Command>
+[[nodiscard]] DecodedCommand recordSizedCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin, u32 end) {
   const auto& handler = handlerFor(dialect, Command::kind);
   const SourceRange range = reader.range(begin, end - begin);
   const auto bytes = reader.slice(begin, end - begin);
@@ -349,15 +355,76 @@ template <class Command>
 }
 
 template <class Command>
-[[nodiscard]] DecodedCommand recordFallthrough(const SequenceDialect& dialect, ByteReader reader, u32 begin, u32 end) {
-  auto decoded = recordCommand<Command>(dialect, reader, begin, end);
-  decoded.flow.fallthrough = Address{end};
-  return decoded;
+[[nodiscard]] std::optional<ParsedCommand<Command>> parseCommandBytes(const SequenceDialect& dialect, ByteReader reader,
+                                                                      u32 begin, u32 sequenceEnd) {
+  if (!hasSequenceBytes(reader, begin, 1, sequenceEnd)) {
+    return std::nullopt;
+  }
+
+  const auto boundedEnd = static_cast<u32>(std::min<size_t>(reader.size(), sequenceEnd));
+  if (begin >= boundedEnd) {
+    return std::nullopt;
+  }
+
+  const auto& handler = handlerFor(dialect, Command::kind);
+  const u32 availableSize = boundedEnd - begin;
+  const SourceRange availableRange = reader.range(begin, availableSize);
+  const auto availableBytes = reader.slice(begin, availableSize);
+  std::vector<CommandOperand> operands;
+  CommandReader commandReader{availableRange, availableBytes, &operands};
+
+  Command command;
+  try {
+    command = Command::parse(commandReader);
+  } catch (const std::out_of_range&) {
+    return std::nullopt;
+  }
+
+  const auto commandSize = static_cast<u32>(commandReader.position());
+  const auto commandBytes = availableBytes.subspan(0, commandSize);
+  std::vector<u8> ownedBytes{commandBytes.begin(), commandBytes.end()};
+  return ParsedCommand<Command>{
+      .decoded =
+          DecodedCommand{
+              .handler = handler.id,
+              .kind = handler.kind,
+              .range = reader.range(begin, commandSize),
+              .bytes = std::move(ownedBytes),
+              .operands = std::move(operands),
+          },
+      .command = command,
+  };
 }
 
 [[nodiscard]] DecodedCommand terminalCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin, u32 end) {
-  auto decoded = recordCommand<Terminal>(dialect, reader, begin, end);
+  auto decoded = recordSizedCommand<Terminal>(dialect, reader, begin, end);
   decoded.flow.terminal = true;
+  return decoded;
+}
+
+[[nodiscard]] DecodedCommand truncatedCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin,
+                                              u32 sequenceEnd) {
+  const auto boundedEnd = static_cast<u32>(std::min<size_t>(reader.size(), sequenceEnd));
+  return terminalCommand(dialect, reader, begin, std::min(begin + 1, boundedEnd));
+}
+
+template <class Command>
+[[nodiscard]] DecodedCommand recordAutoCommand(const SequenceDialect& dialect, ByteReader reader, u32 begin,
+                                               u32 sequenceEnd) {
+  auto parsed = parseCommandBytes<Command>(dialect, reader, begin, sequenceEnd);
+  if (!parsed) {
+    return truncatedCommand(dialect, reader, begin, sequenceEnd);
+  }
+  return std::move(parsed->decoded);
+}
+
+template <class Command>
+[[nodiscard]] DecodedCommand recordAutoFallthrough(const SequenceDialect& dialect, ByteReader reader, u32 begin,
+                                                   u32 sequenceEnd) {
+  auto decoded = recordAutoCommand<Command>(dialect, reader, begin, sequenceEnd);
+  if (!decoded.flow.terminal) {
+    decoded.flow.fallthrough = Address{static_cast<u32>(decoded.range.endOffset())};
+  }
   return decoded;
 }
 
@@ -366,39 +433,29 @@ template <class Command>
   if (!hasSequenceBytes(reader, operandOffset, operandBytes, sequenceEnd)) {
     return terminalCommand(dialect, reader, begin, operandOffset);
   }
-  return recordFallthrough<NoOp>(dialect, reader, begin, operandOffset + operandBytes);
-}
-
-template <class Command>
-[[nodiscard]] DecodedCommand recordFixed(const SequenceDialect& dialect, ByteReader reader, u32 sequenceEnd, u32 begin,
-                                         u32 operandOffset, u32 operandBytes) {
-  if (!hasSequenceBytes(reader, operandOffset, operandBytes, sequenceEnd)) {
-    return terminalCommand(dialect, reader, begin, operandOffset);
-  }
-  return recordFallthrough<Command>(dialect, reader, begin, operandOffset + operandBytes);
-}
-
-template <class Command>
-[[nodiscard]] DecodedCommand recordVarLen(const SequenceDialect& dialect, ByteReader reader, u32 sequenceEnd, u32 begin,
-                                          u32& offset) {
-  static_cast<void>(readVarLen(reader, offset, sequenceEnd));
-  return recordFallthrough<Command>(dialect, reader, begin, offset);
+  auto decoded = recordSizedCommand<NoOp>(dialect, reader, begin, operandOffset + operandBytes);
+  decoded.flow.fallthrough = Address{operandOffset + operandBytes};
+  return decoded;
 }
 
 template <class Command>
 [[nodiscard]] DecodedCommand recordBranch(const SequenceDialect& dialect, ByteReader reader, u32 sequenceOffset,
-                                          u32 sequenceEnd, u32 begin, u32 operandOffset, bool returns) {
-  const auto destination = readSseqAddress(reader, sequenceOffset, sequenceEnd, operandOffset);
-  if (!destination || *destination >= sequenceEnd) {
-    return terminalCommand(dialect, reader, begin, operandOffset);
+                                          u32 sequenceEnd, u32 begin, bool returns) {
+  auto parsed = parseCommandBytes<Command>(dialect, reader, begin, sequenceEnd);
+  if (!parsed) {
+    return truncatedCommand(dialect, reader, begin, sequenceEnd);
   }
 
-  const u32 end = operandOffset + 3;
-  auto decoded = recordCommand<Command>(dialect, reader, begin, end);
-  if (returns) {
-    decoded.flow.fallthrough = Address{end};
+  const u32 destination = static_cast<u32>(sequenceOffset + 0x1c + parsed->command.relative);
+  if (destination >= sequenceEnd) {
+    return terminalCommand(dialect, reader, begin, begin + 1);
   }
-  decoded.flow.staticTargets = {Address{*destination}};
+
+  auto decoded = std::move(parsed->decoded);
+  if (returns) {
+    decoded.flow.fallthrough = Address{static_cast<u32>(decoded.range.endOffset())};
+  }
+  decoded.flow.staticTargets = {Address{destination}};
   return decoded;
 }
 
@@ -418,91 +475,91 @@ template <class Command>
   }
 }
 
+// Real SSEQ commands let parse() determine their length. Only ignored opcodes
+// name byte counts here, because they do not have source-driver command types yet.
 [[nodiscard]] DecodedCommand decodeCommand(const SequenceDialect& dialect, ByteReader reader, u32 sequenceOffset,
                                            u32 sequenceEnd, u32 offset) {
+#define NDS_EMIT(Type) return recordAutoFallthrough<Type>(dialect, reader, begin, sequenceEnd)
+#define NDS_CASE(Op, Type) \
+  case Op:                 \
+    NDS_EMIT(Type)
+#define NDS_BRANCH(Op, Type) \
+  case Op:                   \
+    return recordBranch<Type>(dialect, reader, sequenceOffset, sequenceEnd, begin, false)
+#define NDS_CALL(Op, Type) \
+  case Op:                 \
+    return recordBranch<Type>(dialect, reader, sequenceOffset, sequenceEnd, begin, true)
+#define NDS_IGNORE(Op, OperandBytes) \
+  case Op:                           \
+    return recordIgnored(dialect, reader, sequenceEnd, begin, begin + 1, OperandBytes)
+#define NDS_TERMINAL(Op) \
+  case Op:               \
+    return terminalCommand(dialect, reader, begin, begin + 1)
+#define NDS_EVENT(Op, Type) \
+  case Op:                  \
+    return recordAutoCommand<Type>(dialect, reader, begin, sequenceEnd)
+
   const u32 begin = offset;
-  const u8 status = reader.u8At(offset++);
+  const u8 status = reader.u8At(offset);
 
   if (status < 0x80) {
-    if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
-      return terminalCommand(dialect, reader, begin, offset);
-    }
-    ++offset;
-    return recordVarLen<Note>(dialect, reader, sequenceEnd, begin, offset);
+    NDS_EMIT(Note);
   }
 
   switch (status) {
-    case 0x80:
-      return recordVarLen<Rest>(dialect, reader, sequenceEnd, begin, offset);
-    case 0x81:
-      return recordVarLen<Program>(dialect, reader, sequenceEnd, begin, offset);
-    case 0x93:
-      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 4);
-    case 0x94:
-      return recordBranch<Jump>(dialect, reader, sequenceOffset, sequenceEnd, begin, offset, false);
-    case 0x95:
-      return recordBranch<Call>(dialect, reader, sequenceOffset, sequenceEnd, begin, offset, true);
-    case 0x96:
-      return terminalCommand(dialect, reader, begin, offset);
-    case 0xa0:
-      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 5);
-    case 0xa1:
-      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 2);
-    case 0xa2:
-      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 0);
-    case 0xb0:
-    case 0xb1:
-    case 0xb2:
-    case 0xb3:
-    case 0xb4:
-    case 0xb5:
-    case 0xb6:
-    case 0xb8:
-    case 0xb9:
-    case 0xba:
-    case 0xbb:
-    case 0xbc:
-    case 0xbd:
-      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 3);
-    case 0xc0:
-      return recordFixed<Pan>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xc1:
-      return recordFixed<Volume>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xc3:
-      return recordFixed<Transpose>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xc4:
-      return recordFixed<PitchBend>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xc5:
-      return recordFixed<PitchBendRange>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xc7:
-      return recordFixed<NoteWait>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xca:
-      return recordFixed<ModulationDepth>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xce:
-      return recordFixed<PortamentoSwitch>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xcf:
-      return recordFixed<PortamentoTime>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xd5:
-      return recordFixed<ExpressionLevel>(dialect, reader, sequenceEnd, begin, offset, 1);
-    case 0xe1:
-      return recordFixed<Tempo>(dialect, reader, sequenceEnd, begin, offset, 2);
-    case 0xe0:
-    case 0xe3:
-      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 2);
-    case 0xfd:
-      return recordCommand<Return>(dialect, reader, begin, offset);
-    case 0xff:
-      return recordCommand<End>(dialect, reader, begin, offset);
-    case 0xfc:
-      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 0);
-    case 0xfe:
-      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 2);
+    NDS_CASE(0x80, Rest);
+    NDS_CASE(0x81, Program);
+    NDS_IGNORE(0x93, 4);
+    NDS_BRANCH(0x94, Jump);
+    NDS_CALL(0x95, Call);
+    NDS_TERMINAL(0x96);
+    NDS_IGNORE(0xa0, 5);
+    NDS_IGNORE(0xa1, 2);
+    NDS_IGNORE(0xa2, 0);
+    NDS_IGNORE(0xb0, 3);
+    NDS_IGNORE(0xb1, 3);
+    NDS_IGNORE(0xb2, 3);
+    NDS_IGNORE(0xb3, 3);
+    NDS_IGNORE(0xb4, 3);
+    NDS_IGNORE(0xb5, 3);
+    NDS_IGNORE(0xb6, 3);
+    NDS_IGNORE(0xb8, 3);
+    NDS_IGNORE(0xb9, 3);
+    NDS_IGNORE(0xba, 3);
+    NDS_IGNORE(0xbb, 3);
+    NDS_IGNORE(0xbc, 3);
+    NDS_IGNORE(0xbd, 3);
+    NDS_CASE(0xc0, Pan);
+    NDS_CASE(0xc1, Volume);
+    NDS_CASE(0xc3, Transpose);
+    NDS_CASE(0xc4, PitchBend);
+    NDS_CASE(0xc5, PitchBendRange);
+    NDS_CASE(0xc7, NoteWait);
+    NDS_CASE(0xca, ModulationDepth);
+    NDS_CASE(0xce, PortamentoSwitch);
+    NDS_CASE(0xcf, PortamentoTime);
+    NDS_CASE(0xd5, ExpressionLevel);
+    NDS_IGNORE(0xe0, 2);
+    NDS_CASE(0xe1, Tempo);
+    NDS_IGNORE(0xe3, 2);
+    NDS_IGNORE(0xfc, 0);
+    NDS_EVENT(0xfd, Return);
+    NDS_IGNORE(0xfe, 2);
+    NDS_EVENT(0xff, End);
     default:
       if (isUnhandledOneByteCommand(status)) {
-        return recordFixed<OneByteNoOp>(dialect, reader, sequenceEnd, begin, offset, 1);
+        NDS_EMIT(OneByteNoOp);
       }
-      return terminalCommand(dialect, reader, begin, offset);
+      return terminalCommand(dialect, reader, begin, begin + 1);
   }
+
+#undef NDS_IGNORE
+#undef NDS_EVENT
+#undef NDS_TERMINAL
+#undef NDS_CALL
+#undef NDS_BRANCH
+#undef NDS_CASE
+#undef NDS_EMIT
 }
 
 void appendDecoded(TrackProgramBuilder& builder, const DecodedCommand& decoded, u32 offset) {
@@ -597,7 +654,7 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& di
           // Some malformed FAT entries fall through one byte before a real call
           // target. Stop the fallthrough interpretation before it consumes the
           // overlapping subroutine bytes.
-          auto end = recordCommand<End>(dialect, reader, begin, begin + 1);
+          auto end = recordSizedCommand<End>(dialect, reader, begin, begin + 1);
           appendDecoded(builder, end, begin);
           break;
         }
@@ -606,12 +663,12 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& di
       if (decoded.kind == jumpKind && !decoded.flow.staticTargets.empty()) {
         const u32 destination = decoded.flow.staticTargets.front().value;
         if (visitedControlDestinations.contains(destination)) {
-          auto end = recordCommand<End>(dialect, reader, begin, begin + 1);
+          auto end = recordSizedCommand<End>(dialect, reader, begin, begin + 1);
           appendDecoded(builder, end, begin);
           break;
         }
         visitedControlDestinations.insert(destination);
-        auto noOp = recordCommand<NoOp>(dialect, reader, begin, static_cast<u32>(decoded.range.endOffset()));
+        auto noOp = recordSizedCommand<NoOp>(dialect, reader, begin, static_cast<u32>(decoded.range.endOffset()));
         appendDecoded(builder, noOp, begin);
         offset = destination;
         continue;
