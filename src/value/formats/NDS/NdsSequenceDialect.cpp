@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace vgmtrans::formats::nds {
 
@@ -23,16 +24,50 @@ using namespace core;
 
 namespace {
 
+#define NDS_COMMAND(Suffix, DisplayName)                  \
+  static constexpr std::string_view kind = "nds." Suffix; \
+  static constexpr std::string_view name = DisplayName
+
 constexpr size_t kMaxTrackCommands = 262144;
 
 struct Context {};
 
 struct TrackState {
-  explicit TrackState(const SequenceProgram& program, const TrackProgram&) : sequenceDataBase(program.sourceBaseAddress.value) {}
+  explicit TrackState(const SequenceProgram& program, const TrackProgram&)
+      : sequenceDataBase(program.sourceBaseAddress.value) {}
 
   u64 sequenceDataBase = 0;
   bool noteWait = false;
   s32 transpose = 0;
+};
+
+using Runtime = CommandRuntime<TrackState, Context>;
+
+template <class Derived>
+struct EmptyParse {
+  static Derived parse(CommandReader&) { return {}; }
+};
+
+template <class Derived>
+struct RawU8 {
+  u8 raw = 0;
+
+  static Derived parse(CommandReader& in) {
+    Derived result;
+    result.raw = in.u8(Derived::operandName);
+    return result;
+  }
+};
+
+template <class Derived>
+struct RawS8 {
+  s8 raw = 0;
+
+  static Derived parse(CommandReader& in) {
+    Derived result;
+    result.raw = in.s8(Derived::operandName);
+    return result;
+  }
 };
 
 [[nodiscard]] u32 absoluteAddress(const TrackState& state, u32 relative) {
@@ -69,10 +104,10 @@ struct Note {
   u8 velocity = 0;
   u32 duration = 0;
 
-  static constexpr std::string_view kind = "nds.note";
-  static constexpr std::string_view name = "Note";
+  NDS_COMMAND("note", "Note");
 
   static Note parse(CommandReader& in) {
+    in.derived("key", static_cast<u64>(in.opcode()));
     return Note{
         .key = in.opcode(),
         .velocity = in.u8("velocity"),
@@ -80,265 +115,174 @@ struct Note {
     };
   }
 
-  void describe(CommandInfo& out) const {
-    out.field("key", static_cast<u64>(key));
-    out.field("velocity", static_cast<u64>(velocity));
-    out.field("duration", static_cast<u64>(duration));
-  }
-
-  Effects execute(TrackState& state, Emit& out, VmApi&, const Context&) const {
-    out.note(NotePerformanceEvent{
-        .key = static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + state.transpose, 0, 127)),
-        .velocity = velocity / 127.0,
-        .durationTicks = duration,
-    });
-    return Effects::wait(state.noteWait ? duration : 0);
+  Effects execute(Runtime& rt) const {
+    rt.out.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
+                velocity / 127.0, duration);
+    return rt.wait(rt.state.noteWait ? duration : 0);
   }
 };
 
 struct Rest {
   u32 duration = 0;
 
-  static constexpr std::string_view kind = "nds.rest";
-  static constexpr std::string_view name = "Rest";
+  NDS_COMMAND("rest", "Rest");
 
-  static Rest parse(CommandReader& in) {
-    return Rest{.duration = in.varLen("duration")};
-  }
+  static Rest parse(CommandReader& in) { return Rest{.duration = in.varLen("duration")}; }
 
-  void describe(CommandInfo& out) const {
-    out.field("duration", static_cast<u64>(duration));
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi&, const Context&) const {
-    return Effects::wait(duration);
-  }
+  Effects execute(Runtime& rt) const { return rt.wait(duration); }
 };
 
 struct Program {
   u32 raw = 0;
 
-  static constexpr std::string_view kind = "nds.program";
-  static constexpr std::string_view name = "Program";
+  NDS_COMMAND("program", "Program");
 
-  static Program parse(CommandReader& in) {
-    return Program{.raw = in.varLen("program")};
-  }
+  static Program parse(CommandReader& in) { return Program{.raw = in.varLen("program")}; }
+
+  [[nodiscard]] u32 bank() const { return raw >> 7; }
+  [[nodiscard]] u32 program() const { return raw & 0x7f; }
 
   void describe(CommandInfo& out) const {
-    out.field("bank", static_cast<u64>(raw >> 7));
-    out.field("program", static_cast<u64>(raw & 0x7f));
+    out.field("bank", bank());
+    out.field("program", program());
   }
 
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
-    out.instrument(InstrumentPerformanceEvent{
-        .bank = raw >> 7,
-        .program = raw & 0x7f,
-    });
-    return Effects::none();
-  }
+  void execute(Runtime& rt) const { rt.out.instrument(bank(), program()); }
 };
 
+template <class Derived>
 struct RelativeAddressCommand {
   u32 relative = 0;
 
-  static RelativeAddressCommand parse(CommandReader& in) {
-    return RelativeAddressCommand{.relative = in.le24("destination")};
+  static Derived parse(CommandReader& in) {
+    Derived result;
+    result.relative = in.le24("destination");
+    return result;
   }
 };
 
-struct Jump : RelativeAddressCommand {
-  static constexpr std::string_view kind = "nds.jump";
-  static constexpr std::string_view name = "Jump";
+struct Jump : RelativeAddressCommand<Jump> {
+  NDS_COMMAND("jump", "Jump");
 
-  static Jump parse(CommandReader& in) {
-    return Jump{RelativeAddressCommand::parse(in)};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("destination", static_cast<u64>(relative));
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi& vm, const Context&) const {
-    return Effects{.step = vm.jump(Address{absoluteAddress(state, relative)})};
-  }
+  Effects execute(Runtime& rt) const { return rt.jump(Address{absoluteAddress(rt.state, relative)}); }
 };
 
-struct Call : RelativeAddressCommand {
-  static constexpr std::string_view kind = "nds.call";
-  static constexpr std::string_view name = "Call";
+struct Call : RelativeAddressCommand<Call> {
+  NDS_COMMAND("call", "Call");
 
-  static Call parse(CommandReader& in) {
-    return Call{RelativeAddressCommand::parse(in)};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("destination", static_cast<u64>(relative));
-  }
-
-  Effects execute(TrackState& state, Emit&, VmApi& vm, const Context&) const {
-    return Effects{.step = vm.call(Address{absoluteAddress(state, relative)})};
-  }
+  Effects execute(Runtime& rt) const { return rt.call(Address{absoluteAddress(rt.state, relative)}); }
 };
 
-struct Return {
-  static constexpr std::string_view kind = "nds.return";
-  static constexpr std::string_view name = "Return";
+struct Return : EmptyParse<Return> {
+  NDS_COMMAND("return", "Return");
 
-  static Return parse(CommandReader&) {
-    return Return{};
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi& vm, const Context&) const {
-    return Effects{.step = vm.return_()};
-  }
+  Effects execute(Runtime& rt) const { return rt.return_(); }
 };
 
-struct End {
-  static constexpr std::string_view kind = "nds.end";
-  static constexpr std::string_view name = "End";
+struct End : EmptyParse<End> {
+  NDS_COMMAND("end", "End");
 
-  static End parse(CommandReader&) {
-    return End{};
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi& vm, const Context&) const {
-    return Effects{.step = vm.end()};
-  }
+  Effects execute(Runtime& rt) const { return rt.end(); }
 };
 
-struct Pan {
-  u8 raw = 0;
+struct Pan : RawU8<Pan> {
+  NDS_COMMAND("pan", "Pan");
+  static constexpr std::string_view operandName = "pan";
 
-  static constexpr std::string_view kind = "nds.pan";
-  static constexpr std::string_view name = "Pan";
-
-  static Pan parse(CommandReader& in) {
-    return Pan{.raw = in.u8("pan")};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("raw", static_cast<u64>(raw));
-  }
-
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
-    out.pan(PanPerformanceEvent{
-        .stereoPosition = std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0),
-    });
-    return Effects::none();
-  }
+  void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
-struct Volume {
-  u8 raw = 0;
+struct Volume : RawU8<Volume> {
+  NDS_COMMAND("volume", "Volume");
+  static constexpr std::string_view operandName = "volume";
 
-  static constexpr std::string_view kind = "nds.volume";
-  static constexpr std::string_view name = "Volume";
+  void execute(Runtime& rt) const { rt.out.level(std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0)); }
+};
 
-  static Volume parse(CommandReader& in) {
-    return Volume{.raw = in.u8("volume")};
-  }
+struct ExpressionLevel : RawU8<ExpressionLevel> {
+  NDS_COMMAND("expression", "Expression");
+  static constexpr std::string_view operandName = "expression";
 
-  void describe(CommandInfo& out) const {
-    out.field("raw", static_cast<u64>(raw));
-  }
-
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
-    out.level(LevelPerformanceEvent{
-        .linearGain = std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0),
-    });
-    return Effects::none();
-  }
+  void execute(Runtime& rt) const { rt.out.expression(std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0)); }
 };
 
 struct Transpose {
   s8 semitones = 0;
 
-  static constexpr std::string_view kind = "nds.transpose";
-  static constexpr std::string_view name = "Transpose";
+  NDS_COMMAND("transpose", "Transpose");
 
-  static Transpose parse(CommandReader& in) {
-    return Transpose{.semitones = in.s8("semitones")};
-  }
+  static Transpose parse(CommandReader& in) { return Transpose{.semitones = in.s8("semitones")}; }
 
-  void describe(CommandInfo& out) const {
-    out.field("semitones", static_cast<s64>(semitones));
-  }
+  void execute(Runtime& rt) const { rt.state.transpose = semitones; }
+};
 
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.transpose = semitones;
-    return Effects::none();
+struct PitchBend : RawS8<PitchBend> {
+  NDS_COMMAND("pitch-bend", "Pitch Bend");
+  static constexpr std::string_view operandName = "bend";
+
+  void execute(Runtime& rt) const { rt.out.pitchBend(static_cast<s16>(raw * 64)); }
+};
+
+struct PitchBendRange : RawU8<PitchBendRange> {
+  NDS_COMMAND("pitch-bend-range", "Pitch Bend Range");
+  static constexpr std::string_view operandName = "semitones";
+
+  void execute(Runtime& rt) const { rt.out.pitchBendRange(raw); }
+};
+
+struct ModulationDepth : RawU8<ModulationDepth> {
+  NDS_COMMAND("modulation-depth", "Modulation Depth");
+  static constexpr std::string_view operandName = "depth";
+
+  void execute(Runtime& rt) const {
+    rt.out.modulation(ModulationPerformanceTarget::VibratoDepth, static_cast<double>(raw) / 127.0);
   }
 };
 
-struct NoteWait {
-  u8 raw = 0;
+struct PortamentoSwitch : RawU8<PortamentoSwitch> {
+  NDS_COMMAND("portamento", "Portamento");
+  static constexpr std::string_view operandName = "enabled";
 
-  static constexpr std::string_view kind = "nds.note-wait";
-  static constexpr std::string_view name = "Note Wait";
+  void execute(Runtime& rt) const { rt.out.portamentoEnable(raw != 0); }
+};
 
-  static NoteWait parse(CommandReader& in) {
-    return NoteWait{.raw = in.u8("enabled")};
-  }
+struct PortamentoTime : RawU8<PortamentoTime> {
+  NDS_COMMAND("portamento-time", "Portamento Time");
+  static constexpr std::string_view operandName = "time";
 
-  void describe(CommandInfo& out) const {
-    out.field("enabled", static_cast<u64>(raw));
-  }
+  void execute(Runtime& rt) const { rt.out.portamentoTime(raw); }
+};
 
-  Effects execute(TrackState& state, Emit&, VmApi&, const Context&) const {
-    state.noteWait = raw != 0;
-    return Effects::none();
-  }
+struct NoteWait : RawU8<NoteWait> {
+  NDS_COMMAND("note-wait", "Note Wait");
+  static constexpr std::string_view operandName = "enabled";
+
+  void execute(Runtime& rt) const { rt.state.noteWait = raw != 0; }
 };
 
 struct Tempo {
   u16 bpm = 0;
 
-  static constexpr std::string_view kind = "nds.tempo";
-  static constexpr std::string_view name = "Tempo";
+  NDS_COMMAND("tempo", "Tempo");
 
-  static Tempo parse(CommandReader& in) {
-    return Tempo{.bpm = in.le16("bpm")};
-  }
+  static Tempo parse(CommandReader& in) { return Tempo{.bpm = in.le16("bpm")}; }
 
-  void describe(CommandInfo& out) const {
-    out.field("bpm", static_cast<u64>(bpm));
-  }
-
-  Effects execute(TrackState&, Emit& out, VmApi&, const Context&) const {
+  void execute(Runtime& rt) const {
     if (bpm != 0) {
-      out.tempo(TempoPerformanceEvent{
-          .microsecondsPerQuarter = static_cast<u32>(std::round(60000000.0 / bpm)),
-      });
+      rt.out.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
     }
-    return Effects::none();
   }
 };
 
-struct OneByteNoOp {
-  u8 value = 0;
-
-  static constexpr std::string_view kind = "nds.no-op-1";
-  static constexpr std::string_view name = "No-op";
-
-  static OneByteNoOp parse(CommandReader& in) {
-    return OneByteNoOp{.value = in.u8("value")};
-  }
-
-  void describe(CommandInfo& out) const {
-    out.field("value", static_cast<u64>(value));
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi&, const Context&) const {
-    return Effects::none();
-  }
+struct OneByteNoOp : RawU8<OneByteNoOp> {
+  NDS_COMMAND("no-op-1", "No-op");
+  static constexpr std::string_view operandName = "value";
 };
 
 struct NoOp {
   std::string bytes;
 
-  static constexpr std::string_view kind = "nds.no-op";
-  static constexpr std::string_view name = "No-op";
+  NDS_COMMAND("no-op", "No-op");
 
   static NoOp parse(CommandReader& in) {
     // Many SSEQ opcodes are currently preserved for UI/parity but have no
@@ -347,32 +291,17 @@ struct NoOp {
         .bytes = in.remainingBytes().empty() ? std::string{} : in.rawRemainingBytes("bytes"),
     };
   }
-
-  void describe(CommandInfo& out) const {
-    if (!bytes.empty()) {
-      out.field("bytes", bytes);
-    }
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi&, const Context&) const {
-    return Effects::none();
-  }
 };
 
-struct Terminal {
-  static constexpr std::string_view kind = "nds.terminal";
-  static constexpr std::string_view name = "Terminal";
+struct Terminal : EmptyParse<Terminal> {
+  NDS_COMMAND("terminal", "Terminal");
 
-  static Terminal parse(CommandReader&) {
-    return Terminal{};
-  }
-
-  Effects execute(TrackState&, Emit&, VmApi& vm, const Context&) const {
-    vm.diagnostic(Diagnostic{
+  Effects execute(Runtime& rt) const {
+    rt.vm.diagnostic(Diagnostic{
         .severity = Severity::Warning,
         .message = "NDS SSEQ command stopped playback because it is unsupported or truncated",
     });
-    return Effects{.step = vm.end()};
+    return rt.end();
   }
 };
 
@@ -383,6 +312,11 @@ struct DecodedCommand {
   std::vector<u8> bytes;
   std::vector<CommandOperand> operands;
   DecodeFlow flow;
+};
+
+struct PendingBlock {
+  u32 offset = 0;
+  bool callTarget = false;
 };
 
 [[nodiscard]] const CommandHandler& handlerFor(const SequenceDialect& dialect, std::string_view kind) {
@@ -427,74 +361,95 @@ template <class Command>
   return decoded;
 }
 
+[[nodiscard]] DecodedCommand recordIgnored(const SequenceDialect& dialect, ByteReader reader, u32 sequenceEnd,
+                                           u32 begin, u32 operandOffset, u32 operandBytes) {
+  if (!hasSequenceBytes(reader, operandOffset, operandBytes, sequenceEnd)) {
+    return terminalCommand(dialect, reader, begin, operandOffset);
+  }
+  return recordFallthrough<NoOp>(dialect, reader, begin, operandOffset + operandBytes);
+}
+
+template <class Command>
+[[nodiscard]] DecodedCommand recordFixed(const SequenceDialect& dialect, ByteReader reader, u32 sequenceEnd, u32 begin,
+                                         u32 operandOffset, u32 operandBytes) {
+  if (!hasSequenceBytes(reader, operandOffset, operandBytes, sequenceEnd)) {
+    return terminalCommand(dialect, reader, begin, operandOffset);
+  }
+  return recordFallthrough<Command>(dialect, reader, begin, operandOffset + operandBytes);
+}
+
+template <class Command>
+[[nodiscard]] DecodedCommand recordVarLen(const SequenceDialect& dialect, ByteReader reader, u32 sequenceEnd, u32 begin,
+                                          u32& offset) {
+  static_cast<void>(readVarLen(reader, offset, sequenceEnd));
+  return recordFallthrough<Command>(dialect, reader, begin, offset);
+}
+
+template <class Command>
+[[nodiscard]] DecodedCommand recordBranch(const SequenceDialect& dialect, ByteReader reader, u32 sequenceOffset,
+                                          u32 sequenceEnd, u32 begin, u32 operandOffset, bool returns) {
+  const auto destination = readSseqAddress(reader, sequenceOffset, sequenceEnd, operandOffset);
+  if (!destination || *destination >= sequenceEnd) {
+    return terminalCommand(dialect, reader, begin, operandOffset);
+  }
+
+  const u32 end = operandOffset + 3;
+  auto decoded = recordCommand<Command>(dialect, reader, begin, end);
+  if (returns) {
+    decoded.flow.fallthrough = Address{end};
+  }
+  decoded.flow.staticTargets = {Address{*destination}};
+  return decoded;
+}
+
+[[nodiscard]] bool isUnhandledOneByteCommand(u8 status) {
+  switch (status) {
+    case 0xc3:
+    case 0xc4:
+    case 0xc5:
+    case 0xc7:
+    case 0xca:
+    case 0xce:
+    case 0xcf:
+    case 0xd5:
+      return false;
+    default:
+      return status >= 0xc2 && status <= 0xd6;
+  }
+}
+
 [[nodiscard]] DecodedCommand decodeCommand(const SequenceDialect& dialect, ByteReader reader, u32 sequenceOffset,
                                            u32 sequenceEnd, u32 offset) {
   const u32 begin = offset;
   const u8 status = reader.u8At(offset++);
-  auto terminal = [&] { return terminalCommand(dialect, reader, begin, offset); };
-  auto operand = [&](u32 size) {
-    return hasSequenceBytes(reader, offset, size, sequenceEnd);
-  };
 
   if (status < 0x80) {
-    if (!operand(1)) {
-      return terminal();
+    if (!hasSequenceBytes(reader, offset, 1, sequenceEnd)) {
+      return terminalCommand(dialect, reader, begin, offset);
     }
     ++offset;
-    static_cast<void>(readVarLen(reader, offset, sequenceEnd));
-    return recordFallthrough<Note>(dialect, reader, begin, offset);
+    return recordVarLen<Note>(dialect, reader, sequenceEnd, begin, offset);
   }
 
   switch (status) {
     case 0x80:
-      static_cast<void>(readVarLen(reader, offset, sequenceEnd));
-      return recordFallthrough<Rest>(dialect, reader, begin, offset);
+      return recordVarLen<Rest>(dialect, reader, sequenceEnd, begin, offset);
     case 0x81:
-      static_cast<void>(readVarLen(reader, offset, sequenceEnd));
-      return recordFallthrough<Program>(dialect, reader, begin, offset);
+      return recordVarLen<Program>(dialect, reader, sequenceEnd, begin, offset);
     case 0x93:
-      if (!operand(4)) {
-        return terminal();
-      }
-      offset += 4;
-      return recordFallthrough<NoOp>(dialect, reader, begin, offset);
-    case 0x94: {
-      const auto destination = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset);
-      if (!destination || *destination >= sequenceEnd) {
-        return terminal();
-      }
-      offset += 3;
-      auto decoded = recordCommand<Jump>(dialect, reader, begin, offset);
-      decoded.flow.staticTargets = {Address{*destination}};
-      return decoded;
-    }
-    case 0x95: {
-      const auto destination = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset);
-      if (!destination || *destination >= sequenceEnd) {
-        return terminal();
-      }
-      offset += 3;
-      auto decoded = recordCommand<Call>(dialect, reader, begin, offset);
-      decoded.flow.fallthrough = Address{offset};
-      decoded.flow.staticTargets = {Address{*destination}};
-      return decoded;
-    }
+      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 4);
+    case 0x94:
+      return recordBranch<Jump>(dialect, reader, sequenceOffset, sequenceEnd, begin, offset, false);
+    case 0x95:
+      return recordBranch<Call>(dialect, reader, sequenceOffset, sequenceEnd, begin, offset, true);
     case 0x96:
       return terminalCommand(dialect, reader, begin, offset);
     case 0xa0:
-      if (!operand(5)) {
-        return terminal();
-      }
-      offset += 5;
-      return recordFallthrough<NoOp>(dialect, reader, begin, offset);
+      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 5);
     case 0xa1:
-      if (!operand(2)) {
-        return terminal();
-      }
-      offset += 2;
-      return recordFallthrough<NoOp>(dialect, reader, begin, offset);
+      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 2);
     case 0xa2:
-      return recordFallthrough<NoOp>(dialect, reader, begin, offset);
+      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 0);
     case 0xb0:
     case 0xb1:
     case 0xb2:
@@ -508,76 +463,43 @@ template <class Command>
     case 0xbb:
     case 0xbc:
     case 0xbd:
-      if (!operand(3)) {
-        return terminal();
-      }
-      offset += 3;
-      return recordFallthrough<NoOp>(dialect, reader, begin, offset);
+      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 3);
     case 0xc0:
-      if (!operand(1)) {
-        return terminal();
-      }
-      return recordFallthrough<Pan>(dialect, reader, begin, offset + 1);
+      return recordFixed<Pan>(dialect, reader, sequenceEnd, begin, offset, 1);
     case 0xc1:
-      if (!operand(1)) {
-        return terminal();
-      }
-      return recordFallthrough<Volume>(dialect, reader, begin, offset + 1);
+      return recordFixed<Volume>(dialect, reader, sequenceEnd, begin, offset, 1);
     case 0xc3:
-      if (!operand(1)) {
-        return terminal();
-      }
-      return recordFallthrough<Transpose>(dialect, reader, begin, offset + 1);
+      return recordFixed<Transpose>(dialect, reader, sequenceEnd, begin, offset, 1);
     case 0xc4:
+      return recordFixed<PitchBend>(dialect, reader, sequenceEnd, begin, offset, 1);
     case 0xc5:
-    case 0xce:
-    case 0xcf:
-    case 0xd5:
-      if (!operand(1)) {
-        return terminal();
-      }
-      return recordFallthrough<OneByteNoOp>(dialect, reader, begin, offset + 1);
+      return recordFixed<PitchBendRange>(dialect, reader, sequenceEnd, begin, offset, 1);
     case 0xc7:
-      if (!operand(1)) {
-        return terminal();
-      }
-      return recordFallthrough<NoteWait>(dialect, reader, begin, offset + 1);
+      return recordFixed<NoteWait>(dialect, reader, sequenceEnd, begin, offset, 1);
     case 0xca:
-      if (!operand(1)) {
-        return terminal();
-      }
-      return recordFallthrough<OneByteNoOp>(dialect, reader, begin, offset + 1);
+      return recordFixed<ModulationDepth>(dialect, reader, sequenceEnd, begin, offset, 1);
+    case 0xce:
+      return recordFixed<PortamentoSwitch>(dialect, reader, sequenceEnd, begin, offset, 1);
+    case 0xcf:
+      return recordFixed<PortamentoTime>(dialect, reader, sequenceEnd, begin, offset, 1);
+    case 0xd5:
+      return recordFixed<ExpressionLevel>(dialect, reader, sequenceEnd, begin, offset, 1);
     case 0xe1:
-      if (!operand(2)) {
-        return terminal();
-      }
-      return recordFallthrough<Tempo>(dialect, reader, begin, offset + 2);
+      return recordFixed<Tempo>(dialect, reader, sequenceEnd, begin, offset, 2);
     case 0xe0:
     case 0xe3:
-      if (!operand(2)) {
-        return terminal();
-      }
-      offset += 2;
-      return recordFallthrough<NoOp>(dialect, reader, begin, offset);
+      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 2);
     case 0xfd:
       return recordCommand<Return>(dialect, reader, begin, offset);
     case 0xff:
       return recordCommand<End>(dialect, reader, begin, offset);
     case 0xfc:
-      return recordFallthrough<NoOp>(dialect, reader, begin, offset);
+      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 0);
     case 0xfe:
-      if (!operand(2)) {
-        return terminal();
-      }
-      offset += 2;
-      return recordFallthrough<NoOp>(dialect, reader, begin, offset);
+      return recordIgnored(dialect, reader, sequenceEnd, begin, offset, 2);
     default:
-      if ((status >= 0xc2 && status <= 0xd6) && status != 0xc3 && status != 0xc4 && status != 0xc5 && status != 0xc7 &&
-          status != 0xca && status != 0xce && status != 0xcf && status != 0xd5) {
-        if (!operand(1)) {
-          return terminal();
-        }
-        return recordFallthrough<OneByteNoOp>(dialect, reader, begin, offset + 1);
+      if (isUnhandledOneByteCommand(status)) {
+        return recordFixed<OneByteNoOp>(dialect, reader, sequenceEnd, begin, offset, 1);
       }
       return terminalCommand(dialect, reader, begin, offset);
   }
@@ -597,7 +519,8 @@ SequenceDialect ndsSequenceDialect() {
           .commandLimit = static_cast<u32>(kMaxTrackCommands),
       })
       .commands<Note, Rest, Program, Jump, Call, Return, End, Pan, Volume, Transpose, NoteWait, Tempo, OneByteNoOp,
-                NoOp, Terminal>();
+                ExpressionLevel, PitchBend, PitchBendRange, ModulationDepth, PortamentoSwitch, PortamentoTime, NoOp,
+                Terminal>();
 }
 
 void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
@@ -646,30 +569,68 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& di
   u32 offset = startOffset;
   size_t decodedCommands = 0;
   std::set<u32> visitedControlDestinations;
-  while (hasSequenceBytes(reader, offset, 1, sequenceEnd) && decodedCommands++ < kMaxTrackCommands) {
-    auto decoded = decodeCommand(dialect, reader, sequenceOffset, sequenceEnd, offset);
-    const u32 begin = offset;
+  std::set<u32> decodedOffsets;
+  std::set<u32> callTargetOffsets;
+  std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
+  const CommandKindId callKind = handlerFor(dialect, Call::kind).kind;
+  const CommandKindId endKind = handlerFor(dialect, End::kind).kind;
+  const CommandKindId jumpKind = handlerFor(dialect, Jump::kind).kind;
 
-    if (decoded.kind == handlerFor(dialect, Jump::kind).kind && !decoded.flow.staticTargets.empty()) {
-      const u32 destination = decoded.flow.staticTargets.front().value;
-      if (visitedControlDestinations.contains(destination)) {
-        auto end = recordCommand<End>(dialect, reader, begin, begin + 1);
-        appendDecoded(builder, end, begin);
+  while (!pendingBlocks.empty()) {
+    const PendingBlock block = pendingBlocks.back();
+    pendingBlocks.pop_back();
+    offset = block.offset;
+
+    while (hasSequenceBytes(reader, offset, 1, sequenceEnd) && decodedCommands++ < kMaxTrackCommands) {
+      const u32 begin = offset;
+      if (decodedOffsets.contains(begin)) {
         break;
       }
-      visitedControlDestinations.insert(destination);
-      auto noOp = recordCommand<NoOp>(dialect, reader, begin, static_cast<u32>(decoded.range.endOffset()));
-      appendDecoded(builder, noOp, begin);
-      offset = destination;
-      continue;
-    }
+      decodedOffsets.insert(begin);
 
-    const auto next = decoded.flow.fallthrough;
-    appendDecoded(builder, decoded, begin);
-    if (!next || decoded.flow.terminal || decoded.kind == handlerFor(dialect, End::kind).kind) {
-      break;
+      auto decoded = decodeCommand(dialect, reader, sequenceOffset, sequenceEnd, offset);
+
+      if (!block.callTarget) {
+        const auto overlap = std::ranges::find_if(
+            callTargetOffsets, [&](u32 target) { return begin < target && target < decoded.range.endOffset(); });
+        if (overlap != callTargetOffsets.end()) {
+          // Some malformed FAT entries fall through one byte before a real call
+          // target. Stop the fallthrough interpretation before it consumes the
+          // overlapping subroutine bytes.
+          auto end = recordCommand<End>(dialect, reader, begin, begin + 1);
+          appendDecoded(builder, end, begin);
+          break;
+        }
+      }
+
+      if (decoded.kind == jumpKind && !decoded.flow.staticTargets.empty()) {
+        const u32 destination = decoded.flow.staticTargets.front().value;
+        if (visitedControlDestinations.contains(destination)) {
+          auto end = recordCommand<End>(dialect, reader, begin, begin + 1);
+          appendDecoded(builder, end, begin);
+          break;
+        }
+        visitedControlDestinations.insert(destination);
+        auto noOp = recordCommand<NoOp>(dialect, reader, begin, static_cast<u32>(decoded.range.endOffset()));
+        appendDecoded(builder, noOp, begin);
+        offset = destination;
+        continue;
+      }
+
+      if (decoded.kind == callKind && !decoded.flow.staticTargets.empty()) {
+        const u32 destination = decoded.flow.staticTargets.front().value;
+        if (!decodedOffsets.contains(destination) && callTargetOffsets.insert(destination).second) {
+          pendingBlocks.push_back(PendingBlock{.offset = destination, .callTarget = true});
+        }
+      }
+
+      const auto next = decoded.flow.fallthrough;
+      appendDecoded(builder, decoded, begin);
+      if (!next || decoded.flow.terminal || decoded.kind == endKind) {
+        break;
+      }
+      offset = next->value;
     }
-    offset = next->value;
   }
 
   return track;
@@ -718,5 +679,7 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
   starts.insert(starts.end(), extraStarts.begin(), extraStarts.end());
   return starts;
 }
+
+#undef NDS_COMMAND
 
 }  // namespace vgmtrans::formats::nds

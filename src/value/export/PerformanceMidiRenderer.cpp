@@ -164,6 +164,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 .value = data7(typedEvent.linearGain * 127.0),
             });
           }
+        } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
+          track.events.push_back(Expression{
+              .tick = typedEvent.header.tick,
+              .channel = channel,
+              .value = data7(typedEvent.linearGain * 127.0),
+          });
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
           track.events.push_back(Pan{
               .tick = typedEvent.header.tick,
@@ -204,8 +210,21 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // Global transpose is a renderer-side state change, mirroring the
           // legacy MIDI global track. It affects later notes and portamento
           // controls but does not write a MIDI event itself.
+        } else if constexpr (std::is_same_v<TypedEvent, PitchBendPerformanceEvent>) {
+          track.events.push_back(PitchBend{
+              .tick = typedEvent.header.tick,
+              .channel = channel,
+              .value = typedEvent.value,
+          });
+        } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
+          track.events.push_back(PitchBendRange{
+              .tick = typedEvent.header.tick,
+              .channel = channel,
+              .semitones = typedEvent.semitones,
+          });
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
-          const double previousKey = typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
+          const double previousKey =
+              typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
           track.events.push_back(PortamentoTime14{
               .tick = typedEvent.header.tick,
               .channel = channel,
@@ -216,8 +235,21 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .channel = channel,
               .key = midiKey(previousKey),
           });
+        } else if constexpr (std::is_same_v<TypedEvent, PortamentoEnablePerformanceEvent>) {
+          track.events.push_back(PortamentoEnable{
+              .tick = typedEvent.header.tick,
+              .channel = channel,
+              .enabled = typedEvent.enabled,
+          });
+        } else if constexpr (std::is_same_v<TypedEvent, PortamentoTimePerformanceEvent>) {
+          track.events.push_back(PortamentoTime{
+              .tick = typedEvent.header.tick,
+              .channel = channel,
+              .value = typedEvent.value,
+          });
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoControlPerformanceEvent>) {
-          const double previousKey = typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
+          const double previousKey =
+              typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
           track.events.push_back(PortamentoControl{
               .tick = typedEvent.header.tick,
               .channel = channel,

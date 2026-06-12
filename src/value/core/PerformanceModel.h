@@ -51,6 +51,12 @@ struct LevelPerformanceEvent {
   LevelResolution resolution = LevelResolution::SevenBit;
 };
 
+struct ExpressionPerformanceEvent {
+  PerformanceEventHeader header;
+  double linearGain = 1.0;
+  LevelResolution resolution = LevelResolution::SevenBit;
+};
+
 struct PanPerformanceEvent {
   PerformanceEventHeader header;
   // -1.0 is hard left, 0.0 is center, and 1.0 is hard right.
@@ -85,10 +91,30 @@ struct GlobalTransposePerformanceEvent {
   s32 semitones = 0;
 };
 
+struct PitchBendPerformanceEvent {
+  PerformanceEventHeader header;
+  s16 value = 0;
+};
+
+struct PitchBendRangePerformanceEvent {
+  PerformanceEventHeader header;
+  u8 semitones = 2;
+};
+
 struct PortamentoPerformanceEvent {
   PerformanceEventHeader header;
   double timeMilliseconds = 0.0;
   double previousKey = 0.0;
+};
+
+struct PortamentoEnablePerformanceEvent {
+  PerformanceEventHeader header;
+  bool enabled = false;
+};
+
+struct PortamentoTimePerformanceEvent {
+  PerformanceEventHeader header;
+  u8 value = 0;
 };
 
 struct PortamentoControlPerformanceEvent {
@@ -120,12 +146,13 @@ struct MarkerPerformanceEvent {
   std::string text;
 };
 
-using PerformanceEvent = std::variant<NotePerformanceEvent, TempoPerformanceEvent, InstrumentPerformanceEvent,
-                                      LevelPerformanceEvent, PanPerformanceEvent, MasterLevelPerformanceEvent,
-                                      ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
-                                      GlobalTransposePerformanceEvent, PortamentoPerformanceEvent,
-                                      PortamentoControlPerformanceEvent, LegatoPedalPerformanceEvent,
-                                      ModulationPerformanceEvent, MarkerPerformanceEvent>;
+using PerformanceEvent =
+    std::variant<NotePerformanceEvent, TempoPerformanceEvent, InstrumentPerformanceEvent, LevelPerformanceEvent,
+                 ExpressionPerformanceEvent, PanPerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
+                 MonoModePerformanceEvent, TuningPerformanceEvent, GlobalTransposePerformanceEvent,
+                 PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent, PortamentoTimePerformanceEvent,
+                 PortamentoControlPerformanceEvent, PitchBendPerformanceEvent, PitchBendRangePerformanceEvent,
+                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
 
 struct PerformanceTrack {
   TrackId id;

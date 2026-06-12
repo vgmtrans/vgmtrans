@@ -185,6 +185,18 @@ void Emit::level(double linearGain, LevelResolution resolution) {
   });
 }
 
+void Emit::expression(ExpressionPerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void Emit::expression(double linearGain, LevelResolution resolution) {
+  expression(ExpressionPerformanceEvent{
+      .linearGain = linearGain,
+      .resolution = resolution,
+  });
+}
+
 void Emit::pan(PanPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
@@ -241,6 +253,28 @@ void Emit::globalTranspose(s32 semitones) {
   });
 }
 
+void Emit::pitchBend(PitchBendPerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void Emit::pitchBend(s16 value) {
+  pitchBend(PitchBendPerformanceEvent{
+      .value = value,
+  });
+}
+
+void Emit::pitchBendRange(PitchBendRangePerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void Emit::pitchBendRange(u8 semitones) {
+  pitchBendRange(PitchBendRangePerformanceEvent{
+      .semitones = semitones,
+  });
+}
+
 void Emit::portamento(PortamentoPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
@@ -250,6 +284,28 @@ void Emit::portamento(double timeMilliseconds, double previousKey) {
   portamento(PortamentoPerformanceEvent{
       .timeMilliseconds = timeMilliseconds,
       .previousKey = previousKey,
+  });
+}
+
+void Emit::portamentoEnable(PortamentoEnablePerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void Emit::portamentoEnable(bool enabled) {
+  portamentoEnable(PortamentoEnablePerformanceEvent{
+      .enabled = enabled,
+  });
+}
+
+void Emit::portamentoTime(PortamentoTimePerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void Emit::portamentoTime(u8 value) {
+  portamentoTime(PortamentoTimePerformanceEvent{
+      .value = value,
   });
 }
 
@@ -387,8 +443,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     std::optional<u64> loopTick;
   };
 
-  const auto renderTrack = [&](const TrackProgram& track,
-                               PerformanceSequence& targetSequence,
+  const auto renderTrack = [&](const TrackProgram& track, PerformanceSequence& targetSequence,
                                std::optional<u64> stopTick) -> RenderedTrack {
     PerformanceTrack performanceTrack{
         .id = track.id,
@@ -396,8 +451,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     };
     addInitialTrackEvents(performanceTrack, behavior);
 
-    std::any trackState = dialect.createTrackState != nullptr ? dialect.createTrackState(program, track, dialect.context)
-                                                              : std::any{};
+    std::any trackState =
+        dialect.createTrackState != nullptr ? dialect.createTrackState(program, track, dialect.context) : std::any{};
     VmTrackRuntime runtime;
     // A command reached through a different return stack or repeat-counter state
     // is distinct playback. This keeps normal calls/repeats from looking like
@@ -436,10 +491,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
               // Preserve-mode exports one pass plus neutral loop markers instead of
               // replaying until the safety command limit.
               addLoopMarker(performanceTrack, previous->second.command, previous->second.tick, "Loop Start");
-              addLoopMarker(performanceTrack,
-                            runtime.lastCommand.valid() ? runtime.lastCommand : command.id,
-                            runtime.tick,
-                            "Loop End");
+              addLoopMarker(performanceTrack, runtime.lastCommand.valid() ? runtime.lastCommand : command.id,
+                            runtime.tick, "Loop End");
               break;
             }
 
