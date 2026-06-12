@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/core/SequenceDialect.h"
+#include "value/core/PerformanceModel.h"
 #include "value/core/Source.h"
 
 #include <algorithm>
@@ -63,6 +64,46 @@ struct Be16Operand {
     result.raw = in.be16(Derived::operandName);
     return result;
   }
+};
+
+// Common one-operand command bodies. Formats still name each command locally,
+// but these remove boilerplate for driver opcodes that only set state or emit a
+// direct performance control.
+template <class Derived, auto Member>
+struct U8StateCommand : U8Operand<Derived> {
+  void execute(auto& rt) const { rt.state.*Member = this->raw; }
+};
+
+template <class Derived, auto Member>
+struct S8StateCommand : S8Operand<Derived> {
+  void execute(auto& rt) const { rt.state.*Member = this->raw; }
+};
+
+template <class Derived, auto Member>
+struct U8BoolStateCommand : U8Operand<Derived> {
+  void execute(auto& rt) const { rt.state.*Member = this->raw != 0; }
+};
+
+template <class Derived, void (Emit::*Method)(u8)>
+struct U8RawOutCommand : U8Operand<Derived> {
+  void execute(auto& rt) const { (rt.out.*Method)(this->raw); }
+};
+
+template <class Derived, void (Emit::*Method)(bool)>
+struct U8BoolOutCommand : U8Operand<Derived> {
+  void execute(auto& rt) const { (rt.out.*Method)(this->raw != 0); }
+};
+
+template <class Derived, void (Emit::*Method)(double, LevelResolution)>
+struct U8NormalizedOutCommand : U8Operand<Derived> {
+  void execute(auto& rt) const {
+    (rt.out.*Method)(std::clamp(static_cast<double>(this->raw) / 127.0, 0.0, 1.0), LevelResolution::SevenBit);
+  }
+};
+
+template <class Derived, ModulationPerformanceTarget Target>
+struct U8ModulationCommand : U8Operand<Derived> {
+  void execute(auto& rt) const { rt.out.modulation(Target, static_cast<double>(this->raw) / 127.0); }
 };
 
 // Temporary decoded form used while a bytecode decoder is deciding control flow.

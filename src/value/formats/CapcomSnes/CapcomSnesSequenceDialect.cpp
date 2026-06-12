@@ -35,18 +35,6 @@ namespace {
     void execute(Runtime& rt) const { rt.state.Member = true; } \
   }
 
-#define CAPCOM_U8_STATE(Type, Operand, Member)                 \
-  struct Type : U8Operand<Type> {                              \
-    static constexpr std::string_view operandName = Operand;   \
-    void execute(Runtime& rt) const { rt.state.Member = raw; } \
-  }
-
-#define CAPCOM_S8_STATE(Type, Operand, Member)                 \
-  struct Type : S8Operand<Type> {                              \
-    static constexpr std::string_view operandName = Operand;   \
-    void execute(Runtime& rt) const { rt.state.Member = raw; } \
-  }
-
 constexpr u8 kNoteOctaveMask = 0x07;
 constexpr u8 kNoteOctaveUpMask = 0x08;
 constexpr u8 kNoteDottedMask = 0x10;
@@ -288,7 +276,10 @@ struct NoteAttributes : U8Operand<NoteAttributes> {
   void execute(Runtime& rt) const { rt.state.applyAttributes(raw, &rt.out); }
 };
 
-CAPCOM_U8_STATE(Octave, "octave", noteOctave);
+struct Octave : U8StateCommand<Octave, &TrackState::noteOctave> {
+  static constexpr std::string_view operandName = "octave";
+};
+
 CAPCOM_TOGGLE(ToggleTriplet, noteTriplet);
 
 struct ToggleSlur : NoOperands<ToggleSlur> {
@@ -306,7 +297,9 @@ struct GlobalTranspose {
   void execute(Runtime& rt) const { rt.out.globalTranspose(raw); }
 };
 
-CAPCOM_S8_STATE(Transpose, "semitones", transpose);
+struct Transpose : S8StateCommand<Transpose, &TrackState::transpose> {
+  static constexpr std::string_view operandName = "semitones";
+};
 
 struct Tuning : S8Operand<Tuning> {
   static constexpr std::string_view operandName = "tuning";
@@ -334,7 +327,9 @@ struct Tempo : Be16Operand<Tempo> {
   void execute(Runtime& rt) const { rt.out.tempo(tempoMicrosecondsPerQuarter(raw)); }
 };
 
-CAPCOM_U8_STATE(DurationRate, "rate", durationRate);
+struct DurationRate : U8StateCommand<DurationRate, &TrackState::durationRate> {
+  static constexpr std::string_view operandName = "rate";
+};
 
 struct RepeatUntil {
   u8 slot = 0;
@@ -669,8 +664,6 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialec
                                    [&](u32 offset) { return bytecode.decode(reader, offset); });
 }
 
-#undef CAPCOM_S8_STATE
-#undef CAPCOM_U8_STATE
 #undef CAPCOM_SET_TRUE
 #undef CAPCOM_TOGGLE
 

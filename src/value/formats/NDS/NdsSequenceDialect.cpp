@@ -23,37 +23,6 @@ using namespace core;
 
 namespace {
 
-// Keep these macros to one-byte commands whose behavior fits on one line.
-#define NDS_U8_NORMALIZED_OUT(Type, Operand, Method)                                                           \
-  struct Type : U8Operand<Type> {                                                                              \
-    static constexpr std::string_view operandName = Operand;                                                   \
-    void execute(Runtime& rt) const { rt.out.Method(std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0)); } \
-  }
-
-#define NDS_U8_RAW_OUT(Type, Operand, Method)                \
-  struct Type : U8Operand<Type> {                            \
-    static constexpr std::string_view operandName = Operand; \
-    void execute(Runtime& rt) const { rt.out.Method(raw); }  \
-  }
-
-#define NDS_U8_BOOL_OUT(Type, Operand, Method)                   \
-  struct Type : U8Operand<Type> {                                \
-    static constexpr std::string_view operandName = Operand;     \
-    void execute(Runtime& rt) const { rt.out.Method(raw != 0); } \
-  }
-
-#define NDS_U8_BOOL_STATE(Type, Operand, Member)                    \
-  struct Type : U8Operand<Type> {                                   \
-    static constexpr std::string_view operandName = Operand;        \
-    void execute(Runtime& rt) const { rt.state.Member = raw != 0; } \
-  }
-
-#define NDS_U8_MODULATION(Type, Operand, Target)                                                     \
-  struct Type : U8Operand<Type> {                                                                    \
-    static constexpr std::string_view operandName = Operand;                                         \
-    void execute(Runtime& rt) const { rt.out.modulation(Target, static_cast<double>(raw) / 127.0); } \
-  }
-
 constexpr size_t kMaxTrackCommands = 262144;
 
 struct Context {};
@@ -188,8 +157,13 @@ struct Pan : U8Operand<Pan> {
   void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
-NDS_U8_NORMALIZED_OUT(Volume, "volume", level);
-NDS_U8_NORMALIZED_OUT(ExpressionLevel, "expression", expression);
+struct Volume : U8NormalizedOutCommand<Volume, &Emit::level> {
+  static constexpr std::string_view operandName = "volume";
+};
+
+struct ExpressionLevel : U8NormalizedOutCommand<ExpressionLevel, &Emit::expression> {
+  static constexpr std::string_view operandName = "expression";
+};
 
 struct Transpose {
   s8 semitones = 0;
@@ -205,11 +179,25 @@ struct PitchBend : S8Operand<PitchBend> {
   void execute(Runtime& rt) const { rt.out.pitchBend(static_cast<s16>(raw * 64)); }
 };
 
-NDS_U8_RAW_OUT(PitchBendRange, "semitones", pitchBendRange);
-NDS_U8_MODULATION(ModulationDepth, "depth", ModulationPerformanceTarget::VibratoDepth);
-NDS_U8_BOOL_OUT(PortamentoSwitch, "enabled", portamentoEnable);
-NDS_U8_RAW_OUT(PortamentoTime, "time", portamentoTime);
-NDS_U8_BOOL_STATE(NoteWait, "enabled", noteWait);
+struct PitchBendRange : U8RawOutCommand<PitchBendRange, &Emit::pitchBendRange> {
+  static constexpr std::string_view operandName = "semitones";
+};
+
+struct ModulationDepth : U8ModulationCommand<ModulationDepth, ModulationPerformanceTarget::VibratoDepth> {
+  static constexpr std::string_view operandName = "depth";
+};
+
+struct PortamentoSwitch : U8BoolOutCommand<PortamentoSwitch, &Emit::portamentoEnable> {
+  static constexpr std::string_view operandName = "enabled";
+};
+
+struct PortamentoTime : U8RawOutCommand<PortamentoTime, &Emit::portamentoTime> {
+  static constexpr std::string_view operandName = "time";
+};
+
+struct NoteWait : U8BoolStateCommand<NoteWait, &TrackState::noteWait> {
+  static constexpr std::string_view operandName = "enabled";
+};
 
 struct Tempo {
   u16 bpm = 0;
@@ -508,11 +496,5 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
   starts.insert(starts.end(), extraStarts.begin(), extraStarts.end());
   return starts;
 }
-
-#undef NDS_U8_MODULATION
-#undef NDS_U8_BOOL_STATE
-#undef NDS_U8_BOOL_OUT
-#undef NDS_U8_RAW_OUT
-#undef NDS_U8_NORMALIZED_OUT
 
 }  // namespace vgmtrans::formats::nds
