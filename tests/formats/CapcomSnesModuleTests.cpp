@@ -154,8 +154,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(firstTrack.commands.size() == 8, "track should decode all fixture commands");
   expect(dialect->describe(firstTrack, firstTrack.commands[0]).detailKind == "capcom-snes.tempo",
          "track should decode tempo command");
-  expect(firstTrack.bytesFor(firstTrack.commands[0])[1] == 0x12 && firstTrack.bytesFor(firstTrack.commands[0])[2] == 0x34,
-         "tempo command should preserve raw big-endian value");
+  expect(
+      firstTrack.bytesFor(firstTrack.commands[0])[1] == 0x12 && firstTrack.bytesFor(firstTrack.commands[0])[2] == 0x34,
+      "tempo command should preserve raw big-endian value");
   expect(dialect->describe(firstTrack, firstTrack.commands[1]).detailKind == "capcom-snes.program",
          "track should decode program command");
   expect(dialect->describe(firstTrack, firstTrack.commands[2]).detailKind == "capcom-snes.volume",
@@ -170,11 +171,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "track should decode note command");
   expect(dialect->describe(firstTrack, firstTrack.commands[7]).detailKind == "capcom-snes.end",
          "track should decode end command");
-  expect(sequence->program.referencedInstruments.size() == 1,
-         "sequence should expose unique referenced instruments");
-  expect(sequence->program.referencedInstruments[0].bank == 0 &&
-             sequence->program.referencedInstruments[0].program == 0,
-         "instrument reference should preserve decoded bank and program");
+  expect(sequence->program.referencedInstruments.size() == 1, "sequence should expose unique referenced instruments");
+  expect(
+      sequence->program.referencedInstruments[0].bank == 0 && sequence->program.referencedInstruments[0].program == 0,
+      "instrument reference should preserve decoded bank and program");
   expect(sequence->program.referencedInstruments[0].asset == project.collections[0].instrumentSets[0],
          "instrument reference should point at the decoded instrument set asset");
   expect(sequence->program.referencedInstruments[0].range.has_value() &&
@@ -185,9 +185,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto& sequenceItems = sequence->metadata.items.nodes;
   const auto commandItemCount =
       std::ranges::count_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Command; });
-  expect(
-      commandItemCount == sequence->program.tracks.size() * sequence->program.tracks[0].commands.size(),
-      "sequence item tree should expose decoded command nodes for every track");
+  expect(commandItemCount == sequence->program.tracks.size() * sequence->program.tracks[0].commands.size(),
+         "sequence item tree should expose decoded command nodes for every track");
 
   const auto firstTrackItem =
       std::ranges::find_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Track; });
@@ -542,14 +541,16 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
          "CapcomSnes source dialect should index decoded command addresses");
 
   const auto programOperands = track.operandsFor(track.commands[1]);
-  expect(programOperands.size() == 1 && programOperands[0].name == "program" &&
+  expect(programOperands.size() == 1 && programOperands[0].name == "raw" &&
              std::get<u64>(programOperands[0].value) == 0x85,
          "CapcomSnes source command should preserve decoded program operands");
 
   const CommandInfo programInfo = dialect.describe(track, track.commands[1]);
   expect(programInfo.name == "Program", "CapcomSnes dialect should describe commands through local command code");
-  expect(programInfo.fields.size() == 2 && programInfo.fields[0].value == "1" && programInfo.fields[1].value == "5",
-         "CapcomSnes program display should decode bank and program together");
+  expect(programInfo.fields.size() == 3 && programInfo.fields[0].name == "raw" &&
+             programInfo.fields[0].value == "133" && programInfo.fields[1].value == "1" &&
+             programInfo.fields[2].value == "5",
+         "CapcomSnes program display should show the raw byte plus decoded bank and program");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -642,16 +643,11 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   expect(track.commands.size() == 10, "CapcomSnes source-only commands should not truncate track decoding");
 
   const std::vector<std::string> expectedKinds{
-      "capcom-snes.tuning",
-      "capcom-snes.portamento-time",
-      "capcom-snes.master-volume",
-      "capcom-snes.echo-param",
-      "capcom-snes.echo-on-off",
-      "capcom-snes.release-rate",
-      "capcom-snes.nop",
-      "capcom-snes.nop",
-      "capcom-snes.note",
-      "capcom-snes.end",
+      "capcom-snes.tuning",        "capcom-snes.portamento-time",
+      "capcom-snes.master-volume", "capcom-snes.echo-param",
+      "capcom-snes.echo-on-off",   "capcom-snes.release-rate",
+      "capcom-snes.nop",           "capcom-snes.nop",
+      "capcom-snes.note",          "capcom-snes.end",
   };
   for (size_t index = 0; index < expectedKinds.size(); ++index) {
     expect(dialect.describe(track, track.commands[index]).detailKind == expectedKinds[index],
@@ -795,8 +791,9 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
          "CapcomSnes V1 unknown one-byte event should preserve its source range");
 
   const auto operands = track.operandsFor(track.commands[0]);
-  expect(operands.size() == 1 && operands[0].name == "value" && std::get<u64>(operands[0].value) == 0xab,
-         "CapcomSnes V1 unknown one-byte event should preserve its operand");
+  expect(operands.size() == 2 && operands[0].name == "opcode" && std::get<u64>(operands[0].value) == 0x1e &&
+             operands[1].name == "value" && std::get<u64>(operands[1].value) == 0xab,
+         "CapcomSnes V1 unknown one-byte event should preserve its opcode and operand");
 
   const SequenceProgram program{
       .dialect = dialect.id,

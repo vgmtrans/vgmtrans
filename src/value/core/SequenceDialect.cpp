@@ -63,9 +63,8 @@ void CommandInfo::field(std::string fieldName, Address value) {
 }
 
 const CommandHandler* SequenceDialect::handler(CommandHandlerId handlerId) const {
-  const auto found = std::ranges::find_if(handlers, [handlerId](const CommandHandler& handler) {
-    return handler.id == handlerId;
-  });
+  const auto found =
+      std::ranges::find_if(handlers, [handlerId](const CommandHandler& handler) { return handler.id == handlerId; });
   if (found == handlers.end()) {
     return nullptr;
   }
@@ -73,9 +72,8 @@ const CommandHandler* SequenceDialect::handler(CommandHandlerId handlerId) const
 }
 
 const CommandHandler* SequenceDialect::handlerForKind(std::string_view kindName) const {
-  const auto found = std::ranges::find_if(handlers, [kindName](const CommandHandler& handler) {
-    return handler.kindName == kindName;
-  });
+  const auto found = std::ranges::find_if(
+      handlers, [kindName](const CommandHandler& handler) { return handler.kindName == kindName; });
   if (found == handlers.end()) {
     return nullptr;
   }
@@ -92,6 +90,11 @@ CommandInfo SequenceDialect::describe(const TrackProgram& track, const SourceCom
       .name = commandHandler->name,
       .detailKind = commandHandler->detailKind,
   };
+  // Parsed operands belong to the immutable source snapshot. Format-specific
+  // describe() hooks should add derived meaning instead of reprinting them.
+  for (const CommandOperand& operand : track.operandsFor(command)) {
+    std::visit([&](const auto& value) { info.field(operand.name, value); }, operand.value);
+  }
   commandHandler->describe(command, track, info, context);
   return info;
 }
@@ -110,8 +113,7 @@ std::string commandInfoDescription(const CommandInfo& info) {
 ItemId addSourceCommandItem(ItemTreeBuilder& items, std::optional<ItemId> parent, const SequenceDialect& dialect,
                             const TrackProgram& track, const SourceCommand& command) {
   const CommandInfo info = dialect.describe(track, command);
-  return items.add(parent, ItemKind::Command, info.detailKind, info.name, command.range,
-                   commandInfoDescription(info));
+  return items.add(parent, ItemKind::Command, info.detailKind, info.name, command.range, commandInfoDescription(info));
 }
 
 void SequenceDialectRegistry::add(SequenceDialect dialect) {

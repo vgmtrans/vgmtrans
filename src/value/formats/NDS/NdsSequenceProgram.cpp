@@ -44,19 +44,14 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
 
   u32 trackIndex = 0;
   for (const u32 start : ndsSequenceTrackStarts(input.reader, range.offset, range.sequenceEnd)) {
-    auto track = decodeNdsSequenceTrack(input.reader,
-                                        dialect,
-                                        range.offset,
-                                        range.sequenceEnd,
-                                        start,
-                                        trackIndex++,
+    auto track = decodeNdsSequenceTrack(input.reader, dialect, range.offset, range.sequenceEnd, start, trackIndex++,
                                         range.linearizeMalformedControlFlow);
     const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
                                      input.reader.range(start, 0));
     for (const auto& command : track.commands) {
       static_cast<void>(addSourceCommandItem(items, trackItem, dialect, track, command));
       if (programHandler != nullptr) {
-        addBankedProgramReference(asset.program, track, command, programHandler->kind, "program", instrumentSet);
+        addBankedProgramReference(asset.program, track, command, programHandler->kind, "raw", instrumentSet);
       }
     }
     asset.program.tracks.push_back(std::move(track));

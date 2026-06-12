@@ -24,8 +24,8 @@ SequenceProgramAsset parseCapcomSnesSequenceProgram(const ScanInput& input, cons
   const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
   ItemTree items;
   ItemTreeBuilder itemBuilder(items, input.ids);
-  const auto root = itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes.sequence-header",
-                                    "Sequence Header", input.reader.range(layout.sequenceHeaderAddress, headerSize));
+  const auto root = itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes.sequence-header", "Sequence Header",
+                                    input.reader.range(layout.sequenceHeaderAddress, headerSize));
 
   const SequenceDialect dialect = capcomSnesSequenceDialect(layout.version);
   SequenceProgram program{
@@ -48,15 +48,13 @@ SequenceProgramAsset parseCapcomSnesSequenceProgram(const ScanInput& input, cons
     const auto trackItem =
         itemBuilder.add(root, ItemKind::Track, "capcom-snes.track-pointer", "Track Pointer",
                         input.reader.range(pointerOffset, 2), fmt::format("Track starts at ${:04X}", trackAddress));
-    auto track = decodeCapcomSnesSourceTrack(input.reader,
-                                             dialect,
-                                             static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex),
-                                             trackAddress);
+    auto track = decodeCapcomSnesSourceTrack(input.reader, dialect,
+                                             static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex), trackAddress);
 
     for (const auto& command : track.commands) {
       static_cast<void>(addSourceCommandItem(itemBuilder, trackItem, dialect, track, command));
       if (programHandler != nullptr) {
-        addBankedProgramReference(program, track, command, programHandler->kind, "program", instrumentSetId);
+        addBankedProgramReference(program, track, command, programHandler->kind, "raw", instrumentSetId);
       }
     }
 

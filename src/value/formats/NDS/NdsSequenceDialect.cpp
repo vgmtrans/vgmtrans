@@ -11,7 +11,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -32,9 +31,40 @@ namespace {
   static constexpr u8 opcode = Op;           \
   NDS_KIND(Suffix, DisplayName)
 
-#define NDS_IGNORED_COMMAND(Op, Type, Suffix, DisplayName, OperandBytes) \
-  struct Type : RawBytesOperand<Type, OperandBytes> {                    \
-    NDS_COMMAND(Op, Suffix, DisplayName);                                \
+// Keep these macros to one-byte commands whose behavior fits on one line.
+#define NDS_U8_NORMALIZED_OUT(Type, Op, Suffix, DisplayName, Operand, Method)                                  \
+  struct Type : U8Operand<Type> {                                                                              \
+    NDS_COMMAND(Op, Suffix, DisplayName);                                                                      \
+    static constexpr std::string_view operandName = Operand;                                                   \
+    void execute(Runtime& rt) const { rt.out.Method(std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0)); } \
+  }
+
+#define NDS_U8_RAW_OUT(Type, Op, Suffix, DisplayName, Operand, Method) \
+  struct Type : U8Operand<Type> {                                      \
+    NDS_COMMAND(Op, Suffix, DisplayName);                              \
+    static constexpr std::string_view operandName = Operand;           \
+    void execute(Runtime& rt) const { rt.out.Method(raw); }            \
+  }
+
+#define NDS_U8_BOOL_OUT(Type, Op, Suffix, DisplayName, Operand, Method) \
+  struct Type : U8Operand<Type> {                                       \
+    NDS_COMMAND(Op, Suffix, DisplayName);                               \
+    static constexpr std::string_view operandName = Operand;            \
+    void execute(Runtime& rt) const { rt.out.Method(raw != 0); }        \
+  }
+
+#define NDS_U8_BOOL_STATE(Type, Op, Suffix, DisplayName, Operand, Member) \
+  struct Type : U8Operand<Type> {                                         \
+    NDS_COMMAND(Op, Suffix, DisplayName);                                 \
+    static constexpr std::string_view operandName = Operand;              \
+    void execute(Runtime& rt) const { rt.state.Member = raw != 0; }       \
+  }
+
+#define NDS_U8_MODULATION(Type, Op, Suffix, DisplayName, Operand, Target)                            \
+  struct Type : U8Operand<Type> {                                                                    \
+    NDS_COMMAND(Op, Suffix, DisplayName);                                                            \
+    static constexpr std::string_view operandName = Operand;                                         \
+    void execute(Runtime& rt) const { rt.out.modulation(Target, static_cast<double>(raw) / 127.0); } \
   }
 
 constexpr size_t kMaxTrackCommands = 262144;
@@ -117,7 +147,7 @@ struct Program {
 
   NDS_COMMAND(0x81, "program", "Program");
 
-  static Program parse(CommandReader& in) { return Program{.raw = in.varLen("program")}; }
+  static Program parse(CommandReader& in) { return Program{.raw = in.varLen("raw")}; }
 
   [[nodiscard]] u32 bank() const { return raw >> 7; }
   [[nodiscard]] u32 program() const { return raw & 0x7f; }
@@ -172,19 +202,8 @@ struct Pan : U8Operand<Pan> {
   void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
-struct Volume : U8Operand<Volume> {
-  NDS_COMMAND(0xc1, "volume", "Volume");
-  static constexpr std::string_view operandName = "volume";
-
-  void execute(Runtime& rt) const { rt.out.level(std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0)); }
-};
-
-struct ExpressionLevel : U8Operand<ExpressionLevel> {
-  NDS_COMMAND(0xd5, "expression", "Expression");
-  static constexpr std::string_view operandName = "expression";
-
-  void execute(Runtime& rt) const { rt.out.expression(std::clamp(static_cast<double>(raw) / 127.0, 0.0, 1.0)); }
-};
+NDS_U8_NORMALIZED_OUT(Volume, 0xc1, "volume", "Volume", "volume", level);
+NDS_U8_NORMALIZED_OUT(ExpressionLevel, 0xd5, "expression", "Expression", "expression", expression);
 
 struct Transpose {
   s8 semitones = 0;
@@ -203,42 +222,12 @@ struct PitchBend : S8Operand<PitchBend> {
   void execute(Runtime& rt) const { rt.out.pitchBend(static_cast<s16>(raw * 64)); }
 };
 
-struct PitchBendRange : U8Operand<PitchBendRange> {
-  NDS_COMMAND(0xc5, "pitch-bend-range", "Pitch Bend Range");
-  static constexpr std::string_view operandName = "semitones";
-
-  void execute(Runtime& rt) const { rt.out.pitchBendRange(raw); }
-};
-
-struct ModulationDepth : U8Operand<ModulationDepth> {
-  NDS_COMMAND(0xca, "modulation-depth", "Modulation Depth");
-  static constexpr std::string_view operandName = "depth";
-
-  void execute(Runtime& rt) const {
-    rt.out.modulation(ModulationPerformanceTarget::VibratoDepth, static_cast<double>(raw) / 127.0);
-  }
-};
-
-struct PortamentoSwitch : U8Operand<PortamentoSwitch> {
-  NDS_COMMAND(0xce, "portamento", "Portamento");
-  static constexpr std::string_view operandName = "enabled";
-
-  void execute(Runtime& rt) const { rt.out.portamentoEnable(raw != 0); }
-};
-
-struct PortamentoTime : U8Operand<PortamentoTime> {
-  NDS_COMMAND(0xcf, "portamento-time", "Portamento Time");
-  static constexpr std::string_view operandName = "time";
-
-  void execute(Runtime& rt) const { rt.out.portamentoTime(raw); }
-};
-
-struct NoteWait : U8Operand<NoteWait> {
-  NDS_COMMAND(0xc7, "note-wait", "Note Wait");
-  static constexpr std::string_view operandName = "enabled";
-
-  void execute(Runtime& rt) const { rt.state.noteWait = raw != 0; }
-};
+NDS_U8_RAW_OUT(PitchBendRange, 0xc5, "pitch-bend-range", "Pitch Bend Range", "semitones", pitchBendRange);
+NDS_U8_MODULATION(ModulationDepth, 0xca, "modulation-depth", "Modulation Depth", "depth",
+                  ModulationPerformanceTarget::VibratoDepth);
+NDS_U8_BOOL_OUT(PortamentoSwitch, 0xce, "portamento", "Portamento", "enabled", portamentoEnable);
+NDS_U8_RAW_OUT(PortamentoTime, 0xcf, "portamento-time", "Portamento Time", "time", portamentoTime);
+NDS_U8_BOOL_STATE(NoteWait, 0xc7, "note-wait", "Note Wait", "enabled", noteWait);
 
 struct Tempo {
   u16 bpm = 0;
@@ -254,40 +243,47 @@ struct Tempo {
   }
 };
 
-NDS_IGNORED_COMMAND(0x93, OpenTrack, "open-track", "Open Track", 4);
-NDS_IGNORED_COMMAND(0xa0, RandomValueCommand, "random-value", "Cmd with Random Value", 5);
-NDS_IGNORED_COMMAND(0xa1, VariableCommand, "variable-command", "Cmd with Variable", 2);
-NDS_IGNORED_COMMAND(0xa2, IfCommand, "if", "If", 0);
-NDS_IGNORED_COMMAND(0xb0, SetVariable, "set-variable", "Set Variable", 3);
-NDS_IGNORED_COMMAND(0xb1, AddVariable, "add-variable", "Add Variable", 3);
-NDS_IGNORED_COMMAND(0xb2, SubVariable, "sub-variable", "Sub Variable", 3);
-NDS_IGNORED_COMMAND(0xb3, MulVariable, "mul-variable", "Mul Variable", 3);
-NDS_IGNORED_COMMAND(0xb4, DivVariable, "div-variable", "Div Variable", 3);
-NDS_IGNORED_COMMAND(0xb5, ShiftVariable, "shift-variable", "Shift Variable", 3);
-NDS_IGNORED_COMMAND(0xb6, RandVariable, "rand-variable", "Rand Variable", 3);
-NDS_IGNORED_COMMAND(0xb8, IfVariableEqual, "if-variable-equal", "If Variable ==", 3);
-NDS_IGNORED_COMMAND(0xb9, IfVariableGreaterEqual, "if-variable-greater-equal", "If Variable >=", 3);
-NDS_IGNORED_COMMAND(0xba, IfVariableGreater, "if-variable-greater", "If Variable >", 3);
-NDS_IGNORED_COMMAND(0xbb, IfVariableLessEqual, "if-variable-less-equal", "If Variable <=", 3);
-NDS_IGNORED_COMMAND(0xbc, IfVariableLess, "if-variable-less", "If Variable <", 3);
-NDS_IGNORED_COMMAND(0xbd, IfVariableNotEqual, "if-variable-not-equal", "If Variable !=", 3);
-NDS_IGNORED_COMMAND(0xc2, MasterVolume, "master-volume", "Master Volume", 1);
-NDS_IGNORED_COMMAND(0xc6, Priority, "priority", "Priority", 1);
-NDS_IGNORED_COMMAND(0xc8, Tie, "tie", "Tie", 1);
-NDS_IGNORED_COMMAND(0xc9, PortamentoControl, "portamento-control", "Portamento Control", 1);
-NDS_IGNORED_COMMAND(0xcb, ModulationSpeed, "modulation-speed", "Modulation Speed", 1);
-NDS_IGNORED_COMMAND(0xcc, ModulationType, "modulation-type", "Modulation Type", 1);
-NDS_IGNORED_COMMAND(0xcd, ModulationRange, "modulation-range", "Modulation Range", 1);
-NDS_IGNORED_COMMAND(0xd0, AttackRate, "attack-rate", "Attack Rate", 1);
-NDS_IGNORED_COMMAND(0xd1, DecayRate, "decay-rate", "Decay Rate", 1);
-NDS_IGNORED_COMMAND(0xd2, SustainLevel, "sustain-level", "Sustain Level", 1);
-NDS_IGNORED_COMMAND(0xd3, ReleaseRate, "release-rate", "Release Rate", 1);
-NDS_IGNORED_COMMAND(0xd4, LoopStart, "loop-start", "Loop Start", 1);
-NDS_IGNORED_COMMAND(0xd6, PrintVariable, "print-variable", "Print Variable", 1);
-NDS_IGNORED_COMMAND(0xe0, ModulationDelay, "modulation-delay", "Modulation Delay", 2);
-NDS_IGNORED_COMMAND(0xe3, SweepPitch, "sweep-pitch", "Sweep Pitch", 2);
-NDS_IGNORED_COMMAND(0xfc, LoopEnd, "loop-end", "Loop End", 0);
-NDS_IGNORED_COMMAND(0xfe, AllocateTrack, "allocate-track", "Allocate Track", 2);
+#define NDS_PRESERVED(Op, Suffix, DisplayName, OperandBytes) \
+  PreservedBytecodeCommandSpec {                             \
+    Op, "nds." Suffix, DisplayName, OperandBytes             \
+  }
+
+constexpr PreservedBytecodeCommandSpec kNdsPreservedCommands[] = {
+    NDS_PRESERVED(0x93, "open-track", "Open Track", 4),
+    NDS_PRESERVED(0xa0, "random-value", "Cmd with Random Value", 5),
+    NDS_PRESERVED(0xa1, "variable-command", "Cmd with Variable", 2),
+    NDS_PRESERVED(0xa2, "if", "If", 0),
+    NDS_PRESERVED(0xb0, "set-variable", "Set Variable", 3),
+    NDS_PRESERVED(0xb1, "add-variable", "Add Variable", 3),
+    NDS_PRESERVED(0xb2, "sub-variable", "Sub Variable", 3),
+    NDS_PRESERVED(0xb3, "mul-variable", "Mul Variable", 3),
+    NDS_PRESERVED(0xb4, "div-variable", "Div Variable", 3),
+    NDS_PRESERVED(0xb5, "shift-variable", "Shift Variable", 3),
+    NDS_PRESERVED(0xb6, "rand-variable", "Rand Variable", 3),
+    NDS_PRESERVED(0xb8, "if-variable-equal", "If Variable ==", 3),
+    NDS_PRESERVED(0xb9, "if-variable-greater-equal", "If Variable >=", 3),
+    NDS_PRESERVED(0xba, "if-variable-greater", "If Variable >", 3),
+    NDS_PRESERVED(0xbb, "if-variable-less-equal", "If Variable <=", 3),
+    NDS_PRESERVED(0xbc, "if-variable-less", "If Variable <", 3),
+    NDS_PRESERVED(0xbd, "if-variable-not-equal", "If Variable !=", 3),
+    NDS_PRESERVED(0xc2, "master-volume", "Master Volume", 1),
+    NDS_PRESERVED(0xc6, "priority", "Priority", 1),
+    NDS_PRESERVED(0xc8, "tie", "Tie", 1),
+    NDS_PRESERVED(0xc9, "portamento-control", "Portamento Control", 1),
+    NDS_PRESERVED(0xcb, "modulation-speed", "Modulation Speed", 1),
+    NDS_PRESERVED(0xcc, "modulation-type", "Modulation Type", 1),
+    NDS_PRESERVED(0xcd, "modulation-range", "Modulation Range", 1),
+    NDS_PRESERVED(0xd0, "attack-rate", "Attack Rate", 1),
+    NDS_PRESERVED(0xd1, "decay-rate", "Decay Rate", 1),
+    NDS_PRESERVED(0xd2, "sustain-level", "Sustain Level", 1),
+    NDS_PRESERVED(0xd3, "release-rate", "Release Rate", 1),
+    NDS_PRESERVED(0xd4, "loop-start", "Loop Start", 1),
+    NDS_PRESERVED(0xd6, "print-variable", "Print Variable", 1),
+    NDS_PRESERVED(0xe0, "modulation-delay", "Modulation Delay", 2),
+    NDS_PRESERVED(0xe3, "sweep-pitch", "Sweep Pitch", 2),
+    NDS_PRESERVED(0xfc, "loop-end", "Loop End", 0),
+    NDS_PRESERVED(0xfe, "allocate-track", "Allocate Track", 2),
+};
 
 struct NoOp {
   std::string bytes;
@@ -315,16 +311,23 @@ struct Terminal : NoOperands<Terminal> {
   }
 };
 
-#define NDS_COMMAND_TYPES                                                                                              \
-  Note, Rest, Program, OpenTrack, Jump, Call, Return, End, RandomValueCommand, VariableCommand, IfCommand,             \
-      SetVariable, AddVariable, SubVariable, MulVariable, DivVariable, ShiftVariable, RandVariable, IfVariableEqual,   \
-      IfVariableGreaterEqual, IfVariableGreater, IfVariableLessEqual, IfVariableLess, IfVariableNotEqual, Pan, Volume, \
-      MasterVolume, Transpose, PitchBend, PitchBendRange, Priority, NoteWait, Tie, PortamentoControl, ModulationDepth, \
-      ModulationSpeed, ModulationType, ModulationRange, PortamentoSwitch, PortamentoTime, AttackRate, DecayRate,       \
-      SustainLevel, ReleaseRate, LoopStart, ExpressionLevel, PrintVariable, ModulationDelay, Tempo, SweepPitch,        \
-      LoopEnd, AllocateTrack, NoOp, Terminal
+#define NDS_FALLTHROUGH_COMMANDS(X) \
+  X(Rest)                           \
+  X(Program)                        \
+  X(Pan)                            \
+  X(Volume)                         \
+  X(Transpose)                      \
+  X(PitchBend)                      \
+  X(PitchBendRange)                 \
+  X(NoteWait)                       \
+  X(ModulationDepth)                \
+  X(PortamentoSwitch)               \
+  X(PortamentoTime)                 \
+  X(ExpressionLevel)                \
+  X(Tempo)
 
-using DecodedCommand = DecodedBytecodeCommand;
+#define NDS_TYPE(Type) Type,
+#define NDS_COMMAND_TYPES Note, NDS_FALLTHROUGH_COMMANDS(NDS_TYPE) Jump, Call, Return, End, NoOp, Terminal
 
 struct PendingBlock {
   u32 offset = 0;
@@ -352,11 +355,17 @@ template <class Command>
   return decoded;
 }
 
-// Performed SSEQ commands let parse() determine length. Ignored source-driver
-// commands keep their operand counts in the command declaration.
+[[nodiscard]] const PreservedBytecodeCommandSpec* preservedCommand(u8 opcode) {
+  const auto found =
+      std::ranges::find_if(kNdsPreservedCommands, [opcode](const auto& command) { return command.opcode == opcode; });
+  return found == std::end(kNdsPreservedCommands) ? nullptr : &*found;
+}
+
+// Performed SSEQ commands let parse() determine length. Preserved source-driver
+// commands keep fixed operand counts in kNdsPreservedCommands.
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const SequenceDialect& dialect, ByteReader reader,
                                                    u32 sequenceOffset, u32 sequenceEnd, u32 offset) {
-#define NDS_EMIT(Type) return recordAutoFallthroughBytecodeCommand<Type, Terminal>(dialect, reader, begin, sequenceEnd)
+#define NDS_EMIT(Type) return recordAutoFallthroughBytecodeCommand<Type, Terminal>(dialect, reader, begin, sequenceEnd);
 #define NDS_CASE(Type) \
   case Type::opcode:   \
     NDS_EMIT(Type)
@@ -366,10 +375,6 @@ template <class Command>
 #define NDS_CALL(Type) \
   case Type::opcode:   \
     return ndsBranch<Type>(dialect, reader, sequenceOffset, sequenceEnd, begin, true)
-#define NDS_IGNORE(Type)                                                                                \
-  case Type::opcode:                                                                                    \
-    return recordIgnoredBytecodeCommand<Type, Terminal>(dialect, reader, sequenceEnd, begin, begin + 1, \
-                                                        Type::operandBytes)
 #define NDS_TERMINAL(Op) \
   case Op:               \
     return terminalBytecodeCommand<Terminal>(dialect, reader, begin, begin + 1)
@@ -383,65 +388,21 @@ template <class Command>
   if (status >= Note::firstOpcode && status <= Note::lastOpcode) {
     NDS_EMIT(Note);
   }
+  if (const auto* preserved = preservedCommand(status); preserved != nullptr) {
+    return recordPreservedBytecodeCommand<Terminal>(dialect, reader, sequenceEnd, begin, begin + 1, *preserved);
+  }
 
   switch (status) {
-    NDS_CASE(Rest);
-    NDS_CASE(Program);
-    NDS_IGNORE(OpenTrack);
+    NDS_FALLTHROUGH_COMMANDS(NDS_CASE)
     NDS_BRANCH(Jump);
     NDS_CALL(Call);
     NDS_TERMINAL(0x96);
-    NDS_IGNORE(RandomValueCommand);
-    NDS_IGNORE(VariableCommand);
-    NDS_IGNORE(IfCommand);
-    NDS_IGNORE(SetVariable);
-    NDS_IGNORE(AddVariable);
-    NDS_IGNORE(SubVariable);
-    NDS_IGNORE(MulVariable);
-    NDS_IGNORE(DivVariable);
-    NDS_IGNORE(ShiftVariable);
-    NDS_IGNORE(RandVariable);
-    NDS_IGNORE(IfVariableEqual);
-    NDS_IGNORE(IfVariableGreaterEqual);
-    NDS_IGNORE(IfVariableGreater);
-    NDS_IGNORE(IfVariableLessEqual);
-    NDS_IGNORE(IfVariableLess);
-    NDS_IGNORE(IfVariableNotEqual);
-    NDS_CASE(Pan);
-    NDS_CASE(Volume);
-    NDS_IGNORE(MasterVolume);
-    NDS_CASE(Transpose);
-    NDS_CASE(PitchBend);
-    NDS_CASE(PitchBendRange);
-    NDS_IGNORE(Priority);
-    NDS_CASE(NoteWait);
-    NDS_IGNORE(Tie);
-    NDS_IGNORE(PortamentoControl);
-    NDS_CASE(ModulationDepth);
-    NDS_IGNORE(ModulationSpeed);
-    NDS_IGNORE(ModulationType);
-    NDS_IGNORE(ModulationRange);
-    NDS_CASE(PortamentoSwitch);
-    NDS_CASE(PortamentoTime);
-    NDS_IGNORE(AttackRate);
-    NDS_IGNORE(DecayRate);
-    NDS_IGNORE(SustainLevel);
-    NDS_IGNORE(ReleaseRate);
-    NDS_IGNORE(LoopStart);
-    NDS_CASE(ExpressionLevel);
-    NDS_IGNORE(PrintVariable);
-    NDS_IGNORE(ModulationDelay);
-    NDS_CASE(Tempo);
-    NDS_IGNORE(SweepPitch);
-    NDS_IGNORE(LoopEnd);
     NDS_EVENT(Return);
-    NDS_IGNORE(AllocateTrack);
     NDS_EVENT(End);
     default:
       return terminalBytecodeCommand<Terminal>(dialect, reader, begin, begin + 1);
   }
 
-#undef NDS_IGNORE
 #undef NDS_EVENT
 #undef NDS_TERMINAL
 #undef NDS_CALL
@@ -460,34 +421,10 @@ template <class Command>
 
 [[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
                                                  u32 sequenceEnd, u32 startOffset, u32 trackIndex) {
-  TrackProgram track = makeTrack(startOffset, trackIndex);
-  TrackProgramBuilder builder{track};
-  std::map<u32, DecodedCommand> commandsByOffset;
-  std::vector<u32> pendingBlocks{startOffset};
-
-  while (!pendingBlocks.empty()) {
-    u32 offset = pendingBlocks.back();
-    pendingBlocks.pop_back();
-    while (hasBytecodeBytes(reader, offset, 1, sequenceEnd) && !commandsByOffset.contains(offset)) {
-      auto decoded = decodeCommand(dialect, reader, sequenceOffset, sequenceEnd, offset);
-      for (const Address target : decoded.flow.staticTargets) {
-        if (target.value < sequenceEnd && !commandsByOffset.contains(target.value)) {
-          pendingBlocks.push_back(target.value);
-        }
-      }
-      const auto next = decoded.flow.fallthrough;
-      commandsByOffset.emplace(offset, std::move(decoded));
-      if (!next) {
-        break;
-      }
-      offset = next->value;
-    }
-  }
-
-  for (const auto& [offset, decoded] : commandsByOffset) {
-    appendDecodedBytecodeCommand(builder, decoded, offset);
-  }
-  return track;
+  return decodeReachableBytecodeBlocks(
+      reader, sequenceEnd, startOffset, trackIndex,
+      ReachableBytecodeDecodePolicy{.maxCommands = static_cast<u32>(kMaxTrackCommands)},
+      [&](u32 offset) { return decodeCommand(dialect, reader, sequenceOffset, sequenceEnd, offset); });
 }
 
 [[nodiscard]] TrackProgram decodeLegacyMalformedFallthrough(ByteReader reader, const SequenceDialect& dialect,
@@ -575,6 +512,7 @@ SequenceDialect ndsSequenceDialect() {
           .defaultLoopPolicy = LoopPolicy::PlayOnce,
           .commandLimit = static_cast<u32>(kMaxTrackCommands),
       })
+      .preservedCommands(std::span<const PreservedBytecodeCommandSpec>{kNdsPreservedCommands})
       .commands<NDS_COMMAND_TYPES>();
 }
 
@@ -636,7 +574,14 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
 }
 
 #undef NDS_COMMAND_TYPES
-#undef NDS_IGNORED_COMMAND
+#undef NDS_TYPE
+#undef NDS_FALLTHROUGH_COMMANDS
+#undef NDS_PRESERVED
+#undef NDS_U8_MODULATION
+#undef NDS_U8_BOOL_STATE
+#undef NDS_U8_BOOL_OUT
+#undef NDS_U8_RAW_OUT
+#undef NDS_U8_NORMALIZED_OUT
 #undef NDS_COMMAND
 #undef NDS_KIND
 
