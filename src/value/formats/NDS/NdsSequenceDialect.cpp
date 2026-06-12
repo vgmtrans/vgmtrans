@@ -348,6 +348,8 @@ template <class Registrar>
   };
 }
 
+// Normal SSEQ decode follows statically reachable bytecode blocks from the
+// track start, preserving calls and jumps as source commands.
 [[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const NdsBytecodeMap& bytecode, u32 sequenceOffset,
                                                  u32 sequenceEnd, u32 startOffset, u32 trackIndex) {
   return decodeReachableBytecodeBlocks(
@@ -362,9 +364,12 @@ template <class Registrar>
       });
 }
 
-[[nodiscard]] TrackProgram decodeLegacyMalformedFallthrough(ByteReader reader, const NdsBytecodeMap& bytecode,
-                                                            u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
-                                                            u32 trackIndex) {
+// Recovery decode for malformed SDAT ranges where control-flow bytes overlap.
+// It linearizes repeated jumps as no-ops and avoids consuming real call-target
+// bytes as fallthrough.
+[[nodiscard]] TrackProgram decodeMalformedLinearizedFallthrough(ByteReader reader, const NdsBytecodeMap& bytecode,
+                                                                u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
+                                                                u32 trackIndex) {
   TrackProgram track = makeTrack(startOffset, trackIndex);
   TrackProgramBuilder builder{track};
   u32 offset = startOffset;
@@ -465,7 +470,7 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& di
                                     bool linearizeMalformedControlFlow) {
   const NdsBytecodeMap bytecode = ndsBytecodeMap(dialect);
   if (linearizeMalformedControlFlow) {
-    return decodeLegacyMalformedFallthrough(reader, bytecode, sequenceOffset, sequenceEnd, startOffset, trackIndex);
+    return decodeMalformedLinearizedFallthrough(reader, bytecode, sequenceOffset, sequenceEnd, startOffset, trackIndex);
   }
   return decodeReachableBlocks(reader, bytecode, sequenceOffset, sequenceEnd, startOffset, trackIndex);
 }
