@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "value/core/SequenceDialect.h"
-#include "value/core/Source.h"
+#include "value/sequence/SequenceDialect.h"
+#include "value/base/Source.h"
 
 #include <vector>
 

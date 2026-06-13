@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/MetadataModel.h"
+#include "value/model/MetadataModel.h"
 #include "value/export/ExportPolicy.h"
 
 #include <string>

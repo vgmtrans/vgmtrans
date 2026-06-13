@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/Source.h"
+#include "value/base/Source.h"
 #include "value/formats/NDS/NdsSequenceProgram.h"
 
 namespace vgmtrans::formats::nds {

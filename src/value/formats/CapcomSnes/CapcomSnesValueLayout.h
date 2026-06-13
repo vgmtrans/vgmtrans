@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/Source.h"
+#include "value/base/Source.h"
 #include "value/formats/CapcomSnes/CapcomSnesTypes.h"
 
 #include <optional>

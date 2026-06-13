@@ -6,8 +6,8 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesValueSynth.h"
 
-#include "value/core/SnesDsp.h"
-#include "value/core/SynthMath.h"
+#include "value/synth/SnesDsp.h"
+#include "value/synth/SynthMath.h"
 #include "formats/CapcomSnes/CapcomSnesConstants.h"
 
 #include <fmt/format.h>

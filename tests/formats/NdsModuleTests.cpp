@@ -4,9 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/export/PerformanceMidiRenderer.h"
-#include "value/core/ScanTypes.h"
-#include "value/core/SequenceVm.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/scan/ScanTypes.h"
+#include "value/sequence/SequenceVm.h"
 #include "value/formats/NDS/NdsSequenceDialect.h"
 #include "value/formats/NDS/NdsSequenceProgram.h"
 

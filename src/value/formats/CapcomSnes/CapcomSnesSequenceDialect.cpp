@@ -6,10 +6,10 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesSequenceDialect.h"
 
-#include "value/core/BytecodeSequenceDecoder.h"
-#include "value/core/BytecodeWalkers.h"
-#include "value/core/LevelScale.h"
-#include "value/core/SequenceVm.h"
+#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
+#include "value/sequence/bytecode/BytecodeWalkers.h"
+#include "value/base/LevelScale.h"
+#include "value/sequence/SequenceVm.h"
 #include "value/formats/CapcomSnes/CapcomSnesSequenceMath.h"
 #include "value/formats/CapcomSnes/CapcomSnesValueLayout.h"
 

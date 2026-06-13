@@ -4,21 +4,21 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/export/DlsExporter.h"
+#include "value/export/synth/DlsExporter.h"
 #include "value/export/Export.h"
-#include "value/core/BytecodeSequenceDecoder.h"
-#include "value/core/FormatModule.h"
-#include "value/core/LevelScale.h"
-#include "value/export/MidiExporter.h"
-#include "value/core/ModulationAnalysis.h"
-#include "value/core/SequenceDialect.h"
-#include "value/core/SequenceVm.h"
-#include "value/core/Session.h"
-#include "value/core/SampleDecoder.h"
-#include "value/export/ModulationScaling.h"
-#include "value/export/PerformanceMidiRenderer.h"
-#include "value/export/SoundFontExporter.h"
-#include "value/export/WavExporter.h"
+#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
+#include "value/scan/FormatModule.h"
+#include "value/base/LevelScale.h"
+#include "value/export/midi/MidiExporter.h"
+#include "value/export/midi/ModulationAnalysis.h"
+#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
+#include "value/synth/SampleDecoder.h"
+#include "value/export/synth/ModulationScaling.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/export/synth/SoundFontExporter.h"
+#include "value/export/audio/WavExporter.h"
 
 #include <algorithm>
 #include <array>
