@@ -13,7 +13,7 @@
 #include "value/extractors/PsfExtractor.h"
 #include "value/extractors/SnesRsnExtractor.h"
 #include "value/extractors/SnesSpcExtractor.h"
-#include "value/core/Session.h"
+#include "value/session/Session.h"
 
 namespace vgmtrans::formats {
 

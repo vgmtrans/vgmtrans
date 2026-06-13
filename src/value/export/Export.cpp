@@ -6,18 +6,18 @@
 
 #include "value/export/Export.h"
 
-#include "value/export/DlsExporter.h"
+#include "value/export/synth/DlsExporter.h"
 #include "value/export/ExportDiagnostics.h"
-#include "value/export/MidiExporter.h"
-#include "value/core/ModulationAnalysis.h"
-#include "value/core/ProjectModel.h"
-#include "value/core/SampleDecoder.h"
-#include "value/core/SequenceVm.h"
-#include "value/core/Source.h"
-#include "value/export/ModulationScaling.h"
-#include "value/export/PerformanceMidiRenderer.h"
-#include "value/export/SoundFontExporter.h"
-#include "value/export/WavExporter.h"
+#include "value/export/midi/MidiExporter.h"
+#include "value/export/midi/ModulationAnalysis.h"
+#include "value/model/ProjectModel.h"
+#include "value/synth/SampleDecoder.h"
+#include "value/sequence/SequenceVm.h"
+#include "value/base/Source.h"
+#include "value/export/synth/ModulationScaling.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/export/synth/SoundFontExporter.h"
+#include "value/export/audio/WavExporter.h"
 
 #include <algorithm>
 #include <cctype>

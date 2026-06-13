@@ -6,7 +6,7 @@
 
 #include "value/extractors/SnesSpcExtractor.h"
 
-#include "value/core/FormatRegistry.h"
+#include "value/scan/FormatRegistry.h"
 
 #include <algorithm>
 #include <filesystem>

@@ -6,8 +6,8 @@
 
 #include "value/formats/NDS/NdsModule.h"
 
-#include "value/core/FormatRegistry.h"
-#include "value/core/SynthMath.h"
+#include "value/scan/FormatRegistry.h"
+#include "value/synth/SynthMath.h"
 #include "value/formats/NDS/NdsSequenceProgram.h"
 #include "value/formats/NDS/NdsSequenceRanges.h"
 

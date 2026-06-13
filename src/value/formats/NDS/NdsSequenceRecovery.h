@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/core/BytecodeSequenceDecoder.h"
+#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
 
 #include <cstddef>
 

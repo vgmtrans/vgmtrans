@@ -109,66 +109,66 @@ add_library(vgmtransvaluecore STATIC)
 vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
-    ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/PerformanceModel.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/Session.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/Scan.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/ScanTypes.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/SequenceDialect.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/SequenceProgram.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/SequenceVm.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/Source.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/core/SynthMath.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/DlsExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/ProjectModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/base/Source.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/Export.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/ModulationScaling.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/PerformanceMidiRenderer.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/SynthExportData.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/WavExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
-      ${PROJECT_SOURCE_DIR}/src/value/core/BytecodeSequenceDecoder.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/BytecodeWalkers.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/CoreTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/LevelScale.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/MetadataModel.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/MidiModel.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/ModulationAnalysis.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/PerformanceModel.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/ProjectModel.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/Session.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/Scan.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/ScanTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceDialect.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceCommandHelpers.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceProgram.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceVm.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SnesDsp.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/Source.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SynthModel.h
-      ${PROJECT_SOURCE_DIR}/src/value/core/SynthMath.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/DlsExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeSequenceDecoder.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeWalkers.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/ProjectModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/SequenceCommandHelpers.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/Source.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SynthModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/MidiExporter.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/ModulationScaling.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/PerformanceMidiRenderer.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/SoundFontExporter.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/SynthExportData.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/WavExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.h
 )
 target_include_directories(
   vgmtransvaluecore
