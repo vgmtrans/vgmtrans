@@ -9,6 +9,7 @@
 #include "value/core/FormatRegistry.h"
 #include "value/core/SynthMath.h"
 #include "value/formats/NDS/NdsSequenceProgram.h"
+#include "value/formats/NDS/NdsSequenceRanges.h"
 
 #include <fmt/format.h>
 
@@ -35,7 +36,6 @@ namespace {
 
 constexpr std::string_view kFormatName = "NDS";
 constexpr std::string_view kSdatSignature = "SDAT\xff\xfe\x00\x01";
-constexpr std::string_view kSseqSignature = "SSEQ\xff\xfe\x00\x01";
 constexpr std::string_view kSwarSignature = "SWAR\xff\xfe\x00\x01";
 constexpr u32 kMaxNameLength = 128;
 constexpr double kEnvelopeIntervalSeconds = (2728.0 * 64.0) / 33513982.0;
@@ -99,44 +99,6 @@ struct SdatInfo {
     if (reader.u8At(offset + i) != static_cast<u8>(signature[i])) {
       return false;
     }
-  }
-  return true;
-}
-
-[[nodiscard]] std::optional<u32> nearbySseqHeader(ByteReader reader, FileRange range) {
-  constexpr u32 kMaxPaddingBeforeSseq = 0x200;
-  const u64 searchEnd =
-      std::min<u64>(reader.size(), static_cast<u64>(range.offset) + range.size + kMaxPaddingBeforeSseq);
-  for (u64 offset = range.offset + 1; offset + kSseqSignature.size() <= searchEnd; ++offset) {
-    if (matches(reader, offset, kSseqSignature)) {
-      return static_cast<u32>(offset);
-    }
-  }
-  return std::nullopt;
-}
-
-[[nodiscard]] bool isZeroFilled(ByteReader reader, u32 begin, u32 end) {
-  for (u32 offset = begin; offset < end && reader.has(offset, 1); ++offset) {
-    if (reader.u8At(offset) != 0) {
-      return false;
-    }
-  }
-  return true;
-}
-
-[[nodiscard]] bool shouldRecoverMalformedSdatRange(ByteReader reader, FileRange range) {
-  const auto sseqOffset = nearbySseqHeader(reader, range);
-  if (!sseqOffset) {
-    return false;
-  }
-
-  const u32 trackStart = range.offset + 0x1c;
-  const u32 paddingEnd = std::min(*sseqOffset, range.offset + range.size);
-  // Some zero-filled pseudo-sequences overlap a later SSEQ. If the padding
-  // would align the SSEQ signature as bogus note data, leave it empty.
-  if (range.size <= 0x100 && *sseqOffset >= trackStart && isZeroFilled(reader, range.offset, paddingEnd) &&
-      ((*sseqOffset - trackStart) % 3) == 2) {
-    return false;
   }
   return true;
 }
@@ -765,23 +727,9 @@ void scanSdat(const ScanInput& input, const SdatInfo& sdat, ScanResult& result) 
         bankAsset == bankAssetIds.end() ? std::nullopt : std::optional<AssetId>{bankAsset->second};
     const auto sequenceId = input.ids.nextAssetId();
     const std::string& name = sdat.sequenceNames[sequenceIndex];
-    const bool hasSseqHeader = matches(input.reader, sequenceRange->offset, kSseqSignature);
-    const bool recoverMalformedSdatRange =
-        !hasSseqHeader && shouldRecoverMalformedSdatRange(input.reader, *sequenceRange);
-    const bool extendRecoveryPastFatRange = recoverMalformedSdatRange && sequenceRange->size <= 0x100;
-    const u32 sequenceEnd =
-        hasSseqHeader || !extendRecoveryPastFatRange
-            ? static_cast<u32>(
-                  std::min<u64>(input.reader.size(), static_cast<u64>(sequenceRange->offset) + sequenceRange->size))
-            : static_cast<u32>(input.reader.size());
-    result.assets.emplace_back(parseNdsSequenceProgram(input, sequenceId,
-                                                       NdsSequenceRange{
-                                                           .offset = sequenceRange->offset,
-                                                           .size = sequenceRange->size,
-                                                           .sequenceEnd = sequenceEnd,
-                                                           .recoverMalformedSdatRange = recoverMalformedSdatRange,
-                                                       },
-                                                       name, instrumentSet));
+    result.assets.emplace_back(parseNdsSequenceProgram(
+        input, sequenceId, ndsSequenceRangeForFatEntry(input.reader, sequenceRange->offset, sequenceRange->size), name,
+        instrumentSet));
 
     Collection collection{
         .id = input.ids.nextCollectionId(),

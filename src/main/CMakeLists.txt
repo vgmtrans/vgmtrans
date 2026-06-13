@@ -136,6 +136,7 @@ target_sources(vgmtransvaluecore
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
       ${PROJECT_SOURCE_DIR}/src/value/core/BytecodeSequenceDecoder.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/BytecodeWalkers.h
       ${PROJECT_SOURCE_DIR}/src/value/core/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/core/FormatRegistry.h
@@ -149,6 +150,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/core/Scan.h
       ${PROJECT_SOURCE_DIR}/src/value/core/ScanTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/core/SequenceCommandHelpers.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SequenceProgram.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SequenceVm.h
       ${PROJECT_SOURCE_DIR}/src/value/core/SampleDecoder.h
@@ -193,6 +195,7 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRanges.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRecovery.cpp
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
   PUBLIC
@@ -212,6 +215,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRanges.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRecovery.h
       formats/CapcomSnes/CapcomSnesDriverMath.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h

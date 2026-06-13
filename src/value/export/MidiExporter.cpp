@@ -172,6 +172,12 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
         } else if constexpr (std::is_same_v<TypedEvent, Expression>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 11, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
+        } else if constexpr (std::is_same_v<TypedEvent, Expression14>) {
+          addController(messages, typedEvent.tick, typedEvent.channel, 11,
+                        static_cast<u8>((typedEvent.value >> 7) & 0x7f), 20);
+          addController(messages, typedEvent.tick, typedEvent.channel, 43, static_cast<u8>(typedEvent.value & 0x7f),
+                        21);
+          endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, MasterVolume>) {
           const std::array<u8, 7> payload{
               0x7f,

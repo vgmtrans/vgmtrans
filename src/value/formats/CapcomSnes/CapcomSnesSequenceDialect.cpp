@@ -7,6 +7,7 @@
 #include "value/formats/CapcomSnes/CapcomSnesSequenceDialect.h"
 
 #include "value/core/BytecodeSequenceDecoder.h"
+#include "value/core/BytecodeWalkers.h"
 #include "value/core/LevelScale.h"
 #include "value/core/SequenceVm.h"
 #include "value/formats/CapcomSnes/CapcomSnesSequenceMath.h"
@@ -14,6 +15,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -70,7 +72,8 @@ using Runtime = CommandRuntime<TrackState, Context>;
 void emitLinearVolume(Runtime& rt, u8 raw) {
   // Capcom volume is a linear amplitude gain. MIDI rendering applies the
   // square-root MIDI controller curve later.
-  rt.out.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)), LevelResolution::FourteenBit);
+  rt.out.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)),
+               LevelPrecisionHint::FourteenBit);
 }
 
 void emitLinearMasterVolume(Runtime& rt, u8 raw) {
@@ -594,6 +597,16 @@ template <class Registrar>
   return CapcomSnesEngineVersion::none;
 }
 
+[[nodiscard]] const BytecodeDispatchTable& capcomBytecodeMapFor(const SequenceDialect& dialect) {
+  static std::map<std::string, BytecodeDispatchTable> maps;
+  if (const auto found = maps.find(dialect.id.value); found != maps.end()) {
+    return found->second;
+  }
+
+  auto [inserted, _] = maps.emplace(dialect.id.value, capcomBytecodeMap(dialect, versionForDialect(dialect)));
+  return inserted->second;
+}
+
 }  // namespace
 
 SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version) {
@@ -618,7 +631,7 @@ void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
 
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sourceTrackNumber,
                                          u32 startAddress) {
-  const BytecodeDispatchTable bytecode = capcomBytecodeMap(dialect, versionForDialect(dialect));
+  const BytecodeDispatchTable& bytecode = capcomBytecodeMapFor(dialect);
   return decodeLinearBytecodeTrack(reader, sourceTrackNumber, startAddress,
                                    LinearBytecodeDecodePolicy{.maxCommands = 4096},
                                    [&](u32 offset) { return bytecode.decode(reader, offset); });
