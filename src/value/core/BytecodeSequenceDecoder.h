@@ -6,17 +6,14 @@
 
 #pragma once
 
-#include "value/core/LevelScale.h"
 #include "value/core/SequenceDialect.h"
-#include "value/core/PerformanceModel.h"
+#include "value/core/SequenceCommandHelpers.h"
 #include "value/core/Source.h"
 
 #include <algorithm>
 #include <array>
 #include <limits>
-#include <map>
 #include <optional>
-#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -26,98 +23,6 @@
 #include <vector>
 
 namespace vgmtrans::core {
-
-// Parse mixins for common source-driver command shapes. They keep format command
-// structs compact while still recording named operands for the source view.
-template <class Derived>
-struct NoOperands {
-  static Derived parse(CommandReader&) { return {}; }
-};
-
-template <class Derived>
-struct U8Operand {
-  u8 raw = 0;
-
-  static Derived parse(CommandReader& in) {
-    Derived result;
-    result.raw = in.u8(Derived::operandName);
-    return result;
-  }
-};
-
-template <class Derived>
-struct S8Operand {
-  s8 raw = 0;
-
-  static Derived parse(CommandReader& in) {
-    Derived result;
-    result.raw = in.s8(Derived::operandName);
-    return result;
-  }
-};
-
-template <class Derived>
-struct Be16Operand {
-  u16 raw = 0;
-
-  static Derived parse(CommandReader& in) {
-    Derived result;
-    result.raw = in.be16(Derived::operandName);
-    return result;
-  }
-};
-
-// Common one-operand command bodies. Formats still name each command locally,
-// but these remove boilerplate for driver opcodes that only set state or emit a
-// direct performance control.
-template <class Derived, auto Member>
-struct U8StateCommand : U8Operand<Derived> {
-  void execute(auto& rt) const { rt.state.*Member = this->raw; }
-};
-
-template <class Derived, auto Member>
-struct S8StateCommand : S8Operand<Derived> {
-  void execute(auto& rt) const { rt.state.*Member = this->raw; }
-};
-
-template <class Derived, auto Member>
-struct U8BoolStateCommand : U8Operand<Derived> {
-  void execute(auto& rt) const { rt.state.*Member = this->raw != 0; }
-};
-
-template <class Derived, auto Member>
-struct ToggleBoolStateCommand : NoOperands<Derived> {
-  void execute(auto& rt) const { rt.state.*Member = !(rt.state.*Member); }
-};
-
-template <class Derived, auto Member, bool Value>
-struct SetBoolStateCommand : NoOperands<Derived> {
-  void execute(auto& rt) const { rt.state.*Member = Value; }
-};
-
-template <class Derived, auto Member>
-using SetTrueStateCommand = SetBoolStateCommand<Derived, Member, true>;
-
-template <class Derived, auto Member>
-using SetFalseStateCommand = SetBoolStateCommand<Derived, Member, false>;
-
-template <class Derived, void (Emit::*Method)(u8)>
-struct U8RawOutCommand : U8Operand<Derived> {
-  void execute(auto& rt) const { (rt.out.*Method)(this->raw); }
-};
-
-template <class Derived, void (Emit::*Method)(bool)>
-struct U8BoolOutCommand : U8Operand<Derived> {
-  void execute(auto& rt) const { (rt.out.*Method)(this->raw != 0); }
-};
-
-// For source controls that are already MIDI-shaped. The performance model
-// stores linear gain, so the source byte is squared before emission.
-template <class Derived, void (Emit::*Method)(double, LevelResolution),
-          LevelResolution Resolution = LevelResolution::SevenBit>
-struct U8MidiLevelOutCommand : U8Operand<Derived> {
-  void execute(auto& rt) const { (rt.out.*Method)(LevelScale::linearFromMidi7(this->raw), Resolution); }
-};
 
 // Temporary decoded form used while a bytecode decoder is deciding control flow.
 // TrackProgramBuilder still owns the final immutable source-command snapshot.
@@ -166,12 +71,30 @@ struct FixedOperandByteCount {
   u32 value = 0;
 };
 
+struct PreservedBytecodeCommand {
+  u8 opcode = 0;
+  std::string_view displayName;
+  FixedOperandByteCount operandBytes;
+  BytecodeCommandOptions options;
+};
+
 [[nodiscard]] constexpr BytecodeCommandOptions suffix(std::string_view value) {
   return BytecodeCommandOptions{.suffix = value};
 }
 
 [[nodiscard]] constexpr FixedOperandByteCount operandBytes(u32 value) {
   return FixedOperandByteCount{.value = value};
+}
+
+[[nodiscard]] constexpr PreservedBytecodeCommand preservedOpcode(u8 opcode, std::string_view displayName,
+                                                                 FixedOperandByteCount operandBytes = {},
+                                                                 BytecodeCommandOptions options = {}) {
+  return PreservedBytecodeCommand{
+      .opcode = opcode,
+      .displayName = displayName,
+      .operandBytes = operandBytes,
+      .options = options,
+  };
 }
 
 [[nodiscard]] inline std::string slugifyCommandName(std::string_view displayName) {
@@ -534,6 +457,13 @@ public:
     return preserved(opcode, displayName, FixedOperandByteCount{}, options);
   }
 
+  BytecodeMapBuilder& preserved(std::span<const PreservedBytecodeCommand> commands) {
+    for (const PreservedBytecodeCommand& command : commands) {
+      preserved(command.opcode, command.displayName, command.operandBytes, command.options);
+    }
+    return *this;
+  }
+
   template <class Command>
   BytecodeMapBuilder& unknown(std::string_view displayName, BytecodeCommandOptions options = {}) {
     table_.unknown = commandSpec<Command>(displayName, options, detail::decodeMappedTruncatedCommand<Command>);
@@ -711,99 +641,5 @@ private:
   std::vector<BytecodeRangeSpec> ranges_;
   std::unordered_map<std::string, HandlerCacheEntry> handlers_;
 };
-
-// Common walkers own traversal mechanics and limits. Formats still own opcode
-// decoding and control-flow classification for their source driver.
-struct LinearBytecodeDecodePolicy {
-  u32 maxCommands = 4096;
-  bool stopAtVisitedOffset = true;
-  bool followUnconditionalJumps = true;
-};
-
-template <class DecodeCommand>
-[[nodiscard]] TrackProgram decodeLinearBytecodeTrack(ByteReader reader, u32 sourceTrackNumber, u32 startAddress,
-                                                     LinearBytecodeDecodePolicy policy, DecodeCommand decodeCommand) {
-  TrackProgram track{
-      .id = TrackId{sourceTrackNumber},
-      .sourceTrackNumber = sourceTrackNumber,
-      .startAddress = Address{startAddress},
-  };
-  TrackProgramBuilder builder{track};
-  std::set<u32> visitedOffsets;
-  u32 offset = startAddress;
-
-  while (reader.has(offset, 1) && track.commands.size() < policy.maxCommands) {
-    if (policy.stopAtVisitedOffset && !visitedOffsets.insert(offset).second) {
-      break;
-    }
-
-    const u32 begin = offset;
-    auto decoded = decodeCommand(begin);
-    const auto next = decoded.flow.fallthrough;
-    const bool terminal = decoded.flow.terminal;
-    const auto targets = decoded.flow.staticTargets;
-    appendDecodedBytecodeCommand(builder, decoded, begin);
-
-    if (terminal) {
-      break;
-    }
-    if (next) {
-      offset = next->value;
-      continue;
-    }
-    if (policy.followUnconditionalJumps && targets.size() == 1) {
-      offset = targets.front().value;
-      continue;
-    }
-    break;
-  }
-
-  return track;
-}
-
-struct ReachableBytecodeDecodePolicy {
-  u32 maxCommands = 262144;
-};
-
-template <class DecodeCommand>
-[[nodiscard]] TrackProgram decodeReachableBytecodeBlocks(ByteReader reader, u32 bytecodeEnd, u32 startOffset,
-                                                         u32 trackIndex, ReachableBytecodeDecodePolicy policy,
-                                                         DecodeCommand decodeCommand) {
-  TrackProgram track{
-      .id = TrackId{trackIndex},
-      .sourceTrackNumber = trackIndex,
-      .startAddress = Address{startOffset},
-  };
-  TrackProgramBuilder builder{track};
-  std::map<u32, DecodedBytecodeCommand> commandsByOffset;
-  std::vector<u32> pendingBlocks{startOffset};
-  size_t decodedCommands = 0;
-
-  while (!pendingBlocks.empty() && decodedCommands < policy.maxCommands) {
-    u32 offset = pendingBlocks.back();
-    pendingBlocks.pop_back();
-    while (hasBytecodeBytes(reader, offset, 1, bytecodeEnd) && !commandsByOffset.contains(offset) &&
-           decodedCommands < policy.maxCommands) {
-      auto decoded = decodeCommand(offset);
-      ++decodedCommands;
-      for (const Address target : decoded.flow.staticTargets) {
-        if (target.value < bytecodeEnd && !commandsByOffset.contains(target.value)) {
-          pendingBlocks.push_back(target.value);
-        }
-      }
-      const auto next = decoded.flow.fallthrough;
-      commandsByOffset.emplace(offset, std::move(decoded));
-      if (!next) {
-        break;
-      }
-      offset = next->value;
-    }
-  }
-
-  for (const auto& [offset, decoded] : commandsByOffset) {
-    appendDecodedBytecodeCommand(builder, decoded, offset);
-  }
-  return track;
-}
 
 }  // namespace vgmtrans::core

@@ -37,8 +37,8 @@ namespace {
   return LevelScale::midi7FromLinear(linearVelocity);
 }
 
-[[nodiscard]] u8 midiChannel(size_t trackIndex) {
-  const size_t channel = trackIndex >= 9 ? trackIndex + 1 : trackIndex;
+[[nodiscard]] u8 midiChannel(size_t trackIndex, const MidiExportOptions& options) {
+  const size_t channel = options.skipChannel10 && trackIndex >= 9 ? trackIndex + 1 : trackIndex;
   return static_cast<u8>(channel % 16);
 }
 
@@ -48,6 +48,34 @@ namespace {
 
 [[nodiscard]] u8 midiNormalized7(double amount) {
   return data7(std::clamp(amount, 0.0, 1.0) * 127.0);
+}
+
+[[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested, LevelPrecisionHint hint) {
+  if (requested != MidiLevelResolution::Auto) {
+    return requested;
+  }
+  return hint == LevelPrecisionHint::FourteenBit ? MidiLevelResolution::FourteenBit : MidiLevelResolution::SevenBit;
+}
+
+[[nodiscard]] bool writeBankSelectLsb(const MidiExportOptions& options) {
+  return options.bankSelectStyle == MidiBankSelectStyle::MsbAndLsb;
+}
+
+void addExpression(MidiTrack& track, u64 tick, u8 channel, double linearGain, LevelPrecisionHint precisionHint,
+                   const MidiExportOptions& options) {
+  if (resolveLevelResolution(options.expressionResolution, precisionHint) == MidiLevelResolution::FourteenBit) {
+    track.events.push_back(Expression14{
+        .tick = tick,
+        .channel = channel,
+        .value = LevelScale::midi14FromLinear(linearGain),
+    });
+  } else {
+    track.events.push_back(Expression{
+        .tick = tick,
+        .channel = channel,
+        .value = LevelScale::midi7FromLinear(linearGain),
+    });
+  }
 }
 
 struct RenderTrackState {
@@ -112,7 +140,7 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
 }
 
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
-                  std::span<const GlobalTransposeChange> globalTransposes) {
+                  std::span<const GlobalTransposeChange> globalTransposes, const MidiExportOptions& options) {
   std::visit(
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
@@ -140,7 +168,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 .tick = typedEvent.header.tick,
                 .channel = channel,
                 .bank = static_cast<u16>(typedEvent.bank),
-                .writeLsb = false,
+                .writeLsb = writeBankSelectLsb(options),
             });
           }
           track.events.push_back(ProgramChange{
@@ -149,7 +177,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .program = data7(typedEvent.program),
           });
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
-          if (typedEvent.resolution == LevelResolution::FourteenBit) {
+          if (resolveLevelResolution(options.volumeResolution, typedEvent.precisionHint) ==
+              MidiLevelResolution::FourteenBit) {
             track.events.push_back(Volume14{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
@@ -163,13 +192,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             });
           }
         } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
-          // The performance model may request higher precision later, but the
-          // MIDI event model currently has only a 7-bit expression event.
-          track.events.push_back(Expression{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .value = LevelScale::midi7FromLinear(typedEvent.linearGain),
-          });
+          addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, typedEvent.precisionHint,
+                        options);
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
           track.events.push_back(Pan{
               .tick = typedEvent.header.tick,
@@ -177,11 +201,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .value = midiPan(typedEvent.stereoPosition),
           });
           if (typedEvent.linearGain != 1.0) {
-            track.events.push_back(Expression{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .value = LevelScale::midi7FromLinear(typedEvent.linearGain),
-            });
+            addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, LevelPrecisionHint::SevenBit,
+                          options);
           }
         } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
           track.events.push_back(MasterVolume{
@@ -305,7 +326,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
 
 }  // namespace
 
-MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performance) const {
+MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performance, MidiExportOptions options) const {
   MidiSequence sequence{
       .timebase = performance.timebase,
       .diagnostics = performance.diagnostics,
@@ -319,9 +340,9 @@ MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performa
         .name = "Track " + std::to_string(performanceTrack.sourceTrackNumber),
     };
     RenderTrackState renderState;
-    const u8 channel = midiChannel(trackIndex);
+    const u8 channel = midiChannel(trackIndex, options);
     for (const auto& event : performanceTrack.events) {
-      addMidiEvent(midiTrack, renderState, event, channel, globalTransposes);
+      addMidiEvent(midiTrack, renderState, event, channel, globalTransposes, options);
     }
     midiTrack.events.push_back(EndOfTrack{
         .tick = performanceTrack.endTick,

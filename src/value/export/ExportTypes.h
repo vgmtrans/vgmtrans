@@ -21,11 +21,31 @@ enum class ExportKind {
   Wav,
 };
 
+enum class MidiLevelResolution {
+  Auto,
+  SevenBit,
+  FourteenBit,
+};
+
+enum class MidiBankSelectStyle {
+  MsbOnly,
+  MsbAndLsb,
+};
+
+struct MidiExportOptions {
+  // Auto follows the source precision hints recorded in PerformanceSequence.
+  MidiLevelResolution volumeResolution = MidiLevelResolution::Auto;
+  MidiLevelResolution expressionResolution = MidiLevelResolution::Auto;
+  bool skipChannel10 = true;
+  MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
+};
+
 // ExportRequest is policy, not parsed data. Callers choose which containers to
 // write and how to lower ambiguous behavior such as loops or modulation ranges.
 struct ExportRequest {
   std::vector<ExportKind> kinds;
   LoopPolicy loopPolicy = LoopPolicy::Default;
+  MidiExportOptions midi;
   ModulationScalingPolicy synthModulationScaling = ModulationScalingPolicy::FullFormatRange;
 };
 

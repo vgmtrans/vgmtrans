@@ -178,10 +178,10 @@ void Emit::level(LevelPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
-void Emit::level(double linearGain, LevelResolution resolution) {
+void Emit::level(double linearGain, LevelPrecisionHint precisionHint) {
   level(LevelPerformanceEvent{
       .linearGain = linearGain,
-      .resolution = resolution,
+      .precisionHint = precisionHint,
   });
 }
 
@@ -190,10 +190,10 @@ void Emit::expression(ExpressionPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
-void Emit::expression(double linearGain, LevelResolution resolution) {
+void Emit::expression(double linearGain, LevelPrecisionHint precisionHint) {
   expression(ExpressionPerformanceEvent{
       .linearGain = linearGain,
-      .resolution = resolution,
+      .precisionHint = precisionHint,
   });
 }
 

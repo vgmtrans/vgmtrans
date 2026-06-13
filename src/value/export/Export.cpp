@@ -91,7 +91,8 @@ struct MidiLoweringResult {
 }
 
 [[nodiscard]] MidiLoweringResult lowerMidiSequence(const PreparedCollectionExport& prepared,
-                                                   const SequenceDialectRegistry& dialects, LoopPolicy loopPolicy) {
+                                                   const SequenceDialectRegistry& dialects,
+                                                   const ExportRequest& request) {
   // Sequence rendering is needed both for .mid output and for observed modulation scaling
   // in synth exports. Keep failures as diagnostics so non-MIDI artifacts can still be built.
   if (!prepared.assets.diagnostics.collection.empty()) {
@@ -118,8 +119,8 @@ struct MidiLoweringResult {
     };
   }
 
-  auto performance = SequenceVm(loopPolicy).render(sequence.program, *dialect);
-  auto midi = PerformanceMidiRenderer().render(performance);
+  auto performance = SequenceVm(request.loopPolicy).render(sequence.program, *dialect);
+  auto midi = PerformanceMidiRenderer().render(performance, request.midi);
   return MidiLoweringResult{
       .performance = std::move(performance),
       .sequence = std::move(midi),
@@ -310,7 +311,7 @@ std::vector<Artifact> exportCollection(const Project& project, const SourceStore
     // Several requested artifacts can depend on the same lowered MIDI sequence. Lower it
     // once so diagnostics and modulation analysis all refer to identical playback data.
     if (!midiLowering) {
-      midiLowering = lowerMidiSequence(prepared, dialects, request.loopPolicy);
+      midiLowering = lowerMidiSequence(prepared, dialects, request);
     }
     return *midiLowering;
   };

@@ -7,11 +7,13 @@
 #include "value/formats/NDS/NdsSequenceDialect.h"
 
 #include "value/core/BytecodeSequenceDecoder.h"
+#include "value/core/BytecodeWalkers.h"
 #include "value/core/LevelScale.h"
 #include "value/core/SequenceVm.h"
 #include "value/formats/NDS/NdsSequenceRecovery.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <optional>
 #include <string>
@@ -187,12 +189,8 @@ struct PitchBendRange : U8RawOutCommand<PitchBendRange, &Emit::pitchBendRange> {
   static constexpr std::string_view operandName = "semitones";
 };
 
-struct ModulationDepth : U8Operand<ModulationDepth> {
+struct ModulationDepth : U8MidiModulationOutCommand<ModulationDepth, ModulationPerformanceTarget::VibratoDepth> {
   static constexpr std::string_view operandName = "depth";
-
-  void execute(Runtime& rt) const {
-    rt.out.modulation(ModulationPerformanceTarget::VibratoDepth, static_cast<double>(raw) / 127.0);
-  }
 };
 
 struct PortamentoSwitch : U8BoolOutCommand<PortamentoSwitch, &Emit::portamentoEnable> {
@@ -264,58 +262,62 @@ template <class Registrar>
 [[nodiscard]] NdsBytecodeMap ndsBytecodeMap(Registrar& registrar) {
   BytecodeMapBuilder<TrackState, Context> map{"nds", registrar};
 
+  constexpr std::array preservedCommands{
+      preservedOpcode(0x93, "Open Track", operandBytes(4)),
+      preservedOpcode(0xa0, "Cmd with Random Value", operandBytes(5), suffix("random-value")),
+      preservedOpcode(0xa1, "Cmd with Variable", operandBytes(2), suffix("variable-command")),
+      preservedOpcode(0xa2, "If"),
+      preservedOpcode(0xb0, "Set Variable", operandBytes(3)),
+      preservedOpcode(0xb1, "Add Variable", operandBytes(3)),
+      preservedOpcode(0xb2, "Sub Variable", operandBytes(3)),
+      preservedOpcode(0xb3, "Mul Variable", operandBytes(3)),
+      preservedOpcode(0xb4, "Div Variable", operandBytes(3)),
+      preservedOpcode(0xb5, "Shift Variable", operandBytes(3)),
+      preservedOpcode(0xb6, "Rand Variable", operandBytes(3)),
+      preservedOpcode(0xb8, "If Variable ==", operandBytes(3), suffix("if-variable-equal")),
+      preservedOpcode(0xb9, "If Variable >=", operandBytes(3), suffix("if-variable-greater-equal")),
+      preservedOpcode(0xba, "If Variable >", operandBytes(3), suffix("if-variable-greater")),
+      preservedOpcode(0xbb, "If Variable <=", operandBytes(3), suffix("if-variable-less-equal")),
+      preservedOpcode(0xbc, "If Variable <", operandBytes(3), suffix("if-variable-less")),
+      preservedOpcode(0xbd, "If Variable !=", operandBytes(3), suffix("if-variable-not-equal")),
+      preservedOpcode(0xc2, "Master Volume", operandBytes(1)),
+      preservedOpcode(0xc6, "Priority", operandBytes(1)),
+      preservedOpcode(0xc8, "Tie", operandBytes(1)),
+      preservedOpcode(0xc9, "Portamento Control", operandBytes(1)),
+      preservedOpcode(0xcb, "Modulation Speed", operandBytes(1)),
+      preservedOpcode(0xcc, "Modulation Type", operandBytes(1)),
+      preservedOpcode(0xcd, "Modulation Range", operandBytes(1)),
+      preservedOpcode(0xd0, "Attack Rate", operandBytes(1)),
+      preservedOpcode(0xd1, "Decay Rate", operandBytes(1)),
+      preservedOpcode(0xd2, "Sustain Level", operandBytes(1)),
+      preservedOpcode(0xd3, "Release Rate", operandBytes(1)),
+      preservedOpcode(0xd4, "Loop Start", operandBytes(1)),
+      preservedOpcode(0xd6, "Print Variable", operandBytes(1)),
+      preservedOpcode(0xe0, "Modulation Delay", operandBytes(2)),
+      preservedOpcode(0xe3, "Sweep Pitch", operandBytes(2)),
+      preservedOpcode(0xfc, "Loop End"),
+      preservedOpcode(0xfe, "Allocate Track", operandBytes(2)),
+  };
+
   map.range<0x00, 0x7f, Note>("Note");
   map.op<0x80, Rest>("Rest");
   map.op<0x81, Program>("Program");
-  map.preserved(0x93, "Open Track", operandBytes(4));
   map.op<0x94, Jump>("Jump");
   map.op<0x95, Call>("Call");
   map.terminal<0x96, UnsupportedCommand>("Unsupported Command", suffix("unsupported"));
-  map.preserved(0xa0, "Cmd with Random Value", operandBytes(5), suffix("random-value"));
-  map.preserved(0xa1, "Cmd with Variable", operandBytes(2), suffix("variable-command"));
-  map.preserved(0xa2, "If");
-  map.preserved(0xb0, "Set Variable", operandBytes(3));
-  map.preserved(0xb1, "Add Variable", operandBytes(3));
-  map.preserved(0xb2, "Sub Variable", operandBytes(3));
-  map.preserved(0xb3, "Mul Variable", operandBytes(3));
-  map.preserved(0xb4, "Div Variable", operandBytes(3));
-  map.preserved(0xb5, "Shift Variable", operandBytes(3));
-  map.preserved(0xb6, "Rand Variable", operandBytes(3));
-  map.preserved(0xb8, "If Variable ==", operandBytes(3), suffix("if-variable-equal"));
-  map.preserved(0xb9, "If Variable >=", operandBytes(3), suffix("if-variable-greater-equal"));
-  map.preserved(0xba, "If Variable >", operandBytes(3), suffix("if-variable-greater"));
-  map.preserved(0xbb, "If Variable <=", operandBytes(3), suffix("if-variable-less-equal"));
-  map.preserved(0xbc, "If Variable <", operandBytes(3), suffix("if-variable-less"));
-  map.preserved(0xbd, "If Variable !=", operandBytes(3), suffix("if-variable-not-equal"));
+  map.preserved(preservedCommands);
   map.op<0xc0, Pan>("Pan");
   map.op<0xc1, Volume>("Volume");
-  map.preserved(0xc2, "Master Volume", operandBytes(1));
   map.op<0xc3, Transpose>("Transpose");
   map.op<0xc4, PitchBend>("Pitch Bend");
   map.op<0xc5, PitchBendRange>("Pitch Bend Range");
-  map.preserved(0xc6, "Priority", operandBytes(1));
   map.op<0xc7, NoteWait>("Note Wait");
-  map.preserved(0xc8, "Tie", operandBytes(1));
-  map.preserved(0xc9, "Portamento Control", operandBytes(1));
   map.op<0xca, ModulationDepth>("Modulation Depth");
-  map.preserved(0xcb, "Modulation Speed", operandBytes(1));
-  map.preserved(0xcc, "Modulation Type", operandBytes(1));
-  map.preserved(0xcd, "Modulation Range", operandBytes(1));
   map.op<0xce, PortamentoSwitch>("Portamento");
   map.op<0xcf, PortamentoTime>("Portamento Time");
-  map.preserved(0xd0, "Attack Rate", operandBytes(1));
-  map.preserved(0xd1, "Decay Rate", operandBytes(1));
-  map.preserved(0xd2, "Sustain Level", operandBytes(1));
-  map.preserved(0xd3, "Release Rate", operandBytes(1));
-  map.preserved(0xd4, "Loop Start", operandBytes(1));
   map.op<0xd5, ExpressionLevel>("Expression");
-  map.preserved(0xd6, "Print Variable", operandBytes(1));
-  map.preserved(0xe0, "Modulation Delay", operandBytes(2));
   map.op<0xe1, Tempo>("Tempo");
-  map.preserved(0xe3, "Sweep Pitch", operandBytes(2));
-  map.preserved(0xfc, "Loop End");
   map.returns<0xfd, Return>("Return");
-  map.preserved(0xfe, "Allocate Track", operandBytes(2));
   map.terminal<0xff, End>("End");
   map.truncated<TruncatedCommand>("Truncated Command", suffix("truncated"));
   map.unknown<UnknownOpcode>("Unknown Opcode", suffix("unknown"));
@@ -343,6 +345,11 @@ template <class Registrar>
       });
 }
 
+[[nodiscard]] const NdsBytecodeMap& ndsBytecodeMapFor(const SequenceDialect& dialect) {
+  static const NdsBytecodeMap bytecode = ndsBytecodeMap(dialect);
+  return bytecode;
+}
+
 }  // namespace
 
 SequenceDialect ndsSequenceDialect() {
@@ -362,7 +369,7 @@ void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
 
 TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
                                     u32 sequenceEnd, u32 startOffset, u32 trackIndex, bool recoverMalformedSdatRange) {
-  const NdsBytecodeMap bytecode = ndsBytecodeMap(dialect);
+  const NdsBytecodeMap& bytecode = ndsBytecodeMapFor(dialect);
   if (recoverMalformedSdatRange) {
     return decodeMalformedSdatRangeTrack(reader, bytecode.dispatch, bytecode.noOp, *bytecode.dispatch.opcodes[0xff],
                                          sequenceOffset, sequenceEnd, startOffset, trackIndex, kMaxTrackCommands);

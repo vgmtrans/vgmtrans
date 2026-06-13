@@ -42,7 +42,7 @@ struct InstrumentPerformanceEvent {
   bool forceBankSelect = false;
 };
 
-enum class LevelResolution {
+enum class LevelPrecisionHint {
   SevenBit,
   FourteenBit,
 };
@@ -51,18 +51,18 @@ struct LevelPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted loudness as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  // Precision hint for current MIDI rendering. Future export options can
-  // override this without changing format code.
-  LevelResolution resolution = LevelResolution::SevenBit;
+  // Source precision hint. MIDI export options may override this without
+  // changing format code.
+  LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit;
 };
 
 struct ExpressionPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted expression as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  // Precision hint for current MIDI rendering. Expression currently quantizes
-  // to 7-bit until the MIDI event model grows an Expression14 event.
-  LevelResolution resolution = LevelResolution::SevenBit;
+  // Source precision hint. MIDI export options may override this without
+  // changing format code.
+  LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit;
 };
 
 struct PanPerformanceEvent {

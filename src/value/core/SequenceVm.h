@@ -32,9 +32,9 @@ public:
   void instrument(InstrumentPerformanceEvent event);
   void instrument(u32 bank, u32 program, bool forceBankSelect = false);
   void level(LevelPerformanceEvent event);
-  void level(double linearGain, LevelResolution resolution = LevelResolution::SevenBit);
+  void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
   void expression(ExpressionPerformanceEvent event);
-  void expression(double linearGain, LevelResolution resolution = LevelResolution::SevenBit);
+  void expression(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
   void pan(PanPerformanceEvent event);
   void pan(double stereoPosition, double linearGain = 1.0);
   void masterLevel(MasterLevelPerformanceEvent event);

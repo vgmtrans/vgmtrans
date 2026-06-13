@@ -86,6 +86,12 @@ struct Expression {
   u8 value = 127;
 };
 
+struct Expression14 {
+  u64 tick = 0;
+  u8 channel = 0;
+  u16 value = 16383;
+};
+
 struct MasterVolume {
   u64 tick = 0;
   u16 value = 0;
@@ -204,9 +210,9 @@ struct Marker {
 
 using MidiEvent =
     std::variant<NoteOn, NoteOff, NoteDuration, Tempo, ProgramChange, BankSelect, Volume, Volume14, Pan, Expression,
-                 MasterVolume, Reverb, FineTune, CoarseTune, PitchBend, PitchBendRange, VibratoDepth, VibratoFrequency,
-                 VibratoDelay, TremoloDepth, TremoloFrequency, TremoloDelay, PortamentoEnable, PortamentoTime,
-                 PortamentoTime14, PortamentoControl, LegatoPedal, MonoMode, EndOfTrack, Marker>;
+                 Expression14, MasterVolume, Reverb, FineTune, CoarseTune, PitchBend, PitchBendRange, VibratoDepth,
+                 VibratoFrequency, VibratoDelay, TremoloDepth, TremoloFrequency, TremoloDelay, PortamentoEnable,
+                 PortamentoTime, PortamentoTime14, PortamentoControl, LegatoPedal, MonoMode, EndOfTrack, Marker>;
 
 struct MidiTrack {
   // Empty names are valid; the exporter will omit track-name meta events.

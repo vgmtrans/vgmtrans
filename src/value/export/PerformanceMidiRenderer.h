@@ -8,12 +8,13 @@
 
 #include "value/core/MidiModel.h"
 #include "value/core/PerformanceModel.h"
+#include "value/export/ExportTypes.h"
 
 namespace vgmtrans::core {
 
 class PerformanceMidiRenderer {
 public:
-  [[nodiscard]] MidiSequence render(const PerformanceSequence& performance) const;
+  [[nodiscard]] MidiSequence render(const PerformanceSequence& performance, MidiExportOptions options = {}) const;
 };
 
 }  // namespace vgmtrans::core

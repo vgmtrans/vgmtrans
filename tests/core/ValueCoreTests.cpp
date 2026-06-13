@@ -1286,6 +1286,72 @@ void performanceMidiRendererExtendsPreviousSameKeyNotes() {
   expect(std::get<EndOfTrack>(events.back()).tick == 24, "performance renderer should preserve track end ticks");
 }
 
+void performanceMidiRendererHonorsMidiExportOptions() {
+  PerformanceSequence performance{.timebase = Timebase{.ppqn = 48},
+                                  .tracks = {
+                                      PerformanceTrack{
+                                          .id = TrackId{0},
+                                          .sourceTrackNumber = 0,
+                                          .events =
+                                              {
+                                                  InstrumentPerformanceEvent{
+                                                      .header = PerformanceEventHeader{.tick = 0},
+                                                      .bank = 130,
+                                                      .program = 5,
+                                                  },
+                                                  LevelPerformanceEvent{
+                                                      .header = PerformanceEventHeader{.tick = 0},
+                                                      .linearGain = 1.0,
+                                                      .precisionHint = LevelPrecisionHint::FourteenBit,
+                                                  },
+                                                  ExpressionPerformanceEvent{
+                                                      .header = PerformanceEventHeader{.tick = 0},
+                                                      .linearGain = 1.0,
+                                                      .precisionHint = LevelPrecisionHint::FourteenBit,
+                                                  },
+                                              },
+                                      },
+                                  }};
+  for (u32 trackIndex = 1; trackIndex <= 9; ++trackIndex) {
+    performance.tracks.push_back(PerformanceTrack{
+        .id = TrackId{trackIndex},
+        .sourceTrackNumber = trackIndex,
+        .events = {NotePerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 0},
+            .key = 60.0,
+            .linearVelocity = 1.0,
+            .durationTicks = 1,
+        }},
+    });
+  }
+
+  const MidiSequence autoMidi = PerformanceMidiRenderer().render(performance);
+  expect(std::get<BankSelect>(autoMidi.tracks[0].events[0]).writeLsb == false,
+         "MIDI renderer should default to MSB-only bank select");
+  expect(std::holds_alternative<Volume14>(autoMidi.tracks[0].events[2]),
+         "MIDI renderer should honor 14-bit source volume hints by default");
+  expect(std::holds_alternative<Expression14>(autoMidi.tracks[0].events[3]),
+         "MIDI renderer should honor 14-bit source expression hints by default");
+  expect(std::get<NoteDuration>(autoMidi.tracks[9].events[0]).channel == 10,
+         "MIDI renderer should skip channel 10 by default");
+
+  const MidiSequence forcedMidi =
+      PerformanceMidiRenderer().render(performance, MidiExportOptions{
+                                                        .volumeResolution = MidiLevelResolution::SevenBit,
+                                                        .expressionResolution = MidiLevelResolution::SevenBit,
+                                                        .skipChannel10 = false,
+                                                        .bankSelectStyle = MidiBankSelectStyle::MsbAndLsb,
+                                                    });
+  expect(std::get<BankSelect>(forcedMidi.tracks[0].events[0]).writeLsb == true,
+         "MIDI renderer should allow bank-select LSB output");
+  expect(std::holds_alternative<Volume>(forcedMidi.tracks[0].events[2]),
+         "MIDI renderer should allow forced 7-bit volume output");
+  expect(std::holds_alternative<Expression>(forcedMidi.tracks[0].events[3]),
+         "MIDI renderer should allow forced 7-bit expression output");
+  expect(std::get<NoteDuration>(forcedMidi.tracks[9].events[0]).channel == 9,
+         "MIDI renderer should allow channel 10 when requested");
+}
+
 void modulationAnalysisReportsObservedMidiControllerRanges() {
   const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -1904,6 +1970,7 @@ int main() {
     snesBrrDecoderProducesPcm();
     midiExporterWritesStandardMidiFile();
     performanceMidiRendererExtendsPreviousSameKeyNotes();
+    performanceMidiRendererHonorsMidiExportOptions();
     modulationAnalysisReportsObservedMidiControllerRanges();
     modulationAnalysisReportsObservedPerformanceRanges();
     observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
