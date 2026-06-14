@@ -3,6 +3,12 @@ target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
     formats/NdsModuleTests.cpp
+    core/ValueMidiTests.cpp
+    core/ValueRegistryTests.cpp
+    core/ValueSequenceModelTests.cpp
+    core/ValueSequenceVmTests.cpp
+    core/ValueSessionTests.cpp
+    core/ValueSynthExportTests.cpp
     core/ValueCoreTests.cpp
 )
 target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)

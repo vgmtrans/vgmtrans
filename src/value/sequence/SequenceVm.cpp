@@ -9,6 +9,7 @@
 #include <any>
 #include <algorithm>
 #include <fmt/format.h>
+#include <limits>
 #include <map>
 #include <optional>
 #include <stdexcept>
@@ -48,6 +49,9 @@ constexpr u32 kFallbackCommandLimit = 100000;
   if (index < track.commands.size()) {
     const SourceCommand& command = track.commands[index];
     if (command.encodedSize > 0) {
+      if (command.address.value > std::numeric_limits<u64>::max() - command.encodedSize) {
+        return std::nullopt;
+      }
       if (const auto byAddress = track.addressIndex.find(Address{command.address.value + command.encodedSize})) {
         return byAddress;
       }
@@ -590,7 +594,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     };
     for (const TrackProgram& track : program.tracks) {
       const auto rendered = renderTrack(track, dryRunSequence, std::nullopt);
-      if (rendered.loopTick && (!synchronizedStopTick || *rendered.loopTick > *synchronizedStopTick)) {
+      if (rendered.loopTick && (!synchronizedStopTick || *rendered.loopTick < *synchronizedStopTick)) {
         synchronizedStopTick = rendered.loopTick;
       }
     }
