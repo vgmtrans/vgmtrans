@@ -1243,7 +1243,16 @@ std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::fil
   return summaries;
 }
 
-std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesystem::path& path) {
+u32 parseLoopCount(std::string_view text) {
+  size_t parsed = 0;
+  const unsigned long value = std::stoul(std::string(text), &parsed, 10);
+  if (parsed != text.size() || value > std::numeric_limits<u32>::max()) {
+    throw std::runtime_error("invalid loop count: " + std::string(text));
+  }
+  return static_cast<u32>(value);
+}
+
+std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   const auto root = scanLegacyFile(path);
   std::map<std::string, std::vector<u8>> midis;
 
@@ -1251,7 +1260,9 @@ std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesyst
     if (collection == nullptr || collection->seq() == nullptr) {
       continue;
     }
-    auto midi = collection->seq()->convertToMidi(collection);
+    ConversionContext context;
+    context.sequenceLoops = static_cast<int>(sequenceLoops);
+    auto midi = collection->seq()->convertToMidi(collection, context);
     if (!midi) {
       throw std::runtime_error("legacy collection failed to convert to MIDI: " + collection->name());
     }
@@ -1269,11 +1280,12 @@ std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesyst
   return midis;
 }
 
-std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection) {
+std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops = 0) {
   const auto artifacts =
       session.exportCollection(collection, ExportRequest{
                                              .kinds = {ExportKind::Midi},
                                              .loopPolicy = LoopPolicy::PlayOnce,
+                                             .sequenceLoops = sequenceLoops,
                                          });
 
   for (const auto& artifact : artifacts) {
@@ -1288,7 +1300,8 @@ std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection) {
   throw std::runtime_error("value exporter did not produce a MIDI artifact");
 }
 
-std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesystem::path& path) {
+std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesystem::path& path,
+                                                            u32 sequenceLoops = 0) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
@@ -1307,7 +1320,7 @@ std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesyste
   for (const auto& collection : project.collections) {
     std::vector<u8> midi;
     try {
-      midi = valueCollectionMidi(session, collection.id);
+      midi = valueCollectionMidi(session, collection.id, sequenceLoops);
     } catch (const std::exception& ex) {
       throw std::runtime_error("value MIDI export failed for collection '" + collection.name + "': " + ex.what());
     }
@@ -2670,9 +2683,9 @@ int compareNdsDirectSummary(const std::filesystem::path& path) {
   return 0;
 }
 
-int compareNdsDirectMidi(const std::filesystem::path& path) {
-  const auto legacyMidis = legacyCollectionMidis(path);
-  const auto valueMidis = valueCollectionMidis(path);
+int compareNdsDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  const auto legacyMidis = legacyCollectionMidis(path, sequenceLoops);
+  const auto valueMidis = valueCollectionMidis(path, sequenceLoops);
   if (valueMidis.size() != legacyMidis.size()) {
     std::cout << "value NDS MIDI collection count differs: legacy=" << legacyMidis.size()
               << " value=" << valueMidis.size() << "\n";
@@ -2685,13 +2698,13 @@ int compareNdsDirectMidi(const std::filesystem::path& path) {
       std::cout << "value NDS scan did not produce MIDI for collection '" << collectionName << "'\n";
       return 1;
     }
-    std::cout << "checking " << collectionName << " MIDI via direct NDS value scan\n";
+    std::cout << "checking " << collectionName << " MIDI via direct NDS value scan, loops=" << sequenceLoops << "\n";
     if (!compareMidi(legacyMidi, found->second, std::cout)) {
       return 1;
     }
   }
 
-  std::cout << "NDS direct MIDI parity ok: collections=" << legacyMidis.size() << "\n";
+  std::cout << "NDS direct MIDI parity ok: collections=" << legacyMidis.size() << " loops=" << sequenceLoops << "\n";
   return 0;
 }
 
@@ -2885,7 +2898,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-rsn-direct-synth <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n"
-      << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file>\n"
+      << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
       << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
       << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
 }
@@ -2936,6 +2949,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "nds-direct-midi") {
       return compareNdsDirectMidi(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "nds-direct-midi") {
+      return compareNdsDirectMidi(argv[2], parseLoopCount(argv[3]));
     }
 
     if (argc == 3 && std::string(argv[1]) == "nds-direct-synth") {
