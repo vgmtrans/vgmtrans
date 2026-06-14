@@ -190,11 +190,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRanges.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRecovery.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.cpp
     formats/CapcomSnes/CapcomSnesDriverMath.cpp
   PUBLIC
     FILE_SET HEADERS
@@ -208,11 +207,11 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRanges.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceRecovery.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsTypes.h
       formats/CapcomSnes/CapcomSnesDriverMath.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )

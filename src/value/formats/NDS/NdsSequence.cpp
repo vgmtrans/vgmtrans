@@ -4,19 +4,23 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/NDS/NdsSequenceDialect.h"
+#include "value/formats/NDS/NdsSequence.h"
 
-#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
-#include "value/sequence/bytecode/BytecodeWalkers.h"
 #include "value/base/LevelScale.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/formats/NDS/NdsSequenceRecovery.h"
+#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
+#include "value/sequence/bytecode/BytecodeWalkers.h"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cmath>
 #include <optional>
+#include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -27,8 +31,14 @@ using namespace core;
 namespace {
 
 constexpr size_t kMaxTrackCommands = 262144;
+constexpr std::string_view kSseqSignature = "SSEQ\xff\xfe\x00\x01";
 
 struct Context {};
+
+struct PendingBlock {
+  u32 offset = 0;
+  bool callTarget = false;
+};
 
 struct TrackState {
   explicit TrackState(const SequenceProgram& program, const TrackProgram&)
@@ -43,6 +53,18 @@ using Runtime = CommandRuntime<TrackState, Context>;
 
 [[nodiscard]] u32 absoluteAddress(const TrackState& state, u32 relative) {
   return static_cast<u32>(state.sequenceDataBase + relative);
+}
+
+[[nodiscard]] bool matches(ByteReader reader, u64 offset, std::string_view signature) {
+  if (!reader.has(offset, signature.size())) {
+    return false;
+  }
+  for (size_t i = 0; i < signature.size(); ++i) {
+    if (reader.u8At(offset + i) != static_cast<u8>(signature[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 [[nodiscard]] u32 readVarLen(ByteReader reader, u32& offset, u32 sequenceEnd) {
@@ -64,6 +86,43 @@ using Runtime = CommandRuntime<TrackState, Context>;
   }
   return reader.u8At(operandOffset) + (reader.u8At(operandOffset + 1) << 8) + (reader.u8At(operandOffset + 2) << 16) +
          sequenceOffset + 0x1c;
+}
+
+[[nodiscard]] std::optional<u32> nearbySseqHeader(ByteReader reader, u32 offset, u32 size) {
+  constexpr u32 kMaxPaddingBeforeSseq = 0x200;
+  const u64 searchEnd = std::min<u64>(reader.size(), static_cast<u64>(offset) + size + kMaxPaddingBeforeSseq);
+  for (u64 candidate = offset + 1; candidate + kSseqSignature.size() <= searchEnd; ++candidate) {
+    if (matches(reader, candidate, kSseqSignature)) {
+      return static_cast<u32>(candidate);
+    }
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] bool isZeroFilled(ByteReader reader, u32 begin, u32 end) {
+  for (u32 offset = begin; offset < end && reader.has(offset, 1); ++offset) {
+    if (reader.u8At(offset) != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+[[nodiscard]] bool shouldRecoverMalformedSdatRange(ByteReader reader, u32 offset, u32 size) {
+  const auto sseqOffset = nearbySseqHeader(reader, offset, size);
+  if (!sseqOffset) {
+    return false;
+  }
+
+  const u32 trackStart = offset + 0x1c;
+  const u32 paddingEnd = std::min(*sseqOffset, offset + size);
+  // Some zero-filled pseudo-sequences overlap a later SSEQ. If the padding
+  // would align the SSEQ signature as bogus note data, leave it empty.
+  if (size <= 0x100 && *sseqOffset >= trackStart && isZeroFilled(reader, offset, paddingEnd) &&
+      ((*sseqOffset - trackStart) % 3) == 2) {
+    return false;
+  }
+  return true;
 }
 
 // Notes, rests, and program selection.
@@ -258,6 +317,101 @@ struct NdsBytecodeMap {
   BytecodeCommandSpec noOp;
 };
 
+[[nodiscard]] TrackProgram makeTrack(u32 startOffset, u32 trackIndex) {
+  return TrackProgram{
+      .id = TrackId{trackIndex},
+      .sourceTrackNumber = trackIndex,
+      .startAddress = Address{startOffset},
+  };
+}
+
+[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(const BytecodeCommandSpec& terminalSpec, ByteReader reader,
+                                                             u32 offset) {
+  auto command = recordSizedPreservedBytecodeCommand(terminalSpec, reader, offset, offset + 1);
+  command.flow = DecodeFlow::terminalFlow();
+  return command;
+}
+
+// Recovery decoder for malformed SDAT ranges that do not contain a normal SSEQ
+// header. Normal SSEQ decode stays source-driver oriented; this path repairs
+// range-level damage before source commands can be trusted.
+[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(ByteReader reader, const BytecodeDispatchTable& dispatch,
+                                                         const BytecodeCommandSpec& noOpSpec,
+                                                         const BytecodeCommandSpec& terminalSpec, u32 sequenceOffset,
+                                                         u32 sequenceEnd, u32 startOffset, u32 trackIndex,
+                                                         size_t maxCommands) {
+  TrackProgram track = makeTrack(startOffset, trackIndex);
+  TrackProgramBuilder builder{track};
+  u32 offset = startOffset;
+  size_t decodedCommands = 0;
+  std::set<u32> visitedControlDestinations;
+  std::set<u32> decodedOffsets;
+  std::set<u32> callTargetOffsets;
+  std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
+
+  while (!pendingBlocks.empty()) {
+    const PendingBlock block = pendingBlocks.back();
+    pendingBlocks.pop_back();
+    offset = block.offset;
+
+    while (hasBytecodeBytes(reader, offset, 1, sequenceEnd) && decodedCommands++ < maxCommands) {
+      const u32 begin = offset;
+      if (decodedOffsets.contains(begin)) {
+        break;
+      }
+      decodedOffsets.insert(begin);
+
+      auto decoded = dispatch.decode(reader, offset,
+                                     BytecodeDecodeContext{
+                                         .bytecodeEnd = sequenceEnd,
+                                         .sequenceOffset = sequenceOffset,
+                                         .sequenceEnd = sequenceEnd,
+                                     });
+
+      if (!block.callTarget) {
+        const auto overlap = std::ranges::find_if(
+            callTargetOffsets, [&](u32 target) { return begin < target && target < decoded.range.endOffset(); });
+        if (overlap != callTargetOffsets.end()) {
+          // Some malformed FAT entries fall through one byte before a real call
+          // target. Stop before consuming the overlapping subroutine bytes.
+          appendDecodedBytecodeCommand(builder, terminalRecoveryCommand(terminalSpec, reader, begin), begin);
+          break;
+        }
+      }
+
+      if (decoded.flow.unconditionalJump()) {
+        const u32 destination = decoded.flow.staticTargets.front().value;
+        if (visitedControlDestinations.contains(destination)) {
+          appendDecodedBytecodeCommand(builder, terminalRecoveryCommand(terminalSpec, reader, begin), begin);
+          break;
+        }
+        visitedControlDestinations.insert(destination);
+        auto noOp =
+            recordSizedPreservedBytecodeCommand(noOpSpec, reader, begin, static_cast<u32>(decoded.range.endOffset()));
+        appendDecodedBytecodeCommand(builder, noOp, begin);
+        offset = destination;
+        continue;
+      }
+
+      if (decoded.flow.callTarget()) {
+        const u32 destination = decoded.flow.staticTargets.front().value;
+        if (!decodedOffsets.contains(destination) && callTargetOffsets.insert(destination).second) {
+          pendingBlocks.push_back(PendingBlock{.offset = destination, .callTarget = true});
+        }
+      }
+
+      const auto next = decoded.flow.fallthrough;
+      appendDecodedBytecodeCommand(builder, decoded, begin);
+      if (!next || decoded.flow.terminal) {
+        break;
+      }
+      offset = next->value;
+    }
+  }
+
+  return track;
+}
+
 template <class Registrar>
 [[nodiscard]] NdsBytecodeMap ndsBytecodeMap(Registrar& registrar) {
   BytecodeMapBuilder<TrackState, Context> map{"nds", registrar};
@@ -419,6 +573,64 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
   std::vector<u32> starts{offset};
   starts.insert(starts.end(), extraStarts.begin(), extraStarts.end());
   return starts;
+}
+
+NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 size) {
+  const bool hasSseqHeader = matches(reader, offset, kSseqSignature);
+  const bool recoverMalformedSdatRange = !hasSseqHeader && shouldRecoverMalformedSdatRange(reader, offset, size);
+  const bool extendRecoveryPastFatRange = recoverMalformedSdatRange && size <= 0x100;
+  const u32 sequenceEnd = hasSseqHeader || !extendRecoveryPastFatRange
+                              ? static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + size))
+                              : static_cast<u32>(reader.size());
+  return NdsSequenceRange{
+      .offset = offset,
+      .size = size,
+      .sequenceEnd = sequenceEnd,
+      .recoverMalformedSdatRange = recoverMalformedSdatRange,
+  };
+}
+
+SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
+                                             const std::string& name, std::optional<AssetId> instrumentSet) {
+  const SequenceDialect dialect = ndsSequenceDialect();
+  SequenceProgramAsset asset{
+      .metadata =
+          AssetMetadata{
+              .id = id,
+              .format = std::string(kNdsFormatName),
+              .name = name,
+              .range = input.reader.range(range.offset, range.size),
+          },
+      .program =
+          SequenceProgram{
+              .dialect = dialect.id,
+              .timebase = dialect.timebase,
+              .sourceBaseAddress = Address{range.offset + 0x1c},
+              .behavior = dialect.defaultBehavior,
+          },
+  };
+
+  const CommandHandler* programHandler = dialect.handlerForKind("nds.program");
+  ItemTreeBuilder items(asset.metadata.items, input.ids);
+  const auto root =
+      items.add(std::nullopt, ItemKind::Sequence, "sseq", name, input.reader.range(range.offset, range.size));
+
+  u32 trackIndex = 0;
+  for (const u32 start : ndsSequenceTrackStarts(input.reader, range.offset, range.sequenceEnd)) {
+    auto track = decodeNdsSequenceTrack(input.reader, dialect, range.offset, range.sequenceEnd, start, trackIndex++,
+                                        range.recoverMalformedSdatRange);
+    const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
+                                     input.reader.range(start, 0));
+    for (const auto& command : track.commands) {
+      static_cast<void>(addSourceCommandItem(items, trackItem, dialect, track, command));
+      if (programHandler != nullptr) {
+        addBankedProgramReference(asset.program, track, command, programHandler->kind, "raw", instrumentSet);
+      }
+    }
+    asset.program.tracks.push_back(std::move(track));
+  }
+
+  return asset;
 }
 
 }  // namespace vgmtrans::formats::nds

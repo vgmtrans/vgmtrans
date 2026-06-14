@@ -6,9 +6,13 @@
 
 #pragma once
 
-#include "value/sequence/SequenceDialect.h"
 #include "value/base/Source.h"
+#include "value/formats/NDS/NdsTypes.h"
+#include "value/scan/ScanTypes.h"
+#include "value/sequence/SequenceDialect.h"
 
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace vgmtrans::formats::nds {
@@ -23,5 +27,11 @@ void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
                                                         u32 trackIndex, bool recoverMalformedSdatRange = false);
 
 [[nodiscard]] std::vector<u32> ndsSequenceTrackStarts(core::ByteReader reader, u32 sequenceOffset, u32 sequenceEnd);
+
+[[nodiscard]] NdsSequenceRange ndsSequenceRangeForFatEntry(core::ByteReader reader, u32 offset, u32 size);
+
+[[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(const core::ScanInput& input, core::AssetId id,
+                                                                 NdsSequenceRange range, const std::string& name,
+                                                                 std::optional<core::AssetId> instrumentSet);
 
 }  // namespace vgmtrans::formats::nds
