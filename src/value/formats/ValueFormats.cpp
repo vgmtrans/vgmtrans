@@ -7,7 +7,7 @@
 #include "value/formats/ValueFormats.h"
 
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
-#include "value/formats/CapcomSnes/CapcomSnesSequenceDialect.h"
+#include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 #include "value/formats/NDS/NdsModule.h"
 #include "value/formats/NDS/NdsSequenceDialect.h"
 #include "value/extractors/PsfExtractor.h"

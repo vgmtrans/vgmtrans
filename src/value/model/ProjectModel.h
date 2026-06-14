@@ -12,6 +12,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -39,6 +40,14 @@ struct Collection {
   std::vector<AssetId> miscAssets;
 };
 
+struct ProjectIndex {
+  // Index entries are vector indices rather than pointers so Project remains a
+  // normal movable/copyable value snapshot.
+  bool valid = false;
+  std::unordered_map<u32, size_t> assetsById;
+  std::unordered_map<u32, size_t> collectionsById;
+};
+
 struct Project {
   // Sources includes user-added files plus extracted virtual files such as SPC RAM or
   // archive members. Asset ranges refer back into this list.
@@ -46,6 +55,7 @@ struct Project {
   std::vector<Asset> assets;
   std::vector<Collection> collections;
   std::vector<Diagnostic> diagnostics;
+  ProjectIndex index;
 };
 
 struct CollectionAssetDiagnostics {
@@ -71,6 +81,8 @@ struct CollectionAssets {
 
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
+[[nodiscard]] ProjectIndex buildProjectIndex(const Project& project);
+void rebuildProjectIndex(Project& project);
 [[nodiscard]] ItemNode* itemById(ItemTree& tree, ItemId id);
 [[nodiscard]] const ItemNode* itemById(const ItemTree& tree, ItemId id);
 [[nodiscard]] Asset* assetById(Project& project, AssetId id);

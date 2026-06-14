@@ -4,26 +4,27 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/CapcomSnes/CapcomSnesSequenceDialect.h"
+#include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 
-#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
-#include "value/sequence/bytecode/BytecodeWalkers.h"
+#include "formats/CapcomSnes/CapcomSnesDriverMath.h"
 #include "value/base/LevelScale.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/formats/CapcomSnes/CapcomSnesSequenceMath.h"
-#include "value/formats/CapcomSnes/CapcomSnesValueLayout.h"
+#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
+#include "value/sequence/bytecode/BytecodeWalkers.h"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cmath>
 #include <map>
 #include <optional>
 #include <string>
-#include <vector>
+#include <string_view>
+#include <utility>
 
 namespace vgmtrans::formats::capcom_snes {
 
 using namespace core;
-namespace math = sequence_math;
 
 namespace {
 
@@ -33,6 +34,7 @@ constexpr u8 kNoteDottedMask = 0x10;
 constexpr u8 kNoteTripletMask = 0x20;
 constexpr u8 kNoteSlurredMask = 0x40;
 
+// Driver-local state used while executing decoded source commands.
 struct Context {
   CapcomSnesEngineVersion version = CapcomSnesEngineVersion::v3BgmFixedLocation;
 };
@@ -67,23 +69,69 @@ struct TrackState {
   bool didRest = false;
 };
 
-using Runtime = CommandRuntime<TrackState, Context>;
+// Small driver formulas kept local to the Capcom sequence reader.
+namespace math {
 
-void emitLinearVolume(Runtime& rt, u8 raw) {
-  // Capcom volume is a linear amplitude gain. MIDI rendering applies the
-  // square-root MIDI controller curve later.
-  rt.out.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)),
-               LevelPrecisionHint::FourteenBit);
+[[nodiscard]] double tuningSemitones(s8 tuning) {
+  return static_cast<double>(tuning) / 256.0;
 }
 
-void emitLinearMasterVolume(Runtime& rt, u8 raw) {
-  rt.out.masterLevel(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)));
+[[nodiscard]] double tuningCents(s8 tuning) {
+  return tuningSemitones(tuning) * 100.0;
 }
 
-void emitPan(Runtime& rt, u8 raw) {
-  const auto pan = math::panConversion(rt.context.version, raw);
-  rt.out.pan(math::stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
+[[nodiscard]] double portamentoMillisecondsPerCent(u8 rawTime) {
+  const u8 step = static_cast<u8>((rawTime << 1) & 0xff);
+  const double centsPerUpdate = step * (100.0 / 256.0);
+  // The Capcom voice/portamento update runs every other 8 ms timer tick.
+  return centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
 }
+
+[[nodiscard]] u32 baseNoteTicks(u32 rawDuration) {
+  if (rawDuration == 0 || rawDuration > 7) {
+    return 0;
+  }
+  return 192u >> (7u - rawDuration);
+}
+
+[[nodiscard]] u32 tempoMicrosecondsPerQuarter(u32 rawTempo) {
+  if (rawTempo == 0) {
+    return 60000000;
+  }
+  // Capcom tempo is derived from the SNES timer update rate, not stored as BPM.
+  return static_cast<u32>(std::round(kCapcomSnesPpqn * (125 * 0x40) * 2 * 256.0 / rawTempo));
+}
+
+[[nodiscard]] double volumeGain(CapcomSnesEngineVersion version, u8 rawVolume) {
+  return version == CapcomSnesEngineVersion::v1BgmInList ? ::capcom_snes::calculateVolumeV1(rawVolume)
+                                                         : ::capcom_snes::calculateVolumeV2(rawVolume);
+}
+
+[[nodiscard]] ::capcom_snes::PanConversionResult panConversion(CapcomSnesEngineVersion version, u8 rawPan) {
+  const auto biasedPan = static_cast<u8>(rawPan + 0x80);
+  return version == CapcomSnesEngineVersion::v1BgmInList ? ::capcom_snes::linear8BitPanToMidi(biasedPan)
+                                                         : ::capcom_snes::calculatePanV2(biasedPan);
+}
+
+[[nodiscard]] double stereoPosition(const ::capcom_snes::PanConversionResult& converted) {
+  // Store the pan on the same 0..127 lattice the MIDI renderer uses so Capcom
+  // pan values survive the neutral stereo-position hop without shifting left.
+  return std::clamp((static_cast<double>(converted.midiPan) / 127.0) * 2.0 - 1.0, -1.0, 1.0);
+}
+
+[[nodiscard]] u8 tremoloDepth(CapcomSnesEngineVersion version, u8 rawDepth) {
+  return ::capcom_snes::tremoloDepthToMidiValue(rawDepth, version == CapcomSnesEngineVersion::v1BgmInList);
+}
+
+[[nodiscard]] double midi7Amount(u8 value) {
+  return static_cast<double>(value) / 127.0;
+}
+
+[[nodiscard]] double lfoRateAmount(u8 rawRate) {
+  return midi7Amount(::capcom_snes::lfoRateByteToMidiValue(rawRate));
+}
+
+}  // namespace math
 
 u32 TrackState::consumeNoteTicks(u8 rawDuration) {
   u32 length = math::baseNoteTicks(rawDuration);
@@ -172,6 +220,25 @@ void TrackState::emitModulationDepths(Emit& out, bool enabled) const {
   if (tremoloDepth != 0) {
     out.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? math::midi7Amount(tremoloDepth) : 0.0);
   }
+}
+
+using Runtime = CommandRuntime<TrackState, Context>;
+
+// Opcode implementations.
+void emitLinearVolume(Runtime& rt, u8 raw) {
+  // Capcom volume is a linear amplitude gain. MIDI rendering applies the
+  // square-root MIDI controller curve later.
+  rt.out.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)),
+               LevelPrecisionHint::FourteenBit);
+}
+
+void emitLinearMasterVolume(Runtime& rt, u8 raw) {
+  rt.out.masterLevel(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)));
+}
+
+void emitPan(Runtime& rt, u8 raw) {
+  const auto pan = math::panConversion(rt.context.version, raw);
+  rt.out.pan(math::stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
 }
 
 // Notes and note-state commands.
@@ -521,6 +588,8 @@ struct UnknownOpcode {
   }
 };
 
+// Source opcode table. This should stay compact enough to read like the
+// driver's dispatch map.
 template <class Registrar>
 [[nodiscard]] BytecodeDispatchTable capcomBytecodeMap(Registrar& registrar, CapcomSnesEngineVersion version) {
   BytecodeMapBuilder<TrackState, Context> map{"capcom-snes", registrar};
@@ -635,6 +704,61 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialec
   return decodeLinearBytecodeTrack(reader, sourceTrackNumber, startAddress,
                                    LinearBytecodeDecodePolicy{.maxCommands = 4096},
                                    [&](u32 offset) { return bytecode.decode(reader, offset); });
+}
+
+SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const CapcomSnesLayout& layout, AssetId sequenceId,
+                                             std::optional<AssetId> instrumentSetId, std::string_view displayName) {
+  const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
+  ItemTree items;
+  ItemTreeBuilder itemBuilder(items, input.ids);
+  const auto root = itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes.sequence-header", "Sequence Header",
+                                    input.reader.range(layout.sequenceHeaderAddress, headerSize));
+
+  const SequenceDialect dialect = capcomSnesSequenceDialect(layout.version);
+  SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
+  };
+
+  const CommandHandler* programHandler = dialect.handlerForKind("capcom-snes.program");
+  const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
+  // Capcom stores track pointers in reverse channel order. The normalized source track
+  // number below matches the driver's playback order.
+  for (int trackIndex = static_cast<int>(kCapcomSnesMaxTracks) - 1; trackIndex >= 0; --trackIndex) {
+    const auto pointerOffset = pointerBase + static_cast<u32>(trackIndex) * 2;
+    const u16 trackAddress = input.reader.be16(pointerOffset);
+    if (trackAddress == 0) {
+      continue;
+    }
+
+    const auto trackItem =
+        itemBuilder.add(root, ItemKind::Track, "capcom-snes.track-pointer", "Track Pointer",
+                        input.reader.range(pointerOffset, 2), fmt::format("Track starts at ${:04X}", trackAddress));
+    auto track = decodeCapcomSnesSourceTrack(input.reader, dialect,
+                                             static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex), trackAddress);
+
+    for (const auto& command : track.commands) {
+      static_cast<void>(addSourceCommandItem(itemBuilder, trackItem, dialect, track, command));
+      if (programHandler != nullptr) {
+        addBankedProgramReference(program, track, command, programHandler->kind, "raw", instrumentSetId);
+      }
+    }
+
+    program.tracks.push_back(std::move(track));
+  }
+
+  return SequenceProgramAsset{
+      .metadata =
+          AssetMetadata{
+              .id = sequenceId,
+              .format = "CapcomSnes",
+              .name = std::string(displayName),
+              .range = input.reader.range(layout.sequenceHeaderAddress, headerSize),
+              .items = std::move(items),
+          },
+      .program = std::move(program),
+  };
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

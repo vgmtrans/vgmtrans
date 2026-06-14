@@ -7,9 +7,9 @@
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
 
 #include "value/scan/FormatRegistry.h"
-#include "value/formats/CapcomSnes/CapcomSnesSequenceProgram.h"
-#include "value/formats/CapcomSnes/CapcomSnesValueLayout.h"
-#include "value/formats/CapcomSnes/CapcomSnesValueSynth.h"
+#include "value/formats/CapcomSnes/CapcomSnesSequence.h"
+#include "value/formats/CapcomSnes/CapcomSnesLayout.h"
+#include "value/formats/CapcomSnes/CapcomSnesSynth.h"
 
 #include <optional>
 #include <string>
@@ -41,27 +41,19 @@ using namespace core;
   std::vector<CapcomSnesInstrumentInfo> instrumentInfos;
   std::vector<CapcomSnesSampleInfo> sampleInfos;
   if (layout->instrumentTableAddress && layout->spcDirAddress) {
-    instrumentInfos = parseCapcomSnesInstrumentInfos(input.reader,
-                                                     *layout->instrumentTableAddress,
-                                                     *layout->spcDirAddress);
+    instrumentInfos =
+        parseCapcomSnesInstrumentInfos(input.reader, *layout->instrumentTableAddress, *layout->spcDirAddress);
     sampleInfos = parseCapcomSnesSampleInfos(input.reader, *layout->spcDirAddress, instrumentInfos);
   }
 
   const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
-  result.assets.emplace_back(parseCapcomSnesSequenceProgram(input,
-                                                            *layout,
-                                                            sequenceId,
-                                                            hasInstrumentSet ? std::optional<AssetId>{instrumentSetId}
-                                                                              : std::nullopt,
-                                                            displayName));
+  result.assets.emplace_back(
+      parseCapcomSnesSequence(input, *layout, sequenceId,
+                              hasInstrumentSet ? std::optional<AssetId>{instrumentSetId} : std::nullopt, displayName));
 
   if (hasInstrumentSet) {
-    result.assets.emplace_back(parseCapcomSnesInstrumentSet(input,
-                                                             instrumentSetId,
-                                                             sampleCollectionId,
-                                                             instrumentInfos,
-                                                             sampleInfos,
-                                                             displayName));
+    result.assets.emplace_back(parseCapcomSnesInstrumentSet(input, instrumentSetId, sampleCollectionId, instrumentInfos,
+                                                            sampleInfos, displayName));
     result.assets.emplace_back(parseCapcomSnesSamples(input, sampleCollectionId, sampleInfos, displayName));
   }
 

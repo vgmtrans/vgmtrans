@@ -69,6 +69,8 @@ struct SourceCommand {
   CommandHandlerId handler;
   CommandKindId kind;
   u8 opcode = 0;
+  Address address;
+  u32 encodedSize = 0;
   SourceRange range;
   ByteSpan bytes;
   OperandSpan operands;
