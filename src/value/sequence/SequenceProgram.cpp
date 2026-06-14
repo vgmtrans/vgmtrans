@@ -190,13 +190,15 @@ SourceRange CommandReader::operandRange(size_t begin, size_t size) const {
 }
 
 void AddressIndex::add(Address address, u32 commandIndex) {
-  entries.emplace_back(address, commandIndex);
+  const auto [_, inserted] = commandByAddress.emplace(address.value, commandIndex);
+  if (!inserted) {
+    throw std::invalid_argument("Sequence command address was decoded more than once");
+  }
 }
 
 std::optional<u32> AddressIndex::find(Address address) const {
-  const auto found =
-      std::ranges::find_if(entries, [address](const auto& entry) { return entry.first.value == address.value; });
-  if (found == entries.end()) {
+  const auto found = commandByAddress.find(address.value);
+  if (found == commandByAddress.end()) {
     return std::nullopt;
   }
   return found->second;
@@ -287,6 +289,9 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, C
                                                      std::span<const CommandOperand> operands) {
   if (bytes.empty()) {
     throw std::invalid_argument("Sequence source commands must include an opcode byte");
+  }
+  if (track_.addressIndex.find(address)) {
+    throw std::invalid_argument("Sequence command address was decoded more than once");
   }
 
   const auto commandIndex = static_cast<u32>(track_.commands.size());

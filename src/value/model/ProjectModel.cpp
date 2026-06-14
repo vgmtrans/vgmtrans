@@ -7,7 +7,9 @@
 #include "value/model/ProjectModel.h"
 
 #include <algorithm>
+#include <iterator>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -19,6 +21,14 @@ namespace {
   return Diagnostic{
       .severity = Severity::Error,
       .message = std::move(message),
+  };
+}
+
+[[nodiscard]] Diagnostic projectError(std::string message, SourceRange range) {
+  return Diagnostic{
+      .severity = Severity::Error,
+      .message = std::move(message),
+      .range = range,
   };
 }
 
@@ -66,8 +76,55 @@ ProjectIndex buildProjectIndex(const Project& project) {
   return index;
 }
 
+std::vector<Diagnostic> projectIndexDiagnostics(const Project& project) {
+  std::vector<Diagnostic> diagnostics;
+
+  std::unordered_set<u32> assetIds;
+  assetIds.reserve(project.assets.size());
+  for (const auto& asset : project.assets) {
+    const auto& meta = metadata(asset);
+    if (!meta.id.valid()) {
+      continue;
+    }
+
+    if (assetIds.insert(meta.id.value).second) {
+      continue;
+    }
+
+    const std::string message = "Duplicate asset id " + std::to_string(meta.id.value) + " in Project snapshot";
+    if (meta.range.valid()) {
+      diagnostics.push_back(projectError(message, meta.range));
+    } else {
+      diagnostics.push_back(projectError(message));
+    }
+  }
+
+  std::unordered_set<u32> collectionIds;
+  collectionIds.reserve(project.collections.size());
+  for (const auto& collection : project.collections) {
+    if (!collection.id.valid()) {
+      continue;
+    }
+
+    if (!collectionIds.insert(collection.id.value).second) {
+      diagnostics.push_back(
+          projectError("Duplicate collection id " + std::to_string(collection.id.value) + " in Project snapshot"));
+    }
+  }
+
+  return diagnostics;
+}
+
 void rebuildProjectIndex(Project& project) {
   project.index = buildProjectIndex(project);
+}
+
+void finalizeProjectIndex(Project& project) {
+  rebuildProjectIndex(project);
+
+  auto diagnostics = projectIndexDiagnostics(project);
+  project.diagnostics.insert(project.diagnostics.end(), std::make_move_iterator(diagnostics.begin()),
+                             std::make_move_iterator(diagnostics.end()));
 }
 
 ItemNode* itemById(ItemTree& tree, ItemId id) {
