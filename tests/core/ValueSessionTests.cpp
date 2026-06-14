@@ -90,6 +90,57 @@ void projectSessionReportsUnregisteredSequenceDialect() {
                         SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
+void projectFinalizationReportsDuplicateIds() {
+  Project project;
+  project.assets.emplace_back(MiscAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{7},
+              .format = "Probe",
+              .name = "First",
+              .range = probeRange(4, 1),
+          },
+  });
+  project.assets.emplace_back(MiscAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{7},
+              .format = "Probe",
+              .name = "Duplicate",
+              .range = probeRange(8, 1),
+          },
+  });
+  project.collections.push_back(Collection{
+      .id = CollectionId{3},
+      .name = "First",
+      .miscAssets = {AssetId{7}},
+  });
+  project.collections.push_back(Collection{
+      .id = CollectionId{3},
+      .name = "Duplicate",
+      .miscAssets = {AssetId{7}},
+  });
+
+  finalizeProjectIndex(project);
+
+  expect(project.index.valid, "project finalization should publish an index");
+  expect(assetById(project, AssetId{7}) == &project.assets[0],
+         "duplicate asset id lookup should keep the first asset");
+  expect(collectionById(project, CollectionId{3}) == &project.collections[0],
+         "duplicate collection id lookup should keep the first collection");
+  expect(project.diagnostics.size() == 2, "project finalization should report duplicate ids");
+
+  const auto& assetDiagnostic = diagnosticWithMessage(project.diagnostics, "Duplicate asset id 7 in Project snapshot");
+  expect(assetDiagnostic.severity == Severity::Error, "duplicate asset id should be reported as an error");
+  expect(assetDiagnostic.range && sameRange(*assetDiagnostic.range, probeRange(8, 1)),
+         "duplicate asset id diagnostic should point at the conflicting asset");
+
+  const auto& collectionDiagnostic =
+      diagnosticWithMessage(project.diagnostics, "Duplicate collection id 3 in Project snapshot");
+  expect(collectionDiagnostic.severity == Severity::Error, "duplicate collection id should be reported as an error");
+  expect(!collectionDiagnostic.range.has_value(), "collection id diagnostics should not invent a source range");
+}
+
 void projectCollectionAssetResolutionProvidesTypedExportInputs() {
   Project project;
   project.assets.emplace_back(SequenceProgramAsset{
@@ -242,6 +293,7 @@ void projectSessionExportsAllCollections() {
 void runValueSessionTests() {
   projectSessionScansValuesAndVirtualSources();
   projectSessionReportsUnregisteredSequenceDialect();
+  projectFinalizationReportsDuplicateIds();
   projectCollectionAssetResolutionProvidesTypedExportInputs();
   projectSessionAddsSourceFromPath();
   projectSessionExportsAllCollections();

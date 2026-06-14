@@ -82,7 +82,9 @@ struct CollectionAssets {
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
 [[nodiscard]] ProjectIndex buildProjectIndex(const Project& project);
+[[nodiscard]] std::vector<Diagnostic> projectIndexDiagnostics(const Project& project);
 void rebuildProjectIndex(Project& project);
+void finalizeProjectIndex(Project& project);
 [[nodiscard]] ItemNode* itemById(ItemTree& tree, ItemId id);
 [[nodiscard]] const ItemNode* itemById(const ItemTree& tree, ItemId id);
 [[nodiscard]] Asset* assetById(Project& project, AssetId id);

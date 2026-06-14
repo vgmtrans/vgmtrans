@@ -99,6 +99,27 @@ void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
   expect(track.commands.size() == 1, "rejected command bytes should not mutate the track program");
 }
 
+void trackProgramBuilderRejectsDuplicateCommandAddresses() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 2> programBytes{0x80, 0x05};
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
+
+  bool rejectedDuplicateAddress = false;
+  try {
+    static_cast<void>(addProbeCommand<ProbeProgramCommand>(
+        builder, dialect, Address{0}, probeRange(2, programBytes.size()), programBytes));
+  } catch (const std::invalid_argument&) {
+    rejectedDuplicateAddress = true;
+  }
+  expect(rejectedDuplicateAddress, "track builder should reject duplicate source command addresses");
+  expect(track.commands.size() == 1, "duplicate-address rejection should not mutate the track program");
+}
 
 }  // namespace
 
@@ -106,4 +127,5 @@ void runValueSequenceModelTests() {
   levelScaleRoundTripsMidiValues();
   byteReaderChecksBoundsAndEndian();
   sourceCommandsPreserveBytesOperandsAndDialectDisplay();
+  trackProgramBuilderRejectsDuplicateCommandAddresses();
 }

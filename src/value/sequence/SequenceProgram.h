@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -160,7 +161,7 @@ private:
 };
 
 struct AddressIndex {
-  std::vector<std::pair<Address, u32>> entries;
+  std::unordered_map<u64, u32> commandByAddress;
 
   void add(Address address, u32 commandIndex);
   [[nodiscard]] std::optional<u32> find(Address address) const;
