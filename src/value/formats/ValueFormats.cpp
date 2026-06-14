@@ -9,7 +9,7 @@
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
 #include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 #include "value/formats/NDS/NdsModule.h"
-#include "value/formats/NDS/NdsSequenceDialect.h"
+#include "value/formats/NDS/NdsSequence.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/extractors/SnesRsnExtractor.h"
 #include "value/extractors/SnesSpcExtractor.h"

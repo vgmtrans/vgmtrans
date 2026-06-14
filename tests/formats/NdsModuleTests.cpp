@@ -7,8 +7,7 @@
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/formats/NDS/NdsSequenceDialect.h"
-#include "value/formats/NDS/NdsSequenceProgram.h"
+#include "value/formats/NDS/NdsSequence.h"
 
 #include <stdexcept>
 #include <string>
