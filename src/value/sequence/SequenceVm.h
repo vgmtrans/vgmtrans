@@ -100,9 +100,17 @@ private:
   u32 currentIndex_ = 0;
 };
 
+struct SequenceVmOptions {
+  LoopPolicy loopPolicy = LoopPolicy::Default;
+  // Extra runtime loop repeats after the first pass through an infinite loop.
+  u32 sequenceLoops = 0;
+};
+
 class SequenceVm {
 public:
-  explicit SequenceVm(LoopPolicy loopPolicy = LoopPolicy::Default);
+  SequenceVm() = default;
+  explicit SequenceVm(LoopPolicy loopPolicy);
+  explicit SequenceVm(SequenceVmOptions options);
 
   [[nodiscard]] PerformanceSequence render(const SequenceProgram& program, const SequenceDialect& dialect) const;
 
@@ -110,7 +118,7 @@ private:
   [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program,
                                                          const SequenceDialect& dialect) const;
 
-  LoopPolicy loopPolicy_ = LoopPolicy::Default;
+  SequenceVmOptions options_;
 };
 
 }  // namespace vgmtrans::core

@@ -443,7 +443,10 @@ VmApi::VmApi(VmTrackRuntime& runtime, PerformanceSequence& sequence, SourceRange
     : runtime_(runtime), sequence_(sequence), commandRange_(commandRange), currentIndex_(currentIndex) {
 }
 
-SequenceVm::SequenceVm(LoopPolicy loopPolicy) : loopPolicy_(loopPolicy) {
+SequenceVm::SequenceVm(LoopPolicy loopPolicy) : options_(SequenceVmOptions{.loopPolicy = loopPolicy}) {
+}
+
+SequenceVm::SequenceVm(SequenceVmOptions options) : options_(options) {
 }
 
 PerformanceSequence SequenceVm::render(const SequenceProgram& program, const SequenceDialect& dialect) const {
@@ -456,7 +459,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
   struct RenderedTrack {
     PerformanceTrack track;
-    std::optional<u64> loopTick;
+    std::optional<u64> loopStopTick;
   };
 
   const auto renderTrack = [&](const TrackProgram& track, PerformanceSequence& targetSequence,
@@ -481,6 +484,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
     u32 executedCommands = 0;
     std::optional<u64> firstLoopTick;
+    std::optional<u64> loopStopTick;
+    u32 loopRepeats = 0;
     bool arrivedByControlFlow = true;
     while (current) {
       if (executedCommands >= behavior.commandLimit) {
@@ -512,7 +517,16 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
               break;
             }
 
-            break;
+            if (loopPolicy == LoopPolicy::PlayOnce && loopRepeats < options_.sequenceLoops) {
+              ++loopRepeats;
+              // A configured loop repeat is real playback, so let the repeated
+              // command execute and start detecting the next pass from here.
+              visited.clear();
+              visited.emplace(visitState, VisitRecord{.tick = runtime.tick, .command = command.id});
+            } else {
+              loopStopTick = runtime.tick;
+              break;
+            }
           }
         } else {
           visited.emplace(visitState, VisitRecord{.tick = runtime.tick, .command = command.id});
@@ -584,7 +598,10 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     }
 
     performanceTrack.endTick = runtime.tick;
-    return RenderedTrack{.track = std::move(performanceTrack), .loopTick = firstLoopTick};
+    return RenderedTrack{
+        .track = std::move(performanceTrack),
+        .loopStopTick = loopStopTick ? loopStopTick : firstLoopTick,
+    };
   };
 
   std::optional<u64> synchronizedStopTick;
@@ -594,8 +611,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     };
     for (const TrackProgram& track : program.tracks) {
       const auto rendered = renderTrack(track, dryRunSequence, std::nullopt);
-      if (rendered.loopTick && (!synchronizedStopTick || *rendered.loopTick < *synchronizedStopTick)) {
-        synchronizedStopTick = rendered.loopTick;
+      if (rendered.loopStopTick && (!synchronizedStopTick || *rendered.loopStopTick < *synchronizedStopTick)) {
+        synchronizedStopTick = rendered.loopStopTick;
       }
     }
   }
@@ -619,8 +636,8 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
   } else if (dialect.defaultBehavior.defaultLoopPolicy != LoopPolicy::Default) {
     behavior.defaultLoopPolicy = dialect.defaultBehavior.defaultLoopPolicy;
   }
-  if (loopPolicy_ != LoopPolicy::Default) {
-    behavior.defaultLoopPolicy = loopPolicy_;
+  if (options_.loopPolicy != LoopPolicy::Default) {
+    behavior.defaultLoopPolicy = options_.loopPolicy;
   }
 
   if (program.behavior.commandLimit != 0) {
