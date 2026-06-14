@@ -870,10 +870,12 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
          "initial mono mode should preserve explicit zero and should not pretend to come from a source command");
 
   const MidiSequence midi = PerformanceMidiRenderer().render(performance);
-  const auto* midiReverb = std::get_if<Reverb>(&midi.tracks[0].events[0]);
+  const auto* midiPort = std::get_if<MidiPort>(&midi.tracks[0].events[0]);
+  expect(midiPort != nullptr && midiPort->port == 0, "performance renderer should emit MIDI port metadata");
+  const auto* midiReverb = std::get_if<Reverb>(&midi.tracks[0].events[1]);
   expect(midiReverb != nullptr && midiReverb->channel == 0 && midiReverb->value == 0,
          "performance renderer should lower initial reverb to MIDI CC91");
-  const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[1]);
+  const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[2]);
   expect(midiMono != nullptr && midiMono->channel == 0 && midiMono->channels == 0,
          "performance renderer should lower initial mono mode to MIDI CC126");
 }
@@ -970,6 +972,8 @@ void projectSessionScansValuesAndVirtualSources() {
   expect(project.assets.size() == 2, "scan should produce sequence and misc assets");
   expect(project.collections.size() == 1, "scan should produce one collection");
   expect(project.diagnostics.size() == 1, "scan should preserve module diagnostics");
+  expect(project.index.valid && project.index.assetsById.size() == 2 && project.index.collectionsById.size() == 1,
+         "scan should publish an indexed project snapshot");
 
   const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
   expect(sequence != nullptr, "first asset should be a sequence");
@@ -1221,6 +1225,7 @@ void midiExporterWritesStandardMidiFile() {
           .events =
               {
                   Tempo{.tick = 0, .microsecondsPerQuarter = 500000},
+                  MidiPort{.tick = 0, .port = 2},
                   ProgramChange{.tick = 0, .channel = 0, .program = 5},
                   Volume{.tick = 0, .channel = 0, .value = 100},
                   NoteDuration{.tick = 0, .channel = 0, .key = 60, .velocity = 100, .duration = 24},
@@ -1231,10 +1236,10 @@ void midiExporterWritesStandardMidiFile() {
   };
 
   const std::vector<u8> expected{
-      'M',  'T',  'h',  'd',  0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x30, 'M',
-      'T',  'r',  'k',  0x00, 0x00, 0x00, 0x26, 0x00, 0xff, 0x03, 0x04, 'L',  'e',  'a',  'd',
-      0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, 0x00, 0xc0, 0x05, 0x00, 0xb0, 0x07, 0x64, 0x00,
-      0x90, 0x3c, 0x64, 0x0c, 0xb0, 0x0a, 0x40, 0x0c, 0x80, 0x3c, 0x40, 0x00, 0xff, 0x2f, 0x00,
+      'M',  'T',  'h',  'd',  0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x30, 'M',  'T',  'r',
+      'k',  0x00, 0x00, 0x00, 0x2b, 0x00, 0xff, 0x03, 0x04, 'L',  'e',  'a',  'd',  0x00, 0xff, 0x21, 0x01,
+      0x02, 0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, 0x00, 0xc0, 0x05, 0x00, 0xb0, 0x07, 0x64, 0x00, 0x90,
+      0x3c, 0x64, 0x0c, 0xb0, 0x0a, 0x40, 0x0c, 0x80, 0x3c, 0x40, 0x00, 0xff, 0x2f, 0x00,
   };
 
   const auto exported = MidiExporter().exportMidi(midiSequence);
@@ -1277,8 +1282,9 @@ void performanceMidiRendererExtendsPreviousSameKeyNotes() {
   const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
   expect(midiSequence.tracks.size() == 1, "performance renderer should preserve tracks");
   const auto& events = midiSequence.tracks[0].events;
-  const auto firstNote = std::get_if<NoteDuration>(&events[0]);
-  const auto secondNote = std::get_if<NoteDuration>(&events[1]);
+  expect(std::holds_alternative<MidiPort>(events[0]), "performance renderer should mark each track's MIDI port");
+  const auto firstNote = std::get_if<NoteDuration>(&events[1]);
+  const auto secondNote = std::get_if<NoteDuration>(&events[2]);
   expect(firstNote != nullptr && firstNote->tick == 0 && firstNote->key == 60 && firstNote->duration == 18,
          "performance renderer should extend a previous same-key note");
   expect(secondNote != nullptr && secondNote->tick == 18 && secondNote->key == 62 && secondNote->duration == 6,
@@ -1312,7 +1318,7 @@ void performanceMidiRendererHonorsMidiExportOptions() {
                                               },
                                       },
                                   }};
-  for (u32 trackIndex = 1; trackIndex <= 9; ++trackIndex) {
+  for (u32 trackIndex = 1; trackIndex <= 15; ++trackIndex) {
     performance.tracks.push_back(PerformanceTrack{
         .id = TrackId{trackIndex},
         .sourceTrackNumber = trackIndex,
@@ -1326,14 +1332,19 @@ void performanceMidiRendererHonorsMidiExportOptions() {
   }
 
   const MidiSequence autoMidi = PerformanceMidiRenderer().render(performance);
-  expect(std::get<BankSelect>(autoMidi.tracks[0].events[0]).writeLsb == false,
+  expect(std::get<MidiPort>(autoMidi.tracks[0].events[0]).port == 0,
+         "MIDI renderer should emit port zero for the first channel group");
+  expect(std::get<BankSelect>(autoMidi.tracks[0].events[1]).writeLsb == false,
          "MIDI renderer should default to MSB-only bank select");
-  expect(std::holds_alternative<Volume14>(autoMidi.tracks[0].events[2]),
+  expect(std::holds_alternative<Volume14>(autoMidi.tracks[0].events[3]),
          "MIDI renderer should honor 14-bit source volume hints by default");
-  expect(std::holds_alternative<Expression14>(autoMidi.tracks[0].events[3]),
+  expect(std::holds_alternative<Expression14>(autoMidi.tracks[0].events[4]),
          "MIDI renderer should honor 14-bit source expression hints by default");
-  expect(std::get<NoteDuration>(autoMidi.tracks[9].events[0]).channel == 10,
+  expect(std::get<NoteDuration>(autoMidi.tracks[9].events[1]).channel == 10,
          "MIDI renderer should skip channel 10 by default");
+  expect(std::get<MidiPort>(autoMidi.tracks[15].events[0]).port == 1 &&
+             std::get<NoteDuration>(autoMidi.tracks[15].events[1]).channel == 0,
+         "MIDI renderer should move skipped-channel overflow to the next MIDI port");
 
   const MidiSequence forcedMidi =
       PerformanceMidiRenderer().render(performance, MidiExportOptions{
@@ -1342,14 +1353,17 @@ void performanceMidiRendererHonorsMidiExportOptions() {
                                                         .skipChannel10 = false,
                                                         .bankSelectStyle = MidiBankSelectStyle::MsbAndLsb,
                                                     });
-  expect(std::get<BankSelect>(forcedMidi.tracks[0].events[0]).writeLsb == true,
+  expect(std::get<BankSelect>(forcedMidi.tracks[0].events[1]).writeLsb == true,
          "MIDI renderer should allow bank-select LSB output");
-  expect(std::holds_alternative<Volume>(forcedMidi.tracks[0].events[2]),
+  expect(std::holds_alternative<Volume>(forcedMidi.tracks[0].events[3]),
          "MIDI renderer should allow forced 7-bit volume output");
-  expect(std::holds_alternative<Expression>(forcedMidi.tracks[0].events[3]),
+  expect(std::holds_alternative<Expression>(forcedMidi.tracks[0].events[4]),
          "MIDI renderer should allow forced 7-bit expression output");
-  expect(std::get<NoteDuration>(forcedMidi.tracks[9].events[0]).channel == 9,
+  expect(std::get<NoteDuration>(forcedMidi.tracks[9].events[1]).channel == 9,
          "MIDI renderer should allow channel 10 when requested");
+  expect(std::get<MidiPort>(forcedMidi.tracks[15].events[0]).port == 0 &&
+             std::get<NoteDuration>(forcedMidi.tracks[15].events[1]).channel == 15,
+         "MIDI renderer should use all 16 channels per port when channel 10 is allowed");
 }
 
 void modulationAnalysisReportsObservedMidiControllerRanges() {

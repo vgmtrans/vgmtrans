@@ -47,8 +47,8 @@ constexpr u32 kFallbackCommandLimit = 100000;
 [[nodiscard]] std::optional<u32> nextCommandIndex(const TrackProgram& track, u32 index) {
   if (index < track.commands.size()) {
     const SourceCommand& command = track.commands[index];
-    if (command.range.valid()) {
-      if (const auto byAddress = track.addressIndex.find(Address{static_cast<u32>(command.range.endOffset())})) {
+    if (command.encodedSize > 0) {
+      if (const auto byAddress = track.addressIndex.find(Address{command.address.value + command.encodedSize})) {
         return byAddress;
       }
     }

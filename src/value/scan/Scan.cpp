@@ -150,6 +150,7 @@ Project scanProject(SourceStore& sources, const FormatRegistry& formats) {
   }
 
   project.sources = sources.sourceFiles();
+  rebuildProjectIndex(project);
   return project;
 }
 

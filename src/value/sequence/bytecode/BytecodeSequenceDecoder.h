@@ -261,7 +261,7 @@ template <class Command>
   }
 
   auto decoded = std::move(parsed->decoded);
-  context.commandEnd = static_cast<u32>(decoded.range.endOffset());
+  context.commandEnd = begin + static_cast<u32>(decoded.bytes.size());
   decoded.flow = commandDecodeFlow(parsed->command, context);
   return decoded;
 }
@@ -296,7 +296,7 @@ template <class Command, Address Command::* Target>
   }
 
   auto decoded = std::move(parsed->decoded);
-  decoded.flow = DecodeFlow::call(parsed->command.*Target, Address{static_cast<u32>(decoded.range.endOffset())});
+  decoded.flow = DecodeFlow::call(parsed->command.*Target, Address{begin + static_cast<u32>(decoded.bytes.size())});
   return decoded;
 }
 

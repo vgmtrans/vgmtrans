@@ -37,9 +37,32 @@ namespace {
   return LevelScale::midi7FromLinear(linearVelocity);
 }
 
-[[nodiscard]] u8 midiChannel(size_t trackIndex, const MidiExportOptions& options) {
-  const size_t channel = options.skipChannel10 && trackIndex >= 9 ? trackIndex + 1 : trackIndex;
-  return static_cast<u8>(channel % 16);
+struct MidiChannelAssignment {
+  size_t port = 0;
+  u8 channel = 0;
+};
+
+[[nodiscard]] MidiChannelAssignment midiChannelAssignment(size_t trackIndex, const MidiExportOptions& options) {
+  constexpr size_t channelsPerPort = 16;
+  constexpr size_t skippedDrumChannel = 9;
+  if (options.skipChannel10) {
+    constexpr size_t usableChannelsPerPort = channelsPerPort - 1;
+    const size_t port = trackIndex / usableChannelsPerPort;
+    const size_t slot = trackIndex % usableChannelsPerPort;
+    return MidiChannelAssignment{
+        .port = port,
+        .channel = static_cast<u8>(slot < skippedDrumChannel ? slot : slot + 1),
+    };
+  }
+
+  return MidiChannelAssignment{
+      .port = trackIndex / channelsPerPort,
+      .channel = static_cast<u8>(trackIndex % channelsPerPort),
+  };
+}
+
+[[nodiscard]] u8 midiPortByte(size_t port) {
+  return static_cast<u8>(std::min<size_t>(port, 255));
 }
 
 [[nodiscard]] u8 midiPan(double stereoPosition) {
@@ -340,9 +363,19 @@ MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performa
         .name = "Track " + std::to_string(performanceTrack.sourceTrackNumber),
     };
     RenderTrackState renderState;
-    const u8 channel = midiChannel(trackIndex, options);
+    const auto assignment = midiChannelAssignment(trackIndex, options);
+    if (assignment.port > 255) {
+      sequence.diagnostics.push_back(Diagnostic{
+          .severity = Severity::Warning,
+          .message = "MIDI port number exceeded the Standard MIDI File port meta-event range",
+      });
+    }
+    midiTrack.events.push_back(MidiPort{
+        .tick = 0,
+        .port = midiPortByte(assignment.port),
+    });
     for (const auto& event : performanceTrack.events) {
-      addMidiEvent(midiTrack, renderState, event, channel, globalTransposes, options);
+      addMidiEvent(midiTrack, renderState, event, assignment.channel, globalTransposes, options);
     }
     midiTrack.events.push_back(EndOfTrack{
         .tick = performanceTrack.endTick,

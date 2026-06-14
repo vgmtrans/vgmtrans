@@ -187,11 +187,9 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceMath.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceDialect.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceProgram.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.cpp
@@ -206,12 +204,10 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceDialect.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceMath.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequenceProgram.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueLayout.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesValueSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequenceProgram.h

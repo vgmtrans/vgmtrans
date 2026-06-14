@@ -75,9 +75,10 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   const MidiSequence midi = PerformanceMidiRenderer().render(performance);
   expect(midi.tracks.size() == 1, "NDS SSEQ MIDI rendering should preserve one track");
   const auto& events = midi.tracks[0].events;
-  expect(std::get<NoteDuration>(events[0]).tick == 0 && std::get<NoteDuration>(events[0]).duration == 24,
+  expect(std::get<MidiPort>(events[0]).port == 0, "NDS SSEQ MIDI rendering should emit MIDI port metadata");
+  expect(std::get<NoteDuration>(events[1]).tick == 0 && std::get<NoteDuration>(events[1]).duration == 24,
          "NDS SSEQ note should render at the current tick with its source duration");
-  expect(std::get<Tempo>(events[1]).tick == 24 && std::get<Tempo>(events[1]).microsecondsPerQuarter == 500000,
+  expect(std::get<Tempo>(events[2]).tick == 24 && std::get<Tempo>(events[2]).microsecondsPerQuarter == 500000,
          "NDS SSEQ tempo should convert BPM to microseconds per quarter");
   expect(std::get<EndOfTrack>(events.back()).tick == 30, "NDS SSEQ MIDI rendering should preserve VM end tick");
 
@@ -122,7 +123,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   };
   const MidiSequence expressionMidi =
       PerformanceMidiRenderer().render(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram, dialect));
-  expect(std::holds_alternative<Expression>(expressionMidi.tracks[0].events[0]),
+  expect(std::holds_alternative<Expression>(expressionMidi.tracks[0].events[1]),
          "NDS expression opcode should render as MIDI expression");
 }
 

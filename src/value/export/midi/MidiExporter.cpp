@@ -145,6 +145,10 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           };
           addMessage(messages, typedEvent.tick, 0, metaEvent(0x51, tempoBytes));
           endTick = std::max(endTick, typedEvent.tick);
+        } else if constexpr (std::is_same_v<TypedEvent, MidiPort>) {
+          const std::array<u8, 1> portBytes{typedEvent.port};
+          addMessage(messages, typedEvent.tick, -5, metaEvent(0x21, portBytes));
+          endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, ProgramChange>) {
           addMessage(messages, typedEvent.tick, 15,
                      {static_cast<u8>(0xc0 | channel4(typedEvent.channel)), data7(typedEvent.program)});

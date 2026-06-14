@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/CapcomSnes/CapcomSnesValueSynth.h"
+#include "value/formats/CapcomSnes/CapcomSnesSynth.h"
 
 #include "value/synth/SnesDsp.h"
 #include "value/synth/SynthMath.h"

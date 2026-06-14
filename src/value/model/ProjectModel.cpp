@@ -44,6 +44,32 @@ const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
 }
 
+ProjectIndex buildProjectIndex(const Project& project) {
+  ProjectIndex index;
+  index.assetsById.reserve(project.assets.size());
+  for (size_t i = 0; i < project.assets.size(); ++i) {
+    const AssetId id = metadata(project.assets[i]).id;
+    if (id.valid()) {
+      index.assetsById.emplace(id.value, i);
+    }
+  }
+
+  index.collectionsById.reserve(project.collections.size());
+  for (size_t i = 0; i < project.collections.size(); ++i) {
+    const CollectionId id = project.collections[i].id;
+    if (id.valid()) {
+      index.collectionsById.emplace(id.value, i);
+    }
+  }
+
+  index.valid = true;
+  return index;
+}
+
+void rebuildProjectIndex(Project& project) {
+  project.index = buildProjectIndex(project);
+}
+
 ItemNode* itemById(ItemTree& tree, ItemId id) {
   const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) { return item.id == id; });
   if (found == tree.nodes.end()) {
@@ -61,6 +87,14 @@ const ItemNode* itemById(const ItemTree& tree, ItemId id) {
 }
 
 Asset* assetById(Project& project, AssetId id) {
+  if (project.index.valid) {
+    const auto found = project.index.assetsById.find(id.value);
+    if (found == project.index.assetsById.end() || found->second >= project.assets.size()) {
+      return nullptr;
+    }
+    return &project.assets[found->second];
+  }
+
   const auto found =
       std::ranges::find_if(project.assets, [id](const Asset& asset) { return metadata(asset).id == id; });
   if (found == project.assets.end()) {
@@ -70,6 +104,14 @@ Asset* assetById(Project& project, AssetId id) {
 }
 
 const Asset* assetById(const Project& project, AssetId id) {
+  if (project.index.valid) {
+    const auto found = project.index.assetsById.find(id.value);
+    if (found == project.index.assetsById.end() || found->second >= project.assets.size()) {
+      return nullptr;
+    }
+    return &project.assets[found->second];
+  }
+
   const auto found =
       std::ranges::find_if(project.assets, [id](const Asset& asset) { return metadata(asset).id == id; });
   if (found == project.assets.end()) {
@@ -79,6 +121,14 @@ const Asset* assetById(const Project& project, AssetId id) {
 }
 
 const Collection* collectionById(const Project& project, CollectionId id) {
+  if (project.index.valid) {
+    const auto found = project.index.collectionsById.find(id.value);
+    if (found == project.index.collectionsById.end() || found->second >= project.collections.size()) {
+      return nullptr;
+    }
+    return &project.collections[found->second];
+  }
+
   const auto found =
       std::ranges::find_if(project.collections, [id](const Collection& collection) { return collection.id == id; });
   if (found == project.collections.end()) {
