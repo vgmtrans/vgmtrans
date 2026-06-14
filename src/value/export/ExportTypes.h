@@ -45,6 +45,9 @@ struct MidiExportOptions {
 struct ExportRequest {
   std::vector<ExportKind> kinds;
   LoopPolicy loopPolicy = LoopPolicy::Default;
+  // Extra repeats after the initial playthrough. This mirrors the legacy
+  // "Sequence Loops" setting: 0 means stop at the first infinite-loop point.
+  u32 sequenceLoops = 0;
   MidiExportOptions midi;
   ModulationScalingPolicy synthModulationScaling = ModulationScalingPolicy::FullFormatRange;
 };

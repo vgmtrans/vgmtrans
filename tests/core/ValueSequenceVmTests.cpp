@@ -71,6 +71,38 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
          "performance source-link helper should return null for a missing command");
 }
 
+void sequenceVmReplaysInfiniteLoopsWhenRequested() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> jumpBytes{0xfe, 0x00, 0x00};
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm(SequenceVmOptions{
+                                                        .loopPolicy = LoopPolicy::PlayOnce,
+                                                        .sequenceLoops = 2,
+                                                    })
+                                               .render(program, dialect);
+  expect(performance.diagnostics.empty(), "configured loop-count fixture should not report diagnostics");
+  expect(performance.tracks[0].endTick == 36, "two requested loop repeats should produce three playthroughs");
+  for (u64 tick : {0ULL, 12ULL, 24ULL}) {
+    expect(countProbeNotesAt(performance.tracks[0], tick) == 1,
+           "configured loop-count fixture should emit a note at tick " + std::to_string(tick));
+  }
+}
+
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -566,6 +598,7 @@ void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
 
 void runValueSequenceVmTests() {
   sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
+  sequenceVmReplaysInfiniteLoopsWhenRequested();
   sequenceVmPreservesLoopsAsPerformanceMarkers();
   sequenceVmUsesDialectCommandLimitDefault();
   sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();

@@ -157,6 +157,59 @@ void performanceMidiRendererHonorsMidiExportOptions() {
          "MIDI renderer should use all 16 channels per port when channel 10 is allowed");
 }
 
+void exportRequestSequenceLoopsAffectMidiLowering() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> jumpBytes{0xfe, 0x00, 0x00};
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+
+  Project project;
+  project.assets.emplace_back(SequenceProgramAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{0},
+              .format = "Probe",
+              .name = "Looping Sequence",
+          },
+      .program =
+          SequenceProgram{
+              .dialect = dialect.id,
+              .timebase = dialect.timebase,
+              .tracks = {track},
+          },
+  });
+  project.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Looping",
+      .sequence = AssetId{0},
+  });
+  rebuildProjectIndex(project);
+
+  SourceStore sources;
+  SequenceDialectRegistry dialects;
+  dialects.add(dialect);
+
+  const auto artifacts = exportCollection(project, sources, CollectionId{0},
+                                          ExportRequest{
+                                              .kinds = {ExportKind::Midi},
+                                              .loopPolicy = LoopPolicy::PlayOnce,
+                                              .sequenceLoops = 2,
+                                          },
+                                          dialects);
+
+  expect(artifacts.size() == 1 && artifacts[0].diagnostics.empty(),
+         "MIDI export with configured sequence loops should produce one clean artifact");
+  const auto noteOnCount = std::ranges::count(artifacts[0].bytes, static_cast<u8>(0x90));
+  expect(noteOnCount == 3, "ExportRequest sequenceLoops should replay the loop before MIDI rendering");
+}
+
 void modulationAnalysisReportsObservedMidiControllerRanges() {
   const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -351,6 +404,7 @@ void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
   performanceMidiRendererExtendsPreviousSameKeyNotes();
   performanceMidiRendererHonorsMidiExportOptions();
+  exportRequestSequenceLoopsAffectMidiLowering();
   modulationAnalysisReportsObservedMidiControllerRanges();
   modulationAnalysisReportsObservedPerformanceRanges();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();

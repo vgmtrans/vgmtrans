@@ -119,7 +119,11 @@ struct MidiLoweringResult {
     };
   }
 
-  auto performance = SequenceVm(request.loopPolicy).render(sequence.program, *dialect);
+  auto performance = SequenceVm(SequenceVmOptions{
+                                    .loopPolicy = request.loopPolicy,
+                                    .sequenceLoops = request.sequenceLoops,
+                                })
+                         .render(sequence.program, *dialect);
   auto midi = PerformanceMidiRenderer().render(performance, request.midi);
   return MidiLoweringResult{
       .performance = std::move(performance),
