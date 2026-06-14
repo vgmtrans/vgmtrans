@@ -372,6 +372,14 @@ Step VmApi::jump(Address destination) const noexcept {
   return Step::jump(destination);
 }
 
+Step VmApi::jumpOrLoopForever(Address destination) const noexcept {
+  return Step::jumpOrLoopForever(destination);
+}
+
+Step VmApi::loopForever(Address destination) const noexcept {
+  return Step::loopForever(destination);
+}
+
 Step VmApi::call(Address destination) const noexcept {
   return Step::call(destination);
 }
@@ -566,6 +574,99 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
                           command.range));
           }
           break;
+
+        case Step::Kind::JumpOrLoopForever: {
+          const auto destination = destinationIndex(track, effects.step.destination);
+          if (!destination) {
+            targetSequence.diagnostics.push_back(
+                vmWarning(fmt::format("Sequence jump target ${:04X} was not decoded", effects.step.destination.value),
+                          command.range));
+            current = std::nullopt;
+            arrivedByControlFlow = true;
+            break;
+          }
+
+          const VisitRecord* previousVisit = nullptr;
+          for (const auto& [state, record] : visited) {
+            if (state.commandIndex == *destination && state.callStack == runtime.callStack) {
+              previousVisit = &record;
+              break;
+            }
+          }
+
+          if (previousVisit == nullptr) {
+            current = destination;
+            arrivedByControlFlow = true;
+            break;
+          }
+
+          if (!firstLoopTick) {
+            firstLoopTick = runtime.tick;
+          }
+
+          if (loopPolicy == LoopPolicy::Preserve) {
+            addLoopMarker(performanceTrack, previousVisit->command, previousVisit->tick, "Loop Start");
+            addLoopMarker(performanceTrack, command.id, runtime.tick, "Loop End");
+            current = std::nullopt;
+            arrivedByControlFlow = false;
+            break;
+          }
+
+          if (loopPolicy == LoopPolicy::PlayOnce && loopRepeats < options_.sequenceLoops) {
+            ++loopRepeats;
+            visited.clear();
+            current = destination;
+            arrivedByControlFlow = true;
+          } else {
+            loopStopTick = runtime.tick;
+            current = std::nullopt;
+            arrivedByControlFlow = false;
+          }
+          break;
+        }
+
+        case Step::Kind::LoopForever: {
+          if (!firstLoopTick) {
+            firstLoopTick = runtime.tick;
+          }
+
+          const auto destination = destinationIndex(track, effects.step.destination);
+          if (!destination) {
+            targetSequence.diagnostics.push_back(
+                vmWarning(fmt::format("Sequence loop target ${:04X} was not decoded", effects.step.destination.value),
+                          command.range));
+            current = std::nullopt;
+            arrivedByControlFlow = false;
+            break;
+          }
+
+          if (loopPolicy == LoopPolicy::Preserve) {
+            const auto previous = visited.find(VisitState{
+                .commandIndex = *destination,
+                .callStack = runtime.callStack,
+                .repeatRemaining = runtime.repeatRemaining,
+            });
+            const SourceCommand& destinationCommand = track.commands.at(*destination);
+            addLoopMarker(performanceTrack, destinationCommand.id,
+                          previous != visited.end() ? previous->second.tick : runtime.tick, "Loop Start");
+            addLoopMarker(performanceTrack, command.id, runtime.tick, "Loop End");
+            current = std::nullopt;
+            arrivedByControlFlow = false;
+            break;
+          }
+
+          if (loopPolicy == LoopPolicy::PlayOnce && loopRepeats < options_.sequenceLoops) {
+            ++loopRepeats;
+            visited.clear();
+            current = destination;
+            arrivedByControlFlow = true;
+          } else {
+            loopStopTick = runtime.tick;
+            current = std::nullopt;
+            arrivedByControlFlow = false;
+          }
+          break;
+        }
 
         case Step::Kind::Call: {
           if (const auto returnIndex = nextCommandIndex(track, *current)) {

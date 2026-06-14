@@ -356,6 +356,36 @@ struct ProbeJumpCommand {
   }
 };
 
+struct ProbeLoopForeverCommand {
+  Address destination;
+
+  static constexpr std::string_view kind = "probe.loop-forever";
+  static constexpr std::string_view name = "Loop Forever";
+
+  static ProbeLoopForeverCommand parse(CommandReader& in) {
+    return ProbeLoopForeverCommand{.destination = in.le16Address("destination")};
+  }
+
+  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+    return Effects{.step = vm.loopForever(destination)};
+  }
+};
+
+struct ProbeJumpOrLoopForeverCommand {
+  Address destination;
+
+  static constexpr std::string_view kind = "probe.jump-or-loop-forever";
+  static constexpr std::string_view name = "Jump Or Loop Forever";
+
+  static ProbeJumpOrLoopForeverCommand parse(CommandReader& in) {
+    return ProbeJumpOrLoopForeverCommand{.destination = in.le16Address("destination")};
+  }
+
+  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+    return Effects{.step = vm.jumpOrLoopForever(destination)};
+  }
+};
+
 struct ProbeCallCommand {
   Address destination;
 
@@ -442,8 +472,9 @@ struct ProbeEndCommand {
                                                                        ProbeSequenceContext{.linearVelocity = 0.5})
       .timebase(Timebase{.ppqn = 48})
       .defaultBehavior(behavior)
-      .commands<ProbeProgramCommand, ProbeNoteCommand, ProbeJumpCommand, ProbeCallCommand, ProbeReturnCommand,
-                ProbeRepeatCommand, ProbeRepeatBreakCommand, ProbeEndCommand>();
+      .commands<ProbeProgramCommand, ProbeNoteCommand, ProbeJumpCommand, ProbeLoopForeverCommand,
+                ProbeJumpOrLoopForeverCommand, ProbeCallCommand, ProbeReturnCommand, ProbeRepeatCommand,
+                ProbeRepeatBreakCommand, ProbeEndCommand>();
 }
 
 [[nodiscard]] SourceRange probeRange(u64 offset, u64 size) {

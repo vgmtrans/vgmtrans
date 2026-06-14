@@ -103,6 +103,75 @@ void sequenceVmReplaysInfiniteLoopsWhenRequested() {
   }
 }
 
+void sequenceVmStopsKnownLoopForeverBeforeTargetReplay() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 2> programBytes{0x80, 0x05};
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
+                                       programBytes);
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeLoopForeverCommand>(builder, dialect, Address{5}, probeRange(5, loopBytes.size()), loopBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence playOnce = SequenceVm().render(program, dialect);
+  expect(playOnce.diagnostics.empty(), "known loop-forever fixture should not report diagnostics");
+  expect(playOnce.tracks[0].endTick == 12, "known loop-forever should stop at the loop command by default");
+  expect(playOnce.tracks[0].events.size() == 2,
+         "known loop-forever should not replay target setup events when no loops are requested");
+
+  const PerformanceSequence oneLoop = SequenceVm(SequenceVmOptions{
+                                                  .loopPolicy = LoopPolicy::PlayOnce,
+                                                  .sequenceLoops = 1,
+                                              })
+                                         .render(program, dialect);
+  expect(oneLoop.tracks[0].endTick == 24, "known loop-forever should honor one requested loop repeat");
+  expect(countProbeNotesAt(oneLoop.tracks[0], 0) == 1 && countProbeNotesAt(oneLoop.tracks[0], 12) == 1,
+         "known loop-forever should replay the target only while loop budget remains");
+}
+
+void sequenceVmJumpOrLoopForeverRequiresVisitedDestination() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{10},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> jumpToStartBytes{0xfc, 0x00, 0x00};
+  const std::array<u8, 3> jumpToBodyBytes{0xfc, 0x00, 0x00};
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpOrLoopForeverCommand>(builder, dialect, Address{3}, probeRange(3, jumpToStartBytes.size()),
+                                                 jumpToStartBytes);
+  addProbeCommand<ProbeJumpOrLoopForeverCommand>(builder, dialect, Address{10}, probeRange(10, jumpToBodyBytes.size()),
+                                                 jumpToBodyBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "jump-or-loop fixture should not report diagnostics");
+  expect(performance.tracks[0].endTick == 12,
+         "jump-or-loop should allow an unvisited backward destination and stop after it repeats");
+  expect(countProbeNotesAt(performance.tracks[0], 0) == 1,
+         "jump-or-loop should not replay the loop target after detecting the visited destination");
+}
+
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -599,6 +668,8 @@ void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
 void runValueSequenceVmTests() {
   sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
   sequenceVmReplaysInfiniteLoopsWhenRequested();
+  sequenceVmStopsKnownLoopForeverBeforeTargetReplay();
+  sequenceVmJumpOrLoopForeverRequiresVisitedDestination();
   sequenceVmPreservesLoopsAsPerformanceMarkers();
   sequenceVmUsesDialectCommandLimitDefault();
   sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
