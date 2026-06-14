@@ -31,6 +31,8 @@ struct Step {
     Next,
     End,
     Jump,
+    JumpOrLoopForever,
+    LoopForever,
     Call,
     Return,
   };
@@ -42,6 +44,12 @@ struct Step {
   [[nodiscard]] static constexpr Step end() noexcept { return Step{.kind = Kind::End}; }
   [[nodiscard]] static constexpr Step jump(Address destination) noexcept {
     return Step{.kind = Kind::Jump, .destination = destination};
+  }
+  [[nodiscard]] static constexpr Step jumpOrLoopForever(Address destination) noexcept {
+    return Step{.kind = Kind::JumpOrLoopForever, .destination = destination};
+  }
+  [[nodiscard]] static constexpr Step loopForever(Address destination) noexcept {
+    return Step{.kind = Kind::LoopForever, .destination = destination};
   }
   [[nodiscard]] static constexpr Step call(Address destination) noexcept {
     return Step{.kind = Kind::Call, .destination = destination};

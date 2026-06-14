@@ -379,7 +379,7 @@ struct RepeatUntil {
 
   Effects execute(Runtime& rt) const {
     if (count == 0) {
-      return rt.jump(destination);
+      return Effects{.step = rt.vm.loopForever(destination)};
     }
 
     // Capcom stores the number of replays. The VM helper receives total plays.
@@ -441,7 +441,7 @@ struct Jump {
 
   static Jump parse(CommandReader& in) { return Jump{.destination = in.be16Address("destination")}; }
 
-  Effects execute(Runtime& rt) const { return rt.jump(destination); }
+  Effects execute(Runtime& rt) const { return Effects{.step = rt.vm.jumpOrLoopForever(destination)}; }
 };
 
 struct End : NoOperands<End> {
@@ -685,7 +685,6 @@ SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version) {
           .defaultLoopPolicy = LoopPolicy::PlayOnce,
           .initialReverbSend = 0.0,
           .initialMonoModeChannels = 0,
-          .stopAllTracksAtFirstLoop = true,
       });
   static_cast<void>(capcomBytecodeMap(builder, version));
   return builder.finish();

@@ -76,6 +76,8 @@ public:
   [[nodiscard]] Step next() const noexcept;
   [[nodiscard]] Step end() const noexcept;
   [[nodiscard]] Step jump(Address destination) const noexcept;
+  [[nodiscard]] Step jumpOrLoopForever(Address destination) const noexcept;
+  [[nodiscard]] Step loopForever(Address destination) const noexcept;
   [[nodiscard]] Step call(Address destination) const noexcept;
   [[nodiscard]] Step return_() const noexcept;
 
