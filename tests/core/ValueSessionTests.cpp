@@ -144,6 +144,176 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
          "completed bank collection should retain the instrument reference");
 }
 
+void sessionRemovesSourceFamilyAndDiscoveredData() {
+  Session session;
+  session.formats().add(probeSequenceModule());
+  session.formats().add(probeMiscModule());
+  session.dialects().add(probeSequenceDialect());
+
+  const auto source = session.addSource(SourceFile{.name = "remove-me.probe"}, {0xaa, 0x34});
+  SessionSnapshot project = session.scanSource(source);
+  expect(project.sources.size() == 2, "fixture should scan one user source and one derived source");
+  expect(project.assets.size() == 2, "fixture should scan user and derived assets");
+  expect(project.matchFacts.size() == 1, "fixture should publish a collection match fact");
+  expect(project.collections.size() == 1, "fixture should publish one collection");
+  expect(project.diagnostics.size() == 1, "fixture should publish one source-backed diagnostic");
+
+  project = session.removeSource(source);
+  expect(project.sources.empty(), "removed source family should disappear from snapshots");
+  expect(project.assets.empty(), "removed source family should remove discovered assets");
+  expect(project.matchFacts.empty(), "removed source family should remove match facts");
+  expect(project.collections.empty(), "removed source family should remove discovered collections");
+  expect(project.diagnostics.empty(), "removed source family should remove source-backed diagnostics");
+  expect(session.sources().sourceCount() == 0, "source store should count only active sources");
+  expect(!session.sources().contains(source), "removed source should no longer be readable");
+
+  bool readRemovedSourceFailed = false;
+  try {
+    static_cast<void>(session.sources().bytes(source));
+  } catch (const std::out_of_range&) {
+    readRemovedSourceFailed = true;
+  }
+  expect(readRemovedSourceFailed, "removed source bytes should be inaccessible");
+
+  bool scanRemovedSourceFailed = false;
+  try {
+    static_cast<void>(session.scanSource(source));
+  } catch (const std::out_of_range&) {
+    scanRemovedSourceFailed = true;
+  }
+  expect(scanRemovedSourceFailed, "removed sources should not be scannable");
+
+  const auto replacement = session.addSource(SourceFile{.name = "replacement.probe"}, {0xaa});
+  expect(replacement == SourceId{2}, "source ids should not be reused after removing a source family");
+  project = session.scanPendingSources();
+  expect(project.sources.size() == 2, "replacement scan should add a new derived source");
+  expect(project.sources[0].id == replacement, "replacement user source should keep its new stable id");
+}
+
+void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
+  Session session;
+  session.formats().add(probeBankSequenceModule());
+  session.formats().add(probeBankInstrumentModule());
+  session.dialects().add(probeSequenceDialect());
+
+  const auto instrument = session.addSource(SourceFile{.name = "bank-9.instr"}, {0xdd, 9});
+  const auto sequence = session.addSource(SourceFile{.name = "bank-9.seq"}, {0xcc, 9});
+  SessionSnapshot project = session.scanPendingSources();
+  expect(project.collections.size() == 1, "matching bank files should produce one collection");
+  expect(project.collections[0].status == CollectionStatus::Complete, "matched bank collection should be complete");
+  const CollectionId collectionId = project.collections[0].id;
+
+  project = session.removeSource(instrument);
+  expect(project.sources.size() == 1, "removing one matched source should leave the other source active");
+  expect(project.assets.size() == 1, "removing one matched source should leave the other asset active");
+  expect(project.matchFacts.size() == 1, "removing one matched source should leave the other match fact active");
+  expect(project.collections.size() == 1, "remaining match fact should keep the bank collection alive");
+  expect(project.collections[0].id == collectionId, "collection id should be preserved for the same key");
+  expect(project.collections[0].status == CollectionStatus::Incomplete,
+         "remaining sequence-only collection should become incomplete");
+  expect(project.collections[0].sequence.has_value(), "remaining collection should keep the sequence asset");
+  expect(project.collections[0].instrumentSets.empty(),
+         "removed instrument source should be removed from the collection");
+  expect(!project.collections[0].issues.empty(), "incomplete collection should explain what is missing");
+
+  project = session.removeSource(sequence);
+  expect(project.sources.empty(), "removing the last matched source should leave no active sources");
+  expect(project.assets.empty(), "removing the last matched source should leave no assets");
+  expect(project.matchFacts.empty(), "removing the last matched source should leave no match facts");
+  expect(project.collections.empty(), "resolver-owned discovered collection should disappear when no facts remain");
+}
+
+void sessionResolverFailureDoesNotWipeExistingCollections() {
+  Session session;
+  session.formats().add(probeSequenceModule());
+  session.dialects().add(probeSequenceDialect());
+
+  const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
+  SessionSnapshot project = session.scanSource(first);
+  expect(project.collections.size() == 1, "initial scan should create a collection");
+  const CollectionId originalCollection = project.collections[0].id;
+
+  session.formats().add(throwingProbeSequenceResolverModule());
+  session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
+  project = session.scanPendingSources();
+  expect(project.collections.size() == 1, "resolver failure should preserve previous collections");
+  expect(project.collections[0].id == originalCollection, "preserved collection should keep its id");
+  static_cast<void>(diagnosticWithMessage(
+      project.diagnostics, "ProbeSequenceThrowingResolver resolveCollections failed: resolver exploded"));
+}
+
+void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
+  Session session;
+  session.formats().add(probeSequenceModule());
+  session.dialects().add(probeSequenceDialect());
+
+  const auto source = session.addSource(SourceFile{.name = "stale-on-failure.probe"}, {0xaa});
+  SessionSnapshot project = session.scanSource(source);
+  expect(project.collections.size() == 1, "initial scan should create a collection");
+  const CollectionId originalCollection = project.collections[0].id;
+
+  session.formats().add(throwingProbeSequenceResolverModule());
+  project = session.removeSource(source);
+  expect(project.sources.empty(), "failed reconcile after removal should still remove sources");
+  expect(project.assets.empty(), "failed reconcile after removal should still remove assets");
+  expect(project.matchFacts.empty(), "failed reconcile after removal should still remove match facts");
+  expect(project.collections.size() == 1, "resolver failure should keep the previous collection inspectable");
+  expect(project.collections[0].id == originalCollection, "stale collection should keep its id");
+  expect(project.collections[0].status == CollectionStatus::Stale,
+         "collection should be marked stale when cleanup cannot reconcile its resolver");
+  expect(!project.collections[0].issues.empty(), "stale collection should explain why it is stale");
+  static_cast<void>(diagnosticWithMessage(
+      project.diagnostics, "ProbeSequenceThrowingResolver resolveCollections failed: resolver exploded"));
+}
+
+void sessionRejectsDuplicateAssetIdsAtScanCommit() {
+  Session session;
+  session.formats().add(probeDuplicateAssetModule());
+
+  session.addSource(SourceFile{.name = "duplicate.probe"}, {0xee});
+  const SessionSnapshot project = session.scanPendingSources();
+  expect(project.assets.empty(), "duplicate asset ids should reject the whole scan result before commit");
+  expect(project.collections.empty(), "rejected duplicate asset scan should not create collections");
+  expectDiagnosticRange(project.diagnostics, "ProbeDuplicate scan failed: Scan result contained duplicate asset id 7",
+                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
+}
+
+void sessionRejectsExtractedSourcesWithMissingParents() {
+  Session session;
+  session.formats().add(probeBadExtractedSourceModule());
+  session.formats().add(probeMiscModule());
+
+  session.addSource(SourceFile{.name = "bad-derived-parent.probe"}, {0xf1});
+  const SessionSnapshot project = session.scanPendingSources();
+  expect(project.sources.size() == 1, "bad extracted source should not be added to the session");
+  expect(project.assets.empty(), "bad extracted source should not be scanned by later modules");
+  expectDiagnosticRange(project.diagnostics, "ProbeBadExtracted extracted source had a missing parent source",
+                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
+}
+
+void sourceStoreRejectsMissingOrRemovedDerivedParents() {
+  SourceStore store;
+
+  bool missingParentFailed = false;
+  try {
+    static_cast<void>(store.addDerived(SourceFile{.name = "missing.child"}, {0xbb}, SourceId{99}, std::nullopt));
+  } catch (const std::invalid_argument&) {
+    missingParentFailed = true;
+  }
+  expect(missingParentFailed, "derived source parent must already exist");
+
+  const auto parent = store.add(SourceFile{.name = "parent"}, {0xaa});
+  static_cast<void>(store.removeFamily(parent));
+
+  bool removedParentFailed = false;
+  try {
+    static_cast<void>(store.addDerived(SourceFile{.name = "removed.child"}, {0xbb}, parent, std::nullopt));
+  } catch (const std::invalid_argument&) {
+    removedParentFailed = true;
+  }
+  expect(removedParentFailed, "derived source parent must still be active");
+}
+
 void sessionSnapshotFinalizationReportsDuplicateIds() {
   SessionSnapshot project;
   project.assets.emplace_back(MiscAsset{
@@ -347,6 +517,13 @@ void runValueSessionTests() {
   sessionReportsUnregisteredSequenceDialect();
   sessionScansIndividualSourcesWithoutDuplicating();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
+  sessionRemovesSourceFamilyAndDiscoveredData();
+  sessionRemovalUpdatesCrossSourceCollectionLifecycle();
+  sessionResolverFailureDoesNotWipeExistingCollections();
+  sessionMarksCollectionsStaleWhenRemovalCannotReconcile();
+  sessionRejectsDuplicateAssetIdsAtScanCommit();
+  sessionRejectsExtractedSourcesWithMissingParents();
+  sourceStoreRejectsMissingOrRemovedDerivedParents();
   sessionSnapshotFinalizationReportsDuplicateIds();
   sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs();
   sessionAddsSourceFromPath();

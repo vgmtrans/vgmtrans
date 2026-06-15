@@ -33,6 +33,7 @@ struct Collection {
   CollectionId id;
   std::string name;
   CollectionStatus status = CollectionStatus::Complete;
+  CollectionOrigin origin = CollectionOrigin::Discovered;
   CollectionKey key;
   // Collections are the export units. A sequence may be paired with instrument
   // sets and sample collections loaded from the same or separate sources.
@@ -40,6 +41,7 @@ struct Collection {
   std::vector<AssetId> instrumentSets;
   std::vector<AssetId> sampleCollections;
   std::vector<AssetId> miscAssets;
+  std::vector<CollectionIssue> issues;
 };
 
 struct SessionSnapshotIndex {

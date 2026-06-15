@@ -22,9 +22,15 @@ enum class SourceKind {
   Derived,
 };
 
+enum class SourceStatus {
+  Active,
+  Removed,
+};
+
 struct SourceFile {
   SourceId id;
   SourceKind kind = SourceKind::UserLoaded;
+  SourceStatus status = SourceStatus::Active;
   std::string name;
   std::optional<std::string> title;
   std::filesystem::path path;
@@ -35,6 +41,7 @@ struct SourceFile {
   std::optional<SourceRange> origin;
 
   [[nodiscard]] bool derived() const noexcept { return kind == SourceKind::Derived; }
+  [[nodiscard]] bool active() const noexcept { return status == SourceStatus::Active; }
 };
 
 class ByteReader {
@@ -81,14 +88,18 @@ public:
   // values instead of copying source bytes.
   SourceId add(SourceFile file, std::vector<u8> bytes);
   SourceId addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::optional<SourceRange> origin);
+  [[nodiscard]] std::vector<SourceId> removeFamily(SourceId id);
 
   [[nodiscard]] bool contains(SourceId id) const noexcept;
+  [[nodiscard]] bool hasSlot(SourceId id) const noexcept;
   [[nodiscard]] std::span<const u8> bytes(SourceId id) const;
   [[nodiscard]] ByteReader reader(SourceId id) const;
   [[nodiscard]] const SourceFile& source(SourceId id) const;
   [[nodiscard]] const SourceFile& sourceAt(size_t index) const;
-  [[nodiscard]] size_t sourceCount() const noexcept { return entries_.size(); }
+  [[nodiscard]] size_t sourceCount() const noexcept;
   [[nodiscard]] std::vector<SourceFile> sourceFiles() const;
+  [[nodiscard]] std::vector<SourceId> sourceFamily(SourceId id) const;
+  [[nodiscard]] std::vector<SourceId> activeUserSources() const;
 
 private:
   struct Entry {

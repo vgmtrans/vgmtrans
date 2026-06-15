@@ -78,6 +78,7 @@ void ByteReader::require(u64 offset, u64 size) const {
 SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
   const auto id = SourceId{static_cast<u32>(entries_.size())};
   file.id = id;
+  file.status = SourceStatus::Active;
   file.size = bytes.size();
   if (file.name.empty() && !file.path.empty()) {
     file.name = file.path.filename().string();
@@ -88,8 +89,8 @@ SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
 
 SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent,
                                  std::optional<SourceRange> origin) {
-  if (!parent.valid()) {
-    throw std::invalid_argument("Derived source requires a valid parent SourceId");
+  if (!contains(parent)) {
+    throw std::invalid_argument("Derived source parent is not present");
   }
 
   file.kind = SourceKind::Derived;
@@ -98,7 +99,23 @@ SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceI
   return add(std::move(file), std::move(bytes));
 }
 
+std::vector<SourceId> SourceStore::removeFamily(SourceId id) {
+  const auto family = sourceFamily(id);
+  for (const SourceId source : family) {
+    auto& entry = entries_[source.value];
+    entry.file.status = SourceStatus::Removed;
+    entry.file.size = 0;
+    entry.bytes.clear();
+    entry.bytes.shrink_to_fit();
+  }
+  return family;
+}
+
 bool SourceStore::contains(SourceId id) const noexcept {
+  return hasSlot(id) && entries_[id.value].file.active();
+}
+
+bool SourceStore::hasSlot(SourceId id) const noexcept {
   return id.valid() && id.value < entries_.size();
 }
 
@@ -116,19 +133,61 @@ const SourceFile& SourceStore::source(SourceId id) const {
 }
 
 const SourceFile& SourceStore::sourceAt(size_t index) const {
-  if (index >= entries_.size()) {
-    throw std::out_of_range("Source index outside SourceStore bounds");
+  size_t activeIndex = 0;
+  for (const auto& entry : entries_) {
+    if (!entry.file.active()) {
+      continue;
+    }
+    if (activeIndex == index) {
+      return entry.file;
+    }
+    ++activeIndex;
   }
-  return entries_[index].file;
+
+  throw std::out_of_range("Source index outside SourceStore bounds");
+}
+
+size_t SourceStore::sourceCount() const noexcept {
+  return static_cast<size_t>(std::ranges::count_if(entries_, [](const Entry& entry) { return entry.file.active(); }));
 }
 
 std::vector<SourceFile> SourceStore::sourceFiles() const {
   std::vector<SourceFile> files;
-  files.reserve(entries_.size());
+  files.reserve(sourceCount());
   for (const auto& e : entries_) {
-    files.push_back(e.file);
+    if (e.file.active()) {
+      files.push_back(e.file);
+    }
   }
   return files;
+}
+
+std::vector<SourceId> SourceStore::sourceFamily(SourceId id) const {
+  std::vector<SourceId> family;
+  if (!contains(id)) {
+    return family;
+  }
+
+  family.push_back(id);
+  for (size_t index = 0; index < family.size(); ++index) {
+    const SourceId parent = family[index];
+    for (const auto& entry : entries_) {
+      if (entry.file.active() && entry.file.parent == parent) {
+        family.push_back(entry.file.id);
+      }
+    }
+  }
+  return family;
+}
+
+std::vector<SourceId> SourceStore::activeUserSources() const {
+  std::vector<SourceId> sources;
+  for (const auto& entry : entries_) {
+    if (entry.file.active() && !entry.file.derived()) {
+      sources.push_back(entry.file.id);
+    }
+  }
+  return sources;
 }
 
 const SourceStore::Entry& SourceStore::entry(SourceId id) const {

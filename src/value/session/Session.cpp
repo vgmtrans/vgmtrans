@@ -13,9 +13,11 @@
 #include <exception>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -43,6 +45,49 @@ void addMissingSequenceDialectDiagnostics(SessionSnapshot& snapshot, const Seque
         .range = sequence->metadata.range.valid() ? std::optional<SourceRange>{sequence->metadata.range} : std::nullopt,
     });
   }
+}
+
+[[nodiscard]] std::string collectionKeyString(const CollectionKey& key) {
+  return key.resolver + '\x1f' + key.value;
+}
+
+[[nodiscard]] std::unordered_set<u32> sourceIdSet(const std::vector<SourceId>& sources) {
+  std::unordered_set<u32> ids;
+  ids.reserve(sources.size());
+  for (const SourceId source : sources) {
+    ids.insert(source.value);
+  }
+  return ids;
+}
+
+[[nodiscard]] bool diagnosticFromSource(const Diagnostic& diagnostic, const std::unordered_set<u32>& sourceIds) {
+  return diagnostic.range && sourceIds.contains(diagnostic.range->source.value);
+}
+
+[[nodiscard]] bool factFromSource(const MatchFact& fact, const std::unordered_set<u32>& sourceIds) {
+  return fact.scope.source && sourceIds.contains(fact.scope.source->value);
+}
+
+[[nodiscard]] bool referencesAnyAsset(const Collection& collection, const std::unordered_set<u32>& assetIds) {
+  const auto referencesOne = [&](std::optional<AssetId> id) { return id && assetIds.contains(id->value); };
+  const auto referencesMany = [&](const std::vector<AssetId>& ids) {
+    return std::ranges::any_of(ids, [&](AssetId id) { return assetIds.contains(id.value); });
+  };
+  return referencesOne(collection.sequence) || referencesMany(collection.instrumentSets) ||
+         referencesMany(collection.sampleCollections) || referencesMany(collection.miscAssets);
+}
+
+[[nodiscard]] bool hasIssueCode(const Collection& collection, std::string_view code) {
+  return std::ranges::any_of(collection.issues, [code](const CollectionIssue& issue) { return issue.code == code; });
+}
+
+[[nodiscard]] CollectionStatus statusWithIssues(const DesiredCollection& collection) {
+  if (collection.status != CollectionStatus::Complete) {
+    return collection.status;
+  }
+  const bool hasError = std::ranges::any_of(
+      collection.issues, [](const CollectionIssue& issue) { return issue.severity == Severity::Error; });
+  return hasError ? CollectionStatus::Incomplete : CollectionStatus::Complete;
 }
 
 }  // namespace
@@ -81,6 +126,25 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
       std::move(bytes));
 }
 
+SessionSnapshot Session::removeSource(SourceId id) {
+  if (!sources_.hasSlot(id)) {
+    throw std::out_of_range("Cannot remove a SourceId that is not present in the Session");
+  }
+
+  if (!sources_.contains(id)) {
+    return snapshot();
+  }
+
+  const auto removedSources = sources_.removeFamily(id);
+  for (const SourceId source : removedSources) {
+    scannedSources_.erase(source.value);
+  }
+
+  removeDiscoveredDataForSources(removedSources);
+  rebuildCollections();
+  return snapshot();
+}
+
 // Scan this source if it has not been scanned yet. Any files extracted from it are
 // added as derived sources and scanned before this call returns.
 SessionSnapshot Session::scanSource(SourceId id) {
@@ -101,14 +165,12 @@ SessionSnapshot Session::scanSource(SourceId id) {
 // here because scanning their parent source already scans them.
 SessionSnapshot Session::scanPendingSources() {
   bool scannedAny = false;
-  const size_t sourceCount = sources_.sourceCount();
-  for (size_t index = 0; index < sourceCount; ++index) {
-    const auto& source = sources_.sourceAt(index);
-    if (source.derived() || scannedSources_.contains(source.id.value)) {
+  for (const SourceId source : sources_.activeUserSources()) {
+    if (scannedSources_.contains(source.value)) {
       continue;
     }
 
-    scanSourceAndDerived(source.id);
+    scanSourceAndDerived(source);
     scannedAny = true;
   }
 
@@ -174,7 +236,8 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
       // that another registered module can still parse.
       shouldScan = module.canScan(source, bytes);
     } catch (const std::exception& ex) {
-      diagnostics_.push_back(sessionError(std::string(module.name) + " canScan failed: " + ex.what()));
+      diagnostics_.push_back(sessionError(std::string(module.name) + " canScan failed: " + ex.what(),
+                                          SourceRange{.source = source.id, .offset = 0, .size = source.size}));
     }
 
     if (!shouldScan) {
@@ -189,16 +252,29 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
       });
       normalizeScanResult(result, ids_);
 
-      assets_.insert(assets_.end(), std::make_move_iterator(result.assets.begin()),
-                     std::make_move_iterator(result.assets.end()));
+      appendScanAssets(std::move(result.assets), source.id);
       matchFacts_.insert(matchFacts_.end(), std::make_move_iterator(result.matchFacts.begin()),
                          std::make_move_iterator(result.matchFacts.end()));
+      for (auto& diagnostic : result.diagnostics) {
+        if (!diagnostic.range) {
+          diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
+        }
+      }
       diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(result.diagnostics.begin()),
                           std::make_move_iterator(result.diagnostics.end()));
 
       for (auto& extracted : result.extractedSources) {
-        const SourceId parent =
-            extracted.origin && extracted.origin->source.valid() ? extracted.origin->source : source.id;
+        SourceId parent = source.id;
+        if (extracted.origin && extracted.origin->source.valid()) {
+          if (!sources_.contains(extracted.origin->source)) {
+            diagnostics_.push_back(
+                sessionError(std::string(module.name) + " extracted source had a missing parent source",
+                             SourceRange{.source = source.id, .offset = 0, .size = source.size}));
+            continue;
+          }
+          parent = extracted.origin->source;
+        }
+
         const SourceId derived =
             sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent, extracted.origin);
         if (queued.insert(derived.value).second) {
@@ -212,6 +288,71 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
   }
 }
 
+void Session::appendScanAssets(std::vector<Asset> assets, SourceId owner) {
+  std::unordered_set<u32> batchIds;
+  for (const auto& asset : assets) {
+    const auto id = metadata(asset).id;
+    if (!id.valid()) {
+      throw std::invalid_argument("Scan result contained an asset without an id");
+    }
+    if (!batchIds.insert(id.value).second) {
+      throw std::invalid_argument("Scan result contained duplicate asset id " + std::to_string(id.value));
+    }
+    if (assetSourceOwners_.contains(id.value)) {
+      throw std::invalid_argument("Scan result reused existing asset id " + std::to_string(id.value));
+    }
+  }
+
+  for (auto& asset : assets) {
+    const auto id = metadata(asset).id;
+    assetSourceOwners_.emplace(id.value, owner.value);
+    assets_.push_back(std::move(asset));
+  }
+}
+
+void Session::removeDiscoveredDataForSources(const std::vector<SourceId>& sources) {
+  const auto sourceIds = sourceIdSet(sources);
+  std::unordered_set<u32> removedAssetIds;
+
+  for (const auto& [assetId, sourceId] : assetSourceOwners_) {
+    if (sourceIds.contains(sourceId)) {
+      removedAssetIds.insert(assetId);
+    }
+  }
+
+  for (const auto& asset : assets_) {
+    const auto& meta = metadata(asset);
+    if (meta.range.valid() && sourceIds.contains(meta.range.source.value) && meta.id.valid()) {
+      removedAssetIds.insert(meta.id.value);
+    }
+  }
+
+  for (const auto& fact : matchFacts_) {
+    if (!factFromSource(fact, sourceIds) || !fact.asset.valid()) {
+      continue;
+    }
+    if (!assetSourceOwners_.contains(fact.asset.value)) {
+      removedAssetIds.insert(fact.asset.value);
+    }
+  }
+
+  std::erase_if(assets_, [&](const Asset& asset) {
+    const auto id = metadata(asset).id;
+    return id.valid() && removedAssetIds.contains(id.value);
+  });
+  for (const u32 id : removedAssetIds) {
+    assetSourceOwners_.erase(id);
+  }
+
+  std::erase_if(matchFacts_, [&](const MatchFact& fact) {
+    return factFromSource(fact, sourceIds) || (fact.asset.valid() && removedAssetIds.contains(fact.asset.value));
+  });
+  std::erase_if(diagnostics_,
+                [&](const Diagnostic& diagnostic) { return diagnosticFromSource(diagnostic, sourceIds); });
+
+  markCollectionsStaleForAssets(removedAssetIds);
+}
+
 // Ask registered formats which collections should exist for the current assets and
 // match facts, then merge those answers into the session.
 void Session::rebuildCollections() {
@@ -222,49 +363,115 @@ void Session::rebuildCollections() {
       .snapshot = current,
   };
 
-  std::vector<DesiredCollection> desiredCollections;
+  std::map<std::string, std::vector<DesiredCollection>> desiredByResolver;
+  std::set<std::string> failedResolvers;
   for (const auto& module : formats_.modules()) {
     if (module.resolveCollections == nullptr) {
       continue;
     }
 
-    auto desired = module.resolveCollections(context);
-    desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),
-                              std::make_move_iterator(desired.end()));
+    const std::string resolverId =
+        !module.collectionResolver.empty() ? std::string(module.collectionResolver) : std::string(module.name);
+    auto& desiredCollections = desiredByResolver[resolverId];
+    try {
+      auto desired = module.resolveCollections(context);
+      desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),
+                                std::make_move_iterator(desired.end()));
+    } catch (const std::exception& ex) {
+      failedResolvers.insert(resolverId);
+      diagnostics_.push_back(sessionError(std::string(module.name) + " resolveCollections failed: " + ex.what()));
+    }
   }
 
-  reconcileCollections(std::move(desiredCollections));
+  for (auto& [resolverId, desiredCollections] : desiredByResolver) {
+    if (failedResolvers.contains(resolverId)) {
+      continue;
+    }
+    reconcileCollections(resolverId, std::move(desiredCollections));
+  }
 }
 
-// Update an existing collection when a resolver returns the same key; otherwise
-// create a new collection with a new ID.
-void Session::reconcileCollections(std::vector<DesiredCollection> desiredCollections) {
-  for (const auto& desired : desiredCollections) {
-    if (desired.key.resolver.empty() || desired.key.value.empty()) {
+// A resolver owns every discovered collection with its resolver id. Each pass
+// replaces that resolver's desired set while preserving ids for keys that remain.
+void Session::reconcileCollections(std::string_view resolverId, std::vector<DesiredCollection> desiredCollections) {
+  std::set<std::string> seenKeys;
+  for (auto& desired : desiredCollections) {
+    if (desired.key.resolver.empty()) {
+      desired.key.resolver = std::string(resolverId);
+    }
+    if (desired.key.resolver != resolverId) {
+      diagnostics_.push_back(sessionError("Collection resolver '" + std::string(resolverId) +
+                                          "' returned a collection for resolver '" + desired.key.resolver + "'"));
+      continue;
+    }
+    if (desired.key.value.empty()) {
+      diagnostics_.push_back(sessionError("Collection resolver '" + std::string(resolverId) +
+                                          "' returned a collection with an empty key"));
+      continue;
+    }
+
+    const auto key = collectionKeyString(desired.key);
+    if (!seenKeys.insert(key).second) {
+      diagnostics_.push_back(sessionError("Collection resolver '" + std::string(resolverId) +
+                                          "' returned duplicate collection key '" + desired.key.value + "'"));
       continue;
     }
 
     const auto sameKey = [&](const Collection& collection) { return collection.key == desired.key; };
     if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
+      if (found->origin == CollectionOrigin::UserCreated) {
+        found->status = CollectionStatus::Stale;
+        continue;
+      }
       found->name = desired.name;
-      found->status = desired.status;
+      found->status = statusWithIssues(desired);
+      found->origin = desired.origin;
       found->sequence = desired.sequence;
       found->instrumentSets = desired.instrumentSets;
       found->sampleCollections = desired.sampleCollections;
       found->miscAssets = desired.miscAssets;
+      found->issues = std::move(desired.issues);
       continue;
     }
 
     collections_.push_back(Collection{
         .id = ids_.nextCollectionId(),
         .name = desired.name,
-        .status = desired.status,
+        .status = statusWithIssues(desired),
+        .origin = desired.origin,
         .key = desired.key,
         .sequence = desired.sequence,
         .instrumentSets = desired.instrumentSets,
         .sampleCollections = desired.sampleCollections,
         .miscAssets = desired.miscAssets,
+        .issues = std::move(desired.issues),
     });
+  }
+
+  std::erase_if(collections_, [&](const Collection& collection) {
+    return collection.origin == CollectionOrigin::Discovered && collection.key.resolver == resolverId &&
+           !seenKeys.contains(collectionKeyString(collection.key));
+  });
+}
+
+void Session::markCollectionsStaleForAssets(const std::unordered_set<u32>& assetIds) {
+  if (assetIds.empty()) {
+    return;
+  }
+
+  for (auto& collection : collections_) {
+    if (!referencesAnyAsset(collection, assetIds)) {
+      continue;
+    }
+
+    collection.status = CollectionStatus::Stale;
+    if (!hasIssueCode(collection, "removed-asset")) {
+      collection.issues.push_back(CollectionIssue{
+          .severity = Severity::Error,
+          .code = "removed-asset",
+          .message = "Collection references an asset from a removed source",
+      });
+    }
   }
 }
 
