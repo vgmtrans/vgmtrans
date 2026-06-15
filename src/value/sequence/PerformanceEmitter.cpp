@@ -81,10 +81,17 @@ void PerformanceEmitter::pan(PanPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void PerformanceEmitter::pan(double stereoPosition) {
+  pan(PanPerformanceEvent{
+      .stereoPosition = stereoPosition,
+  });
+}
+
 void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
   pan(PanPerformanceEvent{
       .stereoPosition = stereoPosition,
       .linearGain = linearGain,
+      .hasLinearGain = true,
   });
 }
 
