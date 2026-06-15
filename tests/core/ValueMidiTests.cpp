@@ -61,13 +61,13 @@ void midiExporterKeeps14BitControllerPairsAdjacent() {
          "MIDI exporter should keep 14-bit volume MSB/LSB controllers adjacent before same-tick pan");
 }
 
-void performanceMidiRendererExtendsPreviousSameKeyNotes() {
+void performanceMidiRendererTrustsSourceNoteExtensions() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {PerformanceTrack{
           .id = TrackId{0},
           .sourceTrackNumber = 2,
-          .endTick = 24,
+          .endTick = 30,
           .events =
               {
                   NotePerformanceEvent{
@@ -83,12 +83,22 @@ void performanceMidiRendererExtendsPreviousSameKeyNotes() {
                       .durationTicks = 6,
                       .extendsPrevious = true,
                   },
+                  GlobalTransposePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 18},
+                      .semitones = -1,
+                  },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 18},
-                      .key = 62.0,
+                      .key = 60.0,
                       .linearVelocity = 0.5,
                       .durationTicks = 6,
                       .extendsPrevious = true,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 24},
+                      .key = 62.0,
+                      .linearVelocity = 0.5,
+                      .durationTicks = 6,
                   },
               },
       }},
@@ -100,11 +110,11 @@ void performanceMidiRendererExtendsPreviousSameKeyNotes() {
   expect(std::holds_alternative<MidiPort>(events[0]), "performance renderer should mark each track's MIDI port");
   const auto firstNote = std::get_if<NoteDuration>(&events[1]);
   const auto secondNote = std::get_if<NoteDuration>(&events[2]);
-  expect(firstNote != nullptr && firstNote->tick == 0 && firstNote->key == 60 && firstNote->duration == 18,
-         "performance renderer should extend a previous same-key note");
-  expect(secondNote != nullptr && secondNote->tick == 18 && secondNote->key == 62 && secondNote->duration == 6,
-         "performance renderer should emit a new note when no matching previous key exists");
-  expect(std::get<EndOfTrack>(events.back()).tick == 24, "performance renderer should preserve track end ticks");
+  expect(firstNote != nullptr && firstNote->tick == 0 && firstNote->key == 60 && firstNote->duration == 24,
+         "performance renderer should trust source-selected note extensions");
+  expect(secondNote != nullptr && secondNote->tick == 24 && secondNote->key == 61 && secondNote->duration == 6,
+         "performance renderer should emit a new note when the source does not request an extension");
+  expect(std::get<EndOfTrack>(events.back()).tick == 30, "performance renderer should preserve track end ticks");
 }
 
 void performanceMidiRendererWritesPanGainResetWhenRequested() {
@@ -459,7 +469,7 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
 void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
   midiExporterKeeps14BitControllerPairsAdjacent();
-  performanceMidiRendererExtendsPreviousSameKeyNotes();
+  performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererHonorsMidiExportOptions();
   exportRequestSequenceLoopsAffectMidiLowering();

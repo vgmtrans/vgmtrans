@@ -143,14 +143,13 @@ struct GlobalTransposeChange {
   return semitones;
 }
 
-bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePerformanceEvent& note, u8 channel,
-                        u8 key) {
+bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePerformanceEvent& note, u8 channel) {
   if (!note.extendsPrevious || !state.lastNoteIndex || *state.lastNoteIndex >= track.events.size()) {
     return false;
   }
 
   auto* previous = std::get_if<NoteDuration>(&track.events[*state.lastNoteIndex]);
-  if (previous == nullptr || previous->channel != channel || previous->key != key) {
+  if (previous == nullptr || previous->channel != channel) {
     return false;
   }
 
@@ -169,7 +168,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
         if constexpr (std::is_same_v<TypedEvent, NotePerformanceEvent>) {
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
-          if (extendPreviousNote(track, state, typedEvent, channel, key)) {
+          if (extendPreviousNote(track, state, typedEvent, channel)) {
             return;
           }
           state.lastNoteIndex = track.events.size();
