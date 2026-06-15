@@ -313,7 +313,7 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
 }
 
 [[nodiscard]] ScanResult scanPsf(const ScanInput& input) {
-  // The scanner emits one virtual executable image. Platform-specific format modules then
+  // The scanner emits one derived executable image. Platform-specific format modules then
   // inspect that image exactly as if it came from a ROM/container file.
   ScanResult result;
   const auto range = input.reader.range(0, input.reader.size());

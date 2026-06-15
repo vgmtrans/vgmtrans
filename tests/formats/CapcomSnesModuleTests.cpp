@@ -133,7 +133,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "value format registration should include CapcomSnes sequence dialects");
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   expect(project.diagnostics.empty(), "CapcomSnes scan should not report diagnostics for complete fixture");
   expect(project.collections.size() == 1, "CapcomSnes scan should produce one collection");
   expect(project.assets.size() == 3, "CapcomSnes scan should produce sequence, instrument set, and samples");
@@ -387,32 +387,32 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
   vgmtrans::formats::registerValueFormats(session);
   const auto sourceId = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesSpc());
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   expect(project.diagnostics.empty(), "SPC-backed CapcomSnes scan should not report diagnostics");
   expect(project.sources.size() == 2, "SPC scan should preserve original source plus extracted ARAM");
-  expect(!project.sources[0].virtualized, "original SPC source should not be virtualized");
-  expect(project.sources[1].virtualized, "SPC RAM source should be virtualized");
-  expect(project.sources[1].name == "Mega Man X.spc - ram", "virtual ARAM source should match legacy naming");
-  expect(project.sources[1].title == "Capcom Logo", "virtual ARAM source should carry the SPC title tag");
-  expect(project.sources[1].origin.has_value(), "virtual ARAM source should preserve origin range");
-  expect(project.sources[1].origin->source == sourceId, "virtual ARAM origin should point at the SPC source");
+  expect(!project.sources[0].derived(), "original SPC source should not be derived");
+  expect(project.sources[1].derived(), "SPC RAM source should be derived");
+  expect(project.sources[1].name == "Mega Man X.spc - ram", "derived ARAM source should match legacy naming");
+  expect(project.sources[1].title == "Capcom Logo", "derived ARAM source should carry the SPC title tag");
+  expect(project.sources[1].origin.has_value(), "derived ARAM source should preserve origin range");
+  expect(project.sources[1].origin->source == sourceId, "derived ARAM origin should point at the SPC source");
   expect(project.sources[1].origin->offset == 0x100 && project.sources[1].origin->size == 0x10000,
-         "virtual ARAM origin should point at SPC RAM bytes");
+         "derived ARAM origin should point at SPC RAM bytes");
 
   expect(project.collections.size() == 1, "SPC-backed scan should produce one collection");
   expect(project.collections[0].name == "Capcom Logo", "SPC-backed collection should use the SPC title tag");
-  expect(project.assets.size() == 3, "SPC-backed scan should produce CapcomSnes assets from virtual ARAM");
+  expect(project.assets.size() == 3, "SPC-backed scan should produce CapcomSnes assets from derived ARAM");
   const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
   expect(sequence != nullptr, "SPC-backed scan should produce a sequence");
   expect(sequence->metadata.name == "Capcom Logo", "SPC-backed sequence should use the SPC title tag");
-  expect(sequence->metadata.range.source == SourceId{1}, "sequence range should point at virtual ARAM source");
+  expect(sequence->metadata.range.source == SourceId{1}, "sequence range should point at derived ARAM source");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should preserve ARAM-relative address");
 
   const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets[2]);
   expect(samples != nullptr, "SPC-backed scan should produce samples");
   expect(!samples->samples.samples.empty(), "SPC-backed scan should discover sample data");
   expect(samples->samples.samples[0].encodedData.source == SourceId{1},
-         "sample encoded data should point at virtual ARAM source");
+         "sample encoded data should point at derived ARAM source");
 }
 
 void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy() {
@@ -463,7 +463,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, std::move(bytes));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   expect(project.diagnostics.empty(), "CapcomSnes note-state scan should not report diagnostics");
   expect(!project.assets.empty(), "CapcomSnes note-state scan should produce assets");
 

@@ -54,7 +54,7 @@ struct TrackId {
   friend constexpr bool operator==(TrackId, TrackId) noexcept = default;
 };
 
-// SourceRange is the shared breadcrumb back to original or virtualized bytes.
+// SourceRange is the shared breadcrumb back to user-loaded or derived bytes.
 // UI item trees, diagnostics, and source-backed commands all use this rather
 // than storing format-specific address metadata in separate side channels.
 struct SourceRange {

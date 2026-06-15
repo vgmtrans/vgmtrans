@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "value/model/ProjectModel.h"
 #include "value/base/Source.h"
+#include "value/model/SessionSnapshot.h"
 
 #include <optional>
 #include <string>
@@ -16,7 +16,7 @@
 namespace vgmtrans::core {
 
 class ScanIdAllocator {
- public:
+public:
   [[nodiscard]] AssetId nextAssetId() noexcept;
   [[nodiscard]] CollectionId nextCollectionId() noexcept;
   [[nodiscard]] ItemId nextItemId() noexcept;
@@ -25,7 +25,7 @@ class ScanIdAllocator {
   void reserveAfter(CollectionId id) noexcept;
   void reserveAfter(ItemId id) noexcept;
 
- private:
+private:
   // Scan results may provide stable IDs explicitly; generated IDs advance past them.
   u32 nextAssetId_ = 0;
   u32 nextCollectionId_ = 0;
@@ -36,31 +36,29 @@ struct ScanInput {
   SourceFile source;
   ByteReader reader;
   ScanIdAllocator& ids;
+  u32 loadGroup = 0;
 };
 
 class ItemTreeBuilder {
- public:
+public:
   ItemTreeBuilder(ItemTree& tree, ScanIdAllocator& ids);
 
   // Keeps parent child-lists current while format parsers build source-backed UI trees.
-  [[nodiscard]] ItemId add(
-      std::optional<ItemId> parent,
-      ItemKind kind,
-      std::string detailKind,
-      std::string name,
-      SourceRange range,
-      std::string description = {});
+  [[nodiscard]] ItemId add(std::optional<ItemId> parent, ItemKind kind, std::string detailKind, std::string name,
+                           SourceRange range, std::string description = {});
 
- private:
+private:
   ItemTree& tree_;
   ScanIdAllocator& ids_;
 };
 
 struct ScanResult {
   std::vector<Asset> assets;
-  std::vector<Collection> collections;
+  std::vector<MatchFact> matchFacts;
   std::vector<Diagnostic> diagnostics;
   std::vector<ExtractedSource> extractedSources;
 };
+
+void normalizeScanResult(ScanResult& result, ScanIdAllocator& ids);
 
 }  // namespace vgmtrans::core

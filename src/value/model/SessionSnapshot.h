@@ -6,8 +6,9 @@
 
 #pragma once
 
-#include "value/sequence/SequenceProgram.h"
 #include "value/base/Source.h"
+#include "value/model/MatchModel.h"
+#include "value/sequence/SequenceProgram.h"
 #include "value/synth/SynthModel.h"
 
 #include <optional>
@@ -18,9 +19,8 @@
 
 namespace vgmtrans::core {
 
-// ProjectModel is a snapshot of everything discovered from the current SourceStore.
-// It deliberately stores assets by value and references them by stable IDs so scans,
-// UI inspection, and exports can share one immutable-looking result.
+// SessionSnapshot is a copyable view of the current Session stores. It is the
+// read model for UI, tests, and exports; Session remains the mutable owner.
 
 struct MiscAsset {
   AssetMetadata metadata;
@@ -32,6 +32,9 @@ using Asset = std::variant<SequenceProgramAsset, InstrumentSetAsset, SampleColle
 struct Collection {
   CollectionId id;
   std::string name;
+  CollectionOrigin origin = CollectionOrigin::Discovered;
+  CollectionStatus status = CollectionStatus::Complete;
+  CollectionKey key;
   // Collections are the export units. A sequence can be paired with zero or more synth
   // and sample assets because some games store those banks separately or share them.
   std::optional<AssetId> sequence;
@@ -40,22 +43,23 @@ struct Collection {
   std::vector<AssetId> miscAssets;
 };
 
-struct ProjectIndex {
-  // Index entries are vector indices rather than pointers so Project remains a
-  // normal movable/copyable value snapshot.
+struct SessionSnapshotIndex {
+  // Index entries are vector indices rather than pointers so snapshots remain
+  // normal movable/copyable values.
   bool valid = false;
   std::unordered_map<u32, size_t> assetsById;
   std::unordered_map<u32, size_t> collectionsById;
 };
 
-struct Project {
-  // Sources includes user-added files plus extracted virtual files such as SPC RAM or
+struct SessionSnapshot {
+  // Sources includes user-added files plus extracted derived files such as SPC RAM or
   // archive members. Asset ranges refer back into this list.
   std::vector<SourceFile> sources;
   std::vector<Asset> assets;
+  std::vector<MatchFact> matchFacts;
   std::vector<Collection> collections;
   std::vector<Diagnostic> diagnostics;
-  ProjectIndex index;
+  SessionSnapshotIndex index;
 };
 
 struct CollectionAssetDiagnostics {
@@ -69,8 +73,8 @@ struct CollectionAssetDiagnostics {
 };
 
 struct CollectionAssets {
-  // Resolved pointer view over a Project. It is intentionally non-owning so exporters can
-  // work without copying large sample/instrument assets.
+  // Resolved pointer view over a SessionSnapshot. It is intentionally non-owning
+  // so exporters can work without copying large sample/instrument assets.
   const Collection* collection = nullptr;
   const SequenceProgramAsset* sequenceProgram = nullptr;
   std::vector<const InstrumentSetAsset*> instrumentSets;
@@ -81,26 +85,26 @@ struct CollectionAssets {
 
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
-[[nodiscard]] ProjectIndex buildProjectIndex(const Project& project);
-[[nodiscard]] std::vector<Diagnostic> projectIndexDiagnostics(const Project& project);
-void rebuildProjectIndex(Project& project);
-void finalizeProjectIndex(Project& project);
+[[nodiscard]] SessionSnapshotIndex buildSessionSnapshotIndex(const SessionSnapshot& snapshot);
+[[nodiscard]] std::vector<Diagnostic> sessionSnapshotIndexDiagnostics(const SessionSnapshot& snapshot);
+void rebuildSessionSnapshotIndex(SessionSnapshot& snapshot);
+void finalizeSessionSnapshotIndex(SessionSnapshot& snapshot);
 [[nodiscard]] ItemNode* itemById(ItemTree& tree, ItemId id);
 [[nodiscard]] const ItemNode* itemById(const ItemTree& tree, ItemId id);
-[[nodiscard]] Asset* assetById(Project& project, AssetId id);
-[[nodiscard]] const Asset* assetById(const Project& project, AssetId id);
+[[nodiscard]] Asset* assetById(SessionSnapshot& snapshot, AssetId id);
+[[nodiscard]] const Asset* assetById(const SessionSnapshot& snapshot, AssetId id);
 
 template <typename T>
-[[nodiscard]] const T* assetById(const Project& project, AssetId id) {
-  const auto* asset = assetById(project, id);
+[[nodiscard]] const T* assetById(const SessionSnapshot& snapshot, AssetId id) {
+  const auto* asset = assetById(snapshot, id);
   if (asset == nullptr) {
     return nullptr;
   }
   return std::get_if<T>(asset);
 }
 
-[[nodiscard]] const Collection* collectionById(const Project& project, CollectionId id);
-[[nodiscard]] CollectionAssets resolveCollectionAssets(const Project& project, CollectionId id);
-[[nodiscard]] CollectionAssets resolveCollectionAssets(const Project& project, const Collection& collection);
+[[nodiscard]] const Collection* collectionById(const SessionSnapshot& snapshot, CollectionId id);
+[[nodiscard]] CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id);
+[[nodiscard]] CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, const Collection& collection);
 
 }  // namespace vgmtrans::core

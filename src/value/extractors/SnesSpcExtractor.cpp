@@ -127,7 +127,7 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
 
 [[nodiscard]] ScanResult scanSnesSpc(const ScanInput& input) {
   // SPC files are snapshots. The actual format scanners want the 64 KiB ARAM image, so
-  // expose RAM as a virtual child source and let normal SNES modules scan that.
+  // expose RAM as a derived child source and let normal SNES modules scan that.
   const auto spcBytes = input.reader.slice(0, input.reader.size());
   const auto ramBytes = input.reader.slice(kSpcRamOffset, kSpcRamSize);
   std::vector<u8> ram(ramBytes.begin(), ramBytes.end());

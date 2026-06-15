@@ -110,10 +110,12 @@ vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/model/ProjectModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/SessionStores.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
@@ -138,16 +140,18 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeSequenceDecoder.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeWalkers.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
       ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.h
-      ${PROJECT_SOURCE_DIR}/src/value/model/ProjectModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.h
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
-      ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/SessionStores.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/SequenceCommandHelpers.h

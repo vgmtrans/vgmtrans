@@ -608,10 +608,8 @@ void appendUnique(std::vector<T*>& items, std::span<T* const> newItems) {
   }
 }
 
-void appendLegacySamples(
-    CapcomSnesSummary& summary,
-    std::vector<VGMSamp*>& samples,
-    std::span<VGMSampColl* const> sampleCollections) {
+void appendLegacySamples(CapcomSnesSummary& summary, std::vector<VGMSamp*>& samples,
+                         std::span<VGMSampColl* const> sampleCollections) {
   for (auto* sampleCollection : sampleCollections) {
     if (sampleCollection == nullptr) {
       continue;
@@ -645,10 +643,8 @@ void appendLegacySamples(
   }
 }
 
-void appendLegacyInstruments(
-    CapcomSnesSummary& summary,
-    std::span<VGMInstrSet* const> instrumentSets,
-    std::span<VGMSamp* const> samples) {
+void appendLegacyInstruments(CapcomSnesSummary& summary, std::span<VGMInstrSet* const> instrumentSets,
+                             std::span<VGMSamp* const> samples) {
   for (const auto* instrumentSet : instrumentSets) {
     if (instrumentSet == nullptr) {
       continue;
@@ -694,10 +690,10 @@ void appendLegacyInstruments(
 void normalizeSummary(CapcomSnesSummary& summary) {
   std::ranges::sort(summary.trackCounts);
   std::ranges::sort(summary.samples, [](const SampleSummary& lhs, const SampleSummary& rhs) {
-    return std::tie(lhs.sourceOffset, lhs.sourceSize, lhs.sampleRate, lhs.channels, lhs.frameCount,
-                    lhs.loopEnabled, lhs.loopStart, lhs.loopLength, lhs.pcmHash) <
-           std::tie(rhs.sourceOffset, rhs.sourceSize, rhs.sampleRate, rhs.channels, rhs.frameCount,
-                    rhs.loopEnabled, rhs.loopStart, rhs.loopLength, rhs.pcmHash);
+    return std::tie(lhs.sourceOffset, lhs.sourceSize, lhs.sampleRate, lhs.channels, lhs.frameCount, lhs.loopEnabled,
+                    lhs.loopStart, lhs.loopLength, lhs.pcmHash) <
+           std::tie(rhs.sourceOffset, rhs.sourceSize, rhs.sampleRate, rhs.channels, rhs.frameCount, rhs.loopEnabled,
+                    rhs.loopStart, rhs.loopLength, rhs.pcmHash);
   });
   std::ranges::sort(summary.regions, [](const RegionSummary& lhs, const RegionSummary& rhs) {
     return std::tie(lhs.bank, lhs.program, lhs.sourceOffset, lhs.sampleSourceOffset, lhs.keyLow, lhs.keyHigh,
@@ -707,10 +703,8 @@ void normalizeSummary(CapcomSnesSummary& summary) {
                     rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents, rhs.envelopeAttack, rhs.envelopeDecay,
                     rhs.envelopeSustain, rhs.envelopeRelease);
   });
-  std::ranges::sort(summary.instrumentSynths, [](const InstrumentSynthSummary& lhs,
-                                                 const InstrumentSynthSummary& rhs) {
-    return std::tie(lhs.bank, lhs.program, lhs.sourceOffset) <
-           std::tie(rhs.bank, rhs.program, rhs.sourceOffset);
+  std::ranges::sort(summary.instrumentSynths, [](const InstrumentSynthSummary& lhs, const InstrumentSynthSummary& rhs) {
+    return std::tie(lhs.bank, lhs.program, lhs.sourceOffset) < std::tie(rhs.bank, rhs.program, rhs.sourceOffset);
   });
   for (u32 i = 0; i < summary.samples.size(); ++i) {
     summary.samples[i].index = i;
@@ -794,10 +788,8 @@ std::map<std::string, CapcomSnesSummary> legacyCapcomSnesRsnSummaries(const std:
   return summaries;
 }
 
-CapcomSnesSummary valueCapcomSnesSummary(
-    const Project& project,
-    const SourceStore& sources,
-    const Collection& collection) {
+CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const SourceStore& sources,
+                                         const Collection& collection) {
   const auto decoders = SampleDecoderRegistry::withDefaultDecoders();
 
   CapcomSnesSummary summary;
@@ -902,7 +894,7 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   expect(project.collections.size() == 1, "value ARAM summary expected one collection");
   return valueCapcomSnesSummary(project, session.sources(), project.collections.front());
 }
@@ -912,7 +904,7 @@ std::map<std::string, CapcomSnesSummary> valueCapcomSnesRsnSummaries(const std::
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -996,9 +988,8 @@ std::string describeInstrumentSynth(const InstrumentSynthSummary& synth) {
 bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& value, std::ostream& out,
                     std::string_view label = "CapcomSnes") {
   if (legacy == value) {
-    out << label << " summary parity ok: sequences=" << legacy.sequenceCount
-        << " instruments=" << legacy.regions.size() << " synths=" << legacy.instrumentSynths.size()
-        << " samples=" << legacy.samples.size() << "\n";
+    out << label << " summary parity ok: sequences=" << legacy.sequenceCount << " instruments=" << legacy.regions.size()
+        << " synths=" << legacy.instrumentSynths.size() << " samples=" << legacy.samples.size() << "\n";
     return true;
   }
 
@@ -1073,7 +1064,7 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover a collection";
@@ -1102,11 +1093,10 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
 }
 
 std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
-  const auto artifacts =
-      session.exportCollection(collection, ExportRequest{
-                                             .kinds = {ExportKind::Midi},
-                                             .loopPolicy = LoopPolicy::PlayOnce,
-                                         });
+  const auto artifacts = session.exportCollection(collection, ExportRequest{
+                                                                  .kinds = {ExportKind::Midi},
+                                                                  .loopPolicy = LoopPolicy::PlayOnce,
+                                                              });
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1125,7 +1115,7 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -1146,10 +1136,9 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
 }
 
 SynthExportBytes valueCapcomSnesSynthExports(Session& session, CollectionId collection) {
-  const auto artifacts =
-      session.exportCollection(collection, ExportRequest{
-                                             .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
-                                         });
+  const auto artifacts = session.exportCollection(collection, ExportRequest{
+                                                                  .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
+                                                              });
 
   SynthExportBytes exports;
   for (const auto& artifact : artifacts) {
@@ -1177,7 +1166,7 @@ std::map<std::string, SynthExportBytes> valueCapcomSnesRsnSynthExports(const std
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -1222,7 +1211,7 @@ std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::fil
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections";
@@ -1281,12 +1270,11 @@ std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesyst
 }
 
 std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops = 0) {
-  const auto artifacts =
-      session.exportCollection(collection, ExportRequest{
-                                             .kinds = {ExportKind::Midi},
-                                             .loopPolicy = LoopPolicy::PlayOnce,
-                                             .sequenceLoops = sequenceLoops,
-                                         });
+  const auto artifacts = session.exportCollection(collection, ExportRequest{
+                                                                  .kinds = {ExportKind::Midi},
+                                                                  .loopPolicy = LoopPolicy::PlayOnce,
+                                                                  .sequenceLoops = sequenceLoops,
+                                                              });
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1300,13 +1288,12 @@ std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u
   throw std::runtime_error("value exporter did not produce a MIDI artifact");
 }
 
-std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesystem::path& path,
-                                                            u32 sequenceLoops = 0) {
+std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover MIDI collections";
@@ -1357,7 +1344,7 @@ std::map<std::string, SynthExportBytes> valueCollectionSynthExports(const std::f
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover synth collections";
@@ -1401,7 +1388,7 @@ bool endsWith(std::string_view text, std::string_view suffix) {
   return text.size() >= suffix.size() && text.substr(text.size() - suffix.size()) == suffix;
 }
 
-u32 valueSampleCount(const Project& project, const Collection& collection) {
+u32 valueSampleCount(const SessionSnapshot& project, const Collection& collection) {
   u32 sampleCount = 0;
   for (const auto sampleCollectionId : collection.sampleCollections) {
     if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, sampleCollectionId)) {
@@ -1523,16 +1510,13 @@ std::vector<RiffNode> parseRiffChildren(std::span<const u8> bytes, size_t begin,
 }
 
 const RiffNode* childChunk(const RiffNode& node, std::string_view id) {
-  const auto found = std::ranges::find_if(node.children, [id](const RiffNode& child) {
-    return child.id == id;
-  });
+  const auto found = std::ranges::find_if(node.children, [id](const RiffNode& child) { return child.id == id; });
   return found == node.children.end() ? nullptr : &*found;
 }
 
 const RiffNode* childList(const RiffNode& node, std::string_view type) {
-  const auto found = std::ranges::find_if(node.children, [type](const RiffNode& child) {
-    return child.id == "LIST" && child.type == type;
-  });
+  const auto found = std::ranges::find_if(
+      node.children, [type](const RiffNode& child) { return child.id == "LIST" && child.type == type; });
   return found == node.children.end() ? nullptr : &*found;
 }
 
@@ -1711,9 +1695,8 @@ NormalizedSf2 normalizeSf2(std::span<const u8> bytes) {
   const auto* imodNode = firstChunk(root, "imod");
   const auto* shdr = firstChunk(root, "shdr");
   const auto* smpl = firstChunk(root, "smpl");
-  expect(phdr != nullptr && pbagNode != nullptr && pgenNode != nullptr && pmodNode != nullptr &&
-             inst != nullptr && ibagNode != nullptr && igenNode != nullptr && imodNode != nullptr &&
-             shdr != nullptr && smpl != nullptr,
+  expect(phdr != nullptr && pbagNode != nullptr && pgenNode != nullptr && pmodNode != nullptr && inst != nullptr &&
+             ibagNode != nullptr && igenNode != nullptr && imodNode != nullptr && shdr != nullptr && smpl != nullptr,
          "SF2 file is missing required pdta/sdta chunks");
 
   const auto pbag = readSf2Bags(bytes, *pbagNode);
@@ -1951,8 +1934,7 @@ std::string describeSf2Instrument(const Sf2Instrument& instrument) {
   return out.str();
 }
 
-void describeFirstZoneMismatch(std::ostream& out,
-                               std::span<const Sf2Zone> legacyZones,
+void describeFirstZoneMismatch(std::ostream& out, std::span<const Sf2Zone> legacyZones,
                                std::span<const Sf2Zone> valueZones) {
   const size_t shared = std::min(legacyZones.size(), valueZones.size());
   for (size_t i = 0; i < shared; ++i) {
@@ -1972,8 +1954,8 @@ std::string describeSf2Sample(const Sf2Sample& sample) {
   std::ostringstream out;
   out << "length=" << sample.length << " loop=" << sample.loopStart << "-" << sample.loopEnd
       << " rate=" << sample.sampleRate << " pitch=" << static_cast<int>(sample.originalPitch)
-      << " tune=" << static_cast<int>(sample.pitchCorrection) << " type=" << sample.sampleType
-      << " hash=0x" << std::hex << sample.pcmHash;
+      << " tune=" << static_cast<int>(sample.pitchCorrection) << " type=" << sample.sampleType << " hash=0x" << std::hex
+      << sample.pcmHash;
   return out.str();
 }
 
@@ -2462,8 +2444,7 @@ public:
 
 class LegacyLevelPrecisionSeq final : public VGMSeq {
 public:
-  explicit LegacyLevelPrecisionSeq(RawFile* file)
-      : VGMSeq("LegacyLevelPrecision", file, 0, 1, "LegacyLevelPrecision") {
+  explicit LegacyLevelPrecisionSeq(RawFile* file) : VGMSeq("LegacyLevelPrecision", file, 0, 1, "LegacyLevelPrecision") {
     setUseLinearAmplitudeScale(true);
     setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustExpressionController);
     setPPQN(48);
@@ -2579,8 +2560,8 @@ int compareCapcomSnesRsnDirectMidi(const std::filesystem::path& path) {
   const auto legacyMidis = legacyCapcomSnesRsnMidis(path);
   const auto valueMidis = valueCapcomSnesRsnMidis(path);
   if (valueMidis.size() != legacyMidis.size()) {
-    std::cout << "value RSN collection count differs: legacy=" << legacyMidis.size()
-              << " value=" << valueMidis.size() << "\n";
+    std::cout << "value RSN collection count differs: legacy=" << legacyMidis.size() << " value=" << valueMidis.size()
+              << "\n";
     return 1;
   }
 
@@ -2739,7 +2720,7 @@ int compareNdsDirectSynth(const std::filesystem::path& path) {
   return 0;
 }
 
-bool validateValueCollectionExports(const Project& project, const Collection& collection,
+bool validateValueCollectionExports(const SessionSnapshot& project, const Collection& collection,
                                     std::span<const Artifact> artifacts, u32 expectedWavs, std::ostream& out,
                                     u64& totalArtifacts) {
   ExportSmokeCounts counts;
@@ -2797,7 +2778,7 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
-  const Project project = session.scan();
+  const SessionSnapshot project = session.scan();
 
   if (project.collections.empty()) {
     std::ostringstream message;
@@ -2835,8 +2816,8 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
 
     const auto* collection = collectionById(project, collectionExport.collection);
     if (collection == nullptr) {
-      std::cout << "value all-collection export referenced missing collection id "
-                << collectionExport.collection.value << "\n";
+      std::cout << "value all-collection export referenced missing collection id " << collectionExport.collection.value
+                << "\n";
       return 1;
     }
 

@@ -254,7 +254,7 @@ vgmtrans::core::Session valueSessionForPath(const std::filesystem::path& path) {
   return session;
 }
 
-void printValueProjectSummary(const vgmtrans::core::Project& project) {
+void printValueSessionSummary(const vgmtrans::core::SessionSnapshot& project) {
   fmt::println("Sources: {}  Assets: {}  Collections: {}  Diagnostics: {}", project.sources.size(),
                project.assets.size(), project.collections.size(), project.diagnostics.size());
 
@@ -289,7 +289,7 @@ void printValueProjectSummary(const vgmtrans::core::Project& project) {
   }
 }
 
-void printValueSources(const vgmtrans::core::Project& project) {
+void printValueSources(const vgmtrans::core::SessionSnapshot& project) {
   if (project.sources.empty()) {
     fmt::println("No value sources.");
     return;
@@ -304,8 +304,11 @@ void printValueSources(const vgmtrans::core::Project& project) {
     if (!source.path.empty()) {
       fmt::print(" path='{}'", source.path.string());
     }
-    if (source.virtualized) {
-      fmt::print(" virtualized");
+    if (source.derived()) {
+      fmt::print(" derived");
+    }
+    if (source.stale) {
+      fmt::print(" stale");
     }
     if (source.origin) {
       fmt::print(" origin=source #{} 0x{:x}:0x{:x}", source.origin->source.value, source.origin->offset,
@@ -382,7 +385,7 @@ void printValueItemTree(const vgmtrans::core::ItemTree& tree, vgmtrans::core::It
   }
 }
 
-bool printValueAssetTree(const vgmtrans::core::Project& project, const std::vector<std::string>& args,
+bool printValueAssetTree(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
                          size_t assetArgIndex) {
   try {
     const int assetIndex = std::stoi(args[assetArgIndex]);
@@ -411,7 +414,7 @@ bool printValueAssetTree(const vgmtrans::core::Project& project, const std::vect
   }
 }
 
-bool printValueSequenceEvents(const vgmtrans::core::Project& project,
+bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project,
                               const vgmtrans::core::SequenceDialectRegistry& dialects,
                               const std::vector<std::string>& args, size_t assetArgIndex) {
   try {
@@ -626,7 +629,7 @@ size_t writeValueArtifacts(const std::filesystem::path& dir, std::span<const vgm
   return written;
 }
 
-bool printValueNoCollections(const vgmtrans::core::Project& project) {
+bool printValueNoCollections(const vgmtrans::core::SessionSnapshot& project) {
   if (!project.collections.empty()) {
     return false;
   }
@@ -638,7 +641,7 @@ bool printValueNoCollections(const vgmtrans::core::Project& project) {
   return true;
 }
 
-void printValueCollectionAssetRef(const vgmtrans::core::Project& project, std::string_view label, size_t index,
+void printValueCollectionAssetRef(const vgmtrans::core::SessionSnapshot& project, std::string_view label, size_t index,
                                   vgmtrans::core::AssetId id) {
   const auto* asset = vgmtrans::core::assetById(project, id);
   if (asset == nullptr) {
@@ -651,8 +654,8 @@ void printValueCollectionAssetRef(const vgmtrans::core::Project& project, std::s
                valueAssetKindName(*asset), meta.format, meta.name, meta.range.offset, meta.range.size);
 }
 
-void printValueCollectionInfo(const vgmtrans::core::Project& project, const vgmtrans::core::Collection& collection,
-                              size_t index) {
+void printValueCollectionInfo(const vgmtrans::core::SessionSnapshot& project,
+                              const vgmtrans::core::Collection& collection, size_t index) {
   fmt::println("collection #{} id={} name='{}'", index, collection.id.value, collection.name);
   if (collection.sequence) {
     printValueCollectionAssetRef(project, "Sequence", 0, *collection.sequence);
@@ -671,7 +674,7 @@ void printValueCollectionInfo(const vgmtrans::core::Project& project, const vgmt
   }
 }
 
-bool printValueCollections(const vgmtrans::core::Project& project, const std::vector<std::string>& args,
+bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
                            size_t collectionArgIndex) {
   if (printValueNoCollections(project)) {
     return false;
@@ -740,7 +743,7 @@ void printValueInstrument(const vgmtrans::core::Instrument& instrument, size_t i
   }
 }
 
-bool printValueInstruments(const vgmtrans::core::Project& project, const std::vector<std::string>& args,
+bool printValueInstruments(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
                            size_t assetArgIndex) {
   try {
     const int assetIndex = std::stoi(args[assetArgIndex]);
@@ -824,7 +827,7 @@ void printValueSample(const vgmtrans::core::Sample& sample, size_t index) {
   fmt::println("  loop {}", valueLoopName(sample.loop));
 }
 
-bool printValueSamples(const vgmtrans::core::Project& project, const std::vector<std::string>& args,
+bool printValueSamples(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
                        size_t assetArgIndex) {
   try {
     const int assetIndex = std::stoi(args[assetArgIndex]);
@@ -870,7 +873,7 @@ bool printValueSamples(const vgmtrans::core::Project& project, const std::vector
   }
 }
 
-size_t exportValueCollectionsToDirectory(const vgmtrans::core::Project& project,
+size_t exportValueCollectionsToDirectory(const vgmtrans::core::SessionSnapshot& project,
                                          std::span<const vgmtrans::core::CollectionExport> exports,
                                          const std::filesystem::path& dir) {
   size_t written = 0;
@@ -1441,14 +1444,14 @@ void value_scan(const std::vector<std::string>& args) {
 
   auto session = valueSessionForRawFile(*file);
   const auto project = session.scan();
-  printValueProjectSummary(project);
+  printValueSessionSummary(project);
 }
 
 void value_scan_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
     const auto project = session.scan();
-    printValueProjectSummary(project);
+    printValueSessionSummary(project);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-scan {}: {}", args[2], ex.what());
   }

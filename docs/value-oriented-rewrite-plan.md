@@ -75,41 +75,72 @@ state, and driver math.
 
 ## Target Architecture
 
-The project-level pipeline should be:
+The application-level pipeline is session-centered:
 
 ```text
-SourceStore
-  -> FormatModule scan
-  -> Project
-      -> Collection
-      -> SequenceProgramAsset
-      -> InstrumentSetAsset
-      -> SampleCollectionAsset
-      -> MiscAsset
-  -> ExportService
-      -> SequenceProgram + SequenceDialect -> PerformanceSequence -> MIDI
-      -> SequenceProgram + SequenceDialect -> future tracker/native export
-      -> InstrumentSetAsset + SampleCollectionAsset -> SynthExportData -> SF2/DLS
-      -> SampleCollectionAsset -> WAV
+Session
+  -> SourceStore
+  -> scan a loaded source plus derived sources
+  -> AssetStore + MatchFactStore + DiagnosticStore
+  -> collection resolvers
+  -> CollectionStore
+  -> SessionSnapshot
+  -> export request
+  -> artifacts
 ```
 
-Format modules produce parsed assets. Export services decide how to lower those
-assets for a selected output.
+`Session` owns the mutable working set. `SessionSnapshot` is the copyable read
+model for UI, tests, and export.
+
+Format modules produce parsed assets and matching facts. Collection resolvers
+turn those facts into session-level export groupings. Export services decide how
+to lower snapshot assets for a selected output:
+
+```text
+SequenceProgram + SequenceDialect -> PerformanceSequence -> MIDI
+SequenceProgram + SequenceDialect -> future tracker/native export
+InstrumentSetAsset + SampleCollectionAsset -> SynthExportData -> SF2/DLS
+SampleCollectionAsset -> WAV
+```
+
+## Session, Scanning, And Matching
+
+Loading is source-oriented:
+
+```cpp
+SourceId id = session.addSource(file, bytes);
+SessionSnapshot snapshot = session.scanSource(id);
+```
+
+`scanSource()` scans that source and any derived sources it produces. It does not
+rescan unrelated loaded files. Full rebuilds are explicit through
+`rescanSource()` and `rescanAll()`.
+
+Derived sources are persistent entries in `SourceStore`. Archive members, SPC
+RAM images, PSF executable images, and similar extracted bytes are deduplicated
+by parent source, extractor id, and derived key. If a rescan no longer refreshes
+a derived source, the source is marked stale rather than silently discarded.
+
+Collections are session-level groupings. They may reference assets discovered
+from different source loads, which is required for legacy-style matcher behavior.
+Scanners emit durable facts; resolvers own the format-specific judgment that
+turns facts into collections.
 
 ## Core Ownership
 
-`src/value/core` should own:
+`src/value` core/model/scan/session code should own:
 
 - IDs, source ranges, byte readers, source storage, and diagnostics.
-- `Project`, `Collection`, `Asset`, metadata, and lookup helpers.
+- `SessionSnapshot`, `Collection`, `Asset`, metadata, and lookup helpers.
+- `AssetStore`, `MatchFactStore`, `CollectionStore`, and `DiagnosticStore`.
+- Typed match facts and collection resolver helpers.
 - `SequenceProgram`, `TrackProgram`, and erased source-command records.
 - `SequenceDialect` registration and command dispatch descriptors.
 - `SequenceVm` traversal, loop policy, and diagnostics.
 - `PerformanceSequence` and target-neutral performance events.
 - `InstrumentSetAsset`, `SampleCollectionAsset`, sample metadata, and decoded
   sample types.
-- Registries and orchestration services such as `FormatRegistry`,
-  `ScanService`, and `Session`.
+- Registries and orchestration services such as `FormatRegistry` and `Session`.
 
 `src/value/export` should own:
 
@@ -677,10 +708,11 @@ Use these rules:
   sequence code easy to distinguish during review.
 
 The synth and export-support files are different. Code such as `SynthModel`,
-`SampleDecoder`, `SynthExportData`, SF2/DLS/WAV exporters, `ProjectModel`,
-`Source`, and scanning infrastructure may be kept and edited when it still fits
-the target architecture. The separation rule is mainly about preventing the old
-sequence command/profile model from seeping into the replacement.
+`SampleDecoder`, `SynthExportData`, SF2/DLS/WAV exporters,
+`SessionSnapshot`, `Source`, and scanning infrastructure may be kept and edited
+when it still fits the target architecture. The separation rule is mainly about
+preventing the old sequence command/profile model from seeping into the
+replacement.
 
 ## Migration Plan
 

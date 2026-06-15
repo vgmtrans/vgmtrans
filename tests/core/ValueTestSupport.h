@@ -9,6 +9,7 @@
 #include "value/export/synth/DlsExporter.h"
 #include "value/export/Export.h"
 #include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
+#include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatModule.h"
 #include "value/base/LevelScale.h"
 #include "value/export/midi/MidiExporter.h"
@@ -28,6 +29,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -193,7 +195,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
 [[nodiscard]] ScanResult scanProbeSequence(const ScanInput& input) {
   const auto assetId = input.ids.nextAssetId();
-  const auto collectionId = input.ids.nextCollectionId();
   const auto itemId = input.ids.nextItemId();
   const auto childItemId = input.ids.nextItemId();
   const auto assetRange = input.reader.range(0, input.reader.size());
@@ -235,10 +236,17 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
   ScanResult result;
   result.assets.emplace_back(std::move(sequence));
-  result.collections.push_back(Collection{
-      .id = collectionId,
-      .name = input.source.name,
-      .sequence = assetId,
+  result.matchFacts.push_back(MatchFact{
+      .asset = assetId,
+      .format = "ProbeSequence",
+      .scope = MatchScope{.kind = MatchScopeKind::Source, .source = input.source.id},
+      .payload =
+          CollectionMemberFact{
+              .key = CollectionKey{.resolver = "ProbeSequence",
+                                   .value = "source:" + std::to_string(input.source.id.value)},
+              .collectionName = input.source.name,
+              .role = CollectionMemberRole::Sequence,
+          },
   });
   result.diagnostics.push_back(Diagnostic{
       .severity = Severity::Info,
@@ -246,7 +254,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .range = assetRange,
   });
 
-  if (!input.source.virtualized) {
+  if (!input.source.derived()) {
     result.extractedSources.push_back(ExtractedSource{
         .file = SourceFile{.name = input.source.name + ".child"},
         .bytes = {0xbb, 0x01},
@@ -257,16 +265,21 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return result;
 }
 
+[[nodiscard]] std::vector<DesiredCollection> resolveProbeSequenceCollections(const MatchContext& context) {
+  return resolveCollectionMemberFacts(context, "ProbeSequence", "ProbeSequence");
+}
+
 [[nodiscard]] FormatModule probeSequenceModule() {
   return FormatModule{
       .name = "ProbeSequence",
       .canScan = canScanProbeSequence,
       .scan = scanProbeSequence,
+      .resolveCollections = resolveProbeSequenceCollections,
   };
 }
 
 [[nodiscard]] bool canScanProbeMisc(const SourceFile& source, std::span<const u8> bytes) {
-  return source.virtualized && !bytes.empty() && bytes[0] == 0xbb;
+  return source.derived() && !bytes.empty() && bytes[0] == 0xbb;
 }
 
 [[nodiscard]] ScanResult scanProbeMisc(const ScanInput& input) {
@@ -288,6 +301,115 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .name = "ProbeMisc",
       .canScan = canScanProbeMisc,
       .scan = scanProbeMisc,
+  };
+}
+
+[[nodiscard]] bool canScanProbeBankSequence(const SourceFile&, std::span<const u8> bytes) {
+  return bytes.size() >= 2 && bytes[0] == 0xcc;
+}
+
+[[nodiscard]] bool canScanProbeBankInstruments(const SourceFile&, std::span<const u8> bytes) {
+  return bytes.size() >= 2 && bytes[0] == 0xdd;
+}
+
+[[nodiscard]] MatchFact probeBankFact(const ScanInput& input, AssetId asset, u32 bank) {
+  return MatchFact{
+      .asset = asset,
+      .format = "ProbeBank",
+      .scope = MatchScope{.kind = MatchScopeKind::Session},
+      .payload = IdMatchFact{.domain = "probe.bank", .value = bank},
+  };
+}
+
+[[nodiscard]] ScanResult scanProbeBankSequence(const ScanInput& input) {
+  const auto assetId = input.ids.nextAssetId();
+  const auto bank = input.reader.u8At(1);
+  SequenceProgramAsset sequence{
+      .metadata =
+          AssetMetadata{
+              .id = assetId,
+              .format = "ProbeBank",
+              .name = input.source.name,
+              .range = input.reader.range(0, input.reader.size()),
+          },
+      .program =
+          SequenceProgram{
+              .dialect = DialectId{.value = "probe"},
+              .timebase = Timebase{.ppqn = 48},
+          },
+  };
+
+  ScanResult result;
+  result.assets.emplace_back(std::move(sequence));
+  result.matchFacts.push_back(probeBankFact(input, assetId, bank));
+  return result;
+}
+
+[[nodiscard]] ScanResult scanProbeBankInstruments(const ScanInput& input) {
+  const auto assetId = input.ids.nextAssetId();
+  const auto bank = input.reader.u8At(1);
+  ScanResult result;
+  result.assets.emplace_back(InstrumentSetAsset{
+      .metadata =
+          AssetMetadata{
+              .id = assetId,
+              .format = "ProbeBank",
+              .name = input.source.name,
+              .range = input.reader.range(0, input.reader.size()),
+          },
+  });
+  result.matchFacts.push_back(probeBankFact(input, assetId, bank));
+  return result;
+}
+
+[[nodiscard]] std::vector<DesiredCollection> resolveProbeBankCollections(const MatchContext& context) {
+  std::vector<DesiredCollection> collections;
+  for (const auto& fact : context.snapshot.matchFacts) {
+    const auto* id = std::get_if<IdMatchFact>(&fact.payload);
+    if (id == nullptr || fact.format != "ProbeBank" || id->domain != "probe.bank") {
+      continue;
+    }
+
+    const CollectionKey key{.resolver = "ProbeBank", .value = "bank:" + std::to_string(id->value)};
+    auto found =
+        std::ranges::find_if(collections, [&](const DesiredCollection& collection) { return collection.key == key; });
+    if (found == collections.end()) {
+      collections.push_back(DesiredCollection{
+          .key = key,
+          .name = "Probe Bank " + std::to_string(id->value),
+          .status = CollectionStatus::Incomplete,
+      });
+      found = std::prev(collections.end());
+    }
+
+    if (assetById<SequenceProgramAsset>(context.snapshot, fact.asset) != nullptr) {
+      found->sequence = fact.asset;
+    } else if (assetById<InstrumentSetAsset>(context.snapshot, fact.asset) != nullptr) {
+      found->instrumentSets.push_back(fact.asset);
+    }
+
+    if (found->sequence && !found->instrumentSets.empty()) {
+      found->status = CollectionStatus::Complete;
+    }
+  }
+  return collections;
+}
+
+[[nodiscard]] FormatModule probeBankSequenceModule() {
+  return FormatModule{
+      .name = "ProbeBankSequence",
+      .canScan = canScanProbeBankSequence,
+      .scan = scanProbeBankSequence,
+      .collectionResolver = "ProbeBank",
+      .resolveCollections = resolveProbeBankCollections,
+  };
+}
+
+[[nodiscard]] FormatModule probeBankInstrumentModule() {
+  return FormatModule{
+      .name = "ProbeBankInstrument",
+      .canScan = canScanProbeBankInstruments,
+      .scan = scanProbeBankInstruments,
   };
 }
 
@@ -512,6 +634,5 @@ const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const Sequenc
   }
   return nullptr;
 }
-
 
 }  // namespace

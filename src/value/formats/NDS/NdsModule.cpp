@@ -9,6 +9,7 @@
 #include "value/formats/NDS/NdsLayout.h"
 #include "value/formats/NDS/NdsSequence.h"
 #include "value/formats/NDS/NdsSynth.h"
+#include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatRegistry.h"
 
 #include <array>
@@ -28,6 +29,29 @@ namespace {
 
 [[nodiscard]] Diagnostic warning(std::string message, SourceRange range) {
   return Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = range};
+}
+
+[[nodiscard]] CollectionKey ndsCollectionKey(SourceId source, u32 sdatOffset, u32 sequenceIndex) {
+  return CollectionKey{
+      .resolver = std::string(kNdsFormatName),
+      .value = "source:" + std::to_string(source.value) + ":sdat:" + std::to_string(sdatOffset) +
+               ":seq:" + std::to_string(sequenceIndex),
+  };
+}
+
+void addNdsCollectionMember(ScanResult& result, const ScanInput& input, CollectionKey key, AssetId asset,
+                            std::string name, CollectionMemberRole role) {
+  result.matchFacts.push_back(MatchFact{
+      .asset = asset,
+      .format = std::string(kNdsFormatName),
+      .scope = MatchScope{.kind = MatchScopeKind::Source, .source = input.source.id},
+      .payload =
+          CollectionMemberFact{
+              .key = std::move(key),
+              .collectionName = std::move(name),
+              .role = role,
+          },
+  });
 }
 
 void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& result) {
@@ -120,23 +144,20 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& 
         input, sequenceId, ndsSequenceRangeForFatEntry(input.reader, sequenceRange->offset, sequenceRange->size), name,
         instrumentSet));
 
-    Collection collection{
-        .id = input.ids.nextCollectionId(),
-        .name = name,
-        .sequence = sequenceId,
-    };
-    collection.sampleCollections.push_back(psgId);
+    const auto key = ndsCollectionKey(input.source.id, layout.baseOffset, sequenceIndex);
+    addNdsCollectionMember(result, input, key, sequenceId, name, CollectionMemberRole::Sequence);
+    addNdsCollectionMember(result, input, key, psgId, name, CollectionMemberRole::SampleCollection);
     if (instrumentSet) {
-      collection.instrumentSets.push_back(*instrumentSet);
+      addNdsCollectionMember(result, input, key, *instrumentSet, name, CollectionMemberRole::InstrumentSet);
     }
     if (sequence.bank < layout.banks.size()) {
       for (const u16 waveArchive : layout.banks[sequence.bank].waveArchives) {
         if (waveArchive != 0xffff && waveArchive < waveAssetIds.size() && waveAssetIds[waveArchive]) {
-          collection.sampleCollections.push_back(*waveAssetIds[waveArchive]);
+          addNdsCollectionMember(result, input, key, *waveAssetIds[waveArchive], name,
+                                 CollectionMemberRole::SampleCollection);
         }
       }
     }
-    result.collections.push_back(std::move(collection));
   }
 }
 
@@ -157,6 +178,10 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& 
   return result;
 }
 
+[[nodiscard]] std::vector<DesiredCollection> resolveNdsCollections(const MatchContext& context) {
+  return resolveCollectionMemberFacts(context, kNdsFormatName, kNdsFormatName);
+}
+
 }  // namespace
 
 void registerNdsModule(FormatRegistry& registry) {
@@ -164,6 +189,7 @@ void registerNdsModule(FormatRegistry& registry) {
       .name = std::string(kNdsFormatName),
       .canScan = canScanNds,
       .scan = scanNds,
+      .resolveCollections = resolveNdsCollections,
   });
 }
 

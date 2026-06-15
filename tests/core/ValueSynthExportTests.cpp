@@ -43,7 +43,6 @@ void snesBrrDecoderProducesPcm() {
   expect(threw, "sample decoder registry should reject incomplete decoder values");
 }
 
-
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -359,7 +358,7 @@ void exportDiagnosticsPreserveSourceRanges() {
           },
   };
 
-  Project project;
+  SessionSnapshot project;
   project.assets.push_back(missingSampleCollection);
   project.collections.push_back(Collection{
       .id = CollectionId{0},
