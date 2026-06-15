@@ -47,10 +47,10 @@ struct TrackState {
   [[nodiscard]] bool extendsPreviousSlurredNote(s32 key) const;
   void finishExtendedNote();
   void finishNote(s32 key);
-  void applyAttributes(u8 attributes, Emit* out = nullptr);
-  void toggleSlur(Emit& out);
-  void emitPortamentoIfNeeded(s32 key, Emit& out);
-  void emitModulationDepths(Emit& out, bool enabled) const;
+  void applyAttributes(u8 attributes, PerformanceEmitter* out = nullptr);
+  void toggleSlur(PerformanceEmitter& out);
+  void emitPortamentoIfNeeded(s32 key, PerformanceEmitter& out);
+  void emitModulationDepths(PerformanceEmitter& out, bool enabled) const;
 
   u32 durationRate = 0xff;
   s32 transpose = 0;
@@ -162,7 +162,7 @@ double TrackState::performedKey(s32 key) const {
   return static_cast<double>(key + transpose);
 }
 
-void TrackState::applyAttributes(u8 attributes, Emit* out) {
+void TrackState::applyAttributes(u8 attributes, PerformanceEmitter* out) {
   const bool wasSlurred = noteSlurred;
   // The driver ORs octave bits instead of replacing them. Preserve that quirk until
   // parity proves a specific version behaves differently.
@@ -176,7 +176,7 @@ void TrackState::applyAttributes(u8 attributes, Emit* out) {
   }
 }
 
-void TrackState::toggleSlur(Emit& out) {
+void TrackState::toggleSlur(PerformanceEmitter& out) {
   const bool wasSlurred = noteSlurred;
   noteSlurred = !noteSlurred;
   if (noteSlurred != wasSlurred) {
@@ -198,7 +198,7 @@ void TrackState::finishNote(s32 key) {
   lastNoteSlurred = noteSlurred;
 }
 
-void TrackState::emitPortamentoIfNeeded(s32 key, Emit& out) {
+void TrackState::emitPortamentoIfNeeded(s32 key, PerformanceEmitter& out) {
   if (portamentoMillisecondsPerCent <= 0.0 || !lastSourceKey) {
     return;
   }
@@ -213,7 +213,7 @@ void TrackState::emitPortamentoIfNeeded(s32 key, Emit& out) {
   }
 }
 
-void TrackState::emitModulationDepths(Emit& out, bool enabled) const {
+void TrackState::emitModulationDepths(PerformanceEmitter& out, bool enabled) const {
   if (vibratoDepth != 0) {
     out.modulation(ModulationPerformanceTarget::VibratoDepth, enabled ? math::midi7Amount(vibratoDepth) : 0.0);
   }
