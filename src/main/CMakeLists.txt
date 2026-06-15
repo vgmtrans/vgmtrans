@@ -118,6 +118,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/session/CollectionStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/DiagnosticStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/ScanCommit.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp

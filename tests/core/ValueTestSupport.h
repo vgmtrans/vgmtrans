@@ -471,7 +471,17 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 }
 
 [[nodiscard]] ScanResult scanProbeBadExtractedSource(const ScanInput& input) {
+  const auto assetId = input.ids.nextAssetId();
   ScanResult result;
+  result.assets.emplace_back(MiscAsset{
+      .metadata =
+          AssetMetadata{
+              .id = assetId,
+              .format = "ProbeBadExtracted",
+              .name = "Rejected asset",
+              .range = input.reader.range(0, input.reader.size()),
+          },
+  });
   result.extractedSources.push_back(ExtractedSource{
       .file = SourceFile{.name = "bad-parent.child"},
       .bytes = {0xbb},

@@ -8,6 +8,7 @@
 
 #include "value/export/Export.h"
 #include "value/scan/FormatModule.h"
+#include "value/session/ScanCommit.h"
 
 #include <exception>
 #include <fstream>
@@ -15,7 +16,6 @@
 #include <map>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -207,34 +207,10 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           .ids = ids_,
       });
       normalizeScanResult(result, ids_);
-      validateScanResult(result);
-
-      assets_.append(std::move(result.assets), source.id);
-      matchFacts_.append(std::move(result.matchFacts));
-      for (auto& diagnostic : result.diagnostics) {
-        if (!diagnostic.range) {
-          diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
-        }
-      }
-      diagnostics_.append(std::move(result.diagnostics));
-
-      for (auto& extracted : result.extractedSources) {
-        SourceId parent = source.id;
-        if (extracted.origin && extracted.origin->source.valid()) {
-          if (!sources_.contains(extracted.origin->source)) {
-            diagnostics_.addError(std::string(module.name) + " extracted source had a missing parent source",
-                                  SourceRange{.source = source.id, .offset = 0, .size = source.size});
-            continue;
-          }
-          parent = extracted.origin->source;
-        }
-
-        const SourceId derived =
-            sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent, extracted.origin);
-        if (queued.insert(derived.value).second) {
-          queue.push_back(derived);
-        }
-      }
+      ScanCommit commit = ScanCommit::fromScanResult(source, std::move(result));
+      commit.validate(sources_, assets_);
+      commit.commit(assets_, matchFacts_, diagnostics_);
+      addExtractedSources(std::move(commit.extractedSources), source.id, queue, queued);
     } catch (const std::exception& ex) {
       diagnostics_.addError(std::string(module.name) + " scan failed: " + ex.what(),
                             SourceRange{.source = source.id, .offset = 0, .size = source.size});
@@ -242,35 +218,18 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
   }
 }
 
-void Session::validateScanResult(const ScanResult& result) const {
-  std::unordered_set<u32> batchAssetIds;
-  for (const auto& asset : result.assets) {
-    const auto id = metadata(asset).id;
-    if (!id.valid()) {
-      throw std::invalid_argument("Scan result contained an asset without an id");
+void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
+                                  std::vector<SourceId>& queue, std::set<u32>& queued) {
+  for (auto& extracted : extractedSources) {
+    SourceId parent = defaultParent;
+    if (extracted.origin && extracted.origin->source.valid()) {
+      parent = extracted.origin->source;
     }
-    if (!batchAssetIds.insert(id.value).second) {
-      throw std::invalid_argument("Scan result contained duplicate asset id " + std::to_string(id.value));
-    }
-    if (assets_.contains(id)) {
-      throw std::invalid_argument("Scan result reused existing asset id " + std::to_string(id.value));
-    }
-  }
 
-  for (const auto& fact : result.matchFacts) {
-    if (!fact.asset.valid()) {
-      throw std::invalid_argument("Scan result contained a match fact without an asset id");
-    }
-    if (!batchAssetIds.contains(fact.asset.value) && !assets_.contains(fact.asset)) {
-      throw std::invalid_argument("Scan result contained a match fact for missing asset id " +
-                                  std::to_string(fact.asset.value));
-    }
-    if (fact.scope.kind == MatchScopeKind::Source && !fact.scope.source) {
-      throw std::invalid_argument("Scan result contained a source-scoped match fact without a source id");
-    }
-    if (fact.scope.source && !sources_.contains(*fact.scope.source)) {
-      throw std::invalid_argument("Scan result contained a match fact for missing source id " +
-                                  std::to_string(fact.scope.source->value));
+    const SourceId derived =
+        sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent, extracted.origin);
+    if (queued.insert(derived.value).second) {
+      queue.push_back(derived);
     }
   }
 }
