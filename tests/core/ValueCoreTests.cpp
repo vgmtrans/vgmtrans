@@ -19,6 +19,7 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource();
 void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
 void capcomSnesNoteStateCommandsAreTypedAndInterpreted();
 void capcomSnesSourceDialectDecodesAndRendersDriverCommands();
+void capcomSnesInitialDurationRateIsFullLength();
 void capcomSnesPanPerformanceCarriesGainCompensation();
 void capcomSnesDialectEmitsSourceOnlyDriverSemantics();
 void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey();
@@ -43,6 +44,7 @@ int main() {
     capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
     capcomSnesNoteStateCommandsAreTypedAndInterpreted();
     capcomSnesSourceDialectDecodesAndRendersDriverCommands();
+    capcomSnesInitialDurationRateIsFullLength();
     capcomSnesPanPerformanceCarriesGainCompensation();
     capcomSnesDialectEmitsSourceOnlyDriverSemantics();
     capcomSnesDialectEmitsPortamentoFromPreviousSourceKey();
