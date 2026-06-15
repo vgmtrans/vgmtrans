@@ -70,6 +70,8 @@ struct CommandInfoField {
   std::string value;
 };
 
+// CommandInfo is UI-facing metadata for a decoded command. Parsed operands are
+// added by core; format describe hooks add driver meaning in the same structure.
 struct CommandInfo {
   std::string name;
   std::string detailKind;
@@ -104,6 +106,9 @@ struct CommandHandler {
   ExecuteSourceCommand execute = nullptr;
 };
 
+// A SequenceDialect is the registered behavior table for one source driver. The
+// parsed SequenceProgram stores handler IDs, and the dialect supplies typed
+// describe/execute hooks when UI or export needs behavior.
 struct SequenceDialect {
   DialectId id;
   Timebase timebase;
@@ -199,6 +204,8 @@ std::any createTrackState(const SequenceProgram& program, const TrackProgram& tr
 template <class Command, class Context>
 void describeCommand(const SourceCommand& record, const TrackProgram& track, CommandInfo& out,
                      const std::any& context) {
+  // Reparse the compact source bytes into the format-local command type. The
+  // immutable SourceCommand remains generic; behavior stays in format structs.
   CommandReader reader{record.range, track.bytesFor(record)};
   const Command command = Command::parse(reader);
   if constexpr (HasDescribeWithContext<Command, Context>) {
@@ -211,6 +218,9 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
 template <class Command, class TrackState, class Context>
 Effects executeCommand(const SourceCommand& record, const TrackProgram& track, std::any& trackState, Emit& out,
                        VmApi& vm, const std::any& context) {
+  // This is the type-erased bridge from VM records back to format-local command
+  // structs and track state. The any_casts are centralized here so command code
+  // remains strongly typed.
   CommandReader reader{record.range, track.bytesFor(record)};
   const Command command = Command::parse(reader);
   auto& typedTrackState = std::any_cast<TrackState&>(trackState);
@@ -235,6 +245,8 @@ Effects executeCommand(const SourceCommand& record, const TrackProgram& track, s
 
 }  // namespace detail
 
+// The builder registers copyable function descriptors. Format modules can
+// declare commands locally without allocating inherited handler objects.
 template <class TrackState, class Context>
 class SequenceDialectBuilder {
 public:
