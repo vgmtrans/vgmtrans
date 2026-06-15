@@ -90,7 +90,7 @@ SessionSnapshot Session::scanSource(SourceId id) {
     return snapshot();
   }
 
-  scanSourceAndDerived(id, nextLoadGroup_++);
+  scanSourceAndDerived(id);
   rebuildCollections();
   return snapshot();
 }
@@ -104,7 +104,7 @@ SessionSnapshot Session::scanPendingSources() {
       continue;
     }
 
-    scanSourceAndDerived(source.id, nextLoadGroup_++);
+    scanSourceAndDerived(source.id);
     scannedAny = true;
   }
 
@@ -138,7 +138,7 @@ std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest&
   return core::exportAllCollections(current, sources_, request, dialects_);
 }
 
-void Session::scanSourceAndDerived(SourceId id, u32 loadGroup) {
+void Session::scanSourceAndDerived(SourceId id) {
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
@@ -147,11 +147,11 @@ void Session::scanSourceAndDerived(SourceId id, u32 loadGroup) {
   std::set<u32> queued{id.value};
 
   for (size_t index = 0; index < queue.size(); ++index) {
-    scanOneSource(queue[index], loadGroup, queue, queued);
+    scanOneSource(queue[index], queue, queued);
   }
 }
 
-void Session::scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& queue, std::set<u32>& queued) {
+void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued) {
   if (!scannedSources_.insert(id.value).second) {
     return;
   }
@@ -178,7 +178,6 @@ void Session::scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& q
           .source = source,
           .reader = sources_.reader(id),
           .ids = ids_,
-          .loadGroup = loadGroup,
       });
       normalizeScanResult(result, ids_);
 
@@ -192,13 +191,8 @@ void Session::scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& q
       for (auto& extracted : result.extractedSources) {
         const SourceId parent =
             extracted.origin && extracted.origin->source.valid() ? extracted.origin->source : source.id;
-        std::string derivedKey = extracted.file.derivedKey;
-        if (derivedKey.empty()) {
-          derivedKey = !extracted.file.name.empty() ? extracted.file.name : std::string(module.name);
-        }
-
-        const SourceId derived = sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent,
-                                                     std::string(module.name), std::move(derivedKey), extracted.origin);
+        const SourceId derived =
+            sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent, extracted.origin);
         if (queued.insert(derived.value).second) {
           queue.push_back(derived);
         }

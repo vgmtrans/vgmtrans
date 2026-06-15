@@ -20,11 +20,7 @@ namespace vgmtrans::core {
 
 enum class MatchScopeKind {
   Session,
-  LoadGroup,
-  SourceFamily,
   Source,
-  Directory,
-  FormatSpecific,
 };
 
 struct CollectionKey {
@@ -44,8 +40,6 @@ enum class CollectionMemberRole {
 struct MatchScope {
   MatchScopeKind kind = MatchScopeKind::Session;
   std::optional<SourceId> source;
-  std::optional<u32> loadGroup;
-  std::string value;
 
   friend bool operator==(const MatchScope&, const MatchScope&) noexcept = default;
 };

@@ -36,7 +36,6 @@ struct ScanInput {
   SourceFile source;
   ByteReader reader;
   ScanIdAllocator& ids;
-  u32 loadGroup = 0;
 };
 
 class ItemTreeBuilder {

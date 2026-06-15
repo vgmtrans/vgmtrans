@@ -43,8 +43,8 @@ public:
   [[nodiscard]] SequenceDialectRegistry& dialects() noexcept { return dialects_; }
 
 private:
-  void scanSourceAndDerived(SourceId id, u32 loadGroup);
-  void scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& queue, std::set<u32>& queued);
+  void scanSourceAndDerived(SourceId id);
+  void scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued);
   void rebuildCollections();
   void reconcileCollections(std::vector<DesiredCollection> desiredCollections);
 
@@ -57,7 +57,6 @@ private:
   SequenceDialectRegistry dialects_;
   ScanIdAllocator ids_;
   std::unordered_set<u32> scannedSources_;
-  u32 nextLoadGroup_ = 1;
 };
 
 }  // namespace vgmtrans::core
