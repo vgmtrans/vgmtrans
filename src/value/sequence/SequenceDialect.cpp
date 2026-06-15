@@ -117,6 +117,9 @@ ItemId addSourceCommandItem(ItemTreeBuilder& items, std::optional<ItemId> parent
 }
 
 void SequenceDialectRegistry::add(SequenceDialect dialect) {
+  if (sealed_) {
+    throw std::logic_error("Cannot register sequence dialects after session mutation has started");
+  }
   if (!dialect.id.valid()) {
     throw std::invalid_argument("Cannot register a SequenceDialect with an empty id");
   }
@@ -125,6 +128,10 @@ void SequenceDialectRegistry::add(SequenceDialect dialect) {
   if (!dialects_.emplace(id, std::move(dialect)).second) {
     throw std::invalid_argument(fmt::format("Duplicate SequenceDialect registered: {}", id));
   }
+}
+
+void SequenceDialectRegistry::seal() noexcept {
+  sealed_ = true;
 }
 
 const SequenceDialect* SequenceDialectRegistry::find(std::string_view id) const {

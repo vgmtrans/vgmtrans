@@ -418,7 +418,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .name = "ProbeBankSequence",
       .canScan = canScanProbeBankSequence,
       .scan = scanProbeBankSequence,
-      .collectionResolver = "ProbeBank",
+      .collectionResolverId = "ProbeBank",
       .resolveCollections = resolveProbeBankCollections,
   };
 }
@@ -488,6 +488,62 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
+[[nodiscard]] bool canScanProbeBadFactAsset(const SourceFile&, std::span<const u8> bytes) {
+  return !bytes.empty() && bytes[0] == 0xf2;
+}
+
+[[nodiscard]] ScanResult scanProbeBadFactAsset(const ScanInput& input) {
+  return ScanResult{
+      .matchFacts = {MatchFact{
+          .asset = AssetId{99},
+          .format = "ProbeBadFact",
+          .scope = MatchScope{.kind = MatchScopeKind::Session},
+          .payload = IdMatchFact{.domain = "probe.bad", .value = 1},
+      }},
+  };
+}
+
+[[nodiscard]] FormatModule probeBadFactAssetModule() {
+  return FormatModule{
+      .name = "ProbeBadFactAsset",
+      .canScan = canScanProbeBadFactAsset,
+      .scan = scanProbeBadFactAsset,
+  };
+}
+
+[[nodiscard]] bool canScanProbeBadFactSource(const SourceFile&, std::span<const u8> bytes) {
+  return !bytes.empty() && bytes[0] == 0xf3;
+}
+
+[[nodiscard]] ScanResult scanProbeBadFactSource(const ScanInput& input) {
+  const auto assetId = input.ids.nextAssetId();
+  return ScanResult{
+      .assets = {MiscAsset{
+          .metadata =
+              AssetMetadata{
+                  .id = assetId,
+                  .format = "ProbeBadFact",
+                  .name = "Bad source fact",
+                  .range = input.reader.range(0, input.reader.size()),
+              },
+      }},
+      .matchFacts = {MatchFact{
+          .asset = assetId,
+          .format = "ProbeBadFact",
+          .scope = MatchScope{.kind = MatchScopeKind::Source, .source = SourceId{99}},
+          .payload = IdMatchFact{.domain = "probe.bad", .value = 2},
+      }},
+  };
+}
+
+[[nodiscard]] FormatModule probeBadFactSourceModule() {
+  return FormatModule{
+      .name = "ProbeBadFactSource",
+      .canScan = canScanProbeBadFactSource,
+      .scan = scanProbeBadFactSource,
+  };
+}
+
 [[nodiscard]] bool canScanNever(const SourceFile&, std::span<const u8>) {
   return false;
 }
@@ -496,17 +552,60 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return {};
 }
 
-[[nodiscard]] std::vector<DesiredCollection> throwingProbeSequenceResolver(const MatchContext&) {
-  throw std::runtime_error("resolver exploded");
+[[nodiscard]] std::vector<DesiredCollection> fragileProbeSequenceResolver(const MatchContext& context) {
+  if (context.snapshot.assets.empty() || context.snapshot.assets.size() > 1) {
+    throw std::runtime_error("resolver exploded");
+  }
+  return resolveCollectionMemberFacts(context, "ProbeSequence", "ProbeSequence");
 }
 
-[[nodiscard]] FormatModule throwingProbeSequenceResolverModule() {
+[[nodiscard]] FormatModule fragileProbeSequenceModule() {
   return FormatModule{
-      .name = "ProbeSequenceThrowingResolver",
+      .name = "ProbeSequenceFragileResolver",
+      .canScan = canScanProbeSequence,
+      .scan = scanProbeSequence,
+      .collectionResolverId = "ProbeSequence",
+      .resolveCollections = fragileProbeSequenceResolver,
+  };
+}
+
+[[nodiscard]] std::vector<DesiredCollection> missingAssetCollectionResolver(const MatchContext&) {
+  return {DesiredCollection{
+      .key = CollectionKey{.resolver = "ProbeMissingRefs", .value = "missing-assets"},
+      .name = "Missing Assets",
+      .sequence = AssetId{99},
+      .instrumentSets = {AssetId{98}},
+      .sampleCollections = {AssetId{97}},
+      .miscAssets = {AssetId{96}},
+  }};
+}
+
+[[nodiscard]] FormatModule missingAssetCollectionResolverModule() {
+  return FormatModule{
+      .name = "ProbeMissingRefs",
       .canScan = canScanNever,
       .scan = scanNothing,
-      .collectionResolver = "ProbeSequence",
-      .resolveCollections = throwingProbeSequenceResolver,
+      .resolveCollections = missingAssetCollectionResolver,
+  };
+}
+
+[[nodiscard]] std::vector<DesiredCollection> duplicateKeyCollectionResolver(const MatchContext&) {
+  return {DesiredCollection{
+              .key = CollectionKey{.resolver = "ProbeDuplicateKeys", .value = "same-key"},
+              .name = "First",
+          },
+          DesiredCollection{
+              .key = CollectionKey{.resolver = "ProbeDuplicateKeys", .value = "same-key"},
+              .name = "Second",
+          }};
+}
+
+[[nodiscard]] FormatModule duplicateKeyCollectionResolverModule() {
+  return FormatModule{
+      .name = "ProbeDuplicateKeys",
+      .canScan = canScanNever,
+      .scan = scanNothing,
+      .resolveCollections = duplicateKeyCollectionResolver,
   };
 }
 

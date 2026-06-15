@@ -150,11 +150,14 @@ struct CommandRuntime {
 class SequenceDialectRegistry {
 public:
   void add(SequenceDialect dialect);
+  void seal() noexcept;
   [[nodiscard]] const SequenceDialect* find(std::string_view id) const;
   [[nodiscard]] bool contains(std::string_view id) const;
+  [[nodiscard]] bool sealed() const noexcept { return sealed_; }
 
 private:
   std::unordered_map<std::string, SequenceDialect> dialects_;
+  bool sealed_ = false;
 };
 
 namespace detail {

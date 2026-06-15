@@ -17,11 +17,14 @@ public:
   // Order matters: every source is offered to modules in registration order, including
   // derived sources extracted by earlier modules.
   void add(FormatModule module);
+  void seal() noexcept;
 
   [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept { return modules_; }
+  [[nodiscard]] bool sealed() const noexcept { return sealed_; }
 
 private:
   std::vector<FormatModule> modules_;
+  bool sealed_ = false;
 };
 
 }  // namespace vgmtrans::core
