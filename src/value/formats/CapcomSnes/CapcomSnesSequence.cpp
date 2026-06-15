@@ -52,7 +52,7 @@ struct TrackState {
   void emitPortamentoIfNeeded(s32 key, PerformanceEmitter& out);
   void emitModulationDepths(PerformanceEmitter& out, bool enabled) const;
 
-  u32 durationRate = 0xff;
+  u32 durationRate = 0;
   s32 transpose = 0;
   u32 noteOctave = 0;
   bool noteDotted = false;

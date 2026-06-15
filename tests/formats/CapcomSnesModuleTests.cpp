@@ -585,6 +585,33 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
          "CapcomSnes pan event should occur after the note advances the VM clock");
 }
 
+void capcomSnesInitialDurationRateIsFullLength() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0xe1;
+  bytes[0x3001] = 0x17;
+
+  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  expect(track.commands.size() == 2, "CapcomSnes duration fixture should decode note and end");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes duration fixture should render without diagnostics");
+
+  const auto note = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  expect(note != performance.tracks[0].events.end(), "CapcomSnes duration fixture should emit a note");
+  expect(std::get<NotePerformanceEvent>(*note).durationTicks == 192,
+         "CapcomSnes initial duration rate should produce full-length notes like legacy");
+  expect(performance.tracks[0].endTick == 192,
+         "CapcomSnes initial duration rate should not change source note length");
+}
+
 void capcomSnesPanPerformanceCarriesGainCompensation() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x18;
