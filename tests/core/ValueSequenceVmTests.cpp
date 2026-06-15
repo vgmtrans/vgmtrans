@@ -206,6 +206,40 @@ void sequenceVmJumpOrLoopForeverRequiresVisitedDestination() {
          "jump-or-loop should not replay the loop target after detecting the visited destination");
 }
 
+void sequenceVmJumpOrLoopForeverIgnoresRepeatStateForLoopCandidate() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
+  const std::array<u8, 3> jumpToRepeatBytes{0xfe, 0x14, 0x00};
+  const std::array<u8, 3> jumpOrLoopBytes{0xfc, 0x00, 0x00};
+  const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0x0a, 0x00};
+
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, probeRange(3, jumpToRepeatBytes.size()),
+                                    jumpToRepeatBytes);
+  addProbeCommand<ProbeJumpOrLoopForeverCommand>(builder, dialect, Address{10}, probeRange(10, jumpOrLoopBytes.size()),
+                                                 jumpOrLoopBytes);
+  addProbeCommand<ProbeRepeatCommand>(builder, dialect, Address{20}, probeRange(20, repeatBytes.size()), repeatBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "jump-or-loop repeat-state fixture should not report diagnostics");
+  expect(performance.tracks[0].endTick == 12,
+         "jump-or-loop should honor a prior loop target even when a repeat counter is active");
+  expect(countProbeNotesAt(performance.tracks[0], 0) == 1 && countProbeNotesAt(performance.tracks[0], 12) == 0,
+         "jump-or-loop should stop at the declared loop instead of replaying the target under repeat state");
+}
+
 void sequenceVmPreservesJumpOrLoopForeverAsPerformanceMarkers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -807,6 +841,7 @@ void runValueSequenceVmTests() {
   sequenceVmStopsKnownLoopForeverBeforeTargetReplay();
   sequenceVmPreservesKnownLoopForeverAsPerformanceMarkers();
   sequenceVmJumpOrLoopForeverRequiresVisitedDestination();
+  sequenceVmJumpOrLoopForeverIgnoresRepeatStateForLoopCandidate();
   sequenceVmPreservesJumpOrLoopForeverAsPerformanceMarkers();
   sequenceVmPreservesLoopsAsPerformanceMarkers();
   sequenceVmUsesDialectCommandLimitDefault();
