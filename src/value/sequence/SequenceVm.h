@@ -21,11 +21,11 @@ struct BranchResult {
   Effects effects;
 };
 
-// Commands call Emit to add notes, tempo changes, controller changes, and markers.
-// Emit fills in the current tick and source command automatically.
-class Emit {
+// Commands call PerformanceEmitter to add notes, tempo changes, controller changes, and markers.
+// PerformanceEmitter fills in the current tick and source command automatically.
+class PerformanceEmitter {
 public:
-  Emit(PerformanceTrack& track, CommandId sourceCommand, u64 tick);
+  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, u64 tick);
 
   void note(NotePerformanceEvent event);
   void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);

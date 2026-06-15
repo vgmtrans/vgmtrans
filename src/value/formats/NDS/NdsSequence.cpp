@@ -222,11 +222,11 @@ struct Pan : U8Operand<Pan> {
   void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
-struct Volume : U8MidiLevelOutCommand<Volume, &Emit::level> {
+struct Volume : U8MidiLevelOutCommand<Volume, &PerformanceEmitter::level> {
   static constexpr std::string_view operandName = "volume";
 };
 
-struct ExpressionLevel : U8MidiLevelOutCommand<ExpressionLevel, &Emit::expression> {
+struct ExpressionLevel : U8MidiLevelOutCommand<ExpressionLevel, &PerformanceEmitter::expression> {
   static constexpr std::string_view operandName = "expression";
 };
 
@@ -244,7 +244,7 @@ struct PitchBend : S8Operand<PitchBend> {
   void execute(Runtime& rt) const { rt.out.pitchBend(static_cast<s16>(raw * 64)); }
 };
 
-struct PitchBendRange : U8RawOutCommand<PitchBendRange, &Emit::pitchBendRange> {
+struct PitchBendRange : U8RawOutCommand<PitchBendRange, &PerformanceEmitter::pitchBendRange> {
   static constexpr std::string_view operandName = "semitones";
 };
 
@@ -252,11 +252,11 @@ struct ModulationDepth : U8MidiModulationOutCommand<ModulationDepth, ModulationP
   static constexpr std::string_view operandName = "depth";
 };
 
-struct PortamentoSwitch : U8BoolOutCommand<PortamentoSwitch, &Emit::portamentoEnable> {
+struct PortamentoSwitch : U8BoolOutCommand<PortamentoSwitch, &PerformanceEmitter::portamentoEnable> {
   static constexpr std::string_view operandName = "enabled";
 };
 
-struct PortamentoTime : U8RawOutCommand<PortamentoTime, &Emit::portamentoTime> {
+struct PortamentoTime : U8RawOutCommand<PortamentoTime, &PerformanceEmitter::portamentoTime> {
   static constexpr std::string_view operandName = "time";
 };
 

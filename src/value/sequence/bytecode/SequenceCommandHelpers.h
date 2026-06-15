@@ -89,12 +89,12 @@ using SetTrueStateCommand = SetBoolStateCommand<Derived, Member, true>;
 template <class Derived, auto Member>
 using SetFalseStateCommand = SetBoolStateCommand<Derived, Member, false>;
 
-template <class Derived, void (Emit::*Method)(u8)>
+template <class Derived, void (PerformanceEmitter::*Method)(u8)>
 struct U8RawOutCommand : U8Operand<Derived> {
   void execute(auto& rt) const { (rt.out.*Method)(this->raw); }
 };
 
-template <class Derived, void (Emit::*Method)(bool)>
+template <class Derived, void (PerformanceEmitter::*Method)(bool)>
 struct U8BoolOutCommand : U8Operand<Derived> {
   void execute(auto& rt) const { (rt.out.*Method)(this->raw != 0); }
 };
@@ -108,7 +108,7 @@ struct U8MidiModulationOutCommand : U8Operand<Derived> {
 
 // For source level controls that already use MIDI's 0-127 curve. The performance
 // model stores linear gain, so convert before emitting the event.
-template <class Derived, void (Emit::*Method)(double, LevelPrecisionHint),
+template <class Derived, void (PerformanceEmitter::*Method)(double, LevelPrecisionHint),
           LevelPrecisionHint PrecisionHint = LevelPrecisionHint::SevenBit>
 struct U8MidiLevelOutCommand : U8Operand<Derived> {
   void execute(auto& rt) const { (rt.out.*Method)(LevelScale::linearFromMidi7(this->raw), PrecisionHint); }

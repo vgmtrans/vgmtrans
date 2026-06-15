@@ -429,7 +429,7 @@ struct ProbeProgramCommand {
 
   static ProbeProgramCommand parse(CommandReader& in) { return ProbeProgramCommand{.program = in.u8("program")}; }
 
-  Effects execute(ProbeTrackState& state, Emit& out, VmApi&, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState& state, PerformanceEmitter& out, VmApi&, const ProbeSequenceContext&) const {
     state.program = program;
     out.instrument(InstrumentPerformanceEvent{
         .program = program,
@@ -452,7 +452,7 @@ struct ProbeNoteCommand {
     };
   }
 
-  Effects execute(ProbeTrackState& state, Emit& out, VmApi&, const ProbeSequenceContext& context) const {
+  Effects execute(ProbeTrackState& state, PerformanceEmitter& out, VmApi&, const ProbeSequenceContext& context) const {
     // This mirrors a source driver using the current track program as a key bank.
     out.note(NotePerformanceEvent{
         .key = static_cast<double>(state.program * 12 + key),
@@ -473,7 +473,7 @@ struct ProbeJumpCommand {
     return ProbeJumpCommand{.destination = in.le16Address("destination")};
   }
 
-  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.jump(destination)};
   }
 };
@@ -488,7 +488,7 @@ struct ProbeLoopForeverCommand {
     return ProbeLoopForeverCommand{.destination = in.le16Address("destination")};
   }
 
-  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.loopForever(destination)};
   }
 };
@@ -503,7 +503,7 @@ struct ProbeJumpOrLoopForeverCommand {
     return ProbeJumpOrLoopForeverCommand{.destination = in.le16Address("destination")};
   }
 
-  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.jumpOrLoopForever(destination)};
   }
 };
@@ -518,7 +518,7 @@ struct ProbeCallCommand {
     return ProbeCallCommand{.destination = in.le16Address("destination")};
   }
 
-  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.call(destination)};
   }
 };
@@ -529,7 +529,7 @@ struct ProbeReturnCommand {
 
   static ProbeReturnCommand parse(CommandReader&) { return ProbeReturnCommand{}; }
 
-  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.return_()};
   }
 };
@@ -550,7 +550,7 @@ struct ProbeRepeatCommand {
     };
   }
 
-  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
     return vm.repeatUntilEffect(slot, count, destination);
   }
 };
@@ -569,7 +569,7 @@ struct ProbeRepeatBreakCommand {
     };
   }
 
-  Effects execute(ProbeTrackState&, Emit& out, VmApi& vm, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState&, PerformanceEmitter& out, VmApi& vm, const ProbeSequenceContext&) const {
     const BranchResult branch = vm.repeatBreakBranch(slot, destination);
     if (branch.taken) {
       out.instrument(InstrumentPerformanceEvent{.program = 99});
@@ -584,7 +584,7 @@ struct ProbeEndCommand {
 
   static ProbeEndCommand parse(CommandReader&) { return ProbeEndCommand{}; }
 
-  Effects execute(ProbeTrackState&, Emit&, VmApi& vm, const ProbeSequenceContext&) const {
+  Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
     return Effects{.step = vm.end()};
   }
 };

@@ -22,7 +22,7 @@
 
 namespace vgmtrans::core {
 
-class Emit;
+class PerformanceEmitter;
 class ItemTreeBuilder;
 class VmApi;
 
@@ -92,8 +92,8 @@ struct CommandInfo {
 
 using DescribeSourceCommand = void (*)(const SourceCommand&, const TrackProgram&, CommandInfo&,
                                        const std::any& context);
-using ExecuteSourceCommand = Effects (*)(const SourceCommand&, const TrackProgram&, std::any& trackState, Emit& out,
-                                         VmApi& vm, const std::any& context);
+using ExecuteSourceCommand = Effects (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
+                                         PerformanceEmitter& out, VmApi& vm, const std::any& context);
 using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&, const std::any& context);
 
 struct CommandHandler {
@@ -125,7 +125,7 @@ struct SequenceDialect {
 template <class TrackState, class Context>
 struct CommandRuntime {
   TrackState& state;
-  Emit& out;
+  PerformanceEmitter& out;
   VmApi& vm;
   const Context& context;
 
@@ -178,15 +178,15 @@ concept HasRuntimeVoidExecute = requires(const Command& command, CommandRuntime<
 
 template <class Command, class TrackState, class Context>
 concept HasLegacyExecute =
-    requires(const Command& command, TrackState& state, Emit& out, VmApi& vm, const Context& context) {
+    requires(const Command& command, TrackState& state, PerformanceEmitter& out, VmApi& vm, const Context& context) {
       { command.execute(state, out, vm, context) } -> std::same_as<Effects>;
     };
 
 inline void describePreservedSourceCommand(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any&) {
 }
 
-inline Effects executePreservedSourceCommand(const SourceCommand&, const TrackProgram&, std::any&, Emit&, VmApi&,
-                                             const std::any&) {
+inline Effects executePreservedSourceCommand(const SourceCommand&, const TrackProgram&, std::any&, PerformanceEmitter&,
+                                             VmApi&, const std::any&) {
   return Effects::none();
 }
 
@@ -216,8 +216,8 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
 }
 
 template <class Command, class TrackState, class Context>
-Effects executeCommand(const SourceCommand& record, const TrackProgram& track, std::any& trackState, Emit& out,
-                       VmApi& vm, const std::any& context) {
+Effects executeCommand(const SourceCommand& record, const TrackProgram& track, std::any& trackState,
+                       PerformanceEmitter& out, VmApi& vm, const std::any& context) {
   // SourceCommand stores bytes and IDs, while format code expects its own command
   // and track-state types. Do the casts here before calling execute().
   CommandReader reader{record.range, track.bytesFor(record)};
