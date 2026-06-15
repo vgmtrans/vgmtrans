@@ -65,8 +65,8 @@ struct CommandOperand {
   SourceRange range;
 };
 
-// A SourceCommand is the immutable decoded record for one source opcode. It
-// stores source bytes and operands, but leaves musical behavior to the dialect.
+// One decoded source opcode. It keeps the original bytes, named operands, source
+// range, and the handler ID used to find the driver-specific behavior.
 struct SourceCommand {
   CommandId id;
   CommandHandlerId handler;
@@ -79,8 +79,8 @@ struct SourceCommand {
   OperandSpan operands;
 };
 
-// DecodeFlow is bytecode-discovery flow, not playback flow. It tells walkers
-// which source addresses may need decoding before the VM executes commands.
+// Where decoding can continue after an opcode. Walkers use this before playback
+// so jumps and calls can point at commands that have already been decoded.
 struct DecodeFlow {
   enum class Kind {
     Fallthrough,
@@ -130,8 +130,8 @@ struct DecodeFlow {
   [[nodiscard]] bool callTarget() const noexcept { return kind == Kind::Call && !staticTargets.empty(); }
 };
 
-// CommandReader lets format-local command structs parse source operands once,
-// while automatically capturing named operand metadata for HexView/UI details.
+// Command structs use this to read operands. If an operand vector is supplied,
+// each read also records a name, value, and source byte range for the UI.
 class CommandReader {
 public:
   CommandReader(SourceRange commandRange, std::span<const u8> bytes, std::vector<CommandOperand>* operands = nullptr);
@@ -166,9 +166,8 @@ private:
   size_t position_ = 1;
 };
 
-// AddressIndex is the VM's fast bridge from source-driver addresses to decoded
-// command records. It also enforces the invariant that a track decodes each
-// source address at most once.
+// Maps source addresses to command indexes. The VM uses this for jumps, calls,
+// and finding the next command by source address when vector order is different.
 struct AddressIndex {
   std::unordered_map<u64, u32> commandByAddress;
 
@@ -199,8 +198,8 @@ struct SequenceInstrumentRef {
   std::optional<SourceRange> range;
 };
 
-// SequenceProgramBehavior keeps driver-wide playback choices near the parsed
-// sequence, while still allowing dialect defaults and export options to fill in.
+// Driver settings that affect playback but are not individual source commands,
+// such as loop policy or initial channel state.
 struct SequenceProgramBehavior {
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
   // Zero means "use the next default": program -> dialect -> VM fallback.
@@ -247,8 +246,8 @@ public:
   const SourceCommand& add(CommandHandlerId handler, CommandKindId kind, Address address, SourceRange range,
                            std::span<const u8> bytes) {
     std::vector<CommandOperand> decodedOperands;
-    // Parse through the same CommandReader used at execution time so stored
-    // operands and runtime command interpretation cannot drift apart.
+    // Decode once while adding the command, using the same parser that will be
+    // used later to describe or execute it.
     CommandReader reader{range, bytes, &decodedOperands};
     static_cast<void>(Command::parse(reader));
     if (!reader.done()) {

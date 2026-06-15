@@ -81,8 +81,8 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
       std::move(bytes));
 }
 
-// Scans one source exactly once. Derived sources are discovered and scanned by
-// the same transaction, so callers do not need to manually chase extracted data.
+// Scan this source if it has not been scanned yet. Any files extracted from it are
+// added as derived sources and scanned before this call returns.
 SessionSnapshot Session::scanSource(SourceId id) {
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
@@ -97,8 +97,8 @@ SessionSnapshot Session::scanSource(SourceId id) {
   return snapshot();
 }
 
-// Convenience path for tests and shell commands: scan user-loaded sources that
-// have not been scanned yet, leaving derived sources to their parent scan.
+// Scan every user-loaded source that is still pending. Derived sources are skipped
+// here because scanning their parent source already scans them.
 SessionSnapshot Session::scanPendingSources() {
   bool scannedAny = false;
   const size_t sourceCount = sources_.sourceCount();
@@ -142,9 +142,8 @@ std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest&
   return core::exportAllCollections(current, sources_, request, dialects_);
 }
 
-// Walks the append-only extraction graph produced by this scan. New derived
-// sources are queued immediately so archives, PSF images, and SPC RAM can feed
-// normal format modules in the same pass.
+// Scan the requested source, then scan any sources extracted from it. This lets an
+// archive or container produce bytes that normal format modules can parse.
 void Session::scanSourceAndDerived(SourceId id) {
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
@@ -158,8 +157,8 @@ void Session::scanSourceAndDerived(SourceId id) {
   }
 }
 
-// Runs every registered module that claims the source, appends discovered data,
-// and queues any extracted sources. The scanned set makes repeat calls no-ops.
+// Run every module that recognizes this source. Assets, match facts, diagnostics,
+// and extracted sources are appended to the session.
 void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued) {
   if (!scannedSources_.insert(id.value).second) {
     return;
@@ -213,8 +212,8 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
   }
 }
 
-// Re-evaluates collection resolvers over the current facts. This does not erase
-// collections; reconcileCollections updates existing keys and appends new ones.
+// Ask registered formats which collections should exist for the current assets and
+// match facts, then merge those answers into the session.
 void Session::rebuildCollections() {
   const auto current = snapshot();
 
@@ -237,8 +236,8 @@ void Session::rebuildCollections() {
   reconcileCollections(std::move(desiredCollections));
 }
 
-// Keeps collection identities stable as new files complete previous partial
-// matches, such as an instrument bank loaded before its sequence.
+// Update an existing collection when a resolver returns the same key; otherwise
+// create a new collection with a new ID.
 void Session::reconcileCollections(std::vector<DesiredCollection> desiredCollections) {
   for (const auto& desired : desiredCollections) {
     if (desired.key.resolver.empty() || desired.key.value.empty()) {

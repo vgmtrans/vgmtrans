@@ -21,8 +21,8 @@ struct BranchResult {
   Effects effects;
 };
 
-// Emit is the command author's small output API. It attaches source-command IDs
-// and ticks automatically so exported events remain traceable to byte ranges.
+// Commands call Emit to add notes, tempo changes, controller changes, and markers.
+// Emit fills in the current tick and source command automatically.
 class Emit {
 public:
   Emit(PerformanceTrack& track, CommandId sourceCommand, u64 tick);
@@ -73,8 +73,8 @@ private:
   u64 tick_ = 0;
 };
 
-// VmApi exposes shared driver mechanics to command structs: stepping, branching,
-// calls, repeats, diagnostics, and the current tick.
+// Commands use VmApi for playback flow that is shared across formats: next, end,
+// jump, call, return, repeat handling, diagnostics, and current tick.
 class VmApi {
 public:
   [[nodiscard]] Step next() const noexcept;
@@ -85,8 +85,8 @@ public:
   [[nodiscard]] Step call(Address destination) const noexcept;
   [[nodiscard]] Step return_() const noexcept;
 
-  // Common repeat handling stays in the VM so loop policy and dry-run logic can
-  // eventually reason about repeat commands without each format reimplementing it.
+  // Formats provide the repeat slot, count, and target; the VM owns the counters
+  // and applies loop policy consistently.
   [[nodiscard]] Step repeatUntil(u8 slot, u32 count, Address destination);
   [[nodiscard]] Step repeatBreak(u8 slot, Address destination);
   [[nodiscard]] Effects repeatUntilEffect(u8 slot, u32 count, Address destination);
@@ -112,8 +112,10 @@ struct SequenceVmOptions {
   u32 sequenceLoops = 0;
 };
 
-// SequenceVm turns a parsed source-driver program into target-neutral
-// performance events. MIDI or other exporters consume that later.
+// SequenceVm turns a parsed source-driver program into target-neutral performance events.
+// It walks each track, asks the SequenceDialect to execute each SourceCommand, advances time
+// from the returned Effects, and handles jumps, calls, repeats, loop policy, and diagnostics.
+// MIDI or other exporters consume the resulting PerformanceSequence later.
 class SequenceVm {
 public:
   SequenceVm() = default;
