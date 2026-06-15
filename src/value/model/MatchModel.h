@@ -98,6 +98,21 @@ struct MatchFact {
 enum class CollectionStatus {
   Complete,
   Incomplete,
+  Ambiguous,
+  Stale,
+};
+
+enum class CollectionOrigin {
+  Discovered,
+  UserCreated,
+};
+
+struct CollectionIssue {
+  Severity severity = Severity::Info;
+  std::string code;
+  std::string message;
+  std::optional<AssetId> asset;
+  std::optional<SourceRange> range;
 };
 
 struct DesiredCollection {
@@ -108,6 +123,8 @@ struct DesiredCollection {
   std::vector<AssetId> sampleCollections;
   std::vector<AssetId> miscAssets;
   CollectionStatus status = CollectionStatus::Complete;
+  CollectionOrigin origin = CollectionOrigin::Discovered;
+  std::vector<CollectionIssue> issues;
 };
 
 }  // namespace vgmtrans::core

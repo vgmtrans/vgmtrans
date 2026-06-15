@@ -392,6 +392,24 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       found->status = CollectionStatus::Complete;
     }
   }
+  for (auto& collection : collections) {
+    if (!collection.sequence) {
+      collection.status = CollectionStatus::Incomplete;
+      collection.issues.push_back(CollectionIssue{
+          .severity = Severity::Warning,
+          .code = "missing-sequence",
+          .message = "Probe bank collection has no sequence",
+      });
+    }
+    if (collection.instrumentSets.empty()) {
+      collection.status = CollectionStatus::Incomplete;
+      collection.issues.push_back(CollectionIssue{
+          .severity = Severity::Warning,
+          .code = "missing-instrument-set",
+          .message = "Probe bank collection has no instrument set",
+      });
+    }
+  }
   return collections;
 }
 
@@ -410,6 +428,85 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .name = "ProbeBankInstrument",
       .canScan = canScanProbeBankInstruments,
       .scan = scanProbeBankInstruments,
+  };
+}
+
+[[nodiscard]] bool canScanProbeDuplicateAssets(const SourceFile&, std::span<const u8> bytes) {
+  return !bytes.empty() && bytes[0] == 0xee;
+}
+
+[[nodiscard]] ScanResult scanProbeDuplicateAssets(const ScanInput& input) {
+  return ScanResult{
+      .assets = {MiscAsset{
+                     .metadata =
+                         AssetMetadata{
+                             .id = AssetId{7},
+                             .format = "ProbeDuplicate",
+                             .name = "First duplicate",
+                             .range = input.reader.range(0, input.reader.size()),
+                         },
+                 },
+                 MiscAsset{
+                     .metadata =
+                         AssetMetadata{
+                             .id = AssetId{7},
+                             .format = "ProbeDuplicate",
+                             .name = "Second duplicate",
+                             .range = input.reader.range(0, input.reader.size()),
+                         },
+                 }},
+  };
+}
+
+[[nodiscard]] FormatModule probeDuplicateAssetModule() {
+  return FormatModule{
+      .name = "ProbeDuplicate",
+      .canScan = canScanProbeDuplicateAssets,
+      .scan = scanProbeDuplicateAssets,
+  };
+}
+
+[[nodiscard]] bool canScanProbeBadExtractedSource(const SourceFile&, std::span<const u8> bytes) {
+  return !bytes.empty() && bytes[0] == 0xf1;
+}
+
+[[nodiscard]] ScanResult scanProbeBadExtractedSource(const ScanInput& input) {
+  ScanResult result;
+  result.extractedSources.push_back(ExtractedSource{
+      .file = SourceFile{.name = "bad-parent.child"},
+      .bytes = {0xbb},
+      .origin = SourceRange{.source = SourceId{99}, .offset = 0, .size = 1},
+  });
+  return result;
+}
+
+[[nodiscard]] FormatModule probeBadExtractedSourceModule() {
+  return FormatModule{
+      .name = "ProbeBadExtracted",
+      .canScan = canScanProbeBadExtractedSource,
+      .scan = scanProbeBadExtractedSource,
+  };
+}
+
+[[nodiscard]] bool canScanNever(const SourceFile&, std::span<const u8>) {
+  return false;
+}
+
+[[nodiscard]] ScanResult scanNothing(const ScanInput&) {
+  return {};
+}
+
+[[nodiscard]] std::vector<DesiredCollection> throwingProbeSequenceResolver(const MatchContext&) {
+  throw std::runtime_error("resolver exploded");
+}
+
+[[nodiscard]] FormatModule throwingProbeSequenceResolverModule() {
+  return FormatModule{
+      .name = "ProbeSequenceThrowingResolver",
+      .canScan = canScanNever,
+      .scan = scanNothing,
+      .collectionResolver = "ProbeSequence",
+      .resolveCollections = throwingProbeSequenceResolver,
   };
 }
 
