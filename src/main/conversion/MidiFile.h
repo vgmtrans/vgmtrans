@@ -316,7 +316,7 @@ class NoteEvent
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
   bool bNoteDown;
-  s8 key;
+  u8 key;
   s8 vel;
 };
 

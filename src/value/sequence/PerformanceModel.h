@@ -27,6 +27,8 @@ struct NotePerformanceEvent {
   // are applied only by MIDI-like renderers.
   double linearVelocity = 1.0;
   u32 durationTicks = 0;
+  // The source format already decided this note extends the previous emitted note.
+  // Renderers should not re-test pitch after target-specific transforms such as global transpose.
   bool extendsPrevious = false;
 };
 
