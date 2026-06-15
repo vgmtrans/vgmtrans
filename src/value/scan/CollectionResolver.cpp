@@ -34,6 +34,8 @@ void addMember(DesiredCollection& collection, AssetId asset, CollectionMemberRol
 
 std::vector<DesiredCollection> resolveCollectionMemberFacts(const MatchContext& context, std::string_view resolver,
                                                             std::string_view format) {
+  // Group member facts by CollectionKey so files loaded at different times can
+  // still complete the same collection.
   std::map<std::pair<std::string, std::string>, DesiredCollection> grouped;
 
   for (const auto& fact : context.snapshot.matchFacts) {

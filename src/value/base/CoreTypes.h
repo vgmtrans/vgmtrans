@@ -14,9 +14,8 @@
 
 namespace vgmtrans::core {
 
-// Tiny ID wrappers make cross-asset references explicit without turning every
-// model object into a heap-allocated node. invalidIdValue marks optional or
-// not-yet-assigned IDs throughout the value model.
+// IDs are stored as small values so assets can refer to each other without owning
+// each other. invalidIdValue marks optional or not-yet-assigned IDs.
 inline constexpr u32 invalidIdValue = std::numeric_limits<u32>::max();
 
 struct SourceId {
@@ -54,9 +53,8 @@ struct TrackId {
   friend constexpr bool operator==(TrackId, TrackId) noexcept = default;
 };
 
-// SourceRange is the shared breadcrumb back to user-loaded or derived bytes.
-// UI item trees, diagnostics, and source-backed commands all use this rather
-// than storing format-specific address metadata in separate side channels.
+// A byte range inside a user-loaded or derived source. Parsed objects, diagnostics,
+// and UI items use this to point back to the bytes they came from.
 struct SourceRange {
   SourceId source;
   u64 offset = 0;

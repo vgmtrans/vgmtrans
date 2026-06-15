@@ -26,7 +26,8 @@ public:
   void reserveAfter(ItemId id) noexcept;
 
 private:
-  // Scan results may provide stable IDs explicitly; generated IDs advance past them.
+  // Formats may assign IDs explicitly when they need cross-references. Generated
+  // IDs always advance past any explicit IDs already seen.
   u32 nextAssetId_ = 0;
   u32 nextCollectionId_ = 0;
   u32 nextItemId_ = 0;
@@ -42,7 +43,7 @@ class ItemTreeBuilder {
 public:
   ItemTreeBuilder(ItemTree& tree, ScanIdAllocator& ids);
 
-  // Keeps parent child-lists current while format parsers build source-backed UI trees.
+  // Adds a UI item and updates the parent's child list at the same time.
   [[nodiscard]] ItemId add(std::optional<ItemId> parent, ItemKind kind, std::string detailKind, std::string name,
                            SourceRange range, std::string description = {});
 

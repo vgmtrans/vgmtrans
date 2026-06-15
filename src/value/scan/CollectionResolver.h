@@ -13,9 +13,8 @@
 
 namespace vgmtrans::core {
 
-// Common resolver for formats that already know an asset belongs to a discovered
-// collection while scanning. More complex formats can still provide their own
-// resolver over IDs, filenames, sample coverage, or format-specific facts.
+// Resolver for the common case where scanners emit CollectionMemberFact records.
+// Formats with looser matching rules can provide their own resolver instead.
 [[nodiscard]] std::vector<DesiredCollection> resolveCollectionMemberFacts(const MatchContext& context,
                                                                           std::string_view resolver,
                                                                           std::string_view format = {});

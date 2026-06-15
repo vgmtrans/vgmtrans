@@ -30,7 +30,7 @@ struct SourceFile {
   std::filesystem::path path;
   u64 size = 0;
   // Derived sources are real session entries, such as archive members, SPC RAM,
-  // or PSF executable images. Parent and origin metadata record where they came from.
+  // or PSF executable images. parent/origin record where they came from.
   std::optional<SourceId> parent;
   std::optional<SourceRange> origin;
 
@@ -48,7 +48,8 @@ public:
   [[nodiscard]] bool has(u64 offset, u64 size) const noexcept;
   [[nodiscard]] SourceRange range(u64 offset, u64 size) const noexcept;
 
-  // Reads are bounds-checked; callers use has() when malformed data should stop parsing.
+  // Reads throw on out-of-range access. Use has() first when malformed data should
+  // stop parsing without an exception.
   [[nodiscard]] u8 u8At(u64 offset) const;
   [[nodiscard]] s8 s8At(u64 offset) const;
   [[nodiscard]] u16 le16(u64 offset) const;
@@ -67,8 +68,8 @@ private:
 };
 
 struct ExtractedSource {
-  // Format modules return extracted bytes here; Session appends them as derived
-  // sources so they can be inspected and scanned by later modules.
+  // Format modules return extracted bytes here. Session appends them as derived
+  // sources so they can be inspected and scanned like user-loaded files.
   SourceFile file;
   std::vector<u8> bytes;
   std::optional<SourceRange> origin;
@@ -76,8 +77,8 @@ struct ExtractedSource {
 
 class SourceStore {
 public:
-  // SourceStore owns all bytes referenced by SourceRange. Assets copy only SourceRange
-  // values, which keeps SessionSnapshot values small and diagnostics precise.
+  // SourceStore owns all bytes referenced by SourceRange. Assets copy SourceRange
+  // values instead of copying source bytes.
   SourceId add(SourceFile file, std::vector<u8> bytes);
   SourceId addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::optional<SourceRange> origin);
 

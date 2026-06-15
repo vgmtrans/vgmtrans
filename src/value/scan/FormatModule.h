@@ -21,8 +21,8 @@ struct MatchContext {
 };
 
 struct FormatModule {
-  // A format module is a copyable descriptor, not an inherited plugin object. Registration
-  // is therefore cheap, deterministic, and free of lifetime concerns.
+  // Function table registered by one format. Session calls canScan() first, then scan(),
+  // and later resolveCollections() after new assets and facts have been added.
   using CanScan = bool (*)(const SourceFile& source, std::span<const u8> bytes);
   using Scan = ScanResult (*)(const ScanInput& input);
   using ResolveCollections = std::vector<DesiredCollection> (*)(const MatchContext& context);
@@ -31,8 +31,8 @@ struct FormatModule {
   // canScan should be cheap and non-mutating; scan does the full parse once selected.
   CanScan canScan = nullptr;
   Scan scan = nullptr;
-  // Defaults to name when empty. Set this when a module owns a resolver whose
-  // stable collection keys intentionally use a different namespace.
+  // Defaults to name when empty. Set this when a resolver intentionally uses a
+  // different key prefix for its collections.
   std::string_view collectionResolver;
   ResolveCollections resolveCollections = nullptr;
 };

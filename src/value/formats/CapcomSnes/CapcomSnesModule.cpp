@@ -53,7 +53,7 @@ void addCapcomCollectionMember(ScanResult& result, const ScanInput& input, Asset
     return {};
   }
 
-  // The module only orchestrates value construction; layout, sequence, and synth parsing stay isolated.
+  // Keep this file as wiring: layout discovery, sequence parsing, and synth parsing each stay in their own file.
   const std::string displayName = capcomSnesSourceDisplayName(input.source);
   const auto sequenceId = input.ids.nextAssetId();
   const auto instrumentSetId = input.ids.nextAssetId();

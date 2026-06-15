@@ -15,9 +15,8 @@
 
 namespace vgmtrans::core {
 
-// SynthModel represents sample-backed instruments before choosing an output container
-// such as SF2, DLS, or eventually a tracker instrument format. Values are normalized
-// enough to share exporters, but source ranges and codec metadata remain available.
+// Common instrument and sample data after scanning. Format scanners fill this once,
+// then SF2, DLS, WAV, or future exporters choose how to write it.
 
 constexpr double kDefaultInstrumentReverbSend = 0.25;
 
@@ -32,8 +31,8 @@ struct VelocityRange {
 };
 
 struct SampleRef {
-  // Region sample indexes are local to the referenced SampleCollectionAsset. Keeping the
-  // collection optional lets incomplete scans report diagnostics instead of crashing.
+  // index is local to collection. collection may be empty when a format implies
+  // "use the collection paired with this instrument set".
   std::optional<AssetId> collection;
   u32 index = 0;
 };
@@ -96,16 +95,16 @@ struct SynthGenerator {
 };
 
 struct SynthModulator {
-  // Missing source means a constant/default modulator. Exporters map these to the closest
-  // concept available in SF2/DLS rather than inventing per-format parser code.
+  // Empty source means the modulation is always active, such as a default vibrato
+  // amount attached to an instrument.
   std::optional<SynthSource> source;
   SynthDestination destination = SynthDestination::Unknown;
   s32 amount = 0;
 };
 
 struct Region {
-  // Region is the common zone abstraction: key/velocity selection, sample reference,
-  // tuning, envelope, and per-zone placement.
+  // One playable zone inside an instrument: key/velocity range, sample reference,
+  // tuning, envelope, pan, and attenuation.
   KeyRange keyRange;
   VelocityRange velocityRange;
   SampleRef sample;
@@ -120,8 +119,8 @@ struct Region {
 };
 
 struct Instrument {
-  // Bank/program are the public selection identity. The vectors below describe how the
-  // instrument sounds once selected.
+  // Bank/program select the instrument. regions/generators/modulators describe
+  // how it sounds once selected.
   u32 bank = 0;
   u32 program = 0;
   double reverb = kDefaultInstrumentReverbSend;
@@ -157,8 +156,8 @@ struct Loop {
 struct Sample {
   std::string name;
   AudioCodec codec = AudioCodec::Unknown;
-  // Encoded bytes stay in SourceStore. That keeps assets cheap to copy and lets exporters
-  // decode with source-aware diagnostics.
+  // Encoded bytes stay in SourceStore. Samples keep only a source range plus the
+  // codec settings needed to decode it later.
   SourceRange encodedData;
   u32 sampleRate = 0;
   u8 channels = 1;
@@ -179,7 +178,7 @@ struct SampleCollectionAsset {
 };
 
 struct DecodedSample {
-  // Decoders return interleaved signed PCM16, the common handoff format for WAV/SF2/DLS.
+  // Interleaved signed PCM16 used by WAV, SF2, and DLS exporters.
   u32 sampleRate = 0;
   u8 channels = 1;
   std::vector<s16> pcm;

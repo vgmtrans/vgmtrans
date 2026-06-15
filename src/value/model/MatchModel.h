@@ -15,8 +15,8 @@
 
 namespace vgmtrans::core {
 
-// Match facts are durable scanner output. They replace legacy matcher pointers
-// with small value records that collection resolvers can inspect across loads.
+// Scanners emit MatchFact records when assets may belong together. Collection
+// resolvers read the accumulated facts and decide which collections should exist.
 
 enum class MatchScopeKind {
   Session,
@@ -24,6 +24,8 @@ enum class MatchScopeKind {
 };
 
 struct CollectionKey {
+  // Stable identity for a resolved collection. The same key updates the same
+  // collection when more sources are loaded later.
   std::string resolver;
   std::string value;
 
@@ -67,6 +69,7 @@ struct SampleRequirementFact {
 };
 
 struct CollectionMemberFact {
+  // Simple case: the scanner already knows this asset belongs to this collection.
   CollectionKey key;
   std::string collectionName;
   CollectionMemberRole role = CollectionMemberRole::Misc;

@@ -232,8 +232,8 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
     return std::nullopt;
   }
 
-  // The value model points encodedData at the nibble stream. The four-byte ADPCM predictor
-  // header lives immediately before that range in SWAV data.
+  // Sample::encodedData starts at the ADPCM nibble stream. SWAV stores the predictor header in
+  // the four bytes immediately before it.
   const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
   const u32 headerOffset = static_cast<u32>(sample.encodedData.offset - 4);
   const u32 header =

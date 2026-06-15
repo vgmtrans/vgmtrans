@@ -205,8 +205,8 @@ CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, Collec
 }
 
 CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, const Collection& collection) {
-  // Export code should not have to duplicate ID lookup and diagnostic policy. Resolve all
-  // optional references once and return the usable assets plus any broken-reference errors.
+  // Resolve collection references once before export. The returned pointers are the usable
+  // assets; diagnostics describe any missing or wrong-type references.
   CollectionAssets resolved{
       .collection = &collection,
   };

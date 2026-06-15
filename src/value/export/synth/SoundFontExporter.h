@@ -32,6 +32,8 @@ struct SoundFontResult {
   std::vector<Diagnostic> diagnostics;
 };
 
+// Writes resolved instrument/sample assets as an SF2 container. Sample bytes are
+// decoded through SourceStore so source-backed diagnostics remain available.
 class SoundFontExporter {
 public:
   [[nodiscard]] SoundFontResult exportSoundFont(const SoundFontInput& input, const SourceStore& sources) const;

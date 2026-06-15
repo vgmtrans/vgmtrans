@@ -33,19 +33,19 @@ enum class MidiBankSelectStyle {
 };
 
 struct MidiExportOptions {
-  // Auto follows the source precision hints recorded in PerformanceSequence.
+  // Auto follows the precision hints written by SequenceVm.
   MidiLevelResolution volumeResolution = MidiLevelResolution::Auto;
   MidiLevelResolution expressionResolution = MidiLevelResolution::Auto;
   bool skipChannel10 = true;
   MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
 };
 
-// ExportRequest is policy, not parsed data. Callers choose which containers to
-// write and how to lower ambiguous behavior such as loops or modulation ranges.
+// ExportRequest is policy, not parsed data. Callers choose which files to write
+// and how to handle loops, MIDI channels, and synth modulation scaling.
 struct ExportRequest {
   std::vector<ExportKind> kinds;
   LoopPolicy loopPolicy = LoopPolicy::Default;
-  // Extra repeats after the initial playthrough. This mirrors the legacy
+  // Extra repeats after the initial playthrough. This is the user-facing
   // "Sequence Loops" setting: 0 means stop at the first infinite-loop point.
   u32 sequenceLoops = 0;
   MidiExportOptions midi;

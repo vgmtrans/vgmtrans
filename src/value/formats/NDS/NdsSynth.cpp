@@ -288,7 +288,7 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
                                          const std::string& name, AssetId psgCollection,
                                          const std::array<std::optional<AssetId>, 4>& waveCollections) {
   // SBNK instruments fan out by type: single region, PSG pulse/noise, drumset, or
-  // key-split multi-region. Each case fills the same value Instrument shape.
+  // key-split multi-region. Each case fills the same Instrument fields.
   InstrumentSetAsset asset{
       .metadata =
           AssetMetadata{

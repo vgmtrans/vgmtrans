@@ -15,8 +15,8 @@
 namespace vgmtrans::core {
 
 struct ObservedValueRange {
-  // Stores the actual values seen in a sequence. Synth exporters use this to avoid
-  // mapping a tiny real vibrato range across the full theoretical controller range.
+  // Min/max controller values that actually occur in the rendered sequence.
+  // Synth exporters can use this to improve resolution for small vibrato/tremolo ranges.
   bool observed = false;
   u32 min = 0;
   u32 max = 0;
@@ -32,9 +32,8 @@ struct MidiTrackModulationUsage {
 };
 
 struct MidiModulationUsage {
-  // Controller-level usage reflects the MIDI controller range consumed by SF2/DLS
-  // modulators. Prefer deriving it from PerformanceSequence when possible so source
-  // driver semantics stay above MIDI rendering.
+  // Aggregate modulation usage for the whole sequence plus per-track detail.
+  // Prefer analyzing PerformanceSequence so source meaning is read before MIDI quantization.
   ObservedValueRange vibratoDepth;
   ObservedValueRange vibratoRate;
   ObservedValueRange tremoloDepth;

@@ -12,6 +12,8 @@
 
 namespace vgmtrans::core {
 
+// Converts SequenceVm output into MIDI events. This is where parsed performance
+// values become MIDI channels, ports, controller numbers, and quantized controller values.
 class PerformanceMidiRenderer {
 public:
   [[nodiscard]] MidiSequence render(const PerformanceSequence& performance, MidiExportOptions options = {}) const;
