@@ -23,6 +23,8 @@ struct LinearBytecodeDecodePolicy {
   bool followUnconditionalJumps = true;
 };
 
+// Linear decoding matches drivers whose tracks are physically laid out in the
+// order they play, with optional following of one-way jumps.
 template <class DecodeCommand>
 [[nodiscard]] TrackProgram decodeLinearBytecodeTrack(ByteReader reader, u32 sourceTrackNumber, u32 startAddress,
                                                      LinearBytecodeDecodePolicy policy, DecodeCommand decodeCommand) {
@@ -68,6 +70,9 @@ struct ReachableBytecodeDecodePolicy {
   u32 maxCommands = 262144;
 };
 
+// Reachable-block decoding discovers all statically reachable source blocks
+// before appending commands in address order. That keeps snapshots stable even
+// when calls and jumps lead to out-of-order bytecode.
 template <class DecodeCommand>
 [[nodiscard]] TrackProgram decodeReachableBytecodeBlocks(ByteReader reader, u32 bytecodeEnd, u32 startOffset,
                                                          u32 trackIndex, ReachableBytecodeDecodePolicy policy,
@@ -89,6 +94,8 @@ template <class DecodeCommand>
            decodedCommands < policy.maxCommands) {
       auto decoded = decodeCommand(offset);
       ++decodedCommands;
+      // Static targets become new pending blocks. Fallthrough continues the
+      // current block so ordinary linear command runs stay cheap.
       for (const Address target : decoded.flow.staticTargets) {
         if (target.value < bytecodeEnd && !commandsByOffset.contains(target.value)) {
           pendingBlocks.push_back(target.value);

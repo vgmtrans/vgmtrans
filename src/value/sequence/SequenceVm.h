@@ -21,6 +21,8 @@ struct BranchResult {
   Effects effects;
 };
 
+// Emit is the command author's small output API. It attaches source-command IDs
+// and ticks automatically so exported events remain traceable to byte ranges.
 class Emit {
 public:
   Emit(PerformanceTrack& track, CommandId sourceCommand, u64 tick);
@@ -71,6 +73,8 @@ private:
   u64 tick_ = 0;
 };
 
+// VmApi exposes shared driver mechanics to command structs: stepping, branching,
+// calls, repeats, diagnostics, and the current tick.
 class VmApi {
 public:
   [[nodiscard]] Step next() const noexcept;
@@ -108,6 +112,8 @@ struct SequenceVmOptions {
   u32 sequenceLoops = 0;
 };
 
+// SequenceVm turns a parsed source-driver program into target-neutral
+// performance events. MIDI or other exporters consume that later.
 class SequenceVm {
 public:
   SequenceVm() = default;
