@@ -33,7 +33,7 @@ struct FormatModule {
   Scan scan = nullptr;
   // Defaults to name when empty. Set this when a resolver intentionally uses a
   // different key prefix for its collections.
-  std::string_view collectionResolver;
+  std::string_view collectionResolverId;
   ResolveCollections resolveCollections = nullptr;
 };
 

@@ -45,12 +45,17 @@ public:
   [[nodiscard]] SequenceDialectRegistry& dialects() noexcept { return dialects_; }
 
 private:
+  void sealRegistries() noexcept;
   void scanSourceAndDerived(SourceId id);
   void scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued);
+  void validateScanResult(const ScanResult& result) const;
+  [[nodiscard]] bool assetExists(AssetId id) const noexcept;
   void appendScanAssets(std::vector<Asset> assets, SourceId owner);
   void removeDiscoveredDataForSources(const std::vector<SourceId>& sources);
   void rebuildCollections();
+  [[nodiscard]] CollectionId nextCollectionId();
   void reconcileCollections(std::string_view resolverId, std::vector<DesiredCollection> desiredCollections);
+  void validateDesiredCollectionReferences(std::string_view resolverId, DesiredCollection& desired);
   void markCollectionsStaleForAssets(const std::unordered_set<u32>& assetIds);
 
   SourceStore sources_;

@@ -93,6 +93,7 @@ void addMissingSequenceDialectDiagnostics(SessionSnapshot& snapshot, const Seque
 }  // namespace
 
 SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
+  sealRegistries();
   file.kind = SourceKind::UserLoaded;
   return sources_.add(std::move(file), std::move(bytes));
 }
@@ -127,6 +128,7 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
 }
 
 SessionSnapshot Session::removeSource(SourceId id) {
+  sealRegistries();
   if (!sources_.hasSlot(id)) {
     throw std::out_of_range("Cannot remove a SourceId that is not present in the Session");
   }
@@ -148,6 +150,7 @@ SessionSnapshot Session::removeSource(SourceId id) {
 // Scan this source if it has not been scanned yet. Any files extracted from it are
 // added as derived sources and scanned before this call returns.
 SessionSnapshot Session::scanSource(SourceId id) {
+  sealRegistries();
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
@@ -164,6 +167,7 @@ SessionSnapshot Session::scanSource(SourceId id) {
 // Scan every user-loaded source that is still pending. Derived sources are skipped
 // here because scanning their parent source already scans them.
 SessionSnapshot Session::scanPendingSources() {
+  sealRegistries();
   bool scannedAny = false;
   for (const SourceId source : sources_.activeUserSources()) {
     if (scannedSources_.contains(source.value)) {
@@ -202,6 +206,11 @@ std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportReq
 std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest& request) const {
   const auto current = snapshot();
   return core::exportAllCollections(current, sources_, request, dialects_);
+}
+
+void Session::sealRegistries() noexcept {
+  formats_.seal();
+  dialects_.seal();
 }
 
 // Scan the requested source, then scan any sources extracted from it. This lets an
@@ -251,6 +260,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           .ids = ids_,
       });
       normalizeScanResult(result, ids_);
+      validateScanResult(result);
 
       appendScanAssets(std::move(result.assets), source.id);
       matchFacts_.insert(matchFacts_.end(), std::make_move_iterator(result.matchFacts.begin()),
@@ -286,6 +296,43 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
                                           SourceRange{.source = source.id, .offset = 0, .size = source.size}));
     }
   }
+}
+
+void Session::validateScanResult(const ScanResult& result) const {
+  std::unordered_set<u32> batchAssetIds;
+  for (const auto& asset : result.assets) {
+    const auto id = metadata(asset).id;
+    if (!id.valid()) {
+      throw std::invalid_argument("Scan result contained an asset without an id");
+    }
+    if (!batchAssetIds.insert(id.value).second) {
+      throw std::invalid_argument("Scan result contained duplicate asset id " + std::to_string(id.value));
+    }
+    if (assetExists(id)) {
+      throw std::invalid_argument("Scan result reused existing asset id " + std::to_string(id.value));
+    }
+  }
+
+  for (const auto& fact : result.matchFacts) {
+    if (!fact.asset.valid()) {
+      throw std::invalid_argument("Scan result contained a match fact without an asset id");
+    }
+    if (!batchAssetIds.contains(fact.asset.value) && !assetExists(fact.asset)) {
+      throw std::invalid_argument("Scan result contained a match fact for missing asset id " +
+                                  std::to_string(fact.asset.value));
+    }
+    if (fact.scope.kind == MatchScopeKind::Source && !fact.scope.source) {
+      throw std::invalid_argument("Scan result contained a source-scoped match fact without a source id");
+    }
+    if (fact.scope.source && !sources_.contains(*fact.scope.source)) {
+      throw std::invalid_argument("Scan result contained a match fact for missing source id " +
+                                  std::to_string(fact.scope.source->value));
+    }
+  }
+}
+
+bool Session::assetExists(AssetId id) const noexcept {
+  return id.valid() && assetSourceOwners_.contains(id.value);
 }
 
 void Session::appendScanAssets(std::vector<Asset> assets, SourceId owner) {
@@ -371,7 +418,7 @@ void Session::rebuildCollections() {
     }
 
     const std::string resolverId =
-        !module.collectionResolver.empty() ? std::string(module.collectionResolver) : std::string(module.name);
+        !module.collectionResolverId.empty() ? std::string(module.collectionResolverId) : std::string(module.name);
     auto& desiredCollections = desiredByResolver[resolverId];
     try {
       auto desired = module.resolveCollections(context);
@@ -389,6 +436,14 @@ void Session::rebuildCollections() {
     }
     reconcileCollections(resolverId, std::move(desiredCollections));
   }
+}
+
+CollectionId Session::nextCollectionId() {
+  CollectionId id;
+  do {
+    id = ids_.nextCollectionId();
+  } while (std::ranges::any_of(collections_, [id](const Collection& collection) { return collection.id == id; }));
+  return id;
 }
 
 // A resolver owns every discovered collection with its resolver id. Each pass
@@ -417,6 +472,8 @@ void Session::reconcileCollections(std::string_view resolverId, std::vector<Desi
       continue;
     }
 
+    validateDesiredCollectionReferences(resolverId, desired);
+
     const auto sameKey = [&](const Collection& collection) { return collection.key == desired.key; };
     if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
       if (found->origin == CollectionOrigin::UserCreated) {
@@ -435,7 +492,7 @@ void Session::reconcileCollections(std::string_view resolverId, std::vector<Desi
     }
 
     collections_.push_back(Collection{
-        .id = ids_.nextCollectionId(),
+        .id = nextCollectionId(),
         .name = desired.name,
         .status = statusWithIssues(desired),
         .origin = desired.origin,
@@ -452,6 +509,39 @@ void Session::reconcileCollections(std::string_view resolverId, std::vector<Desi
     return collection.origin == CollectionOrigin::Discovered && collection.key.resolver == resolverId &&
            !seenKeys.contains(collectionKeyString(collection.key));
   });
+}
+
+void Session::validateDesiredCollectionReferences(std::string_view resolverId, DesiredCollection& desired) {
+  const auto addMissingAssetDiagnostic = [&](AssetId id, std::string_view role) {
+    diagnostics_.push_back(sessionError("Collection resolver '" + std::string(resolverId) + "' returned " +
+                                        std::string(role) + " asset id " + std::to_string(id.value) +
+                                        " that does not exist"));
+    desired.issues.push_back(CollectionIssue{
+        .severity = Severity::Error,
+        .code = "missing-" + std::string(role),
+        .message = "Collection references missing " + std::string(role) + " asset " + std::to_string(id.value),
+        .asset = id,
+    });
+  };
+
+  if (desired.sequence && !assetExists(*desired.sequence)) {
+    addMissingAssetDiagnostic(*desired.sequence, "sequence");
+    desired.sequence = std::nullopt;
+  }
+
+  const auto filterExistingAssets = [&](std::vector<AssetId>& ids, std::string_view role) {
+    std::erase_if(ids, [&](AssetId id) {
+      if (assetExists(id)) {
+        return false;
+      }
+      addMissingAssetDiagnostic(id, role);
+      return true;
+    });
+  };
+
+  filterExistingAssets(desired.instrumentSets, "instrument-set");
+  filterExistingAssets(desired.sampleCollections, "sample-collection");
+  filterExistingAssets(desired.miscAssets, "misc");
 }
 
 void Session::markCollectionsStaleForAssets(const std::unordered_set<u32>& assetIds) {
