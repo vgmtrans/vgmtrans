@@ -395,19 +395,11 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   for (auto& collection : collections) {
     if (!collection.sequence) {
       collection.status = CollectionStatus::Incomplete;
-      collection.issues.push_back(CollectionIssue{
-          .severity = Severity::Warning,
-          .code = "missing-sequence",
-          .message = "Probe bank collection has no sequence",
-      });
+      collection.issues.push_back(missingSequenceIssue());
     }
     if (collection.instrumentSets.empty()) {
       collection.status = CollectionStatus::Incomplete;
-      collection.issues.push_back(CollectionIssue{
-          .severity = Severity::Warning,
-          .code = "missing-instrument-set",
-          .message = "Probe bank collection has no instrument set",
-      });
+      collection.issues.push_back(missingInstrumentSetIssue());
     }
   }
   return collections;

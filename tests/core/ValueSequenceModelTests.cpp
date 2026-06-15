@@ -22,7 +22,6 @@ void levelScaleRoundTripsMidiValues() {
   }
 }
 
-
 void byteReaderChecksBoundsAndEndian() {
   const std::vector<u8> bytes{0x00, 0x34, 0x12, 0x78, 0x56};
   const ByteReader reader(SourceId{7}, bytes);
@@ -112,13 +111,43 @@ void trackProgramBuilderRejectsDuplicateCommandAddresses() {
 
   bool rejectedDuplicateAddress = false;
   try {
-    static_cast<void>(addProbeCommand<ProbeProgramCommand>(
-        builder, dialect, Address{0}, probeRange(2, programBytes.size()), programBytes));
+    static_cast<void>(addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0},
+                                                           probeRange(2, programBytes.size()), programBytes));
   } catch (const std::invalid_argument&) {
     rejectedDuplicateAddress = true;
   }
   expect(rejectedDuplicateAddress, "track builder should reject duplicate source command addresses");
   expect(track.commands.size() == 1, "duplicate-address rejection should not mutate the track program");
+}
+
+void collectionIssueHelpersValidateStoredStatus() {
+  const CollectionIssue missingSequence = missingSequenceIssue();
+  expect(missingSequence.severity == Severity::Warning && missingSequence.code == "missing-sequence",
+         "missing sequence helper should create a warning issue");
+  const std::vector<CollectionIssue> missingIssues{missingSequence};
+  expect(validatedCollectionStatus(CollectionStatus::Complete, missingIssues) == CollectionStatus::Incomplete,
+         "missing issues should prevent complete collection status");
+
+  const CollectionIssue missingInstrument = missingInstrumentSetIssue(AssetId{7});
+  expect(missingInstrument.severity == Severity::Error && missingInstrument.asset == AssetId{7},
+         "missing instrument helper should preserve a broken asset reference");
+
+  const CollectionIssue ambiguous = ambiguousMatchIssue("multiple banks match");
+  const std::vector<CollectionIssue> ambiguousIssues{ambiguous};
+  expect(validatedCollectionStatus(CollectionStatus::Complete, ambiguousIssues) == CollectionStatus::Ambiguous,
+         "ambiguous match issue should validate complete status to ambiguous");
+
+  const CollectionIssue removed = removedStaleAssetIssue();
+  const std::vector<CollectionIssue> removedIssues{removed};
+  expect(validatedCollectionStatus(CollectionStatus::Complete, removedIssues) == CollectionStatus::Stale,
+         "removed asset issue should validate complete status to stale");
+
+  DesiredCollection explicitStale{
+      .status = CollectionStatus::Stale,
+      .issues = {missingSampleCollectionIssue()},
+  };
+  expect(validatedCollectionStatus(explicitStale) == CollectionStatus::Stale,
+         "explicit non-complete status should remain stored instead of being derived from issues");
 }
 
 }  // namespace
@@ -128,4 +157,5 @@ void runValueSequenceModelTests() {
   byteReaderChecksBoundsAndEndian();
   sourceCommandsPreserveBytesOperandsAndDialectDisplay();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
+  collectionIssueHelpersValidateStoredStatus();
 }
