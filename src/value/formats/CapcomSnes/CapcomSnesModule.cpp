@@ -10,6 +10,7 @@
 #include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 #include "value/formats/CapcomSnes/CapcomSnesLayout.h"
 #include "value/formats/CapcomSnes/CapcomSnesSynth.h"
+#include "value/scan/CollectionResolver.h"
 
 #include <optional>
 #include <string>
@@ -22,6 +23,28 @@ using namespace core;
 
 [[nodiscard]] bool canScanCapcomSnes(const SourceFile&, std::span<const u8> bytes) {
   return findCapcomSnesLayout(ByteReader(SourceId{}, bytes)).has_value();
+}
+
+[[nodiscard]] CollectionKey capcomCollectionKey(SourceId source) {
+  return CollectionKey{
+      .resolver = "CapcomSnes",
+      .value = "source:" + std::to_string(source.value),
+  };
+}
+
+void addCapcomCollectionMember(ScanResult& result, const ScanInput& input, AssetId asset, std::string displayName,
+                               CollectionMemberRole role) {
+  result.matchFacts.push_back(MatchFact{
+      .asset = asset,
+      .format = "CapcomSnes",
+      .scope = MatchScope{.kind = MatchScopeKind::Source, .source = input.source.id},
+      .payload =
+          CollectionMemberFact{
+              .key = capcomCollectionKey(input.source.id),
+              .collectionName = std::move(displayName),
+              .role = role,
+          },
+  });
 }
 
 [[nodiscard]] ScanResult scanCapcomSnes(const ScanInput& input) {
@@ -50,23 +73,15 @@ using namespace core;
   result.assets.emplace_back(
       parseCapcomSnesSequence(input, *layout, sequenceId,
                               hasInstrumentSet ? std::optional<AssetId>{instrumentSetId} : std::nullopt, displayName));
+  addCapcomCollectionMember(result, input, sequenceId, displayName, CollectionMemberRole::Sequence);
 
   if (hasInstrumentSet) {
     result.assets.emplace_back(parseCapcomSnesInstrumentSet(input, instrumentSetId, sampleCollectionId, instrumentInfos,
                                                             sampleInfos, displayName));
     result.assets.emplace_back(parseCapcomSnesSamples(input, sampleCollectionId, sampleInfos, displayName));
+    addCapcomCollectionMember(result, input, instrumentSetId, displayName, CollectionMemberRole::InstrumentSet);
+    addCapcomCollectionMember(result, input, sampleCollectionId, displayName, CollectionMemberRole::SampleCollection);
   }
-
-  Collection collection{
-      .id = input.ids.nextCollectionId(),
-      .name = displayName,
-      .sequence = sequenceId,
-  };
-  if (hasInstrumentSet) {
-    collection.instrumentSets.push_back(instrumentSetId);
-    collection.sampleCollections.push_back(sampleCollectionId);
-  }
-  result.collections.push_back(std::move(collection));
 
   if (!layout->instrumentTableAddress || !layout->spcDirAddress) {
     result.diagnostics.push_back(Diagnostic{
@@ -79,11 +94,16 @@ using namespace core;
   return result;
 }
 
+[[nodiscard]] std::vector<DesiredCollection> resolveCapcomSnesCollections(const MatchContext& context) {
+  return resolveCollectionMemberFacts(context, "CapcomSnes", "CapcomSnes");
+}
+
 void registerCapcomSnesModule(FormatRegistry& registry) {
   registry.add(FormatModule{
       .name = "CapcomSnes",
       .canScan = canScanCapcomSnes,
       .scan = scanCapcomSnes,
+      .resolveCollections = resolveCapcomSnesCollections,
   });
 }
 

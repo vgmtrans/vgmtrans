@@ -170,7 +170,7 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
-  Project project;
+  SessionSnapshot project;
   project.assets.emplace_back(SequenceProgramAsset{
       .metadata =
           AssetMetadata{
@@ -190,7 +190,7 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
       .name = "Looping",
       .sequence = AssetId{0},
   });
-  rebuildProjectIndex(project);
+  rebuildSessionSnapshotIndex(project);
 
   SourceStore sources;
   SequenceDialectRegistry dialects;
@@ -396,7 +396,6 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
       scaledSynthModulatorAmount(explicitVibratoDepth, &usage, ModulationScalingPolicy::ObservedSequenceRange) == 300,
       "observed modulation scaling should not change explicit-source synth modulator amounts");
 }
-
 
 }  // namespace
 

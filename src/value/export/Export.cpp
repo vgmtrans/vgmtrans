@@ -10,7 +10,7 @@
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
-#include "value/model/ProjectModel.h"
+#include "value/model/SessionSnapshot.h"
 #include "value/synth/SampleDecoder.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/base/Source.h"
@@ -290,13 +290,14 @@ struct MidiLoweringResult {
 
 }  // namespace
 
-std::vector<Artifact> exportCollection(const Project& project, const SourceStore& sources, CollectionId collection,
-                                       const ExportRequest& request, const SequenceDialectRegistry& dialects) {
-  auto resolved = resolveCollectionAssets(project, collection);
+std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
+                                       CollectionId collection, const ExportRequest& request,
+                                       const SequenceDialectRegistry& dialects) {
+  auto resolved = resolveCollectionAssets(snapshot, collection);
   if (resolved.collection == nullptr) {
     auto diagnostics = resolved.diagnostics.collection;
     if (diagnostics.empty()) {
-      diagnostics.push_back(exportError("CollectionId was not found in the Project snapshot"));
+      diagnostics.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
     }
     return {Artifact{
         .filename = "export-error.txt",
@@ -356,15 +357,15 @@ std::vector<Artifact> exportCollection(const Project& project, const SourceStore
   return artifacts;
 }
 
-std::vector<CollectionExport> exportAllCollections(const Project& project, const SourceStore& sources,
+std::vector<CollectionExport> exportAllCollections(const SessionSnapshot& snapshot, const SourceStore& sources,
                                                    const ExportRequest& request,
                                                    const SequenceDialectRegistry& dialects) {
   std::vector<CollectionExport> exports;
-  exports.reserve(project.collections.size());
-  for (const auto& collection : project.collections) {
+  exports.reserve(snapshot.collections.size());
+  for (const auto& collection : snapshot.collections) {
     exports.push_back(CollectionExport{
         .collection = collection.id,
-        .artifacts = exportCollection(project, sources, collection.id, request, dialects),
+        .artifacts = exportCollection(snapshot, sources, collection.id, request, dialects),
     });
   }
   return exports;

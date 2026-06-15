@@ -60,7 +60,7 @@ struct AssetMetadata {
 };
 
 // Address is a driver/source address, not necessarily a file offset after a
-// source has been extracted or virtualized.
+// source has been extracted or otherwise derived.
 struct Address {
   u64 value = 0;
 };
