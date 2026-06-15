@@ -86,9 +86,8 @@ SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
   return id;
 }
 
-SourceId SourceStore::addOrUpdateDerived(SourceFile file, std::vector<u8> bytes, SourceId parent,
-                                         std::string extractorId, std::string derivedKey,
-                                         std::optional<SourceRange> origin) {
+SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::string extractorId,
+                                 std::string derivedKey, std::optional<SourceRange> origin) {
   if (!parent.valid()) {
     throw std::invalid_argument("Derived source requires a valid parent SourceId");
   }
@@ -97,39 +96,10 @@ SourceId SourceStore::addOrUpdateDerived(SourceFile file, std::vector<u8> bytes,
     derivedKey = !file.name.empty() ? file.name : std::string{"derived"};
   }
 
-  for (auto& entry : entries_) {
-    if (!entry.file.derived() || entry.file.parent != parent || entry.file.extractorId != extractorId ||
-        entry.file.derivedKey != derivedKey) {
-      continue;
-    }
-
-    if (entry.bytes != bytes) {
-      entry.bytes = std::move(bytes);
-      entry.file.revision++;
-      entry.file.size = entry.bytes.size();
-    }
-
-    file.id = entry.file.id;
-    file.kind = SourceKind::Derived;
-    file.size = entry.file.size;
-    file.parent = parent;
-    file.extractorId = std::move(extractorId);
-    file.derivedKey = std::move(derivedKey);
-    file.revision = entry.file.revision;
-    file.stale = false;
-    file.origin = origin;
-    if (file.name.empty()) {
-      file.name = entry.file.name;
-    }
-    entry.file = std::move(file);
-    return entry.file.id;
-  }
-
   file.kind = SourceKind::Derived;
   file.parent = parent;
   file.extractorId = std::move(extractorId);
   file.derivedKey = std::move(derivedKey);
-  file.stale = false;
   file.origin = origin;
   return add(std::move(file), std::move(bytes));
 }
@@ -165,45 +135,6 @@ std::vector<SourceFile> SourceStore::sourceFiles() const {
     files.push_back(e.file);
   }
   return files;
-}
-
-std::vector<SourceId> SourceStore::sourceFamily(SourceId id) const {
-  std::vector<SourceId> family;
-  if (!contains(id)) {
-    return family;
-  }
-
-  family.push_back(id);
-  for (size_t index = 0; index < family.size(); ++index) {
-    const SourceId parent = family[index];
-    for (const auto& entry : entries_) {
-      if (entry.file.parent == parent) {
-        family.push_back(entry.file.id);
-      }
-    }
-  }
-  return family;
-}
-
-void SourceStore::markDerivedSourcesStale() {
-  for (auto& entry : entries_) {
-    if (entry.file.derived()) {
-      entry.file.stale = true;
-    }
-  }
-}
-
-void SourceStore::markDerivedSourceFamilyStale(SourceId id) {
-  const auto family = sourceFamily(id);
-  for (const auto source : family) {
-    if (!contains(source)) {
-      continue;
-    }
-    auto& file = entries_[source.value].file;
-    if (file.derived()) {
-      file.stale = true;
-    }
-  }
 }
 
 const SourceStore::Entry& SourceStore::entry(SourceId id) const {

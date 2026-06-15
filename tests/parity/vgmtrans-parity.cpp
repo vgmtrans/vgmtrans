@@ -894,7 +894,7 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   expect(project.collections.size() == 1, "value ARAM summary expected one collection");
   return valueCapcomSnesSummary(project, session.sources(), project.collections.front());
 }
@@ -904,7 +904,7 @@ std::map<std::string, CapcomSnesSummary> valueCapcomSnesRsnSummaries(const std::
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -1064,7 +1064,7 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover a collection";
@@ -1115,7 +1115,7 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -1166,7 +1166,7 @@ std::map<std::string, SynthExportBytes> valueCapcomSnesRsnSynthExports(const std
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -1211,7 +1211,7 @@ std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::fil
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections";
@@ -1293,7 +1293,7 @@ std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesyste
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover MIDI collections";
@@ -1344,7 +1344,7 @@ std::map<std::string, SynthExportBytes> valueCollectionSynthExports(const std::f
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   if (project.collections.empty()) {
     std::ostringstream message;
     message << "value scanner did not discover synth collections";
@@ -2778,7 +2778,7 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
 
   if (project.collections.empty()) {
     std::ostringstream message;

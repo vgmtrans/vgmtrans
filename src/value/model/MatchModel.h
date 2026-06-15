@@ -98,15 +98,9 @@ struct MatchFact {
   MatchFactPayload payload;
 };
 
-enum class CollectionOrigin {
-  Discovered,
-  UserCreated,
-};
-
 enum class CollectionStatus {
   Complete,
   Incomplete,
-  Stale,
 };
 
 struct DesiredCollection {
@@ -117,7 +111,6 @@ struct DesiredCollection {
   std::vector<AssetId> sampleCollections;
   std::vector<AssetId> miscAssets;
   CollectionStatus status = CollectionStatus::Complete;
-  CollectionOrigin origin = CollectionOrigin::Discovered;
 };
 
 }  // namespace vgmtrans::core

@@ -115,7 +115,6 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/session/SessionStores.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
@@ -151,7 +150,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.h
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
-      ${PROJECT_SOURCE_DIR}/src/value/session/SessionStores.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/SequenceCommandHelpers.h

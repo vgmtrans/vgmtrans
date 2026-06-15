@@ -33,7 +33,7 @@ and musical meaning should live together.
 - Keep format modules small, readable, and source-driver oriented.
 - Avoid pointer-heavy inherited object graphs.
 - Preserve source ranges, decoded operands, diagnostics, and HexView links.
-- Make parsed assets repeatably exportable without rescanning source bytes.
+- Make parsed assets repeatably exportable without rereading source bytes.
 - Centralize common sequence execution mechanics: jumps, calls, repeats, loop
   analysis, dry runs, command limits, and loop policy.
 - Keep registration deterministic and copyable.
@@ -81,9 +81,9 @@ The application-level pipeline is session-centered:
 Session
   -> SourceStore
   -> scan a loaded source plus derived sources
-  -> AssetStore + MatchFactStore + DiagnosticStore
+  -> append assets + match facts + diagnostics
   -> collection resolvers
-  -> CollectionStore
+  -> collections
   -> SessionSnapshot
   -> export request
   -> artifacts
@@ -113,13 +113,15 @@ SessionSnapshot snapshot = session.scanSource(id);
 ```
 
 `scanSource()` scans that source and any derived sources it produces. It does not
-rescan unrelated loaded files. Full rebuilds are explicit through
-`rescanSource()` and `rescanAll()`.
+scan unrelated loaded files, and calling it again for an already-scanned source is
+a no-op. A convenience `scanPendingSources()` scans user-loaded sources that have
+not been scanned yet.
 
 Derived sources are persistent entries in `SourceStore`. Archive members, SPC
-RAM images, PSF executable images, and similar extracted bytes are deduplicated
-by parent source, extractor id, and derived key. If a rescan no longer refreshes
-a derived source, the source is marked stale rather than silently discarded.
+RAM images, PSF executable images, and similar extracted bytes are appended to
+the session so HexView and later scanners can inspect them. The session is
+append-only during normal use; reloading changed input should create a new
+session rather than replacing previously scanned source families.
 
 Collections are session-level groupings. They may reference assets discovered
 from different source loads, which is required for legacy-style matcher behavior.
@@ -132,7 +134,6 @@ turns facts into collections.
 
 - IDs, source ranges, byte readers, source storage, and diagnostics.
 - `SessionSnapshot`, `Collection`, `Asset`, metadata, and lookup helpers.
-- `AssetStore`, `MatchFactStore`, `CollectionStore`, and `DiagnosticStore`.
 - Typed match facts and collection resolver helpers.
 - `SequenceProgram`, `TrackProgram`, and erased source-command records.
 - `SequenceDialect` registration and command dispatch descriptors.

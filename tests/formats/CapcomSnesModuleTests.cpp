@@ -133,7 +133,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "value format registration should include CapcomSnes sequence dialects");
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   expect(project.diagnostics.empty(), "CapcomSnes scan should not report diagnostics for complete fixture");
   expect(project.collections.size() == 1, "CapcomSnes scan should produce one collection");
   expect(project.assets.size() == 3, "CapcomSnes scan should produce sequence, instrument set, and samples");
@@ -387,7 +387,7 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
   vgmtrans::formats::registerValueFormats(session);
   const auto sourceId = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesSpc());
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   expect(project.diagnostics.empty(), "SPC-backed CapcomSnes scan should not report diagnostics");
   expect(project.sources.size() == 2, "SPC scan should preserve original source plus extracted ARAM");
   expect(!project.sources[0].derived(), "original SPC source should not be derived");
@@ -463,7 +463,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, std::move(bytes));
 
-  const SessionSnapshot project = session.scan();
+  const SessionSnapshot project = session.scanPendingSources();
   expect(project.diagnostics.empty(), "CapcomSnes note-state scan should not report diagnostics");
   expect(!project.assets.empty(), "CapcomSnes note-state scan should produce assets");
 

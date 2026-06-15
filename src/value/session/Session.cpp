@@ -9,6 +9,7 @@
 #include "value/export/Export.h"
 #include "value/scan/FormatModule.h"
 
+#include <algorithm>
 #include <exception>
 #include <fstream>
 #include <iterator>
@@ -80,35 +81,35 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
       std::move(bytes));
 }
 
-SessionSnapshot Session::scan() {
-  return rescanAll();
-}
-
 SessionSnapshot Session::scanSource(SourceId id) {
-  scanSourceFamily(id, false);
+  if (!sources_.contains(id)) {
+    throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
+  }
+
+  if (scannedSources_.contains(id.value)) {
+    return snapshot();
+  }
+
+  scanSourceAndDerived(id, nextLoadGroup_++);
+  rebuildCollections();
   return snapshot();
 }
 
-SessionSnapshot Session::rescanSource(SourceId id) {
-  scanSourceFamily(id, true);
-  return snapshot();
-}
-
-SessionSnapshot Session::rescanAll() {
-  assets_.clear();
-  matchFacts_.clear();
-  collections_.clear();
-  diagnostics_.clear();
-  ids_ = {};
-  scannedSources_.clear();
-  sources_.markDerivedSourcesStale();
-
+SessionSnapshot Session::scanPendingSources() {
+  bool scannedAny = false;
   const size_t sourceCount = sources_.sourceCount();
   for (size_t index = 0; index < sourceCount; ++index) {
     const auto& source = sources_.sourceAt(index);
-    if (!source.derived()) {
-      scanSourceFamily(source.id, false);
+    if (source.derived() || scannedSources_.contains(source.id.value)) {
+      continue;
     }
+
+    scanSourceAndDerived(source.id, nextLoadGroup_++);
+    scannedAny = true;
+  }
+
+  if (scannedAny) {
+    rebuildCollections();
   }
 
   return snapshot();
@@ -117,10 +118,10 @@ SessionSnapshot Session::rescanAll() {
 SessionSnapshot Session::snapshot() const {
   SessionSnapshot current{
       .sources = sources_.sourceFiles(),
-      .assets = assets_.snapshot(),
-      .matchFacts = matchFacts_.snapshot(),
-      .collections = collections_.snapshot(),
-      .diagnostics = diagnostics_.snapshot(),
+      .assets = assets_,
+      .matchFacts = matchFacts_,
+      .collections = collections_,
+      .diagnostics = diagnostics_,
   };
   addMissingSequenceDialectDiagnostics(current, dialects_);
   finalizeSessionSnapshotIndex(current);
@@ -137,25 +138,17 @@ std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest&
   return core::exportAllCollections(current, sources_, request, dialects_);
 }
 
-void Session::scanSourceFamily(SourceId id, bool clearExisting) {
+void Session::scanSourceAndDerived(SourceId id, u32 loadGroup) {
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
 
-  if (clearExisting) {
-    sources_.markDerivedSourceFamilyStale(id);
-    removeDiscoveredDataForSourceFamily(id);
-  }
-
-  const u32 loadGroup = nextLoadGroup_++;
   std::vector<SourceId> queue{id};
   std::set<u32> queued{id.value};
 
   for (size_t index = 0; index < queue.size(); ++index) {
     scanOneSource(queue[index], loadGroup, queue, queued);
   }
-
-  rebuildCollections();
 }
 
 void Session::scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& queue, std::set<u32>& queued) {
@@ -173,7 +166,7 @@ void Session::scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& q
       // that another registered module can still parse.
       shouldScan = module.canScan(source, bytes);
     } catch (const std::exception& ex) {
-      diagnostics_.add(sessionError(std::string(module.name) + " canScan failed: " + ex.what()));
+      diagnostics_.push_back(sessionError(std::string(module.name) + " canScan failed: " + ex.what()));
     }
 
     if (!shouldScan) {
@@ -189,9 +182,12 @@ void Session::scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& q
       });
       normalizeScanResult(result, ids_);
 
-      const auto upsert = assets_.upsertDiscovered(std::move(result.assets));
-      matchFacts_.add(std::move(result.matchFacts), upsert.remappedIds);
-      diagnostics_.add(std::move(result.diagnostics));
+      assets_.insert(assets_.end(), std::make_move_iterator(result.assets.begin()),
+                     std::make_move_iterator(result.assets.end()));
+      matchFacts_.insert(matchFacts_.end(), std::make_move_iterator(result.matchFacts.begin()),
+                         std::make_move_iterator(result.matchFacts.end()));
+      diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(result.diagnostics.begin()),
+                          std::make_move_iterator(result.diagnostics.end()));
 
       for (auto& extracted : result.extractedSources) {
         const SourceId parent =
@@ -201,34 +197,17 @@ void Session::scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& q
           derivedKey = !extracted.file.name.empty() ? extracted.file.name : std::string(module.name);
         }
 
-        const SourceId derived =
-            sources_.addOrUpdateDerived(std::move(extracted.file), std::move(extracted.bytes), parent,
-                                        std::string(module.name), std::move(derivedKey), extracted.origin);
+        const SourceId derived = sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent,
+                                                     std::string(module.name), std::move(derivedKey), extracted.origin);
         if (queued.insert(derived.value).second) {
           queue.push_back(derived);
         }
       }
     } catch (const std::exception& ex) {
-      diagnostics_.add(sessionError(std::string(module.name) + " scan failed: " + ex.what(),
-                                    SourceRange{.source = source.id, .offset = 0, .size = source.size}));
+      diagnostics_.push_back(sessionError(std::string(module.name) + " scan failed: " + ex.what(),
+                                          SourceRange{.source = source.id, .offset = 0, .size = source.size}));
     }
   }
-}
-
-void Session::removeDiscoveredDataForSourceFamily(SourceId id) {
-  const auto family = sources_.sourceFamily(id);
-  std::unordered_set<u32> sourceIds;
-  sourceIds.reserve(family.size());
-  for (const auto source : family) {
-    sourceIds.insert(source.value);
-    scannedSources_.erase(source.value);
-  }
-
-  const auto assetsFromFacts = matchFacts_.assetIdsForSources(sourceIds);
-  const auto removedAssets = assets_.removeForSources(sourceIds, assetsFromFacts);
-  matchFacts_.removeForSourcesOrAssets(sourceIds, removedAssets);
-  diagnostics_.removeForSources(sourceIds);
-  collections_.markReferencesStale(removedAssets);
 }
 
 void Session::rebuildCollections() {
@@ -240,20 +219,47 @@ void Session::rebuildCollections() {
   };
 
   std::vector<DesiredCollection> desiredCollections;
-  std::set<std::string> activeResolvers;
   for (const auto& module : formats_.modules()) {
     if (module.resolveCollections == nullptr) {
       continue;
     }
 
-    const std::string_view resolver = !module.collectionResolver.empty() ? module.collectionResolver : module.name;
-    activeResolvers.insert(std::string(resolver));
     auto desired = module.resolveCollections(context);
     desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),
                               std::make_move_iterator(desired.end()));
   }
 
-  collections_.reconcile(std::move(desiredCollections), activeResolvers, ids_);
+  reconcileCollections(std::move(desiredCollections));
+}
+
+void Session::reconcileCollections(std::vector<DesiredCollection> desiredCollections) {
+  for (const auto& desired : desiredCollections) {
+    if (desired.key.resolver.empty() || desired.key.value.empty()) {
+      continue;
+    }
+
+    const auto sameKey = [&](const Collection& collection) { return collection.key == desired.key; };
+    if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
+      found->name = desired.name;
+      found->status = desired.status;
+      found->sequence = desired.sequence;
+      found->instrumentSets = desired.instrumentSets;
+      found->sampleCollections = desired.sampleCollections;
+      found->miscAssets = desired.miscAssets;
+      continue;
+    }
+
+    collections_.push_back(Collection{
+        .id = ids_.nextCollectionId(),
+        .name = desired.name,
+        .status = desired.status,
+        .key = desired.key,
+        .sequence = desired.sequence,
+        .instrumentSets = desired.instrumentSets,
+        .sampleCollections = desired.sampleCollections,
+        .miscAssets = desired.miscAssets,
+    });
+  }
 }
 
 }  // namespace vgmtrans::core
