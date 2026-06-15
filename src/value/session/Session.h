@@ -51,7 +51,8 @@ private:
   void sealRegistries() noexcept;
   void scanSourceAndDerived(SourceId id);
   void scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued);
-  void validateScanResult(const ScanResult& result) const;
+  void addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
+                           std::vector<SourceId>& queue, std::set<u32>& queued);
   void removeDiscoveredDataForSources(const std::vector<SourceId>& sources);
   void rebuildCollections();
 

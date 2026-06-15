@@ -319,9 +319,11 @@ void sessionRejectsExtractedSourcesWithMissingParents() {
   session.addSource(SourceFile{.name = "bad-derived-parent.probe"}, {0xf1});
   const SessionSnapshot project = session.scanPendingSources();
   expect(project.sources.size() == 1, "bad extracted source should not be added to the session");
-  expect(project.assets.empty(), "bad extracted source should not be scanned by later modules");
-  expectDiagnosticRange(project.diagnostics, "ProbeBadExtracted extracted source had a missing parent source",
-                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
+  expect(project.assets.empty(), "bad extracted source should reject staged scan assets before commit");
+  expectDiagnosticRange(
+      project.diagnostics,
+      "ProbeBadExtracted scan failed: Scan result contained extracted source with missing parent source 99",
+      SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
 void sessionRejectsMatchFactsForMissingAssets() {
