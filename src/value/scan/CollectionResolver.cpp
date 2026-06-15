@@ -65,11 +65,7 @@ std::vector<DesiredCollection> resolveCollectionMemberFacts(const MatchContext& 
     auto& collection = entry.second;
     if (!collection.sequence) {
       collection.status = CollectionStatus::Incomplete;
-      collection.issues.push_back(CollectionIssue{
-          .severity = Severity::Warning,
-          .code = "missing-sequence",
-          .message = "Collection has no sequence asset",
-      });
+      collection.issues.push_back(missingSequenceIssue());
     }
     collections.push_back(std::move(collection));
   }

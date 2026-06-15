@@ -32,15 +32,6 @@ namespace {
   return std::ranges::any_of(collection.issues, [code](const CollectionIssue& issue) { return issue.code == code; });
 }
 
-[[nodiscard]] CollectionStatus statusWithIssues(const DesiredCollection& collection) {
-  if (collection.status != CollectionStatus::Complete) {
-    return collection.status;
-  }
-  const bool hasError = std::ranges::any_of(
-      collection.issues, [](const CollectionIssue& issue) { return issue.severity == Severity::Error; });
-  return hasError ? CollectionStatus::Incomplete : CollectionStatus::Complete;
-}
-
 }  // namespace
 
 void CollectionStore::reconcile(std::string_view resolverId, std::vector<DesiredCollection> desiredCollections,
@@ -77,7 +68,7 @@ void CollectionStore::reconcile(std::string_view resolverId, std::vector<Desired
         continue;
       }
       found->name = desired.name;
-      found->status = statusWithIssues(desired);
+      found->status = validatedCollectionStatus(desired);
       found->origin = desired.origin;
       found->sequence = desired.sequence;
       found->instrumentSets = desired.instrumentSets;
@@ -90,7 +81,7 @@ void CollectionStore::reconcile(std::string_view resolverId, std::vector<Desired
     collections_.push_back(Collection{
         .id = nextCollectionId(ids),
         .name = desired.name,
-        .status = statusWithIssues(desired),
+        .status = validatedCollectionStatus(desired),
         .origin = desired.origin,
         .key = desired.key,
         .sequence = desired.sequence,
@@ -119,11 +110,7 @@ void CollectionStore::markStaleForAssets(const std::unordered_set<u32>& assetIds
 
     collection.status = CollectionStatus::Stale;
     if (!hasIssueCode(collection, "removed-asset")) {
-      collection.issues.push_back(CollectionIssue{
-          .severity = Severity::Error,
-          .code = "removed-asset",
-          .message = "Collection references an asset from a removed source",
-      });
+      collection.issues.push_back(removedStaleAssetIssue());
     }
   }
 }
@@ -141,12 +128,20 @@ void CollectionStore::validateAssetReferences(std::string_view resolverId, Desir
   const auto addMissingAssetDiagnostic = [&](AssetId id, std::string_view role) {
     diagnostics.addError("Collection resolver '" + std::string(resolverId) + "' returned " + std::string(role) +
                          " asset id " + std::to_string(id.value) + " that does not exist");
-    desired.issues.push_back(CollectionIssue{
-        .severity = Severity::Error,
-        .code = "missing-" + std::string(role),
-        .message = "Collection references missing " + std::string(role) + " asset " + std::to_string(id.value),
-        .asset = id,
-    });
+    if (role == "sequence") {
+      desired.issues.push_back(missingSequenceIssue(id));
+    } else if (role == "instrument-set") {
+      desired.issues.push_back(missingInstrumentSetIssue(id));
+    } else if (role == "sample-collection") {
+      desired.issues.push_back(missingSampleCollectionIssue(id));
+    } else {
+      desired.issues.push_back(CollectionIssue{
+          .severity = Severity::Error,
+          .code = "missing-" + std::string(role),
+          .message = "Collection references missing " + std::string(role) + " asset " + std::to_string(id.value),
+          .asset = id,
+      });
+    }
   };
 
   if (desired.sequence && !assets.contains(*desired.sequence)) {

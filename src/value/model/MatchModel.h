@@ -9,6 +9,7 @@
 #include "value/base/CoreTypes.h"
 
 #include <optional>
+#include <span>
 #include <string>
 #include <variant>
 #include <vector>
@@ -126,5 +127,20 @@ struct DesiredCollection {
   CollectionOrigin origin = CollectionOrigin::Discovered;
   std::vector<CollectionIssue> issues;
 };
+
+[[nodiscard]] CollectionIssue missingSequenceIssue(std::optional<AssetId> asset = std::nullopt);
+[[nodiscard]] CollectionIssue missingInstrumentSetIssue(std::optional<AssetId> asset = std::nullopt);
+[[nodiscard]] CollectionIssue missingSampleCollectionIssue(std::optional<AssetId> asset = std::nullopt);
+[[nodiscard]] CollectionIssue ambiguousMatchIssue(std::string message = "Collection has ambiguous matches",
+                                                  std::optional<AssetId> asset = std::nullopt,
+                                                  std::optional<SourceRange> range = std::nullopt);
+[[nodiscard]] CollectionIssue removedStaleAssetIssue(std::optional<AssetId> asset = std::nullopt);
+
+// Status is still stored because a resolver often knows the collection's state
+// directly. This helper only prevents a "complete" status from contradicting
+// common issue codes.
+[[nodiscard]] CollectionStatus validatedCollectionStatus(CollectionStatus status,
+                                                         std::span<const CollectionIssue> issues);
+[[nodiscard]] CollectionStatus validatedCollectionStatus(const DesiredCollection& collection);
 
 }  // namespace vgmtrans::core
