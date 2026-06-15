@@ -30,11 +30,8 @@ struct SourceFile {
   std::filesystem::path path;
   u64 size = 0;
   // Derived sources are real session entries, such as archive members, SPC RAM,
-  // or PSF executable images. Parent/extractor/key metadata records where they
-  // came from without making the session support source replacement.
+  // or PSF executable images. Parent and origin metadata record where they came from.
   std::optional<SourceId> parent;
-  std::string extractorId;
-  std::string derivedKey;
   std::optional<SourceRange> origin;
 
   [[nodiscard]] bool derived() const noexcept { return kind == SourceKind::Derived; }
@@ -82,8 +79,7 @@ public:
   // SourceStore owns all bytes referenced by SourceRange. Assets copy only SourceRange
   // values, which keeps SessionSnapshot values small and diagnostics precise.
   SourceId add(SourceFile file, std::vector<u8> bytes);
-  SourceId addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::string extractorId,
-                      std::string derivedKey, std::optional<SourceRange> origin);
+  SourceId addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::optional<SourceRange> origin);
 
   [[nodiscard]] bool contains(SourceId id) const noexcept;
   [[nodiscard]] std::span<const u8> bytes(SourceId id) const;

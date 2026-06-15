@@ -86,20 +86,14 @@ SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
   return id;
 }
 
-SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::string extractorId,
-                                 std::string derivedKey, std::optional<SourceRange> origin) {
+SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent,
+                                 std::optional<SourceRange> origin) {
   if (!parent.valid()) {
     throw std::invalid_argument("Derived source requires a valid parent SourceId");
   }
 
-  if (derivedKey.empty()) {
-    derivedKey = !file.name.empty() ? file.name : std::string{"derived"};
-  }
-
   file.kind = SourceKind::Derived;
   file.parent = parent;
-  file.extractorId = std::move(extractorId);
-  file.derivedKey = std::move(derivedKey);
   file.origin = origin;
   return add(std::move(file), std::move(bytes));
 }
