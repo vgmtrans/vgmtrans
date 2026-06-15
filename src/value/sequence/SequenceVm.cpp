@@ -17,6 +17,8 @@
 
 namespace vgmtrans::core {
 
+namespace detail {
+
 struct RepeatReplayWindow {
   Address beginAddress;
   Address endAddress;
@@ -99,6 +101,9 @@ private:
                                                             u32 currentIndex) {
     RepeatReplayWindow window{.stopIndex = currentIndex};
     if (const auto endAddress = commandEndAddress(command)) {
+      // Repeat replay suppression covers the contiguous command-address interval
+      // between the repeat target and repeat command. Formats with non-contiguous
+      // repeat bodies should model that flow explicitly instead of using this helper.
       const u64 destinationEnd =
           destination.value == std::numeric_limits<u64>::max() ? destination.value : destination.value + 1;
       window.beginAddress = Address{std::min(destination.value, command.address.value)};
@@ -121,7 +126,19 @@ struct VmTrackRuntime {
   CommandId lastCommand;
 };
 
+struct VmApiAccess {
+  [[nodiscard]] static VmApi make(VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command,
+                                  u32 currentIndex) {
+    return VmApi(runtime, sequence, command, currentIndex);
+  }
+};
+
+}  // namespace detail
+
 namespace {
+
+using detail::RepeatStateSnapshot;
+using detail::VmTrackRuntime;
 
 constexpr u32 kFallbackCommandLimit = 100000;
 
@@ -230,8 +247,11 @@ public:
     return found != visited_.end() ? &found->second : nullptr;
   }
 
-  [[nodiscard]] const VisitRecord* findByCommandAndCallStack(u32 commandIndex,
-                                                             const std::vector<u32>& callStack) const {
+  [[nodiscard]] const VisitRecord* findLoopCandidateIgnoringRepeatState(u32 commandIndex,
+                                                                        const std::vector<u32>& callStack) const {
+    // JumpOrLoopForever is a source-driver hint that the jump target is a loop
+    // point. Repeat counters are ignored here so the hint still applies when the
+    // loop command appears while a finite repeat is active.
     for (const auto& [state, record] : visited_) {
       if (state.commandIndex == commandIndex && state.callStack == callStack) {
         return &record;
@@ -282,8 +302,6 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
     });
   }
 }
-
-}  // namespace
 
 struct RenderedTrack {
   PerformanceTrack track;
@@ -348,7 +366,7 @@ public:
       }
 
       PerformanceEmitter out{performanceTrack_, command.id, runtime_.tick};
-      VmApi vm{runtime_, targetSequence_, command, *current_};
+      VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command, *current_);
       const Effects effects = handler->execute(command, track_, trackState_, out, vm, dialect_.context);
       runtime_.tick += effects.advanceTicks;
       runtime_.lastCommand = command.id;
@@ -464,7 +482,8 @@ private:
       return;
     }
 
-    const VisitRecord* previousVisit = loopDetector_.findByCommandAndCallStack(*destination, runtime_.callStack);
+    const VisitRecord* previousVisit =
+        loopDetector_.findLoopCandidateIgnoringRepeatState(*destination, runtime_.callStack);
     if (previousVisit == nullptr) {
       current_ = destination;
       arrivedByControlFlow_ = true;
@@ -480,10 +499,6 @@ private:
   }
 
   void applyLoopForever(const SourceCommand& command, Address destinationAddress) {
-    if (!firstLoopTick_) {
-      firstLoopTick_ = runtime_.tick;
-    }
-
     const auto destination = destinationIndex(track_, destinationAddress);
     if (!destination) {
       warn(fmt::format("Sequence loop target ${:04X} was not decoded", destinationAddress.value), command.range);
@@ -535,6 +550,8 @@ private:
   u32 loopRepeats_ = 0;
   bool arrivedByControlFlow_ = true;
 };
+
+}  // namespace
 
 Step VmApi::next() const noexcept {
   return Step::next();
@@ -595,7 +612,8 @@ void VmApi::diagnostic(Diagnostic diagnostic) {
   sequence_.diagnostics.push_back(std::move(diagnostic));
 }
 
-VmApi::VmApi(VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command, u32 currentIndex)
+VmApi::VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command,
+             u32 currentIndex)
     : runtime_(runtime), sequence_(sequence), command_(command), currentIndex_(currentIndex) {
 }
 

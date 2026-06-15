@@ -9,13 +9,12 @@
 #include "value/sequence/PerformanceModel.h"
 #include "value/sequence/SequenceDialect.h"
 
-#include <map>
-#include <vector>
-
 namespace vgmtrans::core {
 
+namespace detail {
+struct VmApiAccess;
 struct VmTrackRuntime;
-class VmTrackExecutor;
+}  // namespace detail
 
 struct BranchResult {
   bool taken = false;
@@ -97,12 +96,11 @@ public:
   void diagnostic(Diagnostic diagnostic);
 
 private:
-  friend class SequenceVm;
-  friend class VmTrackExecutor;
+  friend struct detail::VmApiAccess;
 
-  VmApi(VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command, u32 currentIndex);
+  VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command, u32 currentIndex);
 
-  VmTrackRuntime& runtime_;
+  detail::VmTrackRuntime& runtime_;
   PerformanceSequence& sequence_;
   const SourceCommand& command_;
   u32 currentIndex_ = 0;
