@@ -70,8 +70,8 @@ struct CommandInfoField {
   std::string value;
 };
 
-// CommandInfo is UI-facing metadata for a decoded command. Parsed operands are
-// added by core; format describe hooks add driver meaning in the same structure.
+// Details shown for a parsed command. Core adds operands read from the bytes; the
+// format adds fields that explain what those operands mean.
 struct CommandInfo {
   std::string name;
   std::string detailKind;
@@ -106,9 +106,9 @@ struct CommandHandler {
   ExecuteSourceCommand execute = nullptr;
 };
 
-// A SequenceDialect is the registered behavior table for one source driver. The
-// parsed SequenceProgram stores handler IDs, and the dialect supplies typed
-// describe/execute hooks when UI or export needs behavior.
+// SequenceProgram stores handler IDs instead of owning code for each command.
+// SequenceDialect is the driver-specific table that turns those IDs into UI names,
+// descriptions, and VM execution.
 struct SequenceDialect {
   DialectId id;
   Timebase timebase;
@@ -204,8 +204,8 @@ std::any createTrackState(const SequenceProgram& program, const TrackProgram& tr
 template <class Command, class Context>
 void describeCommand(const SourceCommand& record, const TrackProgram& track, CommandInfo& out,
                      const std::any& context) {
-  // Reparse the compact source bytes into the format-local command type. The
-  // immutable SourceCommand remains generic; behavior stays in format structs.
+  // SourceCommand stores bytes and IDs. Rebuild the command type here so the
+  // format's describe() method can use its normal parsed fields.
   CommandReader reader{record.range, track.bytesFor(record)};
   const Command command = Command::parse(reader);
   if constexpr (HasDescribeWithContext<Command, Context>) {
@@ -218,9 +218,8 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
 template <class Command, class TrackState, class Context>
 Effects executeCommand(const SourceCommand& record, const TrackProgram& track, std::any& trackState, Emit& out,
                        VmApi& vm, const std::any& context) {
-  // This is the type-erased bridge from VM records back to format-local command
-  // structs and track state. The any_casts are centralized here so command code
-  // remains strongly typed.
+  // SourceCommand stores bytes and IDs, while format code expects its own command
+  // and track-state types. Do the casts here before calling execute().
   CommandReader reader{record.range, track.bytesFor(record)};
   const Command command = Command::parse(reader);
   auto& typedTrackState = std::any_cast<TrackState&>(trackState);
@@ -245,8 +244,8 @@ Effects executeCommand(const SourceCommand& record, const TrackProgram& track, s
 
 }  // namespace detail
 
-// The builder registers copyable function descriptors. Format modules can
-// declare commands locally without allocating inherited handler objects.
+// Used while registering a sequence driver. addCommand<T>() gives T a handler ID and
+// stores the small wrapper functions that later parse, describe, and execute T.
 template <class TrackState, class Context>
 class SequenceDialectBuilder {
 public:

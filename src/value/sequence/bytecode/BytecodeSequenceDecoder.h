@@ -42,8 +42,8 @@ struct ParsedBytecodeCommand {
 };
 
 struct BytecodeDecodeContext {
-  // bytecodeEnd bounds physical reads; sequenceEnd can be narrower when a
-  // command needs to understand the driver's logical sequence region.
+  // bytecodeEnd is the first offset the decoder must not read. sequenceEnd can be
+  // smaller when a driver stores several sequences in one larger byte buffer.
   u32 bytecodeEnd = std::numeric_limits<u32>::max();
   u32 sequenceOffset = 0;
   u32 sequenceEnd = std::numeric_limits<u32>::max();
@@ -88,8 +88,8 @@ struct PreservedBytecodeCommand {
   return FixedOperandByteCount{.value = value};
 }
 
-// Preserved opcodes keep source coverage and HexView metadata for commands
-// whose playback behavior is currently irrelevant or not implemented.
+// Use this for known opcodes that should appear in the parsed source view even
+// when they do not affect playback yet.
 [[nodiscard]] constexpr PreservedBytecodeCommand preservedOpcode(u8 opcode, std::string_view displayName,
                                                                  FixedOperandByteCount operandBytes = {},
                                                                  BytecodeCommandOptions options = {}) {
@@ -138,8 +138,7 @@ struct PreservedBytecodeCommand {
   CommandReader commandReader{range, ownedBytes, &operands};
   const auto operandBytes = static_cast<u32>(end - begin - 1);
   if (operandBytes > 0) {
-    // Preserve raw operands as a single field so ignored commands still have
-    // useful HexView details without inventing fake semantic operands.
+    // Keep unknown operands as raw bytes instead of inventing names or meanings.
     static_cast<void>(commandReader.rawBytes("bytes", operandBytes));
   }
   if (!commandReader.done()) {
@@ -248,8 +247,8 @@ concept HasDecodeFlow = requires(const Command& command) {
 
 template <class Command>
 [[nodiscard]] DecodeFlow commandDecodeFlow(const Command& command, const BytecodeDecodeContext& context) {
-  // Command-owned flow handles driver-specific branches. The map-level helpers
-  // below are only for simple jump/call/return/end shapes.
+  // Simple branches can be declared in the opcode map. More unusual branch rules
+  // live on the command type itself as decodeFlow().
   if constexpr (HasDecodeFlowWithContext<Command>) {
     return command.decodeFlow(context);
   } else if constexpr (HasDecodeFlow<Command>) {
@@ -269,8 +268,7 @@ template <class Command>
   }
 
   auto decoded = std::move(parsed->decoded);
-  // Flow defaults need the true command end, which is only known after the
-  // command parser consumes variable-length operands.
+  // Variable-length commands do not know their next address until parsing is done.
   context.commandEnd = begin + static_cast<u32>(decoded.bytes.size());
   decoded.flow = commandDecodeFlow(parsed->command, context);
   return decoded;
@@ -396,8 +394,8 @@ struct BytecodeDispatchTable {
     }
 
     const u8 opcode = reader.u8At(begin);
-    // Exact opcode entries are checked first, but finish() rejects overlap so
-    // dispatch order does not hide ambiguous source-driver maps.
+    // Exact opcodes are checked before ranges, but finish() rejects overlap so an
+    // accidental duplicate cannot change behavior silently.
     if (const auto& spec = opcodes[opcode]) {
       return spec->decode(*spec, *truncated, reader, begin, context);
     }
@@ -413,8 +411,10 @@ struct BytecodeDispatchTable {
   }
 };
 
-// BytecodeMapBuilder is the local opcode table for a source driver. The same
-// map can either register dialect handlers or bind decode to an existing dialect.
+// Builds the opcode table for one source driver. Format code calls op(), range(),
+// jump(), call(), terminal(), and related helpers from one local map. When the
+// dialect is built, the map assigns handler IDs; when a sequence is decoded, it
+// looks those IDs up again so both paths stay tied to the same opcode list.
 template <class TrackState, class Context>
 class BytecodeMapBuilder {
 public:
@@ -550,8 +550,8 @@ private:
       occupied[opcode] = table_.opcodes[opcode].has_value();
     }
 
-    // Exact opcode entries and ranges are both source-driver declarations. Make
-    // ambiguity explicit instead of relying on dispatch precedence.
+    // Exact opcodes and ranges are both entries in the format's opcode table.
+    // Reject overlap so no one has to remember which one would win.
     for (const BytecodeRangeSpec& range : ranges_) {
       for (u32 opcode = range.first; opcode <= range.last; ++opcode) {
         if (occupied[opcode]) {
@@ -587,8 +587,8 @@ private:
     const HandlerTypeToken commandType = commandTypeToken<Command>();
     if (const auto found = handlers_.find(kindName); found != handlers_.end()) {
       const HandlerCacheEntry& entry = found->second;
-      // Reusing a kind is expected for opcode ranges. Reusing it for a different
-      // command type would make the parsed program and dialect disagree.
+      // A range may map many opcodes to the same command type. Reusing the same
+      // name for a different type would make parsed commands point at the wrong code.
       if (entry.preserved || entry.commandType != commandType || entry.name != displayName) {
         throw std::logic_error("Bytecode command kind reused with incompatible handler");
       }

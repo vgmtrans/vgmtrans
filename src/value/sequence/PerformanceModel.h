@@ -14,9 +14,6 @@
 
 namespace vgmtrans::core {
 
-// Performance events are the target-neutral result of running a source
-// sequence. They keep source links for UI/debugging, but avoid MIDI-specific
-// controller encoding until the export layer.
 struct PerformanceEventHeader {
   CommandId sourceCommand;
   TrackId track;
@@ -173,6 +170,8 @@ struct PerformanceTrack {
   std::vector<PerformanceEvent> events;
 };
 
+// Output from SequenceVm. Events point back to the source command that produced
+// them, but MIDI controller encoding happens later in the export layer.
 struct PerformanceSequence {
   Timebase timebase;
   std::vector<PerformanceTrack> tracks;

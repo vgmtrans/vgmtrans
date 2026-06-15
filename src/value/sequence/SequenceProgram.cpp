@@ -74,8 +74,8 @@ s16 CommandReader::leS16(std::string_view name) {
   const size_t begin = position_;
   const auto value = static_cast<s16>(le16(name));
   if (operands_ != nullptr && !operands_->empty()) {
-    // le16() already captured the bytes. Rewrite only the displayed value so
-    // the same source range is shown with signed driver meaning.
+    // le16() already recorded the byte range. Only change the saved value from
+    // unsigned to signed.
     operands_->back().value = static_cast<s64>(value);
     operands_->back().range = operandRange(begin, 2);
   }
@@ -86,8 +86,8 @@ Address CommandReader::le16Address(std::string_view name) {
   const size_t begin = position_;
   const Address value{.value = le16(name)};
   if (operands_ != nullptr && !operands_->empty()) {
-    // Addresses are stored distinctly from integers so UI and VM tooling can
-    // present them as source locations instead of generic numbers.
+    // le16() recorded a number. Replace it with Address so the UI can show it
+    // as a source location.
     operands_->back().value = value;
     operands_->back().range = operandRange(begin, 2);
   }
@@ -153,8 +153,8 @@ std::string CommandReader::rawRemainingBytes(std::string_view name) {
 }
 
 void CommandReader::derived(std::string_view name, CommandOperandValue value) {
-  // Derived operands come from opcode bits or driver state, not extra bytes.
-  // Anchor them to the opcode byte so HexView still has a clickable range.
+  // Derived operands come from opcode bits or driver state. They have no
+  // separate bytes, so attach them to the opcode byte.
   operand(name, std::move(value), 0, 1);
 }
 
@@ -304,8 +304,8 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, C
   const auto byteOffset = static_cast<u32>(track_.commandBytes.size());
   track_.commandBytes.insert(track_.commandBytes.end(), bytes.begin(), bytes.end());
 
-  // Store command payloads in track-level pools. SourceCommand keeps compact
-  // spans into those pools, which makes the parsed snapshot cheaper to copy.
+  // Copy bytes and operands into track-level storage. Each SourceCommand stores
+  // spans into these vectors instead of owning separate vectors.
   const auto operandOffset = static_cast<u32>(track_.operands.size());
   track_.operands.insert(track_.operands.end(), operands.begin(), operands.end());
 

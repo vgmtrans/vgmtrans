@@ -16,8 +16,8 @@
 
 namespace vgmtrans::core {
 
-// Parse mixins for common source-driver command shapes. They keep format command
-// structs compact while still recording named operands for the source view.
+// Base parsers for simple command shapes. They keep format command structs small
+// while still recording named operands for the source view.
 template <class Derived>
 struct NoOperands {
   static Derived parse(CommandReader&) { return {}; }
@@ -56,9 +56,8 @@ struct Be16Operand {
   }
 };
 
-// Common one-operand command bodies. Formats still name each command locally,
-// but these remove boilerplate for driver opcodes that only set state or emit a
-// direct performance control.
+// Helpers for simple one-operand commands. Formats still name each command
+// locally; these only remove repeated parse/execute boilerplate.
 template <class Derived, auto Member>
 struct U8StateCommand : U8Operand<Derived> {
   void execute(auto& rt) const { rt.state.*Member = this->raw; }
@@ -107,8 +106,8 @@ struct U8MidiModulationOutCommand : U8Operand<Derived> {
   }
 };
 
-// For source controls that are already MIDI-shaped. The performance model
-// stores linear gain, so the source byte is squared before emission.
+// For source level controls that already use MIDI's 0-127 curve. The performance
+// model stores linear gain, so convert before emitting the event.
 template <class Derived, void (Emit::*Method)(double, LevelPrecisionHint),
           LevelPrecisionHint PrecisionHint = LevelPrecisionHint::SevenBit>
 struct U8MidiLevelOutCommand : U8Operand<Derived> {

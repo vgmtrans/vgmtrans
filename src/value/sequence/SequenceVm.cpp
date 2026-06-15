@@ -25,8 +25,8 @@ struct RepeatReplayWindow {
   u64 endOffset = 0;
 };
 
-// Runtime state that is not part of the parsed sequence. It tracks one track's
-// playback position, call stack, repeat counters, and last executed command.
+// Mutable playback state for one track. The parsed SequenceProgram stays unchanged
+// while the VM advances ticks, calls, repeats, and loop detection.
 struct VmTrackRuntime {
   u64 tick = 0;
   std::vector<u32> callStack;
@@ -51,8 +51,8 @@ constexpr u32 kFallbackCommandLimit = 100000;
   if (index < track.commands.size()) {
     const SourceCommand& command = track.commands[index];
     if (command.encodedSize > 0) {
-      // Prefer source-address fallthrough over vector order. Reachable bytecode
-      // walkers can append commands in an order that differs from decode flow.
+      // The next command is usually at address + size. Use that address instead of
+      // vector order, because decoding can store commands out of byte order.
       if (command.address.value > std::numeric_limits<u64>::max() - command.encodedSize) {
         return std::nullopt;
       }
@@ -73,8 +73,8 @@ constexpr u32 kFallbackCommandLimit = 100000;
   return track.addressIndex.find(destination);
 }
 
-// Repeat replay intentionally revisits commands. Suppress generic loop detection
-// while the VM is inside the repeated source window.
+// Repeats intentionally revisit commands. While replaying the repeat body, do not
+// treat that revisit as an infinite loop.
 [[nodiscard]] bool isReplayingRepeat(const VmTrackRuntime& runtime, u32 currentIndex, const SourceCommand& command) {
   if (!runtime.repeatReplayWindow) {
     return false;
@@ -427,8 +427,7 @@ Effects VmApi::repeatUntilEffect(u8 slot, u32 count, Address destination) {
 Step VmApi::repeatBreak(u8 slot, Address destination) {
   const auto found = runtime_.repeatRemaining.find(slot);
   if (found != runtime_.repeatRemaining.end() && found->second == 1) {
-    // Break commands trigger on the final repeat pass. Earlier passes continue
-    // through the loop body normally.
+    // A repeat-break branch is taken only on the last repeat pass.
     runtime_.repeatRemaining.erase(found);
     runtime_.repeatReplayWindow.reset();
     return jump(destination);
@@ -521,8 +520,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
       if (!replayingRepeat) {
         if (const auto previous = visited.find(visitState); previous != visited.end()) {
           if (arrivedByControlFlow) {
-            // Re-entering the same command with the same call/repeat state is
-            // the loop signal. Linear fallthrough to a duplicate record is not.
+            // A real loop is reaching the same command again by branch/call/repeat,
+            // with the same call stack and repeat counters.
             if (!firstLoopTick) {
               firstLoopTick = runtime.tick;
             }
@@ -610,9 +609,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
             break;
           }
 
-          // Some command structs know a jump is an infinite loop by driver
-          // convention. Handle that as soon as the destination is known to be a
-          // previous visit instead of waiting for another full command pass.
+          // This command declared that jumping backward means "loop forever". Once
+          // the destination is known to be earlier playback, apply loop policy now.
           if (!firstLoopTick) {
             firstLoopTick = runtime.tick;
           }
@@ -720,8 +718,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
   std::optional<u64> synchronizedStopTick;
   if (loopPolicy == LoopPolicy::PlayOnce && behavior.stopAllTracksAtFirstLoop) {
-    // Dry-run every track to find the earliest loop boundary, then render for
-    // real with that shared stop tick. Some drivers halt all tracks together.
+    // First find when each track reaches its loop. Then render all tracks again,
+    // stopping them at the earliest loop tick.
     PerformanceSequence dryRunSequence{
         .timebase = program.timebase,
     };

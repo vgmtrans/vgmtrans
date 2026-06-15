@@ -90,8 +90,8 @@ CommandInfo SequenceDialect::describe(const TrackProgram& track, const SourceCom
       .name = commandHandler->name,
       .detailKind = commandHandler->detailKind,
   };
-  // Parsed operands belong to the immutable source snapshot. Format-specific
-  // describe() hooks should add derived meaning instead of reprinting them.
+  // Operands read from the bytes are already listed. The format hook should add
+  // higher-level details instead of printing the same operands again.
   for (const CommandOperand& operand : track.operandsFor(command)) {
     std::visit([&](const auto& value) { info.field(operand.name, value); }, operand.value);
   }
