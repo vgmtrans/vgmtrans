@@ -9,28 +9,18 @@
 #include "value/export/Export.h"
 #include "value/scan/FormatModule.h"
 
-#include <algorithm>
 #include <exception>
 #include <fstream>
 #include <iterator>
 #include <map>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 #include <unordered_set>
 #include <utility>
 
 namespace vgmtrans::core {
 
 namespace {
-
-[[nodiscard]] Diagnostic sessionError(std::string message, std::optional<SourceRange> range = std::nullopt) {
-  return Diagnostic{
-      .severity = Severity::Error,
-      .message = std::move(message),
-      .range = range,
-  };
-}
 
 void addMissingSequenceDialectDiagnostics(SessionSnapshot& snapshot, const SequenceDialectRegistry& dialects) {
   for (const auto& asset : snapshot.assets) {
@@ -45,49 +35,6 @@ void addMissingSequenceDialectDiagnostics(SessionSnapshot& snapshot, const Seque
         .range = sequence->metadata.range.valid() ? std::optional<SourceRange>{sequence->metadata.range} : std::nullopt,
     });
   }
-}
-
-[[nodiscard]] std::string collectionKeyString(const CollectionKey& key) {
-  return key.resolver + '\x1f' + key.value;
-}
-
-[[nodiscard]] std::unordered_set<u32> sourceIdSet(const std::vector<SourceId>& sources) {
-  std::unordered_set<u32> ids;
-  ids.reserve(sources.size());
-  for (const SourceId source : sources) {
-    ids.insert(source.value);
-  }
-  return ids;
-}
-
-[[nodiscard]] bool diagnosticFromSource(const Diagnostic& diagnostic, const std::unordered_set<u32>& sourceIds) {
-  return diagnostic.range && sourceIds.contains(diagnostic.range->source.value);
-}
-
-[[nodiscard]] bool factFromSource(const MatchFact& fact, const std::unordered_set<u32>& sourceIds) {
-  return fact.scope.source && sourceIds.contains(fact.scope.source->value);
-}
-
-[[nodiscard]] bool referencesAnyAsset(const Collection& collection, const std::unordered_set<u32>& assetIds) {
-  const auto referencesOne = [&](std::optional<AssetId> id) { return id && assetIds.contains(id->value); };
-  const auto referencesMany = [&](const std::vector<AssetId>& ids) {
-    return std::ranges::any_of(ids, [&](AssetId id) { return assetIds.contains(id.value); });
-  };
-  return referencesOne(collection.sequence) || referencesMany(collection.instrumentSets) ||
-         referencesMany(collection.sampleCollections) || referencesMany(collection.miscAssets);
-}
-
-[[nodiscard]] bool hasIssueCode(const Collection& collection, std::string_view code) {
-  return std::ranges::any_of(collection.issues, [code](const CollectionIssue& issue) { return issue.code == code; });
-}
-
-[[nodiscard]] CollectionStatus statusWithIssues(const DesiredCollection& collection) {
-  if (collection.status != CollectionStatus::Complete) {
-    return collection.status;
-  }
-  const bool hasError = std::ranges::any_of(
-      collection.issues, [](const CollectionIssue& issue) { return issue.severity == Severity::Error; });
-  return hasError ? CollectionStatus::Incomplete : CollectionStatus::Complete;
 }
 
 }  // namespace
@@ -188,10 +135,10 @@ SessionSnapshot Session::scanPendingSources() {
 SessionSnapshot Session::snapshot() const {
   SessionSnapshot current{
       .sources = sources_.sourceFiles(),
-      .assets = assets_,
-      .matchFacts = matchFacts_,
-      .collections = collections_,
-      .diagnostics = diagnostics_,
+      .assets = assets_.all(),
+      .matchFacts = matchFacts_.all(),
+      .collections = collections_.all(),
+      .diagnostics = diagnostics_.all(),
   };
   addMissingSequenceDialectDiagnostics(current, dialects_);
   finalizeSessionSnapshotIndex(current);
@@ -245,8 +192,8 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
       // that another registered module can still parse.
       shouldScan = module.canScan(source, bytes);
     } catch (const std::exception& ex) {
-      diagnostics_.push_back(sessionError(std::string(module.name) + " canScan failed: " + ex.what(),
-                                          SourceRange{.source = source.id, .offset = 0, .size = source.size}));
+      diagnostics_.addError(std::string(module.name) + " canScan failed: " + ex.what(),
+                            SourceRange{.source = source.id, .offset = 0, .size = source.size});
     }
 
     if (!shouldScan) {
@@ -262,24 +209,21 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
       normalizeScanResult(result, ids_);
       validateScanResult(result);
 
-      appendScanAssets(std::move(result.assets), source.id);
-      matchFacts_.insert(matchFacts_.end(), std::make_move_iterator(result.matchFacts.begin()),
-                         std::make_move_iterator(result.matchFacts.end()));
+      assets_.append(std::move(result.assets), source.id);
+      matchFacts_.append(std::move(result.matchFacts));
       for (auto& diagnostic : result.diagnostics) {
         if (!diagnostic.range) {
           diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
         }
       }
-      diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(result.diagnostics.begin()),
-                          std::make_move_iterator(result.diagnostics.end()));
+      diagnostics_.append(std::move(result.diagnostics));
 
       for (auto& extracted : result.extractedSources) {
         SourceId parent = source.id;
         if (extracted.origin && extracted.origin->source.valid()) {
           if (!sources_.contains(extracted.origin->source)) {
-            diagnostics_.push_back(
-                sessionError(std::string(module.name) + " extracted source had a missing parent source",
-                             SourceRange{.source = source.id, .offset = 0, .size = source.size}));
+            diagnostics_.addError(std::string(module.name) + " extracted source had a missing parent source",
+                                  SourceRange{.source = source.id, .offset = 0, .size = source.size});
             continue;
           }
           parent = extracted.origin->source;
@@ -292,8 +236,8 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
         }
       }
     } catch (const std::exception& ex) {
-      diagnostics_.push_back(sessionError(std::string(module.name) + " scan failed: " + ex.what(),
-                                          SourceRange{.source = source.id, .offset = 0, .size = source.size}));
+      diagnostics_.addError(std::string(module.name) + " scan failed: " + ex.what(),
+                            SourceRange{.source = source.id, .offset = 0, .size = source.size});
     }
   }
 }
@@ -308,7 +252,7 @@ void Session::validateScanResult(const ScanResult& result) const {
     if (!batchAssetIds.insert(id.value).second) {
       throw std::invalid_argument("Scan result contained duplicate asset id " + std::to_string(id.value));
     }
-    if (assetExists(id)) {
+    if (assets_.contains(id)) {
       throw std::invalid_argument("Scan result reused existing asset id " + std::to_string(id.value));
     }
   }
@@ -317,7 +261,7 @@ void Session::validateScanResult(const ScanResult& result) const {
     if (!fact.asset.valid()) {
       throw std::invalid_argument("Scan result contained a match fact without an asset id");
     }
-    if (!batchAssetIds.contains(fact.asset.value) && !assetExists(fact.asset)) {
+    if (!batchAssetIds.contains(fact.asset.value) && !assets_.contains(fact.asset)) {
       throw std::invalid_argument("Scan result contained a match fact for missing asset id " +
                                   std::to_string(fact.asset.value));
     }
@@ -331,73 +275,11 @@ void Session::validateScanResult(const ScanResult& result) const {
   }
 }
 
-bool Session::assetExists(AssetId id) const noexcept {
-  return id.valid() && assetSourceOwners_.contains(id.value);
-}
-
-void Session::appendScanAssets(std::vector<Asset> assets, SourceId owner) {
-  std::unordered_set<u32> batchIds;
-  for (const auto& asset : assets) {
-    const auto id = metadata(asset).id;
-    if (!id.valid()) {
-      throw std::invalid_argument("Scan result contained an asset without an id");
-    }
-    if (!batchIds.insert(id.value).second) {
-      throw std::invalid_argument("Scan result contained duplicate asset id " + std::to_string(id.value));
-    }
-    if (assetSourceOwners_.contains(id.value)) {
-      throw std::invalid_argument("Scan result reused existing asset id " + std::to_string(id.value));
-    }
-  }
-
-  for (auto& asset : assets) {
-    const auto id = metadata(asset).id;
-    assetSourceOwners_.emplace(id.value, owner.value);
-    assets_.push_back(std::move(asset));
-  }
-}
-
 void Session::removeDiscoveredDataForSources(const std::vector<SourceId>& sources) {
-  const auto sourceIds = sourceIdSet(sources);
-  std::unordered_set<u32> removedAssetIds;
-
-  for (const auto& [assetId, sourceId] : assetSourceOwners_) {
-    if (sourceIds.contains(sourceId)) {
-      removedAssetIds.insert(assetId);
-    }
-  }
-
-  for (const auto& asset : assets_) {
-    const auto& meta = metadata(asset);
-    if (meta.range.valid() && sourceIds.contains(meta.range.source.value) && meta.id.valid()) {
-      removedAssetIds.insert(meta.id.value);
-    }
-  }
-
-  for (const auto& fact : matchFacts_) {
-    if (!factFromSource(fact, sourceIds) || !fact.asset.valid()) {
-      continue;
-    }
-    if (!assetSourceOwners_.contains(fact.asset.value)) {
-      removedAssetIds.insert(fact.asset.value);
-    }
-  }
-
-  std::erase_if(assets_, [&](const Asset& asset) {
-    const auto id = metadata(asset).id;
-    return id.valid() && removedAssetIds.contains(id.value);
-  });
-  for (const u32 id : removedAssetIds) {
-    assetSourceOwners_.erase(id);
-  }
-
-  std::erase_if(matchFacts_, [&](const MatchFact& fact) {
-    return factFromSource(fact, sourceIds) || (fact.asset.valid() && removedAssetIds.contains(fact.asset.value));
-  });
-  std::erase_if(diagnostics_,
-                [&](const Diagnostic& diagnostic) { return diagnosticFromSource(diagnostic, sourceIds); });
-
-  markCollectionsStaleForAssets(removedAssetIds);
+  const auto removedAssetIds = assets_.removeForSources(sources);
+  matchFacts_.removeForSourcesAndAssets(sources, removedAssetIds);
+  diagnostics_.removeForSources(sources);
+  collections_.markStaleForAssets(removedAssetIds);
 }
 
 // Ask registered formats which collections should exist for the current assets and
@@ -426,7 +308,7 @@ void Session::rebuildCollections() {
                                 std::make_move_iterator(desired.end()));
     } catch (const std::exception& ex) {
       failedResolvers.insert(resolverId);
-      diagnostics_.push_back(sessionError(std::string(module.name) + " resolveCollections failed: " + ex.what()));
+      diagnostics_.addError(std::string(module.name) + " resolveCollections failed: " + ex.what());
     }
   }
 
@@ -434,134 +316,7 @@ void Session::rebuildCollections() {
     if (failedResolvers.contains(resolverId)) {
       continue;
     }
-    reconcileCollections(resolverId, std::move(desiredCollections));
-  }
-}
-
-CollectionId Session::nextCollectionId() {
-  CollectionId id;
-  do {
-    id = ids_.nextCollectionId();
-  } while (std::ranges::any_of(collections_, [id](const Collection& collection) { return collection.id == id; }));
-  return id;
-}
-
-// A resolver owns every discovered collection with its resolver id. Each pass
-// replaces that resolver's desired set while preserving ids for keys that remain.
-void Session::reconcileCollections(std::string_view resolverId, std::vector<DesiredCollection> desiredCollections) {
-  std::set<std::string> seenKeys;
-  for (auto& desired : desiredCollections) {
-    if (desired.key.resolver.empty()) {
-      desired.key.resolver = std::string(resolverId);
-    }
-    if (desired.key.resolver != resolverId) {
-      diagnostics_.push_back(sessionError("Collection resolver '" + std::string(resolverId) +
-                                          "' returned a collection for resolver '" + desired.key.resolver + "'"));
-      continue;
-    }
-    if (desired.key.value.empty()) {
-      diagnostics_.push_back(sessionError("Collection resolver '" + std::string(resolverId) +
-                                          "' returned a collection with an empty key"));
-      continue;
-    }
-
-    const auto key = collectionKeyString(desired.key);
-    if (!seenKeys.insert(key).second) {
-      diagnostics_.push_back(sessionError("Collection resolver '" + std::string(resolverId) +
-                                          "' returned duplicate collection key '" + desired.key.value + "'"));
-      continue;
-    }
-
-    validateDesiredCollectionReferences(resolverId, desired);
-
-    const auto sameKey = [&](const Collection& collection) { return collection.key == desired.key; };
-    if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
-      if (found->origin == CollectionOrigin::UserCreated) {
-        found->status = CollectionStatus::Stale;
-        continue;
-      }
-      found->name = desired.name;
-      found->status = statusWithIssues(desired);
-      found->origin = desired.origin;
-      found->sequence = desired.sequence;
-      found->instrumentSets = desired.instrumentSets;
-      found->sampleCollections = desired.sampleCollections;
-      found->miscAssets = desired.miscAssets;
-      found->issues = std::move(desired.issues);
-      continue;
-    }
-
-    collections_.push_back(Collection{
-        .id = nextCollectionId(),
-        .name = desired.name,
-        .status = statusWithIssues(desired),
-        .origin = desired.origin,
-        .key = desired.key,
-        .sequence = desired.sequence,
-        .instrumentSets = desired.instrumentSets,
-        .sampleCollections = desired.sampleCollections,
-        .miscAssets = desired.miscAssets,
-        .issues = std::move(desired.issues),
-    });
-  }
-
-  std::erase_if(collections_, [&](const Collection& collection) {
-    return collection.origin == CollectionOrigin::Discovered && collection.key.resolver == resolverId &&
-           !seenKeys.contains(collectionKeyString(collection.key));
-  });
-}
-
-void Session::validateDesiredCollectionReferences(std::string_view resolverId, DesiredCollection& desired) {
-  const auto addMissingAssetDiagnostic = [&](AssetId id, std::string_view role) {
-    diagnostics_.push_back(sessionError("Collection resolver '" + std::string(resolverId) + "' returned " +
-                                        std::string(role) + " asset id " + std::to_string(id.value) +
-                                        " that does not exist"));
-    desired.issues.push_back(CollectionIssue{
-        .severity = Severity::Error,
-        .code = "missing-" + std::string(role),
-        .message = "Collection references missing " + std::string(role) + " asset " + std::to_string(id.value),
-        .asset = id,
-    });
-  };
-
-  if (desired.sequence && !assetExists(*desired.sequence)) {
-    addMissingAssetDiagnostic(*desired.sequence, "sequence");
-    desired.sequence = std::nullopt;
-  }
-
-  const auto filterExistingAssets = [&](std::vector<AssetId>& ids, std::string_view role) {
-    std::erase_if(ids, [&](AssetId id) {
-      if (assetExists(id)) {
-        return false;
-      }
-      addMissingAssetDiagnostic(id, role);
-      return true;
-    });
-  };
-
-  filterExistingAssets(desired.instrumentSets, "instrument-set");
-  filterExistingAssets(desired.sampleCollections, "sample-collection");
-  filterExistingAssets(desired.miscAssets, "misc");
-}
-
-void Session::markCollectionsStaleForAssets(const std::unordered_set<u32>& assetIds) {
-  if (assetIds.empty()) {
-    return;
-  }
-
-  for (auto& collection : collections_) {
-    if (!referencesAnyAsset(collection, assetIds)) {
-      continue;
-    }
-
-    collection.status = CollectionStatus::Stale;
-    if (!hasIssueCode(collection, "removed-asset")) {
-      collection.issues.push_back(CollectionIssue{
-          .severity = Severity::Error,
-          .code = "removed-asset",
-          .message = "Collection references an asset from a removed source",
-      });
-    }
+    collections_.reconcile(resolverId, std::move(desiredCollections), assets_, diagnostics_, ids_);
   }
 }
 

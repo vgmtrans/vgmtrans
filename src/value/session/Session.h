@@ -12,10 +12,13 @@
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceDialect.h"
+#include "value/session/AssetStore.h"
+#include "value/session/CollectionStore.h"
+#include "value/session/DiagnosticStore.h"
+#include "value/session/MatchFactStore.h"
 
 #include <filesystem>
 #include <set>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -49,21 +52,16 @@ private:
   void scanSourceAndDerived(SourceId id);
   void scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued);
   void validateScanResult(const ScanResult& result) const;
-  [[nodiscard]] bool assetExists(AssetId id) const noexcept;
-  void appendScanAssets(std::vector<Asset> assets, SourceId owner);
   void removeDiscoveredDataForSources(const std::vector<SourceId>& sources);
   void rebuildCollections();
-  [[nodiscard]] CollectionId nextCollectionId();
-  void reconcileCollections(std::string_view resolverId, std::vector<DesiredCollection> desiredCollections);
-  void validateDesiredCollectionReferences(std::string_view resolverId, DesiredCollection& desired);
-  void markCollectionsStaleForAssets(const std::unordered_set<u32>& assetIds);
 
   SourceStore sources_;
-  std::vector<Asset> assets_;
-  std::vector<MatchFact> matchFacts_;
-  std::vector<Collection> collections_;
-  std::vector<Diagnostic> diagnostics_;
-  std::unordered_map<u32, u32> assetSourceOwners_;
+  // These stores keep cleanup and validation rules beside the data they protect.
+  // Session coordinates source loading, scanning, and export around them.
+  AssetStore assets_;
+  MatchFactStore matchFacts_;
+  CollectionStore collections_;
+  DiagnosticStore diagnostics_;
   FormatRegistry formats_;
   SequenceDialectRegistry dialects_;
   ScanIdAllocator ids_;
