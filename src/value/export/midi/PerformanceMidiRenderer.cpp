@@ -223,7 +223,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .channel = channel,
               .value = midiPan(typedEvent.stereoPosition),
           });
-          if (typedEvent.linearGain != 1.0) {
+          if (typedEvent.hasLinearGain) {
             addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, LevelPrecisionHint::SevenBit,
                           options);
           }

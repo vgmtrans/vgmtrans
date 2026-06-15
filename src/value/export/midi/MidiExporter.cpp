@@ -90,9 +90,9 @@ void addRpn(std::vector<MidiMessage>& messages, u64 tick, u8 channel, u8 paramet
   // RPN writes are emitted as controller sequences. Callers use this for pitch bend range
   // and fine/coarse tuning because SMF has no shorter channel event for them.
   addController(messages, tick, channel, 101, parameterMsb, priority);
-  addController(messages, tick, channel, 100, parameterLsb, priority + 1);
-  addController(messages, tick, channel, 6, static_cast<u8>((value >> 7) & 0x7f), priority + 2);
-  addController(messages, tick, channel, 38, static_cast<u8>(value & 0x7f), priority + 3);
+  addController(messages, tick, channel, 100, parameterLsb, priority);
+  addController(messages, tick, channel, 6, static_cast<u8>((value >> 7) & 0x7f), priority);
+  addController(messages, tick, channel, 38, static_cast<u8>(value & 0x7f), priority);
 }
 
 [[nodiscard]] std::vector<u8> metaEvent(u8 type, std::span<const u8> payload) {
@@ -158,7 +158,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
                         static_cast<u8>((typedEvent.bank >> 7) & 0x7f), 10);
           if (typedEvent.writeLsb) {
             addController(messages, typedEvent.tick, typedEvent.channel, 32, static_cast<u8>(typedEvent.bank & 0x7f),
-                          11);
+                          10);
           }
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, Volume>) {
@@ -168,7 +168,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           addController(messages, typedEvent.tick, typedEvent.channel, 7,
                         static_cast<u8>((typedEvent.value >> 7) & 0x7f), 20);
           addController(messages, typedEvent.tick, typedEvent.channel, 39, static_cast<u8>(typedEvent.value & 0x7f),
-                        21);
+                        20);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, Pan>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 10, typedEvent.value);
@@ -180,7 +180,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           addController(messages, typedEvent.tick, typedEvent.channel, 11,
                         static_cast<u8>((typedEvent.value >> 7) & 0x7f), 20);
           addController(messages, typedEvent.tick, typedEvent.channel, 43, static_cast<u8>(typedEvent.value & 0x7f),
-                        21);
+                        20);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, MasterVolume>) {
           const std::array<u8, 7> payload{
@@ -243,7 +243,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           addController(messages, typedEvent.tick, typedEvent.channel, 5,
                         static_cast<u8>((typedEvent.value >> 7) & 0x7f), 20);
           addController(messages, typedEvent.tick, typedEvent.channel, 37, static_cast<u8>(typedEvent.value & 0x7f),
-                        21);
+                        20);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoControl>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 84, typedEvent.key);

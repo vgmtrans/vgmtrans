@@ -38,7 +38,8 @@ public:
   void expression(ExpressionPerformanceEvent event);
   void expression(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
   void pan(PanPerformanceEvent event);
-  void pan(double stereoPosition, double linearGain = 1.0);
+  void pan(double stereoPosition);
+  void pan(double stereoPosition, double linearGain);
   void masterLevel(MasterLevelPerformanceEvent event);
   void masterLevel(double linearGain);
   void reverb(ReverbPerformanceEvent event);

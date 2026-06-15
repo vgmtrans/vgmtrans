@@ -37,6 +37,30 @@ void midiExporterWritesStandardMidiFile() {
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
 }
 
+void midiExporterKeeps14BitControllerPairsAdjacent() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  Volume14{.tick = 0, .channel = 0, .value = 0x1234},
+                  Pan{.tick = 0, .channel = 0, .value = 64},
+                  EndOfTrack{.tick = 0},
+              },
+      }},
+  };
+
+  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const std::vector<u8> expectedOrder{
+      0x00, 0xb0, 0x07, 0x24,
+      0x00, 0xb0, 0x27, 0x34,
+      0x00, 0xb0, 0x0a, 0x40,
+  };
+
+  expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
+         "MIDI exporter should keep 14-bit volume MSB/LSB controllers adjacent before same-tick pan");
+}
+
 void performanceMidiRendererExtendsPreviousSameKeyNotes() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -81,6 +105,39 @@ void performanceMidiRendererExtendsPreviousSameKeyNotes() {
   expect(secondNote != nullptr && secondNote->tick == 18 && secondNote->key == 62 && secondNote->duration == 6,
          "performance renderer should emit a new note when no matching previous key exists");
   expect(std::get<EndOfTrack>(events.back()).tick == 24, "performance renderer should preserve track end ticks");
+}
+
+void performanceMidiRendererWritesPanGainResetWhenRequested() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 24,
+          .events =
+              {
+                  PanPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .stereoPosition = -1.0,
+                      .linearGain = 0.5,
+                      .hasLinearGain = true,
+                  },
+                  PanPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 12},
+                      .stereoPosition = 0.0,
+                      .linearGain = 1.0,
+                      .hasLinearGain = true,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  const auto& events = midiSequence.tracks[0].events;
+  expect(std::get<Pan>(events[1]).value == 0 && std::holds_alternative<Expression>(events[2]),
+         "pan gain compensation should emit expression with the pan event");
+  expect(std::get<Pan>(events[3]).value == 64 && std::get<Expression>(events[4]).value == 127,
+         "full-gain compensated pan should reset expression to full scale");
 }
 
 void performanceMidiRendererHonorsMidiExportOptions() {
@@ -401,7 +458,9 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
 
 void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
+  midiExporterKeeps14BitControllerPairsAdjacent();
   performanceMidiRendererExtendsPreviousSameKeyNotes();
+  performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererHonorsMidiExportOptions();
   exportRequestSequenceLoopsAffectMidiLowering();
   modulationAnalysisReportsObservedMidiControllerRanges();
