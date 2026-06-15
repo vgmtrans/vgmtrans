@@ -30,13 +30,11 @@ struct SourceFile {
   std::filesystem::path path;
   u64 size = 0;
   // Derived sources are real session entries, such as archive members, SPC RAM,
-  // or PSF executable images. Stable parent/extractor/key metadata lets rescans
-  // refresh them without changing HexView identity.
+  // or PSF executable images. Parent/extractor/key metadata records where they
+  // came from without making the session support source replacement.
   std::optional<SourceId> parent;
   std::string extractorId;
   std::string derivedKey;
-  u64 revision = 0;
-  bool stale = false;
   std::optional<SourceRange> origin;
 
   [[nodiscard]] bool derived() const noexcept { return kind == SourceKind::Derived; }
@@ -72,8 +70,8 @@ private:
 };
 
 struct ExtractedSource {
-  // Format modules return extracted bytes here; Session stores or updates the
-  // derived source so it can be inspected, rescanned, and used by later modules.
+  // Format modules return extracted bytes here; Session appends them as derived
+  // sources so they can be inspected and scanned by later modules.
   SourceFile file;
   std::vector<u8> bytes;
   std::optional<SourceRange> origin;
@@ -84,8 +82,8 @@ public:
   // SourceStore owns all bytes referenced by SourceRange. Assets copy only SourceRange
   // values, which keeps SessionSnapshot values small and diagnostics precise.
   SourceId add(SourceFile file, std::vector<u8> bytes);
-  SourceId addOrUpdateDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::string extractorId,
-                              std::string derivedKey, std::optional<SourceRange> origin);
+  SourceId addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::string extractorId,
+                      std::string derivedKey, std::optional<SourceRange> origin);
 
   [[nodiscard]] bool contains(SourceId id) const noexcept;
   [[nodiscard]] std::span<const u8> bytes(SourceId id) const;
@@ -94,10 +92,6 @@ public:
   [[nodiscard]] const SourceFile& sourceAt(size_t index) const;
   [[nodiscard]] size_t sourceCount() const noexcept { return entries_.size(); }
   [[nodiscard]] std::vector<SourceFile> sourceFiles() const;
-  [[nodiscard]] std::vector<SourceId> sourceFamily(SourceId id) const;
-
-  void markDerivedSourcesStale();
-  void markDerivedSourceFamilyStale(SourceId id);
 
 private:
   struct Entry {

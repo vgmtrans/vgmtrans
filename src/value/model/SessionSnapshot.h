@@ -32,7 +32,6 @@ using Asset = std::variant<SequenceProgramAsset, InstrumentSetAsset, SampleColle
 struct Collection {
   CollectionId id;
   std::string name;
-  CollectionOrigin origin = CollectionOrigin::Discovered;
   CollectionStatus status = CollectionStatus::Complete;
   CollectionKey key;
   // Collections are the export units. A sequence can be paired with zero or more synth

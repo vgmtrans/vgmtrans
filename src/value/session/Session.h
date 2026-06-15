@@ -12,7 +12,6 @@
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceDialect.h"
-#include "value/session/SessionStores.h"
 
 #include <filesystem>
 #include <set>
@@ -29,12 +28,8 @@ public:
   SourceId addSource(SourceFile file, std::vector<u8> bytes);
   SourceId addSourceFromPath(std::filesystem::path path);
 
-  // Compatibility wrapper for older call sites. New load paths should call
-  // scanSource() for the source that was just added.
-  [[nodiscard]] SessionSnapshot scan();
   [[nodiscard]] SessionSnapshot scanSource(SourceId id);
-  [[nodiscard]] SessionSnapshot rescanSource(SourceId id);
-  [[nodiscard]] SessionSnapshot rescanAll();
+  [[nodiscard]] SessionSnapshot scanPendingSources();
   [[nodiscard]] SessionSnapshot snapshot() const;
 
   [[nodiscard]] std::vector<Artifact> exportCollection(CollectionId id, const ExportRequest& request) const;
@@ -48,16 +43,16 @@ public:
   [[nodiscard]] SequenceDialectRegistry& dialects() noexcept { return dialects_; }
 
 private:
-  void scanSourceFamily(SourceId id, bool clearExisting);
+  void scanSourceAndDerived(SourceId id, u32 loadGroup);
   void scanOneSource(SourceId id, u32 loadGroup, std::vector<SourceId>& queue, std::set<u32>& queued);
-  void removeDiscoveredDataForSourceFamily(SourceId id);
   void rebuildCollections();
+  void reconcileCollections(std::vector<DesiredCollection> desiredCollections);
 
   SourceStore sources_;
-  AssetStore assets_;
-  MatchFactStore matchFacts_;
-  CollectionStore collections_;
-  DiagnosticStore diagnostics_;
+  std::vector<Asset> assets_;
+  std::vector<MatchFact> matchFacts_;
+  std::vector<Collection> collections_;
+  std::vector<Diagnostic> diagnostics_;
   FormatRegistry formats_;
   SequenceDialectRegistry dialects_;
   ScanIdAllocator ids_;
