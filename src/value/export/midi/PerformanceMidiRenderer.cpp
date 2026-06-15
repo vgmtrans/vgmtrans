@@ -251,9 +251,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .cents = typedEvent.cents,
           });
         } else if constexpr (std::is_same_v<TypedEvent, GlobalTransposePerformanceEvent>) {
-          // Global transpose is a renderer-side state change, mirroring the
-          // legacy MIDI global track. It affects later notes and portamento
-          // controls but does not write a MIDI event itself.
+          // Global transpose changes how later notes and portamento controls are written. It does not
+          // become a MIDI event itself.
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendPerformanceEvent>) {
           track.events.push_back(PitchBend{
               .tick = typedEvent.header.tick,

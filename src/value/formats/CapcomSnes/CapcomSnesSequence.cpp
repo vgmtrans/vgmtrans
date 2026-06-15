@@ -114,8 +114,8 @@ namespace math {
 }
 
 [[nodiscard]] double stereoPosition(const ::capcom_snes::PanConversionResult& converted) {
-  // Store the pan on the same 0..127 lattice the MIDI renderer uses so Capcom
-  // pan values survive the neutral stereo-position hop without shifting left.
+  // Store pan on the same 0..127 steps the MIDI renderer uses so Capcom center
+  // and edge positions survive conversion without shifting left.
   return std::clamp((static_cast<double>(converted.midiPan) / 127.0) * 2.0 - 1.0, -1.0, 1.0);
 }
 
@@ -518,8 +518,8 @@ struct Lfo {
       }
 
       default:
-        // Type 3 is the driver's reset-LFO-phase flag. SF2/DLS always reset phase
-        // on note activation, so there is no target-neutral performance event yet.
+        // Type 3 is the driver's reset-LFO-phase flag. SF2/DLS already reset phase
+        // on note activation, so there is nothing useful to emit yet.
         break;
     }
   }
@@ -722,8 +722,8 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
 
   const CommandHandler* programHandler = dialect.handlerForKind("capcom-snes.program");
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
-  // Capcom stores track pointers in reverse channel order. The normalized source track
-  // number below matches the driver's playback order.
+  // Capcom stores track pointers in reverse channel order. Reorder them here so source
+  // track numbers match the driver's playback order.
   for (int trackIndex = static_cast<int>(kCapcomSnesMaxTracks) - 1; trackIndex >= 0; --trackIndex) {
     const auto pointerOffset = pointerBase + static_cast<u32>(trackIndex) * 2;
     const u16 trackAddress = input.reader.be16(pointerOffset);

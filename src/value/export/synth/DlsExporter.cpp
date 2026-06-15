@@ -205,7 +205,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] std::optional<DlsConnection> dlsConnectionForGenerator(const SynthGenerator& generator) {
-  // Unconditional normalized generators become source-less DLS connections.
+  // Generators with no controller source become DLS connections that are always active.
   switch (generator.destination) {
     case SynthDestination::Pitch:
       return DlsConnection{.destination = kDlsConnDstPitch, .scale = dlsPitchScale(generator.amount)};

@@ -19,8 +19,8 @@
 
 namespace vgmtrans::core {
 
-// SessionSnapshot is a copyable view of the current Session stores. It is the
-// read model for UI, tests, and exports; Session remains the mutable owner.
+// Copyable view of the current Session state. UI, tests, and export read this
+// snapshot; Session owns the mutable stores.
 
 struct MiscAsset {
   AssetMetadata metadata;
@@ -34,8 +34,8 @@ struct Collection {
   std::string name;
   CollectionStatus status = CollectionStatus::Complete;
   CollectionKey key;
-  // Collections are the export units. A sequence can be paired with zero or more synth
-  // and sample assets because some games store those banks separately or share them.
+  // Collections are the export units. A sequence may be paired with instrument
+  // sets and sample collections loaded from the same or separate sources.
   std::optional<AssetId> sequence;
   std::vector<AssetId> instrumentSets;
   std::vector<AssetId> sampleCollections;
@@ -43,16 +43,15 @@ struct Collection {
 };
 
 struct SessionSnapshotIndex {
-  // Index entries are vector indices rather than pointers so snapshots remain
-  // normal movable/copyable values.
+  // Store vector indexes rather than pointers so snapshots stay easy to copy/move.
   bool valid = false;
   std::unordered_map<u32, size_t> assetsById;
   std::unordered_map<u32, size_t> collectionsById;
 };
 
 struct SessionSnapshot {
-  // Sources includes user-added files plus extracted derived files such as SPC RAM or
-  // archive members. Asset ranges refer back into this list.
+  // User-loaded sources plus derived sources such as archive members or SPC RAM.
+  // Asset ranges refer back into this list.
   std::vector<SourceFile> sources;
   std::vector<Asset> assets;
   std::vector<MatchFact> matchFacts;
@@ -72,8 +71,8 @@ struct CollectionAssetDiagnostics {
 };
 
 struct CollectionAssets {
-  // Resolved pointer view over a SessionSnapshot. It is intentionally non-owning
-  // so exporters can work without copying large sample/instrument assets.
+  // Non-owning pointers to the assets in one Collection. Exporters use this
+  // instead of repeatedly resolving IDs.
   const Collection* collection = nullptr;
   const SequenceProgramAsset* sequenceProgram = nullptr;
   std::vector<const InstrumentSetAsset*> instrumentSets;

@@ -25,8 +25,8 @@ struct SampleDecoder {
 
 class SampleDecoderRegistry {
 public:
-  // The default registry covers codecs used by current value formats. Tests and future
-  // formats can still build custom registries from the same value descriptor type.
+  // Covers codecs used by the current formats. Tests or future formats can build
+  // their own registry if they need different decoder functions.
   static SampleDecoderRegistry withDefaultDecoders();
 
   void add(SampleDecoder decoder);

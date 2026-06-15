@@ -20,9 +20,10 @@
 
 namespace vgmtrans::core {
 
-// Session is the mutable owner of the value pipeline. It owns source bytes,
-// discovered assets, match facts, collections, diagnostics, and registries.
-// Call snapshot() when UI, tests, or export need a stable read model.
+// Session is the mutable state for one loaded workspace. It owns the source
+// bytes, the assets found inside them, the facts used to match related assets,
+// the collections built from those matches, and the format registries.
+// Call snapshot() when UI, tests, or export need a stable read-only view.
 class Session {
 public:
   SourceId addSource(SourceFile file, std::vector<u8> bytes);

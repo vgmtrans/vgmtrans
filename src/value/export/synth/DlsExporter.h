@@ -32,6 +32,8 @@ struct DlsResult {
   std::vector<Diagnostic> diagnostics;
 };
 
+// Writes resolved instrument/sample assets as a DLS container. Sample bytes are
+// decoded through SourceStore so source-backed diagnostics remain available.
 class DlsExporter {
 public:
   [[nodiscard]] DlsResult exportDls(const DlsInput& input, const SourceStore& sources) const;

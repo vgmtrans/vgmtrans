@@ -93,8 +93,8 @@ struct MidiLoweringResult {
 [[nodiscard]] MidiLoweringResult lowerMidiSequence(const PreparedCollectionExport& prepared,
                                                    const SequenceDialectRegistry& dialects,
                                                    const ExportRequest& request) {
-  // Sequence rendering is needed both for .mid output and for observed modulation scaling
-  // in synth exports. Keep failures as diagnostics so non-MIDI artifacts can still be built.
+  // Rendering the source sequence is needed for .mid output and for observed-range
+  // synth modulation. Keep failures as diagnostics so other exports can still run.
   if (!prepared.assets.diagnostics.collection.empty()) {
     return MidiLoweringResult{
         .diagnostics = prepared.assets.diagnostics.collection,
@@ -157,8 +157,8 @@ struct MidiLoweringResult {
 
   auto midiSequence = *lowering.sequence;
   if (request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
-    // MIDI export also applies the same scaling so controller values and synth modulators
-    // agree when a user asks for observed-range modulation.
+    // Apply the same observed-range scaling to MIDI controller values and synth
+    // modulators so they continue to match each other.
     const auto usage = lowering.performance ? analyzePerformanceModulationUsage(*lowering.performance)
                                             : analyzeMidiModulationUsage(midiSequence);
     if (hasMidiModulationUsage(usage)) {
@@ -313,8 +313,8 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   bool midiUsageAnalyzed = false;
 
   const auto requireMidiLowering = [&]() -> const MidiLoweringResult& {
-    // Several requested artifacts can depend on the same lowered MIDI sequence. Lower it
-    // once so diagnostics and modulation analysis all refer to identical playback data.
+    // Several requested files can depend on the same rendered sequence. Render it
+    // once so diagnostics and modulation analysis refer to the same playback data.
     if (!midiLowering) {
       midiLowering = lowerMidiSequence(prepared, dialects, request);
     }

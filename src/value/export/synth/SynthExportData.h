@@ -23,7 +23,8 @@ struct SynthSampleDecodeOptions {
   std::string nonMonoWarning;
 };
 
-// Shared decoded-sample view used by synth exporters before writing format-specific containers.
+// Decoded sample plus its original collection/index identity. Synth exporters use
+// this to build one flat sample table without losing region references.
 struct DecodedSynthSample {
   AssetId collectionId;
   u32 localIndex = 0;
@@ -46,7 +47,8 @@ struct ResolvedSynthInstrument {
 using SynthSampleIndexKey = std::pair<u32, u32>;
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 
-// Decodes samples while preserving collection-local indexes used by instrument regions.
+// Decode all referenced sample collections once before writing a synth container.
+// The returned samples still remember the collection-local indexes used by regions.
 [[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(
     std::span<const SampleCollectionAsset* const> sampleCollections,
     const SourceStore& sources,

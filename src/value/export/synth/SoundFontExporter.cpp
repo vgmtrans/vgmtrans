@@ -341,8 +341,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 [[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(
     const SynthModulator& modulator, const MidiModulationUsage* midiModulationUsage = nullptr,
     ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange) {
-  // The normalized SynthModulator omits SF2 source-generator encodings. This function is
-  // the only place that knows the SF2 controller ids chosen for shared modulation concepts.
+  // SynthModulator names common controller behavior. This function chooses the SF2 controller
+  // and generator numbers that represent it in the file.
   const auto source = modulator.source ? sf2SourceForSynthSource(*modulator.source)
                                        : sf2DefaultSourceForDestination(modulator.destination);
   const auto destination = sf2GeneratorForDestination(modulator.destination);
@@ -365,8 +365,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] std::optional<double> envelopeSeconds(u32 microseconds, std::optional<double> preciseSeconds) {
-  // Formats can provide precise seconds when legacy math is not exactly representable as
-  // integer microseconds. Prefer that for SF2 timecent conversion.
+  // Some source drivers use envelope timing that does not round cleanly to integer microseconds.
+  // Prefer a precise seconds value when the format provides one.
   if (preciseSeconds && *preciseSeconds >= 0.0 && std::isfinite(*preciseSeconds)) {
     return *preciseSeconds;
   }
@@ -504,7 +504,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }
 
 [[nodiscard]] Chunk phdrChunk(std::span<const ResolvedSynthInstrument> instruments) {
-  // Each value Instrument becomes one SF2 preset pointing at the matching SF2 instrument
+  // Each parsed Instrument becomes one SF2 preset pointing at the matching SF2 instrument
   // by index. The terminal EOP record is required by the SF2 table format.
   std::vector<u8> payload;
   for (u32 i = 0; i < instruments.size(); ++i) {
@@ -621,7 +621,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 [[nodiscard]] Chunk igenChunk(std::span<const ResolvedSynthInstrument> instruments,
                               std::span<const DecodedSfSample> samplesByIndex) {
   // Region generators are written in SF2's required order: ranges and placement first,
-  // then envelope/tuning/sample linkage. Unsupported normalized generators are skipped.
+  // then envelope/tuning/sample linkage. Unsupported SynthGenerator destinations are skipped.
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
     for (const auto& generator : instrument.instrument->generators) {

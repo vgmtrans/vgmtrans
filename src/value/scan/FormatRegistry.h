@@ -14,8 +14,8 @@ namespace vgmtrans::core {
 
 class FormatRegistry {
 public:
-  // Registry order matters: scanners are asked in registration order for every source,
-  // including derived sources extracted by earlier scanners.
+  // Order matters: every source is offered to modules in registration order, including
+  // derived sources extracted by earlier modules.
   void add(FormatModule module);
 
   [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept { return modules_; }

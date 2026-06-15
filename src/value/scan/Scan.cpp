@@ -14,7 +14,8 @@ namespace vgmtrans::core {
 namespace {
 
 void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
-  // Modules can return hand-authored or builder-created trees; normalize them before publishing.
+  // Scanners may build item trees manually. Assign any missing IDs and rebuild
+  // child lists before the tree is published.
   for (auto& item : items.nodes) {
     if (item.id.valid()) {
       ids.reserveAfter(item.id);
@@ -55,8 +56,8 @@ void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
 }
 
 void assignMissingAssetIds(std::vector<Asset>& assets, ScanIdAllocator& ids) {
-  // Format modules may assign IDs when cross-references are known during parsing. If
-  // they do not, the shared scanner fills them in consistently before publishing assets.
+  // Formats may assign IDs when assets reference each other. If they leave an ID
+  // empty, assign one here before the asset leaves the scan result.
   for (auto& asset : assets) {
     auto& meta = metadata(asset);
     if (meta.id.valid()) {
