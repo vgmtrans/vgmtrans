@@ -15,6 +15,7 @@
 namespace vgmtrans::core {
 
 struct VmTrackRuntime;
+class VmTrackExecutor;
 
 struct BranchResult {
   bool taken = false;
@@ -97,12 +98,13 @@ public:
 
 private:
   friend class SequenceVm;
+  friend class VmTrackExecutor;
 
-  VmApi(VmTrackRuntime& runtime, PerformanceSequence& sequence, SourceRange commandRange, u32 currentIndex);
+  VmApi(VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command, u32 currentIndex);
 
   VmTrackRuntime& runtime_;
   PerformanceSequence& sequence_;
-  SourceRange commandRange_;
+  const SourceCommand& command_;
   u32 currentIndex_ = 0;
 };
 

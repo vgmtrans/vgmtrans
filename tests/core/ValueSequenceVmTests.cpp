@@ -141,6 +141,40 @@ void sequenceVmStopsKnownLoopForeverBeforeTargetReplay() {
          "known loop-forever should replay the target only while loop budget remains");
 }
 
+void sequenceVmPreservesKnownLoopForeverAsPerformanceMarkers() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
+  const CommandId noteCommand =
+      addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes).id;
+  const CommandId loopCommand =
+      addProbeCommand<ProbeLoopForeverCommand>(builder, dialect, Address{3}, probeRange(3, loopBytes.size()), loopBytes)
+          .id;
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
+  expect(performance.diagnostics.empty(), "preserved loop-forever fixture should not report diagnostics");
+  expect(performance.tracks[0].endTick == 12, "preserved loop-forever should stop after the first pass");
+
+  const MarkerPerformanceEvent* loopStart = probeMarkerAt(performance.tracks[0], "Loop Start", 0);
+  const MarkerPerformanceEvent* loopEnd = probeMarkerAt(performance.tracks[0], "Loop End", 12);
+  expect(loopStart != nullptr && loopStart->header.sourceCommand == noteCommand,
+         "preserved loop-forever should mark the declared loop target as loop start");
+  expect(loopEnd != nullptr && loopEnd->header.sourceCommand == loopCommand,
+         "preserved loop-forever should mark the explicit loop command as loop end");
+}
+
 void sequenceVmJumpOrLoopForeverRequiresVisitedDestination() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -170,6 +204,41 @@ void sequenceVmJumpOrLoopForeverRequiresVisitedDestination() {
          "jump-or-loop should allow an unvisited backward destination and stop after it repeats");
   expect(countProbeNotesAt(performance.tracks[0], 0) == 1,
          "jump-or-loop should not replay the loop target after detecting the visited destination");
+}
+
+void sequenceVmPreservesJumpOrLoopForeverAsPerformanceMarkers() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 3> jumpBytes{0xfc, 0x00, 0x00};
+  const CommandId noteCommand =
+      addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes).id;
+  const CommandId jumpCommand =
+      addProbeCommand<ProbeJumpOrLoopForeverCommand>(builder, dialect, Address{3}, probeRange(3, jumpBytes.size()),
+                                                     jumpBytes)
+          .id;
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
+  expect(performance.diagnostics.empty(), "preserved jump-or-loop fixture should not report diagnostics");
+  expect(performance.tracks[0].endTick == 12, "preserved jump-or-loop should stop after the first pass");
+
+  const MarkerPerformanceEvent* loopStart = probeMarkerAt(performance.tracks[0], "Loop Start", 0);
+  const MarkerPerformanceEvent* loopEnd = probeMarkerAt(performance.tracks[0], "Loop End", 12);
+  expect(loopStart != nullptr && loopStart->header.sourceCommand == noteCommand,
+         "preserved jump-or-loop should mark the visited destination as loop start");
+  expect(loopEnd != nullptr && loopEnd->header.sourceCommand == jumpCommand,
+         "preserved jump-or-loop should mark the jump command as loop end");
 }
 
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
@@ -428,6 +497,37 @@ void sequenceVmReplaysFiniteRepeatBlocks() {
   }
 }
 
+void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{1003},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> jumpToOutsideBytes{0xfe, 0xd0, 0x07};
+  const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0xe8, 0x03};
+  const std::array<u8, 3> jumpToSelfBytes{0xfe, 0xd0, 0x07};
+
+  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{1000}, probeRange(100, jumpToOutsideBytes.size()),
+                                    jumpToOutsideBytes);
+  addProbeCommand<ProbeRepeatCommand>(builder, dialect, Address{1003}, probeRange(103, repeatBytes.size()),
+                                      repeatBytes);
+  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{2000}, probeRange(200, jumpToSelfBytes.size()),
+                                    jumpToSelfBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .behavior = SequenceProgramBehavior{.commandLimit = 8},
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(),
+         "repeat replay suppression should follow command addresses, not unrelated source offsets");
+}
+
 void sequenceVmExecutesNestedCallInsideRepeat() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -611,6 +711,42 @@ void sequenceVmStopsAllTracksAtEarliestLoopTick() {
          "stopAllTracksAtFirstLoop should prevent later-track events past the earliest loop tick");
 }
 
+void sequenceVmSynchronizedDryRunDoesNotDuplicateDiagnostics() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
+  const std::array<u8, 3> jumpLoopBytes{0xfe, 0x00, 0x00};
+  const std::array<u8, 3> jumpMissingBytes{0xfe, 0x63, 0x00};
+
+  TrackProgram track0{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder0{track0};
+  addProbeCommand<ProbeNoteCommand>(builder0, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(builder0, dialect, Address{3}, probeRange(3, jumpLoopBytes.size()),
+                                    jumpLoopBytes);
+
+  TrackProgram track1{
+      .id = TrackId{1},
+      .startAddress = Address{100},
+  };
+  TrackProgramBuilder builder1{track1};
+  const SourceRange missingJumpRange = probeRange(100, jumpMissingBytes.size());
+  addProbeCommand<ProbeJumpCommand>(builder1, dialect, Address{100}, missingJumpRange, jumpMissingBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .behavior = SequenceProgramBehavior{.stopAllTracksAtFirstLoop = true},
+      .tracks = {track0, track1},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.size() == 1,
+         "synchronized dry-run diagnostics should not be copied into the final render");
+  expectDiagnosticRange(performance.diagnostics, "Sequence jump target $0063 was not decoded", missingJumpRange);
+}
+
 void sequenceVmDoesNotWrapCommandAddressOverflow() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -669,18 +805,22 @@ void runValueSequenceVmTests() {
   sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
   sequenceVmReplaysInfiniteLoopsWhenRequested();
   sequenceVmStopsKnownLoopForeverBeforeTargetReplay();
+  sequenceVmPreservesKnownLoopForeverAsPerformanceMarkers();
   sequenceVmJumpOrLoopForeverRequiresVisitedDestination();
+  sequenceVmPreservesJumpOrLoopForeverAsPerformanceMarkers();
   sequenceVmPreservesLoopsAsPerformanceMarkers();
   sequenceVmUsesDialectCommandLimitDefault();
   sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
   sequenceVmEmitsDialectInitialChannelDefaults();
   sequenceVmAllowsRepeatedCallsToSameSubroutine();
   sequenceVmReplaysFiniteRepeatBlocks();
+  sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets();
   sequenceVmExecutesNestedCallInsideRepeat();
   sequenceVmExecutesRepeatInsideCall();
   sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken();
   sequenceVmPreservesLoopMarkersForInteriorJumpTarget();
   sequenceVmStopsAllTracksAtEarliestLoopTick();
+  sequenceVmSynchronizedDryRunDoesNotDuplicateDiagnostics();
   sequenceVmDoesNotWrapCommandAddressOverflow();
   sequenceVmReportsMissingJumpTargetAfterEmittedEvents();
 }
