@@ -112,6 +112,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
