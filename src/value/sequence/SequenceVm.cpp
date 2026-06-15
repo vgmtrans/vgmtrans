@@ -74,7 +74,7 @@ public:
       // A repeat-break branch is taken only on the last repeat pass.
       remaining_.erase(found);
       replayWindow_.reset();
-      return Step::jump(destination);
+      return Step::branch(destination);
     }
     return Step::next();
   }
@@ -440,6 +440,14 @@ private:
         }
         break;
 
+      case Step::Kind::Branch:
+        current_ = destinationIndex(track_, step.destination);
+        arrivedByControlFlow_ = false;
+        if (!current_) {
+          warn(fmt::format("Sequence branch target ${:04X} was not decoded", step.destination.value), command.range);
+        }
+        break;
+
       case Step::Kind::JumpOrLoopForever:
         applyJumpOrLoopForever(command, step.destination);
         break;
@@ -596,7 +604,7 @@ Step VmApi::repeatBreak(u8 slot, Address destination) {
 BranchResult VmApi::repeatBreakBranch(u8 slot, Address destination) {
   const Step step = repeatBreak(slot, destination);
   return BranchResult{
-      .taken = step.kind == Step::Kind::Jump,
+      .taken = step.kind == Step::Kind::Jump || step.kind == Step::Kind::Branch,
       .effects = Effects{.step = step},
   };
 }

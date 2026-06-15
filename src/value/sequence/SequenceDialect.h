@@ -31,6 +31,7 @@ struct Step {
     Next,
     End,
     Jump,
+    Branch,
     JumpOrLoopForever,
     LoopForever,
     Call,
@@ -44,6 +45,11 @@ struct Step {
   [[nodiscard]] static constexpr Step end() noexcept { return Step{.kind = Kind::End}; }
   [[nodiscard]] static constexpr Step jump(Address destination) noexcept {
     return Step{.kind = Kind::Jump, .destination = destination};
+  }
+  // Finite branches, such as repeat-break alternate endings, should not be
+  // treated as loops merely because the destination command ran earlier.
+  [[nodiscard]] static constexpr Step branch(Address destination) noexcept {
+    return Step{.kind = Kind::Branch, .destination = destination};
   }
   [[nodiscard]] static constexpr Step jumpOrLoopForever(Address destination) noexcept {
     return Step{.kind = Kind::JumpOrLoopForever, .destination = destination};

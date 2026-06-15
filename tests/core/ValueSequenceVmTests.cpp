@@ -669,6 +669,41 @@ void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
   expect(sideEffects == 1, "repeat-break command should emit side effects only when the break branch is taken");
 }
 
+void sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
+  const std::array<u8, 3> jumpBytes{0xfe, 0x14, 0x00};
+  const std::array<u8, 4> repeatBreakBytes{0xf1, 0x00, 0x00, 0x00};
+  const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0x14, 0x00};
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeRepeatBreakCommand>(builder, dialect, Address{23}, probeRange(23, repeatBreakBytes.size()),
+                                           repeatBreakBytes);
+  addProbeCommand<ProbeRepeatCommand>(builder, dialect, Address{27}, probeRange(27, repeatBytes.size()), repeatBytes);
+  addProbeCommand<ProbeEndCommand>(builder, dialect, Address{32}, probeRange(32, endBytes.size()), endBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "repeat-break branch-to-visited fixture should not report diagnostics");
+  expect(countProbeNotesAt(performance.tracks[0], 36) == 1,
+         "repeat-break should execute a branch target even if that command ran earlier");
+  expect(performance.tracks[0].endTick == 48,
+         "repeat-break branch-to-visited fixture should stop only after the branch target note plays");
+}
+
 void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -853,6 +888,7 @@ void runValueSequenceVmTests() {
   sequenceVmExecutesNestedCallInsideRepeat();
   sequenceVmExecutesRepeatInsideCall();
   sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken();
+  sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode();
   sequenceVmPreservesLoopMarkersForInteriorJumpTarget();
   sequenceVmStopsAllTracksAtEarliestLoopTick();
   sequenceVmSynchronizedDryRunDoesNotDuplicateDiagnostics();
