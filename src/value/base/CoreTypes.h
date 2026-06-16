@@ -8,6 +8,8 @@
 
 #include "base/Types.h"
 
+#include <cstddef>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <string>
@@ -18,40 +20,37 @@ namespace vgmtrans::core {
 // each other. invalidIdValue marks optional or not-yet-assigned IDs.
 inline constexpr u32 invalidIdValue = std::numeric_limits<u32>::max();
 
-struct SourceId {
+template <class Tag>
+struct Id {
   u32 value = invalidIdValue;
 
   [[nodiscard]] constexpr bool valid() const noexcept { return value != invalidIdValue; }
-  friend constexpr bool operator==(SourceId, SourceId) noexcept = default;
+  friend constexpr bool operator==(Id, Id) noexcept = default;
 };
 
-struct AssetId {
-  u32 value = invalidIdValue;
+struct SourceIdTag;
+using SourceId = Id<SourceIdTag>;
 
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != invalidIdValue; }
-  friend constexpr bool operator==(AssetId, AssetId) noexcept = default;
-};
+struct AssetIdTag;
+using AssetId = Id<AssetIdTag>;
 
-struct CollectionId {
-  u32 value = invalidIdValue;
+struct CollectionIdTag;
+using CollectionId = Id<CollectionIdTag>;
 
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != invalidIdValue; }
-  friend constexpr bool operator==(CollectionId, CollectionId) noexcept = default;
-};
+struct ItemIdTag;
+using ItemId = Id<ItemIdTag>;
 
-struct ItemId {
-  u32 value = invalidIdValue;
+struct TrackIdTag;
+using TrackId = Id<TrackIdTag>;
 
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != invalidIdValue; }
-  friend constexpr bool operator==(ItemId, ItemId) noexcept = default;
-};
+struct CommandIdTag;
+using CommandId = Id<CommandIdTag>;
 
-struct TrackId {
-  u32 value = invalidIdValue;
+struct CommandHandlerIdTag;
+using CommandHandlerId = Id<CommandHandlerIdTag>;
 
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != invalidIdValue; }
-  friend constexpr bool operator==(TrackId, TrackId) noexcept = default;
-};
+struct CommandKindIdTag;
+using CommandKindId = Id<CommandKindIdTag>;
 
 // A byte range inside a user-loaded or derived source. Parsed objects, diagnostics,
 // and UI items use this to point back to the bytes they came from.
@@ -79,3 +78,14 @@ struct Diagnostic {
 };
 
 }  // namespace vgmtrans::core
+
+namespace std {
+
+template <class Tag>
+struct hash<vgmtrans::core::Id<Tag>> {
+  std::size_t operator()(vgmtrans::core::Id<Tag> id) const noexcept {
+    return std::hash<::u32>{}(id.value);
+  }
+};
+
+}  // namespace std
