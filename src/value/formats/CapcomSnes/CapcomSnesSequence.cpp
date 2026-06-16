@@ -17,7 +17,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -654,32 +653,7 @@ template <class Registrar>
   return "capcom-snes";
 }
 
-[[nodiscard]] CapcomSnesEngineVersion versionForDialect(const SequenceDialect& dialect) {
-  if (dialect.id.value == "capcom-snes:v1") {
-    return CapcomSnesEngineVersion::v1BgmInList;
-  }
-  if (dialect.id.value == "capcom-snes:v2") {
-    return CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation;
-  }
-  if (dialect.id.value == "capcom-snes:v3") {
-    return CapcomSnesEngineVersion::v3BgmFixedLocation;
-  }
-  return CapcomSnesEngineVersion::none;
-}
-
-[[nodiscard]] const BytecodeDispatchTable& capcomBytecodeMapFor(const SequenceDialect& dialect) {
-  static std::map<std::string, BytecodeDispatchTable> maps;
-  if (const auto found = maps.find(dialect.id.value); found != maps.end()) {
-    return found->second;
-  }
-
-  auto [inserted, _] = maps.emplace(dialect.id.value, capcomBytecodeMap(dialect, versionForDialect(dialect)));
-  return inserted->second;
-}
-
-}  // namespace
-
-SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version) {
+[[nodiscard]] CapcomSnesSequenceDescriptor makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion version) {
   SequenceDialectBuilder<TrackState, Context> builder{dialectId(version), Context{.version = version}};
   builder.timebase(Timebase{.ppqn = kCapcomSnesPpqn})
       .defaultBehavior(SequenceProgramBehavior{
@@ -687,20 +661,50 @@ SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version) {
           .initialReverbSend = 0.0,
           .initialMonoModeChannels = 0,
       });
-  static_cast<void>(capcomBytecodeMap(builder, version));
-  return builder.finish();
+  auto bytecode = capcomBytecodeMap(builder, version);
+  return CapcomSnesSequenceDescriptor{
+      .dialect = builder.finish(),
+      .bytecode = std::move(bytecode),
+  };
+}
+
+}  // namespace
+
+const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngineVersion version) {
+  static const CapcomSnesSequenceDescriptor none = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::none);
+  static const CapcomSnesSequenceDescriptor v1 = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v1BgmInList);
+  static const CapcomSnesSequenceDescriptor v2 =
+      makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation);
+  static const CapcomSnesSequenceDescriptor v3 =
+      makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+
+  switch (version) {
+    case CapcomSnesEngineVersion::v1BgmInList:
+      return v1;
+    case CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation:
+      return v2;
+    case CapcomSnesEngineVersion::v3BgmFixedLocation:
+      return v3;
+    case CapcomSnesEngineVersion::none:
+      return none;
+  }
+  return none;
+}
+
+SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version) {
+  return capcomSnesSequenceDescriptor(version).dialect;
 }
 
 void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
-  registry.add(capcomSnesSequenceDialect(CapcomSnesEngineVersion::none));
-  registry.add(capcomSnesSequenceDialect(CapcomSnesEngineVersion::v1BgmInList));
-  registry.add(capcomSnesSequenceDialect(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation));
-  registry.add(capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation));
+  registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::none).dialect);
+  registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v1BgmInList).dialect);
+  registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation).dialect);
+  registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation).dialect);
 }
 
-TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sourceTrackNumber,
-                                         u32 startAddress) {
-  const BytecodeDispatchTable& bytecode = capcomBytecodeMapFor(dialect);
+TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequenceDescriptor& descriptor,
+                                         u32 sourceTrackNumber, u32 startAddress) {
+  const BytecodeDispatchTable& bytecode = descriptor.bytecode;
   return decodeLinearBytecodeTrack(reader, sourceTrackNumber, startAddress,
                                    LinearBytecodeDecodePolicy{.maxCommands = 4096},
                                    [&](u32 offset) { return bytecode.decode(reader, offset); });
@@ -714,7 +718,8 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
   const auto root = itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes.sequence-header", "Sequence Header",
                                     input.reader.range(layout.sequenceHeaderAddress, headerSize));
 
-  const SequenceDialect dialect = capcomSnesSequenceDialect(layout.version);
+  const CapcomSnesSequenceDescriptor& descriptor = capcomSnesSequenceDescriptor(layout.version);
+  const SequenceDialect& dialect = descriptor.dialect;
   SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
@@ -735,7 +740,7 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
     const auto trackItem =
         itemBuilder.add(root, ItemKind::Track, "capcom-snes.track-pointer", "Track Pointer",
                         input.reader.range(pointerOffset, 2), fmt::format("Track starts at ${:04X}", trackAddress));
-    auto track = decodeCapcomSnesSourceTrack(input.reader, dialect,
+    auto track = decodeCapcomSnesSourceTrack(input.reader, descriptor,
                                              static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex), trackAddress);
 
     for (const auto& command : track.commands) {

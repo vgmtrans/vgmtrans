@@ -43,12 +43,13 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   bytes[trackStart + 9] = 0x06;
   bytes[trackStart + 10] = 0xff;
 
-  const SequenceDialect dialect = ndsSequenceDialect();
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
   const auto starts = ndsSequenceTrackStarts(ByteReader(SourceId{4}, bytes), sequenceOffset, trackStart + 11);
   expect(starts.size() == 1 && starts[0] == trackStart, "NDS SSEQ track-start discovery should find the primary track");
 
-  const TrackProgram track =
-      decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), dialect, sequenceOffset, trackStart + 11, trackStart, 0);
+  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), descriptor, sequenceOffset,
+                                                    trackStart + 11, trackStart, 0);
   expect(track.commands.size() == 5, "NDS SSEQ dialect should decode all fixture commands");
   expect(dialect.describe(track, track.commands[0]).detailKind == "nds.note-wait",
          "NDS SSEQ dialect should decode note-wait as a local command");
@@ -110,7 +111,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   bytes[trackStart + 1] = 0x7f;
   bytes[trackStart + 2] = 0xff;
   const TrackProgram expressionTrack =
-      decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), dialect, sequenceOffset, trackStart + 3, trackStart, 0);
+      decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), descriptor, sequenceOffset, trackStart + 3, trackStart, 0);
   expect(expressionTrack.commands.size() == 2 &&
              dialect.describe(expressionTrack, expressionTrack.commands[0]).detailKind == "nds.expression",
          "NDS expression opcode should decode as a musical command");
@@ -148,8 +149,9 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   bytes[subroutineOffset + 2] = 0x05;
   bytes[subroutineOffset + 3] = 0xfd;
 
-  const SequenceDialect dialect = ndsSequenceDialect();
-  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{5}, bytes), dialect, sequenceOffset,
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{5}, bytes), descriptor, sequenceOffset,
                                                     subroutineOffset + 4, trackStart, 0);
   expect(track.commands.size() == 6, "NDS call fixture should decode call target and fallthrough blocks");
 
@@ -180,8 +182,8 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   expect(noteEvent.header.tick == 0 && noteEvent.key == 60.0 && noteEvent.durationTicks == 5,
          "NDS subroutine note should render at the call tick and use source duration");
 
-  const TrackProgram linearizedTrack = decodeNdsSequenceTrack(ByteReader(SourceId{5}, bytes), dialect, sequenceOffset,
-                                                              subroutineOffset + 4, trackStart, 0, true);
+  const TrackProgram linearizedTrack = decodeNdsSequenceTrack(
+      ByteReader(SourceId{5}, bytes), descriptor, sequenceOffset, subroutineOffset + 4, trackStart, 0, true);
   expect(linearizedTrack.commands.size() == 6,
          "NDS linearized call fixture should still decode call target and fallthrough blocks");
   const SequenceProgram linearizedProgram{
@@ -204,7 +206,7 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   overlapBytes[trackStart + 6] = 0x64;
   overlapBytes[trackStart + 7] = 0x01;
   overlapBytes[trackStart + 8] = 0xfd;
-  const TrackProgram overlapTrack = decodeNdsSequenceTrack(ByteReader(SourceId{8}, overlapBytes), dialect,
+  const TrackProgram overlapTrack = decodeNdsSequenceTrack(ByteReader(SourceId{8}, overlapBytes), descriptor,
                                                            sequenceOffset, trackStart + 9, trackStart, 0, true);
   expect(overlapTrack.commands.size() == 4,
          "NDS linearized overlap fixture should split fallthrough from call-target bytes");
@@ -247,9 +249,10 @@ void ndsSequenceDialectDiscoversSecondaryTrackStarts() {
   expect(starts.size() == 2 && starts[0] == primaryStart && starts[1] == secondaryStart,
          "NDS SSEQ track-start discovery should include bootstrap secondary tracks");
 
-  const SequenceDialect dialect = ndsSequenceDialect();
-  const TrackProgram secondary =
-      decodeNdsSequenceTrack(ByteReader(SourceId{6}, bytes), dialect, sequenceOffset, secondaryStart + 3, starts[1], 1);
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram secondary = decodeNdsSequenceTrack(ByteReader(SourceId{6}, bytes), descriptor, sequenceOffset,
+                                                        secondaryStart + 3, starts[1], 1);
   expect(secondary.sourceTrackNumber == 1 && secondary.commands.size() == 2,
          "NDS secondary track should decode independently from the primary bootstrap");
   expect(dialect.describe(secondary, secondary.commands[0]).detailKind == "nds.rest",
@@ -266,9 +269,10 @@ void ndsSequenceDialectPreservesIgnoredCommandOperands() {
   bytes[trackStart + 2] = 0x34;
   bytes[trackStart + 3] = 0xff;
 
-  const SequenceDialect dialect = ndsSequenceDialect();
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
   const TrackProgram track =
-      decodeNdsSequenceTrack(ByteReader(SourceId{7}, bytes), dialect, sequenceOffset, trackStart + 4, trackStart, 0);
+      decodeNdsSequenceTrack(ByteReader(SourceId{7}, bytes), descriptor, sequenceOffset, trackStart + 4, trackStart, 0);
   expect(track.commands.size() == 2, "NDS ignored-command fixture should decode the ignored command and end command");
 
   const SourceCommand& ignored = track.commands[0];
@@ -293,9 +297,10 @@ void ndsSequenceDialectKeepsEmptyPlaceholderTrack() {
   expect(starts.size() == 1 && starts.front() == trackStart,
          "NDS empty placeholder sequences should keep their first empty track");
 
-  const SequenceDialect dialect = ndsSequenceDialect();
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
   const TrackProgram track =
-      decodeNdsSequenceTrack(ByteReader(SourceId{8}, bytes), dialect, sequenceOffset, trackStart, trackStart, 0);
+      decodeNdsSequenceTrack(ByteReader(SourceId{8}, bytes), descriptor, sequenceOffset, trackStart, trackStart, 0);
   expect(track.commands.empty(), "NDS empty placeholder tracks should not decode padding as commands");
 }
 
@@ -307,9 +312,10 @@ void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {
   bytes[trackStart + 0] = 0x80;
   bytes[trackStart + 1] = 0x81;
 
-  const SequenceDialect dialect = ndsSequenceDialect();
-  const TrackProgram track =
-      decodeNdsSequenceTrack(ByteReader(SourceId{10}, bytes), dialect, sequenceOffset, trackStart + 2, trackStart, 0);
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{10}, bytes), descriptor, sequenceOffset,
+                                                    trackStart + 2, trackStart, 0);
   expect(track.commands.size() == 1, "NDS unterminated variable-length command should decode as one command");
   expect(dialect.describe(track, track.commands[0]).detailKind == "nds.truncated",
          "NDS unterminated variable-length command should use the truncated-command fallback");
@@ -342,8 +348,9 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
   bytes[subroutineOffset + 5] = static_cast<u8>((subroutineRelative >> 8) & 0xff);
   bytes[subroutineOffset + 6] = static_cast<u8>((subroutineRelative >> 16) & 0xff);
 
-  const SequenceDialect dialect = ndsSequenceDialect();
-  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{9}, bytes), dialect, sequenceOffset,
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{9}, bytes), descriptor, sequenceOffset,
                                                     subroutineOffset + 7, trackStart, 0, true);
   const auto jump = std::ranges::find_if(track.commands, [&](const SourceCommand& command) {
     return dialect.describe(track, command).detailKind == "nds.jump";

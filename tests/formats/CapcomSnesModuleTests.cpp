@@ -536,8 +536,9 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   bytes[0x300b] = 0x00;
   bytes[0x300c] = 0x17;
 
-  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 2, 0x3000);
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 2, 0x3000);
   expect(track.commands.size() == 7,
          "CapcomSnes source dialect should decode the fixture commands, got " + std::to_string(track.commands.size()));
   expect(track.addressIndex.find(Address{0x3009}).has_value(),
@@ -590,8 +591,9 @@ void capcomSnesInitialDurationRateIsFullLength() {
   bytes[0x3000] = 0xe1;
   bytes[0x3001] = 0x17;
 
-  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
   expect(track.commands.size() == 2, "CapcomSnes duration fixture should decode note and end");
 
   const SequenceProgram program{
@@ -608,8 +610,7 @@ void capcomSnesInitialDurationRateIsFullLength() {
   expect(note != performance.tracks[0].events.end(), "CapcomSnes duration fixture should emit a note");
   expect(std::get<NotePerformanceEvent>(*note).durationTicks == 192,
          "CapcomSnes initial duration rate should produce full-length notes like legacy");
-  expect(performance.tracks[0].endTick == 192,
-         "CapcomSnes initial duration rate should not change source note length");
+  expect(performance.tracks[0].endTick == 192, "CapcomSnes initial duration rate should not change source note length");
 }
 
 void capcomSnesPanPerformanceCarriesGainCompensation() {
@@ -618,8 +619,9 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   bytes[0x3001] = 0x40;
   bytes[0x3002] = 0x17;
 
-  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
   expect(track.commands.size() == 2, "CapcomSnes pan fixture should decode pan and end");
 
   const CommandInfo panInfo = dialect.describe(track, track.commands[0]);
@@ -668,8 +670,9 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   bytes[0x300f] = 0x41;
   bytes[0x3010] = 0x17;
 
-  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
   expect(track.commands.size() == 10, "CapcomSnes source-only commands should not truncate track decoding");
 
   const std::vector<std::string> expectedKinds{
@@ -732,8 +735,9 @@ void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey() {
   bytes[0x3003] = 0x46;
   bytes[0x3004] = 0x17;
 
-  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
   expect(track.commands.size() == 4, "CapcomSnes portamento fixture should decode portamento, notes, and end");
 
   const SequenceProgram program{
@@ -771,8 +775,9 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
   bytes[0x3004] = 0x00;
   bytes[0x3005] = 0x17;
 
-  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
   expect(track.commands.size() == 3, "CapcomSnes repeat fixture should decode note, repeat, and end");
 
   const CommandInfo repeat = dialect.describe(track, track.commands[1]);
@@ -810,8 +815,9 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
   bytes[0x3004] = 0x41;
   bytes[0x3005] = 0x17;
 
-  const SequenceDialect dialect = capcomSnesSequenceDialect(CapcomSnesEngineVersion::v1BgmInList);
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), dialect, 0, 0x3000);
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v1BgmInList);
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
   expect(track.commands.size() == 4, "CapcomSnes V1 unknown one-byte events should not truncate track decoding");
   expect(dialect.describe(track, track.commands[0]).detailKind == "capcom-snes.unknown-one-byte",
          "CapcomSnes V1 opcode $1E should decode as a one-byte unknown event");
