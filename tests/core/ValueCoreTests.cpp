@@ -29,6 +29,8 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectExecutesCallAndReturn();
 void ndsSequenceDialectDiscoversSecondaryTrackStarts();
 void ndsSequenceDialectPreservesIgnoredCommandOperands();
+void ndsSequenceDialectKeepsEmptyPlaceholderTrack();
+void ndsMalformedRecoveryKeepsExecutableJumps();
 
 int main() {
   try {
@@ -54,6 +56,8 @@ int main() {
     ndsSequenceDialectExecutesCallAndReturn();
     ndsSequenceDialectDiscoversSecondaryTrackStarts();
     ndsSequenceDialectPreservesIgnoredCommandOperands();
+    ndsSequenceDialectKeepsEmptyPlaceholderTrack();
+    ndsMalformedRecoveryKeepsExecutableJumps();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;

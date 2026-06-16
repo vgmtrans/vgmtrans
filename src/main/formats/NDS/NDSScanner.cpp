@@ -14,7 +14,9 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <fmt/format.h>
@@ -23,9 +25,64 @@ namespace vgmtrans::scanners {
   ScannerRegistration<NDSScanner> s_nds("NDS", {"nds", "sdat", "mini2sf", "2sf", "2sflib"});
 }
 
+namespace {
+
 /* Observed from multiple samples, the maximum length of standard archives is 127 + null terminator */
 constexpr auto MAX_NAME_LEN = 128;
 constexpr auto NDS_FORMAT_NAME = "NDS";
+constexpr std::string_view SSEQ_SIGNATURE{"SSEQ\xFF\xFE\x00\x01", 8};
+constexpr u32 MAX_PADDING_BEFORE_SSEQ = 0x200;
+
+bool rawFileHasBytes(RawFile* file, u32 offset, u32 size) {
+  return offset <= file->size() && size <= file->size() - offset;
+}
+
+bool matchesBytes(RawFile* file, u32 offset, std::string_view signature) {
+  if (!rawFileHasBytes(file, offset, static_cast<u32>(signature.size()))) {
+    return false;
+  }
+  for (size_t i = 0; i < signature.size(); ++i) {
+    if (file->readByte(offset + i) != static_cast<u8>(signature[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool isZeroFilled(RawFile* file, u32 begin, u32 end) {
+  for (u32 offset = begin; offset < end && offset < file->size(); ++offset) {
+    if (file->readByte(offset) != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::optional<u32> nearbySseqHeader(RawFile* file, u32 offset, u32 size) {
+  const u32 searchEnd =
+      static_cast<u32>(std::min<u64>(file->size(), static_cast<u64>(offset) + size + MAX_PADDING_BEFORE_SSEQ));
+  for (u32 candidate = offset + 1; candidate + SSEQ_SIGNATURE.size() <= searchEnd; ++candidate) {
+    if (matchesBytes(file, candidate, SSEQ_SIGNATURE)) {
+      return candidate;
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<u32> recoveredSseqOffset(RawFile* file, u32 offset, u32 size) {
+  const auto sseqOffset = nearbySseqHeader(file, offset, size);
+  if (!sseqOffset) {
+    return std::nullopt;
+  }
+
+  const u32 trackStart = offset + 0x1c;
+  const u32 paddingEnd = std::min(*sseqOffset, offset + size);
+  if (size <= 0x100 && *sseqOffset >= trackStart && isZeroFilled(file, offset, paddingEnd) &&
+      ((*sseqOffset - trackStart) % 3) == 2) {
+    return std::nullopt;
+  }
+  return sseqOffset;
+}
 
 const VGMMetadataHint* findNDSMetadataHint(RawFile* file,
                                            u32 seqIndex,
@@ -64,6 +121,8 @@ std::string displayNameForNDSSeq(RawFile* file,
 
   return seqName;
 }
+
+}  // namespace
 
 void NDSScanner::scan(RawFile* file, void* /*info*/) {
   searchForSDAT(file);
@@ -288,6 +347,16 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
       u32 pSeqFatData = file->readWord(offset) + baseOff;
       offset += 4;
       u32 fileSize = file->readWord(offset);
+      // Some 2SF SDATs have FAT entries that point at padding just before the
+      // real SSEQ. Decode the real header instead of turning padding into notes.
+      if (!matchesBytes(file, pSeqFatData, SSEQ_SIGNATURE)) {
+        if (const auto recovered = recoveredSseqOffset(file, pSeqFatData, fileSize)) {
+          pSeqFatData = *recovered;
+          if (rawFileHasBytes(file, pSeqFatData + 8, 4)) {
+            fileSize = file->readWord(pSeqFatData + 8);
+          }
+        }
+      }
       const auto displayName = displayNameForNDSSeq(file, i, seqNames[i], pSeqFatData);
       auto* NewNDSSeq = pRoot->loadVGMFile<NDSSeq>(file, pSeqFatData, fileSize, displayName);
       if (!NewNDSSeq) {

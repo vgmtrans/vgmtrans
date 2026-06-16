@@ -283,3 +283,64 @@ void ndsSequenceDialectPreservesIgnoredCommandOperands() {
   expect(operands[0].range.offset == trackStart + 1 && operands[0].range.size == 2,
          "NDS ignored command operand bytes should preserve their source range");
 }
+
+void ndsSequenceDialectKeepsEmptyPlaceholderTrack() {
+  std::vector<u8> bytes(0x130);
+  constexpr u32 sequenceOffset = 0x100;
+  constexpr u32 trackStart = sequenceOffset + 0x1c;
+
+  const auto starts = ndsSequenceTrackStarts(ByteReader(SourceId{8}, bytes), sequenceOffset, trackStart);
+  expect(starts.size() == 1 && starts.front() == trackStart,
+         "NDS empty placeholder sequences should keep their first empty track");
+
+  const SequenceDialect dialect = ndsSequenceDialect();
+  const TrackProgram track =
+      decodeNdsSequenceTrack(ByteReader(SourceId{8}, bytes), dialect, sequenceOffset, trackStart, trackStart, 0);
+  expect(track.commands.empty(), "NDS empty placeholder tracks should not decode padding as commands");
+}
+
+void ndsMalformedRecoveryKeepsExecutableJumps() {
+  std::vector<u8> bytes(0x180);
+  constexpr u32 sequenceOffset = 0x100;
+  constexpr u32 trackStart = sequenceOffset + 0x1c;
+  constexpr u32 subroutineOffset = trackStart + 0x20;
+  constexpr u32 subroutineRelative = subroutineOffset - trackStart;
+
+  bytes[trackStart + 0] = 0xc7;
+  bytes[trackStart + 1] = 0x01;
+  bytes[trackStart + 2] = 0x95;
+  bytes[trackStart + 3] = static_cast<u8>(subroutineRelative & 0xff);
+  bytes[trackStart + 4] = static_cast<u8>((subroutineRelative >> 8) & 0xff);
+  bytes[trackStart + 5] = static_cast<u8>((subroutineRelative >> 16) & 0xff);
+  bytes[trackStart + 6] = 0x80;
+  bytes[trackStart + 7] = 0x01;
+  bytes[trackStart + 8] = 0xff;
+
+  bytes[subroutineOffset + 0] = 0x3c;
+  bytes[subroutineOffset + 1] = 0x64;
+  bytes[subroutineOffset + 2] = 0x02;
+  bytes[subroutineOffset + 3] = 0x94;
+  bytes[subroutineOffset + 4] = static_cast<u8>(subroutineRelative & 0xff);
+  bytes[subroutineOffset + 5] = static_cast<u8>((subroutineRelative >> 8) & 0xff);
+  bytes[subroutineOffset + 6] = static_cast<u8>((subroutineRelative >> 16) & 0xff);
+
+  const SequenceDialect dialect = ndsSequenceDialect();
+  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{9}, bytes), dialect, sequenceOffset,
+                                                    subroutineOffset + 7, trackStart, 0, true);
+  const auto jump = std::ranges::find_if(track.commands, [&](const SourceCommand& command) {
+    return dialect.describe(track, command).detailKind == "nds.jump";
+  });
+  expect(jump != track.commands.end(), "NDS malformed recovery should preserve recovered jumps as jump commands");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .sourceBaseAddress = Address{trackStart},
+      .behavior = SequenceProgramBehavior{.commandLimit = 64},
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  expect(performance.diagnostics.empty(), "NDS recovered jump loop should stop without hitting the command limit");
+  expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 2,
+         "NDS recovered jump loop should render one pass through the subroutine loop");
+}
