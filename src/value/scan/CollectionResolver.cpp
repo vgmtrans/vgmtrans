@@ -38,7 +38,7 @@ std::vector<DesiredCollection> resolveCollectionMemberFacts(const MatchContext& 
   // still complete the same collection.
   std::map<std::pair<std::string, std::string>, DesiredCollection> grouped;
 
-  for (const auto& fact : context.snapshot.matchFacts) {
+  for (const auto& fact : context.snapshot.matchFacts()) {
     if (!format.empty() && fact.format != format) {
       continue;
     }

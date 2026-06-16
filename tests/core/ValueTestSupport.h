@@ -365,7 +365,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
 [[nodiscard]] std::vector<DesiredCollection> resolveProbeBankCollections(const MatchContext& context) {
   std::vector<DesiredCollection> collections;
-  for (const auto& fact : context.snapshot.matchFacts) {
+  for (const auto& fact : context.snapshot.matchFacts()) {
     const auto* id = std::get_if<IdMatchFact>(&fact.payload);
     if (id == nullptr || fact.format != "ProbeBank" || id->domain != "probe.bank") {
       continue;
@@ -556,7 +556,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 }
 
 [[nodiscard]] std::vector<DesiredCollection> fragileProbeSequenceResolver(const MatchContext& context) {
-  if (context.snapshot.assets.empty() || context.snapshot.assets.size() > 1) {
+  if (context.snapshot.assets().empty() || context.snapshot.assets().size() > 1) {
     throw std::runtime_error("resolver exploded");
   }
   return resolveCollectionMemberFacts(context, "ProbeSequence", "ProbeSequence");

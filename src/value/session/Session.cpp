@@ -22,7 +22,7 @@ namespace vgmtrans::core {
 
 namespace {
 
-void addMissingSequenceDialectDiagnostics(SessionSnapshot& snapshot, const SequenceDialectRegistry& dialects) {
+void addMissingSequenceDialectDiagnostics(SessionSnapshotBuilder& snapshot, const SequenceDialectRegistry& dialects) {
   for (const auto& asset : snapshot.assets) {
     const auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
     if (sequence == nullptr || dialects.contains(sequence->program.dialect.value)) {
@@ -133,7 +133,7 @@ SessionSnapshot Session::scanPendingSources() {
 }
 
 SessionSnapshot Session::snapshot() const {
-  SessionSnapshot current{
+  SessionSnapshotBuilder current{
       .sources = sources_.sourceFiles(),
       .assets = assets_.all(),
       .matchFacts = matchFacts_.all(),
@@ -141,8 +141,7 @@ SessionSnapshot Session::snapshot() const {
       .diagnostics = diagnostics_.all(),
   };
   addMissingSequenceDialectDiagnostics(current, dialects_);
-  finalizeSessionSnapshotIndex(current);
-  return current;
+  return current.finish();
 }
 
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {

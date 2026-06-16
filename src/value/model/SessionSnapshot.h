@@ -44,22 +44,59 @@ struct Collection {
   std::vector<CollectionIssue> issues;
 };
 
-struct SessionSnapshotIndex {
-  // Store vector indexes rather than pointers so snapshots stay easy to copy/move.
-  bool valid = false;
-  std::unordered_map<u32, size_t> assetsById;
-  std::unordered_map<u32, size_t> collectionsById;
+class SessionSnapshotBuilder;
+
+// Copyable read-only view of the current Session state. UI, tests, and export
+// read this snapshot; Session owns the mutable stores.
+class SessionSnapshot {
+public:
+  [[nodiscard]] const std::vector<SourceFile>& sources() const noexcept { return sources_; }
+  [[nodiscard]] const std::vector<Asset>& assets() const noexcept { return assets_; }
+  [[nodiscard]] const std::vector<MatchFact>& matchFacts() const noexcept { return matchFacts_; }
+  [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return collections_; }
+  [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return diagnostics_; }
+
+  [[nodiscard]] const Asset* asset(AssetId id) const;
+
+  template <typename T>
+  [[nodiscard]] const T* asset(AssetId id) const {
+    const auto* found = asset(id);
+    return found != nullptr ? std::get_if<T>(found) : nullptr;
+  }
+
+  [[nodiscard]] const Collection* collection(CollectionId id) const;
+
+private:
+  friend class SessionSnapshotBuilder;
+
+  struct Index {
+    // Store vector indexes rather than pointers so snapshots stay easy to copy/move.
+    std::unordered_map<u32, size_t> assetsById;
+    std::unordered_map<u32, size_t> collectionsById;
+  };
+
+  SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets, std::vector<MatchFact> matchFacts,
+                  std::vector<Collection> collections, std::vector<Diagnostic> diagnostics);
+
+  [[nodiscard]] static Index buildIndex(const std::vector<Asset>& assets, const std::vector<Collection>& collections);
+
+  std::vector<SourceFile> sources_;
+  std::vector<Asset> assets_;
+  std::vector<MatchFact> matchFacts_;
+  std::vector<Collection> collections_;
+  std::vector<Diagnostic> diagnostics_;
+  Index index_;
 };
 
-struct SessionSnapshot {
-  // User-loaded sources plus derived sources such as archive members or SPC RAM.
-  // Asset ranges refer back into this list.
+class SessionSnapshotBuilder {
+public:
   std::vector<SourceFile> sources;
   std::vector<Asset> assets;
   std::vector<MatchFact> matchFacts;
   std::vector<Collection> collections;
   std::vector<Diagnostic> diagnostics;
-  SessionSnapshotIndex index;
+
+  [[nodiscard]] SessionSnapshot finish();
 };
 
 struct CollectionAssetDiagnostics {
@@ -85,22 +122,13 @@ struct CollectionAssets {
 
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
-[[nodiscard]] SessionSnapshotIndex buildSessionSnapshotIndex(const SessionSnapshot& snapshot);
-[[nodiscard]] std::vector<Diagnostic> sessionSnapshotIndexDiagnostics(const SessionSnapshot& snapshot);
-void rebuildSessionSnapshotIndex(SessionSnapshot& snapshot);
-void finalizeSessionSnapshotIndex(SessionSnapshot& snapshot);
 [[nodiscard]] ItemNode* itemById(ItemTree& tree, ItemId id);
 [[nodiscard]] const ItemNode* itemById(const ItemTree& tree, ItemId id);
-[[nodiscard]] Asset* assetById(SessionSnapshot& snapshot, AssetId id);
 [[nodiscard]] const Asset* assetById(const SessionSnapshot& snapshot, AssetId id);
 
 template <typename T>
 [[nodiscard]] const T* assetById(const SessionSnapshot& snapshot, AssetId id) {
-  const auto* asset = assetById(snapshot, id);
-  if (asset == nullptr) {
-    return nullptr;
-  }
-  return std::get_if<T>(asset);
+  return snapshot.asset<T>(id);
 }
 
 [[nodiscard]] const Collection* collectionById(const SessionSnapshot& snapshot, CollectionId id);

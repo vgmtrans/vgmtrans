@@ -11,7 +11,7 @@
 namespace vgmtrans::core {
 
 class SequenceDialectRegistry;
-struct SessionSnapshot;
+class SessionSnapshot;
 class SourceStore;
 
 [[nodiscard]] std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,

@@ -54,34 +54,61 @@ const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
 }
 
-SessionSnapshotIndex buildSessionSnapshotIndex(const SessionSnapshot& snapshot) {
-  SessionSnapshotIndex index;
-  index.assetsById.reserve(snapshot.assets.size());
-  for (size_t i = 0; i < snapshot.assets.size(); ++i) {
-    const AssetId id = metadata(snapshot.assets[i]).id;
+SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets,
+                                 std::vector<MatchFact> matchFacts, std::vector<Collection> collections,
+                                 std::vector<Diagnostic> diagnostics)
+    : sources_(std::move(sources)), assets_(std::move(assets)), matchFacts_(std::move(matchFacts)),
+      collections_(std::move(collections)), diagnostics_(std::move(diagnostics)),
+      index_(buildIndex(assets_, collections_)) {
+}
+
+SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<Asset>& assets,
+                                                   const std::vector<Collection>& collections) {
+  Index index;
+  index.assetsById.reserve(assets.size());
+  for (size_t i = 0; i < assets.size(); ++i) {
+    const AssetId id = metadata(assets[i]).id;
     if (id.valid()) {
       index.assetsById.emplace(id.value, i);
     }
   }
 
-  index.collectionsById.reserve(snapshot.collections.size());
-  for (size_t i = 0; i < snapshot.collections.size(); ++i) {
-    const CollectionId id = snapshot.collections[i].id;
+  index.collectionsById.reserve(collections.size());
+  for (size_t i = 0; i < collections.size(); ++i) {
+    const CollectionId id = collections[i].id;
     if (id.valid()) {
       index.collectionsById.emplace(id.value, i);
     }
   }
 
-  index.valid = true;
   return index;
 }
 
-std::vector<Diagnostic> sessionSnapshotIndexDiagnostics(const SessionSnapshot& snapshot) {
+const Asset* SessionSnapshot::asset(AssetId id) const {
+  const auto found = index_.assetsById.find(id.value);
+  if (found == index_.assetsById.end() || found->second >= assets_.size()) {
+    return nullptr;
+  }
+  return &assets_[found->second];
+}
+
+const Collection* SessionSnapshot::collection(CollectionId id) const {
+  const auto found = index_.collectionsById.find(id.value);
+  if (found == index_.collectionsById.end() || found->second >= collections_.size()) {
+    return nullptr;
+  }
+  return &collections_[found->second];
+}
+
+namespace {
+
+std::vector<Diagnostic> sessionSnapshotIndexDiagnostics(const std::vector<Asset>& assets,
+                                                        const std::vector<Collection>& collections) {
   std::vector<Diagnostic> diagnostics;
 
   std::unordered_set<u32> assetIds;
-  assetIds.reserve(snapshot.assets.size());
-  for (const auto& asset : snapshot.assets) {
+  assetIds.reserve(assets.size());
+  for (const auto& asset : assets) {
     const auto& meta = metadata(asset);
     if (!meta.id.valid()) {
       continue;
@@ -100,8 +127,8 @@ std::vector<Diagnostic> sessionSnapshotIndexDiagnostics(const SessionSnapshot& s
   }
 
   std::unordered_set<u32> collectionIds;
-  collectionIds.reserve(snapshot.collections.size());
-  for (const auto& collection : snapshot.collections) {
+  collectionIds.reserve(collections.size());
+  for (const auto& collection : collections) {
     if (!collection.id.valid()) {
       continue;
     }
@@ -115,16 +142,15 @@ std::vector<Diagnostic> sessionSnapshotIndexDiagnostics(const SessionSnapshot& s
   return diagnostics;
 }
 
-void rebuildSessionSnapshotIndex(SessionSnapshot& snapshot) {
-  snapshot.index = buildSessionSnapshotIndex(snapshot);
-}
+}  // namespace
 
-void finalizeSessionSnapshotIndex(SessionSnapshot& snapshot) {
-  rebuildSessionSnapshotIndex(snapshot);
-
-  auto diagnostics = sessionSnapshotIndexDiagnostics(snapshot);
-  snapshot.diagnostics.insert(snapshot.diagnostics.end(), std::make_move_iterator(diagnostics.begin()),
-                              std::make_move_iterator(diagnostics.end()));
+SessionSnapshot SessionSnapshotBuilder::finish() {
+  auto indexDiagnostics = sessionSnapshotIndexDiagnostics(assets, collections);
+  diagnostics.insert(diagnostics.end(), std::make_move_iterator(indexDiagnostics.begin()),
+                     std::make_move_iterator(indexDiagnostics.end()));
+  return SessionSnapshot{
+      std::move(sources), std::move(assets), std::move(matchFacts), std::move(collections), std::move(diagnostics),
+  };
 }
 
 ItemNode* itemById(ItemTree& tree, ItemId id) {
@@ -143,55 +169,12 @@ const ItemNode* itemById(const ItemTree& tree, ItemId id) {
   return &*found;
 }
 
-Asset* assetById(SessionSnapshot& snapshot, AssetId id) {
-  if (snapshot.index.valid) {
-    const auto found = snapshot.index.assetsById.find(id.value);
-    if (found == snapshot.index.assetsById.end() || found->second >= snapshot.assets.size()) {
-      return nullptr;
-    }
-    return &snapshot.assets[found->second];
-  }
-
-  const auto found =
-      std::ranges::find_if(snapshot.assets, [id](const Asset& asset) { return metadata(asset).id == id; });
-  if (found == snapshot.assets.end()) {
-    return nullptr;
-  }
-  return &*found;
-}
-
 const Asset* assetById(const SessionSnapshot& snapshot, AssetId id) {
-  if (snapshot.index.valid) {
-    const auto found = snapshot.index.assetsById.find(id.value);
-    if (found == snapshot.index.assetsById.end() || found->second >= snapshot.assets.size()) {
-      return nullptr;
-    }
-    return &snapshot.assets[found->second];
-  }
-
-  const auto found =
-      std::ranges::find_if(snapshot.assets, [id](const Asset& asset) { return metadata(asset).id == id; });
-  if (found == snapshot.assets.end()) {
-    return nullptr;
-  }
-  return &*found;
+  return snapshot.asset(id);
 }
 
 const Collection* collectionById(const SessionSnapshot& snapshot, CollectionId id) {
-  if (snapshot.index.valid) {
-    const auto found = snapshot.index.collectionsById.find(id.value);
-    if (found == snapshot.index.collectionsById.end() || found->second >= snapshot.collections.size()) {
-      return nullptr;
-    }
-    return &snapshot.collections[found->second];
-  }
-
-  const auto found =
-      std::ranges::find_if(snapshot.collections, [id](const Collection& collection) { return collection.id == id; });
-  if (found == snapshot.collections.end()) {
-    return nullptr;
-  }
-  return &*found;
+  return snapshot.collection(id);
 }
 
 CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id) {

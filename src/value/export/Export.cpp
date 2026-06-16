@@ -361,8 +361,8 @@ std::vector<CollectionExport> exportAllCollections(const SessionSnapshot& snapsh
                                                    const ExportRequest& request,
                                                    const SequenceDialectRegistry& dialects) {
   std::vector<CollectionExport> exports;
-  exports.reserve(snapshot.collections.size());
-  for (const auto& collection : snapshot.collections) {
+  exports.reserve(snapshot.collections().size());
+  for (const auto& collection : snapshot.collections()) {
     exports.push_back(CollectionExport{
         .collection = collection.id,
         .artifacts = exportCollection(snapshot, sources, collection.id, request, dialects),

@@ -377,13 +377,14 @@ void exportDiagnosticsPreserveSourceRanges() {
           },
   };
 
-  SessionSnapshot project;
-  project.assets.push_back(missingSampleCollection);
-  project.collections.push_back(Collection{
+  SessionSnapshotBuilder builder;
+  builder.assets.push_back(missingSampleCollection);
+  builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Probe",
       .sampleCollections = {missingSampleCollection.metadata.id},
   });
+  const SessionSnapshot project = builder.finish();
 
   SequenceDialectRegistry dialects;
   const auto wavArtifacts =
