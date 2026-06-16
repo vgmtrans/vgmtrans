@@ -6,6 +6,8 @@
 
 #include "ValueTestSupport.h"
 
+#include "value/session/ScanCommit.h"
+
 namespace {
 
 void sessionScansValuesAndDerivedSources() {
@@ -351,6 +353,149 @@ void sessionRejectsSourceScopedMatchFactsForMissingSources() {
                         SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
+[[nodiscard]] AssetMetadata badRangeMetadata(AssetId id, std::string name, SourceRange range) {
+  return AssetMetadata{
+      .id = id,
+      .format = "ProbeBadRange",
+      .name = std::move(name),
+      .range = range,
+  };
+}
+
+[[nodiscard]] ScanResult badRangeScanResult(u8 kind, AssetId assetId, SourceRange goodRange, SourceRange badRange) {
+  switch (kind) {
+    case 0:
+      return ScanResult{
+          .assets = {MiscAsset{.metadata = badRangeMetadata(assetId, "Bad Asset Range", badRange)}},
+      };
+
+    case 1: {
+      auto metadata = badRangeMetadata(assetId, "Bad Item Range", goodRange);
+      metadata.items.nodes.push_back(ItemNode{
+          .kind = ItemKind::Misc,
+          .name = "Bad Item",
+          .range = badRange,
+      });
+      return ScanResult{
+          .assets = {MiscAsset{.metadata = std::move(metadata)}},
+      };
+    }
+
+    case 2:
+      return ScanResult{
+          .assets = {SequenceProgramAsset{
+              .metadata = badRangeMetadata(assetId, "Bad Command Range", goodRange),
+              .program =
+                  SequenceProgram{
+                      .dialect = DialectId{.value = "probe"},
+                      .timebase = Timebase{.ppqn = 48},
+                      .tracks = {TrackProgram{
+                          .id = TrackId{0},
+                          .commands = {SourceCommand{
+                              .id = CommandId{0},
+                              .range = badRange,
+                          }},
+                      }},
+                  },
+          }},
+      };
+
+    case 3:
+      return ScanResult{
+          .assets = {SampleCollectionAsset{
+              .metadata = badRangeMetadata(assetId, "Bad Sample Range", goodRange),
+              .samples =
+                  SampleCollection{
+                      .samples = {Sample{
+                          .name = "Bad Sample",
+                          .encodedData = badRange,
+                      }},
+                  },
+          }},
+      };
+
+    case 4:
+      return ScanResult{
+          .diagnostics = {Diagnostic{
+              .severity = Severity::Warning,
+              .message = "bad range diagnostic",
+              .range = badRange,
+          }},
+      };
+
+    case 5:
+      return ScanResult{
+          .extractedSources = {ExtractedSource{
+              .file = SourceFile{.name = "bad-range.child"},
+              .bytes = {0xbb},
+              .origin = badRange,
+          }},
+      };
+
+    default:
+      return {};
+  }
+}
+
+void scanCommitRejectsOutOfBoundsScanResultRanges() {
+  struct BadRangeCase {
+    u8 kind = 0;
+    std::string_view message;
+  };
+
+  const std::array<BadRangeCase, 6> cases{{
+      BadRangeCase{
+          .kind = 0,
+          .message = "Scan result contained asset metadata range outside source bounds (source 0, offset 3, size 1, "
+                     "source size 2)",
+      },
+      BadRangeCase{
+          .kind = 1,
+          .message = "Scan result contained asset item range outside source bounds (source 0, offset 3, size 1, source "
+                     "size 2)",
+      },
+      BadRangeCase{
+          .kind = 2,
+          .message = "Scan result contained sequence command range outside source bounds (source 0, offset 3, size 1, "
+                     "source size 2)",
+      },
+      BadRangeCase{
+          .kind = 3,
+          .message = "Scan result contained sample encoded data range outside source bounds (source 0, offset 3, size "
+                     "1, source size 2)",
+      },
+      BadRangeCase{
+          .kind = 4,
+          .message = "Scan result contained diagnostic range outside source bounds (source 0, offset 3, size 1, source "
+                     "size 2)",
+      },
+      BadRangeCase{
+          .kind = 5,
+          .message = "Scan result contained extracted source origin range outside source bounds (source 0, offset 3, "
+                     "size 1, source size 2)",
+      },
+  }};
+
+  for (const auto& testCase : cases) {
+    SourceStore sources;
+    const auto source = sources.add(SourceFile{.name = "bad-range.probe"}, {0xf7, testCase.kind});
+    ScanIdAllocator ids;
+    ScanResult result = badRangeScanResult(testCase.kind, ids.nextAssetId(), sources.reader(source).range(0, 2),
+                                           sources.reader(source).range(3, 1));
+    normalizeScanResult(result, ids);
+    const ScanCommit commit = ScanCommit::fromScanResult(sources.source(source), std::move(result));
+
+    std::string message;
+    try {
+      AssetStore assets;
+      commit.validate(sources, assets);
+    } catch (const std::invalid_argument& ex) {
+      message = ex.what();
+    }
+    expect(message == testCase.message, "scan commit should reject out-of-bounds source ranges");
+  }
+}
+
 void sessionReportsDesiredCollectionMissingAssetReferences() {
   Session session;
   session.formats().add(missingAssetCollectionResolverModule());
@@ -627,6 +772,7 @@ void runValueSessionTests() {
   sessionRejectsExtractedSourcesWithMissingParents();
   sessionRejectsMatchFactsForMissingAssets();
   sessionRejectsSourceScopedMatchFactsForMissingSources();
+  scanCommitRejectsOutOfBoundsScanResultRanges();
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionReportsDuplicateDesiredCollectionKeys();
   sourceStoreRejectsMissingOrRemovedDerivedParents();
