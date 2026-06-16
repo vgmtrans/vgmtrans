@@ -677,33 +677,33 @@ struct ProbeJumpCommand {
   }
 };
 
-struct ProbeLoopForeverCommand {
+struct ProbeDeclaredLoopCommand {
   Address destination;
 
-  static constexpr std::string_view kind = "probe.loop-forever";
-  static constexpr std::string_view name = "Loop Forever";
+  static constexpr std::string_view kind = "probe.declared-loop";
+  static constexpr std::string_view name = "Declared Loop";
 
-  static ProbeLoopForeverCommand parse(CommandReader& in) {
-    return ProbeLoopForeverCommand{.destination = in.le16Address("destination")};
+  static ProbeDeclaredLoopCommand parse(CommandReader& in) {
+    return ProbeDeclaredLoopCommand{.destination = in.le16Address("destination")};
   }
 
   Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
-    return Effects{.step = vm.loopForever(destination)};
+    return Effects{.step = vm.declaredLoop(destination)};
   }
 };
 
-struct ProbeJumpOrLoopForeverCommand {
+struct ProbeLoopCandidateCommand {
   Address destination;
 
-  static constexpr std::string_view kind = "probe.jump-or-loop-forever";
-  static constexpr std::string_view name = "Jump Or Loop Forever";
+  static constexpr std::string_view kind = "probe.loop-candidate";
+  static constexpr std::string_view name = "Loop Candidate";
 
-  static ProbeJumpOrLoopForeverCommand parse(CommandReader& in) {
-    return ProbeJumpOrLoopForeverCommand{.destination = in.le16Address("destination")};
+  static ProbeLoopCandidateCommand parse(CommandReader& in) {
+    return ProbeLoopCandidateCommand{.destination = in.le16Address("destination")};
   }
 
   Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
-    return Effects{.step = vm.jumpOrLoopForever(destination)};
+    return Effects{.step = vm.loopCandidate(destination)};
   }
 };
 
@@ -750,7 +750,7 @@ struct ProbeRepeatCommand {
   }
 
   Effects execute(ProbeTrackState&, PerformanceEmitter&, VmApi& vm, const ProbeSequenceContext&) const {
-    return vm.repeatUntilEffect(slot, count, destination);
+    return vm.countedRepeatUntil(slot, count, destination);
   }
 };
 
@@ -769,7 +769,7 @@ struct ProbeRepeatBreakCommand {
   }
 
   Effects execute(ProbeTrackState&, PerformanceEmitter& out, VmApi& vm, const ProbeSequenceContext&) const {
-    const BranchResult branch = vm.repeatBreakBranch(slot, destination);
+    const BranchResult branch = vm.countedRepeatBreak(slot, destination);
     if (branch.taken) {
       out.instrument(InstrumentPerformanceEvent{.program = 99});
     }
@@ -793,8 +793,8 @@ struct ProbeEndCommand {
                                                                        ProbeSequenceContext{.linearVelocity = 0.5})
       .timebase(Timebase{.ppqn = 48})
       .defaultBehavior(behavior)
-      .commands<ProbeProgramCommand, ProbeNoteCommand, ProbeJumpCommand, ProbeLoopForeverCommand,
-                ProbeJumpOrLoopForeverCommand, ProbeCallCommand, ProbeReturnCommand, ProbeRepeatCommand,
+      .commands<ProbeProgramCommand, ProbeNoteCommand, ProbeJumpCommand, ProbeDeclaredLoopCommand,
+                ProbeLoopCandidateCommand, ProbeCallCommand, ProbeReturnCommand, ProbeRepeatCommand,
                 ProbeRepeatBreakCommand, ProbeEndCommand>();
 }
 

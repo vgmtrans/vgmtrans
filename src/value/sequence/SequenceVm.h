@@ -12,6 +12,7 @@
 namespace vgmtrans::core {
 
 namespace detail {
+class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
 }  // namespace detail
@@ -19,6 +20,24 @@ struct VmTrackRuntime;
 struct BranchResult {
   bool taken = false;
   Effects effects;
+};
+
+class RepeatCounter {
+public:
+  [[nodiscard]] bool active() const;
+  [[nodiscard]] bool firstVisit() const;
+  [[nodiscard]] u32 remainingPlays() const;
+  void start(u32 totalPlays);
+  [[nodiscard]] bool consumeReplay();
+  void finish();
+
+private:
+  friend class VmApi;
+
+  RepeatCounter(detail::RepeatState& state, u8 slot) noexcept;
+
+  detail::RepeatState* state_ = nullptr;
+  u8 slot_ = 0;
 };
 
 // Commands call PerformanceEmitter to add notes, tempo changes, controller changes, and markers.
@@ -81,17 +100,20 @@ public:
   [[nodiscard]] Step next() const noexcept;
   [[nodiscard]] Step end() const noexcept;
   [[nodiscard]] Step jump(Address destination) const noexcept;
-  [[nodiscard]] Step jumpOrLoopForever(Address destination) const noexcept;
-  [[nodiscard]] Step loopForever(Address destination) const noexcept;
+  [[nodiscard]] Step finiteBranch(Address destination) const noexcept;
+  [[nodiscard]] Step loopCandidate(Address destination) const noexcept;
+  [[nodiscard]] Step declaredLoop(Address destination) const noexcept;
   [[nodiscard]] Step call(Address destination) const noexcept;
   [[nodiscard]] Step return_() const noexcept;
 
-  // Formats provide the repeat slot, count, and target; the VM owns the counters
-  // and applies loop policy consistently.
-  [[nodiscard]] Step repeatUntil(u8 slot, u32 count, Address destination);
-  [[nodiscard]] Step repeatBreak(u8 slot, Address destination);
-  [[nodiscard]] Effects repeatUntilEffect(u8 slot, u32 count, Address destination);
-  [[nodiscard]] BranchResult repeatBreakBranch(u8 slot, Address destination);
+  // Formats can manage repeat counters directly when their driver does not fit
+  // the counted-repeat helpers below.
+  [[nodiscard]] RepeatCounter repeatCounter(u8 slot);
+
+  // Counted-repeat helpers cover drivers where the first encounter counts as
+  // one play and a repeat command jumps back to a decoded source block.
+  [[nodiscard]] Effects countedRepeatUntil(u8 slot, u32 totalPlays, Address destination);
+  [[nodiscard]] BranchResult countedRepeatBreak(u8 slot, Address destination);
 
   [[nodiscard]] u64 tick() const noexcept;
   void diagnostic(Diagnostic diagnostic);
@@ -99,12 +121,11 @@ public:
 private:
   friend struct detail::VmApiAccess;
 
-  VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command, u32 currentIndex);
+  VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command);
 
   detail::VmTrackRuntime& runtime_;
   PerformanceSequence& sequence_;
   const SourceCommand& command_;
-  u32 currentIndex_ = 0;
 };
 
 struct SequenceVmOptions {
