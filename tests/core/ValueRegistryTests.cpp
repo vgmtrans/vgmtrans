@@ -59,12 +59,19 @@ void bytecodeMapRequiresFallbackCommand() {
 void formatRegistryStoresCopyableModuleValues() {
   FormatRegistry registry;
   registry.add(probeSequenceModule());
+  registry.add(FormatModule{
+      .name = std::string("DynamicProbe"),
+      .canScan = canScanProbeSequence,
+      .scan = scanProbeSequence,
+  });
 
   const FormatRegistry copy = registry;
   const std::array<u8, 1> probeBytes{0xaa};
-  expect(copy.modules().size() == 1, "format registry should copy registered module values");
-  expect(copy.modules()[0].name == std::string_view("ProbeSequence"),
+  expect(copy.modules().size() == 2, "format registry should copy registered module values");
+  expect(copy.modules()[0].name == "ProbeSequence",
          "format registry should preserve copied module names");
+  expect(copy.modules()[1].name == "DynamicProbe",
+         "format registry should own dynamically registered module names");
   expect(copy.modules()[0].canScan(SourceFile{}, probeBytes),
          "format registry should preserve copied module scan predicates");
 

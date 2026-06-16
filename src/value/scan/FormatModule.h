@@ -10,6 +10,7 @@
 #include "value/scan/ScanTypes.h"
 
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -27,13 +28,13 @@ struct FormatModule {
   using Scan = ScanResult (*)(const ScanInput& input);
   using ResolveCollections = std::vector<DesiredCollection> (*)(const MatchContext& context);
 
-  std::string_view name;
+  std::string name;
   // canScan should be cheap and non-mutating; scan does the full parse once selected.
   CanScan canScan = nullptr;
   Scan scan = nullptr;
   // Defaults to name when empty. Set this when a resolver intentionally uses a
   // different key prefix for its collections.
-  std::string_view collectionResolverId;
+  std::string collectionResolverId;
   ResolveCollections resolveCollections = nullptr;
 };
 
