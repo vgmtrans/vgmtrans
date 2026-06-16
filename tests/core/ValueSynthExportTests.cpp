@@ -43,6 +43,25 @@ void snesBrrDecoderProducesPcm() {
   expect(threw, "sample decoder registry should reject incomplete decoder values");
 }
 
+void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
+  const Sample sample{
+      .name = "adpcm",
+      .codec = AudioCodec::NdsImaAdpcm,
+      .encodedData = SourceRange{.source = SourceId{0}, .offset = 4, .size = 1},
+      .sampleRate = 32768,
+  };
+
+  const auto registry = SampleDecoderRegistry::withDefaultDecoders();
+  const std::vector<u8> validMaxIndex{0x00, 0x00, 0x58, 0x00, 0x00};
+  const auto decoded = registry.decode(sample, validMaxIndex);
+  expect(decoded.has_value() && decoded->pcm.size() == 3,
+         "NDS IMA ADPCM decoder should accept initial predictor index 88");
+
+  const std::vector<u8> invalidIndex{0x00, 0x00, 0x59, 0x00, 0x00};
+  expect(!registry.decode(sample, invalidIndex).has_value(),
+         "NDS IMA ADPCM decoder should reject initial predictor indexes outside the step table");
+}
+
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -451,6 +470,7 @@ void exportDiagnosticsPreserveSourceRanges() {
 
 void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
+  ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();

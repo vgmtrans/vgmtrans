@@ -240,6 +240,9 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
       static_cast<u32>(le16(sourceBytes, headerOffset)) | (static_cast<u32>(le16(sourceBytes, headerOffset + 2)) << 16);
   int pcm16 = static_cast<s16>(header & 0xffff);
   int index = static_cast<int>((header >> 16) & 0x7f);
+  if (index >= static_cast<int>(std::size(kNdsAdpcmTable))) {
+    return std::nullopt;
+  }
 
   DecodedSample decoded{
       .sampleRate = sample.sampleRate,
