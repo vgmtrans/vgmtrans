@@ -26,27 +26,6 @@ struct DialectId {
   friend bool operator==(const DialectId&, const DialectId&) noexcept = default;
 };
 
-struct CommandId {
-  u32 value = invalidIdValue;
-
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != invalidIdValue; }
-  friend constexpr bool operator==(CommandId, CommandId) noexcept = default;
-};
-
-struct CommandHandlerId {
-  u32 value = invalidIdValue;
-
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != invalidIdValue; }
-  friend constexpr bool operator==(CommandHandlerId, CommandHandlerId) noexcept = default;
-};
-
-struct CommandKindId {
-  u32 value = invalidIdValue;
-
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != invalidIdValue; }
-  friend constexpr bool operator==(CommandKindId, CommandKindId) noexcept = default;
-};
-
 struct ByteSpan {
   u32 offset = 0;
   u32 size = 0;
