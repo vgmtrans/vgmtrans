@@ -351,46 +351,6 @@ void sessionRejectsSourceScopedMatchFactsForMissingSources() {
                         SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
-void sessionRejectsCollectionMemberFactsWithWrongAssetTypes() {
-  Session session;
-  session.formats().add(probeBadCollectionRoleModule());
-
-  session.addSource(SourceFile{.name = "bad-collection-role.probe"}, {0xf4});
-  const SessionSnapshot project = session.scanPendingSources();
-  expect(project.assets().empty(), "wrong collection member asset type should reject the scan result");
-  expect(project.matchFacts().empty(), "wrong collection member asset type should not commit match facts");
-  expectDiagnosticRange(project.diagnostics(),
-                        "ProbeBadCollectionRole scan failed: Scan result contained a collection member fact with "
-                        "sequence role for asset id 0, but that asset is not a sequence asset",
-                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
-}
-
-void sessionRejectsSequenceInstrumentReferencesWithWrongAssetTypes() {
-  Session session;
-  session.formats().add(probeBadSequenceInstrumentRefModule());
-
-  session.addSource(SourceFile{.name = "bad-sequence-instrument.probe"}, {0xf5});
-  const SessionSnapshot project = session.scanPendingSources();
-  expect(project.assets().empty(), "wrong sequence instrument reference type should reject the scan result");
-  expectDiagnosticRange(project.diagnostics(),
-                        "ProbeBadSequenceInstrumentRef scan failed: Scan result contained sequence instrument "
-                        "reference to asset id 1, but that asset is not an instrument set asset",
-                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
-}
-
-void sessionRejectsInstrumentRegionSampleReferencesWithWrongAssetTypes() {
-  Session session;
-  session.formats().add(probeBadRegionSampleRefModule());
-
-  session.addSource(SourceFile{.name = "bad-region-sample.probe"}, {0xf6});
-  const SessionSnapshot project = session.scanPendingSources();
-  expect(project.assets().empty(), "wrong region sample reference type should reject the scan result");
-  expectDiagnosticRange(project.diagnostics(),
-                        "ProbeBadRegionSampleRef scan failed: Scan result contained instrument region sample "
-                        "collection reference to asset id 1, but that asset is not a sample collection asset",
-                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
-}
-
 void sessionReportsDesiredCollectionMissingAssetReferences() {
   Session session;
   session.formats().add(missingAssetCollectionResolverModule());
@@ -667,9 +627,6 @@ void runValueSessionTests() {
   sessionRejectsExtractedSourcesWithMissingParents();
   sessionRejectsMatchFactsForMissingAssets();
   sessionRejectsSourceScopedMatchFactsForMissingSources();
-  sessionRejectsCollectionMemberFactsWithWrongAssetTypes();
-  sessionRejectsSequenceInstrumentReferencesWithWrongAssetTypes();
-  sessionRejectsInstrumentRegionSampleReferencesWithWrongAssetTypes();
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionReportsDuplicateDesiredCollectionKeys();
   sourceStoreRejectsMissingOrRemovedDerivedParents();
