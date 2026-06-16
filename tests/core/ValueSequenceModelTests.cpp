@@ -43,6 +43,27 @@ void byteReaderChecksBoundsAndEndian() {
   expect(threw, "reader should throw on out-of-range access");
 }
 
+void commandReaderRejectsUnterminatedVariableLengthOperands() {
+  std::vector<CommandOperand> operands;
+  const std::array<u8, 3> completeBytes{0x80, 0x81, 0x05};
+  CommandReader completeReader{probeRange(0, completeBytes.size()), completeBytes, &operands};
+  expect(completeReader.varLen("duration") == 133, "command reader should decode complete variable-length operands");
+  expect(operands.size() == 1 && operands[0].name == "duration" && operands[0].range.offset == 1 &&
+             operands[0].range.size == 2,
+         "command reader should record complete variable-length operand metadata");
+
+  bool rejectedUnterminated = false;
+  const std::array<u8, 2> unterminatedBytes{0x80, 0x81};
+  CommandReader unterminatedReader{probeRange(0, unterminatedBytes.size()), unterminatedBytes, &operands};
+  try {
+    static_cast<void>(unterminatedReader.varLen("duration"));
+  } catch (const std::out_of_range&) {
+    rejectedUnterminated = true;
+  }
+  expect(rejectedUnterminated, "command reader should reject variable-length operands without a terminating byte");
+  expect(operands.size() == 1, "unterminated variable-length operands should not be recorded as decoded operands");
+}
+
 void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -155,6 +176,7 @@ void collectionIssueHelpersValidateStoredStatus() {
 void runValueSequenceModelTests() {
   levelScaleRoundTripsMidiValues();
   byteReaderChecksBoundsAndEndian();
+  commandReaderRejectsUnterminatedVariableLengthOperands();
   sourceCommandsPreserveBytesOperandsAndDialectDisplay();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
   collectionIssueHelpersValidateStoredStatus();

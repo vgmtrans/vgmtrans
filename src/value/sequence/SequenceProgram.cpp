@@ -107,7 +107,7 @@ u32 CommandReader::le24(std::string_view name) {
 u32 CommandReader::varLen(std::string_view name) {
   const size_t begin = position_;
   u32 value = 0;
-  while (position_ < bytes_.size()) {
+  while (true) {
     const ::u8 byte = readByte();
     value = (value << 7) + (byte & 0x7f);
     if ((byte & 0x80) == 0) {

@@ -30,6 +30,7 @@ void ndsSequenceDialectExecutesCallAndReturn();
 void ndsSequenceDialectDiscoversSecondaryTrackStarts();
 void ndsSequenceDialectPreservesIgnoredCommandOperands();
 void ndsSequenceDialectKeepsEmptyPlaceholderTrack();
+void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
 void ndsMalformedRecoveryKeepsExecutableJumps();
 
 int main() {
@@ -57,6 +58,7 @@ int main() {
     ndsSequenceDialectDiscoversSecondaryTrackStarts();
     ndsSequenceDialectPreservesIgnoredCommandOperands();
     ndsSequenceDialectKeepsEmptyPlaceholderTrack();
+    ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
     ndsMalformedRecoveryKeepsExecutableJumps();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
