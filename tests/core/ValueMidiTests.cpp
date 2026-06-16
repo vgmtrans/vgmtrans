@@ -61,6 +61,27 @@ void midiExporterKeeps14BitControllerPairsAdjacent() {
          "MIDI exporter should keep 14-bit volume MSB/LSB controllers adjacent before same-tick pan");
 }
 
+void midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  NoteDuration{.tick = 10, .channel = 0, .key = 60, .velocity = 100, .duration = 10},
+                  NoteDuration{.tick = 0, .channel = 0, .key = 60, .velocity = 100, .duration = 10},
+                  EndOfTrack{.tick = 20},
+              },
+      }},
+  };
+
+  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const std::vector<u8> expectedOrder{
+      0x0a, 0x80, 0x3c, 0x40, 0x00, 0x90, 0x3c, 0x64,
+  };
+  expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
+         "MIDI exporter should write generated note-off before same-tick note-on");
+}
+
 void performanceMidiRendererTrustsSourceNoteExtensions() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -504,6 +525,7 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
 void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
   midiExporterKeeps14BitControllerPairsAdjacent();
+  midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererHonorsMidiExportOptions();

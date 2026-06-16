@@ -134,7 +134,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           addMessage(
               messages, typedEvent.tick, 50,
               {static_cast<u8>(0x90 | channel4(typedEvent.channel)), data7(typedEvent.key), typedEvent.velocity});
-          addMessage(messages, typedEvent.tick + typedEvent.duration, 50,
+          addMessage(messages, typedEvent.tick + typedEvent.duration, 40,
                      {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), 64});
           endTick = std::max(endTick, typedEvent.tick + typedEvent.duration);
         } else if constexpr (std::is_same_v<TypedEvent, Tempo>) {
