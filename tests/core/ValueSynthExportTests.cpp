@@ -62,6 +62,31 @@ void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
          "NDS IMA ADPCM decoder should reject initial predictor indexes outside the step table");
 }
 
+void envelopePredicatesDetectPreciseOnlyData() {
+  expect(!hasCoarseEnvelope(Envelope{}), "empty envelope should not report coarse envelope data");
+  expect(!hasPreciseEnvelope(Envelope{}), "empty envelope should not report precise envelope data");
+  expect(!hasExplicitEnvelope(Envelope{}), "empty envelope should not report explicit envelope data");
+
+  const Envelope coarse{
+      .attack = 1,
+  };
+  expect(hasCoarseEnvelope(coarse), "coarse envelope predicate should detect integer envelope fields");
+  expect(hasAnyEnvelopeData(coarse), "any-envelope predicate should detect coarse envelope data");
+
+  const Envelope precise{
+      .attackSeconds = 0.25,
+  };
+  expect(!hasCoarseEnvelope(precise), "precise-only envelope should not report coarse envelope data");
+  expect(hasPreciseEnvelope(precise), "precise envelope predicate should detect seconds fields");
+  expect(hasExplicitEnvelope(precise), "explicit envelope predicate should detect precise-only envelope data");
+
+  const Envelope preciseSustain{
+      .sustainAmplitude = 0.5,
+  };
+  expect(hasPreciseEnvelope(preciseSustain), "precise envelope predicate should detect sustain amplitude");
+  expect(hasExplicitEnvelope(preciseSustain), "explicit envelope predicate should detect precise-only sustain data");
+}
+
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -472,6 +497,7 @@ void exportDiagnosticsPreserveSourceRanges() {
 void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
+  envelopePredicatesDetectPreciseOnlyData();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();

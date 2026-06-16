@@ -59,9 +59,22 @@ struct Envelope {
   std::optional<double> sustainAmplitude;
 };
 
-[[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
+[[nodiscard]] inline bool hasCoarseEnvelope(const Envelope& envelope) {
   return envelope.attack != 0 || envelope.hold != 0 || envelope.decay != 0 || envelope.sustain != 0 ||
          envelope.release != 0;
+}
+
+[[nodiscard]] inline bool hasPreciseEnvelope(const Envelope& envelope) {
+  return envelope.attackSeconds.has_value() || envelope.holdSeconds.has_value() || envelope.decaySeconds.has_value() ||
+         envelope.releaseSeconds.has_value() || envelope.sustainAmplitude.has_value();
+}
+
+[[nodiscard]] inline bool hasAnyEnvelopeData(const Envelope& envelope) {
+  return hasCoarseEnvelope(envelope) || hasPreciseEnvelope(envelope);
+}
+
+[[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
+  return hasAnyEnvelopeData(envelope);
 }
 
 enum class SynthDestination {
