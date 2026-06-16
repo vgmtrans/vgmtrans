@@ -47,6 +47,7 @@ struct TrackState {
   u64 sequenceDataBase = 0;
   bool noteWait = false;
   s32 transpose = 0;
+  u8 pitchBendRangeSemitones = 2;
 };
 
 using Runtime = CommandRuntime<TrackState, Context>;
@@ -241,14 +242,21 @@ struct Transpose {
 struct PitchBend : S8Operand<PitchBend> {
   static constexpr std::string_view operandName = "bend";
 
-  void execute(Runtime& rt) const { rt.out.pitchBend(static_cast<s16>(raw * 64)); }
+  void execute(Runtime& rt) const {
+    rt.out.pitchBend((static_cast<double>(raw) / 128.0) * rt.state.pitchBendRangeSemitones);
+  }
 };
 
-struct PitchBendRange : U8RawOutCommand<PitchBendRange, &PerformanceEmitter::pitchBendRange> {
+struct PitchBendRange : U8Operand<PitchBendRange> {
   static constexpr std::string_view operandName = "semitones";
+
+  void execute(Runtime& rt) const {
+    rt.state.pitchBendRangeSemitones = raw;
+    rt.out.pitchBendRange(raw);
+  }
 };
 
-struct ModulationDepth : U8MidiModulationOutCommand<ModulationDepth, ModulationPerformanceTarget::VibratoDepth> {
+struct ModulationDepth : U8NormalizedModulationOutCommand<ModulationDepth, ModulationPerformanceTarget::VibratoDepth> {
   static constexpr std::string_view operandName = "depth";
 };
 
@@ -256,8 +264,10 @@ struct PortamentoSwitch : U8BoolOutCommand<PortamentoSwitch, &PerformanceEmitter
   static constexpr std::string_view operandName = "enabled";
 };
 
-struct PortamentoTime : U8RawOutCommand<PortamentoTime, &PerformanceEmitter::portamentoTime> {
+struct PortamentoTime : U8Operand<PortamentoTime> {
   static constexpr std::string_view operandName = "time";
+
+  void execute(Runtime& rt) const { rt.out.portamentoTime(static_cast<double>(raw)); }
 };
 
 struct NoteWait : U8BoolStateCommand<NoteWait, &TrackState::noteWait> {

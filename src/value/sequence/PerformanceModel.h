@@ -107,7 +107,8 @@ struct GlobalTransposePerformanceEvent {
 
 struct PitchBendPerformanceEvent {
   PerformanceEventHeader header;
-  s16 value = 0;
+  // Musical bend amount. MIDI renderers quantize this using the active pitch-bend range.
+  double semitones = 0.0;
 };
 
 struct PitchBendRangePerformanceEvent {
@@ -128,7 +129,8 @@ struct PortamentoEnablePerformanceEvent {
 
 struct PortamentoTimePerformanceEvent {
   PerformanceEventHeader header;
-  u8 value = 0;
+  // Musical glide time. MIDI renderers decide whether to write 7-bit or 14-bit controller data.
+  double timeMilliseconds = 0.0;
 };
 
 struct PortamentoControlPerformanceEvent {

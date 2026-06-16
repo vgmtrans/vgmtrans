@@ -49,7 +49,7 @@ public:
   void globalTranspose(GlobalTransposePerformanceEvent event);
   void globalTranspose(s32 semitones);
   void pitchBend(PitchBendPerformanceEvent event);
-  void pitchBend(s16 value);
+  void pitchBend(double semitones);
   void pitchBendRange(PitchBendRangePerformanceEvent event);
   void pitchBendRange(u8 semitones);
   void portamento(PortamentoPerformanceEvent event);
@@ -57,7 +57,7 @@ public:
   void portamentoEnable(PortamentoEnablePerformanceEvent event);
   void portamentoEnable(bool enabled);
   void portamentoTime(PortamentoTimePerformanceEvent event);
-  void portamentoTime(u8 value);
+  void portamentoTime(double timeMilliseconds);
   void portamentoControl(PortamentoControlPerformanceEvent event);
   void portamentoControl(double previousKey);
   void legatoPedal(LegatoPedalPerformanceEvent event);

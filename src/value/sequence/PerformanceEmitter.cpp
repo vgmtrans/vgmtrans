@@ -144,9 +144,9 @@ void PerformanceEmitter::pitchBend(PitchBendPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
-void PerformanceEmitter::pitchBend(s16 value) {
+void PerformanceEmitter::pitchBend(double semitones) {
   pitchBend(PitchBendPerformanceEvent{
-      .value = value,
+      .semitones = semitones,
   });
 }
 
@@ -189,9 +189,9 @@ void PerformanceEmitter::portamentoTime(PortamentoTimePerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
-void PerformanceEmitter::portamentoTime(u8 value) {
+void PerformanceEmitter::portamentoTime(double timeMilliseconds) {
   portamentoTime(PortamentoTimePerformanceEvent{
-      .value = value,
+      .timeMilliseconds = timeMilliseconds,
   });
 }
 

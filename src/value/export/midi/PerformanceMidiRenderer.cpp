@@ -73,6 +73,15 @@ struct MidiChannelAssignment {
   return data7(std::clamp(amount, 0.0, 1.0) * 127.0);
 }
 
+[[nodiscard]] s16 midiPitchBend(double semitones, u8 rangeSemitones) {
+  if (rangeSemitones == 0) {
+    return 0;
+  }
+
+  const double normalized = semitones / static_cast<double>(rangeSemitones);
+  return static_cast<s16>(std::clamp<int>(static_cast<int>(std::lround(normalized * 8192.0)), -8192, 8191));
+}
+
 [[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested, LevelPrecisionHint hint) {
   if (requested != MidiLevelResolution::Auto) {
     return requested;
@@ -103,6 +112,7 @@ void addExpression(MidiTrack& track, u64 tick, u8 channel, double linearGain, Le
 
 struct RenderTrackState {
   std::optional<size_t> lastNoteIndex;
+  u8 pitchBendRangeSemitones = 2;
 };
 
 struct GlobalTransposeChange {
@@ -256,7 +266,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           track.events.push_back(PitchBend{
               .tick = typedEvent.header.tick,
               .channel = channel,
-              .value = typedEvent.value,
+              .value = midiPitchBend(typedEvent.semitones, state.pitchBendRangeSemitones),
           });
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
           track.events.push_back(PitchBendRange{
@@ -264,6 +274,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .channel = channel,
               .semitones = typedEvent.semitones,
           });
+          state.pitchBendRangeSemitones = typedEvent.semitones;
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
           const double previousKey =
               typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
@@ -287,7 +298,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           track.events.push_back(PortamentoTime{
               .tick = typedEvent.header.tick,
               .channel = channel,
-              .value = typedEvent.value,
+              .value = data7(typedEvent.timeMilliseconds),
           });
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoControlPerformanceEvent>) {
           const double previousKey =
