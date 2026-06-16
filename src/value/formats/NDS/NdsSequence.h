@@ -10,6 +10,7 @@
 #include "value/formats/NDS/NdsTypes.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceDialect.h"
+#include "value/sequence/bytecode/BytecodeTable.h"
 
 #include <optional>
 #include <string>
@@ -19,12 +20,20 @@ namespace vgmtrans::formats::nds {
 
 inline constexpr auto kNdsSequenceDialectId = "nds:sseq";
 
+// Keep the bytecode table paired with the dialect whose handler IDs it stores.
+struct NdsSequenceDescriptor {
+  core::SequenceDialect dialect;
+  core::BytecodeDispatchTable bytecode;
+};
+
+[[nodiscard]] const NdsSequenceDescriptor& ndsSequenceDescriptor();
 [[nodiscard]] core::SequenceDialect ndsSequenceDialect();
 void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
 
-[[nodiscard]] core::TrackProgram decodeNdsSequenceTrack(core::ByteReader reader, const core::SequenceDialect& dialect,
-                                                        u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
-                                                        u32 trackIndex, bool recoverMalformedSdatRange = false);
+[[nodiscard]] core::TrackProgram decodeNdsSequenceTrack(core::ByteReader reader,
+                                                        const NdsSequenceDescriptor& descriptor, u32 sequenceOffset,
+                                                        u32 sequenceEnd, u32 startOffset, u32 trackIndex,
+                                                        bool recoverMalformedSdatRange = false);
 
 [[nodiscard]] std::vector<u32> ndsSequenceTrackStarts(core::ByteReader reader, u32 sequenceOffset, u32 sequenceEnd);
 

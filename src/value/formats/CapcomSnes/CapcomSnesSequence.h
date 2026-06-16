@@ -8,6 +8,7 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesLayout.h"
 #include "value/sequence/SequenceDialect.h"
+#include "value/sequence/bytecode/BytecodeTable.h"
 #include "value/base/Source.h"
 #include "value/scan/ScanTypes.h"
 #include "value/formats/CapcomSnes/CapcomSnesTypes.h"
@@ -17,11 +18,18 @@
 
 namespace vgmtrans::formats::capcom_snes {
 
+// Keep the bytecode table paired with the dialect whose handler IDs it stores.
+struct CapcomSnesSequenceDescriptor {
+  core::SequenceDialect dialect;
+  core::BytecodeDispatchTable bytecode;
+};
+
+[[nodiscard]] const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngineVersion version);
 [[nodiscard]] core::SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version);
 void registerCapcomSnesSequenceDialects(core::SequenceDialectRegistry& registry);
 
 [[nodiscard]] core::TrackProgram decodeCapcomSnesSourceTrack(core::ByteReader reader,
-                                                             const core::SequenceDialect& dialect,
+                                                             const CapcomSnesSequenceDescriptor& descriptor,
                                                              u32 sourceTrackNumber, u32 startAddress);
 
 [[nodiscard]] core::SequenceProgramAsset parseCapcomSnesSequence(const core::ScanInput& input,

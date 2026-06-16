@@ -323,10 +323,6 @@ struct TruncatedCommand : NoOperands<TruncatedCommand> {
   }
 };
 
-struct NdsBytecodeMap {
-  BytecodeDispatchTable dispatch;
-};
-
 [[nodiscard]] TrackProgram makeTrack(u32 startOffset, u32 trackIndex) {
   return TrackProgram{
       .id = TrackId{trackIndex},
@@ -417,7 +413,7 @@ struct NdsBytecodeMap {
 }
 
 template <class Registrar>
-[[nodiscard]] NdsBytecodeMap ndsBytecodeMap(Registrar& registrar) {
+[[nodiscard]] BytecodeDispatchTable ndsBytecodeMap(Registrar& registrar) {
   BytecodeMapBuilder<TrackState, Context> map{"nds", registrar};
 
   constexpr std::array preservedCommands{
@@ -480,55 +476,60 @@ template <class Registrar>
   map.truncated<TruncatedCommand>("Truncated Command", suffix("truncated"));
   map.unknown<UnknownOpcode>("Unknown Opcode", suffix("unknown"));
 
-  return NdsBytecodeMap{
-      .dispatch = map.finish(),
-  };
+  return map.finish();
 }
 
 // Normal SSEQ decode follows statically reachable bytecode blocks from the
 // track start, preserving calls and jumps as source commands.
-[[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const NdsBytecodeMap& bytecode, u32 sequenceOffset,
-                                                 u32 sequenceEnd, u32 startOffset, u32 trackIndex) {
+[[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const BytecodeDispatchTable& bytecode,
+                                                 u32 sequenceOffset, u32 sequenceEnd, u32 startOffset, u32 trackIndex) {
   return decodeReachableBytecodeBlocks(
       reader, sequenceEnd, startOffset, trackIndex,
       ReachableBytecodeDecodePolicy{.maxCommands = static_cast<u32>(kMaxTrackCommands)}, [&](u32 offset) {
-        return bytecode.dispatch.decode(reader, offset,
-                                        BytecodeDecodeContext{
-                                            .bytecodeEnd = sequenceEnd,
-                                            .sequenceOffset = sequenceOffset,
-                                            .sequenceEnd = sequenceEnd,
-                                        });
+        return bytecode.decode(reader, offset,
+                               BytecodeDecodeContext{
+                                   .bytecodeEnd = sequenceEnd,
+                                   .sequenceOffset = sequenceOffset,
+                                   .sequenceEnd = sequenceEnd,
+                               });
       });
 }
 
-[[nodiscard]] const NdsBytecodeMap& ndsBytecodeMapFor(const SequenceDialect& dialect) {
-  static const NdsBytecodeMap bytecode = ndsBytecodeMap(dialect);
-  return bytecode;
-}
-
-}  // namespace
-
-SequenceDialect ndsSequenceDialect() {
+[[nodiscard]] NdsSequenceDescriptor makeNdsSequenceDescriptor() {
   SequenceDialectBuilder<TrackState, Context> builder{kNdsSequenceDialectId, Context{}};
   builder.timebase(Timebase{.ppqn = 0x30})
       .defaultBehavior(SequenceProgramBehavior{
           .defaultLoopPolicy = LoopPolicy::PlayOnce,
           .commandLimit = static_cast<u32>(kMaxTrackCommands),
       });
-  static_cast<void>(ndsBytecodeMap(builder));
-  return builder.finish();
+  auto bytecode = ndsBytecodeMap(builder);
+  return NdsSequenceDescriptor{
+      .dialect = builder.finish(),
+      .bytecode = std::move(bytecode),
+  };
+}
+
+}  // namespace
+
+const NdsSequenceDescriptor& ndsSequenceDescriptor() {
+  static const NdsSequenceDescriptor descriptor = makeNdsSequenceDescriptor();
+  return descriptor;
+}
+
+SequenceDialect ndsSequenceDialect() {
+  return ndsSequenceDescriptor().dialect;
 }
 
 void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
-  registry.add(ndsSequenceDialect());
+  registry.add(ndsSequenceDescriptor().dialect);
 }
 
-TrackProgram decodeNdsSequenceTrack(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
+TrackProgram decodeNdsSequenceTrack(ByteReader reader, const NdsSequenceDescriptor& descriptor, u32 sequenceOffset,
                                     u32 sequenceEnd, u32 startOffset, u32 trackIndex, bool recoverMalformedSdatRange) {
-  const NdsBytecodeMap& bytecode = ndsBytecodeMapFor(dialect);
+  const BytecodeDispatchTable& bytecode = descriptor.bytecode;
   if (recoverMalformedSdatRange) {
-    return decodeMalformedSdatRangeTrack(reader, bytecode.dispatch, *bytecode.dispatch.opcodes[0xff], sequenceOffset,
-                                         sequenceEnd, startOffset, trackIndex, kMaxTrackCommands);
+    return decodeMalformedSdatRangeTrack(reader, bytecode, *bytecode.opcodes[0xff], sequenceOffset, sequenceEnd,
+                                         startOffset, trackIndex, kMaxTrackCommands);
   }
   return decodeReachableBlocks(reader, bytecode, sequenceOffset, sequenceEnd, startOffset, trackIndex);
 }
@@ -585,13 +586,12 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
   const bool recoverMalformedSdatRange = recoveredSequenceOffset.has_value();
   const bool zeroFilled = !hasSseqHeader && !recoverMalformedSdatRange && isZeroFilled(reader, offset, fatEnd);
   const u32 decodeOffset = recoveredSequenceOffset.value_or(offset);
-  const u32 recoveredEnd = recoveredSequenceOffset && reader.has(*recoveredSequenceOffset + 8, 4)
-                               ? static_cast<u32>(std::min<u64>(
-                                     reader.size(), static_cast<u64>(*recoveredSequenceOffset) +
-                                                        reader.le32(*recoveredSequenceOffset + 8)))
-                               : static_cast<u32>(reader.size());
-  const u32 emptySequenceEnd =
-      static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + 0x1c));
+  const u32 recoveredEnd =
+      recoveredSequenceOffset && reader.has(*recoveredSequenceOffset + 8, 4)
+          ? static_cast<u32>(std::min<u64>(
+                reader.size(), static_cast<u64>(*recoveredSequenceOffset) + reader.le32(*recoveredSequenceOffset + 8)))
+          : static_cast<u32>(reader.size());
+  const u32 emptySequenceEnd = static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + 0x1c));
   const u32 sequenceEnd = zeroFilled ? emptySequenceEnd : recoverMalformedSdatRange ? recoveredEnd : fatEnd;
   return NdsSequenceRange{
       .offset = offset,
@@ -604,7 +604,8 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
 
 SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
                                              const std::string& name, std::optional<AssetId> instrumentSet) {
-  const SequenceDialect dialect = ndsSequenceDialect();
+  const NdsSequenceDescriptor& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
   const u32 sequenceOffset = range.decodeOffset != 0 ? range.decodeOffset : range.offset;
   SequenceProgramAsset asset{
       .metadata =
@@ -630,8 +631,8 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
 
   u32 trackIndex = 0;
   for (const u32 start : ndsSequenceTrackStarts(input.reader, sequenceOffset, range.sequenceEnd)) {
-    auto track = decodeNdsSequenceTrack(input.reader, dialect, sequenceOffset, range.sequenceEnd, start, trackIndex++,
-                                        range.recoverMalformedSdatRange);
+    auto track = decodeNdsSequenceTrack(input.reader, descriptor, sequenceOffset, range.sequenceEnd, start,
+                                        trackIndex++, range.recoverMalformedSdatRange);
     const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
                                      input.reader.range(start, 0));
     for (const auto& command : track.commands) {
