@@ -299,6 +299,24 @@ void ndsSequenceDialectKeepsEmptyPlaceholderTrack() {
   expect(track.commands.empty(), "NDS empty placeholder tracks should not decode padding as commands");
 }
 
+void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {
+  std::vector<u8> bytes(0x130);
+  constexpr u32 sequenceOffset = 0x100;
+  constexpr u32 trackStart = sequenceOffset + 0x1c;
+
+  bytes[trackStart + 0] = 0x80;
+  bytes[trackStart + 1] = 0x81;
+
+  const SequenceDialect dialect = ndsSequenceDialect();
+  const TrackProgram track =
+      decodeNdsSequenceTrack(ByteReader(SourceId{10}, bytes), dialect, sequenceOffset, trackStart + 2, trackStart, 0);
+  expect(track.commands.size() == 1, "NDS unterminated variable-length command should decode as one command");
+  expect(dialect.describe(track, track.commands[0]).detailKind == "nds.truncated",
+         "NDS unterminated variable-length command should use the truncated-command fallback");
+  expect(track.bytesFor(track.commands[0]).size() == 1 && track.bytesFor(track.commands[0])[0] == 0x80,
+         "NDS truncated command should preserve only the opcode byte");
+}
+
 void ndsMalformedRecoveryKeepsExecutableJumps() {
   std::vector<u8> bytes(0x180);
   constexpr u32 sequenceOffset = 0x100;
