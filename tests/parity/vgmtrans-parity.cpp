@@ -1242,6 +1242,27 @@ u32 parseLoopCount(std::string_view text) {
   return static_cast<u32>(value);
 }
 
+std::string midiCollectionKey(std::string_view name, u64 sequenceOffset) {
+  std::ostringstream key;
+  key << name << " @ 0x" << std::hex << sequenceOffset;
+  return key.str();
+}
+
+std::string legacyMidiCollectionKey(const VGMColl& collection) {
+  return midiCollectionKey(collection.name(), collection.seq()->offset());
+}
+
+std::string valueMidiCollectionKey(const SessionSnapshot& project, const Collection& collection) {
+  if (!collection.sequence) {
+    throw std::runtime_error("value MIDI collection had no sequence: " + collection.name);
+  }
+  const auto* sequence = assetById<SequenceProgramAsset>(project, *collection.sequence);
+  if (sequence == nullptr) {
+    throw std::runtime_error("value MIDI collection referenced a missing sequence: " + collection.name);
+  }
+  return midiCollectionKey(collection.name, sequence->metadata.range.offset);
+}
+
 std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   const auto root = scanLegacyFile(path);
   std::map<std::string, std::vector<u8>> midis;
@@ -1258,9 +1279,10 @@ std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesyst
     }
     std::vector<u8> bytes;
     midi->writeMidiToBuffer(bytes);
-    auto [_, inserted] = midis.emplace(collection->name(), std::move(bytes));
+    const std::string key = legacyMidiCollectionKey(*collection);
+    auto [_, inserted] = midis.emplace(key, std::move(bytes));
     if (!inserted) {
-      throw std::runtime_error("duplicate legacy MIDI collection name: " + collection->name());
+      throw std::runtime_error("duplicate legacy MIDI collection key: " + key);
     }
   }
 
@@ -1306,16 +1328,23 @@ std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesyste
 
   std::map<std::string, std::vector<u8>> midis;
   for (const auto& collection : project.collections) {
+    if (!collection.sequence) {
+      continue;
+    }
     std::vector<u8> midi;
     try {
       midi = valueCollectionMidi(session, collection.id, sequenceLoops);
     } catch (const std::exception& ex) {
       throw std::runtime_error("value MIDI export failed for collection '" + collection.name + "': " + ex.what());
     }
-    auto [_, inserted] = midis.emplace(collection.name, std::move(midi));
+    const std::string key = valueMidiCollectionKey(project, collection);
+    auto [_, inserted] = midis.emplace(key, std::move(midi));
     if (!inserted) {
-      throw std::runtime_error("duplicate value MIDI collection name: " + collection.name);
+      throw std::runtime_error("duplicate value MIDI collection key: " + key);
     }
+  }
+  if (midis.empty()) {
+    throw std::runtime_error("value scanner did not discover MIDI collections");
   }
   return midis;
 }
