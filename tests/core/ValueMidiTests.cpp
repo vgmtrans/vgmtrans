@@ -224,6 +224,41 @@ void performanceMidiRendererHonorsMidiExportOptions() {
          "MIDI renderer should use all 16 channels per port when channel 10 is allowed");
 }
 
+void performanceMidiRendererQuantizesPitchBendAndPortamento() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 24,
+          .events =
+              {
+                  PitchBendRangePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .semitones = 4,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .semitones = 1.0,
+                  },
+                  PortamentoTimePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 12},
+                      .timeMilliseconds = 83.0,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  const auto& events = midiSequence.tracks[0].events;
+  expect(std::get<PitchBendRange>(events[1]).semitones == 4,
+         "MIDI renderer should emit the performance pitch-bend range");
+  expect(std::get<PitchBend>(events[2]).value == 2048,
+         "MIDI renderer should quantize semitone pitch bend through the active range");
+  expect(std::get<PortamentoTime>(events[3]).value == 83,
+         "MIDI renderer should quantize performance portamento milliseconds");
+}
+
 void exportRequestSequenceLoopsAffectMidiLowering() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -472,6 +507,7 @@ void runValueMidiTests() {
   performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererHonorsMidiExportOptions();
+  performanceMidiRendererQuantizesPitchBendAndPortamento();
   exportRequestSequenceLoopsAffectMidiLowering();
   modulationAnalysisReportsObservedMidiControllerRanges();
   modulationAnalysisReportsObservedPerformanceRanges();

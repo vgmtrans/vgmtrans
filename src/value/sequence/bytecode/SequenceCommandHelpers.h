@@ -100,7 +100,7 @@ struct U8BoolOutCommand : U8Operand<Derived> {
 };
 
 template <class Derived, ModulationPerformanceTarget Target>
-struct U8MidiModulationOutCommand : U8Operand<Derived> {
+struct U8NormalizedModulationOutCommand : U8Operand<Derived> {
   void execute(auto& rt) const {
     rt.out.modulation(Target, std::clamp(static_cast<double>(this->raw) / 127.0, 0.0, 1.0));
   }
