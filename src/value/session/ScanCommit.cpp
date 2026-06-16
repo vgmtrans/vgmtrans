@@ -6,6 +6,8 @@
 
 #include "value/session/ScanCommit.h"
 
+#include "value/session/RangeValidation.h"
+
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -36,6 +38,8 @@ void ScanCommit::validate(const SourceStore& sources, const AssetStore& existing
   if (!sources.contains(source)) {
     throw std::invalid_argument("Scan result source is not active");
   }
+
+  validateScanCommitRanges(*this, sources);
 
   std::unordered_set<u32> batchAssetIds;
   for (const auto& asset : assets) {
