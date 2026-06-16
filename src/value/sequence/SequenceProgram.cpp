@@ -225,6 +225,13 @@ std::span<const CommandOperand> TrackProgram::operandsFor(const SourceCommand& c
 }
 
 const TrackProgram* trackById(const SequenceProgram& program, TrackId id) {
+  if (id.valid() && id.value < program.tracks.size()) {
+    const auto& track = program.tracks[id.value];
+    if (track.id == id) {
+      return &track;
+    }
+  }
+
   const auto found = std::ranges::find_if(program.tracks, [id](const TrackProgram& track) { return track.id == id; });
   if (found == program.tracks.end()) {
     return nullptr;
@@ -233,6 +240,13 @@ const TrackProgram* trackById(const SequenceProgram& program, TrackId id) {
 }
 
 const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) {
+  if (id.valid() && id.value < track.commands.size()) {
+    const auto& command = track.commands[id.value];
+    if (command.id == id) {
+      return &command;
+    }
+  }
+
   const auto found =
       std::ranges::find_if(track.commands, [id](const SourceCommand& command) { return command.id == id; });
   if (found == track.commands.end()) {

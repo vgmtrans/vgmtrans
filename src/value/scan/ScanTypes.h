@@ -9,8 +9,10 @@
 #include "value/base/Source.h"
 #include "value/model/SessionSnapshot.h"
 
+#include <cstddef>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -48,8 +50,11 @@ public:
                            SourceRange range, std::string description = {});
 
 private:
+  [[nodiscard]] ItemNode* item(ItemId id);
+
   ItemTree& tree_;
   ScanIdAllocator& ids_;
+  std::unordered_map<u32, std::size_t> itemIndexes_;
 };
 
 struct ScanResult {

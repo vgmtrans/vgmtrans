@@ -7,7 +7,9 @@
 #include "value/scan/ScanTypes.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <optional>
+#include <unordered_map>
 
 namespace vgmtrans::core {
 
@@ -30,6 +32,22 @@ void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
     return;
   }
 
+  std::unordered_map<u32, std::size_t> itemIndexes;
+  itemIndexes.reserve(items.nodes.size());
+  for (std::size_t i = 0; i < items.nodes.size(); ++i) {
+    itemIndexes.emplace(items.nodes[i].id.value, i);
+  }
+
+  const auto itemByIndexedId = [&items, &itemIndexes](ItemId id) -> ItemNode* {
+    const auto found = itemIndexes.find(id.value);
+    if (found == itemIndexes.end() || found->second >= items.nodes.size()) {
+      return nullptr;
+    }
+
+    auto& item = items.nodes[found->second];
+    return item.id == id ? &item : nullptr;
+  };
+
   std::optional<ItemId> firstRoot;
   for (auto& item : items.nodes) {
     if (!item.parent.has_value()) {
@@ -39,7 +57,7 @@ void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
       continue;
     }
 
-    if (auto* parent = itemById(items, *item.parent)) {
+    if (auto* parent = itemByIndexedId(*item.parent)) {
       parent->children.push_back(item.id);
     } else {
       // Keep orphaned nodes inspectable instead of dropping source context.
@@ -50,7 +68,7 @@ void normalizeItemTree(ItemTree& items, ScanIdAllocator& ids) {
     }
   }
 
-  if (!items.root.has_value() || !itemById(items, *items.root)) {
+  if (!items.root.has_value() || !itemByIndexedId(*items.root)) {
     items.root = firstRoot;
   }
 }
