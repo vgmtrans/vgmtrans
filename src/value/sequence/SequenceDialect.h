@@ -26,41 +26,39 @@ class PerformanceEmitter;
 class ItemTreeBuilder;
 class VmApi;
 
+enum class StepKind {
+  Next,
+  End,
+  Jump,
+  Call,
+  Return,
+};
+
+enum class JumpSemantics {
+  Normal,
+  FiniteBranch,
+  FiniteRepeat,
+  LoopCandidate,
+  DeclaredLoop,
+};
+
+// Step names the primitive control-flow result of a command. JumpSemantics
+// annotates jump-like steps when the VM needs loop-policy context.
 struct Step {
-  enum class Kind {
-    Next,
-    End,
-    Jump,
-    Branch,
-    JumpOrLoopForever,
-    LoopForever,
-    Call,
-    Return,
-  };
-
-  Kind kind = Kind::Next;
+  StepKind kind = StepKind::Next;
   Address destination;
+  JumpSemantics jumpSemantics = JumpSemantics::Normal;
 
-  [[nodiscard]] static constexpr Step next() noexcept { return Step{.kind = Kind::Next}; }
-  [[nodiscard]] static constexpr Step end() noexcept { return Step{.kind = Kind::End}; }
-  [[nodiscard]] static constexpr Step jump(Address destination) noexcept {
-    return Step{.kind = Kind::Jump, .destination = destination};
-  }
-  // Finite branches, such as repeat-break alternate endings, should not be
-  // treated as loops merely because the destination command ran earlier.
-  [[nodiscard]] static constexpr Step branch(Address destination) noexcept {
-    return Step{.kind = Kind::Branch, .destination = destination};
-  }
-  [[nodiscard]] static constexpr Step jumpOrLoopForever(Address destination) noexcept {
-    return Step{.kind = Kind::JumpOrLoopForever, .destination = destination};
-  }
-  [[nodiscard]] static constexpr Step loopForever(Address destination) noexcept {
-    return Step{.kind = Kind::LoopForever, .destination = destination};
+  [[nodiscard]] static constexpr Step next() noexcept { return Step{.kind = StepKind::Next}; }
+  [[nodiscard]] static constexpr Step end() noexcept { return Step{.kind = StepKind::End}; }
+  [[nodiscard]] static constexpr Step jump(Address destination,
+                                           JumpSemantics semantics = JumpSemantics::Normal) noexcept {
+    return Step{.kind = StepKind::Jump, .destination = destination, .jumpSemantics = semantics};
   }
   [[nodiscard]] static constexpr Step call(Address destination) noexcept {
-    return Step{.kind = Kind::Call, .destination = destination};
+    return Step{.kind = StepKind::Call, .destination = destination};
   }
-  [[nodiscard]] static constexpr Step return_() noexcept { return Step{.kind = Kind::Return}; }
+  [[nodiscard]] static constexpr Step return_() noexcept { return Step{.kind = StepKind::Return}; }
 };
 
 struct Effects {

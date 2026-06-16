@@ -379,11 +379,11 @@ struct RepeatUntil {
 
   Effects execute(Runtime& rt) const {
     if (count == 0) {
-      return Effects{.step = rt.vm.loopForever(destination)};
+      return Effects{.step = rt.vm.declaredLoop(destination)};
     }
 
     // Capcom stores the number of replays. The VM helper receives total plays.
-    return rt.vm.repeatUntilEffect(slot, static_cast<u32>(count) + 1, destination);
+    return rt.vm.countedRepeatUntil(slot, static_cast<u32>(count) + 1, destination);
   }
 };
 
@@ -403,7 +403,7 @@ struct RepeatBreak {
   }
 
   Effects execute(Runtime& rt) const {
-    const BranchResult branch = rt.vm.repeatBreakBranch(slot, destination);
+    const BranchResult branch = rt.vm.countedRepeatBreak(slot, destination);
     if (branch.taken) {
       rt.state.applyAttributes(attributes, &rt.out);
     }
@@ -441,7 +441,7 @@ struct Jump {
 
   static Jump parse(CommandReader& in) { return Jump{.destination = in.be16Address("destination")}; }
 
-  Effects execute(Runtime& rt) const { return Effects{.step = rt.vm.jumpOrLoopForever(destination)}; }
+  Effects execute(Runtime& rt) const { return Effects{.step = rt.vm.loopCandidate(destination)}; }
 };
 
 struct End : NoOperands<End> {

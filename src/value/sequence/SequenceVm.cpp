@@ -19,7 +19,7 @@ namespace vgmtrans::core {
 
 namespace detail {
 
-struct RepeatReplayWindow {
+struct LoopSuppressionWindow {
   Address beginAddress;
   Address endAddress;
   u32 stopIndex = 0;
@@ -44,77 +44,65 @@ struct RepeatStateSnapshot {
   }
 };
 
-// RepeatState keeps repeat counters out of format commands and exposes a small
-// snapshot so loop detection can distinguish normal repeats from infinite loops.
+[[nodiscard]] LoopSuppressionWindow loopSuppressionWindow(Address destination, const SourceCommand& command,
+                                                          u32 currentIndex) {
+  LoopSuppressionWindow window{.stopIndex = currentIndex};
+  if (const auto endAddress = commandEndAddress(command)) {
+    // This suppression covers the contiguous command-address interval between
+    // the repeat target and repeat command. Formats with non-contiguous repeat
+    // bodies should use lower-level VM flow instead of the counted-repeat helper.
+    const u64 destinationEnd =
+        destination.value == std::numeric_limits<u64>::max() ? destination.value : destination.value + 1;
+    window.beginAddress = Address{std::min(destination.value, command.address.value)};
+    window.endAddress = Address{std::max(destinationEnd, endAddress->value)};
+    window.hasAddressWindow = true;
+  }
+  return window;
+}
+
+[[nodiscard]] bool suppressesLoopDetection(const std::optional<LoopSuppressionWindow>& window,
+                                           const SourceCommand& command, u32 currentIndex) {
+  if (!window) {
+    return false;
+  }
+
+  if (window->hasAddressWindow) {
+    return command.address.value >= window->beginAddress.value && command.address.value < window->endAddress.value;
+  }
+
+  // Synthetic tests do not always use encoded command sizes. Keep the older
+  // index fallback for those programs; real bytecode should use command addresses.
+  return currentIndex <= window->stopIndex;
+}
+
+// RepeatState only tracks counters. Jump semantics decide how a repeat branch
+// affects loop detection and export policy.
 class RepeatState {
 public:
-  [[nodiscard]] Step repeatUntil(u8 slot, u32 count, Address destination, const SourceCommand& command,
-                                 u32 currentIndex) {
-    // Most drivers count the first encounter as one iteration. The VM keeps that
-    // state here so format commands only name the slot, count, and target.
-    auto& remaining = remaining_[slot];
-    if (remaining == 0) {
-      remaining = count;
-    }
+  [[nodiscard]] bool active(u8 slot) const { return remaining_.contains(slot); }
 
-    if (remaining > 1) {
-      --remaining;
-      replayWindow_ = repeatReplayWindow(destination, command, currentIndex);
-      return Step::jump(destination);
-    }
-
-    remaining_.erase(slot);
-    replayWindow_.reset();
-    return Step::next();
-  }
-
-  [[nodiscard]] Step repeatBreak(u8 slot, Address destination) {
+  [[nodiscard]] u32 remainingPlays(u8 slot) const {
     const auto found = remaining_.find(slot);
-    if (found != remaining_.end() && found->second == 1) {
-      // A repeat-break branch is taken only on the last repeat pass.
-      remaining_.erase(found);
-      replayWindow_.reset();
-      return Step::branch(destination);
-    }
-    return Step::next();
+    return found != remaining_.end() ? found->second : 0;
   }
 
-  [[nodiscard]] bool isReplayingRepeat(const SourceCommand& command, u32 currentIndex) const {
-    if (!replayWindow_) {
+  void start(u8 slot, u32 totalPlays) { remaining_[slot] = totalPlays; }
+
+  [[nodiscard]] bool consumeReplay(u8 slot) {
+    auto found = remaining_.find(slot);
+    if (found == remaining_.end() || found->second <= 1) {
       return false;
     }
-
-    const RepeatReplayWindow& window = *replayWindow_;
-    if (window.hasAddressWindow) {
-      return command.address.value >= window.beginAddress.value && command.address.value < window.endAddress.value;
-    }
-
-    // Synthetic tests do not always use encoded command sizes. Keep the older
-    // index fallback for those programs; real bytecode should use command addresses.
-    return currentIndex <= window.stopIndex;
+    --found->second;
+    return true;
   }
+
+  void finish(u8 slot) { remaining_.erase(slot); }
 
   [[nodiscard]] RepeatStateSnapshot snapshot() const { return RepeatStateSnapshot{.remaining = remaining_}; }
 
 private:
-  [[nodiscard]] static RepeatReplayWindow repeatReplayWindow(Address destination, const SourceCommand& command,
-                                                            u32 currentIndex) {
-    RepeatReplayWindow window{.stopIndex = currentIndex};
-    if (const auto endAddress = commandEndAddress(command)) {
-      // Repeat replay suppression covers the contiguous command-address interval
-      // between the repeat target and repeat command. Formats with non-contiguous
-      // repeat bodies should model that flow explicitly instead of using this helper.
-      const u64 destinationEnd =
-          destination.value == std::numeric_limits<u64>::max() ? destination.value : destination.value + 1;
-      window.beginAddress = Address{std::min(destination.value, command.address.value)};
-      window.endAddress = Address{std::max(destinationEnd, endAddress->value)};
-      window.hasAddressWindow = true;
-    }
-    return window;
-  }
-
   std::map<u8, u32> remaining_;
-  std::optional<RepeatReplayWindow> replayWindow_;
 };
 
 // Mutable playback state for one track. The parsed SequenceProgram stays unchanged
@@ -123,13 +111,14 @@ struct VmTrackRuntime {
   u64 tick = 0;
   std::vector<u32> callStack;
   RepeatState repeat;
+  std::optional<LoopSuppressionWindow> loopSuppression;
   CommandId lastCommand;
 };
 
 struct VmApiAccess {
-  [[nodiscard]] static VmApi make(VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command,
-                                  u32 currentIndex) {
-    return VmApi(runtime, sequence, command, currentIndex);
+  [[nodiscard]] static VmApi make(VmTrackRuntime& runtime, PerformanceSequence& sequence,
+                                  const SourceCommand& command) {
+    return VmApi(runtime, sequence, command);
   }
 };
 
@@ -221,9 +210,9 @@ public:
 
   [[nodiscard]] std::optional<LoopPoint> observe(const VisitState& state, const SourceCommand& command,
                                                  const VmTrackRuntime& runtime, bool arrivedByControlFlow) {
-    // Repeats intentionally revisit commands. While replaying the repeat body, do not
-    // treat that revisit as an infinite loop.
-    if (runtime.repeat.isReplayingRepeat(command, state.commandIndex)) {
+    // Finite repeat replays intentionally revisit commands. While replaying that
+    // body, do not treat the revisit as an infinite loop.
+    if (suppressesLoopDetection(runtime.loopSuppression, command, state.commandIndex)) {
       return std::nullopt;
     }
 
@@ -249,9 +238,9 @@ public:
 
   [[nodiscard]] const VisitRecord* findLoopCandidateIgnoringRepeatState(u32 commandIndex,
                                                                         const std::vector<u32>& callStack) const {
-    // JumpOrLoopForever is a source-driver hint that the jump target is a loop
-    // point. Repeat counters are ignored here so the hint still applies when the
-    // loop command appears while a finite repeat is active.
+    // LoopCandidate is a source-driver hint that the jump target is a loop point.
+    // Repeat counters are ignored here so the hint still applies when the loop
+    // command appears while a finite repeat is active.
     for (const auto& [state, record] : visited_) {
       if (state.commandIndex == commandIndex && state.callStack == callStack) {
         return &record;
@@ -320,14 +309,8 @@ public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
                   PerformanceSequence& targetSequence, std::optional<u64> stopTick, TrackRenderMode mode)
-      : track_(track),
-        dialect_(dialect),
-        behavior_(behavior),
-        loopPolicy_(behavior.defaultLoopPolicy),
-        options_(options),
-        targetSequence_(targetSequence),
-        stopTick_(stopTick),
-        mode_(mode),
+      : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
+        options_(options), targetSequence_(targetSequence), stopTick_(stopTick), mode_(mode),
         performanceTrack_(PerformanceTrack{
             .id = track.id,
             .sourceTrackNumber = track.sourceTrackNumber,
@@ -366,7 +349,7 @@ public:
       }
 
       PerformanceEmitter out{performanceTrack_, command.id, runtime_.tick};
-      VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command, *current_);
+      VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
       const Effects effects = handler->execute(command, track_, trackState_, out, vm, dialect_.context);
       runtime_.tick += effects.advanceTicks;
       runtime_.lastCommand = command.id;
@@ -422,41 +405,21 @@ private:
 
   void applyStep(const SourceCommand& command, const Step& step) {
     switch (step.kind) {
-      case Step::Kind::Next:
+      case StepKind::Next:
         current_ = nextCommandIndex(track_, *current_);
         arrivedByControlFlow_ = false;
         break;
 
-      case Step::Kind::End:
+      case StepKind::End:
         current_ = std::nullopt;
         arrivedByControlFlow_ = false;
         break;
 
-      case Step::Kind::Jump:
-        current_ = destinationIndex(track_, step.destination);
-        arrivedByControlFlow_ = true;
-        if (!current_) {
-          warn(fmt::format("Sequence jump target ${:04X} was not decoded", step.destination.value), command.range);
-        }
+      case StepKind::Jump:
+        applyJump(command, step.destination, step.jumpSemantics);
         break;
 
-      case Step::Kind::Branch:
-        current_ = destinationIndex(track_, step.destination);
-        arrivedByControlFlow_ = false;
-        if (!current_) {
-          warn(fmt::format("Sequence branch target ${:04X} was not decoded", step.destination.value), command.range);
-        }
-        break;
-
-      case Step::Kind::JumpOrLoopForever:
-        applyJumpOrLoopForever(command, step.destination);
-        break;
-
-      case Step::Kind::LoopForever:
-        applyLoopForever(command, step.destination);
-        break;
-
-      case Step::Kind::Call:
+      case StepKind::Call:
         if (const auto returnIndex = nextCommandIndex(track_, *current_)) {
           runtime_.callStack.push_back(*returnIndex);
         }
@@ -467,7 +430,7 @@ private:
         }
         break;
 
-      case Step::Kind::Return:
+      case StepKind::Return:
         if (runtime_.callStack.empty()) {
           warn("Sequence return had no active call", command.range);
           current_ = std::nullopt;
@@ -481,7 +444,38 @@ private:
     }
   }
 
-  void applyJumpOrLoopForever(const SourceCommand& command, Address destinationAddress) {
+  void applyJump(const SourceCommand& command, Address destinationAddress, JumpSemantics semantics) {
+    switch (semantics) {
+      case JumpSemantics::Normal:
+        applyPlainJump(command, destinationAddress, true, "jump");
+        break;
+      case JumpSemantics::FiniteBranch:
+        applyPlainJump(command, destinationAddress, false, "branch");
+        break;
+      case JumpSemantics::FiniteRepeat:
+        runtime_.loopSuppression = detail::loopSuppressionWindow(destinationAddress, command, *current_);
+        applyPlainJump(command, destinationAddress, true, "repeat");
+        break;
+      case JumpSemantics::LoopCandidate:
+        applyLoopCandidateJump(command, destinationAddress);
+        break;
+      case JumpSemantics::DeclaredLoop:
+        applyDeclaredLoop(command, destinationAddress);
+        break;
+    }
+  }
+
+  void applyPlainJump(const SourceCommand& command, Address destinationAddress, bool arrivedByControlFlow,
+                      std::string_view targetName) {
+    current_ = destinationIndex(track_, destinationAddress);
+    arrivedByControlFlow_ = arrivedByControlFlow;
+    if (!current_) {
+      warn(fmt::format("Sequence {} target ${:04X} was not decoded", targetName, destinationAddress.value),
+           command.range);
+    }
+  }
+
+  void applyLoopCandidateJump(const SourceCommand& command, Address destinationAddress) {
     const auto destination = destinationIndex(track_, destinationAddress);
     if (!destination) {
       warn(fmt::format("Sequence jump target ${:04X} was not decoded", destinationAddress.value), command.range);
@@ -506,7 +500,7 @@ private:
     static_cast<void>(handleLoop(loop, *destination));
   }
 
-  void applyLoopForever(const SourceCommand& command, Address destinationAddress) {
+  void applyDeclaredLoop(const SourceCommand& command, Address destinationAddress) {
     const auto destination = destinationIndex(track_, destinationAddress);
     if (!destination) {
       warn(fmt::format("Sequence loop target ${:04X} was not decoded", destinationAddress.value), command.range);
@@ -561,6 +555,37 @@ private:
 
 }  // namespace
 
+RepeatCounter::RepeatCounter(detail::RepeatState& state, u8 slot) noexcept : state_(&state), slot_(slot) {
+}
+
+bool RepeatCounter::active() const {
+  return state_ != nullptr && state_->active(slot_);
+}
+
+bool RepeatCounter::firstVisit() const {
+  return !active();
+}
+
+u32 RepeatCounter::remainingPlays() const {
+  return state_ != nullptr ? state_->remainingPlays(slot_) : 0;
+}
+
+void RepeatCounter::start(u32 totalPlays) {
+  if (state_ != nullptr) {
+    state_->start(slot_, totalPlays);
+  }
+}
+
+bool RepeatCounter::consumeReplay() {
+  return state_ != nullptr && state_->consumeReplay(slot_);
+}
+
+void RepeatCounter::finish() {
+  if (state_ != nullptr) {
+    state_->finish(slot_);
+  }
+}
+
 Step VmApi::next() const noexcept {
   return Step::next();
 }
@@ -573,12 +598,16 @@ Step VmApi::jump(Address destination) const noexcept {
   return Step::jump(destination);
 }
 
-Step VmApi::jumpOrLoopForever(Address destination) const noexcept {
-  return Step::jumpOrLoopForever(destination);
+Step VmApi::finiteBranch(Address destination) const noexcept {
+  return Step::jump(destination, JumpSemantics::FiniteBranch);
 }
 
-Step VmApi::loopForever(Address destination) const noexcept {
-  return Step::loopForever(destination);
+Step VmApi::loopCandidate(Address destination) const noexcept {
+  return Step::jump(destination, JumpSemantics::LoopCandidate);
+}
+
+Step VmApi::declaredLoop(Address destination) const noexcept {
+  return Step::jump(destination, JumpSemantics::DeclaredLoop);
 }
 
 Step VmApi::call(Address destination) const noexcept {
@@ -589,23 +618,39 @@ Step VmApi::return_() const noexcept {
   return Step::return_();
 }
 
-Step VmApi::repeatUntil(u8 slot, u32 count, Address destination) {
-  return runtime_.repeat.repeatUntil(slot, count, destination, command_, currentIndex_);
+RepeatCounter VmApi::repeatCounter(u8 slot) {
+  return RepeatCounter(runtime_.repeat, slot);
 }
 
-Effects VmApi::repeatUntilEffect(u8 slot, u32 count, Address destination) {
-  return Effects{.step = repeatUntil(slot, count, destination)};
+Effects VmApi::countedRepeatUntil(u8 slot, u32 totalPlays, Address destination) {
+  RepeatCounter counter = repeatCounter(slot);
+  if (counter.firstVisit()) {
+    counter.start(totalPlays);
+  }
+
+  if (counter.consumeReplay()) {
+    return Effects{.step = Step::jump(destination, JumpSemantics::FiniteRepeat)};
+  }
+
+  counter.finish();
+  runtime_.loopSuppression.reset();
+  return Effects{.step = next()};
 }
 
-Step VmApi::repeatBreak(u8 slot, Address destination) {
-  return runtime_.repeat.repeatBreak(slot, destination);
-}
+BranchResult VmApi::countedRepeatBreak(u8 slot, Address destination) {
+  RepeatCounter counter = repeatCounter(slot);
+  if (counter.remainingPlays() == 1) {
+    counter.finish();
+    runtime_.loopSuppression.reset();
+    return BranchResult{
+        .taken = true,
+        .effects = Effects{.step = finiteBranch(destination)},
+    };
+  }
 
-BranchResult VmApi::repeatBreakBranch(u8 slot, Address destination) {
-  const Step step = repeatBreak(slot, destination);
   return BranchResult{
-      .taken = step.kind == Step::Kind::Jump || step.kind == Step::Kind::Branch,
-      .effects = Effects{.step = step},
+      .taken = false,
+      .effects = Effects{.step = next()},
   };
 }
 
@@ -620,9 +665,8 @@ void VmApi::diagnostic(Diagnostic diagnostic) {
   sequence_.diagnostics.push_back(std::move(diagnostic));
 }
 
-VmApi::VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command,
-             u32 currentIndex)
-    : runtime_(runtime), sequence_(sequence), command_(command), currentIndex_(currentIndex) {
+VmApi::VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command)
+    : runtime_(runtime), sequence_(sequence), command_(command) {
 }
 
 SequenceVm::SequenceVm(LoopPolicy loopPolicy) : options_(SequenceVmOptions{.loopPolicy = loopPolicy}) {
@@ -657,11 +701,10 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
   }
 
   for (size_t i = 0; i < program.tracks.size(); ++i) {
-    sequence.tracks.push_back(
-        VmTrackExecutor(program, program.tracks[i], dialect, behavior, options_, sequence, synchronizedStopTick,
-                        TrackRenderMode::Normal)
-            .render()
-            .track);
+    sequence.tracks.push_back(VmTrackExecutor(program, program.tracks[i], dialect, behavior, options_, sequence,
+                                              synchronizedStopTick, TrackRenderMode::Normal)
+                                  .render()
+                                  .track);
   }
 
   return sequence;

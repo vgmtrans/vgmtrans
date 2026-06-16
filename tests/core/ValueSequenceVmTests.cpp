@@ -91,10 +91,10 @@ void sequenceVmReplaysInfiniteLoopsWhenRequested() {
   };
 
   const PerformanceSequence performance = SequenceVm(SequenceVmOptions{
-                                                        .loopPolicy = LoopPolicy::PlayOnce,
-                                                        .sequenceLoops = 2,
-                                                    })
-                                               .render(program, dialect);
+                                                         .loopPolicy = LoopPolicy::PlayOnce,
+                                                         .sequenceLoops = 2,
+                                                     })
+                                              .render(program, dialect);
   expect(performance.diagnostics.empty(), "configured loop-count fixture should not report diagnostics");
   expect(performance.tracks[0].endTick == 36, "two requested loop repeats should produce three playthroughs");
   for (u64 tick : {0ULL, 12ULL, 24ULL}) {
@@ -103,7 +103,7 @@ void sequenceVmReplaysInfiniteLoopsWhenRequested() {
   }
 }
 
-void sequenceVmStopsKnownLoopForeverBeforeTargetReplay() {
+void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
       .id = TrackId{0},
@@ -114,10 +114,9 @@ void sequenceVmStopsKnownLoopForeverBeforeTargetReplay() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
-  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()),
-                                       programBytes);
+  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeLoopForeverCommand>(builder, dialect, Address{5}, probeRange(5, loopBytes.size()), loopBytes);
+  addProbeCommand<ProbeDeclaredLoopCommand>(builder, dialect, Address{5}, probeRange(5, loopBytes.size()), loopBytes);
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -126,22 +125,22 @@ void sequenceVmStopsKnownLoopForeverBeforeTargetReplay() {
   };
 
   const PerformanceSequence playOnce = SequenceVm().render(program, dialect);
-  expect(playOnce.diagnostics.empty(), "known loop-forever fixture should not report diagnostics");
-  expect(playOnce.tracks[0].endTick == 12, "known loop-forever should stop at the loop command by default");
+  expect(playOnce.diagnostics.empty(), "declared-loop fixture should not report diagnostics");
+  expect(playOnce.tracks[0].endTick == 12, "declared-loop should stop at the loop command by default");
   expect(playOnce.tracks[0].events.size() == 2,
-         "known loop-forever should not replay target setup events when no loops are requested");
+         "declared-loop should not replay target setup events when no loops are requested");
 
   const PerformanceSequence oneLoop = SequenceVm(SequenceVmOptions{
-                                                  .loopPolicy = LoopPolicy::PlayOnce,
-                                                  .sequenceLoops = 1,
-                                              })
-                                         .render(program, dialect);
-  expect(oneLoop.tracks[0].endTick == 24, "known loop-forever should honor one requested loop repeat");
+                                                     .loopPolicy = LoopPolicy::PlayOnce,
+                                                     .sequenceLoops = 1,
+                                                 })
+                                          .render(program, dialect);
+  expect(oneLoop.tracks[0].endTick == 24, "declared-loop should honor one requested loop repeat");
   expect(countProbeNotesAt(oneLoop.tracks[0], 0) == 1 && countProbeNotesAt(oneLoop.tracks[0], 12) == 1,
-         "known loop-forever should replay the target only while loop budget remains");
+         "declared-loop should replay the target only while loop budget remains");
 }
 
-void sequenceVmPreservesKnownLoopForeverAsPerformanceMarkers() {
+void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
       .id = TrackId{0},
@@ -153,9 +152,9 @@ void sequenceVmPreservesKnownLoopForeverAsPerformanceMarkers() {
   const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
   const CommandId noteCommand =
       addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes).id;
-  const CommandId loopCommand =
-      addProbeCommand<ProbeLoopForeverCommand>(builder, dialect, Address{3}, probeRange(3, loopBytes.size()), loopBytes)
-          .id;
+  const CommandId loopCommand = addProbeCommand<ProbeDeclaredLoopCommand>(builder, dialect, Address{3},
+                                                                          probeRange(3, loopBytes.size()), loopBytes)
+                                    .id;
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -164,18 +163,18 @@ void sequenceVmPreservesKnownLoopForeverAsPerformanceMarkers() {
   };
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
-  expect(performance.diagnostics.empty(), "preserved loop-forever fixture should not report diagnostics");
-  expect(performance.tracks[0].endTick == 12, "preserved loop-forever should stop after the first pass");
+  expect(performance.diagnostics.empty(), "preserved declared-loop fixture should not report diagnostics");
+  expect(performance.tracks[0].endTick == 12, "preserved declared-loop should stop after the first pass");
 
   const MarkerPerformanceEvent* loopStart = probeMarkerAt(performance.tracks[0], "Loop Start", 0);
   const MarkerPerformanceEvent* loopEnd = probeMarkerAt(performance.tracks[0], "Loop End", 12);
   expect(loopStart != nullptr && loopStart->header.sourceCommand == noteCommand,
-         "preserved loop-forever should mark the declared loop target as loop start");
+         "preserved declared-loop should mark the declared loop target as loop start");
   expect(loopEnd != nullptr && loopEnd->header.sourceCommand == loopCommand,
-         "preserved loop-forever should mark the explicit loop command as loop end");
+         "preserved declared-loop should mark the explicit loop command as loop end");
 }
 
-void sequenceVmJumpOrLoopForeverRequiresVisitedDestination() {
+void sequenceVmLoopCandidateRequiresVisitedDestination() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
       .id = TrackId{0},
@@ -187,10 +186,10 @@ void sequenceVmJumpOrLoopForeverRequiresVisitedDestination() {
   const std::array<u8, 3> jumpToStartBytes{0xfc, 0x00, 0x00};
   const std::array<u8, 3> jumpToBodyBytes{0xfc, 0x00, 0x00};
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpOrLoopForeverCommand>(builder, dialect, Address{3}, probeRange(3, jumpToStartBytes.size()),
-                                                 jumpToStartBytes);
-  addProbeCommand<ProbeJumpOrLoopForeverCommand>(builder, dialect, Address{10}, probeRange(10, jumpToBodyBytes.size()),
-                                                 jumpToBodyBytes);
+  addProbeCommand<ProbeLoopCandidateCommand>(builder, dialect, Address{3}, probeRange(3, jumpToStartBytes.size()),
+                                             jumpToStartBytes);
+  addProbeCommand<ProbeLoopCandidateCommand>(builder, dialect, Address{10}, probeRange(10, jumpToBodyBytes.size()),
+                                             jumpToBodyBytes);
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -199,14 +198,14 @@ void sequenceVmJumpOrLoopForeverRequiresVisitedDestination() {
   };
 
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
-  expect(performance.diagnostics.empty(), "jump-or-loop fixture should not report diagnostics");
+  expect(performance.diagnostics.empty(), "loop-candidate fixture should not report diagnostics");
   expect(performance.tracks[0].endTick == 12,
-         "jump-or-loop should allow an unvisited backward destination and stop after it repeats");
+         "loop-candidate should allow an unvisited backward destination and stop after it repeats");
   expect(countProbeNotesAt(performance.tracks[0], 0) == 1,
-         "jump-or-loop should not replay the loop target after detecting the visited destination");
+         "loop-candidate should not replay the loop target after detecting the visited destination");
 }
 
-void sequenceVmJumpOrLoopForeverIgnoresRepeatStateForLoopCandidate() {
+void sequenceVmLoopCandidateIgnoresRepeatState() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
       .id = TrackId{0},
@@ -216,14 +215,14 @@ void sequenceVmJumpOrLoopForeverIgnoresRepeatStateForLoopCandidate() {
 
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
   const std::array<u8, 3> jumpToRepeatBytes{0xfe, 0x14, 0x00};
-  const std::array<u8, 3> jumpOrLoopBytes{0xfc, 0x00, 0x00};
+  const std::array<u8, 3> loopCandidateBytes{0xfc, 0x00, 0x00};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0x0a, 0x00};
 
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, probeRange(3, jumpToRepeatBytes.size()),
                                     jumpToRepeatBytes);
-  addProbeCommand<ProbeJumpOrLoopForeverCommand>(builder, dialect, Address{10}, probeRange(10, jumpOrLoopBytes.size()),
-                                                 jumpOrLoopBytes);
+  addProbeCommand<ProbeLoopCandidateCommand>(builder, dialect, Address{10}, probeRange(10, loopCandidateBytes.size()),
+                                             loopCandidateBytes);
   addProbeCommand<ProbeRepeatCommand>(builder, dialect, Address{20}, probeRange(20, repeatBytes.size()), repeatBytes);
 
   const SequenceProgram program{
@@ -233,14 +232,14 @@ void sequenceVmJumpOrLoopForeverIgnoresRepeatStateForLoopCandidate() {
   };
 
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
-  expect(performance.diagnostics.empty(), "jump-or-loop repeat-state fixture should not report diagnostics");
+  expect(performance.diagnostics.empty(), "loop-candidate repeat-state fixture should not report diagnostics");
   expect(performance.tracks[0].endTick == 12,
-         "jump-or-loop should honor a prior loop target even when a repeat counter is active");
+         "loop-candidate should honor a prior loop target even when a repeat counter is active");
   expect(countProbeNotesAt(performance.tracks[0], 0) == 1 && countProbeNotesAt(performance.tracks[0], 12) == 0,
-         "jump-or-loop should stop at the declared loop instead of replaying the target under repeat state");
+         "loop-candidate should stop at the declared loop instead of replaying the target under repeat state");
 }
 
-void sequenceVmPreservesJumpOrLoopForeverAsPerformanceMarkers() {
+void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
       .id = TrackId{0},
@@ -252,10 +251,9 @@ void sequenceVmPreservesJumpOrLoopForeverAsPerformanceMarkers() {
   const std::array<u8, 3> jumpBytes{0xfc, 0x00, 0x00};
   const CommandId noteCommand =
       addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes).id;
-  const CommandId jumpCommand =
-      addProbeCommand<ProbeJumpOrLoopForeverCommand>(builder, dialect, Address{3}, probeRange(3, jumpBytes.size()),
-                                                     jumpBytes)
-          .id;
+  const CommandId jumpCommand = addProbeCommand<ProbeLoopCandidateCommand>(builder, dialect, Address{3},
+                                                                           probeRange(3, jumpBytes.size()), jumpBytes)
+                                    .id;
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -264,15 +262,15 @@ void sequenceVmPreservesJumpOrLoopForeverAsPerformanceMarkers() {
   };
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
-  expect(performance.diagnostics.empty(), "preserved jump-or-loop fixture should not report diagnostics");
-  expect(performance.tracks[0].endTick == 12, "preserved jump-or-loop should stop after the first pass");
+  expect(performance.diagnostics.empty(), "preserved loop-candidate fixture should not report diagnostics");
+  expect(performance.tracks[0].endTick == 12, "preserved loop-candidate should stop after the first pass");
 
   const MarkerPerformanceEvent* loopStart = probeMarkerAt(performance.tracks[0], "Loop Start", 0);
   const MarkerPerformanceEvent* loopEnd = probeMarkerAt(performance.tracks[0], "Loop End", 12);
   expect(loopStart != nullptr && loopStart->header.sourceCommand == noteCommand,
-         "preserved jump-or-loop should mark the visited destination as loop start");
+         "preserved loop-candidate should mark the visited destination as loop start");
   expect(loopEnd != nullptr && loopEnd->header.sourceCommand == jumpCommand,
-         "preserved jump-or-loop should mark the jump command as loop end");
+         "preserved loop-candidate should mark the jump command as loop end");
 }
 
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
@@ -775,7 +773,8 @@ void sequenceVmStopsAllTracksAtEarliestLoopTick() {
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "synchronized first-loop fixture should not report diagnostics");
   expect(performance.tracks[0].endTick == 12, "looping track should stop at its first repeated command");
-  expect(performance.tracks[1].endTick == 20, "other tracks should stop after the command crossing the first loop tick");
+  expect(performance.tracks[1].endTick == 20,
+         "other tracks should stop after the command crossing the first loop tick");
   expect(countProbeNotesAt(performance.tracks[1], 0) == 1 && countProbeNotesAt(performance.tracks[1], 20) == 0,
          "stopAllTracksAtFirstLoop should prevent later-track events past the earliest loop tick");
 }
@@ -792,8 +791,7 @@ void sequenceVmSynchronizedDryRunDoesNotDuplicateDiagnostics() {
   };
   TrackProgramBuilder builder0{track0};
   addProbeCommand<ProbeNoteCommand>(builder0, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(builder0, dialect, Address{3}, probeRange(3, jumpLoopBytes.size()),
-                                    jumpLoopBytes);
+  addProbeCommand<ProbeJumpCommand>(builder0, dialect, Address{3}, probeRange(3, jumpLoopBytes.size()), jumpLoopBytes);
 
   TrackProgram track1{
       .id = TrackId{1},
@@ -867,17 +865,16 @@ void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
   expectDiagnosticRange(performance.diagnostics, "Sequence jump target $0063 was not decoded", jumpRange);
 }
 
-
 }  // namespace
 
 void runValueSequenceVmTests() {
   sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
   sequenceVmReplaysInfiniteLoopsWhenRequested();
-  sequenceVmStopsKnownLoopForeverBeforeTargetReplay();
-  sequenceVmPreservesKnownLoopForeverAsPerformanceMarkers();
-  sequenceVmJumpOrLoopForeverRequiresVisitedDestination();
-  sequenceVmJumpOrLoopForeverIgnoresRepeatStateForLoopCandidate();
-  sequenceVmPreservesJumpOrLoopForeverAsPerformanceMarkers();
+  sequenceVmStopsDeclaredLoopBeforeTargetReplay();
+  sequenceVmPreservesDeclaredLoopAsPerformanceMarkers();
+  sequenceVmLoopCandidateRequiresVisitedDestination();
+  sequenceVmLoopCandidateIgnoresRepeatState();
+  sequenceVmPreservesLoopCandidateAsPerformanceMarkers();
   sequenceVmPreservesLoopsAsPerformanceMarkers();
   sequenceVmUsesDialectCommandLimitDefault();
   sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
