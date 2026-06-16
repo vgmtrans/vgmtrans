@@ -63,12 +63,12 @@ void CommandInfo::field(std::string fieldName, Address value) {
 }
 
 const CommandHandler* SequenceDialect::handler(CommandHandlerId handlerId) const {
-  const auto found =
-      std::ranges::find_if(handlers, [handlerId](const CommandHandler& handler) { return handler.id == handlerId; });
-  if (found == handlers.end()) {
+  if (!handlerId.valid() || handlerId.value >= handlers.size()) {
     return nullptr;
   }
-  return &*found;
+
+  const auto& commandHandler = handlers[handlerId.value];
+  return commandHandler.id == handlerId ? &commandHandler : nullptr;
 }
 
 const CommandHandler* SequenceDialect::handlerForKind(std::string_view kindName) const {
