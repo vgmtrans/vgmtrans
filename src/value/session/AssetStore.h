@@ -27,7 +27,7 @@ public:
 
 private:
   std::vector<Asset> assets_;
-  std::unordered_map<u32, u32> sourceOwners_;
+  std::unordered_map<u32, SourceId> sourceOwners_;
 };
 
 }  // namespace vgmtrans::core

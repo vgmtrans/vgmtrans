@@ -6,26 +6,18 @@
 
 #include "value/session/MatchFactStore.h"
 
+#include "value/session/SourceIdSet.h"
+
 #include <algorithm>
 #include <iterator>
-#include <unordered_set>
 #include <utility>
 
 namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] std::unordered_set<u32> sourceIdSet(const std::vector<SourceId>& sources) {
-  std::unordered_set<u32> ids;
-  ids.reserve(sources.size());
-  for (const SourceId source : sources) {
-    ids.insert(source.value);
-  }
-  return ids;
-}
-
-[[nodiscard]] bool factFromSource(const MatchFact& fact, const std::unordered_set<u32>& sourceIds) {
-  return fact.scope.source && sourceIds.contains(fact.scope.source->value);
+[[nodiscard]] bool factFromSource(const MatchFact& fact, const SourceIdSet& sourceIds) {
+  return fact.scope.source && sourceIds.contains(*fact.scope.source);
 }
 
 }  // namespace
@@ -36,7 +28,7 @@ void MatchFactStore::append(std::vector<MatchFact> facts) {
 
 void MatchFactStore::removeForSourcesAndAssets(const std::vector<SourceId>& sources,
                                                const std::unordered_set<u32>& assetIds) {
-  const auto sourceIds = sourceIdSet(sources);
+  const auto sourceIds = makeSourceIdSet(sources);
   std::erase_if(facts_, [&](const MatchFact& fact) {
     return factFromSource(fact, sourceIds) || (fact.asset.valid() && assetIds.contains(fact.asset.value));
   });

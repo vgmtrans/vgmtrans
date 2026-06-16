@@ -160,6 +160,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/session/CollectionStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/DiagnosticStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/SourceIdSet.h
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h

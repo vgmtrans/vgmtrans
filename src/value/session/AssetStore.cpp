@@ -6,6 +6,8 @@
 
 #include "value/session/AssetStore.h"
 
+#include "value/session/SourceIdSet.h"
+
 #include <algorithm>
 #include <stdexcept>
 #include <string>
@@ -13,19 +15,6 @@
 #include <utility>
 
 namespace vgmtrans::core {
-
-namespace {
-
-[[nodiscard]] std::unordered_set<u32> sourceIdSet(const std::vector<SourceId>& sources) {
-  std::unordered_set<u32> ids;
-  ids.reserve(sources.size());
-  for (const SourceId source : sources) {
-    ids.insert(source.value);
-  }
-  return ids;
-}
-
-}  // namespace
 
 bool AssetStore::contains(AssetId id) const noexcept {
   return id.valid() && sourceOwners_.contains(id.value);
@@ -48,13 +37,13 @@ void AssetStore::append(std::vector<Asset> assets, SourceId owner) {
 
   for (auto& asset : assets) {
     const auto id = metadata(asset).id;
-    sourceOwners_.emplace(id.value, owner.value);
+    sourceOwners_.emplace(id.value, owner);
     assets_.push_back(std::move(asset));
   }
 }
 
 std::unordered_set<u32> AssetStore::removeForSources(const std::vector<SourceId>& sources) {
-  const auto sourceIds = sourceIdSet(sources);
+  const auto sourceIds = makeSourceIdSet(sources);
   std::unordered_set<u32> removedAssetIds;
 
   for (const auto& [assetId, sourceId] : sourceOwners_) {
@@ -65,7 +54,7 @@ std::unordered_set<u32> AssetStore::removeForSources(const std::vector<SourceId>
 
   for (const auto& asset : assets_) {
     const auto& meta = metadata(asset);
-    if (meta.range.valid() && sourceIds.contains(meta.range.source.value) && meta.id.valid()) {
+    if (meta.range.valid() && sourceIds.contains(meta.range.source) && meta.id.valid()) {
       removedAssetIds.insert(meta.id.value);
     }
   }
