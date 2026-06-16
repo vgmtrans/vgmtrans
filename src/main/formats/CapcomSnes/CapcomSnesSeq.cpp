@@ -431,6 +431,10 @@ bool CapcomSnesTrack::readEvent() {
         break;
       }
 
+      case EVENT_NOP:
+        addGenericEvent(beginOffset, curOffset - beginOffset, "No Operation", "", Type::Nop);
+        break;
+
       case EVENT_TOGGLE_TRIPLET:
         setNoteTriplet(!isNoteTriplet());
         addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Triplet", "", Type::DurationChange);

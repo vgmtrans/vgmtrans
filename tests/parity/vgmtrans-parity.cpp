@@ -36,6 +36,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
 #include <sstream>
 #include <stdexcept>
@@ -2116,6 +2117,11 @@ struct NormalizedMidiEvent {
   friend bool operator==(const NormalizedMidiEvent&, const NormalizedMidiEvent&) = default;
 };
 
+bool normalizedMidiEventLess(const NormalizedMidiEvent& lhs, const NormalizedMidiEvent& rhs) {
+  return std::tie(lhs.track, lhs.tick, lhs.kind, lhs.channel, lhs.a, lhs.b, lhs.c, lhs.text) <
+         std::tie(rhs.track, rhs.tick, rhs.kind, rhs.channel, rhs.a, rhs.b, rhs.c, rhs.text);
+}
+
 struct MidiCompareOptions {
   bool allowExtraValueTrackTailSetup = false;
 };
@@ -2382,35 +2388,41 @@ std::vector<NormalizedMidiEvent> normalizeMidi(std::span<const u8> bytes) {
 
   expect(reader.empty(), "MIDI has trailing bytes after declared tracks");
 
-  std::ranges::sort(events, [](const auto& lhs, const auto& rhs) {
-    return std::tie(lhs.track, lhs.tick, lhs.kind, lhs.channel, lhs.a, lhs.b, lhs.c, lhs.text) <
-           std::tie(rhs.track, rhs.tick, rhs.kind, rhs.channel, rhs.a, rhs.b, rhs.c, rhs.text);
-  });
+  std::ranges::sort(events, normalizedMidiEventLess);
   return events;
 }
 
-bool isTrackTailSetupEvent(const NormalizedMidiEvent& event) {
-  return event.kind == "control" || event.kind == "program";
+bool isTailSetupEvent(const NormalizedMidiEvent& event) {
+  return event.kind == "control" || event.kind == "program" || event.kind == "tempo";
 }
 
-// Capcom value decoding can keep real zero-time setup commands after the last
-// legacy event on a track. Tolerate those in parity without changing the export.
-std::vector<NormalizedMidiEvent> withoutExtraValueTrackTailSetup(const std::vector<NormalizedMidiEvent>& legacy,
-                                                                 const std::vector<NormalizedMidiEvent>& value,
-                                                                 size_t& removedCount) {
+// Capcom value decoding can keep real source-driver setup commands at the play-once tail.
+// Legacy sometimes drops those when it stops conversion at the loop boundary.
+std::vector<NormalizedMidiEvent> withoutExtraValueTailSetup(const std::vector<NormalizedMidiEvent>& legacy,
+                                                            const std::vector<NormalizedMidiEvent>& value,
+                                                            size_t& removedCount) {
   std::map<u32, u64> lastLegacyTickByTrack;
+  std::multiset<NormalizedMidiEvent, decltype(&normalizedMidiEventLess)> remainingLegacy(normalizedMidiEventLess);
   for (const auto& event : legacy) {
     auto& lastTick = lastLegacyTickByTrack[event.track];
     lastTick = std::max(lastTick, event.tick);
+    remainingLegacy.insert(event);
   }
 
   std::vector<NormalizedMidiEvent> filtered;
   filtered.reserve(value.size());
   removedCount = 0;
   for (const auto& event : value) {
+    const auto matchedLegacy = remainingLegacy.find(event);
+    if (matchedLegacy != remainingLegacy.end()) {
+      filtered.push_back(event);
+      remainingLegacy.erase(matchedLegacy);
+      continue;
+    }
+
     const auto lastLegacyTick = lastLegacyTickByTrack.find(event.track);
-    if (lastLegacyTick != lastLegacyTickByTrack.end() && event.tick > lastLegacyTick->second &&
-        isTrackTailSetupEvent(event)) {
+    if (lastLegacyTick != lastLegacyTickByTrack.end() && event.tick >= lastLegacyTick->second &&
+        isTailSetupEvent(event)) {
       ++removedCount;
       continue;
     }
@@ -2436,9 +2448,9 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
 
   if (options.allowExtraValueTrackTailSetup) {
     size_t removedCount = 0;
-    const auto filteredValue = withoutExtraValueTrackTailSetup(legacy, value, removedCount);
+    const auto filteredValue = withoutExtraValueTailSetup(legacy, value, removedCount);
     if (removedCount != 0 && legacy == filteredValue) {
-      out << "MIDI parity ok after ignoring " << removedCount << " extra value track-tail setup events\n";
+      out << "MIDI parity ok after ignoring " << removedCount << " extra value tail setup events\n";
       return true;
     }
   }
