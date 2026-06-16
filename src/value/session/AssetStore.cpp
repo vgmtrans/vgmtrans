@@ -16,6 +16,15 @@
 
 namespace vgmtrans::core {
 
+const Asset* AssetStore::asset(AssetId id) const noexcept {
+  if (!id.valid() || !sourceOwners_.contains(id.value)) {
+    return nullptr;
+  }
+
+  const auto found = std::ranges::find_if(assets_, [id](const Asset& asset) { return metadata(asset).id == id; });
+  return found != assets_.end() ? &*found : nullptr;
+}
+
 bool AssetStore::contains(AssetId id) const noexcept {
   return id.valid() && sourceOwners_.contains(id.value);
 }
