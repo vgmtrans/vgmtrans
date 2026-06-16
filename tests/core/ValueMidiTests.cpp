@@ -52,9 +52,7 @@ void midiExporterKeeps14BitControllerPairsAdjacent() {
 
   const auto exported = MidiExporter().exportMidi(midiSequence);
   const std::vector<u8> expectedOrder{
-      0x00, 0xb0, 0x07, 0x24,
-      0x00, 0xb0, 0x27, 0x34,
-      0x00, 0xb0, 0x0a, 0x40,
+      0x00, 0xb0, 0x07, 0x24, 0x00, 0xb0, 0x27, 0x34, 0x00, 0xb0, 0x0a, 0x40,
   };
 
   expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
@@ -286,15 +284,15 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
       .id = TrackId{0},
       .startAddress = Address{0},
   };
-  TrackProgramBuilder builder{track};
+  TrackProgramBuilder trackBuilder{track};
 
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x00, 0x00};
-  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(trackBuilder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
-  SessionSnapshot project;
-  project.assets.emplace_back(SequenceProgramAsset{
+  SessionSnapshotBuilder snapshotBuilder;
+  snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
       .metadata =
           AssetMetadata{
               .id = AssetId{0},
@@ -308,12 +306,12 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
               .tracks = {track},
           },
   });
-  project.collections.push_back(Collection{
+  snapshotBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Looping",
       .sequence = AssetId{0},
   });
-  rebuildSessionSnapshotIndex(project);
+  const SessionSnapshot project = snapshotBuilder.finish();
 
   SourceStore sources;
   SequenceDialectRegistry dialects;

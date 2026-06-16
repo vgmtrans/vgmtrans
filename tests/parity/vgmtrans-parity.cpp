@@ -896,8 +896,8 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
   const SessionSnapshot project = session.scanPendingSources();
-  expect(project.collections.size() == 1, "value ARAM summary expected one collection");
-  return valueCapcomSnesSummary(project, session.sources(), project.collections.front());
+  expect(project.collections().size() == 1, "value ARAM summary expected one collection");
+  return valueCapcomSnesSummary(project, session.sources(), project.collections().front());
 }
 
 std::map<std::string, CapcomSnesSummary> valueCapcomSnesRsnSummaries(const std::filesystem::path& path) {
@@ -906,17 +906,17 @@ std::map<std::string, CapcomSnesSummary> valueCapcomSnesRsnSummaries(const std::
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
   const SessionSnapshot project = session.scanPendingSources();
-  if (project.collections.empty()) {
+  if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
-    if (!project.diagnostics.empty()) {
-      message << ": " << project.diagnostics.front().message;
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
     }
     throw std::runtime_error(message.str());
   }
 
   std::map<std::string, CapcomSnesSummary> summaries;
-  for (const auto& collection : project.collections) {
+  for (const auto& collection : project.collections()) {
     auto [_, inserted] =
         summaries.emplace(collection.name, valueCapcomSnesSummary(project, session.sources(), collection));
     if (!inserted) {
@@ -1066,20 +1066,20 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
   const SessionSnapshot project = session.scanPendingSources();
-  if (project.collections.empty()) {
+  if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover a collection";
-    if (!project.diagnostics.empty()) {
-      message << ": " << project.diagnostics.front().message;
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
     }
     throw std::runtime_error(message.str());
   }
 
   const auto artifacts =
-      session.exportCollection(project.collections.front().id, ExportRequest{
-                                                                   .kinds = {ExportKind::Midi},
-                                                                   .loopPolicy = LoopPolicy::PlayOnce,
-                                                               });
+      session.exportCollection(project.collections().front().id, ExportRequest{
+                                                                     .kinds = {ExportKind::Midi},
+                                                                     .loopPolicy = LoopPolicy::PlayOnce,
+                                                                 });
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1117,17 +1117,17 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
   const SessionSnapshot project = session.scanPendingSources();
-  if (project.collections.empty()) {
+  if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
-    if (!project.diagnostics.empty()) {
-      message << ": " << project.diagnostics.front().message;
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
     }
     throw std::runtime_error(message.str());
   }
 
   std::map<std::string, std::vector<u8>> midis;
-  for (const auto& collection : project.collections) {
+  for (const auto& collection : project.collections()) {
     auto [_, inserted] = midis.emplace(collection.name, valueCapcomSnesMidi(session, collection.id));
     if (!inserted) {
       throw std::runtime_error("duplicate value collection name from RSN: " + collection.name);
@@ -1168,17 +1168,17 @@ std::map<std::string, SynthExportBytes> valueCapcomSnesRsnSynthExports(const std
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
   const SessionSnapshot project = session.scanPendingSources();
-  if (project.collections.empty()) {
+  if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
-    if (!project.diagnostics.empty()) {
-      message << ": " << project.diagnostics.front().message;
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
     }
     throw std::runtime_error(message.str());
   }
 
   std::map<std::string, SynthExportBytes> exports;
-  for (const auto& collection : project.collections) {
+  for (const auto& collection : project.collections()) {
     auto [_, inserted] = exports.emplace(collection.name, valueCapcomSnesSynthExports(session, collection.id));
     if (!inserted) {
       throw std::runtime_error("duplicate value collection name from RSN: " + collection.name);
@@ -1213,17 +1213,17 @@ std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::fil
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
   const SessionSnapshot project = session.scanPendingSources();
-  if (project.collections.empty()) {
+  if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections";
-    if (!project.diagnostics.empty()) {
-      message << ": " << project.diagnostics.front().message;
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
     }
     throw std::runtime_error(message.str());
   }
 
   std::map<std::string, CapcomSnesSummary> summaries;
-  for (const auto& collection : project.collections) {
+  for (const auto& collection : project.collections()) {
     auto [_, inserted] =
         summaries.emplace(collection.name, valueCapcomSnesSummary(project, session.sources(), collection));
     if (!inserted) {
@@ -1317,17 +1317,17 @@ std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesyste
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
   const SessionSnapshot project = session.scanPendingSources();
-  if (project.collections.empty()) {
+  if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover MIDI collections";
-    if (!project.diagnostics.empty()) {
-      message << ": " << project.diagnostics.front().message;
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
     }
     throw std::runtime_error(message.str());
   }
 
   std::map<std::string, std::vector<u8>> midis;
-  for (const auto& collection : project.collections) {
+  for (const auto& collection : project.collections()) {
     if (!collection.sequence) {
       continue;
     }
@@ -1375,17 +1375,17 @@ std::map<std::string, SynthExportBytes> valueCollectionSynthExports(const std::f
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
   const SessionSnapshot project = session.scanPendingSources();
-  if (project.collections.empty()) {
+  if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover synth collections";
-    if (!project.diagnostics.empty()) {
-      message << ": " << project.diagnostics.front().message;
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
     }
     throw std::runtime_error(message.str());
   }
 
   std::map<std::string, SynthExportBytes> exports;
-  for (const auto& collection : project.collections) {
+  for (const auto& collection : project.collections()) {
     if (collection.instrumentSets.empty() || collection.sampleCollections.empty()) {
       continue;
     }
@@ -2871,18 +2871,18 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
   const SessionSnapshot project = session.scanPendingSources();
 
-  if (project.collections.empty()) {
+  if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
-    if (!project.diagnostics.empty()) {
-      message << ": " << project.diagnostics.front().message;
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
     }
     throw std::runtime_error(message.str());
   }
 
-  if (project.collections.size() != legacySummaries.size()) {
+  if (project.collections().size() != legacySummaries.size()) {
     std::cout << "value RSN collection count differs: legacy=" << legacySummaries.size()
-              << " value=" << project.collections.size() << "\n";
+              << " value=" << project.collections().size() << "\n";
     return 1;
   }
 
@@ -2890,8 +2890,8 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
       .kinds = {ExportKind::Midi, ExportKind::SoundFont2, ExportKind::Dls, ExportKind::Wav},
       .loopPolicy = LoopPolicy::PlayOnce,
   });
-  if (collectionExports.size() != project.collections.size()) {
-    std::cout << "value all-collection export count differs: collections=" << project.collections.size()
+  if (collectionExports.size() != project.collections().size()) {
+    std::cout << "value all-collection export count differs: collections=" << project.collections().size()
               << " exports=" << collectionExports.size() << "\n";
     return 1;
   }
@@ -2932,7 +2932,7 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
     }
   }
 
-  std::cout << "CapcomSnes direct RSN export smoke ok: collections=" << project.collections.size()
+  std::cout << "CapcomSnes direct RSN export smoke ok: collections=" << project.collections().size()
             << " artifacts=" << totalArtifacts << "\n";
   return 0;
 }

@@ -134,11 +134,11 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
   const SessionSnapshot project = session.scanPendingSources();
-  expect(project.diagnostics.empty(), "CapcomSnes scan should not report diagnostics for complete fixture");
-  expect(project.collections.size() == 1, "CapcomSnes scan should produce one collection");
-  expect(project.assets.size() == 3, "CapcomSnes scan should produce sequence, instrument set, and samples");
+  expect(project.diagnostics().empty(), "CapcomSnes scan should not report diagnostics for complete fixture");
+  expect(project.collections().size() == 1, "CapcomSnes scan should produce one collection");
+  expect(project.assets().size() == 3, "CapcomSnes scan should produce sequence, instrument set, and samples");
 
-  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
+  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets()[0]);
   expect(sequence != nullptr, "first CapcomSnes asset should be sequence");
   expect(sequence->metadata.format == "CapcomSnes", "sequence should retain format name");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should point at fixed BGM header body");
@@ -175,7 +175,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(
       sequence->program.referencedInstruments[0].bank == 0 && sequence->program.referencedInstruments[0].program == 0,
       "instrument reference should preserve decoded bank and program");
-  expect(sequence->program.referencedInstruments[0].asset == project.collections[0].instrumentSets[0],
+  expect(sequence->program.referencedInstruments[0].asset == project.collections()[0].instrumentSets[0],
          "instrument reference should point at the decoded instrument set asset");
   expect(sequence->program.referencedInstruments[0].range.has_value() &&
              sequence->program.referencedInstruments[0].range->offset == 0x3003 &&
@@ -242,10 +242,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[14]).tick == 6,
          "builder should advance time before end of track");
 
-  const auto artifacts = session.exportCollection(project.collections[0].id, ExportRequest{
-                                                                                 .kinds = {ExportKind::Midi},
-                                                                                 .loopPolicy = LoopPolicy::PlayOnce,
-                                                                             });
+  const auto artifacts = session.exportCollection(project.collections()[0].id, ExportRequest{
+                                                                                   .kinds = {ExportKind::Midi},
+                                                                                   .loopPolicy = LoopPolicy::PlayOnce,
+                                                                               });
   expect(artifacts.size() == 1, "value export should produce one MIDI artifact");
   expect(artifacts[0].filename == "Mega Man X.mid", "MIDI artifact should use collection name");
   expect(artifacts[0].mediaType == "audio/midi", "MIDI artifact should use audio/midi media type");
@@ -253,9 +253,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(artifacts[0].bytes == MidiExporter().exportMidi(midiSequence),
          "Session MIDI export should match direct builder/exporter output");
 
-  const auto wavArtifacts = session.exportCollection(project.collections[0].id, ExportRequest{
-                                                                                    .kinds = {ExportKind::Wav},
-                                                                                });
+  const auto wavArtifacts = session.exportCollection(project.collections()[0].id, ExportRequest{
+                                                                                      .kinds = {ExportKind::Wav},
+                                                                                  });
   expect(wavArtifacts.size() == 1, "value export should produce one WAV artifact for one sample");
   expect(wavArtifacts[0].filename == "Mega Man X-0-Sample 0.wav", "WAV artifact should include sample index and name");
   expect(wavArtifacts[0].mediaType == "audio/wav", "WAV artifact should use audio/wav media type");
@@ -267,9 +267,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(wavArtifacts[0].bytes[24] == 0x00 && wavArtifacts[0].bytes[25] == 0x7d,
          "WAV artifact should preserve the CapcomSnes sample rate");
 
-  const auto sf2Artifacts = session.exportCollection(project.collections[0].id, ExportRequest{
-                                                                                    .kinds = {ExportKind::SoundFont2},
-                                                                                });
+  const auto sf2Artifacts = session.exportCollection(project.collections()[0].id, ExportRequest{
+                                                                                      .kinds = {ExportKind::SoundFont2},
+                                                                                  });
   expect(sf2Artifacts.size() == 1, "value export should produce one SoundFont artifact");
   expect(sf2Artifacts[0].filename == "Mega Man X.sf2", "SoundFont artifact should use collection name");
   expect(sf2Artifacts[0].mediaType == "audio/soundfont", "SoundFont artifact should use audio/soundfont media type");
@@ -282,9 +282,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::vector<u8>{'s', 'f', 'b', 'k'},
          "SoundFont artifact should use sfbk RIFF type");
 
-  const auto dlsArtifacts = session.exportCollection(project.collections[0].id, ExportRequest{
-                                                                                    .kinds = {ExportKind::Dls},
-                                                                                });
+  const auto dlsArtifacts = session.exportCollection(project.collections()[0].id, ExportRequest{
+                                                                                      .kinds = {ExportKind::Dls},
+                                                                                  });
   expect(dlsArtifacts.size() == 1, "value export should produce one DLS artifact");
   expect(dlsArtifacts[0].filename == "Mega Man X.dls", "DLS artifact should use collection name");
   expect(dlsArtifacts[0].mediaType == "audio/dls", "DLS artifact should use audio/dls media type");
@@ -297,7 +297,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::vector<u8>{'D', 'L', 'S', ' '},
          "DLS artifact should use DLS RIFF type");
 
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets[1]);
+  const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument set");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid instrument");
   const auto& instrument = instruments->instruments[0];
@@ -352,7 +352,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(regionItem->range.offset == 0x4000 && regionItem->range.size == 6,
          "region item should preserve the instrument header source range");
 
-  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets[2]);
+  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
   expect(samples != nullptr, "third CapcomSnes asset should be sample collection");
   expect(samples->samples.samples.size() == 1, "sample collection should include referenced sample");
   expect(samples->samples.samples[0].codec == AudioCodec::SnesBrr, "sample should preserve BRR codec");
@@ -375,10 +375,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "sample item should preserve the encoded BRR source range");
   expect(sampleItem->description == "DIR entry $5000", "sample item should retain its source DIR entry address");
 
-  expect(project.collections[0].sequence == sequence->metadata.id, "collection should reference sequence");
-  expect(project.collections[0].instrumentSets == std::vector<AssetId>{instruments->metadata.id},
+  expect(project.collections()[0].sequence == sequence->metadata.id, "collection should reference sequence");
+  expect(project.collections()[0].instrumentSets == std::vector<AssetId>{instruments->metadata.id},
          "collection should reference instrument set");
-  expect(project.collections[0].sampleCollections == std::vector<AssetId>{samples->metadata.id},
+  expect(project.collections()[0].sampleCollections == std::vector<AssetId>{samples->metadata.id},
          "collection should reference sample collection");
 }
 
@@ -388,27 +388,27 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
   const auto sourceId = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesSpc());
 
   const SessionSnapshot project = session.scanPendingSources();
-  expect(project.diagnostics.empty(), "SPC-backed CapcomSnes scan should not report diagnostics");
-  expect(project.sources.size() == 2, "SPC scan should preserve original source plus extracted ARAM");
-  expect(!project.sources[0].derived(), "original SPC source should not be derived");
-  expect(project.sources[1].derived(), "SPC RAM source should be derived");
-  expect(project.sources[1].name == "Mega Man X.spc - ram", "derived ARAM source should match legacy naming");
-  expect(project.sources[1].title == "Capcom Logo", "derived ARAM source should carry the SPC title tag");
-  expect(project.sources[1].origin.has_value(), "derived ARAM source should preserve origin range");
-  expect(project.sources[1].origin->source == sourceId, "derived ARAM origin should point at the SPC source");
-  expect(project.sources[1].origin->offset == 0x100 && project.sources[1].origin->size == 0x10000,
+  expect(project.diagnostics().empty(), "SPC-backed CapcomSnes scan should not report diagnostics");
+  expect(project.sources().size() == 2, "SPC scan should preserve original source plus extracted ARAM");
+  expect(!project.sources()[0].derived(), "original SPC source should not be derived");
+  expect(project.sources()[1].derived(), "SPC RAM source should be derived");
+  expect(project.sources()[1].name == "Mega Man X.spc - ram", "derived ARAM source should match legacy naming");
+  expect(project.sources()[1].title == "Capcom Logo", "derived ARAM source should carry the SPC title tag");
+  expect(project.sources()[1].origin.has_value(), "derived ARAM source should preserve origin range");
+  expect(project.sources()[1].origin->source == sourceId, "derived ARAM origin should point at the SPC source");
+  expect(project.sources()[1].origin->offset == 0x100 && project.sources()[1].origin->size == 0x10000,
          "derived ARAM origin should point at SPC RAM bytes");
 
-  expect(project.collections.size() == 1, "SPC-backed scan should produce one collection");
-  expect(project.collections[0].name == "Capcom Logo", "SPC-backed collection should use the SPC title tag");
-  expect(project.assets.size() == 3, "SPC-backed scan should produce CapcomSnes assets from derived ARAM");
-  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
+  expect(project.collections().size() == 1, "SPC-backed scan should produce one collection");
+  expect(project.collections()[0].name == "Capcom Logo", "SPC-backed collection should use the SPC title tag");
+  expect(project.assets().size() == 3, "SPC-backed scan should produce CapcomSnes assets from derived ARAM");
+  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets()[0]);
   expect(sequence != nullptr, "SPC-backed scan should produce a sequence");
   expect(sequence->metadata.name == "Capcom Logo", "SPC-backed sequence should use the SPC title tag");
   expect(sequence->metadata.range.source == SourceId{1}, "sequence range should point at derived ARAM source");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should preserve ARAM-relative address");
 
-  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets[2]);
+  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
   expect(samples != nullptr, "SPC-backed scan should produce samples");
   expect(!samples->samples.samples.empty(), "SPC-backed scan should discover sample data");
   expect(samples->samples.samples[0].encodedData.source == SourceId{1},
@@ -464,10 +464,10 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, std::move(bytes));
 
   const SessionSnapshot project = session.scanPendingSources();
-  expect(project.diagnostics.empty(), "CapcomSnes note-state scan should not report diagnostics");
-  expect(!project.assets.empty(), "CapcomSnes note-state scan should produce assets");
+  expect(project.diagnostics().empty(), "CapcomSnes note-state scan should not report diagnostics");
+  expect(!project.assets().empty(), "CapcomSnes note-state scan should produce assets");
 
-  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets[0]);
+  const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets()[0]);
   expect(sequence != nullptr, "CapcomSnes note-state scan should produce a sequence");
   expect(!sequence->program.tracks.empty(), "CapcomSnes note-state scan should decode tracks");
 
