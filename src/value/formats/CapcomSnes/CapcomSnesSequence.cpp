@@ -9,8 +9,9 @@
 #include "formats/CapcomSnes/CapcomSnesDriverMath.h"
 #include "value/base/LevelScale.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
+#include "value/sequence/bytecode/BytecodeMap.h"
 #include "value/sequence/bytecode/BytecodeWalkers.h"
+#include "value/sequence/bytecode/SequenceCommandHelpers.h"
 
 #include <fmt/format.h>
 

@@ -8,7 +8,8 @@
 
 #include "value/export/synth/DlsExporter.h"
 #include "value/export/Export.h"
-#include "value/sequence/bytecode/BytecodeSequenceDecoder.h"
+#include "value/sequence/bytecode/BytecodeMap.h"
+#include "value/sequence/bytecode/SequenceCommandHelpers.h"
 #include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatModule.h"
 #include "value/base/LevelScale.h"
