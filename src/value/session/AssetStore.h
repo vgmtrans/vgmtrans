@@ -20,6 +20,14 @@ namespace vgmtrans::core {
 class AssetStore {
 public:
   [[nodiscard]] const std::vector<Asset>& all() const noexcept { return assets_; }
+  [[nodiscard]] const Asset* asset(AssetId id) const noexcept;
+
+  template <typename T>
+  [[nodiscard]] const T* asset(AssetId id) const noexcept {
+    const auto* found = asset(id);
+    return found != nullptr ? std::get_if<T>(found) : nullptr;
+  }
+
   [[nodiscard]] bool contains(AssetId id) const noexcept;
 
   void append(std::vector<Asset> assets, SourceId owner);
