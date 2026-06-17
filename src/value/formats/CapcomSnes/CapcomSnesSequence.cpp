@@ -742,10 +742,7 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
     auto track = decodeCapcomSnesSourceTrack(input.reader, descriptor,
                                              static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex), trackAddress);
 
-    for (const auto& command : track.commands) {
-      static_cast<void>(addSourceCommandItem(itemBuilder, trackItem, dialect, track, command));
-      addCommandInstrumentReferences(program, dialect, track, command, instrumentSetId);
-    }
+    addSourceCommandItemsAndInstrumentReferences(itemBuilder, trackItem, program, dialect, track, instrumentSetId);
 
     program.tracks.push_back(std::move(track));
   }

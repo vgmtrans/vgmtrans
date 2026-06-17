@@ -629,10 +629,7 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
                                         trackIndex++, range.recoverMalformedSdatRange);
     const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
                                      input.reader.range(start, 0));
-    for (const auto& command : track.commands) {
-      static_cast<void>(addSourceCommandItem(items, trackItem, dialect, track, command));
-      addCommandInstrumentReferences(asset.program, dialect, track, command, instrumentSet);
-    }
+    addSourceCommandItemsAndInstrumentReferences(items, trackItem, asset.program, dialect, track, instrumentSet);
     asset.program.tracks.push_back(std::move(track));
   }
 
