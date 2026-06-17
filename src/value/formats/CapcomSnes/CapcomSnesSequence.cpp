@@ -710,7 +710,8 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequ
 }
 
 SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const CapcomSnesLayout& layout, AssetId sequenceId,
-                                             std::optional<AssetId> instrumentSetId, std::string_view displayName) {
+                                             std::optional<ScanInstrumentSetRef> instrumentSet,
+                                             std::string_view displayName) {
   const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
   ItemTree items;
   ItemTreeBuilder itemBuilder(items, input.ids);
@@ -724,6 +725,8 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
       .timebase = dialect.timebase,
       .behavior = dialect.defaultBehavior,
   };
+  const std::optional<AssetId> instrumentSetId =
+      instrumentSet ? std::optional<AssetId>{instrumentSet->id} : std::nullopt;
 
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   // Capcom stores track pointers in reverse channel order. Reorder them here so source

@@ -8,6 +8,7 @@
 
 #include "value/base/Source.h"
 #include "value/formats/NDS/NdsTypes.h"
+#include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceDialect.h"
 #include "value/sequence/bytecode/BytecodeTable.h"
@@ -41,6 +42,6 @@ void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
 
 [[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(const core::ScanInput& input, core::AssetId id,
                                                                  NdsSequenceRange range, const std::string& name,
-                                                                 std::optional<core::AssetId> instrumentSet);
+                                                                 std::optional<core::ScanInstrumentSetRef> instrumentSet);
 
 }  // namespace vgmtrans::formats::nds

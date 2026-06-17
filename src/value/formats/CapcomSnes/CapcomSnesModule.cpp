@@ -55,7 +55,8 @@ using namespace core;
   const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
   static_cast<void>(result.sequence(sequence, [&](AssetId id) {
     return parseCapcomSnesSequence(
-        input, *layout, id, hasInstrumentSet ? std::optional<AssetId>{instrumentSet.id} : std::nullopt, displayName);
+        input, *layout, id, hasInstrumentSet ? std::optional<ScanInstrumentSetRef>{instrumentSet} : std::nullopt,
+        displayName);
   }));
 
   auto collection = result.collection(displayName, capcomCollectionKey(input.source.id));

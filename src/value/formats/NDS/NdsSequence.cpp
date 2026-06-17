@@ -598,10 +598,12 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
 }
 
 SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
-                                             const std::string& name, std::optional<AssetId> instrumentSet) {
+                                             const std::string& name, std::optional<ScanInstrumentSetRef> instrumentSet) {
   const NdsSequenceDescriptor& descriptor = ndsSequenceDescriptor();
   const SequenceDialect& dialect = descriptor.dialect;
   const u32 sequenceOffset = range.decodeOffset != 0 ? range.decodeOffset : range.offset;
+  const std::optional<AssetId> instrumentSetId =
+      instrumentSet ? std::optional<AssetId>{instrumentSet->id} : std::nullopt;
   SequenceProgramAsset asset{
       .metadata =
           AssetMetadata{
@@ -629,7 +631,7 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
                                         trackIndex++, range.recoverMalformedSdatRange);
     const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
                                      input.reader.range(start, 0));
-    addSourceCommandItemsAndInstrumentReferences(items, trackItem, asset.program, dialect, track, instrumentSet);
+    addSourceCommandItemsAndInstrumentReferences(items, trackItem, asset.program, dialect, track, instrumentSetId);
     asset.program.tracks.push_back(std::move(track));
   }
 
