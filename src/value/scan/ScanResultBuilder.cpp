@@ -130,6 +130,10 @@ ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format,
       collectionResolver_(collectionResolver.empty() ? format_ : std::move(collectionResolver)) {
 }
 
+ParseCursor ScanResultBuilder::cursor(SourceRange bounds) {
+  return ParseCursor(input_.reader, bounds, result_.diagnostics);
+}
+
 ScanSequenceRef ScanResultBuilder::reserveSequence() {
   const auto id = input_.ids.nextAssetId();
   reserveHandle(id, CollectionMemberRole::Sequence);

@@ -121,6 +121,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/session/DiagnosticStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/ExplicitCollectionStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/ParseCursor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/ScanCommit.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
@@ -170,6 +171,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/session/DiagnosticStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/ExplicitCollectionStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/ParseCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/session/SourceIdSet.h
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.h

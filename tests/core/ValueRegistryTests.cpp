@@ -207,6 +207,26 @@ void scanResultBuilderRejectsWrongRoleHandleReuse() {
   expect(threw, "scan result builder should reject using one handle id with the wrong role");
 }
 
+void scanResultBuilderCursorReportsMalformedFields() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "cursor.probe"}, {0xaa, 0xbb, 0xcc});
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  auto cursor = out.cursor(input.reader.range(2, 1));
+  expect(!cursor.le32(0, "probe field"), "parse cursor should reject fields outside its range");
+
+  const ScanResult result = out.finish();
+  expect(result.diagnostics.size() == 1, "parse cursor should report malformed fields as diagnostics");
+  expect(result.diagnostics[0].message == "Could not read probe field: field is outside the parser range",
+         "parse cursor diagnostic should name the failed field");
+}
+
 }  // namespace
 
 void runValueRegistryTests() {
@@ -218,4 +238,5 @@ void runValueRegistryTests() {
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderRejectsReferencedUncommittedHandles();
   scanResultBuilderRejectsWrongRoleHandleReuse();
+  scanResultBuilderCursorReportsMalformedFields();
 }
