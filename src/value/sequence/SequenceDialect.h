@@ -75,11 +75,15 @@ struct CommandInfoField {
   std::string value;
 };
 
-// A command that has no execute() method must say why. This prevents a missing
-// playback implementation from quietly becoming a no-op.
+// Describes what a command means for playback. This is metadata for UI and
+// validation; execute() still implements the actual behavior.
 enum class CommandPlaybackStatus {
   SourceOnly,
   NoOp,
+  AffectsPlayback,
+  AffectsControlFlow,
+  StopsPlayback,
+  Unsupported,
 };
 
 // Details shown for a parsed command. Core adds operands read from the bytes; the
@@ -87,6 +91,7 @@ enum class CommandPlaybackStatus {
 struct CommandInfo {
   std::string name;
   std::string detailKind;
+  CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
   std::vector<CommandInfoField> fields;
 
   void field(std::string fieldName, std::string value);
@@ -133,6 +138,7 @@ struct CommandHandler {
   std::string kindName;
   std::string name;
   std::string detailKind;
+  CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
   DescribeSourceCommand describe = nullptr;
   CollectSourceCommandReferences collectReferences = nullptr;
   ExecuteSourceCommand execute = nullptr;
@@ -269,6 +275,15 @@ concept HasPlaybackStatus = requires { Command::playbackStatus; };
 template <class>
 inline constexpr bool kAlwaysFalse = false;
 
+template <class Command>
+[[nodiscard]] consteval CommandPlaybackStatus commandPlaybackStatus() {
+  if constexpr (HasPlaybackStatus<Command>) {
+    return Command::playbackStatus;
+  } else {
+    return CommandPlaybackStatus::AffectsPlayback;
+  }
+}
+
 inline void describePreservedSourceCommand(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any&) {
 }
 
@@ -342,7 +357,8 @@ Effects executeCommand(const SourceCommand& record, const TrackProgram& track, s
     return command.execute(typedTrackState, out, vm, typedContext);
   } else if constexpr (HasPlaybackStatus<Command>) {
     static_assert(Command::playbackStatus == CommandPlaybackStatus::SourceOnly ||
-                  Command::playbackStatus == CommandPlaybackStatus::NoOp);
+                      Command::playbackStatus == CommandPlaybackStatus::NoOp,
+                  "Commands without execute() must be marked source-only or no-op");
     return Effects::none();
   } else {
     static_assert(kAlwaysFalse<Command>,
@@ -386,18 +402,19 @@ public:
   CommandHandlerId addCommand(std::string_view kindName, std::string_view name) {
     return addHandler(kindName, name, detail::describeCommand<Command, Context>,
                       detail::collectCommandReferences<Command, Context>,
-                      detail::executeCommand<Command, TrackState, Context>);
+                      detail::executeCommand<Command, TrackState, Context>, detail::commandPlaybackStatus<Command>());
   }
 
   CommandHandlerId addPreservedCommand(std::string_view kindName, std::string_view name) {
     return addHandler(kindName, name, detail::describePreservedSourceCommand,
-                      detail::collectPreservedSourceCommandReferences, detail::executePreservedSourceCommand);
+                      detail::collectPreservedSourceCommandReferences, detail::executePreservedSourceCommand,
+                      CommandPlaybackStatus::SourceOnly);
   }
 
 private:
   CommandHandlerId addHandler(std::string_view kindName, std::string_view name, DescribeSourceCommand describe,
                               CollectSourceCommandReferences collectReferences,
-                              ExecuteSourceCommand execute) {
+                              ExecuteSourceCommand execute, CommandPlaybackStatus playbackStatus) {
     const auto index = static_cast<u32>(dialect_.handlers.size());
     dialect_.handlers.push_back(CommandHandler{
         .id = CommandHandlerId{index},
@@ -405,6 +422,7 @@ private:
         .kindName = std::string(kindName),
         .name = std::string(name),
         .detailKind = std::string(kindName),
+        .playbackStatus = playbackStatus,
         .describe = describe,
         .collectReferences = collectReferences,
         .execute = execute,

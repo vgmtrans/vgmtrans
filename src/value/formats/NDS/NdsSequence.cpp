@@ -177,6 +177,8 @@ struct Program {
 
 // Control flow.
 struct Jump : Le24RelativeAddressOperand<Jump> {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   u32 relativeDestination = 0;
 
   [[nodiscard]] DecodeFlow decodeFlow(const BytecodeDecodeContext& context) const {
@@ -191,6 +193,8 @@ struct Jump : Le24RelativeAddressOperand<Jump> {
 };
 
 struct Call : Le24RelativeAddressOperand<Call> {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   u32 relativeDestination = 0;
 
   [[nodiscard]] DecodeFlow decodeFlow(const BytecodeDecodeContext& context) const {
@@ -204,11 +208,11 @@ struct Call : Le24RelativeAddressOperand<Call> {
   Effects execute(Runtime& rt) const { return rt.call(Address{absoluteAddress(rt.state, relativeDestination)}); }
 };
 
-struct Return : NoOperands<Return> {
+struct Return : ControlFlowCommand, NoOperands<Return> {
   Effects execute(Runtime& rt) const { return rt.return_(); }
 };
 
-struct End : NoOperands<End> {
+struct End : StopsPlaybackCommand, NoOperands<End> {
   Effects execute(Runtime& rt) const { return rt.end(); }
 };
 
@@ -283,7 +287,7 @@ struct Tempo {
 };
 
 // Stop conditions and diagnostics.
-struct UnsupportedCommand : NoOperands<UnsupportedCommand> {
+struct UnsupportedCommand : UnsupportedPlaybackCommand, NoOperands<UnsupportedCommand> {
   Effects execute(Runtime& rt) const {
     rt.vm.diagnostic(Diagnostic{
         .severity = Severity::Warning,
@@ -294,6 +298,8 @@ struct UnsupportedCommand : NoOperands<UnsupportedCommand> {
 };
 
 struct UnknownOpcode {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::Unsupported;
+
   static UnknownOpcode parse(CommandReader& in) {
     in.derived("opcode", static_cast<u64>(in.opcode()));
     return {};
@@ -308,7 +314,7 @@ struct UnknownOpcode {
   }
 };
 
-struct TruncatedCommand : NoOperands<TruncatedCommand> {
+struct TruncatedCommand : UnsupportedPlaybackCommand, NoOperands<TruncatedCommand> {
   Effects execute(Runtime& rt) const {
     rt.vm.diagnostic(Diagnostic{
         .severity = Severity::Warning,

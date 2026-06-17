@@ -90,6 +90,8 @@ void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
   const CommandInfo info = dialect.describe(track, command);
   expect(info.name == "Program", "dialect display should use the registered command name");
   expect(info.detailKind == "probe.program", "dialect display should use the registered command kind");
+  expect(info.playbackStatus == CommandPlaybackStatus::AffectsPlayback,
+         "dialect display should expose command playback status");
   expect(info.fields.size() == 1 && info.fields[0].name == "program" && info.fields[0].value == "5",
          "dialect display should be derived by replaying the format-local command parser");
 
@@ -117,6 +119,22 @@ void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
   }
   expect(rejectedTrailingBytes, "track builder should reject command bytes not consumed by the local parser");
   expect(track.commands.size() == 1, "rejected command bytes should not mutate the track program");
+}
+
+void sequenceDialectPreservesCommandPlaybackStatus() {
+  const SequenceDialect dialect = probeSequenceDialect();
+
+  const auto* note = dialect.handlerForKind(ProbeNoteCommand::kind);
+  expect(note != nullptr && note->playbackStatus == CommandPlaybackStatus::AffectsPlayback,
+         "commands without an explicit status should default to playback-affecting");
+
+  const auto* jump = dialect.handlerForKind(ProbeJumpCommand::kind);
+  expect(jump != nullptr && jump->playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
+         "control-flow commands should preserve their explicit playback status");
+
+  const auto* end = dialect.handlerForKind(ProbeEndCommand::kind);
+  expect(end != nullptr && end->playbackStatus == CommandPlaybackStatus::StopsPlayback,
+         "terminal commands should preserve their explicit playback status");
 }
 
 void trackProgramBuilderRejectsDuplicateCommandAddresses() {
@@ -178,6 +196,7 @@ void runValueSequenceModelTests() {
   byteReaderChecksBoundsAndEndian();
   commandReaderRejectsUnterminatedVariableLengthOperands();
   sourceCommandsPreserveBytesOperandsAndDialectDisplay();
+  sequenceDialectPreservesCommandPlaybackStatus();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
   collectionIssueHelpersValidateStoredStatus();
 }
