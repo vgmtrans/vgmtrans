@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 
 #include <string_view>
@@ -45,7 +46,8 @@ struct CapcomSnesInstrumentInfo {
                                                                  std::string_view displayName);
 
 [[nodiscard]] core::InstrumentSetAsset parseCapcomSnesInstrumentSet(
-    const core::ScanInput& input, core::AssetId instrumentSetId, core::AssetId sampleCollectionId,
+    const core::ScanInput& input, core::ScanResultBuilder& builder, core::AssetId instrumentSetId,
+    core::ScanSampleCollectionRef sampleCollection,
     const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos, const std::vector<CapcomSnesSampleInfo>& sampleInfos,
     std::string_view displayName);
 

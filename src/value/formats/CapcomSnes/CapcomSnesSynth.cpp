@@ -334,8 +334,8 @@ SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sam
   };
 }
 
-InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, AssetId instrumentSetId,
-                                                AssetId sampleCollectionId,
+InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResultBuilder& builder,
+                                                AssetId instrumentSetId, ScanSampleCollectionRef sampleCollection,
                                                 const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
                                                 const std::vector<CapcomSnesSampleInfo>& sampleInfos,
                                                 std::string_view displayName) {
@@ -372,11 +372,7 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, AssetId 
         .range = input.reader.range(info.address, 6),
     };
     instrument.regions.push_back(Region{
-        .sample =
-            SampleRef{
-                .collection = sampleCollectionId,
-                .index = sampleIndex->second,
-            },
+        .sample = builder.sampleRef(sampleCollection, sampleIndex->second),
         .range = input.reader.range(info.address, 6),
         .tuning = pitch.aggregate,
         .rootKey = pitch.rootKey,
