@@ -7,6 +7,8 @@
 #include "ValueTestSupport.h"
 
 #include "value/session/ScanCommit.h"
+#include "value/validation/ScanValidation.h"
+#include "value/validation/SnapshotValidation.h"
 
 namespace {
 
@@ -353,6 +355,61 @@ void sessionRejectsSourceScopedMatchFactsForMissingSources() {
                         SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
+void scanValidationReportsMultipleAdmissionErrors() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "multi-error.probe"}, {0xaa});
+  const auto goodRange = sources.reader(source).range(0, 1);
+
+  ScanCommit commit{
+      .source = source,
+      .sourceSize = 1,
+      .assets =
+          {
+              MiscAsset{.metadata =
+                            AssetMetadata{
+                                .id = AssetId{7},
+                                .format = "ProbeValidation",
+                                .name = "First",
+                                .range = goodRange,
+                            }},
+              MiscAsset{.metadata =
+                            AssetMetadata{
+                                .id = AssetId{7},
+                                .format = "ProbeValidation",
+                                .name = "Duplicate",
+                                .range = goodRange,
+                            }},
+          },
+      .matchFacts =
+          {
+              MatchFact{
+                  .asset = AssetId{99},
+                  .format = "ProbeValidation",
+                  .scope = MatchScope{.kind = MatchScopeKind::Source, .source = SourceId{99}},
+                  .payload = IdMatchFact{.domain = "probe", .value = 1},
+              },
+          },
+  };
+
+  AssetStore existingAssets;
+  const auto report = validateScanCommit(commit, sources, existingAssets);
+  expect(report.hasErrors(), "scan validation should report admission errors");
+
+  bool sawDuplicateAsset = false;
+  bool sawMissingFactAsset = false;
+  bool sawMissingFactSource = false;
+  for (const auto& finding : report.findings()) {
+    sawDuplicateAsset = sawDuplicateAsset || finding.message == "Scan result contained duplicate asset id 7";
+    sawMissingFactAsset =
+        sawMissingFactAsset || finding.message == "Scan result contained a match fact for missing asset id 99";
+    sawMissingFactSource =
+        sawMissingFactSource || finding.message == "Scan result contained a match fact for missing source id 99";
+  }
+  expect(sawDuplicateAsset, "scan validation should report duplicate asset ids");
+  expect(sawMissingFactAsset, "scan validation should report match facts for missing assets");
+  expect(sawMissingFactSource, "scan validation should report match facts for missing sources");
+}
+
 [[nodiscard]] AssetMetadata badRangeMetadata(AssetId id, std::string name, SourceRange range) {
   return AssetMetadata{
       .id = id,
@@ -494,6 +551,36 @@ void scanCommitRejectsOutOfBoundsScanResultRanges() {
     }
     expect(message == testCase.message, "scan commit should reject out-of-bounds source ranges");
   }
+}
+
+void snapshotValidationReportsWrongTypeCollectionReferences() {
+  SessionSnapshotBuilder builder;
+  builder.assets.push_back(SequenceProgramAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{0},
+              .format = "ProbeSnapshot",
+              .name = "Sequence",
+          },
+      .program =
+          SequenceProgram{
+              .dialect = DialectId{.value = "probe"},
+              .timebase = Timebase{.ppqn = 48},
+          },
+  });
+  builder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Wrong Type",
+      .key = CollectionKey{.resolver = "ProbeSnapshot", .value = "wrong-type"},
+      .instrumentSets = {AssetId{0}},
+  });
+
+  const auto snapshot = builder.finish();
+  const auto report = validateSessionSnapshot(snapshot);
+  expect(report.hasErrors(), "snapshot validation should report wrong-type collection references");
+  expect(report.findings().size() == 1, "snapshot validation should report the wrong reference once");
+  expect(report.findings()[0].message == "Collection referenced missing or wrong-type instrument-set asset id 0",
+         "snapshot validation should describe the wrong collection role");
 }
 
 void sessionReportsDesiredCollectionMissingAssetReferences() {
@@ -772,7 +859,9 @@ void runValueSessionTests() {
   sessionRejectsExtractedSourcesWithMissingParents();
   sessionRejectsMatchFactsForMissingAssets();
   sessionRejectsSourceScopedMatchFactsForMissingSources();
+  scanValidationReportsMultipleAdmissionErrors();
   scanCommitRejectsOutOfBoundsScanResultRanges();
+  snapshotValidationReportsWrongTypeCollectionReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionReportsDuplicateDesiredCollectionKeys();
   sourceStoreRejectsMissingOrRemovedDerivedParents();

@@ -6,10 +6,11 @@
 
 #include "value/model/SessionSnapshot.h"
 
+#include "value/validation/SnapshotValidation.h"
+
 #include <algorithm>
 #include <iterator>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -21,14 +22,6 @@ namespace {
   return Diagnostic{
       .severity = Severity::Error,
       .message = std::move(message),
-  };
-}
-
-[[nodiscard]] Diagnostic snapshotError(std::string message, SourceRange range) {
-  return Diagnostic{
-      .severity = Severity::Error,
-      .message = std::move(message),
-      .range = range,
   };
 }
 
@@ -100,52 +93,8 @@ const Collection* SessionSnapshot::collection(CollectionId id) const {
   return &collections_[found->second];
 }
 
-namespace {
-
-std::vector<Diagnostic> sessionSnapshotIndexDiagnostics(const std::vector<Asset>& assets,
-                                                        const std::vector<Collection>& collections) {
-  std::vector<Diagnostic> diagnostics;
-
-  std::unordered_set<u32> assetIds;
-  assetIds.reserve(assets.size());
-  for (const auto& asset : assets) {
-    const auto& meta = metadata(asset);
-    if (!meta.id.valid()) {
-      continue;
-    }
-
-    if (assetIds.insert(meta.id.value).second) {
-      continue;
-    }
-
-    const std::string message = "Duplicate asset id " + std::to_string(meta.id.value) + " in SessionSnapshot";
-    if (meta.range.valid()) {
-      diagnostics.push_back(snapshotError(message, meta.range));
-    } else {
-      diagnostics.push_back(snapshotError(message));
-    }
-  }
-
-  std::unordered_set<u32> collectionIds;
-  collectionIds.reserve(collections.size());
-  for (const auto& collection : collections) {
-    if (!collection.id.valid()) {
-      continue;
-    }
-
-    if (!collectionIds.insert(collection.id.value).second) {
-      diagnostics.push_back(
-          snapshotError("Duplicate collection id " + std::to_string(collection.id.value) + " in SessionSnapshot"));
-    }
-  }
-
-  return diagnostics;
-}
-
-}  // namespace
-
 SessionSnapshot SessionSnapshotBuilder::finish() {
-  auto indexDiagnostics = sessionSnapshotIndexDiagnostics(assets, collections);
+  auto indexDiagnostics = validateSessionSnapshotState(assets, collections).diagnostics();
   diagnostics.insert(diagnostics.end(), std::make_move_iterator(indexDiagnostics.begin()),
                      std::make_move_iterator(indexDiagnostics.end()));
   return SessionSnapshot{
