@@ -58,6 +58,11 @@ public:
       : prefix_(std::move(prefix)), dialect_(&dialect) {}
 
   template <u8 Op, class Command>
+  BytecodeMapBuilder& op(BytecodeCommandOptions options = {}) {
+    return op<Op, Command>(Command::meta, options);
+  }
+
+  template <u8 Op, class Command>
   BytecodeMapBuilder& op(std::string_view displayName, BytecodeCommandOptions options = {}) {
     return op<Command>(Op, displayName, options);
   }
@@ -65,6 +70,11 @@ public:
   template <u8 Op, class Command>
   BytecodeMapBuilder& op(CommandMeta meta, BytecodeCommandOptions options = {}) {
     return op<Command>(Op, meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& op(u8 opcode, BytecodeCommandOptions options = {}) {
+    return op<Command>(opcode, Command::meta, options);
   }
 
   template <class Command>
@@ -78,6 +88,11 @@ public:
   }
 
   template <u8 First, u8 Last, class Command>
+  BytecodeMapBuilder& range(BytecodeCommandOptions options = {}) {
+    return range<First, Last, Command>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
+  }
+
+  template <u8 First, u8 Last, class Command>
   BytecodeMapBuilder& range(std::string_view displayName, BytecodeCommandOptions options = {}) {
     static_assert(First <= Last);
     const auto spec = commandSpec<Command>(displayName, options, detail::decodeMappedCommand<Command>);
@@ -86,8 +101,18 @@ public:
   }
 
   template <u8 Op, class Command, Address Command::* Target>
+  BytecodeMapBuilder& jump(BytecodeCommandOptions options = {}) {
+    return jump<Op, Command, Target>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
+  }
+
+  template <u8 Op, class Command, Address Command::* Target>
   BytecodeMapBuilder& jump(std::string_view displayName, BytecodeCommandOptions options = {}) {
     return addOpcode(Op, commandSpec<Command>(displayName, options, detail::decodeMappedJumpCommand<Command, Target>));
+  }
+
+  template <u8 Op, class Command, Address Command::* Target>
+  BytecodeMapBuilder& call(BytecodeCommandOptions options = {}) {
+    return call<Op, Command, Target>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
   }
 
   template <u8 Op, class Command, Address Command::* Target>
@@ -96,8 +121,18 @@ public:
   }
 
   template <u8 Op, class Command>
+  BytecodeMapBuilder& returns(BytecodeCommandOptions options = {}) {
+    return returns<Op, Command>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
+  }
+
+  template <u8 Op, class Command>
   BytecodeMapBuilder& returns(std::string_view displayName, BytecodeCommandOptions options = {}) {
     return addOpcode(Op, commandSpec<Command>(displayName, options, detail::decodeMappedReturnCommand<Command>));
+  }
+
+  template <u8 Op, class Command>
+  BytecodeMapBuilder& terminal(BytecodeCommandOptions options = {}) {
+    return terminal<Op, Command>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
   }
 
   template <u8 Op, class Command>
@@ -127,6 +162,11 @@ public:
   }
 
   template <class Command>
+  BytecodeMapBuilder& unknown(BytecodeCommandOptions options = {}) {
+    return unknown<Command>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
+  }
+
+  template <class Command>
   BytecodeMapBuilder& unknown(std::string_view displayName, BytecodeCommandOptions options = {}) {
     table_.unknown = commandSpec<Command>(displayName, options, detail::decodeMappedTruncatedCommand<Command>);
     if (!table_.truncated) {
@@ -138,6 +178,11 @@ public:
   template <class Command>
   BytecodeMapBuilder& unknown(CommandMeta meta, BytecodeCommandOptions options = {}) {
     return unknown<Command>(meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& truncated(BytecodeCommandOptions options = {}) {
+    return truncated<Command>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
   }
 
   template <class Command>

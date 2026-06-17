@@ -10,6 +10,10 @@
 
 namespace {
 
+struct ProbeMetaCommand : NoOpCommand, NoOperands<ProbeMetaCommand> {
+  static constexpr CommandMeta meta = commandMeta("local-meta", "Local Meta");
+};
+
 void bytecodeMapRejectsIncompatibleHandlerReuse() {
   SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
   BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
@@ -55,6 +59,23 @@ void bytecodeMapRequiresFallbackCommand() {
     threw = true;
   }
   expect(threw, "bytecode map should require an unknown or truncated fallback command");
+}
+
+void bytecodeMapUsesCommandLocalMetadata() {
+  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
+  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
+
+  map.op<0x20, ProbeMetaCommand>();
+  map.unknown<ProbeEndCommand>("End");
+
+  const BytecodeDispatchTable table = map.finish();
+  const SequenceDialect dialect = builder.finish();
+  const auto& spec = table.opcodes[0x20];
+  expect(spec.has_value() && spec->kindName == "probe-bytecode.local-meta" && spec->name == "Local Meta",
+         "bytecode map should use command-local metadata when no display name is passed");
+  const auto* handler = dialect.handler(spec->handler);
+  expect(handler != nullptr && handler->kindName == "probe-bytecode.local-meta" && handler->name == "Local Meta",
+         "command-local metadata should register the matching dialect handler");
 }
 
 void formatRegistryStoresCopyableModuleValues() {
@@ -257,6 +278,7 @@ void runValueRegistryTests() {
   bytecodeMapRejectsIncompatibleHandlerReuse();
   bytecodeMapRejectsOpcodeRangeOverlap();
   bytecodeMapRequiresFallbackCommand();
+  bytecodeMapUsesCommandLocalMetadata();
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();
   scanResultBuilderCoversCommonScannerPlumbing();

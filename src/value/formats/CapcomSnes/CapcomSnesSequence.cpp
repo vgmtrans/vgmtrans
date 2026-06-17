@@ -450,6 +450,8 @@ struct Jump : Be16AddressOperand<Jump> {
 };
 
 struct End : StopsPlaybackCommand, NoOperands<End> {
+  static constexpr CommandMeta meta = commandMeta("end", "End");
+
   Effects execute(Runtime& rt) const { return rt.end(); }
 };
 
@@ -561,9 +563,13 @@ struct ReleaseRate : SourceOnlyCommand, U8Operand<ReleaseRate> {
   void describe(CommandInfo& out) const { out.field("gain", static_cast<u8>(raw | 0xa0)); }
 };
 
-struct Nop : NoOpCommand, NoOperands<Nop> {};
+struct Nop : NoOpCommand, NoOperands<Nop> {
+  static constexpr CommandMeta meta = commandMeta("nop", "No Operation");
+};
 
 struct UnknownOneByte : SourceOnlyCommand {
+  static constexpr CommandMeta meta = commandMeta("unknown-one-byte", "Unknown One-Byte Event");
+
   u8 opcode = 0;
   u8 value = 0;
 
@@ -577,6 +583,7 @@ struct UnknownOneByte : SourceOnlyCommand {
 };
 
 struct UnknownOpcode {
+  static constexpr CommandMeta meta = commandMeta("unknown", "Unknown Opcode");
   static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::Unsupported;
 
   u8 opcode = 0;
@@ -626,7 +633,7 @@ template <class Registrar>
   map.range<0x0e, 0x11, RepeatUntil>("Repeat Until");
   map.range<0x12, 0x15, RepeatBreak>("Repeat Break");
   map.jump<0x16, Jump, &Jump::destination>("Jump");
-  map.terminal<0x17, End>("End");
+  map.terminal<0x17, End>();
   map.op<0x18, Pan>("Pan");
   map.op<0x19, MasterVolume>("Master Volume");
   map.op<0x1a, Lfo>("LFO");
@@ -635,14 +642,14 @@ template <class Registrar>
   map.op<0x1d, ReleaseRate>("Release Rate");
 
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
-    map.op<0x1e, UnknownOneByte>(commandMeta("unknown-one-byte", "Unknown One-Byte Event"));
-    map.op<0x1f, UnknownOneByte>(commandMeta("unknown-one-byte", "Unknown One-Byte Event"));
+    map.op<0x1e, UnknownOneByte>();
+    map.op<0x1f, UnknownOneByte>();
   } else {
-    map.op<0x1e, Nop>(commandMeta("nop", "No Operation"));
-    map.op<0x1f, Nop>(commandMeta("nop", "No Operation"));
+    map.op<0x1e, Nop>();
+    map.op<0x1f, Nop>();
   }
 
-  map.unknown<UnknownOpcode>(commandMeta("unknown", "Unknown Opcode"));
+  map.unknown<UnknownOpcode>();
   return map.finish();
 }
 
