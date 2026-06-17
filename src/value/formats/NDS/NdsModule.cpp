@@ -145,6 +145,11 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
 [[nodiscard]] ScanResult scanNds(const ScanInput& input) {
   ScanResultBuilder result(input, std::string(kNdsFormatName));
   for (const u32 offset : findNdsSdatOffsets(input.reader)) {
+    auto header = result.cursor(input.reader.range(offset, 0x24));
+    if (!header.range(0, 0x24, "NDS SDAT header")) {
+      continue;
+    }
+
     const auto layout = parseNdsLayout(input.reader, offset);
     if (!layout) {
       result.warning("NDS SDAT header was invalid", input.reader.range(offset, 0x24));

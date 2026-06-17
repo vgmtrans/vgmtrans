@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/scan/ParseCursor.h"
 #include "value/scan/ScanTypes.h"
 
 #include <cstddef>
@@ -119,6 +120,7 @@ public:
   [[nodiscard]] const SourceFile& sourceFile() const noexcept { return input_.source; }
   [[nodiscard]] ByteReader reader() const noexcept { return input_.reader; }
   [[nodiscard]] std::string_view format() const noexcept { return format_; }
+  [[nodiscard]] ParseCursor cursor(SourceRange bounds);
 
   [[nodiscard]] ScanSequenceRef reserveSequence();
   [[nodiscard]] ScanInstrumentSetRef reserveInstrumentSet();
