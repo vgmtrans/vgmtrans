@@ -124,7 +124,6 @@ struct DesiredCollection {
   std::vector<AssetId> sampleCollections;
   std::vector<AssetId> miscAssets;
   CollectionStatus status = CollectionStatus::Complete;
-  CollectionOrigin origin = CollectionOrigin::Discovered;
   std::vector<CollectionIssue> issues;
 };
 

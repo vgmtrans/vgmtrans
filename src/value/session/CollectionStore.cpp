@@ -69,7 +69,6 @@ void CollectionStore::reconcile(std::string_view resolverId, std::vector<Desired
       }
       found->name = desired.name;
       found->status = validatedCollectionStatus(desired);
-      found->origin = desired.origin;
       found->sequence = desired.sequence;
       found->instrumentSets = desired.instrumentSets;
       found->sampleCollections = desired.sampleCollections;
@@ -82,7 +81,7 @@ void CollectionStore::reconcile(std::string_view resolverId, std::vector<Desired
         .id = nextCollectionId(ids),
         .name = desired.name,
         .status = validatedCollectionStatus(desired),
-        .origin = desired.origin,
+        .origin = CollectionOrigin::Discovered,
         .key = desired.key,
         .sequence = desired.sequence,
         .instrumentSets = desired.instrumentSets,
@@ -144,24 +143,50 @@ void CollectionStore::validateAssetReferences(std::string_view resolverId, Desir
     }
   };
 
-  if (desired.sequence && !assets.contains(*desired.sequence)) {
-    addMissingAssetDiagnostic(*desired.sequence, "sequence");
-    desired.sequence = std::nullopt;
+  const auto addWrongTypeAssetDiagnostic = [&](AssetId id, std::string_view role, std::string_view article) {
+    diagnostics.addError("Collection resolver '" + std::string(resolverId) + "' returned " + std::string(role) +
+                         " asset id " + std::to_string(id.value) + " that is not " + std::string(article) + " " +
+                         std::string(role) + " asset");
+    desired.issues.push_back(CollectionIssue{
+        .severity = Severity::Error,
+        .code = "wrong-type-" + std::string(role),
+        .message = "Collection references wrong-type " + std::string(role) + " asset " + std::to_string(id.value),
+        .asset = id,
+    });
+  };
+
+  if (desired.sequence) {
+    if (!assets.contains(*desired.sequence)) {
+      addMissingAssetDiagnostic(*desired.sequence, "sequence");
+      desired.sequence = std::nullopt;
+    } else if (assets.findAs<SequenceProgramAsset>(*desired.sequence) == nullptr) {
+      addWrongTypeAssetDiagnostic(*desired.sequence, "sequence", "a");
+      desired.sequence = std::nullopt;
+    }
   }
 
-  const auto filterExistingAssets = [&](std::vector<AssetId>& ids, std::string_view role) {
+  // Resolvers decide which IDs belong together, but CollectionStore owns the final
+  // sanity check before those IDs become durable collection references.
+  const auto filterAssets = [&](std::vector<AssetId>& ids, std::string_view role, std::string_view article,
+                                auto hasExpectedType) {
     std::erase_if(ids, [&](AssetId id) {
-      if (assets.contains(id)) {
+      if (!assets.contains(id)) {
+        addMissingAssetDiagnostic(id, role);
+        return true;
+      }
+      if (hasExpectedType(id)) {
         return false;
       }
-      addMissingAssetDiagnostic(id, role);
+      addWrongTypeAssetDiagnostic(id, role, article);
       return true;
     });
   };
 
-  filterExistingAssets(desired.instrumentSets, "instrument-set");
-  filterExistingAssets(desired.sampleCollections, "sample-collection");
-  filterExistingAssets(desired.miscAssets, "misc");
+  filterAssets(desired.instrumentSets, "instrument-set", "an",
+               [&](AssetId id) { return assets.findAs<InstrumentSetAsset>(id) != nullptr; });
+  filterAssets(desired.sampleCollections, "sample-collection", "a",
+               [&](AssetId id) { return assets.findAs<SampleCollectionAsset>(id) != nullptr; });
+  filterAssets(desired.miscAssets, "misc", "a", [&](AssetId id) { return assets.findAs<MiscAsset>(id) != nullptr; });
 }
 
 }  // namespace vgmtrans::core

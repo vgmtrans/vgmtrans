@@ -20,6 +20,15 @@ bool AssetStore::contains(AssetId id) const noexcept {
   return id.valid() && sourceOwners_.contains(id.value);
 }
 
+const Asset* AssetStore::find(AssetId id) const noexcept {
+  if (!contains(id)) {
+    return nullptr;
+  }
+
+  const auto found = std::ranges::find_if(assets_, [id](const Asset& asset) { return metadata(asset).id == id; });
+  return found != assets_.end() ? &*found : nullptr;
+}
+
 void AssetStore::append(std::vector<Asset> assets, SourceId owner) {
   std::unordered_set<u32> batchIds;
   for (const auto& asset : assets) {
