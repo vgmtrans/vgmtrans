@@ -6,15 +6,15 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
 
-#include "value/scan/FormatRegistry.h"
-#include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 #include "value/formats/CapcomSnes/CapcomSnesLayout.h"
+#include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 #include "value/formats/CapcomSnes/CapcomSnesSynth.h"
 #include "value/scan/CollectionResolver.h"
+#include "value/scan/FormatRegistry.h"
+#include "value/scan/ScanResultBuilder.h"
 
 #include <optional>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace vgmtrans::formats::capcom_snes {
@@ -32,21 +32,6 @@ using namespace core;
   };
 }
 
-void addCapcomCollectionMember(ScanResult& result, const ScanInput& input, AssetId asset, std::string displayName,
-                               CollectionMemberRole role) {
-  result.matchFacts.push_back(MatchFact{
-      .asset = asset,
-      .format = "CapcomSnes",
-      .scope = MatchScope{.kind = MatchScopeKind::Source, .source = input.source.id},
-      .payload =
-          CollectionMemberFact{
-              .key = capcomCollectionKey(input.source.id),
-              .collectionName = std::move(displayName),
-              .role = role,
-          },
-  });
-}
-
 [[nodiscard]] ScanResult scanCapcomSnes(const ScanInput& input) {
   const auto layout = findCapcomSnesLayout(input.reader);
   if (!layout) {
@@ -55,11 +40,10 @@ void addCapcomCollectionMember(ScanResult& result, const ScanInput& input, Asset
 
   // Keep this file as wiring: layout discovery, sequence parsing, and synth parsing each stay in their own file.
   const std::string displayName = capcomSnesSourceDisplayName(input.source);
-  const auto sequenceId = input.ids.nextAssetId();
-  const auto instrumentSetId = input.ids.nextAssetId();
-  const auto sampleCollectionId = input.ids.nextAssetId();
-
-  ScanResult result;
+  ScanResultBuilder result(input, "CapcomSnes");
+  const auto sequence = result.reserveSequence();
+  const auto instrumentSet = result.reserveInstrumentSet();
+  const auto samples = result.reserveSampleCollection();
 
   std::vector<CapcomSnesInstrumentInfo> instrumentInfos;
   std::vector<CapcomSnesSampleInfo> sampleInfos;
@@ -70,28 +54,29 @@ void addCapcomCollectionMember(ScanResult& result, const ScanInput& input, Asset
   }
 
   const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
-  result.assets.emplace_back(
-      parseCapcomSnesSequence(input, *layout, sequenceId,
-                              hasInstrumentSet ? std::optional<AssetId>{instrumentSetId} : std::nullopt, displayName));
-  addCapcomCollectionMember(result, input, sequenceId, displayName, CollectionMemberRole::Sequence);
+  static_cast<void>(result.sequence(sequence, [&](AssetId id) {
+    return parseCapcomSnesSequence(
+        input, *layout, id, hasInstrumentSet ? std::optional<AssetId>{instrumentSet.id} : std::nullopt, displayName);
+  }));
+
+  auto collection = result.collection(displayName, capcomCollectionKey(input.source.id));
+  collection.sequence(sequence);
 
   if (hasInstrumentSet) {
-    result.assets.emplace_back(parseCapcomSnesInstrumentSet(input, instrumentSetId, sampleCollectionId, instrumentInfos,
-                                                            sampleInfos, displayName));
-    result.assets.emplace_back(parseCapcomSnesSamples(input, sampleCollectionId, sampleInfos, displayName));
-    addCapcomCollectionMember(result, input, instrumentSetId, displayName, CollectionMemberRole::InstrumentSet);
-    addCapcomCollectionMember(result, input, sampleCollectionId, displayName, CollectionMemberRole::SampleCollection);
+    static_cast<void>(result.instrumentSet(instrumentSet, [&](AssetId id) {
+      return parseCapcomSnesInstrumentSet(input, id, samples.id, instrumentInfos, sampleInfos, displayName);
+    }));
+    static_cast<void>(result.sampleCollection(
+        samples, [&](AssetId id) { return parseCapcomSnesSamples(input, id, sampleInfos, displayName); }));
+    collection.instrumentSet(instrumentSet).samples(samples);
   }
 
   if (!layout->instrumentTableAddress || !layout->spcDirAddress) {
-    result.diagnostics.push_back(Diagnostic{
-        .severity = Severity::Warning,
-        .message = "CapcomSnes sequence found, but instrument table or SPC DIR address was not detected",
-        .range = input.reader.range(0, input.reader.size()),
-    });
+    result.warning("CapcomSnes sequence found, but instrument table or SPC DIR address was not detected",
+                   input.reader.range(0, input.reader.size()));
   }
 
-  return result;
+  return result.finish();
 }
 
 [[nodiscard]] std::vector<DesiredCollection> resolveCapcomSnesCollections(const MatchContext& context) {

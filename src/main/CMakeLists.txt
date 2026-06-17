@@ -125,6 +125,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.cpp
@@ -166,6 +167,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/session/RangeValidation.h
       ${PROJECT_SOURCE_DIR}/src/value/session/SourceIdSet.h
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/SequenceCommandHelpers.h
