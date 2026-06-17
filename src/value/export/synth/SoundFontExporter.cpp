@@ -271,7 +271,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
       return kSfGenFineTune;
     case SynthDestination::FilterCutoff:
       return kSfGenInitialFilterFc;
-    case SynthDestination::Volume:
+    case SynthDestination::VolumeAttenuation:
       return kSfGenInitialAttenuation;
     case SynthDestination::Pan:
       return kSfGenPan;
@@ -324,7 +324,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     case SynthDestination::VibratoRate:
       return kSfModVibratoRate;
     case SynthDestination::TremoloDepth:
-    case SynthDestination::Volume:
+    case SynthDestination::VolumeAttenuation:
       return kSfModTremoloDepth;
     case SynthDestination::TremoloRate:
       return kSfModSoundController6;

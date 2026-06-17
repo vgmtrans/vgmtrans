@@ -440,7 +440,7 @@ u32 envelopePermille(double level) {
       return 1;
     case SynthDestination::FilterCutoff:
       return 2;
-    case SynthDestination::Volume:
+    case SynthDestination::VolumeAttenuation:
       return 3;
     case SynthDestination::Pan:
       return 4;
@@ -470,7 +470,7 @@ u32 envelopePermille(double level) {
     case ModDest::ModLfoFreq:
       return destinationCode(SynthDestination::TremoloRate);
     case ModDest::InitialAtten:
-      return destinationCode(SynthDestination::Volume);
+      return destinationCode(SynthDestination::VolumeAttenuation);
     case ModDest::VibLfoDelay:
     case ModDest::ModLfoDelay:
       return destinationCode(SynthDestination::Unknown);

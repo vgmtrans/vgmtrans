@@ -190,7 +190,7 @@ struct InstrumentPitch {
           .amount = static_cast<s32>(::capcom_snes::kTremoloHalfDepthCentibels),
       },
       SynthModulator{
-          .destination = SynthDestination::Volume,
+          .destination = SynthDestination::VolumeAttenuation,
           .amount = static_cast<s32>(::capcom_snes::kTremoloHalfDepthCentibels),
       },
   };

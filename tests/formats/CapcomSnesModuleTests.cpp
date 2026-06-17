@@ -336,7 +336,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(!instrument.modulators[4].source && instrument.modulators[4].destination == SynthDestination::TremoloDepth &&
              instrument.modulators[4].amount == 484,
          "instrument should carry legacy tremolo depth range");
-  expect(!instrument.modulators[5].source && instrument.modulators[5].destination == SynthDestination::Volume &&
+  expect(!instrument.modulators[5].source &&
+             instrument.modulators[5].destination == SynthDestination::VolumeAttenuation &&
              instrument.modulators[5].amount == 484,
          "instrument should carry legacy no-boost attenuation modulator");
 
