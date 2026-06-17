@@ -188,8 +188,14 @@ struct CommandRuntime {
 [[nodiscard]] ItemId addSourceCommandItem(ItemTreeBuilder& items, std::optional<ItemId> parent,
                                           const SequenceDialect& dialect, const TrackProgram& track,
                                           const SourceCommand& command);
+void addSourceCommandItems(ItemTreeBuilder& items, std::optional<ItemId> parent, const SequenceDialect& dialect,
+                           const TrackProgram& track);
 void addCommandInstrumentReferences(SequenceProgram& program, const SequenceDialect& dialect, const TrackProgram& track,
                                     const SourceCommand& command, std::optional<AssetId> instrumentSetId);
+void addSourceCommandItemsAndInstrumentReferences(ItemTreeBuilder& items, std::optional<ItemId> parent,
+                                                  SequenceProgram& program, const SequenceDialect& dialect,
+                                                  const TrackProgram& track,
+                                                  std::optional<AssetId> instrumentSetId);
 
 class SequenceDialectRegistry {
 public:

@@ -146,10 +146,27 @@ ItemId addSourceCommandItem(ItemTreeBuilder& items, std::optional<ItemId> parent
   return items.add(parent, ItemKind::Command, info.detailKind, info.name, command.range, commandInfoDescription(info));
 }
 
+void addSourceCommandItems(ItemTreeBuilder& items, std::optional<ItemId> parent, const SequenceDialect& dialect,
+                           const TrackProgram& track) {
+  for (const auto& command : track.commands) {
+    static_cast<void>(addSourceCommandItem(items, parent, dialect, track, command));
+  }
+}
+
 void addCommandInstrumentReferences(SequenceProgram& program, const SequenceDialect& dialect, const TrackProgram& track,
                                     const SourceCommand& command, std::optional<AssetId> instrumentSetId) {
   for (const auto& ref : dialect.instrumentReferences(track, command)) {
     addUniqueReferencedInstrument(program, instrumentSetId, ref.bank, ref.program, ref.range);
+  }
+}
+
+void addSourceCommandItemsAndInstrumentReferences(ItemTreeBuilder& items, std::optional<ItemId> parent,
+                                                  SequenceProgram& program, const SequenceDialect& dialect,
+                                                  const TrackProgram& track,
+                                                  std::optional<AssetId> instrumentSetId) {
+  for (const auto& command : track.commands) {
+    static_cast<void>(addSourceCommandItem(items, parent, dialect, track, command));
+    addCommandInstrumentReferences(program, dialect, track, command, instrumentSetId);
   }
 }
 
