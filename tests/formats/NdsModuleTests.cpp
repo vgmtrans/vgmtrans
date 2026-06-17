@@ -8,7 +8,11 @@
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/formats/NDS/NdsSequence.h"
+#include "value/formats/NDS/NdsSynth.h"
+#include "value/validation/SynthValidation.h"
 
+#include <array>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -23,6 +27,18 @@ void expect(bool condition, const std::string& message) {
   if (!condition) {
     throw std::runtime_error(message);
   }
+}
+
+void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
+  bytes[offset] = static_cast<u8>(value & 0xff);
+  bytes[offset + 1] = static_cast<u8>((value >> 8) & 0xff);
+}
+
+void writeLe32(std::vector<u8>& bytes, size_t offset, u32 value) {
+  bytes[offset] = static_cast<u8>(value & 0xff);
+  bytes[offset + 1] = static_cast<u8>((value >> 8) & 0xff);
+  bytes[offset + 2] = static_cast<u8>((value >> 16) & 0xff);
+  bytes[offset + 3] = static_cast<u8>((value >> 24) & 0xff);
 }
 
 }  // namespace
@@ -368,4 +384,93 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
   expect(performance.diagnostics.empty(), "NDS recovered jump loop should stop without hitting the command limit");
   expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 2,
          "NDS recovered jump loop should render one pass through the subroutine loop");
+}
+
+void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
+  std::vector<u8> bytes(0x80);
+  writeLe32(bytes, 0x38, 1);
+  writeLe32(bytes, 0x3c, (0x40u << 8) | 0x01);
+  writeLe16(bytes, 0x40, 0);
+  writeLe16(bytes, 0x42, 0);
+  bytes[0x44] = 60;
+  bytes[0x45] = 0x6d;
+  bytes[0x46] = 0x20;
+  bytes[0x47] = 0x7f;
+  bytes[0x48] = 0x7f;
+  bytes[0x49] = 64;
+
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{11}, .name = "bank.sbnk", .size = bytes.size()},
+      .reader = ByteReader(SourceId{11}, bytes),
+      .ids = ids,
+  };
+  std::array<std::optional<AssetId>, 4> waves{};
+  waves[0] = AssetId{3};
+
+  const auto bank = parseNdsInstrumentSet(input, AssetId{2},
+                                          NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Bank",
+                                          AssetId{1}, waves);
+  expect(bank.instruments.size() == 1 && bank.instruments[0].regions.size() == 1,
+         "NDS synth parser should keep a valid instrument with infinite release");
+  const Envelope& envelope = bank.instruments[0].regions[0].envelope;
+  expect(envelope.release == kEnvelopeInfinite, "NDS infinite release should remain explicit in coarse envelope units");
+  expect(!envelope.releaseSeconds.has_value(),
+         "NDS infinite release should not use a negative precise-seconds sentinel");
+  expect(validateInstrumentSet(bank).empty(), "NDS infinite release should pass synth validation");
+
+  bytes[0x45] = 0x80;
+  const auto malformedBank =
+      parseNdsInstrumentSet(input, AssetId{4},
+                            NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Malformed Bank",
+                            AssetId{1}, waves);
+  expect(malformedBank.instruments.empty(),
+         "NDS synth parser should skip regions with malformed envelope-rate bytes");
+}
+
+void ndsSynthParserDerivesAdpcmLengthsSafely() {
+  std::vector<u8> bytes(0x60);
+  bytes[0] = 'S';
+  bytes[1] = 'W';
+  bytes[2] = 'A';
+  bytes[3] = 'R';
+  bytes[4] = 0xff;
+  bytes[5] = 0xfe;
+  bytes[6] = 0x00;
+  bytes[7] = 0x01;
+  writeLe32(bytes, 0x38, 1);
+  writeLe32(bytes, 0x3c, 0x40);
+  bytes[0x40] = 2;
+  bytes[0x41] = 0;
+  writeLe16(bytes, 0x42, 32768);
+  writeLe16(bytes, 0x44, 0);
+  writeLe16(bytes, 0x46, 0);
+  writeLe16(bytes, 0x48, 2);
+  bytes[0x50] = 0;
+  bytes[0x51] = 0;
+  bytes[0x52] = 0;
+  bytes[0x53] = 0;
+
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{12}, .name = "wave.swar", .size = bytes.size()},
+      .reader = ByteReader(SourceId{12}, bytes),
+      .ids = ids,
+  };
+
+  const auto wave = parseNdsWaveArchive(input, AssetId{5},
+                                        NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Wave");
+  expect(wave.samples.samples.size() == 1, "NDS parser should keep non-looping ADPCM with loop offset zero");
+  const Sample& sample = wave.samples.samples[0];
+  expect(sample.encodedData.offset == 0x50 && sample.encodedData.size == 4,
+         "NDS ADPCM encoded data should skip the predictor header");
+  expect(!sample.loop.enabled && sample.loop.start == 0 && sample.loop.length == 9,
+         "NDS non-looping ADPCM should keep sane decoded loop metadata");
+
+  bytes[0x41] = 1;
+  const auto malformedLoop =
+      parseNdsWaveArchive(input, AssetId{6}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
+                          "Malformed Wave");
+  expect(malformedLoop.samples.samples.empty(),
+         "NDS parser should skip looped ADPCM with an unusable loop offset instead of underflowing");
 }

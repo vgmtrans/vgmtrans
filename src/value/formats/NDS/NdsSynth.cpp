@@ -67,6 +67,20 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
   return static_cast<u32>(std::lround(std::clamp(level, 0.0, 1.0) * 1000.0));
 }
 
+[[nodiscard]] std::optional<u32> checkedAdd(u32 lhs, u32 rhs) {
+  if (lhs > std::numeric_limits<u32>::max() - rhs) {
+    return std::nullopt;
+  }
+  return lhs + rhs;
+}
+
+[[nodiscard]] std::optional<u32> checkedMul(u32 lhs, u32 rhs) {
+  if (lhs != 0 && rhs > std::numeric_limits<u32>::max() / lhs) {
+    return std::nullopt;
+  }
+  return lhs * rhs;
+}
+
 [[nodiscard]] u16 fallingRate(u8 decayTime) {
   if (decayTime == 0x7f) {
     return 0xffff;
@@ -80,13 +94,16 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
   return static_cast<u16>((0x1e00 / (0x7e - decayTime)) & 0xffff);
 }
 
-[[nodiscard]] Envelope ndsEnvelope(ByteReader reader, u32 offset) {
+[[nodiscard]] std::optional<Envelope> ndsEnvelope(ByteReader reader, u32 offset) {
   // NDS envelopes use driver rate tables rather than SF2/DLS units. Preserve both rounded
   // microseconds and precise seconds so exporters can choose the most accurate conversion.
   const u8 attackTime = reader.u8At(offset + 1);
   const u8 decayTime = reader.u8At(offset + 2);
   const u8 sustainLevel = reader.u8At(offset + 3);
   const u8 releaseTime = reader.u8At(offset + 4);
+  if (attackTime > 0x7f || decayTime > 0x7f || sustainLevel > 0x7f || releaseTime > 0x7f) {
+    return std::nullopt;
+  }
 
   u8 realAttack = 0xff - attackTime;
   if (attackTime >= 0x6d) {
@@ -110,13 +127,15 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
   const u16 realDecay = fallingRate(decayTime);
   const u16 realRelease = fallingRate(releaseTime);
   const double decaySeconds = decayTime == 0x7f ? 0.001 : ((0x16980 / realDecay) * kEnvelopeIntervalSeconds);
-  const double releaseSeconds = releaseTime == 0x7f ? -1.0 : ((0x16980 / realRelease) * kEnvelopeIntervalSeconds);
+  const std::optional<double> releaseSeconds =
+      releaseTime == 0x7f ? std::nullopt
+                           : std::optional<double>{(0x16980 / realRelease) * kEnvelopeIntervalSeconds};
 
   return Envelope{
       .attack = envelopeMicros(attackSeconds),
       .decay = envelopeMicros(decaySeconds),
       .sustain = envelopePermille(sustainAmplitude),
-      .release = envelopeMicros(releaseSeconds),
+      .release = releaseSeconds ? envelopeMicros(*releaseSeconds) : kEnvelopeInfinite,
       .attackSeconds = attackSeconds,
       .decaySeconds = decaySeconds,
       .releaseSeconds = releaseSeconds,
@@ -137,18 +156,28 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
   return static_cast<double>(pan) / 127.0;
 }
 
-[[nodiscard]] Region ndsRegion(ByteReader reader, u32 offset, u32 length, u32 sampleIndex,
-                               std::optional<AssetId> sampleCollection, u8 keyLow = 0, u8 keyHigh = 127,
-                               std::optional<u8> forcedRootKey = std::nullopt) {
+[[nodiscard]] std::optional<Region> ndsRegion(ByteReader reader, u32 offset, u32 length, u32 sampleIndex,
+                                              std::optional<AssetId> sampleCollection, u8 keyLow = 0, u8 keyHigh = 127,
+                                              std::optional<u8> forcedRootKey = std::nullopt) {
   const u32 articulationOffset = offset + length - 6;
+  if (!reader.has(articulationOffset, 6)) {
+    return std::nullopt;
+  }
+  const u8 rootKey = reader.u8At(articulationOffset);
+  const u8 pan = reader.u8At(articulationOffset + 5);
+  const auto envelope = ndsEnvelope(reader, articulationOffset);
+  if (!envelope || rootKey > 0x7f || pan > 0x7f) {
+    return std::nullopt;
+  }
+
   Region region{
       .keyRange = KeyRange{.low = keyLow, .high = keyHigh},
       .velocityRange = VelocityRange{.low = 0, .high = 127},
       .sample = SampleRef{.collection = sampleCollection, .index = sampleIndex},
       .range = reader.range(offset, length),
-      .rootKey = forcedRootKey ? forcedRootKey : std::optional<u8>{reader.u8At(articulationOffset)},
-      .envelope = ndsEnvelope(reader, articulationOffset),
-      .pan = ndsPan(reader.u8At(articulationOffset + 5)),
+      .rootKey = forcedRootKey ? forcedRootKey : std::optional<u8>{rootKey},
+      .envelope = *envelope,
+      .pan = ndsPan(pan),
   };
   return region;
 }
@@ -159,6 +188,12 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
     return std::nullopt;
   }
   return collections[index];
+}
+
+void addRegion(std::vector<Region>& regions, std::optional<Region> region) {
+  if (region) {
+    regions.push_back(std::move(*region));
+  }
 }
 
 }  // namespace
@@ -218,32 +253,47 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
   const auto root =
       items.add(std::nullopt, ItemKind::SampleCollection, "swar", name, input.reader.range(range.offset, range.size));
 
-  if (!isNdsWaveArchive(input.reader, range.offset) || !input.reader.has(range.offset + 0x3c, 4)) {
+  const auto sampleCountOffset = checkedAdd(range.offset, 0x38);
+  const auto sampleTableOffset = checkedAdd(range.offset, 0x3c);
+  if (!sampleCountOffset || !sampleTableOffset || !isNdsWaveArchive(input.reader, range.offset) ||
+      !input.reader.has(*sampleTableOffset, 4)) {
     return asset;
   }
 
-  const u32 sampleCount = input.reader.le32(range.offset + 0x38);
+  const u32 sampleCount = input.reader.le32(*sampleCountOffset);
   for (u32 i = 0; i < sampleCount; ++i) {
-    if (!input.reader.has(range.offset + 0x3c + i * 4, 4)) {
+    const auto tableByteOffset = checkedMul(i, 4);
+    const auto entryOffset = tableByteOffset ? checkedAdd(*sampleTableOffset, *tableByteOffset) : std::nullopt;
+    if (!entryOffset || !input.reader.has(*entryOffset, 4)) {
       break;
     }
-    const u32 sampleOffset = input.reader.le32(range.offset + 0x3c + i * 4) + range.offset;
-    if (!input.reader.has(sampleOffset, 0x0c)) {
+    const auto sampleOffset = checkedAdd(input.reader.le32(*entryOffset), range.offset);
+    if (!sampleOffset || !input.reader.has(*sampleOffset, 0x0c)) {
       continue;
     }
 
-    const u8 waveType = input.reader.u8At(sampleOffset);
-    const bool loops = input.reader.u8At(sampleOffset + 1) != 0;
-    u32 sampleRate = input.reader.le16(sampleOffset + 2);
-    const u16 timerValue = input.reader.le16(sampleOffset + 4);
+    const u8 waveType = input.reader.u8At(*sampleOffset);
+    if (waveType > 2) {
+      continue;
+    }
+    const bool loops = input.reader.u8At(*sampleOffset + 1) != 0;
+    u32 sampleRate = input.reader.le16(*sampleOffset + 2);
+    const u16 timerValue = input.reader.le16(*sampleOffset + 4);
     if (timerValue > 0) {
       sampleRate = 16756991 / timerValue;
     }
 
-    u32 loopOffset = input.reader.le16(sampleOffset + 6) * 4;
-    u32 nonLoopLength = input.reader.le16(sampleOffset + 8) * 4;
-    u32 dataStart = sampleOffset + 0x0c;
-    u32 dataLength = loopOffset + nonLoopLength;
+    const u32 loopOffsetBytes = static_cast<u32>(input.reader.le16(*sampleOffset + 6)) * 4;
+    const u32 nonLoopLengthBytes = static_cast<u32>(input.reader.le16(*sampleOffset + 8)) * 4;
+    const auto totalDataBytes = checkedAdd(loopOffsetBytes, nonLoopLengthBytes);
+    if (!totalDataBytes) {
+      continue;
+    }
+
+    std::optional<u32> dataStart = checkedAdd(*sampleOffset, 0x0c);
+    u32 dataLength = *totalDataBytes;
+    u32 loopStart = loopOffsetBytes;
+    u32 loopLength = nonLoopLengthBytes;
     AudioCodec codec = AudioCodec::PcmS16;
     u16 bitsPerSample = 16;
 
@@ -252,33 +302,60 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
       bitsPerSample = 8;
     } else if (waveType == 2) {
       codec = AudioCodec::NdsImaAdpcm;
-      dataStart = sampleOffset + 0x10;
-      dataLength = loopOffset + nonLoopLength - 4;
-      loopOffset = loopOffset * 2 - 8 + 1;
-      nonLoopLength = (dataLength * 2 + 1) - loopOffset;
+      dataStart = checkedAdd(*sampleOffset, 0x10);
+      if (*totalDataBytes < 4) {
+        continue;
+      }
+      dataLength = *totalDataBytes - 4;
+
+      const auto doubledDataLength = checkedMul(dataLength, 2);
+      const auto decodedSampleCount = doubledDataLength ? checkedAdd(*doubledDataLength, 1) : std::nullopt;
+      if (!decodedSampleCount) {
+        continue;
+      }
+
+      // The loop-start formula only makes sense when the source says the sample loops.
+      // Non-looping ADPCM samples commonly store zero here, so keep their loop fields sane.
+      if (loops) {
+        if (loopOffsetBytes < 4) {
+          continue;
+        }
+        loopStart = ((loopOffsetBytes - 4) * 2) + 1;
+        if (loopStart > *decodedSampleCount) {
+          continue;
+        }
+        loopLength = *decodedSampleCount - loopStart;
+      } else {
+        loopStart = 0;
+        loopLength = *decodedSampleCount;
+      }
     }
 
-    if (!input.reader.has(dataStart, dataLength)) {
+    if (!dataStart || !input.reader.has(*dataStart, dataLength)) {
+      continue;
+    }
+    const auto dataEnd = checkedAdd(*dataStart, dataLength);
+    if (!dataEnd || *dataEnd < *sampleOffset) {
       continue;
     }
 
     const u32 bytesPerFrame = waveType == 1 ? 2 : 1;
     const Loop loop =
         waveType == 2
-            ? Loop{.enabled = loops, .start = loopOffset, .length = nonLoopLength}
-            : Loop{.enabled = loops, .start = loopOffset / bytesPerFrame, .length = nonLoopLength / bytesPerFrame};
+            ? Loop{.enabled = loops, .start = loopStart, .length = loopLength}
+            : Loop{.enabled = loops, .start = loopStart / bytesPerFrame, .length = loopLength / bytesPerFrame};
     const std::string sampleName = fmt::format("Sample {}", asset.samples.samples.size());
     asset.samples.samples.push_back(Sample{
         .name = sampleName,
         .codec = codec,
-        .encodedData = input.reader.range(dataStart, dataLength),
+        .encodedData = input.reader.range(*dataStart, dataLength),
         .sampleRate = sampleRate,
         .channels = 1,
         .bitsPerSample = bitsPerSample,
         .loop = loop,
     });
     static_cast<void>(items.add(root, ItemKind::Sample, "swar-sample", sampleName,
-                                input.reader.range(sampleOffset, dataStart + dataLength - sampleOffset)));
+                                input.reader.range(*sampleOffset, *dataEnd - *sampleOffset)));
   }
 
   return asset;
@@ -336,8 +413,8 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
         instrument.range = input.reader.range(instrumentOffset, 10);
         const u16 sampleIndex = input.reader.le16(instrumentOffset);
         const u16 collectionIndex = input.reader.le16(instrumentOffset + 2);
-        instrument.regions.push_back(ndsRegion(input.reader, instrumentOffset, 10, sampleIndex,
-                                               bankWaveCollection(waveCollections, collectionIndex)));
+        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10, sampleIndex,
+                                                bankWaveCollection(waveCollections, collectionIndex)));
         break;
       }
       case 0x02: {
@@ -349,8 +426,8 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
                                                                "62.5%", "75%", "87.5%", "0%"};
         instrument.name = "PSG Wave (" + std::string(dutyNames[dutyCycle]) + ")";
         instrument.range = input.reader.range(instrumentOffset, 10);
-        instrument.regions.push_back(
-            ndsRegion(input.reader, instrumentOffset, 10, dutyCycle, psgCollection, 0, 127, 69));
+        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10, dutyCycle, psgCollection, 0, 127,
+                                                69));
         break;
       }
       case 0x03: {
@@ -359,7 +436,7 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
         }
         instrument.name = "PSG Noise";
         instrument.range = input.reader.range(instrumentOffset, 10);
-        instrument.regions.push_back(ndsRegion(input.reader, instrumentOffset, 10, 8, psgCollection, 0, 127, 45));
+        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10, 8, psgCollection, 0, 127, 45));
         break;
       }
       case 0x10: {
@@ -380,8 +457,8 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
           const u16 sampleIndex = input.reader.le16(regionOffset + 2);
           const u16 collectionIndex = input.reader.le16(regionOffset + 4);
           const auto key = static_cast<u8>(lowKey + r);
-          instrument.regions.push_back(ndsRegion(input.reader, regionOffset, 12, sampleIndex,
-                                                 bankWaveCollection(waveCollections, collectionIndex), key, key));
+          addRegion(instrument.regions, ndsRegion(input.reader, regionOffset, 12, sampleIndex,
+                                                  bankWaveCollection(waveCollections, collectionIndex), key, key));
         }
         break;
       }
@@ -409,9 +486,9 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
           const u16 sampleIndex = input.reader.le16(regionOffset + 2);
           const u16 collectionIndex = input.reader.le16(regionOffset + 4);
           const u8 keyLow = r == 0 ? 0 : static_cast<u8>(keyRanges[r - 1] + 1);
-          instrument.regions.push_back(ndsRegion(input.reader, regionOffset, 12, sampleIndex,
-                                                 bankWaveCollection(waveCollections, collectionIndex), keyLow,
-                                                 keyRanges[r]));
+          addRegion(instrument.regions, ndsRegion(input.reader, regionOffset, 12, sampleIndex,
+                                                  bankWaveCollection(waveCollections, collectionIndex), keyLow,
+                                                  keyRanges[r]));
         }
         break;
       }
