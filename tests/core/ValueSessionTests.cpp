@@ -610,6 +610,37 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
       project.diagnostics(), "Collection resolver 'ProbeMissingRefs' returned misc asset id 96 that does not exist"));
 }
 
+void sessionReportsDesiredCollectionWrongTypeReferences() {
+  Session session;
+  session.formats().add(probeSequenceModule());
+  session.formats().add(wrongTypeCollectionResolverModule());
+  session.dialects().add(probeSequenceDialect());
+
+  session.addSource(SourceFile{.name = "wrong-type.probe"}, {0xaa});
+  const SessionSnapshot project = session.scanPendingSources();
+  const auto found = std::ranges::find_if(project.collections(), [](const Collection& collection) {
+    return collection.key.resolver == "ProbeWrongTypeRefs";
+  });
+  expect(found != project.collections().end(), "wrong-type resolver should publish a collection shell");
+  expect(found->status == CollectionStatus::Incomplete,
+         "collection with wrong-type references should be incomplete");
+  expect(found->instrumentSets.empty(), "wrong-type instrument reference should be stripped");
+  expect(found->sampleCollections.empty(), "wrong-type sample reference should be stripped");
+  expect(found->miscAssets.empty(), "wrong-type misc reference should be stripped");
+  expect(found->issues.size() == 3, "wrong-type references should be recorded as collection issues");
+
+  static_cast<void>(diagnosticWithMessage(project.diagnostics(),
+                                          "Collection resolver 'ProbeWrongTypeRefs' returned instrument-set asset id 0 "
+                                          "that is not an instrument-set asset"));
+  static_cast<void>(diagnosticWithMessage(
+      project.diagnostics(),
+      "Collection resolver 'ProbeWrongTypeRefs' returned sample-collection asset id 0 that is not a "
+      "sample-collection asset"));
+  static_cast<void>(diagnosticWithMessage(project.diagnostics(),
+                                          "Collection resolver 'ProbeWrongTypeRefs' returned misc asset id 0 that is "
+                                          "not a misc asset"));
+}
+
 void sessionReportsDuplicateDesiredCollectionKeys() {
   Session session;
   session.formats().add(duplicateKeyCollectionResolverModule());
@@ -863,6 +894,7 @@ void runValueSessionTests() {
   scanCommitRejectsOutOfBoundsScanResultRanges();
   snapshotValidationReportsWrongTypeCollectionReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
+  sessionReportsDesiredCollectionWrongTypeReferences();
   sessionReportsDuplicateDesiredCollectionKeys();
   sourceStoreRejectsMissingOrRemovedDerivedParents();
   sessionSnapshotFinalizationReportsDuplicateIds();

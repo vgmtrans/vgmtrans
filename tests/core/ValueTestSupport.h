@@ -592,6 +592,36 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
+[[nodiscard]] std::vector<DesiredCollection> wrongTypeCollectionResolver(const MatchContext& context) {
+  std::optional<AssetId> sequence;
+  for (const auto& asset : context.snapshot.assets()) {
+    if (const auto* typed = std::get_if<SequenceProgramAsset>(&asset)) {
+      sequence = typed->metadata.id;
+      break;
+    }
+  }
+  if (!sequence) {
+    return {};
+  }
+
+  return {DesiredCollection{
+      .key = CollectionKey{.resolver = "ProbeWrongTypeRefs", .value = "wrong-type-assets"},
+      .name = "Wrong Type Assets",
+      .instrumentSets = {*sequence},
+      .sampleCollections = {*sequence},
+      .miscAssets = {*sequence},
+  }};
+}
+
+[[nodiscard]] FormatModule wrongTypeCollectionResolverModule() {
+  return FormatModule{
+      .name = "ProbeWrongTypeRefs",
+      .canScan = canScanNever,
+      .scan = scanNothing,
+      .resolveCollections = wrongTypeCollectionResolver,
+  };
+}
+
 [[nodiscard]] std::vector<DesiredCollection> duplicateKeyCollectionResolver(const MatchContext&) {
   return {DesiredCollection{
               .key = CollectionKey{.resolver = "ProbeDuplicateKeys", .value = "same-key"},

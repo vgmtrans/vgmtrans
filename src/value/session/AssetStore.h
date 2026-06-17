@@ -8,6 +8,7 @@
 
 #include "value/model/SessionSnapshot.h"
 
+#include <variant>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -21,6 +22,13 @@ class AssetStore {
 public:
   [[nodiscard]] const std::vector<Asset>& all() const noexcept { return assets_; }
   [[nodiscard]] bool contains(AssetId id) const noexcept;
+  [[nodiscard]] const Asset* find(AssetId id) const noexcept;
+
+  template <typename T>
+  [[nodiscard]] const T* findAs(AssetId id) const noexcept {
+    const auto* asset = find(id);
+    return asset != nullptr ? std::get_if<T>(asset) : nullptr;
+  }
 
   void append(std::vector<Asset> assets, SourceId owner);
   [[nodiscard]] std::unordered_set<u32> removeForSources(const std::vector<SourceId>& sources);
