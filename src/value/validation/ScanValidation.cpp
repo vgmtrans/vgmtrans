@@ -20,6 +20,9 @@ namespace vgmtrans::core {
 
 namespace {
 
+// SourceRange is the shared link from parsed values back to SourceStore bytes.
+// Invalid ranges are allowed when a value genuinely has no source bytes, but a
+// valid range must point at active bytes that fit in the source.
 void validateRange(ValidationReport& report, const SourceStore& sources, SourceRange range, std::string_view context) {
   if (!range.valid()) {
     return;
@@ -88,6 +91,8 @@ void validateAsset(ValidationReport& report, const SourceStore& sources, const A
   validateRange(report, sources, meta.range, "asset metadata");
   validateItemTreeRanges(report, sources, meta.items);
 
+  // Scan validation owns source-range checks. Domain validators only check the
+  // internal structure of the model they receive.
   if (const auto* sequence = std::get_if<SequenceProgramAsset>(&asset)) {
     validateSequenceRanges(report, sources, sequence->program);
     report.merge(validateSequenceProgram(sequence->program));
@@ -102,6 +107,8 @@ void validateAsset(ValidationReport& report, const SourceStore& sources, const A
 
 void validateAssetIds(ValidationReport& report, const ScanCommit& commit, const AssetStore& existingAssets,
                       std::unordered_set<u32>& batchAssetIds) {
+  // IDs are stable references used by match facts and collections, so a scan
+  // result must be internally unique and must not reuse IDs already in Session.
   batchAssetIds.reserve(commit.assets.size());
   for (const auto& asset : commit.assets) {
     const auto id = metadata(asset).id;
@@ -120,6 +127,8 @@ void validateAssetIds(ValidationReport& report, const ScanCommit& commit, const 
 
 void validateMatchFacts(ValidationReport& report, const ScanCommit& commit, const SourceStore& sources,
                         const AssetStore& existingAssets, const std::unordered_set<u32>& batchAssetIds) {
+  // Match facts may point at assets from this scan or assets already accepted
+  // from earlier source loads. They must never point at a missing source.
   for (const auto& fact : commit.matchFacts) {
     if (!fact.asset.valid()) {
       report.error("scan.match-fact.missing-asset", "Scan result contained a match fact without an asset id");
@@ -160,6 +169,9 @@ ValidationReport validateScanCommit(const ScanCommit& commit, const SourceStore&
                                     const AssetStore& existingAssets) {
   ValidationReport report;
 
+  // This is the boundary between scanner output and durable Session state. Keep
+  // all hard admission checks here so format modules do not need their own ID or
+  // ownership bookkeeping.
   if (!sources.contains(commit.source)) {
     report.error("scan.source.inactive", "Scan result source is not active");
   }

@@ -28,6 +28,8 @@ namespace {
 ValidationReport validateSequenceProgram(const SequenceProgram& program) {
   ValidationReport report;
 
+  // Track IDs are used by performance events and lookup helpers, so they need a
+  // stable one-to-one relationship with the tracks in this program.
   std::unordered_set<u32> trackIds;
   trackIds.reserve(program.tracks.size());
 
@@ -41,6 +43,8 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
 
     std::unordered_set<u32> commandIds;
     commandIds.reserve(track.commands.size());
+    // Commands refer into track-level byte and operand pools. Bad spans mean
+    // later UI/export code could read the wrong command details.
     for (const auto& command : track.commands) {
       if (!command.id.valid()) {
         report.error("sequence.command.missing-id", "Sequence program contained a command without an id",

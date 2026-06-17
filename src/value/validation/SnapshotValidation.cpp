@@ -72,6 +72,8 @@ void validateCollectionAssetRef(ValidationReport& report, const SessionSnapshot&
 ValidationReport validateSessionSnapshotState(std::span<const Asset> assets, std::span<const Collection> collections) {
   ValidationReport report;
 
+  // Snapshot construction has vectors but no lookup index yet, so this only
+  // checks invariants that do not require SessionSnapshot helper methods.
   std::unordered_set<u32> assetIds;
   assetIds.reserve(assets.size());
   for (const auto& asset : assets) {
@@ -106,6 +108,8 @@ ValidationReport validateSessionSnapshotState(std::span<const Asset> assets, std
 ValidationReport validateSessionSnapshot(const SessionSnapshot& snapshot) {
   auto report = validateSessionSnapshotState(snapshot.assets(), snapshot.collections());
 
+  // Collection roles are typed by convention: a sequence slot must point at a
+  // sequence asset, not merely any asset with that ID.
   for (const auto& collection : snapshot.collections()) {
     if (collection.sequence) {
       validateCollectionAssetRef(report, snapshot, *collection.sequence, CollectionAssetRole::Sequence);
