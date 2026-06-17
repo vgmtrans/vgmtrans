@@ -101,6 +101,7 @@ CommandInfo SequenceDialect::describe(const TrackProgram& track, const SourceCom
   CommandInfo info{
       .name = commandHandler->name,
       .detailKind = commandHandler->detailKind,
+      .playbackStatus = commandHandler->playbackStatus,
   };
   // Operands read from the bytes are already listed. The format hook should add
   // higher-level details instead of printing the same operands again.

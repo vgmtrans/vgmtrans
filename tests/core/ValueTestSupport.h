@@ -719,6 +719,8 @@ struct ProbeNoteCommand {
 };
 
 struct ProbeJumpCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   Address destination;
 
   static constexpr std::string_view kind = "probe.jump";
@@ -734,6 +736,8 @@ struct ProbeJumpCommand {
 };
 
 struct ProbeDeclaredLoopCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   Address destination;
 
   static constexpr std::string_view kind = "probe.declared-loop";
@@ -749,6 +753,8 @@ struct ProbeDeclaredLoopCommand {
 };
 
 struct ProbeLoopCandidateCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   Address destination;
 
   static constexpr std::string_view kind = "probe.loop-candidate";
@@ -764,6 +770,8 @@ struct ProbeLoopCandidateCommand {
 };
 
 struct ProbeCallCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   Address destination;
 
   static constexpr std::string_view kind = "probe.call";
@@ -779,6 +787,8 @@ struct ProbeCallCommand {
 };
 
 struct ProbeReturnCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   static constexpr std::string_view kind = "probe.return";
   static constexpr std::string_view name = "Return";
 
@@ -790,6 +800,8 @@ struct ProbeReturnCommand {
 };
 
 struct ProbeRepeatCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   u8 slot = 0;
   u8 count = 0;
   Address destination;
@@ -811,6 +823,8 @@ struct ProbeRepeatCommand {
 };
 
 struct ProbeRepeatBreakCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   u8 slot = 0;
   Address destination;
 
@@ -834,6 +848,8 @@ struct ProbeRepeatBreakCommand {
 };
 
 struct ProbeEndCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::StopsPlayback;
+
   static constexpr std::string_view kind = "probe.end";
   static constexpr std::string_view name = "End";
 

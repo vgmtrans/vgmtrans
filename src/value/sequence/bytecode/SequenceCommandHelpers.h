@@ -24,6 +24,22 @@ struct NoOpCommand {
   static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::NoOp;
 };
 
+struct AffectsPlaybackCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
+};
+
+struct ControlFlowCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+};
+
+struct StopsPlaybackCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::StopsPlayback;
+};
+
+struct UnsupportedPlaybackCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::Unsupported;
+};
+
 // Base parsers for simple command shapes. They keep format command structs small
 // while still recording named operands for the source view.
 template <class Derived>

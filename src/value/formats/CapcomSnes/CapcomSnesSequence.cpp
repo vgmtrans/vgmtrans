@@ -362,6 +362,8 @@ struct DurationRate : U8StateCommand<DurationRate, &TrackState::durationRate> {
 
 // Control flow.
 struct RepeatUntil {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   u8 slot = 0;
   u8 count = 0;
   Address destination;
@@ -387,6 +389,8 @@ struct RepeatUntil {
 };
 
 struct RepeatBreak {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   u8 slot = 0;
   u8 attributes = 0;
   Address destination;
@@ -438,12 +442,14 @@ struct Program : U8Operand<Program> {
 };
 
 struct Jump : Be16AddressOperand<Jump> {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
+
   Address destination;
 
   Effects execute(Runtime& rt) const { return rt.loopCandidate(destination); }
 };
 
-struct End : NoOperands<End> {
+struct End : StopsPlaybackCommand, NoOperands<End> {
   Effects execute(Runtime& rt) const { return rt.end(); }
 };
 
@@ -571,6 +577,8 @@ struct UnknownOneByte : SourceOnlyCommand {
 };
 
 struct UnknownOpcode {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::Unsupported;
+
   u8 opcode = 0;
 
   static UnknownOpcode parse(CommandReader& in) {
