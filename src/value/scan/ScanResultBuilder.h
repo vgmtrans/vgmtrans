@@ -186,6 +186,11 @@ public:
   [[nodiscard]] ScanCollectionBuilder collection(std::string name);
   [[nodiscard]] ScanCollectionBuilder collection(std::string name, CollectionKey key);
 
+  // Builds a region sample reference from a scanner handle and records that the
+  // sample collection must be committed before finish().
+  [[nodiscard]] SampleRef sampleRef(ScanSampleCollectionRef collection, u32 index);
+  [[nodiscard]] SampleRef sampleRef(std::optional<ScanSampleCollectionRef> collection, u32 index);
+
   void fact(AssetId asset, MatchScope scope, MatchFactPayload payload);
   void sourceFact(AssetId asset, MatchFactPayload payload);
   void sessionFact(AssetId asset, MatchFactPayload payload);

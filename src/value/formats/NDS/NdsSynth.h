@@ -7,15 +7,11 @@
 #pragma once
 
 #include "value/formats/NDS/NdsTypes.h"
-#include "value/scan/ScanTypes.h"
+#include "value/scan/ScanResultBuilder.h"
 
 #include <array>
 #include <optional>
 #include <string>
-
-namespace vgmtrans::core {
-class ScanResultBuilder;
-}
 
 namespace vgmtrans::formats::nds {
 
@@ -29,6 +25,7 @@ namespace vgmtrans::formats::nds {
 
 [[nodiscard]] core::InstrumentSetAsset parseNdsInstrumentSet(
     const core::ScanInput& input, core::AssetId id, NdsFileRange range, const std::string& name,
-    core::AssetId psgCollection, const std::array<std::optional<core::AssetId>, 4>& waveCollections);
+    core::ScanResultBuilder& builder, core::ScanSampleCollectionRef psgCollection,
+    const std::array<std::optional<core::ScanSampleCollectionRef>, 4>& waveCollections);
 
 }  // namespace vgmtrans::formats::nds

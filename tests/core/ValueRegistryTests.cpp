@@ -207,6 +207,30 @@ void scanResultBuilderRejectsWrongRoleHandleReuse() {
   expect(threw, "scan result builder should reject using one handle id with the wrong role");
 }
 
+void scanResultBuilderRejectsUncommittedSampleRefs() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "builder-sample-ref.probe"}, {0xaa});
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  const auto samples = out.reserveSampleCollection();
+  const SampleRef ref = out.sampleRef(samples, 7);
+  expect(ref.collection == samples.id && ref.index == 7, "scan result builder should create typed sample refs");
+
+  bool threw = false;
+  try {
+    static_cast<void>(out.finish());
+  } catch (const std::logic_error&) {
+    threw = true;
+  }
+  expect(threw, "scan result builder should reject sample refs to collections that were never added");
+}
+
 void scanResultBuilderCursorReportsMalformedFields() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "cursor.probe"}, {0xaa, 0xbb, 0xcc});
@@ -238,5 +262,6 @@ void runValueRegistryTests() {
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderRejectsReferencedUncommittedHandles();
   scanResultBuilderRejectsWrongRoleHandleReuse();
+  scanResultBuilderRejectsUncommittedSampleRefs();
   scanResultBuilderCursorReportsMalformedFields();
 }

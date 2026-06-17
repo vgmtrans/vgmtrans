@@ -193,6 +193,21 @@ ScanCollectionBuilder ScanResultBuilder::collection(std::string name, Collection
   return ScanCollectionBuilder(*this, index);
 }
 
+SampleRef ScanResultBuilder::sampleRef(ScanSampleCollectionRef collection, u32 index) {
+  markReferenced(collection.id, CollectionMemberRole::SampleCollection);
+  return SampleRef{
+      .collection = collection.id,
+      .index = index,
+  };
+}
+
+SampleRef ScanResultBuilder::sampleRef(std::optional<ScanSampleCollectionRef> collection, u32 index) {
+  if (collection) {
+    return sampleRef(*collection, index);
+  }
+  return SampleRef{.index = index};
+}
+
 void ScanResultBuilder::fact(AssetId asset, MatchScope scope, MatchFactPayload payload) {
   result_.matchFacts.push_back(MatchFact{
       .asset = asset,

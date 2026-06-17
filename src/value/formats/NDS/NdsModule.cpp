@@ -87,18 +87,18 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
       continue;
     }
 
-    std::array<std::optional<AssetId>, 4> waveCollections{};
+    std::array<std::optional<ScanSampleCollectionRef>, 4> waveCollections{};
     for (u32 i = 0; i < bank.waveArchives.size(); ++i) {
       const u16 waveArchive = bank.waveArchives[i];
       if (waveArchive != 0xffff && waveArchive < waveAssetIds.size()) {
         if (waveAssetIds[waveArchive]) {
-          waveCollections[i] = waveAssetIds[waveArchive]->id;
+          waveCollections[i] = *waveAssetIds[waveArchive];
         }
       }
     }
 
     auto instrumentSet = result.instrumentSet([&](AssetId id) {
-      return parseNdsInstrumentSet(input, id, *range, layout.bankNames[bankIndex], psg.id, waveCollections);
+      return parseNdsInstrumentSet(input, id, *range, layout.bankNames[bankIndex], result, psg, waveCollections);
     });
     bankAssetIds.emplace(bankIndex, instrumentSet);
   }
