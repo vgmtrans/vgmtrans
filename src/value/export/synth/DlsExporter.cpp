@@ -209,7 +209,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   switch (generator.destination) {
     case SynthDestination::Pitch:
       return DlsConnection{.destination = kDlsConnDstPitch, .scale = dlsPitchScale(generator.amount)};
-    case SynthDestination::Volume:
+    case SynthDestination::VolumeAttenuation:
       return DlsConnection{.destination = kDlsConnDstAttenuation, .scale = dls16Dot16Scale(generator.amount)};
     case SynthDestination::Pan:
       return DlsConnection{.destination = kDlsConnDstPan, .scale = dls16Dot16Scale(generator.amount)};
@@ -270,7 +270,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     case SynthDestination::TremoloRate:
       return kDlsConnSrcChannelPressure;
     case SynthDestination::TremoloDepth:
-    case SynthDestination::Volume:
+    case SynthDestination::VolumeAttenuation:
       return kDlsConnSrcCc93;
     case SynthDestination::Pitch:
     case SynthDestination::FilterCutoff:
@@ -302,7 +302,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
           .destination = kDlsConnDstPitch,
           .scale = dlsPitchScale(amount),
       };
-    case SynthDestination::Volume:
+    case SynthDestination::VolumeAttenuation:
       return DlsConnection{
           .source = *source,
           .destination = kDlsConnDstAttenuation,

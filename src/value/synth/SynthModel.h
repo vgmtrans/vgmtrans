@@ -78,9 +78,12 @@ struct Envelope {
 }
 
 enum class SynthDestination {
+  // Amounts are exporter-neutral musical units where possible: cents for pitch,
+  // centibels/decibels for attenuation-like level changes, and format-specific
+  // scale units only when the target format requires them later.
   Pitch,
   FilterCutoff,
-  Volume,
+  VolumeAttenuation,
   Pan,
   VibratoDepth,
   VibratoRate,
@@ -127,6 +130,7 @@ struct Region {
   s16 coarseTuneSemitones = 0;
   s16 fineTuneCents = 0;
   Envelope envelope;
+  // Synth region pan is unipolar: 0.0 left, 0.5 center, 1.0 right.
   double pan = 0.5;
   double attenuationDb = 0.0;
 };

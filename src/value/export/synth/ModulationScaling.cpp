@@ -37,7 +37,7 @@ namespace {
       return &usage.tremoloDepth;
     case SynthDestination::TremoloRate:
       return &usage.tremoloRate;
-    case SynthDestination::Volume:
+    case SynthDestination::VolumeAttenuation:
       return &usage.tremoloDepth;
     case SynthDestination::Pitch:
     case SynthDestination::FilterCutoff:
