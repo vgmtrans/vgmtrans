@@ -32,6 +32,8 @@ void ndsSequenceDialectPreservesIgnoredCommandOperands();
 void ndsSequenceDialectKeepsEmptyPlaceholderTrack();
 void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
 void ndsMalformedRecoveryKeepsExecutableJumps();
+void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds();
+void ndsSynthParserDerivesAdpcmLengthsSafely();
 
 int main() {
   try {
@@ -60,6 +62,8 @@ int main() {
     ndsSequenceDialectKeepsEmptyPlaceholderTrack();
     ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
     ndsMalformedRecoveryKeepsExecutableJumps();
+    ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds();
+    ndsSynthParserDerivesAdpcmLengthsSafely();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;
