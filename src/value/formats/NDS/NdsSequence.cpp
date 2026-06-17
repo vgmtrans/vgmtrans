@@ -69,16 +69,21 @@ using Runtime = CommandRuntime<TrackState, Context>;
   return true;
 }
 
-[[nodiscard]] u32 readVarLen(ByteReader reader, u32& offset, u32 sequenceEnd) {
+// Track-start discovery sometimes needs to skip a bootstrap rest command before
+// the real primary track. Keep offset unchanged if the variable-length value is
+// truncated so normal bytecode decode can still preserve the bad command.
+[[nodiscard]] std::optional<u32> readVarLen(ByteReader reader, u32& offset, u32 sequenceEnd) {
   u32 value = 0;
-  while (hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
-    const u8 byte = reader.u8At(offset++);
+  u32 cursor = offset;
+  while (hasBytecodeBytes(reader, cursor, 1, sequenceEnd)) {
+    const u8 byte = reader.u8At(cursor++);
     value = (value << 7) + (byte & 0x7f);
     if ((byte & 0x80) == 0) {
-      break;
+      offset = cursor;
+      return value;
     }
   }
-  return value;
+  return std::nullopt;
 }
 
 [[nodiscard]] std::optional<u32> readSseqAddress(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd,
@@ -552,8 +557,11 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
     }
     u8 status = reader.u8At(offset);
     while (status == 0x80) {
+      const u32 statusOffset = offset;
       ++offset;
-      static_cast<void>(readVarLen(reader, offset, sequenceEnd));
+      if (!readVarLen(reader, offset, sequenceEnd)) {
+        return {statusOffset};
+      }
       if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
         return {offset};
       }

@@ -276,6 +276,30 @@ void ndsSequenceDialectDiscoversSecondaryTrackStarts() {
          "NDS secondary track should preserve decoded source commands");
 }
 
+void ndsSequenceTrackStartDiscoveryKeepsMalformedBootstrapCommands() {
+  std::vector<u8> bytes(0x130);
+  constexpr u32 sequenceOffset = 0x100;
+  constexpr u32 trackStart = sequenceOffset + 0x1c;
+
+  bytes[trackStart + 0] = 0xfe;
+  bytes[trackStart + 1] = 0x00;
+  bytes[trackStart + 2] = 0x00;
+  bytes[trackStart + 3] = 0x80;
+  bytes[trackStart + 4] = 0x81;
+
+  const auto starts = ndsSequenceTrackStarts(ByteReader(SourceId{12}, bytes), sequenceOffset, trackStart + 5);
+  expect(starts.size() == 1 && starts.front() == trackStart + 3,
+         "NDS track-start discovery should not skip an unterminated bootstrap variable-length command");
+
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track =
+      decodeNdsSequenceTrack(ByteReader(SourceId{12}, bytes), descriptor, sequenceOffset, trackStart + 5,
+                             starts.front(), 0);
+  expect(track.commands.size() == 1 && dialect.describe(track, track.commands[0]).detailKind == "nds.truncated",
+         "NDS malformed bootstrap command should be preserved as a truncated source command");
+}
+
 void ndsSequenceDialectPreservesIgnoredCommandOperands() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;

@@ -28,6 +28,7 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectExecutesCallAndReturn();
 void ndsSequenceDialectDiscoversSecondaryTrackStarts();
+void ndsSequenceTrackStartDiscoveryKeepsMalformedBootstrapCommands();
 void ndsSequenceDialectPreservesIgnoredCommandOperands();
 void ndsSequenceDialectKeepsEmptyPlaceholderTrack();
 void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
@@ -59,6 +60,7 @@ int main() {
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
     ndsSequenceDialectExecutesCallAndReturn();
     ndsSequenceDialectDiscoversSecondaryTrackStarts();
+    ndsSequenceTrackStartDiscoveryKeepsMalformedBootstrapCommands();
     ndsSequenceDialectPreservesIgnoredCommandOperands();
     ndsSequenceDialectKeepsEmptyPlaceholderTrack();
     ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
