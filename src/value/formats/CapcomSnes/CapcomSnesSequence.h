@@ -10,6 +10,7 @@
 #include "value/sequence/SequenceDialect.h"
 #include "value/sequence/bytecode/BytecodeTable.h"
 #include "value/base/Source.h"
+#include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 #include "value/formats/CapcomSnes/CapcomSnesTypes.h"
 
@@ -35,7 +36,7 @@ void registerCapcomSnesSequenceDialects(core::SequenceDialectRegistry& registry)
 [[nodiscard]] core::SequenceProgramAsset parseCapcomSnesSequence(const core::ScanInput& input,
                                                                  const CapcomSnesLayout& layout,
                                                                  core::AssetId sequenceId,
-                                                                 std::optional<core::AssetId> instrumentSetId,
+                                                                 std::optional<core::ScanInstrumentSetRef> instrumentSet,
                                                                  std::string_view displayName);
 
 }  // namespace vgmtrans::formats::capcom_snes

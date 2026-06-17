@@ -115,7 +115,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
                                                  .size = 0x40,
                                                  .sequenceEnd = trackStart + 4,
                                              },
-                                             "Program", AssetId{3});
+                                             "Program", ScanInstrumentSetRef{AssetId{3}});
   expect(asset.program.referencedInstruments.size() == 1,
          "NDS sequence program should reference instruments used by source program commands");
   const auto& ref = asset.program.referencedInstruments[0];

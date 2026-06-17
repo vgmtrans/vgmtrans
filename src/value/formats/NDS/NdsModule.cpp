@@ -115,8 +115,8 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
     }
 
     const auto bankAsset = bankAssetIds.find(sequence.bank);
-    const std::optional<AssetId> instrumentSet =
-        bankAsset == bankAssetIds.end() ? std::nullopt : std::optional<AssetId>{bankAsset->second.id};
+    const std::optional<ScanInstrumentSetRef> instrumentSet =
+        bankAsset == bankAssetIds.end() ? std::nullopt : std::optional<ScanInstrumentSetRef>{bankAsset->second};
     const std::string& name = layout.sequenceNames[sequenceIndex];
     const auto sequenceAsset = result.sequence([&](AssetId id) {
       return parseNdsSequenceProgram(
