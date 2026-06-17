@@ -174,39 +174,32 @@ struct Program {
 };
 
 // Control flow.
-template <class Derived>
-struct RelativeAddressCommand {
-  u32 relative = 0;
+struct Jump : Le24RelativeAddressOperand<Jump> {
+  u32 relativeDestination = 0;
 
-  static Derived parse(CommandReader& in) {
-    Derived result;
-    result.relative = in.le24("destination");
-    return result;
-  }
-};
-
-struct Jump : RelativeAddressCommand<Jump> {
   [[nodiscard]] DecodeFlow decodeFlow(const BytecodeDecodeContext& context) const {
-    const u32 destination = static_cast<u32>(context.sequenceOffset + 0x1c + relative);
+    const u32 destination = static_cast<u32>(context.sequenceOffset + 0x1c + relativeDestination);
     if (destination >= context.sequenceEnd) {
       return DecodeFlow::terminalFlow();
     }
     return DecodeFlow::jump(Address{destination});
   }
 
-  Effects execute(Runtime& rt) const { return rt.jump(Address{absoluteAddress(rt.state, relative)}); }
+  Effects execute(Runtime& rt) const { return rt.jump(Address{absoluteAddress(rt.state, relativeDestination)}); }
 };
 
-struct Call : RelativeAddressCommand<Call> {
+struct Call : Le24RelativeAddressOperand<Call> {
+  u32 relativeDestination = 0;
+
   [[nodiscard]] DecodeFlow decodeFlow(const BytecodeDecodeContext& context) const {
-    const u32 destination = static_cast<u32>(context.sequenceOffset + 0x1c + relative);
+    const u32 destination = static_cast<u32>(context.sequenceOffset + 0x1c + relativeDestination);
     if (destination >= context.sequenceEnd) {
       return DecodeFlow::terminalFlow();
     }
     return DecodeFlow::call(Address{destination}, Address{context.commandEnd});
   }
 
-  Effects execute(Runtime& rt) const { return rt.call(Address{absoluteAddress(rt.state, relative)}); }
+  Effects execute(Runtime& rt) const { return rt.call(Address{absoluteAddress(rt.state, relativeDestination)}); }
 };
 
 struct Return : NoOperands<Return> {

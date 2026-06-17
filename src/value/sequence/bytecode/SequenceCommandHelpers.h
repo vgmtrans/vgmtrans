@@ -64,6 +64,22 @@ struct Be16Operand {
   }
 };
 
+// Address helpers remove repeated parse code while leaving the actual address
+// field on the command, so opcode maps can still refer to it directly.
+template <class Derived>
+struct Be16AddressOperand {
+  static Derived parse(CommandReader& in) {
+    return Derived{.destination = in.be16Address("destination")};
+  }
+};
+
+template <class Derived>
+struct Le24RelativeAddressOperand {
+  static Derived parse(CommandReader& in) {
+    return Derived{.relativeDestination = in.le24("destination")};
+  }
+};
+
 // Helpers for simple one-operand commands. Formats still name each command
 // locally; these only remove repeated parse/execute boilerplate.
 template <class Derived, auto Member>

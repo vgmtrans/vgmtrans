@@ -436,10 +436,8 @@ struct Program : U8Operand<Program> {
   void execute(Runtime& rt) const { rt.out.instrument(bank(), program(), true); }
 };
 
-struct Jump {
+struct Jump : Be16AddressOperand<Jump> {
   Address destination;
-
-  static Jump parse(CommandReader& in) { return Jump{.destination = in.be16Address("destination")}; }
 
   Effects execute(Runtime& rt) const { return rt.loopCandidate(destination); }
 };
