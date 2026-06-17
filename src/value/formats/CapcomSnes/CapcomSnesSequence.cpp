@@ -228,17 +228,16 @@ using Runtime = CommandRuntime<TrackState, Context>;
 void emitLinearVolume(Runtime& rt, u8 raw) {
   // Capcom volume is a linear amplitude gain. MIDI rendering applies the
   // square-root MIDI controller curve later.
-  rt.out.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)),
-               LevelPrecisionHint::FourteenBit);
+  rt.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)), LevelPrecisionHint::FourteenBit);
 }
 
 void emitLinearMasterVolume(Runtime& rt, u8 raw) {
-  rt.out.masterLevel(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)));
+  rt.masterLevel(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)));
 }
 
 void emitPan(Runtime& rt, u8 raw) {
   const auto pan = math::panConversion(rt.context.version, raw);
-  rt.out.pan(math::stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
+  rt.pan(math::stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
 }
 
 // Notes and note-state commands.
@@ -283,14 +282,14 @@ struct Note {
       // The Capcom driver treats repeated keys after a slurred note as a tie.
       // Legacy VGMTrans extends the previous MIDI note even if this note has
       // already cleared the slur bit, so the state must look at the previous note.
-      rt.out.note(state.performedKey(key), 1.0, duration, true);
+      rt.note(state.performedKey(key), 1.0, duration, true);
       state.finishExtendedNote();
       return rt.wait(length);
     }
 
     state.emitPortamentoIfNeeded(key, rt.out);
     // Slur is modeled as a one-tick overlap into the next source note.
-    rt.out.note(state.performedKey(key), 1.0, duration + (state.noteSlurred ? 1u : 0u));
+    rt.note(state.performedKey(key), 1.0, duration + (state.noteSlurred ? 1u : 0u));
     state.finishNote(key);
     return rt.wait(length);
   }
@@ -322,7 +321,7 @@ struct GlobalTranspose {
 
   static GlobalTranspose parse(CommandReader& in) { return GlobalTranspose{.raw = in.s8("semitones")}; }
 
-  void execute(Runtime& rt) const { rt.out.globalTranspose(raw); }
+  void execute(Runtime& rt) const { rt.globalTranspose(raw); }
 };
 
 struct Transpose : S8StateCommand<Transpose, &TrackState::transpose> {
@@ -334,7 +333,7 @@ struct Tuning : S8Operand<Tuning> {
 
   void describe(CommandInfo& out) const { out.field("cents", math::tuningCents(raw)); }
 
-  void execute(Runtime& rt) const { rt.out.tuning(math::tuningCents(raw)); }
+  void execute(Runtime& rt) const { rt.tuning(math::tuningCents(raw)); }
 };
 
 struct PortamentoTime : U8Operand<PortamentoTime> {
@@ -354,7 +353,7 @@ struct Tempo : Be16Operand<Tempo> {
     out.field("microseconds_per_quarter", math::tempoMicrosecondsPerQuarter(raw));
   }
 
-  void execute(Runtime& rt) const { rt.out.tempo(math::tempoMicrosecondsPerQuarter(raw)); }
+  void execute(Runtime& rt) const { rt.tempo(math::tempoMicrosecondsPerQuarter(raw)); }
 };
 
 struct DurationRate : U8StateCommand<DurationRate, &TrackState::durationRate> {
@@ -435,7 +434,7 @@ struct Program : U8Operand<Program> {
 
   void references(CommandReferences& out) const { out.instrument(bank(), program()); }
 
-  void execute(Runtime& rt) const { rt.out.instrument(bank(), program(), true); }
+  void execute(Runtime& rt) const { rt.instrument(bank(), program(), true); }
 };
 
 struct Jump : Be16AddressOperand<Jump> {
@@ -491,14 +490,14 @@ struct Lfo {
     switch (type) {
       case 0:
         state.vibratoDepth = value & 0x7f;
-        rt.out.modulation(ModulationPerformanceTarget::VibratoDepth,
-                          state.modulationRate != 0 ? math::midi7Amount(state.vibratoDepth) : 0.0);
+        rt.modulation(ModulationPerformanceTarget::VibratoDepth,
+                      state.modulationRate != 0 ? math::midi7Amount(state.vibratoDepth) : 0.0);
         break;
 
       case 1:
         state.tremoloDepth = math::tremoloDepth(rt.context.version, value);
-        rt.out.modulation(ModulationPerformanceTarget::TremoloDepth,
-                          state.modulationRate != 0 ? math::midi7Amount(state.tremoloDepth) : 0.0);
+        rt.modulation(ModulationPerformanceTarget::TremoloDepth,
+                      state.modulationRate != 0 ? math::midi7Amount(state.tremoloDepth) : 0.0);
         break;
 
       case 2: {
@@ -512,8 +511,8 @@ struct Lfo {
         }
 
         const double rate = math::lfoRateAmount(value);
-        rt.out.modulation(ModulationPerformanceTarget::VibratoRate, rate);
-        rt.out.modulation(ModulationPerformanceTarget::TremoloRate, rate);
+        rt.modulation(ModulationPerformanceTarget::VibratoRate, rate);
+        rt.modulation(ModulationPerformanceTarget::TremoloRate, rate);
         break;
       }
 
@@ -547,7 +546,7 @@ struct EchoOnOff {
     return result;
   }
 
-  void execute(Runtime& rt) const { rt.out.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0); }
+  void execute(Runtime& rt) const { rt.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0); }
 };
 
 struct ReleaseRate : SourceOnlyCommand, U8Operand<ReleaseRate> {

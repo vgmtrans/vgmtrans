@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/sequence/PerformanceModel.h"
 #include "value/sequence/SequenceProgram.h"
 
 #include <any>
@@ -161,6 +162,23 @@ struct CommandRuntime {
   PerformanceEmitter& out;
   VmApi& vm;
   const Context& context;
+
+  // Format commands use these helpers for emitted musical events. The actual
+  // event construction still lives in PerformanceEmitter.
+  void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
+  void tempo(u32 microsecondsPerQuarter);
+  void instrument(u32 bank, u32 program, bool forceBankSelect = false);
+  void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
+  void pan(double stereoPosition);
+  void pan(double stereoPosition, double linearGain);
+  void masterLevel(double linearGain);
+  void reverb(double send);
+  void tuning(double cents);
+  void globalTranspose(s32 semitones);
+  void pitchBend(double semitones);
+  void pitchBendRange(u8 semitones);
+  void portamentoTime(double timeMilliseconds);
+  void modulation(ModulationPerformanceTarget target, double amount);
 
   [[nodiscard]] static constexpr Effects none() noexcept { return Effects::none(); }
   [[nodiscard]] static constexpr Effects wait(u32 ticks) noexcept { return Effects::wait(ticks); }
