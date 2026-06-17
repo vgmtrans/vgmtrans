@@ -208,7 +208,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
       normalizeScanResult(result, ids_);
       ScanCommit commit = ScanCommit::fromScanResult(source, std::move(result));
       commit.validate(sources_, assets_);
-      commit.commit(assets_, matchFacts_, diagnostics_);
+      commit.commit(assets_, matchFacts_, explicitCollections_, diagnostics_);
       addExtractedSources(std::move(commit.extractedSources), source.id, queue, queued);
     } catch (const std::exception& ex) {
       diagnostics_.addError(std::string(module.name) + " scan failed: " + ex.what(),
@@ -236,6 +236,7 @@ void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources,
 void Session::removeDiscoveredDataForSources(const std::vector<SourceId>& sources) {
   const auto removedAssetIds = assets_.removeForSources(sources);
   matchFacts_.removeForSourcesAndAssets(sources, removedAssetIds);
+  explicitCollections_.removeForSourcesAndAssets(sources, removedAssetIds);
   diagnostics_.removeForSources(sources);
   collections_.markStaleForAssets(removedAssetIds);
 }
@@ -250,7 +251,7 @@ void Session::rebuildCollections() {
       .snapshot = current,
   };
 
-  std::map<std::string, std::vector<DesiredCollection>> desiredByResolver;
+  std::map<std::string, std::vector<DesiredCollection>> desiredByResolver = explicitCollections_.desiredByResolver();
   std::set<std::string> failedResolvers;
   for (const auto& module : formats_.modules()) {
     if (module.resolveCollections == nullptr) {

@@ -119,6 +119,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/session/AssetStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/CollectionStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/DiagnosticStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/ExplicitCollectionStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/ScanCommit.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
@@ -167,6 +168,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/session/AssetStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/CollectionStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/DiagnosticStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/ExplicitCollectionStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/SourceIdSet.h
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h

@@ -9,7 +9,6 @@
 #include "value/formats/NDS/NdsLayout.h"
 #include "value/formats/NDS/NdsSequence.h"
 #include "value/formats/NDS/NdsSynth.h"
-#include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanResultBuilder.h"
 
@@ -156,10 +155,6 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
   return result.finish();
 }
 
-[[nodiscard]] std::vector<DesiredCollection> resolveNdsCollections(const MatchContext& context) {
-  return resolveCollectionMemberFacts(context, kNdsFormatName, kNdsFormatName);
-}
-
 }  // namespace
 
 void registerNdsModule(FormatRegistry& registry) {
@@ -167,7 +162,6 @@ void registerNdsModule(FormatRegistry& registry) {
       .name = std::string(kNdsFormatName),
       .canScan = canScanNds,
       .scan = scanNds,
-      .resolveCollections = resolveNdsCollections,
   });
 }
 

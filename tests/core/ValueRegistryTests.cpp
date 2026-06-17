@@ -150,13 +150,14 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
          "scan result builder should assign sequence metadata");
   expect(metadata(result.assets[1]).id == AssetId{1}, "scan result builder should assign instrument metadata");
   expect(metadata(result.assets[2]).id == AssetId{2}, "scan result builder should assign sample metadata");
-  expect(result.matchFacts.size() == 3, "scan result builder should emit collection member facts");
-  expect(std::get<CollectionMemberFact>(result.matchFacts[0].payload).role == CollectionMemberRole::Sequence,
-         "scan result builder should mark sequence collection members");
-  expect(std::get<CollectionMemberFact>(result.matchFacts[1].payload).role == CollectionMemberRole::InstrumentSet,
-         "scan result builder should mark instrument collection members");
-  expect(std::get<CollectionMemberFact>(result.matchFacts[2].payload).role == CollectionMemberRole::SampleCollection,
-         "scan result builder should mark sample collection members");
+  expect(result.matchFacts.empty(), "scan result builder should not need match facts for explicit collections");
+  expect(result.explicitCollections.size() == 1, "scan result builder should emit one explicit collection");
+  expect(result.explicitCollections[0].sequence == sequence.id,
+         "scan result builder should preserve the collection sequence");
+  expect(result.explicitCollections[0].instrumentSets == std::vector<AssetId>{bank.id},
+         "scan result builder should preserve the collection instrument set");
+  expect(result.explicitCollections[0].sampleCollections == std::vector<AssetId>{samples.id},
+         "scan result builder should preserve the collection sample collection");
   expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
          "scan result builder should preserve diagnostics");
 }

@@ -57,9 +57,19 @@ private:
   std::unordered_map<u32, std::size_t> itemIndexes_;
 };
 
+struct ExplicitCollection {
+  CollectionKey key;
+  std::string name;
+  std::optional<AssetId> sequence;
+  std::vector<AssetId> instrumentSets;
+  std::vector<AssetId> sampleCollections;
+  std::vector<AssetId> miscAssets;
+};
+
 struct ScanResult {
   std::vector<Asset> assets;
   std::vector<MatchFact> matchFacts;
+  std::vector<ExplicitCollection> explicitCollections;
   std::vector<Diagnostic> diagnostics;
   std::vector<ExtractedSource> extractedSources;
 };

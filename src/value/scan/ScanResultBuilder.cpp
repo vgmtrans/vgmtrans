@@ -28,27 +28,26 @@ void ensureAssetId(AssetMetadata& metadata, AssetId expectedId) {
 
 }  // namespace
 
-ScanCollectionBuilder::ScanCollectionBuilder(ScanResultBuilder& out, CollectionKey key, std::string name)
-    : out_(out), key_(std::move(key)), name_(std::move(name)) {
+ScanCollectionBuilder::ScanCollectionBuilder(ScanResultBuilder& out, size_t index) : out_(out), index_(index) {
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::sequence(ScanSequenceRef asset) {
-  out_.collectionMember(asset.id, key_, name_, CollectionMemberRole::Sequence);
+  out_.explicitCollection(index_).sequence = asset.id;
   return *this;
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(ScanInstrumentSetRef asset) {
-  out_.collectionMember(asset.id, key_, name_, CollectionMemberRole::InstrumentSet);
+  out_.explicitCollection(index_).instrumentSets.push_back(asset.id);
   return *this;
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::samples(ScanSampleCollectionRef asset) {
-  out_.collectionMember(asset.id, key_, name_, CollectionMemberRole::SampleCollection);
+  out_.explicitCollection(index_).sampleCollections.push_back(asset.id);
   return *this;
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::misc(ScanMiscAssetRef asset) {
-  out_.collectionMember(asset.id, key_, name_, CollectionMemberRole::Misc);
+  out_.explicitCollection(index_).miscAssets.push_back(asset.id);
   return *this;
 }
 
@@ -157,7 +156,12 @@ ScanCollectionBuilder ScanResultBuilder::collection(std::string name, Collection
   if (key.value.empty()) {
     key.value = sourceCollectionKey(input_.source.id, name);
   }
-  return ScanCollectionBuilder(*this, std::move(key), std::move(name));
+  const size_t index = result_.explicitCollections.size();
+  result_.explicitCollections.push_back(ExplicitCollection{
+      .key = std::move(key),
+      .name = std::move(name),
+  });
+  return ScanCollectionBuilder(*this, index);
 }
 
 void ScanResultBuilder::fact(AssetId asset, MatchScope scope, MatchFactPayload payload) {
@@ -221,6 +225,10 @@ CollectionKey ScanResultBuilder::defaultCollectionKey(std::string_view name) con
       .resolver = collectionResolver_,
       .value = sourceCollectionKey(input_.source.id, name),
   };
+}
+
+ExplicitCollection& ScanResultBuilder::explicitCollection(size_t index) {
+  return result_.explicitCollections.at(index);
 }
 
 void ScanResultBuilder::addSequenceAsset(ScanSequenceRef ref, SequenceProgramAsset asset) {
