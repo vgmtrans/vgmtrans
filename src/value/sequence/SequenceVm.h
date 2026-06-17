@@ -93,6 +93,79 @@ private:
   u64 tick_ = 0;
 };
 
+// CommandRuntime is declared with only a forward-declared PerformanceEmitter.
+// Define these helpers here, after the emitter's methods are visible.
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::note(double key, double linearVelocity, u32 durationTicks,
+                                               bool extendsPrevious) {
+  out.note(key, linearVelocity, durationTicks, extendsPrevious);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::tempo(u32 microsecondsPerQuarter) {
+  out.tempo(microsecondsPerQuarter);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::instrument(u32 bank, u32 program, bool forceBankSelect) {
+  out.instrument(bank, program, forceBankSelect);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::level(double linearGain, LevelPrecisionHint precisionHint) {
+  out.level(linearGain, precisionHint);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::pan(double stereoPosition) {
+  out.pan(stereoPosition);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::pan(double stereoPosition, double linearGain) {
+  out.pan(stereoPosition, linearGain);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::masterLevel(double linearGain) {
+  out.masterLevel(linearGain);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::reverb(double send) {
+  out.reverb(send);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::tuning(double cents) {
+  out.tuning(cents);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::globalTranspose(s32 semitones) {
+  out.globalTranspose(semitones);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::pitchBend(double semitones) {
+  out.pitchBend(semitones);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::pitchBendRange(u8 semitones) {
+  out.pitchBendRange(semitones);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::portamentoTime(double timeMilliseconds) {
+  out.portamentoTime(timeMilliseconds);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::modulation(ModulationPerformanceTarget target, double amount) {
+  out.modulation(target, amount);
+}
+
 // Commands use VmApi for playback flow that is shared across formats: next, end,
 // jump, call, return, repeat handling, diagnostics, and current tick.
 class VmApi {

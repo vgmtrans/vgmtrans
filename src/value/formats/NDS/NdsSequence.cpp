@@ -143,8 +143,8 @@ struct Note {
   }
 
   Effects execute(Runtime& rt) const {
-    rt.out.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
-                LevelScale::linearFromMidi7(velocity), duration);
+    rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
+            LevelScale::linearFromMidi7(velocity), duration);
     return rt.wait(rt.state.noteWait ? duration : 0);
   }
 };
@@ -172,7 +172,7 @@ struct Program {
 
   void references(CommandReferences& out) const { out.instrument(bank(), program()); }
 
-  void execute(Runtime& rt) const { rt.out.instrument(bank(), program()); }
+  void execute(Runtime& rt) const { rt.instrument(bank(), program()); }
 };
 
 // Control flow.
@@ -216,7 +216,7 @@ struct End : NoOperands<End> {
 struct Pan : U8Operand<Pan> {
   static constexpr std::string_view operandName = "pan";
 
-  void execute(Runtime& rt) const { rt.out.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
+  void execute(Runtime& rt) const { rt.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
 };
 
 struct Volume : U8MidiLevelOutCommand<Volume, &PerformanceEmitter::level> {
@@ -239,7 +239,7 @@ struct PitchBend : S8Operand<PitchBend> {
   static constexpr std::string_view operandName = "bend";
 
   void execute(Runtime& rt) const {
-    rt.out.pitchBend((static_cast<double>(raw) / 128.0) * rt.state.pitchBendRangeSemitones);
+    rt.pitchBend((static_cast<double>(raw) / 128.0) * rt.state.pitchBendRangeSemitones);
   }
 };
 
@@ -248,7 +248,7 @@ struct PitchBendRange : U8Operand<PitchBendRange> {
 
   void execute(Runtime& rt) const {
     rt.state.pitchBendRangeSemitones = raw;
-    rt.out.pitchBendRange(raw);
+    rt.pitchBendRange(raw);
   }
 };
 
@@ -263,7 +263,7 @@ struct PortamentoSwitch : U8BoolOutCommand<PortamentoSwitch, &PerformanceEmitter
 struct PortamentoTime : U8Operand<PortamentoTime> {
   static constexpr std::string_view operandName = "time";
 
-  void execute(Runtime& rt) const { rt.out.portamentoTime(static_cast<double>(raw)); }
+  void execute(Runtime& rt) const { rt.portamentoTime(static_cast<double>(raw)); }
 };
 
 struct NoteWait : U8BoolStateCommand<NoteWait, &TrackState::noteWait> {
@@ -277,7 +277,7 @@ struct Tempo {
 
   void execute(Runtime& rt) const {
     if (bpm != 0) {
-      rt.out.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
+      rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
     }
   }
 };
