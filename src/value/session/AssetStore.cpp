@@ -17,16 +17,19 @@
 namespace vgmtrans::core {
 
 bool AssetStore::contains(AssetId id) const noexcept {
-  return id.valid() && sourceOwners_.contains(id.value);
+  return id.valid() && assetsById_.contains(id.value);
 }
 
 const Asset* AssetStore::find(AssetId id) const noexcept {
-  if (!contains(id)) {
+  if (!id.valid()) {
     return nullptr;
   }
 
-  const auto found = std::ranges::find_if(assets_, [id](const Asset& asset) { return metadata(asset).id == id; });
-  return found != assets_.end() ? &*found : nullptr;
+  const auto found = assetsById_.find(id.value);
+  if (found == assetsById_.end() || found->second >= assets_.size()) {
+    return nullptr;
+  }
+  return &assets_[found->second];
 }
 
 void AssetStore::append(std::vector<Asset> assets, SourceId owner) {
@@ -39,7 +42,7 @@ void AssetStore::append(std::vector<Asset> assets, SourceId owner) {
     if (!batchIds.insert(id.value).second) {
       throw std::invalid_argument("Scan result contained duplicate asset id " + std::to_string(id.value));
     }
-    if (sourceOwners_.contains(id.value)) {
+    if (assetsById_.contains(id.value)) {
       throw std::invalid_argument("Scan result reused existing asset id " + std::to_string(id.value));
     }
   }
@@ -47,6 +50,7 @@ void AssetStore::append(std::vector<Asset> assets, SourceId owner) {
   for (auto& asset : assets) {
     const auto id = metadata(asset).id;
     sourceOwners_.emplace(id.value, owner);
+    assetsById_.emplace(id.value, assets_.size());
     assets_.push_back(std::move(asset));
   }
 }
@@ -75,8 +79,22 @@ std::unordered_set<u32> AssetStore::removeForSources(const std::vector<SourceId>
   for (const u32 id : removedAssetIds) {
     sourceOwners_.erase(id);
   }
+  rebuildIndex();
 
   return removedAssetIds;
+}
+
+// Removing assets compacts the vector, so every stored vector index must be
+// rebuilt before the next ID lookup.
+void AssetStore::rebuildIndex() {
+  assetsById_.clear();
+  assetsById_.reserve(assets_.size());
+  for (size_t index = 0; index < assets_.size(); ++index) {
+    const auto id = metadata(assets_[index]).id;
+    if (id.valid()) {
+      assetsById_.emplace(id.value, index);
+    }
+  }
 }
 
 }  // namespace vgmtrans::core

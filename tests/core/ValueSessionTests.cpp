@@ -833,6 +833,51 @@ void sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs() {
          "missing collection resolver result should report a collection diagnostic");
 }
 
+void assetStoreRebuildsLookupIndexAfterRemoval() {
+  AssetStore assets;
+  std::vector<Asset> firstSourceAssets;
+  firstSourceAssets.emplace_back(SequenceProgramAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{0},
+              .format = "Probe",
+              .name = "Sequence",
+          },
+  });
+  firstSourceAssets.emplace_back(MiscAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{1},
+              .format = "Probe",
+              .name = "Misc",
+          },
+  });
+  assets.append(std::move(firstSourceAssets), SourceId{0});
+
+  std::vector<Asset> secondSourceAssets;
+  secondSourceAssets.emplace_back(SampleCollectionAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{2},
+              .format = "Probe",
+              .name = "Samples",
+          },
+  });
+  assets.append(std::move(secondSourceAssets), SourceId{1});
+
+  expect(assets.findAs<SampleCollectionAsset>(AssetId{2}) == std::get_if<SampleCollectionAsset>(&assets.all()[2]),
+         "asset store should look up assets by id before removal");
+
+  const auto removed = assets.removeForSources({SourceId{0}});
+  expect(removed.contains(0) && removed.contains(1) && removed.size() == 2,
+         "asset store removal should report assets owned by the removed source");
+  expect(!assets.contains(AssetId{0}) && !assets.contains(AssetId{1}),
+         "asset store should remove deleted asset ids from the lookup index");
+  expect(assets.all().size() == 1 && assets.findAs<SampleCollectionAsset>(AssetId{2}) ==
+                                      std::get_if<SampleCollectionAsset>(&assets.all()[0]),
+         "asset store lookup index should be rebuilt after removal compacts the asset vector");
+}
+
 void sessionAddsSourceFromPath() {
   const auto path = std::filesystem::temp_directory_path() / "vgmtrans-value-core-source-load.bin";
   std::filesystem::remove(path);
@@ -916,6 +961,7 @@ void runValueSessionTests() {
   sourceStoreRejectsMissingOrRemovedDerivedParents();
   sessionSnapshotFinalizationReportsDuplicateIds();
   sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs();
+  assetStoreRebuildsLookupIndexAfterRemoval();
   sessionAddsSourceFromPath();
   sessionExportsAllCollections();
 }

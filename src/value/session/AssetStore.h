@@ -34,7 +34,10 @@ public:
   [[nodiscard]] std::unordered_set<u32> removeForSources(const std::vector<SourceId>& sources);
 
 private:
+  void rebuildIndex();
+
   std::vector<Asset> assets_;
+  std::unordered_map<u32, size_t> assetsById_;
   std::unordered_map<u32, SourceId> sourceOwners_;
 };
 
