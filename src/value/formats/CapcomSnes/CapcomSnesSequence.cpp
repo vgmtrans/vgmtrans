@@ -628,14 +628,14 @@ template <class Registrar>
   map.op<0x1d, ReleaseRate>("Release Rate");
 
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
-    map.op<0x1e, UnknownOneByte>("Unknown One-Byte Event", suffix("unknown-one-byte"));
-    map.op<0x1f, UnknownOneByte>("Unknown One-Byte Event", suffix("unknown-one-byte"));
+    map.op<0x1e, UnknownOneByte>(commandMeta("unknown-one-byte", "Unknown One-Byte Event"));
+    map.op<0x1f, UnknownOneByte>(commandMeta("unknown-one-byte", "Unknown One-Byte Event"));
   } else {
-    map.op<0x1e, Nop>("No Operation", suffix("nop"));
-    map.op<0x1f, Nop>("No Operation", suffix("nop"));
+    map.op<0x1e, Nop>(commandMeta("nop", "No Operation"));
+    map.op<0x1f, Nop>(commandMeta("nop", "No Operation"));
   }
 
-  map.unknown<UnknownOpcode>("Unknown Opcode", suffix("unknown"));
+  map.unknown<UnknownOpcode>(commandMeta("unknown", "Unknown Opcode"));
   return map.finish();
 }
 

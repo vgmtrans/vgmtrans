@@ -14,11 +14,11 @@ void bytecodeMapRejectsIncompatibleHandlerReuse() {
   SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
   BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
 
-  map.op<0x10, ProbeProgramCommand>("Shared", suffix("shared"));
+  map.op<0x10, ProbeProgramCommand>(commandMeta("shared", "Shared"));
 
   bool threw = false;
   try {
-    map.op<0x11, ProbeNoteCommand>("Shared", suffix("shared"));
+    map.op<0x11, ProbeNoteCommand>(commandMeta("shared", "Shared"));
   } catch (const std::logic_error&) {
     threw = true;
   }

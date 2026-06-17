@@ -413,8 +413,8 @@ template <class Registrar>
 
   constexpr std::array preservedCommands{
       preservedOpcode(0x93, "Open Track", operandBytes(4)),
-      preservedOpcode(0xa0, "Cmd with Random Value", operandBytes(5), suffix("random-value")),
-      preservedOpcode(0xa1, "Cmd with Variable", operandBytes(2), suffix("variable-command")),
+      preservedOpcode(0xa0, commandMeta("random-value", "Cmd with Random Value"), operandBytes(5)),
+      preservedOpcode(0xa1, commandMeta("variable-command", "Cmd with Variable"), operandBytes(2)),
       preservedOpcode(0xa2, "If"),
       preservedOpcode(0xb0, "Set Variable", operandBytes(3)),
       preservedOpcode(0xb1, "Add Variable", operandBytes(3)),
@@ -423,12 +423,12 @@ template <class Registrar>
       preservedOpcode(0xb4, "Div Variable", operandBytes(3)),
       preservedOpcode(0xb5, "Shift Variable", operandBytes(3)),
       preservedOpcode(0xb6, "Rand Variable", operandBytes(3)),
-      preservedOpcode(0xb8, "If Variable ==", operandBytes(3), suffix("if-variable-equal")),
-      preservedOpcode(0xb9, "If Variable >=", operandBytes(3), suffix("if-variable-greater-equal")),
-      preservedOpcode(0xba, "If Variable >", operandBytes(3), suffix("if-variable-greater")),
-      preservedOpcode(0xbb, "If Variable <=", operandBytes(3), suffix("if-variable-less-equal")),
-      preservedOpcode(0xbc, "If Variable <", operandBytes(3), suffix("if-variable-less")),
-      preservedOpcode(0xbd, "If Variable !=", operandBytes(3), suffix("if-variable-not-equal")),
+      preservedOpcode(0xb8, commandMeta("if-variable-equal", "If Variable =="), operandBytes(3)),
+      preservedOpcode(0xb9, commandMeta("if-variable-greater-equal", "If Variable >="), operandBytes(3)),
+      preservedOpcode(0xba, commandMeta("if-variable-greater", "If Variable >"), operandBytes(3)),
+      preservedOpcode(0xbb, commandMeta("if-variable-less-equal", "If Variable <="), operandBytes(3)),
+      preservedOpcode(0xbc, commandMeta("if-variable-less", "If Variable <"), operandBytes(3)),
+      preservedOpcode(0xbd, commandMeta("if-variable-not-equal", "If Variable !="), operandBytes(3)),
       preservedOpcode(0xc2, "Master Volume", operandBytes(1)),
       preservedOpcode(0xc6, "Priority", operandBytes(1)),
       preservedOpcode(0xc8, "Tie", operandBytes(1)),
@@ -453,7 +453,7 @@ template <class Registrar>
   map.op<0x81, Program>("Program");
   map.op<0x94, Jump>("Jump");
   map.op<0x95, Call>("Call");
-  map.terminal<0x96, UnsupportedCommand>("Unsupported Command", suffix("unsupported"));
+  map.terminal<0x96, UnsupportedCommand>(commandMeta("unsupported", "Unsupported Command"));
   map.preserved(preservedCommands);
   map.op<0xc0, Pan>("Pan");
   map.op<0xc1, Volume>("Volume");
@@ -468,8 +468,8 @@ template <class Registrar>
   map.op<0xe1, Tempo>("Tempo");
   map.returns<0xfd, Return>("Return");
   map.terminal<0xff, End>("End");
-  map.truncated<TruncatedCommand>("Truncated Command", suffix("truncated"));
-  map.unknown<UnknownOpcode>("Unknown Opcode", suffix("unknown"));
+  map.truncated<TruncatedCommand>(commandMeta("truncated", "Truncated Command"));
+  map.unknown<UnknownOpcode>(commandMeta("unknown", "Unknown Opcode"));
 
   return map.finish();
 }

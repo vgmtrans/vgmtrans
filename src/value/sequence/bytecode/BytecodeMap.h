@@ -62,9 +62,19 @@ public:
     return op<Command>(Op, displayName, options);
   }
 
+  template <u8 Op, class Command>
+  BytecodeMapBuilder& op(CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return op<Command>(Op, meta.displayName, optionsWithMeta(meta, options));
+  }
+
   template <class Command>
   BytecodeMapBuilder& op(u8 opcode, std::string_view displayName, BytecodeCommandOptions options = {}) {
     return addOpcode(opcode, commandSpec<Command>(displayName, options, detail::decodeMappedCommand<Command>));
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& op(u8 opcode, CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return op<Command>(opcode, meta.displayName, optionsWithMeta(meta, options));
   }
 
   template <u8 First, u8 Last, class Command>
@@ -95,6 +105,11 @@ public:
     return addOpcode(Op, commandSpec<Command>(displayName, options, detail::decodeMappedTerminalCommand<Command>));
   }
 
+  template <u8 Op, class Command>
+  BytecodeMapBuilder& terminal(CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return terminal<Op, Command>(meta.displayName, optionsWithMeta(meta, options));
+  }
+
   BytecodeMapBuilder& preserved(u8 opcode, std::string_view displayName, FixedOperandByteCount operandBytes = {},
                                 BytecodeCommandOptions options = {}) {
     return addOpcode(opcode, preservedSpec(displayName, operandBytes, options));
@@ -121,9 +136,19 @@ public:
   }
 
   template <class Command>
+  BytecodeMapBuilder& unknown(CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return unknown<Command>(meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <class Command>
   BytecodeMapBuilder& truncated(std::string_view displayName, BytecodeCommandOptions options = {}) {
     table_.truncated = commandSpec<Command>(displayName, options, detail::decodeMappedTruncatedCommand<Command>);
     return *this;
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& truncated(CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return truncated<Command>(meta.displayName, optionsWithMeta(meta, options));
   }
 
   [[nodiscard]] BytecodeDispatchTable finish() {
@@ -153,6 +178,13 @@ private:
   [[nodiscard]] static HandlerTypeToken commandTypeToken() {
     static const int token = 0;
     return &token;
+  }
+
+  [[nodiscard]] static BytecodeCommandOptions optionsWithMeta(CommandMeta meta, BytecodeCommandOptions options) {
+    if (!options.suffix) {
+      options.suffix = meta.stableId;
+    }
+    return options;
   }
 
   BytecodeMapBuilder& addOpcode(u8 opcode, BytecodeCommandSpec spec) {
