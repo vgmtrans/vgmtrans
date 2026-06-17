@@ -59,6 +59,13 @@ struct BytecodeCommandOptions {
   std::optional<std::string_view> suffix;
 };
 
+// Use this when a command needs an explicit stable ID instead of deriving one
+// from the display name shown in the source view.
+struct CommandMeta {
+  std::string_view stableId;
+  std::string_view displayName;
+};
+
 struct FixedOperandByteCount {
   u32 value = 0;
 };
@@ -76,8 +83,11 @@ struct BytecodeRangeSpec {
   BytecodeCommandSpec spec;
 };
 
-[[nodiscard]] constexpr BytecodeCommandOptions suffix(std::string_view value) {
-  return BytecodeCommandOptions{.suffix = value};
+[[nodiscard]] constexpr CommandMeta commandMeta(std::string_view stableId, std::string_view displayName) {
+  return CommandMeta{
+      .stableId = stableId,
+      .displayName = displayName,
+  };
 }
 
 [[nodiscard]] constexpr FixedOperandByteCount operandBytes(u32 value) {
@@ -95,6 +105,15 @@ struct BytecodeRangeSpec {
       .operandBytes = operandBytes,
       .options = options,
   };
+}
+
+[[nodiscard]] constexpr PreservedBytecodeCommand preservedOpcode(u8 opcode, CommandMeta meta,
+                                                                 FixedOperandByteCount operandBytes = {},
+                                                                 BytecodeCommandOptions options = {}) {
+  if (!options.suffix) {
+    options.suffix = meta.stableId;
+  }
+  return preservedOpcode(opcode, meta.displayName, operandBytes, options);
 }
 
 [[nodiscard]] inline bool hasBytecodeBytes(ByteReader reader, u32 offset, u32 size, u32 end) {
