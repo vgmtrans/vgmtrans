@@ -6,6 +6,8 @@
 
 #include "ValueTestSupport.h"
 
+#include "value/scan/ScanResultBuilder.h"
+
 namespace {
 
 void bytecodeMapRejectsIncompatibleHandlerReuse() {
@@ -55,7 +57,6 @@ void bytecodeMapRequiresFallbackCommand() {
   expect(threw, "bytecode map should require an unknown or truncated fallback command");
 }
 
-
 void formatRegistryStoresCopyableModuleValues() {
   FormatRegistry registry;
   registry.add(probeSequenceModule());
@@ -68,10 +69,8 @@ void formatRegistryStoresCopyableModuleValues() {
   const FormatRegistry copy = registry;
   const std::array<u8, 1> probeBytes{0xaa};
   expect(copy.modules().size() == 2, "format registry should copy registered module values");
-  expect(copy.modules()[0].name == "ProbeSequence",
-         "format registry should preserve copied module names");
-  expect(copy.modules()[1].name == "DynamicProbe",
-         "format registry should own dynamically registered module names");
+  expect(copy.modules()[0].name == "ProbeSequence", "format registry should preserve copied module names");
+  expect(copy.modules()[1].name == "DynamicProbe", "format registry should own dynamically registered module names");
   expect(copy.modules()[0].canScan(SourceFile{}, probeBytes),
          "format registry should preserve copied module scan predicates");
 
@@ -107,6 +106,60 @@ void sequenceDialectRegistryStoresCopyableDialectValues() {
   expect(threw, "sequence dialect registry should reject dialects with empty IDs");
 }
 
+void scanResultBuilderCoversCommonScannerPlumbing() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "builder.probe"}, {0xaa, 0xbb, 0xcc});
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  const auto wholeSource = input.reader.range(0, input.reader.size());
+
+  const auto sequence = out.sequence("Builder Sequence", wholeSource)
+                            .program(SequenceProgram{
+                                .dialect = DialectId{.value = "probe"},
+                                .timebase = Timebase{.ppqn = 48},
+                            });
+  const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1)).instruments({});
+
+  SampleCollection sampleCollection;
+  sampleCollection.samples.push_back(Sample{
+      .name = "Builder Sample",
+      .codec = AudioCodec::PcmS8,
+      .encodedData = input.reader.range(1, 2),
+      .sampleRate = 32000,
+      .channels = 1,
+      .bitsPerSample = 8,
+  });
+  const auto samples =
+      out.sampleCollection("Builder Samples", input.reader.range(1, 2)).samples(std::move(sampleCollection));
+
+  out.collection("Builder Song", CollectionKey{.resolver = "ProbeBuilder", .value = "song:1"})
+      .sequence(sequence)
+      .instrumentSet(bank)
+      .samples(samples);
+  out.warning("builder warning", input.reader.range(0, 1));
+
+  ScanResult result = out.finish();
+  expect(result.assets.size() == 3, "scan result builder should add sequence, instrument, and sample assets");
+  expect(metadata(result.assets[0]).id == AssetId{0} && metadata(result.assets[0]).format == "ProbeBuilder",
+         "scan result builder should assign sequence metadata");
+  expect(metadata(result.assets[1]).id == AssetId{1}, "scan result builder should assign instrument metadata");
+  expect(metadata(result.assets[2]).id == AssetId{2}, "scan result builder should assign sample metadata");
+  expect(result.matchFacts.size() == 3, "scan result builder should emit collection member facts");
+  expect(std::get<CollectionMemberFact>(result.matchFacts[0].payload).role == CollectionMemberRole::Sequence,
+         "scan result builder should mark sequence collection members");
+  expect(std::get<CollectionMemberFact>(result.matchFacts[1].payload).role == CollectionMemberRole::InstrumentSet,
+         "scan result builder should mark instrument collection members");
+  expect(std::get<CollectionMemberFact>(result.matchFacts[2].payload).role == CollectionMemberRole::SampleCollection,
+         "scan result builder should mark sample collection members");
+  expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
+         "scan result builder should preserve diagnostics");
+}
 
 }  // namespace
 
@@ -116,4 +169,5 @@ void runValueRegistryTests() {
   bytecodeMapRequiresFallbackCommand();
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();
+  scanResultBuilderCoversCommonScannerPlumbing();
 }

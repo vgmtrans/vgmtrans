@@ -11,6 +11,7 @@
 #include "value/formats/NDS/NdsSynth.h"
 #include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatRegistry.h"
+#include "value/scan/ScanResultBuilder.h"
 
 #include <array>
 #include <map>
@@ -27,10 +28,6 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] Diagnostic warning(std::string message, SourceRange range) {
-  return Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = range};
-}
-
 [[nodiscard]] CollectionKey ndsCollectionKey(SourceId source, u32 sdatOffset, u32 sequenceIndex) {
   return CollectionKey{
       .resolver = std::string(kNdsFormatName),
@@ -39,28 +36,12 @@ namespace {
   };
 }
 
-void addNdsCollectionMember(ScanResult& result, const ScanInput& input, CollectionKey key, AssetId asset,
-                            std::string name, CollectionMemberRole role) {
-  result.matchFacts.push_back(MatchFact{
-      .asset = asset,
-      .format = std::string(kNdsFormatName),
-      .scope = MatchScope{.kind = MatchScopeKind::Source, .source = input.source.id},
-      .payload =
-          CollectionMemberFact{
-              .key = std::move(key),
-              .collectionName = std::move(name),
-              .role = role,
-          },
-  });
-}
-
-void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& result) {
+void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBuilder& result) {
   // Build dependencies before dependents: PSG samples are universal, SWAR collections feed
   // banks, banks feed sequences, and sequences finally become exportable collections.
-  const auto psgId = input.ids.nextAssetId();
-  result.assets.emplace_back(parseNdsPsgSamples(input, psgId));
+  const auto psg = result.sampleCollection([&](AssetId id) { return parseNdsPsgSamples(input, id); });
 
-  std::vector<std::optional<AssetId>> waveAssetIds(layout.waveArchives.size());
+  std::vector<std::optional<ScanSampleCollectionRef>> waveAssetIds(layout.waveArchives.size());
   std::set<u16> referencedWaveArchives;
   for (const auto& bank : layout.banks) {
     for (const u16 waveArchive : bank.waveArchives) {
@@ -77,19 +58,17 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& 
     }
     const auto range = ndsFileRange(input.reader, layout, waveArchive.fileId);
     if (!range) {
-      result.diagnostics.push_back(
-          warning("NDS wave archive FAT entry was invalid", input.reader.range(layout.baseOffset, layout.length)));
+      result.warning("NDS wave archive FAT entry was invalid", input.reader.range(layout.baseOffset, layout.length));
       continue;
     }
     if (!isNdsWaveArchive(input.reader, range->offset)) {
       continue;
     }
-    const auto id = input.ids.nextAssetId();
-    waveAssetIds[waveArchiveIndex] = id;
-    result.assets.emplace_back(parseNdsWaveArchive(input, id, *range, layout.waveArchiveNames[waveArchiveIndex]));
+    waveAssetIds[waveArchiveIndex] = result.sampleCollection(
+        [&](AssetId id) { return parseNdsWaveArchive(input, id, *range, layout.waveArchiveNames[waveArchiveIndex]); });
   }
 
-  std::map<u16, AssetId> bankAssetIds;
+  std::map<u16, ScanInstrumentSetRef> bankAssetIds;
   std::set<u16> referencedBanks;
   for (const auto& sequence : layout.sequences) {
     if (sequence.valid && sequence.bank < layout.banks.size()) {
@@ -104,8 +83,7 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& 
     }
     const auto range = ndsFileRange(input.reader, layout, bank.fileId);
     if (!range) {
-      result.diagnostics.push_back(
-          warning("NDS instrument bank FAT entry was invalid", input.reader.range(layout.baseOffset, layout.length)));
+      result.warning("NDS instrument bank FAT entry was invalid", input.reader.range(layout.baseOffset, layout.length));
       continue;
     }
 
@@ -113,14 +91,16 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& 
     for (u32 i = 0; i < bank.waveArchives.size(); ++i) {
       const u16 waveArchive = bank.waveArchives[i];
       if (waveArchive != 0xffff && waveArchive < waveAssetIds.size()) {
-        waveCollections[i] = waveAssetIds[waveArchive];
+        if (waveAssetIds[waveArchive]) {
+          waveCollections[i] = waveAssetIds[waveArchive]->id;
+        }
       }
     }
 
-    const auto id = input.ids.nextAssetId();
-    bankAssetIds.emplace(bankIndex, id);
-    result.assets.emplace_back(
-        parseNdsInstrumentSet(input, id, *range, layout.bankNames[bankIndex], psgId, waveCollections));
+    auto instrumentSet = result.instrumentSet([&](AssetId id) {
+      return parseNdsInstrumentSet(input, id, *range, layout.bankNames[bankIndex], psg.id, waveCollections);
+    });
+    bankAssetIds.emplace(bankIndex, instrumentSet);
   }
 
   for (u32 sequenceIndex = 0; sequenceIndex < layout.sequences.size(); ++sequenceIndex) {
@@ -130,31 +110,29 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& 
     }
     const auto sequenceRange = ndsFileRange(input.reader, layout, sequence.fileId);
     if (!sequenceRange) {
-      result.diagnostics.push_back(
-          warning("NDS sequence FAT entry was invalid", input.reader.range(layout.baseOffset, layout.length)));
+      result.warning("NDS sequence FAT entry was invalid", input.reader.range(layout.baseOffset, layout.length));
       continue;
     }
 
     const auto bankAsset = bankAssetIds.find(sequence.bank);
     const std::optional<AssetId> instrumentSet =
-        bankAsset == bankAssetIds.end() ? std::nullopt : std::optional<AssetId>{bankAsset->second};
-    const auto sequenceId = input.ids.nextAssetId();
+        bankAsset == bankAssetIds.end() ? std::nullopt : std::optional<AssetId>{bankAsset->second.id};
     const std::string& name = layout.sequenceNames[sequenceIndex];
-    result.assets.emplace_back(parseNdsSequenceProgram(
-        input, sequenceId, ndsSequenceRangeForFatEntry(input.reader, sequenceRange->offset, sequenceRange->size), name,
-        instrumentSet));
+    const auto sequenceAsset = result.sequence([&](AssetId id) {
+      return parseNdsSequenceProgram(
+          input, id, ndsSequenceRangeForFatEntry(input.reader, sequenceRange->offset, sequenceRange->size), name,
+          instrumentSet);
+    });
 
-    const auto key = ndsCollectionKey(input.source.id, layout.baseOffset, sequenceIndex);
-    addNdsCollectionMember(result, input, key, sequenceId, name, CollectionMemberRole::Sequence);
-    addNdsCollectionMember(result, input, key, psgId, name, CollectionMemberRole::SampleCollection);
-    if (instrumentSet) {
-      addNdsCollectionMember(result, input, key, *instrumentSet, name, CollectionMemberRole::InstrumentSet);
+    auto collection = result.collection(name, ndsCollectionKey(input.source.id, layout.baseOffset, sequenceIndex));
+    collection.sequence(sequenceAsset).samples(psg);
+    if (bankAsset != bankAssetIds.end()) {
+      collection.instrumentSet(bankAsset->second);
     }
     if (sequence.bank < layout.banks.size()) {
       for (const u16 waveArchive : layout.banks[sequence.bank].waveArchives) {
         if (waveArchive != 0xffff && waveArchive < waveAssetIds.size() && waveAssetIds[waveArchive]) {
-          addNdsCollectionMember(result, input, key, *waveAssetIds[waveArchive], name,
-                                 CollectionMemberRole::SampleCollection);
+          collection.samples(*waveAssetIds[waveArchive]);
         }
       }
     }
@@ -166,16 +144,16 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResult& 
 }
 
 [[nodiscard]] ScanResult scanNds(const ScanInput& input) {
-  ScanResult result;
+  ScanResultBuilder result(input, std::string(kNdsFormatName));
   for (const u32 offset : findNdsSdatOffsets(input.reader)) {
     const auto layout = parseNdsLayout(input.reader, offset);
     if (!layout) {
-      result.diagnostics.push_back(warning("NDS SDAT header was invalid", input.reader.range(offset, 0x24)));
+      result.warning("NDS SDAT header was invalid", input.reader.range(offset, 0x24));
       continue;
     }
     scanNdsLayout(input, *layout, result);
   }
-  return result;
+  return result.finish();
 }
 
 [[nodiscard]] std::vector<DesiredCollection> resolveNdsCollections(const MatchContext& context) {
