@@ -526,7 +526,7 @@ struct Lfo {
 };
 
 // Source-only and diagnostic commands.
-struct EchoParam {
+struct EchoParam : SourceOnlyCommand {
   u8 argument = 0;
   u8 preset = 0;
 
@@ -550,15 +550,15 @@ struct EchoOnOff {
   void execute(Runtime& rt) const { rt.out.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0); }
 };
 
-struct ReleaseRate : U8Operand<ReleaseRate> {
+struct ReleaseRate : SourceOnlyCommand, U8Operand<ReleaseRate> {
   static constexpr std::string_view operandName = "raw";
 
   void describe(CommandInfo& out) const { out.field("gain", static_cast<u8>(raw | 0xa0)); }
 };
 
-struct Nop : NoOperands<Nop> {};
+struct Nop : NoOpCommand, NoOperands<Nop> {};
 
-struct UnknownOneByte {
+struct UnknownOneByte : SourceOnlyCommand {
   u8 opcode = 0;
   u8 value = 0;
 

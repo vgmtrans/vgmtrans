@@ -74,6 +74,13 @@ struct CommandInfoField {
   std::string value;
 };
 
+// A command that has no execute() method must say why. This prevents a missing
+// playback implementation from quietly becoming a no-op.
+enum class CommandPlaybackStatus {
+  SourceOnly,
+  NoOp,
+};
+
 // Details shown for a parsed command. Core adds operands read from the bytes; the
 // format adds fields that explain what those operands mean.
 struct CommandInfo {
@@ -189,6 +196,12 @@ concept HasLegacyExecute =
       { command.execute(state, out, vm, context) } -> std::same_as<Effects>;
     };
 
+template <class Command>
+concept HasPlaybackStatus = requires { Command::playbackStatus; };
+
+template <class>
+inline constexpr bool kAlwaysFalse = false;
+
 inline void describePreservedSourceCommand(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any&) {
 }
 
@@ -244,7 +257,13 @@ Effects executeCommand(const SourceCommand& record, const TrackProgram& track, s
     return Effects::none();
   } else if constexpr (HasLegacyExecute<Command, TrackState, Context>) {
     return command.execute(typedTrackState, out, vm, typedContext);
+  } else if constexpr (HasPlaybackStatus<Command>) {
+    static_assert(Command::playbackStatus == CommandPlaybackStatus::SourceOnly ||
+                  Command::playbackStatus == CommandPlaybackStatus::NoOp);
+    return Effects::none();
   } else {
+    static_assert(kAlwaysFalse<Command>,
+                  "Sequence command must implement execute() or be marked source-only/no-op");
     return Effects::none();
   }
 }

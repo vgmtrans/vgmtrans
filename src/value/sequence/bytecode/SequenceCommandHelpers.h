@@ -16,6 +16,14 @@
 
 namespace vgmtrans::core {
 
+struct SourceOnlyCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::SourceOnly;
+};
+
+struct NoOpCommand {
+  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::NoOp;
+};
+
 // Base parsers for simple command shapes. They keep format command structs small
 // while still recording named operands for the source view.
 template <class Derived>
