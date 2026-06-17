@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -206,6 +207,11 @@ private:
   [[nodiscard]] CollectionKey defaultCollectionKey(std::string_view name) const;
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 
+  void reserveHandle(AssetId id, CollectionMemberRole role);
+  void markCommitted(AssetId id, CollectionMemberRole role);
+  void markReferenced(AssetId id, CollectionMemberRole role);
+  void validateReferencedHandles() const;
+
   void addSequenceAsset(ScanSequenceRef ref, SequenceProgramAsset asset);
   void addInstrumentSetAsset(ScanInstrumentSetRef ref, InstrumentSetAsset asset);
   void addSampleCollectionAsset(ScanSampleCollectionRef ref, SampleCollectionAsset asset);
@@ -217,6 +223,13 @@ private:
   std::string format_;
   std::string collectionResolver_;
   ScanResult result_;
+
+  struct HandleState {
+    CollectionMemberRole role = CollectionMemberRole::Misc;
+    bool committed = false;
+    bool referenced = false;
+  };
+  std::unordered_map<u32, HandleState> handles_;
 };
 
 }  // namespace vgmtrans::core
