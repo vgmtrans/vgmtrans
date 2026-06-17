@@ -379,7 +379,7 @@ struct RepeatUntil {
 
   Effects execute(Runtime& rt) const {
     if (count == 0) {
-      return Effects{.step = rt.vm.declaredLoop(destination)};
+      return rt.declaredLoop(destination);
     }
 
     // Capcom stores the number of replays. The VM helper receives total plays.
@@ -441,7 +441,7 @@ struct Jump {
 
   static Jump parse(CommandReader& in) { return Jump{.destination = in.be16Address("destination")}; }
 
-  Effects execute(Runtime& rt) const { return Effects{.step = rt.vm.loopCandidate(destination)}; }
+  Effects execute(Runtime& rt) const { return rt.loopCandidate(destination); }
 };
 
 struct End : NoOperands<End> {

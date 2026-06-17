@@ -147,6 +147,15 @@ struct CommandRuntime {
   [[nodiscard]] static constexpr Effects jump(Address destination) noexcept {
     return Effects{.step = Step::jump(destination)};
   }
+  [[nodiscard]] static constexpr Effects finiteBranch(Address destination) noexcept {
+    return Effects{.step = Step::jump(destination, JumpSemantics::FiniteBranch)};
+  }
+  [[nodiscard]] static constexpr Effects loopCandidate(Address destination) noexcept {
+    return Effects{.step = Step::jump(destination, JumpSemantics::LoopCandidate)};
+  }
+  [[nodiscard]] static constexpr Effects declaredLoop(Address destination) noexcept {
+    return Effects{.step = Step::jump(destination, JumpSemantics::DeclaredLoop)};
+  }
   [[nodiscard]] static constexpr Effects call(Address destination) noexcept {
     return Effects{.step = Step::call(destination)};
   }
