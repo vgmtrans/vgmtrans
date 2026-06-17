@@ -101,8 +101,27 @@ struct CommandInfo {
   void field(std::string fieldName, Address value);
 };
 
+struct CommandInstrumentReference {
+  u32 bank = 0;
+  u32 program = 0;
+  std::optional<SourceRange> range;
+};
+
+// Commands can declare relationships they imply, such as "this selects
+// instrument bank/program X". Parsers decide which instrument set that refers to.
+class CommandReferences {
+public:
+  void instrument(u32 bank, u32 program, std::optional<SourceRange> range = std::nullopt);
+  [[nodiscard]] std::vector<CommandInstrumentReference> takeInstruments();
+
+private:
+  std::vector<CommandInstrumentReference> instruments_;
+};
+
 using DescribeSourceCommand = void (*)(const SourceCommand&, const TrackProgram&, CommandInfo&,
                                        const std::any& context);
+using CollectSourceCommandReferences = void (*)(const SourceCommand&, const TrackProgram&, CommandReferences&,
+                                                const std::any& context);
 using ExecuteSourceCommand = Effects (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
                                          PerformanceEmitter& out, VmApi& vm, const std::any& context);
 using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&, const std::any& context);
@@ -114,6 +133,7 @@ struct CommandHandler {
   std::string name;
   std::string detailKind;
   DescribeSourceCommand describe = nullptr;
+  CollectSourceCommandReferences collectReferences = nullptr;
   ExecuteSourceCommand execute = nullptr;
 };
 
@@ -131,6 +151,8 @@ struct SequenceDialect {
   [[nodiscard]] const CommandHandler* handler(CommandHandlerId id) const;
   [[nodiscard]] const CommandHandler* handlerForKind(std::string_view kindName) const;
   [[nodiscard]] CommandInfo describe(const TrackProgram& track, const SourceCommand& command) const;
+  [[nodiscard]] std::vector<CommandInstrumentReference> instrumentReferences(const TrackProgram& track,
+                                                                             const SourceCommand& command) const;
 };
 
 template <class TrackState, class Context>
@@ -166,6 +188,8 @@ struct CommandRuntime {
 [[nodiscard]] ItemId addSourceCommandItem(ItemTreeBuilder& items, std::optional<ItemId> parent,
                                           const SequenceDialect& dialect, const TrackProgram& track,
                                           const SourceCommand& command);
+void addCommandInstrumentReferences(SequenceProgram& program, const SequenceDialect& dialect, const TrackProgram& track,
+                                    const SourceCommand& command, std::optional<AssetId> instrumentSetId);
 
 class SequenceDialectRegistry {
 public:
@@ -188,6 +212,16 @@ concept HasDescribe = requires(const Command& command, CommandInfo& out) { comma
 template <class Command, class Context>
 concept HasDescribeWithContext =
     requires(const Command& command, CommandInfo& out, const Context& context) { command.describe(out, context); };
+
+template <class Command>
+concept HasReferences =
+    requires(const Command& command, CommandReferences& references) { command.references(references); };
+
+template <class Command, class Context>
+concept HasReferencesWithContext =
+    requires(const Command& command, CommandReferences& references, const Context& context) {
+      command.references(references, context);
+    };
 
 template <class Command, class TrackState, class Context>
 concept HasRuntimeEffectsExecute = requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
@@ -212,6 +246,10 @@ template <class>
 inline constexpr bool kAlwaysFalse = false;
 
 inline void describePreservedSourceCommand(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any&) {
+}
+
+inline void collectPreservedSourceCommandReferences(const SourceCommand&, const TrackProgram&, CommandReferences&,
+                                                    const std::any&) {
 }
 
 inline Effects executePreservedSourceCommand(const SourceCommand&, const TrackProgram&, std::any&, PerformanceEmitter&,
@@ -241,6 +279,18 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
     command.describe(out, std::any_cast<const Context&>(context));
   } else if constexpr (HasDescribe<Command>) {
     command.describe(out);
+  }
+}
+
+template <class Command, class Context>
+void collectCommandReferences(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
+                              const std::any& context) {
+  CommandReader reader{record.range, track.bytesFor(record)};
+  const Command command = Command::parse(reader);
+  if constexpr (HasReferencesWithContext<Command, Context>) {
+    command.references(references, std::any_cast<const Context&>(context));
+  } else if constexpr (HasReferences<Command>) {
+    command.references(references);
   }
 }
 
@@ -311,15 +361,18 @@ public:
   template <class Command>
   CommandHandlerId addCommand(std::string_view kindName, std::string_view name) {
     return addHandler(kindName, name, detail::describeCommand<Command, Context>,
+                      detail::collectCommandReferences<Command, Context>,
                       detail::executeCommand<Command, TrackState, Context>);
   }
 
   CommandHandlerId addPreservedCommand(std::string_view kindName, std::string_view name) {
-    return addHandler(kindName, name, detail::describePreservedSourceCommand, detail::executePreservedSourceCommand);
+    return addHandler(kindName, name, detail::describePreservedSourceCommand,
+                      detail::collectPreservedSourceCommandReferences, detail::executePreservedSourceCommand);
   }
 
 private:
   CommandHandlerId addHandler(std::string_view kindName, std::string_view name, DescribeSourceCommand describe,
+                              CollectSourceCommandReferences collectReferences,
                               ExecuteSourceCommand execute) {
     const auto index = static_cast<u32>(dialect_.handlers.size());
     dialect_.handlers.push_back(CommandHandler{
@@ -329,6 +382,7 @@ private:
         .name = std::string(name),
         .detailKind = std::string(kindName),
         .describe = describe,
+        .collectReferences = collectReferences,
         .execute = execute,
     });
     return CommandHandlerId{index};

@@ -62,6 +62,18 @@ void CommandInfo::field(std::string fieldName, Address value) {
   field(std::move(fieldName), fmt::format("${:04X}", value.value));
 }
 
+void CommandReferences::instrument(u32 bank, u32 program, std::optional<SourceRange> range) {
+  instruments_.push_back(CommandInstrumentReference{
+      .bank = bank,
+      .program = program,
+      .range = std::move(range),
+  });
+}
+
+std::vector<CommandInstrumentReference> CommandReferences::takeInstruments() {
+  return std::move(instruments_);
+}
+
 const CommandHandler* SequenceDialect::handler(CommandHandlerId handlerId) const {
   if (!handlerId.valid() || handlerId.value >= handlers.size()) {
     return nullptr;
@@ -99,6 +111,24 @@ CommandInfo SequenceDialect::describe(const TrackProgram& track, const SourceCom
   return info;
 }
 
+std::vector<CommandInstrumentReference> SequenceDialect::instrumentReferences(const TrackProgram& track,
+                                                                              const SourceCommand& command) const {
+  const auto* commandHandler = handler(command.handler);
+  if (commandHandler == nullptr || commandHandler->collectReferences == nullptr) {
+    return {};
+  }
+
+  CommandReferences references;
+  commandHandler->collectReferences(command, track, references, context);
+  auto instruments = references.takeInstruments();
+  for (auto& instrument : instruments) {
+    if (!instrument.range && command.range.valid()) {
+      instrument.range = command.range;
+    }
+  }
+  return instruments;
+}
+
 std::string commandInfoDescription(const CommandInfo& info) {
   std::string description;
   for (const auto& field : info.fields) {
@@ -114,6 +144,13 @@ ItemId addSourceCommandItem(ItemTreeBuilder& items, std::optional<ItemId> parent
                             const TrackProgram& track, const SourceCommand& command) {
   const CommandInfo info = dialect.describe(track, command);
   return items.add(parent, ItemKind::Command, info.detailKind, info.name, command.range, commandInfoDescription(info));
+}
+
+void addCommandInstrumentReferences(SequenceProgram& program, const SequenceDialect& dialect, const TrackProgram& track,
+                                    const SourceCommand& command, std::optional<AssetId> instrumentSetId) {
+  for (const auto& ref : dialect.instrumentReferences(track, command)) {
+    addUniqueReferencedInstrument(program, instrumentSetId, ref.bank, ref.program, ref.range);
+  }
 }
 
 void SequenceDialectRegistry::add(SequenceDialect dialect) {

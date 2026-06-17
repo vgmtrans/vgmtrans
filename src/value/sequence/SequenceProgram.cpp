@@ -255,18 +255,6 @@ const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) 
   return &*found;
 }
 
-std::optional<u64> commandOperandU64(std::span<const CommandOperand> operands, std::string_view name) {
-  const auto found =
-      std::ranges::find_if(operands, [name](const CommandOperand& operand) { return operand.name == name; });
-  if (found == operands.end()) {
-    return std::nullopt;
-  }
-  if (const auto* value = std::get_if<u64>(&found->value)) {
-    return *value;
-  }
-  return std::nullopt;
-}
-
 void addUniqueReferencedInstrument(SequenceProgram& program, std::optional<AssetId> asset, u32 bank, u32 programNumber,
                                    std::optional<SourceRange> range) {
   const auto duplicate =
@@ -283,22 +271,6 @@ void addUniqueReferencedInstrument(SequenceProgram& program, std::optional<Asset
       .program = programNumber,
       .range = std::move(range),
   });
-}
-
-void addBankedProgramReference(SequenceProgram& program, const TrackProgram& track, const SourceCommand& command,
-                               CommandKindId programKind, std::string_view operandName,
-                               std::optional<AssetId> instrumentSetId) {
-  if (command.kind != programKind) {
-    return;
-  }
-
-  const auto rawProgram = commandOperandU64(track.operandsFor(command), operandName);
-  if (!rawProgram) {
-    return;
-  }
-
-  addUniqueReferencedInstrument(program, instrumentSetId, static_cast<u32>(*rawProgram >> 7),
-                                static_cast<u32>(*rawProgram & 0x7f), command.range);
 }
 
 TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
