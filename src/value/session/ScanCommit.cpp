@@ -18,6 +18,7 @@ ScanCommit ScanCommit::fromScanResult(const SourceFile& sourceFile, ScanResult r
       .sourceSize = sourceFile.size,
       .assets = std::move(result.assets),
       .matchFacts = std::move(result.matchFacts),
+      .explicitCollections = std::move(result.explicitCollections),
       .diagnostics = std::move(result.diagnostics),
       .extractedSources = std::move(result.extractedSources),
   };
@@ -35,9 +36,11 @@ void ScanCommit::validate(const SourceStore& sources, const AssetStore& existing
   validateScanCommit(*this, sources, existingAssets).throwIfErrors();
 }
 
-void ScanCommit::commit(AssetStore& assetStore, MatchFactStore& matchFactStore, DiagnosticStore& diagnosticStore) {
+void ScanCommit::commit(AssetStore& assetStore, MatchFactStore& matchFactStore,
+                        ExplicitCollectionStore& explicitCollectionStore, DiagnosticStore& diagnosticStore) {
   assetStore.append(std::move(assets), source);
   matchFactStore.append(std::move(matchFacts));
+  explicitCollectionStore.append(std::move(explicitCollections), source);
   diagnosticStore.append(std::move(diagnostics));
 }
 

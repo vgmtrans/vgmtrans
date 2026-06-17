@@ -8,6 +8,7 @@
 
 #include "value/scan/ScanTypes.h"
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -36,11 +37,11 @@ struct ScanMiscAssetRef {
 
 class ScanResultBuilder;
 
-// Adds CollectionMemberFact records for the common case where the scanner already
-// knows which assets form one exportable collection.
+// Builds one scanner-known collection. This is the common path when a format has
+// already discovered the sequence, instruments, and samples together.
 class ScanCollectionBuilder {
 public:
-  ScanCollectionBuilder(ScanResultBuilder& out, CollectionKey key, std::string name);
+  ScanCollectionBuilder(ScanResultBuilder& out, size_t index);
 
   ScanCollectionBuilder& sequence(ScanSequenceRef asset);
   ScanCollectionBuilder& instrumentSet(ScanInstrumentSetRef asset);
@@ -49,8 +50,7 @@ public:
 
 private:
   ScanResultBuilder& out_;
-  CollectionKey key_;
-  std::string name_;
+  size_t index_ = 0;
 };
 
 class ScanSequenceAssetBuilder {
@@ -196,6 +196,7 @@ public:
   [[nodiscard]] ScanResult finish();
 
 private:
+  friend class ScanCollectionBuilder;
   friend class ScanSequenceAssetBuilder;
   friend class ScanInstrumentSetAssetBuilder;
   friend class ScanSampleCollectionAssetBuilder;
@@ -203,6 +204,7 @@ private:
 
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range, ItemTree items = {}) const;
   [[nodiscard]] CollectionKey defaultCollectionKey(std::string_view name) const;
+  [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 
   void addSequenceAsset(ScanSequenceRef ref, SequenceProgramAsset asset);
   void addInstrumentSetAsset(ScanInstrumentSetRef ref, InstrumentSetAsset asset);

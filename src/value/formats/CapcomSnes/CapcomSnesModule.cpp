@@ -9,7 +9,6 @@
 #include "value/formats/CapcomSnes/CapcomSnesLayout.h"
 #include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 #include "value/formats/CapcomSnes/CapcomSnesSynth.h"
-#include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanResultBuilder.h"
 
@@ -79,16 +78,11 @@ using namespace core;
   return result.finish();
 }
 
-[[nodiscard]] std::vector<DesiredCollection> resolveCapcomSnesCollections(const MatchContext& context) {
-  return resolveCollectionMemberFacts(context, "CapcomSnes", "CapcomSnes");
-}
-
 void registerCapcomSnesModule(FormatRegistry& registry) {
   registry.add(FormatModule{
       .name = "CapcomSnes",
       .canScan = canScanCapcomSnes,
       .scan = scanCapcomSnes,
-      .resolveCollections = resolveCapcomSnesCollections,
   });
 }
 

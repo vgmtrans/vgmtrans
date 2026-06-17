@@ -15,6 +15,7 @@
 #include "value/session/AssetStore.h"
 #include "value/session/CollectionStore.h"
 #include "value/session/DiagnosticStore.h"
+#include "value/session/ExplicitCollectionStore.h"
 #include "value/session/MatchFactStore.h"
 
 #include <filesystem>
@@ -61,6 +62,7 @@ private:
   // Session coordinates source loading, scanning, and export around them.
   AssetStore assets_;
   MatchFactStore matchFacts_;
+  ExplicitCollectionStore explicitCollections_;
   CollectionStore collections_;
   DiagnosticStore diagnostics_;
   FormatRegistry formats_;

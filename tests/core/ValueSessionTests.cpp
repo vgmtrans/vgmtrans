@@ -119,6 +119,22 @@ void sessionScansIndividualSourcesWithoutDuplicating() {
   expect(project.collections().size() == 2, "pending-source scan should leave existing collections unchanged");
 }
 
+void sessionKeepsScannerKnownCollectionsWithoutResolver() {
+  Session session;
+  session.formats().add(probeExplicitCollectionModule());
+  session.dialects().add(probeSequenceDialect());
+
+  const auto source = session.addSource(SourceFile{.name = "explicit.probe"}, {0xab});
+  SessionSnapshot project = session.scanSource(source);
+  expect(project.matchFacts().empty(), "explicit scanner-known collection should not need match facts");
+  expect(project.collections().size() == 1, "explicit scanner-known collection should be published");
+  expect(project.collections()[0].key.resolver == "ProbeExplicit",
+         "explicit scanner-known collection should use its scanner resolver key");
+
+  project = session.removeSource(source);
+  expect(project.collections().empty(), "explicit scanner-known collection should disappear with its source");
+}
+
 void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   Session session;
   session.formats().add(probeBankSequenceModule());
@@ -880,6 +896,7 @@ void runValueSessionTests() {
   sessionScansValuesAndDerivedSources();
   sessionReportsUnregisteredSequenceDialect();
   sessionScansIndividualSourcesWithoutDuplicating();
+  sessionKeepsScannerKnownCollectionsWithoutResolver();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
   sessionRemovesSourceFamilyAndDiscoveredData();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();

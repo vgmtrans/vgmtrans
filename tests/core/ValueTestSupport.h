@@ -12,6 +12,7 @@
 #include "value/sequence/bytecode/SequenceCommandHelpers.h"
 #include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatModule.h"
+#include "value/scan/ScanResultBuilder.h"
 #include "value/base/LevelScale.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
@@ -302,6 +303,31 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .name = "ProbeMisc",
       .canScan = canScanProbeMisc,
       .scan = scanProbeMisc,
+  };
+}
+
+[[nodiscard]] bool canScanProbeExplicitCollection(const SourceFile&, std::span<const u8> bytes) {
+  return !bytes.empty() && bytes[0] == 0xab;
+}
+
+[[nodiscard]] ScanResult scanProbeExplicitCollection(const ScanInput& input) {
+  ScanResultBuilder out(input, "ProbeExplicit");
+  const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, input.reader.size()))
+                            .program(SequenceProgram{
+                                .dialect = DialectId{.value = "probe"},
+                                .timebase = Timebase{.ppqn = 48},
+                            });
+  out.collection(input.source.name, CollectionKey{.resolver = "ProbeExplicit",
+                                                  .value = "source:" + std::to_string(input.source.id.value)})
+      .sequence(sequence);
+  return out.finish();
+}
+
+[[nodiscard]] FormatModule probeExplicitCollectionModule() {
+  return FormatModule{
+      .name = "ProbeExplicit",
+      .canScan = canScanProbeExplicitCollection,
+      .scan = scanProbeExplicitCollection,
   };
 }
 
