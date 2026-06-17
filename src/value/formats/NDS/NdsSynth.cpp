@@ -6,6 +6,7 @@
 
 #include "value/formats/NDS/NdsSynth.h"
 
+#include "value/scan/ScanResultBuilder.h"
 #include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
@@ -196,6 +197,16 @@ void addRegion(std::vector<Region>& regions, std::optional<Region> region) {
   }
 }
 
+// Tests can call the parser without a ScanResultBuilder. In that case the same
+// checked reads run, but diagnostics are discarded.
+[[nodiscard]] ParseCursor makeParseCursor(const ScanInput& input, SourceRange bounds, ScanResultBuilder* diagnostics,
+                                          std::vector<Diagnostic>& ignoredDiagnostics) {
+  if (diagnostics != nullptr) {
+    return diagnostics->cursor(bounds);
+  }
+  return ParseCursor(input.reader, bounds, ignoredDiagnostics);
+}
+
 }  // namespace
 
 bool isNdsWaveArchive(ByteReader reader, u32 offset) {
@@ -237,7 +248,7 @@ SampleCollectionAsset parseNdsPsgSamples(const ScanInput& input, AssetId id) {
 }
 
 SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, NdsFileRange range,
-                                          const std::string& name) {
+                                          const std::string& name, ScanResultBuilder* diagnostics) {
   // SWAR samples are compact wave records. ADPCM entries point encodedData after their
   // four-byte predictor header; SampleDecoder knows to read that header.
   SampleCollectionAsset asset{
@@ -253,56 +264,76 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
   const auto root =
       items.add(std::nullopt, ItemKind::SampleCollection, "swar", name, input.reader.range(range.offset, range.size));
 
-  const auto sampleCountOffset = checkedAdd(range.offset, 0x38);
-  const auto sampleTableOffset = checkedAdd(range.offset, 0x3c);
-  if (!sampleCountOffset || !sampleTableOffset || !isNdsWaveArchive(input.reader, range.offset) ||
-      !input.reader.has(*sampleTableOffset, 4)) {
+  if (!isNdsWaveArchive(input.reader, range.offset)) {
     return asset;
   }
 
-  const u32 sampleCount = input.reader.le32(*sampleCountOffset);
-  for (u32 i = 0; i < sampleCount; ++i) {
+  std::vector<Diagnostic> ignoredDiagnostics;
+  auto archive = makeParseCursor(input, input.reader.range(range.offset, range.size), diagnostics, ignoredDiagnostics);
+  const auto sampleCount = archive.le32(0x38, "SWAR sample count");
+  if (!sampleCount) {
+    return asset;
+  }
+
+  for (u32 i = 0; i < *sampleCount; ++i) {
     const auto tableByteOffset = checkedMul(i, 4);
-    const auto entryOffset = tableByteOffset ? checkedAdd(*sampleTableOffset, *tableByteOffset) : std::nullopt;
-    if (!entryOffset || !input.reader.has(*entryOffset, 4)) {
+    const auto entryOffset = tableByteOffset ? checkedAdd(0x3c, *tableByteOffset) : std::nullopt;
+    if (!entryOffset) {
       break;
     }
-    const auto sampleOffset = checkedAdd(input.reader.le32(*entryOffset), range.offset);
-    if (!sampleOffset || !input.reader.has(*sampleOffset, 0x0c)) {
+    const auto sampleRelativeOffset = archive.le32(*entryOffset, "SWAR sample offset");
+    if (!sampleRelativeOffset) {
+      break;
+    }
+    const auto sampleOffset = checkedAdd(range.offset, *sampleRelativeOffset);
+    const auto sampleHeaderRange = archive.range(*sampleRelativeOffset, 0x0c, "SWAR sample header");
+    if (!sampleOffset || !sampleHeaderRange) {
+      continue;
+    }
+    auto sampleHeader = makeParseCursor(input, *sampleHeaderRange, diagnostics, ignoredDiagnostics);
+
+    const auto waveType = sampleHeader.u8(0, "wave type");
+    if (!waveType || *waveType > 2) {
+      continue;
+    }
+    const auto loopFlag = sampleHeader.u8(1, "loop flag");
+    const auto rawSampleRate = sampleHeader.le16(2, "sample rate");
+    const auto timerValue = sampleHeader.le16(4, "timer value");
+    const auto loopOffsetUnits = sampleHeader.le16(6, "loop offset");
+    const auto nonLoopLengthUnits = sampleHeader.le16(8, "non-loop length");
+    if (!loopFlag || !rawSampleRate || !timerValue || !loopOffsetUnits || !nonLoopLengthUnits) {
       continue;
     }
 
-    const u8 waveType = input.reader.u8At(*sampleOffset);
-    if (waveType > 2) {
-      continue;
-    }
-    const bool loops = input.reader.u8At(*sampleOffset + 1) != 0;
-    u32 sampleRate = input.reader.le16(*sampleOffset + 2);
-    const u16 timerValue = input.reader.le16(*sampleOffset + 4);
-    if (timerValue > 0) {
-      sampleRate = 16756991 / timerValue;
+    const bool loops = *loopFlag != 0;
+    u32 sampleRate = *rawSampleRate;
+    if (*timerValue > 0) {
+      sampleRate = 16756991 / *timerValue;
     }
 
-    const u32 loopOffsetBytes = static_cast<u32>(input.reader.le16(*sampleOffset + 6)) * 4;
-    const u32 nonLoopLengthBytes = static_cast<u32>(input.reader.le16(*sampleOffset + 8)) * 4;
+    const u32 loopOffsetBytes = static_cast<u32>(*loopOffsetUnits) * 4;
+    const u32 nonLoopLengthBytes = static_cast<u32>(*nonLoopLengthUnits) * 4;
     const auto totalDataBytes = checkedAdd(loopOffsetBytes, nonLoopLengthBytes);
     if (!totalDataBytes) {
       continue;
     }
 
-    std::optional<u32> dataStart = checkedAdd(*sampleOffset, 0x0c);
+    std::optional<u32> dataStartRelative = checkedAdd(*sampleRelativeOffset, 0x0c);
     u32 dataLength = *totalDataBytes;
     u32 loopStart = loopOffsetBytes;
     u32 loopLength = nonLoopLengthBytes;
     AudioCodec codec = AudioCodec::PcmS16;
     u16 bitsPerSample = 16;
 
-    if (waveType == 0) {
+    if (*waveType == 0) {
       codec = AudioCodec::PcmS8;
       bitsPerSample = 8;
-    } else if (waveType == 2) {
+    } else if (*waveType == 2) {
       codec = AudioCodec::NdsImaAdpcm;
-      dataStart = checkedAdd(*sampleOffset, 0x10);
+      if (!archive.range(*sampleRelativeOffset, 0x10, "SWAR ADPCM sample header")) {
+        continue;
+      }
+      dataStartRelative = checkedAdd(*sampleRelativeOffset, 0x10);
       if (*totalDataBytes < 4) {
         continue;
       }
@@ -331,31 +362,31 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
       }
     }
 
-    if (!dataStart || !input.reader.has(*dataStart, dataLength)) {
+    if (!dataStartRelative) {
       continue;
     }
-    const auto dataEnd = checkedAdd(*dataStart, dataLength);
-    if (!dataEnd || *dataEnd < *sampleOffset) {
+    const auto dataRange = archive.range(*dataStartRelative, dataLength, "SWAR sample data");
+    if (!dataRange || dataRange->endOffset() < *sampleOffset) {
       continue;
     }
 
-    const u32 bytesPerFrame = waveType == 1 ? 2 : 1;
+    const u32 bytesPerFrame = *waveType == 1 ? 2 : 1;
     const Loop loop =
-        waveType == 2
+        *waveType == 2
             ? Loop{.enabled = loops, .start = loopStart, .length = loopLength}
             : Loop{.enabled = loops, .start = loopStart / bytesPerFrame, .length = loopLength / bytesPerFrame};
     const std::string sampleName = fmt::format("Sample {}", asset.samples.samples.size());
     asset.samples.samples.push_back(Sample{
         .name = sampleName,
         .codec = codec,
-        .encodedData = input.reader.range(*dataStart, dataLength),
+        .encodedData = *dataRange,
         .sampleRate = sampleRate,
         .channels = 1,
         .bitsPerSample = bitsPerSample,
         .loop = loop,
     });
     static_cast<void>(items.add(root, ItemKind::Sample, "swar-sample", sampleName,
-                                input.reader.range(*sampleOffset, *dataEnd - *sampleOffset)));
+                                input.reader.range(*sampleOffset, dataRange->endOffset() - *sampleOffset)));
   }
 
   return asset;

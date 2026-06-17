@@ -34,6 +34,7 @@ void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
 void ndsMalformedRecoveryKeepsExecutableJumps();
 void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds();
 void ndsSynthParserDerivesAdpcmLengthsSafely();
+void ndsWaveArchiveReportsTruncatedSampleHeaders();
 
 int main() {
   try {
@@ -64,6 +65,7 @@ int main() {
     ndsMalformedRecoveryKeepsExecutableJumps();
     ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds();
     ndsSynthParserDerivesAdpcmLengthsSafely();
+    ndsWaveArchiveReportsTruncatedSampleHeaders();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;

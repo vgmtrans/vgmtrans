@@ -5,6 +5,7 @@
  */
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/formats/NDS/NdsSequence.h"
@@ -473,4 +474,36 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
                           "Malformed Wave");
   expect(malformedLoop.samples.samples.empty(),
          "NDS parser should skip looped ADPCM with an unusable loop offset instead of underflowing");
+}
+
+void ndsWaveArchiveReportsTruncatedSampleHeaders() {
+  std::vector<u8> bytes(0x44);
+  bytes[0] = 'S';
+  bytes[1] = 'W';
+  bytes[2] = 'A';
+  bytes[3] = 'R';
+  bytes[4] = 0xff;
+  bytes[5] = 0xfe;
+  bytes[6] = 0x00;
+  bytes[7] = 0x01;
+  writeLe32(bytes, 0x38, 1);
+  writeLe32(bytes, 0x3c, 0x40);
+
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{13}, .name = "truncated-wave.swar", .size = bytes.size()},
+      .reader = ByteReader(SourceId{13}, bytes),
+      .ids = ids,
+  };
+  ScanResultBuilder out(input, "NDS");
+
+  const auto wave =
+      parseNdsWaveArchive(input, AssetId{7}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
+                          "Truncated Wave", &out);
+  expect(wave.samples.samples.empty(), "NDS parser should skip truncated SWAR sample headers");
+
+  const ScanResult result = out.finish();
+  expect(!result.diagnostics.empty(), "NDS parser should diagnose truncated SWAR sample headers");
+  expect(result.diagnostics[0].message.find("SWAR sample header") != std::string::npos,
+         "NDS SWAR diagnostic should name the truncated field");
 }

@@ -13,6 +13,10 @@
 #include <optional>
 #include <string>
 
+namespace vgmtrans::core {
+class ScanResultBuilder;
+}
+
 namespace vgmtrans::formats::nds {
 
 [[nodiscard]] bool isNdsWaveArchive(core::ByteReader reader, u32 offset);
@@ -20,7 +24,8 @@ namespace vgmtrans::formats::nds {
 [[nodiscard]] core::SampleCollectionAsset parseNdsPsgSamples(const core::ScanInput& input, core::AssetId id);
 
 [[nodiscard]] core::SampleCollectionAsset parseNdsWaveArchive(const core::ScanInput& input, core::AssetId id,
-                                                              NdsFileRange range, const std::string& name);
+                                                              NdsFileRange range, const std::string& name,
+                                                              core::ScanResultBuilder* diagnostics = nullptr);
 
 [[nodiscard]] core::InstrumentSetAsset parseNdsInstrumentSet(
     const core::ScanInput& input, core::AssetId id, NdsFileRange range, const std::string& name,

@@ -63,8 +63,9 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
     if (!isNdsWaveArchive(input.reader, range->offset)) {
       continue;
     }
-    waveAssetIds[waveArchiveIndex] = result.sampleCollection(
-        [&](AssetId id) { return parseNdsWaveArchive(input, id, *range, layout.waveArchiveNames[waveArchiveIndex]); });
+    waveAssetIds[waveArchiveIndex] = result.sampleCollection([&](AssetId id) {
+      return parseNdsWaveArchive(input, id, *range, layout.waveArchiveNames[waveArchiveIndex], &result);
+    });
   }
 
   std::map<u16, ScanInstrumentSetRef> bankAssetIds;
