@@ -406,12 +406,14 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
       .reader = ByteReader(SourceId{11}, bytes),
       .ids = ids,
   };
-  std::array<std::optional<AssetId>, 4> waves{};
-  waves[0] = AssetId{3};
+  ScanResultBuilder out(input, "NDS");
+  const auto psg = out.reserveSampleCollection();
+  std::array<std::optional<ScanSampleCollectionRef>, 4> waves{};
+  waves[0] = out.reserveSampleCollection();
 
-  const auto bank = parseNdsInstrumentSet(input, AssetId{2},
-                                          NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Bank",
-                                          AssetId{1}, waves);
+  const auto bank =
+      parseNdsInstrumentSet(input, AssetId{2}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
+                            "Bank", out, psg, waves);
   expect(bank.instruments.size() == 1 && bank.instruments[0].regions.size() == 1,
          "NDS synth parser should keep a valid instrument with infinite release");
   const Envelope& envelope = bank.instruments[0].regions[0].envelope;
@@ -422,9 +424,8 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
 
   bytes[0x45] = 0x80;
   const auto malformedBank =
-      parseNdsInstrumentSet(input, AssetId{4},
-                            NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Malformed Bank",
-                            AssetId{1}, waves);
+      parseNdsInstrumentSet(input, AssetId{4}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
+                            "Malformed Bank", out, psg, waves);
   expect(malformedBank.instruments.empty(),
          "NDS synth parser should skip regions with malformed envelope-rate bytes");
 }

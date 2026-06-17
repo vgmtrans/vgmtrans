@@ -157,8 +157,8 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
   return static_cast<double>(pan) / 127.0;
 }
 
-[[nodiscard]] std::optional<Region> ndsRegion(ByteReader reader, u32 offset, u32 length, u32 sampleIndex,
-                                              std::optional<AssetId> sampleCollection, u8 keyLow = 0, u8 keyHigh = 127,
+[[nodiscard]] std::optional<Region> ndsRegion(ByteReader reader, u32 offset, u32 length, SampleRef sample,
+                                              u8 keyLow = 0, u8 keyHigh = 127,
                                               std::optional<u8> forcedRootKey = std::nullopt) {
   const u32 articulationOffset = offset + length - 6;
   if (!reader.has(articulationOffset, 6)) {
@@ -174,7 +174,7 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
   Region region{
       .keyRange = KeyRange{.low = keyLow, .high = keyHigh},
       .velocityRange = VelocityRange{.low = 0, .high = 127},
-      .sample = SampleRef{.collection = sampleCollection, .index = sampleIndex},
+      .sample = sample,
       .range = reader.range(offset, length),
       .rootKey = forcedRootKey ? forcedRootKey : std::optional<u8>{rootKey},
       .envelope = *envelope,
@@ -183,8 +183,8 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
   return region;
 }
 
-[[nodiscard]] std::optional<AssetId> bankWaveCollection(const std::array<std::optional<AssetId>, 4>& collections,
-                                                        u16 index) {
+[[nodiscard]] std::optional<ScanSampleCollectionRef> bankWaveCollection(
+    const std::array<std::optional<ScanSampleCollectionRef>, 4>& collections, u16 index) {
   if (index >= collections.size()) {
     return std::nullopt;
   }
@@ -393,8 +393,9 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
 }
 
 InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, NdsFileRange range,
-                                         const std::string& name, AssetId psgCollection,
-                                         const std::array<std::optional<AssetId>, 4>& waveCollections) {
+                                         const std::string& name, ScanResultBuilder& builder,
+                                         ScanSampleCollectionRef psgCollection,
+                                         const std::array<std::optional<ScanSampleCollectionRef>, 4>& waveCollections) {
   // SBNK instruments fan out by type: single region, PSG pulse/noise, drumset, or
   // key-split multi-region. Each case fills the same Instrument fields.
   InstrumentSetAsset asset{
@@ -444,8 +445,9 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
         instrument.range = input.reader.range(instrumentOffset, 10);
         const u16 sampleIndex = input.reader.le16(instrumentOffset);
         const u16 collectionIndex = input.reader.le16(instrumentOffset + 2);
-        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10, sampleIndex,
-                                                bankWaveCollection(waveCollections, collectionIndex)));
+        addRegion(instrument.regions,
+                  ndsRegion(input.reader, instrumentOffset, 10,
+                            builder.sampleRef(bankWaveCollection(waveCollections, collectionIndex), sampleIndex)));
         break;
       }
       case 0x02: {
@@ -457,8 +459,9 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
                                                                "62.5%", "75%", "87.5%", "0%"};
         instrument.name = "PSG Wave (" + std::string(dutyNames[dutyCycle]) + ")";
         instrument.range = input.reader.range(instrumentOffset, 10);
-        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10, dutyCycle, psgCollection, 0, 127,
-                                                69));
+        addRegion(instrument.regions,
+                  ndsRegion(input.reader, instrumentOffset, 10, builder.sampleRef(psgCollection, dutyCycle), 0, 127,
+                            69));
         break;
       }
       case 0x03: {
@@ -467,7 +470,8 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
         }
         instrument.name = "PSG Noise";
         instrument.range = input.reader.range(instrumentOffset, 10);
-        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10, 8, psgCollection, 0, 127, 45));
+        addRegion(instrument.regions,
+                  ndsRegion(input.reader, instrumentOffset, 10, builder.sampleRef(psgCollection, 8), 0, 127, 45));
         break;
       }
       case 0x10: {
@@ -488,8 +492,10 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
           const u16 sampleIndex = input.reader.le16(regionOffset + 2);
           const u16 collectionIndex = input.reader.le16(regionOffset + 4);
           const auto key = static_cast<u8>(lowKey + r);
-          addRegion(instrument.regions, ndsRegion(input.reader, regionOffset, 12, sampleIndex,
-                                                  bankWaveCollection(waveCollections, collectionIndex), key, key));
+          addRegion(instrument.regions,
+                    ndsRegion(input.reader, regionOffset, 12,
+                              builder.sampleRef(bankWaveCollection(waveCollections, collectionIndex), sampleIndex), key,
+                              key));
         }
         break;
       }
@@ -517,9 +523,10 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
           const u16 sampleIndex = input.reader.le16(regionOffset + 2);
           const u16 collectionIndex = input.reader.le16(regionOffset + 4);
           const u8 keyLow = r == 0 ? 0 : static_cast<u8>(keyRanges[r - 1] + 1);
-          addRegion(instrument.regions, ndsRegion(input.reader, regionOffset, 12, sampleIndex,
-                                                  bankWaveCollection(waveCollections, collectionIndex), keyLow,
-                                                  keyRanges[r]));
+          addRegion(instrument.regions,
+                    ndsRegion(input.reader, regionOffset, 12,
+                              builder.sampleRef(bankWaveCollection(waveCollections, collectionIndex), sampleIndex),
+                              keyLow, keyRanges[r]));
         }
         break;
       }
