@@ -214,10 +214,14 @@ struct Call : Le24RelativeAddressOperand<Call> {
 };
 
 struct Return : ControlFlowCommand, NoOperands<Return> {
+  static constexpr CommandMeta meta = commandMeta("return", "Return");
+
   Effects execute(Runtime& rt) const { return rt.return_(); }
 };
 
 struct End : StopsPlaybackCommand, NoOperands<End> {
+  static constexpr CommandMeta meta = commandMeta("end", "End");
+
   Effects execute(Runtime& rt) const { return rt.end(); }
 };
 
@@ -293,6 +297,8 @@ struct Tempo {
 
 // Stop conditions and diagnostics.
 struct UnsupportedCommand : UnsupportedPlaybackCommand, NoOperands<UnsupportedCommand> {
+  static constexpr CommandMeta meta = commandMeta("unsupported", "Unsupported Command");
+
   Effects execute(Runtime& rt) const {
     rt.vm.diagnostic(Diagnostic{
         .severity = Severity::Warning,
@@ -303,6 +309,7 @@ struct UnsupportedCommand : UnsupportedPlaybackCommand, NoOperands<UnsupportedCo
 };
 
 struct UnknownOpcode {
+  static constexpr CommandMeta meta = commandMeta("unknown", "Unknown Opcode");
   static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::Unsupported;
 
   static UnknownOpcode parse(CommandReader& in) {
@@ -320,6 +327,8 @@ struct UnknownOpcode {
 };
 
 struct TruncatedCommand : UnsupportedPlaybackCommand, NoOperands<TruncatedCommand> {
+  static constexpr CommandMeta meta = commandMeta("truncated", "Truncated Command");
+
   Effects execute(Runtime& rt) const {
     rt.vm.diagnostic(Diagnostic{
         .severity = Severity::Warning,
@@ -464,7 +473,7 @@ template <class Registrar>
   map.op<0x81, Program>("Program");
   map.op<0x94, Jump>("Jump");
   map.op<0x95, Call>("Call");
-  map.terminal<0x96, UnsupportedCommand>(commandMeta("unsupported", "Unsupported Command"));
+  map.terminal<0x96, UnsupportedCommand>();
   map.preserved(preservedCommands);
   map.op<0xc0, Pan>("Pan");
   map.op<0xc1, Volume>("Volume");
@@ -477,10 +486,10 @@ template <class Registrar>
   map.op<0xcf, PortamentoTime>("Portamento Time");
   map.op<0xd5, ExpressionLevel>("Expression");
   map.op<0xe1, Tempo>("Tempo");
-  map.returns<0xfd, Return>("Return");
-  map.terminal<0xff, End>("End");
-  map.truncated<TruncatedCommand>(commandMeta("truncated", "Truncated Command"));
-  map.unknown<UnknownOpcode>(commandMeta("unknown", "Unknown Opcode"));
+  map.returns<0xfd, Return>();
+  map.terminal<0xff, End>();
+  map.truncated<TruncatedCommand>();
+  map.unknown<UnknownOpcode>();
 
   return map.finish();
 }
