@@ -26,27 +26,44 @@ void ensureAssetId(AssetMetadata& metadata, AssetId expectedId) {
   }
 }
 
+[[nodiscard]] std::string roleName(CollectionMemberRole role) {
+  switch (role) {
+    case CollectionMemberRole::Sequence:
+      return "sequence";
+    case CollectionMemberRole::InstrumentSet:
+      return "instrument-set";
+    case CollectionMemberRole::SampleCollection:
+      return "sample-collection";
+    case CollectionMemberRole::Misc:
+      return "misc";
+  }
+}
+
 }  // namespace
 
 ScanCollectionBuilder::ScanCollectionBuilder(ScanResultBuilder& out, size_t index) : out_(out), index_(index) {
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::sequence(ScanSequenceRef asset) {
+  out_.markReferenced(asset.id, CollectionMemberRole::Sequence);
   out_.explicitCollection(index_).sequence = asset.id;
   return *this;
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(ScanInstrumentSetRef asset) {
+  out_.markReferenced(asset.id, CollectionMemberRole::InstrumentSet);
   out_.explicitCollection(index_).instrumentSets.push_back(asset.id);
   return *this;
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::samples(ScanSampleCollectionRef asset) {
+  out_.markReferenced(asset.id, CollectionMemberRole::SampleCollection);
   out_.explicitCollection(index_).sampleCollections.push_back(asset.id);
   return *this;
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::misc(ScanMiscAssetRef asset) {
+  out_.markReferenced(asset.id, CollectionMemberRole::Misc);
   out_.explicitCollection(index_).miscAssets.push_back(asset.id);
   return *this;
 }
@@ -114,19 +131,27 @@ ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format,
 }
 
 ScanSequenceRef ScanResultBuilder::reserveSequence() {
-  return ScanSequenceRef{.id = input_.ids.nextAssetId()};
+  const auto id = input_.ids.nextAssetId();
+  reserveHandle(id, CollectionMemberRole::Sequence);
+  return ScanSequenceRef{.id = id};
 }
 
 ScanInstrumentSetRef ScanResultBuilder::reserveInstrumentSet() {
-  return ScanInstrumentSetRef{.id = input_.ids.nextAssetId()};
+  const auto id = input_.ids.nextAssetId();
+  reserveHandle(id, CollectionMemberRole::InstrumentSet);
+  return ScanInstrumentSetRef{.id = id};
 }
 
 ScanSampleCollectionRef ScanResultBuilder::reserveSampleCollection() {
-  return ScanSampleCollectionRef{.id = input_.ids.nextAssetId()};
+  const auto id = input_.ids.nextAssetId();
+  reserveHandle(id, CollectionMemberRole::SampleCollection);
+  return ScanSampleCollectionRef{.id = id};
 }
 
 ScanMiscAssetRef ScanResultBuilder::reserveMisc() {
-  return ScanMiscAssetRef{.id = input_.ids.nextAssetId()};
+  const auto id = input_.ids.nextAssetId();
+  reserveHandle(id, CollectionMemberRole::Misc);
+  return ScanMiscAssetRef{.id = id};
 }
 
 ScanSequenceAssetBuilder ScanResultBuilder::sequence(std::string name, SourceRange range) {
@@ -207,6 +232,7 @@ void ScanResultBuilder::extractedSource(ExtractedSource source) {
 }
 
 ScanResult ScanResultBuilder::finish() {
+  validateReferencedHandles();
   return std::move(result_);
 }
 
@@ -231,27 +257,63 @@ ExplicitCollection& ScanResultBuilder::explicitCollection(size_t index) {
   return result_.explicitCollections.at(index);
 }
 
+void ScanResultBuilder::reserveHandle(AssetId id, CollectionMemberRole role) {
+  auto [found, inserted] = handles_.try_emplace(id.value, HandleState{.role = role});
+  if (!inserted && found->second.role != role) {
+    throw std::logic_error("ScanResultBuilder asset handle reused with a different role");
+  }
+}
+
+void ScanResultBuilder::markCommitted(AssetId id, CollectionMemberRole role) {
+  auto [found, inserted] = handles_.try_emplace(id.value, HandleState{.role = role});
+  if (!inserted && found->second.role != role) {
+    throw std::logic_error("ScanResultBuilder asset handle reused with a different role");
+  }
+  found->second.committed = true;
+}
+
+void ScanResultBuilder::markReferenced(AssetId id, CollectionMemberRole role) {
+  auto [found, inserted] = handles_.try_emplace(id.value, HandleState{.role = role});
+  if (!inserted && found->second.role != role) {
+    throw std::logic_error("ScanResultBuilder collection referenced an asset handle with the wrong role");
+  }
+  found->second.referenced = true;
+}
+
+void ScanResultBuilder::validateReferencedHandles() const {
+  for (const auto& [id, state] : handles_) {
+    if (state.referenced && !state.committed) {
+      throw std::logic_error("ScanResultBuilder collection referenced " + roleName(state.role) + " asset id " +
+                             std::to_string(id) + " before it was added");
+    }
+  }
+}
+
 void ScanResultBuilder::addSequenceAsset(ScanSequenceRef ref, SequenceProgramAsset asset) {
   Asset variant = std::move(asset);
   prepareAsset(variant, ref.id);
+  markCommitted(ref.id, CollectionMemberRole::Sequence);
   result_.assets.push_back(std::move(variant));
 }
 
 void ScanResultBuilder::addInstrumentSetAsset(ScanInstrumentSetRef ref, InstrumentSetAsset asset) {
   Asset variant = std::move(asset);
   prepareAsset(variant, ref.id);
+  markCommitted(ref.id, CollectionMemberRole::InstrumentSet);
   result_.assets.push_back(std::move(variant));
 }
 
 void ScanResultBuilder::addSampleCollectionAsset(ScanSampleCollectionRef ref, SampleCollectionAsset asset) {
   Asset variant = std::move(asset);
   prepareAsset(variant, ref.id);
+  markCommitted(ref.id, CollectionMemberRole::SampleCollection);
   result_.assets.push_back(std::move(variant));
 }
 
 void ScanResultBuilder::addMiscAsset(ScanMiscAssetRef ref, MiscAsset asset) {
   Asset variant = std::move(asset);
   prepareAsset(variant, ref.id);
+  markCommitted(ref.id, CollectionMemberRole::Misc);
   result_.assets.push_back(std::move(variant));
 }
 

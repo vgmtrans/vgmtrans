@@ -162,6 +162,51 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
          "scan result builder should preserve diagnostics");
 }
 
+void scanResultBuilderRejectsReferencedUncommittedHandles() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "builder-uncommitted.probe"}, {0xaa});
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  const auto sequence = out.reserveSequence();
+  out.collection("Broken").sequence(sequence);
+
+  bool threw = false;
+  try {
+    static_cast<void>(out.finish());
+  } catch (const std::logic_error&) {
+    threw = true;
+  }
+  expect(threw, "scan result builder should reject referenced handles that were never added");
+}
+
+void scanResultBuilderRejectsWrongRoleHandleReuse() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "builder-wrong-role.probe"}, {0xaa});
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  const auto sequence = out.reserveSequence();
+
+  bool threw = false;
+  try {
+    out.collection("Broken").instrumentSet(ScanInstrumentSetRef{.id = sequence.id});
+  } catch (const std::logic_error&) {
+    threw = true;
+  }
+  expect(threw, "scan result builder should reject using one handle id with the wrong role");
+}
+
 }  // namespace
 
 void runValueRegistryTests() {
@@ -171,4 +216,6 @@ void runValueRegistryTests() {
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();
   scanResultBuilderCoversCommonScannerPlumbing();
+  scanResultBuilderRejectsReferencedUncommittedHandles();
+  scanResultBuilderRejectsWrongRoleHandleReuse();
 }
