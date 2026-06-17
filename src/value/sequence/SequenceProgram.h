@@ -205,12 +205,8 @@ struct SequenceProgram {
 
 [[nodiscard]] const TrackProgram* trackById(const SequenceProgram& program, TrackId id);
 [[nodiscard]] const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id);
-[[nodiscard]] std::optional<u64> commandOperandU64(std::span<const CommandOperand> operands, std::string_view name);
 void addUniqueReferencedInstrument(SequenceProgram& program, std::optional<AssetId> asset, u32 bank, u32 programNumber,
                                    std::optional<SourceRange> range);
-void addBankedProgramReference(SequenceProgram& program, const TrackProgram& track, const SourceCommand& command,
-                               CommandKindId programKind, std::string_view operandName,
-                               std::optional<AssetId> instrumentSetId);
 
 struct SequenceProgramAsset {
   AssetMetadata metadata;

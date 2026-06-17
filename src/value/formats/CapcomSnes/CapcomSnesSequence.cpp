@@ -433,6 +433,8 @@ struct Program : U8Operand<Program> {
     out.field("program", program());
   }
 
+  void references(CommandReferences& out) const { out.instrument(bank(), program()); }
+
   void execute(Runtime& rt) const { rt.out.instrument(bank(), program(), true); }
 };
 
@@ -724,7 +726,6 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
       .behavior = dialect.defaultBehavior,
   };
 
-  const CommandHandler* programHandler = dialect.handlerForKind("capcom-snes.program");
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   // Capcom stores track pointers in reverse channel order. Reorder them here so source
   // track numbers match the driver's playback order.
@@ -743,9 +744,7 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
 
     for (const auto& command : track.commands) {
       static_cast<void>(addSourceCommandItem(itemBuilder, trackItem, dialect, track, command));
-      if (programHandler != nullptr) {
-        addBankedProgramReference(program, track, command, programHandler->kind, "raw", instrumentSetId);
-      }
+      addCommandInstrumentReferences(program, dialect, track, command, instrumentSetId);
     }
 
     program.tracks.push_back(std::move(track));

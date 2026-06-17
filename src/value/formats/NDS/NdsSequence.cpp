@@ -170,6 +170,8 @@ struct Program {
     out.field("program", program());
   }
 
+  void references(CommandReferences& out) const { out.instrument(bank(), program()); }
+
   void execute(Runtime& rt) const { rt.out.instrument(bank(), program()); }
 };
 
@@ -617,7 +619,6 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
           },
   };
 
-  const CommandHandler* programHandler = dialect.handlerForKind("nds.program");
   ItemTreeBuilder items(asset.metadata.items, input.ids);
   const auto root = items.add(std::nullopt, ItemKind::Sequence, "sseq", name,
                               input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset));
@@ -630,9 +631,7 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
                                      input.reader.range(start, 0));
     for (const auto& command : track.commands) {
       static_cast<void>(addSourceCommandItem(items, trackItem, dialect, track, command));
-      if (programHandler != nullptr) {
-        addBankedProgramReference(asset.program, track, command, programHandler->kind, "raw", instrumentSet);
-      }
+      addCommandInstrumentReferences(asset.program, dialect, track, command, instrumentSet);
     }
     asset.program.tracks.push_back(std::move(track));
   }
