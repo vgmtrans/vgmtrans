@@ -183,6 +183,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/CursorBytecode.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/SequenceCommandHelpers.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h

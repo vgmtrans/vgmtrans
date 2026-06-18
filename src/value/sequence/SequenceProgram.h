@@ -44,6 +44,17 @@ struct CommandOperand {
   SourceRange range;
 };
 
+// Describes what a command means for playback. This is metadata for UI and
+// validation; execute() still implements the actual behavior.
+enum class CommandPlaybackStatus {
+  SourceOnly,
+  NoOp,
+  AffectsPlayback,
+  AffectsControlFlow,
+  StopsPlayback,
+  Unsupported,
+};
+
 // One decoded source opcode. It keeps the original bytes, named operands, source
 // range, and the handler ID used to find the driver-specific behavior.
 struct SourceCommand {

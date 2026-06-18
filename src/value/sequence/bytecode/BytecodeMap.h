@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/sequence/bytecode/CursorBytecode.h"
 #include "value/sequence/SequenceDialect.h"
 #include "value/sequence/bytecode/BytecodeDecode.h"
 
@@ -85,6 +86,27 @@ public:
   template <class Command>
   BytecodeMapBuilder& op(u8 opcode, CommandMeta meta, BytecodeCommandOptions options = {}) {
     return op<Command>(opcode, meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <u8 Op, class Command>
+  BytecodeMapBuilder& cursorOp(CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return cursorOp<Command>(Op, meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <u8 Op, class Command>
+  BytecodeMapBuilder& cursorOp(std::string_view displayName, BytecodeCommandOptions options = {}) {
+    return cursorOp<Command>(Op, displayName, options);
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& cursorOp(u8 opcode, CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return cursorOp<Command>(opcode, meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& cursorOp(u8 opcode, std::string_view displayName, BytecodeCommandOptions options = {}) {
+    return addOpcode(opcode,
+                     commandSpec<Command>(displayName, options, detail::decodeCursorBytecodeCommand<Command>));
   }
 
   template <u8 First, u8 Last, class Command>
@@ -181,6 +203,20 @@ public:
   }
 
   template <class Command>
+  BytecodeMapBuilder& cursorUnknown(CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return cursorUnknown<Command>(meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& cursorUnknown(std::string_view displayName, BytecodeCommandOptions options = {}) {
+    table_.unknown = commandSpec<Command>(displayName, options, detail::decodeCursorBytecodeCommand<Command>);
+    if (!table_.truncated) {
+      table_.truncated = table_.unknown;
+    }
+    return *this;
+  }
+
+  template <class Command>
   BytecodeMapBuilder& truncated(BytecodeCommandOptions options = {}) {
     return truncated<Command>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
   }
@@ -194,6 +230,17 @@ public:
   template <class Command>
   BytecodeMapBuilder& truncated(CommandMeta meta, BytecodeCommandOptions options = {}) {
     return truncated<Command>(meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& cursorTruncated(CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return cursorTruncated<Command>(meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <class Command>
+  BytecodeMapBuilder& cursorTruncated(std::string_view displayName, BytecodeCommandOptions options = {}) {
+    table_.truncated = commandSpec<Command>(displayName, options, detail::decodeCursorBytecodeCommand<Command>);
+    return *this;
   }
 
   [[nodiscard]] BytecodeDispatchTable finish() {
@@ -214,6 +261,7 @@ private:
     CommandKindId kind;
     CommandTypeToken commandType = nullptr;
     std::string name;
+    CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
     bool preserved = false;
   };
 
@@ -259,7 +307,8 @@ private:
   [[nodiscard]] BytecodeCommandSpec commandSpec(std::string_view displayName, BytecodeCommandOptions options,
                                                 DecodeBytecodeCommand decode) {
     const std::string kindName = makeKind(displayName, options);
-    const auto [handler, kind] = commandHandler<Command>(kindName, displayName);
+    const auto playbackStatus = options.playbackStatus.value_or(detail::commandPlaybackStatus<Command>());
+    const auto [handler, kind] = commandHandler<Command>(kindName, displayName, playbackStatus);
     return BytecodeCommandSpec{
         .handler = handler,
         .kind = kind,
@@ -285,13 +334,15 @@ private:
 
   template <class Command>
   [[nodiscard]] std::pair<CommandHandlerId, CommandKindId> commandHandler(const std::string& kindName,
-                                                                          std::string_view displayName) {
+                                                                          std::string_view displayName,
+                                                                          CommandPlaybackStatus playbackStatus) {
     const CommandTypeToken commandType = detail::commandTypeToken<Command>();
     if (const auto found = handlers_.find(kindName); found != handlers_.end()) {
       const HandlerCacheEntry& entry = found->second;
       // A range may map many opcodes to the same command type. Reusing the same
       // kind for a different type would make parsed commands point at the wrong code.
-      if (entry.preserved || entry.commandType != commandType || entry.name != displayName) {
+      if (entry.preserved || entry.commandType != commandType || entry.name != displayName ||
+          entry.playbackStatus != playbackStatus) {
         throw std::logic_error("Bytecode command kind reused with incompatible handler");
       }
       return {entry.handler, entry.kind};
@@ -300,13 +351,14 @@ private:
     CommandHandlerId handler;
     CommandKindId kind;
     if (dialectBuilder_ != nullptr) {
-      const auto registered = dialectBuilder_->template addCommand<Command>(kindName, displayName);
+      const auto registered = dialectBuilder_->template addCommand<Command>(kindName, displayName, playbackStatus);
       handler = registered.handler;
       kind = registered.kind;
     } else {
       const CommandKind* foundKind = dialect_->kindForName(kindName);
       const CommandHandler* foundHandler = dialect_->template handlerForCommand<Command>();
-      if (foundKind == nullptr || foundKind->name != displayName || foundHandler == nullptr) {
+      if (foundKind == nullptr || foundKind->name != displayName ||
+          foundKind->playbackStatus != playbackStatus || foundHandler == nullptr) {
         throw std::logic_error("Bytecode command was not registered in its dialect");
       }
       handler = foundHandler->id;
@@ -317,6 +369,7 @@ private:
         .kind = kind,
         .commandType = commandType,
         .name = std::string(displayName),
+        .playbackStatus = playbackStatus,
         .preserved = false,
     };
     return {handler, kind};

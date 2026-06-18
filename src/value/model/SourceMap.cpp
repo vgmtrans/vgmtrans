@@ -188,6 +188,13 @@ AnnotationBuilder& AnnotationBuilder::role(SourceRole role) {
   return *this;
 }
 
+AnnotationBuilder& AnnotationBuilder::range(SourceRange range) {
+  if (auto* found = map_->annotation(id_)) {
+    found->range = range;
+  }
+  return *this;
+}
+
 AnnotationBuilder& AnnotationBuilder::label(std::string_view label) {
   if (auto* found = map_->annotation(id_)) {
     found->label = std::string(label);
