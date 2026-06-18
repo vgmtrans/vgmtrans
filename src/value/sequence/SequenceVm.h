@@ -84,6 +84,7 @@ public:
   void modulation(ModulationPerformanceEvent event);
   void modulation(ModulationPerformanceTarget target, double amount);
   void marker(MarkerPerformanceEvent event);
+  void appendEvents(std::vector<PerformanceEvent> events);
 
 private:
   [[nodiscard]] PerformanceEventHeader header() const;

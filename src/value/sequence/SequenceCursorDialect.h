@@ -178,28 +178,31 @@ struct CursorDialectDriver {
         .references = &references,
     };
     VmCommandCursor cursor(CommandPhase::Decode, record.range, track.bytesFor(record));
-    try {
-      static_cast<void>(Reader::read(runtime, cursor));
-    } catch (const CommandReadTruncated&) {
-    }
+    static_cast<void>(Reader::read(runtime, cursor));
   }
 
   static Effects execute(const SourceCommand& record, const TrackProgram& track, std::any& trackState,
                          PerformanceEmitter& out, VmApi& vm, const std::any& context) {
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
     const auto& typedContext = std::any_cast<const Context&>(context);
+    PerformanceTrack bufferedTrack{
+        .id = track.id,
+        .sourceTrackNumber = track.sourceTrackNumber,
+    };
+    PerformanceEmitter bufferedOut{bufferedTrack, record.id, record.annotation, vm.tick()};
     RenderCursorRuntime<TrackState, Context> runtime{
         .state = typedTrackState,
-        .out = out,
+        .out = bufferedOut,
         .vm = vm,
         .context = typedContext,
     };
     VmCommandCursor cursor(CommandPhase::Render, record.range, track.bytesFor(record));
-    try {
-      return effectsFromCommandFlow(Reader::read(runtime, cursor), vm);
-    } catch (const CommandReadTruncated&) {
+    const CommandFlow flow = Reader::read(runtime, cursor);
+    if (cursor.failed() || flow.truncated) {
       return Effects{.step = Step::end()};
     }
+    out.appendEvents(std::move(bufferedTrack.events));
+    return effectsFromCommandFlow(flow, vm);
   }
 };
 
@@ -274,10 +277,8 @@ template <class TrackState, class Context, class Reader>
       .state = makeDecodeCursorState<TrackState, Context>(context, cursorContext<Context>(dialect)),
       .context = cursorContext<Context>(dialect),
   };
-  CommandFlow commandFlow;
-  try {
-    commandFlow = Reader::read(runtime, cursor);
-  } catch (const CommandReadTruncated&) {
+  CommandFlow commandFlow = Reader::read(runtime, cursor);
+  if (cursor.failed()) {
     commandFlow = CommandFlow{
         .kind = FlowKind::Stop,
         .truncated = true,

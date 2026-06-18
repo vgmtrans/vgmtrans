@@ -194,11 +194,7 @@ void vmCommandCursorRecordsStructuredResourceLinks() {
   const std::array<u8, 1> bytes{0x81};
   VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap);
 
-  static_cast<void>(cmd.name("Program")
-                        .semantic(SequenceSemantic::Program)
-                        .instrumentRef(2, 17)
-                        .sampleRef(5)
-                        .next());
+  static_cast<void>(cmd.name("Program").semantic(SequenceSemantic::Program).instrumentRef(2, 17).sampleRef(5).next());
 
   const SourceMap map = sourceMap.finish();
   const auto& annotation = map.get(cmd.annotation());
@@ -209,7 +205,8 @@ void vmCommandCursorRecordsStructuredResourceLinks() {
   expect(instrumentTarget != nullptr && instrumentTarget->kind == ObjectKind::Instrument &&
              !instrumentTarget->asset.valid() && instrumentTarget->index0 == 2 && instrumentTarget->index1 == 17,
          "cursor instrument helper should preserve unresolved bank/program selectors");
-  expect(annotation.links[1].role == SourceLinkRole::UsesSample, "cursor sample helper should use the sample link role");
+  expect(annotation.links[1].role == SourceLinkRole::UsesSample,
+         "cursor sample helper should use the sample link role");
   const auto* sampleTarget = std::get_if<ObjectRef>(&annotation.links[1].target);
   expect(sampleTarget != nullptr && sampleTarget->kind == ObjectKind::Sample && !sampleTarget->asset.valid() &&
              sampleTarget->index0 == 5,
@@ -223,14 +220,10 @@ void vmCommandCursorStickyFailsMalformedReads() {
   const std::array<u8, 1> bytes{0xc4};
   VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap, &diagnostics);
 
-  bool threw = false;
-  try {
-    static_cast<void>(cmd.name("Pan").semantic(SequenceSemantic::Pan).u8("pan"));
-  } catch (const CommandReadTruncated&) {
-    threw = true;
-  }
+  const auto pan = cmd.name("Pan").semantic(SequenceSemantic::Pan).u8("pan");
   const CommandFlow flow = cmd.next();
-  expect(threw, "cursor should stop command parsing when a required operand is missing");
+  expect(!pan.valid && pan.value == 0 && sameRange(pan.range, probeRange(1, 0)),
+         "cursor should return invalid read metadata instead of throwing on missing operands");
   expect(flow.kind == FlowKind::Stop && flow.truncated,
          "cursor should turn normal flow helpers into truncated stop flow after a failed read");
   expect(diagnostics.size() == 1 && diagnostics[0].message == "Truncated sequence command while reading pan",
