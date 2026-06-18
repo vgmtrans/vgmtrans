@@ -6,6 +6,8 @@
 
 #include "value/sequence/SequenceCursor.h"
 
+#include "value/sequence/SequenceVm.h"
+
 #include <algorithm>
 #include <limits>
 #include <string>
@@ -480,6 +482,23 @@ Effects effectsFromCommandFlow(const CommandFlow& flow) {
       return Effects{.step = Step::jump(*flow.destination, JumpSemantics::FiniteRepeat)};
   }
   return Effects::none();
+}
+
+Effects effectsFromCommandFlow(const CommandFlow& flow, VmApi& vm) {
+  switch (flow.kind) {
+    case FlowKind::CountedRepeatUntil:
+      if (!flow.destination) {
+        return Effects{.step = Step::end()};
+      }
+      return vm.countedRepeatUntil(flow.repeatSlot, flow.repeatTotalPlays, *flow.destination);
+    case FlowKind::CountedRepeatBreak:
+      if (!flow.destination) {
+        return Effects{.step = Step::end()};
+      }
+      return vm.countedRepeatBreak(flow.repeatSlot, *flow.destination).effects;
+    default:
+      return effectsFromCommandFlow(flow);
+  }
 }
 
 }  // namespace vgmtrans::core

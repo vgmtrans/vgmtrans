@@ -150,5 +150,6 @@ private:
 };
 
 [[nodiscard]] Effects effectsFromCommandFlow(const CommandFlow& flow);
+[[nodiscard]] Effects effectsFromCommandFlow(const CommandFlow& flow, VmApi& vm);
 
 }  // namespace vgmtrans::core

@@ -168,7 +168,7 @@ struct CursorBytecodeCommand {
         .context = typedContext,
     };
     VmCommandCursor cursor(CommandPhase::Render, record.range, track.bytesFor(record));
-    return effectsFromCommandFlow(Reader::read(cursor, runtime));
+    return effectsFromCommandFlow(Reader::read(cursor, runtime), vm);
   }
 };
 
