@@ -11,7 +11,6 @@
 #include "value/sequence/SequenceVm.h"
 #include "value/sequence/bytecode/BytecodeMap.h"
 #include "value/sequence/bytecode/BytecodeWalkers.h"
-#include "value/sequence/bytecode/SequenceCommandHelpers.h"
 
 #include <fmt/format.h>
 
@@ -222,303 +221,396 @@ void TrackState::emitModulationDepths(PerformanceEmitter& out, bool enabled) con
   }
 }
 
-using Runtime = CommandRuntime<TrackState, Context>;
-
 // Opcode implementations.
+template <class Runtime>
 void emitLinearVolume(Runtime& rt, u8 raw) {
   // Capcom volume is a linear amplitude gain. MIDI rendering applies the
   // square-root MIDI controller curve later.
   rt.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)), LevelPrecisionHint::FourteenBit);
 }
 
+template <class Runtime>
 void emitLinearMasterVolume(Runtime& rt, u8 raw) {
   rt.masterLevel(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)));
 }
 
+template <class Runtime>
 void emitPan(Runtime& rt, u8 raw) {
   const auto pan = math::panConversion(rt.context.version, raw);
   rt.pan(math::stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
 }
 
-// Notes and note-state commands.
-struct Rest {
-  u8 rawDuration = 0;
+template <class Runtime>
+void applyAttributes(Runtime& rt, u8 raw) {
+  if constexpr (requires { rt.out; }) {
+    rt.state.applyAttributes(raw, &rt.out);
+  } else {
+    rt.state.applyAttributes(raw);
+  }
+}
 
-  static Rest parse(CommandReader& in) {
-    const auto duration = static_cast<u8>(in.opcode() >> 5);
-    in.derived("duration_index", static_cast<u64>(duration));
-    return Rest{.rawDuration = duration};
+template <class Runtime>
+void toggleSlur(Runtime& rt) {
+  if constexpr (requires { rt.out; }) {
+    rt.state.toggleSlur(rt.out);
+  } else {
+    rt.state.noteSlurred = !rt.state.noteSlurred;
+  }
+}
+
+template <class Runtime>
+void renderWarning(Runtime& rt, std::string message) {
+  if constexpr (requires { rt.vm.diagnostic(Diagnostic{}); }) {
+    rt.vm.diagnostic(Diagnostic{
+        .severity = Severity::Warning,
+        .message = std::move(message),
+    });
+  }
+}
+
+struct CapcomCursorReader {
+  template <class Runtime>
+  static CommandFlow read(VmCommandCursor& cmd, Runtime& rt) {
+    const u8 opcode = cmd.opcode();
+    if (opcode >= 0x20) {
+      return (opcode & 0x1f) == 0 ? rest(cmd, rt, opcode) : note(cmd, rt, opcode);
+    }
+
+    switch (opcode) {
+      case 0x00:
+        return toggleTriplet(cmd, rt);
+      case 0x01:
+        return slur(cmd, rt);
+      case 0x02:
+        return dotted(cmd, rt);
+      case 0x03:
+        return toggleOctaveUp(cmd, rt);
+      case 0x04:
+        return noteAttributes(cmd, rt);
+      case 0x05:
+        return tempo(cmd, rt);
+      case 0x06:
+        return durationRate(cmd, rt);
+      case 0x07:
+        return volume(cmd, rt);
+      case 0x08:
+        return program(cmd, rt);
+      case 0x09:
+        return octave(cmd, rt);
+      case 0x0a:
+        return globalTranspose(cmd, rt);
+      case 0x0b:
+        return transpose(cmd, rt);
+      case 0x0c:
+        return tuning(cmd, rt);
+      case 0x0d:
+        return portamentoTime(cmd, rt);
+      case 0x0e:
+      case 0x0f:
+      case 0x10:
+      case 0x11:
+        return repeatUntil(cmd, rt, opcode);
+      case 0x12:
+      case 0x13:
+      case 0x14:
+      case 0x15:
+        return repeatBreak(cmd, rt, opcode);
+      case 0x16:
+        return jump(cmd);
+      case 0x17:
+        return cmd.name("End").kind("end").semantic(SequenceSemantic::End).end();
+      case 0x18:
+        return pan(cmd, rt);
+      case 0x19:
+        return masterVolume(cmd, rt);
+      case 0x1a:
+        return lfo(cmd, rt);
+      case 0x1b:
+        return echoParam(cmd);
+      case 0x1c:
+        return echoOnOff(cmd, rt);
+      case 0x1d:
+        return releaseRate(cmd);
+      case 0x1e:
+      case 0x1f:
+        return rt.context.version == CapcomSnesEngineVersion::v1BgmInList ? unknownOneByte(cmd) : nop(cmd);
+      default:
+        return unknown(cmd, rt);
+    }
   }
 
-  Effects execute(Runtime& rt) const {
+private:
+  template <class Runtime>
+  static CommandFlow rest(VmCommandCursor& cmd, Runtime& rt, u8 opcode) {
+    cmd.name("Rest").semantic(SequenceSemantic::Rest);
+    const auto rawDuration = static_cast<u8>(opcode >> 5);
+    cmd.derived("duration_index", static_cast<u64>(rawDuration));
     const u32 length = rt.state.consumeNoteTicks(rawDuration);
     rt.state.didRest = true;
-    return rt.wait(length);
-  }
-};
-
-struct Note {
-  u8 keyIndex = 0;
-  u8 rawDuration = 0;
-
-  static Note parse(CommandReader& in) {
-    const auto keyIndex = static_cast<u8>(in.opcode() & 0x1f);
-    const auto duration = static_cast<u8>(in.opcode() >> 5);
-    in.derived("key_index", static_cast<u64>(keyIndex));
-    in.derived("duration_index", static_cast<u64>(duration));
-    return Note{
-        .keyIndex = keyIndex,
-        .rawDuration = duration,
-    };
+    return cmd.wait(length);
   }
 
-  Effects execute(Runtime& rt) const {
+  template <class Runtime>
+  static CommandFlow note(VmCommandCursor& cmd, Runtime& rt, u8 opcode) {
+    cmd.name("Note").semantic(SequenceSemantic::Note);
+    const auto keyIndex = static_cast<u8>(opcode & 0x1f);
+    const auto rawDuration = static_cast<u8>(opcode >> 5);
+    cmd.derived("key_index", static_cast<u64>(keyIndex))
+        .derived("duration_index", static_cast<u64>(rawDuration));
+
     auto& state = rt.state;
     const u32 length = state.consumeNoteTicks(rawDuration);
     const s32 key = state.sourceKey(keyIndex);
     const u32 duration = state.soundingTicks(length);
-
     if (state.extendsPreviousSlurredNote(key)) {
-      // The Capcom driver treats repeated keys after a slurred note as a tie.
-      // Legacy VGMTrans extends the previous MIDI note even if this note has
-      // already cleared the slur bit, so the state must look at the previous note.
+      // Repeating a key after a slurred note extends the previous note, even if
+      // this command has already cleared the current slur bit.
       rt.note(state.performedKey(key), 1.0, duration, true);
       state.finishExtendedNote();
-      return rt.wait(length);
+      return cmd.wait(length);
     }
 
-    state.emitPortamentoIfNeeded(key, rt.out);
+    if constexpr (requires { rt.out; }) {
+      state.emitPortamentoIfNeeded(key, rt.out);
+    }
     // Slur is modeled as a one-tick overlap into the next source note.
     rt.note(state.performedKey(key), 1.0, duration + (state.noteSlurred ? 1u : 0u));
     state.finishNote(key);
-    return rt.wait(length);
-  }
-};
-
-struct NoteAttributes : U8Operand<NoteAttributes> {
-  static constexpr std::string_view operandName = "raw";
-
-  void execute(Runtime& rt) const { rt.state.applyAttributes(raw, &rt.out); }
-};
-
-struct Octave : U8StateCommand<Octave, &TrackState::noteOctave> {
-  static constexpr std::string_view operandName = "octave";
-};
-
-struct ToggleTriplet : ToggleBoolStateCommand<ToggleTriplet, &TrackState::noteTriplet> {};
-
-struct ToggleSlur : NoOperands<ToggleSlur> {
-  void execute(Runtime& rt) const { rt.state.toggleSlur(rt.out); }
-};
-
-struct DottedNote : SetTrueStateCommand<DottedNote, &TrackState::noteDotted> {};
-
-struct ToggleOctaveUp : ToggleBoolStateCommand<ToggleOctaveUp, &TrackState::noteOctaveUp> {};
-
-// Pitch, tuning, and timing commands.
-struct GlobalTranspose {
-  s8 raw = 0;
-
-  static GlobalTranspose parse(CommandReader& in) { return GlobalTranspose{.raw = in.s8("semitones")}; }
-
-  void execute(Runtime& rt) const { rt.globalTranspose(raw); }
-};
-
-struct Transpose : S8StateCommand<Transpose, &TrackState::transpose> {
-  static constexpr std::string_view operandName = "semitones";
-};
-
-struct Tuning : S8Operand<Tuning> {
-  static constexpr std::string_view operandName = "tuning";
-
-  void describe(CommandInfo& out) const { out.field("cents", math::tuningCents(raw)); }
-
-  void execute(Runtime& rt) const { rt.tuning(math::tuningCents(raw)); }
-};
-
-struct PortamentoTime : U8Operand<PortamentoTime> {
-  static constexpr std::string_view operandName = "time";
-
-  void execute(Runtime& rt) const {
-    // The driver stores portamento as speed; the next note converts it to a
-    // distance-dependent time using the previous source key.
-    rt.state.portamentoMillisecondsPerCent = math::portamentoMillisecondsPerCent(raw);
-  }
-};
-
-struct Tempo : Be16Operand<Tempo> {
-  static constexpr std::string_view operandName = "raw";
-
-  void describe(CommandInfo& out) const {
-    out.field("microseconds_per_quarter", math::tempoMicrosecondsPerQuarter(raw));
+    return cmd.wait(length);
   }
 
-  void execute(Runtime& rt) const { rt.tempo(math::tempoMicrosecondsPerQuarter(raw)); }
-};
-
-struct DurationRate : U8StateCommand<DurationRate, &TrackState::durationRate> {
-  static constexpr std::string_view operandName = "rate";
-};
-
-// Control flow.
-struct RepeatUntil {
-  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
-
-  u8 slot = 0;
-  u8 count = 0;
-  Address destination;
-
-  static RepeatUntil parse(CommandReader& in) {
-    const auto slot = static_cast<u8>(in.opcode() - 0x0e);
-    in.derived("slot", static_cast<u64>(slot + 1));
-    return RepeatUntil{
-        .slot = slot,
-        .count = in.u8("count"),
-        .destination = in.be16Address("destination"),
-    };
+  template <class Runtime>
+  static CommandFlow noteAttributes(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Note Attributes").semantic(SequenceSemantic::State);
+    const auto raw = cmd.u8("raw");
+    if (raw) {
+      applyAttributes(rt, raw.value);
+    }
+    return cmd.next();
   }
 
-  Effects execute(Runtime& rt) const {
-    if (count == 0) {
-      return rt.declaredLoop(destination);
+  template <class Runtime>
+  static CommandFlow octave(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Octave").semantic(SequenceSemantic::State);
+    const auto value = cmd.u8("octave");
+    if (value) {
+      rt.state.noteOctave = value.value;
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow toggleTriplet(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Toggle Triplet").semantic(SequenceSemantic::State);
+    rt.state.noteTriplet = !rt.state.noteTriplet;
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow slur(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Toggle Slur").semantic(SequenceSemantic::State);
+    toggleSlur(rt);
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow dotted(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Dotted Note").semantic(SequenceSemantic::State);
+    rt.state.noteDotted = true;
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow toggleOctaveUp(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Toggle Octave Up").semantic(SequenceSemantic::State);
+    rt.state.noteOctaveUp = !rt.state.noteOctaveUp;
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow globalTranspose(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Global Transpose").semantic(SequenceSemantic::Pitch);
+    const auto semitones = cmd.s8("semitones");
+    if (semitones) {
+      rt.globalTranspose(semitones.value);
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow transpose(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Transpose").semantic(SequenceSemantic::Pitch);
+    const auto semitones = cmd.s8("semitones");
+    if (semitones) {
+      rt.state.transpose = semitones.value;
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow tuning(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Tuning").semantic(SequenceSemantic::Pitch);
+    const auto raw = cmd.s8("tuning");
+    if (raw) {
+      cmd.detail("cents", math::tuningCents(raw.value));
+      rt.tuning(math::tuningCents(raw.value));
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow portamentoTime(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
+    const auto raw = cmd.u8("time");
+    if (raw) {
+      // The driver stores portamento as speed; the next note turns it into time
+      // using the distance from the previous source key.
+      rt.state.portamentoMillisecondsPerCent = math::portamentoMillisecondsPerCent(raw.value);
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow tempo(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
+    const auto raw = cmd.u16be("raw");
+    if (raw) {
+      const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw.value);
+      cmd.detail("microseconds_per_quarter", static_cast<u64>(microseconds));
+      rt.tempo(microseconds);
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow durationRate(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Duration Rate").semantic(SequenceSemantic::State);
+    const auto rate = cmd.u8("rate");
+    if (rate) {
+      rt.state.durationRate = rate.value;
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow repeatUntil(VmCommandCursor& cmd, Runtime& rt, u8 opcode) {
+    cmd.name("Repeat Until").semantic(SequenceSemantic::Repeat);
+    const auto slot = static_cast<u8>(opcode - 0x0e);
+    cmd.derived("slot", static_cast<u64>(slot + 1));
+    const auto count = cmd.u8("count");
+    const auto destination = cmd.address16be("destination");
+    if (count.value == 0) {
+      return cmd.declaredLoop(destination.value);
     }
 
     // Capcom stores the number of replays. The VM helper receives total plays.
-    return rt.vm.countedRepeatUntil(slot, static_cast<u32>(count) + 1, destination);
-  }
-};
-
-struct RepeatBreak {
-  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
-
-  u8 slot = 0;
-  u8 attributes = 0;
-  Address destination;
-
-  static RepeatBreak parse(CommandReader& in) {
-    const auto slot = static_cast<u8>(in.opcode() - 0x12);
-    in.derived("slot", static_cast<u64>(slot + 1));
-    return RepeatBreak{
-        .slot = slot,
-        .attributes = in.u8("attributes"),
-        .destination = in.be16Address("destination"),
-    };
+    return rt.countedRepeatUntil(cmd, slot, static_cast<u32>(count.value) + 1, destination.value);
   }
 
-  Effects execute(Runtime& rt) const {
-    const BranchResult branch = rt.vm.countedRepeatBreak(slot, destination);
-    if (branch.taken) {
-      rt.state.applyAttributes(attributes, &rt.out);
+  template <class Runtime>
+  static CommandFlow repeatBreak(VmCommandCursor& cmd, Runtime& rt, u8 opcode) {
+    cmd.name("Repeat Break").semantic(SequenceSemantic::RepeatBreak);
+    const auto slot = static_cast<u8>(opcode - 0x12);
+    cmd.derived("slot", static_cast<u64>(slot + 1));
+    const auto attributes = cmd.u8("attributes");
+    const auto destination = cmd.address16be("destination");
+    const RepeatBreakFlow branch = rt.countedRepeatBreak(cmd, slot, destination.value);
+    if (attributes && branch.taken()) {
+      applyAttributes(rt, attributes.value);
     }
-    return branch.effects;
-  }
-};
-
-// Program and mixer controls.
-struct Volume : U8Operand<Volume> {
-  static constexpr std::string_view operandName = "raw";
-
-  void describe(CommandInfo& out, const Context& context) const {
-    out.field("linear_gain", math::volumeGain(context.version, raw));
+    return branch;
   }
 
-  void execute(Runtime& rt) const { emitLinearVolume(rt, raw); }
-};
-
-struct Program : U8Operand<Program> {
-  static constexpr std::string_view operandName = "raw";
-
-  [[nodiscard]] u32 bank() const { return raw >> 7; }
-  [[nodiscard]] u32 program() const { return raw & 0x7f; }
-
-  void describe(CommandInfo& out) const {
-    out.field("bank", bank());
-    out.field("program", program());
+  template <class Runtime>
+  static CommandFlow volume(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Volume").semantic(SequenceSemantic::Level);
+    const auto raw = cmd.u8("raw");
+    if (raw) {
+      cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw.value));
+      emitLinearVolume(rt, raw.value);
+    }
+    return cmd.next();
   }
 
-  void references(CommandReferences& out) const { out.instrument(bank(), program()); }
-
-  void execute(Runtime& rt) const { rt.instrument(bank(), program(), true); }
-};
-
-struct Jump : Be16AddressOperand<Jump> {
-  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
-
-  Address destination;
-
-  Effects execute(Runtime& rt) const { return rt.loopCandidate(destination); }
-};
-
-struct End : StopsPlaybackCommand, NoOperands<End> {
-  static constexpr CommandMeta meta = commandMeta("end", "End");
-
-  Effects execute(Runtime& rt) const { return rt.end(); }
-};
-
-struct Pan : U8Operand<Pan> {
-  static constexpr std::string_view operandName = "raw";
-
-  [[nodiscard]] ::capcom_snes::PanConversionResult conversion(const Context& context) const {
-    return math::panConversion(context.version, raw);
+  template <class Runtime>
+  static CommandFlow program(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Program").semantic(SequenceSemantic::Program);
+    const auto raw = cmd.u8("raw");
+    const u32 bank = raw.value >> 7;
+    const u32 program = raw.value & 0x7f;
+    cmd.derived("bank", static_cast<u64>(bank)).derived("program", static_cast<u64>(program));
+    if (raw) {
+      rt.instrument(bank, program, true);
+    }
+    return cmd.next();
   }
 
-  void describe(CommandInfo& out, const Context& context) const {
-    const auto pan = conversion(context);
-    out.field("stereo_position", math::stereoPosition(pan));
-    out.field("linear_gain", pan.volumeScale);
+  static CommandFlow jump(VmCommandCursor& cmd) {
+    cmd.name("Jump").semantic(SequenceSemantic::Jump);
+    const auto destination = cmd.address16be("destination");
+    return cmd.loopCandidate(destination.value);
   }
 
-  void execute(Runtime& rt) const { emitPan(rt, raw); }
-};
-
-struct MasterVolume : U8Operand<MasterVolume> {
-  static constexpr std::string_view operandName = "raw";
-
-  void describe(CommandInfo& out, const Context& context) const {
-    out.field("linear_gain", math::volumeGain(context.version, raw));
+  template <class Runtime>
+  static CommandFlow pan(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Pan").semantic(SequenceSemantic::Pan);
+    const auto raw = cmd.u8("raw");
+    if (raw) {
+      const auto converted = math::panConversion(rt.context.version, raw.value);
+      cmd.detail("stereo_position", math::stereoPosition(converted))
+          .detail("linear_gain", converted.volumeScale);
+      emitPan(rt, raw.value);
+    }
+    return cmd.next();
   }
 
-  void execute(Runtime& rt) const { emitLinearMasterVolume(rt, raw); }
-};
-
-// LFO and effects commands.
-struct Lfo {
-  u8 type = 0;
-  u8 value = 0;
-
-  static Lfo parse(CommandReader& in) {
-    return Lfo{
-        .type = in.u8("type"),
-        .value = in.u8("value"),
-    };
+  template <class Runtime>
+  static CommandFlow masterVolume(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Master Volume").semantic(SequenceSemantic::Level);
+    const auto raw = cmd.u8("raw");
+    if (raw) {
+      cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw.value));
+      emitLinearMasterVolume(rt, raw.value);
+    }
+    return cmd.next();
   }
 
-  void execute(Runtime& rt) const {
+  template <class Runtime>
+  static CommandFlow lfo(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("LFO").kind("lfo").semantic(SequenceSemantic::Modulation);
+    const auto type = cmd.u8("type");
+    const auto value = cmd.u8("value");
+    if (!type || !value) {
+      return cmd.next();
+    }
+
     auto& state = rt.state;
-    switch (type) {
+    switch (type.value) {
       case 0:
-        state.vibratoDepth = value & 0x7f;
+        state.vibratoDepth = value.value & 0x7f;
         rt.modulation(ModulationPerformanceTarget::VibratoDepth,
                       state.modulationRate != 0 ? math::midi7Amount(state.vibratoDepth) : 0.0);
         break;
 
       case 1:
-        state.tremoloDepth = math::tremoloDepth(rt.context.version, value);
+        state.tremoloDepth = math::tremoloDepth(rt.context.version, value.value);
         rt.modulation(ModulationPerformanceTarget::TremoloDepth,
                       state.modulationRate != 0 ? math::midi7Amount(state.tremoloDepth) : 0.0);
         break;
 
       case 2: {
         const bool wasEnabled = state.modulationRate != 0;
-        state.modulationRate = value;
+        state.modulationRate = value.value;
         const bool isEnabled = state.modulationRate != 0;
-        if (!isEnabled && wasEnabled) {
-          state.emitModulationDepths(rt.out, false);
-        } else if (isEnabled && !wasEnabled) {
-          state.emitModulationDepths(rt.out, true);
+        if constexpr (requires { rt.out; }) {
+          if (!isEnabled && wasEnabled) {
+            state.emitModulationDepths(rt.out, false);
+          } else if (isEnabled && !wasEnabled) {
+            state.emitModulationDepths(rt.out, true);
+          }
         }
 
-        const double rate = math::lfoRateAmount(value);
+        const double rate = math::lfoRateAmount(value.value);
         rt.modulation(ModulationPerformanceTarget::VibratoRate, rate);
         rt.modulation(ModulationPerformanceTarget::TremoloRate, rate);
         break;
@@ -529,78 +621,58 @@ struct Lfo {
         // on note activation, so there is nothing useful to emit yet.
         break;
     }
+    return cmd.next();
+  }
+
+  static CommandFlow echoParam(VmCommandCursor& cmd) {
+    cmd.name("Echo Param").semantic(SequenceSemantic::Meta);
+    static_cast<void>(cmd.u8("argument"));
+    static_cast<void>(cmd.u8("preset"));
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow echoOnOff(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Echo On/Off").semantic(SequenceSemantic::Meta);
+    const auto raw = cmd.u8("raw");
+    cmd.derived("enabled", static_cast<u64>(raw.value & 1));
+    if (raw) {
+      rt.reverb((raw.value & 1) != 0 ? 40.0 / 127.0 : 0.0);
+    }
+    return cmd.next();
+  }
+
+  static CommandFlow releaseRate(VmCommandCursor& cmd) {
+    cmd.name("Release Rate").semantic(SequenceSemantic::Meta);
+    const auto raw = cmd.u8("raw");
+    if (raw) {
+      cmd.derived("gain", static_cast<u64>(raw.value | 0xa0));
+    }
+    return cmd.next();
+  }
+
+  static CommandFlow nop(VmCommandCursor& cmd) {
+    return cmd.name("No Operation").kind("nop").semantic(SequenceSemantic::Meta).next();
+  }
+
+  static CommandFlow unknownOneByte(VmCommandCursor& cmd) {
+    cmd.name("Unknown One-Byte Event").kind("unknown-one-byte").semantic(SequenceSemantic::Meta);
+    cmd.derived("opcode", static_cast<u64>(cmd.opcode()), SourceValueDisplay::Hex);
+    static_cast<void>(cmd.u8("value"));
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow unknown(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Unknown Opcode").kind("unknown").semantic(SequenceSemantic::Unsupported)
+        .derived("opcode", static_cast<u64>(cmd.opcode()), SourceValueDisplay::Hex)
+        .unsupported("Unknown Capcom SNES sequence opcode");
+    renderWarning(rt, "Unknown Capcom SNES sequence opcode");
+    return cmd.end();
   }
 };
 
-// Source-only and diagnostic commands.
-struct EchoParam : SourceOnlyCommand {
-  u8 argument = 0;
-  u8 preset = 0;
-
-  static EchoParam parse(CommandReader& in) {
-    return EchoParam{
-        .argument = in.u8("argument"),
-        .preset = in.u8("preset"),
-    };
-  }
-};
-
-struct EchoOnOff {
-  u8 raw = 0;
-
-  static EchoOnOff parse(CommandReader& in) {
-    EchoOnOff result{.raw = in.u8("raw")};
-    in.derived("enabled", static_cast<u64>(result.raw & 1));
-    return result;
-  }
-
-  void execute(Runtime& rt) const { rt.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0); }
-};
-
-struct ReleaseRate : SourceOnlyCommand, U8Operand<ReleaseRate> {
-  static constexpr std::string_view operandName = "raw";
-
-  void describe(CommandInfo& out) const { out.field("gain", static_cast<u8>(raw | 0xa0)); }
-};
-
-struct Nop : NoOpCommand, NoOperands<Nop> {
-  static constexpr CommandMeta meta = commandMeta("nop", "No Operation");
-};
-
-struct UnknownOneByte : SourceOnlyCommand {
-  static constexpr CommandMeta meta = commandMeta("unknown-one-byte", "Unknown One-Byte Event");
-
-  u8 opcode = 0;
-  u8 value = 0;
-
-  static UnknownOneByte parse(CommandReader& in) {
-    in.derived("opcode", static_cast<u64>(in.opcode()));
-    return UnknownOneByte{
-        .opcode = in.opcode(),
-        .value = in.u8("value"),
-    };
-  }
-};
-
-struct UnknownOpcode {
-  static constexpr CommandMeta meta = commandMeta("unknown", "Unknown Opcode");
-  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::Unsupported;
-
-  u8 opcode = 0;
-
-  static UnknownOpcode parse(CommandReader& in) {
-    in.derived("opcode", static_cast<u64>(in.opcode()));
-    return UnknownOpcode{.opcode = in.opcode()};
-  }
-
-  Effects execute(Runtime& rt) const {
-    rt.vm.diagnostic(Diagnostic{
-        .severity = Severity::Warning,
-        .message = "Unknown Capcom SNES sequence opcode",
-    });
-    return rt.end();
-  }
-};
+using CapcomCursorCommand = CursorBytecodeCommand<TrackState, Context, CapcomCursorReader>;
 
 // Source opcode table. This should stay compact enough to read like the
 // driver's dispatch map.
@@ -610,46 +682,68 @@ template <class Registrar>
 
   for (u16 opcode = 0x20; opcode <= 0xff; ++opcode) {
     if ((opcode & 0x1f) == 0) {
-      map.op<Rest>(static_cast<u8>(opcode), "Rest");
+      map.cursorOp<CapcomCursorCommand>(static_cast<u8>(opcode), commandMeta("rest", "Rest"));
     } else {
-      map.op<Note>(static_cast<u8>(opcode), "Note");
+      map.cursorOp<CapcomCursorCommand>(static_cast<u8>(opcode), commandMeta("note", "Note"));
     }
   }
 
-  map.op<0x00, ToggleTriplet>("Toggle Triplet");
-  map.op<0x01, ToggleSlur>("Toggle Slur");
-  map.op<0x02, DottedNote>("Dotted Note");
-  map.op<0x03, ToggleOctaveUp>("Toggle Octave Up");
-  map.op<0x04, NoteAttributes>("Note Attributes");
-  map.op<0x05, Tempo>("Tempo");
-  map.op<0x06, DurationRate>("Duration Rate");
-  map.op<0x07, Volume>("Volume");
-  map.op<0x08, Program>("Program");
-  map.op<0x09, Octave>("Octave");
-  map.op<0x0a, GlobalTranspose>("Global Transpose");
-  map.op<0x0b, Transpose>("Transpose");
-  map.op<0x0c, Tuning>("Tuning");
-  map.op<0x0d, PortamentoTime>("Portamento Time");
-  map.range<0x0e, 0x11, RepeatUntil>("Repeat Until");
-  map.range<0x12, 0x15, RepeatBreak>("Repeat Break");
-  map.jump<0x16, Jump, &Jump::destination>("Jump");
-  map.terminal<0x17, End>();
-  map.op<0x18, Pan>("Pan");
-  map.op<0x19, MasterVolume>("Master Volume");
-  map.op<0x1a, Lfo>("LFO");
-  map.op<0x1b, EchoParam>("Echo Param");
-  map.op<0x1c, EchoOnOff>("Echo On/Off");
-  map.op<0x1d, ReleaseRate>("Release Rate");
+  map.cursorOp<0x00, CapcomCursorCommand>(commandMeta("toggle-triplet", "Toggle Triplet"));
+  map.cursorOp<0x01, CapcomCursorCommand>(commandMeta("toggle-slur", "Toggle Slur"));
+  map.cursorOp<0x02, CapcomCursorCommand>(commandMeta("dotted-note", "Dotted Note"));
+  map.cursorOp<0x03, CapcomCursorCommand>(commandMeta("toggle-octave-up", "Toggle Octave Up"));
+  map.cursorOp<0x04, CapcomCursorCommand>(commandMeta("note-attributes", "Note Attributes"));
+  map.cursorOp<0x05, CapcomCursorCommand>(commandMeta("tempo", "Tempo"));
+  map.cursorOp<0x06, CapcomCursorCommand>(commandMeta("duration-rate", "Duration Rate"));
+  map.cursorOp<0x07, CapcomCursorCommand>(commandMeta("volume", "Volume"));
+  map.cursorOp<0x08, CapcomCursorCommand>(commandMeta("program", "Program"));
+  map.cursorOp<0x09, CapcomCursorCommand>(commandMeta("octave", "Octave"));
+  map.cursorOp<0x0a, CapcomCursorCommand>(commandMeta("global-transpose", "Global Transpose"));
+  map.cursorOp<0x0b, CapcomCursorCommand>(commandMeta("transpose", "Transpose"));
+  map.cursorOp<0x0c, CapcomCursorCommand>(commandMeta("tuning", "Tuning"));
+  map.cursorOp<0x0d, CapcomCursorCommand>(commandMeta("portamento-time", "Portamento Time"));
+  map.cursorRange<0x0e, 0x11, CapcomCursorCommand>(
+      commandMeta("repeat-until", "Repeat Until"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::AffectsControlFlow});
+  map.cursorRange<0x12, 0x15, CapcomCursorCommand>(
+      commandMeta("repeat-break", "Repeat Break"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::AffectsControlFlow});
+  map.cursorOp<0x16, CapcomCursorCommand>(
+      commandMeta("jump", "Jump"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::AffectsControlFlow});
+  map.cursorOp<0x17, CapcomCursorCommand>(
+      commandMeta("end", "End"), BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::StopsPlayback});
+  map.cursorOp<0x18, CapcomCursorCommand>(commandMeta("pan", "Pan"));
+  map.cursorOp<0x19, CapcomCursorCommand>(commandMeta("master-volume", "Master Volume"));
+  map.cursorOp<0x1a, CapcomCursorCommand>(commandMeta("lfo", "LFO"));
+  map.cursorOp<0x1b, CapcomCursorCommand>(
+      commandMeta("echo-param", "Echo Param"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::SourceOnly});
+  map.cursorOp<0x1c, CapcomCursorCommand>(commandMeta("echo-on-off", "Echo On/Off"));
+  map.cursorOp<0x1d, CapcomCursorCommand>(
+      commandMeta("release-rate", "Release Rate"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::SourceOnly});
 
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
-    map.op<0x1e, UnknownOneByte>();
-    map.op<0x1f, UnknownOneByte>();
+    map.cursorOp<0x1e, CapcomCursorCommand>(
+        commandMeta("unknown-one-byte", "Unknown One-Byte Event"),
+        BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::SourceOnly});
+    map.cursorOp<0x1f, CapcomCursorCommand>(
+        commandMeta("unknown-one-byte", "Unknown One-Byte Event"),
+        BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::SourceOnly});
   } else {
-    map.op<0x1e, Nop>();
-    map.op<0x1f, Nop>();
+    map.cursorOp<0x1e, CapcomCursorCommand>(
+        commandMeta("nop", "No Operation"), BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::NoOp});
+    map.cursorOp<0x1f, CapcomCursorCommand>(
+        commandMeta("nop", "No Operation"), BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::NoOp});
   }
 
-  map.unknown<UnknownOpcode>();
+  map.cursorTruncated<CapcomCursorCommand>(
+      commandMeta("truncated", "Truncated Command"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::Unsupported});
+  map.cursorUnknown<CapcomCursorCommand>(
+      commandMeta("unknown", "Unknown Opcode"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::Unsupported});
   return map.finish();
 }
 
@@ -717,16 +811,26 @@ void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
 }
 
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequenceDescriptor& descriptor,
-                                         u32 sourceTrackNumber, u32 startAddress) {
+                                         u32 sourceTrackNumber, u32 startAddress, SourceMapBuilder* sourceMap,
+                                         std::vector<Diagnostic>* diagnostics) {
   const BytecodeDispatchTable& bytecode = descriptor.bytecode;
   return decodeLinearBytecodeTrack(reader, sourceTrackNumber, startAddress,
                                    LinearBytecodeDecodePolicy{.maxCommands = 4096},
-                                   [&](u32 offset) { return bytecode.decode(reader, offset); });
+                                   [&](u32 offset) {
+                                     return bytecode.decode(reader, offset,
+                                                            BytecodeDecodeContext{
+                                                                .bytecodeEnd = static_cast<u32>(reader.size()),
+                                                                .dialectContext = &descriptor.dialect.context,
+                                                                .sourceMap = sourceMap,
+                                                                .diagnostics = diagnostics,
+                                                            });
+                                   });
 }
 
 SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const CapcomSnesLayout& layout, AssetId sequenceId,
                                              std::optional<ScanInstrumentSetRef> instrumentSet,
-                                             std::string_view displayName) {
+                                             std::string_view displayName, SourceMapBuilder* sourceMap,
+                                             std::vector<Diagnostic>* diagnostics) {
   const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
   ItemTree items;
   ItemTreeBuilder itemBuilder(items, input.ids);
@@ -757,7 +861,8 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
         itemBuilder.add(root, ItemKind::Track, "capcom-snes.track-pointer", "Track Pointer",
                         input.reader.range(pointerOffset, 2), fmt::format("Track starts at ${:04X}", trackAddress));
     auto track = decodeCapcomSnesSourceTrack(input.reader, descriptor,
-                                             static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex), trackAddress);
+                                             static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex), trackAddress,
+                                             sourceMap, diagnostics);
 
     addSourceCommandItemsAndInstrumentReferences(itemBuilder, trackItem, program, dialect, track, instrumentSetId);
 

@@ -418,6 +418,8 @@ void VmCommandCursor::recordOperand(std::string_view name, SourceRange range, co
     }
   } else if (const auto* signedValue = std::get_if<s64>(&value)) {
     operands_->push_back(CommandOperand{.name = std::string(name), .value = *signedValue, .range = range});
+  } else if (const auto* doubleValue = std::get_if<double>(&value)) {
+    operands_->push_back(CommandOperand{.name = std::string(name), .value = *doubleValue, .range = range});
   } else if (const auto* text = std::get_if<std::string>(&value)) {
     operands_->push_back(CommandOperand{.name = std::string(name), .value = *text, .range = range});
   } else if (const auto* boolValue = std::get_if<bool>(&value)) {
@@ -440,6 +442,10 @@ CommandFlow VmCommandCursor::flow(FlowKind kind, u32 waitTicks, std::optional<Ad
 }
 
 Effects effectsFromCommandFlow(const CommandFlow& flow) {
+  if (flow.resolvedEffects) {
+    return *flow.resolvedEffects;
+  }
+
   if (flow.truncated) {
     return Effects{.step = Step::end()};
   }
@@ -485,6 +491,10 @@ Effects effectsFromCommandFlow(const CommandFlow& flow) {
 }
 
 Effects effectsFromCommandFlow(const CommandFlow& flow, VmApi& vm) {
+  if (flow.resolvedEffects) {
+    return *flow.resolvedEffects;
+  }
+
   switch (flow.kind) {
     case FlowKind::CountedRepeatUntil:
       if (!flow.destination) {
