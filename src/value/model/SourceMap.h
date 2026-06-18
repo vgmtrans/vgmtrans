@@ -194,6 +194,7 @@ public:
   [[nodiscard]] SourceAnnotationId id() const noexcept { return id_; }
 
   AnnotationBuilder& role(SourceRole role);
+  AnnotationBuilder& range(SourceRange range);
   AnnotationBuilder& label(std::string_view label);
   AnnotationBuilder& kind(std::string_view localKindOverride);
   AnnotationBuilder& parent(SourceAnnotationId parent);

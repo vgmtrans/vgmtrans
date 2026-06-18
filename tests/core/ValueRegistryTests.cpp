@@ -7,12 +7,48 @@
 #include "ValueTestSupport.h"
 
 #include "value/scan/ScanResultBuilder.h"
+#include "value/sequence/bytecode/BytecodeWalkers.h"
 
 namespace {
 
 struct ProbeMetaCommand : NoOpCommand, NoOperands<ProbeMetaCommand> {
   static constexpr CommandMeta meta = commandMeta("local-meta", "Local Meta");
 };
+
+struct CursorProbeState {
+  u8 transpose = 1;
+};
+
+struct CursorProbeContext {
+  double velocity = 0.5;
+};
+
+struct CursorProbeReader {
+  template <class Runtime>
+  static CommandFlow read(VmCommandCursor& cmd, Runtime& rt) {
+    switch (cmd.opcode()) {
+      case 0x90: {
+        cmd.name("Note").semantic(SequenceSemantic::Note);
+        const auto key = cmd.u8("key");
+        const auto duration = cmd.u8("duration");
+        if (key && duration) {
+          rt.note(key.value + rt.state.transpose, rt.context.velocity, duration.value);
+        }
+        return cmd.wait(duration.value);
+      }
+      case 0xff:
+        return cmd.name("End").kind("end").semantic(SequenceSemantic::End).end();
+      default:
+        return cmd.name("Unsupported Opcode")
+            .kind("unsupported")
+            .semantic(SequenceSemantic::Unsupported)
+            .unsupported("Unsupported cursor probe opcode")
+            .end();
+    }
+  }
+};
+
+using CursorProbeCommand = CursorBytecodeCommand<CursorProbeState, CursorProbeContext, CursorProbeReader>;
 
 void bytecodeMapRejectsIncompatibleHandlerReuse() {
   SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
@@ -104,6 +140,68 @@ void bytecodeMapAllowsOneHandlerForSeveralKinds() {
   expect(decodeTable.opcodes[0x20]->handler == registeredTable.opcodes[0x20]->handler &&
              decodeTable.opcodes[0x21]->kind == registeredTable.opcodes[0x21]->kind,
          "decode-time map construction should reuse the registered handler and kind IDs");
+}
+
+void cursorBytecodeMapDecodesAnnotationsAndRendersThroughVm() {
+  SequenceDialectBuilder<CursorProbeState, CursorProbeContext> builder("cursor-probe",
+                                                                       CursorProbeContext{.velocity = 0.25});
+  builder.timebase(Timebase{.ppqn = 48});
+  BytecodeMapBuilder<CursorProbeState, CursorProbeContext> map{"cursor-probe", builder};
+  map.cursorOp<0x90, CursorProbeCommand>(commandMeta("note", "Note"));
+  map.cursorOp<0xff, CursorProbeCommand>(
+      commandMeta("end", "End"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::StopsPlayback});
+  map.cursorTruncated<CursorProbeCommand>(
+      commandMeta("truncated", "Truncated Command"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::StopsPlayback});
+
+  const BytecodeDispatchTable table = map.finish();
+  const SequenceDialect dialect = builder.finish();
+  expect(dialect.handlers.size() == 1 && dialect.kinds.size() == 3,
+         "cursor-backed opcodes should share one executable handler but keep separate kinds");
+
+  const std::vector<u8> bytes{0x90, 60, 12, 0xff};
+  const ByteReader reader(SourceId{0}, bytes);
+  ScanIdAllocator ids;
+  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
+  std::vector<Diagnostic> diagnostics;
+  auto track = decodeLinearBytecodeTrack(
+      reader, 0, 0, LinearBytecodeDecodePolicy{},
+      [&](u32 offset) {
+        return table.decode(reader, offset,
+                            BytecodeDecodeContext{
+                                .bytecodeEnd = static_cast<u32>(bytes.size()),
+                                .dialectContext = &dialect.context,
+                                .sourceMap = &sourceMap,
+                                .diagnostics = &diagnostics,
+                            });
+      });
+
+  expect(track.commands.size() == 2, "cursor-backed decode should produce note and end commands");
+  const SourceMap annotations = sourceMap.finish();
+  const auto commandAnnotations = annotations.withRole(SourceId{0}, SourceRole::Command);
+  expect(commandAnnotations.size() == 2, "cursor-backed decode should record source command annotations");
+  const auto& noteAnnotation = annotations.get(commandAnnotations[0]);
+  expect(noteAnnotation.label == "Note" && noteAnnotation.localKind == "note" &&
+             noteAnnotation.range.offset == 0 && noteAnnotation.range.size == 3,
+         "cursor-backed note annotation should use the final decoded command range");
+  expect(noteAnnotation.fields.size() == 3 && noteAnnotation.fields[1].name == "key" &&
+             std::get<u64>(noteAnnotation.fields[1].value) == 60,
+         "cursor-backed decode should record opcode and operand fields");
+  expect(diagnostics.empty(), "valid cursor-backed decode should not emit diagnostics");
+
+  SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
+  };
+  program.tracks.push_back(std::move(track));
+  const PerformanceSequence performance = SequenceVm{}.render(program, dialect);
+  expect(performance.tracks.size() == 1 && performance.tracks[0].events.size() == 1,
+         "cursor-backed command should render through the existing VM");
+  const auto* note = std::get_if<NotePerformanceEvent>(&performance.tracks[0].events[0]);
+  expect(note != nullptr && note->key == 61.0 && note->linearVelocity == 0.25 && note->durationTicks == 12,
+         "cursor-backed render should rerun saved bytes with real runtime state");
 }
 
 void formatRegistryStoresCopyableModuleValues() {
@@ -308,6 +406,7 @@ void runValueRegistryTests() {
   bytecodeMapRequiresFallbackCommand();
   bytecodeMapUsesCommandLocalMetadata();
   bytecodeMapAllowsOneHandlerForSeveralKinds();
+  cursorBytecodeMapDecodesAnnotationsAndRendersThroughVm();
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();
   scanResultBuilderCoversCommonScannerPlumbing();

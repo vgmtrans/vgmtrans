@@ -10,6 +10,7 @@
 #include "value/sequence/SequenceProgram.h"
 
 #include <algorithm>
+#include <any>
 #include <array>
 #include <limits>
 #include <optional>
@@ -19,6 +20,8 @@
 #include <vector>
 
 namespace vgmtrans::core {
+
+class SourceMapBuilder;
 
 // Temporary decoded form used while a bytecode decoder is deciding control flow.
 // TrackProgramBuilder still owns the final immutable source-command snapshot.
@@ -38,6 +41,9 @@ struct BytecodeDecodeContext {
   u32 sequenceOffset = 0;
   u32 sequenceEnd = std::numeric_limits<u32>::max();
   u32 commandEnd = 0;
+  const std::any* dialectContext = nullptr;
+  SourceMapBuilder* sourceMap = nullptr;
+  std::vector<Diagnostic>* diagnostics = nullptr;
 };
 
 struct BytecodeCommandSpec;
@@ -57,6 +63,7 @@ struct BytecodeCommandSpec {
 
 struct BytecodeCommandOptions {
   std::optional<std::string_view> suffix;
+  std::optional<CommandPlaybackStatus> playbackStatus;
 };
 
 // Use this when a command needs an explicit stable ID instead of deriving one

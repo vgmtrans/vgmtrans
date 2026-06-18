@@ -81,6 +81,7 @@ public:
   [[nodiscard]] ::u8 opcode() const noexcept { return bytes_.empty() ? 0 : bytes_.front(); }
   [[nodiscard]] SourceRange commandRange() const noexcept { return commandRange_; }
   [[nodiscard]] SourceAnnotationId annotation() const noexcept { return annotation_; }
+  [[nodiscard]] size_t position() const noexcept { return position_; }
   [[nodiscard]] bool failed() const noexcept { return failed_; }
 
   VmCommandCursor& name(std::string_view displayName);

@@ -75,17 +75,6 @@ struct CommandInfoField {
   std::string value;
 };
 
-// Describes what a command means for playback. This is metadata for UI and
-// validation; execute() still implements the actual behavior.
-enum class CommandPlaybackStatus {
-  SourceOnly,
-  NoOp,
-  AffectsPlayback,
-  AffectsControlFlow,
-  StopsPlayback,
-  Unsupported,
-};
-
 // Details shown for a parsed command. Core adds operands read from the bytes; the
 // format adds fields that explain what those operands mean.
 struct CommandInfo {
@@ -269,6 +258,11 @@ template <class Command>
 template <class Command>
 concept HasDescribe = requires(const Command& command, CommandInfo& out) { command.describe(out); };
 
+template <class Command>
+concept HasParseCommand = requires(CommandReader& in) {
+  { Command::parse(in) } -> std::same_as<Command>;
+};
+
 template <class Command, class Context>
 concept HasDescribeWithContext =
     requires(const Command& command, CommandInfo& out, const Context& context) { command.describe(out, context); };
@@ -298,6 +292,13 @@ concept HasLegacyExecute =
     requires(const Command& command, TrackState& state, PerformanceEmitter& out, VmApi& vm, const Context& context) {
       { command.execute(state, out, vm, context) } -> std::same_as<Effects>;
     };
+
+template <class Command, class TrackState, class Context>
+concept HasSourceCommandExecute = requires(const SourceCommand& record, const TrackProgram& track,
+                                           std::any& trackState, PerformanceEmitter& out, VmApi& vm,
+                                           const std::any& context) {
+  { Command::execute(record, track, trackState, out, vm, context) } -> std::same_as<Effects>;
+};
 
 template <class Command>
 concept HasPlaybackStatus = requires { Command::playbackStatus; };
@@ -342,24 +343,32 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
                      const std::any& context) {
   // SourceCommand stores bytes and IDs. Rebuild the command type here so the
   // format's describe() method can use its normal parsed fields.
-  CommandReader reader{record.range, track.bytesFor(record)};
-  const Command command = Command::parse(reader);
-  if constexpr (HasDescribeWithContext<Command, Context>) {
-    command.describe(out, std::any_cast<const Context&>(context));
-  } else if constexpr (HasDescribe<Command>) {
-    command.describe(out);
+  if constexpr (!HasParseCommand<Command>) {
+    return;
+  } else {
+    CommandReader reader{record.range, track.bytesFor(record)};
+    const Command command = Command::parse(reader);
+    if constexpr (HasDescribeWithContext<Command, Context>) {
+      command.describe(out, std::any_cast<const Context&>(context));
+    } else if constexpr (HasDescribe<Command>) {
+      command.describe(out);
+    }
   }
 }
 
 template <class Command, class Context>
 void collectCommandReferences(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
                               const std::any& context) {
-  CommandReader reader{record.range, track.bytesFor(record)};
-  const Command command = Command::parse(reader);
-  if constexpr (HasReferencesWithContext<Command, Context>) {
-    command.references(references, std::any_cast<const Context&>(context));
-  } else if constexpr (HasReferences<Command>) {
-    command.references(references);
+  if constexpr (!HasParseCommand<Command>) {
+    return;
+  } else {
+    CommandReader reader{record.range, track.bytesFor(record)};
+    const Command command = Command::parse(reader);
+    if constexpr (HasReferencesWithContext<Command, Context>) {
+      command.references(references, std::any_cast<const Context&>(context));
+    } else if constexpr (HasReferences<Command>) {
+      command.references(references);
+    }
   }
 }
 
@@ -368,32 +377,37 @@ Effects executeCommand(const SourceCommand& record, const TrackProgram& track, s
                        PerformanceEmitter& out, VmApi& vm, const std::any& context) {
   // SourceCommand stores bytes and IDs, while format code expects its own command
   // and track-state types. Do the casts here before calling execute().
-  CommandReader reader{record.range, track.bytesFor(record)};
-  const Command command = Command::parse(reader);
-  auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-  const auto& typedContext = std::any_cast<const Context&>(context);
-  CommandRuntime<TrackState, Context> rt{
-      .state = typedTrackState,
-      .out = out,
-      .vm = vm,
-      .context = typedContext,
-  };
-  if constexpr (HasRuntimeEffectsExecute<Command, TrackState, Context>) {
-    return command.execute(rt);
-  } else if constexpr (HasRuntimeVoidExecute<Command, TrackState, Context>) {
-    command.execute(rt);
-    return Effects::none();
-  } else if constexpr (HasLegacyExecute<Command, TrackState, Context>) {
-    return command.execute(typedTrackState, out, vm, typedContext);
-  } else if constexpr (HasPlaybackStatus<Command>) {
-    static_assert(Command::playbackStatus == CommandPlaybackStatus::SourceOnly ||
-                      Command::playbackStatus == CommandPlaybackStatus::NoOp,
-                  "Commands without execute() must be marked source-only or no-op");
-    return Effects::none();
+  if constexpr (HasSourceCommandExecute<Command, TrackState, Context>) {
+    return Command::execute(record, track, trackState, out, vm, context);
   } else {
-    static_assert(kAlwaysFalse<Command>,
-                  "Sequence command must implement execute() or be marked source-only/no-op");
-    return Effects::none();
+    static_assert(HasParseCommand<Command>, "Sequence command must implement parse() or source-command execute()");
+    CommandReader reader{record.range, track.bytesFor(record)};
+    const Command command = Command::parse(reader);
+    auto& typedTrackState = std::any_cast<TrackState&>(trackState);
+    const auto& typedContext = std::any_cast<const Context&>(context);
+    CommandRuntime<TrackState, Context> rt{
+        .state = typedTrackState,
+        .out = out,
+        .vm = vm,
+        .context = typedContext,
+    };
+    if constexpr (HasRuntimeEffectsExecute<Command, TrackState, Context>) {
+      return command.execute(rt);
+    } else if constexpr (HasRuntimeVoidExecute<Command, TrackState, Context>) {
+      command.execute(rt);
+      return Effects::none();
+    } else if constexpr (HasLegacyExecute<Command, TrackState, Context>) {
+      return command.execute(typedTrackState, out, vm, typedContext);
+    } else if constexpr (HasPlaybackStatus<Command>) {
+      static_assert(Command::playbackStatus == CommandPlaybackStatus::SourceOnly ||
+                        Command::playbackStatus == CommandPlaybackStatus::NoOp,
+                    "Commands without execute() must be marked source-only or no-op");
+      return Effects::none();
+    } else {
+      static_assert(kAlwaysFalse<Command>,
+                    "Sequence command must implement execute() or be marked source-only/no-op");
+      return Effects::none();
+    }
   }
 }
 
@@ -436,9 +450,15 @@ public:
 
   template <class Command>
   RegisteredCommand addCommand(std::string_view kindName, std::string_view name) {
+    return addCommand<Command>(kindName, name, detail::commandPlaybackStatus<Command>());
+  }
+
+  template <class Command>
+  RegisteredCommand addCommand(std::string_view kindName, std::string_view name,
+                               CommandPlaybackStatus playbackStatus) {
     return addCommand(detail::commandTypeToken<Command>(), kindName, name, detail::describeCommand<Command, Context>,
                       detail::collectCommandReferences<Command, Context>,
-                      detail::executeCommand<Command, TrackState, Context>, detail::commandPlaybackStatus<Command>());
+                      detail::executeCommand<Command, TrackState, Context>, playbackStatus);
   }
 
   RegisteredCommand addPreservedCommand(std::string_view kindName, std::string_view name) {
