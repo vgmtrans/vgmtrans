@@ -12,20 +12,38 @@
 
 #include <algorithm>
 #include <any>
+#include <concepts>
 #include <stdexcept>
 #include <vector>
 
 namespace vgmtrans::core {
 
 template <class TrackState, class Context>
+[[nodiscard]] TrackState makeDecodeCursorState(const BytecodeDecodeContext& decodeContext, const Context& context) {
+  if constexpr (std::constructible_from<TrackState, const BytecodeDecodeContext&, const Context&>) {
+    return TrackState{decodeContext, context};
+  } else if constexpr (std::constructible_from<TrackState, const BytecodeDecodeContext&>) {
+    return TrackState{decodeContext};
+  } else {
+    return TrackState{};
+  }
+}
+
+template <class TrackState, class Context>
 struct DecodeCursorRuntime {
   TrackState state{};
   const Context& context;
+  CommandReferences* references = nullptr;
 
   void note(double, double, u32, bool = false) {}
   void tempo(u32) {}
-  void instrument(u32, u32, bool = false) {}
+  void instrument(u32 bank, u32 program, bool = false) {
+    if (references != nullptr) {
+      references->instrument(bank, program);
+    }
+  }
   void level(double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
+  void expression(double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
   void pan(double) {}
   void pan(double, double) {}
   void masterLevel(double) {}
@@ -34,6 +52,7 @@ struct DecodeCursorRuntime {
   void globalTranspose(s32) {}
   void pitchBend(double) {}
   void pitchBendRange(u8) {}
+  void portamentoEnable(bool) {}
   void portamentoTime(double) {}
   void modulation(ModulationPerformanceTarget, double) {}
 };
@@ -85,8 +104,8 @@ template <class Context>
 // decode mode to record source facts, then in render mode to emit playback events.
 template <class TrackState, class Context, class Reader>
 struct CursorBytecodeCommand {
-  static DecodedBytecodeCommand decode(const BytecodeCommandSpec& spec, ByteReader reader, u32 begin,
-                                       BytecodeDecodeContext context) {
+  static DecodedBytecodeCommand decode(const BytecodeCommandSpec& spec, const BytecodeCommandSpec& truncatedSpec,
+                                       ByteReader reader, u32 begin, BytecodeDecodeContext context) {
     const u32 boundedEnd = static_cast<u32>(std::min<size_t>(reader.size(), context.bytecodeEnd));
     if (begin >= boundedEnd) {
       return DecodedBytecodeCommand{
@@ -100,14 +119,17 @@ struct CursorBytecodeCommand {
     const u32 availableSize = boundedEnd - begin;
     const SourceRange availableRange = reader.range(begin, availableSize);
     const auto availableBytes = reader.slice(begin, availableSize);
+    std::vector<CommandOperand> operands;
     VmCommandCursor cursor(CommandPhase::Decode, availableRange, availableBytes, context.sourceMap,
-                           context.diagnostics);
+                           context.diagnostics, &operands);
     DecodeCursorRuntime<TrackState, Context> runtime{
+        .state = makeDecodeCursorState<TrackState, Context>(context, bytecodeContext<Context>(context)),
         .context = bytecodeContext<Context>(context),
     };
     const CommandFlow commandFlow = Reader::read(cursor, runtime);
 
-    const auto commandSize = static_cast<u32>(std::clamp<size_t>(cursor.position(), 1, availableSize));
+    const bool failed = cursor.failed();
+    const auto commandSize = failed ? 1u : static_cast<u32>(std::clamp<size_t>(cursor.position(), 1, availableSize));
     const auto commandBytes = availableBytes.subspan(0, commandSize);
     std::vector<u8> ownedBytes{commandBytes.begin(), commandBytes.end()};
     const SourceRange commandRange = reader.range(begin, commandSize);
@@ -115,12 +137,24 @@ struct CursorBytecodeCommand {
       AnnotationBuilder{*context.sourceMap, cursor.annotation()}.range(commandRange);
     }
     return DecodedBytecodeCommand{
-        .handler = spec.handler,
-        .kind = spec.kind,
+        .handler = failed ? truncatedSpec.handler : spec.handler,
+        .kind = failed ? truncatedSpec.kind : spec.kind,
         .range = commandRange,
         .bytes = std::move(ownedBytes),
+        .operands = std::move(operands),
         .flow = decodeFlowFromCommandFlow(commandFlow, Address{begin + commandSize}),
     };
+  }
+
+  static void references(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
+                         const std::any& context) {
+    const auto& typedContext = std::any_cast<const Context&>(context);
+    DecodeCursorRuntime<TrackState, Context> runtime{
+        .context = typedContext,
+        .references = &references,
+    };
+    VmCommandCursor cursor(CommandPhase::Decode, record.range, track.bytesFor(record));
+    static_cast<void>(Reader::read(cursor, runtime));
   }
 
   static Effects execute(const SourceCommand& record, const TrackProgram& track, std::any& trackState,
@@ -142,9 +176,9 @@ namespace detail {
 
 template <class Command>
 [[nodiscard]] DecodedBytecodeCommand decodeCursorBytecodeCommand(const BytecodeCommandSpec& spec,
-                                                                 const BytecodeCommandSpec&, ByteReader reader,
+                                                                 const BytecodeCommandSpec& truncatedSpec, ByteReader reader,
                                                                  u32 begin, BytecodeDecodeContext context) {
-  return Command::decode(spec, reader, begin, context);
+  return Command::decode(spec, truncatedSpec, reader, begin, context);
 }
 
 }  // namespace detail

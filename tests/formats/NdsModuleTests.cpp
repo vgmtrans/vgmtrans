@@ -65,8 +65,12 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   const auto starts = ndsSequenceTrackStarts(ByteReader(SourceId{4}, bytes), sequenceOffset, trackStart + 11);
   expect(starts.size() == 1 && starts[0] == trackStart, "NDS SSEQ track-start discovery should find the primary track");
 
+  ScanIdAllocator annotationIds;
+  SourceMapBuilder sourceMap([&annotationIds]() { return annotationIds.nextSourceAnnotationId(); });
+  std::vector<Diagnostic> decodeDiagnostics;
   const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), descriptor, sequenceOffset,
-                                                    trackStart + 11, trackStart, 0);
+                                                    trackStart + 11, trackStart, 0, false, &sourceMap,
+                                                    &decodeDiagnostics);
   expect(track.commands.size() == 5, "NDS SSEQ dialect should decode all fixture commands");
   expect(dialect.describe(track, track.commands[0]).detailKind == "nds.note-wait",
          "NDS SSEQ dialect should decode note-wait as a local command");
@@ -77,6 +81,18 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
              std::get<u64>(track.operandsFor(track.commands[1])[1].value) == 0x64 &&
              std::get<u64>(track.operandsFor(track.commands[1])[2].value) == 0x18,
          "NDS SSEQ note command should preserve key, velocity, and duration operands");
+  const SourceMap annotations = sourceMap.finish();
+  const auto noteAnnotations = annotations.withSequenceSemantic(SourceId{4}, SequenceSemantic::Note);
+  expect(noteAnnotations.size() == 1, "NDS SSEQ note command should publish a source annotation");
+  const auto& noteAnnotation = annotations.get(noteAnnotations[0]);
+  expect(noteAnnotation.range.offset == trackStart + 2 && noteAnnotation.range.size == 3,
+         "NDS SSEQ note annotation should use the exact decoded command range");
+  const auto hasNoteField = [&](std::string_view name) {
+    return std::ranges::any_of(noteAnnotation.fields, [&](const SourceField& field) { return field.name == name; });
+  };
+  expect(hasNoteField("opcode") && hasNoteField("key") && hasNoteField("velocity") && hasNoteField("duration"),
+         "NDS SSEQ note annotation should record opcode and operand fields");
+  expect(decodeDiagnostics.empty(), "NDS SSEQ cursor decode should not emit diagnostics for valid commands");
 
   const SequenceProgram program{
       .dialect = dialect.id,

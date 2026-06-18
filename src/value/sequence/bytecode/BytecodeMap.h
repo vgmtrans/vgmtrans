@@ -110,6 +110,19 @@ public:
   }
 
   template <u8 First, u8 Last, class Command>
+  BytecodeMapBuilder& cursorRange(CommandMeta meta, BytecodeCommandOptions options = {}) {
+    return cursorRange<First, Last, Command>(meta.displayName, optionsWithMeta(meta, options));
+  }
+
+  template <u8 First, u8 Last, class Command>
+  BytecodeMapBuilder& cursorRange(std::string_view displayName, BytecodeCommandOptions options = {}) {
+    static_assert(First <= Last);
+    const auto spec = commandSpec<Command>(displayName, options, detail::decodeCursorBytecodeCommand<Command>);
+    ranges_.push_back(BytecodeRangeSpec{.first = First, .last = Last, .spec = spec});
+    return *this;
+  }
+
+  template <u8 First, u8 Last, class Command>
   BytecodeMapBuilder& range(BytecodeCommandOptions options = {}) {
     return range<First, Last, Command>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
   }

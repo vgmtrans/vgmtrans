@@ -10,14 +10,15 @@
 #include "value/sequence/SequenceVm.h"
 #include "value/sequence/bytecode/BytecodeMap.h"
 #include "value/sequence/bytecode/BytecodeWalkers.h"
-#include "value/sequence/bytecode/SequenceCommandHelpers.h"
 
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <any>
 #include <array>
 #include <cstddef>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <set>
 #include <string>
@@ -42,20 +43,20 @@ struct PendingBlock {
 };
 
 struct TrackState {
+  TrackState() = default;
+
   explicit TrackState(const SequenceProgram& program, const TrackProgram&)
       : sequenceDataBase(program.sourceBaseAddress.value) {}
 
+  explicit TrackState(const BytecodeDecodeContext& context)
+      : sequenceDataBase(context.sequenceOffset + 0x1c), sequenceEnd(context.sequenceEnd) {}
+
   u64 sequenceDataBase = 0;
+  u32 sequenceEnd = std::numeric_limits<u32>::max();
   bool noteWait = false;
   s32 transpose = 0;
   u8 pitchBendRangeSemitones = 2;
 };
-
-using Runtime = CommandRuntime<TrackState, Context>;
-
-[[nodiscard]] u32 absoluteAddress(const TrackState& state, u32 relative) {
-  return static_cast<u32>(state.sequenceDataBase + relative);
-}
 
 [[nodiscard]] bool matches(ByteReader reader, u64 offset, std::string_view signature) {
   if (!reader.has(offset, signature.size())) {
@@ -132,211 +133,247 @@ using Runtime = CommandRuntime<TrackState, Context>;
   return sseqOffset;
 }
 
-// Notes, rests, and program selection.
-struct Note {
-  u8 key = 0;
-  u8 velocity = 0;
-  u32 duration = 0;
-
-  static Note parse(CommandReader& in) {
-    in.derived("key", static_cast<u64>(in.opcode()));
-    return Note{
-        .key = in.opcode(),
-        .velocity = in.u8("velocity"),
-        .duration = in.varLen("duration"),
-    };
-  }
-
-  Effects execute(Runtime& rt) const {
-    rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
-            LevelScale::linearFromMidi7(velocity), duration);
-    return rt.wait(rt.state.noteWait ? duration : 0);
-  }
-};
-
-struct Rest {
-  u32 duration = 0;
-
-  static Rest parse(CommandReader& in) { return Rest{.duration = in.varLen("duration")}; }
-
-  Effects execute(Runtime& rt) const { return rt.wait(duration); }
-};
-
-struct Program {
-  u32 raw = 0;
-
-  static Program parse(CommandReader& in) { return Program{.raw = in.varLen("raw")}; }
-
-  [[nodiscard]] u32 bank() const { return raw >> 7; }
-  [[nodiscard]] u32 program() const { return raw & 0x7f; }
-
-  void describe(CommandInfo& out) const {
-    out.field("bank", bank());
-    out.field("program", program());
-  }
-
-  void references(CommandReferences& out) const { out.instrument(bank(), program()); }
-
-  void execute(Runtime& rt) const { rt.instrument(bank(), program()); }
-};
-
-// Control flow.
-struct Jump : Le24RelativeAddressOperand<Jump> {
-  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
-
-  u32 relativeDestination = 0;
-
-  [[nodiscard]] DecodeFlow decodeFlow(const BytecodeDecodeContext& context) const {
-    const u32 destination = static_cast<u32>(context.sequenceOffset + 0x1c + relativeDestination);
-    if (destination >= context.sequenceEnd) {
-      return DecodeFlow::terminalFlow();
-    }
-    return DecodeFlow::jump(Address{destination});
-  }
-
-  Effects execute(Runtime& rt) const { return rt.jump(Address{absoluteAddress(rt.state, relativeDestination)}); }
-};
-
-struct Call : Le24RelativeAddressOperand<Call> {
-  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsControlFlow;
-
-  u32 relativeDestination = 0;
-
-  [[nodiscard]] DecodeFlow decodeFlow(const BytecodeDecodeContext& context) const {
-    const u32 destination = static_cast<u32>(context.sequenceOffset + 0x1c + relativeDestination);
-    if (destination >= context.sequenceEnd) {
-      return DecodeFlow::terminalFlow();
-    }
-    return DecodeFlow::call(Address{destination}, Address{context.commandEnd});
-  }
-
-  Effects execute(Runtime& rt) const { return rt.call(Address{absoluteAddress(rt.state, relativeDestination)}); }
-};
-
-struct Return : ControlFlowCommand, NoOperands<Return> {
-  static constexpr CommandMeta meta = commandMeta("return", "Return");
-
-  Effects execute(Runtime& rt) const { return rt.return_(); }
-};
-
-struct End : StopsPlaybackCommand, NoOperands<End> {
-  static constexpr CommandMeta meta = commandMeta("end", "End");
-
-  Effects execute(Runtime& rt) const { return rt.end(); }
-};
-
-// Mixer, pitch, and performance controls.
-struct Pan : U8Operand<Pan> {
-  static constexpr std::string_view operandName = "pan";
-
-  void execute(Runtime& rt) const { rt.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0)); }
-};
-
-struct Volume : U8MidiLevelOutCommand<Volume, &PerformanceEmitter::level> {
-  static constexpr std::string_view operandName = "volume";
-};
-
-struct ExpressionLevel : U8MidiLevelOutCommand<ExpressionLevel, &PerformanceEmitter::expression> {
-  static constexpr std::string_view operandName = "expression";
-};
-
-struct Transpose {
-  s8 semitones = 0;
-
-  static Transpose parse(CommandReader& in) { return Transpose{.semitones = in.s8("semitones")}; }
-
-  void execute(Runtime& rt) const { rt.state.transpose = semitones; }
-};
-
-struct PitchBend : S8Operand<PitchBend> {
-  static constexpr std::string_view operandName = "bend";
-
-  void execute(Runtime& rt) const {
-    rt.pitchBend((static_cast<double>(raw) / 128.0) * rt.state.pitchBendRangeSemitones);
-  }
-};
-
-struct PitchBendRange : U8Operand<PitchBendRange> {
-  static constexpr std::string_view operandName = "semitones";
-
-  void execute(Runtime& rt) const {
-    rt.state.pitchBendRangeSemitones = raw;
-    rt.pitchBendRange(raw);
-  }
-};
-
-struct ModulationDepth : U8NormalizedModulationOutCommand<ModulationDepth, ModulationPerformanceTarget::VibratoDepth> {
-  static constexpr std::string_view operandName = "depth";
-};
-
-struct PortamentoSwitch : U8BoolOutCommand<PortamentoSwitch, &PerformanceEmitter::portamentoEnable> {
-  static constexpr std::string_view operandName = "enabled";
-};
-
-struct PortamentoTime : U8Operand<PortamentoTime> {
-  static constexpr std::string_view operandName = "time";
-
-  void execute(Runtime& rt) const { rt.portamentoTime(static_cast<double>(raw)); }
-};
-
-struct NoteWait : U8BoolStateCommand<NoteWait, &TrackState::noteWait> {
-  static constexpr std::string_view operandName = "enabled";
-};
-
-struct Tempo {
-  u16 bpm = 0;
-
-  static Tempo parse(CommandReader& in) { return Tempo{.bpm = in.le16("bpm")}; }
-
-  void execute(Runtime& rt) const {
-    if (bpm != 0) {
-      rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
-    }
-  }
-};
-
-// Stop conditions and diagnostics.
-struct UnsupportedCommand : UnsupportedPlaybackCommand, NoOperands<UnsupportedCommand> {
-  static constexpr CommandMeta meta = commandMeta("unsupported", "Unsupported Command");
-
-  Effects execute(Runtime& rt) const {
+template <class Runtime>
+void renderWarning(Runtime& rt, std::string message) {
+  if constexpr (requires { rt.vm.diagnostic(Diagnostic{}); }) {
     rt.vm.diagnostic(Diagnostic{
         .severity = Severity::Warning,
-        .message = "Unsupported NDS SSEQ command stopped playback",
+        .message = std::move(message),
     });
-    return rt.end();
+  }
+}
+
+template <class Runtime>
+[[nodiscard]] bool decodeTargetOutsideSequence(VmCommandCursor& cmd, Runtime& rt, Address destination) {
+  return cmd.phase() == CommandPhase::Decode && rt.state.sequenceEnd != std::numeric_limits<u32>::max() &&
+         destination.value >= rt.state.sequenceEnd;
+}
+
+struct NdsCursorReader {
+  template <class Runtime>
+  static CommandFlow read(VmCommandCursor& cmd, Runtime& rt) {
+    const u8 opcode = cmd.opcode();
+    if (opcode <= 0x7f) {
+      return note(cmd, rt, opcode);
+    }
+
+    switch (opcode) {
+      case 0x80:
+        return rest(cmd);
+      case 0x81:
+        return program(cmd, rt);
+      case 0x94:
+        return jump(cmd, rt);
+      case 0x95:
+        return call(cmd, rt);
+      case 0x96:
+        return unsupported(cmd, rt, "Unsupported NDS SSEQ command stopped playback");
+      case 0xc0:
+        return pan(cmd, rt);
+      case 0xc1:
+        return volume(cmd, rt);
+      case 0xc3:
+        return transpose(cmd, rt);
+      case 0xc4:
+        return pitchBend(cmd, rt);
+      case 0xc5:
+        return pitchBendRange(cmd, rt);
+      case 0xc7:
+        return noteWait(cmd, rt);
+      case 0xca:
+        return modulationDepth(cmd, rt);
+      case 0xce:
+        return portamentoSwitch(cmd, rt);
+      case 0xcf:
+        return portamentoTime(cmd, rt);
+      case 0xd5:
+        return expression(cmd, rt);
+      case 0xe1:
+        return tempo(cmd, rt);
+      case 0xfd:
+        return cmd.name("Return").kind("return").semantic(SequenceSemantic::Return).ret();
+      case 0xff:
+        return cmd.name("End").kind("end").semantic(SequenceSemantic::End).end();
+      default:
+        return unsupported(cmd, rt, "Unknown NDS SSEQ opcode stopped playback", "Unknown Opcode", "unknown");
+    }
+  }
+
+private:
+  template <class Runtime>
+  static CommandFlow note(VmCommandCursor& cmd, Runtime& rt, u8 key) {
+    cmd.name("Note").semantic(SequenceSemantic::Note).derived("key", static_cast<u64>(key), SourceValueDisplay::MidiNote);
+    const auto velocity = cmd.u8("velocity");
+    const auto duration = cmd.varLen("duration");
+    if (velocity && duration) {
+      rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
+              LevelScale::linearFromMidi7(velocity.value), duration.value);
+    }
+    return rt.state.noteWait ? cmd.wait(duration.value) : cmd.next();
+  }
+
+  static CommandFlow rest(VmCommandCursor& cmd) {
+    cmd.name("Rest").semantic(SequenceSemantic::Rest);
+    const auto duration = cmd.varLen("duration");
+    return cmd.wait(duration.value);
+  }
+
+  template <class Runtime>
+  static CommandFlow program(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Program").semantic(SequenceSemantic::Program);
+    const auto raw = cmd.varLen("raw");
+    const u32 bank = raw.value >> 7;
+    const u32 program = raw.value & 0x7f;
+    cmd.derived("bank", static_cast<u64>(bank)).derived("program", static_cast<u64>(program));
+    if (raw) {
+      rt.instrument(bank, program);
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow jump(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Jump").semantic(SequenceSemantic::Jump);
+    const auto destination = cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
+    if (!destination || decodeTargetOutsideSequence(cmd, rt, destination.value)) {
+      return cmd.end();
+    }
+    return cmd.jump(destination.value);
+  }
+
+  template <class Runtime>
+  static CommandFlow call(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Call").semantic(SequenceSemantic::Call);
+    const auto destination = cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
+    if (!destination || decodeTargetOutsideSequence(cmd, rt, destination.value)) {
+      return cmd.end();
+    }
+    return cmd.call(destination.value);
+  }
+
+  template <class Runtime>
+  static CommandFlow pan(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Pan").semantic(SequenceSemantic::Pan);
+    const auto raw = cmd.u8("pan");
+    if (raw) {
+      rt.pan(std::clamp((static_cast<double>(raw.value) / 63.5) - 1.0, -1.0, 1.0));
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow volume(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Volume").semantic(SequenceSemantic::Level);
+    const auto raw = cmd.u8("volume");
+    if (raw) {
+      rt.level(LevelScale::linearFromMidi7(raw.value));
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow expression(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Expression").kind("expression").semantic(SequenceSemantic::Level);
+    const auto raw = cmd.u8("expression");
+    if (raw) {
+      rt.expression(LevelScale::linearFromMidi7(raw.value));
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow transpose(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Transpose").semantic(SequenceSemantic::State);
+    const auto semitones = cmd.s8("semitones");
+    if (semitones) {
+      rt.state.transpose = semitones.value;
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow pitchBend(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Pitch Bend").semantic(SequenceSemantic::Pitch);
+    const auto bend = cmd.s8("bend");
+    if (bend) {
+      rt.pitchBend((static_cast<double>(bend.value) / 128.0) * rt.state.pitchBendRangeSemitones);
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow pitchBendRange(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Pitch Bend Range").semantic(SequenceSemantic::Pitch);
+    const auto semitones = cmd.u8("semitones");
+    if (semitones) {
+      rt.state.pitchBendRangeSemitones = semitones.value;
+      rt.pitchBendRange(semitones.value);
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow noteWait(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Note Wait").semantic(SequenceSemantic::State);
+    const auto enabled = cmd.u8("enabled");
+    if (enabled) {
+      rt.state.noteWait = enabled.value != 0;
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow modulationDepth(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Modulation Depth").semantic(SequenceSemantic::Modulation);
+    const auto depth = cmd.u8("depth");
+    if (depth) {
+      rt.modulation(ModulationPerformanceTarget::VibratoDepth,
+                    std::clamp(static_cast<double>(depth.value) / 127.0, 0.0, 1.0));
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow portamentoSwitch(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Portamento").semantic(SequenceSemantic::Portamento);
+    const auto enabled = cmd.u8("enabled");
+    if (enabled) {
+      rt.portamentoEnable(enabled.value != 0);
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow portamentoTime(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
+    const auto time = cmd.u8("time");
+    if (time) {
+      rt.portamentoTime(static_cast<double>(time.value));
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow tempo(VmCommandCursor& cmd, Runtime& rt) {
+    cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
+    const auto bpm = cmd.u16le("bpm");
+    if (bpm && bpm.value != 0) {
+      rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm.value)));
+    }
+    return cmd.next();
+  }
+
+  template <class Runtime>
+  static CommandFlow unsupported(VmCommandCursor& cmd, Runtime& rt, std::string_view message,
+                                 std::string_view name = "Unsupported Command",
+                                 std::string_view kind = "unsupported") {
+    cmd.name(name).kind(kind).semantic(SequenceSemantic::Unsupported).unsupported(message);
+    renderWarning(rt, std::string(message));
+    return cmd.end();
   }
 };
 
-struct UnknownOpcode {
-  static constexpr CommandMeta meta = commandMeta("unknown", "Unknown Opcode");
-  static constexpr CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::Unsupported;
-
-  static UnknownOpcode parse(CommandReader& in) {
-    in.derived("opcode", static_cast<u64>(in.opcode()));
-    return {};
-  }
-
-  Effects execute(Runtime& rt) const {
-    rt.vm.diagnostic(Diagnostic{
-        .severity = Severity::Warning,
-        .message = "Unknown NDS SSEQ opcode stopped playback",
-    });
-    return rt.end();
-  }
-};
-
-struct TruncatedCommand : UnsupportedPlaybackCommand, NoOperands<TruncatedCommand> {
-  static constexpr CommandMeta meta = commandMeta("truncated", "Truncated Command");
-
-  Effects execute(Runtime& rt) const {
-    rt.vm.diagnostic(Diagnostic{
-        .severity = Severity::Warning,
-        .message = "Truncated NDS SSEQ command stopped playback",
-    });
-    return rt.end();
-  }
-};
+using NdsCursorCommand = CursorBytecodeCommand<TrackState, Context, NdsCursorReader>;
 
 [[nodiscard]] TrackProgram makeTrack(u32 startOffset, u32 trackIndex) {
   return TrackProgram{
@@ -357,9 +394,11 @@ struct TruncatedCommand : UnsupportedPlaybackCommand, NoOperands<TruncatedComman
 // header. Normal SSEQ decode stays source-driver oriented; this path repairs
 // range-level damage before source commands can be trusted.
 [[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(ByteReader reader, const BytecodeDispatchTable& dispatch,
-                                                         const BytecodeCommandSpec& terminalSpec, u32 sequenceOffset,
+                                                         const BytecodeCommandSpec& terminalSpec,
+                                                         const std::any& dialectContext, u32 sequenceOffset,
                                                          u32 sequenceEnd, u32 startOffset, u32 trackIndex,
-                                                         size_t maxCommands) {
+                                                         size_t maxCommands, SourceMapBuilder* sourceMap,
+                                                         std::vector<Diagnostic>* diagnostics) {
   TrackProgram track = makeTrack(startOffset, trackIndex);
   TrackProgramBuilder builder{track};
   u32 offset = startOffset;
@@ -385,6 +424,9 @@ struct TruncatedCommand : UnsupportedPlaybackCommand, NoOperands<TruncatedComman
                                          .bytecodeEnd = sequenceEnd,
                                          .sequenceOffset = sequenceOffset,
                                          .sequenceEnd = sequenceEnd,
+                                         .dialectContext = &dialectContext,
+                                         .sourceMap = sourceMap,
+                                         .diagnostics = diagnostics,
                                      });
 
       if (!block.callTarget) {
@@ -468,28 +510,38 @@ template <class Registrar>
       preservedOpcode(0xfe, "Allocate Track", operandBytes(2)),
   };
 
-  map.range<0x00, 0x7f, Note>("Note");
-  map.op<0x80, Rest>("Rest");
-  map.op<0x81, Program>("Program");
-  map.op<0x94, Jump>("Jump");
-  map.op<0x95, Call>("Call");
-  map.terminal<0x96, UnsupportedCommand>();
+  map.cursorRange<0x00, 0x7f, NdsCursorCommand>(commandMeta("note", "Note"));
+  map.cursorOp<0x80, NdsCursorCommand>(commandMeta("rest", "Rest"));
+  map.cursorOp<0x81, NdsCursorCommand>(commandMeta("program", "Program"));
+  map.cursorOp<0x94, NdsCursorCommand>(commandMeta("jump", "Jump"),
+                                       BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::AffectsControlFlow});
+  map.cursorOp<0x95, NdsCursorCommand>(commandMeta("call", "Call"),
+                                       BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::AffectsControlFlow});
+  map.cursorOp<0x96, NdsCursorCommand>(
+      commandMeta("unsupported-command", "Unsupported Command"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::Unsupported});
   map.preserved(preservedCommands);
-  map.op<0xc0, Pan>("Pan");
-  map.op<0xc1, Volume>("Volume");
-  map.op<0xc3, Transpose>("Transpose");
-  map.op<0xc4, PitchBend>("Pitch Bend");
-  map.op<0xc5, PitchBendRange>("Pitch Bend Range");
-  map.op<0xc7, NoteWait>("Note Wait");
-  map.op<0xca, ModulationDepth>("Modulation Depth");
-  map.op<0xce, PortamentoSwitch>("Portamento");
-  map.op<0xcf, PortamentoTime>("Portamento Time");
-  map.op<0xd5, ExpressionLevel>("Expression");
-  map.op<0xe1, Tempo>("Tempo");
-  map.returns<0xfd, Return>();
-  map.terminal<0xff, End>();
-  map.truncated<TruncatedCommand>();
-  map.unknown<UnknownOpcode>();
+  map.cursorOp<0xc0, NdsCursorCommand>(commandMeta("pan", "Pan"));
+  map.cursorOp<0xc1, NdsCursorCommand>(commandMeta("volume", "Volume"));
+  map.cursorOp<0xc3, NdsCursorCommand>(commandMeta("transpose", "Transpose"));
+  map.cursorOp<0xc4, NdsCursorCommand>(commandMeta("pitch-bend", "Pitch Bend"));
+  map.cursorOp<0xc5, NdsCursorCommand>(commandMeta("pitch-bend-range", "Pitch Bend Range"));
+  map.cursorOp<0xc7, NdsCursorCommand>(commandMeta("note-wait", "Note Wait"));
+  map.cursorOp<0xca, NdsCursorCommand>(commandMeta("modulation-depth", "Modulation Depth"));
+  map.cursorOp<0xce, NdsCursorCommand>(commandMeta("portamento", "Portamento"));
+  map.cursorOp<0xcf, NdsCursorCommand>(commandMeta("portamento-time", "Portamento Time"));
+  map.cursorOp<0xd5, NdsCursorCommand>(commandMeta("expression", "Expression"));
+  map.cursorOp<0xe1, NdsCursorCommand>(commandMeta("tempo", "Tempo"));
+  map.cursorOp<0xfd, NdsCursorCommand>(commandMeta("return", "Return"),
+                                       BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::AffectsControlFlow});
+  map.cursorOp<0xff, NdsCursorCommand>(commandMeta("end", "End"),
+                                       BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::StopsPlayback});
+  map.cursorTruncated<NdsCursorCommand>(
+      commandMeta("truncated", "Truncated Command"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::Unsupported});
+  map.cursorUnknown<NdsCursorCommand>(
+      commandMeta("unknown", "Unknown Opcode"),
+      BytecodeCommandOptions{.playbackStatus = CommandPlaybackStatus::Unsupported});
 
   return map.finish();
 }
@@ -497,7 +549,9 @@ template <class Registrar>
 // Normal SSEQ decode follows statically reachable bytecode blocks from the
 // track start, preserving calls and jumps as source commands.
 [[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const BytecodeDispatchTable& bytecode,
-                                                 u32 sequenceOffset, u32 sequenceEnd, u32 startOffset, u32 trackIndex) {
+                                                 const std::any& dialectContext, u32 sequenceOffset, u32 sequenceEnd,
+                                                 u32 startOffset, u32 trackIndex, SourceMapBuilder* sourceMap,
+                                                 std::vector<Diagnostic>* diagnostics) {
   return decodeReachableBytecodeBlocks(
       reader, sequenceEnd, startOffset, trackIndex,
       ReachableBytecodeDecodePolicy{.maxCommands = static_cast<u32>(kMaxTrackCommands)}, [&](u32 offset) {
@@ -506,6 +560,9 @@ template <class Registrar>
                                    .bytecodeEnd = sequenceEnd,
                                    .sequenceOffset = sequenceOffset,
                                    .sequenceEnd = sequenceEnd,
+                                   .dialectContext = &dialectContext,
+                                   .sourceMap = sourceMap,
+                                   .diagnostics = diagnostics,
                                });
       });
 }
@@ -540,13 +597,16 @@ void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
 }
 
 TrackProgram decodeNdsSequenceTrack(ByteReader reader, const NdsSequenceDescriptor& descriptor, u32 sequenceOffset,
-                                    u32 sequenceEnd, u32 startOffset, u32 trackIndex, bool recoverMalformedSdatRange) {
+                                    u32 sequenceEnd, u32 startOffset, u32 trackIndex, bool recoverMalformedSdatRange,
+                                    SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const BytecodeDispatchTable& bytecode = descriptor.bytecode;
   if (recoverMalformedSdatRange) {
-    return decodeMalformedSdatRangeTrack(reader, bytecode, *bytecode.opcodes[0xff], sequenceOffset, sequenceEnd,
-                                         startOffset, trackIndex, kMaxTrackCommands);
+    return decodeMalformedSdatRangeTrack(reader, bytecode, *bytecode.opcodes[0xff], descriptor.dialect.context,
+                                         sequenceOffset, sequenceEnd, startOffset, trackIndex, kMaxTrackCommands,
+                                         sourceMap, diagnostics);
   }
-  return decodeReachableBlocks(reader, bytecode, sequenceOffset, sequenceEnd, startOffset, trackIndex);
+  return decodeReachableBlocks(reader, bytecode, descriptor.dialect.context, sequenceOffset, sequenceEnd, startOffset,
+                               trackIndex, sourceMap, diagnostics);
 }
 
 std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
@@ -621,7 +681,8 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
 }
 
 SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
-                                             const std::string& name, std::optional<ScanInstrumentSetRef> instrumentSet) {
+                                             const std::string& name, std::optional<ScanInstrumentSetRef> instrumentSet,
+                                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const NdsSequenceDescriptor& descriptor = ndsSequenceDescriptor();
   const SequenceDialect& dialect = descriptor.dialect;
   const u32 sequenceOffset = range.decodeOffset != 0 ? range.decodeOffset : range.offset;
@@ -651,7 +712,7 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
   u32 trackIndex = 0;
   for (const u32 start : ndsSequenceTrackStarts(input.reader, sequenceOffset, range.sequenceEnd)) {
     auto track = decodeNdsSequenceTrack(input.reader, descriptor, sequenceOffset, range.sequenceEnd, start,
-                                        trackIndex++, range.recoverMalformedSdatRange);
+                                        trackIndex++, range.recoverMalformedSdatRange, sourceMap, diagnostics);
     const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
                                      input.reader.range(start, 0));
     addSourceCommandItemsAndInstrumentReferences(items, trackItem, asset.program, dialect, track, instrumentSetId);

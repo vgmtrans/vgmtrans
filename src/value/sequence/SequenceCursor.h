@@ -73,7 +73,8 @@ struct CursorReadValue {
 class VmCommandCursor {
 public:
   VmCommandCursor(CommandPhase phase, SourceRange commandRange, std::span<const ::u8> bytes,
-                  SourceMapBuilder* sourceMap = nullptr, std::vector<Diagnostic>* diagnostics = nullptr);
+                  SourceMapBuilder* sourceMap = nullptr, std::vector<Diagnostic>* diagnostics = nullptr,
+                  std::vector<CommandOperand>* operands = nullptr);
 
   [[nodiscard]] CommandPhase phase() const noexcept { return phase_; }
   [[nodiscard]] SourceId source() const noexcept { return commandRange_.source; }
@@ -130,6 +131,7 @@ private:
   [[nodiscard]] ::u8 readByte(std::string_view field);
   void recordField(std::string_view name, SourceRange range, SourceValue value,
                    SourceValueDisplay display = SourceValueDisplay::Default);
+  void recordOperand(std::string_view name, SourceRange range, const SourceValue& value, SourceValueDisplay display);
   [[nodiscard]] CommandFlow flow(FlowKind kind, u32 waitTicks = 0,
                                  std::optional<Address> destination = std::nullopt);
 
@@ -138,6 +140,7 @@ private:
   std::span<const ::u8> bytes_;
   SourceMapBuilder* sourceMap_ = nullptr;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
+  std::vector<CommandOperand>* operands_ = nullptr;
   size_t position_ = 1;
   SourceAnnotationId annotation_;
   bool opcodeRecorded_ = false;

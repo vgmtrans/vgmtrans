@@ -36,8 +36,14 @@ RepeatBreakFlow::RepeatBreakFlow(CommandFlow flow, bool taken) : flow_(flow), ta
 }
 
 VmCommandCursor::VmCommandCursor(CommandPhase phase, SourceRange commandRange, std::span<const ::u8> bytes,
-                                 SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics)
-    : phase_(phase), commandRange_(commandRange), bytes_(bytes), sourceMap_(sourceMap), diagnostics_(diagnostics) {
+                                 SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
+                                 std::vector<CommandOperand>* operands)
+    : phase_(phase),
+      commandRange_(commandRange),
+      bytes_(bytes),
+      sourceMap_(sourceMap),
+      diagnostics_(diagnostics),
+      operands_(operands) {
   if (bytes_.empty()) {
     markTruncated("opcode", commandRange_);
   }
@@ -389,11 +395,32 @@ void VmCommandCursor::markTruncated(std::string_view field, SourceRange range) {
 
 void VmCommandCursor::recordField(std::string_view name, SourceRange range, SourceValue value,
                                   SourceValueDisplay display) {
-  if (sourceMap_ == nullptr) {
+  recordOperand(name, range, value, display);
+  if (sourceMap_ != nullptr) {
+    ensureAnnotation();
+    annotationBuilder().field(name, range, std::move(value), display);
+  }
+}
+
+void VmCommandCursor::recordOperand(std::string_view name, SourceRange range, const SourceValue& value,
+                                    SourceValueDisplay display) {
+  if (operands_ == nullptr) {
     return;
   }
-  ensureAnnotation();
-  annotationBuilder().field(name, range, std::move(value), display);
+  if (const auto* unsignedValue = std::get_if<u64>(&value)) {
+    if (display == SourceValueDisplay::Address) {
+      operands_->push_back(CommandOperand{.name = std::string(name), .value = Address{static_cast<u32>(*unsignedValue)},
+                                          .range = range});
+    } else {
+      operands_->push_back(CommandOperand{.name = std::string(name), .value = *unsignedValue, .range = range});
+    }
+  } else if (const auto* signedValue = std::get_if<s64>(&value)) {
+    operands_->push_back(CommandOperand{.name = std::string(name), .value = *signedValue, .range = range});
+  } else if (const auto* text = std::get_if<std::string>(&value)) {
+    operands_->push_back(CommandOperand{.name = std::string(name), .value = *text, .range = range});
+  } else if (const auto* boolValue = std::get_if<bool>(&value)) {
+    operands_->push_back(CommandOperand{.name = std::string(name), .value = static_cast<u64>(*boolValue), .range = range});
+  }
 }
 
 CommandFlow VmCommandCursor::flow(FlowKind kind, u32 waitTicks, std::optional<Address> destination) {
