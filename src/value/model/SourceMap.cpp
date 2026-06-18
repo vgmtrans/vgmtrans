@@ -81,8 +81,16 @@ ObjectRef ObjectRefs::instrument(AssetId instrumentSetAsset, u32 instrumentIndex
   return ObjectRef{.kind = ObjectKind::Instrument, .asset = instrumentSetAsset, .index0 = instrumentIndex};
 }
 
+ObjectRef ObjectRefs::instrumentProgram(u32 bank, u32 program) {
+  return ObjectRef{.kind = ObjectKind::Instrument, .index0 = bank, .index1 = program};
+}
+
 ObjectRef ObjectRefs::sample(AssetId sampleSetAsset, u32 sampleIndex) {
   return ObjectRef{.kind = ObjectKind::Sample, .asset = sampleSetAsset, .index0 = sampleIndex};
+}
+
+ObjectRef ObjectRefs::sampleIndex(u32 sampleIndex) {
+  return ObjectRef{.kind = ObjectKind::Sample, .index0 = sampleIndex};
 }
 
 ObjectRef ObjectRefs::misc(AssetId miscAsset) {

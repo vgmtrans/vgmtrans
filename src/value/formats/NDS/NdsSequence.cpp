@@ -299,7 +299,9 @@ private:
     const u32 raw = cmd.varLen("raw");
     const u32 bank = raw >> 7;
     const u32 program = raw & 0x7f;
-    cmd.derived("bank", static_cast<u64>(bank)).derived("program", static_cast<u64>(program));
+    cmd.derived("bank", static_cast<u64>(bank))
+        .derived("program", static_cast<u64>(program))
+        .instrumentRef(bank, program);
     rt.instrument(bank, program);
     return cmd.next();
   }

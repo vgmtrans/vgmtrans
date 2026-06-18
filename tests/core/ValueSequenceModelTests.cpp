@@ -188,6 +188,34 @@ void vmCommandCursorSupportsKindOverrideAndTargetLinks() {
          "cursor target link should point at the destination source range");
 }
 
+void vmCommandCursorRecordsStructuredResourceLinks() {
+  ScanIdAllocator ids;
+  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
+  const std::array<u8, 1> bytes{0x81};
+  VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap);
+
+  static_cast<void>(cmd.name("Program")
+                        .semantic(SequenceSemantic::Program)
+                        .instrumentRef(2, 17)
+                        .sampleRef(5)
+                        .next());
+
+  const SourceMap map = sourceMap.finish();
+  const auto& annotation = map.get(cmd.annotation());
+  expect(annotation.links.size() == 2, "cursor resource helpers should record structured links");
+  expect(annotation.links[0].role == SourceLinkRole::UsesInstrument,
+         "cursor instrument helper should use the instrument link role");
+  const auto* instrumentTarget = std::get_if<ObjectRef>(&annotation.links[0].target);
+  expect(instrumentTarget != nullptr && instrumentTarget->kind == ObjectKind::Instrument &&
+             !instrumentTarget->asset.valid() && instrumentTarget->index0 == 2 && instrumentTarget->index1 == 17,
+         "cursor instrument helper should preserve unresolved bank/program selectors");
+  expect(annotation.links[1].role == SourceLinkRole::UsesSample, "cursor sample helper should use the sample link role");
+  const auto* sampleTarget = std::get_if<ObjectRef>(&annotation.links[1].target);
+  expect(sampleTarget != nullptr && sampleTarget->kind == ObjectKind::Sample && !sampleTarget->asset.valid() &&
+             sampleTarget->index0 == 5,
+         "cursor sample helper should preserve unresolved sample indexes");
+}
+
 void vmCommandCursorStickyFailsMalformedReads() {
   ScanIdAllocator ids;
   SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
@@ -279,6 +307,7 @@ void runValueSequenceModelTests() {
   sequenceDialectPreservesCommandPlaybackStatus();
   vmCommandCursorRecordsCommandAnnotations();
   vmCommandCursorSupportsKindOverrideAndTargetLinks();
+  vmCommandCursorRecordsStructuredResourceLinks();
   vmCommandCursorStickyFailsMalformedReads();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
   collectionIssueHelpersValidateStoredStatus();

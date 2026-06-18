@@ -259,6 +259,25 @@ VmCommandCursor& VmCommandCursor::target(Address address, SourceLinkRole role) {
   return *this;
 }
 
+VmCommandCursor& VmCommandCursor::instrumentRef(u32 bank, u32 program) {
+  if (sourceMap_ == nullptr) {
+    return *this;
+  }
+  ensureAnnotation();
+  annotationBuilder().link(SourceLinkRole::UsesInstrument, SourceTarget{ObjectRefs::instrumentProgram(bank, program)},
+                           "Instrument");
+  return *this;
+}
+
+VmCommandCursor& VmCommandCursor::sampleRef(u32 sampleIndex) {
+  if (sourceMap_ == nullptr) {
+    return *this;
+  }
+  ensureAnnotation();
+  annotationBuilder().link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sampleIndex(sampleIndex)}, "Sample");
+  return *this;
+}
+
 VmCommandCursor& VmCommandCursor::warning(std::string_view message) {
   if (diagnostics_ != nullptr) {
     diagnostics_->push_back(Diagnostic{
