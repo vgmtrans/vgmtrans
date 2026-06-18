@@ -22,10 +22,12 @@ public:
   [[nodiscard]] AssetId nextAssetId() noexcept;
   [[nodiscard]] CollectionId nextCollectionId() noexcept;
   [[nodiscard]] ItemId nextItemId() noexcept;
+  [[nodiscard]] SourceAnnotationId nextSourceAnnotationId() noexcept;
 
   void reserveAfter(AssetId id) noexcept;
   void reserveAfter(CollectionId id) noexcept;
   void reserveAfter(ItemId id) noexcept;
+  void reserveAfter(SourceAnnotationId id) noexcept;
 
 private:
   // Formats may assign IDs explicitly when they need cross-references. Generated
@@ -33,6 +35,7 @@ private:
   u32 nextAssetId_ = 0;
   u32 nextCollectionId_ = 0;
   u32 nextItemId_ = 0;
+  u32 nextSourceAnnotationId_ = 0;
 };
 
 struct ScanInput {
@@ -70,6 +73,7 @@ struct ScanResult {
   std::vector<Asset> assets;
   std::vector<MatchFact> matchFacts;
   std::vector<ExplicitCollection> explicitCollections;
+  SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;
   std::vector<ExtractedSource> extractedSources;
 };

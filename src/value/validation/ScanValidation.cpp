@@ -86,6 +86,20 @@ void validateSampleCollectionRanges(ValidationReport& report, const SourceStore&
   }
 }
 
+void validateSourceMapRanges(ValidationReport& report, const SourceStore& sources, const SourceMap& sourceMap) {
+  for (const auto& annotation : sourceMap.annotations()) {
+    validateRange(report, sources, annotation.range, "source annotation");
+    for (const auto& field : annotation.fields) {
+      validateRange(report, sources, field.range, "source annotation field");
+    }
+    for (const auto& link : annotation.links) {
+      if (const auto* range = std::get_if<SourceRange>(&link.target)) {
+        validateRange(report, sources, *range, "source annotation link");
+      }
+    }
+  }
+}
+
 void validateAsset(ValidationReport& report, const SourceStore& sources, const Asset& asset) {
   const auto& meta = metadata(asset);
   validateRange(report, sources, meta.range, "asset metadata");
@@ -187,6 +201,7 @@ ValidationReport validateScanCommit(const ScanCommit& commit, const SourceStore&
   }
 
   validateExtractedSources(report, commit, sources);
+  validateSourceMapRanges(report, sources, commit.sourceMap);
 
   std::unordered_set<u32> batchAssetIds;
   validateAssetIds(report, commit, existingAssets, batchAssetIds);

@@ -61,6 +61,7 @@ struct SourceRange {
 
   [[nodiscard]] constexpr bool valid() const noexcept { return source.valid(); }
   [[nodiscard]] constexpr u64 endOffset() const noexcept { return offset + size; }
+  friend constexpr bool operator==(SourceRange, SourceRange) noexcept = default;
 };
 
 enum class Severity {

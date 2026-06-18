@@ -17,6 +17,7 @@
 #include "value/session/DiagnosticStore.h"
 #include "value/session/ExplicitCollectionStore.h"
 #include "value/session/MatchFactStore.h"
+#include "value/session/SourceMapStore.h"
 
 #include <filesystem>
 #include <set>
@@ -63,6 +64,7 @@ private:
   AssetStore assets_;
   MatchFactStore matchFacts_;
   ExplicitCollectionStore explicitCollections_;
+  SourceMapStore sourceMaps_;
   CollectionStore collections_;
   DiagnosticStore diagnostics_;
   FormatRegistry formats_;

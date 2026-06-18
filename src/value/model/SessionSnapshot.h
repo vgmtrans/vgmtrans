@@ -8,6 +8,7 @@
 
 #include "value/base/Source.h"
 #include "value/model/MatchModel.h"
+#include "value/model/SourceMap.h"
 #include "value/sequence/SequenceProgram.h"
 #include "value/synth/SynthModel.h"
 
@@ -54,6 +55,7 @@ public:
   [[nodiscard]] const std::vector<Asset>& assets() const noexcept { return assets_; }
   [[nodiscard]] const std::vector<MatchFact>& matchFacts() const noexcept { return matchFacts_; }
   [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return collections_; }
+  [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
   [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return diagnostics_; }
 
   [[nodiscard]] const Asset* asset(AssetId id) const;
@@ -76,7 +78,7 @@ private:
   };
 
   SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets, std::vector<MatchFact> matchFacts,
-                  std::vector<Collection> collections, std::vector<Diagnostic> diagnostics);
+                  std::vector<Collection> collections, SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
 
   [[nodiscard]] static Index buildIndex(const std::vector<Asset>& assets, const std::vector<Collection>& collections);
 
@@ -84,6 +86,7 @@ private:
   std::vector<Asset> assets_;
   std::vector<MatchFact> matchFacts_;
   std::vector<Collection> collections_;
+  SourceMap sourceMap_;
   std::vector<Diagnostic> diagnostics_;
   Index index_;
 };
@@ -94,6 +97,7 @@ public:
   std::vector<Asset> assets;
   std::vector<MatchFact> matchFacts;
   std::vector<Collection> collections;
+  SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;
 
   [[nodiscard]] SessionSnapshot finish();

@@ -8,6 +8,7 @@
 
 #include "value/scan/ParseCursor.h"
 #include "value/scan/ScanTypes.h"
+#include "value/model/SourceMap.h"
 
 #include <cstddef>
 #include <string>
@@ -121,6 +122,7 @@ public:
   [[nodiscard]] ByteReader reader() const noexcept { return input_.reader; }
   [[nodiscard]] std::string_view format() const noexcept { return format_; }
   [[nodiscard]] ParseCursor cursor(SourceRange bounds);
+  [[nodiscard]] SourceMapBuilder& sourceMap() noexcept { return sourceMap_; }
 
   [[nodiscard]] ScanSequenceRef reserveSequence();
   [[nodiscard]] ScanInstrumentSetRef reserveInstrumentSet();
@@ -230,6 +232,7 @@ private:
   std::string format_;
   std::string collectionResolver_;
   ScanResult result_;
+  SourceMapBuilder sourceMap_;
 
   struct HandleState {
     CollectionMemberRole role = CollectionMemberRole::Misc;
