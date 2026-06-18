@@ -127,7 +127,8 @@ ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format)
 
 ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format, std::string collectionResolver)
     : input_(input), format_(std::move(format)),
-      collectionResolver_(collectionResolver.empty() ? format_ : std::move(collectionResolver)) {
+      collectionResolver_(collectionResolver.empty() ? format_ : std::move(collectionResolver)),
+      sourceMap_([this]() { return input_.ids.nextSourceAnnotationId(); }) {
 }
 
 ParseCursor ScanResultBuilder::cursor(SourceRange bounds) {
@@ -252,6 +253,7 @@ void ScanResultBuilder::extractedSource(ExtractedSource source) {
 
 ScanResult ScanResultBuilder::finish() {
   validateReferencedHandles();
+  result_.sourceMap = sourceMap_.finish();
   return std::move(result_);
 }
 

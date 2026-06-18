@@ -24,6 +24,10 @@ ItemId ScanIdAllocator::nextItemId() noexcept {
   return ItemId{nextItemId_++};
 }
 
+SourceAnnotationId ScanIdAllocator::nextSourceAnnotationId() noexcept {
+  return SourceAnnotationId{nextSourceAnnotationId_++};
+}
+
 void ScanIdAllocator::reserveAfter(AssetId id) noexcept {
   if (id.valid()) {
     nextAssetId_ = std::max(nextAssetId_, id.value + 1);
@@ -39,6 +43,12 @@ void ScanIdAllocator::reserveAfter(CollectionId id) noexcept {
 void ScanIdAllocator::reserveAfter(ItemId id) noexcept {
   if (id.valid()) {
     nextItemId_ = std::max(nextItemId_, id.value + 1);
+  }
+}
+
+void ScanIdAllocator::reserveAfter(SourceAnnotationId id) noexcept {
+  if (id.valid()) {
+    nextSourceAnnotationId_ = std::max(nextSourceAnnotationId_, id.value + 1);
   }
 }
 

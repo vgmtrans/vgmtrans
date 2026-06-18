@@ -138,6 +138,7 @@ SessionSnapshot Session::snapshot() const {
       .assets = assets_.all(),
       .matchFacts = matchFacts_.all(),
       .collections = collections_.all(),
+      .sourceMap = sourceMaps_.all(),
       .diagnostics = diagnostics_.all(),
   };
   addMissingSequenceDialectDiagnostics(current, dialects_);
@@ -208,7 +209,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
       normalizeScanResult(result, ids_);
       ScanCommit commit = ScanCommit::fromScanResult(source, std::move(result));
       commit.validate(sources_, assets_);
-      commit.commit(assets_, matchFacts_, explicitCollections_, diagnostics_);
+      commit.commit(assets_, matchFacts_, explicitCollections_, sourceMaps_, diagnostics_);
       addExtractedSources(std::move(commit.extractedSources), source.id, queue, queued);
     } catch (const std::exception& ex) {
       diagnostics_.addError(std::string(module.name) + " scan failed: " + ex.what(),
@@ -237,6 +238,7 @@ void Session::removeDiscoveredDataForSources(const std::vector<SourceId>& source
   const auto removedAssetIds = assets_.removeForSources(sources);
   matchFacts_.removeForSourcesAndAssets(sources, removedAssetIds);
   explicitCollections_.removeForSourcesAndAssets(sources, removedAssetIds);
+  sourceMaps_.removeForSources(sources);
   diagnostics_.removeForSources(sources);
   collections_.markStaleForAssets(removedAssetIds);
 }

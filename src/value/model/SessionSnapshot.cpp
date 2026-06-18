@@ -49,9 +49,9 @@ const AssetMetadata& metadata(const Asset& asset) {
 
 SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets,
                                  std::vector<MatchFact> matchFacts, std::vector<Collection> collections,
-                                 std::vector<Diagnostic> diagnostics)
+                                 SourceMap sourceMap, std::vector<Diagnostic> diagnostics)
     : sources_(std::move(sources)), assets_(std::move(assets)), matchFacts_(std::move(matchFacts)),
-      collections_(std::move(collections)), diagnostics_(std::move(diagnostics)),
+      collections_(std::move(collections)), sourceMap_(std::move(sourceMap)), diagnostics_(std::move(diagnostics)),
       index_(buildIndex(assets_, collections_)) {
 }
 
@@ -98,7 +98,8 @@ SessionSnapshot SessionSnapshotBuilder::finish() {
   diagnostics.insert(diagnostics.end(), std::make_move_iterator(indexDiagnostics.begin()),
                      std::make_move_iterator(indexDiagnostics.end()));
   return SessionSnapshot{
-      std::move(sources), std::move(assets), std::move(matchFacts), std::move(collections), std::move(diagnostics),
+      std::move(sources),     std::move(assets),     std::move(matchFacts),
+      std::move(collections), std::move(sourceMap),  std::move(diagnostics),
   };
 }
 

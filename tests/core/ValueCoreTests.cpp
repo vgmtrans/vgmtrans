@@ -11,6 +11,7 @@ void runValueRegistryTests();
 void runValueSequenceModelTests();
 void runValueSequenceVmTests();
 void runValueSessionTests();
+void runValueSourceMapTests();
 void runValueMidiTests();
 void runValueSynthExportTests();
 
@@ -43,6 +44,7 @@ int main() {
     runValueSequenceModelTests();
     runValueSequenceVmTests();
     runValueSessionTests();
+    runValueSourceMapTests();
     runValueMidiTests();
     runValueSynthExportTests();
 

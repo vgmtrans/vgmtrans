@@ -11,6 +11,7 @@
 #include "value/session/ExplicitCollectionStore.h"
 #include "value/session/DiagnosticStore.h"
 #include "value/session/MatchFactStore.h"
+#include "value/session/SourceMapStore.h"
 
 namespace vgmtrans::core {
 
@@ -23,6 +24,7 @@ struct ScanCommit {
   std::vector<Asset> assets;
   std::vector<MatchFact> matchFacts;
   std::vector<ExplicitCollection> explicitCollections;
+  SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;
   std::vector<ExtractedSource> extractedSources;
 
@@ -30,7 +32,7 @@ struct ScanCommit {
 
   void validate(const SourceStore& sources, const AssetStore& existingAssets) const;
   void commit(AssetStore& assets, MatchFactStore& matchFacts, ExplicitCollectionStore& explicitCollections,
-              DiagnosticStore& diagnostics);
+              SourceMapStore& sourceMaps, DiagnosticStore& diagnostics);
 };
 
 }  // namespace vgmtrans::core
