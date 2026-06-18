@@ -125,13 +125,16 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
       .reader = ByteReader(SourceId{4}, bytes),
       .ids = ids,
   };
+  SourceMapBuilder programSourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
+  std::vector<Diagnostic> programDiagnostics;
   const auto asset = parseNdsSequenceProgram(input, AssetId{7},
                                              NdsSequenceRange{
                                                  .offset = sequenceOffset,
                                                  .size = 0x40,
                                                  .sequenceEnd = trackStart + 4,
                                              },
-                                             "Program", ScanInstrumentSetRef{AssetId{3}});
+                                             "Program", ScanInstrumentSetRef{AssetId{3}}, &programSourceMap,
+                                             &programDiagnostics);
   expect(asset.program.referencedInstruments.size() == 1,
          "NDS sequence program should reference instruments used by source program commands");
   const auto& ref = asset.program.referencedInstruments[0];
@@ -139,6 +142,20 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS program references should decode bank and program from the source varlen value");
   expect(ref.range && ref.range->offset == trackStart && ref.range->size == 3,
          "NDS program references should preserve the source program command range");
+  const SourceMap programAnnotations = programSourceMap.finish();
+  const auto programAnnotationIds = programAnnotations.withSequenceSemantic(SourceId{4}, SequenceSemantic::Program);
+  expect(programAnnotationIds.size() == 1, "NDS program command should publish one program annotation");
+  const auto& programAnnotation = programAnnotations.get(programAnnotationIds[0]);
+  const auto instrumentLink = std::ranges::find_if(programAnnotation.links, [](const SourceLink& link) {
+    return link.role == SourceLinkRole::UsesInstrument;
+  });
+  expect(instrumentLink != programAnnotation.links.end(),
+         "NDS program command should record a structured instrument source link");
+  const auto* instrumentTarget = std::get_if<ObjectRef>(&instrumentLink->target);
+  expect(instrumentTarget != nullptr && instrumentTarget->kind == ObjectKind::Instrument &&
+             !instrumentTarget->asset.valid() && instrumentTarget->index0 == 1 && instrumentTarget->index1 == 5,
+         "NDS program source link should preserve unresolved bank/program selectors");
+  expect(programDiagnostics.empty(), "NDS program source-link decode should not emit diagnostics");
 
   bytes[trackStart + 0] = 0xd5;
   bytes[trackStart + 1] = 0x7f;

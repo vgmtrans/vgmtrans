@@ -109,6 +109,8 @@ public:
   VmCommandCursor& detail(std::string_view name, SourceValue value,
                           SourceValueDisplay display = SourceValueDisplay::Default);
   VmCommandCursor& target(Address address, SourceLinkRole role);
+  VmCommandCursor& instrumentRef(u32 bank, u32 program);
+  VmCommandCursor& sampleRef(u32 sampleIndex);
   VmCommandCursor& warning(std::string_view message);
   VmCommandCursor& error(std::string_view message);
   VmCommandCursor& unsupported(std::string_view message);
