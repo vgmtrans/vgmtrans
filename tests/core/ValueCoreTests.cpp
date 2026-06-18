@@ -25,6 +25,7 @@ void capcomSnesPanPerformanceCarriesGainCompensation();
 void capcomSnesDialectEmitsSourceOnlyDriverSemantics();
 void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey();
 void capcomSnesDialectExecutesRepeatUntilCommand();
+void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken();
 void capcomSnesV1DialectPreservesUnknownOneByteEvents();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectExecutesCallAndReturn();
@@ -58,6 +59,7 @@ int main() {
     capcomSnesDialectEmitsSourceOnlyDriverSemantics();
     capcomSnesDialectEmitsPortamentoFromPreviousSourceKey();
     capcomSnesDialectExecutesRepeatUntilCommand();
+    capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken();
     capcomSnesV1DialectPreservesUnknownOneByteEvents();
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
     ndsSequenceDialectExecutesCallAndReturn();

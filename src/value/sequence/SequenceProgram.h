@@ -36,7 +36,7 @@ struct OperandSpan {
   u32 size = 0;
 };
 
-using CommandOperandValue = std::variant<u64, s64, std::string, Address>;
+using CommandOperandValue = std::variant<u64, s64, double, std::string, Address>;
 
 struct CommandOperand {
   std::string name;

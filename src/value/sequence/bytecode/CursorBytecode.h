@@ -55,6 +55,69 @@ struct DecodeCursorRuntime {
   void portamentoEnable(bool) {}
   void portamentoTime(double) {}
   void modulation(ModulationPerformanceTarget, double) {}
+
+  [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays,
+                                               Address destination) {
+    return cmd.countedRepeatUntil(slot, totalPlays, destination);
+  }
+
+  [[nodiscard]] RepeatBreakFlow countedRepeatBreak(VmCommandCursor& cmd, u8 slot, Address destination) {
+    return cmd.countedRepeatBreak(slot, destination);
+  }
+};
+
+template <class TrackState, class Context>
+struct RenderCursorRuntime {
+  TrackState& state;
+  PerformanceEmitter& out;
+  VmApi& vm;
+  const Context& context;
+
+  void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false) {
+    out.note(key, linearVelocity, durationTicks, extendsPrevious);
+  }
+  void tempo(u32 microsecondsPerQuarter) { out.tempo(microsecondsPerQuarter); }
+  void instrument(u32 bank, u32 program, bool forceBankSelect = false) {
+    out.instrument(bank, program, forceBankSelect);
+  }
+  void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit) {
+    out.level(linearGain, precisionHint);
+  }
+  void expression(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit) {
+    out.expression(linearGain, precisionHint);
+  }
+  void pan(double stereoPosition) { out.pan(stereoPosition); }
+  void pan(double stereoPosition, double linearGain) { out.pan(stereoPosition, linearGain); }
+  void masterLevel(double linearGain) { out.masterLevel(linearGain); }
+  void reverb(double send) { out.reverb(send); }
+  void tuning(double cents) { out.tuning(cents); }
+  void globalTranspose(s32 semitones) { out.globalTranspose(semitones); }
+  void pitchBend(double semitones) { out.pitchBend(semitones); }
+  void pitchBendRange(u8 semitones) { out.pitchBendRange(semitones); }
+  void portamentoEnable(bool enabled) { out.portamentoEnable(enabled); }
+  void portamentoTime(double timeMilliseconds) { out.portamentoTime(timeMilliseconds); }
+  void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
+
+  // Repeat policy belongs to SequenceVm. These helpers let a cursor command keep
+  // branch-local side effects readable without calling VmApi directly.
+  [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays,
+                                               Address destination) {
+    CommandFlow flow = cmd.countedRepeatUntil(slot, totalPlays, destination);
+    if (!flow.truncated) {
+      flow.resolvedEffects = vm.countedRepeatUntil(slot, totalPlays, destination);
+    }
+    return flow;
+  }
+
+  [[nodiscard]] RepeatBreakFlow countedRepeatBreak(VmCommandCursor& cmd, u8 slot, Address destination) {
+    const BranchResult branch = vm.countedRepeatBreak(slot, destination);
+    const RepeatBreakFlow annotated = cmd.countedRepeatBreak(slot, destination, branch.taken);
+    CommandFlow flow = annotated.flow();
+    if (!flow.truncated) {
+      flow.resolvedEffects = branch.effects;
+    }
+    return RepeatBreakFlow{flow, branch.taken};
+  }
 };
 
 [[nodiscard]] inline DecodeFlow decodeFlowFromCommandFlow(const CommandFlow& flow, Address fallthrough) {
@@ -161,7 +224,7 @@ struct CursorBytecodeCommand {
                          PerformanceEmitter& out, VmApi& vm, const std::any& context) {
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
     const auto& typedContext = std::any_cast<const Context&>(context);
-    CommandRuntime<TrackState, Context> runtime{
+    RenderCursorRuntime<TrackState, Context> runtime{
         .state = typedTrackState,
         .out = out,
         .vm = vm,

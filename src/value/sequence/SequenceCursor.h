@@ -42,6 +42,9 @@ struct CommandFlow {
   ::u8 repeatSlot = 0;
   u32 repeatTotalPlays = 0;
   bool truncated = false;
+  // Render mode can ask the VM to resolve a repeat branch before returning
+  // here. Decode mode leaves this empty and records only static targets.
+  std::optional<Effects> resolvedEffects;
 };
 
 class RepeatBreakFlow {

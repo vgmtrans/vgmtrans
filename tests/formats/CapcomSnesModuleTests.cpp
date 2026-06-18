@@ -131,7 +131,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   vgmtrans::formats::registerValueFormats(session);
   expect(session.dialects().contains("capcom-snes:v3"),
          "value format registration should include CapcomSnes sequence dialects");
-  session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
+  const SourceId source = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
   const SessionSnapshot project = session.scanPendingSources();
   expect(project.diagnostics().empty(), "CapcomSnes scan should not report diagnostics for complete fixture");
@@ -204,6 +204,20 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "command item should preserve raw and interpreted command values");
   expect(firstTempoItem->range.offset == 0x3000 && firstTempoItem->range.size == 3,
          "command item should preserve command source range");
+
+  const auto tempoAnnotations = project.sourceMap().withSequenceSemantic(source, SequenceSemantic::Tempo);
+  expect(tempoAnnotations.size() == sequence->program.tracks.size(),
+         "CapcomSnes scan should publish source annotations for decoded tempo commands");
+  const SourceAnnotation& tempoAnnotation = project.sourceMap().get(tempoAnnotations.front());
+  expect(tempoAnnotation.label == "Tempo" && tempoAnnotation.localKind == "tempo",
+         "CapcomSnes tempo annotation should carry command display metadata");
+  expect(tempoAnnotation.range.offset == 0x3000 && tempoAnnotation.range.size == 3,
+         "CapcomSnes tempo annotation should use the exact decoded command range");
+  const auto hasTempoField = [&](std::string_view name) {
+    return std::ranges::any_of(tempoAnnotation.fields, [&](const SourceField& field) { return field.name == name; });
+  };
+  expect(hasTempoField("opcode") && hasTempoField("raw") && hasTempoField("microseconds_per_quarter"),
+         "CapcomSnes tempo annotation should record opcode, raw operand, and interpreted tempo");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
   const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
@@ -546,9 +560,11 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
          "CapcomSnes source dialect should index decoded command addresses");
 
   const auto programOperands = track.operandsFor(track.commands[1]);
-  expect(programOperands.size() == 1 && programOperands[0].name == "raw" &&
-             std::get<u64>(programOperands[0].value) == 0x85,
-         "CapcomSnes source command should preserve decoded program operands");
+  expect(programOperands.size() == 3 && programOperands[0].name == "raw" &&
+             std::get<u64>(programOperands[0].value) == 0x85 && programOperands[1].name == "bank" &&
+             std::get<u64>(programOperands[1].value) == 1 && programOperands[2].name == "program" &&
+             std::get<u64>(programOperands[2].value) == 5,
+         "CapcomSnes source command should preserve raw and decoded program operands");
 
   const CommandInfo programInfo = dialect.describe(track, track.commands[1]);
   expect(programInfo.name == "Program", "CapcomSnes dialect should describe commands through local command code");
@@ -689,9 +705,10 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   }
 
   const auto tuningOperands = track.operandsFor(track.commands[0]);
-  expect(tuningOperands.size() == 1 && tuningOperands[0].name == "tuning" &&
-             std::get<s64>(tuningOperands[0].value) == -128,
-         "CapcomSnes tuning command should preserve its signed operand");
+  expect(tuningOperands.size() == 2 && tuningOperands[0].name == "tuning" &&
+             std::get<s64>(tuningOperands[0].value) == -128 && tuningOperands[1].name == "cents" &&
+             std::get<double>(tuningOperands[1].value) == -50.0,
+         "CapcomSnes tuning command should preserve raw and interpreted operands");
   const CommandInfo release = dialect.describe(track, track.commands[5]);
   expect(release.fields.size() == 2 && release.fields[1].name == "gain" && release.fields[1].value == "165",
          "CapcomSnes release command should describe the driver GAIN value");
@@ -805,6 +822,54 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
     });
     expect(found, "CapcomSnes repeat fixture should emit a note at tick " + std::to_string(tick));
   }
+}
+
+void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x41;
+  bytes[0x3001] = 0x12;
+  bytes[0x3002] = 0x10;
+  bytes[0x3003] = 0x30;
+  bytes[0x3004] = 0x0a;
+  bytes[0x3005] = 0x41;
+  bytes[0x3006] = 0x0e;
+  bytes[0x3007] = 0x01;
+  bytes[0x3008] = 0x30;
+  bytes[0x3009] = 0x00;
+  bytes[0x300a] = 0x41;
+  bytes[0x300b] = 0x17;
+
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const SequenceDialect& dialect = descriptor.dialect;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
+  expect(track.commands.size() == 6, "CapcomSnes repeat-break fixture should decode both branch paths");
+
+  const CommandInfo repeatBreak = dialect.describe(track, track.commands[1]);
+  expect(repeatBreak.detailKind == "capcom-snes.repeat-break",
+         "CapcomSnes repeat-break opcode should decode as Repeat Break");
+  expect(repeatBreak.fields.size() == 3 && repeatBreak.fields[0].value == "1" &&
+             repeatBreak.fields[1].value == "16" && repeatBreak.fields[2].value == "$300A",
+         "CapcomSnes repeat-break display should preserve slot, attributes, and destination");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes repeat-break should render without diagnostics");
+  expect(performance.tracks[0].events.size() >= 5,
+         "CapcomSnes repeat-break should emit initial defaults and repeated notes");
+  expect(performance.tracks[0].endTick == 27,
+         "CapcomSnes repeat-break attributes should dot the branch-target note only on the final pass");
+
+  const auto finalNote = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* note = std::get_if<NotePerformanceEvent>(&event);
+    return note != nullptr && note->header.tick == 18;
+  });
+  expect(finalNote != performance.tracks[0].events.end() &&
+             std::get<NotePerformanceEvent>(*finalNote).durationTicks == 9,
+         "CapcomSnes repeat-break branch should apply note attributes before the branch target plays");
 }
 
 void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
