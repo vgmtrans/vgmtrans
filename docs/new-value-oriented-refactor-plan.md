@@ -1,9 +1,11 @@
-The following document provides a spec for a major refactor of the value-oriented rewrite residing in src/value.
+The following document provides a spec for a major refactor of the value-oriented rewrite residing in `src/value`.
 The guiding line is:
 
 > **Driver code should look like driver code. The VM should own playback policy. The source map should record what the parser/driver already learned, not become a parallel model of the app.**
 
 This aligns with the principle that the default authoring surface should become an imperative `CommandCursor`/`Flow` API backed by `SequenceVM`, with typed command structs kept only as an advanced escape hatch.
+
+Implementation should preserve the existing value-oriented goals: parsed scan output remains value-like, ownership stays explicit, exports use semantic assets instead of parser objects, and the VM remains the shared place for sequence playback policy. The refactor is not meant to replace that architecture. It is meant to make the normal format-authoring surface small, readable, and source-driver oriented.
 
 ---
 
@@ -148,9 +150,11 @@ The key flow for non-sequence data:
 
 ```text
 source bytes
-  -> ParseCursor + SourceBuilder
+  -> ParseCursor + SourceMapBuilder
   -> semantic assets + SourceMap annotations
 ```
+
+`SourceMap` must be part of the normal scan/session result, not a separate side channel. Scanners should return semantic assets, diagnostics, extracted sources, and source annotations together so HexView and exporters always describe the same parsed snapshot.
 
 ---
 
@@ -427,7 +431,7 @@ public:
   Address address() const noexcept;
   uint8_t opcode() const noexcept;
 
-  SourceSpan commandSpan() const noexcept;
+  SourceRange commandSpan() const noexcept;
   SourceAnnotationId annotation() const noexcept;
 
   // Identity / classification
@@ -478,13 +482,18 @@ public:
 
 ## 4.6 `ReadValue<T>`
 
-Cursor reads should return both value and source span.
+Cursor reads should return the decoded value, source range, and validity. Normal command code should not need an `if (!value)` check after every operand read.
 
 ```cpp
 template <class T>
 struct ReadValue {
   T value;
-  SourceSpan span;
+  SourceRange range;
+  bool valid = true;
+
+  explicit operator bool() const noexcept {
+    return valid;
+  }
 
   operator T() const noexcept {
     return value;
@@ -503,10 +512,45 @@ while the source map records:
 
 ```text
 operand name: volume
-operand span
+operand range
 operand value
 parent command annotation
 ```
+
+### 4.7 Malformed or truncated command reads
+
+Operand reads should be **sticky-failing**. If `cmd.u8("pan")`, `cmd.varLen("duration")`, or another read cannot read the requested bytes:
+
+```text
+the cursor records a diagnostic
+the returned ReadValue has valid == false and a harmless default value
+the command annotation is marked malformed/truncated
+rendered performance events from that command are discarded
+the final flow returned by cmd.next(), cmd.wait(), cmd.jump(), etc. becomes a stop/truncated flow
+```
+
+This keeps common command code readable:
+
+```cpp
+case 0xc4: {
+  auto pan = cmd.name("Pan")
+                .semantic(SequenceSemantic::Pan)
+                .u8("pan");
+
+  rt.pan(PanScale::fromMidi7(pan.value));
+  return cmd.next();
+}
+```
+
+The command case does not need this boilerplate:
+
+```cpp
+if (!pan) {
+  return cmd.truncated();
+}
+```
+
+Rare commands may still inspect `value.valid` when the source driver has a real fallback behavior for malformed operands. That should be the exception, not the normal authoring style.
 
 ---
 
@@ -550,7 +594,7 @@ struct CommandHandler {
 };
 
 struct SourceCommand {
-  SourceCommandId id;
+  CommandId id;
 
   CommandHandlerId handler;
   CommandKindId kind;
@@ -558,12 +602,14 @@ struct SourceCommand {
   uint8_t opcode;
   Address address;
 
-  SourceSpan span;
+  SourceRange range;
   std::vector<uint8_t> bytes;
 
   SourceAnnotationId annotation;
 };
 ```
+
+The names in this sketch are conceptual. Prefer existing ID/value types when they already express the same thing, such as the current command ID type, unless the implementation deliberately renames that type across the value codebase.
 
 For NDS:
 
@@ -620,7 +666,7 @@ Render:
 
 This distinction is essential.
 
-The feedback warned that running the same command reader during decode and render can be dangerous if decode mutates real playback state or infers static flow only from dynamic choices.
+The same command reader can run during decode and render, but the two phases do different work. Decode records source facts and possible flow. Render produces performance events and asks the VM to make the real playback decisions.
 
 ## 6.1 Decode phase
 
@@ -637,8 +683,10 @@ records possible static flow targets
 records diagnostics
 creates SourceCommand
 creates SourceAnnotation
+may mutate a decode-local driver state when later bytes depend on earlier commands
 does not emit real musical events
 does not consume real VM repeat counters
+does not use the real VM call stack or render loop policy
 ```
 
 For example:
@@ -660,6 +708,8 @@ target source link
 
 It does not decide whether this playback pass jumps.
 
+Decode-local driver state is allowed because many source drivers need it just to understand later bytes. For example, a format may need current octave, transpose, default duration, note-wait mode, or Capcom-style note attributes while decoding. That state must be a temporary decode state owned by the decode pass. It must not consume render-only VM state such as actual repeat counters, call stack frames, synchronized loop stopping, or export loop count.
+
 ## 6.2 Render phase
 
 Render phase executes actual playback behavior.
@@ -679,7 +729,7 @@ The author usually does not branch on `cmd.phase()`. The cursor and runtime sink
 
 ## 6.3 Rule
 
-> Decode records all statically visible source facts. Render chooses actual playback behavior.
+> Decode may maintain temporary source-driver state to understand bytes, but it records facts instead of producing playback. Render uses real runtime state and the VM to choose actual playback behavior.
 
 That rule avoids the biggest risk of the hybrid approach.
 
@@ -940,24 +990,26 @@ the complete semantic model of an asset
 
 Semantic assets remain the authoritative parsed model. `SourceMap` records source-backed facts and relationships about those assets.
 
-## 9.1 SourceSpan
+## 9.1 SourceRange
 
 All source annotations are grounded in source bytes.
+
+The implementation should reuse the existing `SourceRange` type unless there is a deliberate rename across the value codebase. Do not introduce a second source-span type with the same meaning.
 
 ```cpp
 using SourceId = StrongId<struct SourceTag, uint32_t>;
 
-struct SourceSpan {
+struct SourceRange {
   SourceId source;
   uint64_t offset = 0;
-  uint64_t length = 0;
+  uint64_t size = 0;
 };
 ```
 
-An empty span is allowed for derived values that have no direct byte range:
+An empty or invalid range is allowed for derived values that have no direct byte range:
 
 ```cpp
-SourceSpan{}; // derived field, synthetic relationship, or unknown location
+SourceRange{}; // derived field, synthetic relationship, or unknown location
 ```
 
 Common examples:
@@ -1208,7 +1260,7 @@ struct SourceField {
   std::string name;
 
   // May be empty for derived values.
-  SourceSpan span;
+  SourceRange range;
 
   SourceValue value;
   SourceValueDisplay display = SourceValueDisplay::Default;
@@ -1389,17 +1441,17 @@ Links may point to a source span, another annotation, or a semantic object.
 
 ```cpp
 using SourceTarget =
-    std::variant<SourceSpan, SourceAnnotationId, ObjectRef>;
+    std::variant<SourceRange, SourceAnnotationId, ObjectRef>;
 ```
 
 Examples:
 
 ```text
-pointer field -> SourceSpan target
-jump command -> SourceSpan or command annotation
+pointer field -> SourceRange target
+jump command -> SourceRange or command annotation
 program command -> ObjectRef instrument
 instrument row -> ObjectRef sample
-decompressed source -> SourceSpan compressed parent
+decompressed source -> SourceRange compressed parent
 ```
 
 ## 9.10 SourceLink
@@ -1417,7 +1469,7 @@ Examples:
 ```cpp
 row.link(
   SourceLinkRole::PointsTo,
-  SourceSpan{sourceId, trackAddress, 1},
+  SourceRange{sourceId, trackAddress, 1},
   "Track Start");
 
 cmd.target(destination, SourceLinkRole::JumpTarget);
@@ -1440,7 +1492,7 @@ using SourceAnnotationId = StrongId<struct SourceAnnotationTag, uint32_t>;
 struct SourceAnnotation {
   SourceAnnotationId id;
 
-  SourceSpan span;
+  SourceRange range;
   SourceRole role = SourceRole::Unknown;
 
   std::string label;
@@ -1468,7 +1520,7 @@ struct SourceAnnotation {
 Notes:
 
 ```text
-span:
+range:
   the primary byte range represented by this annotation.
 
 role:
@@ -1552,8 +1604,8 @@ public:
 
   std::vector<SourceAnnotationId> annotationsForSource(SourceId source) const;
 
-  std::vector<SourceAnnotationId> intersecting(SourceSpan span) const;
-  std::vector<SourceAnnotationId> containing(SourceSpan span) const;
+  std::vector<SourceAnnotationId> intersecting(SourceRange range) const;
+  std::vector<SourceAnnotationId> containing(SourceRange range) const;
   std::vector<SourceAnnotationId> at(SourceId source, uint64_t offset) const;
 
   std::vector<SourceAnnotationId> ownedBy(ObjectRef object) const;
@@ -1640,7 +1692,7 @@ For sequences, the source map and `SequenceProgram` work together.
 
 ```cpp
 struct SourceCommand {
-  SourceCommandId id;
+  CommandId id;
 
   CommandHandlerId handler;
   CommandKindId kind;
@@ -1648,7 +1700,7 @@ struct SourceCommand {
   uint8_t opcode;
   Address address;
 
-  SourceSpan span;
+  SourceRange range;
   std::vector<uint8_t> bytes;
 
   SourceAnnotationId annotation;
@@ -1724,36 +1776,38 @@ It should be ergonomic enough that format authors actually use it for headers, t
 
 It should not expose UI concepts.
 
+The builder should be reachable from the normal scanner output path, most likely through `ScanResultBuilder`. A scanner should not have to manually keep a separate source-map object synchronized with the assets it returns.
+
 ## 10.1 SourceMapBuilder
 
 ```cpp
 class SourceMapBuilder {
 public:
-  AnnotationBuilder source(std::string_view label, SourceSpan span);
+  AnnotationBuilder source(std::string_view label, SourceRange range);
 
-  AnnotationBuilder section(std::string_view label, SourceSpan span);
-  AnnotationBuilder header(std::string_view label, SourceSpan span);
+  AnnotationBuilder section(std::string_view label, SourceRange range);
+  AnnotationBuilder header(std::string_view label, SourceRange range);
 
-  AnnotationBuilder table(std::string_view label, SourceSpan span);
-  AnnotationBuilder row(std::string_view label, SourceSpan span);
+  AnnotationBuilder table(std::string_view label, SourceRange range);
+  AnnotationBuilder row(std::string_view label, SourceRange range);
 
   AnnotationBuilder field(
       std::string_view label,
-      SourceSpan span,
+      SourceRange range,
       SourceValue value);
 
   AnnotationBuilder pointer(
       std::string_view label,
-      SourceSpan span,
+      SourceRange range,
       SourceTarget target);
 
   AnnotationBuilder command(
       std::string_view label,
-      SourceSpan span,
+      SourceRange range,
       SequenceSemantic semantic = SequenceSemantic::Unknown);
 
   void diagnostic(
-      SourceSpan span,
+      SourceRange range,
       Severity severity,
       std::string_view message);
 };
@@ -1792,7 +1846,7 @@ public:
 
   AnnotationBuilder& field(
       std::string_view name,
-      SourceSpan span,
+      SourceRange range,
       SourceValue value,
       SourceValueDisplay display = SourceValueDisplay::Default);
 
@@ -1815,7 +1869,7 @@ public:
 Convenience helpers may be added on top:
 
 ```cpp
-AnnotationBuilder& pointsTo(SourceSpan target, std::string_view label = {});
+AnnotationBuilder& pointsTo(SourceRange target, std::string_view label = {});
 AnnotationBuilder& usesInstrument(ObjectRef instrument);
 AnnotationBuilder& usesSample(ObjectRef sample);
 ```
@@ -1824,13 +1878,18 @@ But the core API should remain small.
 
 ## 10.3 ParseCursor integration
 
-A general `ParseCursor` should return values with spans.
+A general `ParseCursor` should return values with source ranges and validity. It should use the same general failure behavior as `VmCommandCursor`: record diagnostics, return a harmless default value, and let callers inspect validity only when they need special fallback behavior.
 
 ```cpp
 template <class T>
 struct ReadValue {
   T value;
-  SourceSpan span;
+  SourceRange range;
+  bool valid = true;
+
+  explicit operator bool() const noexcept {
+    return valid;
+  }
 
   operator T() const noexcept {
     return value;
@@ -1844,8 +1903,8 @@ public:
   SourceId source() const noexcept;
   uint64_t offset() const noexcept;
 
-  SourceSpan span(uint64_t offset, uint64_t length) const;
-  SourceSpan currentSpan(uint64_t length) const;
+  SourceRange range(uint64_t offset, uint64_t size) const;
+  SourceRange currentRange(uint64_t size) const;
 
   ReadValue<uint8_t> u8(std::string_view name);
   ReadValue<int8_t> s8(std::string_view name);
@@ -1866,7 +1925,7 @@ Example:
 
 ```cpp
 auto version = r.u16le("version");
-header.field("Version", version.span, version.value, SourceValueDisplay::Hex);
+header.field("Version", version.range, version.value, SourceValueDisplay::Hex);
 ```
 
 ## 10.4 Header example
@@ -1877,20 +1936,20 @@ auto header = source.header("SSEQ Header", headerSpan);
 auto magic = r.bytes("magic", 4);
 header.field(
   "Magic",
-  magic.span,
+  magic.range,
   ascii(magic.value),
   SourceValueDisplay::Ascii);
 
 auto version = r.u16le("version");
 header.field(
   "Version",
-  version.span,
+  version.range,
   version.value,
   SourceValueDisplay::Hex);
 
 auto trackTableOffset = r.u32le("track_table_offset");
 
-SourceSpan trackTableSpan{
+SourceRange trackTableSpan{
   sourceId,
   trackTableOffset.value,
   trackTableSize
@@ -1898,7 +1957,7 @@ SourceSpan trackTableSpan{
 
 header.field(
         "Track Table Offset",
-        trackTableOffset.span,
+        trackTableOffset.range,
         trackTableOffset.value,
         SourceValueDisplay::Address)
       .link(
@@ -1915,9 +1974,9 @@ This records source structure that is irrelevant to sequence rendering but essen
 auto table = source.table("Track Pointer Table", tableSpan);
 
 for (uint32_t track = 0; track < trackCount; ++track) {
-  SourceSpan rowSpan = r.currentSpan(4);
+  SourceRange rowRange = r.currentRange(4);
 
-  auto row = source.row(fmt::format("Track {}", track), rowSpan)
+  auto row = source.row(fmt::format("Track {}", track), rowRange)
                    .parent(table.id())
                    .owner(ObjectRefs::sequenceTrack(sequenceAssetId, track));
 
@@ -1926,12 +1985,12 @@ for (uint32_t track = 0; track < trackCount; ++track) {
 
   row.field(
        "Offset",
-       offset.span,
+       offset.range,
        offset.value,
        SourceValueDisplay::Address)
      .link(
        SourceLinkRole::PointsTo,
-       SourceSpan{sourceId, entry, 1},
+       SourceRange{sourceId, entry, 1},
        "Track Start");
 
   programBuilder.addTrack(track, entry, row.id());
@@ -1946,9 +2005,9 @@ This gives the UI a visible track table while also giving the sequence program i
 auto table = source.table("Instrument Table", tableSpan);
 
 for (uint32_t i = 0; i < instrumentCount; ++i) {
-  SourceSpan rowSpan = r.currentSpan(instrumentEntrySize);
+  SourceRange rowRange = r.currentRange(instrumentEntrySize);
 
-  auto row = source.row(fmt::format("Instrument {}", i), rowSpan)
+  auto row = source.row(fmt::format("Instrument {}", i), rowRange)
                    .role(SourceRole::Instrument)
                    .parent(table.id())
                    .owner(ObjectRefs::instrument(instrumentSetId, i));
@@ -1958,10 +2017,10 @@ for (uint32_t i = 0; i < instrumentCount; ++i) {
   auto volume = r.u8("volume");
   auto pan = r.u8("pan");
 
-  row.field("Program", program.span, program.value);
-  row.field("Sample Index", sampleIndex.span, sampleIndex.value);
-  row.field("Volume", volume.span, volume.value);
-  row.field("Pan", pan.span, pan.value);
+  row.field("Program", program.range, program.value);
+  row.field("Sample Index", sampleIndex.range, sampleIndex.value);
+  row.field("Volume", volume.range, volume.value);
+  row.field("Pan", pan.range, pan.value);
 
   row.link(
     SourceLinkRole::UsesSample,
@@ -1985,12 +2044,12 @@ auto loopStart = r.u32le("loop_start");
 auto loopEnd = r.u32le("loop_end");
 auto dataOffset = r.u32le("data_offset");
 
-sample.field("Format", format.span, format.value);
-sample.field("Sample Rate", sampleRate.span, sampleRate.value);
-sample.field("Loop Start", loopStart.span, loopStart.value);
-sample.field("Loop End", loopEnd.span, loopEnd.value);
+sample.field("Format", format.range, format.value);
+sample.field("Sample Rate", sampleRate.range, sampleRate.value);
+sample.field("Loop Start", loopStart.range, loopStart.value);
+sample.field("Loop End", loopEnd.range, loopEnd.value);
 
-SourceSpan payloadSpan{
+SourceRange payloadSpan{
   sourceId,
   dataOffset.value,
   sampleDataLength
@@ -1998,7 +2057,7 @@ SourceSpan payloadSpan{
 
 sample.field(
         "Data Offset",
-        dataOffset.span,
+        dataOffset.range,
         dataOffset.value,
         SourceValueDisplay::Address)
       .link(
@@ -2024,17 +2083,17 @@ auto flags = r.u16le("flags");
 auto count = r.u16le("count");
 auto dataOffset = r.u32le("data_offset");
 
-block.field("Flags", flags.span, flags.value, SourceValueDisplay::Hex);
-block.field("Count", count.span, count.value);
+block.field("Flags", flags.range, flags.value, SourceValueDisplay::Hex);
+block.field("Count", count.range, count.value);
 
 block.field(
        "Data Offset",
-       dataOffset.span,
+       dataOffset.range,
        dataOffset.value,
        SourceValueDisplay::Address)
      .link(
        SourceLinkRole::PointsTo,
-       SourceSpan{sourceId, dataOffset.value, count.value * entrySize},
+       SourceRange{sourceId, dataOffset.value, count.value * entrySize},
        "Data");
 ```
 
@@ -2075,7 +2134,7 @@ annotation.field(
 
 annotation.field(
     "pan",
-    pan.span,
+    pan.range,
     pan.value);
 ```
 
@@ -2164,10 +2223,10 @@ Fields:
   destination
 
 Links:
-  JumpTarget -> target SourceSpan or target SourceAnnotation
+  JumpTarget -> target SourceRange or target SourceAnnotation
 ```
 
-During early decode, the target annotation may not exist yet. In that case, record a target `SourceSpan` first. A later fixup pass may replace or supplement it with the resolved target `SourceAnnotationId`.
+During early decode, the target annotation may not exist yet. In that case, record a target `SourceRange` first. A later fixup pass may replace or supplement it with the resolved target `SourceAnnotationId`.
 
 ## 10.12 Repeat command annotation
 
@@ -2228,7 +2287,7 @@ Parsers and command cursors should be able to attach diagnostics directly.
 ```cpp
 cmd.warning("Unsupported vibrato shape ignored");
 cmd.error("Jump target outside sequence data");
-source.diagnostic(pointer.span, Severity::Warning, "Pointer target is outside file");
+source.diagnostic(pointer.range, Severity::Warning, "Pointer target is outside file");
 ```
 
 A diagnostic should become both:
@@ -2255,7 +2314,7 @@ struct Diagnostic {
   Severity severity;
   std::string message;
 
-  std::optional<SourceSpan> span;
+  std::optional<SourceRange> range;
   std::optional<SourceAnnotationId> annotation;
   std::optional<ObjectRef> object;
 };
@@ -2286,7 +2345,7 @@ public:
 Possible fixups:
 
 ```text
-SourceSpan target -> SourceAnnotationId target, when an exact command/section exists
+SourceRange target -> SourceAnnotationId target, when an exact command/section exists
 bank/program reference -> ObjectRef::instrument, when collection matching is complete
 sample index reference -> ObjectRef::sample, when sample set is known
 diagnostic span -> nearest containing annotation
@@ -2297,7 +2356,7 @@ Fixups should add information, not erase the original source-span relationship.
 For example, a jump can keep both:
 
 ```text
-JumpTarget -> SourceSpan{source, address, 1}
+JumpTarget -> SourceRange{source, address, 1}
 JumpTarget -> SourceAnnotationId{targetCommand}
 ```
 
@@ -2357,6 +2416,8 @@ These conventions are enough for first-pass HexView, source outline, and inspect
 
 Keep `SequenceProgram` as the sequence-specific source/execution model.
 
+The exact container layout can follow the current code if it remains cleaner. Commands may stay track-owned, or they may move into a shared command vector if that materially simplifies indexing. The required design point is that each executable source command has a stable command ID, saved bytes, address/range, handler, kind, and primary source annotation.
+
 ```cpp
 struct SequenceProgram {
   DialectId dialect;
@@ -2373,14 +2434,14 @@ struct SequenceTrackEntry {
   TrackId track;
   Address entryAddress;
 
-  std::optional<SourceCommandId> entryCommand;
+  std::optional<CommandId> entryCommand;
   std::optional<SourceAnnotationId> sourceAnnotation;
 };
 ```
 
 ```cpp
 struct SourceCommand {
-  SourceCommandId id;
+  CommandId id;
 
   CommandHandlerId handler;
   CommandKindId kind;
@@ -2388,7 +2449,7 @@ struct SourceCommand {
   uint8_t opcode;
   Address address;
 
-  SourceSpan span;
+  SourceRange range;
   std::vector<uint8_t> bytes;
 
   SourceAnnotationId annotation;
@@ -2405,17 +2466,17 @@ Example:
 Jump command annotation:
   role: Command
   sequenceSemantic: Jump
-  link: JumpTarget -> target SourceSpan or target command annotation
+  link: JumpTarget -> target SourceRange or target command annotation
 
 Call command annotation:
   role: Command
   sequenceSemantic: Call
-  link: CallTarget -> target SourceSpan or target command annotation
+  link: CallTarget -> target SourceRange or target command annotation
 
 Repeat command annotation:
   role: Command
   sequenceSemantic: Repeat
-  link: RepeatTarget -> target SourceSpan or target command annotation
+  link: RepeatTarget -> target SourceRange or target command annotation
 ```
 
 If later we need a specialized flow graph for source navigation, add it then.
@@ -2484,7 +2545,7 @@ Each emitted event can internally carry origin metadata:
 
 ```cpp
 struct EventOrigin {
-  SourceCommandId command;
+  CommandId command;
   SourceAnnotationId annotation;
 };
 ```
@@ -2600,9 +2661,19 @@ The feedback explicitly argues for this demotion of typed command structs to an 
 
 # 16. Driver helper levels
 
-Avoid one giant switch as the only option, but keep the switch/lambda style primary.
+Avoid one giant switch as the only option forever, but keep the switch/lambda cursor reader as the first implementation target. Do not build the small declarative helper API until NDS and Capcom prove that the cursor model preserves behavior and is actually more readable.
 
-## Level 1: small declarative helpers for boring commands
+## First-pass default: switch/lambda reader for normal commands
+
+```cpp
+driver.read(readNdsCommand);
+```
+
+This is the default path to implement and document first.
+
+## Later convenience: small declarative helpers for boring commands
+
+Small helpers may be useful after the cursor path is stable:
 
 ```cpp
 driver.op(0xc1, "Volume")
@@ -2623,15 +2694,9 @@ driver.op(0xff, "End")
 
 The helper slugifies `"Volume"` to `"volume"`.
 
-## Level 2: switch/lambda reader for normal commands
+These helpers are optional. They should not become a second framework that format authors must learn before writing a readable driver.
 
-```cpp
-driver.read(readNdsCommand);
-```
-
-This is the default.
-
-## Level 3: typed commands for special cases
+## Escape hatch: typed commands for special cases
 
 ```cpp
 map.op<0x81, ProgramCommand>("Program");
@@ -2639,7 +2704,7 @@ map.op<0x81, ProgramCommand>("Program");
 
 This is allowed, not preferred.
 
-The feedback also identified this three-level authoring model as a way to avoid making every driver either a giant switch or a typed-command framework.
+The long-term authoring model can have multiple levels, but the first refactor should prove the imperative cursor reader before adding more surfaces.
 
 ---
 
@@ -2662,7 +2727,7 @@ struct Diagnostic {
   Severity severity;
   std::string message;
 
-  std::optional<SourceSpan> span;
+  std::optional<SourceRange> range;
   std::optional<SourceAnnotationId> annotation;
   std::optional<ObjectRef> object;
 };
@@ -2679,7 +2744,7 @@ cmd.unsupported("Command stops playback");
 Parser examples:
 
 ```cpp
-source.diagnostic(pointer.span, Severity::Warning, "Pointer target is outside file");
+source.diagnostic(pointer.range, Severity::Warning, "Pointer target is outside file");
 ```
 
 ---
@@ -2691,7 +2756,7 @@ source.diagnostic(pointer.span, Severity::Warning, "Pointer target is outside fi
 Implement:
 
 ```text
-SourceSpan
+SourceRange
 SourceValue
 SourceField
 SourceRole
@@ -2703,13 +2768,13 @@ SourceMap
 SourceMapBuilder
 ```
 
-Keep enums small.
+Keep enums small. Store the resulting source map in the normal scan/session snapshot path alongside assets, diagnostics, match facts, and explicit collections. A scanner should not have to return source annotations through a separate side channel.
 
-Do not add layers, presentation hints, `VisualizationService`, `StaticSequenceMap`, or `SequenceTimeline`.
+Do not add annotation layers, UI color/presentation hints, `VisualizationService`, `StaticSequenceMap`, or `SequenceTimeline`. `SourceValueDisplay` is allowed as a small scalar formatting hint for inspectors; it is not a widget or theme instruction.
 
-## Phase 2: Add SourceMap usage for non-sequence data
+## Phase 2: Add a small SourceMap proof for non-sequence data
 
-Add annotation calls for:
+Add a small number of annotation calls for:
 
 ```text
 headers
@@ -2719,11 +2784,13 @@ sample headers
 misc sections
 ```
 
-This proves the source map is useful beyond sequences.
+This proves the source map is useful beyond sequences, but it should not become a mass annotation migration before the sequence authoring path is fixed.
 
 ## Phase 3: Add `VmCommandCursor`
 
 Implement cursor reads, naming, slugification, semantic classification, operand recording, source links, diagnostics, and VM flow helpers.
+
+Cursor reads must be sticky-failing so ordinary command cases do not grow malformed-read boilerplate. A missing operand should mark the cursor failed, record a diagnostic, suppress emitted performance events for that command, and cause the returned flow to stop as truncated.
 
 ## Phase 4: Refactor command kind vs command handler
 
@@ -2773,6 +2840,8 @@ instrument references are structural
 VM render behavior is preserved
 ```
 
+Do not add the optional declarative `driver.op(...).emit(...)` helper layer before this conversion. If NDS still feels too verbose after the cursor conversion, add the smallest helper that removes proven repetition.
+
 ## Phase 7: Convert Capcom SNES
 
 Capcom is the hard proof.
@@ -2789,7 +2858,11 @@ finite repeats do not become infinite loops
 decode phase does not consume render repeat state
 ```
 
-## Phase 8: Add focused tests
+## Phase 8: Consider small declarative helpers only if needed
+
+After NDS and Capcom are readable and passing parity, consider tiny helpers for genuinely boring commands such as one-byte state setters or terminal commands. This is a follow-up convenience, not part of the core architecture.
+
+## Phase 9: Add focused tests
 
 Test the hybrid failure modes:
 
@@ -2802,6 +2875,8 @@ Jump command records static target link
 Call command records static target link
 RepeatBreak records target in decode mode even when not taken
 RepeatUntil does not mutate VM repeat state in decode mode
+malformed cursor reads produce diagnostics without adding per-command boilerplate
+malformed cursor reads suppress render events from the malformed command
 render phase uses VM repeat state
 typed command API still works as an escape hatch
 SourceMap can annotate headers/pointers/instrument rows/misc blocks
@@ -2863,11 +2938,11 @@ if (cmd.kind == "program") infer instrument reference from operand names.
 
 ## 19.4 Decode is static, render is dynamic
 
-Decode records possible source facts.
+Decode records source facts and possible flow. It may maintain temporary source-driver state when later byte decoding depends on earlier commands.
 
 Render chooses playback behavior.
 
-Do not let decode consume actual repeat counters or mutate real playback state.
+Do not let decode consume actual VM repeat counters, real call stack frames, synchronized loop state, export loop count, or other render-only state.
 
 ## 19.5 Add only proven sequence-specific indices
 
