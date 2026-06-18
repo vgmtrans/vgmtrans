@@ -10,7 +10,6 @@
 #include "value/sequence/SequenceProgram.h"
 
 #include <algorithm>
-#include <any>
 #include <array>
 #include <limits>
 #include <optional>
@@ -28,6 +27,7 @@ class SourceMapBuilder;
 struct DecodedBytecodeCommand {
   CommandHandlerId handler;
   CommandKindId kind;
+  std::optional<CommandKind> commandKind;
   SourceRange range;
   std::vector<u8> bytes;
   std::vector<CommandOperand> operands;
@@ -41,7 +41,6 @@ struct BytecodeDecodeContext {
   u32 sequenceOffset = 0;
   u32 sequenceEnd = std::numeric_limits<u32>::max();
   u32 commandEnd = 0;
-  const std::any* dialectContext = nullptr;
   SourceMapBuilder* sourceMap = nullptr;
   std::vector<Diagnostic>* diagnostics = nullptr;
 };

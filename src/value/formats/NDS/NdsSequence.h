@@ -11,7 +11,6 @@
 #include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceDialect.h"
-#include "value/sequence/bytecode/BytecodeTable.h"
 
 #include <optional>
 #include <string>
@@ -21,10 +20,8 @@ namespace vgmtrans::formats::nds {
 
 inline constexpr auto kNdsSequenceDialectId = "nds:sseq";
 
-// Keep the bytecode table paired with the dialect whose handler IDs it stores.
 struct NdsSequenceDescriptor {
   core::SequenceDialect dialect;
-  core::BytecodeDispatchTable bytecode;
 };
 
 [[nodiscard]] const NdsSequenceDescriptor& ndsSequenceDescriptor();
@@ -42,10 +39,9 @@ void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
 
 [[nodiscard]] NdsSequenceRange ndsSequenceRangeForFatEntry(core::ByteReader reader, u32 offset, u32 size);
 
-[[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(const core::ScanInput& input, core::AssetId id,
-                                                                 NdsSequenceRange range, const std::string& name,
-                                                                 std::optional<core::ScanInstrumentSetRef> instrumentSet,
-                                                                 core::SourceMapBuilder* sourceMap = nullptr,
-                                                                 std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(
+    const core::ScanInput& input, core::AssetId id, NdsSequenceRange range, const std::string& name,
+    std::optional<core::ScanInstrumentSetRef> instrumentSet, core::SourceMapBuilder* sourceMap = nullptr,
+    std::vector<core::Diagnostic>* diagnostics = nullptr);
 
 }  // namespace vgmtrans::formats::nds

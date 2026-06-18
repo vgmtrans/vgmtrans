@@ -210,6 +210,24 @@ std::optional<u32> AddressIndex::find(Address address) const {
   return found->second;
 }
 
+const CommandKind* TrackProgram::kind(CommandKindId kindId) const {
+  if (!kindId.valid() || kindId.value >= commandKinds.size()) {
+    return nullptr;
+  }
+
+  const auto& commandKind = commandKinds[kindId.value];
+  return commandKind.id == kindId ? &commandKind : nullptr;
+}
+
+const CommandKind* TrackProgram::kindForName(std::string_view kindName) const {
+  const auto found = std::ranges::find_if(
+      commandKinds, [kindName](const CommandKind& commandKind) { return commandKind.kindName == kindName; });
+  if (found == commandKinds.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
 std::span<const u8> TrackProgram::bytesFor(const SourceCommand& command) const {
   if (command.bytes.offset + command.bytes.size > commandBytes.size()) {
     throw std::out_of_range("SourceCommand byte span is outside its TrackProgram pool");
@@ -276,6 +294,21 @@ void addUniqueReferencedInstrument(SequenceProgram& program, std::optional<Asset
 TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
 }
 
+CommandKindId TrackProgramBuilder::addOrReuseKind(const CommandKind& kind) {
+  if (const auto* existing = track_.kindForName(kind.kindName)) {
+    return existing->id;
+  }
+
+  const auto index = static_cast<u32>(track_.commandKinds.size());
+  CommandKind stored = kind;
+  stored.id = CommandKindId{index};
+  if (stored.detailKind.empty()) {
+    stored.detailKind = stored.kindName;
+  }
+  track_.commandKinds.push_back(std::move(stored));
+  return CommandKindId{index};
+}
+
 const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, CommandKindId kind, Address address,
                                                      SourceRange range, std::span<const u8> bytes,
                                                      std::span<const CommandOperand> operands) {
@@ -308,6 +341,12 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, C
   });
   track_.addressIndex.add(address, commandIndex);
   return track_.commands.back();
+}
+
+const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, const CommandKind& kind, Address address,
+                                                     SourceRange range, std::span<const u8> bytes,
+                                                     std::span<const CommandOperand> operands) {
+  return addDecoded(handler, addOrReuseKind(kind), address, range, bytes, operands);
 }
 
 }  // namespace vgmtrans::core

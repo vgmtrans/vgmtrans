@@ -262,6 +262,11 @@ inline DecodedBytecodeCommand decodeMappedPreservedCommand(const BytecodeCommand
 
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
                                          u32 offset) {
+  if (decoded.commandKind) {
+    builder.addDecoded(decoded.handler, *decoded.commandKind, Address{offset}, decoded.range, decoded.bytes,
+                       decoded.operands);
+    return;
+  }
   builder.addDecoded(decoded.handler, decoded.kind, Address{offset}, decoded.range, decoded.bytes, decoded.operands);
 }
 

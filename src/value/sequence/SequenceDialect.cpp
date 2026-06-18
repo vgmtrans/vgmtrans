@@ -87,9 +87,8 @@ const CommandHandler* SequenceDialect::handlerForType(CommandTypeToken typeToken
   if (typeToken == nullptr) {
     return nullptr;
   }
-  const auto found = std::ranges::find_if(handlers, [typeToken](const CommandHandler& handler) {
-    return handler.typeToken == typeToken;
-  });
+  const auto found = std::ranges::find_if(
+      handlers, [typeToken](const CommandHandler& handler) { return handler.typeToken == typeToken; });
   if (found == handlers.end()) {
     return nullptr;
   }
@@ -116,7 +115,10 @@ const CommandKind* SequenceDialect::kindForName(std::string_view kindName) const
 
 CommandInfo SequenceDialect::describe(const TrackProgram& track, const SourceCommand& command) const {
   const auto* commandHandler = handler(command.handler);
-  const auto* commandKind = kind(command.kind);
+  const auto* commandKind = track.kind(command.kind);
+  if (commandKind == nullptr) {
+    commandKind = kind(command.kind);
+  }
   if (commandHandler == nullptr || commandKind == nullptr || commandHandler->describe == nullptr) {
     return CommandInfo{};
   }
@@ -186,8 +188,7 @@ void addCommandInstrumentReferences(SequenceProgram& program, const SequenceDial
 
 void addSourceCommandItemsAndInstrumentReferences(ItemTreeBuilder& items, std::optional<ItemId> parent,
                                                   SequenceProgram& program, const SequenceDialect& dialect,
-                                                  const TrackProgram& track,
-                                                  std::optional<AssetId> instrumentSetId) {
+                                                  const TrackProgram& track, std::optional<AssetId> instrumentSetId) {
   for (const auto& command : track.commands) {
     static_cast<void>(addSourceCommandItem(items, parent, dialect, track, command));
     addCommandInstrumentReferences(program, dialect, track, command, instrumentSetId);

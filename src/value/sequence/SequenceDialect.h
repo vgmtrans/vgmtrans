@@ -129,14 +129,6 @@ template <class Command>
 
 }  // namespace detail
 
-struct CommandKind {
-  CommandKindId id;
-  std::string kindName;
-  std::string name;
-  std::string detailKind;
-  CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
-};
-
 struct CommandHandler {
   CommandHandlerId id;
   CommandTypeToken typeToken = nullptr;
@@ -150,6 +142,7 @@ struct CommandHandler {
 // losing distinct UI labels or playback metadata.
 struct SequenceDialect {
   DialectId id;
+  std::string commandKindPrefix;
   Timebase timebase;
   SequenceProgramBehavior defaultBehavior;
   CreateTrackState createTrackState = nullptr;
@@ -228,8 +221,7 @@ void addCommandInstrumentReferences(SequenceProgram& program, const SequenceDial
                                     const SourceCommand& command, std::optional<AssetId> instrumentSetId);
 void addSourceCommandItemsAndInstrumentReferences(ItemTreeBuilder& items, std::optional<ItemId> parent,
                                                   SequenceProgram& program, const SequenceDialect& dialect,
-                                                  const TrackProgram& track,
-                                                  std::optional<AssetId> instrumentSetId);
+                                                  const TrackProgram& track, std::optional<AssetId> instrumentSetId);
 
 class SequenceDialectRegistry {
 public:
@@ -274,16 +266,13 @@ concept HasReferences =
     requires(const Command& command, CommandReferences& references) { command.references(references); };
 
 template <class Command, class Context>
-concept HasReferencesWithContext =
-    requires(const Command& command, CommandReferences& references, const Context& context) {
-      command.references(references, context);
-    };
+concept HasReferencesWithContext = requires(const Command& command, CommandReferences& references,
+                                            const Context& context) { command.references(references, context); };
 
 template <class Command>
-concept HasSourceCommandReferences = requires(const SourceCommand& record, const TrackProgram& track,
-                                              CommandReferences& references, const std::any& context) {
-  Command::references(record, track, references, context);
-};
+concept HasSourceCommandReferences =
+    requires(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
+             const std::any& context) { Command::references(record, track, references, context); };
 
 template <class Command, class TrackState, class Context>
 concept HasRuntimeEffectsExecute = requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
@@ -302,9 +291,8 @@ concept HasLegacyExecute =
     };
 
 template <class Command, class TrackState, class Context>
-concept HasSourceCommandExecute = requires(const SourceCommand& record, const TrackProgram& track,
-                                           std::any& trackState, PerformanceEmitter& out, VmApi& vm,
-                                           const std::any& context) {
+concept HasSourceCommandExecute = requires(const SourceCommand& record, const TrackProgram& track, std::any& trackState,
+                                           PerformanceEmitter& out, VmApi& vm, const std::any& context) {
   { Command::execute(record, track, trackState, out, vm, context) } -> std::same_as<Effects>;
 };
 
@@ -414,8 +402,7 @@ Effects executeCommand(const SourceCommand& record, const TrackProgram& track, s
                     "Commands without execute() must be marked source-only or no-op");
       return Effects::none();
     } else {
-      static_assert(kAlwaysFalse<Command>,
-                    "Sequence command must implement execute() or be marked source-only/no-op");
+      static_assert(kAlwaysFalse<Command>, "Sequence command must implement execute() or be marked source-only/no-op");
       return Effects::none();
     }
   }
@@ -464,8 +451,7 @@ public:
   }
 
   template <class Command>
-  RegisteredCommand addCommand(std::string_view kindName, std::string_view name,
-                               CommandPlaybackStatus playbackStatus) {
+  RegisteredCommand addCommand(std::string_view kindName, std::string_view name, CommandPlaybackStatus playbackStatus) {
     return addCommand(detail::commandTypeToken<Command>(), kindName, name, detail::describeCommand<Command, Context>,
                       detail::collectCommandReferences<Command, Context>,
                       detail::executeCommand<Command, TrackState, Context>, playbackStatus);

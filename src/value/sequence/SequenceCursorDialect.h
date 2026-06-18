@@ -13,10 +13,22 @@
 #include <algorithm>
 #include <any>
 #include <concepts>
+#include <limits>
 #include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
+
+template <class Context>
+struct CursorDialectSpec {
+  std::string id;
+  std::string commandKindPrefix;
+  Timebase timebase;
+  SequenceProgramBehavior defaultBehavior;
+  Context context;
+};
 
 template <class TrackState, class Context>
 [[nodiscard]] TrackState makeDecodeCursorState(const BytecodeDecodeContext& decodeContext, const Context& context) {
@@ -56,8 +68,7 @@ struct DecodeCursorRuntime {
   void portamentoTime(double) {}
   void modulation(ModulationPerformanceTarget, double) {}
 
-  [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays,
-                                               Address destination) {
+  [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays, Address destination) {
     return cmd.countedRepeatUntil(slot, totalPlays, destination);
   }
 
@@ -98,10 +109,7 @@ struct RenderCursorRuntime {
   void portamentoTime(double timeMilliseconds) { out.portamentoTime(timeMilliseconds); }
   void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
 
-  // Repeat policy belongs to SequenceVm. These helpers let a cursor command keep
-  // branch-local side effects readable without calling VmApi directly.
-  [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays,
-                                               Address destination) {
+  [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays, Address destination) {
     CommandFlow flow = cmd.countedRepeatUntil(slot, totalPlays, destination);
     if (!flow.truncated) {
       flow.resolvedEffects = vm.countedRepeatUntil(slot, totalPlays, destination);
@@ -155,69 +163,22 @@ struct RenderCursorRuntime {
 }
 
 template <class Context>
-[[nodiscard]] const Context& bytecodeContext(const BytecodeDecodeContext& decodeContext) {
-  if (decodeContext.dialectContext == nullptr) {
-    throw std::logic_error("Cursor bytecode decode requires a dialect context");
-  }
-  return std::any_cast<const Context&>(*decodeContext.dialectContext);
+[[nodiscard]] const Context& cursorContext(const SequenceDialect& dialect) {
+  return std::any_cast<const Context&>(dialect.context);
 }
 
-// CursorBytecodeCommand is the bridge from the readable cursor authoring style
-// to the existing SequenceProgram/SequenceVm model. Reader::read() is called in
-// decode mode to record source facts, then in render mode to emit playback events.
 template <class TrackState, class Context, class Reader>
-struct CursorBytecodeCommand {
-  static DecodedBytecodeCommand decode(const BytecodeCommandSpec& spec, const BytecodeCommandSpec& truncatedSpec,
-                                       ByteReader reader, u32 begin, BytecodeDecodeContext context) {
-    const u32 boundedEnd = static_cast<u32>(std::min<size_t>(reader.size(), context.bytecodeEnd));
-    if (begin >= boundedEnd) {
-      return DecodedBytecodeCommand{
-          .handler = spec.handler,
-          .kind = spec.kind,
-          .range = reader.range(begin, 0),
-          .flow = DecodeFlow::terminalFlow(),
-      };
-    }
-
-    const u32 availableSize = boundedEnd - begin;
-    const SourceRange availableRange = reader.range(begin, availableSize);
-    const auto availableBytes = reader.slice(begin, availableSize);
-    std::vector<CommandOperand> operands;
-    VmCommandCursor cursor(CommandPhase::Decode, availableRange, availableBytes, context.sourceMap,
-                           context.diagnostics, &operands);
-    DecodeCursorRuntime<TrackState, Context> runtime{
-        .state = makeDecodeCursorState<TrackState, Context>(context, bytecodeContext<Context>(context)),
-        .context = bytecodeContext<Context>(context),
-    };
-    const CommandFlow commandFlow = Reader::read(cursor, runtime);
-
-    const bool failed = cursor.failed();
-    const auto commandSize = failed ? 1u : static_cast<u32>(std::clamp<size_t>(cursor.position(), 1, availableSize));
-    const auto commandBytes = availableBytes.subspan(0, commandSize);
-    std::vector<u8> ownedBytes{commandBytes.begin(), commandBytes.end()};
-    const SourceRange commandRange = reader.range(begin, commandSize);
-    if (context.sourceMap != nullptr && cursor.annotation().valid()) {
-      AnnotationBuilder{*context.sourceMap, cursor.annotation()}.range(commandRange);
-    }
-    return DecodedBytecodeCommand{
-        .handler = failed ? truncatedSpec.handler : spec.handler,
-        .kind = failed ? truncatedSpec.kind : spec.kind,
-        .range = commandRange,
-        .bytes = std::move(ownedBytes),
-        .operands = std::move(operands),
-        .flow = decodeFlowFromCommandFlow(commandFlow, Address{begin + commandSize}),
-    };
-  }
+struct CursorDialectDriver {
+  static void describe(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any&) {}
 
   static void references(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
                          const std::any& context) {
-    const auto& typedContext = std::any_cast<const Context&>(context);
     DecodeCursorRuntime<TrackState, Context> runtime{
-        .context = typedContext,
+        .context = std::any_cast<const Context&>(context),
         .references = &references,
     };
     VmCommandCursor cursor(CommandPhase::Decode, record.range, track.bytesFor(record));
-    static_cast<void>(Reader::read(cursor, runtime));
+    static_cast<void>(Reader::read(runtime, cursor));
   }
 
   static Effects execute(const SourceCommand& record, const TrackProgram& track, std::any& trackState,
@@ -231,19 +192,107 @@ struct CursorBytecodeCommand {
         .context = typedContext,
     };
     VmCommandCursor cursor(CommandPhase::Render, record.range, track.bytesFor(record));
-    return effectsFromCommandFlow(Reader::read(cursor, runtime), vm);
+    return effectsFromCommandFlow(Reader::read(runtime, cursor), vm);
   }
 };
 
-namespace detail {
+template <class TrackState, class Context, class Reader>
+[[nodiscard]] SequenceDialect makeCursorDialect(CursorDialectSpec<Context> spec) {
+  SequenceDialect dialect{
+      .id = DialectId{.value = std::move(spec.id)},
+      .commandKindPrefix = std::move(spec.commandKindPrefix),
+      .timebase = spec.timebase,
+      .defaultBehavior = spec.defaultBehavior,
+      .createTrackState = detail::createTrackState<TrackState, Context>,
+      .context = std::move(spec.context),
+  };
+  if (dialect.commandKindPrefix.empty()) {
+    dialect.commandKindPrefix = dialect.id.value;
+  }
 
-template <class Command>
-[[nodiscard]] DecodedBytecodeCommand decodeCursorBytecodeCommand(const BytecodeCommandSpec& spec,
-                                                                 const BytecodeCommandSpec& truncatedSpec, ByteReader reader,
-                                                                 u32 begin, BytecodeDecodeContext context) {
-  return Command::decode(spec, truncatedSpec, reader, begin, context);
+  dialect.handlers.push_back(CommandHandler{
+      .id = CommandHandlerId{0},
+      .typeToken = detail::commandTypeToken<CursorDialectDriver<TrackState, Context, Reader>>(),
+      .describe = CursorDialectDriver<TrackState, Context, Reader>::describe,
+      .collectReferences = CursorDialectDriver<TrackState, Context, Reader>::references,
+      .execute = CursorDialectDriver<TrackState, Context, Reader>::execute,
+  });
+  return dialect;
 }
 
-}  // namespace detail
+template <class TrackState, class Context, class Reader>
+[[nodiscard]] CommandHandlerId cursorDialectHandlerId(const SequenceDialect& dialect) {
+  const auto* handler =
+      dialect.handlerForType(detail::commandTypeToken<CursorDialectDriver<TrackState, Context, Reader>>());
+  if (handler == nullptr) {
+    throw std::logic_error("Cursor dialect is missing its generic command handler");
+  }
+  return handler->id;
+}
+
+template <class TrackState, class Context, class Reader>
+[[nodiscard]] DecodedBytecodeCommand decodeCursorCommand(ByteReader reader, u32 begin, const SequenceDialect& dialect,
+                                                         BytecodeDecodeContext context = {}) {
+  if (context.bytecodeEnd == std::numeric_limits<u32>::max()) {
+    context.bytecodeEnd = static_cast<u32>(reader.size());
+  }
+  if (context.sequenceEnd == std::numeric_limits<u32>::max()) {
+    context.sequenceEnd = context.bytecodeEnd;
+  }
+
+  const u32 boundedEnd = static_cast<u32>(std::min<size_t>(reader.size(), context.bytecodeEnd));
+  if (begin >= boundedEnd) {
+    return DecodedBytecodeCommand{
+        .handler = cursorDialectHandlerId<TrackState, Context, Reader>(dialect),
+        .commandKind =
+            CommandKind{
+                .kindName = dialect.commandKindPrefix + ".truncated",
+                .name = "Truncated Command",
+                .detailKind = dialect.commandKindPrefix + ".truncated",
+                .semantic = SequenceSemantic::Unsupported,
+                .playbackStatus = CommandPlaybackStatus::Unsupported,
+            },
+        .range = reader.range(begin, 0),
+        .flow = DecodeFlow::terminalFlow(),
+    };
+  }
+
+  const u32 availableSize = boundedEnd - begin;
+  const SourceRange availableRange = reader.range(begin, availableSize);
+  const auto availableBytes = reader.slice(begin, availableSize);
+  std::vector<CommandOperand> operands;
+  VmCommandCursor cursor(CommandPhase::Decode, availableRange, availableBytes, context.sourceMap, context.diagnostics,
+                         &operands);
+  DecodeCursorRuntime<TrackState, Context> runtime{
+      .state = makeDecodeCursorState<TrackState, Context>(context, cursorContext<Context>(dialect)),
+      .context = cursorContext<Context>(dialect),
+  };
+  const CommandFlow commandFlow = Reader::read(runtime, cursor);
+
+  if (cursor.failed()) {
+    cursor.name("Truncated Command")
+        .kind("truncated")
+        .semantic(SequenceSemantic::Unsupported)
+        .playbackStatus(CommandPlaybackStatus::Unsupported);
+  }
+
+  const auto commandSize =
+      cursor.failed() ? 1u : static_cast<u32>(std::clamp<size_t>(cursor.position(), 1, availableSize));
+  const auto commandBytes = availableBytes.subspan(0, commandSize);
+  std::vector<u8> ownedBytes{commandBytes.begin(), commandBytes.end()};
+  const SourceRange commandRange = reader.range(begin, commandSize);
+  if (context.sourceMap != nullptr && cursor.annotation().valid()) {
+    AnnotationBuilder{*context.sourceMap, cursor.annotation()}.range(commandRange);
+  }
+
+  return DecodedBytecodeCommand{
+      .handler = cursorDialectHandlerId<TrackState, Context, Reader>(dialect),
+      .commandKind = cursor.commandKind(dialect.commandKindPrefix),
+      .range = commandRange,
+      .bytes = std::move(ownedBytes),
+      .operands = std::move(operands),
+      .flow = decodeFlowFromCommandFlow(commandFlow, Address{begin + commandSize}),
+  };
+}
 
 }  // namespace vgmtrans::core

@@ -32,6 +32,21 @@ namespace {
   return SourceRange{.source = commandRange.source, .offset = address.value, .size = 1};
 }
 
+[[nodiscard]] std::string hexBytes(std::span<const ::u8> bytes) {
+  static constexpr char kDigits[] = "0123456789ABCDEF";
+
+  std::string out;
+  out.reserve(bytes.size() * 3);
+  for (const ::u8 byte : bytes) {
+    if (!out.empty()) {
+      out.push_back(' ');
+    }
+    out.push_back(kDigits[byte >> 4]);
+    out.push_back(kDigits[byte & 0x0f]);
+  }
+  return out;
+}
+
 }  // namespace
 
 RepeatBreakFlow::RepeatBreakFlow(CommandFlow flow, bool taken) : flow_(flow), taken_(taken) {
@@ -40,18 +55,33 @@ RepeatBreakFlow::RepeatBreakFlow(CommandFlow flow, bool taken) : flow_(flow), ta
 VmCommandCursor::VmCommandCursor(CommandPhase phase, SourceRange commandRange, std::span<const ::u8> bytes,
                                  SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
                                  std::vector<CommandOperand>* operands)
-    : phase_(phase),
-      commandRange_(commandRange),
-      bytes_(bytes),
-      sourceMap_(sourceMap),
-      diagnostics_(diagnostics),
+    : phase_(phase), commandRange_(commandRange), bytes_(bytes), sourceMap_(sourceMap), diagnostics_(diagnostics),
       operands_(operands) {
   if (bytes_.empty()) {
     markTruncated("opcode", commandRange_);
   }
 }
 
+CommandKind VmCommandCursor::commandKind(std::string_view kindPrefix) const {
+  std::string kindName;
+  if (!kindPrefix.empty()) {
+    kindName = std::string(kindPrefix) + ".";
+  }
+  kindName += localKind_;
+  return CommandKind{
+      .kindName = std::move(kindName),
+      .name = displayName_,
+      .detailKind = kindPrefix.empty() ? localKind_ : std::string(kindPrefix) + "." + localKind_,
+      .semantic = semantic_,
+      .playbackStatus = playbackStatus_,
+  };
+}
+
 VmCommandCursor& VmCommandCursor::name(std::string_view displayName) {
+  displayName_ = std::string(displayName);
+  if (!kindOverridden_) {
+    localKind_ = sourceLocalKind(displayName);
+  }
   if (sourceMap_ == nullptr) {
     return *this;
   }
@@ -64,22 +94,37 @@ VmCommandCursor& VmCommandCursor::name(std::string_view displayName) {
 }
 
 VmCommandCursor& VmCommandCursor::kind(std::string_view localKindOverride) {
+  localKind_ = std::string(localKindOverride);
+  kindOverridden_ = true;
   if (sourceMap_ == nullptr) {
     return *this;
   }
   ensureAnnotation();
-  kindOverridden_ = true;
   annotationBuilder().kind(localKindOverride);
   return *this;
 }
 
 VmCommandCursor& VmCommandCursor::semantic(SequenceSemantic semantic) {
+  semantic_ = semantic;
   if (sourceMap_ == nullptr) {
     return *this;
   }
   ensureAnnotation();
   annotationBuilder().sequenceSemantic(semantic);
   return *this;
+}
+
+VmCommandCursor& VmCommandCursor::playbackStatus(CommandPlaybackStatus status) {
+  playbackStatus_ = status;
+  return *this;
+}
+
+VmCommandCursor& VmCommandCursor::sourceOnly() {
+  return playbackStatus(CommandPlaybackStatus::SourceOnly);
+}
+
+VmCommandCursor& VmCommandCursor::noOp() {
+  return playbackStatus(CommandPlaybackStatus::NoOp);
 }
 
 CursorReadValue<::u8> VmCommandCursor::u8(std::string_view name) {
@@ -216,6 +261,18 @@ CursorReadValue<Address> VmCommandCursor::le24RelativeAddress(std::string_view n
   return CursorReadValue<Address>{.value = address, .range = range};
 }
 
+CursorReadValue<std::string> VmCommandCursor::rawBytes(std::string_view name, size_t size) {
+  const size_t begin = position_;
+  if (!canRead(size, name)) {
+    return CursorReadValue<std::string>{.range = rangeAt(begin, 0), .valid = false};
+  }
+  const auto range = rangeAt(begin, size);
+  const auto value = hexBytes(bytes_.subspan(begin, size));
+  position_ += size;
+  recordField(name, range, SourceValue{value}, SourceValueDisplay::Hex);
+  return CursorReadValue<std::string>{.value = value, .range = range};
+}
+
 VmCommandCursor& VmCommandCursor::derived(std::string_view name, SourceValue value, SourceValueDisplay display) {
   recordField(name, SourceRange{}, std::move(value), display);
   return *this;
@@ -258,6 +315,7 @@ VmCommandCursor& VmCommandCursor::error(std::string_view message) {
 
 VmCommandCursor& VmCommandCursor::unsupported(std::string_view message) {
   semantic(SequenceSemantic::Unsupported);
+  playbackStatus(CommandPlaybackStatus::Unsupported);
   warning(message);
   return *this;
 }
@@ -411,8 +469,8 @@ void VmCommandCursor::recordOperand(std::string_view name, SourceRange range, co
   }
   if (const auto* unsignedValue = std::get_if<u64>(&value)) {
     if (display == SourceValueDisplay::Address) {
-      operands_->push_back(CommandOperand{.name = std::string(name), .value = Address{static_cast<u32>(*unsignedValue)},
-                                          .range = range});
+      operands_->push_back(CommandOperand{
+          .name = std::string(name), .value = Address{static_cast<u32>(*unsignedValue)}, .range = range});
     } else {
       operands_->push_back(CommandOperand{.name = std::string(name), .value = *unsignedValue, .range = range});
     }
@@ -423,7 +481,8 @@ void VmCommandCursor::recordOperand(std::string_view name, SourceRange range, co
   } else if (const auto* text = std::get_if<std::string>(&value)) {
     operands_->push_back(CommandOperand{.name = std::string(name), .value = *text, .range = range});
   } else if (const auto* boolValue = std::get_if<bool>(&value)) {
-    operands_->push_back(CommandOperand{.name = std::string(name), .value = static_cast<u64>(*boolValue), .range = range});
+    operands_->push_back(
+        CommandOperand{.name = std::string(name), .value = static_cast<u64>(*boolValue), .range = range});
   }
 }
 
