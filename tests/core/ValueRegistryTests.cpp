@@ -180,6 +180,8 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
   expect(noteAnnotation.label == "Note" && noteAnnotation.localKind == "note" && noteAnnotation.range.offset == 0 &&
              noteAnnotation.range.size == 3,
          "cursor-backed note annotation should use the final decoded command range");
+  expect(track.commands[0].annotation == noteAnnotation.id,
+         "cursor-backed source commands should retain their primary source annotation");
   expect(noteAnnotation.fields.size() == 3 && noteAnnotation.fields[1].name == "key" &&
              std::get<u64>(noteAnnotation.fields[1].value) == 60,
          "cursor-backed decode should record opcode and operand fields");
@@ -197,6 +199,8 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
   const auto* note = std::get_if<NotePerformanceEvent>(&performance.tracks[0].events[0]);
   expect(note != nullptr && note->key == 61.0 && note->linearVelocity == 0.25 && note->durationTicks == 12,
          "cursor-backed render should rerun saved bytes with real runtime state");
+  expect(note != nullptr && note->header.sourceAnnotation == program.tracks[0].commands[0].annotation,
+         "cursor-backed performance events should retain source annotation origin");
 }
 
 void formatRegistryStoresCopyableModuleValues() {

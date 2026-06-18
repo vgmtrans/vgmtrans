@@ -16,6 +16,7 @@ namespace vgmtrans::core {
 
 struct PerformanceEventHeader {
   CommandId sourceCommand;
+  SourceAnnotationId sourceAnnotation;
   TrackId track;
   u64 tick = 0;
 };

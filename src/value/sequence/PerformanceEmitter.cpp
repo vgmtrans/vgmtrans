@@ -10,8 +10,9 @@
 
 namespace vgmtrans::core {
 
-PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, u64 tick)
-    : track_(track), sourceCommand_(sourceCommand), tick_(tick) {
+PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand,
+                                       SourceAnnotationId sourceAnnotation, u64 tick)
+    : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick) {
 }
 
 void PerformanceEmitter::note(NotePerformanceEvent event) {
@@ -237,6 +238,7 @@ void PerformanceEmitter::marker(MarkerPerformanceEvent event) {
 PerformanceEventHeader PerformanceEmitter::header() const {
   return PerformanceEventHeader{
       .sourceCommand = sourceCommand_,
+      .sourceAnnotation = sourceAnnotation_,
       .track = track_.id,
       .tick = tick_,
   };

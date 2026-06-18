@@ -348,7 +348,7 @@ public:
         break;
       }
 
-      PerformanceEmitter out{performanceTrack_, command.id, runtime_.tick};
+      PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
       VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
       const Effects effects = handler->execute(command, track_, trackState_, out, vm, dialect_.context);
       runtime_.tick += effects.advanceTicks;
