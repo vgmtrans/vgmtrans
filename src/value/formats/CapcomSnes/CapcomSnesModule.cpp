@@ -71,8 +71,9 @@ using namespace core;
     static_cast<void>(result.instrumentSet(instrumentSet, [&](AssetId id) {
       return parseCapcomSnesInstrumentSet(input, result, id, samples, instrumentInfos, sampleInfos, displayName);
     }));
-    static_cast<void>(result.sampleCollection(
-        samples, [&](AssetId id) { return parseCapcomSnesSamples(input, id, sampleInfos, displayName); }));
+    static_cast<void>(result.sampleCollection(samples, [&](AssetId id) {
+      return parseCapcomSnesSamples(input, id, sampleInfos, displayName, &result.sourceMap());
+    }));
     collection.instrumentSet(instrumentSet).samples(samples);
   }
 

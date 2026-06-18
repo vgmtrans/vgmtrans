@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -32,6 +33,18 @@ void expect(bool condition, const std::string& message) {
   if (!condition) {
     throw std::runtime_error(message);
   }
+}
+
+const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
+                                           std::string_view localKind) {
+  const auto annotations = sourceMap.withRole(source, role);
+  for (const SourceAnnotationId id : annotations) {
+    const SourceAnnotation& annotation = sourceMap.get(id);
+    if (annotation.localKind == localKind) {
+      return &annotation;
+    }
+  }
+  return nullptr;
 }
 
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
@@ -218,6 +231,36 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   };
   expect(hasTempoField("opcode") && hasTempoField("raw") && hasTempoField("microseconds_per_quarter"),
          "CapcomSnes tempo annotation should record opcode, raw operand, and interpreted tempo");
+  const SourceMap& sourceMap = project.sourceMap();
+  const auto* sequenceHeader = annotationWithKind(sourceMap, source, SourceRole::Header, "capcom-snes-sequence-header");
+  expect(sequenceHeader != nullptr && sequenceHeader->range.offset == 0x2001 && sequenceHeader->range.size == 16,
+         "CapcomSnes scan should annotate the sequence header");
+  const auto* trackPointer = annotationWithKind(sourceMap, source, SourceRole::Pointer, "capcom-snes-track-pointer");
+  const auto trackPointers = sourceMap.withRole(source, SourceRole::Pointer);
+  const auto capcomTrackPointerCount = std::ranges::count_if(
+      trackPointers, [&](SourceAnnotationId id) { return sourceMap.get(id).localKind == "capcom-snes-track-pointer"; });
+  expect(trackPointer != nullptr && trackPointer->range.size == 2 && capcomTrackPointerCount == 8,
+         "CapcomSnes scan should annotate track pointer fields");
+  const auto* instrumentTable =
+      annotationWithKind(sourceMap, source, SourceRole::Table, "capcom-snes-instrument-table");
+  expect(instrumentTable != nullptr && instrumentTable->range.offset == 0x4000 && instrumentTable->range.size == 6,
+         "CapcomSnes scan should annotate the instrument table");
+  const auto* instrumentRow = annotationWithKind(sourceMap, source, SourceRole::Instrument, "capcom-snes-instrument");
+  expect(instrumentRow != nullptr && instrumentRow->range.offset == 0x4000 && instrumentRow->range.size == 6,
+         "CapcomSnes scan should annotate parsed instrument rows");
+  const auto instrumentSampleLink = std::ranges::find_if(
+      instrumentRow->links, [](const SourceLink& link) { return link.role == SourceLinkRole::UsesSample; });
+  expect(instrumentSampleLink != instrumentRow->links.end(),
+         "CapcomSnes instrument annotations should link to the sample they use");
+  const auto* sampleDir = annotationWithKind(sourceMap, source, SourceRole::Table, "snes-sample-dir");
+  expect(sampleDir != nullptr && sampleDir->range.offset == 0x5000 && sampleDir->range.size == 4,
+         "CapcomSnes scan should annotate the sample DIR table");
+  const auto* sampleEntry = annotationWithKind(sourceMap, source, SourceRole::Sample, "snes-sample-dir-entry");
+  expect(sampleEntry != nullptr && sampleEntry->range.offset == 0x5000 && sampleEntry->range.size == 4,
+         "CapcomSnes scan should annotate sample DIR entries");
+  const auto* samplePayload = annotationWithKind(sourceMap, source, SourceRole::Payload, "snes-brr-payload");
+  expect(samplePayload != nullptr && samplePayload->range.offset == 0x6000 && samplePayload->range.size == 9,
+         "CapcomSnes scan should annotate BRR sample payloads");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
   const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
@@ -847,8 +890,8 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
   const CommandInfo repeatBreak = dialect.describe(track, track.commands[1]);
   expect(repeatBreak.detailKind == "capcom-snes.repeat-break",
          "CapcomSnes repeat-break opcode should decode as Repeat Break");
-  expect(repeatBreak.fields.size() == 3 && repeatBreak.fields[0].value == "1" &&
-             repeatBreak.fields[1].value == "16" && repeatBreak.fields[2].value == "$300A",
+  expect(repeatBreak.fields.size() == 3 && repeatBreak.fields[0].value == "1" && repeatBreak.fields[1].value == "16" &&
+             repeatBreak.fields[2].value == "$300A",
          "CapcomSnes repeat-break display should preserve slot, attributes, and destination");
 
   const SequenceProgram program{
@@ -867,9 +910,9 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
     const auto* note = std::get_if<NotePerformanceEvent>(&event);
     return note != nullptr && note->header.tick == 18;
   });
-  expect(finalNote != performance.tracks[0].events.end() &&
-             std::get<NotePerformanceEvent>(*finalNote).durationTicks == 9,
-         "CapcomSnes repeat-break branch should apply note attributes before the branch target plays");
+  expect(
+      finalNote != performance.tracks[0].events.end() && std::get<NotePerformanceEvent>(*finalNote).durationTicks == 9,
+      "CapcomSnes repeat-break branch should apply note attributes before the branch target plays");
 }
 
 void capcomSnesV1DialectPreservesUnknownOneByteEvents() {

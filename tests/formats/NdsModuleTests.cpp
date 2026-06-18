@@ -16,6 +16,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -28,6 +29,18 @@ void expect(bool condition, const std::string& message) {
   if (!condition) {
     throw std::runtime_error(message);
   }
+}
+
+const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
+                                           std::string_view localKind) {
+  const auto annotations = sourceMap.withRole(source, role);
+  for (const SourceAnnotationId id : annotations) {
+    const SourceAnnotation& annotation = sourceMap.get(id);
+    if (annotation.localKind == localKind) {
+      return &annotation;
+    }
+  }
+  return nullptr;
 }
 
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
@@ -68,9 +81,9 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   ScanIdAllocator annotationIds;
   SourceMapBuilder sourceMap([&annotationIds]() { return annotationIds.nextSourceAnnotationId(); });
   std::vector<Diagnostic> decodeDiagnostics;
-  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), descriptor, sequenceOffset,
-                                                    trackStart + 11, trackStart, 0, false, &sourceMap,
-                                                    &decodeDiagnostics);
+  const TrackProgram track =
+      decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), descriptor, sequenceOffset, trackStart + 11, trackStart, 0,
+                             false, &sourceMap, &decodeDiagnostics);
   expect(track.commands.size() == 5, "NDS SSEQ dialect should decode all fixture commands");
   expect(dialect.describe(track, track.commands[0]).detailKind == "nds.note-wait",
          "NDS SSEQ dialect should decode note-wait as a local command");
@@ -127,14 +140,14 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   };
   SourceMapBuilder programSourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
   std::vector<Diagnostic> programDiagnostics;
-  const auto asset = parseNdsSequenceProgram(input, AssetId{7},
-                                             NdsSequenceRange{
-                                                 .offset = sequenceOffset,
-                                                 .size = 0x40,
-                                                 .sequenceEnd = trackStart + 4,
-                                             },
-                                             "Program", ScanInstrumentSetRef{AssetId{3}}, &programSourceMap,
-                                             &programDiagnostics);
+  const auto asset =
+      parseNdsSequenceProgram(input, AssetId{7},
+                              NdsSequenceRange{
+                                  .offset = sequenceOffset,
+                                  .size = 0x40,
+                                  .sequenceEnd = trackStart + 4,
+                              },
+                              "Program", ScanInstrumentSetRef{AssetId{3}}, &programSourceMap, &programDiagnostics);
   expect(asset.program.referencedInstruments.size() == 1,
          "NDS sequence program should reference instruments used by source program commands");
   const auto& ref = asset.program.referencedInstruments[0];
@@ -146,9 +159,8 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   const auto programAnnotationIds = programAnnotations.withSequenceSemantic(SourceId{4}, SequenceSemantic::Program);
   expect(programAnnotationIds.size() == 1, "NDS program command should publish one program annotation");
   const auto& programAnnotation = programAnnotations.get(programAnnotationIds[0]);
-  const auto instrumentLink = std::ranges::find_if(programAnnotation.links, [](const SourceLink& link) {
-    return link.role == SourceLinkRole::UsesInstrument;
-  });
+  const auto instrumentLink = std::ranges::find_if(
+      programAnnotation.links, [](const SourceLink& link) { return link.role == SourceLinkRole::UsesInstrument; });
   expect(instrumentLink != programAnnotation.links.end(),
          "NDS program command should record a structured instrument source link");
   const auto* instrumentTarget = std::get_if<ObjectRef>(&instrumentLink->target);
@@ -326,9 +338,8 @@ void ndsSequenceTrackStartDiscoveryKeepsMalformedBootstrapCommands() {
 
   const auto& descriptor = ndsSequenceDescriptor();
   const SequenceDialect& dialect = descriptor.dialect;
-  const TrackProgram track =
-      decodeNdsSequenceTrack(ByteReader(SourceId{12}, bytes), descriptor, sequenceOffset, trackStart + 5,
-                             starts.front(), 0);
+  const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{12}, bytes), descriptor, sequenceOffset,
+                                                    trackStart + 5, starts.front(), 0);
   expect(track.commands.size() == 1 && dialect.describe(track, track.commands[0]).detailKind == "nds.truncated",
          "NDS malformed bootstrap command should be preserved as a truncated source command");
 }
@@ -468,9 +479,8 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
   std::array<std::optional<ScanSampleCollectionRef>, 4> waves{};
   waves[0] = out.reserveSampleCollection();
 
-  const auto bank =
-      parseNdsInstrumentSet(input, AssetId{2}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
-                            "Bank", out, psg, waves);
+  const auto bank = parseNdsInstrumentSet(
+      input, AssetId{2}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Bank", out, psg, waves);
   expect(bank.instruments.size() == 1 && bank.instruments[0].regions.size() == 1,
          "NDS synth parser should keep a valid instrument with infinite release");
   const Envelope& envelope = bank.instruments[0].regions[0].envelope;
@@ -483,8 +493,22 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
   const auto malformedBank =
       parseNdsInstrumentSet(input, AssetId{4}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
                             "Malformed Bank", out, psg, waves);
-  expect(malformedBank.instruments.empty(),
-         "NDS synth parser should skip regions with malformed envelope-rate bytes");
+  expect(malformedBank.instruments.empty(), "NDS synth parser should skip regions with malformed envelope-rate bytes");
+
+  const SourceMap annotations = out.sourceMap().finish();
+  const auto* pointerTable =
+      annotationWithKind(annotations, SourceId{11}, SourceRole::Table, "sbnk-instrument-pointer-table");
+  expect(pointerTable != nullptr && pointerTable->range.offset == 0x38 && pointerTable->range.size == 8,
+         "NDS SBNK parser should annotate the instrument pointer table");
+  const auto* pointer = annotationWithKind(annotations, SourceId{11}, SourceRole::Pointer, "sbnk-instrument-pointer");
+  expect(pointer != nullptr && pointer->range.offset == 0x3c && pointer->range.size == 4,
+         "NDS SBNK parser should annotate instrument pointers");
+  const auto* instrument = annotationWithKind(annotations, SourceId{11}, SourceRole::Instrument, "sbnk-instrument");
+  expect(instrument != nullptr && instrument->range.offset == 0x40 && instrument->range.size == 10,
+         "NDS SBNK parser should annotate parsed instrument rows");
+  const auto sampleLink = std::ranges::find_if(
+      instrument->links, [](const SourceLink& link) { return link.role == SourceLinkRole::UsesSample; });
+  expect(sampleLink != instrument->links.end(), "NDS instrument annotations should link to referenced samples");
 }
 
 void ndsSynthParserDerivesAdpcmLengthsSafely() {
@@ -517,19 +541,31 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
       .ids = ids,
   };
 
-  const auto wave = parseNdsWaveArchive(input, AssetId{5},
-                                        NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Wave");
+  ScanResultBuilder out(input, "NDS");
+  const auto wave = parseNdsWaveArchive(
+      input, AssetId{5}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Wave", &out);
   expect(wave.samples.samples.size() == 1, "NDS parser should keep non-looping ADPCM with loop offset zero");
   const Sample& sample = wave.samples.samples[0];
   expect(sample.encodedData.offset == 0x50 && sample.encodedData.size == 4,
          "NDS ADPCM encoded data should skip the predictor header");
   expect(!sample.loop.enabled && sample.loop.start == 0 && sample.loop.length == 9,
          "NDS non-looping ADPCM should keep sane decoded loop metadata");
+  const ScanResult result = out.finish();
+  const auto* waveHeader = annotationWithKind(result.sourceMap, SourceId{12}, SourceRole::Header, "swar-header");
+  expect(waveHeader != nullptr && waveHeader->range.offset == 0 && waveHeader->range.size == 0x3c,
+         "NDS SWAR parser should annotate the archive header");
+  const auto* sampleTable =
+      annotationWithKind(result.sourceMap, SourceId{12}, SourceRole::Table, "swar-sample-offset-table");
+  expect(sampleTable != nullptr && sampleTable->range.offset == 0x3c && sampleTable->range.size == 4,
+         "NDS SWAR parser should annotate the sample offset table");
+  const auto* sampleHeader =
+      annotationWithKind(result.sourceMap, SourceId{12}, SourceRole::Sample, "swar-sample-header");
+  expect(sampleHeader != nullptr && sampleHeader->range.offset == 0x40 && sampleHeader->range.size == 0x0c,
+         "NDS SWAR parser should annotate parsed sample headers");
 
   bytes[0x41] = 1;
-  const auto malformedLoop =
-      parseNdsWaveArchive(input, AssetId{6}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
-                          "Malformed Wave");
+  const auto malformedLoop = parseNdsWaveArchive(
+      input, AssetId{6}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Malformed Wave");
   expect(malformedLoop.samples.samples.empty(),
          "NDS parser should skip looped ADPCM with an unusable loop offset instead of underflowing");
 }
@@ -555,9 +591,8 @@ void ndsWaveArchiveReportsTruncatedSampleHeaders() {
   };
   ScanResultBuilder out(input, "NDS");
 
-  const auto wave =
-      parseNdsWaveArchive(input, AssetId{7}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
-                          "Truncated Wave", &out);
+  const auto wave = parseNdsWaveArchive(
+      input, AssetId{7}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Truncated Wave", &out);
   expect(wave.samples.samples.empty(), "NDS parser should skip truncated SWAR sample headers");
 
   const ScanResult result = out.finish();
