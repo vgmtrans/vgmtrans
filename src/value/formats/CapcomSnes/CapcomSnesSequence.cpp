@@ -273,410 +273,322 @@ struct CapcomSnesCommandReader {
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     const u8 opcode = cmd.opcode();
     if (opcode >= 0x20) {
-      return (opcode & 0x1f) == 0 ? rest(cmd, rt, opcode) : note(cmd, rt, opcode);
+      const auto rawDuration = static_cast<u8>(opcode >> 5);
+      if ((opcode & 0x1f) == 0) {
+        cmd.name("Rest").semantic(SequenceSemantic::Rest).derived("duration_index", static_cast<u64>(rawDuration));
+        const u32 length = rt.state.consumeNoteTicks(rawDuration);
+        rt.state.didRest = true;
+        return cmd.wait(length);
+      }
+
+      cmd.name("Note").semantic(SequenceSemantic::Note);
+      const auto keyIndex = static_cast<u8>(opcode & 0x1f);
+      cmd.derived("key_index", static_cast<u64>(keyIndex)).derived("duration_index", static_cast<u64>(rawDuration));
+
+      auto& state = rt.state;
+      const u32 length = state.consumeNoteTicks(rawDuration);
+      const s32 key = state.sourceKey(keyIndex);
+      const u32 duration = state.soundingTicks(length);
+      if (state.extendsPreviousSlurredNote(key)) {
+        // Repeating a key after a slurred note extends the previous note, even
+        // if this command has already cleared the current slur bit.
+        rt.note(state.performedKey(key), 1.0, duration, true);
+        state.finishExtendedNote();
+        return cmd.wait(length);
+      }
+
+      if constexpr (requires { rt.out; }) {
+        state.emitPortamentoIfNeeded(key, rt.out);
+      }
+      // Slur is modeled as a one-tick overlap into the next source note.
+      rt.note(state.performedKey(key), 1.0, duration + (state.noteSlurred ? 1u : 0u));
+      state.finishNote(key);
+      return cmd.wait(length);
     }
 
     switch (opcode) {
       case 0x00:
-        return toggleTriplet(cmd, rt);
+        cmd.name("Toggle Triplet").semantic(SequenceSemantic::State);
+        rt.state.noteTriplet = !rt.state.noteTriplet;
+        return cmd.next();
+
       case 0x01:
-        return slur(cmd, rt);
+        cmd.name("Toggle Slur").semantic(SequenceSemantic::State);
+        toggleSlur(rt);
+        return cmd.next();
+
       case 0x02:
-        return dotted(cmd, rt);
+        cmd.name("Dotted Note").semantic(SequenceSemantic::State);
+        rt.state.noteDotted = true;
+        return cmd.next();
+
       case 0x03:
-        return toggleOctaveUp(cmd, rt);
-      case 0x04:
-        return noteAttributes(cmd, rt);
-      case 0x05:
-        return tempo(cmd, rt);
-      case 0x06:
-        return durationRate(cmd, rt);
-      case 0x07:
-        return volume(cmd, rt);
-      case 0x08:
-        return program(cmd, rt);
-      case 0x09:
-        return octave(cmd, rt);
-      case 0x0a:
-        return globalTranspose(cmd, rt);
-      case 0x0b:
-        return transpose(cmd, rt);
-      case 0x0c:
-        return tuning(cmd, rt);
-      case 0x0d:
-        return portamentoTime(cmd, rt);
+        cmd.name("Toggle Octave Up").semantic(SequenceSemantic::State);
+        rt.state.noteOctaveUp = !rt.state.noteOctaveUp;
+        return cmd.next();
+
+      case 0x04: {
+        cmd.name("Note Attributes").semantic(SequenceSemantic::State);
+        const auto raw = cmd.u8("raw");
+        if (raw) {
+          applyAttributes(rt, raw.value);
+        }
+        return cmd.next();
+      }
+
+      case 0x05: {
+        cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
+        const auto raw = cmd.u16be("raw");
+        if (raw) {
+          const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw.value);
+          cmd.detail("microseconds_per_quarter", static_cast<u64>(microseconds));
+          rt.tempo(microseconds);
+        }
+        return cmd.next();
+      }
+
+      case 0x06: {
+        cmd.name("Duration Rate").semantic(SequenceSemantic::State);
+        const auto rate = cmd.u8("rate");
+        if (rate) {
+          rt.state.durationRate = rate.value;
+        }
+        return cmd.next();
+      }
+
+      case 0x07: {
+        cmd.name("Volume").semantic(SequenceSemantic::Level);
+        const auto raw = cmd.u8("raw");
+        if (raw) {
+          cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw.value));
+          emitLinearVolume(rt, raw.value);
+        }
+        return cmd.next();
+      }
+
+      case 0x08: {
+        cmd.name("Program").semantic(SequenceSemantic::Program);
+        const auto raw = cmd.u8("raw");
+        const u32 bank = raw.value >> 7;
+        const u32 program = raw.value & 0x7f;
+        cmd.derived("bank", static_cast<u64>(bank)).derived("program", static_cast<u64>(program));
+        if (raw) {
+          rt.instrument(bank, program, true);
+        }
+        return cmd.next();
+      }
+
+      case 0x09: {
+        cmd.name("Octave").semantic(SequenceSemantic::State);
+        const auto value = cmd.u8("octave");
+        if (value) {
+          rt.state.noteOctave = value.value;
+        }
+        return cmd.next();
+      }
+
+      case 0x0a: {
+        cmd.name("Global Transpose").semantic(SequenceSemantic::Pitch);
+        const auto semitones = cmd.s8("semitones");
+        if (semitones) {
+          rt.globalTranspose(semitones.value);
+        }
+        return cmd.next();
+      }
+
+      case 0x0b: {
+        cmd.name("Transpose").semantic(SequenceSemantic::Pitch);
+        const auto semitones = cmd.s8("semitones");
+        if (semitones) {
+          rt.state.transpose = semitones.value;
+        }
+        return cmd.next();
+      }
+
+      case 0x0c: {
+        cmd.name("Tuning").semantic(SequenceSemantic::Pitch);
+        const auto raw = cmd.s8("tuning");
+        if (raw) {
+          cmd.detail("cents", math::tuningCents(raw.value));
+          rt.tuning(math::tuningCents(raw.value));
+        }
+        return cmd.next();
+      }
+
+      case 0x0d: {
+        cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
+        const auto raw = cmd.u8("time");
+        if (raw) {
+          // The driver stores portamento as speed; the next note turns it into
+          // time using the distance from the previous source key.
+          rt.state.portamentoMillisecondsPerCent = math::portamentoMillisecondsPerCent(raw.value);
+        }
+        return cmd.next();
+      }
+
       case 0x0e:
       case 0x0f:
       case 0x10:
-      case 0x11:
-        return repeatUntil(cmd, rt, opcode);
+      case 0x11: {
+        cmd.name("Repeat Until")
+            .semantic(SequenceSemantic::Repeat)
+            .playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
+        const auto slot = static_cast<u8>(opcode - 0x0e);
+        cmd.derived("slot", static_cast<u64>(slot + 1));
+        const auto count = cmd.u8("count");
+        const auto destination = cmd.address16be("destination");
+        if (count.value == 0) {
+          return cmd.declaredLoop(destination.value);
+        }
+
+        // Capcom stores the number of replays. The VM helper receives total plays.
+        return rt.countedRepeatUntil(cmd, slot, static_cast<u32>(count.value) + 1, destination.value);
+      }
+
       case 0x12:
       case 0x13:
       case 0x14:
-      case 0x15:
-        return repeatBreak(cmd, rt, opcode);
-      case 0x16:
-        return jump(cmd);
+      case 0x15: {
+        cmd.name("Repeat Break")
+            .semantic(SequenceSemantic::RepeatBreak)
+            .playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
+        const auto slot = static_cast<u8>(opcode - 0x12);
+        cmd.derived("slot", static_cast<u64>(slot + 1));
+        const auto attributes = cmd.u8("attributes");
+        const auto destination = cmd.address16be("destination");
+        const RepeatBreakFlow branch = rt.countedRepeatBreak(cmd, slot, destination.value);
+        if (attributes && branch.taken()) {
+          applyAttributes(rt, attributes.value);
+        }
+        return branch;
+      }
+
+      case 0x16: {
+        cmd.name("Jump").semantic(SequenceSemantic::Jump).playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
+        const auto destination = cmd.address16be("destination");
+        return cmd.loopCandidate(destination.value);
+      }
+
       case 0x17:
         return cmd.name("End")
             .kind("end")
             .semantic(SequenceSemantic::End)
             .playbackStatus(CommandPlaybackStatus::StopsPlayback)
             .end();
-      case 0x18:
-        return pan(cmd, rt);
-      case 0x19:
-        return masterVolume(cmd, rt);
-      case 0x1a:
-        return lfo(cmd, rt);
-      case 0x1b:
-        return echoParam(cmd);
-      case 0x1c:
-        return echoOnOff(cmd, rt);
-      case 0x1d:
-        return releaseRate(cmd);
-      case 0x1e:
-      case 0x1f:
-        return rt.context.version == CapcomSnesEngineVersion::v1BgmInList ? unknownOneByte(cmd) : nop(cmd);
-      default:
-        return unknown(cmd, rt);
-    }
-  }
 
-private:
-  template <class Runtime>
-  static CommandFlow rest(VmCommandCursor& cmd, Runtime& rt, u8 opcode) {
-    cmd.name("Rest").semantic(SequenceSemantic::Rest);
-    const auto rawDuration = static_cast<u8>(opcode >> 5);
-    cmd.derived("duration_index", static_cast<u64>(rawDuration));
-    const u32 length = rt.state.consumeNoteTicks(rawDuration);
-    rt.state.didRest = true;
-    return cmd.wait(length);
-  }
-
-  template <class Runtime>
-  static CommandFlow note(VmCommandCursor& cmd, Runtime& rt, u8 opcode) {
-    cmd.name("Note").semantic(SequenceSemantic::Note);
-    const auto keyIndex = static_cast<u8>(opcode & 0x1f);
-    const auto rawDuration = static_cast<u8>(opcode >> 5);
-    cmd.derived("key_index", static_cast<u64>(keyIndex)).derived("duration_index", static_cast<u64>(rawDuration));
-
-    auto& state = rt.state;
-    const u32 length = state.consumeNoteTicks(rawDuration);
-    const s32 key = state.sourceKey(keyIndex);
-    const u32 duration = state.soundingTicks(length);
-    if (state.extendsPreviousSlurredNote(key)) {
-      // Repeating a key after a slurred note extends the previous note, even if
-      // this command has already cleared the current slur bit.
-      rt.note(state.performedKey(key), 1.0, duration, true);
-      state.finishExtendedNote();
-      return cmd.wait(length);
-    }
-
-    if constexpr (requires { rt.out; }) {
-      state.emitPortamentoIfNeeded(key, rt.out);
-    }
-    // Slur is modeled as a one-tick overlap into the next source note.
-    rt.note(state.performedKey(key), 1.0, duration + (state.noteSlurred ? 1u : 0u));
-    state.finishNote(key);
-    return cmd.wait(length);
-  }
-
-  template <class Runtime>
-  static CommandFlow noteAttributes(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Note Attributes").semantic(SequenceSemantic::State);
-    const auto raw = cmd.u8("raw");
-    if (raw) {
-      applyAttributes(rt, raw.value);
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow octave(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Octave").semantic(SequenceSemantic::State);
-    const auto value = cmd.u8("octave");
-    if (value) {
-      rt.state.noteOctave = value.value;
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow toggleTriplet(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Toggle Triplet").semantic(SequenceSemantic::State);
-    rt.state.noteTriplet = !rt.state.noteTriplet;
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow slur(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Toggle Slur").semantic(SequenceSemantic::State);
-    toggleSlur(rt);
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow dotted(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Dotted Note").semantic(SequenceSemantic::State);
-    rt.state.noteDotted = true;
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow toggleOctaveUp(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Toggle Octave Up").semantic(SequenceSemantic::State);
-    rt.state.noteOctaveUp = !rt.state.noteOctaveUp;
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow globalTranspose(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Global Transpose").semantic(SequenceSemantic::Pitch);
-    const auto semitones = cmd.s8("semitones");
-    if (semitones) {
-      rt.globalTranspose(semitones.value);
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow transpose(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Transpose").semantic(SequenceSemantic::Pitch);
-    const auto semitones = cmd.s8("semitones");
-    if (semitones) {
-      rt.state.transpose = semitones.value;
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow tuning(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Tuning").semantic(SequenceSemantic::Pitch);
-    const auto raw = cmd.s8("tuning");
-    if (raw) {
-      cmd.detail("cents", math::tuningCents(raw.value));
-      rt.tuning(math::tuningCents(raw.value));
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow portamentoTime(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
-    const auto raw = cmd.u8("time");
-    if (raw) {
-      // The driver stores portamento as speed; the next note turns it into time
-      // using the distance from the previous source key.
-      rt.state.portamentoMillisecondsPerCent = math::portamentoMillisecondsPerCent(raw.value);
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow tempo(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
-    const auto raw = cmd.u16be("raw");
-    if (raw) {
-      const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw.value);
-      cmd.detail("microseconds_per_quarter", static_cast<u64>(microseconds));
-      rt.tempo(microseconds);
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow durationRate(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Duration Rate").semantic(SequenceSemantic::State);
-    const auto rate = cmd.u8("rate");
-    if (rate) {
-      rt.state.durationRate = rate.value;
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow repeatUntil(VmCommandCursor& cmd, Runtime& rt, u8 opcode) {
-    cmd.name("Repeat Until")
-        .semantic(SequenceSemantic::Repeat)
-        .playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
-    const auto slot = static_cast<u8>(opcode - 0x0e);
-    cmd.derived("slot", static_cast<u64>(slot + 1));
-    const auto count = cmd.u8("count");
-    const auto destination = cmd.address16be("destination");
-    if (count.value == 0) {
-      return cmd.declaredLoop(destination.value);
-    }
-
-    // Capcom stores the number of replays. The VM helper receives total plays.
-    return rt.countedRepeatUntil(cmd, slot, static_cast<u32>(count.value) + 1, destination.value);
-  }
-
-  template <class Runtime>
-  static CommandFlow repeatBreak(VmCommandCursor& cmd, Runtime& rt, u8 opcode) {
-    cmd.name("Repeat Break")
-        .semantic(SequenceSemantic::RepeatBreak)
-        .playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
-    const auto slot = static_cast<u8>(opcode - 0x12);
-    cmd.derived("slot", static_cast<u64>(slot + 1));
-    const auto attributes = cmd.u8("attributes");
-    const auto destination = cmd.address16be("destination");
-    const RepeatBreakFlow branch = rt.countedRepeatBreak(cmd, slot, destination.value);
-    if (attributes && branch.taken()) {
-      applyAttributes(rt, attributes.value);
-    }
-    return branch;
-  }
-
-  template <class Runtime>
-  static CommandFlow volume(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Volume").semantic(SequenceSemantic::Level);
-    const auto raw = cmd.u8("raw");
-    if (raw) {
-      cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw.value));
-      emitLinearVolume(rt, raw.value);
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow program(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Program").semantic(SequenceSemantic::Program);
-    const auto raw = cmd.u8("raw");
-    const u32 bank = raw.value >> 7;
-    const u32 program = raw.value & 0x7f;
-    cmd.derived("bank", static_cast<u64>(bank)).derived("program", static_cast<u64>(program));
-    if (raw) {
-      rt.instrument(bank, program, true);
-    }
-    return cmd.next();
-  }
-
-  static CommandFlow jump(VmCommandCursor& cmd) {
-    cmd.name("Jump").semantic(SequenceSemantic::Jump).playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
-    const auto destination = cmd.address16be("destination");
-    return cmd.loopCandidate(destination.value);
-  }
-
-  template <class Runtime>
-  static CommandFlow pan(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Pan").semantic(SequenceSemantic::Pan);
-    const auto raw = cmd.u8("raw");
-    if (raw) {
-      const auto converted = math::panConversion(rt.context.version, raw.value);
-      cmd.detail("stereo_position", math::stereoPosition(converted)).detail("linear_gain", converted.volumeScale);
-      emitPan(rt, raw.value);
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow masterVolume(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Master Volume").semantic(SequenceSemantic::Level);
-    const auto raw = cmd.u8("raw");
-    if (raw) {
-      cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw.value));
-      emitLinearMasterVolume(rt, raw.value);
-    }
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow lfo(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("LFO").kind("lfo").semantic(SequenceSemantic::Modulation);
-    const auto type = cmd.u8("type");
-    const auto value = cmd.u8("value");
-    if (!type || !value) {
-      return cmd.next();
-    }
-
-    auto& state = rt.state;
-    switch (type.value) {
-      case 0:
-        state.vibratoDepth = value.value & 0x7f;
-        rt.modulation(ModulationPerformanceTarget::VibratoDepth,
-                      state.modulationRate != 0 ? math::midi7Amount(state.vibratoDepth) : 0.0);
-        break;
-
-      case 1:
-        state.tremoloDepth = math::tremoloDepth(rt.context.version, value.value);
-        rt.modulation(ModulationPerformanceTarget::TremoloDepth,
-                      state.modulationRate != 0 ? math::midi7Amount(state.tremoloDepth) : 0.0);
-        break;
-
-      case 2: {
-        const bool wasEnabled = state.modulationRate != 0;
-        state.modulationRate = value.value;
-        const bool isEnabled = state.modulationRate != 0;
-        if constexpr (requires { rt.out; }) {
-          if (!isEnabled && wasEnabled) {
-            state.emitModulationDepths(rt.out, false);
-          } else if (isEnabled && !wasEnabled) {
-            state.emitModulationDepths(rt.out, true);
-          }
+      case 0x18: {
+        cmd.name("Pan").semantic(SequenceSemantic::Pan);
+        const auto raw = cmd.u8("raw");
+        if (raw) {
+          const auto converted = math::panConversion(rt.context.version, raw.value);
+          cmd.detail("stereo_position", math::stereoPosition(converted)).detail("linear_gain", converted.volumeScale);
+          emitPan(rt, raw.value);
         }
-
-        const double rate = math::lfoRateAmount(value.value);
-        rt.modulation(ModulationPerformanceTarget::VibratoRate, rate);
-        rt.modulation(ModulationPerformanceTarget::TremoloRate, rate);
-        break;
+        return cmd.next();
       }
 
+      case 0x19: {
+        cmd.name("Master Volume").semantic(SequenceSemantic::Level);
+        const auto raw = cmd.u8("raw");
+        if (raw) {
+          cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw.value));
+          emitLinearMasterVolume(rt, raw.value);
+        }
+        return cmd.next();
+      }
+
+      case 0x1a: {
+        cmd.name("LFO").kind("lfo").semantic(SequenceSemantic::Modulation);
+        const auto type = cmd.u8("type");
+        const auto value = cmd.u8("value");
+        if (!type || !value) {
+          return cmd.next();
+        }
+
+        auto& state = rt.state;
+        switch (type.value) {
+          case 0:
+            state.vibratoDepth = value.value & 0x7f;
+            rt.modulation(ModulationPerformanceTarget::VibratoDepth,
+                          state.modulationRate != 0 ? math::midi7Amount(state.vibratoDepth) : 0.0);
+            break;
+
+          case 1:
+            state.tremoloDepth = math::tremoloDepth(rt.context.version, value.value);
+            rt.modulation(ModulationPerformanceTarget::TremoloDepth,
+                          state.modulationRate != 0 ? math::midi7Amount(state.tremoloDepth) : 0.0);
+            break;
+
+          case 2: {
+            const bool wasEnabled = state.modulationRate != 0;
+            state.modulationRate = value.value;
+            const bool isEnabled = state.modulationRate != 0;
+            if constexpr (requires { rt.out; }) {
+              if (!isEnabled && wasEnabled) {
+                state.emitModulationDepths(rt.out, false);
+              } else if (isEnabled && !wasEnabled) {
+                state.emitModulationDepths(rt.out, true);
+              }
+            }
+
+            const double rate = math::lfoRateAmount(value.value);
+            rt.modulation(ModulationPerformanceTarget::VibratoRate, rate);
+            rt.modulation(ModulationPerformanceTarget::TremoloRate, rate);
+            break;
+          }
+
+          default:
+            // Type 3 is the driver's reset-LFO-phase flag. SF2/DLS already
+            // reset phase on note activation, so there is nothing useful to emit yet.
+            break;
+        }
+        return cmd.next();
+      }
+
+      case 0x1b:
+        cmd.name("Echo Param").semantic(SequenceSemantic::Meta).sourceOnly();
+        static_cast<void>(cmd.u8("argument"));
+        static_cast<void>(cmd.u8("preset"));
+        return cmd.next();
+
+      case 0x1c: {
+        cmd.name("Echo On/Off").semantic(SequenceSemantic::Meta);
+        const auto raw = cmd.u8("raw");
+        cmd.derived("enabled", static_cast<u64>(raw.value & 1));
+        if (raw) {
+          rt.reverb((raw.value & 1) != 0 ? 40.0 / 127.0 : 0.0);
+        }
+        return cmd.next();
+      }
+
+      case 0x1d: {
+        cmd.name("Release Rate").semantic(SequenceSemantic::Meta).sourceOnly();
+        const auto raw = cmd.u8("raw");
+        if (raw) {
+          cmd.derived("gain", static_cast<u64>(raw.value | 0xa0));
+        }
+        return cmd.next();
+      }
+
+      case 0x1e:
+      case 0x1f:
+        if (rt.context.version == CapcomSnesEngineVersion::v1BgmInList) {
+          cmd.name("Unknown One-Byte Event").kind("unknown-one-byte").semantic(SequenceSemantic::Meta).sourceOnly();
+          cmd.derived("opcode", static_cast<u64>(opcode), SourceValueDisplay::Hex);
+          static_cast<void>(cmd.u8("value"));
+          return cmd.next();
+        }
+        return cmd.name("No Operation").kind("nop").semantic(SequenceSemantic::Meta).noOp().next();
+
       default:
-        // Type 3 is the driver's reset-LFO-phase flag. SF2/DLS already reset phase
-        // on note activation, so there is nothing useful to emit yet.
-        break;
+        cmd.name("Unknown Opcode")
+            .kind("unknown")
+            .semantic(SequenceSemantic::Unsupported)
+            .derived("opcode", static_cast<u64>(opcode), SourceValueDisplay::Hex)
+            .unsupported("Unknown Capcom SNES sequence opcode");
+        renderWarning(rt, "Unknown Capcom SNES sequence opcode");
+        return cmd.end();
     }
-    return cmd.next();
-  }
-
-  static CommandFlow echoParam(VmCommandCursor& cmd) {
-    cmd.name("Echo Param").semantic(SequenceSemantic::Meta).sourceOnly();
-    static_cast<void>(cmd.u8("argument"));
-    static_cast<void>(cmd.u8("preset"));
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow echoOnOff(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Echo On/Off").semantic(SequenceSemantic::Meta);
-    const auto raw = cmd.u8("raw");
-    cmd.derived("enabled", static_cast<u64>(raw.value & 1));
-    if (raw) {
-      rt.reverb((raw.value & 1) != 0 ? 40.0 / 127.0 : 0.0);
-    }
-    return cmd.next();
-  }
-
-  static CommandFlow releaseRate(VmCommandCursor& cmd) {
-    cmd.name("Release Rate").semantic(SequenceSemantic::Meta).sourceOnly();
-    const auto raw = cmd.u8("raw");
-    if (raw) {
-      cmd.derived("gain", static_cast<u64>(raw.value | 0xa0));
-    }
-    return cmd.next();
-  }
-
-  static CommandFlow nop(VmCommandCursor& cmd) {
-    return cmd.name("No Operation").kind("nop").semantic(SequenceSemantic::Meta).noOp().next();
-  }
-
-  static CommandFlow unknownOneByte(VmCommandCursor& cmd) {
-    cmd.name("Unknown One-Byte Event").kind("unknown-one-byte").semantic(SequenceSemantic::Meta).sourceOnly();
-    cmd.derived("opcode", static_cast<u64>(cmd.opcode()), SourceValueDisplay::Hex);
-    static_cast<void>(cmd.u8("value"));
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow unknown(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Unknown Opcode")
-        .kind("unknown")
-        .semantic(SequenceSemantic::Unsupported)
-        .derived("opcode", static_cast<u64>(cmd.opcode()), SourceValueDisplay::Hex)
-        .unsupported("Unknown Capcom SNES sequence opcode");
-    renderWarning(rt, "Unknown Capcom SNES sequence opcode");
-    return cmd.end();
   }
 };
 
