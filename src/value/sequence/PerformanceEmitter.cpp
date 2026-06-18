@@ -6,6 +6,7 @@
 
 #include "value/sequence/SequenceVm.h"
 
+#include <iterator>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -233,6 +234,11 @@ void PerformanceEmitter::modulation(ModulationPerformanceTarget target, double a
 void PerformanceEmitter::marker(MarkerPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
+}
+
+void PerformanceEmitter::appendEvents(std::vector<PerformanceEvent> events) {
+  track_.events.insert(track_.events.end(), std::make_move_iterator(events.begin()),
+                       std::make_move_iterator(events.end()));
 }
 
 PerformanceEventHeader PerformanceEmitter::header() const {

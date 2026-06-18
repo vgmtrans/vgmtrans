@@ -9,7 +9,6 @@
 #include "value/model/SourceMap.h"
 #include "value/sequence/SequenceDialect.h"
 
-#include <exception>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -36,9 +35,14 @@ enum class FlowKind : ::u8 {
   CountedRepeatBreak,
 };
 
-class CommandReadTruncated final : public std::exception {
-public:
-  [[nodiscard]] const char* what() const noexcept override { return "Sequence command operand was truncated"; }
+template <class T>
+struct ReadValue {
+  T value{};
+  SourceRange range;
+  bool valid = true;
+
+  [[nodiscard]] explicit operator bool() const noexcept { return valid; }
+  [[nodiscard]] operator T() const noexcept { return value; }
 };
 
 struct CommandFlow {
@@ -92,17 +96,17 @@ public:
   VmCommandCursor& sourceOnly();
   VmCommandCursor& noOp();
 
-  [[nodiscard]] ::u8 u8(std::string_view name);
-  [[nodiscard]] s8 s8(std::string_view name);
-  [[nodiscard]] u16 u16le(std::string_view name);
-  [[nodiscard]] u16 u16be(std::string_view name);
-  [[nodiscard]] u32 u24le(std::string_view name);
-  [[nodiscard]] u32 u24be(std::string_view name);
-  [[nodiscard]] u32 varLen(std::string_view name);
-  [[nodiscard]] Address address16be(std::string_view name);
-  [[nodiscard]] Address address16le(std::string_view name);
-  [[nodiscard]] Address le24RelativeAddress(std::string_view name, Address base);
-  [[nodiscard]] std::string rawBytes(std::string_view name, size_t size);
+  [[nodiscard]] ReadValue<::u8> u8(std::string_view name);
+  [[nodiscard]] ReadValue<::s8> s8(std::string_view name);
+  [[nodiscard]] ReadValue<u16> u16le(std::string_view name);
+  [[nodiscard]] ReadValue<u16> u16be(std::string_view name);
+  [[nodiscard]] ReadValue<u32> u24le(std::string_view name);
+  [[nodiscard]] ReadValue<u32> u24be(std::string_view name);
+  [[nodiscard]] ReadValue<u32> varLen(std::string_view name);
+  [[nodiscard]] ReadValue<Address> address16be(std::string_view name);
+  [[nodiscard]] ReadValue<Address> address16le(std::string_view name);
+  [[nodiscard]] ReadValue<Address> le24RelativeAddress(std::string_view name, Address base);
+  [[nodiscard]] ReadValue<std::string> rawBytes(std::string_view name, size_t size);
 
   VmCommandCursor& derived(std::string_view name, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
@@ -132,9 +136,9 @@ private:
   void ensureAnnotation();
   void recordOpcode();
   [[nodiscard]] SourceRange rangeAt(size_t begin, size_t size) const;
-  void requireRead(size_t size, std::string_view field);
+  [[nodiscard]] bool requireRead(size_t size, std::string_view field);
   void markTruncated(std::string_view field, SourceRange range);
-  [[nodiscard]] ::u8 readByte(std::string_view field);
+  [[nodiscard]] bool readByte(std::string_view field, ::u8& out);
   void recordField(std::string_view name, SourceRange range, SourceValue value,
                    SourceValueDisplay display = SourceValueDisplay::Default);
   void recordOperand(std::string_view name, SourceRange range, const SourceValue& value, SourceValueDisplay display);

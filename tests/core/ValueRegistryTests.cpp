@@ -35,6 +35,13 @@ struct CursorProbeReader {
         rt.note(key + rt.state.transpose, rt.context.velocity, duration);
         return cmd.wait(duration);
       }
+      case 0x91: {
+        cmd.name("Late Truncated Note").semantic(SequenceSemantic::Note);
+        const u8 key = cmd.u8("key");
+        rt.note(key + rt.state.transpose, rt.context.velocity, 12);
+        static_cast<void>(cmd.u8("missing"));
+        return cmd.next();
+      }
       case 0xff:
         return cmd.name("End")
             .kind("end")
@@ -201,6 +208,41 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
          "cursor-backed render should rerun saved bytes with real runtime state");
   expect(note != nullptr && note->header.sourceAnnotation == program.tracks[0].commands[0].annotation,
          "cursor-backed performance events should retain source annotation origin");
+}
+
+void cursorDialectSuppressesMalformedRenderEvents() {
+  const SequenceDialect dialect =
+      makeCursorDialect<CursorProbeState, CursorProbeContext, CursorProbeReader>(CursorDialectSpec<CursorProbeContext>{
+          .id = "cursor-probe",
+          .commandKindPrefix = "cursor-probe",
+          .timebase = Timebase{.ppqn = 48},
+          .context = CursorProbeContext{.velocity = 0.25},
+      });
+
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+  const std::array<u8, 2> bytes{0x91, 60};
+  builder.addDecoded(dialect.handlers[0].id,
+                     CommandKind{
+                         .kindName = "cursor-probe.late-truncated-note",
+                         .name = "Late Truncated Note",
+                         .detailKind = "cursor-probe.late-truncated-note",
+                         .semantic = SequenceSemantic::Note,
+                     },
+                     Address{0}, probeRange(0, bytes.size()), bytes, {});
+
+  SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+  };
+  program.tracks.push_back(std::move(track));
+
+  const PerformanceSequence performance = SequenceVm{}.render(program, dialect);
+  expect(performance.tracks.size() == 1, "malformed cursor-backed command should still produce a performance track");
+  expect(performance.tracks[0].events.empty(), "malformed cursor-backed command should not leak buffered events");
 }
 
 void formatRegistryStoresCopyableModuleValues() {
@@ -406,6 +448,7 @@ void runValueRegistryTests() {
   bytecodeMapUsesCommandLocalMetadata();
   bytecodeMapAllowsOneHandlerForSeveralKinds();
   cursorDialectDecodesAnnotationsAndRendersThroughVm();
+  cursorDialectSuppressesMalformedRenderEvents();
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();
   scanResultBuilderCoversCommonScannerPlumbing();
