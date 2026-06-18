@@ -44,7 +44,7 @@ private:
 // PerformanceEmitter fills in the current tick and source command automatically.
 class PerformanceEmitter {
 public:
-  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, u64 tick);
+  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick);
 
   void note(NotePerformanceEvent event);
   void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
@@ -90,6 +90,7 @@ private:
 
   PerformanceTrack& track_;
   CommandId sourceCommand_;
+  SourceAnnotationId sourceAnnotation_;
   u64 tick_ = 0;
 };
 

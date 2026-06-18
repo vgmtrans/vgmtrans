@@ -75,6 +75,7 @@ struct SourceCommand {
   Address address;
   u32 encodedSize = 0;
   SourceRange range;
+  SourceAnnotationId annotation;
   ByteSpan bytes;
   OperandSpan operands;
 };
@@ -256,9 +257,11 @@ public:
   }
 
   const SourceCommand& addDecoded(CommandHandlerId handler, CommandKindId kind, Address address, SourceRange range,
-                                  std::span<const u8> bytes, std::span<const CommandOperand> operands);
+                                  std::span<const u8> bytes, std::span<const CommandOperand> operands,
+                                  SourceAnnotationId annotation = {});
   const SourceCommand& addDecoded(CommandHandlerId handler, const CommandKind& kind, Address address, SourceRange range,
-                                  std::span<const u8> bytes, std::span<const CommandOperand> operands);
+                                  std::span<const u8> bytes, std::span<const CommandOperand> operands,
+                                  SourceAnnotationId annotation = {});
 
 private:
   [[nodiscard]] CommandKindId addOrReuseKind(const CommandKind& kind);

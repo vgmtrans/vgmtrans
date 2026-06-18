@@ -304,6 +304,7 @@ template <class TrackState, class Context, class Reader>
       .handler = cursorDialectHandlerId<TrackState, Context, Reader>(dialect),
       .commandKind = cursor.commandKind(dialect.commandKindPrefix),
       .range = commandRange,
+      .annotation = cursor.annotation(),
       .bytes = std::move(ownedBytes),
       .operands = std::move(operands),
       .flow = decodeFlowFromCommandFlow(commandFlow, Address{begin + commandSize}),

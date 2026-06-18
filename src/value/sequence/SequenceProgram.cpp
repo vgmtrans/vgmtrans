@@ -311,7 +311,8 @@ CommandKindId TrackProgramBuilder::addOrReuseKind(const CommandKind& kind) {
 
 const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, CommandKindId kind, Address address,
                                                      SourceRange range, std::span<const u8> bytes,
-                                                     std::span<const CommandOperand> operands) {
+                                                     std::span<const CommandOperand> operands,
+                                                     SourceAnnotationId annotation) {
   if (bytes.empty()) {
     throw std::invalid_argument("Sequence source commands must include an opcode byte");
   }
@@ -336,6 +337,7 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, C
       .address = address,
       .encodedSize = static_cast<u32>(bytes.size()),
       .range = range,
+      .annotation = annotation,
       .bytes = ByteSpan{.offset = byteOffset, .size = static_cast<u32>(bytes.size())},
       .operands = OperandSpan{.offset = operandOffset, .size = static_cast<u32>(operands.size())},
   });
@@ -345,8 +347,9 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, C
 
 const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, const CommandKind& kind, Address address,
                                                      SourceRange range, std::span<const u8> bytes,
-                                                     std::span<const CommandOperand> operands) {
-  return addDecoded(handler, addOrReuseKind(kind), address, range, bytes, operands);
+                                                     std::span<const CommandOperand> operands,
+                                                     SourceAnnotationId annotation) {
+  return addDecoded(handler, addOrReuseKind(kind), address, range, bytes, operands, annotation);
 }
 
 }  // namespace vgmtrans::core

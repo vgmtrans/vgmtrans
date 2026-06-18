@@ -29,6 +29,7 @@ struct DecodedBytecodeCommand {
   CommandKindId kind;
   std::optional<CommandKind> commandKind;
   SourceRange range;
+  SourceAnnotationId annotation;
   std::vector<u8> bytes;
   std::vector<CommandOperand> operands;
   DecodeFlow flow;
