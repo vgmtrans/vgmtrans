@@ -43,7 +43,7 @@ template <class TrackState, class Context>
 
 template <class TrackState, class Context>
 struct DecodeCursorRuntime {
-  TrackState state{};
+  TrackState& state;
   const Context& context;
   CommandReferences* references = nullptr;
 
@@ -173,8 +173,12 @@ struct CursorDialectDriver {
 
   static void references(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
                          const std::any& context) {
+    const auto& typedContext = std::any_cast<const Context&>(context);
+    BytecodeDecodeContext decodeContext;
+    TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, typedContext);
     DecodeCursorRuntime<TrackState, Context> runtime{
-        .context = std::any_cast<const Context&>(context),
+        .state = decodeState,
+        .context = typedContext,
         .references = &references,
     };
     VmCommandCursor cursor(CommandPhase::Decode, record.range, track.bytesFor(record));
@@ -241,8 +245,10 @@ template <class TrackState, class Context, class Reader>
 }
 
 template <class TrackState, class Context, class Reader>
-[[nodiscard]] DecodedBytecodeCommand decodeCursorCommand(ByteReader reader, u32 begin, const SequenceDialect& dialect,
-                                                         BytecodeDecodeContext context = {}) {
+[[nodiscard]] DecodedBytecodeCommand decodeCursorCommandWithState(ByteReader reader, u32 begin,
+                                                                  const SequenceDialect& dialect,
+                                                                  TrackState& decodeState,
+                                                                  BytecodeDecodeContext context = {}) {
   if (context.bytecodeEnd == std::numeric_limits<u32>::max()) {
     context.bytecodeEnd = static_cast<u32>(reader.size());
   }
@@ -274,7 +280,7 @@ template <class TrackState, class Context, class Reader>
   VmCommandCursor cursor(CommandPhase::Decode, availableRange, availableBytes, context.sourceMap, context.diagnostics,
                          &operands);
   DecodeCursorRuntime<TrackState, Context> runtime{
-      .state = makeDecodeCursorState<TrackState, Context>(context, cursorContext<Context>(dialect)),
+      .state = decodeState,
       .context = cursorContext<Context>(dialect),
   };
   CommandFlow commandFlow = Reader::read(runtime, cursor);
@@ -310,6 +316,13 @@ template <class TrackState, class Context, class Reader>
       .operands = std::move(operands),
       .flow = decodeFlowFromCommandFlow(commandFlow, Address{begin + commandSize}),
   };
+}
+
+template <class TrackState, class Context, class Reader>
+[[nodiscard]] DecodedBytecodeCommand decodeCursorCommand(ByteReader reader, u32 begin, const SequenceDialect& dialect,
+                                                         BytecodeDecodeContext context = {}) {
+  TrackState decodeState = makeDecodeCursorState<TrackState, Context>(context, cursorContext<Context>(dialect));
+  return decodeCursorCommandWithState<TrackState, Context, Reader>(reader, begin, dialect, decodeState, context);
 }
 
 }  // namespace vgmtrans::core

@@ -626,15 +626,17 @@ void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequenceDescriptor& descriptor,
                                          u32 sourceTrackNumber, u32 startAddress, SourceMapBuilder* sourceMap,
                                          std::vector<Diagnostic>* diagnostics) {
+  BytecodeDecodeContext decodeContext{
+      .bytecodeEnd = static_cast<u32>(reader.size()),
+      .sourceMap = sourceMap,
+      .diagnostics = diagnostics,
+  };
+  TrackState decodeState =
+      makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(descriptor.dialect));
   return decodeLinearBytecodeTrack(reader, sourceTrackNumber, startAddress,
                                    LinearBytecodeDecodePolicy{.maxCommands = 4096}, [&](u32 offset) {
-                                     return decodeCursorCommand<TrackState, Context, CapcomSnesCommandReader>(
-                                         reader, offset, descriptor.dialect,
-                                         BytecodeDecodeContext{
-                                             .bytecodeEnd = static_cast<u32>(reader.size()),
-                                             .sourceMap = sourceMap,
-                                             .diagnostics = diagnostics,
-                                         });
+                                     return decodeCursorCommandWithState<TrackState, Context, CapcomSnesCommandReader>(
+                                         reader, offset, descriptor.dialect, decodeState, decodeContext);
                                    });
 }
 
