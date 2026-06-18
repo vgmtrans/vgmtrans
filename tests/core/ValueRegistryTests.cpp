@@ -30,12 +30,10 @@ struct CursorProbeReader {
     switch (cmd.opcode()) {
       case 0x90: {
         cmd.name("Note").semantic(SequenceSemantic::Note);
-        const auto key = cmd.u8("key");
-        const auto duration = cmd.u8("duration");
-        if (key && duration) {
-          rt.note(key.value + rt.state.transpose, rt.context.velocity, duration.value);
-        }
-        return cmd.wait(duration.value);
+        const u8 key = cmd.u8("key");
+        const u8 duration = cmd.u8("duration");
+        rt.note(key + rt.state.transpose, rt.context.velocity, duration);
+        return cmd.wait(duration);
       }
       case 0xff:
         return cmd.name("End")

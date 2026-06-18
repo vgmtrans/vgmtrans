@@ -329,100 +329,76 @@ struct CapcomSnesCommandReader {
 
       case 0x04: {
         cmd.name("Note Attributes").semantic(SequenceSemantic::State);
-        const auto raw = cmd.u8("raw");
-        if (raw) {
-          applyAttributes(rt, raw.value);
-        }
+        const u8 raw = cmd.u8("raw");
+        applyAttributes(rt, raw);
         return cmd.next();
       }
 
       case 0x05: {
         cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
-        const auto raw = cmd.u16be("raw");
-        if (raw) {
-          const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw.value);
-          cmd.detail("microseconds_per_quarter", static_cast<u64>(microseconds));
-          rt.tempo(microseconds);
-        }
+        const u16 raw = cmd.u16be("raw");
+        const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw);
+        cmd.detail("microseconds_per_quarter", static_cast<u64>(microseconds));
+        rt.tempo(microseconds);
         return cmd.next();
       }
 
       case 0x06: {
         cmd.name("Duration Rate").semantic(SequenceSemantic::State);
-        const auto rate = cmd.u8("rate");
-        if (rate) {
-          rt.state.durationRate = rate.value;
-        }
+        rt.state.durationRate = cmd.u8("rate");
         return cmd.next();
       }
 
       case 0x07: {
         cmd.name("Volume").semantic(SequenceSemantic::Level);
-        const auto raw = cmd.u8("raw");
-        if (raw) {
-          cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw.value));
-          emitLinearVolume(rt, raw.value);
-        }
+        const u8 raw = cmd.u8("raw");
+        cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw));
+        emitLinearVolume(rt, raw);
         return cmd.next();
       }
 
       case 0x08: {
         cmd.name("Program").semantic(SequenceSemantic::Program);
-        const auto raw = cmd.u8("raw");
-        const u32 bank = raw.value >> 7;
-        const u32 program = raw.value & 0x7f;
+        const u8 raw = cmd.u8("raw");
+        const u32 bank = raw >> 7;
+        const u32 program = raw & 0x7f;
         cmd.derived("bank", static_cast<u64>(bank)).derived("program", static_cast<u64>(program));
-        if (raw) {
-          rt.instrument(bank, program, true);
-        }
+        rt.instrument(bank, program, true);
         return cmd.next();
       }
 
       case 0x09: {
         cmd.name("Octave").semantic(SequenceSemantic::State);
-        const auto value = cmd.u8("octave");
-        if (value) {
-          rt.state.noteOctave = value.value;
-        }
+        rt.state.noteOctave = cmd.u8("octave");
         return cmd.next();
       }
 
       case 0x0a: {
         cmd.name("Global Transpose").semantic(SequenceSemantic::Pitch);
-        const auto semitones = cmd.s8("semitones");
-        if (semitones) {
-          rt.globalTranspose(semitones.value);
-        }
+        rt.globalTranspose(cmd.s8("semitones"));
         return cmd.next();
       }
 
       case 0x0b: {
         cmd.name("Transpose").semantic(SequenceSemantic::Pitch);
-        const auto semitones = cmd.s8("semitones");
-        if (semitones) {
-          rt.state.transpose = semitones.value;
-        }
+        rt.state.transpose = cmd.s8("semitones");
         return cmd.next();
       }
 
       case 0x0c: {
         cmd.name("Tuning").semantic(SequenceSemantic::Pitch);
-        const auto raw = cmd.s8("tuning");
-        if (raw) {
-          cmd.detail("cents", math::tuningCents(raw.value));
-          rt.tuning(math::tuningCents(raw.value));
-        }
+        const s8 raw = cmd.s8("tuning");
+        cmd.detail("cents", math::tuningCents(raw));
+        rt.tuning(math::tuningCents(raw));
         return cmd.next();
       }
 
       case 0x0d: {
         cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
-        const auto raw = cmd.u8("time");
-        if (raw) {
-          // The driver stores portamento as speed; the next note turns it into
-          // time using the distance from the previous source key.
-          rt.state.portamentoMillisecondsPerCent = math::portamentoMillisecondsPerCent(raw.value);
-        }
+        const u8 raw = cmd.u8("time");
+        // The driver stores portamento as speed; the next note turns it into
+        // time using the distance from the previous source key.
+        rt.state.portamentoMillisecondsPerCent = math::portamentoMillisecondsPerCent(raw);
         return cmd.next();
       }
 
@@ -435,14 +411,14 @@ struct CapcomSnesCommandReader {
             .playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
         const auto slot = static_cast<u8>(opcode - 0x0e);
         cmd.derived("slot", static_cast<u64>(slot + 1));
-        const auto count = cmd.u8("count");
-        const auto destination = cmd.address16be("destination");
-        if (count.value == 0) {
-          return cmd.declaredLoop(destination.value);
+        const u8 count = cmd.u8("count");
+        const Address destination = cmd.address16be("destination");
+        if (count == 0) {
+          return cmd.declaredLoop(destination);
         }
 
         // Capcom stores the number of replays. The VM helper receives total plays.
-        return rt.countedRepeatUntil(cmd, slot, static_cast<u32>(count.value) + 1, destination.value);
+        return rt.countedRepeatUntil(cmd, slot, static_cast<u32>(count) + 1, destination);
       }
 
       case 0x12:
@@ -454,19 +430,18 @@ struct CapcomSnesCommandReader {
             .playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
         const auto slot = static_cast<u8>(opcode - 0x12);
         cmd.derived("slot", static_cast<u64>(slot + 1));
-        const auto attributes = cmd.u8("attributes");
-        const auto destination = cmd.address16be("destination");
-        const RepeatBreakFlow branch = rt.countedRepeatBreak(cmd, slot, destination.value);
-        if (attributes && branch.taken()) {
-          applyAttributes(rt, attributes.value);
+        const u8 attributes = cmd.u8("attributes");
+        const Address destination = cmd.address16be("destination");
+        const RepeatBreakFlow branch = rt.countedRepeatBreak(cmd, slot, destination);
+        if (branch.taken()) {
+          applyAttributes(rt, attributes);
         }
         return branch;
       }
 
       case 0x16: {
         cmd.name("Jump").semantic(SequenceSemantic::Jump).playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
-        const auto destination = cmd.address16be("destination");
-        return cmd.loopCandidate(destination.value);
+        return cmd.loopCandidate(cmd.address16be("destination"));
       }
 
       case 0x17:
@@ -478,50 +453,43 @@ struct CapcomSnesCommandReader {
 
       case 0x18: {
         cmd.name("Pan").semantic(SequenceSemantic::Pan);
-        const auto raw = cmd.u8("raw");
-        if (raw) {
-          const auto converted = math::panConversion(rt.context.version, raw.value);
-          cmd.detail("stereo_position", math::stereoPosition(converted)).detail("linear_gain", converted.volumeScale);
-          emitPan(rt, raw.value);
-        }
+        const u8 raw = cmd.u8("raw");
+        const auto converted = math::panConversion(rt.context.version, raw);
+        cmd.detail("stereo_position", math::stereoPosition(converted)).detail("linear_gain", converted.volumeScale);
+        emitPan(rt, raw);
         return cmd.next();
       }
 
       case 0x19: {
         cmd.name("Master Volume").semantic(SequenceSemantic::Level);
-        const auto raw = cmd.u8("raw");
-        if (raw) {
-          cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw.value));
-          emitLinearMasterVolume(rt, raw.value);
-        }
+        const u8 raw = cmd.u8("raw");
+        cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw));
+        emitLinearMasterVolume(rt, raw);
         return cmd.next();
       }
 
       case 0x1a: {
         cmd.name("LFO").kind("lfo").semantic(SequenceSemantic::Modulation);
-        const auto type = cmd.u8("type");
-        const auto value = cmd.u8("value");
-        if (!type || !value) {
-          return cmd.next();
-        }
+        const u8 type = cmd.u8("type");
+        const u8 value = cmd.u8("value");
 
         auto& state = rt.state;
-        switch (type.value) {
+        switch (type) {
           case 0:
-            state.vibratoDepth = value.value & 0x7f;
+            state.vibratoDepth = value & 0x7f;
             rt.modulation(ModulationPerformanceTarget::VibratoDepth,
                           state.modulationRate != 0 ? math::midi7Amount(state.vibratoDepth) : 0.0);
             break;
 
           case 1:
-            state.tremoloDepth = math::tremoloDepth(rt.context.version, value.value);
+            state.tremoloDepth = math::tremoloDepth(rt.context.version, value);
             rt.modulation(ModulationPerformanceTarget::TremoloDepth,
                           state.modulationRate != 0 ? math::midi7Amount(state.tremoloDepth) : 0.0);
             break;
 
           case 2: {
             const bool wasEnabled = state.modulationRate != 0;
-            state.modulationRate = value.value;
+            state.modulationRate = value;
             const bool isEnabled = state.modulationRate != 0;
             if constexpr (requires { rt.out; }) {
               if (!isEnabled && wasEnabled) {
@@ -531,7 +499,7 @@ struct CapcomSnesCommandReader {
               }
             }
 
-            const double rate = math::lfoRateAmount(value.value);
+            const double rate = math::lfoRateAmount(value);
             rt.modulation(ModulationPerformanceTarget::VibratoRate, rate);
             rt.modulation(ModulationPerformanceTarget::TremoloRate, rate);
             break;
@@ -553,20 +521,16 @@ struct CapcomSnesCommandReader {
 
       case 0x1c: {
         cmd.name("Echo On/Off").semantic(SequenceSemantic::Meta);
-        const auto raw = cmd.u8("raw");
-        cmd.derived("enabled", static_cast<u64>(raw.value & 1));
-        if (raw) {
-          rt.reverb((raw.value & 1) != 0 ? 40.0 / 127.0 : 0.0);
-        }
+        const u8 raw = cmd.u8("raw");
+        cmd.derived("enabled", static_cast<u64>(raw & 1));
+        rt.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0);
         return cmd.next();
       }
 
       case 0x1d: {
         cmd.name("Release Rate").semantic(SequenceSemantic::Meta).sourceOnly();
-        const auto raw = cmd.u8("raw");
-        if (raw) {
-          cmd.derived("gain", static_cast<u64>(raw.value | 0xa0));
-        }
+        const u8 raw = cmd.u8("raw");
+        cmd.derived("gain", static_cast<u64>(raw | 0xa0));
         return cmd.next();
       }
 

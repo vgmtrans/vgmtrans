@@ -127,89 +127,68 @@ VmCommandCursor& VmCommandCursor::noOp() {
   return playbackStatus(CommandPlaybackStatus::NoOp);
 }
 
-CursorReadValue<::u8> VmCommandCursor::u8(std::string_view name) {
+::u8 VmCommandCursor::u8(std::string_view name) {
   const size_t begin = position_;
-  if (!canRead(1, name)) {
-    return CursorReadValue<::u8>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const ::u8 value = readByte(name);
   const auto range = rangeAt(begin, 1);
   recordField(name, range, unsignedValue(value));
-  return CursorReadValue<::u8>{.value = value, .range = range};
+  return value;
 }
 
-CursorReadValue<s8> VmCommandCursor::s8(std::string_view name) {
+s8 VmCommandCursor::s8(std::string_view name) {
   const size_t begin = position_;
-  if (!canRead(1, name)) {
-    return CursorReadValue<::s8>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const auto signedByte = static_cast<::s8>(readByte(name));
   const auto range = rangeAt(begin, 1);
   recordField(name, range, signedValue(signedByte), SourceValueDisplay::SignedDecimal);
-  return CursorReadValue<::s8>{.value = signedByte, .range = range};
+  return signedByte;
 }
 
-CursorReadValue<u16> VmCommandCursor::u16le(std::string_view name) {
+u16 VmCommandCursor::u16le(std::string_view name) {
   const size_t begin = position_;
-  if (!canRead(2, name)) {
-    return CursorReadValue<u16>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const u16 low = readByte(name);
   const u16 high = readByte(name);
   const auto value = static_cast<u16>(low | (high << 8));
   const auto range = rangeAt(begin, 2);
   recordField(name, range, unsignedValue(value));
-  return CursorReadValue<u16>{.value = value, .range = range};
+  return value;
 }
 
-CursorReadValue<u16> VmCommandCursor::u16be(std::string_view name) {
+u16 VmCommandCursor::u16be(std::string_view name) {
   const size_t begin = position_;
-  if (!canRead(2, name)) {
-    return CursorReadValue<u16>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const u16 high = readByte(name);
   const u16 low = readByte(name);
   const auto value = static_cast<u16>((high << 8) | low);
   const auto range = rangeAt(begin, 2);
   recordField(name, range, unsignedValue(value));
-  return CursorReadValue<u16>{.value = value, .range = range};
+  return value;
 }
 
-CursorReadValue<u32> VmCommandCursor::u24le(std::string_view name) {
+u32 VmCommandCursor::u24le(std::string_view name) {
   const size_t begin = position_;
-  if (!canRead(3, name)) {
-    return CursorReadValue<u32>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const u32 low = readByte(name);
   const u32 middle = readByte(name);
   const u32 high = readByte(name);
   const u32 value = low | (middle << 8) | (high << 16);
   const auto range = rangeAt(begin, 3);
   recordField(name, range, unsignedValue(value));
-  return CursorReadValue<u32>{.value = value, .range = range};
+  return value;
 }
 
-CursorReadValue<u32> VmCommandCursor::u24be(std::string_view name) {
+u32 VmCommandCursor::u24be(std::string_view name) {
   const size_t begin = position_;
-  if (!canRead(3, name)) {
-    return CursorReadValue<u32>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const u32 high = readByte(name);
   const u32 middle = readByte(name);
   const u32 low = readByte(name);
   const u32 value = (high << 16) | (middle << 8) | low;
   const auto range = rangeAt(begin, 3);
   recordField(name, range, unsignedValue(value));
-  return CursorReadValue<u32>{.value = value, .range = range};
+  return value;
 }
 
-CursorReadValue<u32> VmCommandCursor::varLen(std::string_view name) {
+u32 VmCommandCursor::varLen(std::string_view name) {
   const size_t begin = position_;
   u32 value = 0;
   while (true) {
-    if (!canRead(1, name)) {
-      return CursorReadValue<u32>{.range = rangeAt(begin, position_ - begin), .valid = false};
-    }
     const ::u8 byte = readByte(name);
     value = (value << 7) + (byte & 0x7f);
     if ((byte & 0x80) == 0) {
@@ -218,59 +197,48 @@ CursorReadValue<u32> VmCommandCursor::varLen(std::string_view name) {
   }
   const auto range = rangeAt(begin, position_ - begin);
   recordField(name, range, unsignedValue(value));
-  return CursorReadValue<u32>{.value = value, .range = range};
+  return value;
 }
 
-CursorReadValue<Address> VmCommandCursor::address16be(std::string_view name) {
+Address VmCommandCursor::address16be(std::string_view name) {
   const size_t begin = position_;
-  if (!canRead(2, name)) {
-    return CursorReadValue<Address>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const u16 high = readByte(name);
   const u16 low = readByte(name);
   const Address address{static_cast<u32>((high << 8) | low)};
   const auto range = rangeAt(begin, 2);
   recordField(name, range, unsignedValue(address.value), SourceValueDisplay::Address);
-  return CursorReadValue<Address>{.value = address, .range = range};
+  return address;
 }
 
-CursorReadValue<Address> VmCommandCursor::address16le(std::string_view name) {
+Address VmCommandCursor::address16le(std::string_view name) {
   const size_t begin = position_;
-  if (!canRead(2, name)) {
-    return CursorReadValue<Address>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const u16 low = readByte(name);
   const u16 high = readByte(name);
   const Address address{static_cast<u32>(low | (high << 8))};
   const auto range = rangeAt(begin, 2);
   recordField(name, range, unsignedValue(address.value), SourceValueDisplay::Address);
-  return CursorReadValue<Address>{.value = address, .range = range};
+  return address;
 }
 
-CursorReadValue<Address> VmCommandCursor::le24RelativeAddress(std::string_view name, Address base) {
+Address VmCommandCursor::le24RelativeAddress(std::string_view name, Address base) {
   const size_t begin = position_;
-  if (!canRead(3, name)) {
-    return CursorReadValue<Address>{.range = rangeAt(begin, 0), .valid = false};
-  }
   const u32 low = readByte(name);
   const u32 middle = readByte(name);
   const u32 high = readByte(name);
   const Address address{base.value + (low | (middle << 8) | (high << 16))};
   const auto range = rangeAt(begin, 3);
   recordField(name, range, unsignedValue(address.value), SourceValueDisplay::Address);
-  return CursorReadValue<Address>{.value = address, .range = range};
+  return address;
 }
 
-CursorReadValue<std::string> VmCommandCursor::rawBytes(std::string_view name, size_t size) {
+std::string VmCommandCursor::rawBytes(std::string_view name, size_t size) {
   const size_t begin = position_;
-  if (!canRead(size, name)) {
-    return CursorReadValue<std::string>{.range = rangeAt(begin, 0), .valid = false};
-  }
+  requireRead(size, name);
   const auto range = rangeAt(begin, size);
   const auto value = hexBytes(bytes_.subspan(begin, size));
   position_ += size;
   recordField(name, range, SourceValue{value}, SourceValueDisplay::Hex);
-  return CursorReadValue<std::string>{.value = value, .range = range};
+  return value;
 }
 
 VmCommandCursor& VmCommandCursor::derived(std::string_view name, SourceValue value, SourceValueDisplay display) {
@@ -414,15 +382,13 @@ SourceRange VmCommandCursor::rangeAt(size_t begin, size_t size) const {
   };
 }
 
-bool VmCommandCursor::canRead(size_t size, std::string_view field) {
+void VmCommandCursor::requireRead(size_t size, std::string_view field) {
   if (failed_) {
-    return false;
+    throw CommandReadTruncated{};
   }
   if (position_ > bytes_.size() || size > bytes_.size() - position_) {
     markTruncated(field, rangeAt(position_, 0));
-    return false;
   }
-  return true;
 }
 
 void VmCommandCursor::markTruncated(std::string_view field, SourceRange range) {
@@ -442,12 +408,11 @@ void VmCommandCursor::markTruncated(std::string_view field, SourceRange range) {
         .range = range,
     });
   }
+  throw CommandReadTruncated{};
 }
 
 ::u8 VmCommandCursor::readByte(std::string_view field) {
-  if (!canRead(1, field)) {
-    return 0;
-  }
+  requireRead(1, field);
   const ::u8 value = bytes_[position_];
   ++position_;
   return value;
