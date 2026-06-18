@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "value/sequence/bytecode/CursorBytecode.h"
 #include "value/sequence/SequenceDialect.h"
 #include "value/sequence/bytecode/BytecodeDecode.h"
 
@@ -45,10 +44,8 @@ namespace vgmtrans::core {
   return result;
 }
 
-// Builds the opcode table for one source driver. Format code calls op(), range(),
-// jump(), call(), terminal(), and related helpers from one local map. When the
-// dialect is built, the map assigns handler IDs; when a sequence is decoded, it
-// looks those IDs up again so both paths stay tied to the same opcode list.
+// Builds an opcode table for older typed-command decoders. Cursor-based formats
+// should use makeCursorDialect() and decodeCursorCommand() instead.
 template <class TrackState, class Context>
 class BytecodeMapBuilder {
 public:
@@ -86,40 +83,6 @@ public:
   template <class Command>
   BytecodeMapBuilder& op(u8 opcode, CommandMeta meta, BytecodeCommandOptions options = {}) {
     return op<Command>(opcode, meta.displayName, optionsWithMeta(meta, options));
-  }
-
-  template <u8 Op, class Command>
-  BytecodeMapBuilder& cursorOp(CommandMeta meta, BytecodeCommandOptions options = {}) {
-    return cursorOp<Command>(Op, meta.displayName, optionsWithMeta(meta, options));
-  }
-
-  template <u8 Op, class Command>
-  BytecodeMapBuilder& cursorOp(std::string_view displayName, BytecodeCommandOptions options = {}) {
-    return cursorOp<Command>(Op, displayName, options);
-  }
-
-  template <class Command>
-  BytecodeMapBuilder& cursorOp(u8 opcode, CommandMeta meta, BytecodeCommandOptions options = {}) {
-    return cursorOp<Command>(opcode, meta.displayName, optionsWithMeta(meta, options));
-  }
-
-  template <class Command>
-  BytecodeMapBuilder& cursorOp(u8 opcode, std::string_view displayName, BytecodeCommandOptions options = {}) {
-    return addOpcode(opcode,
-                     commandSpec<Command>(displayName, options, detail::decodeCursorBytecodeCommand<Command>));
-  }
-
-  template <u8 First, u8 Last, class Command>
-  BytecodeMapBuilder& cursorRange(CommandMeta meta, BytecodeCommandOptions options = {}) {
-    return cursorRange<First, Last, Command>(meta.displayName, optionsWithMeta(meta, options));
-  }
-
-  template <u8 First, u8 Last, class Command>
-  BytecodeMapBuilder& cursorRange(std::string_view displayName, BytecodeCommandOptions options = {}) {
-    static_assert(First <= Last);
-    const auto spec = commandSpec<Command>(displayName, options, detail::decodeCursorBytecodeCommand<Command>);
-    ranges_.push_back(BytecodeRangeSpec{.first = First, .last = Last, .spec = spec});
-    return *this;
   }
 
   template <u8 First, u8 Last, class Command>
@@ -216,20 +179,6 @@ public:
   }
 
   template <class Command>
-  BytecodeMapBuilder& cursorUnknown(CommandMeta meta, BytecodeCommandOptions options = {}) {
-    return cursorUnknown<Command>(meta.displayName, optionsWithMeta(meta, options));
-  }
-
-  template <class Command>
-  BytecodeMapBuilder& cursorUnknown(std::string_view displayName, BytecodeCommandOptions options = {}) {
-    table_.unknown = commandSpec<Command>(displayName, options, detail::decodeCursorBytecodeCommand<Command>);
-    if (!table_.truncated) {
-      table_.truncated = table_.unknown;
-    }
-    return *this;
-  }
-
-  template <class Command>
   BytecodeMapBuilder& truncated(BytecodeCommandOptions options = {}) {
     return truncated<Command>(Command::meta.displayName, optionsWithMeta(Command::meta, options));
   }
@@ -243,17 +192,6 @@ public:
   template <class Command>
   BytecodeMapBuilder& truncated(CommandMeta meta, BytecodeCommandOptions options = {}) {
     return truncated<Command>(meta.displayName, optionsWithMeta(meta, options));
-  }
-
-  template <class Command>
-  BytecodeMapBuilder& cursorTruncated(CommandMeta meta, BytecodeCommandOptions options = {}) {
-    return cursorTruncated<Command>(meta.displayName, optionsWithMeta(meta, options));
-  }
-
-  template <class Command>
-  BytecodeMapBuilder& cursorTruncated(std::string_view displayName, BytecodeCommandOptions options = {}) {
-    table_.truncated = commandSpec<Command>(displayName, options, detail::decodeCursorBytecodeCommand<Command>);
-    return *this;
   }
 
   [[nodiscard]] BytecodeDispatchTable finish() {
@@ -370,8 +308,8 @@ private:
     } else {
       const CommandKind* foundKind = dialect_->kindForName(kindName);
       const CommandHandler* foundHandler = dialect_->template handlerForCommand<Command>();
-      if (foundKind == nullptr || foundKind->name != displayName ||
-          foundKind->playbackStatus != playbackStatus || foundHandler == nullptr) {
+      if (foundKind == nullptr || foundKind->name != displayName || foundKind->playbackStatus != playbackStatus ||
+          foundHandler == nullptr) {
         throw std::logic_error("Bytecode command was not registered in its dialect");
       }
       handler = foundHandler->id;

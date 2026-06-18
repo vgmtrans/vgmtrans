@@ -87,10 +87,14 @@ public:
   [[nodiscard]] SourceAnnotationId annotation() const noexcept { return annotation_; }
   [[nodiscard]] size_t position() const noexcept { return position_; }
   [[nodiscard]] bool failed() const noexcept { return failed_; }
+  [[nodiscard]] CommandKind commandKind(std::string_view kindPrefix) const;
 
   VmCommandCursor& name(std::string_view displayName);
   VmCommandCursor& kind(std::string_view localKindOverride);
   VmCommandCursor& semantic(SequenceSemantic semantic);
+  VmCommandCursor& playbackStatus(CommandPlaybackStatus status);
+  VmCommandCursor& sourceOnly();
+  VmCommandCursor& noOp();
 
   [[nodiscard]] CursorReadValue<::u8> u8(std::string_view name);
   [[nodiscard]] CursorReadValue<s8> s8(std::string_view name);
@@ -102,6 +106,7 @@ public:
   [[nodiscard]] CursorReadValue<Address> address16be(std::string_view name);
   [[nodiscard]] CursorReadValue<Address> address16le(std::string_view name);
   [[nodiscard]] CursorReadValue<Address> le24RelativeAddress(std::string_view name, Address base);
+  [[nodiscard]] CursorReadValue<std::string> rawBytes(std::string_view name, size_t size);
 
   VmCommandCursor& derived(std::string_view name, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
@@ -135,8 +140,7 @@ private:
   void recordField(std::string_view name, SourceRange range, SourceValue value,
                    SourceValueDisplay display = SourceValueDisplay::Default);
   void recordOperand(std::string_view name, SourceRange range, const SourceValue& value, SourceValueDisplay display);
-  [[nodiscard]] CommandFlow flow(FlowKind kind, u32 waitTicks = 0,
-                                 std::optional<Address> destination = std::nullopt);
+  [[nodiscard]] CommandFlow flow(FlowKind kind, u32 waitTicks = 0, std::optional<Address> destination = std::nullopt);
 
   CommandPhase phase_ = CommandPhase::Decode;
   SourceRange commandRange_;
@@ -150,6 +154,10 @@ private:
   bool kindOverridden_ = false;
   bool failed_ = false;
   SourceRange failureRange_;
+  std::string displayName_ = "Unknown Command";
+  std::string localKind_ = "unknown-command";
+  SequenceSemantic semantic_ = SequenceSemantic::Unknown;
+  CommandPlaybackStatus playbackStatus_ = CommandPlaybackStatus::AffectsPlayback;
 };
 
 [[nodiscard]] Effects effectsFromCommandFlow(const CommandFlow& flow);

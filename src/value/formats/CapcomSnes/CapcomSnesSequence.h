@@ -8,7 +8,6 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesLayout.h"
 #include "value/sequence/SequenceDialect.h"
-#include "value/sequence/bytecode/BytecodeTable.h"
 #include "value/base/Source.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
@@ -20,10 +19,8 @@
 
 namespace vgmtrans::formats::capcom_snes {
 
-// Keep the bytecode table paired with the dialect whose handler IDs it stores.
 struct CapcomSnesSequenceDescriptor {
   core::SequenceDialect dialect;
-  core::BytecodeDispatchTable bytecode;
 };
 
 [[nodiscard]] const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngineVersion version);
@@ -36,12 +33,9 @@ void registerCapcomSnesSequenceDialects(core::SequenceDialectRegistry& registry)
                                                              core::SourceMapBuilder* sourceMap = nullptr,
                                                              std::vector<core::Diagnostic>* diagnostics = nullptr);
 
-[[nodiscard]] core::SequenceProgramAsset parseCapcomSnesSequence(const core::ScanInput& input,
-                                                                 const CapcomSnesLayout& layout,
-                                                                 core::AssetId sequenceId,
-                                                                 std::optional<core::ScanInstrumentSetRef> instrumentSet,
-                                                                 std::string_view displayName,
-                                                                 core::SourceMapBuilder* sourceMap = nullptr,
-                                                                 std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgramAsset parseCapcomSnesSequence(
+    const core::ScanInput& input, const CapcomSnesLayout& layout, core::AssetId sequenceId,
+    std::optional<core::ScanInstrumentSetRef> instrumentSet, std::string_view displayName,
+    core::SourceMapBuilder* sourceMap = nullptr, std::vector<core::Diagnostic>* diagnostics = nullptr);
 
 }  // namespace vgmtrans::formats::capcom_snes

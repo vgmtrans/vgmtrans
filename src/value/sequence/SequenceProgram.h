@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/model/MetadataModel.h"
+#include "value/model/SourceMap.h"
 
 #include <optional>
 #include <span>
@@ -53,6 +54,15 @@ enum class CommandPlaybackStatus {
   AffectsControlFlow,
   StopsPlayback,
   Unsupported,
+};
+
+struct CommandKind {
+  CommandKindId id;
+  std::string kindName;
+  std::string name;
+  std::string detailKind;
+  SequenceSemantic semantic = SequenceSemantic::Unknown;
+  CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
 };
 
 // One decoded source opcode. It keeps the original bytes, named operands, source
@@ -174,9 +184,12 @@ struct TrackProgram {
 
   // Command bytes and operands are pooled at track scope so the parsed snapshot
   // avoids one heap allocation per command.
+  std::vector<CommandKind> commandKinds;
   std::vector<u8> commandBytes;
   std::vector<CommandOperand> operands;
 
+  [[nodiscard]] const CommandKind* kind(CommandKindId id) const;
+  [[nodiscard]] const CommandKind* kindForName(std::string_view kindName) const;
   [[nodiscard]] std::span<const u8> bytesFor(const SourceCommand& command) const;
   [[nodiscard]] std::span<const CommandOperand> operandsFor(const SourceCommand& command) const;
 };
@@ -244,8 +257,12 @@ public:
 
   const SourceCommand& addDecoded(CommandHandlerId handler, CommandKindId kind, Address address, SourceRange range,
                                   std::span<const u8> bytes, std::span<const CommandOperand> operands);
+  const SourceCommand& addDecoded(CommandHandlerId handler, const CommandKind& kind, Address address, SourceRange range,
+                                  std::span<const u8> bytes, std::span<const CommandOperand> operands);
 
 private:
+  [[nodiscard]] CommandKindId addOrReuseKind(const CommandKind& kind);
+
   TrackProgram& track_;
 };
 
