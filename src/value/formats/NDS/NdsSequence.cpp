@@ -478,6 +478,14 @@ private:
   std::set<u32> decodedOffsets;
   std::set<u32> callTargetOffsets;
   std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
+  BytecodeDecodeContext decodeContext{
+      .bytecodeEnd = sequenceEnd,
+      .sequenceOffset = sequenceOffset,
+      .sequenceEnd = sequenceEnd,
+      .sourceMap = sourceMap,
+      .diagnostics = diagnostics,
+  };
+  TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
 
   while (!pendingBlocks.empty()) {
     const PendingBlock block = pendingBlocks.back();
@@ -491,14 +499,8 @@ private:
       }
       decodedOffsets.insert(begin);
 
-      auto decoded = decodeCursorCommand<TrackState, Context, NdsCommandReader>(reader, offset, dialect,
-                                                                                BytecodeDecodeContext{
-                                                                                    .bytecodeEnd = sequenceEnd,
-                                                                                    .sequenceOffset = sequenceOffset,
-                                                                                    .sequenceEnd = sequenceEnd,
-                                                                                    .sourceMap = sourceMap,
-                                                                                    .diagnostics = diagnostics,
-                                                                                });
+      auto decoded = decodeCursorCommandWithState<TrackState, Context, NdsCommandReader>(reader, offset, dialect,
+                                                                                         decodeState, decodeContext);
 
       if (!block.callTarget) {
         const auto overlap = std::ranges::find_if(
@@ -545,17 +547,19 @@ private:
 [[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
                                                  u32 sequenceEnd, u32 startOffset, u32 trackIndex,
                                                  SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+  BytecodeDecodeContext decodeContext{
+      .bytecodeEnd = sequenceEnd,
+      .sequenceOffset = sequenceOffset,
+      .sequenceEnd = sequenceEnd,
+      .sourceMap = sourceMap,
+      .diagnostics = diagnostics,
+  };
+  TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
   return decodeReachableBytecodeBlocks(
       reader, sequenceEnd, startOffset, trackIndex,
       ReachableBytecodeDecodePolicy{.maxCommands = static_cast<u32>(kMaxTrackCommands)}, [&](u32 offset) {
-        return decodeCursorCommand<TrackState, Context, NdsCommandReader>(reader, offset, dialect,
-                                                                          BytecodeDecodeContext{
-                                                                              .bytecodeEnd = sequenceEnd,
-                                                                              .sequenceOffset = sequenceOffset,
-                                                                              .sequenceEnd = sequenceEnd,
-                                                                              .sourceMap = sourceMap,
-                                                                              .diagnostics = diagnostics,
-                                                                          });
+        return decodeCursorCommandWithState<TrackState, Context, NdsCommandReader>(reader, offset, dialect, decodeState,
+                                                                                   decodeContext);
       });
 }
 

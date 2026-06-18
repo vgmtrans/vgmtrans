@@ -28,10 +28,16 @@ struct CursorProbeReader {
   template <class Runtime>
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     switch (cmd.opcode()) {
+      case 0x70: {
+        cmd.name("Transpose").semantic(SequenceSemantic::State);
+        rt.state.transpose = cmd.s8("semitones");
+        return cmd.next();
+      }
       case 0x90: {
         cmd.name("Note").semantic(SequenceSemantic::Note);
         const u8 key = cmd.u8("key");
         const u8 duration = cmd.u8("duration");
+        cmd.derived("performed_key", static_cast<u64>(key + rt.state.transpose), SourceValueDisplay::MidiNote);
         rt.note(key + rt.state.transpose, rt.context.velocity, duration);
         return cmd.wait(duration);
       }
@@ -161,37 +167,41 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
   expect(dialect.handlers.size() == 1 && dialect.kinds.empty(),
          "cursor dialect should register one generic handler and no opcode-specific kinds");
 
-  const std::vector<u8> bytes{0x90, 60, 12, 0xff};
+  const std::vector<u8> bytes{0x70, 2, 0x90, 60, 12, 0xff};
   const ByteReader reader(SourceId{0}, bytes);
   ScanIdAllocator ids;
   SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
   std::vector<Diagnostic> diagnostics;
+  const BytecodeDecodeContext decodeContext{
+      .bytecodeEnd = static_cast<u32>(bytes.size()),
+      .sourceMap = &sourceMap,
+      .diagnostics = &diagnostics,
+  };
+  auto decodeState = makeDecodeCursorState<CursorProbeState, CursorProbeContext>(
+      decodeContext, cursorContext<CursorProbeContext>(dialect));
   auto track = decodeLinearBytecodeTrack(reader, 0, 0, LinearBytecodeDecodePolicy{}, [&](u32 offset) {
-    return decodeCursorCommand<CursorProbeState, CursorProbeContext, CursorProbeReader>(
-        reader, offset, dialect,
-        BytecodeDecodeContext{
-            .bytecodeEnd = static_cast<u32>(bytes.size()),
-            .sourceMap = &sourceMap,
-            .diagnostics = &diagnostics,
-        });
+    return decodeCursorCommandWithState<CursorProbeState, CursorProbeContext, CursorProbeReader>(
+        reader, offset, dialect, decodeState, decodeContext);
   });
 
-  expect(track.commands.size() == 2, "cursor-backed decode should produce note and end commands");
-  expect(track.commandKinds.size() == 2 && track.commandKinds[0].kindName == "cursor-probe.note" &&
-             track.commandKinds[1].kindName == "cursor-probe.end",
+  expect(track.commands.size() == 3, "cursor-backed decode should produce state, note, and end commands");
+  expect(track.commandKinds.size() == 3 && track.commandKinds[0].kindName == "cursor-probe.transpose" &&
+             track.commandKinds[1].kindName == "cursor-probe.note" &&
+             track.commandKinds[2].kindName == "cursor-probe.end",
          "cursor-backed decode should store source command kinds on the parsed track");
   const SourceMap annotations = sourceMap.finish();
   const auto commandAnnotations = annotations.withRole(SourceId{0}, SourceRole::Command);
-  expect(commandAnnotations.size() == 2, "cursor-backed decode should record source command annotations");
-  const auto& noteAnnotation = annotations.get(commandAnnotations[0]);
-  expect(noteAnnotation.label == "Note" && noteAnnotation.localKind == "note" && noteAnnotation.range.offset == 0 &&
+  expect(commandAnnotations.size() == 3, "cursor-backed decode should record source command annotations");
+  const auto& noteAnnotation = annotations.get(commandAnnotations[1]);
+  expect(noteAnnotation.label == "Note" && noteAnnotation.localKind == "note" && noteAnnotation.range.offset == 2 &&
              noteAnnotation.range.size == 3,
          "cursor-backed note annotation should use the final decoded command range");
-  expect(track.commands[0].annotation == noteAnnotation.id,
+  expect(track.commands[1].annotation == noteAnnotation.id,
          "cursor-backed source commands should retain their primary source annotation");
-  expect(noteAnnotation.fields.size() == 3 && noteAnnotation.fields[1].name == "key" &&
-             std::get<u64>(noteAnnotation.fields[1].value) == 60,
-         "cursor-backed decode should record opcode and operand fields");
+  expect(noteAnnotation.fields.size() == 4 && noteAnnotation.fields[1].name == "key" &&
+             std::get<u64>(noteAnnotation.fields[1].value) == 60 && noteAnnotation.fields[3].name == "performed_key" &&
+             std::get<u64>(noteAnnotation.fields[3].value) == 62,
+         "cursor-backed decode should record opcode, operands, and state-derived fields");
   expect(diagnostics.empty(), "valid cursor-backed decode should not emit diagnostics");
 
   SequenceProgram program{
@@ -204,9 +214,9 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
   expect(performance.tracks.size() == 1 && performance.tracks[0].events.size() == 1,
          "cursor-backed command should render through the existing VM");
   const auto* note = std::get_if<NotePerformanceEvent>(&performance.tracks[0].events[0]);
-  expect(note != nullptr && note->key == 61.0 && note->linearVelocity == 0.25 && note->durationTicks == 12,
+  expect(note != nullptr && note->key == 62.0 && note->linearVelocity == 0.25 && note->durationTicks == 12,
          "cursor-backed render should rerun saved bytes with real runtime state");
-  expect(note != nullptr && note->header.sourceAnnotation == program.tracks[0].commands[0].annotation,
+  expect(note != nullptr && note->header.sourceAnnotation == program.tracks[0].commands[1].annotation,
          "cursor-backed performance events should retain source annotation origin");
 }
 
