@@ -35,6 +35,41 @@ namespace {
   };
 }
 
+[[nodiscard]] u32 boundedSectionSize(ByteReader reader, u32 offset, u32 fallbackSize) {
+  if (reader.has(offset + 8, 4)) {
+    const u32 storedSize = reader.le32(offset + 8) + 8;
+    if (reader.has(offset, storedSize)) {
+      return storedSize;
+    }
+  }
+  return reader.has(offset, fallbackSize) ? fallbackSize : 0;
+}
+
+void annotateNdsLayout(ByteReader reader, const NdsLayout& layout, SourceMapBuilder& sourceMap) {
+  sourceMap.header("SDAT Header", reader.range(layout.baseOffset, 0x24))
+      .field("file_size", reader.range(layout.baseOffset + 8, 4), static_cast<u64>(layout.length),
+             SourceValueDisplay::Hex)
+      .field("symb_offset", reader.range(layout.baseOffset + 0x10, 4), static_cast<u64>(layout.symbOffset),
+             SourceValueDisplay::Address)
+      .field("info_offset", reader.range(layout.baseOffset + 0x18, 4), static_cast<u64>(layout.infoOffset),
+             SourceValueDisplay::Address)
+      .field("fat_offset", reader.range(layout.baseOffset + 0x20, 4), static_cast<u64>(layout.fatOffset),
+             SourceValueDisplay::Address);
+
+  if (layout.hasSymb) {
+    const u32 symbSize = boundedSectionSize(reader, layout.symbOffset, 0x18);
+    if (symbSize != 0) {
+      sourceMap.section("SYMB Section", reader.range(layout.symbOffset, symbSize)).kind("sdat-symb");
+    }
+  }
+  if (const u32 infoSize = boundedSectionSize(reader, layout.infoOffset, 0x18); infoSize != 0) {
+    sourceMap.section("INFO Section", reader.range(layout.infoOffset, infoSize)).kind("sdat-info");
+  }
+  if (const u32 fatSize = boundedSectionSize(reader, layout.fatOffset, 0x0c); fatSize != 0) {
+    sourceMap.table("FAT File Table", reader.range(layout.fatOffset, fatSize)).kind("sdat-fat");
+  }
+}
+
 void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBuilder& result) {
   // Build dependencies before dependents: PSG samples are universal, SWAR collections feed
   // banks, banks feed sequences, and sequences finally become exportable collections.
@@ -161,6 +196,7 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
       result.warning("NDS SDAT header was invalid", input.reader.range(offset, 0x24));
       continue;
     }
+    annotateNdsLayout(input.reader, *layout, result.sourceMap());
     scanNdsLayout(input, *layout, result);
   }
   return result.finish();

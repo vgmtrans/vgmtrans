@@ -43,12 +43,12 @@ struct CapcomSnesInstrumentInfo {
 [[nodiscard]] core::SampleCollectionAsset parseCapcomSnesSamples(const core::ScanInput& input,
                                                                  core::AssetId sampleCollectionId,
                                                                  const std::vector<CapcomSnesSampleInfo>& sampleInfos,
-                                                                 std::string_view displayName);
+                                                                 std::string_view displayName,
+                                                                 core::SourceMapBuilder* sourceMap = nullptr);
 
 [[nodiscard]] core::InstrumentSetAsset parseCapcomSnesInstrumentSet(
     const core::ScanInput& input, core::ScanResultBuilder& builder, core::AssetId instrumentSetId,
-    core::ScanSampleCollectionRef sampleCollection,
-    const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos, const std::vector<CapcomSnesSampleInfo>& sampleInfos,
-    std::string_view displayName);
+    core::ScanSampleCollectionRef sampleCollection, const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
+    const std::vector<CapcomSnesSampleInfo>& sampleInfos, std::string_view displayName);
 
 }  // namespace vgmtrans::formats::capcom_snes

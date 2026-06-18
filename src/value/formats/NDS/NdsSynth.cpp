@@ -129,8 +129,7 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
   const u16 realRelease = fallingRate(releaseTime);
   const double decaySeconds = decayTime == 0x7f ? 0.001 : ((0x16980 / realDecay) * kEnvelopeIntervalSeconds);
   const std::optional<double> releaseSeconds =
-      releaseTime == 0x7f ? std::nullopt
-                           : std::optional<double>{(0x16980 / realRelease) * kEnvelopeIntervalSeconds};
+      releaseTime == 0x7f ? std::nullopt : std::optional<double>{(0x16980 / realRelease) * kEnvelopeIntervalSeconds};
 
   return Envelope{
       .attack = envelopeMicros(attackSeconds),
@@ -263,9 +262,14 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
   ItemTreeBuilder items(asset.metadata.items, input.ids);
   const auto root =
       items.add(std::nullopt, ItemKind::SampleCollection, "swar", name, input.reader.range(range.offset, range.size));
+  SourceMapBuilder* sourceMap = diagnostics != nullptr ? &diagnostics->sourceMap() : nullptr;
 
   if (!isNdsWaveArchive(input.reader, range.offset)) {
     return asset;
+  }
+
+  if (sourceMap != nullptr && input.reader.has(range.offset, 0x3c)) {
+    sourceMap->header("SWAR Header", input.reader.range(range.offset, 0x3c)).kind("swar-header");
   }
 
   std::vector<Diagnostic> ignoredDiagnostics;
@@ -273,6 +277,12 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
   const auto sampleCount = archive.le32(0x38, "SWAR sample count");
   if (!sampleCount) {
     return asset;
+  }
+  if (sourceMap != nullptr) {
+    const u64 sampleTableSize = static_cast<u64>(*sampleCount) * 4;
+    sourceMap->table("SWAR Sample Offset Table", input.reader.range(range.offset + 0x3c, sampleTableSize))
+        .kind("swar-sample-offset-table")
+        .field("sample_count", input.reader.range(range.offset + 0x38, 4), static_cast<u64>(*sampleCount));
   }
 
   for (u32 i = 0; i < *sampleCount; ++i) {
@@ -289,6 +299,13 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
     const auto sampleHeaderRange = archive.range(*sampleRelativeOffset, 0x0c, "SWAR sample header");
     if (!sampleOffset || !sampleHeaderRange) {
       continue;
+    }
+    if (sourceMap != nullptr) {
+      sourceMap
+          ->pointer("SWAR Sample Offset", input.reader.range(range.offset + *entryOffset, 4),
+                    SourceTarget{*sampleHeaderRange})
+          .kind("swar-sample-offset")
+          .derived("sample_index", static_cast<u64>(i));
     }
     auto sampleHeader = makeParseCursor(input, *sampleHeaderRange, diagnostics, ignoredDiagnostics);
 
@@ -375,7 +392,18 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
         *waveType == 2
             ? Loop{.enabled = loops, .start = loopStart, .length = loopLength}
             : Loop{.enabled = loops, .start = loopStart / bytesPerFrame, .length = loopLength / bytesPerFrame};
+    const auto sampleIndex = static_cast<u32>(asset.samples.samples.size());
     const std::string sampleName = fmt::format("Sample {}", asset.samples.samples.size());
+    if (sourceMap != nullptr) {
+      sourceMap->header(sampleName + " Header", *sampleHeaderRange)
+          .role(SourceRole::Sample)
+          .kind("swar-sample-header")
+          .owner(ObjectRefs::sample(id, sampleIndex))
+          .field("wave_type", input.reader.range(sampleHeaderRange->offset, 1), static_cast<u64>(*waveType),
+                 SourceValueDisplay::Hex)
+          .field("loop_flag", input.reader.range(sampleHeaderRange->offset + 1, 1), loops, SourceValueDisplay::Boolean)
+          .field("sample_rate", input.reader.range(sampleHeaderRange->offset + 2, 2), static_cast<u64>(sampleRate));
+    }
     asset.samples.samples.push_back(Sample{
         .name = sampleName,
         .codec = codec,
@@ -416,6 +444,11 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
   }
 
   const u32 instrumentCount = input.reader.le32(range.offset + 0x38);
+  const u64 instrumentTableSize = 4 + static_cast<u64>(instrumentCount) * 4;
+  builder.sourceMap()
+      .table("SBNK Instrument Pointer Table", input.reader.range(range.offset + 0x38, instrumentTableSize))
+      .kind("sbnk-instrument-pointer-table")
+      .field("instrument_count", input.reader.range(range.offset + 0x38, 4), static_cast<u64>(instrumentCount));
   for (u32 i = 0; i < instrumentCount; ++i) {
     const u32 pointerOffset = range.offset + 0x3c + i * 4;
     if (!input.reader.has(pointerOffset, 4)) {
@@ -428,6 +461,12 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
 
     const u8 instrumentType = pointer & 0xff;
     const u32 instrumentOffset = range.offset + (pointer >> 8);
+    builder.sourceMap()
+        .pointer("SBNK Instrument Pointer", input.reader.range(pointerOffset, 4),
+                 SourceTarget{input.reader.range(instrumentOffset, 1)})
+        .kind("sbnk-instrument-pointer")
+        .derived("program", static_cast<u64>(i))
+        .field("type", input.reader.range(pointerOffset, 1), static_cast<u64>(instrumentType), SourceValueDisplay::Hex);
     Instrument instrument{
         .bank = 0,
         .program = i,
@@ -459,9 +498,8 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
                                                                "62.5%", "75%", "87.5%", "0%"};
         instrument.name = "PSG Wave (" + std::string(dutyNames[dutyCycle]) + ")";
         instrument.range = input.reader.range(instrumentOffset, 10);
-        addRegion(instrument.regions,
-                  ndsRegion(input.reader, instrumentOffset, 10, builder.sampleRef(psgCollection, dutyCycle), 0, 127,
-                            69));
+        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10,
+                                                builder.sampleRef(psgCollection, dutyCycle), 0, 127, 69));
         break;
       }
       case 0x03: {
@@ -535,6 +573,19 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
     }
 
     if (!instrument.regions.empty()) {
+      auto annotation = builder.sourceMap()
+                            .row(instrument.name, instrument.range)
+                            .role(SourceRole::Instrument)
+                            .kind("sbnk-instrument")
+                            .owner(ObjectRefs::instrument(id, i))
+                            .derived("program", static_cast<u64>(i))
+                            .derived("region_count", static_cast<u64>(instrument.regions.size()));
+      for (const auto& region : instrument.regions) {
+        if (region.sample.collection) {
+          annotation.link(SourceLinkRole::UsesSample,
+                          SourceTarget{ObjectRefs::sample(*region.sample.collection, region.sample.index)});
+        }
+      }
       const auto instrumentItem =
           items.add(root, ItemKind::Instrument, "instrument", instrument.name, instrument.range);
       for (const auto& region : instrument.regions) {

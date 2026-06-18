@@ -704,6 +704,13 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
   ItemTreeBuilder items(asset.metadata.items, input.ids);
   const auto root = items.add(std::nullopt, ItemKind::Sequence, "sseq", name,
                               input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset));
+  if (sourceMap != nullptr && input.reader.has(sequenceOffset, 0x1c)) {
+    sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, 0x1c))
+        .kind("sseq-header")
+        .field("data_offset", input.reader.range(sequenceOffset + 0x18, 4),
+               static_cast<u64>(sequenceOffset + input.reader.le32(sequenceOffset + 0x18)),
+               SourceValueDisplay::Address);
+  }
 
   u32 trackIndex = 0;
   for (const u32 start : ndsSequenceTrackStarts(input.reader, sequenceOffset, range.sequenceEnd)) {

@@ -649,6 +649,12 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
   ItemTreeBuilder itemBuilder(items, input.ids);
   const auto root = itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes.sequence-header", "Sequence Header",
                                     input.reader.range(layout.sequenceHeaderAddress, headerSize));
+  SourceAnnotationId headerAnnotation;
+  if (sourceMap != nullptr) {
+    auto header = sourceMap->header("Sequence Header", input.reader.range(layout.sequenceHeaderAddress, headerSize))
+                      .kind("capcom-snes-sequence-header");
+    headerAnnotation = header.id();
+  }
 
   const CapcomSnesSequenceDescriptor& descriptor = capcomSnesSequenceDescriptor(layout.version);
   const SequenceDialect& dialect = descriptor.dialect;
@@ -673,6 +679,16 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
     const auto trackItem =
         itemBuilder.add(root, ItemKind::Track, "capcom-snes.track-pointer", "Track Pointer",
                         input.reader.range(pointerOffset, 2), fmt::format("Track starts at ${:04X}", trackAddress));
+    if (sourceMap != nullptr) {
+      sourceMap
+          ->pointer("Track Pointer", input.reader.range(pointerOffset, 2),
+                    SourceTarget{input.reader.range(trackAddress, 1)})
+          .kind("capcom-snes-track-pointer")
+          .parent(headerAnnotation)
+          .derived("source_track", static_cast<u64>(kCapcomSnesMaxTracks - 1 - trackIndex))
+          .field("destination", input.reader.range(pointerOffset, 2), static_cast<u64>(trackAddress),
+                 SourceValueDisplay::Address);
+    }
     auto track =
         decodeCapcomSnesSourceTrack(input.reader, descriptor, static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex),
                                     trackAddress, sourceMap, diagnostics);
