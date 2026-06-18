@@ -73,9 +73,37 @@ void bytecodeMapUsesCommandLocalMetadata() {
   const auto& spec = table.opcodes[0x20];
   expect(spec.has_value() && spec->kindName == "probe-bytecode.local-meta" && spec->name == "Local Meta",
          "bytecode map should use command-local metadata when no display name is passed");
-  const auto* handler = dialect.handler(spec->handler);
-  expect(handler != nullptr && handler->kindName == "probe-bytecode.local-meta" && handler->name == "Local Meta",
-         "command-local metadata should register the matching dialect handler");
+  const auto* commandKind = dialect.kind(spec->kind);
+  expect(commandKind != nullptr && commandKind->kindName == "probe-bytecode.local-meta" &&
+             commandKind->name == "Local Meta",
+         "command-local metadata should register the matching dialect kind");
+  expect(dialect.handler(spec->handler) != nullptr, "command-local metadata should register an executable handler");
+}
+
+void bytecodeMapAllowsOneHandlerForSeveralKinds() {
+  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
+  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
+
+  map.op<0x20, ProbeMetaCommand>(commandMeta("meta-a", "Meta A"));
+  map.op<0x21, ProbeMetaCommand>(commandMeta("meta-b", "Meta B"));
+  map.unknown<ProbeEndCommand>("End");
+
+  const BytecodeDispatchTable registeredTable = map.finish();
+  const SequenceDialect dialect = builder.finish();
+  expect(dialect.handlers.size() == 2 && dialect.kinds.size() == 3,
+         "one command type should register one handler but keep distinct source kinds");
+  expect(registeredTable.opcodes[0x20]->handler == registeredTable.opcodes[0x21]->handler &&
+             registeredTable.opcodes[0x20]->kind != registeredTable.opcodes[0x21]->kind,
+         "two opcodes can share execution while keeping separate source identities");
+
+  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> decodeMap{"probe-bytecode", dialect};
+  decodeMap.op<0x20, ProbeMetaCommand>(commandMeta("meta-a", "Meta A"));
+  decodeMap.op<0x21, ProbeMetaCommand>(commandMeta("meta-b", "Meta B"));
+  decodeMap.unknown<ProbeEndCommand>("End");
+  const BytecodeDispatchTable decodeTable = decodeMap.finish();
+  expect(decodeTable.opcodes[0x20]->handler == registeredTable.opcodes[0x20]->handler &&
+             decodeTable.opcodes[0x21]->kind == registeredTable.opcodes[0x21]->kind,
+         "decode-time map construction should reuse the registered handler and kind IDs");
 }
 
 void formatRegistryStoresCopyableModuleValues() {
@@ -113,8 +141,8 @@ void sequenceDialectRegistryStoresCopyableDialectValues() {
   const SequenceDialectRegistry copy = registry;
   const auto* dialect = copy.find("probe");
   expect(dialect != nullptr, "sequence dialect registry should copy registered dialect values");
-  expect(dialect->handlerForKind(ProbeNoteCommand::kind) != nullptr,
-         "sequence dialect registry should preserve copied command handlers");
+  expect(dialect->kindForName(ProbeNoteCommand::kind) != nullptr,
+         "sequence dialect registry should preserve copied command kinds");
   expect(copy.find("Missing") == nullptr, "sequence dialect registry should return null for a missing dialect");
   expect(copy.contains("probe"), "sequence dialect registry should report copied dialect keys");
 
@@ -279,6 +307,7 @@ void runValueRegistryTests() {
   bytecodeMapRejectsOpcodeRangeOverlap();
   bytecodeMapRequiresFallbackCommand();
   bytecodeMapUsesCommandLocalMetadata();
+  bytecodeMapAllowsOneHandlerForSeveralKinds();
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();
   scanResultBuilderCoversCommonScannerPlumbing();
