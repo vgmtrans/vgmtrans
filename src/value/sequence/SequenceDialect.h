@@ -131,32 +131,51 @@ using CollectSourceCommandReferences = void (*)(const SourceCommand&, const Trac
 using ExecuteSourceCommand = Effects (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
                                          PerformanceEmitter& out, VmApi& vm, const std::any& context);
 using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&, const std::any& context);
+using CommandTypeToken = const void*;
 
-struct CommandHandler {
-  CommandHandlerId id;
-  CommandKindId kind;
+namespace detail {
+
+template <class Command>
+[[nodiscard]] CommandTypeToken commandTypeToken();
+
+}  // namespace detail
+
+struct CommandKind {
+  CommandKindId id;
   std::string kindName;
   std::string name;
   std::string detailKind;
   CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
+};
+
+struct CommandHandler {
+  CommandHandlerId id;
+  CommandTypeToken typeToken = nullptr;
   DescribeSourceCommand describe = nullptr;
   CollectSourceCommandReferences collectReferences = nullptr;
   ExecuteSourceCommand execute = nullptr;
 };
 
-// SequenceProgram stores handler IDs instead of owning code for each command.
-// SequenceDialect is the driver-specific table that turns those IDs into UI names,
-// descriptions, and VM execution.
+// SequenceProgram stores a handler ID for behavior and a kind ID for source-facing
+// identity. That lets one executable handler serve many opcode names without
+// losing distinct UI labels or playback metadata.
 struct SequenceDialect {
   DialectId id;
   Timebase timebase;
   SequenceProgramBehavior defaultBehavior;
   CreateTrackState createTrackState = nullptr;
+  std::vector<CommandKind> kinds;
   std::vector<CommandHandler> handlers;
   std::any context;
 
   [[nodiscard]] const CommandHandler* handler(CommandHandlerId id) const;
-  [[nodiscard]] const CommandHandler* handlerForKind(std::string_view kindName) const;
+  [[nodiscard]] const CommandHandler* handlerForType(CommandTypeToken typeToken) const;
+  template <class Command>
+  [[nodiscard]] const CommandHandler* handlerForCommand() const {
+    return handlerForType(detail::commandTypeToken<Command>());
+  }
+  [[nodiscard]] const CommandKind* kind(CommandKindId id) const;
+  [[nodiscard]] const CommandKind* kindForName(std::string_view kindName) const;
   [[nodiscard]] CommandInfo describe(const TrackProgram& track, const SourceCommand& command) const;
   [[nodiscard]] std::vector<CommandInstrumentReference> instrumentReferences(const TrackProgram& track,
                                                                              const SourceCommand& command) const;
@@ -235,6 +254,17 @@ private:
 };
 
 namespace detail {
+
+template <class Command>
+[[nodiscard]] CommandTypeToken commandTypeToken() {
+  static const int token = 0;
+  return &token;
+}
+
+[[nodiscard]] inline CommandTypeToken preservedCommandTypeToken() {
+  static const int token = 0;
+  return &token;
+}
 
 template <class Command>
 concept HasDescribe = requires(const Command& command, CommandInfo& out) { command.describe(out); };
@@ -369,8 +399,9 @@ Effects executeCommand(const SourceCommand& record, const TrackProgram& track, s
 
 }  // namespace detail
 
-// Used while registering a sequence driver. addCommand<T>() gives T a handler ID and
-// stores the small wrapper functions that later parse, describe, and execute T.
+// Used while registering a sequence driver. Each command kind gets its own name
+// and metadata, while identical command types share the wrapper functions that
+// parse, describe, and execute the command.
 template <class TrackState, class Context>
 class SequenceDialectBuilder {
 public:
@@ -398,31 +429,58 @@ public:
 
   [[nodiscard]] SequenceDialect finish() { return std::move(dialect_); }
 
+  struct RegisteredCommand {
+    CommandHandlerId handler;
+    CommandKindId kind;
+  };
+
   template <class Command>
-  CommandHandlerId addCommand(std::string_view kindName, std::string_view name) {
-    return addHandler(kindName, name, detail::describeCommand<Command, Context>,
+  RegisteredCommand addCommand(std::string_view kindName, std::string_view name) {
+    return addCommand(detail::commandTypeToken<Command>(), kindName, name, detail::describeCommand<Command, Context>,
                       detail::collectCommandReferences<Command, Context>,
                       detail::executeCommand<Command, TrackState, Context>, detail::commandPlaybackStatus<Command>());
   }
 
-  CommandHandlerId addPreservedCommand(std::string_view kindName, std::string_view name) {
-    return addHandler(kindName, name, detail::describePreservedSourceCommand,
+  RegisteredCommand addPreservedCommand(std::string_view kindName, std::string_view name) {
+    return addCommand(detail::preservedCommandTypeToken(), kindName, name, detail::describePreservedSourceCommand,
                       detail::collectPreservedSourceCommandReferences, detail::executePreservedSourceCommand,
                       CommandPlaybackStatus::SourceOnly);
   }
 
 private:
-  CommandHandlerId addHandler(std::string_view kindName, std::string_view name, DescribeSourceCommand describe,
-                              CollectSourceCommandReferences collectReferences,
-                              ExecuteSourceCommand execute, CommandPlaybackStatus playbackStatus) {
-    const auto index = static_cast<u32>(dialect_.handlers.size());
-    dialect_.handlers.push_back(CommandHandler{
-        .id = CommandHandlerId{index},
-        .kind = CommandKindId{index},
+  RegisteredCommand addCommand(CommandTypeToken typeToken, std::string_view kindName, std::string_view name,
+                               DescribeSourceCommand describe, CollectSourceCommandReferences collectReferences,
+                               ExecuteSourceCommand execute, CommandPlaybackStatus playbackStatus) {
+    if (dialect_.kindForName(kindName) != nullptr) {
+      throw std::logic_error("Sequence command kind was registered twice");
+    }
+    return RegisteredCommand{
+        .handler = addHandler(typeToken, describe, collectReferences, execute),
+        .kind = addKind(kindName, name, playbackStatus),
+    };
+  }
+
+  CommandKindId addKind(std::string_view kindName, std::string_view name, CommandPlaybackStatus playbackStatus) {
+    const auto index = static_cast<u32>(dialect_.kinds.size());
+    dialect_.kinds.push_back(CommandKind{
+        .id = CommandKindId{index},
         .kindName = std::string(kindName),
         .name = std::string(name),
         .detailKind = std::string(kindName),
         .playbackStatus = playbackStatus,
+    });
+    return CommandKindId{index};
+  }
+
+  CommandHandlerId addHandler(CommandTypeToken typeToken, DescribeSourceCommand describe,
+                              CollectSourceCommandReferences collectReferences, ExecuteSourceCommand execute) {
+    if (const auto* existing = dialect_.handlerForType(typeToken)) {
+      return existing->id;
+    }
+    const auto index = static_cast<u32>(dialect_.handlers.size());
+    dialect_.handlers.push_back(CommandHandler{
+        .id = CommandHandlerId{index},
+        .typeToken = typeToken,
         .describe = describe,
         .collectReferences = collectReferences,
         .execute = execute,

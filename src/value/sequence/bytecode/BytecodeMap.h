@@ -209,21 +209,13 @@ public:
   }
 
 private:
-  using HandlerTypeToken = const void*;
-
   struct HandlerCacheEntry {
     CommandHandlerId handler;
     CommandKindId kind;
-    HandlerTypeToken commandType = nullptr;
+    CommandTypeToken commandType = nullptr;
     std::string name;
     bool preserved = false;
   };
-
-  template <class Command>
-  [[nodiscard]] static HandlerTypeToken commandTypeToken() {
-    static const int token = 0;
-    return &token;
-  }
 
   [[nodiscard]] static BytecodeCommandOptions optionsWithMeta(CommandMeta meta, BytecodeCommandOptions options) {
     if (!options.suffix) {
@@ -294,11 +286,11 @@ private:
   template <class Command>
   [[nodiscard]] std::pair<CommandHandlerId, CommandKindId> commandHandler(const std::string& kindName,
                                                                           std::string_view displayName) {
-    const HandlerTypeToken commandType = commandTypeToken<Command>();
+    const CommandTypeToken commandType = detail::commandTypeToken<Command>();
     if (const auto found = handlers_.find(kindName); found != handlers_.end()) {
       const HandlerCacheEntry& entry = found->second;
       // A range may map many opcodes to the same command type. Reusing the same
-      // name for a different type would make parsed commands point at the wrong code.
+      // kind for a different type would make parsed commands point at the wrong code.
       if (entry.preserved || entry.commandType != commandType || entry.name != displayName) {
         throw std::logic_error("Bytecode command kind reused with incompatible handler");
       }
@@ -308,15 +300,17 @@ private:
     CommandHandlerId handler;
     CommandKindId kind;
     if (dialectBuilder_ != nullptr) {
-      handler = dialectBuilder_->template addCommand<Command>(kindName, displayName);
-      kind = CommandKindId{handler.value};
+      const auto registered = dialectBuilder_->template addCommand<Command>(kindName, displayName);
+      handler = registered.handler;
+      kind = registered.kind;
     } else {
-      const CommandHandler* found = dialect_->handlerForKind(kindName);
-      if (found == nullptr) {
+      const CommandKind* foundKind = dialect_->kindForName(kindName);
+      const CommandHandler* foundHandler = dialect_->template handlerForCommand<Command>();
+      if (foundKind == nullptr || foundKind->name != displayName || foundHandler == nullptr) {
         throw std::logic_error("Bytecode command was not registered in its dialect");
       }
-      handler = found->id;
-      kind = found->kind;
+      handler = foundHandler->id;
+      kind = foundKind->id;
     }
     handlers_[kindName] = HandlerCacheEntry{
         .handler = handler,
@@ -341,15 +335,17 @@ private:
     CommandHandlerId handler;
     CommandKindId kind;
     if (dialectBuilder_ != nullptr) {
-      handler = dialectBuilder_->addPreservedCommand(kindName, displayName);
-      kind = CommandKindId{handler.value};
+      const auto registered = dialectBuilder_->addPreservedCommand(kindName, displayName);
+      handler = registered.handler;
+      kind = registered.kind;
     } else {
-      const CommandHandler* found = dialect_->handlerForKind(kindName);
-      if (found == nullptr) {
+      const CommandKind* foundKind = dialect_->kindForName(kindName);
+      const CommandHandler* foundHandler = dialect_->handlerForType(detail::preservedCommandTypeToken());
+      if (foundKind == nullptr || foundKind->name != displayName || foundHandler == nullptr) {
         throw std::logic_error("Preserved bytecode command was not registered in its dialect");
       }
-      handler = found->id;
-      kind = found->kind;
+      handler = foundHandler->id;
+      kind = foundKind->id;
     }
     handlers_[kindName] = HandlerCacheEntry{
         .handler = handler,

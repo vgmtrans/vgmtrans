@@ -126,15 +126,15 @@ void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
 void sequenceDialectPreservesCommandPlaybackStatus() {
   const SequenceDialect dialect = probeSequenceDialect();
 
-  const auto* note = dialect.handlerForKind(ProbeNoteCommand::kind);
+  const auto* note = dialect.kindForName(ProbeNoteCommand::kind);
   expect(note != nullptr && note->playbackStatus == CommandPlaybackStatus::AffectsPlayback,
          "commands without an explicit status should default to playback-affecting");
 
-  const auto* jump = dialect.handlerForKind(ProbeJumpCommand::kind);
+  const auto* jump = dialect.kindForName(ProbeJumpCommand::kind);
   expect(jump != nullptr && jump->playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
          "control-flow commands should preserve their explicit playback status");
 
-  const auto* end = dialect.handlerForKind(ProbeEndCommand::kind);
+  const auto* end = dialect.kindForName(ProbeEndCommand::kind);
   expect(end != nullptr && end->playbackStatus == CommandPlaybackStatus::StopsPlayback,
          "terminal commands should preserve their explicit playback status");
 }

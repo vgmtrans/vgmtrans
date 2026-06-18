@@ -885,11 +885,12 @@ struct ProbeEndCommand {
 template <class Command, size_t Size>
 const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, Address address,
                                      SourceRange range, const std::array<u8, Size>& bytes) {
-  const auto* handler = dialect.handlerForKind(Command::kind);
-  if (handler == nullptr) {
-    throw std::runtime_error("probe command handler was not registered");
+  const auto* commandKind = dialect.kindForName(Command::kind);
+  const auto* handler = dialect.handlerForCommand<Command>();
+  if (commandKind == nullptr || handler == nullptr) {
+    throw std::runtime_error("probe command was not registered");
   }
-  return builder.add<Command>(handler->id, handler->kind, address, range, std::span<const u8>{bytes});
+  return builder.add<Command>(handler->id, commandKind->id, address, range, std::span<const u8>{bytes});
 }
 
 [[nodiscard]] size_t countProbeNotesAt(const PerformanceTrack& track, u64 tick) {

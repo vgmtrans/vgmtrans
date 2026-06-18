@@ -83,10 +83,32 @@ const CommandHandler* SequenceDialect::handler(CommandHandlerId handlerId) const
   return commandHandler.id == handlerId ? &commandHandler : nullptr;
 }
 
-const CommandHandler* SequenceDialect::handlerForKind(std::string_view kindName) const {
-  const auto found = std::ranges::find_if(
-      handlers, [kindName](const CommandHandler& handler) { return handler.kindName == kindName; });
+const CommandHandler* SequenceDialect::handlerForType(CommandTypeToken typeToken) const {
+  if (typeToken == nullptr) {
+    return nullptr;
+  }
+  const auto found = std::ranges::find_if(handlers, [typeToken](const CommandHandler& handler) {
+    return handler.typeToken == typeToken;
+  });
   if (found == handlers.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
+const CommandKind* SequenceDialect::kind(CommandKindId kindId) const {
+  if (!kindId.valid() || kindId.value >= kinds.size()) {
+    return nullptr;
+  }
+
+  const auto& commandKind = kinds[kindId.value];
+  return commandKind.id == kindId ? &commandKind : nullptr;
+}
+
+const CommandKind* SequenceDialect::kindForName(std::string_view kindName) const {
+  const auto found = std::ranges::find_if(
+      kinds, [kindName](const CommandKind& commandKind) { return commandKind.kindName == kindName; });
+  if (found == kinds.end()) {
     return nullptr;
   }
   return &*found;
@@ -94,14 +116,15 @@ const CommandHandler* SequenceDialect::handlerForKind(std::string_view kindName)
 
 CommandInfo SequenceDialect::describe(const TrackProgram& track, const SourceCommand& command) const {
   const auto* commandHandler = handler(command.handler);
-  if (commandHandler == nullptr || commandHandler->describe == nullptr) {
+  const auto* commandKind = kind(command.kind);
+  if (commandHandler == nullptr || commandKind == nullptr || commandHandler->describe == nullptr) {
     return CommandInfo{};
   }
 
   CommandInfo info{
-      .name = commandHandler->name,
-      .detailKind = commandHandler->detailKind,
-      .playbackStatus = commandHandler->playbackStatus,
+      .name = commandKind->name,
+      .detailKind = commandKind->detailKind,
+      .playbackStatus = commandKind->playbackStatus,
   };
   // Operands read from the bytes are already listed. The format hook should add
   // higher-level details instead of printing the same operands again.
