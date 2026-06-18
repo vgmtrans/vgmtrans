@@ -117,6 +117,11 @@ void CommandRuntime<TrackState, Context>::level(double linearGain, LevelPrecisio
 }
 
 template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::expression(double linearGain, LevelPrecisionHint precisionHint) {
+  out.expression(linearGain, precisionHint);
+}
+
+template <class TrackState, class Context>
 void CommandRuntime<TrackState, Context>::pan(double stereoPosition) {
   out.pan(stereoPosition);
 }
@@ -154,6 +159,11 @@ void CommandRuntime<TrackState, Context>::pitchBend(double semitones) {
 template <class TrackState, class Context>
 void CommandRuntime<TrackState, Context>::pitchBendRange(u8 semitones) {
   out.pitchBendRange(semitones);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::portamentoEnable(bool enabled) {
+  out.portamentoEnable(enabled);
 }
 
 template <class TrackState, class Context>

@@ -183,6 +183,7 @@ struct CommandRuntime {
   void tempo(u32 microsecondsPerQuarter);
   void instrument(u32 bank, u32 program, bool forceBankSelect = false);
   void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
+  void expression(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
   void pan(double stereoPosition);
   void pan(double stereoPosition, double linearGain);
   void masterLevel(double linearGain);
@@ -191,6 +192,7 @@ struct CommandRuntime {
   void globalTranspose(s32 semitones);
   void pitchBend(double semitones);
   void pitchBendRange(u8 semitones);
+  void portamentoEnable(bool enabled);
   void portamentoTime(double timeMilliseconds);
   void modulation(ModulationPerformanceTarget target, double amount);
 
@@ -277,6 +279,12 @@ concept HasReferencesWithContext =
       command.references(references, context);
     };
 
+template <class Command>
+concept HasSourceCommandReferences = requires(const SourceCommand& record, const TrackProgram& track,
+                                              CommandReferences& references, const std::any& context) {
+  Command::references(record, track, references, context);
+};
+
 template <class Command, class TrackState, class Context>
 concept HasRuntimeEffectsExecute = requires(const Command& command, CommandRuntime<TrackState, Context>& rt) {
   { command.execute(rt) } -> std::same_as<Effects>;
@@ -359,7 +367,9 @@ void describeCommand(const SourceCommand& record, const TrackProgram& track, Com
 template <class Command, class Context>
 void collectCommandReferences(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
                               const std::any& context) {
-  if constexpr (!HasParseCommand<Command>) {
+  if constexpr (HasSourceCommandReferences<Command>) {
+    Command::references(record, track, references, context);
+  } else if constexpr (!HasParseCommand<Command>) {
     return;
   } else {
     CommandReader reader{record.range, track.bytesFor(record)};
