@@ -281,164 +281,132 @@ private:
     cmd.name("Note")
         .semantic(SequenceSemantic::Note)
         .derived("key", static_cast<u64>(key), SourceValueDisplay::MidiNote);
-    const auto velocity = cmd.u8("velocity");
-    const auto duration = cmd.varLen("duration");
-    if (velocity && duration) {
-      rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
-              LevelScale::linearFromMidi7(velocity.value), duration.value);
-    }
-    return rt.state.noteWait ? cmd.wait(duration.value) : cmd.next();
+    const u8 velocity = cmd.u8("velocity");
+    const u32 duration = cmd.varLen("duration");
+    rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
+            LevelScale::linearFromMidi7(velocity), duration);
+    return rt.state.noteWait ? cmd.wait(duration) : cmd.next();
   }
 
   static CommandFlow rest(VmCommandCursor& cmd) {
     cmd.name("Rest").semantic(SequenceSemantic::Rest);
-    const auto duration = cmd.varLen("duration");
-    return cmd.wait(duration.value);
+    return cmd.wait(cmd.varLen("duration"));
   }
 
   template <class Runtime>
   static CommandFlow program(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Program").semantic(SequenceSemantic::Program);
-    const auto raw = cmd.varLen("raw");
-    const u32 bank = raw.value >> 7;
-    const u32 program = raw.value & 0x7f;
+    const u32 raw = cmd.varLen("raw");
+    const u32 bank = raw >> 7;
+    const u32 program = raw & 0x7f;
     cmd.derived("bank", static_cast<u64>(bank)).derived("program", static_cast<u64>(program));
-    if (raw) {
-      rt.instrument(bank, program);
-    }
+    rt.instrument(bank, program);
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow jump(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Jump").semantic(SequenceSemantic::Jump);
-    const auto destination =
+    const Address destination =
         cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
-    if (!destination || decodeTargetOutsideSequence(cmd, rt, destination.value)) {
+    if (decodeTargetOutsideSequence(cmd, rt, destination)) {
       return cmd.end();
     }
-    return cmd.jump(destination.value);
+    return cmd.jump(destination);
   }
 
   template <class Runtime>
   static CommandFlow call(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Call").semantic(SequenceSemantic::Call);
-    const auto destination =
+    const Address destination =
         cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
-    if (!destination || decodeTargetOutsideSequence(cmd, rt, destination.value)) {
+    if (decodeTargetOutsideSequence(cmd, rt, destination)) {
       return cmd.end();
     }
-    return cmd.call(destination.value);
+    return cmd.call(destination);
   }
 
   template <class Runtime>
   static CommandFlow pan(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Pan").semantic(SequenceSemantic::Pan);
-    const auto raw = cmd.u8("pan");
-    if (raw) {
-      rt.pan(std::clamp((static_cast<double>(raw.value) / 63.5) - 1.0, -1.0, 1.0));
-    }
+    const u8 raw = cmd.u8("pan");
+    rt.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0));
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow volume(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Volume").semantic(SequenceSemantic::Level);
-    const auto raw = cmd.u8("volume");
-    if (raw) {
-      rt.level(LevelScale::linearFromMidi7(raw.value));
-    }
+    rt.level(LevelScale::linearFromMidi7(cmd.u8("volume")));
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow expression(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Expression").kind("expression").semantic(SequenceSemantic::Level);
-    const auto raw = cmd.u8("expression");
-    if (raw) {
-      rt.expression(LevelScale::linearFromMidi7(raw.value));
-    }
+    rt.expression(LevelScale::linearFromMidi7(cmd.u8("expression")));
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow transpose(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Transpose").semantic(SequenceSemantic::State);
-    const auto semitones = cmd.s8("semitones");
-    if (semitones) {
-      rt.state.transpose = semitones.value;
-    }
+    rt.state.transpose = cmd.s8("semitones");
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow pitchBend(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Pitch Bend").semantic(SequenceSemantic::Pitch);
-    const auto bend = cmd.s8("bend");
-    if (bend) {
-      rt.pitchBend((static_cast<double>(bend.value) / 128.0) * rt.state.pitchBendRangeSemitones);
-    }
+    const s8 bend = cmd.s8("bend");
+    rt.pitchBend((static_cast<double>(bend) / 128.0) * rt.state.pitchBendRangeSemitones);
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow pitchBendRange(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Pitch Bend Range").semantic(SequenceSemantic::Pitch);
-    const auto semitones = cmd.u8("semitones");
-    if (semitones) {
-      rt.state.pitchBendRangeSemitones = semitones.value;
-      rt.pitchBendRange(semitones.value);
-    }
+    const u8 semitones = cmd.u8("semitones");
+    rt.state.pitchBendRangeSemitones = semitones;
+    rt.pitchBendRange(semitones);
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow noteWait(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Note Wait").semantic(SequenceSemantic::State);
-    const auto enabled = cmd.u8("enabled");
-    if (enabled) {
-      rt.state.noteWait = enabled.value != 0;
-    }
+    rt.state.noteWait = cmd.u8("enabled") != 0;
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow modulationDepth(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Modulation Depth").semantic(SequenceSemantic::Modulation);
-    const auto depth = cmd.u8("depth");
-    if (depth) {
-      rt.modulation(ModulationPerformanceTarget::VibratoDepth,
-                    std::clamp(static_cast<double>(depth.value) / 127.0, 0.0, 1.0));
-    }
+    const u8 depth = cmd.u8("depth");
+    rt.modulation(ModulationPerformanceTarget::VibratoDepth, std::clamp(static_cast<double>(depth) / 127.0, 0.0, 1.0));
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow portamentoSwitch(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Portamento").semantic(SequenceSemantic::Portamento);
-    const auto enabled = cmd.u8("enabled");
-    if (enabled) {
-      rt.portamentoEnable(enabled.value != 0);
-    }
+    rt.portamentoEnable(cmd.u8("enabled") != 0);
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow portamentoTime(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
-    const auto time = cmd.u8("time");
-    if (time) {
-      rt.portamentoTime(static_cast<double>(time.value));
-    }
+    rt.portamentoTime(static_cast<double>(cmd.u8("time")));
     return cmd.next();
   }
 
   template <class Runtime>
   static CommandFlow tempo(VmCommandCursor& cmd, Runtime& rt) {
     cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
-    const auto bpm = cmd.u16le("bpm");
-    if (bpm && bpm.value != 0) {
-      rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm.value)));
+    const u16 bpm = cmd.u16le("bpm");
+    if (bpm != 0) {
+      rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
     }
     return cmd.next();
   }

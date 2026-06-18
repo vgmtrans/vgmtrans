@@ -178,7 +178,10 @@ struct CursorDialectDriver {
         .references = &references,
     };
     VmCommandCursor cursor(CommandPhase::Decode, record.range, track.bytesFor(record));
-    static_cast<void>(Reader::read(runtime, cursor));
+    try {
+      static_cast<void>(Reader::read(runtime, cursor));
+    } catch (const CommandReadTruncated&) {
+    }
   }
 
   static Effects execute(const SourceCommand& record, const TrackProgram& track, std::any& trackState,
@@ -192,7 +195,11 @@ struct CursorDialectDriver {
         .context = typedContext,
     };
     VmCommandCursor cursor(CommandPhase::Render, record.range, track.bytesFor(record));
-    return effectsFromCommandFlow(Reader::read(runtime, cursor), vm);
+    try {
+      return effectsFromCommandFlow(Reader::read(runtime, cursor), vm);
+    } catch (const CommandReadTruncated&) {
+      return Effects{.step = Step::end()};
+    }
   }
 };
 
@@ -267,7 +274,15 @@ template <class TrackState, class Context, class Reader>
       .state = makeDecodeCursorState<TrackState, Context>(context, cursorContext<Context>(dialect)),
       .context = cursorContext<Context>(dialect),
   };
-  const CommandFlow commandFlow = Reader::read(runtime, cursor);
+  CommandFlow commandFlow;
+  try {
+    commandFlow = Reader::read(runtime, cursor);
+  } catch (const CommandReadTruncated&) {
+    commandFlow = CommandFlow{
+        .kind = FlowKind::Stop,
+        .truncated = true,
+    };
+  }
 
   if (cursor.failed()) {
     cursor.name("Truncated Command")

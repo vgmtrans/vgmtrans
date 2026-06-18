@@ -9,6 +9,7 @@
 #include "value/model/SourceMap.h"
 #include "value/sequence/SequenceDialect.h"
 
+#include <exception>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -35,6 +36,11 @@ enum class FlowKind : ::u8 {
   CountedRepeatBreak,
 };
 
+class CommandReadTruncated final : public std::exception {
+public:
+  [[nodiscard]] const char* what() const noexcept override { return "Sequence command operand was truncated"; }
+};
+
 struct CommandFlow {
   FlowKind kind = FlowKind::Next;
   u32 waitTicks = 0;
@@ -58,16 +64,6 @@ public:
 private:
   CommandFlow flow_;
   bool taken_ = false;
-};
-
-template <class T>
-struct CursorReadValue {
-  T value{};
-  SourceRange range;
-  bool valid = true;
-
-  [[nodiscard]] explicit operator bool() const noexcept { return valid; }
-  [[nodiscard]] operator T() const noexcept { return value; }
 };
 
 // VmCommandCursor is the readable command-authoring surface. It records source
@@ -96,17 +92,17 @@ public:
   VmCommandCursor& sourceOnly();
   VmCommandCursor& noOp();
 
-  [[nodiscard]] CursorReadValue<::u8> u8(std::string_view name);
-  [[nodiscard]] CursorReadValue<s8> s8(std::string_view name);
-  [[nodiscard]] CursorReadValue<u16> u16le(std::string_view name);
-  [[nodiscard]] CursorReadValue<u16> u16be(std::string_view name);
-  [[nodiscard]] CursorReadValue<u32> u24le(std::string_view name);
-  [[nodiscard]] CursorReadValue<u32> u24be(std::string_view name);
-  [[nodiscard]] CursorReadValue<u32> varLen(std::string_view name);
-  [[nodiscard]] CursorReadValue<Address> address16be(std::string_view name);
-  [[nodiscard]] CursorReadValue<Address> address16le(std::string_view name);
-  [[nodiscard]] CursorReadValue<Address> le24RelativeAddress(std::string_view name, Address base);
-  [[nodiscard]] CursorReadValue<std::string> rawBytes(std::string_view name, size_t size);
+  [[nodiscard]] ::u8 u8(std::string_view name);
+  [[nodiscard]] s8 s8(std::string_view name);
+  [[nodiscard]] u16 u16le(std::string_view name);
+  [[nodiscard]] u16 u16be(std::string_view name);
+  [[nodiscard]] u32 u24le(std::string_view name);
+  [[nodiscard]] u32 u24be(std::string_view name);
+  [[nodiscard]] u32 varLen(std::string_view name);
+  [[nodiscard]] Address address16be(std::string_view name);
+  [[nodiscard]] Address address16le(std::string_view name);
+  [[nodiscard]] Address le24RelativeAddress(std::string_view name, Address base);
+  [[nodiscard]] std::string rawBytes(std::string_view name, size_t size);
 
   VmCommandCursor& derived(std::string_view name, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
@@ -134,7 +130,7 @@ private:
   void ensureAnnotation();
   void recordOpcode();
   [[nodiscard]] SourceRange rangeAt(size_t begin, size_t size) const;
-  [[nodiscard]] bool canRead(size_t size, std::string_view field);
+  void requireRead(size_t size, std::string_view field);
   void markTruncated(std::string_view field, SourceRange range);
   [[nodiscard]] ::u8 readByte(std::string_view field);
   void recordField(std::string_view name, SourceRange range, SourceValue value,

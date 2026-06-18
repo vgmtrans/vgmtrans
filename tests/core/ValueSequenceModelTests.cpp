@@ -146,10 +146,10 @@ void vmCommandCursorRecordsCommandAnnotations() {
   const std::array<u8, 2> bytes{0xc4, 0x40};
   VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap, &diagnostics);
 
-  const auto pan = cmd.name("Pan").semantic(SequenceSemantic::Pan).u8("pan");
+  const u8 pan = cmd.name("Pan").semantic(SequenceSemantic::Pan).u8("pan");
   const CommandFlow flow = cmd.next();
   expect(flow.kind == FlowKind::Next && !flow.truncated, "cursor next flow should stay simple for valid commands");
-  expect(pan.valid && pan.value == 0x40, "cursor should read valid command operands");
+  expect(pan == 0x40, "cursor should read valid command operands");
 
   const SourceMap map = sourceMap.finish();
   const auto& annotation = map.get(cmd.annotation());
@@ -172,8 +172,9 @@ void vmCommandCursorSupportsKindOverrideAndTargetLinks() {
   const std::array<u8, 3> bytes{0x94, 0x12, 0x34};
   VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap);
 
-  const auto destination = cmd.name("End of Track").kind("jump").semantic(SequenceSemantic::Jump).address16be("destination");
-  const CommandFlow flow = cmd.jump(destination.value);
+  const Address destination =
+      cmd.name("End of Track").kind("jump").semantic(SequenceSemantic::Jump).address16be("destination");
+  const CommandFlow flow = cmd.jump(destination);
   expect(flow.kind == FlowKind::Jump && flow.destination && flow.destination->value == 0x1234,
          "cursor jump flow should preserve destination");
 
@@ -194,20 +195,23 @@ void vmCommandCursorStickyFailsMalformedReads() {
   const std::array<u8, 1> bytes{0xc4};
   VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap, &diagnostics);
 
-  const auto pan = cmd.name("Pan").semantic(SequenceSemantic::Pan).u8("pan");
+  bool threw = false;
+  try {
+    static_cast<void>(cmd.name("Pan").semantic(SequenceSemantic::Pan).u8("pan"));
+  } catch (const CommandReadTruncated&) {
+    threw = true;
+  }
   const CommandFlow flow = cmd.next();
-  expect(!pan.valid, "cursor should mark missing operands invalid");
+  expect(threw, "cursor should stop command parsing when a required operand is missing");
   expect(flow.kind == FlowKind::Stop && flow.truncated,
          "cursor should turn normal flow helpers into truncated stop flow after a failed read");
-  expect(diagnostics.size() == 1 &&
-             diagnostics[0].message == "Truncated sequence command while reading pan",
+  expect(diagnostics.size() == 1 && diagnostics[0].message == "Truncated sequence command while reading pan",
          "cursor should report malformed reads without per-command boilerplate");
 
   const SourceMap map = sourceMap.finish();
   const auto& annotation = map.get(cmd.annotation());
-  const auto truncated = std::ranges::find_if(annotation.fields, [](const SourceField& field) {
-    return field.name == "truncated";
-  });
+  const auto truncated =
+      std::ranges::find_if(annotation.fields, [](const SourceField& field) { return field.name == "truncated"; });
   expect(truncated != annotation.fields.end() && std::get<bool>(truncated->value),
          "cursor should mark malformed command annotations as truncated");
   expect(annotation.fields.size() == 2, "malformed cursor should record opcode and truncated marker only");
