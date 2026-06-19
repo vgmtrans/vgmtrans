@@ -243,6 +243,11 @@ public:
                            SourceValueDisplay display = SourceValueDisplay::Default) {
     return field(name, range, makeSourceValue(std::forward<T>(value)), display);
   }
+  template <class T>
+  AnnotationBuilder& field(std::string_view name, const RangedValue<T>& value,
+                           SourceValueDisplay display = SourceValueDisplay::Default) {
+    return value ? field(name, value.range, value.value, display) : *this;
+  }
   AnnotationBuilder& derived(std::string_view name, SourceValue value,
                              SourceValueDisplay display = SourceValueDisplay::Default);
   template <class T>

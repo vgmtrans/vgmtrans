@@ -13,6 +13,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace vgmtrans::core {
 
@@ -62,6 +63,23 @@ struct SourceRange {
   [[nodiscard]] constexpr bool valid() const noexcept { return source.valid(); }
   [[nodiscard]] constexpr u64 endOffset() const noexcept { return offset + size; }
   friend constexpr bool operator==(SourceRange, SourceRange) noexcept = default;
+};
+
+template <class T>
+struct RangedValue {
+  T value{};
+  SourceRange range;
+  bool valid = false;
+
+  RangedValue() = default;
+  RangedValue(T parsedValue, SourceRange parsedRange)
+      : value(std::move(parsedValue)), range(parsedRange), valid(true) {
+  }
+
+  [[nodiscard]] explicit operator bool() const noexcept { return valid; }
+  [[nodiscard]] const T& operator*() const noexcept { return value; }
+  [[nodiscard]] T& operator*() noexcept { return value; }
+  [[nodiscard]] operator T() const noexcept { return value; }
 };
 
 enum class Severity {
