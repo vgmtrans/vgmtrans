@@ -325,10 +325,10 @@ SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sam
           .role(SourceRole::Sample)
           .kind("snes-sample-dir-entry")
           .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-          .field("start", input.reader.range(sampleInfo.dirEntryAddress, 2), static_cast<u64>(sampleInfo.startAddress),
+          .field("start", input.reader.range(sampleInfo.dirEntryAddress, 2), sampleInfo.startAddress,
                  SourceValueDisplay::Address)
-          .field("loop", input.reader.range(sampleInfo.dirEntryAddress + 2, 2),
-                 static_cast<u64>(sampleInfo.loopAddress), SourceValueDisplay::Address)
+          .field("loop", input.reader.range(sampleInfo.dirEntryAddress + 2, 2), sampleInfo.loopAddress,
+                 SourceValueDisplay::Address)
           .link(SourceLinkRole::PointsTo,
                 SourceTarget{input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength)}, "BRR data");
       sourceMap
@@ -417,16 +417,13 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
             .role(SourceRole::Instrument)
             .kind("capcom-snes-instrument")
             .owner(ObjectRefs::instrument(instrumentSetId, info.index))
-            .derived("bank", static_cast<u64>(info.index >> 7))
-            .derived("program", static_cast<u64>(info.index & 0x7f))
-            .field("srcn", input.reader.range(info.address, 1), static_cast<u64>(info.srcn), SourceValueDisplay::Hex)
-            .field("adsr1", input.reader.range(info.address + 1, 1), static_cast<u64>(info.adsr1),
-                   SourceValueDisplay::Hex)
-            .field("adsr2", input.reader.range(info.address + 2, 1), static_cast<u64>(info.adsr2),
-                   SourceValueDisplay::Hex)
-            .field("gain", input.reader.range(info.address + 3, 1), static_cast<u64>(info.gain),
-                   SourceValueDisplay::Hex)
-            .field("pitch_scale", input.reader.range(info.address + 4, 2), static_cast<s64>(info.pitchScale),
+            .derived("bank", info.index >> 7)
+            .derived("program", info.index & 0x7f)
+            .field("srcn", input.reader.range(info.address, 1), info.srcn, SourceValueDisplay::Hex)
+            .field("adsr1", input.reader.range(info.address + 1, 1), info.adsr1, SourceValueDisplay::Hex)
+            .field("adsr2", input.reader.range(info.address + 2, 1), info.adsr2, SourceValueDisplay::Hex)
+            .field("gain", input.reader.range(info.address + 3, 1), info.gain, SourceValueDisplay::Hex)
+            .field("pitch_scale", input.reader.range(info.address + 4, 2), info.pitchScale,
                    SourceValueDisplay::SignedDecimal);
     annotation.link(SourceLinkRole::UsesSample,
                     SourceTarget{ObjectRefs::sample(sampleCollection.id, sampleIndex->second)});

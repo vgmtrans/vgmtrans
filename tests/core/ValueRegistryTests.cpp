@@ -37,7 +37,7 @@ struct CursorProbeReader {
         cmd.name("Note", SequenceSemantic::Note);
         const u8 key = cmd.u8("key");
         const u8 duration = cmd.u8("duration");
-        cmd.derived("performed_key", static_cast<u64>(key + rt.state.transpose), SourceValueDisplay::MidiNote);
+        cmd.derived("performed_key", key + rt.state.transpose, SourceValueDisplay::MidiNote);
         rt.note(key + rt.state.transpose, rt.context.velocity, duration);
         return cmd.wait(duration);
       }
@@ -207,7 +207,7 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
          "cursor-backed source commands should retain their primary source annotation");
   expect(noteAnnotation.fields.size() == 4 && noteAnnotation.fields[1].name == "key" &&
              std::get<u64>(noteAnnotation.fields[1].value) == 60 && noteAnnotation.fields[3].name == "performed_key" &&
-             std::get<u64>(noteAnnotation.fields[3].value) == 62,
+             std::get<s64>(noteAnnotation.fields[3].value) == 62,
          "cursor-backed decode should record opcode, operands, and state-derived fields");
   expect(diagnostics.empty(), "valid cursor-backed decode should not emit diagnostics");
 

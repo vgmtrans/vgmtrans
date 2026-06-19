@@ -206,7 +206,7 @@ struct NdsCommandReader {
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     const u8 opcode = cmd.opcode();
     if (opcode <= 0x7f) {
-      cmd.name("Note", SequenceSemantic::Note).derived("key", static_cast<u64>(opcode), SourceValueDisplay::MidiNote);
+      cmd.name("Note", SequenceSemantic::Note).derived("key", opcode, SourceValueDisplay::MidiNote);
       const u8 velocity = cmd.u8("velocity");
       const u32 duration = cmd.varLen("duration");
       rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(opcode) + rt.state.transpose, 0, 127)),
@@ -228,8 +228,8 @@ struct NdsCommandReader {
         const u32 raw = cmd.varLen("raw");
         const u32 bank = raw >> 7;
         const u32 program = raw & 0x7f;
-        cmd.derived("bank", static_cast<u64>(bank))
-            .derived("program", static_cast<u64>(program))
+        cmd.derived("bank", bank)
+            .derived("program", program)
             .instrumentRef(bank, program);
         rt.instrument(bank, program);
         return cmd.next();
@@ -627,7 +627,7 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
     sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, kSseqHeaderSize))
         .kind("sseq-header")
         .field("data_offset", input.reader.range(sequenceOffset + kSseqDataOffsetField, 4),
-               static_cast<u64>(sequenceOffset + input.reader.le32(sequenceOffset + kSseqDataOffsetField)),
+               sequenceOffset + input.reader.le32(sequenceOffset + kSseqDataOffsetField),
                SourceValueDisplay::Address);
   }
 

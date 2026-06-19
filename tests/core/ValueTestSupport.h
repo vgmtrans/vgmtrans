@@ -320,7 +320,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   out.sourceMap()
       .header("Probe Header", input.reader.range(0, 1))
       .owner(ObjectRefs::sequence(sequence.id))
-      .field("Magic", input.reader.range(0, 1), static_cast<u64>(input.reader.u8At(0)), SourceValueDisplay::Hex);
+      .field("Magic", input.reader.range(0, 1), input.reader.u8At(0), SourceValueDisplay::Hex);
   out.collection(input.source.name, CollectionKey{.resolver = "ProbeExplicit",
                                                   .value = "source:" + std::to_string(input.source.id.value)})
       .sequence(sequence);

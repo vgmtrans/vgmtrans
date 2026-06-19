@@ -282,7 +282,7 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
     const u64 sampleTableSize = static_cast<u64>(*sampleCount) * 4;
     sourceMap->table("SWAR Sample Offset Table", input.reader.range(range.offset + 0x3c, sampleTableSize))
         .kind("swar-sample-offset-table")
-        .field("sample_count", input.reader.range(range.offset + 0x38, 4), static_cast<u64>(*sampleCount));
+        .field("sample_count", input.reader.range(range.offset + 0x38, 4), *sampleCount);
   }
 
   for (u32 i = 0; i < *sampleCount; ++i) {
@@ -305,7 +305,7 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
           ->pointer("SWAR Sample Offset", input.reader.range(range.offset + *entryOffset, 4),
                     SourceTarget{*sampleHeaderRange})
           .kind("swar-sample-offset")
-          .derived("sample_index", static_cast<u64>(i));
+          .derived("sample_index", i);
     }
     auto sampleHeader = makeParseCursor(input, *sampleHeaderRange, diagnostics, ignoredDiagnostics);
 
@@ -399,10 +399,9 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
           .role(SourceRole::Sample)
           .kind("swar-sample-header")
           .owner(ObjectRefs::sample(id, sampleIndex))
-          .field("wave_type", input.reader.range(sampleHeaderRange->offset, 1), static_cast<u64>(*waveType),
-                 SourceValueDisplay::Hex)
+          .field("wave_type", input.reader.range(sampleHeaderRange->offset, 1), *waveType, SourceValueDisplay::Hex)
           .field("loop_flag", input.reader.range(sampleHeaderRange->offset + 1, 1), loops, SourceValueDisplay::Boolean)
-          .field("sample_rate", input.reader.range(sampleHeaderRange->offset + 2, 2), static_cast<u64>(sampleRate));
+          .field("sample_rate", input.reader.range(sampleHeaderRange->offset + 2, 2), sampleRate);
     }
     asset.samples.samples.push_back(Sample{
         .name = sampleName,
@@ -448,7 +447,7 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
   builder.sourceMap()
       .table("SBNK Instrument Pointer Table", input.reader.range(range.offset + 0x38, instrumentTableSize))
       .kind("sbnk-instrument-pointer-table")
-      .field("instrument_count", input.reader.range(range.offset + 0x38, 4), static_cast<u64>(instrumentCount));
+      .field("instrument_count", input.reader.range(range.offset + 0x38, 4), instrumentCount);
   for (u32 i = 0; i < instrumentCount; ++i) {
     const u32 pointerOffset = range.offset + 0x3c + i * 4;
     if (!input.reader.has(pointerOffset, 4)) {
@@ -465,8 +464,8 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
         .pointer("SBNK Instrument Pointer", input.reader.range(pointerOffset, 4),
                  SourceTarget{input.reader.range(instrumentOffset, 1)})
         .kind("sbnk-instrument-pointer")
-        .derived("program", static_cast<u64>(i))
-        .field("type", input.reader.range(pointerOffset, 1), static_cast<u64>(instrumentType), SourceValueDisplay::Hex);
+        .derived("program", i)
+        .field("type", input.reader.range(pointerOffset, 1), instrumentType, SourceValueDisplay::Hex);
     Instrument instrument{
         .bank = 0,
         .program = i,
@@ -578,8 +577,8 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
                             .role(SourceRole::Instrument)
                             .kind("sbnk-instrument")
                             .owner(ObjectRefs::instrument(id, i))
-                            .derived("program", static_cast<u64>(i))
-                            .derived("region_count", static_cast<u64>(instrument.regions.size()));
+                            .derived("program", i)
+                            .derived("region_count", instrument.regions.size());
       for (const auto& region : instrument.regions) {
         if (region.sample.collection) {
           annotation.link(SourceLinkRole::UsesSample,

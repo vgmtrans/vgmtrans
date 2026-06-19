@@ -276,7 +276,7 @@ struct CapcomSnesCommandReader {
     if (opcode >= 0x20) {
       const auto rawDuration = static_cast<u8>(opcode >> 5);
       if ((opcode & 0x1f) == 0) {
-        cmd.name("Rest", SequenceSemantic::Rest).derived("duration_index", static_cast<u64>(rawDuration));
+        cmd.name("Rest", SequenceSemantic::Rest).derived("duration_index", rawDuration);
         const u32 length = rt.state.consumeNoteTicks(rawDuration);
         rt.state.didRest = true;
         return cmd.wait(length);
@@ -284,7 +284,7 @@ struct CapcomSnesCommandReader {
 
       cmd.name("Note", SequenceSemantic::Note);
       const auto keyIndex = static_cast<u8>(opcode & 0x1f);
-      cmd.derived("key_index", static_cast<u64>(keyIndex)).derived("duration_index", static_cast<u64>(rawDuration));
+      cmd.derived("key_index", keyIndex).derived("duration_index", rawDuration);
 
       auto& state = rt.state;
       const u32 length = state.consumeNoteTicks(rawDuration);
@@ -339,7 +339,7 @@ struct CapcomSnesCommandReader {
         cmd.name("Tempo", SequenceSemantic::Tempo);
         const u16 raw = cmd.u16be("raw");
         const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw);
-        cmd.detail("microseconds_per_quarter", static_cast<u64>(microseconds));
+        cmd.detail("microseconds_per_quarter", microseconds);
         rt.tempo(microseconds);
         return cmd.next();
       }
@@ -363,8 +363,8 @@ struct CapcomSnesCommandReader {
         const u8 raw = cmd.u8("raw");
         const u32 bank = raw >> 7;
         const u32 program = raw & 0x7f;
-        cmd.derived("bank", static_cast<u64>(bank))
-            .derived("program", static_cast<u64>(program))
+        cmd.derived("bank", bank)
+            .derived("program", program)
             .instrumentRef(bank, program);
         rt.instrument(bank, program, true);
         return cmd.next();
@@ -411,7 +411,7 @@ struct CapcomSnesCommandReader {
       case 0x11: {
         cmd.name("Repeat Until");
         const auto slot = static_cast<u8>(opcode - 0x0e);
-        cmd.derived("slot", static_cast<u64>(slot + 1));
+        cmd.derived("slot", slot + 1);
         const u8 count = cmd.u8("count");
         const Address destination = cmd.address16be("destination");
         if (count == 0) {
@@ -428,7 +428,7 @@ struct CapcomSnesCommandReader {
       case 0x15: {
         cmd.name("Repeat Break");
         const auto slot = static_cast<u8>(opcode - 0x12);
-        cmd.derived("slot", static_cast<u64>(slot + 1));
+        cmd.derived("slot", slot + 1);
         const u8 attributes = cmd.u8("attributes");
         const Address destination = cmd.address16be("destination");
         const RepeatBreakFlow branch = rt.countedRepeatBreak(cmd, slot, destination);
@@ -517,7 +517,7 @@ struct CapcomSnesCommandReader {
       case 0x1c: {
         cmd.name("Echo On/Off", SequenceSemantic::Meta);
         const u8 raw = cmd.u8("raw");
-        cmd.derived("enabled", static_cast<u64>(raw & 1));
+        cmd.derived("enabled", raw & 1);
         rt.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0);
         return cmd.next();
       }
@@ -525,7 +525,7 @@ struct CapcomSnesCommandReader {
       case 0x1d: {
         cmd.name("Release Rate", SequenceSemantic::Meta).sourceOnly();
         const u8 raw = cmd.u8("raw");
-        cmd.derived("gain", static_cast<u64>(raw | 0xa0));
+        cmd.derived("gain", raw | 0xa0);
         return cmd.next();
       }
 
@@ -533,7 +533,7 @@ struct CapcomSnesCommandReader {
       case 0x1f:
         if (rt.context.version == CapcomSnesEngineVersion::v1BgmInList) {
           cmd.name("Unknown One-Byte Event", SequenceSemantic::Meta).kind("unknown-one-byte").sourceOnly();
-          cmd.derived("opcode", static_cast<u64>(opcode), SourceValueDisplay::Hex);
+          cmd.derived("opcode", opcode, SourceValueDisplay::Hex);
           static_cast<void>(cmd.u8("value"));
           return cmd.next();
         }
@@ -542,7 +542,7 @@ struct CapcomSnesCommandReader {
       default:
         cmd.name("Unknown Opcode", SequenceSemantic::Unsupported)
             .kind("unknown")
-            .derived("opcode", static_cast<u64>(opcode), SourceValueDisplay::Hex)
+            .derived("opcode", opcode, SourceValueDisplay::Hex)
             .unsupported("Unknown Capcom SNES sequence opcode");
         renderWarning(rt, "Unknown Capcom SNES sequence opcode");
         return cmd.end();
@@ -673,8 +673,8 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
       sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{input.reader.range(trackAddress, 1)})
           .kind("capcom-snes-track-pointer")
           .parent(headerAnnotation)
-          .derived("source_track", static_cast<u64>(sourceTrackNumber))
-          .field("destination", pointerRange, static_cast<u64>(trackAddress), SourceValueDisplay::Address);
+          .derived("source_track", sourceTrackNumber)
+          .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
     }
 
     auto track = decodeCapcomSnesSourceTrack(input.reader, descriptor, sourceTrackNumber, trackAddress, sourceMap, diagnostics);

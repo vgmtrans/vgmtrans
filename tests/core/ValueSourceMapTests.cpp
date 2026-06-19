@@ -16,9 +16,9 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   const SourceRange tableRange{.source = source, .offset = 8, .size = 8};
 
   const auto header = builder.header("Probe Header", headerRange)
-                          .field("Magic", SourceRange{.source = source, .offset = 0, .size = 1}, u64{0xaa},
+                          .field("Magic", SourceRange{.source = source, .offset = 0, .size = 1}, u8{0xaa},
                                  SourceValueDisplay::Hex)
-                          .derived("Decoded", std::string("yes"))
+                          .derived("Decoded", "yes")
                           .link(SourceLinkRole::PointsTo, tableRange, "Table");
   const auto table = builder.table("Pointer Table", tableRange).parent(header.id());
   const auto command = builder.command("Pitch Bend Range", SourceRange{.source = source, .offset = 10, .size = 2},

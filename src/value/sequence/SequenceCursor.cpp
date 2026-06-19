@@ -17,14 +17,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] SourceValue unsignedValue(auto value) {
-  return SourceValue{static_cast<u64>(value)};
-}
-
-[[nodiscard]] SourceValue signedValue(auto value) {
-  return SourceValue{static_cast<s64>(value)};
-}
-
 [[nodiscard]] SourceRange addressTargetRange(SourceRange commandRange, Address address) {
   if (!commandRange.source.valid()) {
     return {};
@@ -143,7 +135,7 @@ ReadValue<::u8> VmCommandCursor::u8(std::string_view name) {
   const bool valid = readByte(name, value);
   const auto range = rangeAt(begin, 1);
   if (valid) {
-    recordField(name, range, unsignedValue(value));
+    recordField(name, range, makeSourceValue(value));
   }
   return ReadValue<::u8>{.value = value, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
 }
@@ -155,7 +147,7 @@ ReadValue<::s8> VmCommandCursor::s8(std::string_view name) {
   const auto signedByte = static_cast<::s8>(byte);
   const auto range = rangeAt(begin, 1);
   if (valid) {
-    recordField(name, range, signedValue(signedByte), SourceValueDisplay::SignedDecimal);
+    recordField(name, range, makeSourceValue(signedByte), SourceValueDisplay::SignedDecimal);
   }
   return ReadValue<::s8>{
       .value = signedByte, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
@@ -171,7 +163,7 @@ ReadValue<u16> VmCommandCursor::u16le(std::string_view name) {
   const auto value = static_cast<u16>(low | (high << 8));
   const auto range = rangeAt(begin, 2);
   if (valid) {
-    recordField(name, range, unsignedValue(value));
+    recordField(name, range, makeSourceValue(value));
   }
   return ReadValue<u16>{.value = value, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
 }
@@ -186,7 +178,7 @@ ReadValue<u16> VmCommandCursor::u16be(std::string_view name) {
   const auto value = static_cast<u16>((high << 8) | low);
   const auto range = rangeAt(begin, 2);
   if (valid) {
-    recordField(name, range, unsignedValue(value));
+    recordField(name, range, makeSourceValue(value));
   }
   return ReadValue<u16>{.value = value, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
 }
@@ -203,7 +195,7 @@ ReadValue<u32> VmCommandCursor::u24le(std::string_view name) {
   const u32 value = low | (middle << 8) | (high << 16);
   const auto range = rangeAt(begin, 3);
   if (valid) {
-    recordField(name, range, unsignedValue(value));
+    recordField(name, range, makeSourceValue(value));
   }
   return ReadValue<u32>{.value = value, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
 }
@@ -220,7 +212,7 @@ ReadValue<u32> VmCommandCursor::u24be(std::string_view name) {
   const u32 value = (high << 16) | (middle << 8) | low;
   const auto range = rangeAt(begin, 3);
   if (valid) {
-    recordField(name, range, unsignedValue(value));
+    recordField(name, range, makeSourceValue(value));
   }
   return ReadValue<u32>{.value = value, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
 }
@@ -239,7 +231,7 @@ ReadValue<u32> VmCommandCursor::varLen(std::string_view name) {
     }
   }
   const auto range = rangeAt(begin, position_ - begin);
-  recordField(name, range, unsignedValue(value));
+  recordField(name, range, makeSourceValue(value));
   return ReadValue<u32>{.value = value, .range = range, .valid = true};
 }
 
@@ -253,7 +245,7 @@ ReadValue<Address> VmCommandCursor::address16be(std::string_view name) {
   const Address address{static_cast<u32>((high << 8) | low)};
   const auto range = rangeAt(begin, 2);
   if (valid) {
-    recordField(name, range, unsignedValue(address.value), SourceValueDisplay::Address);
+    recordField(name, range, makeSourceValue(address.value), SourceValueDisplay::Address);
   }
   return ReadValue<Address>{
       .value = address, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
@@ -269,7 +261,7 @@ ReadValue<Address> VmCommandCursor::address16le(std::string_view name) {
   const Address address{static_cast<u32>(low | (high << 8))};
   const auto range = rangeAt(begin, 2);
   if (valid) {
-    recordField(name, range, unsignedValue(address.value), SourceValueDisplay::Address);
+    recordField(name, range, makeSourceValue(address.value), SourceValueDisplay::Address);
   }
   return ReadValue<Address>{
       .value = address, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
@@ -287,7 +279,7 @@ ReadValue<Address> VmCommandCursor::le24RelativeAddress(std::string_view name, A
   const Address address{base.value + (low | (middle << 8) | (high << 16))};
   const auto range = rangeAt(begin, 3);
   if (valid) {
-    recordField(name, range, unsignedValue(address.value), SourceValueDisplay::Address);
+    recordField(name, range, makeSourceValue(address.value), SourceValueDisplay::Address);
   }
   return ReadValue<Address>{
       .value = address, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
@@ -301,7 +293,7 @@ ReadValue<std::string> VmCommandCursor::rawBytes(std::string_view name, size_t s
   const auto range = rangeAt(begin, size);
   const auto value = hexBytes(bytes_.subspan(begin, size));
   position_ += size;
-  recordField(name, range, SourceValue{value}, SourceValueDisplay::Hex);
+  recordField(name, range, makeSourceValue(value), SourceValueDisplay::Hex);
   return ReadValue<std::string>{.value = value, .range = range, .valid = true};
 }
 
@@ -497,7 +489,7 @@ void VmCommandCursor::recordOpcode() {
     return;
   }
   opcodeRecorded_ = true;
-  annotationBuilder().field("opcode", rangeAt(0, 1), unsignedValue(bytes_.front()), SourceValueDisplay::Hex);
+  annotationBuilder().field("opcode", rangeAt(0, 1), bytes_.front(), SourceValueDisplay::Hex);
 }
 
 SourceRange VmCommandCursor::rangeAt(size_t begin, size_t size) const {
