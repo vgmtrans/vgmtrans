@@ -9,6 +9,7 @@
 #include "value/sequence/SequenceCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/sequence/bytecode/BytecodeTable.h"
+#include "value/sequence/bytecode/BytecodeWalkers.h"
 
 #include <algorithm>
 #include <any>
@@ -345,6 +346,60 @@ template <class TrackState, class Context, class Reader>
                                                          BytecodeDecodeContext context = {}) {
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(context, cursorContext<Context>(dialect));
   return decodeCursorCommandWithState<TrackState, Context, Reader>(reader, begin, dialect, decodeState, context);
+}
+
+struct CursorTrackDecodeInput {
+  u32 trackIndex = 0;
+  u32 startOffset = 0;
+  u32 bytecodeEnd = std::numeric_limits<u32>::max();
+  u32 sequenceOffset = 0;
+  u32 sequenceEnd = std::numeric_limits<u32>::max();
+  SourceMapBuilder* sourceMap = nullptr;
+  std::vector<Diagnostic>* diagnostics = nullptr;
+  u32 maxCommands = 4096;
+};
+
+[[nodiscard]] inline BytecodeDecodeContext cursorBytecodeDecodeContext(CursorTrackDecodeInput input) {
+  return BytecodeDecodeContext{
+      .bytecodeEnd = input.bytecodeEnd,
+      .sequenceOffset = input.sequenceOffset,
+      .sequenceEnd = input.sequenceEnd,
+      .sourceMap = input.sourceMap,
+      .diagnostics = input.diagnostics,
+  };
+}
+
+[[nodiscard]] inline u32 cursorBytecodeEnd(ByteReader reader, CursorTrackDecodeInput input) {
+  return input.bytecodeEnd == std::numeric_limits<u32>::max() ? static_cast<u32>(reader.size()) : input.bytecodeEnd;
+}
+
+template <class TrackState, class Context, class Reader>
+[[nodiscard]] TrackProgram decodeCursorReachableTrack(ByteReader reader, const SequenceDialect& dialect,
+                                                      CursorTrackDecodeInput input) {
+  BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
+  TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
+  const auto decodeCommand = [&](u32 offset) {
+    return decodeCursorCommandWithState<TrackState, Context, Reader>(reader, offset, dialect, decodeState,
+                                                                     decodeContext);
+  };
+
+  return decodeReachableBytecodeBlocks(reader, cursorBytecodeEnd(reader, input), input.startOffset, input.trackIndex,
+                                       ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands},
+                                       decodeCommand);
+}
+
+template <class TrackState, class Context, class Reader>
+[[nodiscard]] TrackProgram decodeCursorLinearTrack(ByteReader reader, const SequenceDialect& dialect,
+                                                   CursorTrackDecodeInput input) {
+  BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
+  TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
+  const auto decodeCommand = [&](u32 offset) {
+    return decodeCursorCommandWithState<TrackState, Context, Reader>(reader, offset, dialect, decodeState,
+                                                                     decodeContext);
+  };
+
+  return decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
+                                   LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
 }
 
 }  // namespace vgmtrans::core
