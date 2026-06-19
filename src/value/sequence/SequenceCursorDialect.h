@@ -16,6 +16,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -59,9 +60,14 @@ struct DecodeCursorRuntime {
   void globalTranspose(s32) {}
   void pitchBend(double) {}
   void pitchBendRange(u8) {}
+  void portamento(double, double) {}
   void portamentoEnable(bool) {}
   void portamentoTime(double) {}
+  void portamentoControl(double) {}
+  void legatoPedal(bool) {}
   void modulation(ModulationPerformanceTarget, double) {}
+  void marker(std::string_view) {}
+  void diagnostic(Severity, std::string_view) {}
 
   [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays, Address destination) {
     return cmd.countedRepeatUntil(slot, totalPlays, destination);
@@ -118,9 +124,16 @@ struct RenderCursorRuntime {
   void globalTranspose(s32 semitones) { out.globalTranspose(semitones); }
   void pitchBend(double semitones) { out.pitchBend(semitones); }
   void pitchBendRange(u8 semitones) { out.pitchBendRange(semitones); }
+  void portamento(double timeMilliseconds, double previousKey) { out.portamento(timeMilliseconds, previousKey); }
   void portamentoEnable(bool enabled) { out.portamentoEnable(enabled); }
   void portamentoTime(double timeMilliseconds) { out.portamentoTime(timeMilliseconds); }
+  void portamentoControl(double previousKey) { out.portamentoControl(previousKey); }
+  void legatoPedal(bool enabled) { out.legatoPedal(enabled); }
   void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
+  void marker(std::string_view label) { out.marker(MarkerPerformanceEvent{.text = std::string(label)}); }
+  void diagnostic(Severity severity, std::string_view message) {
+    vm.diagnostic(Diagnostic{.severity = severity, .message = std::string(message)});
+  }
 
   [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays, Address destination) {
     CommandFlow flow = cmd.countedRepeatUntil(slot, totalPlays, destination);

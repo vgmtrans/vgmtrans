@@ -47,10 +47,14 @@ struct TrackState {
   [[nodiscard]] bool extendsPreviousSlurredNote(s32 key) const;
   void finishExtendedNote();
   void finishNote(s32 key);
-  void applyAttributes(u8 attributes, PerformanceEmitter* out = nullptr);
-  void toggleSlur(PerformanceEmitter& out);
-  void emitPortamentoIfNeeded(s32 key, PerformanceEmitter& out);
-  void emitModulationDepths(PerformanceEmitter& out, bool enabled) const;
+  template <class Runtime>
+  void applyAttributes(u8 attributes, Runtime& rt);
+  template <class Runtime>
+  void toggleSlur(Runtime& rt);
+  template <class Runtime>
+  void emitPortamentoIfNeeded(s32 key, Runtime& rt);
+  template <class Runtime>
+  void emitModulationDepths(Runtime& rt, bool enabled) const;
 
   u32 durationRate = 0;
   s32 transpose = 0;
@@ -162,7 +166,8 @@ double TrackState::performedKey(s32 key) const {
   return static_cast<double>(key + transpose);
 }
 
-void TrackState::applyAttributes(u8 attributes, PerformanceEmitter* out) {
+template <class Runtime>
+void TrackState::applyAttributes(u8 attributes, Runtime& rt) {
   const bool wasSlurred = noteSlurred;
   // The driver ORs octave bits instead of replacing them. Preserve that quirk until
   // parity proves a specific version behaves differently.
@@ -171,16 +176,17 @@ void TrackState::applyAttributes(u8 attributes, PerformanceEmitter* out) {
   noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
   noteTriplet = (attributes & kNoteTripletMask) != 0;
   noteSlurred = (attributes & kNoteSlurredMask) != 0;
-  if (out != nullptr && noteSlurred != wasSlurred) {
-    out->legatoPedal(noteSlurred);
+  if (noteSlurred != wasSlurred) {
+    rt.legatoPedal(noteSlurred);
   }
 }
 
-void TrackState::toggleSlur(PerformanceEmitter& out) {
+template <class Runtime>
+void TrackState::toggleSlur(Runtime& rt) {
   const bool wasSlurred = noteSlurred;
   noteSlurred = !noteSlurred;
   if (noteSlurred != wasSlurred) {
-    out.legatoPedal(noteSlurred);
+    rt.legatoPedal(noteSlurred);
   }
 }
 
@@ -198,7 +204,8 @@ void TrackState::finishNote(s32 key) {
   lastNoteSlurred = noteSlurred;
 }
 
-void TrackState::emitPortamentoIfNeeded(s32 key, PerformanceEmitter& out) {
+template <class Runtime>
+void TrackState::emitPortamentoIfNeeded(s32 key, Runtime& rt) {
   if (portamentoMillisecondsPerCent <= 0.0 || !lastSourceKey) {
     return;
   }
@@ -206,19 +213,20 @@ void TrackState::emitPortamentoIfNeeded(s32 key, PerformanceEmitter& out) {
   const auto keyDistance = static_cast<u32>(std::abs(key - *lastSourceKey));
   const auto portamentoTime = static_cast<u16>(keyDistance * 100 * portamentoMillisecondsPerCent);
   if (portamentoTime != lastPortamentoTime) {
-    out.portamento(static_cast<double>(portamentoTime), static_cast<double>(*lastSourceKey + transpose));
+    rt.portamento(static_cast<double>(portamentoTime), static_cast<double>(*lastSourceKey + transpose));
     lastPortamentoTime = portamentoTime;
   } else {
-    out.portamentoControl(static_cast<double>(*lastSourceKey + transpose));
+    rt.portamentoControl(static_cast<double>(*lastSourceKey + transpose));
   }
 }
 
-void TrackState::emitModulationDepths(PerformanceEmitter& out, bool enabled) const {
+template <class Runtime>
+void TrackState::emitModulationDepths(Runtime& rt, bool enabled) const {
   if (vibratoDepth != 0) {
-    out.modulation(ModulationPerformanceTarget::VibratoDepth, enabled ? math::midi7Amount(vibratoDepth) : 0.0);
+    rt.modulation(ModulationPerformanceTarget::VibratoDepth, enabled ? math::midi7Amount(vibratoDepth) : 0.0);
   }
   if (tremoloDepth != 0) {
-    out.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? math::midi7Amount(tremoloDepth) : 0.0);
+    rt.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? math::midi7Amount(tremoloDepth) : 0.0);
   }
 }
 
@@ -243,30 +251,17 @@ void emitPan(Runtime& rt, u8 raw) {
 
 template <class Runtime>
 void applyAttributes(Runtime& rt, u8 raw) {
-  if constexpr (requires { rt.out; }) {
-    rt.state.applyAttributes(raw, &rt.out);
-  } else {
-    rt.state.applyAttributes(raw);
-  }
+  rt.state.applyAttributes(raw, rt);
 }
 
 template <class Runtime>
 void toggleSlur(Runtime& rt) {
-  if constexpr (requires { rt.out; }) {
-    rt.state.toggleSlur(rt.out);
-  } else {
-    rt.state.noteSlurred = !rt.state.noteSlurred;
-  }
+  rt.state.toggleSlur(rt);
 }
 
 template <class Runtime>
-void renderWarning(Runtime& rt, std::string message) {
-  if constexpr (requires { rt.vm.diagnostic(Diagnostic{}); }) {
-    rt.vm.diagnostic(Diagnostic{
-        .severity = Severity::Warning,
-        .message = std::move(message),
-    });
-  }
+void renderWarning(Runtime& rt, std::string_view message) {
+  rt.diagnostic(Severity::Warning, message);
 }
 
 struct CapcomSnesCommandReader {
@@ -298,9 +293,7 @@ struct CapcomSnesCommandReader {
         return cmd.wait(length);
       }
 
-      if constexpr (requires { rt.out; }) {
-        state.emitPortamentoIfNeeded(key, rt.out);
-      }
+      state.emitPortamentoIfNeeded(key, rt);
       // Slur is modeled as a one-tick overlap into the next source note.
       rt.note(state.performedKey(key), 1.0, duration + (state.noteSlurred ? 1u : 0u));
       state.finishNote(key);
@@ -486,12 +479,10 @@ struct CapcomSnesCommandReader {
             const bool wasEnabled = state.modulationRate != 0;
             state.modulationRate = value;
             const bool isEnabled = state.modulationRate != 0;
-            if constexpr (requires { rt.out; }) {
-              if (!isEnabled && wasEnabled) {
-                state.emitModulationDepths(rt.out, false);
-              } else if (isEnabled && !wasEnabled) {
-                state.emitModulationDepths(rt.out, true);
-              }
+            if (!isEnabled && wasEnabled) {
+              state.emitModulationDepths(rt, false);
+            } else if (isEnabled && !wasEnabled) {
+              state.emitModulationDepths(rt, true);
             }
 
             const double rate = math::lfoRateAmount(value);
