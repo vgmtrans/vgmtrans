@@ -456,22 +456,18 @@ private:
 [[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
                                                  u32 sequenceEnd, u32 startOffset, u32 trackIndex,
                                                  SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  BytecodeDecodeContext decodeContext{
-      .bytecodeEnd = sequenceEnd,
-      .sequenceOffset = sequenceOffset,
-      .sequenceEnd = sequenceEnd,
-      .sourceMap = sourceMap,
-      .diagnostics = diagnostics,
-  };
-  TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
-  const auto decodeCommand = [&](u32 offset) {
-    return decodeCursorCommandWithState<TrackState, Context, NdsCommandReader>(reader, offset, dialect, decodeState,
-                                                                               decodeContext);
-  };
-
-  return decodeReachableBytecodeBlocks(
-      reader, sequenceEnd, startOffset, trackIndex,
-      ReachableBytecodeDecodePolicy{.maxCommands = static_cast<u32>(kMaxTrackCommands)}, decodeCommand);
+  return decodeCursorReachableTrack<TrackState, Context, NdsCommandReader>(
+      reader, dialect,
+      CursorTrackDecodeInput{
+          .trackIndex = trackIndex,
+          .startOffset = startOffset,
+          .bytecodeEnd = sequenceEnd,
+          .sequenceOffset = sequenceOffset,
+          .sequenceEnd = sequenceEnd,
+          .sourceMap = sourceMap,
+          .diagnostics = diagnostics,
+          .maxCommands = static_cast<u32>(kMaxTrackCommands),
+      });
 }
 
 [[nodiscard]] NdsSequenceDescriptor makeNdsSequenceDescriptor() {
