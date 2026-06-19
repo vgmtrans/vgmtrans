@@ -136,11 +136,6 @@ struct TrackState {
 }
 
 template <class Runtime>
-void renderWarning(Runtime& rt, std::string_view message) {
-  rt.diagnostic(Severity::Warning, message);
-}
-
-template <class Runtime>
 [[nodiscard]] bool decodeTargetOutsideSequence(VmCommandCursor& cmd, Runtime& rt, Address destination) {
   return cmd.phase() == CommandPhase::Decode && rt.state.sequenceEnd != std::numeric_limits<u32>::max() &&
          destination.value >= rt.state.sequenceEnd;
@@ -338,7 +333,7 @@ private:
   static CommandFlow unsupported(VmCommandCursor& cmd, Runtime& rt, std::string_view message,
                                  std::string_view name = "Unsupported Command", std::string_view kind = "unsupported") {
     cmd.name(name, SequenceSemantic::Unsupported).kind(kind).unsupported(message);
-    renderWarning(rt, message);
+    rt.diagnostic(Severity::Warning, message);
     return cmd.end();
   }
 };
