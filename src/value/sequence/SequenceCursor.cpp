@@ -93,6 +93,15 @@ VmCommandCursor& VmCommandCursor::name(std::string_view displayName) {
   return *this;
 }
 
+VmCommandCursor& VmCommandCursor::name(std::string_view displayName, SequenceSemantic semantic) {
+  return name(displayName).semantic(semantic);
+}
+
+VmCommandCursor& VmCommandCursor::name(std::string_view displayName, SequenceSemantic semantic,
+                                       CommandPlaybackStatus status) {
+  return name(displayName, semantic).playbackStatus(status);
+}
+
 VmCommandCursor& VmCommandCursor::kind(std::string_view localKindOverride) {
   localKind_ = std::string(localKindOverride);
   kindOverridden_ = true;
@@ -116,6 +125,7 @@ VmCommandCursor& VmCommandCursor::semantic(SequenceSemantic semantic) {
 
 VmCommandCursor& VmCommandCursor::playbackStatus(CommandPlaybackStatus status) {
   playbackStatus_ = status;
+  playbackStatusOverridden_ = true;
   return *this;
 }
 
@@ -381,34 +391,62 @@ CommandFlow VmCommandCursor::stop() {
 }
 
 CommandFlow VmCommandCursor::end() {
+  defaultSemantic(SequenceSemantic::End);
+  defaultPlaybackStatus(CommandPlaybackStatus::StopsPlayback);
   return flow(FlowKind::End);
 }
 
 CommandFlow VmCommandCursor::jump(Address destination) {
+  defaultSemantic(SequenceSemantic::Jump);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
   target(destination, SourceLinkRole::JumpTarget);
   return flow(FlowKind::Jump, 0, destination);
 }
 
 CommandFlow VmCommandCursor::call(Address destination) {
+  defaultSemantic(SequenceSemantic::Call);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
   target(destination, SourceLinkRole::CallTarget);
   return flow(FlowKind::Call, 0, destination);
 }
 
+CommandFlow VmCommandCursor::invalidJump(Address destination, std::string_view message) {
+  defaultSemantic(SequenceSemantic::Jump);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
+  target(destination, SourceLinkRole::JumpTarget).warning(message);
+  return flow(FlowKind::End);
+}
+
+CommandFlow VmCommandCursor::invalidCall(Address destination, std::string_view message) {
+  defaultSemantic(SequenceSemantic::Call);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
+  target(destination, SourceLinkRole::CallTarget).warning(message);
+  return flow(FlowKind::End);
+}
+
 CommandFlow VmCommandCursor::ret() {
+  defaultSemantic(SequenceSemantic::Return);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
   return flow(FlowKind::Return);
 }
 
 CommandFlow VmCommandCursor::loopCandidate(Address destination) {
+  defaultSemantic(SequenceSemantic::Jump);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
   target(destination, SourceLinkRole::LoopTarget);
   return flow(FlowKind::LoopCandidate, 0, destination);
 }
 
 CommandFlow VmCommandCursor::declaredLoop(Address destination) {
+  defaultSemantic(SequenceSemantic::Loop);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
   target(destination, SourceLinkRole::LoopTarget);
   return flow(FlowKind::DeclaredLoop, 0, destination);
 }
 
 CommandFlow VmCommandCursor::countedRepeatUntil(::u8 slot, u32 totalPlays, Address destination) {
+  defaultSemantic(SequenceSemantic::Repeat);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
   target(destination, SourceLinkRole::RepeatTarget);
   auto result = flow(FlowKind::CountedRepeatUntil, 0, destination);
   result.repeatSlot = slot;
@@ -417,6 +455,8 @@ CommandFlow VmCommandCursor::countedRepeatUntil(::u8 slot, u32 totalPlays, Addre
 }
 
 RepeatBreakFlow VmCommandCursor::countedRepeatBreak(::u8 slot, Address destination, bool taken) {
+  defaultSemantic(SequenceSemantic::RepeatBreak);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
   target(destination, SourceLinkRole::RepeatTarget);
   auto result = flow(FlowKind::CountedRepeatBreak, 0, destination);
   result.repeatSlot = slot;
@@ -542,6 +582,18 @@ void VmCommandCursor::recordOperand(std::string_view name, SourceRange range, co
   } else if (const auto* boolValue = std::get_if<bool>(&value)) {
     operands_->push_back(
         CommandOperand{.name = std::string(name), .value = static_cast<u64>(*boolValue), .range = range});
+  }
+}
+
+void VmCommandCursor::defaultSemantic(SequenceSemantic semantic) {
+  if (semantic_ == SequenceSemantic::Unknown) {
+    this->semantic(semantic);
+  }
+}
+
+void VmCommandCursor::defaultPlaybackStatus(CommandPlaybackStatus status) {
+  if (!playbackStatusOverridden_) {
+    playbackStatus_ = status;
   }
 }
 

@@ -293,10 +293,8 @@ template <class TrackState, class Context, class Reader>
   }
 
   if (cursor.failed()) {
-    cursor.name("Truncated Command")
-        .kind("truncated")
-        .semantic(SequenceSemantic::Unsupported)
-        .playbackStatus(CommandPlaybackStatus::Unsupported);
+    cursor.name("Truncated Command", SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported)
+        .kind("truncated");
   }
 
   const auto commandSize =

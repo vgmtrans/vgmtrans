@@ -206,9 +206,7 @@ struct NdsCommandReader {
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     const u8 opcode = cmd.opcode();
     if (opcode <= 0x7f) {
-      cmd.name("Note")
-          .semantic(SequenceSemantic::Note)
-          .derived("key", static_cast<u64>(opcode), SourceValueDisplay::MidiNote);
+      cmd.name("Note", SequenceSemantic::Note).derived("key", static_cast<u64>(opcode), SourceValueDisplay::MidiNote);
       const u8 velocity = cmd.u8("velocity");
       const u32 duration = cmd.varLen("duration");
       rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(opcode) + rt.state.transpose, 0, 127)),
@@ -222,11 +220,11 @@ struct NdsCommandReader {
 
     switch (opcode) {
       case 0x80:
-        cmd.name("Rest").semantic(SequenceSemantic::Rest);
+        cmd.name("Rest", SequenceSemantic::Rest);
         return cmd.wait(cmd.varLen("duration"));
 
       case 0x81: {
-        cmd.name("Program").semantic(SequenceSemantic::Program);
+        cmd.name("Program", SequenceSemantic::Program);
         const u32 raw = cmd.varLen("raw");
         const u32 bank = raw >> 7;
         const u32 program = raw & 0x7f;
@@ -238,23 +236,21 @@ struct NdsCommandReader {
       }
 
       case 0x94: {
-        cmd.name("Jump").semantic(SequenceSemantic::Jump);
+        cmd.name("Jump");
         const Address destination =
             cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
         if (decodeTargetOutsideSequence(cmd, rt, destination)) {
-          cmd.target(destination, SourceLinkRole::JumpTarget).warning("Jump target outside sequence data");
-          return cmd.end();
+          return cmd.invalidJump(destination, "Jump target outside sequence data");
         }
         return cmd.jump(destination);
       }
 
       case 0x95: {
-        cmd.name("Call").semantic(SequenceSemantic::Call);
+        cmd.name("Call");
         const Address destination =
             cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
         if (decodeTargetOutsideSequence(cmd, rt, destination)) {
-          cmd.target(destination, SourceLinkRole::CallTarget).warning("Call target outside sequence data");
-          return cmd.end();
+          return cmd.invalidCall(destination, "Call target outside sequence data");
         }
         return cmd.call(destination);
       }
@@ -263,31 +259,31 @@ struct NdsCommandReader {
         return unsupported(cmd, rt, "Unsupported NDS SSEQ command stopped playback");
 
       case 0xc0: {
-        cmd.name("Pan").semantic(SequenceSemantic::Pan);
+        cmd.name("Pan", SequenceSemantic::Pan);
         const u8 raw = cmd.u8("pan");
         rt.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0));
         return cmd.next();
       }
 
       case 0xc1:
-        cmd.name("Volume").semantic(SequenceSemantic::Level);
+        cmd.name("Volume", SequenceSemantic::Level);
         rt.level(LevelScale::linearFromMidi7(cmd.u8("volume")));
         return cmd.next();
 
       case 0xc3:
-        cmd.name("Transpose").semantic(SequenceSemantic::State);
+        cmd.name("Transpose", SequenceSemantic::State);
         rt.state.transpose = cmd.s8("semitones");
         return cmd.next();
 
       case 0xc4: {
-        cmd.name("Pitch Bend").semantic(SequenceSemantic::Pitch);
+        cmd.name("Pitch Bend", SequenceSemantic::Pitch);
         const s8 bend = cmd.s8("bend");
         rt.pitchBend((static_cast<double>(bend) / 128.0) * rt.state.pitchBendRangeSemitones);
         return cmd.next();
       }
 
       case 0xc5: {
-        cmd.name("Pitch Bend Range").semantic(SequenceSemantic::Pitch);
+        cmd.name("Pitch Bend Range", SequenceSemantic::Pitch);
         const u8 semitones = cmd.u8("semitones");
         rt.state.pitchBendRangeSemitones = semitones;
         rt.pitchBendRange(semitones);
@@ -295,12 +291,12 @@ struct NdsCommandReader {
       }
 
       case 0xc7:
-        cmd.name("Note Wait").semantic(SequenceSemantic::State);
+        cmd.name("Note Wait", SequenceSemantic::State);
         rt.state.noteWait = cmd.u8("enabled") != 0;
         return cmd.next();
 
       case 0xca: {
-        cmd.name("Modulation Depth").semantic(SequenceSemantic::Modulation);
+        cmd.name("Modulation Depth", SequenceSemantic::Modulation);
         const u8 depth = cmd.u8("depth");
         rt.modulation(ModulationPerformanceTarget::VibratoDepth,
                       std::clamp(static_cast<double>(depth) / 127.0, 0.0, 1.0));
@@ -308,22 +304,22 @@ struct NdsCommandReader {
       }
 
       case 0xce:
-        cmd.name("Portamento").semantic(SequenceSemantic::Portamento);
+        cmd.name("Portamento", SequenceSemantic::Portamento);
         rt.portamentoEnable(cmd.u8("enabled") != 0);
         return cmd.next();
 
       case 0xcf:
-        cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
+        cmd.name("Portamento Time", SequenceSemantic::Portamento);
         rt.portamentoTime(static_cast<double>(cmd.u8("time")));
         return cmd.next();
 
       case 0xd5:
-        cmd.name("Expression").kind("expression").semantic(SequenceSemantic::Level);
+        cmd.name("Expression", SequenceSemantic::Level);
         rt.expression(LevelScale::linearFromMidi7(cmd.u8("expression")));
         return cmd.next();
 
       case 0xe1: {
-        cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
+        cmd.name("Tempo", SequenceSemantic::Tempo);
         const u16 bpm = cmd.u16le("bpm");
         if (bpm != 0) {
           rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
@@ -332,18 +328,10 @@ struct NdsCommandReader {
       }
 
       case 0xfd:
-        return cmd.name("Return")
-            .kind("return")
-            .semantic(SequenceSemantic::Return)
-            .playbackStatus(CommandPlaybackStatus::AffectsControlFlow)
-            .ret();
+        return cmd.name("Return").ret();
 
       case 0xff:
-        return cmd.name("End")
-            .kind("end")
-            .semantic(SequenceSemantic::End)
-            .playbackStatus(CommandPlaybackStatus::StopsPlayback)
-            .end();
+        return cmd.name("End").end();
 
       default:
         return unsupported(cmd, rt, "Unknown NDS SSEQ opcode stopped playback", "Unknown Opcode", "unknown");
@@ -354,14 +342,14 @@ private:
   template <class Runtime>
   static CommandFlow unsupported(VmCommandCursor& cmd, Runtime& rt, std::string_view message,
                                  std::string_view name = "Unsupported Command", std::string_view kind = "unsupported") {
-    cmd.name(name).kind(kind).semantic(SequenceSemantic::Unsupported).unsupported(message);
+    cmd.name(name, SequenceSemantic::Unsupported).kind(kind).unsupported(message);
     renderWarning(rt, std::string(message));
     return cmd.end();
   }
 
   static CommandFlow preserve(VmCommandCursor& cmd, std::string_view name, size_t operandBytes = 0,
                               std::string_view kind = {}) {
-    cmd.name(name).semantic(SequenceSemantic::Meta).sourceOnly();
+    cmd.name(name, SequenceSemantic::Meta).sourceOnly();
     if (!kind.empty()) {
       cmd.kind(kind);
     }

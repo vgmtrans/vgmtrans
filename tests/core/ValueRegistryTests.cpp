@@ -29,12 +29,12 @@ struct CursorProbeReader {
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     switch (cmd.opcode()) {
       case 0x70: {
-        cmd.name("Transpose").semantic(SequenceSemantic::State);
+        cmd.name("Transpose", SequenceSemantic::State);
         rt.state.transpose = cmd.s8("semitones");
         return cmd.next();
       }
       case 0x90: {
-        cmd.name("Note").semantic(SequenceSemantic::Note);
+        cmd.name("Note", SequenceSemantic::Note);
         const u8 key = cmd.u8("key");
         const u8 duration = cmd.u8("duration");
         cmd.derived("performed_key", static_cast<u64>(key + rt.state.transpose), SourceValueDisplay::MidiNote);
@@ -42,22 +42,17 @@ struct CursorProbeReader {
         return cmd.wait(duration);
       }
       case 0x91: {
-        cmd.name("Late Truncated Note").semantic(SequenceSemantic::Note);
+        cmd.name("Late Truncated Note", SequenceSemantic::Note);
         const u8 key = cmd.u8("key");
         rt.note(key + rt.state.transpose, rt.context.velocity, 12);
         static_cast<void>(cmd.u8("missing"));
         return cmd.next();
       }
       case 0xff:
-        return cmd.name("End")
-            .kind("end")
-            .semantic(SequenceSemantic::End)
-            .playbackStatus(CommandPlaybackStatus::StopsPlayback)
-            .end();
+        return cmd.name("End").end();
       default:
-        return cmd.name("Unsupported Opcode")
+        return cmd.name("Unsupported Opcode", SequenceSemantic::Unsupported)
             .kind("unsupported")
-            .semantic(SequenceSemantic::Unsupported)
             .unsupported("Unsupported cursor probe opcode")
             .end();
     }
@@ -263,6 +258,31 @@ void cursorDialectReportsWarningsOnFinalCommandRange() {
          "unsupported cursor command should report one warning");
   expect(diagnostics[0].range && sameRange(*diagnostics[0].range, SourceRange{SourceId{0}, 0, 1}),
          "cursor warnings should use the final decoded command range");
+}
+
+void cursorFlowHelpersInferMetadata() {
+  const std::array<u8, 4> bytes{0x94, 0x12, 0x34, 0x56};
+  VmCommandCursor jump(CommandPhase::Decode, probeRange(0, bytes.size()), bytes);
+  static_cast<void>(jump.name("Jump").jump(Address{0x1234}));
+  const CommandKind jumpKind = jump.commandKind("cursor-probe");
+  expect(jumpKind.semantic == SequenceSemantic::Jump &&
+             jumpKind.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
+         "jump flow should infer jump semantic and control-flow status");
+
+  VmCommandCursor end(CommandPhase::Decode, probeRange(0, bytes.size()), bytes);
+  static_cast<void>(end.name("End").end());
+  const CommandKind endKind = end.commandKind("cursor-probe");
+  expect(endKind.semantic == SequenceSemantic::End &&
+             endKind.playbackStatus == CommandPlaybackStatus::StopsPlayback,
+         "end flow should infer end semantic and stops-playback status");
+
+  VmCommandCursor explicitCommand(CommandPhase::Decode, probeRange(0, bytes.size()), bytes);
+  static_cast<void>(
+      explicitCommand.name("Display Only", SequenceSemantic::Meta, CommandPlaybackStatus::SourceOnly).jump(Address{4}));
+  const CommandKind explicitKind = explicitCommand.commandKind("cursor-probe");
+  expect(explicitKind.semantic == SequenceSemantic::Meta &&
+             explicitKind.playbackStatus == CommandPlaybackStatus::SourceOnly,
+         "flow helper defaults should not override explicit command metadata");
 }
 
 void cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead() {
@@ -515,6 +535,7 @@ void runValueRegistryTests() {
   bytecodeMapAllowsOneHandlerForSeveralKinds();
   cursorDialectDecodesAnnotationsAndRendersThroughVm();
   cursorDialectReportsWarningsOnFinalCommandRange();
+  cursorFlowHelpersInferMetadata();
   cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead();
   cursorDialectSuppressesMalformedRenderEvents();
   formatRegistryStoresCopyableModuleValues();

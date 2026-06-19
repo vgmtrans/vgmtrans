@@ -276,13 +276,13 @@ struct CapcomSnesCommandReader {
     if (opcode >= 0x20) {
       const auto rawDuration = static_cast<u8>(opcode >> 5);
       if ((opcode & 0x1f) == 0) {
-        cmd.name("Rest").semantic(SequenceSemantic::Rest).derived("duration_index", static_cast<u64>(rawDuration));
+        cmd.name("Rest", SequenceSemantic::Rest).derived("duration_index", static_cast<u64>(rawDuration));
         const u32 length = rt.state.consumeNoteTicks(rawDuration);
         rt.state.didRest = true;
         return cmd.wait(length);
       }
 
-      cmd.name("Note").semantic(SequenceSemantic::Note);
+      cmd.name("Note", SequenceSemantic::Note);
       const auto keyIndex = static_cast<u8>(opcode & 0x1f);
       cmd.derived("key_index", static_cast<u64>(keyIndex)).derived("duration_index", static_cast<u64>(rawDuration));
 
@@ -309,34 +309,34 @@ struct CapcomSnesCommandReader {
 
     switch (opcode) {
       case 0x00:
-        cmd.name("Toggle Triplet").semantic(SequenceSemantic::State);
+        cmd.name("Toggle Triplet", SequenceSemantic::State);
         rt.state.noteTriplet = !rt.state.noteTriplet;
         return cmd.next();
 
       case 0x01:
-        cmd.name("Toggle Slur").semantic(SequenceSemantic::State);
+        cmd.name("Toggle Slur", SequenceSemantic::State);
         toggleSlur(rt);
         return cmd.next();
 
       case 0x02:
-        cmd.name("Dotted Note").semantic(SequenceSemantic::State);
+        cmd.name("Dotted Note", SequenceSemantic::State);
         rt.state.noteDotted = true;
         return cmd.next();
 
       case 0x03:
-        cmd.name("Toggle Octave Up").semantic(SequenceSemantic::State);
+        cmd.name("Toggle Octave Up", SequenceSemantic::State);
         rt.state.noteOctaveUp = !rt.state.noteOctaveUp;
         return cmd.next();
 
       case 0x04: {
-        cmd.name("Note Attributes").semantic(SequenceSemantic::State);
+        cmd.name("Note Attributes", SequenceSemantic::State);
         const u8 raw = cmd.u8("raw");
         applyAttributes(rt, raw);
         return cmd.next();
       }
 
       case 0x05: {
-        cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
+        cmd.name("Tempo", SequenceSemantic::Tempo);
         const u16 raw = cmd.u16be("raw");
         const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw);
         cmd.detail("microseconds_per_quarter", static_cast<u64>(microseconds));
@@ -345,13 +345,13 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x06: {
-        cmd.name("Duration Rate").semantic(SequenceSemantic::State);
+        cmd.name("Duration Rate", SequenceSemantic::State);
         rt.state.durationRate = cmd.u8("rate");
         return cmd.next();
       }
 
       case 0x07: {
-        cmd.name("Volume").semantic(SequenceSemantic::Level);
+        cmd.name("Volume", SequenceSemantic::Level);
         const u8 raw = cmd.u8("raw");
         cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw));
         emitLinearVolume(rt, raw);
@@ -359,7 +359,7 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x08: {
-        cmd.name("Program").semantic(SequenceSemantic::Program);
+        cmd.name("Program", SequenceSemantic::Program);
         const u8 raw = cmd.u8("raw");
         const u32 bank = raw >> 7;
         const u32 program = raw & 0x7f;
@@ -371,25 +371,25 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x09: {
-        cmd.name("Octave").semantic(SequenceSemantic::State);
+        cmd.name("Octave", SequenceSemantic::State);
         rt.state.noteOctave = cmd.u8("octave");
         return cmd.next();
       }
 
       case 0x0a: {
-        cmd.name("Global Transpose").semantic(SequenceSemantic::Pitch);
+        cmd.name("Global Transpose", SequenceSemantic::Pitch);
         rt.globalTranspose(cmd.s8("semitones"));
         return cmd.next();
       }
 
       case 0x0b: {
-        cmd.name("Transpose").semantic(SequenceSemantic::Pitch);
+        cmd.name("Transpose", SequenceSemantic::Pitch);
         rt.state.transpose = cmd.s8("semitones");
         return cmd.next();
       }
 
       case 0x0c: {
-        cmd.name("Tuning").semantic(SequenceSemantic::Pitch);
+        cmd.name("Tuning", SequenceSemantic::Pitch);
         const s8 raw = cmd.s8("tuning");
         cmd.detail("cents", math::tuningCents(raw));
         rt.tuning(math::tuningCents(raw));
@@ -397,7 +397,7 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x0d: {
-        cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
+        cmd.name("Portamento Time", SequenceSemantic::Portamento);
         const u8 raw = cmd.u8("time");
         // The driver stores portamento as speed; the next note turns it into
         // time using the distance from the previous source key.
@@ -409,9 +409,7 @@ struct CapcomSnesCommandReader {
       case 0x0f:
       case 0x10:
       case 0x11: {
-        cmd.name("Repeat Until")
-            .semantic(SequenceSemantic::Repeat)
-            .playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
+        cmd.name("Repeat Until");
         const auto slot = static_cast<u8>(opcode - 0x0e);
         cmd.derived("slot", static_cast<u64>(slot + 1));
         const u8 count = cmd.u8("count");
@@ -428,9 +426,7 @@ struct CapcomSnesCommandReader {
       case 0x13:
       case 0x14:
       case 0x15: {
-        cmd.name("Repeat Break")
-            .semantic(SequenceSemantic::RepeatBreak)
-            .playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
+        cmd.name("Repeat Break");
         const auto slot = static_cast<u8>(opcode - 0x12);
         cmd.derived("slot", static_cast<u64>(slot + 1));
         const u8 attributes = cmd.u8("attributes");
@@ -443,19 +439,15 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x16: {
-        cmd.name("Jump").semantic(SequenceSemantic::Jump).playbackStatus(CommandPlaybackStatus::AffectsControlFlow);
+        cmd.name("Jump", SequenceSemantic::Jump);
         return cmd.loopCandidate(cmd.address16be("destination"));
       }
 
       case 0x17:
-        return cmd.name("End")
-            .kind("end")
-            .semantic(SequenceSemantic::End)
-            .playbackStatus(CommandPlaybackStatus::StopsPlayback)
-            .end();
+        return cmd.name("End").end();
 
       case 0x18: {
-        cmd.name("Pan").semantic(SequenceSemantic::Pan);
+        cmd.name("Pan", SequenceSemantic::Pan);
         const u8 raw = cmd.u8("raw");
         const auto converted = math::panConversion(rt.context.version, raw);
         cmd.detail("stereo_position", math::stereoPosition(converted)).detail("linear_gain", converted.volumeScale);
@@ -464,7 +456,7 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x19: {
-        cmd.name("Master Volume").semantic(SequenceSemantic::Level);
+        cmd.name("Master Volume", SequenceSemantic::Level);
         const u8 raw = cmd.u8("raw");
         cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw));
         emitLinearMasterVolume(rt, raw);
@@ -472,7 +464,7 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x1a: {
-        cmd.name("LFO").kind("lfo").semantic(SequenceSemantic::Modulation);
+        cmd.name("LFO", SequenceSemantic::Modulation);
         const u8 type = cmd.u8("type");
         const u8 value = cmd.u8("value");
 
@@ -517,13 +509,13 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x1b:
-        cmd.name("Echo Param").semantic(SequenceSemantic::Meta).sourceOnly();
+        cmd.name("Echo Param", SequenceSemantic::Meta).sourceOnly();
         static_cast<void>(cmd.u8("argument"));
         static_cast<void>(cmd.u8("preset"));
         return cmd.next();
 
       case 0x1c: {
-        cmd.name("Echo On/Off").semantic(SequenceSemantic::Meta);
+        cmd.name("Echo On/Off", SequenceSemantic::Meta);
         const u8 raw = cmd.u8("raw");
         cmd.derived("enabled", static_cast<u64>(raw & 1));
         rt.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0);
@@ -531,7 +523,7 @@ struct CapcomSnesCommandReader {
       }
 
       case 0x1d: {
-        cmd.name("Release Rate").semantic(SequenceSemantic::Meta).sourceOnly();
+        cmd.name("Release Rate", SequenceSemantic::Meta).sourceOnly();
         const u8 raw = cmd.u8("raw");
         cmd.derived("gain", static_cast<u64>(raw | 0xa0));
         return cmd.next();
@@ -540,17 +532,16 @@ struct CapcomSnesCommandReader {
       case 0x1e:
       case 0x1f:
         if (rt.context.version == CapcomSnesEngineVersion::v1BgmInList) {
-          cmd.name("Unknown One-Byte Event").kind("unknown-one-byte").semantic(SequenceSemantic::Meta).sourceOnly();
+          cmd.name("Unknown One-Byte Event", SequenceSemantic::Meta).kind("unknown-one-byte").sourceOnly();
           cmd.derived("opcode", static_cast<u64>(opcode), SourceValueDisplay::Hex);
           static_cast<void>(cmd.u8("value"));
           return cmd.next();
         }
-        return cmd.name("No Operation").kind("nop").semantic(SequenceSemantic::Meta).noOp().next();
+        return cmd.name("No Operation", SequenceSemantic::Meta).kind("nop").noOp().next();
 
       default:
-        cmd.name("Unknown Opcode")
+        cmd.name("Unknown Opcode", SequenceSemantic::Unsupported)
             .kind("unknown")
-            .semantic(SequenceSemantic::Unsupported)
             .derived("opcode", static_cast<u64>(opcode), SourceValueDisplay::Hex)
             .unsupported("Unknown Capcom SNES sequence opcode");
         renderWarning(rt, "Unknown Capcom SNES sequence opcode");
