@@ -90,6 +90,8 @@ public:
   [[nodiscard]] CommandKind commandKind(std::string_view kindPrefix) const;
 
   VmCommandCursor& name(std::string_view displayName);
+  VmCommandCursor& name(std::string_view displayName, SequenceSemantic semantic);
+  VmCommandCursor& name(std::string_view displayName, SequenceSemantic semantic, CommandPlaybackStatus status);
   VmCommandCursor& kind(std::string_view localKindOverride);
   VmCommandCursor& semantic(SequenceSemantic semantic);
   VmCommandCursor& playbackStatus(CommandPlaybackStatus status);
@@ -126,6 +128,8 @@ public:
   [[nodiscard]] CommandFlow end();
   [[nodiscard]] CommandFlow jump(Address destination);
   [[nodiscard]] CommandFlow call(Address destination);
+  [[nodiscard]] CommandFlow invalidJump(Address destination, std::string_view message);
+  [[nodiscard]] CommandFlow invalidCall(Address destination, std::string_view message);
   [[nodiscard]] CommandFlow ret();
   [[nodiscard]] CommandFlow loopCandidate(Address destination);
   [[nodiscard]] CommandFlow declaredLoop(Address destination);
@@ -150,6 +154,8 @@ private:
   void recordField(std::string_view name, SourceRange range, SourceValue value,
                    SourceValueDisplay display = SourceValueDisplay::Default);
   void recordOperand(std::string_view name, SourceRange range, const SourceValue& value, SourceValueDisplay display);
+  void defaultSemantic(SequenceSemantic semantic);
+  void defaultPlaybackStatus(CommandPlaybackStatus status);
   [[nodiscard]] CommandFlow flow(FlowKind kind, u32 waitTicks = 0, std::optional<Address> destination = std::nullopt);
 
   CommandPhase phase_ = CommandPhase::Decode;
@@ -170,6 +176,7 @@ private:
   std::string localKind_ = "unknown-command";
   SequenceSemantic semantic_ = SequenceSemantic::Unknown;
   CommandPlaybackStatus playbackStatus_ = CommandPlaybackStatus::AffectsPlayback;
+  bool playbackStatusOverridden_ = false;
 };
 
 [[nodiscard]] Effects effectsFromCommandFlow(const CommandFlow& flow);
