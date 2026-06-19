@@ -259,11 +259,6 @@ void toggleSlur(Runtime& rt) {
   rt.state.toggleSlur(rt);
 }
 
-template <class Runtime>
-void renderWarning(Runtime& rt, std::string_view message) {
-  rt.diagnostic(Severity::Warning, message);
-}
-
 struct CapcomSnesCommandReader {
   template <class Runtime>
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
@@ -535,7 +530,7 @@ struct CapcomSnesCommandReader {
             .kind("unknown")
             .derived("opcode", opcode, SourceValueDisplay::Hex)
             .unsupported("Unknown Capcom SNES sequence opcode");
-        renderWarning(rt, "Unknown Capcom SNES sequence opcode");
+        rt.diagnostic(Severity::Warning, "Unknown Capcom SNES sequence opcode");
         return cmd.end();
     }
   }
