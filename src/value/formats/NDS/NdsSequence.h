@@ -25,7 +25,6 @@ struct NdsSequenceDescriptor {
 };
 
 [[nodiscard]] const NdsSequenceDescriptor& ndsSequenceDescriptor();
-[[nodiscard]] core::SequenceDialect ndsSequenceDialect();
 void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
 
 [[nodiscard]] core::TrackProgram decodeNdsSequenceTrack(core::ByteReader reader,

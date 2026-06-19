@@ -20,6 +20,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace vgmtrans::formats::capcom_snes {
 
@@ -627,11 +628,13 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequ
   };
   TrackState decodeState =
       makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(descriptor.dialect));
+  const auto decodeCommand = [&](u32 offset) {
+    return decodeCursorCommandWithState<TrackState, Context, CapcomSnesCommandReader>(
+        reader, offset, descriptor.dialect, decodeState, decodeContext);
+  };
+
   return decodeLinearBytecodeTrack(reader, sourceTrackNumber, startAddress,
-                                   LinearBytecodeDecodePolicy{.maxCommands = 4096}, [&](u32 offset) {
-                                     return decodeCursorCommandWithState<TrackState, Context, CapcomSnesCommandReader>(
-                                         reader, offset, descriptor.dialect, decodeState, decodeContext);
-                                   });
+                                   LinearBytecodeDecodePolicy{.maxCommands = 4096}, decodeCommand);
 }
 
 SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const CapcomSnesLayout& layout, AssetId sequenceId,
@@ -641,12 +644,13 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
   const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
   ItemTree items;
   ItemTreeBuilder itemBuilder(items, input.ids);
-  const auto root = itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes.sequence-header", "Sequence Header",
-                                    input.reader.range(layout.sequenceHeaderAddress, headerSize));
+  const SourceRange headerRange = input.reader.range(layout.sequenceHeaderAddress, headerSize);
+  const ItemId root =
+      itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes.sequence-header", "Sequence Header", headerRange);
+
   SourceAnnotationId headerAnnotation;
   if (sourceMap != nullptr) {
-    auto header = sourceMap->header("Sequence Header", input.reader.range(layout.sequenceHeaderAddress, headerSize))
-                      .kind("capcom-snes-sequence-header");
+    auto header = sourceMap->header("Sequence Header", headerRange).kind("capcom-snes-sequence-header");
     headerAnnotation = header.id();
   }
 
@@ -661,34 +665,29 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
       instrumentSet ? std::optional<AssetId>{instrumentSet->id} : std::nullopt;
 
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
-  // Capcom stores track pointers in reverse channel order. Reorder them here so source
-  // track numbers match the driver's playback order.
-  for (int trackIndex = static_cast<int>(kCapcomSnesMaxTracks) - 1; trackIndex >= 0; --trackIndex) {
-    const auto pointerOffset = pointerBase + static_cast<u32>(trackIndex) * 2;
+  // Capcom stores track pointers in reverse channel order. Decode them in
+  // playback order so source track numbers match the driver.
+  for (u32 pointerIndex = kCapcomSnesMaxTracks; pointerIndex-- > 0;) {
+    const u32 sourceTrackNumber = kCapcomSnesMaxTracks - 1 - pointerIndex;
+    const u32 pointerOffset = pointerBase + pointerIndex * 2;
+    const SourceRange pointerRange = input.reader.range(pointerOffset, 2);
     const u16 trackAddress = input.reader.be16(pointerOffset);
     if (trackAddress == 0) {
       continue;
     }
 
-    const auto trackItem =
-        itemBuilder.add(root, ItemKind::Track, "capcom-snes.track-pointer", "Track Pointer",
-                        input.reader.range(pointerOffset, 2), fmt::format("Track starts at ${:04X}", trackAddress));
+    const ItemId trackItem = itemBuilder.add(root, ItemKind::Track, "capcom-snes.track-pointer", "Track Pointer",
+                                             pointerRange, fmt::format("Track starts at ${:04X}", trackAddress));
     if (sourceMap != nullptr) {
-      sourceMap
-          ->pointer("Track Pointer", input.reader.range(pointerOffset, 2),
-                    SourceTarget{input.reader.range(trackAddress, 1)})
+      sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{input.reader.range(trackAddress, 1)})
           .kind("capcom-snes-track-pointer")
           .parent(headerAnnotation)
-          .derived("source_track", static_cast<u64>(kCapcomSnesMaxTracks - 1 - trackIndex))
-          .field("destination", input.reader.range(pointerOffset, 2), static_cast<u64>(trackAddress),
-                 SourceValueDisplay::Address);
+          .derived("source_track", static_cast<u64>(sourceTrackNumber))
+          .field("destination", pointerRange, static_cast<u64>(trackAddress), SourceValueDisplay::Address);
     }
-    auto track =
-        decodeCapcomSnesSourceTrack(input.reader, descriptor, static_cast<u32>(kCapcomSnesMaxTracks - 1 - trackIndex),
-                                    trackAddress, sourceMap, diagnostics);
 
+    auto track = decodeCapcomSnesSourceTrack(input.reader, descriptor, sourceTrackNumber, trackAddress, sourceMap, diagnostics);
     addSourceCommandItemsAndInstrumentReferences(itemBuilder, trackItem, program, dialect, track, instrumentSetId);
-
     program.tracks.push_back(std::move(track));
   }
 

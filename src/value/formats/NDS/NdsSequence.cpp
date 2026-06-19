@@ -14,7 +14,6 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <any>
 #include <array>
 #include <cstddef>
 #include <cmath>
@@ -34,6 +33,9 @@ namespace {
 
 constexpr size_t kMaxTrackCommands = 262144;
 constexpr std::string_view kSseqSignature{"SSEQ\xff\xfe\x00\x01", 8};
+constexpr u32 kSseqFileSizeOffset = 0x08;
+constexpr u32 kSseqDataOffsetField = 0x18;
+constexpr u32 kSseqHeaderSize = 0x1c;
 
 struct Context {};
 
@@ -49,7 +51,7 @@ struct TrackState {
       : sequenceDataBase(program.sourceBaseAddress.value) {}
 
   explicit TrackState(const BytecodeDecodeContext& context)
-      : sequenceDataBase(context.sequenceOffset + 0x1c), sequenceEnd(context.sequenceEnd) {}
+      : sequenceDataBase(context.sequenceOffset + kSseqHeaderSize), sequenceEnd(context.sequenceEnd) {}
 
   u64 sequenceDataBase = 0;
   u32 sequenceEnd = std::numeric_limits<u32>::max();
@@ -93,7 +95,7 @@ struct TrackState {
     return std::nullopt;
   }
   return reader.u8At(operandOffset) + (reader.u8At(operandOffset + 1) << 8) + (reader.u8At(operandOffset + 2) << 16) +
-         sequenceOffset + 0x1c;
+         sequenceOffset + kSseqHeaderSize;
 }
 
 [[nodiscard]] std::optional<u32> nearbySseqHeader(ByteReader reader, u32 offset, u32 size) {
@@ -122,7 +124,7 @@ struct TrackState {
     return std::nullopt;
   }
 
-  const u32 trackStart = offset + 0x1c;
+  const u32 trackStart = offset + kSseqHeaderSize;
   const u32 paddingEnd = std::min(*sseqOffset, offset + size);
   // Some zero-filled pseudo-sequences overlap a later SSEQ. If the padding
   // would align the SSEQ signature as bogus note data, leave it empty.
@@ -156,7 +158,7 @@ struct PreservedCommandSpec {
   std::string_view kind = {};
 };
 
-constexpr std::array<PreservedCommandSpec, 34> kPreservedCommands{{
+constexpr auto kPreservedCommands = std::to_array<PreservedCommandSpec>({
     {0x93, "Open Track", 4},
     {0xa0, "Cmd with Random Value", 5, "random-value"},
     {0xa1, "Cmd with Variable", 2, "variable-command"},
@@ -191,7 +193,7 @@ constexpr std::array<PreservedCommandSpec, 34> kPreservedCommands{{
     {0xe3, "Sweep Pitch", 2},
     {0xfc, "Loop End"},
     {0xfe, "Allocate Track", 2},
-}};
+});
 
 [[nodiscard]] const PreservedCommandSpec* preservedCommand(u8 opcode) {
   const auto found = std::ranges::find_if(kPreservedCommands,
@@ -520,10 +522,6 @@ const NdsSequenceDescriptor& ndsSequenceDescriptor() {
   return descriptor;
 }
 
-SequenceDialect ndsSequenceDialect() {
-  return ndsSequenceDescriptor().dialect;
-}
-
 void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
   registry.add(ndsSequenceDescriptor().dialect);
 }
@@ -541,7 +539,7 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const NdsSequenceDescript
 
 std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
   std::vector<u32> extraStarts;
-  u32 offset = sequenceOffset + 0x1c;
+  u32 offset = sequenceOffset + kSseqHeaderSize;
   if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
     return {offset};
   }
@@ -555,7 +553,7 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
       return {offset};
     }
     u8 status = reader.u8At(offset);
-    while (status == 0x80) {
+    if (status == 0x80) {
       const u32 statusOffset = offset;
       ++offset;
       if (!readVarLen(reader, offset, sequenceEnd)) {
@@ -565,7 +563,6 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
         return {offset};
       }
       status = reader.u8At(offset);
-      break;
     }
 
     while (status == 0x93 && hasBytecodeBytes(reader, offset, 5, sequenceEnd)) {
@@ -594,12 +591,13 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
   const bool recoverMalformedSdatRange = recoveredSequenceOffset.has_value();
   const bool zeroFilled = !hasSseqHeader && !recoverMalformedSdatRange && isZeroFilled(reader, offset, fatEnd);
   const u32 decodeOffset = recoveredSequenceOffset.value_or(offset);
-  const u32 recoveredEnd =
-      recoveredSequenceOffset && reader.has(*recoveredSequenceOffset + 8, 4)
-          ? static_cast<u32>(std::min<u64>(
-                reader.size(), static_cast<u64>(*recoveredSequenceOffset) + reader.le32(*recoveredSequenceOffset + 8)))
-          : static_cast<u32>(reader.size());
-  const u32 emptySequenceEnd = static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + 0x1c));
+  const u32 recoveredEnd = recoveredSequenceOffset && reader.has(*recoveredSequenceOffset + kSseqFileSizeOffset, 4)
+                               ? static_cast<u32>(std::min<u64>(
+                                     reader.size(), static_cast<u64>(*recoveredSequenceOffset) +
+                                                        reader.le32(*recoveredSequenceOffset + kSseqFileSizeOffset)))
+                               : static_cast<u32>(reader.size());
+  const u32 emptySequenceEnd =
+      static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + kSseqHeaderSize));
   const u32 sequenceEnd = zeroFilled ? emptySequenceEnd : recoverMalformedSdatRange ? recoveredEnd : fatEnd;
   return NdsSequenceRange{
       .offset = offset,
@@ -630,7 +628,7 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
           SequenceProgram{
               .dialect = dialect.id,
               .timebase = dialect.timebase,
-              .sourceBaseAddress = Address{sequenceOffset + 0x1c},
+              .sourceBaseAddress = Address{sequenceOffset + kSseqHeaderSize},
               .behavior = dialect.defaultBehavior,
           },
   };
@@ -638,11 +636,11 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
   ItemTreeBuilder items(asset.metadata.items, input.ids);
   const auto root = items.add(std::nullopt, ItemKind::Sequence, "sseq", name,
                               input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset));
-  if (sourceMap != nullptr && input.reader.has(sequenceOffset, 0x1c)) {
-    sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, 0x1c))
+  if (sourceMap != nullptr && input.reader.has(sequenceOffset, kSseqHeaderSize)) {
+    sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, kSseqHeaderSize))
         .kind("sseq-header")
-        .field("data_offset", input.reader.range(sequenceOffset + 0x18, 4),
-               static_cast<u64>(sequenceOffset + input.reader.le32(sequenceOffset + 0x18)),
+        .field("data_offset", input.reader.range(sequenceOffset + kSseqDataOffsetField, 4),
+               static_cast<u64>(sequenceOffset + input.reader.le32(sequenceOffset + kSseqDataOffsetField)),
                SourceValueDisplay::Address);
   }
 
