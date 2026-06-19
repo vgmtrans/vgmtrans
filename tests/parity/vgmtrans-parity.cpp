@@ -386,6 +386,22 @@ struct CapcomSnesSummary {
   friend bool operator==(const CapcomSnesSummary&, const CapcomSnesSummary&) = default;
 };
 
+struct AkaoCollectionSummary {
+  u32 sequenceOffset = 0;
+  u32 trackCount = 0;
+  u32 instrumentSetCount = 0;
+  u32 sampleCollectionCount = 0;
+  u32 sampleCount = 0;
+
+  friend bool operator==(const AkaoCollectionSummary&, const AkaoCollectionSummary&) = default;
+};
+
+struct AkaoSummary {
+  std::vector<AkaoCollectionSummary> collections;
+
+  friend bool operator==(const AkaoSummary&, const AkaoSummary&) = default;
+};
+
 u64 fnv1a(std::span<const u8> bytes) {
   u64 hash = 14695981039346656037ull;
   for (const u8 byte : bytes) {
@@ -1231,6 +1247,124 @@ std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::fil
     }
   }
   return summaries;
+}
+
+AkaoSummary legacyAkaoSummary(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  AkaoSummary summary;
+  for (const auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != "Akao") {
+      continue;
+    }
+    AkaoCollectionSummary shape{
+        .sequenceOffset = collection->seq()->offset(),
+        .trackCount = static_cast<u32>(collection->seq()->trackCount()),
+        .instrumentSetCount = static_cast<u32>(collection->instrSets().size()),
+        .sampleCollectionCount = static_cast<u32>(collection->sampColls().size()),
+    };
+    for (const auto* sampleCollection : collection->sampColls()) {
+      if (sampleCollection != nullptr) {
+        shape.sampleCount += static_cast<u32>(sampleCollection->sampleCount());
+      }
+    }
+    summary.collections.push_back(shape);
+  }
+  std::ranges::sort(summary.collections, {}, &AkaoCollectionSummary::sequenceOffset);
+  if (summary.collections.empty()) {
+    throw std::runtime_error("legacy scanner did not discover Akao collections in: " + path.string());
+  }
+  return summary;
+}
+
+AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& diagnostics) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const SessionSnapshot project = session.scanPendingSources();
+  for (const auto& diagnostic : project.diagnostics()) {
+    diagnostics << "value diagnostic: " << diagnostic.message << "\n";
+  }
+
+  AkaoSummary summary;
+  for (const auto& collection : project.collections()) {
+    if (!collection.sequence) {
+      continue;
+    }
+    const auto* sequence = assetById<SequenceProgramAsset>(project, *collection.sequence);
+    if (sequence == nullptr || sequence->metadata.format != "Akao") {
+      continue;
+    }
+    AkaoCollectionSummary shape{
+        .sequenceOffset = static_cast<u32>(sequence->metadata.range.offset),
+        .trackCount = static_cast<u32>(sequence->program.tracks.size()),
+        .instrumentSetCount = static_cast<u32>(collection.instrumentSets.size()),
+        .sampleCollectionCount = static_cast<u32>(collection.sampleCollections.size()),
+    };
+    for (const auto sampleCollectionId : collection.sampleCollections) {
+      if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, sampleCollectionId)) {
+        shape.sampleCount += static_cast<u32>(sampleCollection->samples.samples.size());
+      }
+    }
+    summary.collections.push_back(shape);
+  }
+  if (std::ranges::any_of(summary.collections,
+                          [](const AkaoCollectionSummary& collection) { return collection.sampleCollectionCount == 0; })) {
+    u32 sampleAssets = 0;
+    u32 sampleFacts = 0;
+    for (const auto& asset : project.assets()) {
+      if (const auto* sampleCollection = std::get_if<SampleCollectionAsset>(&asset);
+          sampleCollection != nullptr && sampleCollection->metadata.format == "Akao") {
+        ++sampleAssets;
+      }
+    }
+    for (const auto& fact : project.matchFacts()) {
+      if (fact.format == "Akao") {
+        if (const auto* formatFact = std::get_if<FormatSpecificFact>(&fact.payload);
+            formatFact != nullptr && formatFact->kind == "akao.sample-collection") {
+          ++sampleFacts;
+        }
+      }
+    }
+    diagnostics << "value Akao unresolved sample context: sampleAssets=" << sampleAssets
+                << " sampleFacts=" << sampleFacts << "\n";
+  }
+  std::ranges::sort(summary.collections, {}, &AkaoCollectionSummary::sequenceOffset);
+  if (summary.collections.empty()) {
+    throw std::runtime_error("value scanner did not discover Akao collections in: " + path.string());
+  }
+  return summary;
+}
+
+std::string describeAkaoCollection(const AkaoCollectionSummary& summary) {
+  std::ostringstream out;
+  out << "seq=0x" << std::hex << summary.sequenceOffset << std::dec << " tracks=" << summary.trackCount
+      << " instrSets=" << summary.instrumentSetCount << " sampleCollections=" << summary.sampleCollectionCount
+      << " samples=" << summary.sampleCount;
+  return out.str();
+}
+
+int compareAkaoDirectSummary(const std::filesystem::path& path) {
+  const auto legacy = legacyAkaoSummary(path);
+  const auto value = valueAkaoSummary(path, std::cout);
+  if (legacy == value) {
+    std::cout << "Akao direct summary parity ok: collections=" << legacy.collections.size() << "\n";
+    return 0;
+  }
+
+  std::cout << "Akao direct summary parity mismatch\n";
+  std::cout << "legacy collections=" << legacy.collections.size() << " value collections=" << value.collections.size()
+            << "\n";
+  const size_t shared = std::min(legacy.collections.size(), value.collections.size());
+  for (size_t i = 0; i < shared; ++i) {
+    if (!(legacy.collections[i] == value.collections[i])) {
+      std::cout << "first mismatch at collection " << i << "\n";
+      std::cout << "legacy: " << describeAkaoCollection(legacy.collections[i]) << "\n";
+      std::cout << "value:  " << describeAkaoCollection(value.collections[i]) << "\n";
+      return 1;
+    }
+  }
+  return 1;
 }
 
 u32 parseLoopCount(std::string_view text) {
@@ -2970,6 +3104,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-rsn-direct-synth <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n"
+      << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
       << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
       << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
       << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
@@ -3017,6 +3152,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "nds-direct-summary") {
       return compareNdsDirectSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "akao-direct-summary") {
+      return compareAkaoDirectSummary(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "nds-direct-midi") {

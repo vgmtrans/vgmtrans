@@ -225,6 +225,9 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
@@ -241,6 +244,10 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSequence.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesTypes.h

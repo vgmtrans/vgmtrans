@@ -115,6 +115,38 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
   index = std::clamp(index + kNdsImaIndexTable[data4Bit & 7], 0, 88);
 }
 
+void decodePsxAdpcmBlock(std::span<s16, 28> output, std::span<const u8, 16> block, s32& previous1, s32& previous2) {
+  static constexpr s16 kCoef[5][2] = {
+      {0, 0},
+      {60, 0},
+      {115, -52},
+      {98, -55},
+      {122, -60},
+  };
+
+  const u8 shift = std::min<u8>(block[0] & 0x0f, 12);
+  const u8 filter = std::min<u8>((block[0] & 0xf0) >> 4, 4);
+  const s16 coef0 = kCoef[filter][0];
+  const s16 coef1 = kCoef[filter][1];
+
+  s32 s1 = previous1;
+  s32 s2 = previous2;
+  for (size_t i = 0; i < output.size(); ++i) {
+    const u8 byte = block[2 + (i >> 1)];
+    const u8 nibble = (i & 1u) == 0 ? (byte & 0x0f) : (byte >> 4);
+    const s8 signedNibble = static_cast<s8>(nibble << 4) >> 4;
+    s32 sample = (static_cast<s32>(signedNibble) << 12) >> shift;
+    sample += ((coef0 * s1 + coef1 * s2) >> 6);
+    sample = std::clamp<s32>(sample, -32768, 32767);
+    output[i] = static_cast<s16>(sample);
+    s2 = s1;
+    s1 = sample;
+  }
+
+  previous1 = s1;
+  previous2 = s2;
+}
+
 [[nodiscard]] double ndsPsgDutyCycle(u32 dutyIndex) {
   switch (dutyIndex & 7u) {
     case 7:
@@ -273,6 +305,30 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
   return decoded;
 }
 
+[[nodiscard]] std::optional<DecodedSample> decodePsxAdpcm(const Sample& sample, std::span<const u8> sourceBytes) {
+  if (!rangeIsValid(sample, sourceBytes)) {
+    return std::nullopt;
+  }
+
+  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  DecodedSample decoded{
+      .sampleRate = sample.sampleRate,
+      .channels = sample.channels,
+      .loop = sample.loop,
+  };
+  decoded.pcm.reserve((encoded.size() / 16) * 28);
+
+  s32 previous1 = 0;
+  s32 previous2 = 0;
+  for (size_t offset = 0; offset + 16 <= encoded.size(); offset += 16) {
+    const auto outputOffset = decoded.pcm.size();
+    decoded.pcm.resize(outputOffset + 28);
+    decodePsxAdpcmBlock(std::span<s16, 28>(decoded.pcm.data() + outputOffset, 28),
+                        std::span<const u8, 16>(encoded.data() + offset, 16), previous1, previous2);
+  }
+  return decoded;
+}
+
 [[nodiscard]] std::optional<DecodedSample> decodeSnesBrr(const Sample& sample, std::span<const u8> sourceBytes) {
   const auto offset = sample.encodedData.offset;
   const auto size = sample.encodedData.size;
@@ -316,6 +372,7 @@ SampleDecoderRegistry SampleDecoderRegistry::withDefaultDecoders() {
   registry.add(SampleDecoder{.codec = AudioCodec::SnesBrr, .decode = decodeSnesBrr});
   registry.add(SampleDecoder{.codec = AudioCodec::NdsImaAdpcm, .decode = decodeNdsImaAdpcm});
   registry.add(SampleDecoder{.codec = AudioCodec::NdsPsg, .decode = decodeNdsPsg});
+  registry.add(SampleDecoder{.codec = AudioCodec::PsxAdpcm, .decode = decodePsxAdpcm});
   return registry;
 }
 
