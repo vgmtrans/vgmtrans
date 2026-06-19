@@ -594,10 +594,8 @@ struct CapcomSnesCommandReader {
 const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngineVersion version) {
   static const CapcomSnesSequenceDescriptor none = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::none);
   static const CapcomSnesSequenceDescriptor v1 = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v1BgmInList);
-  static const CapcomSnesSequenceDescriptor v2 =
-      makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation);
-  static const CapcomSnesSequenceDescriptor v3 =
-      makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  static const CapcomSnesSequenceDescriptor v2 = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation);
+  static const CapcomSnesSequenceDescriptor v3 = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
 
   switch (version) {
     case CapcomSnesEngineVersion::v1BgmInList:
@@ -610,10 +608,6 @@ const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngin
       return none;
   }
   return none;
-}
-
-SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version) {
-  return capcomSnesSequenceDescriptor(version).dialect;
 }
 
 void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {

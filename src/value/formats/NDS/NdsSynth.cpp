@@ -362,17 +362,17 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
         continue;
       }
 
-      // The loop-start formula only makes sense when the source says the sample loops.
-      // Non-looping ADPCM samples commonly store zero here, so keep their loop fields sane.
-      if (loops) {
-        if (loopOffsetBytes < 4) {
-          continue;
-        }
+      // Legacy exports preserve ADPCM loop-offset metadata even when the SWAV
+      // loop flag is clear. Keep that metadata for SF2/DLS headers while
+      // Loop::enabled remains controlled by the loop flag.
+      if (loopOffsetBytes >= 4) {
         loopStart = ((loopOffsetBytes - 4) * 2) + 1;
         if (loopStart > *decodedSampleCount) {
           continue;
         }
         loopLength = *decodedSampleCount - loopStart;
+      } else if (loops) {
+        continue;
       } else {
         loopStart = 0;
         loopLength = *decodedSampleCount;

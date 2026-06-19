@@ -149,270 +149,204 @@ template <class Runtime>
          destination.value >= rt.state.sequenceEnd;
 }
 
+struct PreservedCommandSpec {
+  u8 opcode;
+  std::string_view name;
+  size_t operandBytes = 0;
+  std::string_view kind = {};
+};
+
+constexpr std::array<PreservedCommandSpec, 34> kPreservedCommands{{
+    {0x93, "Open Track", 4},
+    {0xa0, "Cmd with Random Value", 5, "random-value"},
+    {0xa1, "Cmd with Variable", 2, "variable-command"},
+    {0xa2, "If"},
+    {0xb0, "Set Variable", 3},
+    {0xb1, "Add Variable", 3},
+    {0xb2, "Sub Variable", 3},
+    {0xb3, "Mul Variable", 3},
+    {0xb4, "Div Variable", 3},
+    {0xb5, "Shift Variable", 3},
+    {0xb6, "Rand Variable", 3},
+    {0xb8, "If Variable ==", 3, "if-variable-equal"},
+    {0xb9, "If Variable >=", 3, "if-variable-greater-equal"},
+    {0xba, "If Variable >", 3, "if-variable-greater"},
+    {0xbb, "If Variable <=", 3, "if-variable-less-equal"},
+    {0xbc, "If Variable <", 3, "if-variable-less"},
+    {0xbd, "If Variable !=", 3, "if-variable-not-equal"},
+    {0xc2, "Master Volume", 1},
+    {0xc6, "Priority", 1},
+    {0xc8, "Tie", 1},
+    {0xc9, "Portamento Control", 1},
+    {0xcb, "Modulation Speed", 1},
+    {0xcc, "Modulation Type", 1},
+    {0xcd, "Modulation Range", 1},
+    {0xd0, "Attack Rate", 1},
+    {0xd1, "Decay Rate", 1},
+    {0xd2, "Sustain Level", 1},
+    {0xd3, "Release Rate", 1},
+    {0xd4, "Loop Start", 1},
+    {0xd6, "Print Variable", 1},
+    {0xe0, "Modulation Delay", 2},
+    {0xe3, "Sweep Pitch", 2},
+    {0xfc, "Loop End"},
+    {0xfe, "Allocate Track", 2},
+}};
+
+[[nodiscard]] const PreservedCommandSpec* preservedCommand(u8 opcode) {
+  const auto found = std::ranges::find_if(kPreservedCommands,
+                                          [opcode](const PreservedCommandSpec& spec) { return spec.opcode == opcode; });
+  return found == kPreservedCommands.end() ? nullptr : &*found;
+}
+
 struct NdsCommandReader {
   template <class Runtime>
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     const u8 opcode = cmd.opcode();
     if (opcode <= 0x7f) {
-      return note(cmd, rt, opcode);
+      cmd.name("Note")
+          .semantic(SequenceSemantic::Note)
+          .derived("key", static_cast<u64>(opcode), SourceValueDisplay::MidiNote);
+      const u8 velocity = cmd.u8("velocity");
+      const u32 duration = cmd.varLen("duration");
+      rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(opcode) + rt.state.transpose, 0, 127)),
+              LevelScale::linearFromMidi7(velocity), duration);
+      return rt.state.noteWait ? cmd.wait(duration) : cmd.next();
+    }
+
+    if (const auto* preserved = preservedCommand(opcode)) {
+      return preserve(cmd, preserved->name, preserved->operandBytes, preserved->kind);
     }
 
     switch (opcode) {
       case 0x80:
-        return rest(cmd);
-      case 0x81:
-        return program(cmd, rt);
-      case 0x93:
-        return preserve(cmd, "Open Track", 4);
-      case 0x94:
-        return jump(cmd, rt);
-      case 0x95:
-        return call(cmd, rt);
+        cmd.name("Rest").semantic(SequenceSemantic::Rest);
+        return cmd.wait(cmd.varLen("duration"));
+
+      case 0x81: {
+        cmd.name("Program").semantic(SequenceSemantic::Program);
+        const u32 raw = cmd.varLen("raw");
+        const u32 bank = raw >> 7;
+        const u32 program = raw & 0x7f;
+        cmd.derived("bank", static_cast<u64>(bank))
+            .derived("program", static_cast<u64>(program))
+            .instrumentRef(bank, program);
+        rt.instrument(bank, program);
+        return cmd.next();
+      }
+
+      case 0x94: {
+        cmd.name("Jump").semantic(SequenceSemantic::Jump);
+        const Address destination =
+            cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
+        if (decodeTargetOutsideSequence(cmd, rt, destination)) {
+          return cmd.end();
+        }
+        return cmd.jump(destination);
+      }
+
+      case 0x95: {
+        cmd.name("Call").semantic(SequenceSemantic::Call);
+        const Address destination =
+            cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
+        if (decodeTargetOutsideSequence(cmd, rt, destination)) {
+          return cmd.end();
+        }
+        return cmd.call(destination);
+      }
+
       case 0x96:
         return unsupported(cmd, rt, "Unsupported NDS SSEQ command stopped playback");
-      case 0xa0:
-        return preserve(cmd, "Cmd with Random Value", 5, "random-value");
-      case 0xa1:
-        return preserve(cmd, "Cmd with Variable", 2, "variable-command");
-      case 0xa2:
-        return preserve(cmd, "If");
-      case 0xb0:
-        return preserve(cmd, "Set Variable", 3);
-      case 0xb1:
-        return preserve(cmd, "Add Variable", 3);
-      case 0xb2:
-        return preserve(cmd, "Sub Variable", 3);
-      case 0xb3:
-        return preserve(cmd, "Mul Variable", 3);
-      case 0xb4:
-        return preserve(cmd, "Div Variable", 3);
-      case 0xb5:
-        return preserve(cmd, "Shift Variable", 3);
-      case 0xb6:
-        return preserve(cmd, "Rand Variable", 3);
-      case 0xb8:
-        return preserve(cmd, "If Variable ==", 3, "if-variable-equal");
-      case 0xb9:
-        return preserve(cmd, "If Variable >=", 3, "if-variable-greater-equal");
-      case 0xba:
-        return preserve(cmd, "If Variable >", 3, "if-variable-greater");
-      case 0xbb:
-        return preserve(cmd, "If Variable <=", 3, "if-variable-less-equal");
-      case 0xbc:
-        return preserve(cmd, "If Variable <", 3, "if-variable-less");
-      case 0xbd:
-        return preserve(cmd, "If Variable !=", 3, "if-variable-not-equal");
-      case 0xc0:
-        return pan(cmd, rt);
+
+      case 0xc0: {
+        cmd.name("Pan").semantic(SequenceSemantic::Pan);
+        const u8 raw = cmd.u8("pan");
+        rt.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0));
+        return cmd.next();
+      }
+
       case 0xc1:
-        return volume(cmd, rt);
-      case 0xc2:
-        return preserve(cmd, "Master Volume", 1);
+        cmd.name("Volume").semantic(SequenceSemantic::Level);
+        rt.level(LevelScale::linearFromMidi7(cmd.u8("volume")));
+        return cmd.next();
+
       case 0xc3:
-        return transpose(cmd, rt);
-      case 0xc4:
-        return pitchBend(cmd, rt);
-      case 0xc5:
-        return pitchBendRange(cmd, rt);
-      case 0xc6:
-        return preserve(cmd, "Priority", 1);
+        cmd.name("Transpose").semantic(SequenceSemantic::State);
+        rt.state.transpose = cmd.s8("semitones");
+        return cmd.next();
+
+      case 0xc4: {
+        cmd.name("Pitch Bend").semantic(SequenceSemantic::Pitch);
+        const s8 bend = cmd.s8("bend");
+        rt.pitchBend((static_cast<double>(bend) / 128.0) * rt.state.pitchBendRangeSemitones);
+        return cmd.next();
+      }
+
+      case 0xc5: {
+        cmd.name("Pitch Bend Range").semantic(SequenceSemantic::Pitch);
+        const u8 semitones = cmd.u8("semitones");
+        rt.state.pitchBendRangeSemitones = semitones;
+        rt.pitchBendRange(semitones);
+        return cmd.next();
+      }
+
       case 0xc7:
-        return noteWait(cmd, rt);
-      case 0xc8:
-        return preserve(cmd, "Tie", 1);
-      case 0xc9:
-        return preserve(cmd, "Portamento Control", 1);
-      case 0xca:
-        return modulationDepth(cmd, rt);
-      case 0xcb:
-        return preserve(cmd, "Modulation Speed", 1);
-      case 0xcc:
-        return preserve(cmd, "Modulation Type", 1);
-      case 0xcd:
-        return preserve(cmd, "Modulation Range", 1);
+        cmd.name("Note Wait").semantic(SequenceSemantic::State);
+        rt.state.noteWait = cmd.u8("enabled") != 0;
+        return cmd.next();
+
+      case 0xca: {
+        cmd.name("Modulation Depth").semantic(SequenceSemantic::Modulation);
+        const u8 depth = cmd.u8("depth");
+        rt.modulation(ModulationPerformanceTarget::VibratoDepth,
+                      std::clamp(static_cast<double>(depth) / 127.0, 0.0, 1.0));
+        return cmd.next();
+      }
+
       case 0xce:
-        return portamentoSwitch(cmd, rt);
+        cmd.name("Portamento").semantic(SequenceSemantic::Portamento);
+        rt.portamentoEnable(cmd.u8("enabled") != 0);
+        return cmd.next();
+
       case 0xcf:
-        return portamentoTime(cmd, rt);
-      case 0xd0:
-        return preserve(cmd, "Attack Rate", 1);
-      case 0xd1:
-        return preserve(cmd, "Decay Rate", 1);
-      case 0xd2:
-        return preserve(cmd, "Sustain Level", 1);
-      case 0xd3:
-        return preserve(cmd, "Release Rate", 1);
-      case 0xd4:
-        return preserve(cmd, "Loop Start", 1);
+        cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
+        rt.portamentoTime(static_cast<double>(cmd.u8("time")));
+        return cmd.next();
+
       case 0xd5:
-        return expression(cmd, rt);
-      case 0xd6:
-        return preserve(cmd, "Print Variable", 1);
-      case 0xe0:
-        return preserve(cmd, "Modulation Delay", 2);
-      case 0xe1:
-        return tempo(cmd, rt);
-      case 0xe3:
-        return preserve(cmd, "Sweep Pitch", 2);
-      case 0xfc:
-        return preserve(cmd, "Loop End");
+        cmd.name("Expression").kind("expression").semantic(SequenceSemantic::Level);
+        rt.expression(LevelScale::linearFromMidi7(cmd.u8("expression")));
+        return cmd.next();
+
+      case 0xe1: {
+        cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
+        const u16 bpm = cmd.u16le("bpm");
+        if (bpm != 0) {
+          rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
+        }
+        return cmd.next();
+      }
+
       case 0xfd:
         return cmd.name("Return")
             .kind("return")
             .semantic(SequenceSemantic::Return)
             .playbackStatus(CommandPlaybackStatus::AffectsControlFlow)
             .ret();
-      case 0xfe:
-        return preserve(cmd, "Allocate Track", 2);
+
       case 0xff:
         return cmd.name("End")
             .kind("end")
             .semantic(SequenceSemantic::End)
             .playbackStatus(CommandPlaybackStatus::StopsPlayback)
             .end();
+
       default:
         return unsupported(cmd, rt, "Unknown NDS SSEQ opcode stopped playback", "Unknown Opcode", "unknown");
     }
   }
 
 private:
-  template <class Runtime>
-  static CommandFlow note(VmCommandCursor& cmd, Runtime& rt, u8 key) {
-    cmd.name("Note")
-        .semantic(SequenceSemantic::Note)
-        .derived("key", static_cast<u64>(key), SourceValueDisplay::MidiNote);
-    const u8 velocity = cmd.u8("velocity");
-    const u32 duration = cmd.varLen("duration");
-    rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(key) + rt.state.transpose, 0, 127)),
-            LevelScale::linearFromMidi7(velocity), duration);
-    return rt.state.noteWait ? cmd.wait(duration) : cmd.next();
-  }
-
-  static CommandFlow rest(VmCommandCursor& cmd) {
-    cmd.name("Rest").semantic(SequenceSemantic::Rest);
-    return cmd.wait(cmd.varLen("duration"));
-  }
-
-  template <class Runtime>
-  static CommandFlow program(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Program").semantic(SequenceSemantic::Program);
-    const u32 raw = cmd.varLen("raw");
-    const u32 bank = raw >> 7;
-    const u32 program = raw & 0x7f;
-    cmd.derived("bank", static_cast<u64>(bank))
-        .derived("program", static_cast<u64>(program))
-        .instrumentRef(bank, program);
-    rt.instrument(bank, program);
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow jump(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Jump").semantic(SequenceSemantic::Jump);
-    const Address destination =
-        cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
-    if (decodeTargetOutsideSequence(cmd, rt, destination)) {
-      return cmd.end();
-    }
-    return cmd.jump(destination);
-  }
-
-  template <class Runtime>
-  static CommandFlow call(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Call").semantic(SequenceSemantic::Call);
-    const Address destination =
-        cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
-    if (decodeTargetOutsideSequence(cmd, rt, destination)) {
-      return cmd.end();
-    }
-    return cmd.call(destination);
-  }
-
-  template <class Runtime>
-  static CommandFlow pan(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Pan").semantic(SequenceSemantic::Pan);
-    const u8 raw = cmd.u8("pan");
-    rt.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0));
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow volume(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Volume").semantic(SequenceSemantic::Level);
-    rt.level(LevelScale::linearFromMidi7(cmd.u8("volume")));
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow expression(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Expression").kind("expression").semantic(SequenceSemantic::Level);
-    rt.expression(LevelScale::linearFromMidi7(cmd.u8("expression")));
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow transpose(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Transpose").semantic(SequenceSemantic::State);
-    rt.state.transpose = cmd.s8("semitones");
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow pitchBend(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Pitch Bend").semantic(SequenceSemantic::Pitch);
-    const s8 bend = cmd.s8("bend");
-    rt.pitchBend((static_cast<double>(bend) / 128.0) * rt.state.pitchBendRangeSemitones);
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow pitchBendRange(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Pitch Bend Range").semantic(SequenceSemantic::Pitch);
-    const u8 semitones = cmd.u8("semitones");
-    rt.state.pitchBendRangeSemitones = semitones;
-    rt.pitchBendRange(semitones);
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow noteWait(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Note Wait").semantic(SequenceSemantic::State);
-    rt.state.noteWait = cmd.u8("enabled") != 0;
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow modulationDepth(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Modulation Depth").semantic(SequenceSemantic::Modulation);
-    const u8 depth = cmd.u8("depth");
-    rt.modulation(ModulationPerformanceTarget::VibratoDepth, std::clamp(static_cast<double>(depth) / 127.0, 0.0, 1.0));
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow portamentoSwitch(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Portamento").semantic(SequenceSemantic::Portamento);
-    rt.portamentoEnable(cmd.u8("enabled") != 0);
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow portamentoTime(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Portamento Time").semantic(SequenceSemantic::Portamento);
-    rt.portamentoTime(static_cast<double>(cmd.u8("time")));
-    return cmd.next();
-  }
-
-  template <class Runtime>
-  static CommandFlow tempo(VmCommandCursor& cmd, Runtime& rt) {
-    cmd.name("Tempo").semantic(SequenceSemantic::Tempo);
-    const u16 bpm = cmd.u16le("bpm");
-    if (bpm != 0) {
-      rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
-    }
-    return cmd.next();
-  }
-
   template <class Runtime>
   static CommandFlow unsupported(VmCommandCursor& cmd, Runtime& rt, std::string_view message,
                                  std::string_view name = "Unsupported Command", std::string_view kind = "unsupported") {

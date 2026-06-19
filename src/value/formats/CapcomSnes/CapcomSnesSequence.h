@@ -24,7 +24,6 @@ struct CapcomSnesSequenceDescriptor {
 };
 
 [[nodiscard]] const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngineVersion version);
-[[nodiscard]] core::SequenceDialect capcomSnesSequenceDialect(CapcomSnesEngineVersion version);
 void registerCapcomSnesSequenceDialects(core::SequenceDialectRegistry& registry);
 
 [[nodiscard]] core::TrackProgram decodeCapcomSnesSourceTrack(core::ByteReader reader,
