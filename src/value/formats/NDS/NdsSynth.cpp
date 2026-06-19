@@ -280,9 +280,11 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
   }
   if (sourceMap != nullptr) {
     const u64 sampleTableSize = static_cast<u64>(*sampleCount) * 4;
-    sourceMap->table("SWAR Sample Offset Table", input.reader.range(range.offset + 0x3c, sampleTableSize))
-        .kind("swar-sample-offset-table")
-        .field("sample_count", input.reader.range(range.offset + 0x38, 4), *sampleCount);
+    if (const auto sampleTableRange = archive.range(0x3c, sampleTableSize, "SWAR sample offset table")) {
+      sourceMap->table("SWAR Sample Offset Table", *sampleTableRange)
+          .kind("swar-sample-offset-table")
+          .field("sample_count", sampleCount);
+    }
   }
 
   for (u32 i = 0; i < *sampleCount; ++i) {
@@ -302,8 +304,7 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
     }
     if (sourceMap != nullptr) {
       sourceMap
-          ->pointer("SWAR Sample Offset", input.reader.range(range.offset + *entryOffset, 4),
-                    SourceTarget{*sampleHeaderRange})
+          ->pointer("SWAR Sample Offset", sampleRelativeOffset.range, SourceTarget{*sampleHeaderRange})
           .kind("swar-sample-offset")
           .derived("sample_index", i);
     }
@@ -399,9 +400,9 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
           .role(SourceRole::Sample)
           .kind("swar-sample-header")
           .owner(ObjectRefs::sample(id, sampleIndex))
-          .field("wave_type", input.reader.range(sampleHeaderRange->offset, 1), *waveType, SourceValueDisplay::Hex)
-          .field("loop_flag", input.reader.range(sampleHeaderRange->offset + 1, 1), loops, SourceValueDisplay::Boolean)
-          .field("sample_rate", input.reader.range(sampleHeaderRange->offset + 2, 2), sampleRate);
+          .field("wave_type", waveType, SourceValueDisplay::Hex)
+          .field("loop_flag", loopFlag.range, loops, SourceValueDisplay::Boolean)
+          .field("sample_rate", rawSampleRate.range, sampleRate);
     }
     asset.samples.samples.push_back(Sample{
         .name = sampleName,

@@ -23,19 +23,19 @@ std::optional<SourceRange> ParseCursor::range(u64 relativeOffset, u64 size, std:
   return reader_.range(*absolute, size);
 }
 
-std::optional<u8> ParseCursor::u8(u64 relativeOffset, std::string_view field) {
+RangedValue<::u8> ParseCursor::u8(u64 relativeOffset, std::string_view field) {
   const auto absolute = absoluteOffset(relativeOffset, 1, field);
-  return absolute ? std::optional<::u8>{reader_.u8At(*absolute)} : std::nullopt;
+  return absolute ? RangedValue<::u8>{reader_.u8At(*absolute), reader_.range(*absolute, 1)} : RangedValue<::u8>{};
 }
 
-std::optional<u16> ParseCursor::le16(u64 relativeOffset, std::string_view field) {
+RangedValue<u16> ParseCursor::le16(u64 relativeOffset, std::string_view field) {
   const auto absolute = absoluteOffset(relativeOffset, 2, field);
-  return absolute ? std::optional<u16>{reader_.le16(*absolute)} : std::nullopt;
+  return absolute ? RangedValue<u16>{reader_.le16(*absolute), reader_.range(*absolute, 2)} : RangedValue<u16>{};
 }
 
-std::optional<u32> ParseCursor::le32(u64 relativeOffset, std::string_view field) {
+RangedValue<u32> ParseCursor::le32(u64 relativeOffset, std::string_view field) {
   const auto absolute = absoluteOffset(relativeOffset, 4, field);
-  return absolute ? std::optional<u32>{reader_.le32(*absolute)} : std::nullopt;
+  return absolute ? RangedValue<u32>{reader_.le32(*absolute), reader_.range(*absolute, 4)} : RangedValue<u32>{};
 }
 
 std::optional<u64> ParseCursor::absoluteOffset(u64 relativeOffset, u64 size, std::string_view field) {

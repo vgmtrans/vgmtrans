@@ -22,9 +22,9 @@ public:
 
   [[nodiscard]] bool ok() const noexcept { return ok_; }
   [[nodiscard]] std::optional<SourceRange> range(u64 relativeOffset, u64 size, std::string_view field);
-  [[nodiscard]] std::optional<u8> u8(u64 relativeOffset, std::string_view field);
-  [[nodiscard]] std::optional<u16> le16(u64 relativeOffset, std::string_view field);
-  [[nodiscard]] std::optional<u32> le32(u64 relativeOffset, std::string_view field);
+  [[nodiscard]] RangedValue<::u8> u8(u64 relativeOffset, std::string_view field);
+  [[nodiscard]] RangedValue<u16> le16(u64 relativeOffset, std::string_view field);
+  [[nodiscard]] RangedValue<u32> le32(u64 relativeOffset, std::string_view field);
 
 private:
   [[nodiscard]] std::optional<u64> absoluteOffset(u64 relativeOffset, u64 size, std::string_view field);
