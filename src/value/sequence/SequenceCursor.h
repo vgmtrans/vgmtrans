@@ -126,6 +126,8 @@ public:
   [[nodiscard]] CommandFlow wait(u32 ticks);
   [[nodiscard]] CommandFlow stop();
   [[nodiscard]] CommandFlow end();
+  [[nodiscard]] CommandFlow preserve(std::string_view displayName, size_t operandBytes = 0,
+                                     std::string_view kindOverride = {});
   [[nodiscard]] CommandFlow jump(Address destination);
   [[nodiscard]] CommandFlow call(Address destination);
   [[nodiscard]] CommandFlow invalidJump(Address destination, std::string_view message);
