@@ -37,12 +37,23 @@ struct OperandSpan {
   u32 size = 0;
 };
 
+struct ReferenceSpan {
+  u32 offset = 0;
+  u32 size = 0;
+};
+
 using CommandOperandValue = std::variant<u64, s64, double, std::string, Address>;
 
 struct CommandOperand {
   std::string name;
   CommandOperandValue value;
   SourceRange range;
+};
+
+struct CommandInstrumentReference {
+  u32 bank = 0;
+  u32 program = 0;
+  std::optional<SourceRange> range;
 };
 
 // Describes what a command means for playback. This is metadata for UI and
@@ -78,6 +89,8 @@ struct SourceCommand {
   SourceAnnotationId annotation;
   ByteSpan bytes;
   OperandSpan operands;
+  ReferenceSpan instrumentReferences;
+  bool referencesDecoded = false;
 };
 
 // Where decoding can continue after an opcode. Walkers use this before playback
@@ -188,11 +201,13 @@ struct TrackProgram {
   std::vector<CommandKind> commandKinds;
   std::vector<u8> commandBytes;
   std::vector<CommandOperand> operands;
+  std::vector<CommandInstrumentReference> commandInstrumentReferences;
 
   [[nodiscard]] const CommandKind* kind(CommandKindId id) const;
   [[nodiscard]] const CommandKind* kindForName(std::string_view kindName) const;
   [[nodiscard]] std::span<const u8> bytesFor(const SourceCommand& command) const;
   [[nodiscard]] std::span<const CommandOperand> operandsFor(const SourceCommand& command) const;
+  [[nodiscard]] std::span<const CommandInstrumentReference> instrumentReferencesFor(const SourceCommand& command) const;
 };
 
 struct SequenceInstrumentRef {
@@ -258,10 +273,14 @@ public:
 
   const SourceCommand& addDecoded(CommandHandlerId handler, CommandKindId kind, Address address, SourceRange range,
                                   std::span<const u8> bytes, std::span<const CommandOperand> operands,
-                                  SourceAnnotationId annotation = {});
+                                  SourceAnnotationId annotation = {},
+                                  std::span<const CommandInstrumentReference> instrumentReferences = {},
+                                  bool referencesDecoded = false);
   const SourceCommand& addDecoded(CommandHandlerId handler, const CommandKind& kind, Address address, SourceRange range,
                                   std::span<const u8> bytes, std::span<const CommandOperand> operands,
-                                  SourceAnnotationId annotation = {});
+                                  SourceAnnotationId annotation = {},
+                                  std::span<const CommandInstrumentReference> instrumentReferences = {},
+                                  bool referencesDecoded = false);
 
 private:
   [[nodiscard]] CommandKindId addOrReuseKind(const CommandKind& kind);

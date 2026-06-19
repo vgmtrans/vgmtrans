@@ -54,9 +54,9 @@ RepeatBreakFlow::RepeatBreakFlow(CommandFlow flow, bool taken) : flow_(flow), ta
 
 VmCommandCursor::VmCommandCursor(CommandPhase phase, SourceRange commandRange, std::span<const ::u8> bytes,
                                  SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
-                                 std::vector<CommandOperand>* operands)
+                                 std::vector<CommandOperand>* operands, CommandReferences* references)
     : phase_(phase), commandRange_(commandRange), bytes_(bytes), sourceMap_(sourceMap), diagnostics_(diagnostics),
-      operands_(operands) {
+      operands_(operands), references_(references) {
   if (bytes_.empty()) {
     markTruncated("opcode", commandRange_);
   }
@@ -314,6 +314,9 @@ VmCommandCursor& VmCommandCursor::target(Address address, SourceLinkRole role) {
 }
 
 VmCommandCursor& VmCommandCursor::instrumentRef(u32 bank, u32 program) {
+  if (references_ != nullptr) {
+    references_->instrument(bank, program);
+  }
   if (sourceMap_ == nullptr) {
     return *this;
   }
@@ -333,24 +336,12 @@ VmCommandCursor& VmCommandCursor::sampleRef(u32 sampleIndex) {
 }
 
 VmCommandCursor& VmCommandCursor::warning(std::string_view message) {
-  if (diagnostics_ != nullptr) {
-    diagnostics_->push_back(Diagnostic{
-        .severity = Severity::Warning,
-        .message = std::string(message),
-        .range = commandRange_,
-    });
-  }
+  queueDiagnostic(Severity::Warning, message);
   return *this;
 }
 
 VmCommandCursor& VmCommandCursor::error(std::string_view message) {
-  if (diagnostics_ != nullptr) {
-    diagnostics_->push_back(Diagnostic{
-        .severity = Severity::Error,
-        .message = std::string(message),
-        .range = commandRange_,
-    });
-  }
+  queueDiagnostic(Severity::Error, message);
   return *this;
 }
 
@@ -359,6 +350,22 @@ VmCommandCursor& VmCommandCursor::unsupported(std::string_view message) {
   playbackStatus(CommandPlaybackStatus::Unsupported);
   warning(message);
   return *this;
+}
+
+void VmCommandCursor::finalizeDiagnostics(SourceRange commandRange) {
+  if (diagnostics_ == nullptr) {
+    pendingDiagnostics_.clear();
+    return;
+  }
+
+  for (auto& diagnostic : pendingDiagnostics_) {
+    diagnostics_->push_back(Diagnostic{
+        .severity = diagnostic.severity,
+        .message = std::move(diagnostic.message),
+        .range = diagnostic.range.value_or(commandRange),
+    });
+  }
+  pendingDiagnostics_.clear();
 }
 
 CommandFlow VmCommandCursor::next() {
@@ -483,6 +490,17 @@ void VmCommandCursor::markTruncated(std::string_view field, SourceRange range) {
         .range = range,
     });
   }
+}
+
+void VmCommandCursor::queueDiagnostic(Severity severity, std::string_view message, std::optional<SourceRange> range) {
+  if (diagnostics_ == nullptr) {
+    return;
+  }
+  pendingDiagnostics_.push_back(PendingDiagnostic{
+      .severity = severity,
+      .message = std::string(message),
+      .range = range,
+  });
 }
 
 bool VmCommandCursor::readByte(std::string_view field, ::u8& out) {

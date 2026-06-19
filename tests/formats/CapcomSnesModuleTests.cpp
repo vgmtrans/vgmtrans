@@ -915,6 +915,47 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
       "CapcomSnes repeat-break branch should apply note attributes before the branch target plays");
 }
 
+void capcomSnesDialectDecodesRepeatBreakSideTargets() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x12;
+  bytes[0x3001] = 0x00;
+  bytes[0x3002] = 0x30;
+  bytes[0x3003] = 0x06;
+  bytes[0x3004] = 0x17;
+  bytes[0x3006] = 0x41;
+  bytes[0x3007] = 0x17;
+
+  const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  const SequenceDialect& dialect = descriptor.dialect;
+  ScanIdAllocator ids;
+  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
+  std::vector<Diagnostic> diagnostics;
+  const TrackProgram track =
+      decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000, &sourceMap, &diagnostics);
+
+  expect(track.commands.size() == 4,
+         "CapcomSnes linear decode should preserve repeat-break side target commands after fallthrough");
+  expect(dialect.describe(track, track.commands[0]).detailKind == "capcom-snes.repeat-break",
+         "CapcomSnes side-target fixture should start with repeat break");
+  expect(dialect.describe(track, track.commands[1]).detailKind == "capcom-snes.end",
+         "CapcomSnes side-target fixture should keep the fallthrough end command");
+  expect(dialect.describe(track, track.commands[2]).detailKind == "capcom-snes.note",
+         "CapcomSnes side-target fixture should decode the out-of-line repeat-break target");
+  expect(diagnostics.empty(), "CapcomSnes side-target fixture should decode without diagnostics");
+
+  const SourceMap annotations = sourceMap.finish();
+  const auto repeatBreakAnnotations = annotations.withSequenceSemantic(SourceId{8}, SequenceSemantic::RepeatBreak);
+  expect(repeatBreakAnnotations.size() == 1, "CapcomSnes repeat-break should publish a source annotation");
+  const SourceAnnotation& repeatBreak = annotations.get(repeatBreakAnnotations.front());
+  const auto link = std::ranges::find_if(repeatBreak.links, [](const SourceLink& sourceLink) {
+    return sourceLink.role == SourceLinkRole::RepeatTarget;
+  });
+  expect(link != repeatBreak.links.end(), "CapcomSnes repeat-break should link to its side target");
+  const auto* targetRange = std::get_if<SourceRange>(&link->target);
+  expect(targetRange != nullptr && targetRange->source == SourceId{8} && targetRange->offset == 0x3006,
+         "CapcomSnes repeat-break source link should point at the out-of-line target");
+}
+
 void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x1e;

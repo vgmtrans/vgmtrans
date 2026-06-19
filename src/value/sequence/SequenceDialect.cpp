@@ -139,6 +139,18 @@ CommandInfo SequenceDialect::describe(const TrackProgram& track, const SourceCom
 
 std::vector<CommandInstrumentReference> SequenceDialect::instrumentReferences(const TrackProgram& track,
                                                                               const SourceCommand& command) const {
+  if (command.referencesDecoded) {
+    std::vector<CommandInstrumentReference> instruments;
+    const auto stored = track.instrumentReferencesFor(command);
+    instruments.assign(stored.begin(), stored.end());
+    for (auto& instrument : instruments) {
+      if (!instrument.range && command.range.valid()) {
+        instrument.range = command.range;
+      }
+    }
+    return instruments;
+  }
+
   const auto* commandHandler = handler(command.handler);
   if (commandHandler == nullptr || commandHandler->collectReferences == nullptr) {
     return {};

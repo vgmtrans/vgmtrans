@@ -62,6 +62,40 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
          "source map should filter annotations by sequence semantic");
 }
 
+void sourceMapRejectsDuplicateAnnotationIds() {
+  bool sourceMapThrew = false;
+  try {
+    static_cast<void>(SourceMap{{
+        SourceAnnotation{
+            .id = SourceAnnotationId{7},
+            .range = SourceRange{.source = SourceId{3}, .offset = 0, .size = 1},
+            .role = SourceRole::Header,
+            .label = "First",
+        },
+        SourceAnnotation{
+            .id = SourceAnnotationId{7},
+            .range = SourceRange{.source = SourceId{3}, .offset = 1, .size = 1},
+            .role = SourceRole::Header,
+            .label = "Second",
+        },
+    }});
+  } catch (const std::logic_error&) {
+    sourceMapThrew = true;
+  }
+  expect(sourceMapThrew, "source map should reject duplicate annotation ids");
+
+  SourceMapBuilder builder([]() { return SourceAnnotationId{9}; });
+  static_cast<void>(builder.header("First", SourceRange{.source = SourceId{3}, .offset = 0, .size = 1}));
+
+  bool builderThrew = false;
+  try {
+    static_cast<void>(builder.header("Second", SourceRange{.source = SourceId{3}, .offset = 1, .size = 1}));
+  } catch (const std::logic_error&) {
+    builderThrew = true;
+  }
+  expect(builderThrew, "source map builder should reject duplicate annotation ids from its allocator");
+}
+
 void sessionSnapshotCarriesScannerSourceMap() {
   Session session;
   session.formats().add(probeExplicitCollectionModule());
@@ -88,5 +122,6 @@ void sessionSnapshotCarriesScannerSourceMap() {
 
 void runValueSourceMapTests() {
   sourceMapBuilderRecordsAnnotationsFieldsAndLinks();
+  sourceMapRejectsDuplicateAnnotationIds();
   sessionSnapshotCarriesScannerSourceMap();
 }

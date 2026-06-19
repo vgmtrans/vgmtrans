@@ -242,6 +242,7 @@ struct NdsCommandReader {
         const Address destination =
             cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
         if (decodeTargetOutsideSequence(cmd, rt, destination)) {
+          cmd.target(destination, SourceLinkRole::JumpTarget).warning("Jump target outside sequence data");
           return cmd.end();
         }
         return cmd.jump(destination);
@@ -252,6 +253,7 @@ struct NdsCommandReader {
         const Address destination =
             cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
         if (decodeTargetOutsideSequence(cmd, rt, destination)) {
+          cmd.target(destination, SourceLinkRole::CallTarget).warning("Call target outside sequence data");
           return cmd.end();
         }
         return cmd.call(destination);

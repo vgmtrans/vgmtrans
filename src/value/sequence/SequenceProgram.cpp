@@ -242,6 +242,14 @@ std::span<const CommandOperand> TrackProgram::operandsFor(const SourceCommand& c
   return std::span<const CommandOperand>(operands).subspan(command.operands.offset, command.operands.size);
 }
 
+std::span<const CommandInstrumentReference> TrackProgram::instrumentReferencesFor(const SourceCommand& command) const {
+  if (command.instrumentReferences.offset + command.instrumentReferences.size > commandInstrumentReferences.size()) {
+    throw std::out_of_range("SourceCommand instrument-reference span is outside its TrackProgram pool");
+  }
+  return std::span<const CommandInstrumentReference>(commandInstrumentReferences)
+      .subspan(command.instrumentReferences.offset, command.instrumentReferences.size);
+}
+
 const TrackProgram* trackById(const SequenceProgram& program, TrackId id) {
   if (id.valid() && id.value < program.tracks.size()) {
     const auto& track = program.tracks[id.value];
@@ -312,7 +320,9 @@ CommandKindId TrackProgramBuilder::addOrReuseKind(const CommandKind& kind) {
 const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, CommandKindId kind, Address address,
                                                      SourceRange range, std::span<const u8> bytes,
                                                      std::span<const CommandOperand> operands,
-                                                     SourceAnnotationId annotation) {
+                                                     SourceAnnotationId annotation,
+                                                     std::span<const CommandInstrumentReference> instrumentReferences,
+                                                     bool referencesDecoded) {
   if (bytes.empty()) {
     throw std::invalid_argument("Sequence source commands must include an opcode byte");
   }
@@ -329,6 +339,10 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, C
   const auto operandOffset = static_cast<u32>(track_.operands.size());
   track_.operands.insert(track_.operands.end(), operands.begin(), operands.end());
 
+  const auto instrumentReferenceOffset = static_cast<u32>(track_.commandInstrumentReferences.size());
+  track_.commandInstrumentReferences.insert(track_.commandInstrumentReferences.end(), instrumentReferences.begin(),
+                                            instrumentReferences.end());
+
   track_.commands.push_back(SourceCommand{
       .id = CommandId{commandIndex},
       .handler = handler,
@@ -340,6 +354,9 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, C
       .annotation = annotation,
       .bytes = ByteSpan{.offset = byteOffset, .size = static_cast<u32>(bytes.size())},
       .operands = OperandSpan{.offset = operandOffset, .size = static_cast<u32>(operands.size())},
+      .instrumentReferences =
+          ReferenceSpan{.offset = instrumentReferenceOffset, .size = static_cast<u32>(instrumentReferences.size())},
+      .referencesDecoded = referencesDecoded,
   });
   track_.addressIndex.add(address, commandIndex);
   return track_.commands.back();
@@ -348,8 +365,11 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, C
 const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, const CommandKind& kind, Address address,
                                                      SourceRange range, std::span<const u8> bytes,
                                                      std::span<const CommandOperand> operands,
-                                                     SourceAnnotationId annotation) {
-  return addDecoded(handler, addOrReuseKind(kind), address, range, bytes, operands, annotation);
+                                                     SourceAnnotationId annotation,
+                                                     std::span<const CommandInstrumentReference> instrumentReferences,
+                                                     bool referencesDecoded) {
+  return addDecoded(handler, addOrReuseKind(kind), address, range, bytes, operands, annotation, instrumentReferences,
+                    referencesDecoded);
 }
 
 }  // namespace vgmtrans::core

@@ -96,12 +96,6 @@ struct CommandInfo {
   void field(std::string fieldName, Address value);
 };
 
-struct CommandInstrumentReference {
-  u32 bank = 0;
-  u32 program = 0;
-  std::optional<SourceRange> range;
-};
-
 // Commands can declare relationships they imply, such as "this selects
 // instrument bank/program X". Parsers decide which instrument set that refers to.
 class CommandReferences {

@@ -64,6 +64,18 @@ struct CursorProbeReader {
   }
 };
 
+struct RepeatBreakProbeVm {
+  bool called = false;
+
+  BranchResult countedRepeatBreak(u8, Address) {
+    called = true;
+    return BranchResult{
+        .taken = true,
+        .effects = Effects{.step = Step::jump(Address{4}, JumpSemantics::FiniteBranch)},
+    };
+  }
+};
+
 void bytecodeMapRejectsIncompatibleHandlerReuse() {
   SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
   BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
@@ -218,6 +230,50 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
          "cursor-backed render should rerun saved bytes with real runtime state");
   expect(note != nullptr && note->header.sourceAnnotation == program.tracks[0].commands[1].annotation,
          "cursor-backed performance events should retain source annotation origin");
+}
+
+void cursorDialectReportsWarningsOnFinalCommandRange() {
+  const SequenceDialect dialect =
+      makeCursorDialect<CursorProbeState, CursorProbeContext, CursorProbeReader>(CursorDialectSpec<CursorProbeContext>{
+          .id = "cursor-probe",
+          .commandKindPrefix = "cursor-probe",
+          .timebase = Timebase{.ppqn = 48},
+          .context = CursorProbeContext{.velocity = 0.25},
+      });
+
+  const std::vector<u8> bytes{0xfe, 0xff};
+  const ByteReader reader(SourceId{0}, bytes);
+  ScanIdAllocator ids;
+  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
+  std::vector<Diagnostic> diagnostics;
+  const BytecodeDecodeContext decodeContext{
+      .bytecodeEnd = static_cast<u32>(bytes.size()),
+      .sourceMap = &sourceMap,
+      .diagnostics = &diagnostics,
+  };
+  auto decodeState = makeDecodeCursorState<CursorProbeState, CursorProbeContext>(
+      decodeContext, cursorContext<CursorProbeContext>(dialect));
+  auto track = decodeLinearBytecodeTrack(reader, 0, 0, LinearBytecodeDecodePolicy{}, [&](u32 offset) {
+    return decodeCursorCommandWithState<CursorProbeState, CursorProbeContext, CursorProbeReader>(
+        reader, offset, dialect, decodeState, decodeContext);
+  });
+
+  expect(track.commands.size() == 1, "unsupported cursor command should stop linear decode");
+  expect(diagnostics.size() == 1 && diagnostics[0].message == "Unsupported cursor probe opcode",
+         "unsupported cursor command should report one warning");
+  expect(diagnostics[0].range && sameRange(*diagnostics[0].range, SourceRange{SourceId{0}, 0, 1}),
+         "cursor warnings should use the final decoded command range");
+}
+
+void cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead() {
+  const std::array<u8, 1> bytes{0x12};
+  VmCommandCursor cursor(CommandPhase::Render, probeRange(0, bytes.size()), bytes);
+  static_cast<void>(cursor.u8("missing"));
+
+  RepeatBreakProbeVm vm;
+  const RepeatBreakFlow flow = detail::resolveRenderCursorRepeatBreak(cursor, vm, 0, Address{4});
+  expect(!vm.called, "truncated cursor repeat-break should not ask the VM to mutate repeat state");
+  expect(!flow.taken() && flow.flow().truncated, "truncated cursor repeat-break should remain an untaken truncation");
 }
 
 void cursorDialectSuppressesMalformedRenderEvents() {
@@ -458,6 +514,8 @@ void runValueRegistryTests() {
   bytecodeMapUsesCommandLocalMetadata();
   bytecodeMapAllowsOneHandlerForSeveralKinds();
   cursorDialectDecodesAnnotationsAndRendersThroughVm();
+  cursorDialectReportsWarningsOnFinalCommandRange();
+  cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead();
   cursorDialectSuppressesMalformedRenderEvents();
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();

@@ -132,6 +132,14 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   bytes[trackStart + 1] = 0x81;
   bytes[trackStart + 2] = 0x05;
   bytes[trackStart + 3] = 0xff;
+  const TrackProgram programTrack =
+      decodeNdsSequenceTrack(ByteReader(SourceId{4}, bytes), descriptor, sequenceOffset, trackStart + 4, trackStart, 0);
+  expect(programTrack.commands.size() == 2, "NDS program reference fixture should decode program and end commands");
+  const auto decodedProgramReferences = programTrack.instrumentReferencesFor(programTrack.commands[0]);
+  expect(decodedProgramReferences.size() == 1 && decodedProgramReferences[0].bank == 1 &&
+             decodedProgramReferences[0].program == 5 && decodedProgramReferences[0].range &&
+             decodedProgramReferences[0].range->offset == trackStart && decodedProgramReferences[0].range->size == 3,
+         "NDS program command should store decoded instrument references on the source command");
   ScanIdAllocator ids;
   ScanInput input{
       .source = SourceFile{.name = "program.sseq"},
@@ -406,6 +414,55 @@ void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {
          "NDS unterminated variable-length command should use the truncated-command fallback");
   expect(track.bytesFor(track.commands[0]).size() == 1 && track.bytesFor(track.commands[0])[0] == 0x80,
          "NDS truncated command should preserve only the opcode byte");
+}
+
+void ndsSequenceDialectLinksInvalidControlTargets() {
+  constexpr u32 sequenceOffset = 0x100;
+  constexpr u32 trackStart = sequenceOffset + 0x1c;
+  constexpr u32 invalidRelativeTarget = 0x80;
+  constexpr u32 sequenceEnd = trackStart + 4;
+  const auto& descriptor = ndsSequenceDescriptor();
+  const SequenceDialect& dialect = descriptor.dialect;
+
+  const auto checkInvalidTarget = [&](u8 opcode, SequenceSemantic semantic, SourceLinkRole role,
+                                      std::string_view detailKind, std::string_view warning) {
+    std::vector<u8> bytes(0x1c0);
+    bytes[trackStart + 0] = opcode;
+    bytes[trackStart + 1] = static_cast<u8>(invalidRelativeTarget & 0xff);
+    bytes[trackStart + 2] = static_cast<u8>((invalidRelativeTarget >> 8) & 0xff);
+    bytes[trackStart + 3] = static_cast<u8>((invalidRelativeTarget >> 16) & 0xff);
+
+    ScanIdAllocator ids;
+    SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
+    std::vector<Diagnostic> diagnostics;
+    const TrackProgram track =
+        decodeNdsSequenceTrack(ByteReader(SourceId{14}, bytes), descriptor, sequenceOffset, sequenceEnd, trackStart, 0,
+                               false, &sourceMap, &diagnostics);
+
+    expect(track.commands.size() == 1 && dialect.describe(track, track.commands[0]).detailKind == detailKind,
+           "NDS invalid control target should preserve the source command");
+    expect(diagnostics.size() == 1 && diagnostics[0].message == warning,
+           "NDS invalid control target should report a decode warning");
+    expect(diagnostics[0].range && diagnostics[0].range->source == SourceId{14} &&
+               diagnostics[0].range->offset == trackStart && diagnostics[0].range->size == 4,
+           "NDS invalid control-target diagnostic should use the command range");
+
+    const SourceMap annotations = sourceMap.finish();
+    const auto commandAnnotations = annotations.withSequenceSemantic(SourceId{14}, semantic);
+    expect(commandAnnotations.size() == 1, "NDS invalid control target should publish a source annotation");
+    const SourceAnnotation& command = annotations.get(commandAnnotations.front());
+    const auto link =
+        std::ranges::find_if(command.links, [role](const SourceLink& sourceLink) { return sourceLink.role == role; });
+    expect(link != command.links.end(), "NDS invalid control target should keep its source link");
+    const auto* targetRange = std::get_if<SourceRange>(&link->target);
+    expect(targetRange != nullptr && targetRange->offset == trackStart + invalidRelativeTarget,
+           "NDS invalid control-target source link should point at the decoded destination");
+  };
+
+  checkInvalidTarget(0x94, SequenceSemantic::Jump, SourceLinkRole::JumpTarget, "nds.jump",
+                     "Jump target outside sequence data");
+  checkInvalidTarget(0x95, SequenceSemantic::Call, SourceLinkRole::CallTarget, "nds.call",
+                     "Call target outside sequence data");
 }
 
 void ndsMalformedRecoveryKeepsExecutableJumps() {
