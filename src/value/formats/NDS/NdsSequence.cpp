@@ -215,7 +215,7 @@ struct NdsCommandReader {
     }
 
     if (const auto* preserved = preservedCommand(opcode)) {
-      return preserve(cmd, preserved->name, preserved->operandBytes, preserved->kind);
+      return cmd.preserve(preserved->name, preserved->operandBytes, preserved->kind);
     }
 
     switch (opcode) {
@@ -345,18 +345,6 @@ private:
     cmd.name(name, SequenceSemantic::Unsupported).kind(kind).unsupported(message);
     renderWarning(rt, std::string(message));
     return cmd.end();
-  }
-
-  static CommandFlow preserve(VmCommandCursor& cmd, std::string_view name, size_t operandBytes = 0,
-                              std::string_view kind = {}) {
-    cmd.name(name, SequenceSemantic::Meta).sourceOnly();
-    if (!kind.empty()) {
-      cmd.kind(kind);
-    }
-    if (operandBytes > 0) {
-      static_cast<void>(cmd.rawBytes("bytes", operandBytes));
-    }
-    return cmd.next();
   }
 };
 

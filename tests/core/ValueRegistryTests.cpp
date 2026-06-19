@@ -285,6 +285,24 @@ void cursorFlowHelpersInferMetadata() {
          "flow helper defaults should not override explicit command metadata");
 }
 
+void cursorPreserveRecordsMetadataAndBytes() {
+  const std::array<u8, 3> bytes{0xe0, 0x12, 0x34};
+  std::vector<CommandOperand> operands;
+  VmCommandCursor cursor(CommandPhase::Decode, probeRange(10, bytes.size()), bytes, nullptr, nullptr, &operands);
+
+  const CommandFlow flow = cursor.preserve("Ignored Command", 2, "ignored-command");
+  const CommandKind kind = cursor.commandKind("cursor-probe");
+
+  expect(flow.kind == FlowKind::Next, "preserved cursor command should continue to the next command");
+  expect(kind.name == "Ignored Command" && kind.detailKind == "cursor-probe.ignored-command" &&
+             kind.semantic == SequenceSemantic::Meta && kind.playbackStatus == CommandPlaybackStatus::SourceOnly,
+         "preserved cursor command should use source-only meta metadata");
+  expect(operands.size() == 1 && operands[0].name == "bytes" && std::get<std::string>(operands[0].value) == "12 34",
+         "preserved cursor command should record raw operand bytes");
+  expect(sameRange(operands[0].range, SourceRange{.source = SourceId{0}, .offset = 11, .size = 2}),
+         "preserved cursor command should preserve the raw-byte operand range");
+}
+
 void cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead() {
   const std::array<u8, 1> bytes{0x12};
   VmCommandCursor cursor(CommandPhase::Render, probeRange(0, bytes.size()), bytes);
@@ -536,6 +554,7 @@ void runValueRegistryTests() {
   cursorDialectDecodesAnnotationsAndRendersThroughVm();
   cursorDialectReportsWarningsOnFinalCommandRange();
   cursorFlowHelpersInferMetadata();
+  cursorPreserveRecordsMetadataAndBytes();
   cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead();
   cursorDialectSuppressesMalformedRenderEvents();
   formatRegistryStoresCopyableModuleValues();

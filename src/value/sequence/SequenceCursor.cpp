@@ -396,6 +396,18 @@ CommandFlow VmCommandCursor::end() {
   return flow(FlowKind::End);
 }
 
+CommandFlow VmCommandCursor::preserve(std::string_view displayName, size_t operandBytes,
+                                      std::string_view kindOverride) {
+  name(displayName, SequenceSemantic::Meta).sourceOnly();
+  if (!kindOverride.empty()) {
+    kind(kindOverride);
+  }
+  if (operandBytes > 0) {
+    static_cast<void>(rawBytes("bytes", operandBytes));
+  }
+  return next();
+}
+
 CommandFlow VmCommandCursor::jump(Address destination) {
   defaultSemantic(SequenceSemantic::Jump);
   defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
