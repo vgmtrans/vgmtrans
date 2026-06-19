@@ -32,6 +32,9 @@ namespace {
 
 constexpr u8 kNds2sfVersion = 0x24;
 constexpr u8 kNcsfVersion = 0x25;
+constexpr u8 kPsf1Version = 0x01;
+constexpr size_t kPsf1DataOffset = 0x800;
+constexpr size_t kPsf1LoadAddressOffset = 0x18;
 constexpr int kMaxRecursion = 10;
 
 struct PsfData {
@@ -49,11 +52,13 @@ struct Image {
 };
 
 [[nodiscard]] bool supportedVersion(u8 version) {
-  return version == kNds2sfVersion || version == kNcsfVersion;
+  return version == kPsf1Version || version == kNds2sfVersion || version == kNcsfVersion;
 }
 
 [[nodiscard]] std::optional<size_t> dataOffsetForVersion(u8 version) {
   switch (version) {
+    case kPsf1Version:
+      return kPsf1DataOffset;
     case kNds2sfVersion:
       return 0x08;
     case kNcsfVersion:
@@ -239,15 +244,17 @@ void overlay(Image& image, u32 address, const u8* data, size_t size) {
 
 void overlayPsfExe(const PsfData& psf, Image& image) {
   // The first word of the decompressed executable gives the load address. The playable
-  // data begins after a version-specific mini-header.
+  // data begins after a version-specific mini-header. PSF1 is the exception: it stores
+  // a PS-X EXE header, with the load address at 0x18 and the payload at 0x800.
   if (psf.exe.empty()) {
     return;
   }
   const auto dataOffset = dataOffsetForVersion(psf.version);
-  if (!dataOffset || psf.exe.size() < *dataOffset || psf.exe.size() < 4) {
+  const size_t addressOffset = psf.version == kPsf1Version ? kPsf1LoadAddressOffset : 0;
+  if (!dataOffset || psf.exe.size() < *dataOffset || psf.exe.size() < addressOffset + 4) {
     throw std::runtime_error("PSF executable header is invalid");
   }
-  const u32 address = le32(psf.exe, 0);
+  const u32 address = le32(psf.exe, addressOffset);
   overlay(image, address, psf.exe.data() + *dataOffset, psf.exe.size() - *dataOffset);
 }
 
