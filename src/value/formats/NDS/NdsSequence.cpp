@@ -136,13 +136,8 @@ struct TrackState {
 }
 
 template <class Runtime>
-void renderWarning(Runtime& rt, std::string message) {
-  if constexpr (requires { rt.vm.diagnostic(Diagnostic{}); }) {
-    rt.vm.diagnostic(Diagnostic{
-        .severity = Severity::Warning,
-        .message = std::move(message),
-    });
-  }
+void renderWarning(Runtime& rt, std::string_view message) {
+  rt.diagnostic(Severity::Warning, message);
 }
 
 template <class Runtime>
@@ -343,7 +338,7 @@ private:
   static CommandFlow unsupported(VmCommandCursor& cmd, Runtime& rt, std::string_view message,
                                  std::string_view name = "Unsupported Command", std::string_view kind = "unsupported") {
     cmd.name(name, SequenceSemantic::Unsupported).kind(kind).unsupported(message);
-    renderWarning(rt, std::string(message));
+    renderWarning(rt, message);
     return cmd.end();
   }
 };
