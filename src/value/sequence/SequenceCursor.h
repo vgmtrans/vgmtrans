@@ -12,6 +12,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -112,8 +113,18 @@ public:
 
   VmCommandCursor& derived(std::string_view name, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
+  template <class T>
+  VmCommandCursor& derived(std::string_view name, T&& value,
+                           SourceValueDisplay display = SourceValueDisplay::Default) {
+    return derived(name, makeSourceValue(std::forward<T>(value)), display);
+  }
   VmCommandCursor& detail(std::string_view name, SourceValue value,
                           SourceValueDisplay display = SourceValueDisplay::Default);
+  template <class T>
+  VmCommandCursor& detail(std::string_view name, T&& value,
+                          SourceValueDisplay display = SourceValueDisplay::Default) {
+    return detail(name, makeSourceValue(std::forward<T>(value)), display);
+  }
   VmCommandCursor& target(Address address, SourceLinkRole role);
   VmCommandCursor& instrumentRef(u32 bank, u32 program);
   VmCommandCursor& sampleRef(u32 sampleIndex);

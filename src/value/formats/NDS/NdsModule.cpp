@@ -47,14 +47,12 @@ namespace {
 
 void annotateNdsLayout(ByteReader reader, const NdsLayout& layout, SourceMapBuilder& sourceMap) {
   sourceMap.header("SDAT Header", reader.range(layout.baseOffset, 0x24))
-      .field("file_size", reader.range(layout.baseOffset + 8, 4), static_cast<u64>(layout.length),
-             SourceValueDisplay::Hex)
-      .field("symb_offset", reader.range(layout.baseOffset + 0x10, 4), static_cast<u64>(layout.symbOffset),
+      .field("file_size", reader.range(layout.baseOffset + 8, 4), layout.length, SourceValueDisplay::Hex)
+      .field("symb_offset", reader.range(layout.baseOffset + 0x10, 4), layout.symbOffset,
              SourceValueDisplay::Address)
-      .field("info_offset", reader.range(layout.baseOffset + 0x18, 4), static_cast<u64>(layout.infoOffset),
+      .field("info_offset", reader.range(layout.baseOffset + 0x18, 4), layout.infoOffset,
              SourceValueDisplay::Address)
-      .field("fat_offset", reader.range(layout.baseOffset + 0x20, 4), static_cast<u64>(layout.fatOffset),
-             SourceValueDisplay::Address);
+      .field("fat_offset", reader.range(layout.baseOffset + 0x20, 4), layout.fatOffset, SourceValueDisplay::Address);
 
   if (layout.hasSymb) {
     const u32 symbSize = boundedSectionSize(reader, layout.symbOffset, 0x18);

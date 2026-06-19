@@ -8,12 +8,15 @@
 
 #include "value/base/CoreTypes.h"
 
+#include <concepts>
 #include <optional>
 #include <functional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -67,6 +70,37 @@ enum class SequenceSemantic : u8 {
 };
 
 using SourceValue = std::variant<std::monostate, bool, u64, s64, double, std::string>;
+
+[[nodiscard]] inline SourceValue makeSourceValue(SourceValue value) {
+  return value;
+}
+
+[[nodiscard]] inline SourceValue makeSourceValue(bool value) {
+  return SourceValue{value};
+}
+
+template <std::integral T>
+  requires(!std::same_as<std::remove_cvref_t<T>, bool>)
+[[nodiscard]] SourceValue makeSourceValue(T value) {
+  if constexpr (std::is_signed_v<T>) {
+    return SourceValue{static_cast<s64>(value)};
+  } else {
+    return SourceValue{static_cast<u64>(value)};
+  }
+}
+
+template <std::floating_point T>
+[[nodiscard]] SourceValue makeSourceValue(T value) {
+  return SourceValue{static_cast<double>(value)};
+}
+
+[[nodiscard]] inline SourceValue makeSourceValue(std::string value) {
+  return SourceValue{std::move(value)};
+}
+
+[[nodiscard]] inline SourceValue makeSourceValue(std::string_view value) {
+  return SourceValue{std::string(value)};
+}
 
 enum class SourceValueDisplay : u8 {
   Default,
@@ -204,8 +238,18 @@ public:
   AnnotationBuilder& sequenceSemantic(SequenceSemantic semantic);
   AnnotationBuilder& field(std::string_view name, SourceRange range, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
+  template <class T>
+  AnnotationBuilder& field(std::string_view name, SourceRange range, T&& value,
+                           SourceValueDisplay display = SourceValueDisplay::Default) {
+    return field(name, range, makeSourceValue(std::forward<T>(value)), display);
+  }
   AnnotationBuilder& derived(std::string_view name, SourceValue value,
                              SourceValueDisplay display = SourceValueDisplay::Default);
+  template <class T>
+  AnnotationBuilder& derived(std::string_view name, T&& value,
+                             SourceValueDisplay display = SourceValueDisplay::Default) {
+    return derived(name, makeSourceValue(std::forward<T>(value)), display);
+  }
   AnnotationBuilder& link(SourceLinkRole role, SourceTarget target, std::string_view label = {});
 
 private:
@@ -224,6 +268,10 @@ public:
   [[nodiscard]] AnnotationBuilder table(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder row(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder field(std::string_view label, SourceRange range, SourceValue value);
+  template <class T>
+  [[nodiscard]] AnnotationBuilder field(std::string_view label, SourceRange range, T&& value) {
+    return field(label, range, makeSourceValue(std::forward<T>(value)));
+  }
   [[nodiscard]] AnnotationBuilder pointer(std::string_view label, SourceRange range, SourceTarget target);
   [[nodiscard]] AnnotationBuilder command(std::string_view label, SourceRange range,
                                           SequenceSemantic semantic = SequenceSemantic::Unknown);
