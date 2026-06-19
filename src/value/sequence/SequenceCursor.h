@@ -77,7 +77,7 @@ class VmCommandCursor {
 public:
   VmCommandCursor(CommandPhase phase, SourceRange commandRange, std::span<const ::u8> bytes,
                   SourceMapBuilder* sourceMap = nullptr, std::vector<Diagnostic>* diagnostics = nullptr,
-                  std::vector<CommandOperand>* operands = nullptr);
+                  std::vector<CommandOperand>* operands = nullptr, CommandReferences* references = nullptr);
 
   [[nodiscard]] CommandPhase phase() const noexcept { return phase_; }
   [[nodiscard]] SourceId source() const noexcept { return commandRange_.source; }
@@ -118,6 +118,7 @@ public:
   VmCommandCursor& warning(std::string_view message);
   VmCommandCursor& error(std::string_view message);
   VmCommandCursor& unsupported(std::string_view message);
+  void finalizeDiagnostics(SourceRange commandRange);
 
   [[nodiscard]] CommandFlow next();
   [[nodiscard]] CommandFlow wait(u32 ticks);
@@ -132,12 +133,19 @@ public:
   [[nodiscard]] RepeatBreakFlow countedRepeatBreak(::u8 slot, Address destination, bool taken = false);
 
 private:
+  struct PendingDiagnostic {
+    Severity severity = Severity::Info;
+    std::string message;
+    std::optional<SourceRange> range;
+  };
+
   [[nodiscard]] AnnotationBuilder annotationBuilder();
   void ensureAnnotation();
   void recordOpcode();
   [[nodiscard]] SourceRange rangeAt(size_t begin, size_t size) const;
   [[nodiscard]] bool requireRead(size_t size, std::string_view field);
   void markTruncated(std::string_view field, SourceRange range);
+  void queueDiagnostic(Severity severity, std::string_view message, std::optional<SourceRange> range = std::nullopt);
   [[nodiscard]] bool readByte(std::string_view field, ::u8& out);
   void recordField(std::string_view name, SourceRange range, SourceValue value,
                    SourceValueDisplay display = SourceValueDisplay::Default);
@@ -150,6 +158,8 @@ private:
   SourceMapBuilder* sourceMap_ = nullptr;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
   std::vector<CommandOperand>* operands_ = nullptr;
+  CommandReferences* references_ = nullptr;
+  std::vector<PendingDiagnostic> pendingDiagnostics_;
   size_t position_ = 1;
   SourceAnnotationId annotation_;
   bool opcodeRecorded_ = false;

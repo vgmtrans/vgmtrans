@@ -8,8 +8,10 @@
 
 #include "value/sequence/bytecode/BytecodeDecode.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <map>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -34,11 +36,46 @@ template <class DecodeCommand>
   };
   TrackProgramBuilder builder{track};
   std::set<u32> visitedOffsets;
+  std::vector<u32> pendingOffsets;
   u32 offset = startAddress;
 
-  while (reader.has(offset, 1) && track.commands.size() < policy.maxCommands) {
+  const auto nextPendingOffset = [&]() -> std::optional<u32> {
+    while (!pendingOffsets.empty()) {
+      const u32 pending = pendingOffsets.back();
+      pendingOffsets.pop_back();
+      if (reader.has(pending, 1) && (!policy.stopAtVisitedOffset || !visitedOffsets.contains(pending))) {
+        return pending;
+      }
+    }
+    return std::nullopt;
+  };
+
+  const auto queueSideTarget = [&](Address target) {
+    if (!reader.has(target.value, 1) || (policy.stopAtVisitedOffset && visitedOffsets.contains(target.value))) {
+      return;
+    }
+    if (std::find(pendingOffsets.begin(), pendingOffsets.end(), target.value) == pendingOffsets.end()) {
+      pendingOffsets.push_back(target.value);
+    }
+  };
+
+  while (track.commands.size() < policy.maxCommands) {
+    if (!reader.has(offset, 1)) {
+      const auto pending = nextPendingOffset();
+      if (!pending) {
+        break;
+      }
+      offset = *pending;
+      continue;
+    }
+
     if (policy.stopAtVisitedOffset && !visitedOffsets.insert(offset).second) {
-      break;
+      const auto pending = nextPendingOffset();
+      if (!pending) {
+        break;
+      }
+      offset = *pending;
+      continue;
     }
 
     const u32 begin = offset;
@@ -46,17 +83,39 @@ template <class DecodeCommand>
     const auto next = decoded.flow.fallthrough;
     const bool terminal = decoded.flow.terminal;
     const auto targets = decoded.flow.staticTargets;
+    const std::optional<Address> followedJump =
+        !next && policy.followUnconditionalJumps && targets.size() == 1 ? std::optional<Address>{targets.front()}
+                                                                        : std::nullopt;
     appendDecodedBytecodeCommand(builder, decoded, begin);
 
+    for (const Address target : targets) {
+      if ((next && target.value == next->value) || (followedJump && target.value == followedJump->value)) {
+        continue;
+      }
+      queueSideTarget(target);
+    }
+
     if (terminal) {
-      break;
+      const auto pending = nextPendingOffset();
+      if (!pending) {
+        break;
+      }
+      offset = *pending;
+      continue;
     }
     if (next) {
       offset = next->value;
       continue;
     }
-    if (policy.followUnconditionalJumps && targets.size() == 1) {
-      offset = targets.front().value;
+    if (followedJump && reader.has(followedJump->value, 1) &&
+        (!policy.stopAtVisitedOffset || !visitedOffsets.contains(followedJump->value))) {
+      offset = followedJump->value;
+      continue;
+    }
+
+    const auto pending = nextPendingOffset();
+    if (pending) {
+      offset = *pending;
       continue;
     }
     break;

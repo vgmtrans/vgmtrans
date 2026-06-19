@@ -264,11 +264,11 @@ inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const Dec
                                          u32 offset) {
   if (decoded.commandKind) {
     builder.addDecoded(decoded.handler, *decoded.commandKind, Address{offset}, decoded.range, decoded.bytes,
-                       decoded.operands, decoded.annotation);
+                       decoded.operands, decoded.annotation, decoded.instrumentReferences, decoded.referencesDecoded);
     return;
   }
   builder.addDecoded(decoded.handler, decoded.kind, Address{offset}, decoded.range, decoded.bytes, decoded.operands,
-                     decoded.annotation);
+                     decoded.annotation, decoded.instrumentReferences, decoded.referencesDecoded);
 }
 
 }  // namespace vgmtrans::core

@@ -32,6 +32,8 @@ struct DecodedBytecodeCommand {
   SourceAnnotationId annotation;
   std::vector<u8> bytes;
   std::vector<CommandOperand> operands;
+  std::vector<CommandInstrumentReference> instrumentReferences;
+  bool referencesDecoded = false;
   DecodeFlow flow;
 };
 

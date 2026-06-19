@@ -45,15 +45,10 @@ template <class TrackState, class Context>
 struct DecodeCursorRuntime {
   TrackState& state;
   const Context& context;
-  CommandReferences* references = nullptr;
 
   void note(double, double, u32, bool = false) {}
   void tempo(u32) {}
-  void instrument(u32 bank, u32 program, bool = false) {
-    if (references != nullptr) {
-      references->instrument(bank, program);
-    }
-  }
+  void instrument(u32, u32, bool = false) {}
   void level(double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
   void expression(double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
   void pan(double) {}
@@ -76,6 +71,24 @@ struct DecodeCursorRuntime {
     return cmd.countedRepeatBreak(slot, destination);
   }
 };
+
+namespace detail {
+
+template <class Vm>
+[[nodiscard]] RepeatBreakFlow resolveRenderCursorRepeatBreak(VmCommandCursor& cmd, Vm& vm, u8 slot,
+                                                             Address destination) {
+  const RepeatBreakFlow annotated = cmd.countedRepeatBreak(slot, destination, false);
+  CommandFlow flow = annotated.flow();
+  if (flow.truncated) {
+    return annotated;
+  }
+
+  const BranchResult branch = vm.countedRepeatBreak(slot, destination);
+  flow.resolvedEffects = branch.effects;
+  return RepeatBreakFlow{flow, branch.taken};
+}
+
+}  // namespace detail
 
 template <class TrackState, class Context>
 struct RenderCursorRuntime {
@@ -118,13 +131,7 @@ struct RenderCursorRuntime {
   }
 
   [[nodiscard]] RepeatBreakFlow countedRepeatBreak(VmCommandCursor& cmd, u8 slot, Address destination) {
-    const BranchResult branch = vm.countedRepeatBreak(slot, destination);
-    const RepeatBreakFlow annotated = cmd.countedRepeatBreak(slot, destination, branch.taken);
-    CommandFlow flow = annotated.flow();
-    if (!flow.truncated) {
-      flow.resolvedEffects = branch.effects;
-    }
-    return RepeatBreakFlow{flow, branch.taken};
+    return detail::resolveRenderCursorRepeatBreak(cmd, vm, slot, destination);
   }
 };
 
@@ -172,17 +179,10 @@ struct CursorDialectDriver {
   static void describe(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any&) {}
 
   static void references(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
-                         const std::any& context) {
-    const auto& typedContext = std::any_cast<const Context&>(context);
-    BytecodeDecodeContext decodeContext;
-    TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, typedContext);
-    DecodeCursorRuntime<TrackState, Context> runtime{
-        .state = decodeState,
-        .context = typedContext,
-        .references = &references,
-    };
-    VmCommandCursor cursor(CommandPhase::Decode, record.range, track.bytesFor(record));
-    static_cast<void>(Reader::read(runtime, cursor));
+                         const std::any&) {
+    for (const auto& reference : track.instrumentReferencesFor(record)) {
+      references.instrument(reference.bank, reference.program, reference.range);
+    }
   }
 
   static Effects execute(const SourceCommand& record, const TrackProgram& track, std::any& trackState,
@@ -277,8 +277,9 @@ template <class TrackState, class Context, class Reader>
   const SourceRange availableRange = reader.range(begin, availableSize);
   const auto availableBytes = reader.slice(begin, availableSize);
   std::vector<CommandOperand> operands;
+  CommandReferences references;
   VmCommandCursor cursor(CommandPhase::Decode, availableRange, availableBytes, context.sourceMap, context.diagnostics,
-                         &operands);
+                         &operands, &references);
   DecodeCursorRuntime<TrackState, Context> runtime{
       .state = decodeState,
       .context = cursorContext<Context>(dialect),
@@ -303,9 +304,17 @@ template <class TrackState, class Context, class Reader>
   const auto commandBytes = availableBytes.subspan(0, commandSize);
   std::vector<u8> ownedBytes{commandBytes.begin(), commandBytes.end()};
   const SourceRange commandRange = reader.range(begin, commandSize);
+  auto instrumentReferences =
+      cursor.failed() ? std::vector<CommandInstrumentReference>{} : references.takeInstruments();
+  for (auto& reference : instrumentReferences) {
+    if (!reference.range && commandRange.valid()) {
+      reference.range = commandRange;
+    }
+  }
   if (context.sourceMap != nullptr && cursor.annotation().valid()) {
     AnnotationBuilder{*context.sourceMap, cursor.annotation()}.range(commandRange);
   }
+  cursor.finalizeDiagnostics(commandRange);
 
   return DecodedBytecodeCommand{
       .handler = cursorDialectHandlerId<TrackState, Context, Reader>(dialect),
@@ -314,6 +323,8 @@ template <class TrackState, class Context, class Reader>
       .annotation = cursor.annotation(),
       .bytes = std::move(ownedBytes),
       .operands = std::move(operands),
+      .instrumentReferences = std::move(instrumentReferences),
+      .referencesDecoded = true,
       .flow = decodeFlowFromCommandFlow(commandFlow, Address{begin + commandSize}),
   };
 }

@@ -178,7 +178,10 @@ void SourceMap::buildIndexes() {
   for (size_t i = 0; i < annotations_.size(); ++i) {
     const auto id = annotations_[i].id;
     if (id.valid()) {
-      annotationsById_.emplace(id.value, i);
+      const auto [_, inserted] = annotationsById_.emplace(id.value, i);
+      if (!inserted) {
+        throw std::logic_error("Duplicate SourceAnnotationId in SourceMap");
+      }
     }
     if (annotations_[i].range.source.valid()) {
       annotationsBySource_[annotations_[i].range.source.value].push_back(id);
@@ -322,6 +325,9 @@ SourceAnnotationId SourceMapBuilder::allocateId() {
 
 AnnotationBuilder SourceMapBuilder::add(SourceRole role, std::string_view label, SourceRange range) {
   const auto id = allocateId();
+  if (id.valid() && annotationsById_.contains(id.value)) {
+    throw std::logic_error("Duplicate SourceAnnotationId in SourceMapBuilder");
+  }
   const auto index = annotations_.size();
   annotations_.push_back(SourceAnnotation{
       .id = id,
@@ -330,7 +336,9 @@ AnnotationBuilder SourceMapBuilder::add(SourceRole role, std::string_view label,
       .label = std::string(label),
       .localKind = sourceLocalKind(label),
   });
-  annotationsById_.emplace(id.value, index);
+  if (id.valid()) {
+    annotationsById_.emplace(id.value, index);
+  }
   return AnnotationBuilder{*this, id};
 }
 
