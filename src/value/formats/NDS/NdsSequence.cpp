@@ -491,12 +491,14 @@ private:
       .diagnostics = diagnostics,
   };
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
+  const auto decodeCommand = [&](u32 offset) {
+    return decodeCursorCommandWithState<TrackState, Context, NdsCommandReader>(reader, offset, dialect, decodeState,
+                                                                               decodeContext);
+  };
+
   return decodeReachableBytecodeBlocks(
       reader, sequenceEnd, startOffset, trackIndex,
-      ReachableBytecodeDecodePolicy{.maxCommands = static_cast<u32>(kMaxTrackCommands)}, [&](u32 offset) {
-        return decodeCursorCommandWithState<TrackState, Context, NdsCommandReader>(reader, offset, dialect, decodeState,
-                                                                                   decodeContext);
-      });
+      ReachableBytecodeDecodePolicy{.maxCommands = static_cast<u32>(kMaxTrackCommands)}, decodeCommand);
 }
 
 [[nodiscard]] NdsSequenceDescriptor makeNdsSequenceDescriptor() {
@@ -598,7 +600,14 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
                                : static_cast<u32>(reader.size());
   const u32 emptySequenceEnd =
       static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + kSseqHeaderSize));
-  const u32 sequenceEnd = zeroFilled ? emptySequenceEnd : recoverMalformedSdatRange ? recoveredEnd : fatEnd;
+
+  u32 sequenceEnd = fatEnd;
+  if (zeroFilled) {
+    sequenceEnd = emptySequenceEnd;
+  } else if (recoverMalformedSdatRange) {
+    sequenceEnd = recoveredEnd;
+  }
+
   return NdsSequenceRange{
       .offset = offset,
       .decodeOffset = decodeOffset,
@@ -616,13 +625,14 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
   const u32 sequenceOffset = range.decodeOffset != 0 ? range.decodeOffset : range.offset;
   const std::optional<AssetId> instrumentSetId =
       instrumentSet ? std::optional<AssetId>{instrumentSet->id} : std::nullopt;
+  const SourceRange sequenceRange = input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset);
   SequenceProgramAsset asset{
       .metadata =
           AssetMetadata{
               .id = id,
               .format = std::string(kNdsFormatName),
               .name = name,
-              .range = input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset),
+              .range = sequenceRange,
           },
       .program =
           SequenceProgram{
@@ -634,8 +644,7 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
   };
 
   ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root = items.add(std::nullopt, ItemKind::Sequence, "sseq", name,
-                              input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset));
+  const auto root = items.add(std::nullopt, ItemKind::Sequence, "sseq", name, sequenceRange);
   if (sourceMap != nullptr && input.reader.has(sequenceOffset, kSseqHeaderSize)) {
     sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, kSseqHeaderSize))
         .kind("sseq-header")
