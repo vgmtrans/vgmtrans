@@ -1367,6 +1367,142 @@ int compareAkaoDirectSummary(const std::filesystem::path& path) {
   return 1;
 }
 
+std::string legacyMidiCollectionKey(const VGMColl& collection);
+std::string valueMidiCollectionKey(const SessionSnapshot& project, const Collection& collection);
+std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops);
+
+std::map<std::string, std::vector<u8>> legacyAkaoCollectionMidis(const std::filesystem::path& path,
+                                                                 u32 sequenceLoops = 0) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, std::vector<u8>> midis;
+
+  for (auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != "Akao") {
+      continue;
+    }
+    ConversionContext context;
+    context.sequenceLoops = static_cast<int>(sequenceLoops);
+    auto midi = collection->seq()->convertToMidi(collection, context);
+    if (!midi) {
+      throw std::runtime_error("legacy Akao collection failed to convert to MIDI: " + collection->name());
+    }
+    std::vector<u8> bytes;
+    midi->writeMidiToBuffer(bytes);
+    const std::string key = legacyMidiCollectionKey(*collection);
+    auto [_, inserted] = midis.emplace(key, std::move(bytes));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy Akao MIDI collection key: " + key);
+    }
+  }
+
+  if (midis.empty()) {
+    throw std::runtime_error("legacy scanner did not discover Akao MIDI collections in: " + path.string());
+  }
+  return midis;
+}
+
+std::map<std::string, std::vector<u8>> valueAkaoCollectionMidis(const std::filesystem::path& path,
+                                                                u32 sequenceLoops = 0) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const SessionSnapshot project = session.scanPendingSources();
+  if (project.collections().empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover Akao MIDI collections";
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, std::vector<u8>> midis;
+  for (const auto& collection : project.collections()) {
+    if (!collection.sequence) {
+      continue;
+    }
+    const auto* sequence = assetById<SequenceProgramAsset>(project, *collection.sequence);
+    if (sequence == nullptr || sequence->metadata.format != "Akao") {
+      continue;
+    }
+    std::vector<u8> midi;
+    try {
+      midi = valueCollectionMidi(session, collection.id, sequenceLoops);
+    } catch (const std::exception& ex) {
+      throw std::runtime_error("value Akao MIDI export failed for collection '" + collection.name + "': " + ex.what());
+    }
+    const std::string key = valueMidiCollectionKey(project, collection);
+    auto [_, inserted] = midis.emplace(key, std::move(midi));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value Akao MIDI collection key: " + key);
+    }
+  }
+  if (midis.empty()) {
+    throw std::runtime_error("value scanner did not discover Akao MIDI collections");
+  }
+  return midis;
+}
+
+std::map<std::string, SynthExportBytes> legacyAkaoCollectionSynthExports(const std::filesystem::path& path) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, SynthExportBytes> exports;
+
+  for (auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != "Akao" ||
+        collection->instrSets().empty() || collection->sampColls().empty()) {
+      continue;
+    }
+    const std::string key = legacyMidiCollectionKey(*collection);
+    auto [_, inserted] = exports.emplace(key, legacyCollectionSynthExports(*collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy Akao synth collection key: " + key);
+    }
+  }
+
+  if (exports.empty()) {
+    throw std::runtime_error("legacy scanner did not discover Akao synth-exportable collections in: " + path.string());
+  }
+  return exports;
+}
+
+std::map<std::string, SynthExportBytes> valueAkaoCollectionSynthExports(const std::filesystem::path& path) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const SessionSnapshot project = session.scanPendingSources();
+  if (project.collections().empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover Akao synth collections";
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, SynthExportBytes> exports;
+  for (const auto& collection : project.collections()) {
+    if (!collection.sequence || collection.instrumentSets.empty() || collection.sampleCollections.empty()) {
+      continue;
+    }
+    const auto* sequence = assetById<SequenceProgramAsset>(project, *collection.sequence);
+    if (sequence == nullptr || sequence->metadata.format != "Akao") {
+      continue;
+    }
+    const std::string key = valueMidiCollectionKey(project, collection);
+    auto [_, inserted] = exports.emplace(key, valueCapcomSnesSynthExports(session, collection.id));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value Akao synth collection key: " + key);
+    }
+  }
+
+  if (exports.empty()) {
+    throw std::runtime_error("value scanner did not discover Akao synth-exportable collections in: " + path.string());
+  }
+  return exports;
+}
+
 u32 parseLoopCount(std::string_view text) {
   size_t parsed = 0;
   const unsigned long value = std::stoul(std::string(text), &parsed, 10);
@@ -2945,6 +3081,62 @@ int compareNdsDirectSynth(const std::filesystem::path& path) {
   return 0;
 }
 
+int compareAkaoDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  const auto legacyMidis = legacyAkaoCollectionMidis(path, sequenceLoops);
+  const auto valueMidis = valueAkaoCollectionMidis(path, sequenceLoops);
+  if (valueMidis.size() != legacyMidis.size()) {
+    std::cout << "value Akao MIDI collection count differs: legacy=" << legacyMidis.size()
+              << " value=" << valueMidis.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacyMidi] : legacyMidis) {
+    const auto found = valueMidis.find(collectionName);
+    if (found == valueMidis.end()) {
+      std::cout << "value Akao scan did not produce MIDI for collection '" << collectionName << "'\n";
+      return 1;
+    }
+    std::cout << "checking " << collectionName << " MIDI via direct Akao value scan, loops=" << sequenceLoops << "\n";
+    if (!compareMidi(legacyMidi, found->second, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "Akao direct MIDI parity ok: collections=" << legacyMidis.size() << " loops=" << sequenceLoops << "\n";
+  return 0;
+}
+
+int compareAkaoDirectSynth(const std::filesystem::path& path) {
+  const auto legacyExports = legacyAkaoCollectionSynthExports(path);
+  const auto valueExports = valueAkaoCollectionSynthExports(path);
+  if (valueExports.size() != legacyExports.size()) {
+    std::cout << "value Akao synth collection count differs: legacy=" << legacyExports.size()
+              << " value=" << valueExports.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacy] : legacyExports) {
+    const auto found = valueExports.find(collectionName);
+    if (found == valueExports.end()) {
+      std::cout << "value Akao scan did not produce synth exports for collection '" << collectionName << "'\n";
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " SF2 via direct Akao value scan\n";
+    if (!compareSf2(legacy.sf2, found->second.sf2, std::cout)) {
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " DLS via direct Akao value scan\n";
+    if (!compareDls(legacy.dls, found->second.dls, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "Akao direct SF2/DLS parity ok: collections=" << legacyExports.size() << "\n";
+  return 0;
+}
+
 bool validateValueCollectionExports(const SessionSnapshot& project, const Collection& collection,
                                     std::span<const Artifact> artifacts, u32 expectedWavs, std::ostream& out,
                                     u64& totalArtifacts) {
@@ -3104,6 +3296,8 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-rsn-direct-synth <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n"
+      << "  vgmtrans-parity akao-direct-midi <psf-or-raw-file> [sequence-loops]\n"
+      << "  vgmtrans-parity akao-direct-synth <psf-or-raw-file>\n"
       << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
       << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
       << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
@@ -3156,6 +3350,18 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "akao-direct-summary") {
       return compareAkaoDirectSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "akao-direct-midi") {
+      return compareAkaoDirectMidi(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "akao-direct-midi") {
+      return compareAkaoDirectMidi(argv[2], parseLoopCount(argv[3]));
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "akao-direct-synth") {
+      return compareAkaoDirectSynth(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "nds-direct-midi") {
