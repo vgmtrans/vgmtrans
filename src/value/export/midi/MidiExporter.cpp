@@ -114,6 +114,14 @@ void addRpn(std::vector<MidiMessage>& messages, u64 tick, u8 channel, u8 paramet
   return bytes;
 }
 
+[[nodiscard]] u8 denominatorPower(u8 denominator) {
+  if (denominator == 0) {
+    return 0;
+  }
+  constexpr double ln2 = 0.69314718055994530942;
+  return data7(static_cast<u32>(std::log(static_cast<double>(denominator)) / ln2));
+}
+
 void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event, u64& endTick) {
   // Convert one MidiEvent to raw SMF messages. Source-driver interpretation should
   // already be finished before this point.
@@ -144,6 +152,15 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
               static_cast<u8>(typedEvent.microsecondsPerQuarter & 0xff),
           };
           addMessage(messages, typedEvent.tick, 0, metaEvent(0x51, tempoBytes));
+          endTick = std::max(endTick, typedEvent.tick);
+        } else if constexpr (std::is_same_v<TypedEvent, TimeSignature>) {
+          const std::array<u8, 4> timeSignatureBytes{
+              typedEvent.numerator,
+              denominatorPower(typedEvent.denominator),
+              typedEvent.clocksPerMetronomeClick,
+              8,
+          };
+          addMessage(messages, typedEvent.tick, 0, metaEvent(0x58, timeSignatureBytes));
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, MidiPort>) {
           const std::array<u8, 1> portBytes{typedEvent.port};

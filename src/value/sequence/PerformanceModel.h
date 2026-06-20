@@ -38,6 +38,13 @@ struct TempoPerformanceEvent {
   u32 microsecondsPerQuarter = 500000;
 };
 
+struct TimeSignaturePerformanceEvent {
+  PerformanceEventHeader header;
+  u8 numerator = 4;
+  u8 denominator = 4;
+  u8 clocksPerMetronomeClick = 24;
+};
+
 struct InstrumentPerformanceEvent {
   PerformanceEventHeader header;
   u32 bank = 0;
@@ -164,9 +171,9 @@ struct MarkerPerformanceEvent {
 };
 
 using PerformanceEvent =
-    std::variant<NotePerformanceEvent, TempoPerformanceEvent, InstrumentPerformanceEvent, LevelPerformanceEvent,
-                 ExpressionPerformanceEvent, PanPerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
-                 MonoModePerformanceEvent, TuningPerformanceEvent, GlobalTransposePerformanceEvent,
+    std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
+                 LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent, MasterLevelPerformanceEvent,
+                 ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent, GlobalTransposePerformanceEvent,
                  PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent, PortamentoTimePerformanceEvent,
                  PortamentoControlPerformanceEvent, PitchBendPerformanceEvent, PitchBendRangePerformanceEvent,
                  LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;

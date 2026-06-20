@@ -59,6 +59,27 @@ void midiExporterKeeps14BitControllerPairsAdjacent() {
          "MIDI exporter should keep 14-bit volume MSB/LSB controllers adjacent before same-tick pan");
 }
 
+void midiExporterWritesTimeSignatureMetaEvent() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  TimeSignature{.tick = 0, .numerator = 3, .denominator = 4, .clocksPerMetronomeClick = 48},
+                  EndOfTrack{.tick = 0},
+              },
+      }},
+  };
+
+  const std::vector<u8> expected{
+      'M',  'T',  'h',  'd',  0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x30,
+      'M',  'T',  'r',  'k',  0x00, 0x00, 0x00, 0x0c, 0x00, 0xff, 0x58, 0x04, 0x03, 0x02,
+      0x30, 0x08, 0x00, 0xff, 0x2f, 0x00,
+  };
+
+  expect(MidiExporter().exportMidi(midiSequence) == expected, "MIDI exporter should write time-signature meta events");
+}
+
 void midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn() {
   const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -119,6 +140,12 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
                       .linearVelocity = 0.5,
                       .durationTicks = 6,
                   },
+                  TimeSignaturePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 30},
+                      .numerator = 3,
+                      .denominator = 4,
+                      .clocksPerMetronomeClick = 48,
+                  },
               },
       }},
   };
@@ -133,6 +160,9 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
          "performance renderer should trust source-selected note extensions");
   expect(secondNote != nullptr && secondNote->tick == 24 && secondNote->key == 61 && secondNote->duration == 6,
          "performance renderer should emit a new note when the source does not request an extension");
+  const auto* timeSignature = std::get_if<TimeSignature>(&events[3]);
+  expect(timeSignature != nullptr && timeSignature->tick == 30 && timeSignature->numerator == 3,
+         "performance renderer should preserve source time signatures");
   expect(std::get<EndOfTrack>(events.back()).tick == 30, "performance renderer should preserve track end ticks");
 }
 
@@ -523,6 +553,7 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
 void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
   midiExporterKeeps14BitControllerPairsAdjacent();
+  midiExporterWritesTimeSignatureMetaEvent();
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererWritesPanGainResetWhenRequested();

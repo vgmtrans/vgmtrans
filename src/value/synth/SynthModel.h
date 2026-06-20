@@ -118,9 +118,15 @@ struct SynthModulator {
   s32 amount = 0;
 };
 
+struct Loop {
+  bool enabled = false;
+  u32 start = 0;
+  u32 length = 0;
+};
+
 struct Region {
   // One playable zone inside an instrument: key/velocity range, sample reference,
-  // tuning, envelope, pan, and attenuation.
+  // tuning, envelope, pan, attenuation, and optional region-specific loop.
   KeyRange keyRange;
   VelocityRange velocityRange;
   SampleRef sample;
@@ -130,6 +136,7 @@ struct Region {
   s16 coarseTuneSemitones = 0;
   s16 fineTuneCents = 0;
   Envelope envelope;
+  std::optional<Loop> loop;
   // Synth region pan is unipolar: 0.0 left, 0.5 center, 1.0 right.
   double pan = 0.5;
   double attenuationDb = 0.0;
@@ -162,12 +169,6 @@ enum class AudioCodec {
   NdsPsg,
   PsxAdpcm,
   OkiAdpcm,
-};
-
-struct Loop {
-  bool enabled = false;
-  u32 start = 0;
-  u32 length = 0;
 };
 
 struct Sample {

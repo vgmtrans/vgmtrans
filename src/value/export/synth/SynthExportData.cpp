@@ -109,6 +109,10 @@ std::optional<u16> resolveRegionSampleIndex(const Region& region, std::optional<
   return found->second;
 }
 
+Loop effectiveRegionLoop(const Region& region, const DecodedSynthSample& sample) {
+  return region.loop.value_or(sample.decoded.loop);
+}
+
 std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     std::span<const InstrumentSetAsset* const> instrumentSets,
     std::span<const SampleCollectionAsset* const> sampleCollections, const SynthSampleIndexMap& samples,

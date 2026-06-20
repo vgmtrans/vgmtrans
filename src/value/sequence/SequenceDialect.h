@@ -168,6 +168,7 @@ struct CommandRuntime {
   // event construction still lives in PerformanceEmitter.
   void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
   void tempo(u32 microsecondsPerQuarter);
+  void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick);
   void instrument(u32 bank, u32 program, bool forceBankSelect = false);
   void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
   void expression(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
@@ -179,8 +180,11 @@ struct CommandRuntime {
   void globalTranspose(s32 semitones);
   void pitchBend(double semitones);
   void pitchBendRange(u8 semitones);
+  void portamento(double timeMilliseconds, double previousKey);
   void portamentoEnable(bool enabled);
   void portamentoTime(double timeMilliseconds);
+  void portamentoControl(double previousKey);
+  void legatoPedal(bool enabled);
   void modulation(ModulationPerformanceTarget target, double amount);
 
   [[nodiscard]] static constexpr Effects none() noexcept { return Effects::none(); }

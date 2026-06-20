@@ -46,10 +46,13 @@ class PerformanceEmitter {
 public:
   PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick);
 
+  [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   void note(NotePerformanceEvent event);
   void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
   void tempo(TempoPerformanceEvent event);
   void tempo(u32 microsecondsPerQuarter);
+  void timeSignature(TimeSignaturePerformanceEvent event);
+  void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick);
   void instrument(InstrumentPerformanceEvent event);
   void instrument(u32 bank, u32 program, bool forceBankSelect = false);
   void level(LevelPerformanceEvent event);
@@ -109,6 +112,11 @@ void CommandRuntime<TrackState, Context>::tempo(u32 microsecondsPerQuarter) {
 }
 
 template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick) {
+  out.timeSignature(numerator, denominator, clocksPerMetronomeClick);
+}
+
+template <class TrackState, class Context>
 void CommandRuntime<TrackState, Context>::instrument(u32 bank, u32 program, bool forceBankSelect) {
   out.instrument(bank, program, forceBankSelect);
 }
@@ -164,6 +172,11 @@ void CommandRuntime<TrackState, Context>::pitchBendRange(u8 semitones) {
 }
 
 template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::portamento(double timeMilliseconds, double previousKey) {
+  out.portamento(timeMilliseconds, previousKey);
+}
+
+template <class TrackState, class Context>
 void CommandRuntime<TrackState, Context>::portamentoEnable(bool enabled) {
   out.portamentoEnable(enabled);
 }
@@ -171,6 +184,16 @@ void CommandRuntime<TrackState, Context>::portamentoEnable(bool enabled) {
 template <class TrackState, class Context>
 void CommandRuntime<TrackState, Context>::portamentoTime(double timeMilliseconds) {
   out.portamentoTime(timeMilliseconds);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::portamentoControl(double previousKey) {
+  out.portamentoControl(previousKey);
+}
+
+template <class TrackState, class Context>
+void CommandRuntime<TrackState, Context>::legatoPedal(bool enabled) {
+  out.legatoPedal(enabled);
 }
 
 template <class TrackState, class Context>

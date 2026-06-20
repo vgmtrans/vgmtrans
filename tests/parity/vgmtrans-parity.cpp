@@ -392,6 +392,9 @@ struct AkaoCollectionSummary {
   u32 instrumentSetCount = 0;
   u32 sampleCollectionCount = 0;
   u32 sampleCount = 0;
+  std::vector<SampleSummary> samples;
+  std::vector<RegionSummary> regions;
+  std::vector<InstrumentSynthSummary> instrumentSynths;
 
   friend bool operator==(const AkaoCollectionSummary&, const AkaoCollectionSummary&) = default;
 };
@@ -661,14 +664,15 @@ void appendLegacySamples(CapcomSnesSummary& summary, std::vector<VGMSamp*>& samp
 }
 
 void appendLegacyInstruments(CapcomSnesSummary& summary, std::span<VGMInstrSet* const> instrumentSets,
-                             std::span<VGMSamp* const> samples) {
+                             std::span<VGMSamp* const> samples, bool useExportInstruments = false) {
   for (const auto* instrumentSet : instrumentSets) {
     if (instrumentSet == nullptr) {
       continue;
     }
 
     ++summary.instrumentSetCount;
-    for (const auto* instrument : instrumentSet->instrs()) {
+    const auto instruments = useExportInstruments ? instrumentSet->exportInstrs() : instrumentSet->instrs();
+    for (const auto* instrument : instruments) {
       InstrumentSynthSummary synth{
           .bank = instrument->bank,
           .program = instrument->instrNum,
@@ -753,6 +757,38 @@ CapcomSnesSummary legacyCapcomSnesCollectionSummary(const VGMColl& collection) {
   return summary;
 }
 
+CapcomSnesSummary legacyPreparedCollectionSummary(const VGMColl& collection) {
+  CapcomSnesSummary summary;
+
+  if (const auto* sequence = collection.seq()) {
+    ++summary.sequenceCount;
+    summary.trackCounts.push_back(static_cast<u32>(sequence->trackCount()));
+  }
+
+  std::vector<VGMInstrSet*> instrumentSets;
+  appendUnique(instrumentSets, collection.instrSets());
+  for (auto* instrumentSet : instrumentSets) {
+    instrumentSet->prepareForExport(&collection);
+  }
+
+  std::vector<VGMSampColl*> sampleCollections;
+  appendUnique(sampleCollections, collection.sampColls());
+  for (const auto* instrumentSet : instrumentSets) {
+    appendUnique(sampleCollections, instrumentSet->sampColl());
+  }
+
+  std::vector<VGMSamp*> samples;
+  appendLegacySamples(summary, samples, sampleCollections);
+  appendLegacyInstruments(summary, instrumentSets, samples, true);
+  normalizeSummary(summary);
+
+  for (auto* instrumentSet : instrumentSets) {
+    instrumentSet->cleanupAfterExport();
+  }
+
+  return summary;
+}
+
 CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const std::string& name) {
   const auto root = scanLegacyCapcomSnes(aramBytes, name);
 
@@ -811,6 +847,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
   CapcomSnesSummary summary;
   std::map<u32, const SampleCollectionAsset*> sampleCollectionsById;
+  std::optional<AssetId> fallbackSampleCollection;
 
   if (collection.sequence) {
     if (const auto* sequenceProgram = assetById<SequenceProgramAsset>(project, *collection.sequence)) {
@@ -826,6 +863,9 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
     }
 
     ++summary.sampleCollectionCount;
+    if (!fallbackSampleCollection) {
+      fallbackSampleCollection = sampleCollection->metadata.id;
+    }
     sampleCollectionsById[sampleCollection->metadata.id.value] = sampleCollection;
     for (u32 i = 0; i < sampleCollection->samples.samples.size(); ++i) {
       const auto& sample = sampleCollection->samples.samples[i];
@@ -869,8 +909,9 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
       for (const auto& region : instrument.regions) {
         u32 sampleSourceOffset = 0;
-        if (region.sample.collection) {
-          const auto sampleCollection = sampleCollectionsById.find(region.sample.collection->value);
+        const auto regionSampleCollection = region.sample.collection ? region.sample.collection : fallbackSampleCollection;
+        if (regionSampleCollection) {
+          const auto sampleCollection = sampleCollectionsById.find(regionSampleCollection->value);
           if (sampleCollection != sampleCollectionsById.end() &&
               region.sample.index < sampleCollection->second->samples.samples.size()) {
             sampleSourceOffset =
@@ -1262,11 +1303,16 @@ AkaoSummary legacyAkaoSummary(const std::filesystem::path& path) {
         .instrumentSetCount = static_cast<u32>(collection->instrSets().size()),
         .sampleCollectionCount = static_cast<u32>(collection->sampColls().size()),
     };
-    for (const auto* sampleCollection : collection->sampColls()) {
-      if (sampleCollection != nullptr) {
-        shape.sampleCount += static_cast<u32>(sampleCollection->sampleCount());
-      }
+    const auto detailed = legacyPreparedCollectionSummary(*collection);
+    shape.sampleCount = static_cast<u32>(detailed.samples.size());
+    shape.samples = detailed.samples;
+    for (auto& sample : shape.samples) {
+      sample.loopEnabled = false;
+      sample.loopStart = 0;
+      sample.loopLength = 0;
     }
+    shape.regions = detailed.regions;
+    shape.instrumentSynths = detailed.instrumentSynths;
     summary.collections.push_back(shape);
   }
   std::ranges::sort(summary.collections, {}, &AkaoCollectionSummary::sequenceOffset);
@@ -1301,11 +1347,16 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
         .instrumentSetCount = static_cast<u32>(collection.instrumentSets.size()),
         .sampleCollectionCount = static_cast<u32>(collection.sampleCollections.size()),
     };
-    for (const auto sampleCollectionId : collection.sampleCollections) {
-      if (const auto* sampleCollection = assetById<SampleCollectionAsset>(project, sampleCollectionId)) {
-        shape.sampleCount += static_cast<u32>(sampleCollection->samples.samples.size());
-      }
+    const auto detailed = valueCapcomSnesSummary(project, session.sources(), collection);
+    shape.sampleCount = static_cast<u32>(detailed.samples.size());
+    shape.samples = detailed.samples;
+    for (auto& sample : shape.samples) {
+      sample.loopEnabled = false;
+      sample.loopStart = 0;
+      sample.loopLength = 0;
     }
+    shape.regions = detailed.regions;
+    shape.instrumentSynths = detailed.instrumentSynths;
     summary.collections.push_back(shape);
   }
   if (std::ranges::any_of(summary.collections,
@@ -1340,8 +1391,60 @@ std::string describeAkaoCollection(const AkaoCollectionSummary& summary) {
   std::ostringstream out;
   out << "seq=0x" << std::hex << summary.sequenceOffset << std::dec << " tracks=" << summary.trackCount
       << " instrSets=" << summary.instrumentSetCount << " sampleCollections=" << summary.sampleCollectionCount
-      << " samples=" << summary.sampleCount;
+      << " samples=" << summary.sampleCount << " regions=" << summary.regions.size()
+      << " synths=" << summary.instrumentSynths.size();
   return out.str();
+}
+
+bool describeAkaoCollectionMismatch(const AkaoCollectionSummary& legacy, const AkaoCollectionSummary& value) {
+  if (legacy.trackCount != value.trackCount || legacy.instrumentSetCount != value.instrumentSetCount ||
+      legacy.sampleCollectionCount != value.sampleCollectionCount || legacy.sampleCount != value.sampleCount) {
+    return false;
+  }
+
+  const size_t sharedSamples = std::min(legacy.samples.size(), value.samples.size());
+  for (size_t i = 0; i < sharedSamples; ++i) {
+    if (!(legacy.samples[i] == value.samples[i])) {
+      std::cout << "first sample mismatch at " << i << "\n";
+      std::cout << "legacy: " << describeSample(legacy.samples[i]) << "\n";
+      std::cout << "value:  " << describeSample(value.samples[i]) << "\n";
+      return true;
+    }
+  }
+  if (legacy.samples.size() != value.samples.size()) {
+    std::cout << "sample count differs\n";
+    return true;
+  }
+
+  const size_t sharedRegions = std::min(legacy.regions.size(), value.regions.size());
+  for (size_t i = 0; i < sharedRegions; ++i) {
+    if (!(legacy.regions[i] == value.regions[i])) {
+      std::cout << "first region mismatch at " << i << "\n";
+      std::cout << "legacy: " << describeRegion(legacy.regions[i]) << "\n";
+      std::cout << "value:  " << describeRegion(value.regions[i]) << "\n";
+      return true;
+    }
+  }
+  if (legacy.regions.size() != value.regions.size()) {
+    std::cout << "region count differs\n";
+    return true;
+  }
+
+  const size_t sharedSynths = std::min(legacy.instrumentSynths.size(), value.instrumentSynths.size());
+  for (size_t i = 0; i < sharedSynths; ++i) {
+    if (!(legacy.instrumentSynths[i] == value.instrumentSynths[i])) {
+      std::cout << "first instrument synth mismatch at " << i << "\n";
+      std::cout << "legacy: " << describeInstrumentSynth(legacy.instrumentSynths[i]) << "\n";
+      std::cout << "value:  " << describeInstrumentSynth(value.instrumentSynths[i]) << "\n";
+      return true;
+    }
+  }
+  if (legacy.instrumentSynths.size() != value.instrumentSynths.size()) {
+    std::cout << "instrument synth count differs\n";
+    return true;
+  }
+
+  return false;
 }
 
 int compareAkaoDirectSummary(const std::filesystem::path& path) {
@@ -1361,6 +1464,7 @@ int compareAkaoDirectSummary(const std::filesystem::path& path) {
       std::cout << "first mismatch at collection " << i << "\n";
       std::cout << "legacy: " << describeAkaoCollection(legacy.collections[i]) << "\n";
       std::cout << "value:  " << describeAkaoCollection(value.collections[i]) << "\n";
+      static_cast<void>(describeAkaoCollectionMismatch(legacy.collections[i], value.collections[i]));
       return 1;
     }
   }
@@ -2265,6 +2369,76 @@ std::string describeDlsCounts(const NormalizedDls& dls) {
   return out.str();
 }
 
+std::string describeBytesSummary(std::span<const u8> bytes) {
+  std::ostringstream out;
+  out << "size=" << bytes.size() << " hash=0x" << std::hex << fnv1a(bytes);
+  if (bytes.size() <= 24) {
+    out << " bytes=";
+    for (const u8 byte : bytes) {
+      const auto high = static_cast<u8>((byte >> 4) & 0x0f);
+      const auto low = static_cast<u8>(byte & 0x0f);
+      out << static_cast<char>(high < 10 ? '0' + high : 'a' + high - 10)
+          << static_cast<char>(low < 10 ? '0' + low : 'a' + low - 10);
+    }
+  }
+  return out.str();
+}
+
+std::string describeDlsConnections(std::span<const DlsConnection> connections) {
+  std::ostringstream out;
+  out << "[";
+  for (size_t i = 0; i < connections.size(); ++i) {
+    if (i != 0) {
+      out << ", ";
+    }
+    const auto& connection = connections[i];
+    out << "(" << connection.source << "," << connection.control << "," << connection.destination << ","
+        << connection.transform << "," << connection.scale << ")";
+  }
+  out << "]";
+  return out.str();
+}
+
+std::string describeDlsRegion(const DlsRegionSummary& region) {
+  std::ostringstream out;
+  out << "header{" << describeBytesSummary(region.header) << "} sample{" << describeBytesSummary(region.sample)
+      << "} link{" << describeBytesSummary(region.link) << "} connections="
+      << describeDlsConnections(region.connections);
+  return out.str();
+}
+
+std::string describeDlsInstrument(const DlsInstrumentSummary& instrument) {
+  std::ostringstream out;
+  out << "bank=" << instrument.bank << " program=" << instrument.program << " regions=" << instrument.regions.size();
+  if (!instrument.regions.empty()) {
+    out << " firstRegion{" << describeDlsRegion(instrument.regions.front()) << "}";
+  }
+  return out.str();
+}
+
+void describeFirstDlsRegionMismatch(std::ostream& out, std::span<const DlsRegionSummary> legacyRegions,
+                                    std::span<const DlsRegionSummary> valueRegions) {
+  const size_t shared = std::min(legacyRegions.size(), valueRegions.size());
+  for (size_t i = 0; i < shared; ++i) {
+    if (!(legacyRegions[i] == valueRegions[i])) {
+      out << "first region mismatch at " << i << "\n";
+      out << "legacy region: " << describeDlsRegion(legacyRegions[i]) << "\n";
+      out << "value region:  " << describeDlsRegion(valueRegions[i]) << "\n";
+      return;
+    }
+  }
+  if (legacyRegions.size() != valueRegions.size()) {
+    out << "region count differs: legacy=" << legacyRegions.size() << " value=" << valueRegions.size() << "\n";
+  }
+}
+
+std::string describeDlsWave(const DlsWaveSummary& wave) {
+  std::ostringstream out;
+  out << "format{" << describeBytesSummary(wave.format) << "} sample{" << describeBytesSummary(wave.sample)
+      << "} dataSize=" << wave.dataSize << " dataHash=0x" << std::hex << wave.dataHash;
+  return out.str();
+}
+
 bool compareSf2(std::span<const u8> legacyBytes, std::span<const u8> valueBytes, std::ostream& out) {
   const auto legacy = normalizeSf2(legacyBytes);
   const auto value = normalizeSf2(valueBytes);
@@ -2328,8 +2502,27 @@ bool compareDls(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
   out << "value:  " << describeDlsCounts(value) << "\n";
   if (legacy.instruments != value.instruments) {
     out << "instrument regions/articulations differ\n";
+    const size_t shared = std::min(legacy.instruments.size(), value.instruments.size());
+    for (size_t i = 0; i < shared; ++i) {
+      if (!(legacy.instruments[i] == value.instruments[i])) {
+        out << "first instrument mismatch at " << i << "\n";
+        out << "legacy: " << describeDlsInstrument(legacy.instruments[i]) << "\n";
+        out << "value:  " << describeDlsInstrument(value.instruments[i]) << "\n";
+        describeFirstDlsRegionMismatch(out, legacy.instruments[i].regions, value.instruments[i].regions);
+        break;
+      }
+    }
   } else if (legacy.waves != value.waves) {
     out << "wave format/sample data differ\n";
+    const size_t shared = std::min(legacy.waves.size(), value.waves.size());
+    for (size_t i = 0; i < shared; ++i) {
+      if (!(legacy.waves[i] == value.waves[i])) {
+        out << "first wave mismatch at " << i << "\n";
+        out << "legacy: " << describeDlsWave(legacy.waves[i]) << "\n";
+        out << "value:  " << describeDlsWave(value.waves[i]) << "\n";
+        break;
+      }
+    }
   }
   return false;
 }
