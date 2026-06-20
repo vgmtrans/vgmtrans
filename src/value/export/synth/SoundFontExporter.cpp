@@ -93,6 +93,11 @@ struct SfSampleHeaderPitch {
   s8 correction = 0;
 };
 
+struct SfSampleHeaderInfo {
+  SfSampleHeaderPitch pitch;
+  Loop loop;
+};
+
 struct SfModulatorRecord {
   u16 source = 0;
   u16 destination = 0;
@@ -261,6 +266,10 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   };
 }
 
+[[nodiscard]] Loop effectiveSfLoop(const Region& region, const DecodedSfSample& sample) {
+  return region.loop.value_or(sample.decoded.loop);
+}
+
 [[nodiscard]] s16 sf2Pan(double pan) {
   return clampS16(static_cast<s32>(std::lround((std::clamp(pan, 0.0, 1.0) - 0.5) * 1000.0)));
 }
@@ -359,9 +368,14 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 
 [[nodiscard]] u16 sf2Attenuation(const Region& region, const Sample& sample) {
   constexpr double centibelsPerDb = 10.0;
+  // Legacy VGMTrans declares EMU8000-compatible SF2 output. EMU-compatible
+  // synths apply a 0.4 factor to initialAttenuation, so the stored value uses
+  // the reciprocal to preserve the requested dB attenuation.
+  constexpr double emu8000InitialAttenuationScale = 2.5;
   constexpr double maxInitialAttenuation = 1440.0;
-  return static_cast<u16>(std::clamp(std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb), 0l,
-                                     static_cast<long>(maxInitialAttenuation)));
+  return static_cast<u16>(std::clamp(std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb *
+                                                 emu8000InitialAttenuationScale),
+                                     0l, static_cast<long>(maxInitialAttenuation)));
 }
 
 [[nodiscard]] std::optional<double> envelopeSeconds(u32 microseconds, std::optional<double> preciseSeconds) {
@@ -656,7 +670,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
       writeAmountGen(payload, kSfGenReleaseVolEnv,
                      sf2EnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
       writeWordGen(payload, kSfGenOverridingRootKey, pitch.rootKey);
-      writeWordGen(payload, kSfGenSampleModes, sample.decoded.loop.enabled ? 1 : 0);
+      writeWordGen(payload, kSfGenSampleModes, effectiveSfLoop(region, sample).enabled ? 1 : 0);
       writeWordGen(payload, kSfGenSampleId, sfRegion.sampleIndex);
     }
   }
@@ -665,42 +679,46 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("igen", std::move(payload));
 }
 
-[[nodiscard]] std::vector<SfSampleHeaderPitch> sampleHeaderPitches(
+[[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(
     std::span<const DecodedSfSample> samples, std::span<const ResolvedSynthInstrument> instruments) {
   // SF2 sample headers have their own original-key/correction fields. Pick the first
   // region that references each sample so sample headers stay consistent with zones.
-  std::vector<SfSampleHeaderPitch> pitches(samples.size());
+  std::vector<SfSampleHeaderInfo> info(samples.size());
   std::vector<bool> assigned(samples.size(), false);
+  for (size_t i = 0; i < samples.size(); ++i) {
+    info[i].loop = samples[i].decoded.loop;
+  }
   for (const auto& instrument : instruments) {
     for (const auto& sfRegion : instrument.regions) {
-      if (sfRegion.sampleIndex >= pitches.size() || assigned[sfRegion.sampleIndex]) {
+      if (sfRegion.sampleIndex >= info.size() || assigned[sfRegion.sampleIndex]) {
         continue;
       }
       const auto pitch = sf2RegionPitch(*sfRegion.region, samples[sfRegion.sampleIndex]);
-      pitches[sfRegion.sampleIndex] =
+      info[sfRegion.sampleIndex].pitch =
           sf2SampleHeaderPitch(pitch.rootKey, clampS16(samples[sfRegion.sampleIndex].pitch.cents));
+      info[sfRegion.sampleIndex].loop = effectiveSfLoop(*sfRegion.region, samples[sfRegion.sampleIndex]);
       assigned[sfRegion.sampleIndex] = true;
     }
   }
-  return pitches;
+  return info;
 }
 
 [[nodiscard]] Chunk shdrChunk(std::span<const DecodedSfSample> samples,
                               std::span<const ResolvedSynthInstrument> instruments) {
-  const auto pitches = sampleHeaderPitches(samples, instruments);
+  const auto headers = sampleHeaderInfo(samples, instruments);
   std::vector<u8> payload;
   for (size_t i = 0; i < samples.size(); ++i) {
     const auto& sample = samples[i];
     writeFixedString(payload, sf2Name(sample.name, "Sample"), 20);
     writeLe32(payload, sample.startFrame);
     writeLe32(payload, sample.endFrame);
-    const u32 loopStart = sample.startFrame + sample.decoded.loop.start;
-    const u32 loopEnd = loopStart + sample.decoded.loop.length;
+    const u32 loopStart = sample.startFrame + headers[i].loop.start;
+    const u32 loopEnd = loopStart + headers[i].loop.length;
     writeLe32(payload, loopStart);
     writeLe32(payload, std::min(loopEnd, sample.endFrame));
     writeLe32(payload, sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate);
-    writeU8(payload, pitches[i].originalKey);
-    writeU8(payload, static_cast<u8>(pitches[i].correction));
+    writeU8(payload, headers[i].pitch.originalKey);
+    writeU8(payload, static_cast<u8>(headers[i].pitch.correction));
     writeLe16(payload, 0);
     writeLe16(payload, 1);
   }

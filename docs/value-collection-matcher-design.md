@@ -110,6 +110,47 @@ stable for rescans, allows different PSF tracks with the same sequence id to
 coexist, and avoids the legacy matcher's destructive "consume sequence after
 match" behavior.
 
+## Akao Format Module Shape
+
+Akao should stay split by the format concepts rather than by export target:
+
+- `AkaoScanner` finds sequence and sample headers, reserves assets, and emits
+  only match facts needed by the resolver.
+- `AkaoResolver` owns collection assembly. It chooses instruments by sequence id,
+  chooses sample collections by preferred sample-set id plus articulation
+  coverage, and reports missing coverage as collection issues.
+- `AkaoVersion` contains source-name and header heuristics.
+- `AkaoBytecode` contains opcode sizes, branch targets, and track analysis.
+- `AkaoSequenceDecoder` converts bytecode into the shared sequence VM commands.
+- `AkaoSynth` parses articulation tables and PSX ADPCM sample data.
+- `AkaoInstrumentSet` turns sequence-side instrument/drum tables plus resolved
+  articulations into value-model instruments and regions.
+
+This keeps parity quirks local to the format concept that owns them. For example,
+version 3 drum tables inherit ADSR override bytes from the start of the drum
+table, so that rule belongs in `AkaoInstrumentSet`, not in SF2/DLS exporters.
+Akao absolute tuning preserves legacy pitch-bend quantization in
+`AkaoSequenceDecoder`; the shared MIDI renderer keeps its normal rounding
+behavior for other formats.
+
+## Synth Loop Ownership
+
+Akao exposed a value-model gap: some loop points belong to articulations/regions,
+not globally to a decoded sample. The synth model therefore allows `Region::loop`
+to override `Sample::loop`. Exporters compute an effective loop as
+`region.loop.value_or(sample.loop)`.
+
+For Akao specifically:
+
+- PSX ADPCM loop status is still stored on `Sample::loop`.
+- Articulation loop points are copied to `Region::loop` only when legacy PSX
+  sample-loop priority would use region data.
+- Non-playing loop offsets may remain on `Sample::loop` with `enabled=false`,
+  matching legacy SF2 sample headers while keeping `sampleModes` off.
+
+This avoids Akao-specific branches in the exporters and gives future formats a
+clear place to represent region-local loop metadata.
+
 ## PSF1 Extraction
 
 The value extractor must support PSF1 in addition to 2SF/NCSF. PSF1 executable

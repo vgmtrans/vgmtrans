@@ -201,7 +201,9 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 
 [[nodiscard]] s32 dlsAttenuation(const Region& region, const DecodedDlsSample& sample) {
   constexpr double centibelsPerDb = 10.0;
-  return static_cast<s32>(std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb));
+  const double units = std::clamp((region.attenuationDb + sample.attenuationDb) * centibelsPerDb * 65536.0, 0.0,
+                                  static_cast<double>(std::numeric_limits<s32>::max()));
+  return -static_cast<s32>(units);
 }
 
 [[nodiscard]] std::optional<DlsConnection> dlsConnectionForGenerator(const SynthGenerator& generator) {
@@ -395,6 +397,11 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return static_cast<s32>(std::clamp(std::lround(scaledLevel), 0l, static_cast<long>(kDlsSustainLevelFullScale)));
 }
 
+[[nodiscard]] s32 dlsPanScale(double pan) {
+  const auto tenthPercentUnits = static_cast<s32>(std::lround(std::clamp(pan, 0.0, 1.0) * 1000.0)) - 500;
+  return dls16Dot16Scale(tenthPercentUnits);
+}
+
 [[nodiscard]] Chunk colhChunk(std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<u8> payload;
   writeLe32(payload, static_cast<u32>(instruments.size()));
@@ -408,9 +415,10 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] Chunk inshChunk(const ResolvedSynthInstrument& instrument) {
+  const u32 dlsBank = (instrument.instrument->bank & 0x7f) << 8;
   std::vector<u8> payload;
   writeLe32(payload, static_cast<u32>(instrument.regions.size()));
-  writeLe32(payload, instrument.instrument->bank);
+  writeLe32(payload, dlsBank);
   writeLe32(payload, instrument.instrument->program);
   return makeChunk("insh", std::move(payload));
 }
@@ -430,6 +438,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 [[nodiscard]] Chunk wsmpChunk(const Region& region, const DecodedDlsSample& sample) {
   // wsmp carries sample playback metadata for a region: unity key, fine tune,
   // attenuation, and loop points.
+  const Loop loop = effectiveRegionLoop(region, sample);
   u8 unityKey = kDefaultRootKey;
   s16 fineTune = 0;
   if (region.rootKey) {
@@ -447,12 +456,12 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   writeLeS16(payload, fineTune);
   writeLeS32(payload, dlsAttenuation(region, sample));
   writeLe32(payload, 1);
-  writeLe32(payload, sample.decoded.loop.enabled ? 1 : 0);
-  if (sample.decoded.loop.enabled) {
+  writeLe32(payload, loop.enabled ? 1 : 0);
+  if (loop.enabled) {
     writeLe32(payload, 16);
     writeLe32(payload, 0);
-    writeLe32(payload, sample.decoded.loop.start);
-    writeLe32(payload, sample.decoded.loop.length);
+    writeLe32(payload, loop.start);
+    writeLe32(payload, loop.length);
   }
   return makeChunk("wsmp", std::move(payload));
 }
@@ -483,10 +492,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
                               ModulationScalingPolicy modulationScaling) {
   // Each region gets a DLS2 articulation list. Region envelope/pan is always written;
   // instrument generators/modulators are appended as additional connections.
-  const auto panScale = static_cast<s32>(std::lround((std::clamp(region.pan, 0.0, 1.0) - 0.5) * 65536.0));
-
   std::vector<u8> connections;
-  writeConnection(connections, kDlsConnDstPan, panScale);
+  writeConnection(connections, kDlsConnDstPan, dlsPanScale(region.pan));
   const bool explicitEnvelope = hasExplicitEnvelope(region.envelope);
   writeConnection(connections, kDlsConnDstEg1AttackTime,
                   dlsEnvelopeTimecents(region.envelope.attack, region.envelope.attackSeconds));

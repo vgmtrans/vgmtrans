@@ -16,6 +16,10 @@ PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId source
     : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick) {
 }
 
+PerformanceEmitter PerformanceEmitter::at(u64 tick) const {
+  return PerformanceEmitter{track_, sourceCommand_, sourceAnnotation_, tick};
+}
+
 void PerformanceEmitter::note(NotePerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
@@ -38,6 +42,19 @@ void PerformanceEmitter::tempo(TempoPerformanceEvent event) {
 void PerformanceEmitter::tempo(u32 microsecondsPerQuarter) {
   tempo(TempoPerformanceEvent{
       .microsecondsPerQuarter = microsecondsPerQuarter,
+  });
+}
+
+void PerformanceEmitter::timeSignature(TimeSignaturePerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void PerformanceEmitter::timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick) {
+  timeSignature(TimeSignaturePerformanceEvent{
+      .numerator = numerator,
+      .denominator = denominator,
+      .clocksPerMetronomeClick = clocksPerMetronomeClick,
   });
 }
 

@@ -50,10 +50,14 @@ struct DecodeCursorRuntime {
 
   void note(double, double, u32, bool = false) {}
   void tempo(u32) {}
+  void timeSignature(u8, u8, u8) {}
   void instrument(u32, u32, bool = false) {}
   void level(double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
+  void levelAt(u64, double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
   void expression(double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
+  void expressionAt(u64, double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
   void pan(double) {}
+  void panAt(u64, double) {}
   void pan(double, double) {}
   void masterLevel(double) {}
   void reverb(double) {}
@@ -108,16 +112,26 @@ struct RenderCursorRuntime {
     out.note(key, linearVelocity, durationTicks, extendsPrevious);
   }
   void tempo(u32 microsecondsPerQuarter) { out.tempo(microsecondsPerQuarter); }
+  void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick) {
+    out.timeSignature(numerator, denominator, clocksPerMetronomeClick);
+  }
   void instrument(u32 bank, u32 program, bool forceBankSelect = false) {
     out.instrument(bank, program, forceBankSelect);
   }
   void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit) {
     out.level(linearGain, precisionHint);
   }
+  void levelAt(u64 tick, double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit) {
+    out.at(tick).level(linearGain, precisionHint);
+  }
   void expression(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit) {
     out.expression(linearGain, precisionHint);
   }
+  void expressionAt(u64 tick, double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit) {
+    out.at(tick).expression(linearGain, precisionHint);
+  }
   void pan(double stereoPosition) { out.pan(stereoPosition); }
+  void panAt(u64 tick, double stereoPosition) { out.at(tick).pan(stereoPosition); }
   void pan(double stereoPosition, double linearGain) { out.pan(stereoPosition, linearGain); }
   void masterLevel(double linearGain) { out.masterLevel(linearGain); }
   void reverb(double send) { out.reverb(send); }

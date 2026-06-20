@@ -284,10 +284,23 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
         .send = *behavior.initialReverbSend,
     });
   }
+  if (behavior.initialLevel) {
+    track.events.emplace_back(LevelPerformanceEvent{
+        .header = header,
+        .linearGain = *behavior.initialLevel,
+        .precisionHint = LevelPrecisionHint::SevenBit,
+    });
+  }
   if (behavior.initialMonoModeChannels) {
     track.events.emplace_back(MonoModePerformanceEvent{
         .header = header,
         .channels = *behavior.initialMonoModeChannels,
+    });
+  }
+  if (behavior.initialPitchBendRangeSemitones) {
+    track.events.emplace_back(PitchBendRangePerformanceEvent{
+        .header = header,
+        .semitones = *behavior.initialPitchBendRangeSemitones,
     });
   }
 }
@@ -738,10 +751,22 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
     behavior.initialReverbSend = dialect.defaultBehavior.initialReverbSend;
   }
 
+  if (program.behavior.initialLevel) {
+    behavior.initialLevel = program.behavior.initialLevel;
+  } else if (dialect.defaultBehavior.initialLevel) {
+    behavior.initialLevel = dialect.defaultBehavior.initialLevel;
+  }
+
   if (program.behavior.initialMonoModeChannels) {
     behavior.initialMonoModeChannels = program.behavior.initialMonoModeChannels;
   } else if (dialect.defaultBehavior.initialMonoModeChannels) {
     behavior.initialMonoModeChannels = dialect.defaultBehavior.initialMonoModeChannels;
+  }
+
+  if (program.behavior.initialPitchBendRangeSemitones) {
+    behavior.initialPitchBendRangeSemitones = program.behavior.initialPitchBendRangeSemitones;
+  } else if (dialect.defaultBehavior.initialPitchBendRangeSemitones) {
+    behavior.initialPitchBendRangeSemitones = dialect.defaultBehavior.initialPitchBendRangeSemitones;
   }
 
   behavior.stopAllTracksAtFirstLoop =

@@ -66,6 +66,8 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
     const SynthSampleIndexMap& samples,
     std::vector<Diagnostic>& diagnostics);
 
+[[nodiscard]] Loop effectiveRegionLoop(const Region& region, const DecodedSynthSample& sample);
+
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     std::span<const InstrumentSetAsset* const> instrumentSets,
     std::span<const SampleCollectionAsset* const> sampleCollections,

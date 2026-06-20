@@ -47,6 +47,13 @@ struct Tempo {
   u32 microsecondsPerQuarter = 500000;
 };
 
+struct TimeSignature {
+  u64 tick = 0;
+  u8 numerator = 4;
+  u8 denominator = 4;
+  u8 clocksPerMetronomeClick = 24;
+};
+
 struct MidiPort {
   u64 tick = 0;
   u8 port = 0;
@@ -213,11 +220,11 @@ struct Marker {
   std::string text;
 };
 
-using MidiEvent = std::variant<NoteOn, NoteOff, NoteDuration, Tempo, MidiPort, ProgramChange, BankSelect, Volume,
-                               Volume14, Pan, Expression, Expression14, MasterVolume, Reverb, FineTune, CoarseTune,
-                               PitchBend, PitchBendRange, VibratoDepth, VibratoFrequency, VibratoDelay, TremoloDepth,
-                               TremoloFrequency, TremoloDelay, PortamentoEnable, PortamentoTime, PortamentoTime14,
-                               PortamentoControl, LegatoPedal, MonoMode, EndOfTrack, Marker>;
+using MidiEvent = std::variant<NoteOn, NoteOff, NoteDuration, Tempo, TimeSignature, MidiPort, ProgramChange, BankSelect,
+                               Volume, Volume14, Pan, Expression, Expression14, MasterVolume, Reverb, FineTune,
+                               CoarseTune, PitchBend, PitchBendRange, VibratoDepth, VibratoFrequency, VibratoDelay,
+                               TremoloDepth, TremoloFrequency, TremoloDelay, PortamentoEnable, PortamentoTime,
+                               PortamentoTime14, PortamentoControl, LegatoPedal, MonoMode, EndOfTrack, Marker>;
 
 struct MidiTrack {
   // Empty names are valid; the exporter will omit track-name meta events.

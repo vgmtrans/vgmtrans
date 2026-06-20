@@ -194,6 +194,13 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .tick = typedEvent.header.tick,
               .microsecondsPerQuarter = typedEvent.microsecondsPerQuarter,
           });
+        } else if constexpr (std::is_same_v<TypedEvent, TimeSignaturePerformanceEvent>) {
+          track.events.push_back(TimeSignature{
+              .tick = typedEvent.header.tick,
+              .numerator = typedEvent.numerator,
+              .denominator = typedEvent.denominator,
+              .clocksPerMetronomeClick = typedEvent.clocksPerMetronomeClick,
+          });
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
           if (typedEvent.bank != 0 || typedEvent.forceBankSelect) {
             track.events.push_back(BankSelect{

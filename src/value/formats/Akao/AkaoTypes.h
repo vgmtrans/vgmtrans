@@ -8,6 +8,7 @@
 
 #include "value/base/CoreTypes.h"
 #include "value/scan/ScanResultBuilder.h"
+#include "value/synth/SynthModel.h"
 
 #include <map>
 #include <optional>
@@ -59,6 +60,7 @@ struct AkaoArt {
   s16 fineTuneCents = 0;
   u32 sampleOffset = 0;
   u32 loopPoint = 0;
+  std::optional<core::Loop> loop;
   u16 adsr1 = 0;
   u16 adsr2 = 0;
   u32 sampleIndex = 0;
@@ -90,15 +92,5 @@ struct AkaoInstrDatLocation {
   u32 firstArtId = 0;
   u32 artCount = 0;
 };
-
-[[nodiscard]] std::string versionName(AkaoPs1Version version);
-[[nodiscard]] std::string dialectId(AkaoPs1Version version);
-[[nodiscard]] bool isVersion3OrLater(AkaoPs1Version version) noexcept;
-[[nodiscard]] AkaoPs1Version determineVersionFromSource(const core::SourceFile& source);
-[[nodiscard]] AkaoPs1Version guessSequenceVersion(core::ByteReader reader, u32 offset);
-[[nodiscard]] AkaoPs1Version guessSampleVersion(core::ByteReader reader, u32 offset);
-[[nodiscard]] u32 trackAllocationBitsOffset(AkaoPs1Version version) noexcept;
-[[nodiscard]] u32 trackHeaderOffset(AkaoPs1Version version) noexcept;
-[[nodiscard]] u32 sequenceLengthForVersion(core::ByteReader reader, u32 offset, AkaoPs1Version version);
 
 }  // namespace vgmtrans::formats::akao
