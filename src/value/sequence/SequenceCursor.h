@@ -30,6 +30,7 @@ enum class FlowKind : ::u8 {
   Jump,
   Call,
   Return,
+  ConditionalBranch,
   LoopCandidate,
   DeclaredLoop,
   CountedRepeatUntil,
@@ -83,6 +84,8 @@ public:
   [[nodiscard]] CommandPhase phase() const noexcept { return phase_; }
   [[nodiscard]] SourceId source() const noexcept { return commandRange_.source; }
   [[nodiscard]] Address address() const noexcept { return Address{static_cast<u32>(commandRange_.offset)}; }
+  [[nodiscard]] u32 absolutePosition() const noexcept;
+  [[nodiscard]] Address addressAtCursor() const noexcept { return Address{absolutePosition()}; }
   [[nodiscard]] ::u8 opcode() const noexcept { return bytes_.empty() ? 0 : bytes_.front(); }
   [[nodiscard]] SourceRange commandRange() const noexcept { return commandRange_; }
   [[nodiscard]] SourceAnnotationId annotation() const noexcept { return annotation_; }
@@ -103,6 +106,8 @@ public:
   [[nodiscard]] ReadValue<::s8> s8(std::string_view name);
   [[nodiscard]] ReadValue<u16> u16le(std::string_view name);
   [[nodiscard]] ReadValue<u16> u16be(std::string_view name);
+  [[nodiscard]] ReadValue<s16> s16le(std::string_view name);
+  [[nodiscard]] ReadValue<s16> s16be(std::string_view name);
   [[nodiscard]] ReadValue<u32> u24le(std::string_view name);
   [[nodiscard]] ReadValue<u32> u24be(std::string_view name);
   [[nodiscard]] ReadValue<u32> varLen(std::string_view name);
@@ -114,15 +119,13 @@ public:
   VmCommandCursor& derived(std::string_view name, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
   template <class T>
-  VmCommandCursor& derived(std::string_view name, T&& value,
-                           SourceValueDisplay display = SourceValueDisplay::Default) {
+  VmCommandCursor& derived(std::string_view name, T&& value, SourceValueDisplay display = SourceValueDisplay::Default) {
     return derived(name, makeSourceValue(std::forward<T>(value)), display);
   }
   VmCommandCursor& detail(std::string_view name, SourceValue value,
                           SourceValueDisplay display = SourceValueDisplay::Default);
   template <class T>
-  VmCommandCursor& detail(std::string_view name, T&& value,
-                          SourceValueDisplay display = SourceValueDisplay::Default) {
+  VmCommandCursor& detail(std::string_view name, T&& value, SourceValueDisplay display = SourceValueDisplay::Default) {
     return detail(name, makeSourceValue(std::forward<T>(value)), display);
   }
   VmCommandCursor& target(Address address, SourceLinkRole role);
@@ -144,6 +147,7 @@ public:
   [[nodiscard]] CommandFlow invalidJump(Address destination, std::string_view message);
   [[nodiscard]] CommandFlow invalidCall(Address destination, std::string_view message);
   [[nodiscard]] CommandFlow ret();
+  [[nodiscard]] CommandFlow conditionalBranch(Address destination);
   [[nodiscard]] CommandFlow loopCandidate(Address destination);
   [[nodiscard]] CommandFlow declaredLoop(Address destination);
   [[nodiscard]] CommandFlow countedRepeatUntil(::u8 slot, u32 totalPlays, Address destination);

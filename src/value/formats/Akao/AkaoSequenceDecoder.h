@@ -14,5 +14,6 @@ namespace vgmtrans::formats::akao {
 [[nodiscard]] core::SequenceDialect makeAkaoDialect(AkaoPs1Version version);
 [[nodiscard]] core::TrackProgram decodeAkaoTrack(core::ByteReader reader, const core::SequenceDialect& dialect,
                                                  core::CursorTrackDecodeInput input);
+void analyzeAkaoTrack(core::ByteReader reader, AkaoSequenceAnalysis& analysis, u32 start);
 
 }  // namespace vgmtrans::formats::akao

@@ -6,7 +6,6 @@
 
 #include "value/formats/Akao/AkaoSequence.h"
 
-#include "value/formats/Akao/AkaoBytecode.h"
 #include "value/formats/Akao/AkaoSequenceDecoder.h"
 #include "value/formats/Akao/AkaoVersion.h"
 
@@ -23,15 +22,16 @@ bool isPossibleAkaoSequence(ByteReader reader, u32 offset) {
     return false;
   }
   const AkaoPs1Version version = guessSequenceVersion(reader, offset);
-  const u32 bitsOffset = trackAllocationBitsOffset(version);
+  const AkaoProfile profile = akaoProfile(version);
+  const u32 bitsOffset = profile.trackAllocationBitsOffset();
   if (!reader.has(offset + bitsOffset, 4)) {
     return false;
   }
   const u32 trackBits = reader.le32(offset + bitsOffset);
-  if (!isVersion3OrLater(version) && (trackBits & ~0xffffffu) != 0) {
+  if (!profile.version3OrLater() && (trackBits & ~0xffffffu) != 0) {
     return false;
   }
-  if (isVersion3OrLater(version)) {
+  if (profile.version3OrLater()) {
     if (!reader.has(offset + 0x40, 1)) {
       return false;
     }
@@ -55,7 +55,8 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
     return std::nullopt;
   }
 
-  const u32 length = sequenceLengthForVersion(reader, offset, version);
+  const AkaoProfile profile = akaoProfile(version);
+  const u32 length = profile.sequenceLength(reader, offset);
   if (length == 0 || !reader.has(offset, std::min<u64>(length, reader.size() - offset))) {
     return std::nullopt;
   }
@@ -66,10 +67,10 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
       .length = static_cast<u32>(std::min<u64>(length, reader.size() - offset)),
       .version = version,
       .sequenceId = reader.le16(offset + 4),
-      .trackBits = reader.le32(offset + trackAllocationBitsOffset(version)),
-      .trackHeaderOffset = trackHeaderOffset(version),
+      .trackBits = reader.le32(offset + profile.trackAllocationBitsOffset()),
+      .trackHeaderOffset = profile.trackHeaderOffset(),
   };
-  if (isVersion3OrLater(version)) {
+  if (profile.version3OrLater()) {
     analysis.header.sampleSetId = reader.le16(offset + 0x14);
     const u32 instr = reader.le32(offset + 0x30);
     const u32 drum = reader.le32(offset + 0x34);
@@ -90,7 +91,7 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
 
   for (u32 i = 0; i < trackCount; ++i) {
     const u32 pointerOffset = analysis.header.trackHeaderOffset + i * 2;
-    const u32 base = pointerOffset + (isVersion3OrLater(version) ? 0 : 2);
+    const u32 base = pointerOffset + (profile.version3OrLater() ? 0 : 2);
     const u32 relative = reader.le16(offset + pointerOffset);
     const u32 trackStart = offset + base + relative;
     if (trackStart < sequenceEnd && reader.has(trackStart, 1)) {
@@ -106,8 +107,7 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
 
 SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id, const AkaoSequenceAnalysis& analysis,
                                               std::optional<ScanInstrumentSetRef> instrumentSet,
-                                              SourceMapBuilder* sourceMap,
-                                              std::vector<Diagnostic>* diagnostics) {
+                                              SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SequenceDialect dialect = makeAkaoDialect(analysis.header.version);
   const u32 sequenceEnd = analysis.header.offset + analysis.header.length;
   const std::string name = fmt::format("Akao Seq {:02X}", analysis.header.sequenceId);
@@ -124,19 +124,19 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
                                       input.reader.range(analysis.header.offset, analysis.header.length));
 
   if (sourceMap != nullptr) {
-    auto header = sourceMap->header("AKAO Sequence Header",
-                                    input.reader.range(analysis.header.offset, analysis.header.trackHeaderOffset))
-                      .kind("akao-sequence-header")
-                      .field("sequence_id", input.reader.range(analysis.header.offset + 4, 2),
-                             analysis.header.sequenceId)
-                      .field("size", input.reader.range(analysis.header.offset + 6, 2), analysis.header.length)
-                      .field("track_bits", input.reader.range(analysis.header.offset + trackAllocationBitsOffset(
-                                                                   analysis.header.version),
-                                                               4),
-                             analysis.header.trackBits, SourceValueDisplay::Hex);
+    auto header =
+        sourceMap
+            ->header("AKAO Sequence Header",
+                     input.reader.range(analysis.header.offset, analysis.header.trackHeaderOffset))
+            .kind("akao-sequence-header")
+            .field("sequence_id", input.reader.range(analysis.header.offset + 4, 2), analysis.header.sequenceId)
+            .field("size", input.reader.range(analysis.header.offset + 6, 2), analysis.header.length)
+            .field("track_bits",
+                   input.reader.range(
+                       analysis.header.offset + akaoProfile(analysis.header.version).trackAllocationBitsOffset(), 4),
+                   analysis.header.trackBits, SourceValueDisplay::Hex);
     if (analysis.header.sampleSetId) {
-      header.field("sample_set_id", input.reader.range(analysis.header.offset + 0x14, 2),
-                   *analysis.header.sampleSetId);
+      header.field("sample_set_id", input.reader.range(analysis.header.offset + 0x14, 2), *analysis.header.sampleSetId);
     }
   }
 

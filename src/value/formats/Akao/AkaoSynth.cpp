@@ -6,7 +6,6 @@
 
 #include "value/formats/Akao/AkaoSynth.h"
 
-#include "value/formats/Akao/AkaoBytecode.h"
 #include "value/formats/Akao/AkaoVersion.h"
 
 #include <algorithm>
@@ -53,10 +52,9 @@ struct PsxSampleInfo {
                           (sustainLevel & 0x0f));
 }
 
-[[nodiscard]] u16 composePsxAdsr2(u8 sustainMode, u8 sustainDirection, u8 sustainRate, u8 releaseMode,
-                                  u8 releaseRate) {
-  return static_cast<u16>(((sustainMode & 1) << 15) | ((sustainDirection & 1) << 14) |
-                          ((sustainRate & 0x7f) << 6) | ((releaseMode & 1) << 5) | (releaseRate & 0x1f));
+[[nodiscard]] u16 composePsxAdsr2(u8 sustainMode, u8 sustainDirection, u8 sustainRate, u8 releaseMode, u8 releaseRate) {
+  return static_cast<u16>(((sustainMode & 1) << 15) | ((sustainDirection & 1) << 14) | ((sustainRate & 0x7f) << 6) |
+                          ((releaseMode & 1) << 5) | (releaseRate & 0x1f));
 }
 
 [[nodiscard]] double log2Cents(double multiplier) {
@@ -116,11 +114,12 @@ struct PsxSampleInfo {
 }
 
 [[nodiscard]] std::optional<ArticulationTable> sampleHeader(ByteReader reader, u32 offset, AkaoPs1Version version) {
-  if (version == AkaoPs1Version::Unknown) {
+  const AkaoProfile profile = akaoProfile(version);
+  if (!profile.known()) {
     return std::nullopt;
   }
   ArticulationTable table;
-  if (isVersion3OrLater(version)) {
+  if (profile.version3OrLater()) {
     if (!reader.has(offset, 0x40)) {
       return std::nullopt;
     }
@@ -128,16 +127,15 @@ struct PsxSampleInfo {
     table.sampleSectionSize = reader.le32(offset + 0x14);
     table.firstArtId = reader.le32(offset + 0x18);
     table.artCount = reader.le32(offset + 0x1c);
-    table.artSize = version >= AkaoPs1Version::Version3_1 ? 0x10 : 0x40;
+    table.artSize = profile.artRowSize();
     table.artsOffset = offset + 0x40;
-  } else if (version >= AkaoPs1Version::Version1_1) {
+  } else if (profile.hasLegacySampleHeader()) {
     if (!reader.has(offset, 0x40)) {
       return std::nullopt;
     }
     table.sampleSectionSize = reader.le32(offset + 0x14);
     table.firstArtId = reader.le32(offset + 0x18);
-    const u32 endingArtId =
-        version == AkaoPs1Version::Version1_1 ? 0x80 : (reader.le32(offset + 0x1c) == 0 ? 0x100 : reader.le32(offset + 0x1c));
+    const u32 endingArtId = profile.legacySampleEndingArtId(reader, offset);
     if (endingArtId < table.firstArtId) {
       return std::nullopt;
     }
@@ -190,9 +188,10 @@ struct PsxSampleInfo {
 
 [[nodiscard]] std::optional<AkaoArt> readArt(ByteReader reader, const ArticulationTable& table, AkaoPs1Version version,
                                              u32 index, u32 spuDestAddress) {
+  const AkaoProfile profile = akaoProfile(version);
   const u32 artOffset = table.artsOffset + index * table.artSize;
   AkaoArt art{.artId = table.firstArtId + index};
-  if (version >= AkaoPs1Version::Version3_1) {
+  if (profile.hasCompactArtRows()) {
     const s16 rawFineTune = leS16(reader, artOffset + 8);
     const double multiplier =
         rawFineTune >= 0 ? 1.0 + (rawFineTune / 32768.0) : (static_cast<u16>(rawFineTune) / 65536.0);
@@ -216,9 +215,9 @@ struct PsxSampleInfo {
     art.unityKey = static_cast<u8>(72 - coarse);
     art.adsr1 = composePsxAdsr1((reader.u8At(artOffset + 0x3d) & 4) >> 2, reader.u8At(artOffset + 0x38),
                                 reader.u8At(artOffset + 0x39), reader.u8At(artOffset + 0x3a));
-    art.adsr2 = composePsxAdsr2((reader.u8At(artOffset + 0x3e) & 4) >> 2,
-                                (reader.u8At(artOffset + 0x3e) & 2) >> 1, reader.u8At(artOffset + 0x3b),
-                                (reader.u8At(artOffset + 0x3f) & 4) >> 2, reader.u8At(artOffset + 0x3c));
+    art.adsr2 = composePsxAdsr2((reader.u8At(artOffset + 0x3e) & 4) >> 2, (reader.u8At(artOffset + 0x3e) & 2) >> 1,
+                                reader.u8At(artOffset + 0x3b), (reader.u8At(artOffset + 0x3f) & 4) >> 2,
+                                reader.u8At(artOffset + 0x3c));
     return art;
   }
 
@@ -236,22 +235,19 @@ struct PsxSampleInfo {
   art.unityKey = static_cast<u8>(72 - coarse);
   art.adsr1 = composePsxAdsr1((reader.u8At(artOffset + 0x0d) & 4) >> 2, reader.u8At(artOffset + 8),
                               reader.u8At(artOffset + 9), reader.u8At(artOffset + 0x0a));
-  art.adsr2 = composePsxAdsr2((reader.u8At(artOffset + 0x0e) & 4) >> 2,
-                              (reader.u8At(artOffset + 0x0e) & 2) >> 1, reader.u8At(artOffset + 0x0b),
-                              (reader.u8At(artOffset + 0x0f) & 4) >> 2, reader.u8At(artOffset + 0x0c));
+  art.adsr2 = composePsxAdsr2((reader.u8At(artOffset + 0x0e) & 4) >> 2, (reader.u8At(artOffset + 0x0e) & 2) >> 1,
+                              reader.u8At(artOffset + 0x0b), (reader.u8At(artOffset + 0x0f) & 4) >> 2,
+                              reader.u8At(artOffset + 0x0c));
   return art;
 }
 
-[[nodiscard]] std::optional<AkaoSampleCollectionParse>
-parseSampleCollectionWithTable(const ScanInput& input, ScanResultBuilder& result, ScanSampleCollectionRef ref,
-                               u32 offset, u32 length, AkaoPs1Version version, ArticulationTable table,
-                               u32 scanOrdinal, std::string name) {
+[[nodiscard]] std::optional<AkaoSampleCollectionParse> parseSampleCollectionWithTable(
+    const ScanInput& input, ScanResultBuilder& result, ScanSampleCollectionRef ref, u32 offset, u32 length,
+    AkaoPs1Version version, ArticulationTable table, u32 scanOrdinal, std::string name) {
   if (table.artCount == 0 || table.sampleSectionSize == 0) {
     return std::nullopt;
   }
-  const u32 spuDestAddress = version == AkaoPs1Version::Version1_0
-                                 ? (input.reader.has(offset, 4) ? input.reader.le32(offset) : 0)
-                                 : (input.reader.has(offset + 0x10, 4) ? input.reader.le32(offset + 0x10) : 0);
+  const u32 spuDestAddress = akaoProfile(version).spuDestinationAddress(input.reader, offset);
   std::vector<AkaoArt> arts;
   arts.reserve(table.artCount);
   for (u32 i = 0; i < table.artCount; ++i) {
@@ -315,7 +311,8 @@ parseSampleCollectionWithTable(const ScanInput& input, ScanResultBuilder& result
                  art.loopPoint < encodedLength) {
         const u32 loopStart = psxDecodedOffset(art.loopPoint);
         sampleLoop.start = loopStart;
-        sampleLoop.length = loopStart < psxDecodedFrames(encodedLength) ? psxDecodedFrames(encodedLength) - loopStart : 0;
+        sampleLoop.length =
+            loopStart < psxDecodedFrames(encodedLength) ? psxDecodedFrames(encodedLength) - loopStart : 0;
       }
     }
   }
@@ -381,11 +378,11 @@ std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInp
   if (!table) {
     return std::nullopt;
   }
-  const u32 length = static_cast<u32>(std::min<u64>(
-      input.reader.size() - offset, table->sampleSectionOffset + table->sampleSectionSize - offset));
-  return parseSampleCollectionWithTable(input, result, ref, offset, length, version, *table, scanOrdinal,
-                                        fmt::format("Akao Sample Collection {:02X}",
-                                                    table->sampleSetId.value_or(input.reader.le16(offset + 4))));
+  const u32 length = static_cast<u32>(
+      std::min<u64>(input.reader.size() - offset, table->sampleSectionOffset + table->sampleSectionSize - offset));
+  return parseSampleCollectionWithTable(
+      input, result, ref, offset, length, version, *table, scanOrdinal,
+      fmt::format("Akao Sample Collection {:02X}", table->sampleSetId.value_or(input.reader.le16(offset + 4))));
 }
 
 std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInput& input, ScanResultBuilder& result,

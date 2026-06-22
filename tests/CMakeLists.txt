@@ -2,6 +2,7 @@ add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
+    formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
     core/ValueMidiTests.cpp
     core/ValueRegistryTests.cpp

@@ -6,7 +6,7 @@
 
 #include "value/formats/Akao/AkaoScanner.h"
 
-#include "value/formats/Akao/AkaoBytecode.h"
+#include "value/formats/Akao/AkaoInstrumentSet.h"
 #include "value/formats/Akao/AkaoFacts.h"
 #include "value/formats/Akao/AkaoSequence.h"
 #include "value/formats/Akao/AkaoSynth.h"
@@ -70,27 +70,29 @@ void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const
   result.sourceFact(sequence.id, akaoFact(std::string(kAkaoFactSequence), std::move(fields)));
 }
 
-void addInstrumentFacts(ScanResultBuilder& result, ScanInstrumentSetRef instrument, const AkaoSequenceAnalysis& analysis,
-                        std::span<const u32> requiredArts) {
-  result.sourceFact(instrument.id, akaoFact(std::string(kAkaoFactInstrumentSet), {
-                                           MatchField{.name = std::string(kAkaoFieldSequenceId),
-                                                      .value = std::to_string(analysis.header.sequenceId)},
-                                       }));
+void addInstrumentFacts(ScanResultBuilder& result, ScanInstrumentSetRef instrument,
+                        const AkaoSequenceAnalysis& analysis, std::span<const u32> requiredArts) {
+  result.sourceFact(instrument.id, akaoFact(std::string(kAkaoFactInstrumentSet),
+                                            {
+                                                MatchField{.name = std::string(kAkaoFieldSequenceId),
+                                                           .value = std::to_string(analysis.header.sequenceId)},
+                                            }));
   for (const u32 artId : requiredArts) {
     if (artId == 0) {
       continue;
     }
-    result.sourceFact(instrument.id, akaoFact(std::string(kAkaoFactRequiredArticulation), {
-                                             MatchField{.name = std::string(kAkaoFieldSequenceId),
-                                                        .value = std::to_string(analysis.header.sequenceId)},
-                                             MatchField{.name = std::string(kAkaoFieldArtId),
-                                                        .value = std::to_string(artId)},
-                                         }));
+    result.sourceFact(instrument.id,
+                      akaoFact(std::string(kAkaoFactRequiredArticulation),
+                               {
+                                   MatchField{.name = std::string(kAkaoFieldSequenceId),
+                                              .value = std::to_string(analysis.header.sequenceId)},
+                                   MatchField{.name = std::string(kAkaoFieldArtId), .value = std::to_string(artId)},
+                               }));
   }
 }
 
 std::vector<AkaoSampleCollectionParse> scanSampleCollections(const ScanInput& input, ScanResultBuilder& result,
-                                                            std::span<const u32> offsets) {
+                                                             std::span<const u32> offsets) {
   const AkaoPs1Version sourceVersion = determineVersionFromSource(input.source);
   std::vector<AkaoSampleCollectionParse> sampleCollections;
   u32 scanOrdinal = 0;
@@ -99,8 +101,8 @@ std::vector<AkaoSampleCollectionParse> scanSampleCollections(const ScanInput& in
     if (input.reader.le16(offset + 6) != 0 || !isPossibleAkaoSampleCollection(input.reader, offset)) {
       continue;
     }
-    AkaoPs1Version version = sourceVersion == AkaoPs1Version::Unknown ? guessSampleVersion(input.reader, offset)
-                                                                       : sourceVersion;
+    AkaoPs1Version version =
+        sourceVersion == AkaoPs1Version::Unknown ? guessSampleVersion(input.reader, offset) : sourceVersion;
     auto ref = result.reserveSampleCollection();
     if (auto parsed = parseAkaoSampleCollection(input, result, ref, offset, version, scanOrdinal++)) {
       addSampleFacts(result, *parsed);
@@ -115,7 +117,8 @@ std::vector<AkaoSampleCollectionParse> scanSampleCollections(const ScanInput& in
     auto ref = result.reserveSampleCollection();
     if (auto parsed = parseAkaoSampleCollection(
             input, result, ref,
-            AkaoInstrDatLocation{.instrAllOffset = 0xe0000, .instrDatOffset = 0x156000, .firstArtId = 0, .artCount = 128},
+            AkaoInstrDatLocation{
+                .instrAllOffset = 0xe0000, .instrDatOffset = 0x156000, .firstArtId = 0, .artCount = 128},
             scanOrdinal++)) {
       addSampleFacts(result, *parsed);
       sampleCollections.push_back(std::move(*parsed));
@@ -140,17 +143,17 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     const auto instrumentRef = result.reserveInstrumentSet();
     static_cast<void>(result.sequence(sequenceRef, [&](AssetId id) {
       std::vector<Diagnostic> diagnostics;
-      auto asset =
-          parseAkaoSequenceProgram(input, id, *analysis, instrumentRef, &result.sourceMap(), &diagnostics);
+      auto asset = parseAkaoSequenceProgram(input, id, *analysis, instrumentRef, &result.sourceMap(), &diagnostics);
       for (auto& diagnostic : diagnostics) {
         result.diagnostic(std::move(diagnostic));
       }
       return asset;
     }));
+    auto parsedInstrumentSet = parseAkaoInstrumentSet(input, instrumentRef.id, *analysis, artMap);
+    const auto required = parsedInstrumentSet.requiredArticulations;
     static_cast<void>(result.instrumentSet(
-        instrumentRef, [&](AssetId id) { return parseAkaoInstrumentSet(input, id, *analysis, artMap); }));
+        instrumentRef, [asset = std::move(parsedInstrumentSet.asset)](AssetId) mutable { return std::move(asset); }));
 
-    const auto required = requiredArticulations(input.reader, *analysis);
     addSequenceFacts(result, sequenceRef, *analysis);
     addInstrumentFacts(result, instrumentRef, *analysis, required);
   }
