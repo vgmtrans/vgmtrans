@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/Akao/AkaoInstrumentSet.h"
+#include "value/formats/Akao/AkaoResolver.h"
 #include "value/formats/Akao/AkaoSequenceDecoder.h"
 #include "value/sequence/SequenceVm.h"
 
@@ -311,4 +312,17 @@ void akaoRequiredArticulationsComeFromInstrumentRows() {
 
   const auto required = requiredArticulations(ByteReader(SourceId{22}, bytes), analysis);
   expect(required == std::vector<u32>{5}, "Akao required articulations should include parsed melodic row art ids");
+}
+
+void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
+  const std::vector<AkaoSampleCandidate> candidates{
+      AkaoSampleCandidate{.index = 0, .sampleSetId = 0, .firstArt = 0, .artCount = 32, .scanOrdinal = 0},
+      AkaoSampleCandidate{.index = 1, .sampleSetId = 5, .firstArt = 32, .artCount = 81, .scanOrdinal = 1},
+      AkaoSampleCandidate{.index = 2, .sampleSetId = 29, .firstArt = 128, .artCount = 22, .scanOrdinal = 2},
+  };
+  const std::vector<u32> required{32, 128};
+
+  const auto selected = selectAkaoSampleCandidates(29, required, candidates);
+  expect(selected == std::vector<std::size_t>{1, 2},
+         "Akao sample selection should combine the preferred sample set with required-art coverage");
 }
