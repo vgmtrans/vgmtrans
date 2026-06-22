@@ -37,6 +37,7 @@ void akaoLoopBranchUsesCurrentRepeatPass();
 void akaoTieAfterRestDoesNotExtendPreviousNote();
 void akaoTempoFadeEmitsDriverTickRamp();
 void akaoRequiredArticulationsComeFromInstrumentRows();
+void akaoMelodicRegionsDropAdvancingOverlaps();
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectExecutesCallAndReturn();
@@ -83,6 +84,7 @@ int main() {
     akaoTieAfterRestDoesNotExtendPreviousNote();
     akaoTempoFadeEmitsDriverTickRamp();
     akaoRequiredArticulationsComeFromInstrumentRows();
+    akaoMelodicRegionsDropAdvancingOverlaps();
     akaoSampleSelectionKeepsPreferredAndRequiredCollections();
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
     ndsSequenceDialectExecutesCallAndReturn();

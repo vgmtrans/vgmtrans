@@ -5,6 +5,7 @@
  */
 
 #include "ValueTestSupport.h"
+#include "value/export/synth/SynthExportData.h"
 
 namespace {
 
@@ -85,6 +86,31 @@ void envelopePredicatesDetectPreciseOnlyData() {
   };
   expect(hasPreciseEnvelope(preciseSustain), "precise envelope predicate should detect sustain amplitude");
   expect(hasExplicitEnvelope(preciseSustain), "explicit envelope predicate should detect precise-only sustain data");
+}
+
+void synthEffectiveLoopExpandsEnabledZeroLengthLoop() {
+  const DecodedSynthSample sample{
+      .collectionId = AssetId{1},
+      .decoded =
+          DecodedSample{
+              .channels = 1,
+              .pcm = std::vector<s16>(16),
+              .loop = Loop{.enabled = true, .start = 4, .length = 0},
+          },
+  };
+
+  const Loop sampleLoop = effectiveRegionLoop(Region{}, sample);
+  expect(sampleLoop.enabled, "enabled zero-length sample loop should remain enabled");
+  expect(sampleLoop.start == 4, "effective sample loop should preserve loop start");
+  expect(sampleLoop.length == 12, "effective sample loop should extend to sample end");
+
+  const Region region{
+      .loop = Loop{.enabled = true, .start = 2, .length = 0},
+  };
+  const Loop regionLoop = effectiveRegionLoop(region, sample);
+  expect(regionLoop.enabled, "enabled zero-length region loop should remain enabled");
+  expect(regionLoop.start == 2, "effective region loop should preserve loop start");
+  expect(regionLoop.length == 14, "effective region loop should extend to sample end");
 }
 
 void wavExporterWritesPcm16RiffFile() {
@@ -498,6 +524,7 @@ void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   envelopePredicatesDetectPreciseOnlyData();
+  synthEffectiveLoopExpandsEnabledZeroLengthLoop();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();

@@ -110,7 +110,13 @@ std::optional<u16> resolveRegionSampleIndex(const Region& region, std::optional<
 }
 
 Loop effectiveRegionLoop(const Region& region, const DecodedSynthSample& sample) {
-  return region.loop.value_or(sample.decoded.loop);
+  Loop loop = region.loop.value_or(sample.decoded.loop);
+  if (loop.enabled && loop.length == 0) {
+    const auto channels = std::max<u16>(1, sample.decoded.channels);
+    const auto frameCount = static_cast<u32>(sample.decoded.pcm.size() / channels);
+    loop.length = loop.start < frameCount ? frameCount - loop.start : 0;
+  }
+  return loop;
 }
 
 std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
