@@ -32,14 +32,18 @@ struct AkaoContext {
 struct AkaoRepeatStack {
   u8 layer = 0;
   std::array<Address, 4> begin{};
+  std::array<u16, 4> completedPlays{};
 
   void start(Address address) {
     layer = static_cast<u8>((layer + 1) & 3);
     begin[layer] = address;
+    completedPlays[layer] = 0;
   }
 
   [[nodiscard]] Address current() const { return begin[layer]; }
+  [[nodiscard]] u16 currentCompletedPlays() const { return completedPlays[layer]; }
 
+  void completeCurrentPlay() { ++completedPlays[layer]; }
   void finishFallthrough() { layer = static_cast<u8>((layer - 1) & 3); }
 };
 
@@ -59,8 +63,10 @@ struct AkaoTrackState {
   u16 expression = 127;
   u16 pan = 64;
   AkaoRepeatStack repeats;
+  double tempoBpm = 120.0;
   u32 microsecondsPerQuarter = 500000;
   std::optional<u8> previousKey;
+  std::optional<u8> tieKey;
 };
 
 [[nodiscard]] u8 percentPanToMidi(double percent) {
@@ -123,6 +129,10 @@ struct AkaoTrackState {
   const double percent = akaoTuningScale(tuning) / std::log(2.0);
   const auto bend = static_cast<s16>(std::clamp(static_cast<int>(percent * 8192.0), -8192, 8191));
   return (bend / 8192.0) * legacyPitchBendRangeSemitones;
+}
+
+[[nodiscard]] u32 akaoMicrosPerQuarterFromBpm(double bpm) {
+  return static_cast<u32>(std::round(60000000.0 / std::max(1.0, bpm)));
 }
 
 template <class Runtime>
@@ -254,8 +264,31 @@ template <class Runtime>
 [[nodiscard]] CommandFlow tempo(Runtime& rt, VmCommandCursor& cmd) {
   cmd.name("Tempo", SequenceSemantic::Tempo);
   const u16 raw = cmd.u16le("tempo");
+  rt.state.tempoBpm = rt.context.profile.tempoBpm(raw);
   rt.state.microsecondsPerQuarter = rt.context.profile.tempoMicrosPerQuarter(raw);
   rt.tempo(rt.state.microsecondsPerQuarter);
+  return cmd.next();
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow tempoFade(Runtime& rt, VmCommandCursor& cmd) {
+  cmd.name("Tempo Fade", SequenceSemantic::Tempo);
+  const u16 duration = akaoZeroAs256(cmd.u8("duration"));
+  const u16 raw = cmd.u16le("tempo");
+  const double targetBpm = rt.context.profile.tempoBpm(raw);
+  cmd.derived("duration_ticks", duration);
+
+  if constexpr (requires { rt.vm.tick(); rt.out.at(u64{}).tempo(u32{}); }) {
+    const u64 startTick = rt.vm.tick();
+    const double increment = (targetBpm - rt.state.tempoBpm) / static_cast<double>(duration);
+    for (u16 i = 0; i < duration; ++i) {
+      const double bpm = rt.state.tempoBpm + (increment * (i + 1));
+      rt.out.at(startTick + i).tempo(akaoMicrosPerQuarterFromBpm(bpm));
+    }
+  }
+
+  rt.state.tempoBpm = targetBpm;
+  rt.state.microsecondsPerQuarter = rt.context.profile.tempoMicrosPerQuarter(raw);
   return cmd.next();
 }
 
@@ -273,10 +306,28 @@ template <class Runtime>
   const u8 slot = rt.state.repeats.layer;
   const Address target = rt.state.repeats.current();
   cmd.derived("count", count).target(target, SourceLinkRole::JumpTarget);
+  rt.state.repeats.completeCurrentPlay();
   CommandFlow flow = rt.countedRepeatUntil(cmd, slot, count, target);
   if (cmd.phase() == CommandPhase::Decode ||
       (flow.resolvedEffects && flow.resolvedEffects->step.kind == StepKind::Next)) {
     rt.state.repeats.finishFallthrough();
+  }
+  return flow;
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow repeatBranch(Runtime& rt, VmCommandCursor& cmd) {
+  cmd.name("Loop Branch", SequenceSemantic::RepeatBreak);
+  const u16 count = akaoZeroAs256(cmd.u8("count"));
+  const Address destination = readRelativeAddress(rt, cmd, "relative");
+  cmd.derived("count", count);
+  CommandFlow flow = cmd.conditionalBranch(destination);
+  if constexpr (requires { rt.vm.finiteBranch(destination); }) {
+    if (rt.state.repeats.currentCompletedPlays() + 1 == count) {
+      flow.resolvedEffects = Effects{.step = rt.vm.finiteBranch(destination)};
+    } else {
+      flow.resolvedEffects = Effects::none();
+    }
   }
   return flow;
 }
@@ -305,6 +356,8 @@ template <class Runtime>
   switch (sub) {
     case 0x00:
       return tempo(rt, cmd);
+    case 0x01:
+      return tempoFade(rt, cmd);
     case 0x04:
       if (profile.version3OrLater()) {
         return drumKitOn(rt, cmd);
@@ -319,7 +372,7 @@ template <class Runtime>
     case 0x07:
       return branchWithCondition(rt, cmd, "CPU Conditional Jump", "condition");
     case 0x08:
-      return branchWithCondition(rt, cmd, "Loop Branch", "count");
+      return repeatBranch(rt, cmd);
     case 0x09:
       return branchWithCondition(rt, cmd, "Loop Break", "count");
     case 0x0a:
@@ -399,12 +452,13 @@ struct AkaoCommandReader {
 
       if (rest) {
         cmd.name("Rest", SequenceSemantic::Rest);
+        rt.state.tieKey.reset();
         return cmd.wait(delta);
       }
       if (tie) {
         cmd.name("Tie", SequenceSemantic::Note);
-        if (rt.state.previousKey) {
-          rt.note(*rt.state.previousKey, LevelScale::linearFromMidi7(kNoteVelocity), std::max<u32>(1, sounding), true);
+        if (rt.state.tieKey) {
+          rt.note(*rt.state.tieKey, LevelScale::linearFromMidi7(kNoteVelocity), std::max<u32>(1, sounding), true);
         }
         return cmd.wait(delta);
       }
@@ -420,6 +474,7 @@ struct AkaoCommandReader {
       }
       rt.note(key, LevelScale::linearFromMidi7(kNoteVelocity), std::max<u32>(1, sounding));
       rt.state.previousKey = key;
+      rt.state.tieKey = key;
       return cmd.wait(delta);
     }
 
@@ -608,7 +663,7 @@ struct AkaoCommandReader {
         break;
       case 0xf0:
         if (profile.legacyFamily()) {
-          return branchWithCondition(rt, cmd, "Loop Branch", "count");
+          return repeatBranch(rt, cmd);
         }
         break;
       case 0xf1:
@@ -623,11 +678,35 @@ struct AkaoCommandReader {
         break;
       case 0xf4:
         if (profile.version == AkaoPs1Version::Version1_0) {
-          cmd.name("Individual Art Event", SequenceSemantic::Program).sourceOnly();
-          const u8 art = cmd.u8("articulation");
-          cmd.derived("bank", 0).derived("program", art).instrumentRef(0, art);
-          recordIndividualArt(rt, art);
-          static_cast<void>(cmd.rawBytes("bytes", 1));
+          cmd.name("Overlay Voice On", SequenceSemantic::Program);
+          const u8 primaryArt = cmd.u8("primary_articulation");
+          const u8 secondaryArt = cmd.u8("secondary_articulation");
+          cmd.derived("bank", 0).derived("program", primaryArt).instrumentRef(0, primaryArt);
+          recordIndividualArt(rt, primaryArt);
+          recordIndividualArt(rt, secondaryArt);
+          rt.instrument(akaoMidiBank(0), primaryArt, true);
+          return cmd.next();
+        }
+        break;
+      case 0xf5:
+        if (profile.version == AkaoPs1Version::Version1_0) {
+          cmd.name("Overlay Voice Off").sourceOnly();
+          return cmd.next();
+        }
+        break;
+      case 0xf6:
+        if (profile.version == AkaoPs1Version::Version1_0) {
+          cmd.name("Overlay Volume Balance").sourceOnly();
+          cmd.detail("balance", cmd.u8("balance"));
+          return cmd.next();
+        }
+        break;
+      case 0xf7:
+        if (profile.version == AkaoPs1Version::Version1_0) {
+          cmd.name("Overlay Volume Balance Fade").sourceOnly();
+          const u16 duration = akaoZeroAs256(cmd.u8("duration"));
+          const u8 balance = cmd.u8("balance");
+          cmd.derived("duration_ticks", duration).detail("balance", balance);
           return cmd.next();
         }
         break;
