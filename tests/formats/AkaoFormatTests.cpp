@@ -6,6 +6,7 @@
 
 #include "value/formats/Akao/AkaoInstrumentSet.h"
 #include "value/formats/Akao/AkaoSequenceDecoder.h"
+#include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -143,6 +144,145 @@ void akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks() {
          "Akao repeat start should be an explicit command");
   expect(hasCommandKind(dialect, track, "akao-ps1-3.2.repeat-until", start + 1),
          "Akao repeat until should be an explicit command");
+}
+
+void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange() {
+  std::vector<u8> bytes(0x40, 0xa0);
+  constexpr u32 start = 0x20;
+  bytes[start] = 0xf4;
+  bytes[start + 1] = 0x54;
+  bytes[start + 2] = 0x53;
+  bytes[start + 3] = 0xf6;
+  bytes[start + 4] = 0x20;
+  bytes[start + 5] = 0xa8;
+  bytes[start + 6] = 0x04;
+  bytes[start + 7] = 0xa0;
+
+  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_0);
+  const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40);
+  expect(track.commands.size() == 4, "Akao v1.0 overlay fixture should decode all commands");
+  expect(track.commands[0].range.size == 3 && track.commands[1].range.size == 2,
+         "Akao v1.0 overlay voice and balance command lengths should match legacy");
+  expect(track.commands[2].range.offset == start + 5 && track.commands[2].opcode == 0xa8,
+         "Akao v1.0 overlay balance should not consume the following expression command");
+
+  AkaoSequenceAnalysis analysis = analyzeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40);
+  expect(analysis.individualArtIds.contains(0x54) && analysis.individualArtIds.contains(0x53),
+         "Akao v1.0 overlay voice should require both articulations");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const auto instrument = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<InstrumentPerformanceEvent>(event);
+  });
+  expect(instrument != performance.tracks[0].events.end(), "Akao v1.0 overlay voice should emit a program change");
+}
+
+void akaoLoopBranchUsesCurrentRepeatPass() {
+  std::vector<u8> bytes(0x40, 0xa0);
+  constexpr u32 start = 0x20;
+  bytes[start] = 0xc8;
+  bytes[start + 1] = 0x08;
+  bytes[start + 2] = 0xf0;
+  bytes[start + 3] = 0x02;
+  writeLeS16(bytes, start + 4, 3);
+  bytes[start + 6] = 0x13;
+  bytes[start + 7] = 0xc9;
+  bytes[start + 8] = 0x02;
+  bytes[start + 9] = 0x1e;
+  bytes[start + 10] = 0xa0;
+
+  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_0);
+  const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40);
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+
+  size_t skippedPhraseNotes = 0;
+  bool sawExitNote = false;
+  for (const auto& event : performance.tracks[0].events) {
+    const auto* note = std::get_if<NotePerformanceEvent>(&event);
+    if (note == nullptr || note->extendsPrevious) {
+      continue;
+    }
+    if (note->key == 49) {
+      ++skippedPhraseNotes;
+    }
+    if (note->key == 50 && note->header.tick == 48) {
+      sawExitNote = true;
+    }
+  }
+
+  expect(skippedPhraseNotes == 1, "Akao loop branch should skip the branch body on the matching repeat pass");
+  expect(sawExitNote, "Akao loop branch should continue at the branch target without adding another repeat body");
+}
+
+void akaoTieAfterRestDoesNotExtendPreviousNote() {
+  std::vector<u8> bytes(0x40, 0xa0);
+  constexpr u32 start = 0x20;
+  bytes[start] = 0x08;
+  bytes[start + 1] = 0x8c;
+  bytes[start + 2] = 0x91;
+  bytes[start + 3] = 0x8c;
+  bytes[start + 4] = 0xa0;
+
+  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
+  const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40);
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "Akao tie-after-rest fixture should render without diagnostics");
+
+  const auto noteCount = std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  expect(noteCount == 2, "Akao tie after a rest should not extend the previous note");
+}
+
+void akaoTempoFadeEmitsDriverTickRamp() {
+  std::vector<u8> bytes(0x40, 0xa0);
+  constexpr u32 start = 0x20;
+  bytes[start] = 0xfc;
+  bytes[start + 1] = 0x00;
+  writeLe16(bytes, start + 2, 0x3000);
+  bytes[start + 4] = 0xfc;
+  bytes[start + 5] = 0x01;
+  bytes[start + 6] = 0x03;
+  writeLe16(bytes, start + 7, 0x6000);
+  bytes[start + 9] = 0xa0;
+
+  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
+  const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40);
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "Akao tempo-fade fixture should render without diagnostics");
+
+  std::vector<TempoPerformanceEvent> tempos;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* tempo = std::get_if<TempoPerformanceEvent>(&event)) {
+      tempos.push_back(*tempo);
+    }
+  }
+
+  expect(tempos.size() == 4, "Akao tempo fade should emit one tempo event per driver tick");
+  expect(tempos[1].header.tick == 0 && tempos[2].header.tick == 1 && tempos[3].header.tick == 2,
+         "Akao tempo fade should schedule tempo changes on consecutive ticks");
+  expect(tempos[3].microsecondsPerQuarter < tempos[1].microsecondsPerQuarter,
+         "Akao tempo fade should move toward the target tempo");
 }
 
 void akaoRequiredArticulationsComeFromInstrumentRows() {

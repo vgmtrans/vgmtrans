@@ -166,6 +166,58 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
   expect(std::get<EndOfTrack>(events.back()).tick == 30, "performance renderer should preserve track end ticks");
 }
 
+void performanceMidiRendererWritesTimeSignaturesToFirstTrack() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks =
+          {
+              PerformanceTrack{
+                  .id = TrackId{0},
+                  .sourceTrackNumber = 0,
+                  .endTick = 12,
+                  .events =
+                      {
+                          NotePerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 0},
+                              .key = 60.0,
+                              .linearVelocity = 0.5,
+                              .durationTicks = 12,
+                          },
+                      },
+              },
+              PerformanceTrack{
+                  .id = TrackId{1},
+                  .sourceTrackNumber = 12,
+                  .endTick = 48,
+                  .events =
+                      {
+                          TimeSignaturePerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 48},
+                              .numerator = 4,
+                              .denominator = 4,
+                              .clocksPerMetronomeClick = 48,
+                          },
+                      },
+              },
+          },
+  };
+
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  expect(midiSequence.tracks.size() == 2, "performance renderer should preserve source track count");
+
+  const auto& firstTrackEvents = midiSequence.tracks[0].events;
+  const auto& secondTrackEvents = midiSequence.tracks[1].events;
+  const auto* timeSignature = std::get_if<TimeSignature>(&firstTrackEvents[firstTrackEvents.size() - 2]);
+  expect(timeSignature != nullptr && timeSignature->tick == 48 && timeSignature->numerator == 4,
+         "performance renderer should write global time signatures to the first MIDI track");
+  expect(std::get<EndOfTrack>(firstTrackEvents.back()).tick == 48,
+         "first MIDI track end should cover global time signatures");
+  expect(std::none_of(secondTrackEvents.begin(), secondTrackEvents.end(), [](const MidiEvent& event) {
+           return std::holds_alternative<TimeSignature>(event);
+         }),
+         "performance renderer should not duplicate time signatures on their source track");
+}
+
 void performanceMidiRendererWritesPanGainResetWhenRequested() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -556,6 +608,7 @@ void runValueMidiTests() {
   midiExporterWritesTimeSignatureMetaEvent();
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   performanceMidiRendererTrustsSourceNoteExtensions();
+  performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererHonorsMidiExportOptions();
   performanceMidiRendererQuantizesPitchBendAndPortamento();

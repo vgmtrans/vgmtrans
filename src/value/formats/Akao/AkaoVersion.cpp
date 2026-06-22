@@ -29,7 +29,7 @@ namespace {
   return std::ranges::any_of(needles, [text](std::string_view needle) { return text.find(needle) != text.npos; });
 }
 
-[[nodiscard]] double tempoBpm(AkaoPs1Version version, u16 tempo) {
+[[nodiscard]] double akaoTempoBpm(AkaoPs1Version version, u16 tempo) {
   if (tempo == 0) {
     return 1.0;
   }
@@ -226,9 +226,10 @@ u32 AkaoProfile::directOperandBytes(u8 status) const noexcept {
     case 0xf2:
       return legacyFamily() ? 1 : 0;
     case 0xf4:
-    case 0xf6:
     case 0xf7:
       return version == AkaoPs1Version::Version1_0 ? 2 : 0;
+    case 0xf6:
+      return version == AkaoPs1Version::Version1_0 ? 1 : 0;
     case 0xf8:
       return version == AkaoPs1Version::Version1_0 ? 1 : 0;
     case 0xfc:
@@ -333,8 +334,12 @@ u32 AkaoProfile::sequenceLength(ByteReader reader, u32 offset) const {
   return version3OrLater() ? stored : stored + 0x10;
 }
 
+double AkaoProfile::tempoBpm(u16 tempo) const {
+  return akaoTempoBpm(version, tempo);
+}
+
 u32 AkaoProfile::tempoMicrosPerQuarter(u16 tempo) const {
-  const double bpm = tempoBpm(version, tempo);
+  const double bpm = tempoBpm(tempo);
   return static_cast<u32>(std::clamp(std::llround(60000000.0 / std::max(1.0, bpm)), 1ll,
                                      static_cast<long long>(std::numeric_limits<u32>::max())));
 }

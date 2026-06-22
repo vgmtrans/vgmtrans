@@ -46,6 +46,7 @@ struct AkaoProfile {
   [[nodiscard]] u32 trackAllocationBitsOffset() const noexcept;
   [[nodiscard]] u32 trackHeaderOffset() const noexcept;
   [[nodiscard]] u32 sequenceLength(core::ByteReader reader, u32 offset) const;
+  [[nodiscard]] double tempoBpm(u16 tempo) const;
   [[nodiscard]] u32 tempoMicrosPerQuarter(u16 tempo) const;
 };
 

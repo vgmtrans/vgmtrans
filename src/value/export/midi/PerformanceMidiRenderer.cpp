@@ -153,6 +153,28 @@ struct GlobalTransposeChange {
   return semitones;
 }
 
+[[nodiscard]] std::vector<TimeSignature> collectGlobalTimeSignatures(const PerformanceSequence& performance) {
+  std::vector<TimeSignature> timeSignatures;
+  for (const auto& track : performance.tracks) {
+    for (const auto& event : track.events) {
+      const auto* timeSignature = std::get_if<TimeSignaturePerformanceEvent>(&event);
+      if (timeSignature == nullptr) {
+        continue;
+      }
+      timeSignatures.push_back(TimeSignature{
+          .tick = timeSignature->header.tick,
+          .numerator = timeSignature->numerator,
+          .denominator = timeSignature->denominator,
+          .clocksPerMetronomeClick = timeSignature->clocksPerMetronomeClick,
+      });
+    }
+  }
+  std::ranges::stable_sort(timeSignatures, [](const TimeSignature& lhs, const TimeSignature& rhs) {
+    return lhs.tick < rhs.tick;
+  });
+  return timeSignatures;
+}
+
 bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePerformanceEvent& note, u8 channel) {
   if (!note.extendsPrevious || !state.lastNoteIndex || *state.lastNoteIndex >= track.events.size()) {
     return false;
@@ -195,12 +217,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .microsecondsPerQuarter = typedEvent.microsecondsPerQuarter,
           });
         } else if constexpr (std::is_same_v<TypedEvent, TimeSignaturePerformanceEvent>) {
-          track.events.push_back(TimeSignature{
-              .tick = typedEvent.header.tick,
-              .numerator = typedEvent.numerator,
-              .denominator = typedEvent.denominator,
-              .clocksPerMetronomeClick = typedEvent.clocksPerMetronomeClick,
-          });
+          // Standard MIDI treats time signatures as global metadata. They are collected
+          // once and written to the first MIDI track by PerformanceMidiRenderer::render.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
           if (typedEvent.bank != 0 || typedEvent.forceBankSelect) {
             track.events.push_back(BankSelect{
@@ -372,6 +390,7 @@ MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performa
   };
   sequence.tracks.reserve(performance.tracks.size());
   const std::vector<GlobalTransposeChange> globalTransposes = collectGlobalTransposeChanges(performance);
+  const std::vector<TimeSignature> globalTimeSignatures = collectGlobalTimeSignatures(performance);
 
   for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
     const auto& performanceTrack = performance.tracks[trackIndex];
@@ -393,8 +412,15 @@ MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performa
     for (const auto& event : performanceTrack.events) {
       addMidiEvent(midiTrack, renderState, event, assignment.channel, globalTransposes, options);
     }
+    u64 endTick = performanceTrack.endTick;
+    if (trackIndex == 0) {
+      midiTrack.events.insert(midiTrack.events.end(), globalTimeSignatures.begin(), globalTimeSignatures.end());
+      for (const auto& timeSignature : globalTimeSignatures) {
+        endTick = std::max(endTick, timeSignature.tick);
+      }
+    }
     midiTrack.events.push_back(EndOfTrack{
-        .tick = performanceTrack.endTick,
+        .tick = endTick,
     });
     sequence.tracks.push_back(std::move(midiTrack));
   }
