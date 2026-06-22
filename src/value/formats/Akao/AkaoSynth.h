@@ -26,6 +26,4 @@ namespace vgmtrans::formats::akao {
                                                                                  AkaoInstrDatLocation location,
                                                                                  u32 scanOrdinal);
 
-[[nodiscard]] AkaoArtMap buildAkaoArtMap(const std::vector<AkaoSampleCollectionParse>& sampleCollections);
-
 }  // namespace vgmtrans::formats::akao

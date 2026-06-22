@@ -61,7 +61,7 @@ struct SampleFactEntry {
   return source != nullptr && extensionIsPsf(source->path);
 }
 
-[[nodiscard]] bool covers(const SampleFactEntry& sample, u32 artId) {
+[[nodiscard]] bool covers(const AkaoSampleCandidate& sample, u32 artId) {
   return artId >= sample.firstArt && artId < sample.firstArt + sample.artCount;
 }
 
@@ -195,7 +195,7 @@ struct SampleFactEntry {
   return candidates;
 }
 
-void markCoveredArticulations(std::set<u32>& remaining, const SampleFactEntry& sample) {
+void markCoveredArticulations(std::set<u32>& remaining, const AkaoSampleCandidate& sample) {
   for (auto it = remaining.begin(); it != remaining.end();) {
     if (covers(sample, *it)) {
       it = remaining.erase(it);
@@ -210,15 +210,24 @@ std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& s
                                                       std::set<u32>& remaining,
                                                       CollectionAssembly& collection) {
   auto candidates = candidateSamples(sequence, samples);
-  std::vector<SampleFactEntry> selected;
-  if (sequence.sampleSetId && *sequence.sampleSetId > 0) {
-    auto preferred = std::ranges::find_if(candidates, [&](const SampleFactEntry& sample) {
+  std::vector<AkaoSampleCandidate> sampleCandidates;
+  sampleCandidates.reserve(candidates.size());
+  for (std::size_t i = 0; i < candidates.size(); ++i) {
+    const auto& candidate = candidates[i];
+    sampleCandidates.push_back(AkaoSampleCandidate{
+        .index = i,
+        .sampleSetId = candidate.sampleSetId,
+        .firstArt = candidate.firstArt,
+        .artCount = candidate.artCount,
+        .scanOrdinal = candidate.scanOrdinal,
+    });
+  }
+
+  if (sequence.sampleSetId && *sequence.sampleSetId > 0 && !psfLike(sequence.source)) {
+    const auto preferred = std::ranges::find_if(sampleCandidates, [&](const AkaoSampleCandidate& sample) {
       return sample.sampleSetId && *sample.sampleSetId == *sequence.sampleSetId;
     });
-    if (preferred != candidates.end()) {
-      selected.push_back(*preferred);
-      markCoveredArticulations(remaining, *preferred);
-    } else if (!psfLike(sequence.source)) {
+    if (preferred == sampleCandidates.end()) {
       collection.incomplete(CollectionIssue{
           .severity = Severity::Warning,
           .code = "missing-preferred-sample-set",
@@ -228,23 +237,12 @@ std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& s
     }
   }
 
-  for (const auto& sample : candidates) {
-    if (std::ranges::find(selected, sample.asset, &SampleFactEntry::asset) != selected.end()) {
-      continue;
-    }
-    const bool associated = sameSampleSet(sequence.sampleSetId, sample.sampleSetId);
-    const bool matchesRequired = std::ranges::any_of(remaining, [&](u32 art) { return covers(sample, art); });
-    if (!associated && !matchesRequired) {
-      continue;
-    }
-    selected.push_back(sample);
-    markCoveredArticulations(remaining, sample);
-    if (remaining.empty() && !selected.empty()) {
-      break;
-    }
+  std::vector<u32> required(remaining.begin(), remaining.end());
+  std::vector<SampleFactEntry> selected;
+  for (const std::size_t index : selectAkaoSampleCandidates(sequence.sampleSetId, required, sampleCandidates)) {
+    selected.push_back(candidates[index]);
+    markCoveredArticulations(remaining, sampleCandidates[index]);
   }
-
-  std::ranges::sort(selected, {}, &SampleFactEntry::firstArt);
   return selected;
 }
 
@@ -276,6 +274,50 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
 }
 
 }  // namespace
+
+std::vector<std::size_t> selectAkaoSampleCandidates(std::optional<u32> sequenceSampleSet,
+                                                    std::span<const u32> requiredArticulations,
+                                                    std::span<const AkaoSampleCandidate> candidates) {
+  std::vector<AkaoSampleCandidate> ordered(candidates.begin(), candidates.end());
+  std::ranges::sort(ordered, std::ranges::greater{}, &AkaoSampleCandidate::scanOrdinal);
+
+  std::set<u32> remaining(requiredArticulations.begin(), requiredArticulations.end());
+  std::vector<AkaoSampleCandidate> selected;
+  if (sequenceSampleSet && *sequenceSampleSet > 0) {
+    const auto preferred = std::ranges::find_if(ordered, [&](const AkaoSampleCandidate& sample) {
+      return sample.sampleSetId && *sample.sampleSetId == *sequenceSampleSet;
+    });
+    if (preferred != ordered.end()) {
+      selected.push_back(*preferred);
+      markCoveredArticulations(remaining, *preferred);
+    }
+  }
+
+  for (const auto& sample : ordered) {
+    if (std::ranges::find(selected, sample.index, &AkaoSampleCandidate::index) != selected.end()) {
+      continue;
+    }
+    const bool associated = sameSampleSet(sequenceSampleSet, sample.sampleSetId);
+    const bool matchesRequired = std::ranges::any_of(remaining, [&](u32 art) { return covers(sample, art); });
+    if (!associated && !matchesRequired) {
+      continue;
+    }
+    selected.push_back(sample);
+    markCoveredArticulations(remaining, sample);
+    if (remaining.empty() && !selected.empty()) {
+      break;
+    }
+  }
+
+  std::ranges::sort(selected, {}, &AkaoSampleCandidate::firstArt);
+
+  std::vector<std::size_t> indexes;
+  indexes.reserve(selected.size());
+  for (const auto& sample : selected) {
+    indexes.push_back(sample.index);
+  }
+  return indexes;
+}
 
 std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& context) {
   const MatchFactIndex index(context);

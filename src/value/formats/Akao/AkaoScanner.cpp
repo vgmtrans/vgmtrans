@@ -8,6 +8,7 @@
 
 #include "value/formats/Akao/AkaoInstrumentSet.h"
 #include "value/formats/Akao/AkaoFacts.h"
+#include "value/formats/Akao/AkaoResolver.h"
 #include "value/formats/Akao/AkaoSequence.h"
 #include "value/formats/Akao/AkaoSynth.h"
 #include "value/formats/Akao/AkaoVersion.h"
@@ -116,6 +117,39 @@ void addInstrumentFacts(ScanResultBuilder& result, ScanInstrumentSetRef instrume
   }
 }
 
+[[nodiscard]] std::vector<AkaoSampleCandidate> sampleCandidates(
+    std::span<const AkaoSampleCollectionParse> sampleCollections) {
+  std::vector<AkaoSampleCandidate> candidates;
+  candidates.reserve(sampleCollections.size());
+  for (std::size_t i = 0; i < sampleCollections.size(); ++i) {
+    const auto& sampleCollection = sampleCollections[i];
+    candidates.push_back(AkaoSampleCandidate{
+        .index = i,
+        .sampleSetId = sampleCollection.sampleSetId ? std::optional<u32>{*sampleCollection.sampleSetId} : std::nullopt,
+        .firstArt = sampleCollection.firstArtId,
+        .artCount = sampleCollection.artCount,
+        .scanOrdinal = sampleCollection.scanOrdinal,
+    });
+  }
+  return candidates;
+}
+
+[[nodiscard]] AkaoArtMap buildSelectedArtMap(std::span<const AkaoSampleCollectionParse> sampleCollections,
+                                             std::span<const std::size_t> selectedIndexes) {
+  AkaoArtMap map;
+  for (const std::size_t index : selectedIndexes) {
+    const auto& collection = sampleCollections[index];
+    for (const auto& art : collection.arts) {
+      map[art.artId] = AkaoArtBinding{
+          .collection = collection.ref,
+          .sampleIndex = art.sampleIndex,
+          .art = art,
+      };
+    }
+  }
+  return map;
+}
+
 std::vector<AkaoSampleCollectionParse> scanSampleCollections(const ScanInput& input, ScanResultBuilder& result,
                                                              std::span<const u32> offsets) {
   const AkaoPs1Version sourceVersion = determineVersionFromSource(input.source);
@@ -154,7 +188,7 @@ std::vector<AkaoSampleCollectionParse> scanSampleCollections(const ScanInput& in
 }
 
 void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets,
-                   const AkaoArtMap& artMap) {
+                   std::span<const AkaoSampleCollectionParse> sampleCollections) {
   for (const u32 offset : offsets) {
     if (!isAkaoSequenceCandidate(input.reader, offset)) {
       continue;
@@ -174,7 +208,14 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
       }
       return asset;
     }));
-    auto parsedInstrumentSet = parseAkaoInstrumentSet(input, instrumentRef.id, *analysis, artMap);
+    const auto requiredArtIds = requiredArticulations(input.reader, *analysis);
+    const auto candidates = sampleCandidates(sampleCollections);
+    const auto selectedSampleCollections = selectAkaoSampleCandidates(
+        analysis->header.sampleSetId ? std::optional<u32>{*analysis->header.sampleSetId} : std::nullopt,
+        requiredArtIds, candidates);
+    auto parsedInstrumentSet =
+        parseAkaoInstrumentSet(input, instrumentRef.id, *analysis,
+                               buildSelectedArtMap(sampleCollections, selectedSampleCollections));
     const auto required = parsedInstrumentSet.requiredArticulations;
     static_cast<void>(result.instrumentSet(
         instrumentRef, [asset = std::move(parsedInstrumentSet.asset)](AssetId) mutable { return std::move(asset); }));
@@ -198,7 +239,7 @@ ScanResult scanAkao(const ScanInput& input) {
   ScanResultBuilder result(input, std::string(kAkaoFormatName), std::string(kAkaoCollectionResolver));
   const auto offsets = akaoOffsets(input.reader);
   const auto sampleCollections = scanSampleCollections(input, result, offsets);
-  scanSequences(input, result, offsets, buildAkaoArtMap(sampleCollections));
+  scanSequences(input, result, offsets, sampleCollections);
   return result.finish();
 }
 

@@ -402,18 +402,4 @@ std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInp
                                         table, scanOrdinal, "Akao Sample Collection FF7");
 }
 
-AkaoArtMap buildAkaoArtMap(const std::vector<AkaoSampleCollectionParse>& sampleCollections) {
-  AkaoArtMap map;
-  for (const auto& collection : sampleCollections) {
-    for (const auto& art : collection.arts) {
-      map[art.artId] = AkaoArtBinding{
-          .collection = collection.ref,
-          .sampleIndex = art.sampleIndex,
-          .art = art,
-      };
-    }
-  }
-  return map;
-}
-
 }  // namespace vgmtrans::formats::akao
