@@ -17,36 +17,8 @@ namespace vgmtrans::formats::akao {
 
 using namespace core;
 
-bool isPossibleAkaoSequence(ByteReader reader, u32 offset) {
-  if (!reader.has(offset, 0x10) || reader.be32(offset) != kAkaoSignature || reader.le16(offset + 6) == 0) {
-    return false;
-  }
-  const AkaoPs1Version version = guessSequenceVersion(reader, offset);
-  const AkaoProfile profile = akaoProfile(version);
-  const u32 bitsOffset = profile.trackAllocationBitsOffset();
-  if (!reader.has(offset + bitsOffset, 4)) {
-    return false;
-  }
-  const u32 trackBits = reader.le32(offset + bitsOffset);
-  if (!profile.version3OrLater() && (trackBits & ~0xffffffu) != 0) {
-    return false;
-  }
-  if (profile.version3OrLater()) {
-    if (!reader.has(offset + 0x40, 1)) {
-      return false;
-    }
-    if (reader.le32(offset + 0x28) != 0 || reader.le32(offset + 0x2c) != 0 || reader.le32(offset + 0x38) != 0 ||
-        reader.le32(offset + 0x3c) != 0) {
-      return false;
-    }
-  }
-  return true;
-}
-
 std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const SourceFile& source, u32 offset) {
-  if (!isPossibleAkaoSequence(reader, offset)) {
-    return std::nullopt;
-  }
+  // Resolve the driver version first; most offsets and pointer math below are version-specific.
   AkaoPs1Version version = determineVersionFromSource(source);
   if (version == AkaoPs1Version::Unknown) {
     version = guessSequenceVersion(reader, offset);
@@ -61,6 +33,7 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
     return std::nullopt;
   }
 
+  // Parse the sequence header into the shared analysis object used by sequence, instrument, and fact builders.
   AkaoSequenceAnalysis analysis;
   analysis.header = AkaoSequenceHeader{
       .offset = offset,
@@ -82,6 +55,7 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
     }
   }
 
+  // Resolve each allocated track pointer to an absolute bytecode offset.
   const u32 trackCount = std::popcount(analysis.header.trackBits);
   const u32 pointerTable = offset + analysis.header.trackHeaderOffset;
   const u32 sequenceEnd = offset + analysis.header.length;
@@ -99,6 +73,7 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
     }
   }
 
+  // Run the command reader over reachable track bytecode to collect table and articulation references.
   for (const u32 trackStart : analysis.trackStarts) {
     analyzeAkaoTrack(reader, analysis, trackStart);
   }

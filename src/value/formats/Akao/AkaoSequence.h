@@ -15,7 +15,6 @@
 
 namespace vgmtrans::formats::akao {
 
-[[nodiscard]] bool isPossibleAkaoSequence(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(core::ByteReader reader,
                                                                       const core::SourceFile& source, u32 offset);
 [[nodiscard]] core::SequenceProgramAsset parseAkaoSequenceProgram(

@@ -48,6 +48,31 @@ namespace {
   return offsets;
 }
 
+[[nodiscard]] bool isAkaoSequenceCandidate(ByteReader reader, u32 offset) {
+  if (!reader.has(offset, 0x10) || reader.be32(offset) != kAkaoSignature || reader.le16(offset + 6) == 0) {
+    return false;
+  }
+  const AkaoProfile profile = akaoProfile(guessSequenceVersion(reader, offset));
+  const u32 bitsOffset = profile.trackAllocationBitsOffset();
+  if (!reader.has(offset + bitsOffset, 4)) {
+    return false;
+  }
+  const u32 trackBits = reader.le32(offset + bitsOffset);
+  if (!profile.version3OrLater() && (trackBits & ~0xffffffu) != 0) {
+    return false;
+  }
+  if (profile.version3OrLater()) {
+    if (!reader.has(offset + 0x40, 1)) {
+      return false;
+    }
+    if (reader.le32(offset + 0x28) != 0 || reader.le32(offset + 0x2c) != 0 || reader.le32(offset + 0x38) != 0 ||
+        reader.le32(offset + 0x3c) != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void addSampleFacts(ScanResultBuilder& result, const AkaoSampleCollectionParse& parsed) {
   std::vector<MatchField> fields{
       MatchField{.name = std::string(kAkaoFieldFirstArt), .value = std::to_string(parsed.firstArtId)},
@@ -131,7 +156,7 @@ std::vector<AkaoSampleCollectionParse> scanSampleCollections(const ScanInput& in
 void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets,
                    const AkaoArtMap& artMap) {
   for (const u32 offset : offsets) {
-    if (input.reader.le16(offset + 6) == 0) {
+    if (!isAkaoSequenceCandidate(input.reader, offset)) {
       continue;
     }
     auto analysis = analyzeAkaoSequence(input.reader, input.source, offset);
