@@ -363,9 +363,9 @@ void requireArt(std::set<u32>& required, u32 artId) {
     if (!regions.empty()) {
       Region& previous = regions.back();
       if (region.keyRange.high > previous.keyRange.high && region.keyRange.low > previous.keyRange.high) {
-        region.keyRange.low = std::min<u8>(region.keyRange.low, static_cast<u8>(previous.keyRange.high + 1));
-        regions.push_back(std::move(region));
-      } else if (region.keyRange.high != previous.keyRange.high) {
+        if (region.keyRange.low > previous.keyRange.high + 1) {
+          region.keyRange.low = static_cast<u8>(previous.keyRange.high + 1);
+        }
         regions.push_back(std::move(region));
       }
     } else {

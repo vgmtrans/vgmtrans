@@ -314,6 +314,52 @@ void akaoRequiredArticulationsComeFromInstrumentRows() {
   expect(required == std::vector<u32>{5}, "Akao required articulations should include parsed melodic row art ids");
 }
 
+void akaoMelodicRegionsDropAdvancingOverlaps() {
+  std::vector<u8> bytes(0x100);
+  constexpr u32 instrSet = 0x20;
+  constexpr u32 melodicTable = 0x40;
+  writeLe16(bytes, instrSet, 0);
+  bytes[melodicTable] = 0x01;
+  bytes[melodicTable + 1] = 0x00;
+  bytes[melodicTable + 2] = 0x20;
+  bytes[melodicTable + 8] = 0x02;
+  bytes[melodicTable + 9] = 0x21;
+  bytes[melodicTable + 10] = 0x2d;
+  bytes[melodicTable + 16] = 0x03;
+  bytes[melodicTable + 17] = 0x22;
+  bytes[melodicTable + 18] = 0x36;
+  bytes[melodicTable + 24] = 0x04;
+  bytes[melodicTable + 25] = 0x37;
+  bytes[melodicTable + 26] = 0x41;
+
+  ScanIdAllocator ids;
+  AkaoSequenceAnalysis analysis;
+  analysis.header = AkaoSequenceHeader{
+      .offset = 0,
+      .length = 0x100,
+      .version = AkaoPs1Version::Version3_2,
+      .sequenceId = 7,
+      .instrumentSetOffset = instrSet,
+      .sampleSetId = 1,
+  };
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{22}, .name = "overlap-keys.akao", .size = bytes.size()},
+      .reader = ByteReader(SourceId{22}, bytes),
+      .ids = ids,
+  };
+
+  const auto parsed = parseAkaoInstrumentSet(input, AssetId{99}, analysis, {});
+  expect(parsed.asset.instruments.size() == 1, "Akao overlap fixture should parse one melodic instrument");
+  const auto& regions = parsed.asset.instruments.front().regions;
+  expect(regions.size() == 3, "Akao advancing overlapping key rows should match legacy filtering");
+  expect(regions[0].keyRange.low == 0 && regions[0].keyRange.high == 0x20,
+         "Akao first overlap fixture region should keep its high key");
+  expect(regions[1].keyRange.low == 0x21 && regions[1].keyRange.high == 0x2d,
+         "Akao second overlap fixture region should be contiguous");
+  expect(regions[2].keyRange.low == 0x2e && regions[2].keyRange.high == 0x7f,
+         "Akao row after dropped overlap should bridge the uncovered key range");
+}
+
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
   const std::vector<AkaoSampleCandidate> candidates{
       AkaoSampleCandidate{.index = 0, .sampleSetId = 0, .firstArt = 0, .artCount = 32, .scanOrdinal = 0},
