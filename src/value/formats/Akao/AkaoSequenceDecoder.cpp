@@ -176,236 +176,158 @@ template <class Runtime>
 }
 
 template <class Runtime>
-struct AkaoRuntime {
-  Runtime& rt;
-
-  [[nodiscard]] const AkaoProfile& profile() const { return rt.context.profile; }
-  [[nodiscard]] AkaoSequenceAnalysis* analysis() const { return rt.context.analysis; }
-
-  void useIndividualArt(u32 art) {
-    if (auto* out = analysis()) {
-      out->usesIndividualArts = true;
-      if (art != 0) {
-        out->individualArtIds.insert(art);
-      }
+void recordIndividualArt(Runtime& rt, u32 art) {
+  if (auto* out = rt.context.analysis) {
+    out->usesIndividualArts = true;
+    if (art != 0) {
+      out->individualArtIds.insert(art);
     }
   }
-
-  void customInstrumentTable(Address table) {
-    if (auto* out = analysis()) {
-      out->customInstrumentOffsets.insert(table.value);
-    }
-  }
-
-  void drumInstrumentTable(Address table) {
-    if (auto* out = analysis()) {
-      out->drumInstrumentOffsets.insert(table.value);
-    }
-  }
-
-  [[nodiscard]] Address relativeAddress(VmCommandCursor& cmd, std::string_view name) const {
-    const u32 operandOffset = cmd.absolutePosition();
-    const s16 relative = cmd.s16le(name);
-    const Address destination{profile().relativeDestination(operandOffset, relative)};
-    cmd.derived(fmt::format("{}_absolute", name), destination.value, SourceValueDisplay::Address);
-    return destination;
-  }
-
-  [[nodiscard]] CommandFlow jump(VmCommandCursor& cmd, Address destination) const {
-    return destination.value <= cmd.address().value ? cmd.loopCandidate(destination) : cmd.jump(destination);
-  }
-
-  [[nodiscard]] CommandFlow conditionalBranch(VmCommandCursor& cmd, Address destination) const {
-    return cmd.conditionalBranch(destination);
-  }
-
-  [[nodiscard]] CommandFlow artProgram(VmCommandCursor& cmd, std::string_view name) {
-    cmd.name(name, SequenceSemantic::Program);
-    const u8 art = cmd.u8("articulation");
-    cmd.derived("bank", 0).derived("program", art).instrumentRef(0, art);
-    useIndividualArt(art);
-    rt.instrument(akaoMidiBank(0), art, true);
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow keySplitProgram(VmCommandCursor& cmd) {
-    cmd.name("Program Change (Key-Split Instrument)", SequenceSemantic::Program);
-    const u8 program = cmd.u8("program");
-    cmd.derived("bank", 1).derived("program", program).instrumentRef(1, program);
-    rt.instrument(akaoMidiBank(1), program, true);
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow sourceArtReference(VmCommandCursor& cmd, std::string_view name, u32 extraBytes = 0) {
-    cmd.name(name, SequenceSemantic::Program).sourceOnly();
-    const u8 art = cmd.u8("articulation");
-    cmd.derived("bank", 0).derived("program", art).instrumentRef(0, art);
-    useIndividualArt(art);
-    if (extraBytes > 0) {
-      static_cast<void>(cmd.rawBytes("bytes", extraBytes));
-    }
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow customInstrumentTableCommand(VmCommandCursor& cmd) {
-    cmd.name("Program Change (Key-Split Instrument)", SequenceSemantic::Program).sourceOnly();
-    const Address table = relativeAddress(cmd, "relative");
-    cmd.target(table, SourceLinkRole::JumpTarget);
-    customInstrumentTable(table);
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow drumKitOn(VmCommandCursor& cmd, std::optional<Address> table = std::nullopt) {
-    cmd.name("Drum Kit On", SequenceSemantic::Program);
-    if (table) {
-      cmd.target(*table, SourceLinkRole::JumpTarget);
-      drumInstrumentTable(*table);
-    }
-    rt.instrument(akaoMidiBank(127), 127, true);
-    rt.state.drum = true;
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow drumKitOff(VmCommandCursor& cmd) {
-    cmd.name("Drum Kit Off", SequenceSemantic::Program);
-    rt.state.drum = false;
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow tempo(VmCommandCursor& cmd) {
-    cmd.name("Tempo", SequenceSemantic::Tempo);
-    const u16 raw = cmd.u16le("tempo");
-    rt.state.microsecondsPerQuarter = profile().tempoMicrosPerQuarter(raw);
-    rt.tempo(rt.state.microsecondsPerQuarter);
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow setVolume(VmCommandCursor& cmd) {
-    cmd.name("Volume", SequenceSemantic::Level);
-    rt.state.volume = cmd.u8("volume");
-    rt.level(akaoLinearControllerGain(static_cast<u8>(rt.state.volume)));
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow fadeVolume(VmCommandCursor& cmd) {
-    cmd.name("Volume Fade", SequenceSemantic::Level);
-    const u16 duration = akaoZeroAs256(cmd.u8("duration"));
-    const u8 target = cmd.u8("target_volume");
-    cmd.derived("duration_ticks", duration);
-    emitAkaoControllerSlide(
-        rt, rt.state.volume, target, duration,
-        [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
-        [](auto& runtime, u64 tick, u8 value) { runtime.levelAt(tick, akaoLinearControllerGain(value)); });
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow setExpression(VmCommandCursor& cmd) {
-    cmd.name("Expression", SequenceSemantic::Level);
-    rt.state.expression = cmd.u8("expression");
-    rt.expression(akaoLinearControllerGain(static_cast<u8>(rt.state.expression)));
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow fadeExpression(VmCommandCursor& cmd) {
-    cmd.name("Expression Fade", SequenceSemantic::Level);
-    const u16 duration = akaoZeroAs256(cmd.u8("duration"));
-    const u8 target = cmd.u8("target_expression");
-    cmd.derived("duration_ticks", duration);
-    emitAkaoControllerSlide(
-        rt, rt.state.expression, target, duration,
-        [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
-        [](auto& runtime, u64 tick, u8 value) { runtime.expressionAt(tick, akaoLinearControllerGain(value)); });
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow setPan(VmCommandCursor& cmd) {
-    cmd.name("Pan", SequenceSemantic::Pan);
-    rt.state.pan = cmd.u8("pan");
-    rt.pan(stereoPositionFromMidiPan(linearPan7ToMidi(static_cast<u8>(rt.state.pan))));
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow fadePan(VmCommandCursor& cmd) {
-    cmd.name("Pan Fade", SequenceSemantic::Pan);
-    const u16 duration = akaoZeroAs256(cmd.u8("duration"));
-    const u8 target = cmd.u8("target_pan");
-    cmd.derived("duration_ticks", duration);
-    emitAkaoControllerSlide(
-        rt, rt.state.pan, target, duration, [](u8 value) { return value; },
-        [](auto& runtime, u64 tick, u8 value) { runtime.panAt(tick, stereoPositionFromMidiPan(value)); });
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow repeatStart(VmCommandCursor& cmd) {
-    cmd.name("Repeat Start", SequenceSemantic::Repeat);
-    rt.state.repeats.start(cmd.addressAtCursor());
-    return cmd.next();
-  }
-
-  [[nodiscard]] CommandFlow repeatUntil(VmCommandCursor& cmd) {
-    cmd.name("Repeat Until", SequenceSemantic::Repeat);
-    const u16 count = akaoZeroAs256(cmd.u8("count"));
-    const u8 slot = rt.state.repeats.layer;
-    const Address target = rt.state.repeats.current();
-    cmd.derived("count", count).target(target, SourceLinkRole::JumpTarget);
-    CommandFlow flow = rt.countedRepeatUntil(cmd, slot, count, target);
-    if (cmd.phase() == CommandPhase::Decode ||
-        (flow.resolvedEffects && flow.resolvedEffects->step.kind == StepKind::Next)) {
-      rt.state.repeats.finishFallthrough();
-    }
-    return flow;
-  }
-
-  [[nodiscard]] CommandFlow repeatAgain(VmCommandCursor& cmd) {
-    cmd.name("Repeat Again", SequenceSemantic::Repeat);
-    const Address target = rt.state.repeats.current();
-    cmd.target(target, SourceLinkRole::JumpTarget);
-    return cmd.loopCandidate(target);
-  }
-
-  [[nodiscard]] CommandFlow branchWithCondition(VmCommandCursor& cmd, std::string_view name,
-                                                std::string_view conditionName) {
-    cmd.name(name, SequenceSemantic::Jump);
-    const u8 condition = cmd.u8(conditionName);
-    const Address destination = relativeAddress(cmd, "relative");
-    cmd.detail(conditionName, condition);
-    return conditionalBranch(cmd, destination);
-  }
-};
+}
 
 template <class Runtime>
-AkaoRuntime(Runtime&) -> AkaoRuntime<Runtime>;
+void recordCustomInstrumentTable(Runtime& rt, Address table) {
+  if (auto* out = rt.context.analysis) {
+    out->customInstrumentOffsets.insert(table.value);
+  }
+}
+
+template <class Runtime>
+void recordDrumInstrumentTable(Runtime& rt, Address table) {
+  if (auto* out = rt.context.analysis) {
+    out->drumInstrumentOffsets.insert(table.value);
+  }
+}
+
+template <class Runtime>
+[[nodiscard]] Address readRelativeAddress(Runtime& rt, VmCommandCursor& cmd, std::string_view name) {
+  const u32 operandOffset = cmd.absolutePosition();
+  const s16 relative = cmd.s16le(name);
+  const Address destination{rt.context.profile.relativeDestination(operandOffset, relative)};
+  cmd.derived(fmt::format("{}_absolute", name), destination.value, SourceValueDisplay::Address);
+  return destination;
+}
+
+[[nodiscard]] CommandFlow jumpOrLoop(VmCommandCursor& cmd, Address destination) {
+  return destination.value <= cmd.address().value ? cmd.loopCandidate(destination) : cmd.jump(destination);
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow programArt(Runtime& rt, VmCommandCursor& cmd, std::string_view name) {
+  cmd.name(name, SequenceSemantic::Program);
+  const u8 art = cmd.u8("articulation");
+  cmd.derived("bank", 0).derived("program", art).instrumentRef(0, art);
+  recordIndividualArt(rt, art);
+  rt.instrument(akaoMidiBank(0), art, true);
+  return cmd.next();
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow customInstrumentTableCommand(Runtime& rt, VmCommandCursor& cmd) {
+  cmd.name("Program Change (Key-Split Instrument)", SequenceSemantic::Program).sourceOnly();
+  const Address table = readRelativeAddress(rt, cmd, "relative");
+  cmd.target(table, SourceLinkRole::JumpTarget);
+  recordCustomInstrumentTable(rt, table);
+  return cmd.next();
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow drumKitOn(Runtime& rt, VmCommandCursor& cmd, std::optional<Address> table = std::nullopt) {
+  cmd.name("Drum Kit On", SequenceSemantic::Program);
+  if (table) {
+    cmd.target(*table, SourceLinkRole::JumpTarget);
+    recordDrumInstrumentTable(rt, *table);
+  }
+  rt.instrument(akaoMidiBank(127), 127, true);
+  rt.state.drum = true;
+  return cmd.next();
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow drumKitOff(Runtime& rt, VmCommandCursor& cmd) {
+  cmd.name("Drum Kit Off", SequenceSemantic::Program);
+  rt.state.drum = false;
+  return cmd.next();
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow tempo(Runtime& rt, VmCommandCursor& cmd) {
+  cmd.name("Tempo", SequenceSemantic::Tempo);
+  const u16 raw = cmd.u16le("tempo");
+  rt.state.microsecondsPerQuarter = rt.context.profile.tempoMicrosPerQuarter(raw);
+  rt.tempo(rt.state.microsecondsPerQuarter);
+  return cmd.next();
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow repeatStart(Runtime& rt, VmCommandCursor& cmd) {
+  cmd.name("Repeat Start", SequenceSemantic::Repeat);
+  rt.state.repeats.start(cmd.addressAtCursor());
+  return cmd.next();
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow repeatUntil(Runtime& rt, VmCommandCursor& cmd) {
+  cmd.name("Repeat Until", SequenceSemantic::Repeat);
+  const u16 count = akaoZeroAs256(cmd.u8("count"));
+  const u8 slot = rt.state.repeats.layer;
+  const Address target = rt.state.repeats.current();
+  cmd.derived("count", count).target(target, SourceLinkRole::JumpTarget);
+  CommandFlow flow = rt.countedRepeatUntil(cmd, slot, count, target);
+  if (cmd.phase() == CommandPhase::Decode ||
+      (flow.resolvedEffects && flow.resolvedEffects->step.kind == StepKind::Next)) {
+    rt.state.repeats.finishFallthrough();
+  }
+  return flow;
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow repeatAgain(Runtime& rt, VmCommandCursor& cmd) {
+  cmd.name("Repeat Again", SequenceSemantic::Repeat);
+  const Address target = rt.state.repeats.current();
+  cmd.target(target, SourceLinkRole::JumpTarget);
+  return cmd.loopCandidate(target);
+}
+
+template <class Runtime>
+[[nodiscard]] CommandFlow branchWithCondition(Runtime& rt, VmCommandCursor& cmd, std::string_view name,
+                                              std::string_view conditionName) {
+  cmd.name(name, SequenceSemantic::Jump);
+  const u8 condition = cmd.u8(conditionName);
+  const Address destination = readRelativeAddress(rt, cmd, "relative");
+  cmd.detail(conditionName, condition);
+  return cmd.conditionalBranch(destination);
+}
 
 template <class Runtime>
 [[nodiscard]] CommandFlow readSubEvent(Runtime& rt, VmCommandCursor& cmd, u8 sub) {
-  AkaoRuntime akao{rt};
-  const AkaoProfile& profile = akao.profile();
+  const AkaoProfile& profile = rt.context.profile;
   switch (sub) {
     case 0x00:
-      return akao.tempo(cmd);
+      return tempo(rt, cmd);
     case 0x04:
       if (profile.version3OrLater()) {
-        return akao.drumKitOn(cmd);
+        return drumKitOn(rt, cmd);
       }
-      return akao.drumKitOn(cmd, akao.relativeAddress(cmd, "relative"));
+      return drumKitOn(rt, cmd, readRelativeAddress(rt, cmd, "relative"));
     case 0x05:
-      return akao.drumKitOff(cmd);
+      return drumKitOff(rt, cmd);
     case 0x06: {
       cmd.name("Jump");
-      return akao.jump(cmd, akao.relativeAddress(cmd, "relative"));
+      return jumpOrLoop(cmd, readRelativeAddress(rt, cmd, "relative"));
     }
     case 0x07:
-      return akao.branchWithCondition(cmd, "CPU Conditional Jump", "condition");
+      return branchWithCondition(rt, cmd, "CPU Conditional Jump", "condition");
     case 0x08:
-      return akao.branchWithCondition(cmd, "Loop Branch", "count");
+      return branchWithCondition(rt, cmd, "Loop Branch", "count");
     case 0x09:
-      return akao.branchWithCondition(cmd, "Loop Break", "count");
+      return branchWithCondition(rt, cmd, "Loop Break", "count");
     case 0x0a:
-      return akao.artProgram(cmd, "Program Change w/o Attack");
+      return programArt(rt, cmd, "Program Change w/o Attack");
     case 0x0e: {
       if (profile.version32()) {
         cmd.name("Play Pattern");
-        const Address destination = akao.relativeAddress(cmd, "relative");
+        const Address destination = readRelativeAddress(rt, cmd, "relative");
         return cmd.call(destination);
       }
       return preserve(rt, cmd, "Unknown FE 0E", profile.subOperandBytes(sub), "unknown-fe-0e");
@@ -416,13 +338,26 @@ template <class Runtime>
         return cmd.ret();
       }
       return preserve(rt, cmd, "Unknown FE 0F", profile.subOperandBytes(sub), "unknown-fe-0f");
-    case 0x12:
-      return akao.fadeVolume(cmd);
+    case 0x12: {
+      cmd.name("Volume Fade", SequenceSemantic::Level);
+      const u16 duration = akaoZeroAs256(cmd.u8("duration"));
+      const u8 target = cmd.u8("target_volume");
+      cmd.derived("duration_ticks", duration);
+      emitAkaoControllerSlide(
+          rt, rt.state.volume, target, duration,
+          [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
+          [](auto& runtime, u64 tick, u8 value) { runtime.levelAt(tick, akaoLinearControllerGain(value)); });
+      return cmd.next();
+    }
     case 0x14:
       if (profile.version3OrLater()) {
-        return akao.keySplitProgram(cmd);
+        cmd.name("Program Change (Key-Split Instrument)", SequenceSemantic::Program);
+        const u8 program = cmd.u8("program");
+        cmd.derived("bank", 1).derived("program", program).instrumentRef(1, program);
+        rt.instrument(akaoMidiBank(1), program, true);
+        return cmd.next();
       }
-      return akao.customInstrumentTableCommand(cmd);
+      return customInstrumentTableCommand(rt, cmd);
     case 0x15:
       cmd.name("Time Signature");
       emitAkaoTimeSignature(rt, cmd);
@@ -435,8 +370,7 @@ template <class Runtime>
 struct AkaoCommandReader {
   template <class Runtime>
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
-    AkaoRuntime akao{rt};
-    const AkaoProfile& profile = akao.profile();
+    const AkaoProfile& profile = rt.context.profile;
     const u8 status = cmd.opcode();
     if (profile.isNoteOpcode(status)) {
       const bool noteWithLength = profile.noteHasInlineDuration(status);
@@ -504,14 +438,17 @@ struct AkaoCommandReader {
         cmd.name("End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
         return cmd.end();
       case 0xa1:
-        return akao.artProgram(cmd, "Program");
+        return programArt(rt, cmd, "Program");
       case 0xa2:
         cmd.name("Next Note Length");
         rt.state.oneTimeDuration = cmd.u8("duration");
         rt.state.useOneTimeDuration = true;
         return cmd.next();
       case 0xa3:
-        return akao.setVolume(cmd);
+        cmd.name("Volume", SequenceSemantic::Level);
+        rt.state.volume = cmd.u8("volume");
+        rt.level(akaoLinearControllerGain(static_cast<u8>(rt.state.volume)));
+        return cmd.next();
       case 0xa5:
         cmd.name("Octave");
         rt.state.octave = cmd.u8("octave");
@@ -527,13 +464,36 @@ struct AkaoCommandReader {
         }
         return cmd.next();
       case 0xa8:
-        return akao.setExpression(cmd);
-      case 0xa9:
-        return akao.fadeExpression(cmd);
+        cmd.name("Expression", SequenceSemantic::Level);
+        rt.state.expression = cmd.u8("expression");
+        rt.expression(akaoLinearControllerGain(static_cast<u8>(rt.state.expression)));
+        return cmd.next();
+      case 0xa9: {
+        cmd.name("Expression Fade", SequenceSemantic::Level);
+        const u16 duration = akaoZeroAs256(cmd.u8("duration"));
+        const u8 target = cmd.u8("target_expression");
+        cmd.derived("duration_ticks", duration);
+        emitAkaoControllerSlide(
+            rt, rt.state.expression, target, duration,
+            [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
+            [](auto& runtime, u64 tick, u8 value) { runtime.expressionAt(tick, akaoLinearControllerGain(value)); });
+        return cmd.next();
+      }
       case 0xaa:
-        return akao.setPan(cmd);
-      case 0xab:
-        return akao.fadePan(cmd);
+        cmd.name("Pan", SequenceSemantic::Pan);
+        rt.state.pan = cmd.u8("pan");
+        rt.pan(stereoPositionFromMidiPan(linearPan7ToMidi(static_cast<u8>(rt.state.pan))));
+        return cmd.next();
+      case 0xab: {
+        cmd.name("Pan Fade", SequenceSemantic::Pan);
+        const u16 duration = akaoZeroAs256(cmd.u8("duration"));
+        const u8 target = cmd.u8("target_pan");
+        cmd.derived("duration_ticks", duration);
+        emitAkaoControllerSlide(
+            rt, rt.state.pan, target, duration, [](u8 value) { return value; },
+            [](auto& runtime, u64 tick, u8 value) { runtime.panAt(tick, stereoPositionFromMidiPan(value)); });
+        return cmd.next();
+      }
       case 0xc0:
         cmd.name("Transpose");
         rt.state.transpose = cmd.s8("semitones");
@@ -553,11 +513,11 @@ struct AkaoCommandReader {
         cmd.name("Reverb Off").sourceOnly();
         return cmd.next();
       case 0xc8:
-        return akao.repeatStart(cmd);
+        return repeatStart(rt, cmd);
       case 0xc9:
-        return akao.repeatUntil(cmd);
+        return repeatUntil(rt, cmd);
       case 0xca:
-        return akao.repeatAgain(cmd);
+        return repeatAgain(rt, cmd);
       case 0xcc:
         cmd.name("Slur On");
         rt.state.slur = true;
@@ -614,7 +574,7 @@ struct AkaoCommandReader {
       }
       case 0xe8:
         if (profile.legacyFamily()) {
-          return akao.tempo(cmd);
+          return tempo(rt, cmd);
         }
         break;
       case 0xea:
@@ -627,43 +587,48 @@ struct AkaoCommandReader {
         break;
       case 0xec:
         if (profile.legacyFamily()) {
-          return akao.drumKitOn(cmd, akao.relativeAddress(cmd, "relative"));
+          return drumKitOn(rt, cmd, readRelativeAddress(rt, cmd, "relative"));
         }
         break;
       case 0xed:
         if (profile.legacyFamily()) {
-          return akao.drumKitOff(cmd);
+          return drumKitOff(rt, cmd);
         }
         break;
       case 0xee:
         if (profile.legacyFamily()) {
           cmd.name("Jump");
-          return akao.jump(cmd, akao.relativeAddress(cmd, "relative"));
+          return jumpOrLoop(cmd, readRelativeAddress(rt, cmd, "relative"));
         }
         break;
       case 0xef:
         if (profile.legacyFamily()) {
-          return akao.branchWithCondition(cmd, "CPU Conditional Jump", "condition");
+          return branchWithCondition(rt, cmd, "CPU Conditional Jump", "condition");
         }
         break;
       case 0xf0:
         if (profile.legacyFamily()) {
-          return akao.branchWithCondition(cmd, "Loop Branch", "count");
+          return branchWithCondition(rt, cmd, "Loop Branch", "count");
         }
         break;
       case 0xf1:
         if (profile.legacyFamily()) {
-          return akao.branchWithCondition(cmd, "Loop Break", "count");
+          return branchWithCondition(rt, cmd, "Loop Break", "count");
         }
         break;
       case 0xf2:
         if (profile.legacyFamily()) {
-          return akao.artProgram(cmd, "Program Change w/o Attack");
+          return programArt(rt, cmd, "Program Change w/o Attack");
         }
         break;
       case 0xf4:
         if (profile.version == AkaoPs1Version::Version1_0) {
-          return akao.sourceArtReference(cmd, "Individual Art Event", 1);
+          cmd.name("Individual Art Event", SequenceSemantic::Program).sourceOnly();
+          const u8 art = cmd.u8("articulation");
+          cmd.derived("bank", 0).derived("program", art).instrumentRef(0, art);
+          recordIndividualArt(rt, art);
+          static_cast<void>(cmd.rawBytes("bytes", 1));
+          return cmd.next();
         }
         break;
       case 0xfd:
@@ -675,7 +640,7 @@ struct AkaoCommandReader {
         break;
       case 0xfc:
         if (profile.version == AkaoPs1Version::Version1_1) {
-          return akao.customInstrumentTableCommand(cmd);
+          return customInstrumentTableCommand(rt, cmd);
         }
         break;
       default:
