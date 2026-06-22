@@ -225,7 +225,6 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoBytecode.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoInstrumentSet.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoResolver.cpp
@@ -250,8 +249,8 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoBytecode.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoFacts.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoInstrumentSet.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoModule.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoResolver.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoScanner.h

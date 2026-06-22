@@ -183,6 +183,15 @@ struct RenderCursorRuntime {
       return flow.destination ? DecodeFlow::call(*flow.destination, fallthrough) : DecodeFlow::terminalFlow();
     case FlowKind::Return:
       return DecodeFlow::return_();
+    case FlowKind::ConditionalBranch:
+      if (!flow.destination) {
+        return DecodeFlow::fallthroughTo(fallthrough);
+      }
+      return DecodeFlow{
+          .kind = DecodeFlow::Kind::Fallthrough,
+          .fallthrough = fallthrough,
+          .staticTargets = {*flow.destination},
+      };
     case FlowKind::CountedRepeatUntil:
     case FlowKind::CountedRepeatBreak:
       if (!flow.destination) {
@@ -398,8 +407,7 @@ template <class TrackState, class Context, class Reader>
   };
 
   return decodeReachableBytecodeBlocks(reader, cursorBytecodeEnd(reader, input), input.startOffset, input.trackIndex,
-                                       ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands},
-                                       decodeCommand);
+                                       ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
 }
 
 template <class TrackState, class Context, class Reader>

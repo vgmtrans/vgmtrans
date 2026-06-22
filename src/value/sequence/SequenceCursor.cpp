@@ -69,6 +69,10 @@ CommandKind VmCommandCursor::commandKind(std::string_view kindPrefix) const {
   };
 }
 
+u32 VmCommandCursor::absolutePosition() const noexcept {
+  return static_cast<u32>(commandRange_.offset + position_);
+}
+
 VmCommandCursor& VmCommandCursor::name(std::string_view displayName) {
   displayName_ = std::string(displayName);
   if (!kindOverridden_) {
@@ -181,6 +185,36 @@ ReadValue<u16> VmCommandCursor::u16be(std::string_view name) {
     recordField(name, range, makeSourceValue(value));
   }
   return ReadValue<u16>{.value = value, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
+}
+
+ReadValue<s16> VmCommandCursor::s16le(std::string_view name) {
+  const size_t begin = position_;
+  ::u8 lowByte = 0;
+  ::u8 highByte = 0;
+  const bool valid = readByte(name, lowByte) && readByte(name, highByte);
+  const u16 low = lowByte;
+  const u16 high = highByte;
+  const auto value = static_cast<s16>(low | (high << 8));
+  const auto range = rangeAt(begin, 2);
+  if (valid) {
+    recordField(name, range, makeSourceValue(value), SourceValueDisplay::SignedDecimal);
+  }
+  return ReadValue<s16>{.value = value, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
+}
+
+ReadValue<s16> VmCommandCursor::s16be(std::string_view name) {
+  const size_t begin = position_;
+  ::u8 highByte = 0;
+  ::u8 lowByte = 0;
+  const bool valid = readByte(name, highByte) && readByte(name, lowByte);
+  const u16 high = highByte;
+  const u16 low = lowByte;
+  const auto value = static_cast<s16>((high << 8) | low);
+  const auto range = rangeAt(begin, 2);
+  if (valid) {
+    recordField(name, range, makeSourceValue(value), SourceValueDisplay::SignedDecimal);
+  }
+  return ReadValue<s16>{.value = value, .range = valid ? range : rangeAt(begin, position_ - begin), .valid = valid};
 }
 
 ReadValue<u32> VmCommandCursor::u24le(std::string_view name) {
@@ -434,6 +468,13 @@ CommandFlow VmCommandCursor::ret() {
   return flow(FlowKind::Return);
 }
 
+CommandFlow VmCommandCursor::conditionalBranch(Address destination) {
+  defaultSemantic(SequenceSemantic::Jump);
+  defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
+  target(destination, SourceLinkRole::JumpTarget);
+  return flow(FlowKind::ConditionalBranch, 0, destination);
+}
+
 CommandFlow VmCommandCursor::loopCandidate(Address destination) {
   defaultSemantic(SequenceSemantic::Jump);
   defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
@@ -644,6 +685,8 @@ Effects effectsFromCommandFlow(const CommandFlow& flow) {
       return Effects{.step = Step::call(*flow.destination)};
     case FlowKind::Return:
       return Effects{.step = Step::return_()};
+    case FlowKind::ConditionalBranch:
+      return Effects::none();
     case FlowKind::LoopCandidate:
       if (!flow.destination) {
         return Effects{.step = Step::end()};

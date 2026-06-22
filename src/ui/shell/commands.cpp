@@ -255,15 +255,15 @@ vgmtrans::core::Session valueSessionForPath(const std::filesystem::path& path) {
 }
 
 void printValueSessionSummary(const vgmtrans::core::SessionSnapshot& project) {
-  fmt::println("Sources: {}  Assets: {}  Collections: {}  Diagnostics: {}", project.sources.size(),
-               project.assets.size(), project.collections.size(), project.diagnostics.size());
+  fmt::println("Sources: {}  Assets: {}  Collections: {}  Diagnostics: {}", project.sources().size(),
+               project.assets().size(), project.collections().size(), project.diagnostics().size());
 
-  for (const auto& diagnostic : project.diagnostics) {
+  for (const auto& diagnostic : project.diagnostics()) {
     printValueDiagnostic(diagnostic);
   }
 
-  for (size_t i = 0; i < project.assets.size(); ++i) {
-    const auto& asset = project.assets[i];
+  for (size_t i = 0; i < project.assets().size(); ++i) {
+    const auto& asset = project.assets()[i];
     const auto& meta = vgmtrans::core::metadata(asset);
     fmt::print("asset #{} [{}] id={} format={} name='{}' range=0x{:x}:0x{:x}", i, valueAssetKindName(asset),
                meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size);
@@ -280,8 +280,8 @@ void printValueSessionSummary(const vgmtrans::core::SessionSnapshot& project) {
     fmt::print("\n");
   }
 
-  for (size_t i = 0; i < project.collections.size(); ++i) {
-    const auto& collection = project.collections[i];
+  for (size_t i = 0; i < project.collections().size(); ++i) {
+    const auto& collection = project.collections()[i];
     fmt::println("collection #{} id={} name='{}' sequence={} instrumentSets={} sampleCollections={}", i,
                  collection.id.value, collection.name,
                  collection.sequence ? std::to_string(collection.sequence->value) : std::string("-"),
@@ -290,13 +290,13 @@ void printValueSessionSummary(const vgmtrans::core::SessionSnapshot& project) {
 }
 
 void printValueSources(const vgmtrans::core::SessionSnapshot& project) {
-  if (project.sources.empty()) {
+  if (project.sources().empty()) {
     fmt::println("No value sources.");
     return;
   }
 
-  for (size_t i = 0; i < project.sources.size(); ++i) {
-    const auto& source = project.sources[i];
+  for (size_t i = 0; i < project.sources().size(); ++i) {
+    const auto& source = project.sources()[i];
     fmt::print("source #{} id={} name='{}' size=0x{:x}", i, source.id.value, source.name, source.size);
     if (source.title) {
       fmt::print(" title='{}'", *source.title);
@@ -386,7 +386,7 @@ bool printValueAssetTree(const vgmtrans::core::SessionSnapshot& project, const s
                          size_t assetArgIndex) {
   try {
     const int assetIndex = std::stoi(args[assetArgIndex]);
-    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets.size()) {
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
       fmt::println("Asset index out of bounds");
       return false;
     }
@@ -397,7 +397,7 @@ bool printValueAssetTree(const vgmtrans::core::SessionSnapshot& project, const s
       maxDepth = std::stoi(args[depthArgIndex]);
     }
 
-    const auto& items = vgmtrans::core::metadata(project.assets[static_cast<size_t>(assetIndex)]).items;
+    const auto& items = vgmtrans::core::metadata(project.assets()[static_cast<size_t>(assetIndex)]).items;
     if (!items.root) {
       fmt::println("Asset has no item tree");
       return false;
@@ -416,12 +416,12 @@ bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project,
                               const std::vector<std::string>& args, size_t assetArgIndex) {
   try {
     const int assetIndex = std::stoi(args[assetArgIndex]);
-    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets.size()) {
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
       fmt::println("Asset index out of bounds");
       return false;
     }
 
-    const auto& asset = project.assets[static_cast<size_t>(assetIndex)];
+    const auto& asset = project.assets()[static_cast<size_t>(assetIndex)];
     const auto* sequenceProgram = std::get_if<vgmtrans::core::SequenceProgramAsset>(&asset);
     if (sequenceProgram == nullptr) {
       fmt::println("Asset is not a sequence");
@@ -627,12 +627,12 @@ size_t writeValueArtifacts(const std::filesystem::path& dir, std::span<const vgm
 }
 
 bool printValueNoCollections(const vgmtrans::core::SessionSnapshot& project) {
-  if (!project.collections.empty()) {
+  if (!project.collections().empty()) {
     return false;
   }
 
   fmt::println("Value scan did not discover any collections.");
-  for (const auto& diagnostic : project.diagnostics) {
+  for (const auto& diagnostic : project.diagnostics()) {
     printValueDiagnostic(diagnostic);
   }
   return true;
@@ -678,8 +678,8 @@ bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const
   }
 
   if (args.size() <= collectionArgIndex) {
-    for (size_t i = 0; i < project.collections.size(); ++i) {
-      const auto& collection = project.collections[i];
+    for (size_t i = 0; i < project.collections().size(); ++i) {
+      const auto& collection = project.collections()[i];
       fmt::println("collection #{} id={} name='{}' sequence={} instrumentSets={} sampleCollections={} misc={}", i,
                    collection.id.value, collection.name,
                    collection.sequence ? std::to_string(collection.sequence->value) : std::string("-"),
@@ -690,11 +690,11 @@ bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const
 
   try {
     const int collectionIndex = std::stoi(args[collectionArgIndex]);
-    if (collectionIndex < 0 || static_cast<size_t>(collectionIndex) >= project.collections.size()) {
+    if (collectionIndex < 0 || static_cast<size_t>(collectionIndex) >= project.collections().size()) {
       fmt::println("Collection index out of bounds");
       return false;
     }
-    printValueCollectionInfo(project, project.collections[static_cast<size_t>(collectionIndex)],
+    printValueCollectionInfo(project, project.collections()[static_cast<size_t>(collectionIndex)],
                              static_cast<size_t>(collectionIndex));
     return true;
   } catch (...) {
@@ -744,13 +744,13 @@ bool printValueInstruments(const vgmtrans::core::SessionSnapshot& project, const
                            size_t assetArgIndex) {
   try {
     const int assetIndex = std::stoi(args[assetArgIndex]);
-    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets.size()) {
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
       fmt::println("Asset index out of bounds");
       return false;
     }
 
     const auto* instrumentSetAsset =
-        std::get_if<vgmtrans::core::InstrumentSetAsset>(&project.assets[static_cast<size_t>(assetIndex)]);
+        std::get_if<vgmtrans::core::InstrumentSetAsset>(&project.assets()[static_cast<size_t>(assetIndex)]);
     if (instrumentSetAsset == nullptr) {
       fmt::println("Asset is not an instrument set");
       return false;
@@ -828,13 +828,13 @@ bool printValueSamples(const vgmtrans::core::SessionSnapshot& project, const std
                        size_t assetArgIndex) {
   try {
     const int assetIndex = std::stoi(args[assetArgIndex]);
-    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets.size()) {
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
       fmt::println("Asset index out of bounds");
       return false;
     }
 
     const auto* sampleAsset =
-        std::get_if<vgmtrans::core::SampleCollectionAsset>(&project.assets[static_cast<size_t>(assetIndex)]);
+        std::get_if<vgmtrans::core::SampleCollectionAsset>(&project.assets()[static_cast<size_t>(assetIndex)]);
     if (sampleAsset == nullptr) {
       fmt::println("Asset is not a sample collection");
       return false;
@@ -1615,7 +1615,7 @@ void value_export(const std::vector<std::string>& args) {
 
   try {
     const int collectionIndex = std::stoi(args[3]);
-    if (collectionIndex < 0 || static_cast<size_t>(collectionIndex) >= project.collections.size()) {
+    if (collectionIndex < 0 || static_cast<size_t>(collectionIndex) >= project.collections().size()) {
       fmt::println("Collection index out of bounds");
       return;
     }
@@ -1630,11 +1630,11 @@ void value_export(const std::vector<std::string>& args) {
       return;
     }
 
-    const auto collectionId = project.collections[static_cast<size_t>(collectionIndex)].id;
+    const auto collectionId = project.collections()[static_cast<size_t>(collectionIndex)].id;
     const auto artifacts = session.exportCollection(collectionId, *request);
     const auto written = writeValueArtifacts(dir, artifacts);
     fmt::println("Exported {} value artifacts for collection '{}'.", written,
-                 project.collections[static_cast<size_t>(collectionIndex)].name);
+                 project.collections()[static_cast<size_t>(collectionIndex)].name);
   } catch (...) {
     fmt::println("Invalid arguments");
   }
