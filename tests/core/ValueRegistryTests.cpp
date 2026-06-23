@@ -12,10 +12,6 @@
 
 namespace {
 
-struct ProbeMetaCommand : NoOpCommand, NoOperands<ProbeMetaCommand> {
-  static constexpr CommandMeta meta = commandMeta("local-meta", "Local Meta");
-};
-
 struct CursorProbeState {
   u8 transpose = 1;
 };
@@ -81,108 +77,15 @@ struct RepeatUntilProbeVm {
   }
 };
 
-void bytecodeMapRejectsIncompatibleHandlerReuse() {
-  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
-  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
-
-  map.op<0x10, ProbeProgramCommand>(commandMeta("shared", "Shared"));
-
-  bool threw = false;
-  try {
-    map.op<0x11, ProbeNoteCommand>(commandMeta("shared", "Shared"));
-  } catch (const std::logic_error&) {
-    threw = true;
-  }
-  expect(threw, "bytecode map should reject one kind reused for different command types");
-}
-
-void bytecodeMapRejectsOpcodeRangeOverlap() {
-  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
-  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
-
-  map.op<0x12, ProbeProgramCommand>("Program");
-  map.range<0x10, 0x20, ProbeNoteCommand>("Note");
-  map.unknown<ProbeEndCommand>("End");
-
-  bool threw = false;
-  try {
-    static_cast<void>(map.finish());
-  } catch (const std::logic_error&) {
-    threw = true;
-  }
-  expect(threw, "bytecode map should reject overlapping exact opcode and range declarations");
-}
-
-void bytecodeMapRequiresFallbackCommand() {
-  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
-  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
-
-  map.op<0x10, ProbeProgramCommand>("Program");
-
-  bool threw = false;
-  try {
-    static_cast<void>(map.finish());
-  } catch (const std::logic_error&) {
-    threw = true;
-  }
-  expect(threw, "bytecode map should require an unknown or truncated fallback command");
-}
-
-void bytecodeMapUsesCommandLocalMetadata() {
-  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
-  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
-
-  map.op<0x20, ProbeMetaCommand>();
-  map.unknown<ProbeEndCommand>("End");
-
-  const BytecodeDispatchTable table = map.finish();
-  const SequenceDialect dialect = builder.finish();
-  const auto& spec = table.opcodes[0x20];
-  expect(spec.has_value() && spec->kindName == "probe-bytecode.local-meta" && spec->name == "Local Meta",
-         "bytecode map should use command-local metadata when no display name is passed");
-  const auto* commandKind = dialect.kind(spec->kind);
-  expect(commandKind != nullptr && commandKind->kindName == "probe-bytecode.local-meta" &&
-             commandKind->name == "Local Meta",
-         "command-local metadata should register the matching dialect kind");
-  expect(dialect.handler(spec->handler) != nullptr, "command-local metadata should register an executable handler");
-}
-
-void bytecodeMapAllowsOneHandlerForSeveralKinds() {
-  SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
-  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
-
-  map.op<0x20, ProbeMetaCommand>(commandMeta("meta-a", "Meta A"));
-  map.op<0x21, ProbeMetaCommand>(commandMeta("meta-b", "Meta B"));
-  map.unknown<ProbeEndCommand>("End");
-
-  const BytecodeDispatchTable registeredTable = map.finish();
-  const SequenceDialect dialect = builder.finish();
-  expect(dialect.handlers.size() == 2 && dialect.kinds.size() == 3,
-         "one command type should register one handler but keep distinct source kinds");
-  expect(registeredTable.opcodes[0x20]->handler == registeredTable.opcodes[0x21]->handler &&
-             registeredTable.opcodes[0x20]->kind != registeredTable.opcodes[0x21]->kind,
-         "two opcodes can share execution while keeping separate source identities");
-
-  BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> decodeMap{"probe-bytecode", dialect};
-  decodeMap.op<0x20, ProbeMetaCommand>(commandMeta("meta-a", "Meta A"));
-  decodeMap.op<0x21, ProbeMetaCommand>(commandMeta("meta-b", "Meta B"));
-  decodeMap.unknown<ProbeEndCommand>("End");
-  const BytecodeDispatchTable decodeTable = decodeMap.finish();
-  expect(decodeTable.opcodes[0x20]->handler == registeredTable.opcodes[0x20]->handler &&
-             decodeTable.opcodes[0x21]->kind == registeredTable.opcodes[0x21]->kind,
-         "decode-time map construction should reuse the registered handler and kind IDs");
-}
-
 void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
   const SequenceDialect dialect =
       makeCursorDialect<CursorProbeState, CursorProbeContext, CursorProbeReader>(CursorDialectSpec<CursorProbeContext>{
           .id = "cursor-probe",
-          .commandKindPrefix = "cursor-probe",
+          .commandDetailKindPrefix = "cursor-probe",
           .timebase = Timebase{.ppqn = 48},
           .context = CursorProbeContext{.velocity = 0.25},
       });
-  expect(dialect.handlers.size() == 1 && dialect.kinds.empty(),
-         "cursor dialect should register one generic handler and no opcode-specific kinds");
+  expect(dialect.handlers.size() == 1, "cursor dialect should register one generic handler");
 
   const std::vector<u8> bytes{0x70, 2, 0x90, 60, 12, 0xff};
   const ByteReader reader(SourceId{0}, bytes);
@@ -202,13 +105,13 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
   });
 
   expect(track.commands.size() == 3, "cursor-backed decode should produce state, note, and end commands");
-  expect(track.commandKinds.size() == 3 && track.commandKinds[0].kindName == "cursor-probe.transpose" &&
-             track.commandKinds[1].kindName == "cursor-probe.note" &&
-             track.commandKinds[2].kindName == "cursor-probe.end",
-         "cursor-backed decode should store source command kinds on the parsed track");
   const SourceMap annotations = sourceMap.finish();
   const auto commandAnnotations = annotations.withRole(SourceId{0}, SourceRole::Command);
   expect(commandAnnotations.size() == 3, "cursor-backed decode should record source command annotations");
+  expect(annotations.get(commandAnnotations[0]).detailKind == "cursor-probe.transpose" &&
+             annotations.get(commandAnnotations[1]).detailKind == "cursor-probe.note" &&
+             annotations.get(commandAnnotations[2]).detailKind == "cursor-probe.end",
+        "cursor-backed decode should store command detail metadata in source annotations");
   const auto& noteAnnotation = annotations.get(commandAnnotations[1]);
   expect(noteAnnotation.label == "Note" && noteAnnotation.localKind == "note" && noteAnnotation.range.offset == 2 &&
              noteAnnotation.range.size == 3,
@@ -241,7 +144,7 @@ void cursorDialectReportsWarningsOnFinalCommandRange() {
   const SequenceDialect dialect =
       makeCursorDialect<CursorProbeState, CursorProbeContext, CursorProbeReader>(CursorDialectSpec<CursorProbeContext>{
           .id = "cursor-probe",
-          .commandKindPrefix = "cursor-probe",
+          .commandDetailKindPrefix = "cursor-probe",
           .timebase = Timebase{.ppqn = 48},
           .context = CursorProbeContext{.velocity = 0.25},
       });
@@ -268,49 +171,56 @@ void cursorDialectReportsWarningsOnFinalCommandRange() {
          "unsupported cursor command should report one warning");
   expect(diagnostics[0].range && sameRange(*diagnostics[0].range, SourceRange{SourceId{0}, 0, 1}),
          "cursor warnings should use the final decoded command range");
+  expect(diagnostics[0].annotation && *diagnostics[0].annotation == track.commands[0].annotation,
+         "cursor warnings should attach to the decoded source annotation");
 }
 
 void cursorFlowHelpersInferMetadata() {
   const std::array<u8, 4> bytes{0x94, 0x12, 0x34, 0x56};
   VmCommandCursor jump(CommandPhase::Decode, probeRange(0, bytes.size()), bytes);
   static_cast<void>(jump.name("Jump").jump(Address{0x1234}));
-  const CommandKind jumpKind = jump.commandKind("cursor-probe");
-  expect(jumpKind.semantic == SequenceSemantic::Jump &&
-             jumpKind.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
+  const CursorCommandMetadata jumpMetadata = jump.metadata("cursor-probe");
+  expect(jumpMetadata.semantic == SequenceSemantic::Jump &&
+             jumpMetadata.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
          "jump flow should infer jump semantic and control-flow status");
 
   VmCommandCursor end(CommandPhase::Decode, probeRange(0, bytes.size()), bytes);
   static_cast<void>(end.name("End").end());
-  const CommandKind endKind = end.commandKind("cursor-probe");
-  expect(endKind.semantic == SequenceSemantic::End &&
-             endKind.playbackStatus == CommandPlaybackStatus::StopsPlayback,
+  const CursorCommandMetadata endMetadata = end.metadata("cursor-probe");
+  expect(endMetadata.semantic == SequenceSemantic::End &&
+             endMetadata.playbackStatus == CommandPlaybackStatus::StopsPlayback,
          "end flow should infer end semantic and stops-playback status");
 
   VmCommandCursor explicitCommand(CommandPhase::Decode, probeRange(0, bytes.size()), bytes);
   static_cast<void>(
       explicitCommand.name("Display Only", SequenceSemantic::Meta, CommandPlaybackStatus::SourceOnly).jump(Address{4}));
-  const CommandKind explicitKind = explicitCommand.commandKind("cursor-probe");
-  expect(explicitKind.semantic == SequenceSemantic::Meta &&
-             explicitKind.playbackStatus == CommandPlaybackStatus::SourceOnly,
+  const CursorCommandMetadata explicitMetadata = explicitCommand.metadata("cursor-probe");
+  expect(explicitMetadata.semantic == SequenceSemantic::Meta &&
+             explicitMetadata.playbackStatus == CommandPlaybackStatus::SourceOnly,
          "flow helper defaults should not override explicit command metadata");
 }
 
 void cursorPreserveRecordsMetadataAndBytes() {
   const std::array<u8, 3> bytes{0xe0, 0x12, 0x34};
-  std::vector<CommandOperand> operands;
-  VmCommandCursor cursor(CommandPhase::Decode, probeRange(10, bytes.size()), bytes, nullptr, nullptr, &operands);
+  SourceMapBuilder sourceMap;
+  VmCommandCursor cursor(CommandPhase::Decode, probeRange(10, bytes.size()), bytes, &sourceMap);
 
   const CommandFlow flow = cursor.preserve("Ignored Command", 2, "ignored-command");
-  const CommandKind kind = cursor.commandKind("cursor-probe");
+  const CursorCommandMetadata metadata = cursor.metadata("cursor-probe");
+  const SourceMap annotations = sourceMap.finish();
+  const SourceAnnotation& annotation = annotations.get(cursor.annotation());
 
   expect(flow.kind == FlowKind::Next, "preserved cursor command should continue to the next command");
-  expect(kind.name == "Ignored Command" && kind.detailKind == "cursor-probe.ignored-command" &&
-             kind.semantic == SequenceSemantic::Meta && kind.playbackStatus == CommandPlaybackStatus::SourceOnly,
+  expect(metadata.name == "Ignored Command" && metadata.detailKind == "cursor-probe.ignored-command" &&
+             metadata.semantic == SequenceSemantic::Meta &&
+             metadata.playbackStatus == CommandPlaybackStatus::SourceOnly,
          "preserved cursor command should use source-only meta metadata");
-  expect(operands.size() == 1 && operands[0].name == "bytes" && std::get<std::string>(operands[0].value) == "12 34",
-         "preserved cursor command should record raw operand bytes");
-  expect(sameRange(operands[0].range, SourceRange{.source = SourceId{0}, .offset = 11, .size = 2}),
-         "preserved cursor command should preserve the raw-byte operand range");
+  const auto bytesField = std::ranges::find_if(
+      annotation.fields, [](const SourceField& field) { return field.name == "bytes"; });
+  expect(bytesField != annotation.fields.end() && std::get<std::string>(bytesField->value) == "12 34",
+         "preserved cursor command should record raw operand bytes in source annotations");
+  expect(sameRange(bytesField->range, SourceRange{.source = SourceId{0}, .offset = 11, .size = 2}),
+         "preserved cursor command annotation should preserve the raw-byte operand range");
 }
 
 void cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead() {
@@ -354,7 +264,7 @@ void cursorDialectSuppressesMalformedRenderEvents() {
   const SequenceDialect dialect =
       makeCursorDialect<CursorProbeState, CursorProbeContext, CursorProbeReader>(CursorDialectSpec<CursorProbeContext>{
           .id = "cursor-probe",
-          .commandKindPrefix = "cursor-probe",
+          .commandDetailKindPrefix = "cursor-probe",
           .timebase = Timebase{.ppqn = 48},
           .context = CursorProbeContext{.velocity = 0.25},
       });
@@ -365,14 +275,7 @@ void cursorDialectSuppressesMalformedRenderEvents() {
   };
   TrackProgramBuilder builder{track};
   const std::array<u8, 2> bytes{0x91, 60};
-  builder.addDecoded(dialect.handlers[0].id,
-                     CommandKind{
-                         .kindName = "cursor-probe.late-truncated-note",
-                         .name = "Late Truncated Note",
-                         .detailKind = "cursor-probe.late-truncated-note",
-                         .semantic = SequenceSemantic::Note,
-                     },
-                     Address{0}, probeRange(0, bytes.size()), bytes, {});
+  builder.addDecoded(dialect.handlers[0].id, Address{0}, probeRange(0, bytes.size()), bytes);
 
   SequenceProgram program{
       .dialect = dialect.id,
@@ -420,8 +323,7 @@ void sequenceDialectRegistryStoresCopyableDialectValues() {
   const SequenceDialectRegistry copy = registry;
   const auto* dialect = copy.find("probe");
   expect(dialect != nullptr, "sequence dialect registry should copy registered dialect values");
-  expect(dialect->kindForName(ProbeNoteCommand::kind) != nullptr,
-         "sequence dialect registry should preserve copied command kinds");
+  expect(!dialect->handlers.empty(), "sequence dialect registry should preserve copied command handlers");
   expect(copy.find("Missing") == nullptr, "sequence dialect registry should return null for a missing dialect");
   expect(copy.contains("probe"), "sequence dialect registry should report copied dialect keys");
 
@@ -596,11 +498,6 @@ void scanResultBuilderCursorReportsMalformedFields() {
 }  // namespace
 
 void runValueRegistryTests() {
-  bytecodeMapRejectsIncompatibleHandlerReuse();
-  bytecodeMapRejectsOpcodeRangeOverlap();
-  bytecodeMapRequiresFallbackCommand();
-  bytecodeMapUsesCommandLocalMetadata();
-  bytecodeMapAllowsOneHandlerForSeveralKinds();
   cursorDialectDecodesAnnotationsAndRendersThroughVm();
   cursorDialectReportsWarningsOnFinalCommandRange();
   cursorFlowHelpersInferMetadata();

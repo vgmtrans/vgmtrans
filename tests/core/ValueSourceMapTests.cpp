@@ -22,7 +22,9 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
                           .link(SourceLinkRole::PointsTo, tableRange, "Table");
   const auto table = builder.table("Pointer Table", tableRange).parent(header.id());
   const auto command = builder.command("Pitch Bend Range", SourceRange{.source = source, .offset = 10, .size = 2},
-                                       SequenceSemantic::Pitch);
+                                       SequenceSemantic::Pitch)
+                            .field("bend", SourceRange{.source = source, .offset = 10, .size = 1}, s8{-2},
+                                   SourceValueDisplay::SignedDecimal);
 
   const SourceMap sourceMap = builder.finish();
   expect(sourceMap.annotations().size() == 3, "source map should contain all builder annotations");
@@ -45,10 +47,18 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
          "command helper should preserve sequence semantic");
   expect(sourceMap.get(command.id()).localKind == "pitch-bend-range",
          "command helper should slugify multi-word labels");
+  expect(sourceMap.get(command.id()).fields.size() == 1 &&
+             sourceMap.get(command.id()).fields[0].name == "bend" &&
+             std::get<s64>(sourceMap.get(command.id()).fields[0].value) == -2 &&
+             sourceMap.get(command.id()).fields[0].display == SourceValueDisplay::SignedDecimal,
+         "command annotation should own decoded operand fields for inspectors and HexView");
 
   expect(sourceMap.annotationsForSource(source).size() == 3, "source map should index annotations by source");
   expect(sourceMap.at(source, 10) == std::vector<SourceAnnotationId>{table.id(), command.id()},
          "source map should find annotations at a byte offset");
+  expect(sourceMap.intersecting(SourceRange{.source = source, .offset = 10, .size = 1}) ==
+             std::vector<SourceAnnotationId>{table.id(), command.id()},
+         "HexView-style range lookup should return the same annotations that own decoded fields");
   expect(sourceMap.intersecting(SourceRange{.source = source, .offset = 9, .size = 1}) ==
              std::vector<SourceAnnotationId>{table.id()},
          "source map should find intersecting annotations");
@@ -60,6 +70,37 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   expect(sourceMap.withSequenceSemantic(source, SequenceSemantic::Pitch) ==
              std::vector<SourceAnnotationId>{command.id()},
          "source map should filter annotations by sequence semantic");
+}
+
+void sourceAnnotationsCarryOutlinePolicyForTreeConsumers() {
+  ScanIdAllocator ids;
+  SourceMapBuilder builder([&ids]() { return ids.nextSourceAnnotationId(); });
+  const SourceId source{8};
+  const auto root = builder.header("Header", SourceRange{.source = source, .offset = 0, .size = 4});
+  const auto autoField =
+      builder.annotation(SourceRole::Field, "Version", SourceRange{.source = source, .offset = 0, .size = 1})
+          .parent(root.id());
+  const auto shownField =
+      builder.annotation(SourceRole::Field, "ADSR/Gain", SourceRange{.source = source, .offset = 1, .size = 3})
+          .parent(root.id())
+          .outline(SourceOutlinePolicy::Show);
+  const auto hiddenHeader =
+      builder.header("Internal Header", SourceRange{.source = source, .offset = 2, .size = 1})
+          .parent(root.id())
+          .outline(SourceOutlinePolicy::Hide);
+
+  const SourceMap sourceMap = builder.finish();
+  expect(sourceMap.get(root.id()).outline == SourceOutlinePolicy::Auto,
+         "source annotations should default to automatic outline visibility");
+  expect(sourceMap.get(autoField.id()).outline == SourceOutlinePolicy::Auto,
+         "field annotations should preserve automatic outline policy for consumers to hide by default");
+  expect(sourceMap.get(shownField.id()).outline == SourceOutlinePolicy::Show,
+         "format code should be able to force structural documentation into Tree View");
+  expect(sourceMap.get(hiddenHeader.id()).outline == SourceOutlinePolicy::Hide,
+         "format code should be able to hide source-backed implementation details from Tree View");
+  expect(sourceMap.childrenOf(root.id()) ==
+             std::vector<SourceAnnotationId>{autoField.id(), shownField.id(), hiddenHeader.id()},
+         "outline policy should not replace source-backed hierarchy");
 }
 
 void sourceMapRejectsDuplicateAnnotationIds() {
@@ -96,6 +137,33 @@ void sourceMapRejectsDuplicateAnnotationIds() {
   expect(builderThrew, "source map builder should reject duplicate annotation ids from its allocator");
 }
 
+void diagnosticsCanReferenceSourceAnnotationsAndObjects() {
+  ScanIdAllocator ids;
+  SourceMapBuilder builder([&ids]() { return ids.nextSourceAnnotationId(); });
+  const SourceId source{4};
+  const AssetId asset{9};
+  const SourceRange headerRange{.source = source, .offset = 2, .size = 3};
+  const auto header = builder.header("Probe Header", headerRange).owner(ObjectRefs::asset(asset));
+  const SourceMap sourceMap = builder.finish();
+
+  const Diagnostic annotationDiagnostic{
+      .severity = Severity::Warning,
+      .message = "annotation diagnostic",
+      .range = headerRange,
+      .annotation = header.id(),
+  };
+  const Diagnostic objectDiagnostic{
+      .severity = Severity::Error,
+      .message = "object diagnostic",
+      .object = ObjectRefs::asset(asset),
+  };
+
+  expect(sourceMap.find(*annotationDiagnostic.annotation) != nullptr,
+         "diagnostics should be able to anchor to source annotations");
+  expect(objectDiagnostic.object && sourceMap.ownedBy(*objectDiagnostic.object) == std::vector<SourceAnnotationId>{header.id()},
+         "diagnostics should be able to anchor to semantic objects");
+}
+
 void sessionSnapshotCarriesScannerSourceMap() {
   Session session;
   session.formats().add(probeExplicitCollectionModule());
@@ -122,6 +190,8 @@ void sessionSnapshotCarriesScannerSourceMap() {
 
 void runValueSourceMapTests() {
   sourceMapBuilderRecordsAnnotationsFieldsAndLinks();
+  sourceAnnotationsCarryOutlinePolicyForTreeConsumers();
   sourceMapRejectsDuplicateAnnotationIds();
+  diagnosticsCanReferenceSourceAnnotationsAndObjects();
   sessionSnapshotCarriesScannerSourceMap();
 }

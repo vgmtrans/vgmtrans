@@ -55,9 +55,7 @@ using namespace core;
   const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
   static_cast<void>(result.sequence(sequence, [&](AssetId id) {
     std::vector<Diagnostic> sequenceDiagnostics;
-    auto asset = parseCapcomSnesSequence(
-        input, *layout, id, hasInstrumentSet ? std::optional<ScanInstrumentSetRef>{instrumentSet} : std::nullopt,
-        displayName, &result.sourceMap(), &sequenceDiagnostics);
+    auto asset = parseCapcomSnesSequence(input, *layout, id, displayName, &result.sourceMap(), &sequenceDiagnostics);
     for (auto& diagnostic : sequenceDiagnostics) {
       result.diagnostic(std::move(diagnostic));
     }

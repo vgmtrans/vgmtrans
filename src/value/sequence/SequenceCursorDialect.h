@@ -26,7 +26,7 @@ namespace vgmtrans::core {
 template <class Context>
 struct CursorDialectSpec {
   std::string id;
-  std::string commandKindPrefix;
+  std::string commandDetailKindPrefix;
   Timebase timebase;
   SequenceProgramBehavior defaultBehavior;
   Context context;
@@ -240,15 +240,6 @@ template <class Context>
 
 template <class TrackState, class Context, class Reader>
 struct CursorDialectDriver {
-  static void describe(const SourceCommand&, const TrackProgram&, CommandInfo&, const std::any&) {}
-
-  static void references(const SourceCommand& record, const TrackProgram& track, CommandReferences& references,
-                         const std::any&) {
-    for (const auto& reference : track.instrumentReferencesFor(record)) {
-      references.instrument(reference.bank, reference.program, reference.range);
-    }
-  }
-
   static Effects execute(const SourceCommand& record, const TrackProgram& track, std::any& trackState,
                          PerformanceEmitter& out, VmApi& vm, const std::any& context) {
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
@@ -278,21 +269,19 @@ template <class TrackState, class Context, class Reader>
 [[nodiscard]] SequenceDialect makeCursorDialect(CursorDialectSpec<Context> spec) {
   SequenceDialect dialect{
       .id = DialectId{.value = std::move(spec.id)},
-      .commandKindPrefix = std::move(spec.commandKindPrefix),
+      .commandDetailKindPrefix = std::move(spec.commandDetailKindPrefix),
       .timebase = spec.timebase,
       .defaultBehavior = spec.defaultBehavior,
       .createTrackState = detail::createTrackState<TrackState, Context>,
       .context = std::move(spec.context),
   };
-  if (dialect.commandKindPrefix.empty()) {
-    dialect.commandKindPrefix = dialect.id.value;
+  if (dialect.commandDetailKindPrefix.empty()) {
+    dialect.commandDetailKindPrefix = dialect.id.value;
   }
 
   dialect.handlers.push_back(CommandHandler{
       .id = CommandHandlerId{0},
       .typeToken = detail::commandTypeToken<CursorDialectDriver<TrackState, Context, Reader>>(),
-      .describe = CursorDialectDriver<TrackState, Context, Reader>::describe,
-      .collectReferences = CursorDialectDriver<TrackState, Context, Reader>::references,
       .execute = CursorDialectDriver<TrackState, Context, Reader>::execute,
   });
   return dialect;
@@ -324,14 +313,6 @@ template <class TrackState, class Context, class Reader>
   if (begin >= boundedEnd) {
     return DecodedBytecodeCommand{
         .handler = cursorDialectHandlerId<TrackState, Context, Reader>(dialect),
-        .commandKind =
-            CommandKind{
-                .kindName = dialect.commandKindPrefix + ".truncated",
-                .name = "Truncated Command",
-                .detailKind = dialect.commandKindPrefix + ".truncated",
-                .semantic = SequenceSemantic::Unsupported,
-                .playbackStatus = CommandPlaybackStatus::Unsupported,
-            },
         .range = reader.range(begin, 0),
         .flow = DecodeFlow::terminalFlow(),
     };
@@ -340,10 +321,7 @@ template <class TrackState, class Context, class Reader>
   const u32 availableSize = boundedEnd - begin;
   const SourceRange availableRange = reader.range(begin, availableSize);
   const auto availableBytes = reader.slice(begin, availableSize);
-  std::vector<CommandOperand> operands;
-  CommandReferences references;
-  VmCommandCursor cursor(CommandPhase::Decode, availableRange, availableBytes, context.sourceMap, context.diagnostics,
-                         &operands, &references);
+  VmCommandCursor cursor(CommandPhase::Decode, availableRange, availableBytes, context.sourceMap, context.diagnostics);
   DecodeCursorRuntime<TrackState, Context> runtime{
       .state = decodeState,
       .context = cursorContext<Context>(dialect),
@@ -366,27 +344,23 @@ template <class TrackState, class Context, class Reader>
   const auto commandBytes = availableBytes.subspan(0, commandSize);
   std::vector<u8> ownedBytes{commandBytes.begin(), commandBytes.end()};
   const SourceRange commandRange = reader.range(begin, commandSize);
-  auto instrumentReferences =
-      cursor.failed() ? std::vector<CommandInstrumentReference>{} : references.takeInstruments();
-  for (auto& reference : instrumentReferences) {
-    if (!reference.range && commandRange.valid()) {
-      reference.range = commandRange;
-    }
-  }
+  const CursorCommandMetadata commandMetadata = cursor.metadata(dialect.commandDetailKindPrefix);
   if (context.sourceMap != nullptr && cursor.annotation().valid()) {
-    AnnotationBuilder{*context.sourceMap, cursor.annotation()}.range(commandRange);
+    auto annotation = AnnotationBuilder{*context.sourceMap, cursor.annotation()}
+                          .range(commandRange)
+                          .label(commandMetadata.name)
+                          .detailKind(commandMetadata.detailKind);
+    if (context.parentAnnotation) {
+      annotation.parent(*context.parentAnnotation);
+    }
   }
   cursor.finalizeDiagnostics(commandRange);
 
   return DecodedBytecodeCommand{
       .handler = cursorDialectHandlerId<TrackState, Context, Reader>(dialect),
-      .commandKind = cursor.commandKind(dialect.commandKindPrefix),
       .range = commandRange,
       .annotation = cursor.annotation(),
       .bytes = std::move(ownedBytes),
-      .operands = std::move(operands),
-      .instrumentReferences = std::move(instrumentReferences),
-      .referencesDecoded = true,
       .flow = decodeFlowFromCommandFlow(commandFlow, Address{begin + commandSize}),
   };
 }
@@ -399,11 +373,13 @@ template <class TrackState, class Context, class Reader>
 }
 
 struct CursorTrackDecodeInput {
+  std::optional<AssetId> sequenceAsset;
   u32 trackIndex = 0;
   u32 startOffset = 0;
   u32 bytecodeEnd = std::numeric_limits<u32>::max();
   u32 sequenceOffset = 0;
   u32 sequenceEnd = std::numeric_limits<u32>::max();
+  std::optional<SourceAnnotationId> parentAnnotation;
   SourceMapBuilder* sourceMap = nullptr;
   std::vector<Diagnostic>* diagnostics = nullptr;
   u32 maxCommands = 4096;
@@ -414,9 +390,29 @@ struct CursorTrackDecodeInput {
       .bytecodeEnd = input.bytecodeEnd,
       .sequenceOffset = input.sequenceOffset,
       .sequenceEnd = input.sequenceEnd,
+      .parentAnnotation = input.parentAnnotation,
       .sourceMap = input.sourceMap,
       .diagnostics = input.diagnostics,
   };
+}
+
+[[nodiscard]] inline std::optional<SourceAnnotationId> createCursorTrackAnnotation(ByteReader reader,
+                                                                                   CursorTrackDecodeInput input) {
+  if (input.sourceMap == nullptr) {
+    return std::nullopt;
+  }
+
+  auto track = input.sourceMap
+                   ->annotation(SourceRole::SequenceTrack, "Track " + std::to_string(input.trackIndex),
+                                reader.range(input.startOffset, 0))
+                   .kind("track");
+  if (input.sequenceAsset) {
+    track.owner(ObjectRefs::sequenceTrack(*input.sequenceAsset, input.trackIndex));
+  }
+  if (input.parentAnnotation) {
+    track.parent(*input.parentAnnotation);
+  }
+  return track.id();
 }
 
 [[nodiscard]] inline u32 cursorBytecodeEnd(ByteReader reader, CursorTrackDecodeInput input) {
@@ -427,6 +423,9 @@ template <class TrackState, class Context, class Reader>
 [[nodiscard]] TrackProgram decodeCursorReachableTrack(ByteReader reader, const SequenceDialect& dialect,
                                                       CursorTrackDecodeInput input) {
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
+  if (auto trackAnnotation = createCursorTrackAnnotation(reader, input)) {
+    decodeContext.parentAnnotation = trackAnnotation;
+  }
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
   const auto decodeCommand = [&](u32 offset) {
     return decodeCursorCommandWithState<TrackState, Context, Reader>(reader, offset, dialect, decodeState,
@@ -441,6 +440,9 @@ template <class TrackState, class Context, class Reader>
 [[nodiscard]] TrackProgram decodeCursorLinearTrack(ByteReader reader, const SequenceDialect& dialect,
                                                    CursorTrackDecodeInput input) {
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
+  if (auto trackAnnotation = createCursorTrackAnnotation(reader, input)) {
+    decodeContext.parentAnnotation = trackAnnotation;
+  }
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
   const auto decodeCommand = [&](u32 offset) {
     return decodeCursorCommandWithState<TrackState, Context, Reader>(reader, offset, dialect, decodeState,

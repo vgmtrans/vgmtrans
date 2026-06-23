@@ -73,9 +73,9 @@ ScanSequenceAssetBuilder::ScanSequenceAssetBuilder(ScanResultBuilder& out, ScanS
     : out_(out), ref_(ref), name_(std::move(name)), range_(range) {
 }
 
-ScanSequenceRef ScanSequenceAssetBuilder::program(SequenceProgram program, ItemTree items) {
+ScanSequenceRef ScanSequenceAssetBuilder::program(SequenceProgram program) {
   out_.addSequenceAsset(ref_, SequenceProgramAsset{
-                                  .metadata = out_.metadata(ref_.id, std::move(name_), range_, std::move(items)),
+                                  .metadata = out_.metadata(ref_.id, std::move(name_), range_),
                                   .program = std::move(program),
                               });
   return ref_;
@@ -86,9 +86,9 @@ ScanInstrumentSetAssetBuilder::ScanInstrumentSetAssetBuilder(ScanResultBuilder& 
     : out_(out), ref_(ref), name_(std::move(name)), range_(range) {
 }
 
-ScanInstrumentSetRef ScanInstrumentSetAssetBuilder::instruments(std::vector<Instrument> instruments, ItemTree items) {
+ScanInstrumentSetRef ScanInstrumentSetAssetBuilder::instruments(std::vector<Instrument> instruments) {
   out_.addInstrumentSetAsset(ref_, InstrumentSetAsset{
-                                       .metadata = out_.metadata(ref_.id, std::move(name_), range_, std::move(items)),
+                                       .metadata = out_.metadata(ref_.id, std::move(name_), range_),
                                        .instruments = std::move(instruments),
                                    });
   return ref_;
@@ -99,10 +99,10 @@ ScanSampleCollectionAssetBuilder::ScanSampleCollectionAssetBuilder(ScanResultBui
     : out_(out), ref_(ref), name_(std::move(name)), range_(range) {
 }
 
-ScanSampleCollectionRef ScanSampleCollectionAssetBuilder::samples(SampleCollection samples, ItemTree items) {
+ScanSampleCollectionRef ScanSampleCollectionAssetBuilder::samples(SampleCollection samples) {
   out_.addSampleCollectionAsset(ref_,
                                 SampleCollectionAsset{
-                                    .metadata = out_.metadata(ref_.id, std::move(name_), range_, std::move(items)),
+                                    .metadata = out_.metadata(ref_.id, std::move(name_), range_),
                                     .samples = std::move(samples),
                                 });
   return ref_;
@@ -113,9 +113,9 @@ ScanMiscAssetBuilder::ScanMiscAssetBuilder(ScanResultBuilder& out, ScanMiscAsset
     : out_(out), ref_(ref), name_(std::move(name)), range_(range) {
 }
 
-ScanMiscAssetRef ScanMiscAssetBuilder::payload(std::vector<u8> payload, ItemTree items) {
+ScanMiscAssetRef ScanMiscAssetBuilder::payload(std::vector<u8> payload) {
   out_.addMiscAsset(ref_, MiscAsset{
-                              .metadata = out_.metadata(ref_.id, std::move(name_), range_, std::move(items)),
+                              .metadata = out_.metadata(ref_.id, std::move(name_), range_),
                               .payload = std::move(payload),
                           });
   return ref_;
@@ -257,13 +257,12 @@ ScanResult ScanResultBuilder::finish() {
   return std::move(result_);
 }
 
-AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRange range, ItemTree items) const {
+AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRange range) const {
   return AssetMetadata{
       .id = id,
       .format = format_,
       .name = std::move(name),
       .range = range,
-      .items = std::move(items),
   };
 }
 

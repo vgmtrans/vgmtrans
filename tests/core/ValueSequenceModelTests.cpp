@@ -45,28 +45,7 @@ void byteReaderChecksBoundsAndEndian() {
   expect(threw, "reader should throw on out-of-range access");
 }
 
-void commandReaderRejectsUnterminatedVariableLengthOperands() {
-  std::vector<CommandOperand> operands;
-  const std::array<u8, 3> completeBytes{0x80, 0x81, 0x05};
-  CommandReader completeReader{probeRange(0, completeBytes.size()), completeBytes, &operands};
-  expect(completeReader.varLen("duration") == 133, "command reader should decode complete variable-length operands");
-  expect(operands.size() == 1 && operands[0].name == "duration" && operands[0].range.offset == 1 &&
-             operands[0].range.size == 2,
-         "command reader should record complete variable-length operand metadata");
-
-  bool rejectedUnterminated = false;
-  const std::array<u8, 2> unterminatedBytes{0x80, 0x81};
-  CommandReader unterminatedReader{probeRange(0, unterminatedBytes.size()), unterminatedBytes, &operands};
-  try {
-    static_cast<void>(unterminatedReader.varLen("duration"));
-  } catch (const std::out_of_range&) {
-    rejectedUnterminated = true;
-  }
-  expect(rejectedUnterminated, "command reader should reject variable-length operands without a terminating byte");
-  expect(operands.size() == 1, "unterminated variable-length operands should not be recorded as decoded operands");
-}
-
-void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
+void sourceCommandsPreserveBytes() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
       .id = TrackId{0},
@@ -81,62 +60,6 @@ void sourceCommandsPreserveBytesOperandsAndDialectDisplay() {
   expect(track.commandBytes.size() == programBytes.size(), "track builder should pool command bytes");
   expect(track.bytesFor(command)[0] == 0x80 && track.bytesFor(command)[1] == 0x05,
          "source command should point back to its stored bytes");
-
-  const auto operands = track.operandsFor(command);
-  expect(operands.size() == 1, "source command should retain decoded operands");
-  expect(operands[0].name == "program", "decoded operand should preserve its source name");
-  expect(std::get<u64>(operands[0].value) == 5, "decoded operand should preserve its raw value");
-  expect(operands[0].range.offset == 1 && operands[0].range.size == 1,
-         "decoded operand should preserve its source range");
-
-  const CommandInfo info = dialect.describe(track, command);
-  expect(info.name == "Program", "dialect display should use the registered command name");
-  expect(info.detailKind == "probe.program", "dialect display should use the registered command kind");
-  expect(info.playbackStatus == CommandPlaybackStatus::AffectsPlayback,
-         "dialect display should expose command playback status");
-  expect(info.fields.size() == 1 && info.fields[0].name == "program" && info.fields[0].value == "5",
-         "dialect display should be derived by replaying the format-local command parser");
-
-  ItemTree itemTree;
-  ScanIdAllocator ids;
-  ItemTreeBuilder items(itemTree, ids);
-  const ItemId root = items.add(std::nullopt, ItemKind::Track, "probe.track", "Track", probeRange(0, 0));
-  const ItemId commandItem = addSourceCommandItem(items, root, dialect, track, command);
-  const auto* item = itemById(itemTree, commandItem);
-  expect(item != nullptr && item->kind == ItemKind::Command, "source command helper should add a command item");
-  expect(item->detailKind == "probe.program" && item->name == "Program",
-         "source command helper should reuse dialect display metadata");
-  expect(item->description == "program 5", "source command helper should format command fields consistently");
-  expect(sameRange(item->range, command.range), "source command helper should preserve the command source range");
-  expect(itemById(itemTree, root)->children == std::vector<ItemId>{commandItem},
-         "source command helper should attach command items under the requested parent");
-
-  bool rejectedTrailingBytes = false;
-  try {
-    const std::array<u8, 3> trailingProgramBytes{0x80, 0x05, 0xaa};
-    static_cast<void>(addProbeCommand<ProbeProgramCommand>(
-        builder, dialect, Address{2}, probeRange(2, trailingProgramBytes.size()), trailingProgramBytes));
-  } catch (const std::invalid_argument&) {
-    rejectedTrailingBytes = true;
-  }
-  expect(rejectedTrailingBytes, "track builder should reject command bytes not consumed by the local parser");
-  expect(track.commands.size() == 1, "rejected command bytes should not mutate the track program");
-}
-
-void sequenceDialectPreservesCommandPlaybackStatus() {
-  const SequenceDialect dialect = probeSequenceDialect();
-
-  const auto* note = dialect.kindForName(ProbeNoteCommand::kind);
-  expect(note != nullptr && note->playbackStatus == CommandPlaybackStatus::AffectsPlayback,
-         "commands without an explicit status should default to playback-affecting");
-
-  const auto* jump = dialect.kindForName(ProbeJumpCommand::kind);
-  expect(jump != nullptr && jump->playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
-         "control-flow commands should preserve their explicit playback status");
-
-  const auto* end = dialect.kindForName(ProbeEndCommand::kind);
-  expect(end != nullptr && end->playbackStatus == CommandPlaybackStatus::StopsPlayback,
-         "terminal commands should preserve their explicit playback status");
 }
 
 void vmCommandCursorRecordsCommandAnnotations() {
@@ -295,9 +218,7 @@ void collectionIssueHelpersValidateStoredStatus() {
 void runValueSequenceModelTests() {
   levelScaleRoundTripsMidiValues();
   byteReaderChecksBoundsAndEndian();
-  commandReaderRejectsUnterminatedVariableLengthOperands();
-  sourceCommandsPreserveBytesOperandsAndDialectDisplay();
-  sequenceDialectPreservesCommandPlaybackStatus();
+  sourceCommandsPreserveBytes();
   vmCommandCursorRecordsCommandAnnotations();
   vmCommandCursorSupportsKindOverrideAndTargetLinks();
   vmCommandCursorRecordsStructuredResourceLinks();

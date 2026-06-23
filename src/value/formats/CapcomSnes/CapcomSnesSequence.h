@@ -30,11 +30,13 @@ void registerCapcomSnesSequenceDialects(core::SequenceDialectRegistry& registry)
                                                              const CapcomSnesSequenceDescriptor& descriptor,
                                                              u32 sourceTrackNumber, u32 startAddress,
                                                              core::SourceMapBuilder* sourceMap = nullptr,
-                                                             std::vector<core::Diagnostic>* diagnostics = nullptr);
+                                                             std::vector<core::Diagnostic>* diagnostics = nullptr,
+                                                             std::optional<core::SourceAnnotationId> parent = std::nullopt,
+                                                             std::optional<core::AssetId> sequenceAsset = std::nullopt);
 
 [[nodiscard]] core::SequenceProgramAsset parseCapcomSnesSequence(
     const core::ScanInput& input, const CapcomSnesLayout& layout, core::AssetId sequenceId,
-    std::optional<core::ScanInstrumentSetRef> instrumentSet, std::string_view displayName,
-    core::SourceMapBuilder* sourceMap = nullptr, std::vector<core::Diagnostic>* diagnostics = nullptr);
+    std::string_view displayName, core::SourceMapBuilder* sourceMap = nullptr,
+    std::vector<core::Diagnostic>* diagnostics = nullptr);
 
 }  // namespace vgmtrans::formats::capcom_snes

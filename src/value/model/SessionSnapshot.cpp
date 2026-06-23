@@ -103,22 +103,6 @@ SessionSnapshot SessionSnapshotBuilder::finish() {
   };
 }
 
-ItemNode* itemById(ItemTree& tree, ItemId id) {
-  const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) { return item.id == id; });
-  if (found == tree.nodes.end()) {
-    return nullptr;
-  }
-  return &*found;
-}
-
-const ItemNode* itemById(const ItemTree& tree, ItemId id) {
-  const auto found = std::ranges::find_if(tree.nodes, [id](const ItemNode& item) { return item.id == id; });
-  if (found == tree.nodes.end()) {
-    return nullptr;
-  }
-  return &*found;
-}
-
 const Asset* assetById(const SessionSnapshot& snapshot, AssetId id) {
   return snapshot.asset(id);
 }

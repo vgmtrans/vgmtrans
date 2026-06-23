@@ -49,23 +49,15 @@ RepeatUntilFlow::RepeatUntilFlow(CommandFlow flow, bool fallsThrough)
 }
 
 VmCommandCursor::VmCommandCursor(CommandPhase phase, SourceRange commandRange, std::span<const ::u8> bytes,
-                                 SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
-                                 std::vector<CommandOperand>* operands, CommandReferences* references)
-    : phase_(phase), commandRange_(commandRange), bytes_(bytes), sourceMap_(sourceMap), diagnostics_(diagnostics),
-      operands_(operands), references_(references) {
+                                 SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics)
+    : phase_(phase), commandRange_(commandRange), bytes_(bytes), sourceMap_(sourceMap), diagnostics_(diagnostics) {
   if (bytes_.empty()) {
     markTruncated("opcode", commandRange_);
   }
 }
 
-CommandKind VmCommandCursor::commandKind(std::string_view kindPrefix) const {
-  std::string kindName;
-  if (!kindPrefix.empty()) {
-    kindName = std::string(kindPrefix) + ".";
-  }
-  kindName += localKind_;
-  return CommandKind{
-      .kindName = std::move(kindName),
+CursorCommandMetadata VmCommandCursor::metadata(std::string_view kindPrefix) const {
+  return CursorCommandMetadata{
       .name = displayName_,
       .detailKind = kindPrefix.empty() ? localKind_ : std::string(kindPrefix) + "." + localKind_,
       .semantic = semantic_,
@@ -354,9 +346,6 @@ VmCommandCursor& VmCommandCursor::target(Address address, SourceLinkRole role) {
 }
 
 VmCommandCursor& VmCommandCursor::instrumentRef(u32 bank, u32 program) {
-  if (references_ != nullptr) {
-    references_->instrument(bank, program);
-  }
   if (sourceMap_ == nullptr) {
     return *this;
   }
@@ -403,6 +392,7 @@ void VmCommandCursor::finalizeDiagnostics(SourceRange commandRange) {
         .severity = diagnostic.severity,
         .message = std::move(diagnostic.message),
         .range = diagnostic.range.value_or(commandRange),
+        .annotation = annotation_.valid() ? std::optional<SourceAnnotationId>{annotation_} : std::nullopt,
     });
   }
   pendingDiagnostics_.clear();
@@ -577,6 +567,7 @@ void VmCommandCursor::markTruncated(std::string_view field, SourceRange range) {
         .severity = Severity::Warning,
         .message = "Truncated sequence command while reading " + std::string(field),
         .range = range,
+        .annotation = annotation_.valid() ? std::optional<SourceAnnotationId>{annotation_} : std::nullopt,
     });
   }
 }
@@ -603,34 +594,9 @@ bool VmCommandCursor::readByte(std::string_view field, ::u8& out) {
 
 void VmCommandCursor::recordField(std::string_view name, SourceRange range, SourceValue value,
                                   SourceValueDisplay display) {
-  recordOperand(name, range, value, display);
   if (sourceMap_ != nullptr) {
     ensureAnnotation();
     annotationBuilder().field(name, range, std::move(value), display);
-  }
-}
-
-void VmCommandCursor::recordOperand(std::string_view name, SourceRange range, const SourceValue& value,
-                                    SourceValueDisplay display) {
-  if (operands_ == nullptr) {
-    return;
-  }
-  if (const auto* unsignedValue = std::get_if<u64>(&value)) {
-    if (display == SourceValueDisplay::Address) {
-      operands_->push_back(CommandOperand{
-          .name = std::string(name), .value = Address{static_cast<u32>(*unsignedValue)}, .range = range});
-    } else {
-      operands_->push_back(CommandOperand{.name = std::string(name), .value = *unsignedValue, .range = range});
-    }
-  } else if (const auto* signedValue = std::get_if<s64>(&value)) {
-    operands_->push_back(CommandOperand{.name = std::string(name), .value = *signedValue, .range = range});
-  } else if (const auto* doubleValue = std::get_if<double>(&value)) {
-    operands_->push_back(CommandOperand{.name = std::string(name), .value = *doubleValue, .range = range});
-  } else if (const auto* text = std::get_if<std::string>(&value)) {
-    operands_->push_back(CommandOperand{.name = std::string(name), .value = *text, .range = range});
-  } else if (const auto* boolValue = std::get_if<bool>(&value)) {
-    operands_->push_back(
-        CommandOperand{.name = std::string(name), .value = static_cast<u64>(*boolValue), .range = range});
   }
 }
 

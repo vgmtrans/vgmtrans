@@ -43,17 +43,18 @@ void sessionScansValuesAndDerivedSources() {
   expect(assetById(snapshot, AssetId{99}) == nullptr, "session snapshot should return null for a missing asset id");
   expect(assetById<SequenceProgramAsset>(snapshot, AssetId{99}) == nullptr,
          "session snapshot should return null for a missing asset id");
-  expect(sequence->metadata.items.nodes.size() == 2, "sequence should expose item tree");
-  expect(sequence->metadata.items.root == sequence->metadata.items.nodes[0].id,
-         "scanner should preserve valid item tree root");
-  expect(sequence->metadata.items.nodes[0].children == std::vector<ItemId>{sequence->metadata.items.nodes[1].id},
-         "scanner should rebuild item children from parent links");
-  expect(itemById(sequence->metadata.items, sequence->metadata.items.nodes[0].id) == &sequence->metadata.items.nodes[0],
-         "item tree should find its root item by stable id");
-  expect(itemById(sequence->metadata.items, sequence->metadata.items.nodes[1].id) == &sequence->metadata.items.nodes[1],
-         "item tree should find child items by stable id");
-  expect(itemById(sequence->metadata.items, ItemId{99}) == nullptr,
-         "item tree should return null for a missing item id");
+  const SourceMap& sourceMap = snapshot.sourceMap();
+  const auto sequenceAnnotations = sourceMap.withRole(sourceId, SourceRole::Sequence);
+  expect(sequenceAnnotations.size() == 1, "sequence should expose a source-root annotation");
+  const SourceAnnotation& sequenceRoot = sourceMap.get(sequenceAnnotations.front());
+  expect(sequenceRoot.owner == ObjectRefs::sequence(sequence->metadata.id),
+         "sequence root annotation should point at the semantic sequence asset");
+  const auto rootChildren = sourceMap.childrenOf(sequenceRoot.id);
+  expect(rootChildren.size() == 1, "source annotations should preserve parent-child relationships");
+  expect(sourceMap.get(rootChildren.front()).role == SourceRole::Header,
+         "source annotation children should support tree view nodes");
+  expect(sourceMap.find(SourceAnnotationId{99}) == nullptr,
+         "source map should return null for a missing annotation id");
   expect(snapshot.collections()[0].sequence == sequence->metadata.id, "collection should reference sequence asset");
   expect(collectionById(snapshot, snapshot.collections()[0].id) == &snapshot.collections()[0],
          "session snapshot should find a collection by stable id");
@@ -513,13 +514,17 @@ void scanValidationReportsMultipleAdmissionErrors() {
 
     case 1: {
       auto metadata = badRangeMetadata(assetId, "Bad Item Range", goodRange);
-      metadata.items.nodes.push_back(ItemNode{
-          .kind = ItemKind::Misc,
-          .name = "Bad Item",
-          .range = badRange,
-      });
       return ScanResult{
           .assets = {MiscAsset{.metadata = std::move(metadata)}},
+          .sourceMap =
+              SourceMap{{
+                  SourceAnnotation{
+                      .id = SourceAnnotationId{0},
+                      .range = badRange,
+                      .role = SourceRole::DataBlock,
+                      .label = "Bad Annotation",
+                  },
+              }},
       };
     }
 
@@ -593,8 +598,9 @@ void scanCommitRejectsOutOfBoundsScanResultRanges() {
       },
       BadRangeCase{
           .kind = 1,
-          .message = "Scan result contained asset item range outside source bounds (source 0, offset 3, size 1, source "
-                     "size 2)",
+          .message =
+              "Scan result contained source annotation range outside source bounds (source 0, offset 3, size 1, source "
+              "size 2)",
       },
       BadRangeCase{
           .kind = 2,

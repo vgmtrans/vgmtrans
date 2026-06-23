@@ -405,7 +405,7 @@ template <class Runtime>
   }
 }
 
-struct AkaoCommandReader {
+struct AkaoCursorReader {
   template <class Runtime>
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     const AkaoProfile& profile = rt.context.profile;
@@ -720,9 +720,9 @@ struct AkaoCommandReader {
 namespace {
 
 SequenceDialect makeAkaoDialect(AkaoPs1Version version, AkaoSequenceAnalysis* analysis) {
-  return makeCursorDialect<AkaoTrackState, AkaoContext, AkaoCommandReader>(CursorDialectSpec<AkaoContext>{
+  return makeCursorDialect<AkaoTrackState, AkaoContext, AkaoCursorReader>(CursorDialectSpec<AkaoContext>{
       .id = dialectId(version),
-      .commandKindPrefix = dialectId(version),
+      .commandDetailKindPrefix = dialectId(version),
       .timebase = Timebase{.ppqn = kAkaoPpqn},
       .defaultBehavior =
           SequenceProgramBehavior{
@@ -742,12 +742,12 @@ SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
 }
 
 TrackProgram decodeAkaoTrack(ByteReader reader, const SequenceDialect& dialect, CursorTrackDecodeInput input) {
-  return decodeCursorReachableTrack<AkaoTrackState, AkaoContext, AkaoCommandReader>(reader, dialect, input);
+  return decodeCursorReachableTrack<AkaoTrackState, AkaoContext, AkaoCursorReader>(reader, dialect, input);
 }
 
 void analyzeAkaoTrack(ByteReader reader, AkaoSequenceAnalysis& analysis, u32 start) {
   const SequenceDialect dialect = makeAkaoDialect(analysis.header.version, &analysis);
-  static_cast<void>(decodeCursorReachableTrack<AkaoTrackState, AkaoContext, AkaoCommandReader>(
+  static_cast<void>(decodeCursorReachableTrack<AkaoTrackState, AkaoContext, AkaoCursorReader>(
       reader, dialect,
       CursorTrackDecodeInput{
           .startOffset = start,

@@ -259,7 +259,7 @@ void toggleSlur(Runtime& rt) {
   rt.state.toggleSlur(rt);
 }
 
-struct CapcomSnesCommandReader {
+struct CapcomSnesCursorReader {
   template <class Runtime>
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     const u8 opcode = cmd.opcode();
@@ -552,9 +552,9 @@ struct CapcomSnesCommandReader {
 
 [[nodiscard]] CapcomSnesSequenceDescriptor makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion version) {
   return CapcomSnesSequenceDescriptor{
-      .dialect = makeCursorDialect<TrackState, Context, CapcomSnesCommandReader>(CursorDialectSpec<Context>{
+      .dialect = makeCursorDialect<TrackState, Context, CapcomSnesCursorReader>(CursorDialectSpec<Context>{
           .id = dialectId(version),
-          .commandKindPrefix = "capcom-snes",
+          .commandDetailKindPrefix = "capcom-snes",
           .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
           .defaultBehavior =
               SequenceProgramBehavior{
@@ -597,12 +597,16 @@ void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
 
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequenceDescriptor& descriptor,
                                          u32 sourceTrackNumber, u32 startAddress, SourceMapBuilder* sourceMap,
-                                         std::vector<Diagnostic>* diagnostics) {
-  return decodeCursorLinearTrack<TrackState, Context, CapcomSnesCommandReader>(
+                                         std::vector<Diagnostic>* diagnostics,
+                                         std::optional<SourceAnnotationId> parentAnnotation,
+                                         std::optional<AssetId> sequenceAsset) {
+  return decodeCursorLinearTrack<TrackState, Context, CapcomSnesCursorReader>(
       reader, descriptor.dialect,
       CursorTrackDecodeInput{
+          .sequenceAsset = sequenceAsset,
           .trackIndex = sourceTrackNumber,
           .startOffset = startAddress,
+          .parentAnnotation = parentAnnotation,
           .sourceMap = sourceMap,
           .diagnostics = diagnostics,
           .maxCommands = 4096,
@@ -610,19 +614,16 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequ
 }
 
 SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const CapcomSnesLayout& layout, AssetId sequenceId,
-                                             std::optional<ScanInstrumentSetRef> instrumentSet,
                                              std::string_view displayName, SourceMapBuilder* sourceMap,
                                              std::vector<Diagnostic>* diagnostics) {
   const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
-  ItemTree items;
-  ItemTreeBuilder itemBuilder(items, input.ids);
   const SourceRange headerRange = input.reader.range(layout.sequenceHeaderAddress, headerSize);
-  const ItemId root =
-      itemBuilder.add(std::nullopt, ItemKind::Sequence, "capcom-snes.sequence-header", "Sequence Header", headerRange);
 
   SourceAnnotationId headerAnnotation;
   if (sourceMap != nullptr) {
-    auto header = sourceMap->header("Sequence Header", headerRange).kind("capcom-snes-sequence-header");
+    auto header = sourceMap->header("Sequence Header", headerRange)
+                      .kind("capcom-snes-sequence-header")
+                      .owner(ObjectRefs::sequence(sequenceId));
     headerAnnotation = header.id();
   }
 
@@ -633,9 +634,6 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
       .timebase = dialect.timebase,
       .behavior = dialect.defaultBehavior,
   };
-  const std::optional<AssetId> instrumentSetId =
-      instrumentSet ? std::optional<AssetId>{instrumentSet->id} : std::nullopt;
-
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   // Capcom stores track pointers in reverse channel order. Decode them in
   // playback order so source track numbers match the driver.
@@ -648,18 +646,21 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
       continue;
     }
 
-    const ItemId trackItem = itemBuilder.add(root, ItemKind::Track, "capcom-snes.track-pointer", "Track Pointer",
-                                             pointerRange, fmt::format("Track starts at ${:04X}", trackAddress));
+    std::optional<SourceAnnotationId> trackAnnotation;
     if (sourceMap != nullptr) {
-      sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{input.reader.range(trackAddress, 1)})
-          .kind("capcom-snes-track-pointer")
-          .parent(headerAnnotation)
-          .derived("source_track", sourceTrackNumber)
-          .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
+      auto pointer = sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{input.reader.range(trackAddress, 1)})
+                         .kind("capcom-snes-track-pointer")
+                         .description(fmt::format("Track starts at ${:04X}", trackAddress))
+                         .derived("source_track", sourceTrackNumber)
+                         .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
+      if (headerAnnotation.valid()) {
+        pointer.parent(headerAnnotation);
+      }
+      trackAnnotation = pointer.id();
     }
 
-    auto track = decodeCapcomSnesSourceTrack(input.reader, descriptor, sourceTrackNumber, trackAddress, sourceMap, diagnostics);
-    addSourceCommandItemsAndInstrumentReferences(itemBuilder, trackItem, program, dialect, track, instrumentSetId);
+    auto track = decodeCapcomSnesSourceTrack(input.reader, descriptor, sourceTrackNumber, trackAddress, sourceMap,
+                                             diagnostics, trackAnnotation, sequenceId);
     program.tracks.push_back(std::move(track));
   }
 
@@ -670,7 +671,6 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
               .format = "CapcomSnes",
               .name = std::string(displayName),
               .range = input.reader.range(layout.sequenceHeaderAddress, headerSize),
-              .items = std::move(items),
           },
       .program = std::move(program),
   };

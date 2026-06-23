@@ -275,7 +275,6 @@ std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(ByteReader reader, 
 SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sampleCollectionId,
                                              const std::vector<CapcomSnesSampleInfo>& sampleInfos,
                                              std::string_view displayName, SourceMapBuilder* sourceMap) {
-  ItemTree items;
   u32 rootOffset = 0;
   u32 rootSize = 0;
   if (!sampleInfos.empty()) {
@@ -284,11 +283,12 @@ SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sam
     rootSize = lastEnd - rootOffset;
   }
 
-  ItemTreeBuilder itemBuilder(items, input.ids);
-  const auto root = itemBuilder.add(std::nullopt, ItemKind::SampleCollection, "snes-sample-dir", "Sample DIR",
-                                    input.reader.range(rootOffset, rootSize));
+  SourceAnnotationId root;
   if (sourceMap != nullptr) {
-    sourceMap->table("Sample DIR", input.reader.range(rootOffset, rootSize)).kind("snes-sample-dir");
+    root = sourceMap->table("Sample DIR", input.reader.range(rootOffset, rootSize))
+               .kind("snes-sample-dir")
+               .owner(ObjectRefs::asset(sampleCollectionId))
+               .id();
   }
 
   SampleCollection collection;
@@ -319,30 +319,30 @@ SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sam
             },
     });
     if (sourceMap != nullptr) {
-      sourceMap
-          ->row(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(sampleInfo.srcn)),
-                input.reader.range(sampleInfo.dirEntryAddress, 4))
-          .role(SourceRole::Sample)
-          .kind("snes-sample-dir-entry")
-          .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-          .field("start", input.reader.range(sampleInfo.dirEntryAddress, 2), sampleInfo.startAddress,
-                 SourceValueDisplay::Address)
-          .field("loop", input.reader.range(sampleInfo.dirEntryAddress + 2, 2), sampleInfo.loopAddress,
-                 SourceValueDisplay::Address)
-          .link(SourceLinkRole::PointsTo,
-                SourceTarget{input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength)}, "BRR data");
+      auto row = sourceMap
+                     ->row(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(sampleInfo.srcn)),
+                           input.reader.range(sampleInfo.dirEntryAddress, 4))
+                     .role(SourceRole::Sample)
+                     .kind("snes-sample-dir-entry")
+                     .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
+                     .field("start", input.reader.range(sampleInfo.dirEntryAddress, 2), sampleInfo.startAddress,
+                            SourceValueDisplay::Address)
+                     .field("loop", input.reader.range(sampleInfo.dirEntryAddress + 2, 2), sampleInfo.loopAddress,
+                            SourceValueDisplay::Address)
+                     .link(SourceLinkRole::PointsTo,
+                           SourceTarget{input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength)},
+                           "BRR data");
+      if (root.valid()) {
+        row.parent(root);
+      }
       sourceMap
           ->section(fmt::format("Sample {} BRR Data", static_cast<unsigned>(sampleInfo.srcn)),
                     input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength))
           .role(SourceRole::Payload)
           .kind("snes-brr-payload")
-          .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex));
+          .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
+          .parent(row.id());
     }
-
-    static_cast<void>(itemBuilder.add(root, ItemKind::Sample, "snes-brr-sample",
-                                      fmt::format("Sample {}", static_cast<unsigned>(sampleInfo.srcn)),
-                                      input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength),
-                                      fmt::format("DIR entry ${:04X}", sampleInfo.dirEntryAddress)));
   }
 
   return SampleCollectionAsset{
@@ -352,7 +352,6 @@ SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sam
               .format = "CapcomSnes",
               .name = fmt::format("{} Samples", displayName),
               .range = input.reader.range(rootOffset, rootSize),
-              .items = std::move(items),
           },
       .samples = std::move(collection),
   };
@@ -373,16 +372,13 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
     sampleIndexBySrcn[sampleInfos[index].srcn] = canonical->second;
   }
 
-  ItemTree items;
   u32 rootOffset = instrumentInfos.empty() ? 0 : instrumentInfos.front().address;
   u32 rootSize = instrumentInfos.empty() ? 0 : (instrumentInfos.back().address + 6) - rootOffset;
-  ItemTreeBuilder itemBuilder(items, input.ids);
-  const auto root = itemBuilder.add(std::nullopt, ItemKind::InstrumentSet, "capcom-snes-instrument-table",
-                                    "Instrument Table", input.reader.range(rootOffset, rootSize));
-  builder.sourceMap()
-      .table("Instrument Table", input.reader.range(rootOffset, rootSize))
-      .kind("capcom-snes-instrument-table")
-      .owner(ObjectRefs::asset(instrumentSetId));
+  const SourceAnnotationId root = builder.sourceMap()
+                                      .table("Instrument Table", input.reader.range(rootOffset, rootSize))
+                                      .kind("capcom-snes-instrument-table")
+                                      .owner(ObjectRefs::asset(instrumentSetId))
+                                      .id();
 
   std::vector<Instrument> instruments;
   instruments.reserve(instrumentInfos.size());
@@ -425,14 +421,25 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
             .field("gain", input.reader.range(info.address + 3, 1), info.gain, SourceValueDisplay::Hex)
             .field("pitch_scale", input.reader.range(info.address + 4, 2), info.pitchScale,
                    SourceValueDisplay::SignedDecimal);
+    if (root.valid()) {
+      annotation.parent(root);
+    }
     annotation.link(SourceLinkRole::UsesSample,
                     SourceTarget{ObjectRefs::sample(sampleCollection.id, sampleIndex->second)});
-    const auto instrumentItem =
-        itemBuilder.add(root, ItemKind::Instrument, "capcom-snes-instrument", fmt::format("Instrument {}", info.index),
-                        input.reader.range(info.address, 6), fmt::format("SRCN {}", static_cast<unsigned>(info.srcn)));
-    static_cast<void>(itemBuilder.add(instrumentItem, ItemKind::Region, "capcom-snes-region", "Region",
-                                      input.reader.range(info.address, 6),
-                                      fmt::format("Sample {}", sampleIndex->second)));
+    builder.sourceMap()
+        .annotation(SourceRole::DataBlock, "ADSR/Gain", input.reader.range(info.address + 1, 3))
+        .kind("capcom-snes-adsr-gain")
+        .parent(annotation.id())
+        .outline(SourceOutlinePolicy::Show)
+        .field("adsr1", input.reader.range(info.address + 1, 1), info.adsr1, SourceValueDisplay::Hex)
+        .field("adsr2", input.reader.range(info.address + 2, 1), info.adsr2, SourceValueDisplay::Hex)
+        .field("gain", input.reader.range(info.address + 3, 1), info.gain, SourceValueDisplay::Hex);
+    builder.sourceMap()
+        .annotation(SourceRole::Region, "Region", input.reader.range(info.address, 6))
+        .kind("capcom-snes-region")
+        .parent(annotation.id())
+        .description(fmt::format("Sample {}", sampleIndex->second))
+        .link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, sampleIndex->second)});
   }
 
   return InstrumentSetAsset{
@@ -442,7 +449,6 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
               .format = "CapcomSnes",
               .name = fmt::format("{} Instruments", displayName),
               .range = input.reader.range(rootOffset, rootSize),
-              .items = std::move(items),
           },
       .instruments = std::move(instruments),
   };

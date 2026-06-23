@@ -9,44 +9,9 @@
 #include "base/Types.h"
 #include "value/base/CoreTypes.h"
 
-#include <optional>
 #include <string>
-#include <vector>
 
 namespace vgmtrans::core {
-
-// Item nodes describe what the UI can click in the source bytes. They point back
-// to parsed data, but they are not the parsed data themselves.
-enum class ItemKind {
-  Source,
-  Header,
-  Sequence,
-  Track,
-  Command,
-  InstrumentSet,
-  Instrument,
-  Region,
-  SampleCollection,
-  Sample,
-  Misc,
-};
-
-struct ItemNode {
-  ItemId id;
-  std::optional<ItemId> parent;
-  ItemKind kind = ItemKind::Misc;
-  std::string detailKind;
-  std::string name;
-  std::string description;
-  SourceRange range;
-  std::vector<ItemId> children;
-};
-
-struct ItemTree {
-  // Source-backed outline for HexView/tree navigation.
-  std::optional<ItemId> root;
-  std::vector<ItemNode> nodes;
-};
 
 // Common metadata for sequences, instrument sets, sample collections, and misc
 // assets. Exporters use this for names and source ranges instead of rediscovering them.
@@ -55,7 +20,6 @@ struct AssetMetadata {
   std::string format;
   std::string name;
   SourceRange range;
-  ItemTree items;
 };
 
 // Address is the driver's address value. It may differ from a file offset after

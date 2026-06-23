@@ -150,6 +150,14 @@ std::vector<SourceAnnotationId> SourceMap::ownedBy(ObjectRef object) const {
   });
 }
 
+std::vector<SourceAnnotationId> SourceMap::childrenOf(SourceAnnotationId parent) const {
+  const auto found = annotationsByParent_.find(parent.value);
+  if (found == annotationsByParent_.end()) {
+    return {};
+  }
+  return found->second;
+}
+
 std::vector<SourceAnnotationId> SourceMap::withRole(SourceId source, SourceRole role) const {
   return idsFromAnnotations(annotations_, [&](const SourceAnnotation& annotation) {
     return annotation.range.source == source && annotation.role == role;
@@ -186,6 +194,9 @@ void SourceMap::buildIndexes() {
     if (annotations_[i].range.source.valid()) {
       annotationsBySource_[annotations_[i].range.source.value].push_back(id);
     }
+    if (annotations_[i].parent && annotations_[i].parent->valid()) {
+      annotationsByParent_[annotations_[i].parent->value].push_back(id);
+    }
   }
 }
 
@@ -216,9 +227,23 @@ AnnotationBuilder& AnnotationBuilder::label(std::string_view label) {
   return *this;
 }
 
+AnnotationBuilder& AnnotationBuilder::description(std::string_view description) {
+  if (auto* found = map_->annotation(id_)) {
+    found->description = std::string(description);
+  }
+  return *this;
+}
+
 AnnotationBuilder& AnnotationBuilder::kind(std::string_view localKindOverride) {
   if (auto* found = map_->annotation(id_)) {
     found->localKind = std::string(localKindOverride);
+  }
+  return *this;
+}
+
+AnnotationBuilder& AnnotationBuilder::detailKind(std::string_view detailKind) {
+  if (auto* found = map_->annotation(id_)) {
+    found->detailKind = std::string(detailKind);
   }
   return *this;
 }
@@ -233,6 +258,13 @@ AnnotationBuilder& AnnotationBuilder::parent(SourceAnnotationId parent) {
 AnnotationBuilder& AnnotationBuilder::owner(ObjectRef owner) {
   if (auto* found = map_->annotation(id_)) {
     found->owner = owner;
+  }
+  return *this;
+}
+
+AnnotationBuilder& AnnotationBuilder::outline(SourceOutlinePolicy policy) {
+  if (auto* found = map_->annotation(id_)) {
+    found->outline = policy;
   }
   return *this;
 }
@@ -277,6 +309,10 @@ SourceMapBuilder::SourceMapBuilder(std::function<SourceAnnotationId()> nextId) :
 
 AnnotationBuilder SourceMapBuilder::source(std::string_view label, SourceRange range) {
   return add(SourceRole::Source, label, range);
+}
+
+AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view label, SourceRange range) {
+  return add(role, label, range);
 }
 
 AnnotationBuilder SourceMapBuilder::section(std::string_view label, SourceRange range) {

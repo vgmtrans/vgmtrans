@@ -15,6 +15,8 @@
 #include "value/formats/CapcomSnes/CapcomSnesSynth.h"
 #include "value/formats/ValueFormats.h"
 
+#include "ValueFormatTestSupport.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -165,58 +167,52 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(dialect != nullptr, "registered dialect should interpret the scanned sequence program");
   const auto& firstTrack = sequence->program.tracks[0];
   expect(firstTrack.commands.size() == 8, "track should decode all fixture commands");
-  expect(dialect->describe(firstTrack, firstTrack.commands[0]).detailKind == "capcom-snes.tempo",
-         "track should decode tempo command");
+  constexpr std::array<std::string_view, 8> expectedCommandDetailKinds{
+      "capcom-snes.tempo",  "capcom-snes.program", "capcom-snes.volume", "capcom-snes.pan",
+      "capcom-snes.lfo",    "capcom-snes.lfo",     "capcom-snes.note",   "capcom-snes.end",
+  };
+  for (size_t index = 0; index < expectedCommandDetailKinds.size(); ++index) {
+    expect(commandDetailKind(project.sourceMap(), firstTrack.commands[index]) == expectedCommandDetailKinds[index],
+           "track should decode command " + std::to_string(index));
+  }
   expect(
       firstTrack.bytesFor(firstTrack.commands[0])[1] == 0x12 && firstTrack.bytesFor(firstTrack.commands[0])[2] == 0x34,
       "tempo command should preserve raw big-endian value");
-  expect(dialect->describe(firstTrack, firstTrack.commands[1]).detailKind == "capcom-snes.program",
-         "track should decode program command");
-  expect(dialect->describe(firstTrack, firstTrack.commands[2]).detailKind == "capcom-snes.volume",
-         "track should decode volume command");
-  expect(dialect->describe(firstTrack, firstTrack.commands[3]).detailKind == "capcom-snes.pan",
-         "track should decode pan command");
-  expect(dialect->describe(firstTrack, firstTrack.commands[4]).detailKind == "capcom-snes.lfo",
-         "track should decode vibrato/LFO command");
-  expect(dialect->describe(firstTrack, firstTrack.commands[5]).detailKind == "capcom-snes.lfo",
-         "track should decode modulation-rate/LFO command");
-  expect(dialect->describe(firstTrack, firstTrack.commands[6]).detailKind == "capcom-snes.note",
-         "track should decode note command");
-  expect(dialect->describe(firstTrack, firstTrack.commands[7]).detailKind == "capcom-snes.end",
-         "track should decode end command");
-  expect(sequence->program.referencedInstruments.size() == 1, "sequence should expose unique referenced instruments");
-  expect(
-      sequence->program.referencedInstruments[0].bank == 0 && sequence->program.referencedInstruments[0].program == 0,
-      "instrument reference should preserve decoded bank and program");
-  expect(sequence->program.referencedInstruments[0].asset == project.collections()[0].instrumentSets[0],
-         "instrument reference should point at the decoded instrument set asset");
-  expect(sequence->program.referencedInstruments[0].range.has_value() &&
-             sequence->program.referencedInstruments[0].range->offset == 0x3003 &&
-             sequence->program.referencedInstruments[0].range->size == 2,
-         "instrument reference should preserve the program command source range");
+  const SourceMap& sourceMap = project.sourceMap();
+  const SourceAnnotation& programAnnotation = commandAnnotation(sourceMap, firstTrack.commands[1]);
+  const auto programInstrumentLink = std::ranges::find_if(
+      programAnnotation.links, [](const SourceLink& link) { return link.role == SourceLinkRole::UsesInstrument; });
+  expect(programInstrumentLink != programAnnotation.links.end(),
+         "program command should record its instrument reference as a source annotation link");
+  const auto* programInstrument = std::get_if<ObjectRef>(&programInstrumentLink->target);
+  expect(programInstrument != nullptr && programInstrument->kind == ObjectKind::Instrument &&
+             !programInstrument->asset.valid() && programInstrument->index0 == 0 && programInstrument->index1 == 0,
+         "program source link should preserve unresolved bank/program selectors");
+  expect(programAnnotation.range.offset == 0x3003 && programAnnotation.range.size == 2,
+         "program source link should be anchored by the program command annotation range");
 
-  const auto& sequenceItems = sequence->metadata.items.nodes;
-  const auto commandItemCount =
-      std::ranges::count_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Command; });
-  expect(commandItemCount == sequence->program.tracks.size() * sequence->program.tracks[0].commands.size(),
-         "sequence item tree should expose decoded command nodes for every track");
+  const auto commandAnnotations = sourceMap.withRole(source, SourceRole::Command);
+  expect(commandAnnotations.size() == sequence->program.tracks.size() * sequence->program.tracks[0].commands.size(),
+         "source map should expose decoded command annotations for every track");
 
-  const auto firstTrackItem =
-      std::ranges::find_if(sequenceItems, [](const ItemNode& item) { return item.kind == ItemKind::Track; });
-  expect(firstTrackItem != sequenceItems.end(), "sequence item tree should expose track nodes");
-  expect(firstTrackItem->children.size() == sequence->program.tracks[0].commands.size(),
-         "track item should parent its decoded command nodes");
+  const auto trackAnnotations = sourceMap.withRole(source, SourceRole::SequenceTrack);
+  expect(!trackAnnotations.empty(), "source map should expose track annotations");
+  const SourceAnnotation& firstTrackAnnotation = sourceMap.get(trackAnnotations.front());
+  expect(firstTrackAnnotation.owner == ObjectRefs::sequenceTrack(sequence->metadata.id, firstTrack.sourceTrackNumber),
+         "track annotation should point at the semantic sequence track");
+  expect(sourceMap.childrenOf(firstTrackAnnotation.id).size() == sequence->program.tracks[0].commands.size(),
+         "track annotation should parent its decoded command annotations");
 
-  const auto firstTempoItem = std::ranges::find_if(sequenceItems, [](const ItemNode& item) {
-    return item.kind == ItemKind::Command && item.detailKind == "capcom-snes.tempo";
+  const auto firstTempoAnnotationId = std::ranges::find_if(commandAnnotations, [&](SourceAnnotationId id) {
+    const SourceAnnotation& annotation = sourceMap.get(id);
+    return annotation.detailKind == "capcom-snes.tempo";
   });
-  expect(firstTempoItem != sequenceItems.end(), "sequence item tree should expose typed command nodes");
-  expect(firstTempoItem->parent == firstTrackItem->id, "command item should point back to its track item");
-  expect(firstTempoItem->name == "Tempo", "command item should carry a readable command name");
-  expect(firstTempoItem->description == "raw 4660, microseconds_per_quarter 42191",
-         "command item should preserve raw and interpreted command values");
-  expect(firstTempoItem->range.offset == 0x3000 && firstTempoItem->range.size == 3,
-         "command item should preserve command source range");
+  expect(firstTempoAnnotationId != commandAnnotations.end(), "source map should expose typed command annotations");
+  const SourceAnnotation& firstTempoAnnotation = sourceMap.get(*firstTempoAnnotationId);
+  expect(firstTempoAnnotation.parent == firstTrackAnnotation.id, "command annotation should point back to its track");
+  expect(firstTempoAnnotation.label == "Tempo", "command annotation should carry a readable command name");
+  expect(firstTempoAnnotation.range.offset == 0x3000 && firstTempoAnnotation.range.size == 3,
+         "command annotation should preserve command source range");
 
   const auto tempoAnnotations = project.sourceMap().withSequenceSemantic(source, SequenceSemantic::Tempo);
   expect(tempoAnnotations.size() == sequence->program.tracks.size(),
@@ -231,10 +227,11 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   };
   expect(hasTempoField("opcode") && hasTempoField("raw") && hasTempoField("microseconds_per_quarter"),
          "CapcomSnes tempo annotation should record opcode, raw operand, and interpreted tempo");
-  const SourceMap& sourceMap = project.sourceMap();
   const auto* sequenceHeader = annotationWithKind(sourceMap, source, SourceRole::Header, "capcom-snes-sequence-header");
   expect(sequenceHeader != nullptr && sequenceHeader->range.offset == 0x2001 && sequenceHeader->range.size == 16,
          "CapcomSnes scan should annotate the sequence header");
+  expect(sequenceHeader->owner == ObjectRefs::sequence(sequence->metadata.id),
+         "sequence header annotation should point at the semantic sequence asset");
   const auto* trackPointer = annotationWithKind(sourceMap, source, SourceRole::Pointer, "capcom-snes-track-pointer");
   const auto trackPointers = sourceMap.withRole(source, SourceRole::Pointer);
   const auto capcomTrackPointerCount = std::ranges::count_if(
@@ -398,17 +395,29 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              instrument.modulators[5].amount == 484,
          "instrument should carry legacy no-boost attenuation modulator");
 
-  const auto& instrumentItems = instruments->metadata.items.nodes;
-  const auto instrumentItem =
-      std::ranges::find_if(instrumentItems, [](const ItemNode& item) { return item.kind == ItemKind::Instrument; });
-  expect(instrumentItem != instrumentItems.end(), "instrument set item tree should expose instrument nodes");
-  const auto regionItem = std::ranges::find_if(instrumentItems, [](const ItemNode& item) {
-    return item.kind == ItemKind::Region && item.detailKind == "capcom-snes-region";
+  const auto instrumentAnnotations = sourceMap.ownedBy(ObjectRefs::instrument(instruments->metadata.id, 0));
+  expect(!instrumentAnnotations.empty(), "instrument set source map should expose instrument annotations");
+  const SourceAnnotation& instrumentAnnotation = sourceMap.get(instrumentAnnotations.front());
+  const auto instrumentChildren = sourceMap.childrenOf(instrumentAnnotation.id);
+  const auto regionAnnotationId = std::ranges::find_if(instrumentChildren, [&](SourceAnnotationId id) {
+    const SourceAnnotation& annotation = sourceMap.get(id);
+    return annotation.role == SourceRole::Region && annotation.localKind == "capcom-snes-region";
   });
-  expect(regionItem != instrumentItems.end(), "instrument set item tree should expose region nodes");
-  expect(regionItem->parent == instrumentItem->id, "region item should point back to its instrument item");
-  expect(regionItem->range.offset == 0x4000 && regionItem->range.size == 6,
-         "region item should preserve the instrument header source range");
+  expect(regionAnnotationId != instrumentChildren.end(), "instrument set source map should expose region annotations");
+  const SourceAnnotation& regionAnnotation = sourceMap.get(*regionAnnotationId);
+  expect(regionAnnotation.parent == instrumentAnnotation.id, "region annotation should point back to its instrument");
+  expect(regionAnnotation.range.offset == 0x4000 && regionAnnotation.range.size == 6,
+         "region annotation should preserve the instrument header source range");
+  const auto adsrAnnotationId = std::ranges::find_if(instrumentChildren, [&](SourceAnnotationId id) {
+    const SourceAnnotation& annotation = sourceMap.get(id);
+    return annotation.role == SourceRole::DataBlock && annotation.localKind == "capcom-snes-adsr-gain";
+  });
+  expect(adsrAnnotationId != instrumentChildren.end(), "instrument source map should expose ADSR/Gain documentation");
+  const SourceAnnotation& adsrAnnotation = sourceMap.get(*adsrAnnotationId);
+  expect(adsrAnnotation.outline == SourceOutlinePolicy::Show,
+         "ADSR/Gain annotation should be forced visible for Tree View consumers");
+  expect(adsrAnnotation.range.offset == 0x4001 && adsrAnnotation.range.size == 3,
+         "ADSR/Gain annotation should preserve the raw byte range");
 
   const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
   expect(samples != nullptr, "third CapcomSnes asset should be sample collection");
@@ -417,21 +426,14 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(samples->samples.samples[0].encodedData.offset == 0x6000, "sample should point at encoded BRR bytes");
   expect(samples->samples.samples[0].encodedData.size == 9, "sample should preserve encoded BRR byte length");
 
-  const auto& sampleItems = samples->metadata.items.nodes;
-  const auto sampleCollectionItem = std::ranges::find_if(sampleItems, [](const ItemNode& item) {
-    return item.kind == ItemKind::SampleCollection && item.detailKind == "snes-sample-dir";
-  });
-  expect(sampleCollectionItem != sampleItems.end(), "sample collection item tree should expose the sample DIR root");
-  expect(sampleCollectionItem->range.offset == 0x5000 && sampleCollectionItem->range.size == 4,
+  const auto* sampleCollectionAnnotation = annotationWithKind(sourceMap, source, SourceRole::Table, "snes-sample-dir");
+  expect(sampleCollectionAnnotation != nullptr, "sample collection source map should expose the sample DIR root");
+  expect(sampleCollectionAnnotation->range.offset == 0x5000 && sampleCollectionAnnotation->range.size == 4,
          "sample collection root should preserve the DIR table source range");
-  const auto sampleItem = std::ranges::find_if(sampleItems, [](const ItemNode& item) {
-    return item.kind == ItemKind::Sample && item.detailKind == "snes-brr-sample";
-  });
-  expect(sampleItem != sampleItems.end(), "sample collection item tree should expose sample nodes");
-  expect(sampleItem->parent == sampleCollectionItem->id, "sample item should point back to the sample collection root");
-  expect(sampleItem->range.offset == 0x6000 && sampleItem->range.size == 9,
-         "sample item should preserve the encoded BRR source range");
-  expect(sampleItem->description == "DIR entry $5000", "sample item should retain its source DIR entry address");
+  const auto* sampleAnnotation = annotationWithKind(sourceMap, source, SourceRole::Payload, "snes-brr-payload");
+  expect(sampleAnnotation != nullptr, "sample collection source map should expose sample payload annotations");
+  expect(sampleAnnotation->range.offset == 0x6000 && sampleAnnotation->range.size == 9,
+         "sample payload node should preserve the encoded BRR source range");
 
   expect(project.collections()[0].sequence == sequence->metadata.id, "collection should reference sequence");
   expect(project.collections()[0].instrumentSets == std::vector<AssetId>{instruments->metadata.id},
@@ -535,29 +537,31 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   const auto& commands = track.commands;
   expect(commands.size() == 4, "CapcomSnes note-state fixture should decode four commands");
 
-  const CommandInfo octave = dialect->describe(track, commands[0]);
-  expect(octave.detailKind == "capcom-snes.octave", "CapcomSnes octave opcode should decode as a local command");
-  expect(track.operandsFor(commands[0]).size() == 1 && std::get<u64>(track.operandsFor(commands[0])[0].value) == 4,
-         "CapcomSnes octave command should preserve its raw octave operand");
+  expect(commandDetailKind(project.sourceMap(), commands[0]) == "capcom-snes.octave",
+         "CapcomSnes octave opcode should decode as a local command");
+  const SourceField* octaveField = fieldWithName(commandAnnotation(project.sourceMap(), commands[0]), "octave");
+  expect(fieldEquals(octaveField, u64{4}),
+         "CapcomSnes octave command should preserve its raw octave operand in source annotations");
   expect(commands[0].range.offset == 0x3000 && commands[0].range.size == 2,
          "CapcomSnes octave command should preserve its source range");
 
-  const CommandInfo attributes = dialect->describe(track, commands[1]);
-  expect(attributes.detailKind == "capcom-snes.note-attributes",
+  expect(commandDetailKind(project.sourceMap(), commands[1]) == "capcom-snes.note-attributes",
          "CapcomSnes attributes opcode should decode as a local command");
-  expect(track.operandsFor(commands[1]).size() == 1 && std::get<u64>(track.operandsFor(commands[1])[0].value) == 0x48,
-         "CapcomSnes note attributes should preserve their raw attribute byte");
+  const SourceField* attributeField = fieldWithName(commandAnnotation(project.sourceMap(), commands[1]), "raw");
+  expect(fieldEquals(attributeField, u64{0x48}),
+         "CapcomSnes note attributes should preserve their raw attribute byte in source annotations");
   expect(commands[1].range.offset == 0x3002 && commands[1].range.size == 2,
          "CapcomSnes note attributes should preserve their source range");
 
-  const auto attributeItem = std::ranges::find_if(sequence->metadata.items.nodes, [](const ItemNode& item) {
-    return item.kind == ItemKind::Command && item.detailKind == "capcom-snes.note-attributes" &&
-           item.range.offset == 0x3002;
+  const auto noteCommandAnnotations = project.sourceMap().withRole(commands[1].range.source, SourceRole::Command);
+  const auto attributeAnnotationId = std::ranges::find_if(noteCommandAnnotations, [&](SourceAnnotationId id) {
+    const SourceAnnotation& annotation = project.sourceMap().get(id);
+    return annotation.detailKind == "capcom-snes.note-attributes" && annotation.range.offset == 0x3002;
   });
-  expect(attributeItem != sequence->metadata.items.nodes.end(),
-         "CapcomSnes item tree should expose typed note-attribute command nodes");
-  expect(attributeItem->name == "Note Attributes", "note-attribute item should carry a readable name");
-  expect(attributeItem->description == "raw 72", "note-attribute item should preserve raw command values");
+  expect(attributeAnnotationId != noteCommandAnnotations.end(),
+         "CapcomSnes source map should expose typed note-attribute command annotations");
+  expect(project.sourceMap().get(*attributeAnnotationId).label == "Note Attributes",
+         "note-attribute annotation should carry a readable name");
 
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
   const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
@@ -596,26 +600,24 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
 
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 2, 0x3000);
+  SourceMapBuilder sourceMap;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 2, 0x3000,
+                                                         &sourceMap);
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 7,
          "CapcomSnes source dialect should decode the fixture commands, got " + std::to_string(track.commands.size()));
   expect(track.addressIndex.find(Address{0x3009}).has_value(),
          "CapcomSnes source dialect should index decoded command addresses");
+  const SourceAnnotation& programAnnotation = commandAnnotation(annotations, track.commands[1]);
+  const SourceField* rawProgram = fieldWithName(programAnnotation, "raw");
+  const SourceField* bankProgram = fieldWithName(programAnnotation, "bank");
+  const SourceField* programNumber = fieldWithName(programAnnotation, "program");
+  expect(fieldEquals(rawProgram, u64{0x85}) && fieldEquals(bankProgram, u64{1}) &&
+             fieldEquals(programNumber, u64{5}),
+         "CapcomSnes source command should preserve raw and decoded program operands in source annotations");
 
-  const auto programOperands = track.operandsFor(track.commands[1]);
-  expect(programOperands.size() == 3 && programOperands[0].name == "raw" &&
-             std::get<u64>(programOperands[0].value) == 0x85 && programOperands[1].name == "bank" &&
-             std::get<u64>(programOperands[1].value) == 1 && programOperands[2].name == "program" &&
-             std::get<u64>(programOperands[2].value) == 5,
-         "CapcomSnes source command should preserve raw and decoded program operands");
-
-  const CommandInfo programInfo = dialect.describe(track, track.commands[1]);
-  expect(programInfo.name == "Program", "CapcomSnes dialect should describe commands through local command code");
-  expect(programInfo.fields.size() == 3 && programInfo.fields[0].name == "raw" &&
-             programInfo.fields[0].value == "133" && programInfo.fields[1].value == "1" &&
-             programInfo.fields[2].value == "5",
-         "CapcomSnes program display should show the raw byte plus decoded bank and program");
-
+  expect(commandAnnotation(annotations, track.commands[1]).label == "Program",
+         "CapcomSnes dialect should describe commands through local command code");
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
@@ -681,12 +683,14 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
 
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
+  SourceMapBuilder sourceMap;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
+                                                         &sourceMap);
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 2, "CapcomSnes pan fixture should decode pan and end");
 
-  const CommandInfo panInfo = dialect.describe(track, track.commands[0]);
-  expect(panInfo.fields.size() == 3 && panInfo.fields[2].name == "linear_gain",
-         "CapcomSnes pan display should expose the source pan law gain compensation");
+  const SourceField* linearGain = fieldWithName(commandAnnotation(annotations, track.commands[0]), "linear_gain");
+  expect(linearGain != nullptr, "CapcomSnes pan annotation should expose the source pan law gain compensation");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -732,7 +736,10 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
 
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
+  SourceMapBuilder sourceMap;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
+                                                         &sourceMap);
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 10, "CapcomSnes source-only commands should not truncate track decoding");
 
   const std::vector<std::string> expectedKinds{
@@ -743,18 +750,18 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
       "capcom-snes.note",          "capcom-snes.end",
   };
   for (size_t index = 0; index < expectedKinds.size(); ++index) {
-    expect(dialect.describe(track, track.commands[index]).detailKind == expectedKinds[index],
+    expect(commandDetailKind(annotations, track.commands[index]) == expectedKinds[index],
            "CapcomSnes source-only fixture should decode typed command " + std::to_string(index));
   }
 
-  const auto tuningOperands = track.operandsFor(track.commands[0]);
-  expect(tuningOperands.size() == 2 && tuningOperands[0].name == "tuning" &&
-             std::get<s64>(tuningOperands[0].value) == -128 && tuningOperands[1].name == "cents" &&
-             std::get<double>(tuningOperands[1].value) == -50.0,
-         "CapcomSnes tuning command should preserve raw and interpreted operands");
-  const CommandInfo release = dialect.describe(track, track.commands[5]);
-  expect(release.fields.size() == 2 && release.fields[1].name == "gain" && release.fields[1].value == "165",
-         "CapcomSnes release command should describe the driver GAIN value");
+  const SourceAnnotation& tuningAnnotation = commandAnnotation(annotations, track.commands[0]);
+  const SourceField* tuning = fieldWithName(tuningAnnotation, "tuning");
+  const SourceField* cents = fieldWithName(tuningAnnotation, "cents");
+  expect(fieldEquals(tuning, s64{-128}) && fieldEquals(cents, -50.0),
+         "CapcomSnes tuning command should preserve raw and interpreted operands in source annotations");
+  const SourceField* gain = fieldWithName(commandAnnotation(annotations, track.commands[5]), "gain");
+  expect(fieldEquals(gain, s64{165}),
+         "CapcomSnes release command should keep the driver GAIN display value in source annotations");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -838,14 +845,19 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
 
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
+  SourceMapBuilder sourceMap;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
+                                                         &sourceMap);
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 3, "CapcomSnes repeat fixture should decode note, repeat, and end");
 
-  const CommandInfo repeat = dialect.describe(track, track.commands[1]);
-  expect(repeat.detailKind == "capcom-snes.repeat-until", "CapcomSnes repeat opcode should decode as Repeat Until");
-  expect(repeat.fields.size() == 3 && repeat.fields[0].value == "1" && repeat.fields[1].value == "2" &&
-             repeat.fields[2].value == "$3000",
-         "CapcomSnes repeat display should preserve slot, count, and destination");
+  expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.repeat-until",
+         "CapcomSnes repeat opcode should decode as Repeat Until");
+  const SourceAnnotation& repeatAnnotation = commandAnnotation(annotations, track.commands[1]);
+  expect(fieldEquals(fieldWithName(repeatAnnotation, "slot"), s64{1}) &&
+             fieldEquals(fieldWithName(repeatAnnotation, "count"), u64{2}) &&
+             fieldEquals(fieldWithName(repeatAnnotation, "destination"), u64{0x3000}),
+         "CapcomSnes repeat display should preserve slot, count, and destination in source annotations");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -884,15 +896,19 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
 
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
+  SourceMapBuilder sourceMap;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
+                                                         &sourceMap);
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 6, "CapcomSnes repeat-break fixture should decode both branch paths");
 
-  const CommandInfo repeatBreak = dialect.describe(track, track.commands[1]);
-  expect(repeatBreak.detailKind == "capcom-snes.repeat-break",
+  expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.repeat-break",
          "CapcomSnes repeat-break opcode should decode as Repeat Break");
-  expect(repeatBreak.fields.size() == 3 && repeatBreak.fields[0].value == "1" && repeatBreak.fields[1].value == "16" &&
-             repeatBreak.fields[2].value == "$300A",
-         "CapcomSnes repeat-break display should preserve slot, attributes, and destination");
+  const SourceAnnotation& repeatBreakAnnotation = commandAnnotation(annotations, track.commands[1]);
+  expect(fieldEquals(fieldWithName(repeatBreakAnnotation, "slot"), s64{1}) &&
+             fieldEquals(fieldWithName(repeatBreakAnnotation, "attributes"), u64{16}) &&
+             fieldEquals(fieldWithName(repeatBreakAnnotation, "destination"), u64{0x300a}),
+         "CapcomSnes repeat-break display should preserve slot, attributes, and destination in source annotations");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -926,24 +942,23 @@ void capcomSnesDialectDecodesRepeatBreakSideTargets() {
   bytes[0x3007] = 0x17;
 
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
-  const SequenceDialect& dialect = descriptor.dialect;
   ScanIdAllocator ids;
   SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
   std::vector<Diagnostic> diagnostics;
   const TrackProgram track =
       decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000, &sourceMap, &diagnostics);
+  const SourceMap annotations = sourceMap.finish();
 
   expect(track.commands.size() == 4,
          "CapcomSnes linear decode should preserve repeat-break side target commands after fallthrough");
-  expect(dialect.describe(track, track.commands[0]).detailKind == "capcom-snes.repeat-break",
+  expect(commandDetailKind(annotations, track.commands[0]) == "capcom-snes.repeat-break",
          "CapcomSnes side-target fixture should start with repeat break");
-  expect(dialect.describe(track, track.commands[1]).detailKind == "capcom-snes.end",
+  expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.end",
          "CapcomSnes side-target fixture should keep the fallthrough end command");
-  expect(dialect.describe(track, track.commands[2]).detailKind == "capcom-snes.note",
+  expect(commandDetailKind(annotations, track.commands[2]) == "capcom-snes.note",
          "CapcomSnes side-target fixture should decode the out-of-line repeat-break target");
   expect(diagnostics.empty(), "CapcomSnes side-target fixture should decode without diagnostics");
 
-  const SourceMap annotations = sourceMap.finish();
   const auto repeatBreakAnnotations = annotations.withSequenceSemantic(SourceId{8}, SequenceSemantic::RepeatBreak);
   expect(repeatBreakAnnotations.size() == 1, "CapcomSnes repeat-break should publish a source annotation");
   const SourceAnnotation& repeatBreak = annotations.get(repeatBreakAnnotations.front());
@@ -967,19 +982,23 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
 
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v1BgmInList);
   const SequenceDialect& dialect = descriptor.dialect;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000);
+  SourceMapBuilder sourceMap;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
+                                                         &sourceMap);
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 4, "CapcomSnes V1 unknown one-byte events should not truncate track decoding");
-  expect(dialect.describe(track, track.commands[0]).detailKind == "capcom-snes.unknown-one-byte",
+  expect(commandDetailKind(annotations, track.commands[0]) == "capcom-snes.unknown-one-byte",
          "CapcomSnes V1 opcode $1E should decode as a one-byte unknown event");
-  expect(dialect.describe(track, track.commands[1]).detailKind == "capcom-snes.unknown-one-byte",
+  expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.unknown-one-byte",
          "CapcomSnes V1 opcode $1F should decode as a one-byte unknown event");
   expect(track.commands[0].range.offset == 0x3000 && track.commands[0].range.size == 2,
          "CapcomSnes V1 unknown one-byte event should preserve its source range");
 
-  const auto operands = track.operandsFor(track.commands[0]);
-  expect(operands.size() == 2 && operands[0].name == "opcode" && std::get<u64>(operands[0].value) == 0x1e &&
-             operands[1].name == "value" && std::get<u64>(operands[1].value) == 0xab,
-         "CapcomSnes V1 unknown one-byte event should preserve its opcode and operand");
+  const SourceAnnotation& unknownAnnotation = commandAnnotation(annotations, track.commands[0]);
+  const SourceField* opcode = fieldWithName(unknownAnnotation, "opcode");
+  const SourceField* value = fieldWithName(unknownAnnotation, "value");
+  expect(fieldEquals(opcode, u64{0x1e}) && fieldEquals(value, u64{0xab}),
+         "CapcomSnes V1 unknown one-byte event should preserve its opcode and operand in source annotations");
 
   const SequenceProgram program{
       .dialect = dialect.id,

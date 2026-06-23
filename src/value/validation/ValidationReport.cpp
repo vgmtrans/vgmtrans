@@ -24,8 +24,11 @@ std::vector<Diagnostic> ValidationReport::diagnostics() const {
   for (const auto& finding : findings_) {
     diagnostics.push_back(Diagnostic{
         .severity = finding.severity,
+        .code = finding.code,
         .message = finding.message,
         .range = finding.range,
+        .object = finding.asset ? std::optional<ObjectRef>{ObjectRef{.kind = ObjectKind::Asset, .asset = *finding.asset}}
+                                : std::nullopt,
     });
   }
   return diagnostics;
