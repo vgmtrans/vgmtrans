@@ -83,6 +83,37 @@ public:
     });
   }
 
+  template <class AssetT>
+  [[nodiscard]] std::vector<AssetMatchView<AssetT, IdMatchFact>> idFacts(std::string_view format,
+                                                                         std::string_view domain) const {
+    return facts<AssetT, IdMatchFact>(format, [domain](const MatchFact&, const IdMatchFact& payload) {
+      return payload.domain == domain;
+    });
+  }
+
+  template <class AssetT>
+  [[nodiscard]] std::vector<AssetMatchView<AssetT, OffsetOrderFact>> offsetFacts(std::string_view format) const {
+    return facts<AssetT, OffsetOrderFact>(format, [](const MatchFact&, const OffsetOrderFact&) { return true; });
+  }
+
+  template <class AssetT>
+  [[nodiscard]] std::vector<AssetMatchView<AssetT, SampleCoverageFact>>
+  sampleCoverageFacts(std::string_view format, std::string_view domain) const {
+    return facts<AssetT, SampleCoverageFact>(format,
+                                             [domain](const MatchFact&, const SampleCoverageFact& payload) {
+                                               return payload.domain == domain;
+                                             });
+  }
+
+  template <class AssetT>
+  [[nodiscard]] std::vector<AssetMatchView<AssetT, SampleRequirementFact>>
+  sampleRequirementFacts(std::string_view format, std::string_view domain) const {
+    return facts<AssetT, SampleRequirementFact>(format,
+                                                [domain](const MatchFact&, const SampleRequirementFact& payload) {
+                                                  return payload.domain == domain;
+                                                });
+  }
+
 private:
   const MatchContext& context_;
 };

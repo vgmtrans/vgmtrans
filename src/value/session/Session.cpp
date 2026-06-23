@@ -265,6 +265,34 @@ void Session::rebuildCollections() {
     auto& desiredCollections = desiredByResolver[resolverId];
     try {
       auto desired = module.resolveCollections(context);
+      if (module.materializeCollection != nullptr) {
+        std::vector<DesiredCollection> materializedDesired;
+        std::set<std::string> activeMaterializedKeys;
+        for (auto& collection : desired) {
+          if (collection.key.resolver.empty()) {
+            collection.key.resolver = resolverId;
+          }
+          MaterializationContext materialization{
+              .sources = sources_,
+              .snapshot = current,
+              .collection = collection,
+              .ids = ids_,
+              .assetIdForSlot =
+                  [&](std::string_view slot) {
+                    return assets_.materializedAssetId(resolverId, collection.key, slot, ids_);
+                  },
+          };
+          auto result = module.materializeCollection(materialization);
+          diagnostics_.append(std::move(result.diagnostics));
+          for (auto& asset : result.assets) {
+            activeMaterializedKeys.insert(assets_.upsertMaterializedAsset(resolverId, collection.key, asset.slot,
+                                                                          std::move(asset.asset)));
+          }
+          materializedDesired.push_back(std::move(result.collection));
+        }
+        static_cast<void>(assets_.removeStaleMaterializedAssets(resolverId, activeMaterializedKeys));
+        desired = std::move(materializedDesired);
+      }
       desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),
                                 std::make_move_iterator(desired.end()));
     } catch (const std::exception& ex) {

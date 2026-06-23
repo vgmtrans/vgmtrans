@@ -74,7 +74,6 @@ struct AkaoSampleCollectionParse {
   AkaoPs1Version version = AkaoPs1Version::Unknown;
   u32 firstArtId = 0;
   u32 artCount = 0;
-  u32 scanOrdinal = 0;
   std::vector<AkaoArt> arts;
 };
 

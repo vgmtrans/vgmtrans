@@ -1371,8 +1371,7 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
     }
     for (const auto& fact : project.matchFacts()) {
       if (fact.format == "Akao") {
-        if (const auto* formatFact = std::get_if<FormatSpecificFact>(&fact.payload);
-            formatFact != nullptr && formatFact->kind == "akao.sample-collection") {
+        if (std::holds_alternative<SampleCoverageFact>(fact.payload)) {
           ++sampleFacts;
         }
       }

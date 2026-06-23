@@ -21,12 +21,13 @@ struct AkaoSampleCandidate {
   std::optional<u32> sampleSetId;
   u32 firstArt = 0;
   u32 artCount = 0;
-  u32 scanOrdinal = 0;
+  u32 sourceOffset = 0;
 };
 
 [[nodiscard]] std::vector<std::size_t> selectAkaoSampleCandidates(std::optional<u32> sequenceSampleSet,
                                                                   std::span<const u32> requiredArticulations,
                                                                   std::span<const AkaoSampleCandidate> candidates);
 [[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(const core::MatchContext& context);
+[[nodiscard]] core::MaterializationResult materializeAkaoCollection(const core::MaterializationContext& context);
 
 }  // namespace vgmtrans::formats::akao

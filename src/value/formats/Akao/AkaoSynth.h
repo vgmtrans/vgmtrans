@@ -14,16 +14,19 @@
 
 namespace vgmtrans::formats::akao {
 
+[[nodiscard]] std::optional<AkaoInstrDatLocation> ff7HardcodedAkaoSampleLocation(core::ByteReader reader);
 [[nodiscard]] bool isPossibleAkaoSampleCollection(core::ByteReader reader, u32 offset);
+[[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(
+    const core::ScanInput& input, core::ScanSampleCollectionRef ref, u32 offset, AkaoPs1Version version);
+[[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(
+    const core::ScanInput& input, core::ScanSampleCollectionRef ref, AkaoInstrDatLocation location);
 [[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const core::ScanInput& input,
                                                                                  core::ScanResultBuilder& result,
                                                                                  core::ScanSampleCollectionRef ref,
-                                                                                 u32 offset, AkaoPs1Version version,
-                                                                                 u32 scanOrdinal);
+                                                                                 u32 offset, AkaoPs1Version version);
 [[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const core::ScanInput& input,
                                                                                  core::ScanResultBuilder& result,
                                                                                  core::ScanSampleCollectionRef ref,
-                                                                                 AkaoInstrDatLocation location,
-                                                                                 u32 scanOrdinal);
+                                                                                 AkaoInstrDatLocation location);
 
 }  // namespace vgmtrans::formats::akao
