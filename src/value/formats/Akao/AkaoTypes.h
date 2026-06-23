@@ -21,6 +21,9 @@ namespace vgmtrans::formats::akao {
 
 inline constexpr std::string_view kAkaoFormatName = "Akao";
 inline constexpr std::string_view kAkaoCollectionResolver = "Akao";
+inline constexpr std::string_view kAkaoSequenceIdDomain = "akao.sequence-id";
+inline constexpr std::string_view kAkaoSampleSetDomain = "akao.sample-set";
+inline constexpr std::string_view kAkaoArticulationDomain = "akao.articulation";
 
 enum class AkaoPs1Version : u8 {
   Unknown = 0,
