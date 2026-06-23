@@ -75,7 +75,7 @@ jobs:
       HOMEBREW_PREFIX: ${{ (matrix.target == 'intel' && '/usr/local') || '/opt/homebrew' }}
       ARTIFACT_BASENAME: ${{ format('VGMTrans-macOS-{0}-{1}', matrix.target, needs.prepare.outputs.artifact_label) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           show-progress: false
@@ -115,7 +115,7 @@ jobs:
           cmake --build --preset "macos-${{ matrix.target }}-release" --target install
 
       - name: "Checkout create-dmg"
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: create-dmg/create-dmg
           path: "./build/macos-${{ matrix.target }}/create-dmg"
@@ -170,7 +170,7 @@ jobs:
       ARTIFACT_BASENAME: ${{ format('VGMTrans-Linux-x86_64-{0}', needs.prepare.outputs.artifact_label) }}
       VGMTRANS_WARNINGS_AS_ERRORS: ON
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           show-progress: false
@@ -225,7 +225,7 @@ jobs:
     env:
       PACKAGE_FILE_NAME: ${{ format('VGMTrans-Windows-{0}-{1}', matrix.target == 'x64-clang' && 'x64' || 'x64-msvc', needs.prepare.outputs.artifact_label) }}
     steps:
-       - uses: actions/checkout@v6
+       - uses: actions/checkout@v7
          with:
           submodules: recursive
           show-progress: false
@@ -293,7 +293,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           show-progress: false
 
@@ -338,7 +338,7 @@ jobs:
       VGMTRANS_PREVIEW_TARGET: main
       VGMTRANS_PREVIEW_VERSION: ${{ needs.prepare.outputs.short_sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           show-progress: false
 
