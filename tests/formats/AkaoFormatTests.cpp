@@ -42,6 +42,21 @@ bool hasCommandKind(const SequenceDialect& dialect, const TrackProgram& track, s
   });
 }
 
+const SourceAnnotation& commandAnnotationAt(const SourceMap& sourceMap, SourceId source, u32 offset) {
+  const auto commandIds = sourceMap.withRole(source, SourceRole::Command);
+  const auto found = std::ranges::find_if(commandIds, [&](SourceAnnotationId id) {
+    return sourceMap.get(id).range.offset == offset;
+  });
+  if (found == commandIds.end()) {
+    throw std::runtime_error("expected command annotation was not found");
+  }
+  return sourceMap.get(*found);
+}
+
+bool hasLinkRole(const SourceAnnotation& annotation, SourceLinkRole role) {
+  return std::ranges::any_of(annotation.links, [&](const SourceLink& link) { return link.role == role; });
+}
+
 TrackProgram decodeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end) {
   const SequenceDialect dialect = makeAkaoDialect(version);
   return decodeAkaoTrack(ByteReader(SourceId{20}, bytes), dialect,
@@ -130,6 +145,42 @@ void akaoSequenceAnalysisUsesCommandReaderFacts() {
          "Akao analysis should collect individual articulation ids from command-reader facts");
 }
 
+void akaoTablePointersUseNonControlSourceLinks() {
+  std::vector<u8> bytes(0x90, 0xa0);
+  constexpr SourceId source{22};
+  constexpr u32 start = 0x20;
+  constexpr u32 customTable = 0x60;
+  constexpr u32 drumTable = 0x70;
+  bytes[start] = 0xfc;
+  writeLeS16(bytes, start + 1, static_cast<s16>(customTable - (start + 1 + 2)));
+  bytes[start + 3] = 0xec;
+  writeLeS16(bytes, start + 4, static_cast<s16>(drumTable - (start + 4 + 2)));
+  bytes[start + 6] = 0xa0;
+
+  ScanIdAllocator ids;
+  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
+  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_1);
+  static_cast<void>(decodeAkaoTrack(ByteReader(source, bytes), dialect,
+                                    CursorTrackDecodeInput{
+                                        .startOffset = start,
+                                        .bytecodeEnd = 0x90,
+                                        .sequenceEnd = 0x90,
+                                        .sourceMap = &sourceMap,
+                                        .maxCommands = 64,
+                                    }));
+
+  const SourceMap annotations = sourceMap.finish();
+  const SourceAnnotation& custom = commandAnnotationAt(annotations, source, start);
+  const SourceAnnotation& drum = commandAnnotationAt(annotations, source, start + 3);
+  expect(hasLinkRole(custom, SourceLinkRole::PointsTo),
+         "Akao custom instrument table command should point to data, not control flow");
+  expect(!hasLinkRole(custom, SourceLinkRole::JumpTarget),
+         "Akao custom instrument table command should not expose a jump target");
+  expect(hasLinkRole(drum, SourceLinkRole::PointsTo), "Akao drum table command should point to data, not control flow");
+  expect(!hasLinkRole(drum, SourceLinkRole::JumpTarget),
+         "Akao drum table command should not expose a jump target");
+}
+
 void akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks() {
   std::vector<u8> bytes(0x40, 0xa0);
   constexpr u32 start = 0x20;
@@ -145,6 +196,55 @@ void akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks() {
          "Akao repeat start should be an explicit command");
   expect(hasCommandKind(dialect, track, "akao-ps1-3.2.repeat-until", start + 1),
          "Akao repeat until should be an explicit command");
+}
+
+void akaoRepeatSourceLinksUseSpecificRolesOnly() {
+  constexpr SourceId source{23};
+  constexpr u32 start = 0x20;
+
+  std::vector<u8> repeatUntilBytes(0x40, 0xa0);
+  repeatUntilBytes[start] = 0xc8;
+  repeatUntilBytes[start + 1] = 0xc9;
+  repeatUntilBytes[start + 2] = 0x02;
+  repeatUntilBytes[start + 3] = 0xa0;
+
+  ScanIdAllocator repeatUntilIds;
+  SourceMapBuilder repeatUntilMap([&repeatUntilIds]() { return repeatUntilIds.nextSourceAnnotationId(); });
+  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version3_2);
+  static_cast<void>(decodeAkaoTrack(ByteReader(source, repeatUntilBytes), dialect,
+                                    CursorTrackDecodeInput{
+                                        .startOffset = start,
+                                        .bytecodeEnd = 0x40,
+                                        .sequenceEnd = 0x40,
+                                        .sourceMap = &repeatUntilMap,
+                                        .maxCommands = 64,
+                                    }));
+  const SourceMap repeatUntilAnnotations = repeatUntilMap.finish();
+  const SourceAnnotation& repeatUntil = commandAnnotationAt(repeatUntilAnnotations, source, start + 1);
+  expect(hasLinkRole(repeatUntil, SourceLinkRole::RepeatTarget),
+         "Akao repeat-until should expose a repeat target");
+  expect(!hasLinkRole(repeatUntil, SourceLinkRole::JumpTarget),
+         "Akao repeat-until should not also expose a generic jump target");
+
+  std::vector<u8> repeatAgainBytes(0x40, 0xa0);
+  repeatAgainBytes[start] = 0xc8;
+  repeatAgainBytes[start + 1] = 0xca;
+
+  ScanIdAllocator repeatAgainIds;
+  SourceMapBuilder repeatAgainMap([&repeatAgainIds]() { return repeatAgainIds.nextSourceAnnotationId(); });
+  static_cast<void>(decodeAkaoTrack(ByteReader(source, repeatAgainBytes), dialect,
+                                    CursorTrackDecodeInput{
+                                        .startOffset = start,
+                                        .bytecodeEnd = 0x40,
+                                        .sequenceEnd = 0x40,
+                                        .sourceMap = &repeatAgainMap,
+                                        .maxCommands = 64,
+                                    }));
+  const SourceMap repeatAgainAnnotations = repeatAgainMap.finish();
+  const SourceAnnotation& repeatAgain = commandAnnotationAt(repeatAgainAnnotations, source, start + 1);
+  expect(hasLinkRole(repeatAgain, SourceLinkRole::LoopTarget), "Akao repeat-again should expose a loop target");
+  expect(!hasLinkRole(repeatAgain, SourceLinkRole::JumpTarget),
+         "Akao repeat-again should not also expose a generic jump target");
 }
 
 void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange() {
