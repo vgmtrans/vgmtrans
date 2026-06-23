@@ -154,9 +154,10 @@ match" behavior.
 
 Akao should stay split by the format concepts rather than by export target:
 
-- `AkaoScanner` finds sequence and sample headers, reserves assets, and emits
-  only scanned assets plus facts needed by the resolver. It does not bind
-  instruments to whatever samples happened to be available in the same scan.
+- `AkaoModule` owns scan orchestration: it finds sequence and sample headers,
+  reserves assets, and emits only scanned assets plus facts needed by the
+  resolver. It does not bind instruments to whatever samples happened to be
+  available in the same scan.
 - `AkaoResolver` owns collection assembly. It chooses instruments by sequence id,
   chooses sample collections by preferred sample-set id plus articulation
   coverage, and reports missing coverage as collection issues.

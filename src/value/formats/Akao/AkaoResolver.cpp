@@ -6,7 +6,6 @@
 
 #include "value/formats/Akao/AkaoResolver.h"
 
-#include "value/formats/Akao/AkaoFacts.h"
 #include "value/formats/Akao/AkaoInstrumentSet.h"
 #include "value/formats/Akao/AkaoSequence.h"
 #include "value/formats/Akao/AkaoSynth.h"
