@@ -81,7 +81,6 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
 }
 
 SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id, const AkaoSequenceAnalysis& analysis,
-                                              std::optional<ScanInstrumentSetRef> instrumentSet,
                                               SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SequenceDialect dialect = makeAkaoDialect(analysis.header.version);
   const u32 sequenceEnd = analysis.header.offset + analysis.header.length;
@@ -115,8 +114,6 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
     }
   }
 
-  const std::optional<AssetId> instrumentSetId =
-      instrumentSet ? std::optional<AssetId>{instrumentSet->id} : std::nullopt;
   u32 trackIndex = 0;
   for (const u32 start : analysis.trackStarts) {
     auto track = decodeAkaoTrack(input.reader, dialect,
@@ -133,7 +130,7 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
     track.sourceTrackNumber = trackIndex;
     const auto trackItem = itemBuilder.add(root, ItemKind::Track, "akao-track", fmt::format("Track {}", trackIndex + 1),
                                            input.reader.range(start, 0));
-    addSourceCommandItemsAndInstrumentReferences(itemBuilder, trackItem, program, dialect, track, instrumentSetId);
+    addSourceCommandItemsAndInstrumentReferences(itemBuilder, trackItem, program, dialect, track, std::nullopt);
     program.tracks.push_back(std::move(track));
     ++trackIndex;
   }

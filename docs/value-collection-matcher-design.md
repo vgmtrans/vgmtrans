@@ -33,9 +33,8 @@ Common matchers cover simple cases:
 
 `AkaoMatcher` needs more structure:
 
-- A sequence's `seq_id` matches an instrument set id.
 - A sequence's file id, when present, names its preferred sample set.
-- Instrument regions reference articulation ids.
+- Sequence-side instrument/drum regions reference articulation ids.
 - Sample collections cover articulation-id ranges.
 - A collection may need multiple sample collections to cover all used
   articulations.
@@ -120,21 +119,20 @@ assets. This keeps scan order out of derived asset contents.
 
 Akao scanners emit generic facts in Akao domains:
 
-- `IdMatchFact("akao.sequence-id")` on sequences and instrument sets.
+- `IdMatchFact("akao.sequence-id")` on sequences.
 - `IdMatchFact("akao.sample-set")` on sequences and sample collections when a
   sample-set id exists.
 - `OffsetOrderFact` on sequences and sample collections.
 - `SampleCoverageFact("akao.articulation")` on sample collections, with the
   covered articulation range.
-- `SampleRequirementFact("akao.articulation")` on instrument sets, with the
+- `SampleRequirementFact("akao.articulation")` on sequences, with the
   non-zero articulation ids required by sequence-side instrument tables.
 
 The resolver then:
 
-1. Indexes sequences by `seq_id`, instrument sets by id, samples by coverage,
-   and required articulation ids by instrument set asset.
-2. Creates one desired collection per sequence that has a matching instrument
-   set.
+1. Indexes sequences by `seq_id`, samples by coverage, and required
+   articulation ids by sequence asset.
+2. Creates one desired collection per sequence.
 3. Prefers the sequence's named sample set when present.
 4. Adds recently scanned sample collections that cover remaining required
    articulations.
@@ -158,9 +156,9 @@ Akao should stay split by the format concepts rather than by export target:
   reserves assets, and emits only scanned assets plus facts needed by the
   resolver. It does not bind instruments to whatever samples happened to be
   available in the same scan.
-- `AkaoResolver` owns collection assembly. It chooses instruments by sequence id,
-  chooses sample collections by preferred sample-set id plus articulation
-  coverage, and reports missing coverage as collection issues.
+- `AkaoResolver` owns collection assembly. It chooses sample collections by
+  preferred sample-set id plus sequence-required articulation coverage, and
+  reports missing coverage as collection issues.
 - `AkaoResolver` also owns collection materialization. After resolution, it
   re-reads the resolved sequence and selected sample collections from source
   bytes, builds an articulation map, and emits a stable bound instrument-set

@@ -19,8 +19,7 @@ namespace vgmtrans::formats::akao {
                                                                       const core::SourceFile& source, u32 offset);
 [[nodiscard]] core::SequenceProgramAsset parseAkaoSequenceProgram(
     const core::ScanInput& input, core::AssetId id, const AkaoSequenceAnalysis& analysis,
-    std::optional<core::ScanInstrumentSetRef> instrumentSet, core::SourceMapBuilder* sourceMap,
-    std::vector<core::Diagnostic>* diagnostics);
+    core::SourceMapBuilder* sourceMap, std::vector<core::Diagnostic>* diagnostics);
 
 void registerAkaoSequenceDialects(core::SequenceDialectRegistry& registry);
 
