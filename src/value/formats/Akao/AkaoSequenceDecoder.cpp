@@ -233,7 +233,7 @@ template <class Runtime>
 [[nodiscard]] CommandFlow customInstrumentTableCommand(Runtime& rt, VmCommandCursor& cmd) {
   cmd.name("Program Change (Key-Split Instrument)", SequenceSemantic::Program).sourceOnly();
   const Address table = readRelativeAddress(rt, cmd, "relative");
-  cmd.target(table, SourceLinkRole::JumpTarget);
+  cmd.target(table, SourceLinkRole::PointsTo);
   recordCustomInstrumentTable(rt, table);
   return cmd.next();
 }
@@ -242,7 +242,7 @@ template <class Runtime>
 [[nodiscard]] CommandFlow drumKitOn(Runtime& rt, VmCommandCursor& cmd, std::optional<Address> table = std::nullopt) {
   cmd.name("Drum Kit On", SequenceSemantic::Program);
   if (table) {
-    cmd.target(*table, SourceLinkRole::JumpTarget);
+    cmd.target(*table, SourceLinkRole::PointsTo);
     recordDrumInstrumentTable(rt, *table);
   }
   rt.instrument(akaoMidiBank(127), 127, true);
@@ -300,7 +300,7 @@ template <class Runtime>
   const u16 count = akaoZeroAs256(cmd.u8("count"));
   const u8 slot = rt.state.repeats.layer;
   const Address target = rt.state.repeats.current();
-  cmd.derived("count", count).target(target, SourceLinkRole::JumpTarget);
+  cmd.derived("count", count);
   rt.state.repeats.completeCurrentPlay();
   RepeatUntilFlow flow = rt.countedRepeatUntil(cmd, slot, count, target);
   if (flow.fallsThrough()) {
@@ -322,7 +322,6 @@ template <class Runtime>
 [[nodiscard]] CommandFlow repeatAgain(Runtime& rt, VmCommandCursor& cmd) {
   cmd.name("Repeat Again", SequenceSemantic::Repeat);
   const Address target = rt.state.repeats.current();
-  cmd.target(target, SourceLinkRole::JumpTarget);
   return cmd.loopCandidate(target);
 }
 
