@@ -163,6 +163,75 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
          "completed bank collection should retain the instrument reference");
 }
 
+[[nodiscard]] MaterializationResult materializeProbeBankCollection(const MaterializationContext& context) {
+  MaterializationResult result{
+      .collection = context.collection,
+  };
+  if (!context.collection.sequence || context.collection.instrumentSets.empty()) {
+    return result;
+  }
+
+  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*context.collection.sequence);
+  const auto* scannedInstrument = context.snapshot.asset<InstrumentSetAsset>(context.collection.instrumentSets[0]);
+  if (sequence == nullptr || scannedInstrument == nullptr) {
+    return result;
+  }
+
+  const AssetId materialized = context.assetIdForSlot("bound-instrument-set");
+  InstrumentSetAsset bound = *scannedInstrument;
+  bound.metadata.id = materialized;
+  bound.metadata.name = "Materialized " + scannedInstrument->metadata.name;
+  bound.metadata.range = sequence->metadata.range;
+  bound.instruments.push_back(Instrument{.name = "Materialized Instrument"});
+
+  result.assets.push_back(MaterializedAsset{
+      .slot = "bound-instrument-set",
+      .asset = std::move(bound),
+  });
+  result.collection.instrumentSets = {materialized};
+  return result;
+}
+
+[[nodiscard]] FormatModule probeMaterializedBankSequenceModule() {
+  auto module = probeBankSequenceModule();
+  module.materializeCollection = materializeProbeBankCollection;
+  return module;
+}
+
+void sessionMaterializesResolvedCollectionsWithStableAssets() {
+  Session session;
+  session.formats().add(probeMaterializedBankSequenceModule());
+  session.formats().add(probeBankInstrumentModule());
+  session.dialects().add(probeSequenceDialect());
+
+  const auto instrument = session.addSource(SourceFile{.name = "bank-11.instr"}, {0xdd, 11});
+  session.addSource(SourceFile{.name = "bank-11.seq"}, {0xcc, 11});
+  SessionSnapshot project = session.scanPendingSources();
+  expect(project.collections().size() == 1, "materialized bank files should produce one collection");
+  expect(project.assets().size() == 3, "materialization should add a derived collection asset");
+
+  const auto& collection = project.collections()[0];
+  expect(collection.instrumentSets.size() == 1, "materialized collection should expose one instrument set");
+  expect(collection.instrumentSets[0] != AssetId{0} && collection.instrumentSets[0] != AssetId{1},
+         "materialized collection should not expose either scanned input asset as its final instrument set");
+  const AssetId materializedId = collection.instrumentSets[0];
+  const auto* materialized = project.asset<InstrumentSetAsset>(materializedId);
+  expect(materialized != nullptr, "materialized instrument set should be present in the snapshot");
+  expect(materialized->metadata.name == "Materialized bank-11.instr",
+         "materializer should control the derived asset contents");
+  expect(materialized->instruments.size() == 1, "materialized instrument set should keep derived instrument data");
+
+  project = session.scanPendingSources();
+  expect(project.collections()[0].instrumentSets[0] == materializedId,
+         "materialized asset id should be stable across collection rebuilds");
+
+  project = session.removeSource(instrument);
+  expect(project.collections().size() == 1, "removing one matched source should leave an incomplete collection");
+  expect(project.collections()[0].instrumentSets.empty(),
+         "collection should fall back to no instrument set when materialization input disappears");
+  expect(project.asset(materializedId) == nullptr, "stale materialized asset should be removed with its collection");
+}
+
 void sessionRemovesSourceFamilyAndDiscoveredData() {
   Session session;
   session.formats().add(probeSequenceModule());
@@ -943,6 +1012,7 @@ void runValueSessionTests() {
   sessionScansIndividualSourcesWithoutDuplicating();
   sessionKeepsScannerKnownCollectionsWithoutResolver();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
+  sessionMaterializesResolvedCollectionsWithStableAssets();
   sessionRemovesSourceFamilyAndDiscoveredData();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();
   sessionResolverFailureDoesNotWipeExistingCollections();

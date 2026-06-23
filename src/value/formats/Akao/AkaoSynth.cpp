@@ -43,6 +43,13 @@ struct PsxSampleInfo {
   Loop loop;
 };
 
+struct ParsedSampleCollection {
+  AkaoSampleCollectionParse parse;
+  SampleCollection samples;
+  std::string name;
+  SourceRange range;
+};
+
 [[nodiscard]] s16 leS16(ByteReader reader, u32 offset) {
   return static_cast<s16>(reader.le16(offset));
 }
@@ -241,9 +248,9 @@ struct PsxSampleInfo {
   return art;
 }
 
-[[nodiscard]] std::optional<AkaoSampleCollectionParse> parseSampleCollectionWithTable(
-    const ScanInput& input, ScanResultBuilder& result, ScanSampleCollectionRef ref, u32 offset, u32 length,
-    AkaoPs1Version version, ArticulationTable table, u32 scanOrdinal, std::string name) {
+[[nodiscard]] std::optional<ParsedSampleCollection> parseSampleCollectionWithTable(
+    const ScanInput& input, ScanSampleCollectionRef ref, u32 offset, u32 length, AkaoPs1Version version,
+    ArticulationTable table, std::string name) {
   if (table.artCount == 0 || table.sampleSectionSize == 0) {
     return std::nullopt;
   }
@@ -317,13 +324,34 @@ struct PsxSampleInfo {
     }
   }
 
+  const SourceRange range = input.reader.range(offset, length);
+  return ParsedSampleCollection{
+      .parse =
+          AkaoSampleCollectionParse{
+              .ref = ref,
+              .sampleSetId = table.sampleSetId,
+              .offset = offset,
+              .length = length,
+              .version = version,
+              .firstArtId = table.firstArtId,
+              .artCount = table.artCount,
+              .arts = std::move(arts),
+          },
+      .samples = std::move(collection),
+      .name = std::move(name),
+      .range = range,
+  };
+}
+
+void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, ScanSampleCollectionRef ref,
+                          ParsedSampleCollection& parsed) {
   ItemTree items;
   ItemTreeBuilder itemBuilder(items, input.ids);
-  const SourceRange range = input.reader.range(offset, length);
-  const ItemId root = itemBuilder.add(std::nullopt, ItemKind::SampleCollection, "akao-sample-collection", name, range);
-  for (u32 i = 0; i < collection.samples.size(); ++i) {
-    static_cast<void>(itemBuilder.add(root, ItemKind::Sample, "psx-adpcm-sample", collection.samples[i].name,
-                                      collection.samples[i].encodedData));
+  const ItemId root =
+      itemBuilder.add(std::nullopt, ItemKind::SampleCollection, "akao-sample-collection", parsed.name, parsed.range);
+  for (u32 i = 0; i < parsed.samples.samples.size(); ++i) {
+    static_cast<void>(itemBuilder.add(root, ItemKind::Sample, "psx-adpcm-sample", parsed.samples.samples[i].name,
+                                      parsed.samples.samples[i].encodedData));
   }
 
   static_cast<void>(result.sampleCollection(ref, [&](AssetId id) {
@@ -332,28 +360,61 @@ struct PsxSampleInfo {
             AssetMetadata{
                 .id = id,
                 .format = std::string(kAkaoFormatName),
-                .name = name,
-                .range = range,
+                .name = parsed.name,
+                .range = parsed.range,
                 .items = std::move(items),
             },
-        .samples = std::move(collection),
+        .samples = std::move(parsed.samples),
     };
   }));
+}
 
-  return AkaoSampleCollectionParse{
-      .ref = ref,
-      .sampleSetId = table.sampleSetId,
-      .offset = offset,
-      .length = length,
-      .version = version,
-      .firstArtId = table.firstArtId,
-      .artCount = table.artCount,
-      .scanOrdinal = scanOrdinal,
-      .arts = std::move(arts),
-  };
+[[nodiscard]] std::optional<ParsedSampleCollection> parseAkaoSampleCollectionBuild(
+    const ScanInput& input, ScanSampleCollectionRef ref, u32 offset, AkaoPs1Version version) {
+  if (version == AkaoPs1Version::Unknown) {
+    version = guessSampleVersion(input.reader, offset);
+  }
+  auto table = sampleHeader(input.reader, offset, version);
+  if (!table) {
+    return std::nullopt;
+  }
+  const u32 length = static_cast<u32>(
+      std::min<u64>(input.reader.size() - offset, table->sampleSectionOffset + table->sampleSectionSize - offset));
+  return parseSampleCollectionWithTable(
+      input, ref, offset, length, version, *table,
+      fmt::format("Akao Sample Collection {:02X}", table->sampleSetId.value_or(input.reader.le16(offset + 4))));
+}
+
+[[nodiscard]] std::optional<ParsedSampleCollection> parseAkaoSampleCollectionBuild(
+    const ScanInput& input, ScanSampleCollectionRef ref, AkaoInstrDatLocation location) {
+  if (!input.reader.has(location.instrAllOffset, 8) || !input.reader.has(location.instrDatOffset, 1)) {
+    return std::nullopt;
+  }
+  auto table = hardcodedSampleHeader(input.reader, location);
+  if (!input.reader.has(table.artsOffset, table.artSize * table.artCount) || table.sampleSectionSize == 0) {
+    return std::nullopt;
+  }
+  const u32 offset = std::min(location.instrAllOffset, location.instrDatOffset);
+  const u32 endOffset =
+      std::max(table.sampleSectionOffset + table.sampleSectionSize, table.artsOffset + table.artSize * table.artCount);
+  return parseSampleCollectionWithTable(input, ref, offset, endOffset - offset, AkaoPs1Version::Version1_0, table,
+                                        "Akao Sample Collection FF7");
 }
 
 }  // namespace
+
+std::optional<AkaoInstrDatLocation> ff7HardcodedAkaoSampleLocation(ByteReader reader) {
+  if (reader.size() >= 0x1a8000 && reader.has(0xe0000, 4) && reader.has(0x156000, 4) &&
+      reader.le32(0xe0000) == 0x1010 && reader.le32(0x156000) == 0x1010) {
+    return AkaoInstrDatLocation{
+        .instrAllOffset = 0xe0000,
+        .instrDatOffset = 0x156000,
+        .firstArtId = 0,
+        .artCount = 128,
+    };
+  }
+  return std::nullopt;
+}
 
 bool isPossibleAkaoSampleCollection(ByteReader reader, u32 offset) {
   if (!reader.has(offset, 0x50) || reader.be32(offset) != kAkaoSignature || reader.le16(offset + 6) != 0) {
@@ -368,38 +429,46 @@ bool isPossibleAkaoSampleCollection(ByteReader reader, u32 offset) {
   return firstDest == 0 || firstDest == reader.le32(offset + 0x10);
 }
 
-std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInput& input, ScanResultBuilder& result,
-                                                                   ScanSampleCollectionRef ref, u32 offset,
-                                                                   AkaoPs1Version version, u32 scanOrdinal) {
-  if (version == AkaoPs1Version::Unknown) {
-    version = guessSampleVersion(input.reader, offset);
-  }
-  auto table = sampleHeader(input.reader, offset, version);
-  if (!table) {
+std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const ScanInput& input,
+                                                                       ScanSampleCollectionRef ref, u32 offset,
+                                                                       AkaoPs1Version version) {
+  auto parsed = parseAkaoSampleCollectionBuild(input, ref, offset, version);
+  if (!parsed) {
     return std::nullopt;
   }
-  const u32 length = static_cast<u32>(
-      std::min<u64>(input.reader.size() - offset, table->sampleSectionOffset + table->sampleSectionSize - offset));
-  return parseSampleCollectionWithTable(
-      input, result, ref, offset, length, version, *table, scanOrdinal,
-      fmt::format("Akao Sample Collection {:02X}", table->sampleSetId.value_or(input.reader.le16(offset + 4))));
+  return std::move(parsed->parse);
+}
+
+std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const ScanInput& input,
+                                                                       ScanSampleCollectionRef ref,
+                                                                       AkaoInstrDatLocation location) {
+  auto parsed = parseAkaoSampleCollectionBuild(input, ref, location);
+  if (!parsed) {
+    return std::nullopt;
+  }
+  return std::move(parsed->parse);
+}
+
+std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInput& input, ScanResultBuilder& result,
+                                                                   ScanSampleCollectionRef ref, u32 offset,
+                                                                   AkaoPs1Version version) {
+  auto parsed = parseAkaoSampleCollectionBuild(input, ref, offset, version);
+  if (!parsed) {
+    return std::nullopt;
+  }
+  emitSampleCollection(input, result, ref, *parsed);
+  return std::move(parsed->parse);
 }
 
 std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInput& input, ScanResultBuilder& result,
                                                                    ScanSampleCollectionRef ref,
-                                                                   AkaoInstrDatLocation location, u32 scanOrdinal) {
-  if (!input.reader.has(location.instrAllOffset, 8) || !input.reader.has(location.instrDatOffset, 1)) {
+                                                                   AkaoInstrDatLocation location) {
+  auto parsed = parseAkaoSampleCollectionBuild(input, ref, location);
+  if (!parsed) {
     return std::nullopt;
   }
-  auto table = hardcodedSampleHeader(input.reader, location);
-  if (!input.reader.has(table.artsOffset, table.artSize * table.artCount) || table.sampleSectionSize == 0) {
-    return std::nullopt;
-  }
-  const u32 offset = std::min(location.instrAllOffset, location.instrDatOffset);
-  const u32 endOffset =
-      std::max(table.sampleSectionOffset + table.sampleSectionSize, table.artsOffset + table.artSize * table.artCount);
-  return parseSampleCollectionWithTable(input, result, ref, offset, endOffset - offset, AkaoPs1Version::Version1_0,
-                                        table, scanOrdinal, "Akao Sample Collection FF7");
+  emitSampleCollection(input, result, ref, *parsed);
+  return std::move(parsed->parse);
 }
 
 }  // namespace vgmtrans::formats::akao

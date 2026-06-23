@@ -22,6 +22,7 @@ void registerAkaoModule(FormatRegistry& registry) {
       .scan = scanAkao,
       .collectionResolverId = std::string(kAkaoCollectionResolver),
       .resolveCollections = resolveAkaoCollections,
+      .materializeCollection = materializeAkaoCollection,
   });
 }
 

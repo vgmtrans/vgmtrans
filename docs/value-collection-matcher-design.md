@@ -6,6 +6,7 @@ The value-oriented engine keeps scanners and collection resolution separate:
 
 - Format scanners emit immutable assets plus lightweight match facts.
 - Collection resolvers are pure functions over the current session snapshot.
+- Collection materializers may build derived assets from resolved membership.
 - `CollectionStore` reconciles resolver output by stable `CollectionKey`.
 - If a resolver fails, the session keeps the last resolved collections visible.
 
@@ -51,11 +52,14 @@ declarative matching problem over facts.
 The value matcher layer should:
 
 - Keep the session lifecycle unchanged: scan facts, resolve from snapshots,
-  reconcile by stable keys.
+  materialize derived assets, then reconcile by stable keys.
 - Make resolvers readable and testable without mutable root callbacks.
-- Keep fact payloads format-owned when the rule is format-specific.
+- Use shared typed facts for common relationships and keep fact payloads
+  format-owned only when the rule is genuinely format-specific.
 - Provide reusable indexing, asset typing, and collection assembly utilities.
 - Make incomplete and ambiguous collections explicit in `DesiredCollection`.
+- Keep membership resolution separate from collection-dependent asset
+  construction.
 - Preserve deterministic output independent of scan order, except where a
   format intentionally models "most recent" or source-local behavior.
 
@@ -66,6 +70,12 @@ The value matcher layer should:
 - `MatchFactIndex` wraps `MatchContext` and provides typed fact iteration.
 - `AssetMatchView<T>` exposes typed fact and asset references plus the optional
   source for one fact.
+- Shared typed facts cover common matcher vocabulary:
+  - `IdMatchFact` for ids in a named domain.
+  - `OffsetOrderFact` for deterministic source/order preferences.
+  - `SampleCoverageFact` for sample/articulation coverage in a named domain.
+  - `SampleRequirementFact` for sample/articulation requirements in a named
+    domain.
 - `fieldValue()` and numeric field helpers read `FormatSpecificFact` fields
   without ad hoc loops.
 - `CollectionAssembly` wraps `DesiredCollection` mutation, status, issues, and
@@ -74,20 +84,50 @@ The value matcher layer should:
   `requireSampleCollection()` apply common missing-role issue rules.
 
 The existing `CollectionMemberFact` helper remains for simple formats. More
-complex formats can emit format-specific facts and still build collections with
-shared utilities.
+complex formats can combine typed facts, narrowly scoped format facts, and shared
+collection assembly utilities.
+
+## Materialization Phase
+
+Resolution answers only this question:
+
+> Which scanned sequence, instrument set, sample collections, and misc assets
+> belong together?
+
+Some formats also need a second answer:
+
+> Given those selected members, what derived assets should this collection
+> expose?
+
+That is the job of `FormatModule::materializeCollection`. The session passes a
+`MaterializationContext` containing the immutable sources, the current snapshot,
+the resolver's `DesiredCollection`, the session id allocator, and a stable
+`assetIdForSlot()` callback. A materializer returns:
+
+- the final `DesiredCollection`;
+- zero or more `MaterializedAsset`s keyed by small slot names;
+- optional diagnostics.
+
+The slot name is collection-local. The session combines resolver id, collection
+key, and slot to keep materialized asset ids stable across rescans. If a
+materializer stops returning a slot, the stale materialized asset is removed.
+
+Materializers should not perform matching. They should consume the resolver's
+selected members and immutable source bytes, then build collection-dependent
+assets. This keeps scan order out of derived asset contents.
 
 ## Akao Fact Vocabulary
 
-Akao scanners emit these format-specific facts:
+Akao scanners emit generic facts in Akao domains:
 
-- `akao.sequence`: sequence id, preferred sample-set id, version, and source
-  sequence offset.
-- `akao.instrument-set`: instrument-set id.
-- `akao.sample-collection`: sample-set id, first articulation id, articulation
-  count, and scan ordinal.
-- `akao.required-articulation`: one fact per non-zero articulation id referenced
-  by an instrument set.
+- `IdMatchFact("akao.sequence-id")` on sequences and instrument sets.
+- `IdMatchFact("akao.sample-set")` on sequences and sample collections when a
+  sample-set id exists.
+- `OffsetOrderFact` on sequences and sample collections.
+- `SampleCoverageFact("akao.articulation")` on sample collections, with the
+  covered articulation range.
+- `SampleRequirementFact("akao.articulation")` on instrument sets, with the
+  non-zero articulation ids required by sequence-side instrument tables.
 
 The resolver then:
 
@@ -115,10 +155,15 @@ match" behavior.
 Akao should stay split by the format concepts rather than by export target:
 
 - `AkaoScanner` finds sequence and sample headers, reserves assets, and emits
-  only match facts needed by the resolver.
+  only scanned assets plus facts needed by the resolver. It does not bind
+  instruments to whatever samples happened to be available in the same scan.
 - `AkaoResolver` owns collection assembly. It chooses instruments by sequence id,
   chooses sample collections by preferred sample-set id plus articulation
   coverage, and reports missing coverage as collection issues.
+- `AkaoResolver` also owns collection materialization. After resolution, it
+  re-reads the resolved sequence and selected sample collections from source
+  bytes, builds an articulation map, and emits a stable bound instrument-set
+  asset for the collection.
 - `AkaoVersion` contains source-name and header heuristics.
 - `AkaoBytecode` contains opcode sizes, branch targets, and track analysis.
 - `AkaoSequenceDecoder` converts bytecode into the shared sequence VM commands.
@@ -162,6 +207,8 @@ then `_lib2` and higher, matching legacy behavior.
 
 This design does not move user-created collections into the resolver layer and
 does not add mutable matcher callbacks to the value engine. It also does not
-make every format use `FormatSpecificFact`; scanner-known collections should
-continue using explicit collections or `CollectionMemberFact` when that is the
-clearest expression.
+make every format use matcher facts; scanner-known collections should continue
+using explicit collections or `CollectionMemberFact` when that is the clearest
+expression. Materialization is also not a general cache for expensive parse
+results; it exists for assets whose value depends on the resolved collection
+membership.

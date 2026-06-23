@@ -9,10 +9,13 @@
 #include "value/session/SourceIdSet.h"
 
 #include <algorithm>
+#include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace vgmtrans::core {
 
@@ -55,6 +58,95 @@ void AssetStore::append(std::vector<Asset> assets, SourceId owner) {
   }
 }
 
+std::string AssetStore::materializedKey(std::string_view resolverId, const CollectionKey& collection,
+                                        std::string_view slot) const {
+  return std::string(resolverId) + '\x1f' + collection.resolver + '\x1f' + collection.value + '\x1f' +
+         std::string(slot);
+}
+
+AssetId AssetStore::materializedAssetId(std::string_view resolverId, const CollectionKey& collection,
+                                        std::string_view slot, ScanIdAllocator& ids) {
+  const auto key = materializedKey(resolverId, collection, slot);
+  if (auto found = materializedAssets_.find(key); found != materializedAssets_.end()) {
+    return found->second.id;
+  }
+
+  AssetId id;
+  do {
+    id = ids.nextAssetId();
+  } while (contains(id));
+  materializedAssets_[key] = MaterializedAssetRecord{
+      .id = id,
+      .resolver = std::string(resolverId),
+  };
+  return id;
+}
+
+std::string AssetStore::upsertMaterializedAsset(std::string_view resolverId, const CollectionKey& collection,
+                                                std::string_view slot, Asset asset) {
+  const auto key = materializedKey(resolverId, collection, slot);
+  const AssetId id = metadata(asset).id;
+  if (!id.valid()) {
+    throw std::invalid_argument("Materialized asset '" + key + "' did not receive an asset id");
+  }
+
+  auto known = materializedAssets_.find(key);
+  if (known == materializedAssets_.end()) {
+    if (contains(id)) {
+      throw std::invalid_argument("Materialized asset '" + key + "' reused existing asset id " +
+                                  std::to_string(id.value));
+    }
+    materializedAssets_[key] = MaterializedAssetRecord{
+        .id = id,
+        .resolver = std::string(resolverId),
+    };
+  } else if (known->second.id != id) {
+    throw std::invalid_argument("Materialized asset '" + key + "' used unstable asset id " +
+                                std::to_string(id.value));
+  }
+
+  materializedKeysById_[id.value] = key;
+  if (auto found = assetsById_.find(id.value); found != assetsById_.end()) {
+    assets_[found->second] = std::move(asset);
+  } else {
+    assetsById_.emplace(id.value, assets_.size());
+    assets_.push_back(std::move(asset));
+  }
+  return key;
+}
+
+std::unordered_set<u32> AssetStore::removeStaleMaterializedAssets(std::string_view resolverId,
+                                                                 const std::set<std::string>& activeKeys) {
+  std::vector<std::string> staleKeys;
+  std::unordered_set<u32> removedAssetIds;
+  for (const auto& [key, record] : materializedAssets_) {
+    if (record.resolver == resolverId && !activeKeys.contains(key)) {
+      staleKeys.push_back(key);
+    }
+  }
+
+  if (staleKeys.empty()) {
+    return removedAssetIds;
+  }
+
+  for (const auto& key : staleKeys) {
+    if (auto found = materializedAssets_.find(key); found != materializedAssets_.end()) {
+      removedAssetIds.insert(found->second.id.value);
+      materializedAssets_.erase(found);
+    }
+  }
+
+  std::erase_if(assets_, [&](const Asset& asset) {
+    const AssetId id = metadata(asset).id;
+    return id.valid() && removedAssetIds.contains(id.value);
+  });
+  for (const u32 id : removedAssetIds) {
+    materializedKeysById_.erase(id);
+  }
+  rebuildIndex();
+  return removedAssetIds;
+}
+
 std::unordered_set<u32> AssetStore::removeForSources(const std::vector<SourceId>& sources) {
   const auto sourceIds = makeSourceIdSet(sources);
   std::unordered_set<u32> removedAssetIds;
@@ -78,6 +170,10 @@ std::unordered_set<u32> AssetStore::removeForSources(const std::vector<SourceId>
   });
   for (const u32 id : removedAssetIds) {
     sourceOwners_.erase(id);
+    if (auto key = materializedKeysById_.find(id); key != materializedKeysById_.end()) {
+      materializedAssets_.erase(key->second);
+      materializedKeysById_.erase(key);
+    }
   }
   rebuildIndex();
 

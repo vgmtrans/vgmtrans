@@ -462,9 +462,9 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
 
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
   const std::vector<AkaoSampleCandidate> candidates{
-      AkaoSampleCandidate{.index = 0, .sampleSetId = 0, .firstArt = 0, .artCount = 32, .scanOrdinal = 0},
-      AkaoSampleCandidate{.index = 1, .sampleSetId = 5, .firstArt = 32, .artCount = 81, .scanOrdinal = 1},
-      AkaoSampleCandidate{.index = 2, .sampleSetId = 29, .firstArt = 128, .artCount = 22, .scanOrdinal = 2},
+      AkaoSampleCandidate{.index = 0, .sampleSetId = 0, .firstArt = 0, .artCount = 32, .sourceOffset = 0},
+      AkaoSampleCandidate{.index = 1, .sampleSetId = 5, .firstArt = 32, .artCount = 81, .sourceOffset = 1},
+      AkaoSampleCandidate{.index = 2, .sampleSetId = 29, .firstArt = 128, .artCount = 22, .sourceOffset = 2},
   };
   const std::vector<u32> required{32, 128};
 

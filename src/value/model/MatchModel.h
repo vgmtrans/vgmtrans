@@ -61,11 +61,13 @@ struct OffsetOrderFact {
 };
 
 struct SampleCoverageFact {
+  std::string domain;
   u32 first = 0;
   u32 count = 0;
 };
 
 struct SampleRequirementFact {
+  std::string domain;
   std::vector<u32> required;
 };
 
