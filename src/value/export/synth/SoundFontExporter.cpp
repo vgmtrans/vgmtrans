@@ -157,6 +157,9 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text, size_t widt
   std::vector<u8> payload;
   writeAscii(payload, text);
   payload.push_back(0);
+  if ((payload.size() & 1) != 0) {
+    payload.push_back(0);
+  }
   return makeChunk(std::move(id), std::move(payload));
 }
 

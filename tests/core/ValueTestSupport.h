@@ -81,6 +81,33 @@ u32 chunkSize(const std::vector<u8>& bytes, std::string_view chunkId) {
   return readLe32(bytes, asciiOffset(bytes, chunkId) + 4);
 }
 
+bool soundFontInfoChunksHaveEvenDeclaredSizes(const std::vector<u8>& bytes) {
+  const auto infoTypeOffset = asciiOffset(bytes, "INFO");
+  if (infoTypeOffset < 8) {
+    return false;
+  }
+
+  const std::string_view listId(reinterpret_cast<const char*>(bytes.data() + infoTypeOffset - 8), 4);
+  if (listId != "LIST") {
+    return false;
+  }
+
+  const size_t infoListSize = readLe32(bytes, infoTypeOffset - 4);
+  const size_t infoEnd = infoTypeOffset + infoListSize;
+  if (infoEnd > bytes.size()) {
+    return false;
+  }
+  size_t offset = infoTypeOffset + 4;
+  while (offset + 8 <= infoEnd) {
+    const u32 size = readLe32(bytes, offset + 4);
+    if ((size & 1u) != 0) {
+      return false;
+    }
+    offset += 8 + size + (size & 1u);
+  }
+  return offset == infoEnd;
+}
+
 bool soundFontIgenContainsAmount(const std::vector<u8>& bytes, u16 generator, s16 expectedAmount) {
   const auto chunkOffset = asciiOffset(bytes, "igen");
   const auto size = chunkSize(bytes, "igen");
