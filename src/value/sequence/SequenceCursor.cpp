@@ -44,6 +44,10 @@ namespace {
 RepeatBreakFlow::RepeatBreakFlow(CommandFlow flow, bool taken) : flow_(flow), taken_(taken) {
 }
 
+RepeatUntilFlow::RepeatUntilFlow(CommandFlow flow, bool fallsThrough)
+    : flow_(flow), fallsThrough_(fallsThrough) {
+}
+
 VmCommandCursor::VmCommandCursor(CommandPhase phase, SourceRange commandRange, std::span<const ::u8> bytes,
                                  SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
                                  std::vector<CommandOperand>* operands, CommandReferences* references)

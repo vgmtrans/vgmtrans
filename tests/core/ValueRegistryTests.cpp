@@ -71,6 +71,16 @@ struct RepeatBreakProbeVm {
   }
 };
 
+struct RepeatUntilProbeVm {
+  bool called = false;
+  Effects effects;
+
+  Effects countedRepeatUntil(u8, u32, Address) {
+    called = true;
+    return effects;
+  }
+};
+
 void bytecodeMapRejectsIncompatibleHandlerReuse() {
   SequenceDialectBuilder<ProbeTrackState, ProbeSequenceContext> builder("probe-bytecode", ProbeSequenceContext{});
   BytecodeMapBuilder<ProbeTrackState, ProbeSequenceContext> map{"probe-bytecode", builder};
@@ -312,6 +322,32 @@ void cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead() {
   const RepeatBreakFlow flow = detail::resolveRenderCursorRepeatBreak(cursor, vm, 0, Address{4});
   expect(!vm.called, "truncated cursor repeat-break should not ask the VM to mutate repeat state");
   expect(!flow.taken() && flow.flow().truncated, "truncated cursor repeat-break should remain an untaken truncation");
+}
+
+void cursorRepeatUntilReportsFallthroughAndSkipsTruncatedVmMutation() {
+  const std::array<u8, 1> bytes{0x12};
+
+  VmCommandCursor fallthroughCursor(CommandPhase::Render, probeRange(0, bytes.size()), bytes);
+  RepeatUntilProbeVm fallthroughVm{.effects = Effects::none()};
+  const RepeatUntilFlow fallthrough =
+      detail::resolveRenderCursorRepeatUntil(fallthroughCursor, fallthroughVm, 0, 3, Address{4});
+  expect(fallthroughVm.called, "render cursor repeat-until should ask VM to resolve repeat state");
+  expect(fallthrough.fallsThrough(), "render cursor repeat-until should report VM fallthrough");
+
+  VmCommandCursor branchCursor(CommandPhase::Render, probeRange(0, bytes.size()), bytes);
+  RepeatUntilProbeVm branchVm{.effects = Effects{.step = Step::jump(Address{4}, JumpSemantics::FiniteRepeat)}};
+  const RepeatUntilFlow branch = detail::resolveRenderCursorRepeatUntil(branchCursor, branchVm, 0, 3, Address{4});
+  expect(branchVm.called, "render cursor repeat-until branch should ask VM to resolve repeat state");
+  expect(!branch.fallsThrough(), "render cursor repeat-until should report VM branch");
+
+  VmCommandCursor truncatedCursor(CommandPhase::Render, probeRange(0, bytes.size()), bytes);
+  static_cast<void>(truncatedCursor.u8("missing"));
+  RepeatUntilProbeVm truncatedVm{.effects = Effects::none()};
+  const RepeatUntilFlow truncated =
+      detail::resolveRenderCursorRepeatUntil(truncatedCursor, truncatedVm, 0, 3, Address{4});
+  expect(!truncatedVm.called, "truncated cursor repeat-until should not ask the VM to mutate repeat state");
+  expect(!truncated.fallsThrough() && truncated.flow().truncated,
+         "truncated cursor repeat-until should remain a non-fallthrough truncation");
 }
 
 void cursorDialectSuppressesMalformedRenderEvents() {
@@ -570,6 +606,7 @@ void runValueRegistryTests() {
   cursorFlowHelpersInferMetadata();
   cursorPreserveRecordsMetadataAndBytes();
   cursorRepeatBreakDoesNotMutateVmAfterTruncatedRead();
+  cursorRepeatUntilReportsFallthroughAndSkipsTruncatedVmMutation();
   cursorDialectSuppressesMalformedRenderEvents();
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();

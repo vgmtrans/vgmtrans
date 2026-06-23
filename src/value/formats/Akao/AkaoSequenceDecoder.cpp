@@ -158,10 +158,7 @@ void emitAkaoControllerSlide(Runtime& rt, u16& previous, u16 target, u16 duratio
     return;
   }
 
-  u64 startTick = 0;
-  if constexpr (requires { rt.vm.tick(); }) {
-    startTick = rt.vm.tick();
-  }
+  const u64 startTick = rt.tick();
 
   const double increment =
       static_cast<double>(static_cast<int>(target) - static_cast<int>(previous)) / static_cast<double>(duration);
@@ -278,13 +275,11 @@ template <class Runtime>
   const double targetBpm = rt.context.profile.tempoBpm(raw);
   cmd.derived("duration_ticks", duration);
 
-  if constexpr (requires { rt.vm.tick(); rt.out.at(u64{}).tempo(u32{}); }) {
-    const u64 startTick = rt.vm.tick();
-    const double increment = (targetBpm - rt.state.tempoBpm) / static_cast<double>(duration);
-    for (u16 i = 0; i < duration; ++i) {
-      const double bpm = rt.state.tempoBpm + (increment * (i + 1));
-      rt.out.at(startTick + i).tempo(akaoMicrosPerQuarterFromBpm(bpm));
-    }
+  const u64 startTick = rt.tick();
+  const double increment = (targetBpm - rt.state.tempoBpm) / static_cast<double>(duration);
+  for (u16 i = 0; i < duration; ++i) {
+    const double bpm = rt.state.tempoBpm + (increment * (i + 1));
+    rt.tempoAt(startTick + i, akaoMicrosPerQuarterFromBpm(bpm));
   }
 
   rt.state.tempoBpm = targetBpm;
@@ -307,9 +302,8 @@ template <class Runtime>
   const Address target = rt.state.repeats.current();
   cmd.derived("count", count).target(target, SourceLinkRole::JumpTarget);
   rt.state.repeats.completeCurrentPlay();
-  CommandFlow flow = rt.countedRepeatUntil(cmd, slot, count, target);
-  if (cmd.phase() == CommandPhase::Decode ||
-      (flow.resolvedEffects && flow.resolvedEffects->step.kind == StepKind::Next)) {
+  RepeatUntilFlow flow = rt.countedRepeatUntil(cmd, slot, count, target);
+  if (flow.fallsThrough()) {
     rt.state.repeats.finishFallthrough();
   }
   return flow;
@@ -321,15 +315,7 @@ template <class Runtime>
   const u16 count = akaoZeroAs256(cmd.u8("count"));
   const Address destination = readRelativeAddress(rt, cmd, "relative");
   cmd.derived("count", count);
-  CommandFlow flow = cmd.conditionalBranch(destination);
-  if constexpr (requires { rt.vm.finiteBranch(destination); }) {
-    if (rt.state.repeats.currentCompletedPlays() + 1 == count) {
-      flow.resolvedEffects = Effects{.step = rt.vm.finiteBranch(destination)};
-    } else {
-      flow.resolvedEffects = Effects::none();
-    }
-  }
-  return flow;
+  return rt.conditionalFiniteBranch(cmd, destination, rt.state.repeats.currentCompletedPlays() + 1 == count);
 }
 
 template <class Runtime>

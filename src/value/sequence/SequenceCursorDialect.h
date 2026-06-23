@@ -48,8 +48,10 @@ struct DecodeCursorRuntime {
   TrackState& state;
   const Context& context;
 
+  [[nodiscard]] u64 tick() const noexcept { return 0; }
   void note(double, double, u32, bool = false) {}
   void tempo(u32) {}
+  void tempoAt(u64, u32) {}
   void timeSignature(u8, u8, u8) {}
   void instrument(u32, u32, bool = false) {}
   void level(double, LevelPrecisionHint = LevelPrecisionHint::SevenBit) {}
@@ -74,16 +76,34 @@ struct DecodeCursorRuntime {
   void marker(std::string_view) {}
   void diagnostic(Severity, std::string_view) {}
 
-  [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays, Address destination) {
-    return cmd.countedRepeatUntil(slot, totalPlays, destination);
+  [[nodiscard]] RepeatUntilFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays,
+                                                   Address destination) {
+    CommandFlow flow = cmd.countedRepeatUntil(slot, totalPlays, destination);
+    return RepeatUntilFlow{flow, !flow.truncated};
   }
 
   [[nodiscard]] RepeatBreakFlow countedRepeatBreak(VmCommandCursor& cmd, u8 slot, Address destination) {
     return cmd.countedRepeatBreak(slot, destination);
   }
+
+  [[nodiscard]] CommandFlow conditionalFiniteBranch(VmCommandCursor& cmd, Address destination, bool) {
+    return cmd.conditionalBranch(destination);
+  }
 };
 
 namespace detail {
+
+template <class Vm>
+[[nodiscard]] RepeatUntilFlow resolveRenderCursorRepeatUntil(VmCommandCursor& cmd, Vm& vm, u8 slot,
+                                                             u32 totalPlays, Address destination) {
+  CommandFlow flow = cmd.countedRepeatUntil(slot, totalPlays, destination);
+  if (flow.truncated) {
+    return RepeatUntilFlow{flow, false};
+  }
+
+  flow.resolvedEffects = vm.countedRepeatUntil(slot, totalPlays, destination);
+  return RepeatUntilFlow{flow, flow.resolvedEffects->step.kind == StepKind::Next};
+}
 
 template <class Vm>
 [[nodiscard]] RepeatBreakFlow resolveRenderCursorRepeatBreak(VmCommandCursor& cmd, Vm& vm, u8 slot,
@@ -108,10 +128,12 @@ struct RenderCursorRuntime {
   VmApi& vm;
   const Context& context;
 
+  [[nodiscard]] u64 tick() const noexcept { return vm.tick(); }
   void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false) {
     out.note(key, linearVelocity, durationTicks, extendsPrevious);
   }
   void tempo(u32 microsecondsPerQuarter) { out.tempo(microsecondsPerQuarter); }
+  void tempoAt(u64 tick, u32 microsecondsPerQuarter) { out.at(tick).tempo(microsecondsPerQuarter); }
   void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick) {
     out.timeSignature(numerator, denominator, clocksPerMetronomeClick);
   }
@@ -150,16 +172,21 @@ struct RenderCursorRuntime {
     vm.diagnostic(Diagnostic{.severity = severity, .message = std::string(message)});
   }
 
-  [[nodiscard]] CommandFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays, Address destination) {
-    CommandFlow flow = cmd.countedRepeatUntil(slot, totalPlays, destination);
-    if (!flow.truncated) {
-      flow.resolvedEffects = vm.countedRepeatUntil(slot, totalPlays, destination);
-    }
-    return flow;
+  [[nodiscard]] RepeatUntilFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays,
+                                                   Address destination) {
+    return detail::resolveRenderCursorRepeatUntil(cmd, vm, slot, totalPlays, destination);
   }
 
   [[nodiscard]] RepeatBreakFlow countedRepeatBreak(VmCommandCursor& cmd, u8 slot, Address destination) {
     return detail::resolveRenderCursorRepeatBreak(cmd, vm, slot, destination);
+  }
+
+  [[nodiscard]] CommandFlow conditionalFiniteBranch(VmCommandCursor& cmd, Address destination, bool taken) {
+    CommandFlow flow = cmd.conditionalBranch(destination);
+    if (!flow.truncated) {
+      flow.resolvedEffects = taken ? Effects{.step = vm.finiteBranch(destination)} : Effects::none();
+    }
+    return flow;
   }
 };
 
