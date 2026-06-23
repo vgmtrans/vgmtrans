@@ -1945,6 +1945,14 @@ std::vector<const RiffNode*> childLists(const RiffNode& node, std::string_view t
   return lists;
 }
 
+void validateSf2RiffStructure(const RiffNode& root) {
+  const auto* info = childList(root, "INFO");
+  expect(info != nullptr, "SF2 file is missing INFO list");
+  for (const auto& chunk : info->children) {
+    expect((chunk.size & 1u) == 0, "SF2 INFO chunk has odd declared size");
+  }
+}
+
 std::vector<u8> chunkBytes(std::span<const u8> bytes, const RiffNode* node) {
   if (node == nullptr) {
     return {};
@@ -2088,6 +2096,7 @@ Sf2Zone readSf2Zone(const std::vector<Sf2Bag>& bags, const std::vector<Sf2Genera
 
 NormalizedSf2 normalizeSf2(std::span<const u8> bytes) {
   const auto root = parseRiff(bytes, "sfbk");
+  validateSf2RiffStructure(root);
   const auto* phdr = firstChunk(root, "phdr");
   const auto* pbagNode = firstChunk(root, "pbag");
   const auto* pgenNode = firstChunk(root, "pgen");

@@ -226,6 +226,8 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(std::vector<u8>(result.bytes.begin() + 8, result.bytes.begin() + 12) == std::vector<u8>{'s', 'f', 'b', 'k'},
          "SoundFont RIFF type should be sfbk");
   expect(containsAscii(result.bytes, "INFO"), "SoundFont export should include INFO list");
+  expect(soundFontInfoChunksHaveEvenDeclaredSizes(result.bytes),
+         "SoundFont INFO chunks should declare even sizes for strict readers");
   expect(containsAscii(result.bytes, "sdta"), "SoundFont export should include sample data list");
   expect(containsAscii(result.bytes, "pdta"), "SoundFont export should include preset data list");
   expect(containsAscii(result.bytes, "smpl"), "SoundFont export should include smpl chunk");
