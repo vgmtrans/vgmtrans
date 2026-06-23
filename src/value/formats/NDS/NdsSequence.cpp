@@ -191,7 +191,7 @@ constexpr auto kPreservedCommands = std::to_array<PreservedCommandSpec>({
   return found == kPreservedCommands.end() ? nullptr : &*found;
 }
 
-struct NdsCommandReader {
+struct NdsCursorReader {
   template <class Runtime>
   static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
     const u8 opcode = cmd.opcode();
@@ -351,15 +351,7 @@ private:
   const auto bytes = reader.slice(offset, 1);
   std::vector<u8> ownedBytes{bytes.begin(), bytes.end()};
   auto command = DecodedBytecodeCommand{
-      .handler = cursorDialectHandlerId<TrackState, Context, NdsCommandReader>(dialect),
-      .commandKind =
-          CommandKind{
-              .kindName = dialect.commandKindPrefix + ".end",
-              .name = "End",
-              .detailKind = dialect.commandKindPrefix + ".end",
-              .semantic = SequenceSemantic::End,
-              .playbackStatus = CommandPlaybackStatus::StopsPlayback,
-          },
+      .handler = cursorDialectHandlerId<TrackState, Context, NdsCursorReader>(dialect),
       .range = reader.range(offset, 1),
       .bytes = std::move(ownedBytes),
   };
@@ -403,7 +395,7 @@ private:
       }
       decodedOffsets.insert(begin);
 
-      auto decoded = decodeCursorCommandWithState<TrackState, Context, NdsCommandReader>(reader, offset, dialect,
+      auto decoded = decodeCursorCommandWithState<TrackState, Context, NdsCursorReader>(reader, offset, dialect,
                                                                                          decodeState, decodeContext);
 
       if (!block.callTarget) {
@@ -450,15 +442,19 @@ private:
 // track start, preserving calls and jumps as source commands.
 [[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
                                                  u32 sequenceEnd, u32 startOffset, u32 trackIndex,
-                                                 SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  return decodeCursorReachableTrack<TrackState, Context, NdsCommandReader>(
+                                                 SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
+                                                 std::optional<SourceAnnotationId> parentAnnotation,
+                                                 std::optional<AssetId> sequenceAsset) {
+  return decodeCursorReachableTrack<TrackState, Context, NdsCursorReader>(
       reader, dialect,
       CursorTrackDecodeInput{
+          .sequenceAsset = sequenceAsset,
           .trackIndex = trackIndex,
           .startOffset = startOffset,
           .bytecodeEnd = sequenceEnd,
           .sequenceOffset = sequenceOffset,
           .sequenceEnd = sequenceEnd,
+          .parentAnnotation = parentAnnotation,
           .sourceMap = sourceMap,
           .diagnostics = diagnostics,
           .maxCommands = static_cast<u32>(kMaxTrackCommands),
@@ -467,9 +463,9 @@ private:
 
 [[nodiscard]] NdsSequenceDescriptor makeNdsSequenceDescriptor() {
   return NdsSequenceDescriptor{
-      .dialect = makeCursorDialect<TrackState, Context, NdsCommandReader>(CursorDialectSpec<Context>{
+      .dialect = makeCursorDialect<TrackState, Context, NdsCursorReader>(CursorDialectSpec<Context>{
           .id = std::string(kNdsSequenceDialectId),
-          .commandKindPrefix = "nds",
+          .commandDetailKindPrefix = "nds",
           .timebase = Timebase{.ppqn = 0x30},
           .defaultBehavior =
               SequenceProgramBehavior{
@@ -494,13 +490,15 @@ void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
 
 TrackProgram decodeNdsSequenceTrack(ByteReader reader, const NdsSequenceDescriptor& descriptor, u32 sequenceOffset,
                                     u32 sequenceEnd, u32 startOffset, u32 trackIndex, bool recoverMalformedSdatRange,
-                                    SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+                                    SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
+                                    std::optional<SourceAnnotationId> parentAnnotation,
+                                    std::optional<AssetId> sequenceAsset) {
   if (recoverMalformedSdatRange) {
     return decodeMalformedSdatRangeTrack(reader, descriptor.dialect, sequenceOffset, sequenceEnd, startOffset,
                                          trackIndex, kMaxTrackCommands, sourceMap, diagnostics);
   }
   return decodeReachableBlocks(reader, descriptor.dialect, sequenceOffset, sequenceEnd, startOffset, trackIndex,
-                               sourceMap, diagnostics);
+                               sourceMap, diagnostics, parentAnnotation, sequenceAsset);
 }
 
 std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
@@ -582,13 +580,11 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
 }
 
 SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
-                                             const std::string& name, std::optional<ScanInstrumentSetRef> instrumentSet,
-                                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+                                             const std::string& name, SourceMapBuilder* sourceMap,
+                                             std::vector<Diagnostic>* diagnostics) {
   const NdsSequenceDescriptor& descriptor = ndsSequenceDescriptor();
   const SequenceDialect& dialect = descriptor.dialect;
   const u32 sequenceOffset = range.decodeOffset != 0 ? range.decodeOffset : range.offset;
-  const std::optional<AssetId> instrumentSetId =
-      instrumentSet ? std::optional<AssetId>{instrumentSet->id} : std::nullopt;
   const SourceRange sequenceRange = input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset);
   SequenceProgramAsset asset{
       .metadata =
@@ -607,23 +603,23 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
           },
   };
 
-  ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root = items.add(std::nullopt, ItemKind::Sequence, "sseq", name, sequenceRange);
+  SourceAnnotationId headerAnnotation;
   if (sourceMap != nullptr && input.reader.has(sequenceOffset, kSseqHeaderSize)) {
-    sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, kSseqHeaderSize))
-        .kind("sseq-header")
-        .field("data_offset", input.reader.range(sequenceOffset + kSseqDataOffsetField, 4),
-               sequenceOffset + input.reader.le32(sequenceOffset + kSseqDataOffsetField),
-               SourceValueDisplay::Address);
+    headerAnnotation = sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, kSseqHeaderSize))
+                           .kind("sseq-header")
+                           .owner(ObjectRefs::sequence(id))
+                           .field("data_offset", input.reader.range(sequenceOffset + kSseqDataOffsetField, 4),
+                                  sequenceOffset + input.reader.le32(sequenceOffset + kSseqDataOffsetField),
+                                  SourceValueDisplay::Address)
+                           .id();
   }
 
   u32 trackIndex = 0;
   for (const u32 start : ndsSequenceTrackStarts(input.reader, sequenceOffset, range.sequenceEnd)) {
     auto track = decodeNdsSequenceTrack(input.reader, descriptor, sequenceOffset, range.sequenceEnd, start,
-                                        trackIndex++, range.recoverMalformedSdatRange, sourceMap, diagnostics);
-    const auto trackItem = items.add(root, ItemKind::Track, "track", fmt::format("Track {}", track.sourceTrackNumber),
-                                     input.reader.range(start, 0));
-    addSourceCommandItemsAndInstrumentReferences(items, trackItem, asset.program, dialect, track, instrumentSetId);
+                                        trackIndex, range.recoverMalformedSdatRange, sourceMap, diagnostics,
+                                        headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt, id);
+    ++trackIndex;
     asset.program.tracks.push_back(std::move(track));
   }
 

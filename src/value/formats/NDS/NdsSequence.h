@@ -32,7 +32,9 @@ void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
                                                         u32 sequenceEnd, u32 startOffset, u32 trackIndex,
                                                         bool recoverMalformedSdatRange = false,
                                                         core::SourceMapBuilder* sourceMap = nullptr,
-                                                        std::vector<core::Diagnostic>* diagnostics = nullptr);
+                                                        std::vector<core::Diagnostic>* diagnostics = nullptr,
+                                                        std::optional<core::SourceAnnotationId> parent = std::nullopt,
+                                                        std::optional<core::AssetId> sequenceAsset = std::nullopt);
 
 [[nodiscard]] std::vector<u32> ndsSequenceTrackStarts(core::ByteReader reader, u32 sequenceOffset, u32 sequenceEnd);
 
@@ -40,7 +42,7 @@ void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
 
 [[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(
     const core::ScanInput& input, core::AssetId id, NdsSequenceRange range, const std::string& name,
-    std::optional<core::ScanInstrumentSetRef> instrumentSet, core::SourceMapBuilder* sourceMap = nullptr,
+    core::SourceMapBuilder* sourceMap = nullptr,
     std::vector<core::Diagnostic>* diagnostics = nullptr);
 
 }  // namespace vgmtrans::formats::nds

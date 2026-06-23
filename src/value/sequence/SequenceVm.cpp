@@ -675,6 +675,9 @@ void VmApi::diagnostic(Diagnostic diagnostic) {
   if (!diagnostic.range && command_.range.valid()) {
     diagnostic.range = command_.range;
   }
+  if (!diagnostic.annotation && command_.annotation.valid()) {
+    diagnostic.annotation = command_.annotation;
+  }
   sequence_.diagnostics.push_back(std::move(diagnostic));
 }
 

@@ -60,7 +60,7 @@ class ScanSequenceAssetBuilder {
 public:
   ScanSequenceAssetBuilder(ScanResultBuilder& out, ScanSequenceRef ref, std::string name, SourceRange range);
 
-  [[nodiscard]] ScanSequenceRef program(SequenceProgram program, ItemTree items = {});
+  [[nodiscard]] ScanSequenceRef program(SequenceProgram program);
 
 private:
   ScanResultBuilder& out_;
@@ -73,7 +73,7 @@ class ScanInstrumentSetAssetBuilder {
 public:
   ScanInstrumentSetAssetBuilder(ScanResultBuilder& out, ScanInstrumentSetRef ref, std::string name, SourceRange range);
 
-  [[nodiscard]] ScanInstrumentSetRef instruments(std::vector<Instrument> instruments, ItemTree items = {});
+  [[nodiscard]] ScanInstrumentSetRef instruments(std::vector<Instrument> instruments);
 
 private:
   ScanResultBuilder& out_;
@@ -87,7 +87,7 @@ public:
   ScanSampleCollectionAssetBuilder(ScanResultBuilder& out, ScanSampleCollectionRef ref, std::string name,
                                    SourceRange range);
 
-  [[nodiscard]] ScanSampleCollectionRef samples(SampleCollection samples, ItemTree items = {});
+  [[nodiscard]] ScanSampleCollectionRef samples(SampleCollection samples);
 
 private:
   ScanResultBuilder& out_;
@@ -100,7 +100,7 @@ class ScanMiscAssetBuilder {
 public:
   ScanMiscAssetBuilder(ScanResultBuilder& out, ScanMiscAssetRef ref, std::string name, SourceRange range);
 
-  [[nodiscard]] ScanMiscAssetRef payload(std::vector<u8> payload, ItemTree items = {});
+  [[nodiscard]] ScanMiscAssetRef payload(std::vector<u8> payload);
 
 private:
   ScanResultBuilder& out_;
@@ -212,7 +212,7 @@ private:
   friend class ScanSampleCollectionAssetBuilder;
   friend class ScanMiscAssetBuilder;
 
-  [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range, ItemTree items = {}) const;
+  [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
   [[nodiscard]] CollectionKey defaultCollectionKey(std::string_view name) const;
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 

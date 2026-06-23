@@ -34,6 +34,9 @@
 #include <string_view>
 #include <system_error>
 #include <type_traits>
+#include <unordered_set>
+#include <variant>
+#include <vector>
 
 #include <fmt/color.h>
 #include <fmt/format.h>
@@ -359,26 +362,160 @@ bool printValueSourceBytes(const vgmtrans::core::SourceStore& sources, const std
   return true;
 }
 
-void printValueItemTree(const vgmtrans::core::ItemTree& tree, vgmtrans::core::ItemId id, int depth, int maxDepth) {
+bool valueRangeContains(vgmtrans::core::SourceRange outer, vgmtrans::core::SourceRange inner) {
+  if (!outer.valid() || !inner.valid() || outer.source != inner.source) {
+    return false;
+  }
+  return inner.offset >= outer.offset && inner.offset <= outer.endOffset() &&
+         inner.size <= outer.endOffset() - inner.offset;
+}
+
+bool valueAnnotationBelongsToAsset(const vgmtrans::core::SourceAnnotation& annotation,
+                                   vgmtrans::core::AssetId assetId, vgmtrans::core::SourceRange assetRange) {
+  if (annotation.owner && annotation.owner->asset == assetId) {
+    return true;
+  }
+  return valueRangeContains(assetRange, annotation.range);
+}
+
+bool valueSourceOutlineAutoVisible(vgmtrans::core::SourceRole role) {
+  switch (role) {
+    case vgmtrans::core::SourceRole::Unknown:
+    case vgmtrans::core::SourceRole::Field:
+    case vgmtrans::core::SourceRole::Opcode:
+    case vgmtrans::core::SourceRole::Operand:
+    case vgmtrans::core::SourceRole::Padding:
+      return false;
+    case vgmtrans::core::SourceRole::Source:
+    case vgmtrans::core::SourceRole::Section:
+    case vgmtrans::core::SourceRole::Header:
+    case vgmtrans::core::SourceRole::Sequence:
+    case vgmtrans::core::SourceRole::SequenceTrack:
+    case vgmtrans::core::SourceRole::Table:
+    case vgmtrans::core::SourceRole::TableRow:
+    case vgmtrans::core::SourceRole::Pointer:
+    case vgmtrans::core::SourceRole::Payload:
+    case vgmtrans::core::SourceRole::DataBlock:
+    case vgmtrans::core::SourceRole::Command:
+    case vgmtrans::core::SourceRole::InstrumentSet:
+    case vgmtrans::core::SourceRole::Instrument:
+    case vgmtrans::core::SourceRole::Region:
+    case vgmtrans::core::SourceRole::SampleCollection:
+    case vgmtrans::core::SourceRole::Sample:
+      return true;
+  }
+  return false;
+}
+
+bool valueSourceOutlineVisible(const vgmtrans::core::SourceAnnotation& annotation) {
+  switch (annotation.outline) {
+    case vgmtrans::core::SourceOutlinePolicy::Show:
+      return true;
+    case vgmtrans::core::SourceOutlinePolicy::Hide:
+      return false;
+    case vgmtrans::core::SourceOutlinePolicy::Auto:
+      return valueSourceOutlineAutoVisible(annotation.role);
+  }
+  return false;
+}
+
+std::string valueSourceText(const vgmtrans::core::SourceValue& value) {
+  if (const auto* boolValue = std::get_if<bool>(&value)) {
+    return *boolValue ? "true" : "false";
+  }
+  if (const auto* unsignedValue = std::get_if<u64>(&value)) {
+    return std::to_string(*unsignedValue);
+  }
+  if (const auto* signedValue = std::get_if<s64>(&value)) {
+    return std::to_string(*signedValue);
+  }
+  if (const auto* doubleValue = std::get_if<double>(&value)) {
+    return fmt::format("{}", *doubleValue);
+  }
+  if (const auto* text = std::get_if<std::string>(&value)) {
+    return *text;
+  }
+  return {};
+}
+
+std::string valueAnnotationDescription(const vgmtrans::core::SourceAnnotation& annotation) {
+  if (!annotation.description.empty()) {
+    return annotation.description;
+  }
+
+  std::string description;
+  for (const auto& field : annotation.fields) {
+    if (field.name.empty() || field.name == "opcode") {
+      continue;
+    }
+    const std::string value = valueSourceText(field.value);
+    if (value.empty()) {
+      continue;
+    }
+    if (!description.empty()) {
+      description += ", ";
+    }
+    description += field.name + " " + value;
+  }
+  return description;
+}
+
+std::string_view valueAnnotationKind(const vgmtrans::core::SourceAnnotation& annotation) {
+  return annotation.detailKind.empty() ? std::string_view{annotation.localKind} : std::string_view{annotation.detailKind};
+}
+
+std::vector<vgmtrans::core::SourceAnnotationId> valueAssetAnnotationRoots(
+    const vgmtrans::core::SessionSnapshot& project, vgmtrans::core::AssetId assetId) {
+  const auto* asset = project.asset(assetId);
+  if (asset == nullptr) {
+    return {};
+  }
+
+  const auto& meta = vgmtrans::core::metadata(*asset);
+  const auto& sourceMap = project.sourceMap();
+  std::unordered_set<u32> included;
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (valueSourceOutlineVisible(annotation) && valueAnnotationBelongsToAsset(annotation, assetId, meta.range)) {
+      included.insert(annotation.id.value);
+    }
+  }
+
+  std::vector<vgmtrans::core::SourceAnnotationId> roots;
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (!included.contains(annotation.id.value)) {
+      continue;
+    }
+    if (!annotation.parent || !included.contains(annotation.parent->value)) {
+      roots.push_back(annotation.id);
+    }
+  }
+  return roots;
+}
+
+void printValueSourceAnnotationTree(const vgmtrans::core::SourceMap& sourceMap, vgmtrans::core::SourceAnnotationId id,
+                                    int depth, int maxDepth) {
   if (depth > maxDepth) {
     return;
   }
 
-  const auto* item = vgmtrans::core::itemById(tree, id);
-  if (item == nullptr) {
+  const auto* annotation = sourceMap.find(id);
+  if (annotation == nullptr) {
     return;
   }
 
   const std::string indent(static_cast<size_t>(depth) * 2, ' ');
-  fmt::print("{}#{} [{}] {} 0x{:x}:0x{:x}", indent, item->id.value, item->detailKind, item->name, item->range.offset,
-             item->range.size);
-  if (!item->description.empty()) {
-    fmt::print(" - {}", item->description);
+  fmt::print("{}#{} [{}] {} 0x{:x}:0x{:x}", indent, annotation->id.value, valueAnnotationKind(*annotation),
+             annotation->label, annotation->range.offset, annotation->range.size);
+  const std::string description = valueAnnotationDescription(*annotation);
+  if (!description.empty()) {
+    fmt::print(" - {}", description);
   }
   fmt::print("\n");
 
-  for (const auto child : item->children) {
-    printValueItemTree(tree, child, depth + 1, maxDepth);
+  for (const auto child : sourceMap.childrenOf(annotation->id)) {
+    if (const auto* childAnnotation = sourceMap.find(child); childAnnotation && valueSourceOutlineVisible(*childAnnotation)) {
+      printValueSourceAnnotationTree(sourceMap, child, depth + 1, maxDepth);
+    }
   }
 }
 
@@ -397,13 +534,16 @@ bool printValueAssetTree(const vgmtrans::core::SessionSnapshot& project, const s
       maxDepth = std::stoi(args[depthArgIndex]);
     }
 
-    const auto& items = vgmtrans::core::metadata(project.assets()[static_cast<size_t>(assetIndex)]).items;
-    if (!items.root) {
-      fmt::println("Asset has no item tree");
+    const auto assetId = vgmtrans::core::metadata(project.assets()[static_cast<size_t>(assetIndex)]).id;
+    const auto roots = valueAssetAnnotationRoots(project, assetId);
+    if (roots.empty()) {
+      fmt::println("Asset has no source outline");
       return false;
     }
 
-    printValueItemTree(items, *items.root, 0, maxDepth);
+    for (const auto root : roots) {
+      printValueSourceAnnotationTree(project.sourceMap(), root, 0, maxDepth);
+    }
     return true;
   } catch (...) {
     fmt::println("Invalid arguments");
@@ -411,9 +551,8 @@ bool printValueAssetTree(const vgmtrans::core::SessionSnapshot& project, const s
   }
 }
 
-bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project,
-                              const vgmtrans::core::SequenceDialectRegistry& dialects,
-                              const std::vector<std::string>& args, size_t assetArgIndex) {
+bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
+                              size_t assetArgIndex) {
   try {
     const int assetIndex = std::stoi(args[assetArgIndex]);
     if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
@@ -435,7 +574,6 @@ bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project,
       return false;
     }
 
-    const auto* dialect = dialects.find(sequenceProgram->program.dialect.value);
     size_t limit = sequenceProgram->program.tracks[static_cast<size_t>(trackIndex)].commands.size();
     const size_t limitArgIndex = assetArgIndex + 2;
     if (args.size() > limitArgIndex) {
@@ -448,22 +586,19 @@ bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project,
     }
 
     const auto& track = sequenceProgram->program.tracks[static_cast<size_t>(trackIndex)];
+    const auto& sourceMap = project.sourceMap();
     fmt::println("Commands for value sequence asset #{} track #{} (source track {}, start 0x{:x}):", assetIndex,
                  trackIndex, track.sourceTrackNumber, track.startAddress.value);
-    if (dialect == nullptr) {
-      fmt::println("No registered dialect for '{}'; showing raw command ids.", sequenceProgram->program.dialect.value);
-    }
     const size_t count = std::min(limit, track.commands.size());
     for (size_t i = 0; i < count; ++i) {
       const auto& command = track.commands[i];
-      if (dialect != nullptr) {
-        const auto info = dialect->describe(track, command);
-        const auto description = vgmtrans::core::commandInfoDescription(info);
+      if (const auto* annotation = sourceMap.find(command.annotation)) {
+        const std::string description = valueAnnotationDescription(*annotation);
         fmt::println("#{} 0x{:x}:0x{:x} opcode=0x{:02x} {}{}{}", i, command.range.offset, command.range.size,
-                     command.opcode, info.name, description.empty() ? "" : " - ", description);
+                     command.opcode, annotation->label, description.empty() ? "" : " - ", description);
       } else {
-        fmt::println("#{} 0x{:x}:0x{:x} kind={} opcode=0x{:02x}", i, command.range.offset, command.range.size,
-                     command.kind.value, command.opcode);
+        fmt::println("#{} 0x{:x}:0x{:x} handler={} opcode=0x{:02x}", i, command.range.offset, command.range.size,
+                     command.handler.value, command.opcode);
       }
     }
     if (count < track.commands.size()) {
@@ -1525,14 +1660,14 @@ void value_events(const std::vector<std::string>& args) {
 
   auto session = valueSessionForRawFile(*file);
   const auto project = session.scanPendingSources();
-  printValueSequenceEvents(project, session.dialects(), args, 3);
+  printValueSequenceEvents(project, args, 3);
 }
 
 void value_events_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
     const auto project = session.scanPendingSources();
-    printValueSequenceEvents(project, session.dialects(), args, 3);
+    printValueSequenceEvents(project, args, 3);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-events {}: {}", args[2], ex.what());
   }
@@ -1827,8 +1962,8 @@ void registerCommands() {
         value_read_source},
        {"read-source-path", "<path> <source_idx> <offset> <length>",
         "Read bytes from a value source after scanning a filesystem path", 6, value_read_source_path},
-       {"tree", "<rawfile_idx> <asset_idx> [depth]", "Show a value asset ItemTree", 4, value_tree},
-       {"tree-path", "<path> <asset_idx> [depth]", "Show a value asset ItemTree from a filesystem path", 4,
+       {"tree", "<rawfile_idx> <asset_idx> [depth]", "Show a value asset source outline", 4, value_tree},
+       {"tree-path", "<path> <asset_idx> [depth]", "Show a value asset source outline from a filesystem path", 4,
         value_tree_path},
        {"events", "<rawfile_idx> <asset_idx> <track_idx> [limit]", "List decoded commands in a value sequence track", 5,
         value_events},

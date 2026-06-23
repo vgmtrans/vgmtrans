@@ -555,16 +555,9 @@ struct ParsedInstrumentSet {
 
 InstrumentSetAsset buildAkaoInstrumentSetAsset(const ScanInput& input, AssetId id, const AkaoSequenceAnalysis& sequence,
                                                std::vector<Instrument> instruments) {
-  ItemTree items;
-  ItemTreeBuilder itemBuilder(items, input.ids);
   const std::string name = fmt::format("Akao Instr Set {:02X}", sequence.header.sequenceId);
   const SourceRange range = input.reader.range(
       sequence.header.instrumentSetOffset.value_or(sequence.header.drumSetOffset.value_or(sequence.header.offset)), 0);
-  const ItemId root = itemBuilder.add(std::nullopt, ItemKind::InstrumentSet, "akao-instrument-set", name, range);
-  for (u32 i = 0; i < instruments.size(); ++i) {
-    static_cast<void>(
-        itemBuilder.add(root, ItemKind::Instrument, "akao-instrument", instruments[i].name, instruments[i].range));
-  }
 
   return InstrumentSetAsset{
       .metadata =
@@ -573,7 +566,6 @@ InstrumentSetAsset buildAkaoInstrumentSetAsset(const ScanInput& input, AssetId i
               .format = std::string(kAkaoFormatName),
               .name = name,
               .range = range,
-              .items = std::move(items),
           },
       .instruments = std::move(instruments),
   };

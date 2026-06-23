@@ -154,8 +154,6 @@ target_sources(vgmtransvaluecore
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
-      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeDecode.h
-      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeMap.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeTable.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeWalkers.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
@@ -184,7 +182,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursorDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
-      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/SequenceCommandHelpers.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h

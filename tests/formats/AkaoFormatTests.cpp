@@ -12,6 +12,8 @@
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
+#include "ValueFormatTestSupport.h"
+
 #include <algorithm>
 #include <stdexcept>
 #include <string>
@@ -53,35 +55,19 @@ void writeLeS16(std::vector<u8>& bytes, size_t offset, s16 value) {
   writeLe16(bytes, offset, static_cast<u16>(value));
 }
 
-bool hasCommandKind(const SequenceDialect& dialect, const TrackProgram& track, std::string_view detailKind,
-                    u32 offset) {
-  return std::ranges::any_of(track.commands, [&](const SourceCommand& command) {
-    return command.range.offset == offset && dialect.describe(track, command).detailKind == detailKind;
-  });
-}
-
-const SourceAnnotation& commandAnnotationAt(const SourceMap& sourceMap, SourceId source, u32 offset) {
-  const auto commandIds = sourceMap.withRole(source, SourceRole::Command);
-  const auto found = std::ranges::find_if(commandIds, [&](SourceAnnotationId id) {
-    return sourceMap.get(id).range.offset == offset;
-  });
-  if (found == commandIds.end()) {
-    throw std::runtime_error("expected command annotation was not found");
-  }
-  return sourceMap.get(*found);
-}
-
 bool hasLinkRole(const SourceAnnotation& annotation, SourceLinkRole role) {
   return std::ranges::any_of(annotation.links, [&](const SourceLink& link) { return link.role == role; });
 }
 
-TrackProgram decodeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end) {
+TrackProgram decodeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end,
+                                SourceMapBuilder* sourceMap = nullptr, SourceId source = SourceId{20}) {
   const SequenceDialect dialect = makeAkaoDialect(version);
-  return decodeAkaoTrack(ByteReader(SourceId{20}, bytes), dialect,
+  return decodeAkaoTrack(ByteReader(source, bytes), dialect,
                          CursorTrackDecodeInput{
                              .startOffset = start,
                              .bytecodeEnd = end,
                              .sequenceEnd = end,
+                             .sourceMap = sourceMap,
                              .maxCommands = 64,
                          });
 }
@@ -107,13 +93,13 @@ void akaoDialectDecodesLegacyRelativeJumpTargets() {
   writeLeS16(bytes, start + 1, static_cast<s16>(target - (start + 1 + 2)));
   bytes[target] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_0);
-  const TrackProgram track = decodeAkaoTrack(ByteReader(SourceId{20}, bytes), dialect,
-                                             CursorTrackDecodeInput{.startOffset = start, .bytecodeEnd = 0x40});
+  SourceMapBuilder sourceMap;
+  const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40, &sourceMap);
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 2, "Akao legacy jump should decode the jump command and its target block");
-  expect(hasCommandKind(dialect, track, "akao-ps1-1.0.jump", start),
-         "Akao legacy jump should have an explicit command kind");
-  expect(hasCommandKind(dialect, track, "akao-ps1-1.0.end", target),
+  expect(hasCommandAnnotation(annotations, SourceId{20}, "akao-ps1-1.0.jump", start),
+         "Akao legacy jump should publish a source annotation");
+  expect(hasCommandAnnotation(annotations, SourceId{20}, "akao-ps1-1.0.end", target),
          "Akao legacy jump should expose the static target to the cursor walker");
 }
 
@@ -129,19 +115,20 @@ void akaoDialectDecodesConditionalBranchSideTargets() {
   bytes[fallthrough] = 0xa0;
   bytes[target] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version3_2);
-  const TrackProgram track = decodeAkaoTrack(ByteReader(SourceId{21}, bytes), dialect,
-                                             CursorTrackDecodeInput{.startOffset = start, .bytecodeEnd = 0x70});
+  SourceMapBuilder sourceMap;
+  const TrackProgram track =
+      decodeFixtureTrack(bytes, AkaoPs1Version::Version3_2, start, 0x70, &sourceMap, SourceId{21});
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 3, "Akao conditional branch should decode both fallthrough and side-target blocks");
-  expect(hasCommandKind(dialect, track, "akao-ps1-3.2.cpu-conditional-jump", start),
-         "Akao conditional branch should have an explicit command kind");
-  expect(hasCommandKind(dialect, track, "akao-ps1-3.2.end", fallthrough),
+  expect(hasCommandAnnotation(annotations, SourceId{21}, "akao-ps1-3.2.cpu-conditional-jump", start),
+         "Akao conditional branch should publish a source annotation");
+  expect(hasCommandAnnotation(annotations, SourceId{21}, "akao-ps1-3.2.end", fallthrough),
          "Akao conditional branch should preserve fallthrough flow");
-  expect(hasCommandKind(dialect, track, "akao-ps1-3.2.end", target),
+  expect(hasCommandAnnotation(annotations, SourceId{21}, "akao-ps1-3.2.end", target),
          "Akao conditional branch should expose the branch target as static flow");
 }
 
-void akaoSequenceAnalysisUsesCommandReaderFacts() {
+void akaoSequenceAnalysisUsesSourceAnnotations() {
   std::vector<u8> bytes(0x90, 0xa0);
   constexpr u32 start = 0x20;
   constexpr u32 customTable = 0x60;
@@ -207,13 +194,14 @@ void akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks() {
   bytes[start + 2] = 0x02;
   bytes[start + 3] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version3_2);
-  const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version3_2, start, 0x40);
+  SourceMapBuilder sourceMap;
+  const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version3_2, start, 0x40, &sourceMap);
+  const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 3, "Akao repeat fixture should decode start, repeat-until, and fallthrough end");
-  expect(hasCommandKind(dialect, track, "akao-ps1-3.2.repeat-start", start),
-         "Akao repeat start should be an explicit command");
-  expect(hasCommandKind(dialect, track, "akao-ps1-3.2.repeat-until", start + 1),
-         "Akao repeat until should be an explicit command");
+  expect(hasCommandAnnotation(annotations, SourceId{20}, "akao-ps1-3.2.repeat-start", start),
+         "Akao repeat start should publish a source annotation");
+  expect(hasCommandAnnotation(annotations, SourceId{20}, "akao-ps1-3.2.repeat-until", start + 1),
+         "Akao repeat until should publish a source annotation");
 }
 
 void akaoRepeatSourceLinksUseSpecificRolesOnly() {
@@ -559,6 +547,19 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
   expect(collection.instrumentSets.front() != collection.sequence &&
              collection.instrumentSets.front() != collection.sampleCollections.front(),
          "Akao materialized instrument set should be distinct from scanned assets");
+  const auto sequenceHeaders = project.sourceMap().withRole(SourceId{0}, SourceRole::Header);
+  const auto header = std::ranges::find_if(sequenceHeaders, [&](SourceAnnotationId id) {
+    const SourceAnnotation& annotation = project.sourceMap().get(id);
+    return annotation.localKind == "akao-sequence-header";
+  });
+  expect(header != sequenceHeaders.end(), "Akao source map should expose the sequence header annotation");
+  const SourceAnnotation& sequenceHeader = project.sourceMap().get(*header);
+  expect(sequenceHeader.owner == ObjectRefs::sequence(sequenceId),
+         "Akao sequence header annotation should point at the semantic sequence asset");
+  const auto trackAnnotations = project.sourceMap().childrenOf(sequenceHeader.id);
+  expect(!trackAnnotations.empty(), "Akao sequence header should parent decoded track annotations");
+  expect(project.sourceMap().get(trackAnnotations.front()).owner == ObjectRefs::sequenceTrack(sequenceId, 0),
+         "Akao track annotation should point at the semantic sequence track");
 
   const auto* materialized = project.asset<InstrumentSetAsset>(collection.instrumentSets.front());
   expect(materialized != nullptr, "Akao materialized instrument set should be present");

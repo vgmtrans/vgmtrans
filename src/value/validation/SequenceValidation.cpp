@@ -19,10 +19,6 @@ namespace {
   return span.offset <= poolSize && span.size <= poolSize - span.offset;
 }
 
-[[nodiscard]] bool operandSpanFits(OperandSpan span, size_t poolSize) noexcept {
-  return span.offset <= poolSize && span.size <= poolSize - span.offset;
-}
-
 }  // namespace
 
 ValidationReport validateSequenceProgram(const SequenceProgram& program) {
@@ -43,8 +39,8 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
 
     std::unordered_set<u32> commandIds;
     commandIds.reserve(track.commands.size());
-    // Commands refer into track-level byte and operand pools. Bad spans mean
-    // later UI/export code could read the wrong command details.
+    // Commands refer into a track-level byte pool. Bad spans mean later
+    // UI/export code could read the wrong source bytes.
     for (const auto& command : track.commands) {
       if (!command.id.valid()) {
         report.error("sequence.command.missing-id", "Sequence program contained a command without an id",
@@ -57,11 +53,6 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
 
       if (!byteSpanFits(command.bytes, track.commandBytes.size())) {
         report.error("sequence.command.byte-span", "Sequence command byte span was outside its track byte pool",
-                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
-      }
-      if (!operandSpanFits(command.operands, track.operands.size())) {
-        report.error("sequence.command.operand-span",
-                     "Sequence command operand span was outside its track operand pool",
                      command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
       }
     }

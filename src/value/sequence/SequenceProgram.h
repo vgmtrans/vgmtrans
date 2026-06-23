@@ -15,7 +15,6 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -32,65 +31,17 @@ struct ByteSpan {
   u32 size = 0;
 };
 
-struct OperandSpan {
-  u32 offset = 0;
-  u32 size = 0;
-};
-
-struct ReferenceSpan {
-  u32 offset = 0;
-  u32 size = 0;
-};
-
-using CommandOperandValue = std::variant<u64, s64, double, std::string, Address>;
-
-struct CommandOperand {
-  std::string name;
-  CommandOperandValue value;
-  SourceRange range;
-};
-
-struct CommandInstrumentReference {
-  u32 bank = 0;
-  u32 program = 0;
-  std::optional<SourceRange> range;
-};
-
-// Describes what a command means for playback. This is metadata for UI and
-// validation; execute() still implements the actual behavior.
-enum class CommandPlaybackStatus {
-  SourceOnly,
-  NoOp,
-  AffectsPlayback,
-  AffectsControlFlow,
-  StopsPlayback,
-  Unsupported,
-};
-
-struct CommandKind {
-  CommandKindId id;
-  std::string kindName;
-  std::string name;
-  std::string detailKind;
-  SequenceSemantic semantic = SequenceSemantic::Unknown;
-  CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
-};
-
-// One decoded source opcode. It keeps the original bytes, named operands, source
-// range, and the handler ID used to find the driver-specific behavior.
+// One decoded source opcode. Inspection metadata such as operand names, display
+// text, and semantic category lives on its SourceAnnotation.
 struct SourceCommand {
   CommandId id;
   CommandHandlerId handler;
-  CommandKindId kind;
   u8 opcode = 0;
   Address address;
   u32 encodedSize = 0;
   SourceRange range;
   SourceAnnotationId annotation;
   ByteSpan bytes;
-  OperandSpan operands;
-  ReferenceSpan instrumentReferences;
-  bool referencesDecoded = false;
 };
 
 // Where decoding can continue after an opcode. Walkers use this before playback
@@ -144,42 +95,6 @@ struct DecodeFlow {
   [[nodiscard]] bool callTarget() const noexcept { return kind == Kind::Call && !staticTargets.empty(); }
 };
 
-// Command structs use this to read operands. If an operand vector is supplied,
-// each read also records a name, value, and source byte range for the UI.
-class CommandReader {
-public:
-  CommandReader(SourceRange commandRange, std::span<const u8> bytes, std::vector<CommandOperand>* operands = nullptr);
-
-  [[nodiscard]] u8 opcode() const;
-  [[nodiscard]] size_t position() const noexcept { return position_; }
-  [[nodiscard]] bool done() const noexcept { return position_ == bytes_.size(); }
-  [[nodiscard]] std::span<const u8> remainingBytes() const noexcept;
-
-  [[nodiscard]] u8 u8(std::string_view name);
-  [[nodiscard]] s8 s8(std::string_view name);
-  [[nodiscard]] u16 le16(std::string_view name);
-  [[nodiscard]] s16 leS16(std::string_view name);
-  [[nodiscard]] Address le16Address(std::string_view name);
-  [[nodiscard]] u32 le24(std::string_view name);
-  [[nodiscard]] u32 varLen(std::string_view name);
-  [[nodiscard]] u16 be16(std::string_view name);
-  [[nodiscard]] Address be16Address(std::string_view name);
-  [[nodiscard]] std::string rawBytes(std::string_view name, size_t size);
-  [[nodiscard]] std::string rawRemainingBytes(std::string_view name);
-  void derived(std::string_view name, CommandOperandValue value);
-
-private:
-  [[nodiscard]] ::u8 readByte();
-  void require(size_t size) const;
-  void operand(std::string_view name, CommandOperandValue value, size_t begin, size_t size);
-  [[nodiscard]] SourceRange operandRange(size_t begin, size_t size) const;
-
-  SourceRange commandRange_;
-  std::span<const ::u8> bytes_;
-  std::vector<CommandOperand>* operands_ = nullptr;
-  size_t position_ = 1;
-};
-
 // Maps source addresses to command indexes. The VM uses this for jumps, calls,
 // and finding the next command by source address when vector order is different.
 struct AddressIndex {
@@ -196,25 +111,11 @@ struct TrackProgram {
   std::vector<SourceCommand> commands;
   AddressIndex addressIndex;
 
-  // Command bytes and operands are pooled at track scope so the parsed snapshot
-  // avoids one heap allocation per command.
-  std::vector<CommandKind> commandKinds;
+  // Command bytes are pooled at track scope so the parsed snapshot avoids one
+  // heap allocation per command.
   std::vector<u8> commandBytes;
-  std::vector<CommandOperand> operands;
-  std::vector<CommandInstrumentReference> commandInstrumentReferences;
 
-  [[nodiscard]] const CommandKind* kind(CommandKindId id) const;
-  [[nodiscard]] const CommandKind* kindForName(std::string_view kindName) const;
   [[nodiscard]] std::span<const u8> bytesFor(const SourceCommand& command) const;
-  [[nodiscard]] std::span<const CommandOperand> operandsFor(const SourceCommand& command) const;
-  [[nodiscard]] std::span<const CommandInstrumentReference> instrumentReferencesFor(const SourceCommand& command) const;
-};
-
-struct SequenceInstrumentRef {
-  std::optional<AssetId> asset;
-  u32 bank = 0;
-  u32 program = 0;
-  std::optional<SourceRange> range;
 };
 
 // Driver settings that affect playback but are not individual source commands,
@@ -242,13 +143,10 @@ struct SequenceProgram {
   Address sourceBaseAddress;
   SequenceProgramBehavior behavior;
   std::vector<TrackProgram> tracks;
-  std::vector<SequenceInstrumentRef> referencedInstruments;
 };
 
 [[nodiscard]] const TrackProgram* trackById(const SequenceProgram& program, TrackId id);
 [[nodiscard]] const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id);
-void addUniqueReferencedInstrument(SequenceProgram& program, std::optional<AssetId> asset, u32 bank, u32 programNumber,
-                                   std::optional<SourceRange> range);
 
 struct SequenceProgramAsset {
   AssetMetadata metadata;
@@ -259,34 +157,10 @@ class TrackProgramBuilder {
 public:
   explicit TrackProgramBuilder(TrackProgram& track);
 
-  template <class Command>
-  const SourceCommand& add(CommandHandlerId handler, CommandKindId kind, Address address, SourceRange range,
-                           std::span<const u8> bytes) {
-    std::vector<CommandOperand> decodedOperands;
-    // Decode once while adding the command, using the same parser that will be
-    // used later to describe or execute it.
-    CommandReader reader{range, bytes, &decodedOperands};
-    static_cast<void>(Command::parse(reader));
-    if (!reader.done()) {
-      throw std::invalid_argument("Sequence command parser left trailing source bytes");
-    }
-    return addDecoded(handler, kind, address, range, bytes, decodedOperands);
-  }
-
-  const SourceCommand& addDecoded(CommandHandlerId handler, CommandKindId kind, Address address, SourceRange range,
-                                  std::span<const u8> bytes, std::span<const CommandOperand> operands,
-                                  SourceAnnotationId annotation = {},
-                                  std::span<const CommandInstrumentReference> instrumentReferences = {},
-                                  bool referencesDecoded = false);
-  const SourceCommand& addDecoded(CommandHandlerId handler, const CommandKind& kind, Address address, SourceRange range,
-                                  std::span<const u8> bytes, std::span<const CommandOperand> operands,
-                                  SourceAnnotationId annotation = {},
-                                  std::span<const CommandInstrumentReference> instrumentReferences = {},
-                                  bool referencesDecoded = false);
+  const SourceCommand& addDecoded(CommandHandlerId handler, Address address, SourceRange range,
+                                  std::span<const u8> bytes, SourceAnnotationId annotation = {});
 
 private:
-  [[nodiscard]] CommandKindId addOrReuseKind(const CommandKind& kind);
-
   TrackProgram& track_;
 };
 

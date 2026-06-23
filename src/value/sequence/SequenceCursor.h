@@ -59,6 +59,22 @@ struct CommandFlow {
   std::optional<Effects> resolvedEffects;
 };
 
+enum class CommandPlaybackStatus {
+  SourceOnly,
+  NoOp,
+  AffectsPlayback,
+  AffectsControlFlow,
+  StopsPlayback,
+  Unsupported,
+};
+
+struct CursorCommandMetadata {
+  std::string name;
+  std::string detailKind;
+  SequenceSemantic semantic = SequenceSemantic::Unknown;
+  CommandPlaybackStatus playbackStatus = CommandPlaybackStatus::AffectsPlayback;
+};
+
 class RepeatBreakFlow {
 public:
   RepeatBreakFlow(CommandFlow flow, bool taken);
@@ -91,8 +107,7 @@ private:
 class VmCommandCursor {
 public:
   VmCommandCursor(CommandPhase phase, SourceRange commandRange, std::span<const ::u8> bytes,
-                  SourceMapBuilder* sourceMap = nullptr, std::vector<Diagnostic>* diagnostics = nullptr,
-                  std::vector<CommandOperand>* operands = nullptr, CommandReferences* references = nullptr);
+                  SourceMapBuilder* sourceMap = nullptr, std::vector<Diagnostic>* diagnostics = nullptr);
 
   [[nodiscard]] CommandPhase phase() const noexcept { return phase_; }
   [[nodiscard]] SourceId source() const noexcept { return commandRange_.source; }
@@ -104,7 +119,7 @@ public:
   [[nodiscard]] SourceAnnotationId annotation() const noexcept { return annotation_; }
   [[nodiscard]] size_t position() const noexcept { return position_; }
   [[nodiscard]] bool failed() const noexcept { return failed_; }
-  [[nodiscard]] CommandKind commandKind(std::string_view kindPrefix) const;
+  [[nodiscard]] CursorCommandMetadata metadata(std::string_view kindPrefix) const;
 
   VmCommandCursor& name(std::string_view displayName);
   VmCommandCursor& name(std::string_view displayName, SequenceSemantic semantic);
@@ -183,7 +198,6 @@ private:
   [[nodiscard]] bool readByte(std::string_view field, ::u8& out);
   void recordField(std::string_view name, SourceRange range, SourceValue value,
                    SourceValueDisplay display = SourceValueDisplay::Default);
-  void recordOperand(std::string_view name, SourceRange range, const SourceValue& value, SourceValueDisplay display);
   void defaultSemantic(SequenceSemantic semantic);
   void defaultPlaybackStatus(CommandPlaybackStatus status);
   [[nodiscard]] CommandFlow flow(FlowKind kind, u32 waitTicks = 0, std::optional<Address> destination = std::nullopt);
@@ -193,8 +207,6 @@ private:
   std::span<const ::u8> bytes_;
   SourceMapBuilder* sourceMap_ = nullptr;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
-  std::vector<CommandOperand>* operands_ = nullptr;
-  CommandReferences* references_ = nullptr;
   std::vector<PendingDiagnostic> pendingDiagnostics_;
   size_t position_ = 1;
   SourceAnnotationId annotation_;

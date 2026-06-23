@@ -22,14 +22,13 @@
 
 namespace vgmtrans::core {
 
-struct SourceAnnotationIdTag;
-using SourceAnnotationId = Id<SourceAnnotationIdTag>;
-
 enum class SourceRole : u8 {
   Unknown,
   Source,
   Section,
   Header,
+  Sequence,
+  SequenceTrack,
   Table,
   TableRow,
   Field,
@@ -40,9 +39,11 @@ enum class SourceRole : u8 {
   Command,
   Opcode,
   Operand,
+  InstrumentSet,
   Instrument,
+  Region,
+  SampleCollection,
   Sample,
-  Diagnostic,
 };
 
 enum class SequenceSemantic : u8 {
@@ -137,25 +138,6 @@ enum class SourceLinkRole : u8 {
   Related,
 };
 
-enum class ObjectKind : u8 {
-  Asset,
-  Sequence,
-  SequenceTrack,
-  SequenceCommand,
-  Instrument,
-  Sample,
-  Misc,
-};
-
-struct ObjectRef {
-  ObjectKind kind = ObjectKind::Asset;
-  AssetId asset;
-  u32 index0 = 0;
-  u32 index1 = 0;
-
-  friend constexpr bool operator==(ObjectRef, ObjectRef) noexcept = default;
-};
-
 namespace ObjectRefs {
 
 [[nodiscard]] ObjectRef asset(AssetId asset);
@@ -178,15 +160,24 @@ struct SourceLink {
   std::string label;
 };
 
+enum class SourceOutlinePolicy : u8 {
+  Auto,
+  Show,
+  Hide,
+};
+
 struct SourceAnnotation {
   SourceAnnotationId id;
   SourceRange range;
   SourceRole role = SourceRole::Unknown;
   std::string label;
+  std::string description;
   std::optional<SequenceSemantic> sequenceSemantic;
   std::string localKind;
+  std::string detailKind;
   std::optional<ObjectRef> owner;
   std::optional<SourceAnnotationId> parent;
+  SourceOutlinePolicy outline = SourceOutlinePolicy::Auto;
   std::vector<SourceField> fields;
   std::vector<SourceLink> links;
 };
@@ -206,6 +197,7 @@ public:
   [[nodiscard]] std::vector<SourceAnnotationId> containing(SourceRange range) const;
   [[nodiscard]] std::vector<SourceAnnotationId> at(SourceId source, u64 offset) const;
   [[nodiscard]] std::vector<SourceAnnotationId> ownedBy(ObjectRef object) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> childrenOf(SourceAnnotationId parent) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withRole(SourceId source, SourceRole role) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withSequenceSemantic(SourceId source,
                                                                      SequenceSemantic semantic) const;
@@ -218,6 +210,7 @@ private:
   std::vector<SourceAnnotation> annotations_;
   std::unordered_map<u32, size_t> annotationsById_;
   std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsBySource_;
+  std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByParent_;
 };
 
 class SourceMapBuilder;
@@ -232,9 +225,12 @@ public:
   AnnotationBuilder& role(SourceRole role);
   AnnotationBuilder& range(SourceRange range);
   AnnotationBuilder& label(std::string_view label);
+  AnnotationBuilder& description(std::string_view description);
   AnnotationBuilder& kind(std::string_view localKindOverride);
+  AnnotationBuilder& detailKind(std::string_view detailKind);
   AnnotationBuilder& parent(SourceAnnotationId parent);
   AnnotationBuilder& owner(ObjectRef owner);
+  AnnotationBuilder& outline(SourceOutlinePolicy policy);
   AnnotationBuilder& sequenceSemantic(SequenceSemantic semantic);
   AnnotationBuilder& field(std::string_view name, SourceRange range, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
@@ -268,6 +264,7 @@ public:
   explicit SourceMapBuilder(std::function<SourceAnnotationId()> nextId);
 
   [[nodiscard]] AnnotationBuilder source(std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder annotation(SourceRole role, std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder section(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder header(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder table(std::string_view label, SourceRange range);
@@ -299,18 +296,3 @@ private:
 [[nodiscard]] std::string sourceLocalKind(std::string_view label);
 
 }  // namespace vgmtrans::core
-
-namespace std {
-
-template <>
-struct hash<vgmtrans::core::ObjectRef> {
-  size_t operator()(const vgmtrans::core::ObjectRef& ref) const noexcept {
-    size_t seed = std::hash<int>{}(static_cast<int>(ref.kind));
-    seed ^= std::hash<::u32>{}(ref.asset.value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    seed ^= std::hash<::u32>{}(ref.index0) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    seed ^= std::hash<::u32>{}(ref.index1) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    return seed;
-  }
-};
-
-}  // namespace std

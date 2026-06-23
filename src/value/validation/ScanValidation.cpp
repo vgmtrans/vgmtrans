@@ -46,27 +46,13 @@ void validateRange(ValidationReport& report, const SourceStore& sources, SourceR
   }
 }
 
-void validateItemTreeRanges(ValidationReport& report, const SourceStore& sources, const ItemTree& items) {
-  for (const auto& item : items.nodes) {
-    validateRange(report, sources, item.range, "asset item");
-  }
-}
-
 void validateSequenceRanges(ValidationReport& report, const SourceStore& sources, const SequenceProgram& program) {
   for (const auto& track : program.tracks) {
     for (const auto& command : track.commands) {
       validateRange(report, sources, command.range, "sequence command");
     }
-    for (const auto& operand : track.operands) {
-      validateRange(report, sources, operand.range, "sequence command operand");
-    }
   }
 
-  for (const auto& instrument : program.referencedInstruments) {
-    if (instrument.range) {
-      validateRange(report, sources, *instrument.range, "sequence instrument reference");
-    }
-  }
 }
 
 void validateInstrumentSetRanges(ValidationReport& report, const SourceStore& sources,
@@ -103,7 +89,6 @@ void validateSourceMapRanges(ValidationReport& report, const SourceStore& source
 void validateAsset(ValidationReport& report, const SourceStore& sources, const Asset& asset) {
   const auto& meta = metadata(asset);
   validateRange(report, sources, meta.range, "asset metadata");
-  validateItemTreeRanges(report, sources, meta.items);
 
   // Scan validation owns source-range checks. Domain validators only check the
   // internal structure of the model they receive.

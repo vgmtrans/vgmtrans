@@ -24,12 +24,10 @@ class ScanIdAllocator {
 public:
   [[nodiscard]] AssetId nextAssetId() noexcept;
   [[nodiscard]] CollectionId nextCollectionId() noexcept;
-  [[nodiscard]] ItemId nextItemId() noexcept;
   [[nodiscard]] SourceAnnotationId nextSourceAnnotationId() noexcept;
 
   void reserveAfter(AssetId id) noexcept;
   void reserveAfter(CollectionId id) noexcept;
-  void reserveAfter(ItemId id) noexcept;
   void reserveAfter(SourceAnnotationId id) noexcept;
 
 private:
@@ -37,7 +35,6 @@ private:
   // IDs always advance past any explicit IDs already seen.
   u32 nextAssetId_ = 0;
   u32 nextCollectionId_ = 0;
-  u32 nextItemId_ = 0;
   u32 nextSourceAnnotationId_ = 0;
 };
 
@@ -45,22 +42,6 @@ struct ScanInput {
   SourceFile source;
   ByteReader reader;
   ScanIdAllocator& ids;
-};
-
-class ItemTreeBuilder {
-public:
-  ItemTreeBuilder(ItemTree& tree, ScanIdAllocator& ids);
-
-  // Adds a UI item and updates the parent's child list at the same time.
-  [[nodiscard]] ItemId add(std::optional<ItemId> parent, ItemKind kind, std::string detailKind, std::string name,
-                           SourceRange range, std::string description = {});
-
-private:
-  [[nodiscard]] ItemNode* item(ItemId id);
-
-  ItemTree& tree_;
-  ScanIdAllocator& ids_;
-  std::unordered_map<u32, std::size_t> itemIndexes_;
 };
 
 struct ExplicitCollection {

@@ -224,9 +224,6 @@ SampleCollectionAsset parseNdsPsgSamples(const ScanInput& input, AssetId id) {
               .range = input.reader.range(0, 0),
           },
   };
-  ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root =
-      items.add(std::nullopt, ItemKind::SampleCollection, "nds-psg", "NDS PSG samples", input.reader.range(0, 0));
 
   for (u32 i = 0; i <= 8; ++i) {
     asset.samples.samples.push_back(Sample{
@@ -239,8 +236,6 @@ SampleCollectionAsset parseNdsPsgSamples(const ScanInput& input, AssetId id) {
         .loop = Loop{.enabled = true, .start = 0, .length = 32768},
         .codecParameter = i,
     });
-    static_cast<void>(
-        items.add(root, ItemKind::Sample, "nds-psg-sample", fmt::format("PSG_duty_{}", i), input.reader.range(0, 0)));
   }
 
   return asset;
@@ -259,9 +254,6 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
               .range = input.reader.range(range.offset, range.size),
           },
   };
-  ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root =
-      items.add(std::nullopt, ItemKind::SampleCollection, "swar", name, input.reader.range(range.offset, range.size));
   SourceMapBuilder* sourceMap = diagnostics != nullptr ? &diagnostics->sourceMap() : nullptr;
 
   if (!isNdsWaveArchive(input.reader, range.offset)) {
@@ -278,12 +270,14 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
   if (!sampleCount) {
     return asset;
   }
+  SourceAnnotationId sampleTableAnnotation;
   if (sourceMap != nullptr) {
     const u64 sampleTableSize = static_cast<u64>(*sampleCount) * 4;
     if (const auto sampleTableRange = archive.range(0x3c, sampleTableSize, "SWAR sample offset table")) {
-      sourceMap->table("SWAR Sample Offset Table", *sampleTableRange)
-          .kind("swar-sample-offset-table")
-          .field("sample_count", sampleCount);
+      auto table = sourceMap->table("SWAR Sample Offset Table", *sampleTableRange)
+                       .kind("swar-sample-offset-table")
+                       .field("sample_count", sampleCount);
+      sampleTableAnnotation = table.id();
     }
   }
 
@@ -302,11 +296,16 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
     if (!sampleOffset || !sampleHeaderRange) {
       continue;
     }
+    SourceAnnotationId samplePointerAnnotation;
     if (sourceMap != nullptr) {
-      sourceMap
+      auto pointer = sourceMap
           ->pointer("SWAR Sample Offset", sampleRelativeOffset.range, SourceTarget{*sampleHeaderRange})
           .kind("swar-sample-offset")
           .derived("sample_index", i);
+      if (sampleTableAnnotation.valid()) {
+        pointer.parent(sampleTableAnnotation);
+      }
+      samplePointerAnnotation = pointer.id();
     }
     auto sampleHeader = makeParseCursor(input, *sampleHeaderRange, diagnostics, ignoredDiagnostics);
 
@@ -396,13 +395,16 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
     const auto sampleIndex = static_cast<u32>(asset.samples.samples.size());
     const std::string sampleName = fmt::format("Sample {}", asset.samples.samples.size());
     if (sourceMap != nullptr) {
-      sourceMap->header(sampleName + " Header", *sampleHeaderRange)
+      auto header = sourceMap->header(sampleName + " Header", *sampleHeaderRange)
           .role(SourceRole::Sample)
           .kind("swar-sample-header")
           .owner(ObjectRefs::sample(id, sampleIndex))
           .field("wave_type", waveType, SourceValueDisplay::Hex)
           .field("loop_flag", loopFlag.range, loops, SourceValueDisplay::Boolean)
           .field("sample_rate", rawSampleRate.range, sampleRate);
+      if (samplePointerAnnotation.valid()) {
+        header.parent(samplePointerAnnotation);
+      }
     }
     asset.samples.samples.push_back(Sample{
         .name = sampleName,
@@ -413,8 +415,6 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
         .bitsPerSample = bitsPerSample,
         .loop = loop,
     });
-    static_cast<void>(items.add(root, ItemKind::Sample, "swar-sample", sampleName,
-                                input.reader.range(*sampleOffset, dataRange->endOffset() - *sampleOffset)));
   }
 
   return asset;
@@ -435,9 +435,6 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
               .range = input.reader.range(range.offset, range.size),
           },
   };
-  ItemTreeBuilder items(asset.metadata.items, input.ids);
-  const auto root =
-      items.add(std::nullopt, ItemKind::InstrumentSet, "sbnk", name, input.reader.range(range.offset, range.size));
 
   if (!input.reader.has(range.offset + 0x3c, 4)) {
     return asset;
@@ -445,10 +442,11 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
 
   const u32 instrumentCount = input.reader.le32(range.offset + 0x38);
   const u64 instrumentTableSize = 4 + static_cast<u64>(instrumentCount) * 4;
-  builder.sourceMap()
-      .table("SBNK Instrument Pointer Table", input.reader.range(range.offset + 0x38, instrumentTableSize))
-      .kind("sbnk-instrument-pointer-table")
-      .field("instrument_count", input.reader.range(range.offset + 0x38, 4), instrumentCount);
+  auto pointerTable = builder.sourceMap()
+                          .table("SBNK Instrument Pointer Table",
+                                 input.reader.range(range.offset + 0x38, instrumentTableSize))
+                          .kind("sbnk-instrument-pointer-table")
+                          .field("instrument_count", input.reader.range(range.offset + 0x38, 4), instrumentCount);
   for (u32 i = 0; i < instrumentCount; ++i) {
     const u32 pointerOffset = range.offset + 0x3c + i * 4;
     if (!input.reader.has(pointerOffset, 4)) {
@@ -461,12 +459,14 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
 
     const u8 instrumentType = pointer & 0xff;
     const u32 instrumentOffset = range.offset + (pointer >> 8);
-    builder.sourceMap()
-        .pointer("SBNK Instrument Pointer", input.reader.range(pointerOffset, 4),
-                 SourceTarget{input.reader.range(instrumentOffset, 1)})
-        .kind("sbnk-instrument-pointer")
-        .derived("program", i)
-        .field("type", input.reader.range(pointerOffset, 1), instrumentType, SourceValueDisplay::Hex);
+    auto pointerAnnotation =
+        builder.sourceMap()
+            .pointer("SBNK Instrument Pointer", input.reader.range(pointerOffset, 4),
+                     SourceTarget{input.reader.range(instrumentOffset, 1)})
+            .kind("sbnk-instrument-pointer")
+            .derived("program", i)
+            .field("type", input.reader.range(pointerOffset, 1), instrumentType, SourceValueDisplay::Hex);
+    pointerAnnotation.parent(pointerTable.id());
     Instrument instrument{
         .bank = 0,
         .program = i,
@@ -580,16 +580,22 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
                             .owner(ObjectRefs::instrument(id, i))
                             .derived("program", i)
                             .derived("region_count", instrument.regions.size());
+      annotation.parent(pointerAnnotation.id());
       for (const auto& region : instrument.regions) {
         if (region.sample.collection) {
           annotation.link(SourceLinkRole::UsesSample,
                           SourceTarget{ObjectRefs::sample(*region.sample.collection, region.sample.index)});
         }
       }
-      const auto instrumentItem =
-          items.add(root, ItemKind::Instrument, "instrument", instrument.name, instrument.range);
       for (const auto& region : instrument.regions) {
-        static_cast<void>(items.add(instrumentItem, ItemKind::Region, "region", "Region", region.range));
+        auto regionAnnotation = builder.sourceMap()
+                                    .annotation(SourceRole::Region, "Region", region.range)
+                                    .kind("region")
+                                    .parent(annotation.id());
+        if (region.sample.collection) {
+          regionAnnotation.link(SourceLinkRole::UsesSample,
+                                SourceTarget{ObjectRefs::sample(*region.sample.collection, region.sample.index)});
+        }
       }
       asset.instruments.push_back(std::move(instrument));
     }

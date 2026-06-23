@@ -92,23 +92,21 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
       .behavior = dialect.defaultBehavior,
   };
 
-  ItemTree items;
-  ItemTreeBuilder itemBuilder(items, input.ids);
-  const ItemId root = itemBuilder.add(std::nullopt, ItemKind::Sequence, "akao-sequence", name,
-                                      input.reader.range(analysis.header.offset, analysis.header.length));
-
+  SourceAnnotationId headerAnnotation;
   if (sourceMap != nullptr) {
     auto header =
         sourceMap
             ->header("AKAO Sequence Header",
                      input.reader.range(analysis.header.offset, analysis.header.trackHeaderOffset))
             .kind("akao-sequence-header")
+            .owner(ObjectRefs::sequence(id))
             .field("sequence_id", input.reader.range(analysis.header.offset + 4, 2), analysis.header.sequenceId)
             .field("size", input.reader.range(analysis.header.offset + 6, 2), analysis.header.length)
             .field("track_bits",
                    input.reader.range(
                        analysis.header.offset + akaoProfile(analysis.header.version).trackAllocationBitsOffset(), 4),
                    analysis.header.trackBits, SourceValueDisplay::Hex);
+    headerAnnotation = header.id();
     if (analysis.header.sampleSetId) {
       header.field("sample_set_id", input.reader.range(analysis.header.offset + 0x14, 2), *analysis.header.sampleSetId);
     }
@@ -118,19 +116,19 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
   for (const u32 start : analysis.trackStarts) {
     auto track = decodeAkaoTrack(input.reader, dialect,
                                  CursorTrackDecodeInput{
+                                     .sequenceAsset = id,
                                      .trackIndex = trackIndex,
                                      .startOffset = start,
                                      .bytecodeEnd = sequenceEnd,
                                      .sequenceOffset = analysis.header.offset,
                                      .sequenceEnd = sequenceEnd,
+                                     .parentAnnotation =
+                                         headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt,
                                      .sourceMap = sourceMap,
                                      .diagnostics = diagnostics,
                                      .maxCommands = kAkaoMaxTrackCommands,
                                  });
     track.sourceTrackNumber = trackIndex;
-    const auto trackItem = itemBuilder.add(root, ItemKind::Track, "akao-track", fmt::format("Track {}", trackIndex + 1),
-                                           input.reader.range(start, 0));
-    addSourceCommandItemsAndInstrumentReferences(itemBuilder, trackItem, program, dialect, track, std::nullopt);
     program.tracks.push_back(std::move(track));
     ++trackIndex;
   }
@@ -142,7 +140,6 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
               .format = std::string(kAkaoFormatName),
               .name = name,
               .range = input.reader.range(analysis.header.offset, analysis.header.length),
-              .items = std::move(items),
           },
       .program = std::move(program),
   };

@@ -32,14 +32,14 @@ struct Id {
 struct SourceIdTag;
 using SourceId = Id<SourceIdTag>;
 
+struct SourceAnnotationIdTag;
+using SourceAnnotationId = Id<SourceAnnotationIdTag>;
+
 struct AssetIdTag;
 using AssetId = Id<AssetIdTag>;
 
 struct CollectionIdTag;
 using CollectionId = Id<CollectionIdTag>;
-
-struct ItemIdTag;
-using ItemId = Id<ItemIdTag>;
 
 struct TrackIdTag;
 using TrackId = Id<TrackIdTag>;
@@ -50,8 +50,24 @@ using CommandId = Id<CommandIdTag>;
 struct CommandHandlerIdTag;
 using CommandHandlerId = Id<CommandHandlerIdTag>;
 
-struct CommandKindIdTag;
-using CommandKindId = Id<CommandKindIdTag>;
+enum class ObjectKind : u8 {
+  Asset,
+  Sequence,
+  SequenceTrack,
+  SequenceCommand,
+  Instrument,
+  Sample,
+  Misc,
+};
+
+struct ObjectRef {
+  ObjectKind kind = ObjectKind::Asset;
+  AssetId asset;
+  u32 index0 = 0;
+  u32 index1 = 0;
+
+  friend constexpr bool operator==(ObjectRef, ObjectRef) noexcept = default;
+};
 
 // A byte range inside a user-loaded or derived source. Parsed objects, diagnostics,
 // and UI items use this to point back to the bytes they came from.
@@ -92,8 +108,11 @@ enum class Severity {
 // partial results alongside warnings instead of failing the whole conversion.
 struct Diagnostic {
   Severity severity = Severity::Info;
+  std::string code;
   std::string message;
   std::optional<SourceRange> range;
+  std::optional<SourceAnnotationId> annotation;
+  std::optional<ObjectRef> object;
 };
 
 }  // namespace vgmtrans::core
@@ -104,6 +123,17 @@ template <class Tag>
 struct hash<vgmtrans::core::Id<Tag>> {
   std::size_t operator()(vgmtrans::core::Id<Tag> id) const noexcept {
     return std::hash<::u32>{}(id.value);
+  }
+};
+
+template <>
+struct hash<vgmtrans::core::ObjectRef> {
+  std::size_t operator()(const vgmtrans::core::ObjectRef& ref) const noexcept {
+    size_t seed = std::hash<int>{}(static_cast<int>(ref.kind));
+    seed ^= std::hash<::u32>{}(ref.asset.value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= std::hash<::u32>{}(ref.index0) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= std::hash<::u32>{}(ref.index1) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    return seed;
   }
 };
 

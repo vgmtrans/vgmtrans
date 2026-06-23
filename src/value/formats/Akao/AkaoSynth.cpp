@@ -345,13 +345,17 @@ struct ParsedSampleCollection {
 
 void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, ScanSampleCollectionRef ref,
                           ParsedSampleCollection& parsed) {
-  ItemTree items;
-  ItemTreeBuilder itemBuilder(items, input.ids);
-  const ItemId root =
-      itemBuilder.add(std::nullopt, ItemKind::SampleCollection, "akao-sample-collection", parsed.name, parsed.range);
+  const SourceAnnotationId root = result.sourceMap()
+                                      .annotation(SourceRole::SampleCollection, parsed.name, parsed.range)
+                                      .kind("akao-sample-collection")
+                                      .owner(ObjectRefs::asset(ref.id))
+                                      .id();
   for (u32 i = 0; i < parsed.samples.samples.size(); ++i) {
-    static_cast<void>(itemBuilder.add(root, ItemKind::Sample, "psx-adpcm-sample", parsed.samples.samples[i].name,
-                                      parsed.samples.samples[i].encodedData));
+    result.sourceMap()
+        .annotation(SourceRole::Sample, parsed.samples.samples[i].name, parsed.samples.samples[i].encodedData)
+        .kind("psx-adpcm-sample")
+        .owner(ObjectRefs::sample(ref.id, i))
+        .parent(root);
   }
 
   static_cast<void>(result.sampleCollection(ref, [&](AssetId id) {
@@ -362,7 +366,6 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Sca
                 .format = std::string(kAkaoFormatName),
                 .name = parsed.name,
                 .range = parsed.range,
-                .items = std::move(items),
             },
         .samples = std::move(parsed.samples),
     };
