@@ -15,7 +15,6 @@
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanResultBuilder.h"
 
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -83,7 +82,8 @@ void addSampleFacts(ScanResultBuilder& result, const AkaoSampleCollectionParse& 
                                    });
 }
 
-void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const AkaoSequenceAnalysis& analysis) {
+void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const AkaoSequenceAnalysis& analysis,
+                      std::span<const u32> requiredArts) {
   result.sourceFact(sequence.id,
                     IdMatchFact{.domain = std::string(kAkaoSequenceIdDomain), .value = analysis.header.sequenceId});
   if (analysis.header.sampleSetId) {
@@ -91,12 +91,6 @@ void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const
                       IdMatchFact{.domain = std::string(kAkaoSampleSetDomain), .value = *analysis.header.sampleSetId});
   }
   result.sourceFact(sequence.id, OffsetOrderFact{.offset = analysis.header.offset});
-}
-
-void addInstrumentFacts(ScanResultBuilder& result, ScanInstrumentSetRef instrument,
-                        const AkaoSequenceAnalysis& analysis, std::span<const u32> requiredArts) {
-  result.sourceFact(instrument.id,
-                    IdMatchFact{.domain = std::string(kAkaoSequenceIdDomain), .value = analysis.header.sequenceId});
   std::vector<u32> required;
   for (const u32 art : requiredArts) {
     if (art != 0) {
@@ -104,10 +98,10 @@ void addInstrumentFacts(ScanResultBuilder& result, ScanInstrumentSetRef instrume
     }
   }
   if (!required.empty()) {
-    result.sourceFact(instrument.id, SampleRequirementFact{
-                                         .domain = std::string(kAkaoArticulationDomain),
-                                         .required = std::move(required),
-                                     });
+    result.sourceFact(sequence.id, SampleRequirementFact{
+                                       .domain = std::string(kAkaoArticulationDomain),
+                                       .required = std::move(required),
+                                   });
   }
 }
 
@@ -148,22 +142,17 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     }
 
     const auto sequenceRef = result.reserveSequence();
-    const auto instrumentRef = result.reserveInstrumentSet();
     static_cast<void>(result.sequence(sequenceRef, [&](AssetId id) {
       std::vector<Diagnostic> diagnostics;
-      auto asset = parseAkaoSequenceProgram(input, id, *analysis, instrumentRef, &result.sourceMap(), &diagnostics);
+      auto asset = parseAkaoSequenceProgram(input, id, *analysis, &result.sourceMap(), &diagnostics);
       for (auto& diagnostic : diagnostics) {
         result.diagnostic(std::move(diagnostic));
       }
       return asset;
     }));
-    auto parsedInstrumentSet = parseAkaoInstrumentSet(input, instrumentRef.id, *analysis, {});
-    const auto required = parsedInstrumentSet.requiredArticulations;
-    static_cast<void>(result.instrumentSet(
-        instrumentRef, [asset = std::move(parsedInstrumentSet.asset)](AssetId) mutable { return std::move(asset); }));
 
-    addSequenceFacts(result, sequenceRef, *analysis);
-    addInstrumentFacts(result, instrumentRef, *analysis, required);
+    const auto required = requiredArticulations(input.reader, *analysis);
+    addSequenceFacts(result, sequenceRef, *analysis, required);
   }
 }
 

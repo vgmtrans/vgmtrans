@@ -5,14 +5,18 @@
  */
 
 #include "value/formats/Akao/AkaoInstrumentSet.h"
+#include "value/formats/Akao/AkaoModule.h"
 #include "value/formats/Akao/AkaoResolver.h"
+#include "value/formats/Akao/AkaoSequence.h"
 #include "value/formats/Akao/AkaoSequenceDecoder.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
 
 #include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 using namespace vgmtrans::core;
@@ -29,6 +33,20 @@ void expect(bool condition, const std::string& message) {
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value & 0xff);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
+}
+
+void writeLe32(std::vector<u8>& bytes, size_t offset, u32 value) {
+  bytes[offset] = static_cast<u8>(value & 0xff);
+  bytes[offset + 1] = static_cast<u8>((value >> 8) & 0xff);
+  bytes[offset + 2] = static_cast<u8>((value >> 16) & 0xff);
+  bytes[offset + 3] = static_cast<u8>((value >> 24) & 0xff);
+}
+
+void writeBe32(std::vector<u8>& bytes, size_t offset, u32 value) {
+  bytes[offset] = static_cast<u8>((value >> 24) & 0xff);
+  bytes[offset + 1] = static_cast<u8>((value >> 16) & 0xff);
+  bytes[offset + 2] = static_cast<u8>((value >> 8) & 0xff);
+  bytes[offset + 3] = static_cast<u8>(value & 0xff);
 }
 
 void writeLeS16(std::vector<u8>& bytes, size_t offset, s16 value) {
@@ -471,4 +489,88 @@ void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
   const auto selected = selectAkaoSampleCandidates(29, required, candidates);
   expect(selected == std::vector<std::size_t>{1, 2},
          "Akao sample selection should combine the preferred sample set with required-art coverage");
+}
+
+void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
+  std::vector<u8> bytes(0x280);
+
+  constexpr u32 sequenceOffset = 0x00;
+  constexpr u32 trackOffset = 0x50;
+  constexpr u32 instrumentTableOffset = 0x80;
+  constexpr u32 melodicRegionOffset = 0xa0;
+  writeBe32(bytes, sequenceOffset, 0x414b414f);
+  writeLe16(bytes, sequenceOffset + 4, 7);
+  writeLe16(bytes, sequenceOffset + 6, 0x100);
+  writeLe16(bytes, sequenceOffset + 0x14, 1);
+  writeLe32(bytes, sequenceOffset + 0x20, 1);
+  writeLe32(bytes, sequenceOffset + 0x30, instrumentTableOffset - (sequenceOffset + 0x30));
+  writeLe16(bytes, sequenceOffset + 0x40, trackOffset - (sequenceOffset + 0x40));
+  bytes[trackOffset] = 0xa0;
+
+  writeLe16(bytes, instrumentTableOffset, 0);
+  bytes[melodicRegionOffset] = 5;
+  bytes[melodicRegionOffset + 1] = 0;
+  bytes[melodicRegionOffset + 2] = 127;
+  bytes[melodicRegionOffset + 7] = 127;
+
+  constexpr u32 sampleOffset = 0x200;
+  constexpr u32 artOffset = sampleOffset + 0x40;
+  constexpr u32 sampleDataOffset = artOffset + 0x10;
+  writeBe32(bytes, sampleOffset, 0x414b414f);
+  writeLe16(bytes, sampleOffset + 4, 1);
+  writeLe32(bytes, sampleOffset + 0x14, 0x10);
+  writeLe32(bytes, sampleOffset + 0x18, 5);
+  writeLe32(bytes, sampleOffset + 0x1c, 1);
+  writeLe16(bytes, artOffset + 0x0a, 60);
+  bytes[sampleDataOffset + 1] = 1;
+
+  Session session;
+  registerAkaoModule(session.formats());
+  registerAkaoSequenceDialects(session.dialects());
+  session.addSource(SourceFile{.name = "Chrono Cross synthetic.psf"}, bytes);
+  const SessionSnapshot project = session.scanPendingSources();
+
+  u32 sequenceAssets = 0;
+  u32 instrumentAssets = 0;
+  u32 sampleAssets = 0;
+  AssetId sequenceId;
+  for (const auto& asset : project.assets()) {
+    if (metadata(asset).format != kAkaoFormatName) {
+      continue;
+    }
+    if (const auto* sequence = std::get_if<SequenceProgramAsset>(&asset)) {
+      ++sequenceAssets;
+      sequenceId = sequence->metadata.id;
+    } else if (std::holds_alternative<InstrumentSetAsset>(asset)) {
+      ++instrumentAssets;
+    } else if (std::holds_alternative<SampleCollectionAsset>(asset)) {
+      ++sampleAssets;
+    }
+  }
+
+  expect(sequenceAssets == 1, "Akao synthetic scan should produce one sequence asset");
+  expect(sampleAssets == 1, "Akao synthetic scan should produce one sample collection asset");
+  expect(instrumentAssets == 1, "Akao synthetic scan should expose only the materialized instrument set asset");
+  expect(project.collections().size() == 1, "Akao synthetic scan should resolve one collection");
+  const auto& collection = project.collections().front();
+  expect(collection.sequence == sequenceId, "Akao collection should reference the scanned sequence");
+  expect(collection.sampleCollections.size() == 1, "Akao collection should reference the scanned sample collection");
+  expect(collection.instrumentSets.size() == 1, "Akao collection should reference the materialized instrument set");
+  expect(collection.instrumentSets.front() != collection.sequence &&
+             collection.instrumentSets.front() != collection.sampleCollections.front(),
+         "Akao materialized instrument set should be distinct from scanned assets");
+
+  const auto* materialized = project.asset<InstrumentSetAsset>(collection.instrumentSets.front());
+  expect(materialized != nullptr, "Akao materialized instrument set should be present");
+  expect(!materialized->instruments.empty(), "Akao materialized instrument set should contain parsed instruments");
+  expect(materialized->instruments.front().regions.front().sample.collection == collection.sampleCollections.front(),
+         "Akao materialized region should bind to the resolved sample collection");
+
+  const auto requirement = std::ranges::find_if(project.matchFacts(), [&](const MatchFact& fact) {
+    const auto* payload = std::get_if<SampleRequirementFact>(&fact.payload);
+    return fact.format == kAkaoFormatName && fact.asset == sequenceId && payload != nullptr &&
+           payload->domain == kAkaoArticulationDomain && payload->required == std::vector<u32>{5};
+  });
+  expect(requirement != project.matchFacts().end(),
+         "Akao articulation requirements should be sequence facts, not provisional instrument facts");
 }

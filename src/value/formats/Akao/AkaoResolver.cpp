@@ -40,12 +40,6 @@ struct SequenceFactEntry {
   u32 offset = 0;
 };
 
-struct InstrumentFactEntry {
-  AssetId asset;
-  std::optional<SourceId> sourceId;
-  u32 sequenceId = 0;
-};
-
 struct SampleFactEntry {
   AssetId asset;
   std::optional<SourceId> sourceId;
@@ -138,19 +132,6 @@ template <class AssetT>
   return entries;
 }
 
-[[nodiscard]] std::vector<InstrumentFactEntry> instrumentFacts(const MatchFactIndex& index) {
-  std::vector<InstrumentFactEntry> entries;
-  for (const auto& view : index.idFacts<InstrumentSetAsset>(kAkaoFormatName, kAkaoSequenceIdDomain)) {
-    entries.push_back(InstrumentFactEntry{
-        .asset = view.asset.metadata.id,
-        .sourceId = view.fact.scope.source,
-        .sequenceId = view.payload.value,
-    });
-  }
-  std::ranges::sort(entries, {}, [](const InstrumentFactEntry& entry) { return entry.asset.value; });
-  return entries;
-}
-
 [[nodiscard]] std::vector<SampleFactEntry> sampleFacts(const MatchFactIndex& index) {
   std::vector<SampleFactEntry> entries;
   const auto sampleSets = idValuesByAsset<SampleCollectionAsset>(index, kAkaoSampleSetDomain);
@@ -175,32 +156,17 @@ template <class AssetT>
 }
 
 [[nodiscard]] std::map<u32, std::set<u32>> requiredArtFacts(const MatchFactIndex& index) {
-  std::map<u32, std::set<u32>> requiredByInstrument;
+  std::map<u32, std::set<u32>> requiredBySequence;
   for (const auto& view :
-       index.sampleRequirementFacts<InstrumentSetAsset>(kAkaoFormatName, kAkaoArticulationDomain)) {
-    auto& required = requiredByInstrument[view.asset.metadata.id.value];
+       index.sampleRequirementFacts<SequenceProgramAsset>(kAkaoFormatName, kAkaoArticulationDomain)) {
+    auto& required = requiredBySequence[view.asset.metadata.id.value];
     for (const u32 art : view.payload.required) {
       if (art != 0) {
         required.insert(art);
       }
     }
   }
-  return requiredByInstrument;
-}
-
-[[nodiscard]] std::optional<InstrumentFactEntry> chooseInstrument(const SequenceFactEntry& sequence,
-                                                                  const std::vector<InstrumentFactEntry>& instruments) {
-  std::optional<InstrumentFactEntry> fallback;
-  for (const auto& instrument : instruments) {
-    if (instrument.sequenceId != sequence.sequenceId) {
-      continue;
-    }
-    fallback = instrument;
-    if (sameSource(sequence.sourceId, instrument.sourceId)) {
-      return instrument;
-    }
-  }
-  return fallback;
+  return requiredBySequence;
 }
 
 [[nodiscard]] std::vector<SampleFactEntry> candidateSamples(const SequenceFactEntry& sequence,
@@ -269,8 +235,7 @@ std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& s
 }
 
 void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFactEntry& sequence,
-                                const InstrumentFactEntry& instrument, const std::vector<SampleFactEntry>& selected,
-                                const std::set<u32>& remaining) {
+                                const std::vector<SampleFactEntry>& selected, const std::set<u32>& remaining) {
   for (const auto& sample : selected) {
     collection.sampleCollection(sample.asset);
   }
@@ -290,7 +255,7 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
         .severity = Severity::Warning,
         .code = "missing-articulation-coverage",
         .message = std::move(message),
-        .asset = instrument.asset,
+        .asset = sequence.asset,
     });
   }
 }
@@ -440,31 +405,22 @@ std::vector<std::size_t> selectAkaoSampleCandidates(std::optional<u32> sequenceS
 std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& context) {
   const MatchFactIndex index(context);
   const auto sequences = sequenceFacts(index);
-  const auto instruments = instrumentFacts(index);
   const auto samples = sampleFacts(index);
-  const auto requiredByInstrument = requiredArtFacts(index);
+  const auto requiredBySequence = requiredArtFacts(index);
 
   std::vector<DesiredCollection> collections;
   for (const auto& sequence : sequences) {
     CollectionAssembly collection(collectionKey(sequence), sequence.name.empty() ? "Akao Collection" : sequence.name);
     collection.sequence(sequence.asset);
 
-    const auto instrument = chooseInstrument(sequence, instruments);
-    if (!instrument) {
-      collection.requireInstrumentSet();
-      collections.push_back(std::move(collection).finish());
-      continue;
-    }
-    collection.instrumentSet(instrument->asset);
-
     std::set<u32> remaining;
-    if (auto found = requiredByInstrument.find(instrument->asset.value); found != requiredByInstrument.end()) {
+    if (auto found = requiredBySequence.find(sequence.asset.value); found != requiredBySequence.end()) {
       remaining = found->second;
     }
 
     const auto selected = chooseSamplesForSequence(sequence, samples, remaining, collection);
-    attachSamplesAndReportGaps(collection, sequence, *instrument, selected, remaining);
-    collection.requireSequence().requireInstrumentSet().requireSampleCollection();
+    attachSamplesAndReportGaps(collection, sequence, selected, remaining);
+    collection.requireSequence().requireSampleCollection();
     collections.push_back(std::move(collection).finish());
   }
   return collections;
@@ -474,8 +430,7 @@ MaterializationResult materializeAkaoCollection(const MaterializationContext& co
   MaterializationResult result{
       .collection = context.collection,
   };
-  if (!context.collection.sequence || context.collection.instrumentSets.empty() ||
-      context.collection.sampleCollections.empty()) {
+  if (!context.collection.sequence || context.collection.sampleCollections.empty()) {
     return result;
   }
 

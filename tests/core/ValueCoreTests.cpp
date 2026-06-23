@@ -41,6 +41,7 @@ void akaoTempoFadeEmitsDriverTickRamp();
 void akaoRequiredArticulationsComeFromInstrumentRows();
 void akaoMelodicRegionsDropAdvancingOverlaps();
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections();
+void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectExecutesCallAndReturn();
 void ndsSequenceDialectDiscoversSecondaryTrackStarts();
@@ -90,6 +91,7 @@ int main() {
     akaoRequiredArticulationsComeFromInstrumentRows();
     akaoMelodicRegionsDropAdvancingOverlaps();
     akaoSampleSelectionKeepsPreferredAndRequiredCollections();
+    akaoScanMaterializesInstrumentSetWithoutProvisionalAsset();
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
     ndsSequenceDialectExecutesCallAndReturn();
     ndsSequenceDialectDiscoversSecondaryTrackStarts();
