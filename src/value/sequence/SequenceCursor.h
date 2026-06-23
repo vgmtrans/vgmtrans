@@ -72,6 +72,19 @@ private:
   bool taken_ = false;
 };
 
+class RepeatUntilFlow {
+public:
+  RepeatUntilFlow(CommandFlow flow, bool fallsThrough);
+
+  [[nodiscard]] bool fallsThrough() const noexcept { return fallsThrough_; }
+  [[nodiscard]] const CommandFlow& flow() const noexcept { return flow_; }
+  [[nodiscard]] operator CommandFlow() const noexcept { return flow_; }
+
+private:
+  CommandFlow flow_;
+  bool fallsThrough_ = false;
+};
+
 // VmCommandCursor is the readable command-authoring surface. It records source
 // facts while reading bytes and returns VM-neutral flow decisions; the VM still
 // owns playback policy such as loop counts and call stack behavior.
