@@ -464,6 +464,24 @@ std::string_view valueAnnotationKind(const vgmtrans::core::SourceAnnotation& ann
   return annotation.detailKind.empty() ? std::string_view{annotation.localKind} : std::string_view{annotation.detailKind};
 }
 
+std::string_view valuePlaybackStatusName(vgmtrans::core::CommandPlaybackStatus status) {
+  switch (status) {
+    case vgmtrans::core::CommandPlaybackStatus::SourceOnly:
+      return "source-only";
+    case vgmtrans::core::CommandPlaybackStatus::NoOp:
+      return "no-op";
+    case vgmtrans::core::CommandPlaybackStatus::AffectsPlayback:
+      return "playback";
+    case vgmtrans::core::CommandPlaybackStatus::AffectsControlFlow:
+      return "control-flow";
+    case vgmtrans::core::CommandPlaybackStatus::StopsPlayback:
+      return "stops";
+    case vgmtrans::core::CommandPlaybackStatus::Unsupported:
+      return "unsupported";
+  }
+  return "unknown";
+}
+
 std::vector<vgmtrans::core::SourceAnnotationId> valueAssetAnnotationRoots(
     const vgmtrans::core::SessionSnapshot& project, vgmtrans::core::AssetId assetId) {
   const auto* asset = project.asset(assetId);
@@ -594,11 +612,15 @@ bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project, co
       const auto& command = track.commands[i];
       if (const auto* annotation = sourceMap.find(command.annotation)) {
         const std::string description = valueAnnotationDescription(*annotation);
-        fmt::println("#{} 0x{:x}:0x{:x} opcode=0x{:02x} {}{}{}", i, command.range.offset, command.range.size,
-                     command.opcode, annotation->label, description.empty() ? "" : " - ", description);
+        const std::string status =
+            annotation->playbackStatus ? fmt::format(" status={}", valuePlaybackStatusName(*annotation->playbackStatus))
+                                       : std::string{};
+        fmt::println("#{} 0x{:x}:0x{:x} annotation={} kind={}{} opcode=0x{:02x} {}{}{}", i, command.range.offset,
+                     command.range.size, annotation->id.value, valueAnnotationKind(*annotation), status, command.opcode,
+                     annotation->label, description.empty() ? "" : " - ", description);
       } else {
-        fmt::println("#{} 0x{:x}:0x{:x} handler={} opcode=0x{:02x}", i, command.range.offset, command.range.size,
-                     command.handler.value, command.opcode);
+        fmt::println("#{} 0x{:x}:0x{:x} annotation={} opcode=0x{:02x}", i, command.range.offset, command.range.size,
+                     command.annotation.value, command.opcode);
       }
     }
     if (count < track.commands.size()) {
