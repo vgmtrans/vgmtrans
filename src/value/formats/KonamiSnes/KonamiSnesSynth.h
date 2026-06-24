@@ -53,6 +53,7 @@ struct KonamiSnesSampleInfo {
 [[nodiscard]] core::InstrumentSetAsset parseKonamiSnesInstrumentSet(
     const core::ScanInput& input, core::ScanResultBuilder& builder, core::AssetId instrumentSetId,
     core::ScanSampleCollectionRef sampleCollection, KonamiSnesVersion version,
+    u32 spcDirAddress,
     const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
     const std::vector<KonamiSnesSampleInfo>& sampleInfos, std::string_view displayName);
 

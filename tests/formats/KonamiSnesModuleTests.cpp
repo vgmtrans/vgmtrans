@@ -90,6 +90,12 @@ bool hasModulatorDestination(const Instrument& instrument, SynthDestination dest
   });
 }
 
+bool hasSourceLessModulatorDestination(const Instrument& instrument, SynthDestination destination) {
+  return std::ranges::any_of(instrument.modulators, [destination](const SynthModulator& modulator) {
+    return !modulator.source && modulator.destination == destination;
+  });
+}
+
 std::vector<u8> makeKonamiSnesAram() {
   std::vector<u8> bytes(0x10000);
 
@@ -223,11 +229,19 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   const auto vibratoDepth = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-    return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoDepth;
+    return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoDepth &&
+           modulation->amount > 0.0;
   });
   expect(vibratoDepth != performance.tracks[0].events.end(), "KonamiSnes vibrato command should emit target-neutral depth");
-  expect(std::abs(std::get<ModulationPerformanceEvent>(*vibratoDepth).amount - 1.0) < 0.0001,
-         "KonamiSnes vibrato depth should be normalized against the sequence-observed range");
+  const auto& vibratoDepthEvent = std::get<ModulationPerformanceEvent>(*vibratoDepth);
+  const double expectedDepthCents = vibrato::currentDepthCents(KONAMISNES_V6, 0x10, 0x10 << 8);
+  const double expectedDepthAmount =
+      expectedDepthCents / vibrato::maxDepthCents(KONAMISNES_V6, kDefaultVibratoMaxDepth);
+  expect(std::abs(vibratoDepthEvent.amount - expectedDepthAmount) < 0.0001,
+         "KonamiSnes vibrato depth should be normalized against the full synth range");
+  expect(vibratoDepthEvent.pitchDepthSemitones &&
+             std::abs(*vibratoDepthEvent.pitchDepthSemitones - (expectedDepthCents / 100.0)) < 0.0001,
+         "KonamiSnes vibrato depth should retain exact pitch depth for sequence-event simulation");
   const auto vibratoDelay = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<VibratoDelayPerformanceEvent>(event);
   });
@@ -264,6 +278,8 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(!instrument.modulators.empty(), "KonamiSnes instruments should carry default vibrato modulators");
   expect(hasGeneratorDestination(instrument, SynthDestination::VibratoDelay),
          "KonamiSnes instruments should carry a default vibrato delay generator");
+  expect(hasSourceLessModulatorDestination(instrument, SynthDestination::VibratoDepth),
+         "KonamiSnes instruments should carry default vibrato depth as a synth modulator");
   expect(hasModulatorDestination(instrument, SynthDestination::VibratoDelay),
          "KonamiSnes instruments should carry a default vibrato delay modulator");
 

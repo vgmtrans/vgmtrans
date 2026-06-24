@@ -176,6 +176,12 @@ struct ModulationPerformanceEvent {
   // scanner can provide them. Generic controller export continues to use amount.
   std::optional<double> pitchDepthSemitones;
   std::optional<double> frequencyHz;
+  // Optional controller scaling ceiling, normalized to the same full range as amount.
+  // Formats with sequence-derived modulation ranges can use this so MIDI controller
+  // scaling and synth modulator scaling share the same denominator even when the
+  // rendered event stream does not hit the maximum.
+  std::optional<double> controllerRangeMaxAmount;
+  bool controllerRangeOnly = false;
 };
 
 struct MarkerPerformanceEvent {

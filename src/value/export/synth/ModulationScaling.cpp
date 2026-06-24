@@ -101,7 +101,10 @@ s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModula
 
   // If MIDI controller values are expanded upward, the synth-side modulator amount must
   // shrink by the same ratio so the audible depth stays unchanged.
-  return static_cast<s32>(std::lround((static_cast<double>(modulator.amount) * range->max) / 127.0));
+  const double normalizedMax = range->normalizedMax > 0.0
+                                   ? range->normalizedMax
+                                   : (static_cast<double>(range->max) / 127.0);
+  return static_cast<s32>(std::lround(static_cast<double>(modulator.amount) * normalizedMax));
 }
 
 bool shouldExportSynthGenerator(const SynthGenerator& generator, ModulationConversionPolicy conversion) noexcept {

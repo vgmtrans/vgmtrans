@@ -1207,6 +1207,8 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
 SynthExportBytes valueCapcomSnesSynthExports(Session& session, CollectionId collection) {
   const auto artifacts = session.exportCollection(collection, ExportRequest{
                                                                   .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
+                                                                  .synthModulationScaling =
+                                                                      ModulationScalingPolicy::ObservedSequenceRange,
                                                               });
 
   SynthExportBytes exports;
@@ -1681,6 +1683,8 @@ std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u
                                                                   .kinds = {ExportKind::Midi},
                                                                   .loopPolicy = LoopPolicy::PlayOnce,
                                                                   .sequenceLoops = sequenceLoops,
+                                                                  .synthModulationScaling =
+                                                                      ModulationScalingPolicy::ObservedSequenceRange,
                                                               });
 
   for (const auto& artifact : artifacts) {
@@ -3262,6 +3266,64 @@ int compareKonamiSnesDirectSummary(const std::filesystem::path& path) {
   return 0;
 }
 
+int compareKonamiSnesDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  const auto legacyMidis = legacyCollectionMidis(path, sequenceLoops);
+  const auto valueMidis = valueCollectionMidis(path, sequenceLoops);
+  if (valueMidis.size() != legacyMidis.size()) {
+    std::cout << "value KonamiSnes MIDI collection count differs: legacy=" << legacyMidis.size()
+              << " value=" << valueMidis.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacyMidi] : legacyMidis) {
+    const auto found = valueMidis.find(collectionName);
+    if (found == valueMidis.end()) {
+      std::cout << "value KonamiSnes scan did not produce MIDI for collection '" << collectionName << "'\n";
+      return 1;
+    }
+    std::cout << "checking " << collectionName << " MIDI via direct KonamiSnes value scan, loops="
+              << sequenceLoops << "\n";
+    if (!compareMidi(legacyMidi, found->second, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "KonamiSnes direct MIDI parity ok: collections=" << legacyMidis.size() << " loops=" << sequenceLoops
+            << "\n";
+  return 0;
+}
+
+int compareKonamiSnesDirectSynth(const std::filesystem::path& path) {
+  const auto legacyExports = legacyCollectionSynthExports(path);
+  const auto valueExports = valueCollectionSynthExports(path);
+  if (valueExports.size() != legacyExports.size()) {
+    std::cout << "value KonamiSnes synth collection count differs: legacy=" << legacyExports.size()
+              << " value=" << valueExports.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacy] : legacyExports) {
+    const auto found = valueExports.find(collectionName);
+    if (found == valueExports.end()) {
+      std::cout << "value KonamiSnes scan did not produce synth exports for collection '" << collectionName << "'\n";
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " SF2 via direct KonamiSnes value scan\n";
+    if (!compareSf2(legacy.sf2, found->second.sf2, std::cout)) {
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " DLS via direct KonamiSnes value scan\n";
+    if (!compareDls(legacy.dls, found->second.dls, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "KonamiSnes direct SF2/DLS parity ok: collections=" << legacyExports.size() << "\n";
+  return 0;
+}
+
 int compareNdsDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   const auto legacyMidis = legacyCollectionMidis(path, sequenceLoops);
   const auto valueMidis = valueCollectionMidis(path, sequenceLoops);
@@ -3536,6 +3598,8 @@ void printUsage(std::ostream& out) {
 	      << "  vgmtrans-parity akao-direct-midi <psf-or-raw-file> [sequence-loops]\n"
 	      << "  vgmtrans-parity akao-direct-synth <psf-or-raw-file>\n"
 	      << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
+	      << "  vgmtrans-parity konami-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
+	      << "  vgmtrans-parity konami-snes-direct-synth <rsn-or-spc-file>\n"
 	      << "  vgmtrans-parity konami-snes-direct-summary <rsn-or-spc-file>\n"
 	      << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
 	      << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
@@ -3588,6 +3652,18 @@ int main(int argc, char** argv) {
 
 	    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-summary") {
 	      return compareKonamiSnesDirectSummary(argv[2]);
+	    }
+
+	    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-midi") {
+	      return compareKonamiSnesDirectMidi(argv[2]);
+	    }
+
+	    if (argc == 4 && std::string(argv[1]) == "konami-snes-direct-midi") {
+	      return compareKonamiSnesDirectMidi(argv[2], parseLoopCount(argv[3]));
+	    }
+
+	    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-synth") {
+	      return compareKonamiSnesDirectSynth(argv[2]);
 	    }
 
 	    if (argc == 3 && std::string(argv[1]) == "akao-direct-summary") {

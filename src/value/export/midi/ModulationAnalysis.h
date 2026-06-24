@@ -15,11 +15,15 @@
 namespace vgmtrans::core {
 
 struct ObservedValueRange {
-  // Min/max controller values that actually occur in the rendered sequence.
-  // Synth exporters can use this to improve resolution for small vibrato/tremolo ranges.
+  // Min/max controller values that actually occur in the rendered sequence,
+  // plus the normalized source amounts that produced them. MIDI controller
+  // scaling uses the quantized values; synth modulator scaling uses the precise
+  // normalized max when performance data provides it.
   bool observed = false;
   u32 min = 0;
   u32 max = 0;
+  double normalizedMin = 0.0;
+  double normalizedMax = 0.0;
   std::optional<SourceRange> firstRange;
 };
 
