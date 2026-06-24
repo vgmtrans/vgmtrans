@@ -510,15 +510,21 @@ struct TrackState {
   void emitVibratoDepth(Runtime& rt, bool force = false) {
     const bool active = vibrato::isActive(rt.context.version, vibrato.rate(), vibrato.depth());
     double amount = 0.0;
+    double depthSemitones = 0.0;
     if (active) {
       const double currentCents =
           vibrato::currentDepthCents(rt.context.version, vibrato.depth(), vibrato.currentDepth());
       const double maxCents = vibrato::maxDepthCents(rt.context.version, maxVibrato.maxDepth);
       amount = maxCents <= 0.0 ? 0.0 : currentCents / maxCents;
+      depthSemitones = currentCents / 100.0;
     }
     amount = std::clamp(amount, 0.0, 1.0);
     if (force || std::abs(amount - lastVibratoDepthAmount) > 0.0001) {
-      rt.modulation(ModulationPerformanceTarget::VibratoDepth, amount);
+      rt.modulation(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoDepth,
+          .amount = amount,
+          .pitchDepthSemitones = depthSemitones,
+      });
       lastVibratoDepthAmount = amount;
     }
   }
@@ -527,7 +533,11 @@ struct TrackState {
   void emitVibratoRate(Runtime& rt) {
     const u16 factor = vibrato::rateFactor(rt.context.version, vibrato.rate(), tempo);
     const double amount = maxVibrato.maxRateFactor == 0 ? 0.0 : static_cast<double>(factor) / maxVibrato.maxRateFactor;
-    rt.modulation(ModulationPerformanceTarget::VibratoRate, std::clamp(amount, 0.0, 1.0));
+    rt.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoRate,
+        .amount = std::clamp(amount, 0.0, 1.0),
+        .frequencyHz = vibrato::baseHz(rt.context.version) * factor,
+    });
   }
 
   template <class Runtime>
@@ -565,6 +575,7 @@ struct TrackState {
           TrackState& state;
           PerformanceEmitter& out;
           const Context& context;
+          void modulation(ModulationPerformanceEvent event) { out.modulation(std::move(event)); }
           void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
           void vibratoDelay(u32 delayTicks, u8 midiValue) { out.vibratoDelay(delayTicks, midiValue); }
         } rt{*this, out, Context{.version = version}};

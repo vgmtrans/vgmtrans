@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 #include <optional>
 #include <span>
 #include <string>
@@ -116,9 +117,15 @@ struct RenderTrackState {
   u8 sourcePitchBendRangeSemitones = 2;
   double sourcePitchBendSemitones = 0.0;
   double simulatedVibratoSemitones = 0.0;
+  double simulatedVibratoDepthSemitones = 0.0;
+  double vibratoFrequencyHz = 0.0;
   u32 vibratoDelayTicks = 0;
-  std::optional<u64> pendingVibratoTick;
-  double pendingVibratoSemitones = 0.0;
+  bool vibratoDelayArmed = false;
+  u64 vibratoStartTick = 0;
+  u64 vibratoCursorTick = 0;
+  double vibratoPhaseRadians = 0.0;
+  std::optional<s16> lastPitchBendValue;
+  u32 microsecondsPerQuarter = 500000;
   double sourceExpressionGain = 1.0;
   double panExpressionGain = 1.0;
   double simulatedTremoloGain = 1.0;
@@ -203,8 +210,8 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
 }
 
 [[nodiscard]] u8 requiredPitchBendRangeSemitones(const RenderTrackState& state) {
-  const double combined = state.sourcePitchBendSemitones + state.simulatedVibratoSemitones;
-  return static_cast<u8>(std::max<int>(2, static_cast<int>(std::ceil(std::abs(combined)))));
+  const double possibleSemitones = std::abs(state.sourcePitchBendSemitones) + state.simulatedVibratoDepthSemitones;
+  return static_cast<u8>(std::max<int>(2, static_cast<int>(std::ceil(possibleSemitones))));
 }
 
 void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u8 semitones) {
@@ -220,42 +227,65 @@ void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u
   state.pitchBendRangeSemitones = range;
 }
 
-void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel) {
+void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, bool force = true) {
   ensurePitchBendRange(track, state, tick, channel,
                        std::max(state.sourcePitchBendRangeSemitones, requiredPitchBendRangeSemitones(state)));
+  const s16 value = midiPitchBend(state.sourcePitchBendSemitones + state.simulatedVibratoSemitones,
+                                  state.pitchBendRangeSemitones);
+  if (!force && state.lastPitchBendValue && *state.lastPitchBendValue == value) {
+    return;
+  }
   track.events.push_back(PitchBend{
       .tick = tick,
       .channel = channel,
-      .value = midiPitchBend(state.sourcePitchBendSemitones + state.simulatedVibratoSemitones,
-                             state.pitchBendRangeSemitones),
+      .value = value,
   });
+  state.lastPitchBendValue = value;
 }
 
-void flushPendingSimulatedVibrato(MidiTrack& track, RenderTrackState& state, u64 upToTick, u8 channel) {
-  if (!state.pendingVibratoTick || *state.pendingVibratoTick > upToTick) {
+[[nodiscard]] double tickSeconds(const Timebase& timebase, const RenderTrackState& state) {
+  const u16 ppqn = std::max<u16>(timebase.ppqn, 1);
+  return (static_cast<double>(state.microsecondsPerQuarter) / 1'000'000.0) / ppqn;
+}
+
+void flushSimulatedVibrato(MidiTrack& track, RenderTrackState& state, u64 upToTick, u8 channel,
+                           const Timebase& timebase) {
+  if (state.vibratoCursorTick >= upToTick) {
     return;
   }
 
-  const u64 tick = *state.pendingVibratoTick;
-  state.pendingVibratoTick.reset();
-  state.simulatedVibratoSemitones = state.pendingVibratoSemitones;
-  addCombinedPitchBend(track, state, tick, channel);
+  while (state.vibratoCursorTick < upToTick) {
+    ++state.vibratoCursorTick;
+    if (state.vibratoCursorTick < state.vibratoStartTick || state.simulatedVibratoDepthSemitones <= 0.0 ||
+        state.vibratoFrequencyHz <= 0.0) {
+      continue;
+    }
+
+    state.simulatedVibratoSemitones = state.simulatedVibratoDepthSemitones * std::sin(state.vibratoPhaseRadians);
+    addCombinedPitchBend(track, state, state.vibratoCursorTick, channel, false);
+    state.vibratoPhaseRadians += 2.0 * std::numbers::pi * state.vibratoFrequencyHz * tickSeconds(timebase, state);
+    state.vibratoPhaseRadians = std::fmod(state.vibratoPhaseRadians, 2.0 * std::numbers::pi);
+  }
 }
 
 void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double semitones) {
-  state.pendingVibratoTick.reset();
-  if (semitones <= 0.0 || state.vibratoDelayTicks == 0) {
-    state.simulatedVibratoSemitones = semitones;
-    addCombinedPitchBend(track, state, tick, channel);
+  state.simulatedVibratoDepthSemitones = std::max(0.0, semitones);
+  if (state.vibratoDelayArmed) {
+    state.vibratoStartTick = tick + (state.simulatedVibratoDepthSemitones > 0.0 ? state.vibratoDelayTicks : 0);
+    state.vibratoCursorTick = tick;
+    state.vibratoPhaseRadians = 0.0;
+    state.vibratoDelayArmed = false;
+    if (state.simulatedVibratoSemitones != 0.0 || state.simulatedVibratoDepthSemitones <= 0.0) {
+      state.simulatedVibratoSemitones = 0.0;
+      addCombinedPitchBend(track, state, tick, channel);
+    }
     return;
   }
 
-  if (state.simulatedVibratoSemitones != 0.0) {
+  if (state.simulatedVibratoDepthSemitones <= 0.0) {
     state.simulatedVibratoSemitones = 0.0;
     addCombinedPitchBend(track, state, tick, channel);
   }
-  state.pendingVibratoTick = tick + state.vibratoDelayTicks;
-  state.pendingVibratoSemitones = semitones;
 }
 
 void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
@@ -284,6 +314,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .duration = typedEvent.durationTicks,
           });
         } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
+          state.microsecondsPerQuarter = typedEvent.microsecondsPerQuarter;
           track.events.push_back(Tempo{
               .tick = typedEvent.header.tick,
               .microsecondsPerQuarter = typedEvent.microsecondsPerQuarter,
@@ -396,7 +427,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           }
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
           state.vibratoDelayTicks = typedEvent.delayTicks;
-          state.pendingVibratoTick.reset();
+          state.vibratoDelayArmed = true;
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
             track.events.push_back(VibratoDelay{
                 .tick = typedEvent.header.tick,
@@ -452,7 +483,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                                          state,
                                          typedEvent.header.tick,
                                          channel,
-                                         std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0);
+                                         typedEvent.pitchDepthSemitones.value_or(
+                                             std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0));
                 break;
               case ModulationPerformanceTarget::TremoloDepth:
                 state.simulatedTremoloGain = std::clamp(1.0 - (std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
@@ -460,6 +492,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
                 break;
               case ModulationPerformanceTarget::VibratoRate:
+                state.vibratoFrequencyHz = typedEvent.frequencyHz.value_or(state.vibratoFrequencyHz);
+                break;
               case ModulationPerformanceTarget::TremoloRate:
                 break;
             }
@@ -535,11 +569,16 @@ MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performa
         .port = midiPortByte(assignment.port),
     });
     for (const auto& event : performanceTrack.events) {
-      flushPendingSimulatedVibrato(midiTrack, renderState, performanceEventHeader(event).tick, assignment.channel);
+      if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+        flushSimulatedVibrato(midiTrack, renderState, performanceEventHeader(event).tick, assignment.channel,
+                              performance.timebase);
+      }
       addMidiEvent(midiTrack, renderState, event, assignment.channel, globalTransposes, options, modulationConversion);
     }
     u64 endTick = performanceTrack.endTick;
-    flushPendingSimulatedVibrato(midiTrack, renderState, endTick, assignment.channel);
+    if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+      flushSimulatedVibrato(midiTrack, renderState, endTick, assignment.channel, performance.timebase);
+    }
     if (trackIndex == 0) {
       midiTrack.events.insert(midiTrack.events.end(), globalTimeSignatures.begin(), globalTimeSignatures.end());
       for (const auto& timeSignature : globalTimeSignatures) {
