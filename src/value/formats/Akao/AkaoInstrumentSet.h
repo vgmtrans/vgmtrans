@@ -9,6 +9,7 @@
 #include "value/formats/Akao/AkaoTypes.h"
 #include "value/scan/ScanResultBuilder.h"
 
+#include <optional>
 #include <vector>
 
 namespace vgmtrans::formats::akao {
@@ -22,5 +23,8 @@ struct AkaoInstrumentSetParse {
                                                             const AkaoSequenceAnalysis& sequence,
                                                             const AkaoArtMap& artMap);
 [[nodiscard]] std::vector<u32> requiredArticulations(core::ByteReader reader, const AkaoSequenceAnalysis& sequence);
+void annotateAkaoInstrumentStructures(core::ByteReader reader, const AkaoSequenceAnalysis& sequence,
+                                      core::SourceMapBuilder& sourceMap,
+                                      std::optional<core::SourceAnnotationId> parent = std::nullopt);
 
 }  // namespace vgmtrans::formats::akao

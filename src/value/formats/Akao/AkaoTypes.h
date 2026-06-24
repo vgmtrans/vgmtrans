@@ -59,6 +59,7 @@ struct AkaoSequenceAnalysis {
 
 struct AkaoArt {
   u32 artId = 0;
+  core::SourceRange range;
   u8 unityKey = 60;
   s16 fineTuneCents = 0;
   u32 sampleOffset = 0;

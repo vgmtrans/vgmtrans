@@ -13,6 +13,7 @@
 #include <cmath>
 #include <fmt/format.h>
 #include <limits>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -485,6 +486,7 @@ void addSyntheticArtInstruments(std::vector<Instrument>& instruments, const Akao
         .keyRange = KeyRange{.low = 0, .high = 127},
         .velocityRange = VelocityRange{.low = 0, .high = 127},
         .sample = SampleRef{.collection = binding.collection.id, .index = binding.sampleIndex},
+        .range = binding.art.range,
         .rootKey = binding.art.unityKey,
         .fineTuneCents = binding.art.fineTuneCents,
         .envelope = psxEnvelope(binding.art.adsr1, binding.art.adsr2),
@@ -494,6 +496,7 @@ void addSyntheticArtInstruments(std::vector<Instrument>& instruments, const Akao
         .bank = 0,
         .program = artId,
         .name = fmt::format("Articulation {}", artId),
+        .range = binding.art.range,
         .regions = {std::move(region)},
     });
   }
@@ -553,11 +556,71 @@ struct ParsedInstrumentSet {
   return parsed;
 }
 
+void mergeIntoSpan(std::optional<SourceRange>& span, SourceRange range) {
+  if (!range.valid()) {
+    return;
+  }
+  if (!span) {
+    span = range;
+    return;
+  }
+  if (span->source != range.source) {
+    return;
+  }
+  const u64 start = std::min(span->offset, range.offset);
+  const u64 end = std::max(span->endOffset(), range.endOffset());
+  span->offset = start;
+  span->size = end - start;
+}
+
+[[nodiscard]] std::optional<SourceRange> instrumentSpan(const std::vector<Instrument>& instruments) {
+  std::optional<SourceRange> span;
+  for (const Instrument& instrument : instruments) {
+    mergeIntoSpan(span, instrument.range);
+    for (const Region& region : instrument.regions) {
+      mergeIntoSpan(span, region.range);
+    }
+  }
+  return span;
+}
+
+void annotateRegion(ByteReader reader, SourceMapBuilder& sourceMap, SourceAnnotationId parent,
+                    const Region& region) {
+  auto annotation = sourceMap.annotation(SourceRole::Region, "Region", region.range)
+                        .kind("akao-region")
+                        .parent(parent)
+                        .derived("key_low", region.keyRange.low, SourceValueDisplay::MidiNote)
+                        .derived("key_high", region.keyRange.high, SourceValueDisplay::MidiNote)
+                        .derived("velocity_low", region.velocityRange.low)
+                        .derived("velocity_high", region.velocityRange.high)
+                        .derived("pan", region.pan, SourceValueDisplay::Percent)
+                        .derived("attenuation_db", region.attenuationDb, SourceValueDisplay::Decibels);
+  if (region.range.valid() && reader.has(region.range.offset, 1)) {
+    annotation.field("art_id", reader.range(region.range.offset, 1), reader.u8At(region.range.offset),
+                     SourceValueDisplay::Hex);
+  }
+}
+
+void annotateInstrument(ByteReader reader, SourceMapBuilder& sourceMap, SourceAnnotationId parent,
+                        const Instrument& instrument) {
+  auto annotation = sourceMap.annotation(SourceRole::Instrument, instrument.name, instrument.range)
+                        .kind(instrument.bank == 127 ? "akao-drum-kit" : "akao-instrument")
+                        .parent(parent)
+                        .owner(ObjectRefs::instrumentProgram(instrument.bank, instrument.program))
+                        .derived("bank", instrument.bank)
+                        .derived("program", instrument.program)
+                        .derived("region_count", instrument.regions.size());
+  for (const Region& region : instrument.regions) {
+    annotateRegion(reader, sourceMap, annotation.id(), region);
+  }
+}
+
 InstrumentSetAsset buildAkaoInstrumentSetAsset(const ScanInput& input, AssetId id, const AkaoSequenceAnalysis& sequence,
                                                std::vector<Instrument> instruments) {
   const std::string name = fmt::format("Akao Instr Set {:02X}", sequence.header.sequenceId);
-  const SourceRange range = input.reader.range(
+  const SourceRange fallbackRange = input.reader.range(
       sequence.header.instrumentSetOffset.value_or(sequence.header.drumSetOffset.value_or(sequence.header.offset)), 0);
+  const SourceRange range = instrumentSpan(instruments).value_or(fallbackRange);
 
   return InstrumentSetAsset{
       .metadata =
@@ -587,6 +650,24 @@ AkaoInstrumentSetParse parseAkaoInstrumentSet(const ScanInput& input, AssetId id
 
 std::vector<u32> requiredArticulations(ByteReader reader, const AkaoSequenceAnalysis& sequence) {
   return parseInstrumentTables(reader, sequence, {}).requiredArticulations;
+}
+
+void annotateAkaoInstrumentStructures(ByteReader reader, const AkaoSequenceAnalysis& sequence,
+                                      SourceMapBuilder& sourceMap, std::optional<SourceAnnotationId> parent) {
+  const ParsedInstrumentSet parsed = parseInstrumentTables(reader, sequence, {});
+  const std::optional<SourceRange> range = instrumentSpan(parsed.instruments);
+  if (!range) {
+    return;
+  }
+  auto root = sourceMap.annotation(SourceRole::InstrumentSet, "Akao Instrument Layout", *range)
+                  .kind("akao-instrument-layout")
+                  .derived("instrument_count", parsed.instruments.size());
+  if (parent) {
+    root.parent(*parent);
+  }
+  for (const Instrument& instrument : parsed.instruments) {
+    annotateInstrument(reader, sourceMap, root.id(), instrument);
+  }
 }
 
 }  // namespace vgmtrans::formats::akao
