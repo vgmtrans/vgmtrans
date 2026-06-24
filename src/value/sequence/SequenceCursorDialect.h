@@ -8,8 +8,7 @@
 
 #include "value/sequence/SequenceCursor.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/sequence/bytecode/BytecodeTable.h"
-#include "value/sequence/bytecode/BytecodeWalkers.h"
+#include "value/sequence/BytecodeDecode.h"
 
 #include <algorithm>
 #include <any>
