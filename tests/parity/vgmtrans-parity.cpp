@@ -485,6 +485,8 @@ u32 envelopePermille(double level) {
       return 20;
     case SynthDestination::TremoloRate:
       return 21;
+    case SynthDestination::TremoloDelay:
+      return destinationCode(SynthDestination::Unknown);
     case SynthDestination::Unknown:
       return -1;
   }
@@ -932,7 +934,8 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
       for (const auto& region : instrument.regions) {
         u32 sampleSourceOffset = 0;
-        const auto regionSampleCollection = region.sample.collection ? region.sample.collection : fallbackSampleCollection;
+        const auto regionSampleCollection =
+            region.sample.collection ? region.sample.collection : fallbackSampleCollection;
         if (regionSampleCollection) {
           const auto sampleCollection = sampleCollectionsById.find(regionSampleCollection->value);
           if (sampleCollection != sampleCollectionsById.end() &&
@@ -1066,6 +1069,35 @@ std::string describeInstrumentSynth(const InstrumentSynthSummary& synth) {
   return out.str();
 }
 
+std::string describeTrackCounts(const std::vector<u32>& trackCounts) {
+  std::ostringstream out;
+  out << "[";
+  for (size_t i = 0; i < trackCounts.size(); ++i) {
+    if (i != 0) {
+      out << ", ";
+    }
+    out << trackCounts[i];
+  }
+  out << "]";
+  return out.str();
+}
+
+template <class Map>
+std::string describeMapKeys(const Map& values) {
+  std::ostringstream out;
+  out << "[";
+  bool first = true;
+  for (const auto& [key, _] : values) {
+    if (!first) {
+      out << ", ";
+    }
+    first = false;
+    out << key;
+  }
+  out << "]";
+  return out.str();
+}
+
 bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& value, std::ostream& out,
                     std::string_view label = "CapcomSnes") {
   if (legacy == value) {
@@ -1085,7 +1117,8 @@ bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& va
       << " samples=" << value.samples.size() << "\n";
 
   if (legacy.trackCounts != value.trackCounts) {
-    out << "track count vectors differ\n";
+    out << "track count vectors differ: legacy=" << describeTrackCounts(legacy.trackCounts)
+        << " value=" << describeTrackCounts(value.trackCounts) << "\n";
     return false;
   }
 
@@ -1217,11 +1250,11 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
 }
 
 SynthExportBytes valueCapcomSnesSynthExports(Session& session, CollectionId collection) {
-  const auto artifacts = session.exportCollection(collection, ExportRequest{
-                                                                  .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
-                                                                  .synthModulationScaling =
-                                                                      ModulationScalingPolicy::ObservedSequenceRange,
-                                                              });
+  const auto artifacts =
+      session.exportCollection(collection, ExportRequest{
+                                               .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
+                                               .synthModulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
+                                           });
 
   SynthExportBytes exports;
   for (const auto& artifact : artifacts) {
@@ -1315,6 +1348,74 @@ std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::fil
   return summaries;
 }
 
+std::map<std::string, CapcomSnesSummary> legacyFormatCollectionSummaries(const std::filesystem::path& path,
+                                                                         std::string_view formatName,
+                                                                         std::string_view label) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, CapcomSnesSummary> summaries;
+
+  for (const auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != formatName) {
+      continue;
+    }
+    auto [_, inserted] = summaries.emplace(collection->name(), legacyCapcomSnesCollectionSummary(*collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy " + std::string(label) + " collection name: " + collection->name());
+    }
+  }
+
+  if (summaries.empty()) {
+    throw std::runtime_error("legacy scanner did not discover " + std::string(label) +
+                             " collections in: " + path.string());
+  }
+  return summaries;
+}
+
+bool valueCollectionHasSequenceFormat(const SessionSnapshot& project, const Collection& collection,
+                                      std::string_view formatName) {
+  if (!collection.sequence) {
+    return false;
+  }
+  const auto* sequence = assetById<SequenceProgramAsset>(project, *collection.sequence);
+  return sequence != nullptr && sequence->metadata.format == formatName;
+}
+
+std::map<std::string, CapcomSnesSummary> valueFormatCollectionSummaries(const std::filesystem::path& path,
+                                                                        std::string_view formatName,
+                                                                        std::string_view label) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const SessionSnapshot project = session.scanPendingSources();
+  if (project.collections().empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover " << label << " collections";
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, CapcomSnesSummary> summaries;
+  for (const auto& collection : project.collections()) {
+    if (!valueCollectionHasSequenceFormat(project, collection, formatName)) {
+      continue;
+    }
+    auto [_, inserted] =
+        summaries.emplace(collection.name, valueCapcomSnesSummary(project, session.sources(), collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value " + std::string(label) + " collection name: " + collection.name);
+    }
+  }
+
+  if (summaries.empty()) {
+    throw std::runtime_error("value scanner did not discover " + std::string(label) +
+                             " collections in: " + path.string());
+  }
+  return summaries;
+}
+
 AkaoSummary legacyAkaoSummary(const std::filesystem::path& path) {
   const auto root = scanLegacyFile(path);
   AkaoSummary summary;
@@ -1384,8 +1485,9 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
     shape.instrumentSynths = detailed.instrumentSynths;
     summary.collections.push_back(shape);
   }
-  if (std::ranges::any_of(summary.collections,
-                          [](const AkaoCollectionSummary& collection) { return collection.sampleCollectionCount == 0; })) {
+  if (std::ranges::any_of(summary.collections, [](const AkaoCollectionSummary& collection) {
+        return collection.sampleCollectionCount == 0;
+      })) {
     u32 sampleAssets = 0;
     u32 sampleFacts = 0;
     for (const auto& asset : project.assets()) {
@@ -1497,9 +1599,10 @@ int compareAkaoDirectSummary(const std::filesystem::path& path) {
 
 std::string legacyMidiCollectionKey(const VGMColl& collection);
 std::string valueMidiCollectionKey(const SessionSnapshot& project, const Collection& collection);
-std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops,
-                                    ModulationConversionPolicy modulationConversion =
-                                        ModulationConversionPolicy::SynthModulators);
+std::vector<u8> valueCollectionMidi(
+    Session& session, CollectionId collection, u32 sequenceLoops,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
+    MidiExportOptions midiOptions = {});
 
 std::map<std::string, std::vector<u8>> legacyAkaoCollectionMidis(const std::filesystem::path& path,
                                                                  u32 sequenceLoops = 0) {
@@ -1693,15 +1796,16 @@ std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesyst
 }
 
 std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops,
-                                    ModulationConversionPolicy modulationConversion) {
-  const auto artifacts = session.exportCollection(collection, ExportRequest{
-                                                                  .kinds = {ExportKind::Midi},
-                                                                  .loopPolicy = LoopPolicy::PlayOnce,
-                                                                  .sequenceLoops = sequenceLoops,
-                                                                  .synthModulationScaling =
-                                                                      ModulationScalingPolicy::ObservedSequenceRange,
-                                                                  .modulationConversion = modulationConversion,
-                                                              });
+                                    ModulationConversionPolicy modulationConversion, MidiExportOptions midiOptions) {
+  const auto artifacts =
+      session.exportCollection(collection, ExportRequest{
+                                               .kinds = {ExportKind::Midi},
+                                               .loopPolicy = LoopPolicy::PlayOnce,
+                                               .sequenceLoops = sequenceLoops,
+                                               .midi = midiOptions,
+                                               .synthModulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
+                                               .modulationConversion = modulationConversion,
+                                           });
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1755,6 +1859,81 @@ std::map<std::string, std::vector<u8>> valueCollectionMidis(
   return midis;
 }
 
+std::map<std::string, std::vector<u8>> legacyFormatCollectionMidis(const std::filesystem::path& path,
+                                                                   std::string_view formatName, std::string_view label,
+                                                                   u32 sequenceLoops = 0) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, std::vector<u8>> midis;
+
+  for (auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != formatName) {
+      continue;
+    }
+    ConversionContext context;
+    context.sequenceLoops = static_cast<int>(sequenceLoops);
+    auto midi = collection->seq()->convertToMidi(collection, context);
+    if (!midi) {
+      throw std::runtime_error("legacy " + std::string(label) +
+                               " collection failed to convert to MIDI: " + collection->name());
+    }
+    std::vector<u8> bytes;
+    midi->writeMidiToBuffer(bytes);
+    const std::string key = legacyMidiCollectionKey(*collection);
+    auto [_, inserted] = midis.emplace(key, std::move(bytes));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy " + std::string(label) + " MIDI collection key: " + key);
+    }
+  }
+
+  if (midis.empty()) {
+    throw std::runtime_error("legacy scanner did not discover " + std::string(label) +
+                             " MIDI collections in: " + path.string());
+  }
+  return midis;
+}
+
+std::map<std::string, std::vector<u8>> valueFormatCollectionMidis(
+    const std::filesystem::path& path, std::string_view formatName, std::string_view label, u32 sequenceLoops = 0,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
+    MidiExportOptions midiOptions = {}) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const SessionSnapshot project = session.scanPendingSources();
+  if (project.collections().empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover " << label << " MIDI collections";
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, std::vector<u8>> midis;
+  for (const auto& collection : project.collections()) {
+    if (!valueCollectionHasSequenceFormat(project, collection, formatName)) {
+      continue;
+    }
+    std::vector<u8> midi;
+    try {
+      midi = valueCollectionMidi(session, collection.id, sequenceLoops, modulationConversion, midiOptions);
+    } catch (const std::exception& ex) {
+      throw std::runtime_error("value " + std::string(label) + " MIDI export failed for collection '" +
+                               collection.name + "': " + ex.what());
+    }
+    const std::string key = valueMidiCollectionKey(project, collection);
+    auto [_, inserted] = midis.emplace(key, std::move(midi));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value " + std::string(label) + " MIDI collection key: " + key);
+    }
+  }
+  if (midis.empty()) {
+    throw std::runtime_error("value scanner did not discover " + std::string(label) + " MIDI collections");
+  }
+  return midis;
+}
+
 std::map<std::string, SynthExportBytes> legacyCollectionSynthExports(const std::filesystem::path& path) {
   const auto root = scanLegacyFile(path);
   std::map<std::string, SynthExportBytes> exports;
@@ -1771,6 +1950,31 @@ std::map<std::string, SynthExportBytes> legacyCollectionSynthExports(const std::
 
   if (exports.empty()) {
     throw std::runtime_error("legacy scanner did not discover synth-exportable collections in: " + path.string());
+  }
+  return exports;
+}
+
+std::map<std::string, SynthExportBytes> legacyFormatCollectionSynthExports(const std::filesystem::path& path,
+                                                                           std::string_view formatName,
+                                                                           std::string_view label) {
+  const auto root = scanLegacyFile(path);
+  std::map<std::string, SynthExportBytes> exports;
+
+  for (auto* collection : root->vgmColls()) {
+    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != formatName ||
+        collection->instrSets().empty() || collection->sampColls().empty()) {
+      continue;
+    }
+    const std::string key = legacyMidiCollectionKey(*collection);
+    auto [_, inserted] = exports.emplace(key, legacyCollectionSynthExports(*collection));
+    if (!inserted) {
+      throw std::runtime_error("duplicate legacy " + std::string(label) + " synth collection key: " + key);
+    }
+  }
+
+  if (exports.empty()) {
+    throw std::runtime_error("legacy scanner did not discover " + std::string(label) +
+                             " synth-exportable collections in: " + path.string());
   }
   return exports;
 }
@@ -1803,6 +2007,43 @@ std::map<std::string, SynthExportBytes> valueCollectionSynthExports(const std::f
 
   if (exports.empty()) {
     throw std::runtime_error("value scanner did not discover synth-exportable collections in: " + path.string());
+  }
+  return exports;
+}
+
+std::map<std::string, SynthExportBytes> valueFormatCollectionSynthExports(const std::filesystem::path& path,
+                                                                          std::string_view formatName,
+                                                                          std::string_view label) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const SessionSnapshot project = session.scanPendingSources();
+  if (project.collections().empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover " << label << " synth collections";
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, SynthExportBytes> exports;
+  for (const auto& collection : project.collections()) {
+    if (!valueCollectionHasSequenceFormat(project, collection, formatName) || collection.instrumentSets.empty() ||
+        collection.sampleCollections.empty()) {
+      continue;
+    }
+    const std::string key = valueMidiCollectionKey(project, collection);
+    auto [_, inserted] = exports.emplace(key, valueCapcomSnesSynthExports(session, collection.id));
+    if (!inserted) {
+      throw std::runtime_error("duplicate value " + std::string(label) + " synth collection key: " + key);
+    }
+  }
+
+  if (exports.empty()) {
+    throw std::runtime_error("value scanner did not discover " + std::string(label) +
+                             " synth-exportable collections in: " + path.string());
   }
   return exports;
 }
@@ -2443,8 +2684,8 @@ std::string describeDlsConnections(std::span<const DlsConnection> connections) {
 std::string describeDlsRegion(const DlsRegionSummary& region) {
   std::ostringstream out;
   out << "header{" << describeBytesSummary(region.header) << "} sample{" << describeBytesSummary(region.sample)
-      << "} link{" << describeBytesSummary(region.link) << "} connections="
-      << describeDlsConnections(region.connections);
+      << "} link{" << describeBytesSummary(region.link)
+      << "} connections=" << describeDlsConnections(region.connections);
   return out.str();
 }
 
@@ -2980,6 +3221,8 @@ SimulatedModulationStats simulatedModulationStats(std::span<const u8> midiBytes)
     u8 rpnMsb = 0x7f;
     u8 rpnLsb = 0x7f;
     u8 pitchBendRangeSemitones = 2;
+    u8 pitchBendRangeFineCents = 0;
+    u16 pitchBendRangeCents = 200;
     std::optional<u32> lastPitchBend;
   };
   std::map<std::tuple<u32, u8>, ChannelState> channelStates;
@@ -3037,10 +3280,16 @@ SimulatedModulationStats simulatedModulationStats(std::span<const u8> midiBytes)
           state.rpnMsb = data2;
         } else if (data1 == 100) {
           state.rpnLsb = data2;
-        } else if (data1 == 6 && state.rpnMsb == 0 && state.rpnLsb == 0) {
-          state.pitchBendRangeSemitones = std::max<u8>(2, data2);
-          stats.maxPitchBendRangeSemitones =
-              std::max<u32>(stats.maxPitchBendRangeSemitones, state.pitchBendRangeSemitones);
+        } else if ((data1 == 6 || data1 == 38) && state.rpnMsb == 0 && state.rpnLsb == 0) {
+          if (data1 == 6) {
+            state.pitchBendRangeSemitones = data2;
+          } else {
+            state.pitchBendRangeFineCents = data2;
+          }
+          state.pitchBendRangeCents =
+              std::max<u16>(200, static_cast<u16>(state.pitchBendRangeSemitones) * 100 + state.pitchBendRangeFineCents);
+          stats.maxPitchBendRangeSemitones = std::max<u32>(
+              stats.maxPitchBendRangeSemitones, static_cast<u32>(std::ceil(state.pitchBendRangeCents / 100.0)));
         }
       } else if (command == 0xe0) {
         ++stats.pitchBendCount;
@@ -3048,9 +3297,8 @@ SimulatedModulationStats simulatedModulationStats(std::span<const u8> midiBytes)
         const s32 signedBend = static_cast<s32>(unsignedBend) - 8192;
         const u32 absBend = static_cast<u32>(std::abs(signedBend));
         stats.maxAbsPitchBend = std::max(stats.maxAbsPitchBend, absBend);
-        stats.maxAbsPitchBendSemitones =
-            std::max(stats.maxAbsPitchBendSemitones,
-                     (static_cast<double>(absBend) * state.pitchBendRangeSemitones) / 8192.0);
+        stats.maxAbsPitchBendSemitones = std::max(
+            stats.maxAbsPitchBendSemitones, (static_cast<double>(absBend) * state.pitchBendRangeCents) / 819200.0);
         if (signedBend != 0) {
           ++stats.nonCenterPitchBendCount;
         }
@@ -3080,8 +3328,7 @@ std::string performanceEventLocation(const SequenceProgram& program, const Perfo
 }
 
 PerformanceModulationStats performanceModulationStats(const SequenceProgram& program,
-                                                      const SequenceDialectRegistry& dialects,
-                                                      u32 sequenceLoops) {
+                                                      const SequenceDialectRegistry& dialects, u32 sequenceLoops) {
   const auto* dialect = dialects.find(program.dialect.value);
   if (dialect == nullptr) {
     throw std::runtime_error("No sequence dialect registered for '" + program.dialect.value + "'");
@@ -3231,18 +3478,18 @@ int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u3
       return 1;
     }
     const auto& performance = performanceFound->second;
-    std::cout << "checking " << collectionName << " SequenceEventSimulation MIDI: pitchBends="
-              << stats.pitchBendCount << " nonCenter=" << stats.nonCenterPitchBendCount
-              << " maxAbs=" << stats.maxAbsPitchBend << " maxRange=" << stats.maxPitchBendRangeSemitones
-              << " maxSemitones=" << stats.maxAbsPitchBendSemitones << "\n";
+    std::cout << "checking " << collectionName << " SequenceEventSimulation MIDI: pitchBends=" << stats.pitchBendCount
+              << " nonCenter=" << stats.nonCenterPitchBendCount << " maxAbs=" << stats.maxAbsPitchBend
+              << " maxRange=" << stats.maxPitchBendRangeSemitones << " maxSemitones=" << stats.maxAbsPitchBendSemitones
+              << "\n";
     std::cout << "  performance notes: notes=" << performance.noteEvents
               << " drumBankNotes=" << performance.drumBankNoteEvents
               << " melodicBankNotes=" << performance.melodicBankNoteEvents
               << " drumBankPrograms=" << performance.drumBankInstrumentEvents
               << " melodicPrograms=" << performance.melodicInstrumentEvents
               << " firstDrumTick=" << performance.firstDrumBankNoteTick
-              << " lastDrumTick=" << performance.lastDrumBankNoteTick
-              << " lastNoteTick=" << performance.lastNoteTick << "\n";
+              << " lastDrumTick=" << performance.lastDrumBankNoteTick << " lastNoteTick=" << performance.lastNoteTick
+              << "\n";
     std::cout << "  performance vibrato: depthEvents=" << performance.vibratoDepthEvents
               << " activeDepthEvents=" << performance.activeVibratoDepthEvents
               << " maxDepthSemi=" << performance.maxVibratoPitchDepthSemitones
@@ -3332,7 +3579,7 @@ std::vector<NormalizedMidiEvent> withoutExtraValueTailSetup(const std::vector<No
   return filtered;
 }
 
-MidiCompareOptions capcomSnesMidiCompareOptions() {
+MidiCompareOptions allowExtraValueTailSetupOptions() {
   return MidiCompareOptions{
       .allowExtraValueTrackTailSetup = true,
   };
@@ -3497,7 +3744,7 @@ int compareCapcomSnesAramMidi(const std::filesystem::path& path) {
   const std::string name = path.filename().string();
   const auto legacyMidi = legacyCapcomSnesMidi(aramBytes, name);
   const auto valueMidi = valueCapcomSnesMidi(aramBytes, name);
-  return compareMidi(legacyMidi, valueMidi, std::cout, capcomSnesMidiCompareOptions()) ? 0 : 1;
+  return compareMidi(legacyMidi, valueMidi, std::cout, allowExtraValueTailSetupOptions()) ? 0 : 1;
 }
 
 int compareCapcomSnesRsnMidi(const std::filesystem::path& path) {
@@ -3510,7 +3757,7 @@ int compareCapcomSnesRsnMidi(const std::filesystem::path& path) {
     std::cout << "checking " << aram.name << "\n";
     const auto legacyMidi = legacyCapcomSnesMidi(aram.bytes, aram.name);
     const auto valueMidi = valueCapcomSnesMidi(aram.bytes, aram.name);
-    if (!compareMidi(legacyMidi, valueMidi, std::cout, capcomSnesMidiCompareOptions())) {
+    if (!compareMidi(legacyMidi, valueMidi, std::cout, allowExtraValueTailSetupOptions())) {
       return 1;
     }
   }
@@ -3536,7 +3783,7 @@ int compareCapcomSnesRsnDirectMidi(const std::filesystem::path& path) {
     }
 
     std::cout << "checking " << collectionName << " via direct RSN value scan\n";
-    if (!compareMidi(legacyMidi, found->second, std::cout, capcomSnesMidiCompareOptions())) {
+    if (!compareMidi(legacyMidi, found->second, std::cout)) {
       return 1;
     }
   }
@@ -3652,6 +3899,33 @@ int compareKonamiSnesDirectSummary(const std::filesystem::path& path) {
   return 0;
 }
 
+int compareAkaoSnesDirectSummary(const std::filesystem::path& path) {
+  const auto legacySummaries = legacyFormatCollectionSummaries(path, "AkaoSnes", "AkaoSnes");
+  const auto valueSummaries = valueFormatCollectionSummaries(path, "AkaoSnes", "AkaoSnes");
+  if (valueSummaries.size() != legacySummaries.size()) {
+    std::cout << "value AkaoSnes collection count differs: legacy=" << legacySummaries.size()
+              << " value=" << valueSummaries.size() << "\n"
+              << "legacy collections: " << describeMapKeys(legacySummaries) << "\n"
+              << "value collections: " << describeMapKeys(valueSummaries) << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacySummary] : legacySummaries) {
+    const auto found = valueSummaries.find(collectionName);
+    if (found == valueSummaries.end()) {
+      std::cout << "value AkaoSnes scan did not produce collection '" << collectionName << "'\n";
+      return 1;
+    }
+    std::cout << "checking " << collectionName << " via direct AkaoSnes value summary\n";
+    if (!compareSummary(legacySummary, found->second, std::cout, "AkaoSnes")) {
+      return 1;
+    }
+  }
+
+  std::cout << "AkaoSnes direct summary parity ok: collections=" << legacySummaries.size() << "\n";
+  return 0;
+}
+
 int compareKonamiSnesDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   const auto legacyMidis = legacyCollectionMidis(path, sequenceLoops);
   const auto valueMidis = valueCollectionMidis(path, sequenceLoops);
@@ -3667,14 +3941,44 @@ int compareKonamiSnesDirectMidi(const std::filesystem::path& path, u32 sequenceL
       std::cout << "value KonamiSnes scan did not produce MIDI for collection '" << collectionName << "'\n";
       return 1;
     }
-    std::cout << "checking " << collectionName << " MIDI via direct KonamiSnes value scan, loops="
-              << sequenceLoops << "\n";
+    std::cout << "checking " << collectionName << " MIDI via direct KonamiSnes value scan, loops=" << sequenceLoops
+              << "\n";
     if (!compareMidi(legacyMidi, found->second, std::cout)) {
       return 1;
     }
   }
 
   std::cout << "KonamiSnes direct MIDI parity ok: collections=" << legacyMidis.size() << " loops=" << sequenceLoops
+            << "\n";
+  return 0;
+}
+
+int compareAkaoSnesDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  const auto legacyMidis = legacyFormatCollectionMidis(path, "AkaoSnes", "AkaoSnes", sequenceLoops);
+  MidiExportOptions midiOptions;
+  midiOptions.writePortMetaEvents = false;
+  const auto valueMidis = valueFormatCollectionMidis(path, "AkaoSnes", "AkaoSnes", sequenceLoops,
+                                                     ModulationConversionPolicy::SynthModulators, midiOptions);
+  if (valueMidis.size() != legacyMidis.size()) {
+    std::cout << "value AkaoSnes MIDI collection count differs: legacy=" << legacyMidis.size()
+              << " value=" << valueMidis.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacyMidi] : legacyMidis) {
+    const auto found = valueMidis.find(collectionName);
+    if (found == valueMidis.end()) {
+      std::cout << "value AkaoSnes scan did not produce MIDI for collection '" << collectionName << "'\n";
+      return 1;
+    }
+    std::cout << "checking " << collectionName << " MIDI via direct AkaoSnes value scan, loops=" << sequenceLoops
+              << "\n";
+    if (!compareMidi(legacyMidi, found->second, std::cout, allowExtraValueTailSetupOptions())) {
+      return 1;
+    }
+  }
+
+  std::cout << "AkaoSnes direct MIDI parity ok: collections=" << legacyMidis.size() << " loops=" << sequenceLoops
             << "\n";
   return 0;
 }
@@ -3746,6 +4050,37 @@ int compareKonamiSnesDirectSynth(const std::filesystem::path& path) {
   }
 
   std::cout << "KonamiSnes direct SF2/DLS parity ok: collections=" << legacyExports.size() << "\n";
+  return 0;
+}
+
+int compareAkaoSnesDirectSynth(const std::filesystem::path& path) {
+  const auto legacyExports = legacyFormatCollectionSynthExports(path, "AkaoSnes", "AkaoSnes");
+  const auto valueExports = valueFormatCollectionSynthExports(path, "AkaoSnes", "AkaoSnes");
+  if (valueExports.size() != legacyExports.size()) {
+    std::cout << "value AkaoSnes synth collection count differs: legacy=" << legacyExports.size()
+              << " value=" << valueExports.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacy] : legacyExports) {
+    const auto found = valueExports.find(collectionName);
+    if (found == valueExports.end()) {
+      std::cout << "value AkaoSnes scan did not produce synth exports for collection '" << collectionName << "'\n";
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " SF2 via direct AkaoSnes value scan\n";
+    if (!compareSf2(legacy.sf2, found->second.sf2, std::cout)) {
+      return 1;
+    }
+
+    std::cout << "checking " << collectionName << " DLS via direct AkaoSnes value scan\n";
+    if (!compareDls(legacy.dls, found->second.dls, std::cout)) {
+      return 1;
+    }
+  }
+
+  std::cout << "AkaoSnes direct SF2/DLS parity ok: collections=" << legacyExports.size() << "\n";
   return 0;
 }
 
@@ -4023,6 +4358,9 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity akao-direct-midi <psf-or-raw-file> [sequence-loops]\n"
       << "  vgmtrans-parity akao-direct-synth <psf-or-raw-file>\n"
       << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
+      << "  vgmtrans-parity akao-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
+      << "  vgmtrans-parity akao-snes-direct-synth <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity akao-snes-direct-summary <rsn-or-spc-file>\n"
       << "  vgmtrans-parity konami-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
       << "  vgmtrans-parity konami-snes-direct-midi-dump <rsn-or-spc-file> <dir> [sequence-loops]\n"
       << "  vgmtrans-parity konami-snes-direct-midi-sim <rsn-or-spc-file> [sequence-loops]\n"
@@ -4079,6 +4417,22 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-summary") {
       return compareKonamiSnesDirectSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "akao-snes-direct-summary") {
+      return compareAkaoSnesDirectSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "akao-snes-direct-midi") {
+      return compareAkaoSnesDirectMidi(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "akao-snes-direct-midi") {
+      return compareAkaoSnesDirectMidi(argv[2], parseLoopCount(argv[3]));
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "akao-snes-direct-synth") {
+      return compareAkaoSnesDirectSynth(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-midi") {

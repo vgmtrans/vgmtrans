@@ -176,7 +176,7 @@ void PerformanceEmitter::pitchBendRange(PitchBendRangePerformanceEvent event) {
 
 void PerformanceEmitter::pitchBendRange(u8 semitones) {
   pitchBendRange(PitchBendRangePerformanceEvent{
-      .semitones = semitones,
+      .cents = static_cast<u16>(static_cast<u16>(semitones) * 100),
   });
 }
 
@@ -187,6 +187,18 @@ void PerformanceEmitter::vibratoDelay(VibratoDelayPerformanceEvent event) {
 
 void PerformanceEmitter::vibratoDelay(u32 delayTicks, u8 midiValue) {
   vibratoDelay(VibratoDelayPerformanceEvent{
+      .delayTicks = delayTicks,
+      .midiValue = midiValue,
+  });
+}
+
+void PerformanceEmitter::tremoloDelay(TremoloDelayPerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void PerformanceEmitter::tremoloDelay(u32 delayTicks, u8 midiValue) {
+  tremoloDelay(TremoloDelayPerformanceEvent{
       .delayTicks = delayTicks,
       .midiValue = midiValue,
   });

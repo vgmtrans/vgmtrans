@@ -90,6 +90,7 @@ enum class SynthDestination {
   VibratoDelay,
   TremoloDepth,
   TremoloRate,
+  TremoloDelay,
   Unknown,
 };
 

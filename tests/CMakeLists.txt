@@ -3,6 +3,7 @@ target_sources(vgmtrans-value-core-tests
   PRIVATE
 	    formats/CapcomSnesModuleTests.cpp
 	    formats/KonamiSnesModuleTests.cpp
+	    formats/AkaoSnesModuleTests.cpp
 	    formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
     core/ValueMidiTests.cpp

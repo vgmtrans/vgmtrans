@@ -79,6 +79,7 @@ struct SequenceDialect {
   ExecuteSourceCommand execute = nullptr;
   TickTrackState tick = nullptr;
   std::any context;
+  bool requiresCompleteSequencePrepass = false;
 };
 
 class SequenceDialectRegistry {

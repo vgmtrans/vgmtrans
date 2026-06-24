@@ -101,8 +101,7 @@ void midiExporterKeepsSameTickBankProgramPairsAdjacent() {
 
   const auto exported = MidiExporter().exportMidi(midiSequence);
   const std::vector<u8> expectedOrder{
-      0x00, 0xb0, 0x00, 0x00, 0x00, 0xc0, 0x0d, 0x00, 0xb0, 0x00, 0x7f,
-      0x00, 0xc0, 0x00, 0x00, 0x90, 0x3c, 0x64,
+      0x00, 0xb0, 0x00, 0x00, 0x00, 0xc0, 0x0d, 0x00, 0xb0, 0x00, 0x7f, 0x00, 0xc0, 0x00, 0x00, 0x90, 0x3c, 0x64,
   };
 
   expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
@@ -122,9 +121,8 @@ void midiExporterWritesTimeSignatureMetaEvent() {
   };
 
   const std::vector<u8> expected{
-      'M',  'T',  'h',  'd',  0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x30,
-      'M',  'T',  'r',  'k',  0x00, 0x00, 0x00, 0x0c, 0x00, 0xff, 0x58, 0x04, 0x03, 0x02,
-      0x30, 0x08, 0x00, 0xff, 0x2f, 0x00,
+      'M', 'T',  'h',  'd',  0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x30, 'M',  'T',  'r',
+      'k', 0x00, 0x00, 0x00, 0x0c, 0x00, 0xff, 0x58, 0x04, 0x03, 0x02, 0x30, 0x08, 0x00, 0xff, 0x2f, 0x00,
   };
 
   expect(MidiExporter().exportMidi(midiSequence) == expected, "MIDI exporter should write time-signature meta events");
@@ -262,9 +260,8 @@ void performanceMidiRendererWritesTimeSignaturesToFirstTrack() {
          "performance renderer should write global time signatures to the first MIDI track");
   expect(std::get<EndOfTrack>(firstTrackEvents.back()).tick == 48,
          "first MIDI track end should cover global time signatures");
-  expect(std::none_of(secondTrackEvents.begin(), secondTrackEvents.end(), [](const MidiEvent& event) {
-           return std::holds_alternative<TimeSignature>(event);
-         }),
+  expect(std::none_of(secondTrackEvents.begin(), secondTrackEvents.end(),
+                      [](const MidiEvent& event) { return std::holds_alternative<TimeSignature>(event); }),
          "performance renderer should not duplicate time signatures on their source track");
 }
 
@@ -386,7 +383,7 @@ void performanceMidiRendererQuantizesPitchBendAndPortamento() {
               {
                   PitchBendRangePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
-                      .semitones = 4,
+                      .cents = 400,
                   },
                   PitchBendPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -402,7 +399,7 @@ void performanceMidiRendererQuantizesPitchBendAndPortamento() {
 
   const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
   const auto& events = midiSequence.tracks[0].events;
-  expect(std::get<PitchBendRange>(events[1]).semitones == 4,
+  expect(std::get<PitchBendRange>(events[1]).cents == 400,
          "MIDI renderer should emit the performance pitch-bend range");
   expect(std::get<PitchBend>(events[2]).value == 2048,
          "MIDI renderer should quantize semitone pitch bend through the active range");
@@ -421,11 +418,11 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
               {
                   PitchBendRangePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
-                      .semitones = 2,
+                      .cents = 200,
                   },
                   PitchBendRangePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 6},
-                      .semitones = 2,
+                      .cents = 200,
                   },
                   PitchBendPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -452,16 +449,16 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
   };
 
   const auto assertPitchBends = [](const MidiSequence& midiSequence, std::string_view label) {
-    std::vector<std::pair<u64, u8>> pitchBendRanges;
+    std::vector<std::pair<u64, u16>> pitchBendRanges;
     std::vector<std::pair<u64, s16>> pitchBends;
     for (const MidiEvent& event : midiSequence.tracks[0].events) {
       if (const auto* range = std::get_if<PitchBendRange>(&event)) {
-        pitchBendRanges.emplace_back(range->tick, range->semitones);
+        pitchBendRanges.emplace_back(range->tick, range->cents);
       } else if (const auto* pitchBend = std::get_if<PitchBend>(&event)) {
         pitchBends.emplace_back(pitchBend->tick, pitchBend->value);
       }
     }
-    const std::vector<std::pair<u64, u8>> expectedPitchBendRanges{{0, 2}};
+    const std::vector<std::pair<u64, u16>> expectedPitchBendRanges{{0, 200}};
     const std::vector<std::pair<u64, s16>> expectedPitchBends{
         {0, 0},
         {24, 4096},
@@ -473,8 +470,8 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
   };
 
   assertPitchBends(PerformanceMidiRenderer().render(performance), "synth-modulator MIDI lowering");
-  assertPitchBends(PerformanceMidiRenderer().render(
-                       performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation),
+  assertPitchBends(PerformanceMidiRenderer().render(performance, MidiExportOptions{},
+                                                    ModulationConversionPolicy::SequenceEventSimulation),
                    "sequence-event MIDI lowering");
 }
 
@@ -530,13 +527,7 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
 
   expect(!hasPreDelayNonzero, "sequence-event vibrato simulation should stay silent before the delay expires");
   const std::vector<std::pair<u64, s16>> expectedPitchBends{
-      {2, 0},
-      {3, 2048},
-      {4, 4096},
-      {5, 2048},
-      {6, 0},
-      {7, -2048},
-      {8, -4096},
+      {2, 0}, {3, 2048}, {4, 4096}, {5, 2048}, {6, 0}, {7, -2048}, {8, -4096},
   };
   expect(pitchBends == expectedPitchBends,
          "sequence-event vibrato simulation should emit a delayed triangle LFO bend shape");
@@ -598,13 +589,7 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
   }
 
   const std::vector<std::pair<u64, s16>> expectedPitchBends{
-      {2, 0},
-      {3, 2048},
-      {4, 4096},
-      {5, 0},
-      {8, 2048},
-      {9, 4096},
-      {10, 2048},
+      {2, 0}, {3, 2048}, {4, 4096}, {5, 0}, {8, 2048}, {9, 4096}, {10, 2048},
   };
   expect(pitchBends == expectedPitchBends,
          "sequence-event vibrato simulation should restart the delay and phase for each new note");

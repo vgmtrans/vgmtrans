@@ -122,7 +122,7 @@ struct PitchBendPerformanceEvent {
 
 struct PitchBendRangePerformanceEvent {
   PerformanceEventHeader header;
-  u8 semitones = 2;
+  u16 cents = 200;
 };
 
 struct VibratoDelayPerformanceEvent {
@@ -130,6 +130,12 @@ struct VibratoDelayPerformanceEvent {
   // Delay in rendered sequence ticks, used when vibrato is simulated as pitch bend.
   u32 delayTicks = 0;
   // Controller value to write when exporting synth-style MIDI controls.
+  u8 midiValue = 0;
+};
+
+struct TremoloDelayPerformanceEvent {
+  PerformanceEventHeader header;
+  u32 delayTicks = 0;
   u8 midiValue = 0;
 };
 
@@ -192,11 +198,11 @@ struct MarkerPerformanceEvent {
 using PerformanceEvent =
     std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
                  LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent, MasterLevelPerformanceEvent,
-                 ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent, GlobalTransposePerformanceEvent,
-                 PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent, PortamentoTimePerformanceEvent,
-                 PortamentoControlPerformanceEvent, PitchBendPerformanceEvent, PitchBendRangePerformanceEvent,
-                 VibratoDelayPerformanceEvent, LegatoPedalPerformanceEvent, ModulationPerformanceEvent,
-                 MarkerPerformanceEvent>;
+                 ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
+                 GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
+                 PortamentoTimePerformanceEvent, PortamentoControlPerformanceEvent, PitchBendPerformanceEvent,
+                 PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent,
+                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
 
 struct PerformanceTrack {
   TrackId id;

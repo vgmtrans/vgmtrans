@@ -40,6 +40,8 @@ namespace {
       return &usage.tremoloDepth;
     case SynthDestination::TremoloRate:
       return &usage.tremoloRate;
+    case SynthDestination::TremoloDelay:
+      return nullptr;
     case SynthDestination::VolumeAttenuation:
       return &usage.tremoloDepth;
     case SynthDestination::Pitch:
@@ -74,10 +76,9 @@ u8 scaledMidiModulationControllerValue(u8 value, std::optional<double> normalize
   }
 
   return static_cast<u8>(std::clamp<s32>(
-      static_cast<s32>(std::lround((std::clamp(*normalizedAmount, 0.0, range->normalizedMax) * 127.0) /
-                                   range->normalizedMax)),
-      0,
-      127));
+      static_cast<s32>(
+          std::lround((std::clamp(*normalizedAmount, 0.0, range->normalizedMax) * 127.0) / range->normalizedMax)),
+      0, 127));
 }
 
 void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsage& usage,
@@ -88,17 +89,17 @@ void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsag
           [&](auto& typedEvent) {
             using TypedEvent = std::decay_t<decltype(typedEvent)>;
             if constexpr (std::is_same_v<TypedEvent, VibratoDepth>) {
-              typedEvent.value = scaledMidiModulationControllerValue(
-                  typedEvent.value, typedEvent.normalizedAmount, &usage.vibratoDepth, policy);
+              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, typedEvent.normalizedAmount,
+                                                                     &usage.vibratoDepth, policy);
             } else if constexpr (std::is_same_v<TypedEvent, VibratoFrequency>) {
-              typedEvent.value = scaledMidiModulationControllerValue(
-                  typedEvent.value, typedEvent.normalizedAmount, &usage.vibratoRate, policy);
+              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, typedEvent.normalizedAmount,
+                                                                     &usage.vibratoRate, policy);
             } else if constexpr (std::is_same_v<TypedEvent, TremoloDepth>) {
-              typedEvent.value = scaledMidiModulationControllerValue(
-                  typedEvent.value, typedEvent.normalizedAmount, &usage.tremoloDepth, policy);
+              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, typedEvent.normalizedAmount,
+                                                                     &usage.tremoloDepth, policy);
             } else if constexpr (std::is_same_v<TypedEvent, TremoloFrequency>) {
-              typedEvent.value = scaledMidiModulationControllerValue(
-                  typedEvent.value, typedEvent.normalizedAmount, &usage.tremoloRate, policy);
+              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, typedEvent.normalizedAmount,
+                                                                     &usage.tremoloRate, policy);
             }
           },
           event);
@@ -119,9 +120,8 @@ s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModula
 
   // If MIDI controller values are expanded upward, the synth-side modulator amount must
   // shrink by the same ratio so the audible depth stays unchanged.
-  const double normalizedMax = range->normalizedMax > 0.0
-                                   ? range->normalizedMax
-                                   : (static_cast<double>(range->max) / 127.0);
+  const double normalizedMax =
+      range->normalizedMax > 0.0 ? range->normalizedMax : (static_cast<double>(range->max) / 127.0);
   return static_cast<s32>(std::lround(static_cast<double>(modulator.amount) * normalizedMax));
 }
 
@@ -136,6 +136,7 @@ bool shouldExportSynthGenerator(const SynthGenerator& generator, ModulationConve
     case SynthDestination::VibratoDelay:
     case SynthDestination::TremoloDepth:
     case SynthDestination::TremoloRate:
+    case SynthDestination::TremoloDelay:
       return false;
     case SynthDestination::VolumeAttenuation:
     case SynthDestination::Pitch:
@@ -158,6 +159,7 @@ bool shouldExportSynthModulator(const SynthModulator& modulator, ModulationConve
     case SynthDestination::VibratoDelay:
     case SynthDestination::TremoloDepth:
     case SynthDestination::TremoloRate:
+    case SynthDestination::TremoloDelay:
       return false;
     case SynthDestination::VolumeAttenuation:
       return modulator.source.has_value();
