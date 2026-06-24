@@ -490,7 +490,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           if (typedEvent.controllerRangeOnly) {
             return;
           }
-          const u8 value = midiNormalized7(typedEvent.amount);
+          const double normalizedAmount = std::clamp(typedEvent.amount, 0.0, 1.0);
+          const u8 value = midiNormalized7(normalizedAmount);
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             switch (typedEvent.target) {
               case ModulationPerformanceTarget::VibratoDepth:
@@ -520,6 +521,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                   .tick = typedEvent.header.tick,
                   .channel = channel,
                   .value = value,
+                  .normalizedAmount = normalizedAmount,
               });
               break;
             case ModulationPerformanceTarget::VibratoRate:
@@ -527,6 +529,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                   .tick = typedEvent.header.tick,
                   .channel = channel,
                   .value = value,
+                  .normalizedAmount = normalizedAmount,
               });
               break;
             case ModulationPerformanceTarget::TremoloDepth:
@@ -534,6 +537,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                   .tick = typedEvent.header.tick,
                   .channel = channel,
                   .value = value,
+                  .normalizedAmount = normalizedAmount,
               });
               break;
             case ModulationPerformanceTarget::TremoloRate:
@@ -541,6 +545,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                   .tick = typedEvent.header.tick,
                   .channel = channel,
                   .value = value,
+                  .normalizedAmount = normalizedAmount,
               });
               break;
           }

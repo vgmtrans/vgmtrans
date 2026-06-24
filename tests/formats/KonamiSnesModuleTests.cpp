@@ -20,6 +20,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -164,6 +165,20 @@ std::vector<u8> makeKonamiSnesAram() {
   bytes[0x6000] = 0x01;
 
   return bytes;
+}
+
+PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
+  std::vector<u8> bytes(commandBytes.begin(), commandBytes.end());
+  const auto& descriptor = konamiSnesSequenceDescriptor(KONAMISNES_V6);
+  TrackProgram track = decodeKonamiSnesSourceTrack(ByteReader(SourceId{9}, bytes), descriptor, 0, 0);
+  const SequenceProgram program{
+      .dialect = descriptor.dialect.id,
+      .timebase = descriptor.dialect.timebase,
+      .sourceBaseAddress = Address{0},
+      .behavior = descriptor.dialect.defaultBehavior,
+      .tracks = {track},
+  };
+  return SequenceVm(LoopPolicy::PlayOnce).render(program, descriptor.dialect);
 }
 
 }  // namespace
@@ -330,4 +345,51 @@ void konamiSnesSynthParsersStopAtInvalidBankedInstrument() {
   const auto samples = parseKonamiSnesSampleInfos(ByteReader(SourceId{8}, bytes), *layout->spcDirAddress, instruments);
   expect(samples.size() == 1 && samples.front().srcn == 0 && samples.front().encodedLength == 9,
          "KonamiSnes sample parser should keep only samples used by valid instruments");
+}
+
+void konamiSnesProgramChangeReemitsCurrentFineTune() {
+  constexpr std::array<u8, 9> bytes{
+      0xf2, 0xf4,              // tune down before the first note
+      0x3c, 0x05, 0x7f, 0x7f,  // wait five ticks
+      0xe2, 0x09,              // switch to program 9
+      0xff,
+  };
+
+  const PerformanceSequence performance = renderKonamiSnesTrack(bytes);
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const auto& events = midi.tracks[0].events;
+
+  const auto programChange = std::ranges::find_if(events, [](const MidiEvent& event) {
+    const auto* program = std::get_if<ProgramChange>(&event);
+    return program != nullptr && program->tick == 5 && program->program == 9;
+  });
+  expect(programChange != events.end(), "KonamiSnes program change should render at the expected tick");
+
+  const auto programIndex = static_cast<size_t>(std::distance(events.begin(), programChange));
+  const bool hasSameTickFineTuneBeforeProgram = std::ranges::any_of(
+      events.begin(), events.begin() + static_cast<std::ptrdiff_t>(programIndex), [](const MidiEvent& event) {
+        const auto* fineTune = std::get_if<FineTune>(&event);
+        return fineTune != nullptr && fineTune->tick == 5 && std::abs(fineTune->cents + 18.75) < 0.001;
+      });
+  expect(hasSameTickFineTuneBeforeProgram,
+         "KonamiSnes program changes should re-emit the active fine tune before changing instrument");
+}
+
+void konamiSnesPercussionUsesPackedGsDrumBank() {
+  constexpr std::array<u8, 2> bytes{
+      0x60,  // percussion on
+      0xff,
+  };
+
+  const PerformanceSequence performance = renderKonamiSnesTrack(bytes);
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const auto& events = midi.tracks[0].events;
+
+  const auto drumBank = std::ranges::find_if(events, [](const MidiEvent& event) {
+    const auto* bank = std::get_if<BankSelect>(&event);
+    return bank != nullptr && bank->tick == 0;
+  });
+  expect(drumBank != events.end(), "KonamiSnes percussion should emit a drum bank select");
+  expect(std::get<BankSelect>(*drumBank).bank == (0x7f << 7),
+         "KonamiSnes percussion should use the packed GS bank field so MIDI serializes bank MSB 127");
 }

@@ -281,6 +281,10 @@ struct Context {
   return tuning * 4.0 / 256.0;
 }
 
+[[nodiscard]] constexpr u32 midiBank(u32 bankMsb) {
+  return bankMsb << 7;
+}
+
 [[nodiscard]] double linearGainFromRawVolume(u8 volume) {
   return std::clamp(static_cast<double>(volume) / 255.0, 0.0, 1.0);
 }
@@ -410,6 +414,7 @@ struct TrackState {
     pitchBase.reset();
     pitchSlide.clearMotion();
     emittedInitialModulationCeiling = false;
+    lastEmittedTuningCents = std::numeric_limits<double>::quiet_NaN();
   }
 
   static ModulationRanges analyzeVibratoRanges(const SequenceProgram& program, KonamiSnesVersion version) {
@@ -475,9 +480,12 @@ struct TrackState {
   }
 
   template <class Runtime>
-  void applyEffectiveTuning(Runtime& rt) {
+  void applyEffectiveTuning(Runtime& rt, bool force = false) {
     const double cents = totalTuningCents();
-    if (std::abs(lastEmittedTuningCents - cents) > 0.001) {
+    const bool hasEmittedTuning = std::isfinite(lastEmittedTuningCents);
+    const bool hasNonZeroTuning = std::abs(cents) > 0.001;
+    const bool changed = hasEmittedTuning && std::abs(lastEmittedTuningCents - cents) > 0.001;
+    if ((!hasEmittedTuning && hasNonZeroTuning) || changed || (force && hasEmittedTuning)) {
       rt.tuning(cents);
       lastEmittedTuningCents = cents;
     }
@@ -855,7 +863,7 @@ struct KonamiSnesCursorReader {
       case EventType::PercussionOn:
         cmd.name("Percussion On", SequenceSemantic::Program);
         if (!state.percussion) {
-          rt.instrument(0x7f, 0, true);
+          rt.instrument(midiBank(0x7f), 0, true);
           state.percussion = true;
         }
         return cmd.next();
@@ -863,7 +871,8 @@ struct KonamiSnesCursorReader {
       case EventType::PercussionOff:
         cmd.name("Percussion Off", SequenceSemantic::Program);
         if (state.percussion) {
-          rt.instrument(state.instrument >> 7, state.instrument & 0x7f, true);
+          state.applyEffectiveTuning(rt, true);
+          rt.instrument(midiBank(state.instrument >> 7), state.instrument & 0x7f, true);
           state.percussion = false;
         }
         return cmd.next();
@@ -912,7 +921,8 @@ struct KonamiSnesCursorReader {
         const u8 program = cmd.u8("program");
         state.instrument = program;
         cmd.derived("bank", program >> 7).derived("program_number", program & 0x7f).instrumentRef(program >> 7, program & 0x7f);
-        rt.instrument(program >> 7, program & 0x7f, true);
+        state.applyEffectiveTuning(rt, true);
+        rt.instrument(midiBank(program >> 7), program & 0x7f, true);
         emitPan(rt, rt.context.version <= KONAMISNES_V2 ? 10 : 20);
         return cmd.next();
       }
@@ -922,7 +932,8 @@ struct KonamiSnesCursorReader {
         const u8 volume = cmd.u8("volume");
         const u8 program = cmd.u8("program");
         state.instrument = program;
-        rt.instrument(program >> 7, program & 0x7f, true);
+        state.applyEffectiveTuning(rt, true);
+        rt.instrument(midiBank(program >> 7), program & 0x7f, true);
         emitVolume(rt, volume);
         emitPan(rt, rt.context.version <= KONAMISNES_V2 ? 10 : 20);
         return cmd.next();

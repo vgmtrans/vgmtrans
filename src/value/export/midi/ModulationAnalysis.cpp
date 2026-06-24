@@ -78,6 +78,10 @@ void observePerformanceModulation(MidiTrackModulationUsage& usage, const Modulat
   }
 }
 
+[[nodiscard]] double normalizedControllerAmount(u8 value, const std::optional<double>& normalizedAmount) {
+  return normalizedAmount.value_or(static_cast<double>(value) / 127.0);
+}
+
 void mergeTrackUsage(MidiModulationUsage& result, const MidiTrackModulationUsage& trackUsage) {
   merge(result.vibratoDepth, trackUsage.vibratoDepth);
   merge(result.vibratoRate, trackUsage.vibratoRate);
@@ -139,17 +143,17 @@ MidiModulationUsage analyzeMidiModulationUsage(const MidiSequence& sequence) {
           [&](const auto& typedEvent) {
             using TypedEvent = std::decay_t<decltype(typedEvent)>;
             if constexpr (std::is_same_v<TypedEvent, VibratoDepth>) {
-              observe(trackUsage.vibratoDepth, typedEvent.value, static_cast<double>(typedEvent.value) / 127.0,
-                      static_cast<double>(typedEvent.value) / 127.0, SourceRange{});
+              const double normalized = normalizedControllerAmount(typedEvent.value, typedEvent.normalizedAmount);
+              observe(trackUsage.vibratoDepth, typedEvent.value, normalized, normalized, SourceRange{});
             } else if constexpr (std::is_same_v<TypedEvent, VibratoFrequency>) {
-              observe(trackUsage.vibratoRate, typedEvent.value, static_cast<double>(typedEvent.value) / 127.0,
-                      static_cast<double>(typedEvent.value) / 127.0, SourceRange{});
+              const double normalized = normalizedControllerAmount(typedEvent.value, typedEvent.normalizedAmount);
+              observe(trackUsage.vibratoRate, typedEvent.value, normalized, normalized, SourceRange{});
             } else if constexpr (std::is_same_v<TypedEvent, TremoloDepth>) {
-              observe(trackUsage.tremoloDepth, typedEvent.value, static_cast<double>(typedEvent.value) / 127.0,
-                      static_cast<double>(typedEvent.value) / 127.0, SourceRange{});
+              const double normalized = normalizedControllerAmount(typedEvent.value, typedEvent.normalizedAmount);
+              observe(trackUsage.tremoloDepth, typedEvent.value, normalized, normalized, SourceRange{});
             } else if constexpr (std::is_same_v<TypedEvent, TremoloFrequency>) {
-              observe(trackUsage.tremoloRate, typedEvent.value, static_cast<double>(typedEvent.value) / 127.0,
-                      static_cast<double>(typedEvent.value) / 127.0, SourceRange{});
+              const double normalized = normalizedControllerAmount(typedEvent.value, typedEvent.normalizedAmount);
+              observe(trackUsage.tremoloRate, typedEvent.value, normalized, normalized, SourceRange{});
             }
           },
           event);
