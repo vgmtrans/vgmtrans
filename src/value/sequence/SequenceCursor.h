@@ -59,15 +59,6 @@ struct CommandFlow {
   std::optional<Effects> resolvedEffects;
 };
 
-enum class CommandPlaybackStatus {
-  SourceOnly,
-  NoOp,
-  AffectsPlayback,
-  AffectsControlFlow,
-  StopsPlayback,
-  Unsupported,
-};
-
 struct CursorCommandMetadata {
   std::string name;
   std::string detailKind;
@@ -150,12 +141,6 @@ public:
   VmCommandCursor& derived(std::string_view name, T&& value, SourceValueDisplay display = SourceValueDisplay::Default) {
     return derived(name, makeSourceValue(std::forward<T>(value)), display);
   }
-  VmCommandCursor& detail(std::string_view name, SourceValue value,
-                          SourceValueDisplay display = SourceValueDisplay::Default);
-  template <class T>
-  VmCommandCursor& detail(std::string_view name, T&& value, SourceValueDisplay display = SourceValueDisplay::Default) {
-    return detail(name, makeSourceValue(std::forward<T>(value)), display);
-  }
   VmCommandCursor& target(Address address, SourceLinkRole role);
   VmCommandCursor& instrumentRef(u32 bank, u32 program);
   VmCommandCursor& sampleRef(u32 sampleIndex);
@@ -199,6 +184,7 @@ private:
   void recordField(std::string_view name, SourceRange range, SourceValue value,
                    SourceValueDisplay display = SourceValueDisplay::Default);
   void defaultSemantic(SequenceSemantic semantic);
+  void writePlaybackStatus(CommandPlaybackStatus status);
   void defaultPlaybackStatus(CommandPlaybackStatus status);
   [[nodiscard]] CommandFlow flow(FlowKind kind, u32 waitTicks = 0, std::optional<Address> destination = std::nullopt);
 

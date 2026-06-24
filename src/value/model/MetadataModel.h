@@ -22,8 +22,9 @@ struct AssetMetadata {
   SourceRange range;
 };
 
-// Address is the driver's address value. It may differ from a file offset after
-// a source has been extracted or remapped.
+// Address is the canonical sequence bytecode/source offset used by TrackProgram
+// and SequenceVm. Formats must translate raw driver pointers into this address
+// space before handing them to VM flow helpers such as jump, call, or target.
 struct Address {
   u64 value = 0;
 };

@@ -35,7 +35,6 @@ struct ByteSpan {
 // text, and semantic category lives on its SourceAnnotation.
 struct SourceCommand {
   CommandId id;
-  CommandHandlerId handler;
   u8 opcode = 0;
   Address address;
   u32 encodedSize = 0;
@@ -157,8 +156,8 @@ class TrackProgramBuilder {
 public:
   explicit TrackProgramBuilder(TrackProgram& track);
 
-  const SourceCommand& addDecoded(CommandHandlerId handler, Address address, SourceRange range,
-                                  std::span<const u8> bytes, SourceAnnotationId annotation = {});
+  const SourceCommand& addDecoded(Address address, SourceRange range, std::span<const u8> bytes,
+                                  SourceAnnotationId annotation = {});
 
 private:
   TrackProgram& track_;

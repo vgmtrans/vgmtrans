@@ -118,6 +118,7 @@ VmCommandCursor& VmCommandCursor::semantic(SequenceSemantic semantic) {
 VmCommandCursor& VmCommandCursor::playbackStatus(CommandPlaybackStatus status) {
   playbackStatus_ = status;
   playbackStatusOverridden_ = true;
+  writePlaybackStatus(status);
   return *this;
 }
 
@@ -330,10 +331,6 @@ ReadValue<std::string> VmCommandCursor::rawBytes(std::string_view name, size_t s
 VmCommandCursor& VmCommandCursor::derived(std::string_view name, SourceValue value, SourceValueDisplay display) {
   recordField(name, SourceRange{}, std::move(value), display);
   return *this;
-}
-
-VmCommandCursor& VmCommandCursor::detail(std::string_view name, SourceValue value, SourceValueDisplay display) {
-  return derived(name, std::move(value), display);
 }
 
 VmCommandCursor& VmCommandCursor::target(Address address, SourceLinkRole role) {
@@ -606,9 +603,18 @@ void VmCommandCursor::defaultSemantic(SequenceSemantic semantic) {
   }
 }
 
+void VmCommandCursor::writePlaybackStatus(CommandPlaybackStatus status) {
+  if (sourceMap_ == nullptr) {
+    return;
+  }
+  ensureAnnotation();
+  annotationBuilder().playbackStatus(status);
+}
+
 void VmCommandCursor::defaultPlaybackStatus(CommandPlaybackStatus status) {
   if (!playbackStatusOverridden_) {
     playbackStatus_ = status;
+    writePlaybackStatus(status);
   }
 }
 

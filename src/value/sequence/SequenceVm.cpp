@@ -355,15 +355,14 @@ public:
         }
       }
 
-      const CommandHandler* handler = dialect_.handler(command.handler);
-      if (handler == nullptr || handler->execute == nullptr) {
-        warn(fmt::format("Missing sequence command handler {}", command.handler.value), command.range);
+      if (dialect_.execute == nullptr) {
+        warn("Missing sequence dialect executor", command.range);
         break;
       }
 
       PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
       VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-      const Effects effects = handler->execute(command, track_, trackState_, out, vm, dialect_.context);
+      const Effects effects = dialect_.execute(command, track_, trackState_, out, vm, dialect_.context);
       runtime_.tick += effects.advanceTicks;
       runtime_.lastCommand = command.id;
       applyStep(command, effects.step);

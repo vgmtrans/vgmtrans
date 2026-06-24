@@ -331,7 +331,7 @@ template <class Runtime>
   cmd.name(name, SequenceSemantic::Jump);
   const u8 condition = cmd.u8(conditionName);
   const Address destination = readRelativeAddress(rt, cmd, "relative");
-  cmd.detail(conditionName, condition);
+  cmd.derived(conditionName, condition);
   return cmd.conditionalBranch(destination);
 }
 
@@ -621,7 +621,7 @@ struct AkaoCursorReader {
         if (profile.legacyFamily()) {
           cmd.name("Reverb Depth").sourceOnly();
           const u16 depth = cmd.u16le("depth");
-          cmd.detail("depth", depth);
+          cmd.derived("depth", depth);
           return cmd.next();
         }
         break;
@@ -682,7 +682,7 @@ struct AkaoCursorReader {
       case 0xf6:
         if (profile.version == AkaoPs1Version::Version1_0) {
           cmd.name("Overlay Volume Balance").sourceOnly();
-          cmd.detail("balance", cmd.u8("balance"));
+          cmd.derived("balance", cmd.u8("balance"));
           return cmd.next();
         }
         break;
@@ -691,7 +691,7 @@ struct AkaoCursorReader {
           cmd.name("Overlay Volume Balance Fade").sourceOnly();
           const u16 duration = akaoZeroAs256(cmd.u8("duration"));
           const u8 balance = cmd.u8("balance");
-          cmd.derived("duration_ticks", duration).detail("balance", balance);
+          cmd.derived("duration_ticks", duration).derived("balance", balance);
           return cmd.next();
         }
         break;

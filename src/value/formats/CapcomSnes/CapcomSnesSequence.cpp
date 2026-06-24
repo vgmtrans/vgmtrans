@@ -327,7 +327,7 @@ struct CapcomSnesCursorReader {
         cmd.name("Tempo", SequenceSemantic::Tempo);
         const u16 raw = cmd.u16be("raw");
         const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw);
-        cmd.detail("microseconds_per_quarter", microseconds);
+        cmd.derived("microseconds_per_quarter", microseconds);
         rt.tempo(microseconds);
         return cmd.next();
       }
@@ -341,7 +341,7 @@ struct CapcomSnesCursorReader {
       case 0x07: {
         cmd.name("Volume", SequenceSemantic::Level);
         const u8 raw = cmd.u8("raw");
-        cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw));
+        cmd.derived("linear_gain", math::volumeGain(rt.context.version, raw));
         emitLinearVolume(rt, raw);
         return cmd.next();
       }
@@ -379,7 +379,7 @@ struct CapcomSnesCursorReader {
       case 0x0c: {
         cmd.name("Tuning", SequenceSemantic::Pitch);
         const s8 raw = cmd.s8("tuning");
-        cmd.detail("cents", math::tuningCents(raw));
+        cmd.derived("cents", math::tuningCents(raw));
         rt.tuning(math::tuningCents(raw));
         return cmd.next();
       }
@@ -438,7 +438,7 @@ struct CapcomSnesCursorReader {
         cmd.name("Pan", SequenceSemantic::Pan);
         const u8 raw = cmd.u8("raw");
         const auto converted = math::panConversion(rt.context.version, raw);
-        cmd.detail("stereo_position", math::stereoPosition(converted)).detail("linear_gain", converted.volumeScale);
+        cmd.derived("stereo_position", math::stereoPosition(converted)).derived("linear_gain", converted.volumeScale);
         emitPan(rt, raw);
         return cmd.next();
       }
@@ -446,7 +446,7 @@ struct CapcomSnesCursorReader {
       case 0x19: {
         cmd.name("Master Volume", SequenceSemantic::Level);
         const u8 raw = cmd.u8("raw");
-        cmd.detail("linear_gain", math::volumeGain(rt.context.version, raw));
+        cmd.derived("linear_gain", math::volumeGain(rt.context.version, raw));
         emitLinearMasterVolume(rt, raw);
         return cmd.next();
       }

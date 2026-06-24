@@ -6,33 +6,11 @@
 
 #include "value/sequence/SequenceDialect.h"
 
-#include <algorithm>
 #include <fmt/format.h>
 #include <stdexcept>
 #include <utility>
 
 namespace vgmtrans::core {
-
-const CommandHandler* SequenceDialect::handler(CommandHandlerId handlerId) const {
-  if (!handlerId.valid() || handlerId.value >= handlers.size()) {
-    return nullptr;
-  }
-
-  const auto& commandHandler = handlers[handlerId.value];
-  return commandHandler.id == handlerId ? &commandHandler : nullptr;
-}
-
-const CommandHandler* SequenceDialect::handlerForType(CommandTypeToken typeToken) const {
-  if (typeToken == nullptr) {
-    return nullptr;
-  }
-  const auto found = std::ranges::find_if(
-      handlers, [typeToken](const CommandHandler& handler) { return handler.typeToken == typeToken; });
-  if (found == handlers.end()) {
-    return nullptr;
-  }
-  return &*found;
-}
 
 void SequenceDialectRegistry::add(SequenceDialect dialect) {
   if (sealed_) {

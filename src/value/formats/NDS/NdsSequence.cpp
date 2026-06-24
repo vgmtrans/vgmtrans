@@ -346,12 +346,10 @@ private:
   };
 }
 
-[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(const SequenceDialect& dialect, ByteReader reader,
-                                                             u32 offset) {
+[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(ByteReader reader, u32 offset) {
   const auto bytes = reader.slice(offset, 1);
   std::vector<u8> ownedBytes{bytes.begin(), bytes.end()};
   auto command = DecodedBytecodeCommand{
-      .handler = cursorDialectHandlerId<TrackState, Context, NdsCursorReader>(dialect),
       .range = reader.range(offset, 1),
       .bytes = std::move(ownedBytes),
   };
@@ -404,7 +402,7 @@ private:
         if (overlap != callTargetOffsets.end()) {
           // Some malformed FAT entries fall through one byte before a real call
           // target. Stop before consuming the overlapping subroutine bytes.
-          appendDecodedBytecodeCommand(builder, terminalRecoveryCommand(dialect, reader, begin), begin);
+          appendDecodedBytecodeCommand(builder, terminalRecoveryCommand(reader, begin), begin);
           break;
         }
       }

@@ -21,7 +21,6 @@ class SourceMapBuilder;
 // Temporary decoded form used while a bytecode decoder is deciding control flow.
 // TrackProgramBuilder still owns the final immutable source-command snapshot.
 struct DecodedBytecodeCommand {
-  CommandHandlerId handler;
   SourceRange range;
   SourceAnnotationId annotation;
   std::vector<u8> bytes;
@@ -34,7 +33,6 @@ struct BytecodeDecodeContext {
   u32 bytecodeEnd = std::numeric_limits<u32>::max();
   u32 sequenceOffset = 0;
   u32 sequenceEnd = std::numeric_limits<u32>::max();
-  u32 commandEnd = 0;
   std::optional<SourceAnnotationId> parentAnnotation;
   SourceMapBuilder* sourceMap = nullptr;
   std::vector<Diagnostic>* diagnostics = nullptr;
@@ -46,7 +44,7 @@ struct BytecodeDecodeContext {
 
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
                                          u32 offset) {
-  builder.addDecoded(decoded.handler, Address{offset}, decoded.range, decoded.bytes, decoded.annotation);
+  builder.addDecoded(Address{offset}, decoded.range, decoded.bytes, decoded.annotation);
 }
 
 }  // namespace vgmtrans::core

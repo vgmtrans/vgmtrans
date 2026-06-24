@@ -123,7 +123,6 @@ struct SourceField {
   SourceRange range;
   SourceValue value;
   SourceValueDisplay display = SourceValueDisplay::Default;
-  std::optional<SequenceSemantic> sequenceSemantic;
 };
 
 enum class SourceLinkRole : u8 {
@@ -143,7 +142,6 @@ namespace ObjectRefs {
 [[nodiscard]] ObjectRef asset(AssetId asset);
 [[nodiscard]] ObjectRef sequence(AssetId sequenceAsset);
 [[nodiscard]] ObjectRef sequenceTrack(AssetId sequenceAsset, u32 trackIndex);
-[[nodiscard]] ObjectRef sequenceCommand(AssetId sequenceAsset, u32 commandIndex);
 [[nodiscard]] ObjectRef instrument(AssetId instrumentSetAsset, u32 instrumentIndex);
 [[nodiscard]] ObjectRef instrumentProgram(u32 bank, u32 program);
 [[nodiscard]] ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex);
@@ -166,6 +164,18 @@ enum class SourceOutlinePolicy : u8 {
   Hide,
 };
 
+enum class CommandPlaybackStatus : u8 {
+  SourceOnly,
+  NoOp,
+  AffectsPlayback,
+  AffectsControlFlow,
+  StopsPlayback,
+  Unsupported,
+};
+
+// Persistent source annotations are source-backed: every annotation stored in a
+// session SourceMap must have a valid primary range. Derived/range-less facts
+// should be fields on a source-backed annotation instead of standalone nodes.
 struct SourceAnnotation {
   SourceAnnotationId id;
   SourceRange range;
@@ -173,6 +183,7 @@ struct SourceAnnotation {
   std::string label;
   std::string description;
   std::optional<SequenceSemantic> sequenceSemantic;
+  std::optional<CommandPlaybackStatus> playbackStatus;
   std::string localKind;
   std::string detailKind;
   std::optional<ObjectRef> owner;
@@ -232,6 +243,7 @@ public:
   AnnotationBuilder& owner(ObjectRef owner);
   AnnotationBuilder& outline(SourceOutlinePolicy policy);
   AnnotationBuilder& sequenceSemantic(SequenceSemantic semantic);
+  AnnotationBuilder& playbackStatus(CommandPlaybackStatus status);
   AnnotationBuilder& field(std::string_view name, SourceRange range, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
   template <class T>

@@ -104,6 +104,8 @@ void vmCommandCursorSupportsKindOverrideAndTargetLinks() {
   const SourceMap map = sourceMap.finish();
   const auto& annotation = map.get(cmd.annotation());
   expect(annotation.localKind == "jump", "cursor kind override should replace slugified label");
+  expect(annotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
+         "cursor jump helper should persist control-flow playback status");
   expect(annotation.links.size() == 1 && annotation.links[0].role == SourceLinkRole::JumpTarget,
          "cursor jump helper should record a structured target link");
   const auto* target = std::get_if<SourceRange>(&annotation.links[0].target);
