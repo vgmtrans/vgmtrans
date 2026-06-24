@@ -569,64 +569,27 @@ SequenceProgram
 
 The change is authoring surface, not ownership of playback policy.
 
-## 5.2 Decouple command handler from command kind
+## 5.2 Keep command metadata on annotations
 
-The feedback’s best structural point is still this: one executable handler can execute many command kinds, which avoids one typed command class per opcode while preserving VM architecture.
-
-Use:
-
-```cpp
-struct CommandKind {
-  CommandKindId id;
-
-  std::string localKind;       // usually slugified from displayName
-  std::string displayName;     // "Pan"
-  SequenceSemantic semantic;   // Pan, Note, Jump, etc.
-
-  CommandPlaybackStatus playbackStatus;
-};
-
-struct CommandHandler {
-  CommandHandlerId id;
-  std::string name;
-
-  ExecuteSourceCommand execute;
-};
-
-struct SourceCommand {
-  CommandId id;
-
-  CommandHandlerId handler;
-  CommandKindId kind;
-
-  uint8_t opcode;
-  Address address;
-
-  SourceRange range;
-  std::vector<uint8_t> bytes;
-
-  SourceAnnotationId annotation;
-};
-```
-
-The names in this sketch are conceptual. Prefer existing ID/value types when they already express the same thing, such as the current command ID type, unless the implementation deliberately renames that type across the value codebase.
+The simplified command model has no separate command-handler or command-kind
+registry. `SourceCommand` is the executable byte snapshot: command ID, opcode,
+address, source range, saved bytes, and primary source annotation. Display name,
+local kind, detail kind, semantic category, playback status, fields, links, and
+diagnostics live on the corresponding `SourceAnnotation`.
 
 For NDS:
 
 ```text
-Source command kind: note
-Source command kind: rest
-Source command kind: program
-Source command kind: jump
-Source command kind: call
-Source command kind: return
-Source command kind: end
-
-All use handler:
-  nds-sseq.bytecode-driver
+Source command annotation: nds.note
+Source command annotation: nds.rest
+Source command annotation: nds.program
+Source command annotation: nds.jump
+Source command annotation: nds.call
+Source command annotation: nds.return
+Source command annotation: nds.end
 ```
 
-The handler reruns the saved bytes through `readNdsCommand`.
+The dialect reruns the saved bytes through the same cursor reader during render.
 
 The UI does not need to rerun the handler just to inspect basic command facts, because those facts are recorded during decode.
 
@@ -1410,7 +1373,6 @@ namespace ObjectRefs {
 
   ObjectRef sequence(AssetId sequenceAsset);
   ObjectRef sequenceTrack(AssetId sequenceAsset, uint32_t trackIndex);
-  ObjectRef sequenceCommand(AssetId sequenceAsset, uint32_t commandIndex);
 
   ObjectRef instrument(AssetId instrumentSetAsset, uint32_t instrumentIndex);
   ObjectRef sample(AssetId sampleSetAsset, uint32_t sampleIndex);
@@ -1424,7 +1386,7 @@ Examples:
 ```cpp
 row.owner(ObjectRefs::instrument(instrumentSetId, i));
 
-cmd.owner(ObjectRefs::sequenceCommand(sequenceAssetId, commandIndex));
+trackAnnotation.owner(ObjectRefs::sequenceTrack(sequenceAssetId, trackIndex));
 
 sampleData.owner(ObjectRefs::sample(sampleSetId, sampleIndex));
 ```
@@ -1694,14 +1656,12 @@ For sequences, the source map and `SequenceProgram` work together.
 struct SourceCommand {
   CommandId id;
 
-  CommandHandlerId handler;
-  CommandKindId kind;
-
   uint8_t opcode;
   Address address;
+  uint32_t encodedSize;
 
   SourceRange range;
-  std::vector<uint8_t> bytes;
+  ByteSpan bytes;
 
   SourceAnnotationId annotation;
 };
@@ -2416,26 +2376,30 @@ These conventions are enough for first-pass HexView, source outline, and inspect
 
 Keep `SequenceProgram` as the sequence-specific source/execution model.
 
-The exact container layout can follow the current code if it remains cleaner. Commands may stay track-owned, or they may move into a shared command vector if that materially simplifies indexing. The required design point is that each executable source command has a stable command ID, saved bytes, address/range, handler, kind, and primary source annotation.
+The current code keeps commands track-owned and pools command bytes at track
+scope. Keep that shape unless a later port shows a concrete indexing problem.
+The required design point is that each executable source command has a stable
+command ID, opcode, saved bytes, address/range, and primary source annotation.
 
 ```cpp
 struct SequenceProgram {
   DialectId dialect;
-
-  std::vector<SequenceTrackEntry> tracks;
-  std::vector<SourceCommand> commands;
+  Timebase timebase;
+  Address sourceBaseAddress;
 
   SequenceProgramBehavior behavior;
+  std::vector<TrackProgram> tracks;
 };
 ```
 
 ```cpp
-struct SequenceTrackEntry {
-  TrackId track;
-  Address entryAddress;
-
-  std::optional<CommandId> entryCommand;
-  std::optional<SourceAnnotationId> sourceAnnotation;
+struct TrackProgram {
+  TrackId id;
+  uint32_t sourceTrackNumber;
+  Address startAddress;
+  std::vector<SourceCommand> commands;
+  AddressIndex addressIndex;
+  std::vector<uint8_t> commandBytes;
 };
 ```
 
@@ -2443,14 +2407,12 @@ struct SequenceTrackEntry {
 struct SourceCommand {
   CommandId id;
 
-  CommandHandlerId handler;
-  CommandKindId kind;
-
   uint8_t opcode;
   Address address;
+  uint32_t encodedSize;
 
   SourceRange range;
-  std::vector<uint8_t> bytes;
+  ByteSpan bytes;
 
   SourceAnnotationId annotation;
 };
@@ -2483,23 +2445,23 @@ If later we need a specialized flow graph for source navigation, add it then.
 
 ---
 
-# 12. Minimal command kind model
+# 12. Command annotation detail kinds
 
-Keep command kind lightweight.
+Keep command classification lightweight. There is no separate command-kind
+registry in the current design.
 
-```cpp
-struct CommandKind {
-  CommandKindId id;
+Each command annotation carries:
 
-  std::string localKind;       // slugified from displayName unless overridden
-  std::string displayName;     // "Program"
-  SequenceSemantic semantic;   // Program
-
-  CommandPlaybackStatus playbackStatus;
-};
+```text
+label            // "Program"
+localKind        // "program"
+detailKind       // "nds.program"
+sequenceSemantic // Program
+playbackStatus   // AffectsPlayback, SourceOnly, StopsPlayback, etc.
 ```
 
-`localKind` is useful, but not sacred.
+`localKind` and `detailKind` are useful for UI grouping and tests, but they are
+not executable dispatch keys.
 
 Slugification is acceptable:
 
@@ -2792,11 +2754,11 @@ Implement cursor reads, naming, slugification, semantic classification, operand 
 
 Cursor reads must be sticky-failing so ordinary command cases do not grow malformed-read boilerplate. A missing operand should mark the cursor failed, record a diagnostic, suppress emitted performance events for that command, and cause the returned flow to stop as truncated.
 
-## Phase 4: Refactor command kind vs command handler
+## Phase 4: Move command inspection metadata to annotations
 
-Split command identity from execution handler.
-
-Allow many command kinds to share one handler.
+Keep `SourceCommand` as the executable byte snapshot and store display names,
+detail kinds, semantics, playback status, fields, links, and diagnostics on the
+primary `SourceAnnotation`.
 
 ## Phase 5: Add cursor-backed dialect adapter
 
