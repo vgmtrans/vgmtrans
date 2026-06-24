@@ -154,8 +154,7 @@ target_sources(vgmtransvaluecore
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
-      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeTable.h
-      ${PROJECT_SOURCE_DIR}/src/value/sequence/bytecode/BytecodeWalkers.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/BytecodeDecode.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h

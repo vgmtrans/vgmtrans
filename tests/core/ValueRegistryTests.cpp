@@ -8,7 +8,7 @@
 
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceCursorDialect.h"
-#include "value/sequence/bytecode/BytecodeWalkers.h"
+#include "value/sequence/BytecodeDecode.h"
 
 namespace {
 

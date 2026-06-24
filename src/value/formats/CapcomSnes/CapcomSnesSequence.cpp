@@ -10,7 +10,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/SequenceCursorDialect.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/sequence/bytecode/BytecodeWalkers.h"
+#include "value/sequence/BytecodeDecode.h"
 
 #include <fmt/format.h>
 
