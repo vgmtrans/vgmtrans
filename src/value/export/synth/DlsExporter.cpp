@@ -42,6 +42,7 @@ constexpr u16 kDlsConnDstPitch = 0x0003;
 constexpr u16 kDlsConnDstPan = 0x0004;
 constexpr u16 kDlsConnDstLfoFrequency = 0x0104;
 constexpr u16 kDlsConnDstVibFrequency = 0x0114;
+constexpr u16 kDlsConnDstVibStartDelay = 0x0115;
 constexpr u16 kDlsConnDstEg1AttackTime = 0x0206;
 constexpr u16 kDlsConnDstEg1DecayTime = 0x0207;
 constexpr u16 kDlsConnDstEg1ReleaseTime = 0x0209;
@@ -223,6 +224,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
       };
     case SynthDestination::VibratoRate:
       return DlsConnection{.destination = kDlsConnDstVibFrequency, .scale = dlsPitchScale(generator.amount)};
+    case SynthDestination::VibratoDelay:
+      return DlsConnection{.destination = kDlsConnDstVibStartDelay, .scale = dls16Dot16Scale(generator.amount)};
     case SynthDestination::TremoloDepth:
       return DlsConnection{
           .source = kDlsConnSrcLfo,
@@ -271,6 +274,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
     case SynthDestination::VibratoRate:
     case SynthDestination::TremoloRate:
       return kDlsConnSrcChannelPressure;
+    case SynthDestination::VibratoDelay:
     case SynthDestination::TremoloDepth:
     case SynthDestination::VolumeAttenuation:
       return kDlsConnSrcCc93;
@@ -333,6 +337,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
           .destination = kDlsConnDstVibFrequency,
           .scale = dlsPitchScale(amount),
       };
+    case SynthDestination::VibratoDelay:
+      return std::nullopt;
     case SynthDestination::TremoloDepth:
       return DlsConnection{
           .source = kDlsConnSrcLfo,

@@ -87,6 +87,7 @@ enum class SynthDestination {
   Pan,
   VibratoDepth,
   VibratoRate,
+  VibratoDelay,
   TremoloDepth,
   TremoloRate,
   Unknown,
