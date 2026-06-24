@@ -255,8 +255,8 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::abs(vibratoDepthEvent.amount - expectedDepthAmount) < 0.0001,
          "KonamiSnes vibrato depth should be normalized against the full synth range");
   expect(vibratoDepthEvent.pitchDepthSemitones &&
-             std::abs(*vibratoDepthEvent.pitchDepthSemitones - (expectedDepthCents / 200.0)) < 0.0001,
-         "KonamiSnes vibrato depth should retain driver pitch swing for sequence-event simulation");
+             std::abs(*vibratoDepthEvent.pitchDepthSemitones - (expectedDepthCents / 400.0)) < 0.0001,
+         "KonamiSnes vibrato depth should retain peak pitch swing for sequence-event simulation");
   const auto vibratoDelay = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<VibratoDelayPerformanceEvent>(event);
   });
@@ -348,9 +348,10 @@ void konamiSnesSynthParsersStopAtInvalidBankedInstrument() {
 }
 
 void konamiSnesProgramChangeReemitsCurrentFineTune() {
-  constexpr std::array<u8, 10> bytes{
+  constexpr std::array<u8, 15> bytes{
       0xf2, 0xf4,              // tune down
-      0xe2, 0x09,              // switch to program 9 at the tuned note tick
+      0x3c, 0x05, 0x7f, 0x7f,  // establish the active fine tune before the switch
+      0xe2, 0x09,              // switch to program 9 while tuning is still active
       0x3c, 0x05, 0x7f, 0x7f,  // note at the same tick
       0xff,
   };
@@ -361,16 +362,18 @@ void konamiSnesProgramChangeReemitsCurrentFineTune() {
 
   const auto programChange = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* program = std::get_if<ProgramChange>(&event);
-    return program != nullptr && program->tick == 0 && program->program == 9;
+    return program != nullptr && program->tick == 5 && program->program == 9;
   });
   expect(programChange != events.end(), "KonamiSnes program change should render at the expected tick");
 
-  const bool hasSameTickFineTune = std::ranges::any_of(events, [](const MidiEvent& event) {
+  const auto sameTickFineTune = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* fineTune = std::get_if<FineTune>(&event);
-    return fineTune != nullptr && fineTune->tick == 0 && std::abs(fineTune->cents + 18.75) < 0.001;
+    return fineTune != nullptr && fineTune->tick == 5 && std::abs(fineTune->cents + 18.75) < 0.001;
   });
-  expect(hasSameTickFineTune,
-         "KonamiSnes should emit the first active fine tune before same-tick program/note playback");
+  expect(sameTickFineTune != events.end(),
+         "KonamiSnes should re-emit the active fine tune before same-tick program/note playback");
+  expect(std::distance(events.begin(), sameTickFineTune) < std::distance(events.begin(), programChange),
+         "KonamiSnes fine tune should be ordered before the same-tick program change");
 }
 
 void konamiSnesPercussionUsesPackedGsDrumBank() {

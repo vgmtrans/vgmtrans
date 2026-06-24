@@ -83,6 +83,32 @@ void midiExporterOrdersFineTuneBeforeSameTickProgramChange() {
          "MIDI exporter should serialize fine tuning RPN before same-tick bank and program changes");
 }
 
+void midiExporterKeepsSameTickBankProgramPairsAdjacent() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  BankSelect{.tick = 0, .channel = 0, .bank = 0, .writeLsb = false},
+                  ProgramChange{.tick = 0, .channel = 0, .program = 13},
+                  BankSelect{.tick = 0, .channel = 0, .bank = 0x7f << 7, .writeLsb = false},
+                  ProgramChange{.tick = 0, .channel = 0, .program = 0},
+                  NoteDuration{.tick = 0, .channel = 0, .key = 60, .velocity = 100, .duration = 24},
+                  EndOfTrack{.tick = 24},
+              },
+      }},
+  };
+
+  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const std::vector<u8> expectedOrder{
+      0x00, 0xb0, 0x00, 0x00, 0x00, 0xc0, 0x0d, 0x00, 0xb0, 0x00, 0x7f,
+      0x00, 0xc0, 0x00, 0x00, 0x90, 0x3c, 0x64,
+  };
+
+  expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
+         "MIDI exporter should keep same-tick bank/program pairs adjacent before notes");
+}
+
 void midiExporterWritesTimeSignatureMetaEvent() {
   const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -516,6 +542,74 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
          "sequence-event vibrato simulation should emit a delayed triangle LFO bend shape");
 }
 
+void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 10,
+          .events =
+              {
+                  TempoPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .microsecondsPerQuarter = 1'000'000,
+                  },
+                  VibratoDelayPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .delayTicks = 2,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .amount = 1.0,
+                      .frequencyHz = 12.5,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .amount = 0.5,
+                      .pitchDepthSemitones = 1.0,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .key = 60,
+                      .linearVelocity = 1.0,
+                      .durationTicks = 5,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 5},
+                      .key = 64,
+                      .linearVelocity = 1.0,
+                      .durationTicks = 5,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(
+      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+
+  std::vector<std::pair<u64, s16>> pitchBends;
+  for (const MidiEvent& event : midiSequence.tracks[0].events) {
+    if (const auto* pitchBend = std::get_if<PitchBend>(&event)) {
+      pitchBends.emplace_back(pitchBend->tick, pitchBend->value);
+    }
+  }
+
+  const std::vector<std::pair<u64, s16>> expectedPitchBends{
+      {2, 0},
+      {3, 2048},
+      {4, 4096},
+      {5, 0},
+      {8, 2048},
+      {9, 4096},
+      {10, 2048},
+  };
+  expect(pitchBends == expectedPitchBends,
+         "sequence-event vibrato simulation should restart the delay and phase for each new note");
+}
+
 void exportRequestSequenceLoopsAffectMidiLowering() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -784,6 +878,7 @@ void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
   midiExporterKeeps14BitControllerPairsAdjacent();
   midiExporterOrdersFineTuneBeforeSameTickProgramChange();
+  midiExporterKeepsSameTickBankProgramPairsAdjacent();
   midiExporterWritesTimeSignatureMetaEvent();
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   performanceMidiRendererTrustsSourceNoteExtensions();
@@ -793,6 +888,7 @@ void runValueMidiTests() {
   performanceMidiRendererQuantizesPitchBendAndPortamento();
   performanceMidiRendererSkipsRedundantPitchBends();
   performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape();
+  performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
   exportRequestSequenceLoopsAffectMidiLowering();
   modulationAnalysisReportsObservedMidiControllerRanges();
   modulationAnalysisReportsObservedPerformanceRanges();

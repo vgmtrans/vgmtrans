@@ -20,6 +20,7 @@
 #include "value/export/ExportTypes.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/session/Session.h"
+#include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
 #include "value/formats/CapcomSnes/CapcomSnesModule.h"
 #include "value/formats/ValueFormats.h"
@@ -79,6 +80,17 @@ std::vector<u8> readFile(const std::filesystem::path& path) {
     throw std::runtime_error("failed to read input file: " + path.string());
   }
   return bytes;
+}
+
+void writeFile(const std::filesystem::path& path, std::span<const u8> bytes) {
+  std::ofstream stream(path, std::ios::binary);
+  if (!stream) {
+    throw std::runtime_error("failed to open output file: " + path.string());
+  }
+  stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+  if (!stream) {
+    throw std::runtime_error("failed to write output file: " + path.string());
+  }
 }
 
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
@@ -1485,7 +1497,9 @@ int compareAkaoDirectSummary(const std::filesystem::path& path) {
 
 std::string legacyMidiCollectionKey(const VGMColl& collection);
 std::string valueMidiCollectionKey(const SessionSnapshot& project, const Collection& collection);
-std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops);
+std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops,
+                                    ModulationConversionPolicy modulationConversion =
+                                        ModulationConversionPolicy::SynthModulators);
 
 std::map<std::string, std::vector<u8>> legacyAkaoCollectionMidis(const std::filesystem::path& path,
                                                                  u32 sequenceLoops = 0) {
@@ -1678,13 +1692,15 @@ std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesyst
   return midis;
 }
 
-std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops = 0) {
+std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops,
+                                    ModulationConversionPolicy modulationConversion) {
   const auto artifacts = session.exportCollection(collection, ExportRequest{
                                                                   .kinds = {ExportKind::Midi},
                                                                   .loopPolicy = LoopPolicy::PlayOnce,
                                                                   .sequenceLoops = sequenceLoops,
                                                                   .synthModulationScaling =
                                                                       ModulationScalingPolicy::ObservedSequenceRange,
+                                                                  .modulationConversion = modulationConversion,
                                                               });
 
   for (const auto& artifact : artifacts) {
@@ -1699,7 +1715,9 @@ std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u
   throw std::runtime_error("value exporter did not produce a MIDI artifact");
 }
 
-std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+std::map<std::string, std::vector<u8>> valueCollectionMidis(
+    const std::filesystem::path& path, u32 sequenceLoops = 0,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
@@ -1721,7 +1739,7 @@ std::map<std::string, std::vector<u8>> valueCollectionMidis(const std::filesyste
     }
     std::vector<u8> midi;
     try {
-      midi = valueCollectionMidi(session, collection.id, sequenceLoops);
+      midi = valueCollectionMidi(session, collection.id, sequenceLoops, modulationConversion);
     } catch (const std::exception& ex) {
       throw std::runtime_error("value MIDI export failed for collection '" + collection.name + "': " + ex.what());
     }
@@ -2907,6 +2925,365 @@ std::vector<NormalizedMidiEvent> normalizeMidi(std::span<const u8> bytes) {
   return events;
 }
 
+struct SimulatedModulationStats {
+  size_t pitchBendCount = 0;
+  size_t nonCenterPitchBendCount = 0;
+  u32 maxAbsPitchBend = 0;
+  u32 maxPitchBendRangeSemitones = 2;
+  double maxAbsPitchBendSemitones = 0.0;
+  size_t redundantPitchBendCount = 0;
+  size_t vibratoControllerCount = 0;
+};
+
+struct PerformanceModulationStats {
+  size_t noteEvents = 0;
+  size_t drumBankNoteEvents = 0;
+  size_t melodicBankNoteEvents = 0;
+  size_t drumBankInstrumentEvents = 0;
+  size_t melodicInstrumentEvents = 0;
+  u64 firstDrumBankNoteTick = 0;
+  u64 lastDrumBankNoteTick = 0;
+  u64 lastNoteTick = 0;
+  size_t vibratoDepthEvents = 0;
+  size_t activeVibratoDepthEvents = 0;
+  size_t vibratoRateEvents = 0;
+  size_t vibratoDelayEvents = 0;
+  size_t activeVibratoDelayEvents = 0;
+  size_t sourcePitchBendEvents = 0;
+  size_t nonZeroSourcePitchBendEvents = 0;
+  double maxVibratoPitchDepthSemitones = 0.0;
+  double maxVibratoNormalizedAmount = 0.0;
+  double maxVibratoObservedRangeAmount = 0.0;
+  double maxVibratoRateHz = 0.0;
+  double maxSourcePitchBendSemitones = 0.0;
+  u32 maxVibratoDelayTicks = 0;
+  std::string maxVibratoDepthLocation;
+  std::string maxSourcePitchBendLocation;
+};
+
+SimulatedModulationStats simulatedModulationStats(std::span<const u8> midiBytes) {
+  SimulatedModulationStats stats;
+  MidiReader reader(midiBytes);
+  expect(reader.ascii(4, midiBytes.size()) == "MThd", "MIDI missing MThd header");
+  const u32 headerLength = reader.be32(midiBytes.size());
+  expect(headerLength >= 6, "MIDI header is too short");
+  const size_t headerEnd = reader.position() + headerLength;
+  expect(headerEnd <= midiBytes.size(), "MIDI header extends past end of file");
+  static_cast<void>(reader.be16(headerEnd));
+  const u16 trackCount = reader.be16(headerEnd);
+  static_cast<void>(reader.be16(headerEnd));
+  reader.skip(headerEnd - reader.position(), midiBytes.size());
+
+  struct ChannelState {
+    u8 rpnMsb = 0x7f;
+    u8 rpnLsb = 0x7f;
+    u8 pitchBendRangeSemitones = 2;
+    std::optional<u32> lastPitchBend;
+  };
+  std::map<std::tuple<u32, u8>, ChannelState> channelStates;
+
+  for (u32 track = 0; track < trackCount; ++track) {
+    expect(reader.ascii(4, midiBytes.size()) == "MTrk", "MIDI missing MTrk header");
+    const u32 trackLength = reader.be32(midiBytes.size());
+    const size_t trackEnd = reader.position() + trackLength;
+    expect(trackEnd <= midiBytes.size(), "MIDI track extends past end of file");
+
+    std::optional<u8> runningStatus;
+    while (reader.position() < trackEnd) {
+      static_cast<void>(reader.variableLength(trackEnd));
+      u8 status = reader.readU8(trackEnd);
+      std::optional<u8> firstDataByte;
+      if (status < 0x80) {
+        if (!runningStatus) {
+          throw std::runtime_error("MIDI running status used before status byte");
+        }
+        firstDataByte = status;
+        status = *runningStatus;
+      } else if (status < 0xf0) {
+        runningStatus = status;
+      } else {
+        runningStatus.reset();
+      }
+
+      if (status == 0xff || status == 0xf0 || status == 0xf7) {
+        if (status == 0xff) {
+          static_cast<void>(reader.readU8(trackEnd));
+        }
+        const u64 length = reader.variableLength(trackEnd);
+        if (length > std::numeric_limits<size_t>::max()) {
+          throw std::runtime_error("MIDI event is too large");
+        }
+        static_cast<void>(reader.bytes(static_cast<size_t>(length), trackEnd));
+        continue;
+      }
+      if (status >= 0xf0) {
+        throw std::runtime_error("unsupported MIDI system event: " + hexByte(status));
+      }
+
+      const u8 command = static_cast<u8>(status & 0xf0);
+      const u8 channel = static_cast<u8>(status & 0x0f);
+      const bool oneDataByte = command == 0xc0 || command == 0xd0;
+      const u8 data1 = firstDataByte.value_or(reader.readU8(trackEnd));
+      const u8 data2 = oneDataByte ? 0 : reader.readU8(trackEnd);
+      auto& state = channelStates[std::tuple{track, channel}];
+
+      if (command == 0xb0) {
+        if (data1 == 1 || data1 == 76 || data1 == 78) {
+          ++stats.vibratoControllerCount;
+        }
+        if (data1 == 101) {
+          state.rpnMsb = data2;
+        } else if (data1 == 100) {
+          state.rpnLsb = data2;
+        } else if (data1 == 6 && state.rpnMsb == 0 && state.rpnLsb == 0) {
+          state.pitchBendRangeSemitones = std::max<u8>(2, data2);
+          stats.maxPitchBendRangeSemitones =
+              std::max<u32>(stats.maxPitchBendRangeSemitones, state.pitchBendRangeSemitones);
+        }
+      } else if (command == 0xe0) {
+        ++stats.pitchBendCount;
+        const u32 unsignedBend = static_cast<u32>(data1 | (data2 << 7));
+        const s32 signedBend = static_cast<s32>(unsignedBend) - 8192;
+        const u32 absBend = static_cast<u32>(std::abs(signedBend));
+        stats.maxAbsPitchBend = std::max(stats.maxAbsPitchBend, absBend);
+        stats.maxAbsPitchBendSemitones =
+            std::max(stats.maxAbsPitchBendSemitones,
+                     (static_cast<double>(absBend) * state.pitchBendRangeSemitones) / 8192.0);
+        if (signedBend != 0) {
+          ++stats.nonCenterPitchBendCount;
+        }
+        if (state.lastPitchBend && *state.lastPitchBend == unsignedBend) {
+          ++stats.redundantPitchBendCount;
+        }
+        state.lastPitchBend = unsignedBend;
+      }
+    }
+
+    reader.skip(trackEnd - reader.position(), midiBytes.size());
+  }
+
+  expect(reader.empty(), "MIDI has trailing bytes after declared tracks");
+  return stats;
+}
+
+std::string performanceEventLocation(const SequenceProgram& program, const PerformanceEventHeader& header) {
+  std::ostringstream out;
+  out << "track=" << header.track.value << " tick=" << header.tick;
+  const auto* command = sourceCommandForEvent(program, header);
+  if (command != nullptr) {
+    out << " addr=0x" << std::hex << command->address.value << std::dec << " opcode=0x" << std::hex
+        << static_cast<int>(command->opcode) << std::dec;
+  }
+  return out.str();
+}
+
+PerformanceModulationStats performanceModulationStats(const SequenceProgram& program,
+                                                      const SequenceDialectRegistry& dialects,
+                                                      u32 sequenceLoops) {
+  const auto* dialect = dialects.find(program.dialect.value);
+  if (dialect == nullptr) {
+    throw std::runtime_error("No sequence dialect registered for '" + program.dialect.value + "'");
+  }
+
+  const PerformanceSequence performance = SequenceVm(SequenceVmOptions{
+                                                         .loopPolicy = LoopPolicy::PlayOnce,
+                                                         .sequenceLoops = sequenceLoops,
+                                                     })
+                                              .render(program, *dialect);
+  if (!performance.diagnostics.empty()) {
+    throw std::runtime_error("performance render reported: " + performance.diagnostics.front().message);
+  }
+
+  PerformanceModulationStats stats;
+  struct InstrumentState {
+    u32 bank = 0;
+    u32 program = 0;
+  };
+  std::map<u32, InstrumentState> instruments;
+  for (const auto& track : performance.tracks) {
+    auto& instrument = instruments[track.id.value];
+    for (const auto& event : track.events) {
+      if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        ++stats.noteEvents;
+        stats.lastNoteTick = std::max(stats.lastNoteTick, note->header.tick);
+        if (instrument.bank == (0x7f << 7) && instrument.program == 0) {
+          ++stats.drumBankNoteEvents;
+          if (stats.drumBankNoteEvents == 1) {
+            stats.firstDrumBankNoteTick = note->header.tick;
+          }
+          stats.lastDrumBankNoteTick = std::max(stats.lastDrumBankNoteTick, note->header.tick);
+        } else {
+          ++stats.melodicBankNoteEvents;
+        }
+      } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
+        instrument.bank = instrumentEvent->bank;
+        instrument.program = instrumentEvent->program;
+        if (instrument.bank == (0x7f << 7) && instrument.program == 0) {
+          ++stats.drumBankInstrumentEvents;
+        } else {
+          ++stats.melodicInstrumentEvents;
+        }
+      } else if (const auto* pitchBend = std::get_if<PitchBendPerformanceEvent>(&event)) {
+        ++stats.sourcePitchBendEvents;
+        const double semitones = std::abs(pitchBend->semitones);
+        if (semitones > 0.0001) {
+          ++stats.nonZeroSourcePitchBendEvents;
+        }
+        if (semitones > stats.maxSourcePitchBendSemitones) {
+          stats.maxSourcePitchBendSemitones = semitones;
+          stats.maxSourcePitchBendLocation = performanceEventLocation(program, pitchBend->header);
+        }
+      } else if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
+        ++stats.vibratoDelayEvents;
+        stats.maxVibratoDelayTicks = std::max(stats.maxVibratoDelayTicks, delay->delayTicks);
+        if (delay->delayTicks > 0) {
+          ++stats.activeVibratoDelayEvents;
+        }
+      } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
+        if (modulation->target == ModulationPerformanceTarget::VibratoDepth) {
+          ++stats.vibratoDepthEvents;
+          if (modulation->amount > 0.0001) {
+            ++stats.activeVibratoDepthEvents;
+          }
+          stats.maxVibratoNormalizedAmount = std::max(stats.maxVibratoNormalizedAmount, modulation->amount);
+          if (modulation->controllerRangeMaxAmount) {
+            stats.maxVibratoObservedRangeAmount =
+                std::max(stats.maxVibratoObservedRangeAmount, *modulation->controllerRangeMaxAmount);
+          }
+          const double semitones = modulation->pitchDepthSemitones.value_or(0.0);
+          if (semitones > stats.maxVibratoPitchDepthSemitones) {
+            stats.maxVibratoPitchDepthSemitones = semitones;
+            stats.maxVibratoDepthLocation = performanceEventLocation(program, modulation->header);
+          }
+        } else if (modulation->target == ModulationPerformanceTarget::VibratoRate) {
+          ++stats.vibratoRateEvents;
+          if (modulation->frequencyHz) {
+            stats.maxVibratoRateHz = std::max(stats.maxVibratoRateHz, *modulation->frequencyHz);
+          }
+        }
+      }
+    }
+  }
+
+  return stats;
+}
+
+std::map<std::string, PerformanceModulationStats> valueKonamiSnesPerformanceModulationStats(
+    const std::filesystem::path& path, u32 sequenceLoops) {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+
+  const SessionSnapshot project = session.scanPendingSources();
+  if (project.collections().empty()) {
+    std::ostringstream message;
+    message << "value scanner did not discover KonamiSnes performance collections";
+    if (!project.diagnostics().empty()) {
+      message << ": " << project.diagnostics().front().message;
+    }
+    throw std::runtime_error(message.str());
+  }
+
+  std::map<std::string, PerformanceModulationStats> statsByCollection;
+  for (const auto& collection : project.collections()) {
+    if (!collection.sequence) {
+      continue;
+    }
+    const auto* sequence = assetById<SequenceProgramAsset>(project, *collection.sequence);
+    if (sequence == nullptr || sequence->metadata.format != "KonamiSnes") {
+      continue;
+    }
+    const std::string key = valueMidiCollectionKey(project, collection);
+    auto [_, inserted] = statsByCollection.emplace(
+        key, performanceModulationStats(sequence->program, session.dialects(), sequenceLoops));
+    if (!inserted) {
+      throw std::runtime_error("duplicate KonamiSnes performance collection key: " + key);
+    }
+  }
+  if (statsByCollection.empty()) {
+    throw std::runtime_error("value scanner did not discover KonamiSnes performance collections");
+  }
+  return statsByCollection;
+}
+
+int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  const auto valueMidis =
+      valueCollectionMidis(path, sequenceLoops, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto performanceStats = valueKonamiSnesPerformanceModulationStats(path, sequenceLoops);
+  if (valueMidis.empty()) {
+    std::cout << "value KonamiSnes simulation scan did not produce MIDI collections\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, midi] : valueMidis) {
+    const auto stats = simulatedModulationStats(midi);
+    const auto performanceFound = performanceStats.find(collectionName);
+    if (performanceFound == performanceStats.end()) {
+      std::cout << "value KonamiSnes simulation scan did not produce performance stats for '" << collectionName
+                << "'\n";
+      return 1;
+    }
+    const auto& performance = performanceFound->second;
+    std::cout << "checking " << collectionName << " SequenceEventSimulation MIDI: pitchBends="
+              << stats.pitchBendCount << " nonCenter=" << stats.nonCenterPitchBendCount
+              << " maxAbs=" << stats.maxAbsPitchBend << " maxRange=" << stats.maxPitchBendRangeSemitones
+              << " maxSemitones=" << stats.maxAbsPitchBendSemitones << "\n";
+    std::cout << "  performance notes: notes=" << performance.noteEvents
+              << " drumBankNotes=" << performance.drumBankNoteEvents
+              << " melodicBankNotes=" << performance.melodicBankNoteEvents
+              << " drumBankPrograms=" << performance.drumBankInstrumentEvents
+              << " melodicPrograms=" << performance.melodicInstrumentEvents
+              << " firstDrumTick=" << performance.firstDrumBankNoteTick
+              << " lastDrumTick=" << performance.lastDrumBankNoteTick
+              << " lastNoteTick=" << performance.lastNoteTick << "\n";
+    std::cout << "  performance vibrato: depthEvents=" << performance.vibratoDepthEvents
+              << " activeDepthEvents=" << performance.activeVibratoDepthEvents
+              << " maxDepthSemi=" << performance.maxVibratoPitchDepthSemitones
+              << " maxDepthCents=" << (performance.maxVibratoPitchDepthSemitones * 100.0)
+              << " maxAmount=" << performance.maxVibratoNormalizedAmount
+              << " observedRangeAmount=" << performance.maxVibratoObservedRangeAmount
+              << " rateEvents=" << performance.vibratoRateEvents << " maxRateHz=" << performance.maxVibratoRateHz
+              << " delayEvents=" << performance.vibratoDelayEvents
+              << " activeDelays=" << performance.activeVibratoDelayEvents
+              << " maxDelayTicks=" << performance.maxVibratoDelayTicks
+              << " sourcePitchBends=" << performance.sourcePitchBendEvents
+              << " nonZeroSourcePitchBends=" << performance.nonZeroSourcePitchBendEvents
+              << " maxSourcePitchSemi=" << performance.maxSourcePitchBendSemitones << "\n";
+    if (!performance.maxVibratoDepthLocation.empty()) {
+      std::cout << "  max vibrato depth at " << performance.maxVibratoDepthLocation << "\n";
+    }
+    if (!performance.maxSourcePitchBendLocation.empty()) {
+      std::cout << "  max source pitch bend at " << performance.maxSourcePitchBendLocation << "\n";
+    }
+    if (stats.vibratoControllerCount != 0) {
+      std::cout << "sequence-event simulation leaked " << stats.vibratoControllerCount
+                << " synth vibrato controller events\n";
+      return 1;
+    }
+    if (performance.activeVibratoDepthEvents != 0 && performance.maxVibratoPitchDepthSemitones <= 0.0) {
+      std::cout << "KonamiSnes performance emitted active vibrato without a physical pitch depth\n";
+      return 1;
+    }
+    if (performance.activeVibratoDepthEvents != 0 && performance.maxVibratoRateHz <= 0.0) {
+      std::cout << "KonamiSnes performance emitted active vibrato without a physical rate\n";
+      return 1;
+    }
+    if (performance.activeVibratoDepthEvents != 0 && stats.nonCenterPitchBendCount == 0) {
+      std::cout << "sequence-event simulation did not produce non-center pitch bends\n";
+      return 1;
+    }
+    if (stats.redundantPitchBendCount != 0) {
+      std::cout << "sequence-event simulation wrote " << stats.redundantPitchBendCount
+                << " redundant pitch bend events\n";
+      return 1;
+    }
+  }
+
+  std::cout << "KonamiSnes direct MIDI simulation sanity ok: collections=" << valueMidis.size()
+            << " loops=" << sequenceLoops << "\n";
+  return 0;
+}
+
 bool isTailSetupEvent(const NormalizedMidiEvent& event) {
   return event.kind == "control" || event.kind == "program" || event.kind == "tempo";
 }
@@ -3293,6 +3670,45 @@ int compareKonamiSnesDirectMidi(const std::filesystem::path& path, u32 sequenceL
   return 0;
 }
 
+std::string safeDumpFilename(std::string_view name) {
+  std::string safe;
+  safe.reserve(name.size());
+  for (const char ch : name) {
+    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
+      safe.push_back(ch);
+    } else {
+      safe.push_back('_');
+    }
+  }
+  if (safe.empty()) {
+    return "collection";
+  }
+  return safe;
+}
+
+int dumpKonamiSnesDirectMidis(const std::filesystem::path& path, const std::filesystem::path& dir,
+                              u32 sequenceLoops = 0) {
+  std::filesystem::create_directories(dir);
+  const auto legacyMidis = legacyCollectionMidis(path, sequenceLoops);
+  const auto valueMidis = valueCollectionMidis(path, sequenceLoops);
+  const auto simulatedMidis =
+      valueCollectionMidis(path, sequenceLoops, ModulationConversionPolicy::SequenceEventSimulation);
+
+  for (const auto& [collectionName, legacyMidi] : legacyMidis) {
+    const std::string base = safeDumpFilename(collectionName);
+    writeFile(dir / (base + "-legacy.mid"), legacyMidi);
+    if (const auto found = valueMidis.find(collectionName); found != valueMidis.end()) {
+      writeFile(dir / (base + "-value.mid"), found->second);
+    }
+    if (const auto found = simulatedMidis.find(collectionName); found != simulatedMidis.end()) {
+      writeFile(dir / (base + "-value-sim.mid"), found->second);
+    }
+    std::cout << "wrote MIDI dumps for " << collectionName << " to " << dir.string() << "\n";
+  }
+
+  return 0;
+}
+
 int compareKonamiSnesDirectSynth(const std::filesystem::path& path) {
   const auto legacyExports = legacyCollectionSynthExports(path);
   const auto valueExports = valueCollectionSynthExports(path);
@@ -3595,15 +4011,17 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-rsn-direct-synth <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n"
-	      << "  vgmtrans-parity akao-direct-midi <psf-or-raw-file> [sequence-loops]\n"
-	      << "  vgmtrans-parity akao-direct-synth <psf-or-raw-file>\n"
-	      << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
-	      << "  vgmtrans-parity konami-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
-	      << "  vgmtrans-parity konami-snes-direct-synth <rsn-or-spc-file>\n"
-	      << "  vgmtrans-parity konami-snes-direct-summary <rsn-or-spc-file>\n"
-	      << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
-	      << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
-	      << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
+      << "  vgmtrans-parity akao-direct-midi <psf-or-raw-file> [sequence-loops]\n"
+      << "  vgmtrans-parity akao-direct-synth <psf-or-raw-file>\n"
+      << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
+      << "  vgmtrans-parity konami-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
+      << "  vgmtrans-parity konami-snes-direct-midi-dump <rsn-or-spc-file> <dir> [sequence-loops]\n"
+      << "  vgmtrans-parity konami-snes-direct-midi-sim <rsn-or-spc-file> [sequence-loops]\n"
+      << "  vgmtrans-parity konami-snes-direct-synth <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity konami-snes-direct-summary <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
+      << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
+      << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
 }
 
 }  // namespace
@@ -3646,29 +4064,45 @@ int main(int argc, char** argv) {
       return compareCapcomSnesRsnSummary(argv[2]);
     }
 
-	    if (argc == 3 && std::string(argv[1]) == "nds-direct-summary") {
-	      return compareNdsDirectSummary(argv[2]);
-	    }
+    if (argc == 3 && std::string(argv[1]) == "nds-direct-summary") {
+      return compareNdsDirectSummary(argv[2]);
+    }
 
-	    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-summary") {
-	      return compareKonamiSnesDirectSummary(argv[2]);
-	    }
+    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-summary") {
+      return compareKonamiSnesDirectSummary(argv[2]);
+    }
 
-	    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-midi") {
-	      return compareKonamiSnesDirectMidi(argv[2]);
-	    }
+    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-midi") {
+      return compareKonamiSnesDirectMidi(argv[2]);
+    }
 
-	    if (argc == 4 && std::string(argv[1]) == "konami-snes-direct-midi") {
-	      return compareKonamiSnesDirectMidi(argv[2], parseLoopCount(argv[3]));
-	    }
+    if (argc == 4 && std::string(argv[1]) == "konami-snes-direct-midi") {
+      return compareKonamiSnesDirectMidi(argv[2], parseLoopCount(argv[3]));
+    }
 
-	    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-synth") {
-	      return compareKonamiSnesDirectSynth(argv[2]);
-	    }
+    if (argc == 4 && std::string(argv[1]) == "konami-snes-direct-midi-dump") {
+      return dumpKonamiSnesDirectMidis(argv[2], argv[3]);
+    }
 
-	    if (argc == 3 && std::string(argv[1]) == "akao-direct-summary") {
-	      return compareAkaoDirectSummary(argv[2]);
-	    }
+    if (argc == 5 && std::string(argv[1]) == "konami-snes-direct-midi-dump") {
+      return dumpKonamiSnesDirectMidis(argv[2], argv[3], parseLoopCount(argv[4]));
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-midi-sim") {
+      return validateKonamiSnesDirectMidiSimulation(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "konami-snes-direct-midi-sim") {
+      return validateKonamiSnesDirectMidiSimulation(argv[2], parseLoopCount(argv[3]));
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-synth") {
+      return compareKonamiSnesDirectSynth(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "akao-direct-summary") {
+      return compareAkaoDirectSummary(argv[2]);
+    }
 
     if (argc == 3 && std::string(argv[1]) == "akao-direct-midi") {
       return compareAkaoDirectMidi(argv[2]);
