@@ -363,7 +363,7 @@ public:
       PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
       VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
       const Effects effects = dialect_.execute(command, track_, trackState_, out, vm, dialect_.context);
-      runtime_.tick += effects.advanceTicks;
+      advanceTicks(command, effects.advanceTicks);
       runtime_.lastCommand = command.id;
       applyStep(command, effects.step);
 
@@ -453,6 +453,23 @@ private:
           arrivedByControlFlow_ = true;
         }
         break;
+    }
+  }
+
+  void advanceTicks(const SourceCommand& command, u32 ticks) {
+    if (ticks == 0) {
+      return;
+    }
+    if (dialect_.tick == nullptr) {
+      runtime_.tick += ticks;
+      return;
+    }
+
+    for (u32 elapsed = 0; elapsed < ticks; ++elapsed) {
+      ++runtime_.tick;
+      PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
+      VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
+      dialect_.tick(command, track_, trackState_, out, vm, dialect_.context);
     }
   }
 

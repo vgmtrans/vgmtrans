@@ -724,6 +724,16 @@ void normalizeSummary(CapcomSnesSummary& summary) {
                     rhs.velocityLow, rhs.velocityHigh, rhs.tuningCents, rhs.envelopeAttack, rhs.envelopeDecay,
                     rhs.envelopeSustain, rhs.envelopeRelease);
   });
+  for (auto& synth : summary.instrumentSynths) {
+    std::erase_if(synth.generators, [](const GeneratorSummary& generator) { return generator.destination == -1; });
+    std::erase_if(synth.modulators, [](const ModulatorSummary& modulator) { return modulator.destination == -1; });
+    std::ranges::sort(synth.generators, [](const GeneratorSummary& lhs, const GeneratorSummary& rhs) {
+      return std::tie(lhs.destination, lhs.amount) < std::tie(rhs.destination, rhs.amount);
+    });
+    std::ranges::sort(synth.modulators, [](const ModulatorSummary& lhs, const ModulatorSummary& rhs) {
+      return std::tie(lhs.source, lhs.destination, lhs.amount) < std::tie(rhs.source, rhs.destination, rhs.amount);
+    });
+  }
   std::ranges::sort(summary.instrumentSynths, [](const InstrumentSynthSummary& lhs, const InstrumentSynthSummary& rhs) {
     return std::tie(lhs.bank, lhs.program, lhs.sourceOffset) < std::tie(rhs.bank, rhs.program, rhs.sourceOffset);
   });
@@ -3226,6 +3236,31 @@ int compareNdsDirectSummary(const std::filesystem::path& path) {
   return 0;
 }
 
+int compareKonamiSnesDirectSummary(const std::filesystem::path& path) {
+  const auto legacySummaries = legacyCollectionSummaries(path);
+  const auto valueSummaries = valueCollectionSummaries(path);
+  if (valueSummaries.size() != legacySummaries.size()) {
+    std::cout << "value KonamiSnes collection count differs: legacy=" << legacySummaries.size()
+              << " value=" << valueSummaries.size() << "\n";
+    return 1;
+  }
+
+  for (const auto& [collectionName, legacySummary] : legacySummaries) {
+    const auto found = valueSummaries.find(collectionName);
+    if (found == valueSummaries.end()) {
+      std::cout << "value KonamiSnes scan did not produce collection '" << collectionName << "'\n";
+      return 1;
+    }
+    std::cout << "checking " << collectionName << " via direct KonamiSnes value summary\n";
+    if (!compareSummary(legacySummary, found->second, std::cout, "KonamiSnes")) {
+      return 1;
+    }
+  }
+
+  std::cout << "KonamiSnes direct summary parity ok: collections=" << legacySummaries.size() << "\n";
+  return 0;
+}
+
 int compareNdsDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   const auto legacyMidis = legacyCollectionMidis(path, sequenceLoops);
   const auto valueMidis = valueCollectionMidis(path, sequenceLoops);
@@ -3497,12 +3532,13 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-rsn-direct-synth <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n"
-      << "  vgmtrans-parity akao-direct-midi <psf-or-raw-file> [sequence-loops]\n"
-      << "  vgmtrans-parity akao-direct-synth <psf-or-raw-file>\n"
-      << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
-      << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
-      << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
-      << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
+	      << "  vgmtrans-parity akao-direct-midi <psf-or-raw-file> [sequence-loops]\n"
+	      << "  vgmtrans-parity akao-direct-synth <psf-or-raw-file>\n"
+	      << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
+	      << "  vgmtrans-parity konami-snes-direct-summary <rsn-or-spc-file>\n"
+	      << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
+	      << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
+	      << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
 }
 
 }  // namespace
@@ -3545,13 +3581,17 @@ int main(int argc, char** argv) {
       return compareCapcomSnesRsnSummary(argv[2]);
     }
 
-    if (argc == 3 && std::string(argv[1]) == "nds-direct-summary") {
-      return compareNdsDirectSummary(argv[2]);
-    }
+	    if (argc == 3 && std::string(argv[1]) == "nds-direct-summary") {
+	      return compareNdsDirectSummary(argv[2]);
+	    }
 
-    if (argc == 3 && std::string(argv[1]) == "akao-direct-summary") {
-      return compareAkaoDirectSummary(argv[2]);
-    }
+	    if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-summary") {
+	      return compareKonamiSnesDirectSummary(argv[2]);
+	    }
+
+	    if (argc == 3 && std::string(argv[1]) == "akao-direct-summary") {
+	      return compareAkaoDirectSummary(argv[2]);
+	    }
 
     if (argc == 3 && std::string(argv[1]) == "akao-direct-midi") {
       return compareAkaoDirectMidi(argv[2]);

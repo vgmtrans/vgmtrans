@@ -102,4 +102,26 @@ s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModula
   return static_cast<s32>(std::lround((static_cast<double>(modulator.amount) * range->max) / 127.0));
 }
 
+bool shouldExportSynthModulator(const SynthModulator& modulator, ModulationConversionPolicy conversion) noexcept {
+  if (conversion == ModulationConversionPolicy::SynthModulators) {
+    return true;
+  }
+
+  switch (modulator.destination) {
+    case SynthDestination::VibratoDepth:
+    case SynthDestination::VibratoRate:
+    case SynthDestination::TremoloDepth:
+    case SynthDestination::TremoloRate:
+      return false;
+    case SynthDestination::VolumeAttenuation:
+      return modulator.source.has_value();
+    case SynthDestination::Pitch:
+    case SynthDestination::FilterCutoff:
+    case SynthDestination::Pan:
+    case SynthDestination::Unknown:
+      return true;
+  }
+  return true;
+}
+
 }  // namespace vgmtrans::core

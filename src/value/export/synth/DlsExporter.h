@@ -25,6 +25,7 @@ struct DlsInput {
   std::span<const SampleCollectionAsset* const> sampleCollections;
   const MidiModulationUsage* midiModulationUsage = nullptr;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
+  ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
 };
 
 struct DlsResult {

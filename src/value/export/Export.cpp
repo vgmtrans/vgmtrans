@@ -124,7 +124,7 @@ struct MidiLoweringResult {
                                     .sequenceLoops = request.sequenceLoops,
                                 })
                          .render(sequence.program, *dialect);
-  auto midi = PerformanceMidiRenderer().render(performance, request.midi);
+  auto midi = PerformanceMidiRenderer().render(performance, request.midi, request.modulationConversion);
   return MidiLoweringResult{
       .performance = std::move(performance),
       .sequence = std::move(midi),
@@ -156,7 +156,8 @@ struct MidiLoweringResult {
   }
 
   auto midiSequence = *lowering.sequence;
-  if (request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
+  if (request.modulationConversion == ModulationConversionPolicy::SynthModulators &&
+      request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
     // Apply the same observed-range scaling to MIDI controller values and synth
     // modulators so they continue to match each other.
     const auto usage = lowering.performance ? analyzePerformanceModulationUsage(*lowering.performance)
@@ -243,6 +244,7 @@ struct MidiLoweringResult {
           .sampleCollections = prepared.assets.sampleCollections,
           .midiModulationUsage = midiModulation,
           .modulationScaling = request.synthModulationScaling,
+          .modulationConversion = request.modulationConversion,
       },
       sources);
   // Asset-resolution diagnostics describe missing references; exporter diagnostics
@@ -270,6 +272,7 @@ struct MidiLoweringResult {
           .sampleCollections = prepared.assets.sampleCollections,
           .midiModulationUsage = midiModulation,
           .modulationScaling = request.synthModulationScaling,
+          .modulationConversion = request.modulationConversion,
       },
       sources);
   // Keep DLS diagnostic merging parallel to SF2 so callers can compare both exports
@@ -324,7 +327,8 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   const auto requireMidiModulationUsage = [&]() -> const MidiModulationUsage* {
     // Synth exporters only need observed MIDI modulation when the policy asks for it.
     // WAV and plain MIDI export should not pay that analysis cost.
-    if (request.synthModulationScaling != ModulationScalingPolicy::ObservedSequenceRange) {
+    if (request.modulationConversion != ModulationConversionPolicy::SynthModulators ||
+        request.synthModulationScaling != ModulationScalingPolicy::ObservedSequenceRange) {
       return nullptr;
     }
     if (!midiUsageAnalyzed) {

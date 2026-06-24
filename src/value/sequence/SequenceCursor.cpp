@@ -65,6 +65,14 @@ CursorCommandMetadata VmCommandCursor::metadata(std::string_view kindPrefix) con
   };
 }
 
+std::optional<::u8> VmCommandCursor::peekU8(size_t relativeOffset) const noexcept {
+  const size_t offset = position_ + relativeOffset;
+  if (offset >= bytes_.size()) {
+    return std::nullopt;
+  }
+  return bytes_[offset];
+}
+
 u32 VmCommandCursor::absolutePosition() const noexcept {
   return static_cast<u32>(commandRange_.offset + position_);
 }

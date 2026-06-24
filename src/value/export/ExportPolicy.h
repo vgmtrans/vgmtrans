@@ -15,4 +15,12 @@ enum class ModulationScalingPolicy {
   ObservedSequenceRange,
 };
 
+// Controls how sequence-driven vibrato and tremolo are represented at export.
+// SynthModulators writes controller-driven synth LFO settings for SF2/DLS-style output.
+// SequenceEventSimulation collapses modulation into performance/MIDI event streams.
+enum class ModulationConversionPolicy {
+  SynthModulators,
+  SequenceEventSimulation,
+};
+
 }  // namespace vgmtrans::core

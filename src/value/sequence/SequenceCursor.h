@@ -111,6 +111,7 @@ public:
   [[nodiscard]] size_t position() const noexcept { return position_; }
   [[nodiscard]] bool failed() const noexcept { return failed_; }
   [[nodiscard]] CursorCommandMetadata metadata(std::string_view kindPrefix) const;
+  [[nodiscard]] std::optional<::u8> peekU8(size_t relativeOffset = 0) const noexcept;
 
   VmCommandCursor& name(std::string_view displayName);
   VmCommandCursor& name(std::string_view displayName, SequenceSemantic semantic);
