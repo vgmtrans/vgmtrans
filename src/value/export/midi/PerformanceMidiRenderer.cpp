@@ -305,6 +305,26 @@ void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tic
   }
 }
 
+void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel) {
+  if (state.simulatedVibratoDepthSemitones <= 0.0 || state.vibratoFrequencyHz <= 0.0) {
+    return;
+  }
+
+  state.vibratoStartTick = tick + state.vibratoDelayTicks;
+  state.vibratoCursorTick = tick;
+  state.vibratoPhaseCycles = 0.0;
+  if (state.simulatedVibratoSemitones != 0.0) {
+    state.simulatedVibratoSemitones = 0.0;
+    addCombinedPitchBend(track, state, tick, channel, false);
+  }
+}
+
+bool shouldRestartSimulatedVibratoForNote(const PerformanceEvent& event, const RenderTrackState& state) {
+  const auto* note = std::get_if<NotePerformanceEvent>(&event);
+  return note != nullptr && !note->extendsPrevious && state.simulatedVibratoDepthSemitones > 0.0 &&
+         state.vibratoFrequencyHz > 0.0;
+}
+
 void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
                            const MidiExportOptions& options) {
   addExpression(track, tick, channel, state.sourceExpressionGain * state.panExpressionGain * state.simulatedTremoloGain,
@@ -321,6 +341,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
           if (extendPreviousNote(track, state, typedEvent, channel)) {
             return;
+          }
+          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            restartSimulatedVibratoForNote(track, state, typedEvent.header.tick, channel);
           }
           state.lastNoteIndex = track.events.size();
           track.events.push_back(NoteDuration{
@@ -590,8 +613,11 @@ MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performa
     });
     for (const auto& event : performanceTrack.events) {
       if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-        flushSimulatedVibrato(midiTrack, renderState, performanceEventHeader(event).tick, assignment.channel,
-                              performance.timebase);
+        u64 flushTick = performanceEventHeader(event).tick;
+        if (shouldRestartSimulatedVibratoForNote(event, renderState) && flushTick != 0) {
+          --flushTick;
+        }
+        flushSimulatedVibrato(midiTrack, renderState, flushTick, assignment.channel, performance.timebase);
       }
       addMidiEvent(midiTrack, renderState, event, assignment.channel, globalTransposes, options, modulationConversion);
     }

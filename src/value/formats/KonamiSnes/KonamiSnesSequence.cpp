@@ -485,17 +485,15 @@ struct TrackState {
     const bool hasEmittedTuning = std::isfinite(lastEmittedTuningCents);
     const bool hasNonZeroTuning = std::abs(cents) > 0.001;
     const bool changed = hasEmittedTuning && std::abs(lastEmittedTuningCents - cents) > 0.001;
-    if ((!hasEmittedTuning && hasNonZeroTuning) || changed || (force && hasEmittedTuning)) {
+    if ((!hasEmittedTuning && hasNonZeroTuning) || changed || (force && (hasEmittedTuning || hasNonZeroTuning))) {
       rt.tuning(cents);
       lastEmittedTuningCents = cents;
     }
   }
 
   template <class Runtime>
-  void resetPitchForNote(u8 key, Runtime& rt) {
+  void resetPitchForNote(u8 key, Runtime&) {
     pitchSlide.clearMotion();
-    rt.pitchBend(0.0);
-    rt.pitchBendRange(2);
     if (percussion) {
       pitchBase.reset();
       return;
@@ -570,7 +568,9 @@ struct TrackState {
       amount = fullRangeCents <= 0.0 ? 0.0 : currentCents / fullRangeCents;
       const double maxCents = vibrato::maxDepthCents(rt.context.version, maxVibrato.maxDepth);
       rangeMaxAmount = fullRangeCents <= 0.0 ? 0.0 : maxCents / fullRangeCents;
-      depthSemitones = currentCents / 200.0;
+      // The Konami depth conversion is a full exported pitch swing; pitch-bend
+      // simulation needs peak deviation from center.
+      depthSemitones = currentCents / 400.0;
     }
     amount = std::clamp(amount, 0.0, 1.0);
     if (force || std::abs(amount - lastVibratoDepthAmount) > 0.0001) {
@@ -842,6 +842,7 @@ struct KonamiSnesCursorReader {
         const bool tied = state.prevNoteSlurred && state.prevNoteKey && key == *state.prevNoteKey;
         state.resetPitchForNote(key, rt);
         const auto slide = consumeInlinePitchSlide(rt, cmd);
+        rt.pitchBend(0.0);
         state.vibrato.beginReusableFade();
         if (state.vibrato.fadeActive()) {
           state.emitVibratoDepth(rt, true);
@@ -855,6 +856,8 @@ struct KonamiSnesCursorReader {
         }
         if (slide) {
           state.beginPitchSlide(*slide, rt);
+        } else {
+          rt.pitchBendRange(2);
         }
         state.prevNoteSlurred = state.noteDurationRate == noteDurationRateMax(rt.context.version) && !state.percussion;
         return cmd.wait(length);
@@ -918,6 +921,7 @@ struct KonamiSnesCursorReader {
       case EventType::ProgramChange: {
         cmd.name("Program", SequenceSemantic::Program);
         const u8 program = cmd.u8("program");
+        state.applyEffectiveTuning(rt, true);
         state.instrument = program;
         cmd.derived("bank", program >> 7).derived("program_number", program & 0x7f).instrumentRef(program >> 7, program & 0x7f);
         rt.instrument(midiBank(program >> 7), program & 0x7f, true);
@@ -929,6 +933,7 @@ struct KonamiSnesCursorReader {
         cmd.name("Program And Volume", SequenceSemantic::Program);
         const u8 volume = cmd.u8("volume");
         const u8 program = cmd.u8("program");
+        state.applyEffectiveTuning(rt, true);
         state.instrument = program;
         rt.instrument(midiBank(program >> 7), program & 0x7f, true);
         emitVolume(rt, volume);

@@ -172,10 +172,10 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, BankSelect>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 0,
-                        static_cast<u8>((typedEvent.bank >> 7) & 0x7f), 10);
+                        static_cast<u8>((typedEvent.bank >> 7) & 0x7f), 15);
           if (typedEvent.writeLsb) {
             addController(messages, typedEvent.tick, typedEvent.channel, 32, static_cast<u8>(typedEvent.bank & 0x7f),
-                          10);
+                          15);
           }
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, Volume>) {
