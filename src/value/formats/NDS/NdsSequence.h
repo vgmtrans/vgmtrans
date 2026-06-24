@@ -36,7 +36,7 @@ void registerNdsSequenceDialect(core::SequenceDialectRegistry& registry);
                                                         std::optional<core::SourceAnnotationId> parent = std::nullopt,
                                                         std::optional<core::AssetId> sequenceAsset = std::nullopt);
 
-[[nodiscard]] std::vector<u32> ndsSequenceTrackStarts(core::ByteReader reader, u32 sequenceOffset, u32 sequenceEnd);
+[[nodiscard]] std::vector<u32> ndsSequenceTrackAddresses(core::ByteReader reader, u32 sequenceOffset, u32 sequenceEnd);
 
 [[nodiscard]] NdsSequenceRange ndsSequenceRangeForFatEntry(core::ByteReader reader, u32 offset, u32 size);
 

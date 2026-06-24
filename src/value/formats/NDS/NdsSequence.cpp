@@ -72,7 +72,7 @@ struct TrackState {
   return true;
 }
 
-// Track-start discovery sometimes needs to skip a bootstrap rest command before
+// Track-address discovery sometimes needs to skip a bootstrap rest command before
 // the real primary track. Keep offset unchanged if the variable-length value is
 // truncated so normal bytecode decode can still preserve the bad command.
 [[nodiscard]] std::optional<u32> readVarLen(ByteReader reader, u32& offset, u32 sequenceEnd) {
@@ -124,12 +124,12 @@ struct TrackState {
     return std::nullopt;
   }
 
-  const u32 trackStart = offset + kSseqHeaderSize;
+  const u32 trackAddress = offset + kSseqHeaderSize;
   const u32 paddingEnd = std::min(*sseqOffset, offset + size);
   // Some zero-filled pseudo-sequences overlap a later SSEQ. If the padding
   // would align the SSEQ signature as bogus note data, leave it empty.
-  if (size <= 0x100 && *sseqOffset >= trackStart && isZeroFilled(reader, offset, paddingEnd) &&
-      ((*sseqOffset - trackStart) % 3) == 2) {
+  if (size <= 0x100 && *sseqOffset >= trackAddress && isZeroFilled(reader, offset, paddingEnd) &&
+      ((*sseqOffset - trackAddress) % 3) == 2) {
     return std::nullopt;
   }
   return sseqOffset;
@@ -533,8 +533,8 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const NdsSequenceDescript
                                sourceMap, diagnostics, parentAnnotation, sequenceAsset);
 }
 
-std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
-  std::vector<u32> extraStarts;
+std::vector<u32> ndsSequenceTrackAddresses(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
+  std::vector<u32> extraTrackAddresses;
   u32 offset = sequenceOffset + kSseqHeaderSize;
   if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
     return {offset};
@@ -562,9 +562,9 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
     }
 
     while (status == 0x93 && hasBytecodeBytes(reader, offset, 5, sequenceEnd)) {
-      if (const auto start = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset + 2);
-          start && *start < sequenceEnd) {
-        extraStarts.push_back(*start);
+      if (const auto trackAddress = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset + 2);
+          trackAddress && *trackAddress < sequenceEnd) {
+        extraTrackAddresses.push_back(*trackAddress);
       }
       offset += 5;
       if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
@@ -574,9 +574,9 @@ std::vector<u32> ndsSequenceTrackStarts(ByteReader reader, u32 sequenceOffset, u
     }
   }
 
-  std::vector<u32> starts{offset};
-  starts.insert(starts.end(), extraStarts.begin(), extraStarts.end());
-  return starts;
+  std::vector<u32> trackAddresses{offset};
+  trackAddresses.insert(trackAddresses.end(), extraTrackAddresses.begin(), extraTrackAddresses.end());
+  return trackAddresses;
 }
 
 NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 size) {
@@ -647,10 +647,11 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
   }
 
   u32 trackIndex = 0;
-  for (const u32 start : ndsSequenceTrackStarts(input.reader, sequenceOffset, range.sequenceEnd)) {
-    auto track = decodeNdsSequenceTrack(input.reader, descriptor, sequenceOffset, range.sequenceEnd, start, trackIndex,
-                                        range.recoverMalformedSdatRange, sourceMap, diagnostics,
-                                        headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt, id);
+  for (const u32 trackAddress : ndsSequenceTrackAddresses(input.reader, sequenceOffset, range.sequenceEnd)) {
+    auto track =
+        decodeNdsSequenceTrack(input.reader, descriptor, sequenceOffset, range.sequenceEnd, trackAddress, trackIndex,
+                               range.recoverMalformedSdatRange, sourceMap, diagnostics,
+                               headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt, id);
     ++trackIndex;
     asset.program.tracks.push_back(std::move(track));
   }

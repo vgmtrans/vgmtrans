@@ -50,7 +50,7 @@ struct AkaoSequenceHeader {
 
 struct AkaoSequenceAnalysis {
   AkaoSequenceHeader header;
-  std::vector<u32> trackStarts;
+  std::vector<u32> trackAddresses;
   std::set<u32> customInstrumentOffsets;
   std::set<u32> drumInstrumentOffsets;
   std::set<u32> individualArtIds;

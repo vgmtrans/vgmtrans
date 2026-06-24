@@ -77,8 +77,10 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
 
   const auto& descriptor = ndsSequenceDescriptor();
   const SequenceDialect& dialect = descriptor.dialect;
-  const auto starts = ndsSequenceTrackStarts(ByteReader(SourceId{4}, bytes), sequenceOffset, trackStart + 11);
-  expect(starts.size() == 1 && starts[0] == trackStart, "NDS SSEQ track-start discovery should find the primary track");
+  const auto trackAddresses =
+      ndsSequenceTrackAddresses(ByteReader(SourceId{4}, bytes), sequenceOffset, trackStart + 11);
+  expect(trackAddresses.size() == 1 && trackAddresses[0] == trackStart,
+         "NDS SSEQ track-address discovery should find the primary track");
 
   ScanIdAllocator annotationIds;
   SourceMapBuilder sourceMap([&annotationIds]() { return annotationIds.nextSourceAnnotationId(); });
@@ -307,7 +309,7 @@ void ndsSequenceDialectExecutesCallAndReturn() {
          "NDS linearized overlap fixture should render without unpaired-return diagnostics");
 }
 
-void ndsSequenceDialectDiscoversSecondaryTrackStarts() {
+void ndsSequenceDialectDiscoversSecondaryTrackAddresses() {
   std::vector<u8> bytes(0x180);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -329,14 +331,15 @@ void ndsSequenceDialectDiscoversSecondaryTrackStarts() {
   bytes[secondaryStart + 1] = 0x03;
   bytes[secondaryStart + 2] = 0xff;
 
-  const auto starts = ndsSequenceTrackStarts(ByteReader(SourceId{6}, bytes), sequenceOffset, secondaryStart + 3);
-  expect(starts.size() == 2 && starts[0] == primaryStart && starts[1] == secondaryStart,
-         "NDS SSEQ track-start discovery should include bootstrap secondary tracks");
+  const auto trackAddresses =
+      ndsSequenceTrackAddresses(ByteReader(SourceId{6}, bytes), sequenceOffset, secondaryStart + 3);
+  expect(trackAddresses.size() == 2 && trackAddresses[0] == primaryStart && trackAddresses[1] == secondaryStart,
+         "NDS SSEQ track-address discovery should include bootstrap secondary tracks");
 
   const auto& descriptor = ndsSequenceDescriptor();
   SourceMapBuilder sourceMap;
   const TrackProgram secondary = decodeNdsSequenceTrack(ByteReader(SourceId{6}, bytes), descriptor, sequenceOffset,
-                                                        secondaryStart + 3, starts[1], 1, false, &sourceMap);
+                                                        secondaryStart + 3, trackAddresses[1], 1, false, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(secondary.sourceTrackNumber == 1 && secondary.commands.size() == 2,
          "NDS secondary track should decode independently from the primary bootstrap");
@@ -344,7 +347,7 @@ void ndsSequenceDialectDiscoversSecondaryTrackStarts() {
          "NDS secondary track should preserve decoded source commands");
 }
 
-void ndsSequenceTrackStartDiscoveryKeepsMalformedBootstrapCommands() {
+void ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -355,14 +358,15 @@ void ndsSequenceTrackStartDiscoveryKeepsMalformedBootstrapCommands() {
   bytes[trackStart + 3] = 0x80;
   bytes[trackStart + 4] = 0x81;
 
-  const auto starts = ndsSequenceTrackStarts(ByteReader(SourceId{12}, bytes), sequenceOffset, trackStart + 5);
-  expect(starts.size() == 1 && starts.front() == trackStart + 3,
-         "NDS track-start discovery should not skip an unterminated bootstrap variable-length command");
+  const auto trackAddresses =
+      ndsSequenceTrackAddresses(ByteReader(SourceId{12}, bytes), sequenceOffset, trackStart + 5);
+  expect(trackAddresses.size() == 1 && trackAddresses.front() == trackStart + 3,
+         "NDS track-address discovery should not skip an unterminated bootstrap variable-length command");
 
   const auto& descriptor = ndsSequenceDescriptor();
   SourceMapBuilder sourceMap;
   const TrackProgram track = decodeNdsSequenceTrack(ByteReader(SourceId{12}, bytes), descriptor, sequenceOffset,
-                                                    trackStart + 5, starts.front(), 0, false, &sourceMap);
+                                                    trackStart + 5, trackAddresses.front(), 0, false, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 1 && commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS malformed bootstrap command should be preserved as a truncated source command");
@@ -433,8 +437,9 @@ void ndsSequenceDialectKeepsEmptyPlaceholderTrack() {
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
 
-  const auto starts = ndsSequenceTrackStarts(ByteReader(SourceId{8}, bytes), sequenceOffset, trackStart);
-  expect(starts.size() == 1 && starts.front() == trackStart,
+  const auto trackAddresses = ndsSequenceTrackAddresses(ByteReader(SourceId{8}, bytes), sequenceOffset,
+                                                        trackStart);
+  expect(trackAddresses.size() == 1 && trackAddresses.front() == trackStart,
          "NDS empty placeholder sequences should keep their first empty track");
 
   const auto& descriptor = ndsSequenceDescriptor();
