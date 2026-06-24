@@ -16,7 +16,9 @@ namespace vgmtrans::core {
 // values become MIDI channels, ports, controller numbers, and quantized controller values.
 class PerformanceMidiRenderer {
 public:
-  [[nodiscard]] MidiSequence render(const PerformanceSequence& performance, MidiExportOptions options = {}) const;
+  [[nodiscard]] MidiSequence render(const PerformanceSequence& performance, MidiExportOptions options = {},
+                                    ModulationConversionPolicy modulationConversion =
+                                        ModulationConversionPolicy::SynthModulators) const;
 };
 
 }  // namespace vgmtrans::core

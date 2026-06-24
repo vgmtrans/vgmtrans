@@ -50,6 +50,7 @@ struct ExportRequest {
   u32 sequenceLoops = 0;
   MidiExportOptions midi;
   ModulationScalingPolicy synthModulationScaling = ModulationScalingPolicy::FullFormatRange;
+  ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
 };
 
 // Artifact carries diagnostics even when no bytes were produced, so UI/CLI

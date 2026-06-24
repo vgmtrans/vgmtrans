@@ -113,6 +113,12 @@ void addExpression(MidiTrack& track, u64 tick, u8 channel, double linearGain, Le
 struct RenderTrackState {
   std::optional<size_t> lastNoteIndex;
   u8 pitchBendRangeSemitones = 2;
+  u8 sourcePitchBendRangeSemitones = 2;
+  double sourcePitchBendSemitones = 0.0;
+  double simulatedVibratoSemitones = 0.0;
+  double sourceExpressionGain = 1.0;
+  double panExpressionGain = 1.0;
+  double simulatedTremoloGain = 1.0;
 };
 
 struct GlobalTransposeChange {
@@ -193,8 +199,44 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
   return true;
 }
 
+[[nodiscard]] u8 requiredPitchBendRangeSemitones(const RenderTrackState& state) {
+  const double combined = state.sourcePitchBendSemitones + state.simulatedVibratoSemitones;
+  return static_cast<u8>(std::max<int>(2, static_cast<int>(std::ceil(std::abs(combined)))));
+}
+
+void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u8 semitones) {
+  const u8 range = std::max<u8>(2, semitones);
+  if (range == state.pitchBendRangeSemitones) {
+    return;
+  }
+  track.events.push_back(PitchBendRange{
+      .tick = tick,
+      .channel = channel,
+      .semitones = range,
+  });
+  state.pitchBendRangeSemitones = range;
+}
+
+void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel) {
+  ensurePitchBendRange(track, state, tick, channel,
+                       std::max(state.sourcePitchBendRangeSemitones, requiredPitchBendRangeSemitones(state)));
+  track.events.push_back(PitchBend{
+      .tick = tick,
+      .channel = channel,
+      .value = midiPitchBend(state.sourcePitchBendSemitones + state.simulatedVibratoSemitones,
+                             state.pitchBendRangeSemitones),
+  });
+}
+
+void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
+                           const MidiExportOptions& options) {
+  addExpression(track, tick, channel, state.sourceExpressionGain * state.panExpressionGain * state.simulatedTremoloGain,
+                LevelPrecisionHint::SevenBit, options);
+}
+
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
-                  std::span<const GlobalTransposeChange> globalTransposes, const MidiExportOptions& options) {
+                  std::span<const GlobalTransposeChange> globalTransposes, const MidiExportOptions& options,
+                  ModulationConversionPolicy modulationConversion) {
   std::visit(
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
@@ -249,8 +291,13 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             });
           }
         } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
-          addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, typedEvent.precisionHint,
-                        options);
+          state.sourceExpressionGain = typedEvent.linearGain;
+          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
+          } else {
+            addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, typedEvent.precisionHint,
+                          options);
+          }
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
           track.events.push_back(Pan{
               .tick = typedEvent.header.tick,
@@ -258,8 +305,13 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .value = midiPan(typedEvent.stereoPosition),
           });
           if (typedEvent.hasLinearGain) {
-            addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, LevelPrecisionHint::SevenBit,
-                          options);
+            if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+              state.panExpressionGain = typedEvent.linearGain;
+              addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
+            } else {
+              addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain,
+                            LevelPrecisionHint::SevenBit, options);
+            }
           }
         } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
           track.events.push_back(MasterVolume{
@@ -288,18 +340,30 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // Global transpose changes how later notes and portamento controls are written. It does not
           // become a MIDI event itself.
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendPerformanceEvent>) {
-          track.events.push_back(PitchBend{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .value = midiPitchBend(typedEvent.semitones, state.pitchBendRangeSemitones),
-          });
+          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            state.sourcePitchBendSemitones = typedEvent.semitones;
+            addCombinedPitchBend(track, state, typedEvent.header.tick, channel);
+          } else {
+            track.events.push_back(PitchBend{
+                .tick = typedEvent.header.tick,
+                .channel = channel,
+                .value = midiPitchBend(typedEvent.semitones, state.pitchBendRangeSemitones),
+            });
+          }
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
-          track.events.push_back(PitchBendRange{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .semitones = typedEvent.semitones,
-          });
-          state.pitchBendRangeSemitones = typedEvent.semitones;
+          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            state.sourcePitchBendRangeSemitones = std::max<u8>(2, typedEvent.semitones);
+            ensurePitchBendRange(track, state, typedEvent.header.tick, channel,
+                                 std::max(state.sourcePitchBendRangeSemitones,
+                                          requiredPitchBendRangeSemitones(state)));
+          } else {
+            track.events.push_back(PitchBendRange{
+                .tick = typedEvent.header.tick,
+                .channel = channel,
+                .semitones = typedEvent.semitones,
+            });
+            state.pitchBendRangeSemitones = typedEvent.semitones;
+          }
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
           const double previousKey =
               typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
@@ -341,6 +405,23 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           });
         } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
           const u8 value = midiNormalized7(typedEvent.amount);
+          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            switch (typedEvent.target) {
+              case ModulationPerformanceTarget::VibratoDepth:
+                state.simulatedVibratoSemitones = std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0;
+                addCombinedPitchBend(track, state, typedEvent.header.tick, channel);
+                break;
+              case ModulationPerformanceTarget::TremoloDepth:
+                state.simulatedTremoloGain = std::clamp(1.0 - (std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
+                                                        0.0, 1.0);
+                addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
+                break;
+              case ModulationPerformanceTarget::VibratoRate:
+              case ModulationPerformanceTarget::TremoloRate:
+                break;
+            }
+            return;
+          }
           switch (typedEvent.target) {
             case ModulationPerformanceTarget::VibratoDepth:
               track.events.push_back(VibratoDepth{
@@ -383,7 +464,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
 
 }  // namespace
 
-MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performance, MidiExportOptions options) const {
+MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performance, MidiExportOptions options,
+                                             ModulationConversionPolicy modulationConversion) const {
   MidiSequence sequence{
       .timebase = performance.timebase,
       .diagnostics = performance.diagnostics,
@@ -410,7 +492,7 @@ MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performa
         .port = midiPortByte(assignment.port),
     });
     for (const auto& event : performanceTrack.events) {
-      addMidiEvent(midiTrack, renderState, event, assignment.channel, globalTransposes, options);
+      addMidiEvent(midiTrack, renderState, event, assignment.channel, globalTransposes, options, modulationConversion);
     }
     u64 endTick = performanceTrack.endTick;
     if (trackIndex == 0) {

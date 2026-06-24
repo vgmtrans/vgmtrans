@@ -181,6 +181,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursorDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceMotion.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h
@@ -232,6 +233,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.cpp
@@ -257,6 +262,11 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesLayout.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.h

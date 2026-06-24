@@ -67,6 +67,8 @@ struct Effects {
 using ExecuteSourceCommand = Effects (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
                                          PerformanceEmitter& out, VmApi& vm, const std::any& context);
 using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&, const std::any& context);
+using TickTrackState = void (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
+                                PerformanceEmitter& out, VmApi& vm, const std::any& context);
 
 struct SequenceDialect {
   DialectId id;
@@ -75,6 +77,7 @@ struct SequenceDialect {
   SequenceProgramBehavior defaultBehavior;
   CreateTrackState createTrackState = nullptr;
   ExecuteSourceCommand execute = nullptr;
+  TickTrackState tick = nullptr;
   std::any context;
 };
 

@@ -352,9 +352,13 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 
 [[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(
     const SynthModulator& modulator, const MidiModulationUsage* midiModulationUsage = nullptr,
-    ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange) {
+    ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
   // SynthModulator names common controller behavior. This function chooses the SF2 controller
   // and generator numbers that represent it in the file.
+  if (!shouldExportSynthModulator(modulator, modulationConversion)) {
+    return std::nullopt;
+  }
   const auto source = modulator.source ? sf2SourceForSynthSource(*modulator.source)
                                        : sf2DefaultSourceForDestination(modulator.destination);
   const auto destination = sf2GeneratorForDestination(modulator.destination);
@@ -437,13 +441,21 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   }));
 }
 
-[[nodiscard]] u32 instrumentGlobalModulatorCount(const Instrument& instrument) {
+[[nodiscard]] u32 instrumentGlobalModulatorCount(
+    const Instrument& instrument,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
   return static_cast<u32>(std::ranges::count_if(
-      instrument.modulators, [](const SynthModulator& modulator) { return sf2ModulatorFor(modulator).has_value(); }));
+      instrument.modulators, [modulationConversion](const SynthModulator& modulator) {
+        return sf2ModulatorFor(modulator, nullptr, ModulationScalingPolicy::FullFormatRange, modulationConversion)
+            .has_value();
+      }));
 }
 
-[[nodiscard]] bool hasInstrumentGlobalZone(const Instrument& instrument) {
-  return instrumentGlobalGeneratorCount(instrument) != 0 || instrumentGlobalModulatorCount(instrument) != 0;
+[[nodiscard]] bool hasInstrumentGlobalZone(
+    const Instrument& instrument,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
+  return instrumentGlobalGeneratorCount(instrument) != 0 ||
+         instrumentGlobalModulatorCount(instrument, modulationConversion) != 0;
 }
 
 [[nodiscard]] std::vector<Chunk> infoChunks(const std::string& name) {
@@ -571,7 +583,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk(std::move(id), std::move(payload));
 }
 
-[[nodiscard]] Chunk instChunk(std::span<const ResolvedSynthInstrument> instruments) {
+[[nodiscard]] Chunk instChunk(std::span<const ResolvedSynthInstrument> instruments,
+                              ModulationConversionPolicy modulationConversion) {
   // SF2 instruments point into bag tables. Instruments with global generators/modulators
   // get one global bag before their sample regions.
   std::vector<u8> payload;
@@ -579,7 +592,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   for (const auto& instrument : instruments) {
     writeFixedString(payload, sf2Name(instrument.instrument->name, "Instrument"), 20);
     writeLe16(payload, clampU16(bagIndex));
-    bagIndex += static_cast<u32>(instrument.regions.size()) + (hasInstrumentGlobalZone(*instrument.instrument) ? 1 : 0);
+    bagIndex += static_cast<u32>(instrument.regions.size()) +
+                (hasInstrumentGlobalZone(*instrument.instrument, modulationConversion) ? 1 : 0);
   }
 
   writeFixedString(payload, "EOI", 20);
@@ -587,18 +601,19 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("inst", std::move(payload));
 }
 
-[[nodiscard]] Chunk ibagChunk(std::span<const ResolvedSynthInstrument> instruments) {
+[[nodiscard]] Chunk ibagChunk(std::span<const ResolvedSynthInstrument> instruments,
+                              ModulationConversionPolicy modulationConversion) {
   // Bags are index pairs into generator/modulator arrays. Counts must be predicted before
   // writing igen/imod so the table offsets line up exactly.
   std::vector<u8> payload;
   u32 generatorIndex = 0;
   u32 modulatorIndex = 0;
   for (const auto& instrument : instruments) {
-    if (hasInstrumentGlobalZone(*instrument.instrument)) {
+    if (hasInstrumentGlobalZone(*instrument.instrument, modulationConversion)) {
       writeLe16(payload, clampU16(generatorIndex));
       writeLe16(payload, clampU16(modulatorIndex));
       generatorIndex += instrumentGlobalGeneratorCount(*instrument.instrument);
-      modulatorIndex += instrumentGlobalModulatorCount(*instrument.instrument);
+      modulatorIndex += instrumentGlobalModulatorCount(*instrument.instrument, modulationConversion);
     }
 
     for (size_t i = 0; i < instrument.regions.size(); ++i) {
@@ -615,11 +630,12 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 
 [[nodiscard]] Chunk imodChunk(std::span<const ResolvedSynthInstrument> instruments,
                               const MidiModulationUsage* midiModulationUsage,
-                              ModulationScalingPolicy modulationScaling) {
+                              ModulationScalingPolicy modulationScaling,
+                              ModulationConversionPolicy modulationConversion) {
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
     for (const auto& modulator : instrument.instrument->modulators) {
-      const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling);
+      const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling, modulationConversion);
       if (!record) {
         continue;
       }
@@ -742,15 +758,16 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 [[nodiscard]] std::vector<Chunk> pdtaChunks(std::span<const ResolvedSynthInstrument> instruments,
                                             std::span<const DecodedSfSample> samples,
                                             const MidiModulationUsage* midiModulationUsage,
-                                            ModulationScalingPolicy modulationScaling) {
+                                            ModulationScalingPolicy modulationScaling,
+                                            ModulationConversionPolicy modulationConversion) {
   return {
       phdrChunk(instruments),
       pbagChunk(instruments),
       terminalModChunk("pmod"),
       pgenChunk(instruments),
-      instChunk(instruments),
-      ibagChunk(instruments),
-      imodChunk(instruments, midiModulationUsage, modulationScaling),
+      instChunk(instruments, modulationConversion),
+      ibagChunk(instruments, modulationConversion),
+      imodChunk(instruments, midiModulationUsage, modulationScaling, modulationConversion),
       igenChunk(instruments, samples),
       shdrChunk(samples, instruments),
   };
@@ -781,7 +798,8 @@ SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, 
   result.bytes = riffSoundFont({
       makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
       makeListChunk("sdta", {smplChunk(samples)}),
-      makeListChunk("pdta", pdtaChunks(instruments, samples, input.midiModulationUsage, input.modulationScaling)),
+      makeListChunk("pdta", pdtaChunks(instruments, samples, input.midiModulationUsage, input.modulationScaling,
+                                       input.modulationConversion)),
   });
   return result;
 }
