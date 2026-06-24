@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numbers>
 #include <optional>
 #include <span>
 #include <string>
@@ -123,7 +122,7 @@ struct RenderTrackState {
   bool vibratoDelayArmed = false;
   u64 vibratoStartTick = 0;
   u64 vibratoCursorTick = 0;
-  double vibratoPhaseRadians = 0.0;
+  double vibratoPhaseCycles = 0.0;
   std::optional<s16> lastPitchBendValue;
   u32 microsecondsPerQuarter = 500000;
   double sourceExpressionGain = 1.0;
@@ -248,6 +247,17 @@ void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u
   return (static_cast<double>(state.microsecondsPerQuarter) / 1'000'000.0) / ppqn;
 }
 
+[[nodiscard]] double triangleLfo(double phaseCycles) {
+  const double phase = phaseCycles - std::floor(phaseCycles);
+  if (phase < 0.25) {
+    return phase * 4.0;
+  }
+  if (phase < 0.75) {
+    return 2.0 - (phase * 4.0);
+  }
+  return (phase * 4.0) - 4.0;
+}
+
 void flushSimulatedVibrato(MidiTrack& track, RenderTrackState& state, u64 upToTick, u8 channel,
                            const Timebase& timebase) {
   if (state.vibratoCursorTick >= upToTick) {
@@ -261,10 +271,10 @@ void flushSimulatedVibrato(MidiTrack& track, RenderTrackState& state, u64 upToTi
       continue;
     }
 
-    state.simulatedVibratoSemitones = state.simulatedVibratoDepthSemitones * std::sin(state.vibratoPhaseRadians);
+    state.simulatedVibratoSemitones = state.simulatedVibratoDepthSemitones * triangleLfo(state.vibratoPhaseCycles);
     addCombinedPitchBend(track, state, state.vibratoCursorTick, channel, false);
-    state.vibratoPhaseRadians += 2.0 * std::numbers::pi * state.vibratoFrequencyHz * tickSeconds(timebase, state);
-    state.vibratoPhaseRadians = std::fmod(state.vibratoPhaseRadians, 2.0 * std::numbers::pi);
+    state.vibratoPhaseCycles = std::fmod(state.vibratoPhaseCycles + state.vibratoFrequencyHz * tickSeconds(timebase, state),
+                                         1.0);
   }
 }
 
@@ -273,7 +283,7 @@ void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tic
   if (state.vibratoDelayArmed) {
     state.vibratoStartTick = tick + (state.simulatedVibratoDepthSemitones > 0.0 ? state.vibratoDelayTicks : 0);
     state.vibratoCursorTick = tick;
-    state.vibratoPhaseRadians = 0.0;
+    state.vibratoPhaseCycles = 0.0;
     state.vibratoDelayArmed = false;
     if (state.simulatedVibratoSemitones != 0.0 || state.simulatedVibratoDepthSemitones <= 0.0) {
       state.simulatedVibratoSemitones = 0.0;
