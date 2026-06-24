@@ -56,7 +56,7 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
     }
   }
 
-  // Resolve each allocated track pointer to an absolute bytecode offset.
+  // Resolve each allocated track pointer to an absolute bytecode address.
   const u32 trackCount = std::popcount(analysis.header.trackBits);
   const u32 pointerTable = offset + analysis.header.trackHeaderOffset;
   const u32 sequenceEnd = offset + analysis.header.length;
@@ -68,15 +68,15 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(ByteReader reader, const
     const u32 pointerOffset = analysis.header.trackHeaderOffset + i * 2;
     const u32 base = pointerOffset + (profile.version3OrLater() ? 0 : 2);
     const u32 relative = reader.le16(offset + pointerOffset);
-    const u32 trackStart = offset + base + relative;
-    if (trackStart < sequenceEnd && reader.has(trackStart, 1)) {
-      analysis.trackStarts.push_back(trackStart);
+    const u32 trackAddress = offset + base + relative;
+    if (trackAddress < sequenceEnd && reader.has(trackAddress, 1)) {
+      analysis.trackAddresses.push_back(trackAddress);
     }
   }
 
   // Run the command reader over reachable track bytecode to collect table and articulation references.
-  for (const u32 trackStart : analysis.trackStarts) {
-    analyzeAkaoTrack(reader, analysis, trackStart);
+  for (const u32 trackAddress : analysis.trackAddresses) {
+    analyzeAkaoTrack(reader, analysis, trackAddress);
   }
   return analysis;
 }
@@ -115,12 +115,12 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
   }
 
   u32 trackIndex = 0;
-  for (const u32 start : analysis.trackStarts) {
+  for (const u32 trackAddress : analysis.trackAddresses) {
     auto track = decodeAkaoTrack(input.reader, dialect,
                                  CursorTrackDecodeInput{
                                      .sequenceAsset = id,
                                      .trackIndex = trackIndex,
-                                     .startOffset = start,
+                                     .startOffset = trackAddress,
                                      .bytecodeEnd = sequenceEnd,
                                      .sequenceOffset = analysis.header.offset,
                                      .sequenceEnd = sequenceEnd,
