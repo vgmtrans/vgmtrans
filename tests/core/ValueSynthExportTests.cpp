@@ -281,6 +281,23 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write sustainVolEnv from Region envelope");
   expect(soundFontIgenContainsAmount(result.bytes, 38, -2400),
          "SoundFont export should write releaseVolEnv from Region envelope");
+
+  const auto simulatedResult = SoundFontExporter().exportSoundFont(
+      SoundFontInput{
+          .name = "Probe",
+          .instrumentSets = instrumentSets,
+          .sampleCollections = samples,
+          .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+      },
+      sources);
+  expect(simulatedResult.diagnostics.empty(),
+         "SoundFont sequence-event simulation export should not report diagnostics for valid values");
+  expect(!soundFontIgenContainsAmount(simulatedResult.bytes, 6, 120) &&
+             !soundFontIgenContainsAmount(simulatedResult.bytes, 24, 240) &&
+             !soundFontIgenContainsAmount(simulatedResult.bytes, 23, -1200),
+         "SoundFont sequence-event simulation export should suppress synth vibrato generators");
+  expect(!soundFontImodContains(simulatedResult.bytes, 206, 23, 600),
+         "SoundFont sequence-event simulation export should suppress synth vibrato-delay modulators");
 }
 
 void dlsExporterWritesDlsRiffFile() {
@@ -422,6 +439,21 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should write explicit channel-pressure-to-vibrato-rate modulator");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0104, 1114112),
          "DLS export should scale default tremolo-rate modulator from observed MIDI usage");
+
+  const auto simulatedResult = DlsExporter().exportDls(
+      DlsInput{
+          .name = "Probe",
+          .instrumentSets = instrumentSets,
+          .sampleCollections = samples,
+          .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+      },
+      sources);
+  expect(simulatedResult.diagnostics.empty(),
+         "DLS sequence-event simulation export should not report diagnostics for valid values");
+  expect(!dlsArt2ContainsConnection(simulatedResult.bytes, 0x0009, 0x0003, 7864320) &&
+             !dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0114, 15728640) &&
+             !dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0115, -78643200),
+         "DLS sequence-event simulation export should suppress synth vibrato generators");
 }
 
 void exportDiagnosticsPreserveSourceRanges() {

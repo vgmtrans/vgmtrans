@@ -64,6 +64,14 @@ bool hasMidiEvent(const MidiTrack& track) {
   return std::ranges::any_of(track.events, [](const MidiEvent& event) { return std::holds_alternative<Event>(event); });
 }
 
+template <class Event>
+bool hasMidiEventAt(const MidiTrack& track, u64 tick) {
+  return std::ranges::any_of(track.events, [tick](const MidiEvent& event) {
+    const auto* typedEvent = std::get_if<Event>(&event);
+    return typedEvent != nullptr && typedEvent->tick == tick;
+  });
+}
+
 bool hasGeneratorDestination(const Instrument& instrument, SynthDestination destination) {
   return std::ranges::any_of(instrument.generators, [destination](const SynthGenerator& generator) {
     return generator.destination == destination;
@@ -122,7 +130,7 @@ std::vector<u8> makeKonamiSnesAram() {
   bytes[0x2008] = 0xe3;
   bytes[0x2009] = 0x14;
   bytes[0x200a] = 0xe4;
-  bytes[0x200b] = 0x00;
+  bytes[0x200b] = 0x08;
   bytes[0x200c] = 0x20;
   bytes[0x200d] = 0x10;
   bytes[0x200e] = 0x3c;
@@ -214,19 +222,28 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(vibratoDepth != performance.tracks[0].events.end(), "KonamiSnes vibrato command should emit target-neutral depth");
   expect(std::abs(std::get<ModulationPerformanceEvent>(*vibratoDepth).amount - 1.0) < 0.0001,
          "KonamiSnes vibrato depth should be normalized against the sequence-observed range");
+  const auto vibratoDelay = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<VibratoDelayPerformanceEvent>(event);
+  });
+  expect(vibratoDelay != performance.tracks[0].events.end(),
+         "KonamiSnes vibrato command should emit target-neutral delay");
+  expect(std::get<VibratoDelayPerformanceEvent>(*vibratoDelay).delayTicks == 2,
+         "KonamiSnes vibrato delay should be converted to rendered sequence ticks");
 
   const MidiSequence synthModulationMidi = PerformanceMidiRenderer().render(performance);
   expect(hasMidiEvent<VibratoDepth>(synthModulationMidi.tracks[0]) &&
-             hasMidiEvent<VibratoFrequency>(synthModulationMidi.tracks[0]),
+             hasMidiEvent<VibratoFrequency>(synthModulationMidi.tracks[0]) &&
+             hasMidiEvent<VibratoDelay>(synthModulationMidi.tracks[0]),
          "default KonamiSnes MIDI rendering should preserve synth modulation controllers");
 
   const MidiSequence simulatedMidi = PerformanceMidiRenderer().render(
       performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   expect(!hasMidiEvent<VibratoDepth>(simulatedMidi.tracks[0]) &&
-             !hasMidiEvent<VibratoFrequency>(simulatedMidi.tracks[0]),
+             !hasMidiEvent<VibratoFrequency>(simulatedMidi.tracks[0]) &&
+             !hasMidiEvent<VibratoDelay>(simulatedMidi.tracks[0]),
          "sequence-event modulation policy should suppress synth modulation controllers");
-  expect(hasMidiEvent<PitchBend>(simulatedMidi.tracks[0]),
-         "sequence-event modulation policy should simulate vibrato depth as pitch bend");
+  expect(hasMidiEventAt<PitchBend>(simulatedMidi.tracks[0], 2),
+         "sequence-event modulation policy should delay simulated vibrato pitch bend");
 
   const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
   expect(instruments != nullptr, "second KonamiSnes asset should be an instrument set");

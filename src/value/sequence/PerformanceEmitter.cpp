@@ -180,6 +180,18 @@ void PerformanceEmitter::pitchBendRange(u8 semitones) {
   });
 }
 
+void PerformanceEmitter::vibratoDelay(VibratoDelayPerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void PerformanceEmitter::vibratoDelay(u32 delayTicks, u8 midiValue) {
+  vibratoDelay(VibratoDelayPerformanceEvent{
+      .delayTicks = delayTicks,
+      .midiValue = midiValue,
+  });
+}
+
 void PerformanceEmitter::portamento(PortamentoPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));

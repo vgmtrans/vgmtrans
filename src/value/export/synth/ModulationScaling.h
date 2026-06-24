@@ -23,6 +23,9 @@ void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsag
 [[nodiscard]] s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModulationUsage* usage,
                                              ModulationScalingPolicy policy) noexcept;
 
+[[nodiscard]] bool shouldExportSynthGenerator(const SynthGenerator& generator,
+                                              ModulationConversionPolicy conversion) noexcept;
+
 [[nodiscard]] bool shouldExportSynthModulator(const SynthModulator& modulator,
                                               ModulationConversionPolicy conversion) noexcept;
 
