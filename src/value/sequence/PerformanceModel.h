@@ -124,6 +124,14 @@ struct PitchBendRangePerformanceEvent {
   u8 semitones = 2;
 };
 
+struct VibratoDelayPerformanceEvent {
+  PerformanceEventHeader header;
+  // Delay in rendered sequence ticks, used when vibrato is simulated as pitch bend.
+  u32 delayTicks = 0;
+  // Controller value to write when exporting synth-style MIDI controls.
+  u8 midiValue = 0;
+};
+
 struct PortamentoPerformanceEvent {
   PerformanceEventHeader header;
   double timeMilliseconds = 0.0;
@@ -176,7 +184,8 @@ using PerformanceEvent =
                  ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent, GlobalTransposePerformanceEvent,
                  PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent, PortamentoTimePerformanceEvent,
                  PortamentoControlPerformanceEvent, PitchBendPerformanceEvent, PitchBendRangePerformanceEvent,
-                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
+                 VibratoDelayPerformanceEvent, LegatoPedalPerformanceEvent, ModulationPerformanceEvent,
+                 MarkerPerformanceEvent>;
 
 struct PerformanceTrack {
   TrackId id;

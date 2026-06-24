@@ -517,6 +517,9 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeConnection(connections, kDlsConnDstEg1ReleaseTime,
                   dlsEnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
   for (const auto& generator : instrument.generators) {
+    if (!shouldExportSynthGenerator(generator, modulationConversion)) {
+      continue;
+    }
     const auto connection = dlsConnectionForGenerator(generator);
     if (!connection) {
       continue;

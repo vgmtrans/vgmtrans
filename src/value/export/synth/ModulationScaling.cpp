@@ -104,6 +104,28 @@ s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModula
   return static_cast<s32>(std::lround((static_cast<double>(modulator.amount) * range->max) / 127.0));
 }
 
+bool shouldExportSynthGenerator(const SynthGenerator& generator, ModulationConversionPolicy conversion) noexcept {
+  if (conversion == ModulationConversionPolicy::SynthModulators) {
+    return true;
+  }
+
+  switch (generator.destination) {
+    case SynthDestination::VibratoDepth:
+    case SynthDestination::VibratoRate:
+    case SynthDestination::VibratoDelay:
+    case SynthDestination::TremoloDepth:
+    case SynthDestination::TremoloRate:
+      return false;
+    case SynthDestination::VolumeAttenuation:
+    case SynthDestination::Pitch:
+    case SynthDestination::FilterCutoff:
+    case SynthDestination::Pan:
+    case SynthDestination::Unknown:
+      return true;
+  }
+  return true;
+}
+
 bool shouldExportSynthModulator(const SynthModulator& modulator, ModulationConversionPolicy conversion) noexcept {
   if (conversion == ModulationConversionPolicy::SynthModulators) {
     return true;

@@ -10,6 +10,7 @@
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/SequenceCursorDialect.h"
 #include "value/sequence/SequenceMotion.h"
+#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -242,6 +243,38 @@ struct Context {
     return 60000000;
   }
   return static_cast<u32>(std::lround(kKonamiSnesPpqn * (125.0 * timerFrequency(version)) * 256.0 / tempo));
+}
+
+[[nodiscard]] double sequenceTickSeconds(KonamiSnesVersion version, u8 tempo) {
+  return static_cast<double>(tempoMicrosecondsPerQuarter(version, tempo)) /
+         (1'000'000.0 * static_cast<double>(kKonamiSnesPpqn));
+}
+
+[[nodiscard]] u32 vibratoDelayTicks(KonamiSnesVersion version, u8 delay, u8 tempo) {
+  const double tickSeconds = sequenceTickSeconds(version, tempo);
+  if (tickSeconds <= 0.0 || !std::isfinite(tickSeconds)) {
+    return 0;
+  }
+  const double ticks = vibrato::delaySeconds(version, delay, tempo) / tickSeconds;
+  if (ticks <= 0.0 || !std::isfinite(ticks)) {
+    return 0;
+  }
+  return static_cast<u32>(std::min<double>(std::lround(ticks), std::numeric_limits<u32>::max()));
+}
+
+[[nodiscard]] u8 vibratoDelayMidiValue(KonamiSnesVersion version, u8 delay, u8 tempo) {
+  const s32 minAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato::minDelaySeconds(version)));
+  const s32 rangeAmount = synthAmountFromSecondsRange(vibrato::minDelaySeconds(version),
+                                                      vibrato::maxDelaySeconds(version));
+  if (rangeAmount == 0) {
+    return 0;
+  }
+  const s32 currentAmount =
+      synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato::delaySeconds(version, delay, tempo)));
+  return static_cast<u8>(std::clamp<s32>(
+      static_cast<s32>(std::lround(128.0 * (currentAmount - minAmount) / static_cast<double>(rangeAmount))),
+      0,
+      127));
 }
 
 [[nodiscard]] double tuningSemitones(s8 tuning) {
@@ -497,6 +530,16 @@ struct TrackState {
     rt.modulation(ModulationPerformanceTarget::VibratoRate, std::clamp(amount, 0.0, 1.0));
   }
 
+  template <class Runtime>
+  void emitVibratoDelay(Runtime& rt) {
+    if (!vibrato::isActive(rt.context.version, vibrato.rate(), vibrato.depth())) {
+      rt.vibratoDelay(0, 0);
+      return;
+    }
+    rt.vibratoDelay(vibratoDelayTicks(rt.context.version, vibrato.delay(), tempo),
+                    vibratoDelayMidiValue(rt.context.version, vibrato.delay(), tempo));
+  }
+
   void tickAutomation(PerformanceEmitter& out, KonamiSnesVersion version) {
     static_cast<void>(tempoFade.tickRaw([&](s32 rawTempo) {
       tempo = static_cast<u8>(std::clamp<s32>(rawTempo, 0, 0xff));
@@ -523,6 +566,7 @@ struct TrackState {
           PerformanceEmitter& out;
           const Context& context;
           void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
+          void vibratoDelay(u32 delayTicks, u8 midiValue) { out.vibratoDelay(delayTicks, midiValue); }
         } rt{*this, out, Context{.version = version}};
         emitVibratoDepth(rt);
       }
@@ -820,6 +864,7 @@ struct KonamiSnesCursorReader {
         if (builtInFade != 0) {
           state.vibrato.setReusableFade(builtInFade);
         }
+        state.emitVibratoDelay(rt);
         state.emitVibratoDepth(rt, true);
         state.emitVibratoRate(rt);
         return cmd.next();
@@ -897,6 +942,7 @@ struct KonamiSnesCursorReader {
         rt.tempo(microseconds);
         if (vibrato::usesLegacy(rt.context.version)) {
           state.emitVibratoRate(rt);
+          state.emitVibratoDelay(rt);
         }
         return cmd.next();
       }

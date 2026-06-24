@@ -65,6 +65,7 @@ struct DecodeCursorRuntime {
   void globalTranspose(s32) {}
   void pitchBend(double) {}
   void pitchBendRange(u8) {}
+  void vibratoDelay(u32, u8) {}
   void portamento(double, double) {}
   void portamentoEnable(bool) {}
   void portamentoTime(double) {}
@@ -159,6 +160,7 @@ struct RenderCursorRuntime {
   void globalTranspose(s32 semitones) { out.globalTranspose(semitones); }
   void pitchBend(double semitones) { out.pitchBend(semitones); }
   void pitchBendRange(u8 semitones) { out.pitchBendRange(semitones); }
+  void vibratoDelay(u32 delayTicks, u8 midiValue) { out.vibratoDelay(delayTicks, midiValue); }
   void portamento(double timeMilliseconds, double previousKey) { out.portamento(timeMilliseconds, previousKey); }
   void portamentoEnable(bool enabled) { out.portamentoEnable(enabled); }
   void portamentoTime(double timeMilliseconds) { out.portamentoTime(timeMilliseconds); }

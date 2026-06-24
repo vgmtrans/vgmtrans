@@ -441,10 +441,14 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return kBaseInstrumentRegionGenerators + kEnvelopeInstrumentRegionGenerators;
 }
 
-[[nodiscard]] u32 instrumentGlobalGeneratorCount(const Instrument& instrument) {
-  return static_cast<u32>(std::ranges::count_if(instrument.generators, [](const SynthGenerator& generator) {
-    return sf2GeneratorForDestination(generator.destination).has_value();
-  }));
+[[nodiscard]] u32 instrumentGlobalGeneratorCount(
+    const Instrument& instrument,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
+  return static_cast<u32>(std::ranges::count_if(
+      instrument.generators, [modulationConversion](const SynthGenerator& generator) {
+        return shouldExportSynthGenerator(generator, modulationConversion) &&
+               sf2GeneratorForDestination(generator.destination).has_value();
+      }));
 }
 
 [[nodiscard]] u32 instrumentGlobalModulatorCount(
@@ -460,7 +464,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 [[nodiscard]] bool hasInstrumentGlobalZone(
     const Instrument& instrument,
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
-  return instrumentGlobalGeneratorCount(instrument) != 0 ||
+  return instrumentGlobalGeneratorCount(instrument, modulationConversion) != 0 ||
          instrumentGlobalModulatorCount(instrument, modulationConversion) != 0;
 }
 
@@ -618,7 +622,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
     if (hasInstrumentGlobalZone(*instrument.instrument, modulationConversion)) {
       writeLe16(payload, clampU16(generatorIndex));
       writeLe16(payload, clampU16(modulatorIndex));
-      generatorIndex += instrumentGlobalGeneratorCount(*instrument.instrument);
+      generatorIndex += instrumentGlobalGeneratorCount(*instrument.instrument, modulationConversion);
       modulatorIndex += instrumentGlobalModulatorCount(*instrument.instrument, modulationConversion);
     }
 
@@ -658,12 +662,16 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }
 
 [[nodiscard]] Chunk igenChunk(std::span<const ResolvedSynthInstrument> instruments,
-                              std::span<const DecodedSfSample> samplesByIndex) {
+                              std::span<const DecodedSfSample> samplesByIndex,
+                              ModulationConversionPolicy modulationConversion) {
   // Region generators are written in SF2's required order: ranges and placement first,
   // then envelope/tuning/sample linkage. Unsupported SynthGenerator destinations are skipped.
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
     for (const auto& generator : instrument.instrument->generators) {
+      if (!shouldExportSynthGenerator(generator, modulationConversion)) {
+        continue;
+      }
       const auto sf2Generator = sf2GeneratorForDestination(generator.destination);
       if (!sf2Generator) {
         continue;
@@ -774,7 +782,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
       instChunk(instruments, modulationConversion),
       ibagChunk(instruments, modulationConversion),
       imodChunk(instruments, midiModulationUsage, modulationScaling, modulationConversion),
-      igenChunk(instruments, samples),
+      igenChunk(instruments, samples, modulationConversion),
       shdrChunk(samples, instruments),
   };
 }

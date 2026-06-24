@@ -74,6 +74,8 @@ public:
   void pitchBend(double semitones);
   void pitchBendRange(PitchBendRangePerformanceEvent event);
   void pitchBendRange(u8 semitones);
+  void vibratoDelay(VibratoDelayPerformanceEvent event);
+  void vibratoDelay(u32 delayTicks, u8 midiValue);
   void portamento(PortamentoPerformanceEvent event);
   void portamento(double timeMilliseconds, double previousKey);
   void portamentoEnable(PortamentoEnablePerformanceEvent event);
