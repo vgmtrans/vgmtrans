@@ -59,6 +59,30 @@ void midiExporterKeeps14BitControllerPairsAdjacent() {
          "MIDI exporter should keep 14-bit volume MSB/LSB controllers adjacent before same-tick pan");
 }
 
+void midiExporterOrdersFineTuneBeforeSameTickProgramChange() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  FineTune{.tick = 0, .channel = 2, .cents = -46.875},
+                  BankSelect{.tick = 0, .channel = 2, .bank = 0, .writeLsb = false},
+                  ProgramChange{.tick = 0, .channel = 2, .program = 9},
+                  EndOfTrack{.tick = 0},
+              },
+      }},
+  };
+
+  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const std::vector<u8> expectedOrder{
+      0x00, 0xb2, 0x65, 0x00, 0x00, 0xb2, 0x64, 0x01, 0x00, 0xb2, 0x06, 0x22,
+      0x00, 0xb2, 0x26, 0x00, 0x00, 0xb2, 0x00, 0x00, 0x00, 0xc2, 0x09,
+  };
+
+  expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
+         "MIDI exporter should serialize fine tuning RPN before same-tick bank and program changes");
+}
+
 void midiExporterWritesTimeSignatureMetaEvent() {
   const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -732,11 +756,34 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
       "observed modulation scaling should not change explicit-source synth modulator amounts");
 }
 
+void observedModulationScalingUsesPreciseNormalizedAmounts() {
+  MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  VibratoDepth{.tick = 0, .channel = 0, .value = 1, .normalizedAmount = 0.006862745098},
+                  VibratoDepth{.tick = 12, .channel = 0, .value = 2, .normalizedAmount = 0.015686274510},
+              },
+      }},
+  };
+
+  const auto usage = analyzeMidiModulationUsage(midiSequence);
+  applyMidiModulationScaling(midiSequence, usage, ModulationScalingPolicy::ObservedSequenceRange);
+
+  const auto& events = midiSequence.tracks[0].events;
+  expect(std::get<VibratoDepth>(events[0]).value == 56,
+         "observed modulation scaling should use precise source amounts instead of rescaling rounded 7-bit values");
+  expect(std::get<VibratoDepth>(events[1]).value == 127,
+         "observed modulation scaling should expand the precise observed maximum to full controller range");
+}
+
 }  // namespace
 
 void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
   midiExporterKeeps14BitControllerPairsAdjacent();
+  midiExporterOrdersFineTuneBeforeSameTickProgramChange();
   midiExporterWritesTimeSignatureMetaEvent();
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   performanceMidiRendererTrustsSourceNoteExtensions();
@@ -750,4 +797,5 @@ void runValueMidiTests() {
   modulationAnalysisReportsObservedMidiControllerRanges();
   modulationAnalysisReportsObservedPerformanceRanges();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
+  observedModulationScalingUsesPreciseNormalizedAmounts();
 }

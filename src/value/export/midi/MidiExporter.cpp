@@ -217,11 +217,11 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
         } else if constexpr (std::is_same_v<TypedEvent, FineTune>) {
           const double semitones = std::clamp(typedEvent.cents / 100.0, -1.0, 1.0);
           const s32 value = std::min(static_cast<int>(std::lround(8192 * semitones)), 8191) + 8192;
-          addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 1, static_cast<u16>(value));
+          addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 1, static_cast<u16>(value), 8);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, CoarseTune>) {
           const s32 value = std::clamp<s32>((typedEvent.semitones + 64) << 7, 0, 16383);
-          addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 2, static_cast<u16>(value));
+          addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 2, static_cast<u16>(value), 8);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, PitchBend>) {
           const s32 value = std::clamp<s32>(typedEvent.value + 0x2000, 0, 0x3fff);

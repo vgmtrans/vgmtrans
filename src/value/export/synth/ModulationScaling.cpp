@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <type_traits>
 #include <variant>
 
@@ -66,6 +67,19 @@ u8 scaledMidiModulationControllerValue(u8 value, const ObservedValueRange* range
       std::clamp<s32>(static_cast<s32>(std::lround((static_cast<double>(value) * 127.0) / range->max)), 0, 127));
 }
 
+u8 scaledMidiModulationControllerValue(u8 value, std::optional<double> normalizedAmount,
+                                       const ObservedValueRange* range, ModulationScalingPolicy policy) noexcept {
+  if (!shouldScale(range, policy) || !normalizedAmount || range->normalizedMax <= 0.0) {
+    return scaledMidiModulationControllerValue(value, range, policy);
+  }
+
+  return static_cast<u8>(std::clamp<s32>(
+      static_cast<s32>(std::lround((std::clamp(*normalizedAmount, 0.0, range->normalizedMax) * 127.0) /
+                                   range->normalizedMax)),
+      0,
+      127));
+}
+
 void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsage& usage,
                                 ModulationScalingPolicy policy) {
   for (auto& track : sequence.tracks) {
@@ -74,13 +88,17 @@ void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsag
           [&](auto& typedEvent) {
             using TypedEvent = std::decay_t<decltype(typedEvent)>;
             if constexpr (std::is_same_v<TypedEvent, VibratoDepth>) {
-              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, &usage.vibratoDepth, policy);
+              typedEvent.value = scaledMidiModulationControllerValue(
+                  typedEvent.value, typedEvent.normalizedAmount, &usage.vibratoDepth, policy);
             } else if constexpr (std::is_same_v<TypedEvent, VibratoFrequency>) {
-              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, &usage.vibratoRate, policy);
+              typedEvent.value = scaledMidiModulationControllerValue(
+                  typedEvent.value, typedEvent.normalizedAmount, &usage.vibratoRate, policy);
             } else if constexpr (std::is_same_v<TypedEvent, TremoloDepth>) {
-              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, &usage.tremoloDepth, policy);
+              typedEvent.value = scaledMidiModulationControllerValue(
+                  typedEvent.value, typedEvent.normalizedAmount, &usage.tremoloDepth, policy);
             } else if constexpr (std::is_same_v<TypedEvent, TremoloFrequency>) {
-              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, &usage.tremoloRate, policy);
+              typedEvent.value = scaledMidiModulationControllerValue(
+                  typedEvent.value, typedEvent.normalizedAmount, &usage.tremoloRate, policy);
             }
           },
           event);

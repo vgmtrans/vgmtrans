@@ -8,6 +8,7 @@
 
 #include "value/model/MetadataModel.h"
 
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -143,12 +144,14 @@ struct VibratoDepth {
   u64 tick = 0;
   u8 channel = 0;
   u8 value = 0;
+  std::optional<double> normalizedAmount;
 };
 
 struct VibratoFrequency {
   u64 tick = 0;
   u8 channel = 0;
   u8 value = 0;
+  std::optional<double> normalizedAmount;
 };
 
 struct VibratoDelay {
@@ -161,12 +164,14 @@ struct TremoloDepth {
   u64 tick = 0;
   u8 channel = 0;
   u8 value = 0;
+  std::optional<double> normalizedAmount;
 };
 
 struct TremoloFrequency {
   u64 tick = 0;
   u8 channel = 0;
   u8 value = 0;
+  std::optional<double> normalizedAmount;
 };
 
 struct TremoloDelay {
