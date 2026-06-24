@@ -570,7 +570,7 @@ struct TrackState {
       amount = fullRangeCents <= 0.0 ? 0.0 : currentCents / fullRangeCents;
       const double maxCents = vibrato::maxDepthCents(rt.context.version, maxVibrato.maxDepth);
       rangeMaxAmount = fullRangeCents <= 0.0 ? 0.0 : maxCents / fullRangeCents;
-      depthSemitones = currentCents / 100.0;
+      depthSemitones = currentCents / 200.0;
     }
     amount = std::clamp(amount, 0.0, 1.0);
     if (force || std::abs(amount - lastVibratoDepthAmount) > 0.0001) {
@@ -871,7 +871,6 @@ struct KonamiSnesCursorReader {
       case EventType::PercussionOff:
         cmd.name("Percussion Off", SequenceSemantic::Program);
         if (state.percussion) {
-          state.applyEffectiveTuning(rt, true);
           rt.instrument(midiBank(state.instrument >> 7), state.instrument & 0x7f, true);
           state.percussion = false;
         }
@@ -921,7 +920,6 @@ struct KonamiSnesCursorReader {
         const u8 program = cmd.u8("program");
         state.instrument = program;
         cmd.derived("bank", program >> 7).derived("program_number", program & 0x7f).instrumentRef(program >> 7, program & 0x7f);
-        state.applyEffectiveTuning(rt, true);
         rt.instrument(midiBank(program >> 7), program & 0x7f, true);
         emitPan(rt, rt.context.version <= KONAMISNES_V2 ? 10 : 20);
         return cmd.next();
@@ -932,7 +930,6 @@ struct KonamiSnesCursorReader {
         const u8 volume = cmd.u8("volume");
         const u8 program = cmd.u8("program");
         state.instrument = program;
-        state.applyEffectiveTuning(rt, true);
         rt.instrument(midiBank(program >> 7), program & 0x7f, true);
         emitVolume(rt, volume);
         emitPan(rt, rt.context.version <= KONAMISNES_V2 ? 10 : 20);
