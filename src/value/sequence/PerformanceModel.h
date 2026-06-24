@@ -8,6 +8,7 @@
 
 #include "value/sequence/SequenceProgram.h"
 
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -171,6 +172,10 @@ struct ModulationPerformanceEvent {
   ModulationPerformanceTarget target = ModulationPerformanceTarget::VibratoDepth;
   // Normalized driver amount. MIDI and synth exporters decide how to quantize it.
   double amount = 0.0;
+  // Optional physical values used by sequence-event simulation when the source
+  // scanner can provide them. Generic controller export continues to use amount.
+  std::optional<double> pitchDepthSemitones;
+  std::optional<double> frequencyHz;
 };
 
 struct MarkerPerformanceEvent {

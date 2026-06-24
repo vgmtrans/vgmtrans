@@ -360,6 +360,62 @@ void performanceMidiRendererQuantizesPitchBendAndPortamento() {
          "MIDI renderer should quantize performance portamento milliseconds");
 }
 
+void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 8,
+          .events =
+              {
+                  TempoPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .microsecondsPerQuarter = 1'000'000,
+                  },
+                  VibratoDelayPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .delayTicks = 2,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .amount = 1.0,
+                      .frequencyHz = 25.0,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .amount = 0.5,
+                      .pitchDepthSemitones = 1.0,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(
+      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto& events = midiSequence.tracks[0].events;
+
+  bool hasPreDelayNonzero = false;
+  bool hasPositiveBend = false;
+  bool hasNegativeBend = false;
+  for (const MidiEvent& event : events) {
+    const auto* pitchBend = std::get_if<PitchBend>(&event);
+    if (pitchBend == nullptr) {
+      continue;
+    }
+    if (pitchBend->tick < 2 && pitchBend->value != 0) {
+      hasPreDelayNonzero = true;
+    }
+    hasPositiveBend = hasPositiveBend || pitchBend->value > 0;
+    hasNegativeBend = hasNegativeBend || pitchBend->value < 0;
+  }
+
+  expect(!hasPreDelayNonzero, "sequence-event vibrato simulation should stay silent before the delay expires");
+  expect(hasPositiveBend && hasNegativeBend, "sequence-event vibrato simulation should emit an LFO bend shape");
+}
+
 void exportRequestSequenceLoopsAffectMidiLowering() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -612,6 +668,7 @@ void runValueMidiTests() {
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererHonorsMidiExportOptions();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
+  performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape();
   exportRequestSequenceLoopsAffectMidiLowering();
   modulationAnalysisReportsObservedMidiControllerRanges();
   modulationAnalysisReportsObservedPerformanceRanges();

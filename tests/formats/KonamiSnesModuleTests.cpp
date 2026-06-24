@@ -64,11 +64,17 @@ bool hasMidiEvent(const MidiTrack& track) {
   return std::ranges::any_of(track.events, [](const MidiEvent& event) { return std::holds_alternative<Event>(event); });
 }
 
-template <class Event>
-bool hasMidiEventAt(const MidiTrack& track, u64 tick) {
+bool hasNonZeroPitchBendBefore(const MidiTrack& track, u64 tick) {
   return std::ranges::any_of(track.events, [tick](const MidiEvent& event) {
-    const auto* typedEvent = std::get_if<Event>(&event);
-    return typedEvent != nullptr && typedEvent->tick == tick;
+    const auto* pitchBend = std::get_if<PitchBend>(&event);
+    return pitchBend != nullptr && pitchBend->tick < tick && pitchBend->value != 0;
+  });
+}
+
+bool hasNonZeroPitchBendAtOrAfter(const MidiTrack& track, u64 tick) {
+  return std::ranges::any_of(track.events, [tick](const MidiEvent& event) {
+    const auto* pitchBend = std::get_if<PitchBend>(&event);
+    return pitchBend != nullptr && pitchBend->tick >= tick && pitchBend->value != 0;
   });
 }
 
@@ -242,8 +248,10 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              !hasMidiEvent<VibratoFrequency>(simulatedMidi.tracks[0]) &&
              !hasMidiEvent<VibratoDelay>(simulatedMidi.tracks[0]),
          "sequence-event modulation policy should suppress synth modulation controllers");
-  expect(hasMidiEventAt<PitchBend>(simulatedMidi.tracks[0], 2),
-         "sequence-event modulation policy should delay simulated vibrato pitch bend");
+  expect(!hasNonZeroPitchBendBefore(simulatedMidi.tracks[0], 2),
+         "sequence-event modulation policy should keep simulated vibrato silent before delay");
+  expect(hasNonZeroPitchBendAtOrAfter(simulatedMidi.tracks[0], 2),
+         "sequence-event modulation policy should emit nonzero vibrato pitch bend after delay");
 
   const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
   expect(instruments != nullptr, "second KonamiSnes asset should be an instrument set");

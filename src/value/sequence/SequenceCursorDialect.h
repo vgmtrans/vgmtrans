@@ -71,6 +71,7 @@ struct DecodeCursorRuntime {
   void portamentoTime(double) {}
   void portamentoControl(double) {}
   void legatoPedal(bool) {}
+  void modulation(ModulationPerformanceEvent) {}
   void modulation(ModulationPerformanceTarget, double) {}
   void marker(std::string_view) {}
   void diagnostic(Severity, std::string_view) {}
@@ -166,6 +167,7 @@ struct RenderCursorRuntime {
   void portamentoTime(double timeMilliseconds) { out.portamentoTime(timeMilliseconds); }
   void portamentoControl(double previousKey) { out.portamentoControl(previousKey); }
   void legatoPedal(bool enabled) { out.legatoPedal(enabled); }
+  void modulation(ModulationPerformanceEvent event) { out.modulation(std::move(event)); }
   void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
   void marker(std::string_view label) { out.marker(MarkerPerformanceEvent{.text = std::string(label)}); }
   void diagnostic(Severity severity, std::string_view message) {
