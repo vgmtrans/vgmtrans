@@ -48,6 +48,7 @@ struct ParsedSampleCollection {
   SampleCollection samples;
   std::string name;
   SourceRange range;
+  ArticulationTable table;
 };
 
 [[nodiscard]] s16 leS16(ByteReader reader, u32 offset) {
@@ -197,7 +198,10 @@ struct ParsedSampleCollection {
                                              u32 index, u32 spuDestAddress) {
   const AkaoProfile profile = akaoProfile(version);
   const u32 artOffset = table.artsOffset + index * table.artSize;
-  AkaoArt art{.artId = table.firstArtId + index};
+  AkaoArt art{
+      .artId = table.firstArtId + index,
+      .range = reader.range(artOffset, table.artSize),
+  };
   if (profile.hasCompactArtRows()) {
     const s16 rawFineTune = leS16(reader, artOffset + 8);
     const double multiplier =
@@ -340,6 +344,7 @@ struct ParsedSampleCollection {
       .samples = std::move(collection),
       .name = std::move(name),
       .range = range,
+      .table = table,
   };
 }
 
@@ -356,6 +361,33 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Sca
         .kind("psx-adpcm-sample")
         .owner(ObjectRefs::sample(ref.id, i))
         .parent(root);
+  }
+  const SourceRange artTableRange =
+      input.reader.range(parsed.table.artsOffset, parsed.table.artSize * parsed.table.artCount);
+  const SourceAnnotationId artTable =
+      result.sourceMap()
+          .table("Akao Articulation Table", artTableRange)
+          .kind("akao-articulation-table")
+          .parent(root)
+          .derived("first_art_id", parsed.table.firstArtId)
+          .derived("art_count", parsed.table.artCount)
+          .id();
+  for (const AkaoArt& art : parsed.parse.arts) {
+    auto annotation =
+        result.sourceMap()
+            .row(fmt::format("Articulation {}", art.artId), art.range)
+            .kind("akao-articulation")
+            .parent(artTable)
+            .derived("art_id", art.artId)
+            .derived("unity_key", art.unityKey, SourceValueDisplay::MidiNote)
+            .derived("fine_tune_cents", art.fineTuneCents, SourceValueDisplay::Cents)
+            .derived("sample_offset", art.sampleOffset, SourceValueDisplay::Address)
+            .derived("loop_point", art.loopPoint, SourceValueDisplay::Address)
+            .derived("adsr1", art.adsr1, SourceValueDisplay::Hex)
+            .derived("adsr2", art.adsr2, SourceValueDisplay::Hex);
+    if (art.sampleIndex < parsed.samples.samples.size()) {
+      annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(ref.id, art.sampleIndex)});
+    }
   }
 
   static_cast<void>(result.sampleCollection(ref, [&](AssetId id) {

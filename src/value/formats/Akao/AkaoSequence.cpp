@@ -6,6 +6,7 @@
 
 #include "value/formats/Akao/AkaoSequence.h"
 
+#include "value/formats/Akao/AkaoInstrumentSet.h"
 #include "value/formats/Akao/AkaoSequenceDecoder.h"
 #include "value/formats/Akao/AkaoVersion.h"
 
@@ -110,6 +111,7 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
     if (analysis.header.sampleSetId) {
       header.field("sample_set_id", input.reader.range(analysis.header.offset + 0x14, 2), *analysis.header.sampleSetId);
     }
+    annotateAkaoInstrumentStructures(input.reader, analysis, *sourceMap, headerAnnotation);
   }
 
   u32 trackIndex = 0;

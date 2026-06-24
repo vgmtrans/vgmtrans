@@ -59,6 +59,18 @@ bool hasLinkRole(const SourceAnnotation& annotation, SourceLinkRole role) {
   return std::ranges::any_of(annotation.links, [&](const SourceLink& link) { return link.role == role; });
 }
 
+const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
+                                           std::string_view localKind) {
+  const auto annotations = sourceMap.withRole(source, role);
+  for (const SourceAnnotationId id : annotations) {
+    const SourceAnnotation& annotation = sourceMap.get(id);
+    if (annotation.localKind == localKind) {
+      return &annotation;
+    }
+  }
+  return nullptr;
+}
+
 TrackProgram decodeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end,
                                 SourceMapBuilder* sourceMap = nullptr, SourceId source = SourceId{20}) {
   const SequenceDialect dialect = makeAkaoDialect(version);
@@ -558,8 +570,36 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
          "Akao sequence header annotation should point at the semantic sequence asset");
   const auto trackAnnotations = project.sourceMap().childrenOf(sequenceHeader.id);
   expect(!trackAnnotations.empty(), "Akao sequence header should parent decoded track annotations");
-  expect(project.sourceMap().get(trackAnnotations.front()).owner == ObjectRefs::sequenceTrack(sequenceId, 0),
+  const auto trackAnnotation = std::ranges::find_if(trackAnnotations, [&](SourceAnnotationId id) {
+    return project.sourceMap().get(id).owner == ObjectRefs::sequenceTrack(sequenceId, 0);
+  });
+  expect(trackAnnotation != trackAnnotations.end(),
          "Akao track annotation should point at the semantic sequence track");
+  const auto* instrumentLayout =
+      annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::InstrumentSet, "akao-instrument-layout");
+  expect(instrumentLayout != nullptr && instrumentLayout->range.offset == melodicRegionOffset &&
+             instrumentLayout->range.size == 8,
+         "Akao scan should annotate fixed instrument layout bytes discovered from the sequence");
+  const auto* instrument =
+      annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Instrument, "akao-instrument");
+  expect(instrument != nullptr && instrument->range.offset == melodicRegionOffset && instrument->range.size == 8,
+         "Akao scan should annotate parsed instrument rows without waiting for materialization");
+  const auto* region = annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Region, "akao-region");
+  expect(region != nullptr && region->range.offset == melodicRegionOffset && region->range.size == 8,
+         "Akao scan should annotate parsed region rows");
+  expect(fieldEquals(fieldWithName(*region, "art_id"), u64{5}), "Akao region annotation should expose the art id");
+  const auto* artTable =
+      annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Table, "akao-articulation-table");
+  expect(artTable != nullptr && artTable->range.offset == artOffset && artTable->range.size == 0x10,
+         "Akao sample scan should annotate the articulation table");
+  const auto* artRow =
+      annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::TableRow, "akao-articulation");
+  expect(artRow != nullptr && artRow->range.offset == artOffset && artRow->range.size == 0x10,
+         "Akao sample scan should annotate articulation rows");
+  expect(fieldEquals(fieldWithName(*artRow, "art_id"), u64{5}),
+         "Akao articulation annotation should expose the art id");
+  expect(hasLinkRole(*artRow, SourceLinkRole::UsesSample),
+         "Akao articulation annotation should link to the sample it resolves to");
 
   const auto* materialized = project.asset<InstrumentSetAsset>(collection.instrumentSets.front());
   expect(materialized != nullptr, "Akao materialized instrument set should be present");
