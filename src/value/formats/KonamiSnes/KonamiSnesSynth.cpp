@@ -351,10 +351,10 @@ SampleCollectionAsset parseKonamiSnesSamples(const ScanInput& input, AssetId sam
   collection.samples.reserve(sampleInfos.size());
   for (u32 sampleIndex = 0; sampleIndex < sampleInfos.size(); ++sampleIndex) {
     const auto& info = sampleInfos[sampleIndex];
-    const u32 loopStart = info.loopAddress >= info.startAddress ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
     const u32 decodedLength = (info.encodedLength / 9) * 16;
     const u32 lastBlockAddress = info.encodedLength >= 9 ? info.startAddress + info.encodedLength - 9 : info.startAddress;
     const bool loopEnabled = info.loops && info.loopAddress >= info.startAddress && info.loopAddress <= lastBlockAddress;
+    const u32 loopStart = loopEnabled ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
     collection.samples.push_back(Sample{
         .name = fmt::format("Sample {}", static_cast<unsigned>(info.srcn)),
         .codec = AudioCodec::SnesBrr,

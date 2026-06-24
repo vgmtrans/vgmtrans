@@ -20,8 +20,10 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -384,6 +386,287 @@ struct ModulationRanges {
   u16 maxRateFactor = 0;
 };
 
+struct LegacyRangeVisitState {
+  u32 commandIndex = 0;
+  std::vector<u32> callStack;
+  u8 loopCount = 0;
+  u8 loopCount2 = 0;
+
+  friend bool operator<(const LegacyRangeVisitState& lhs, const LegacyRangeVisitState& rhs) {
+    return std::tie(lhs.commandIndex, lhs.callStack, lhs.loopCount, lhs.loopCount2) <
+           std::tie(rhs.commandIndex, rhs.callStack, rhs.loopCount, rhs.loopCount2);
+  }
+};
+
+struct LegacyRangeTrackState {
+  const TrackProgram* track = nullptr;
+  u32 trackOrder = 0;
+  std::optional<u32> commandIndex;
+  u64 tick = 0;
+  u8 noteLength = 0;
+  u8 activeRate = 0;
+  u8 activeDepth = 0;
+  std::optional<Address> loopReturnAddress;
+  std::optional<Address> loopReturnAddress2;
+  u8 loopCount = 0;
+  u8 loopCount2 = 0;
+  std::vector<u32> callStack;
+  std::set<LegacyRangeVisitState> visited;
+
+  [[nodiscard]] bool active() const noexcept { return track != nullptr && commandIndex.has_value(); }
+  [[nodiscard]] bool activeVibrato(KonamiSnesVersion version) const noexcept {
+    return vibrato::isActive(version, activeRate, activeDepth);
+  }
+};
+
+[[nodiscard]] std::optional<u32> nextCommandIndex(const TrackProgram& track, u32 index) {
+  if (index < track.commands.size()) {
+    const SourceCommand& command = track.commands[index];
+    if (command.encodedSize > 0) {
+      if (command.address.value > std::numeric_limits<u64>::max() - command.encodedSize) {
+        return std::nullopt;
+      }
+      if (const auto byAddress = track.addressIndex.find(Address{command.address.value + command.encodedSize})) {
+        return byAddress;
+      }
+    }
+  }
+
+  const u32 next = index + 1;
+  if (next >= track.commands.size()) {
+    return std::nullopt;
+  }
+  return next;
+}
+
+[[nodiscard]] std::optional<u32> commandIndexForAddress(const TrackProgram& track, Address address) {
+  return track.addressIndex.find(address);
+}
+
+void updateLegacyVibratoRateRange(ModulationRanges& ranges, const LegacyRangeTrackState& state,
+                                  KonamiSnesVersion version, u8 tempo) {
+  if (!state.activeVibrato(version)) {
+    return;
+  }
+  ranges.maxRateFactor = std::max(ranges.maxRateFactor, vibrato::rateFactor(version, state.activeRate, tempo));
+}
+
+[[nodiscard]] u32 legacyRangeNoteWait(std::span<const u8> bytes, LegacyRangeTrackState& state) {
+  if (bytes.empty()) {
+    return 0;
+  }
+
+  size_t cursor = 1;
+  if ((bytes[0] & 0x80) == 0 && cursor < bytes.size()) {
+    state.noteLength = bytes[cursor++];
+  }
+  return state.noteLength;
+}
+
+void advanceLegacyRangeTrack(LegacyRangeTrackState& state, std::optional<u32> nextIndex, u32 advanceTicks) {
+  state.commandIndex = nextIndex;
+  state.tick += advanceTicks;
+}
+
+[[nodiscard]] ModulationRanges analyzeLegacyVibratoRanges(const SequenceProgram& program, KonamiSnesVersion version) {
+  ModulationRanges ranges{
+      .maxDepth = kMinVibratoMaxDepth,
+      .maxRateFactor = vibrato::minMaxRateFactor(version),
+  };
+
+  std::vector<LegacyRangeTrackState> tracks;
+  tracks.reserve(program.tracks.size());
+  for (u32 trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
+    const auto& track = program.tracks[trackIndex];
+    tracks.push_back(LegacyRangeTrackState{
+        .track = &track,
+        .trackOrder = trackIndex,
+        .commandIndex = commandIndexForAddress(track, track.startAddress).value_or(0),
+    });
+    if (track.commands.empty()) {
+      tracks.back().commandIndex = std::nullopt;
+    }
+  }
+
+  u8 globalTempo = kKonamiSnesDefaultTempo;
+  u32 commandCount = 0;
+  constexpr u32 kMaxRangeAnalysisCommands = 100000;
+  while (commandCount++ < kMaxRangeAnalysisCommands) {
+    auto current =
+        std::ranges::min_element(tracks, [](const LegacyRangeTrackState& lhs, const LegacyRangeTrackState& rhs) {
+          if (!lhs.active()) {
+            return false;
+          }
+          if (!rhs.active()) {
+            return true;
+          }
+          return std::tie(lhs.tick, lhs.trackOrder) < std::tie(rhs.tick, rhs.trackOrder);
+        });
+    if (current == tracks.end() || !current->active()) {
+      break;
+    }
+
+    const auto& track = *current->track;
+    const u32 commandIndex = *current->commandIndex;
+    if (commandIndex >= track.commands.size()) {
+      current->commandIndex = std::nullopt;
+      continue;
+    }
+
+    const LegacyRangeVisitState visit{
+        .commandIndex = commandIndex,
+        .callStack = current->callStack,
+        .loopCount = current->loopCount,
+        .loopCount2 = current->loopCount2,
+    };
+    if (!current->visited.insert(visit).second) {
+      current->commandIndex = std::nullopt;
+      continue;
+    }
+
+    const SourceCommand& command = track.commands[commandIndex];
+    const auto bytes = track.bytesFor(command);
+    if (bytes.empty()) {
+      advanceLegacyRangeTrack(*current, nextCommandIndex(track, commandIndex), 0);
+      continue;
+    }
+
+    const EventType type = eventType(version, bytes[0]);
+    const auto next = nextCommandIndex(track, commandIndex);
+    switch (type) {
+      case EventType::Note:
+        advanceLegacyRangeTrack(*current, next, legacyRangeNoteWait(bytes, *current));
+        break;
+
+      case EventType::Rest:
+      case EventType::Tie:
+        if (bytes.size() >= 2) {
+          current->noteLength = bytes[1];
+          advanceLegacyRangeTrack(*current, next, bytes[1]);
+        } else {
+          advanceLegacyRangeTrack(*current, next, 0);
+        }
+        break;
+
+      case EventType::Tempo:
+        if (bytes.size() >= 2) {
+          globalTempo = bytes[1];
+          for (const auto& trackState : tracks) {
+            updateLegacyVibratoRateRange(ranges, trackState, version, globalTempo);
+          }
+        }
+        advanceLegacyRangeTrack(*current, next, 0);
+        break;
+
+      case EventType::Vibrato:
+        if (bytes.size() >= 4) {
+          current->activeRate = bytes[2];
+          current->activeDepth = bytes[3];
+          if (current->activeVibrato(version)) {
+            ranges.maxDepth = std::max(ranges.maxDepth, current->activeDepth);
+            updateLegacyVibratoRateRange(ranges, *current, version, globalTempo);
+          }
+        }
+        advanceLegacyRangeTrack(*current, next, 0);
+        break;
+
+      case EventType::LoopStart:
+        if (command.address.value <= std::numeric_limits<u64>::max() - command.encodedSize) {
+          current->loopReturnAddress = Address{command.address.value + command.encodedSize};
+        }
+        advanceLegacyRangeTrack(*current, next, 0);
+        break;
+
+      case EventType::LoopEnd:
+        if (bytes.size() >= 2 && current->loopReturnAddress) {
+          const u8 times = bytes[1];
+          if (times == 0) {
+            current->commandIndex = std::nullopt;
+          } else {
+            ++current->loopCount;
+            if (current->loopCount != times) {
+              current->commandIndex = commandIndexForAddress(track, *current->loopReturnAddress);
+            } else {
+              current->loopCount = 0;
+              advanceLegacyRangeTrack(*current, next, 0);
+            }
+          }
+        } else {
+          advanceLegacyRangeTrack(*current, next, 0);
+        }
+        break;
+
+      case EventType::LoopStart2:
+        if (command.address.value <= std::numeric_limits<u64>::max() - command.encodedSize) {
+          current->loopReturnAddress2 = Address{command.address.value + command.encodedSize};
+        }
+        advanceLegacyRangeTrack(*current, next, 0);
+        break;
+
+      case EventType::LoopEnd2:
+        if (bytes.size() >= 2 && current->loopReturnAddress2) {
+          const u8 times = bytes[1];
+          if (times == 0) {
+            current->commandIndex = std::nullopt;
+          } else {
+            ++current->loopCount2;
+            if (current->loopCount2 != times) {
+              current->commandIndex = commandIndexForAddress(track, *current->loopReturnAddress2);
+            } else {
+              current->loopCount2 = 0;
+              advanceLegacyRangeTrack(*current, next, 0);
+            }
+          }
+        } else {
+          advanceLegacyRangeTrack(*current, next, 0);
+        }
+        break;
+
+      case EventType::ConditionalJumpV1:
+        if (bytes.size() >= 3) {
+          current->commandIndex = commandIndexForAddress(track, Address{static_cast<u64>(bytes[1] | (bytes[2] << 8))});
+        } else {
+          current->commandIndex = std::nullopt;
+        }
+        break;
+
+      case EventType::Goto:
+        if (bytes.size() >= 3) {
+          current->commandIndex = commandIndexForAddress(track, Address{static_cast<u64>(bytes[1] | (bytes[2] << 8))});
+        } else {
+          current->commandIndex = std::nullopt;
+        }
+        break;
+
+      case EventType::Call:
+        if (bytes.size() >= 3) {
+          if (next) {
+            current->callStack.push_back(*next);
+          }
+          current->commandIndex = commandIndexForAddress(track, Address{static_cast<u64>(bytes[1] | (bytes[2] << 8))});
+        } else {
+          current->commandIndex = std::nullopt;
+        }
+        break;
+
+      case EventType::End:
+        if (!current->callStack.empty()) {
+          current->commandIndex = current->callStack.back();
+          current->callStack.pop_back();
+        } else {
+          current->commandIndex = std::nullopt;
+        }
+        break;
+
+      default:
+        advanceLegacyRangeTrack(*current, next, 0);
+        break;
+    }
+  }
+
+  return ranges;
+}
+
 struct TrackState {
   TrackState() = default;
   TrackState(const SequenceProgram& program, const TrackProgram&, const Context& context)
@@ -418,13 +701,16 @@ struct TrackState {
   }
 
   static ModulationRanges analyzeVibratoRanges(const SequenceProgram& program, KonamiSnesVersion version) {
+    if (vibrato::usesLegacy(version)) {
+      return analyzeLegacyVibratoRanges(program, version);
+    }
+
     ModulationRanges ranges{
         .maxDepth = kMinVibratoMaxDepth,
         .maxRateFactor = vibrato::minMaxRateFactor(version),
     };
-    u8 sharedTempo = kKonamiSnesDefaultTempo;
     for (const auto& track : program.tracks) {
-      u8 tempo = vibrato::usesLegacy(version) ? sharedTempo : kKonamiSnesDefaultTempo;
+      u8 tempo = kKonamiSnesDefaultTempo;
       u8 activeRate = 0;
       u8 activeDepth = 0;
       for (const auto& command : track.commands) {
@@ -436,9 +722,6 @@ struct TrackState {
         const EventType type = eventType(version, opcode);
         if (type == EventType::Tempo && bytes.size() >= 2) {
           tempo = bytes[1];
-          if (vibrato::usesLegacy(version)) {
-            sharedTempo = tempo;
-          }
           if (vibrato::isActive(version, activeRate, activeDepth)) {
             ranges.maxRateFactor =
                 std::max(ranges.maxRateFactor, vibrato::rateFactor(version, activeRate, tempo));
