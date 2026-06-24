@@ -85,7 +85,7 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
           .timebase = Timebase{.ppqn = 48},
           .context = CursorProbeContext{.velocity = 0.25},
       });
-  expect(dialect.handlers.size() == 1, "cursor dialect should register one generic handler");
+  expect(dialect.execute != nullptr, "cursor dialect should register one generic executor");
 
   const std::vector<u8> bytes{0x70, 2, 0x90, 60, 12, 0xff};
   const ByteReader reader(SourceId{0}, bytes);
@@ -173,6 +173,9 @@ void cursorDialectReportsWarningsOnFinalCommandRange() {
          "cursor warnings should use the final decoded command range");
   expect(diagnostics[0].annotation && *diagnostics[0].annotation == track.commands[0].annotation,
          "cursor warnings should attach to the decoded source annotation");
+  const SourceMap annotations = sourceMap.finish();
+  expect(annotations.get(track.commands[0].annotation).playbackStatus == CommandPlaybackStatus::Unsupported,
+         "unsupported cursor command should persist unsupported playback status");
 }
 
 void cursorFlowHelpersInferMetadata() {
@@ -215,6 +218,8 @@ void cursorPreserveRecordsMetadataAndBytes() {
              metadata.semantic == SequenceSemantic::Meta &&
              metadata.playbackStatus == CommandPlaybackStatus::SourceOnly,
          "preserved cursor command should use source-only meta metadata");
+  expect(annotation.playbackStatus == CommandPlaybackStatus::SourceOnly,
+         "preserved cursor command should persist source-only playback status");
   const auto bytesField = std::ranges::find_if(
       annotation.fields, [](const SourceField& field) { return field.name == "bytes"; });
   expect(bytesField != annotation.fields.end() && std::get<std::string>(bytesField->value) == "12 34",
@@ -275,7 +280,7 @@ void cursorDialectSuppressesMalformedRenderEvents() {
   };
   TrackProgramBuilder builder{track};
   const std::array<u8, 2> bytes{0x91, 60};
-  builder.addDecoded(dialect.handlers[0].id, Address{0}, probeRange(0, bytes.size()), bytes);
+  builder.addDecoded(Address{0}, probeRange(0, bytes.size()), bytes);
 
   SequenceProgram program{
       .dialect = dialect.id,
@@ -323,7 +328,7 @@ void sequenceDialectRegistryStoresCopyableDialectValues() {
   const SequenceDialectRegistry copy = registry;
   const auto* dialect = copy.find("probe");
   expect(dialect != nullptr, "sequence dialect registry should copy registered dialect values");
-  expect(!dialect->handlers.empty(), "sequence dialect registry should preserve copied command handlers");
+  expect(dialect->execute != nullptr, "sequence dialect registry should preserve copied command executor");
   expect(copy.find("Missing") == nullptr, "sequence dialect registry should return null for a missing dialect");
   expect(copy.contains("probe"), "sequence dialect registry should report copied dialect keys");
 

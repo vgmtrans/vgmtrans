@@ -762,6 +762,8 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   const SourceField* gain = fieldWithName(commandAnnotation(annotations, track.commands[5]), "gain");
   expect(fieldEquals(gain, s64{165}),
          "CapcomSnes release command should keep the driver GAIN display value in source annotations");
+  expect(commandAnnotation(annotations, track.commands[6]).playbackStatus == CommandPlaybackStatus::NoOp,
+         "CapcomSnes no-op command should persist no-op playback status");
 
   const SequenceProgram program{
       .dialect = dialect.id,

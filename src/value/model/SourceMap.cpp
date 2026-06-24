@@ -73,10 +73,6 @@ ObjectRef ObjectRefs::sequenceTrack(AssetId sequenceAsset, u32 trackIndex) {
   return ObjectRef{.kind = ObjectKind::SequenceTrack, .asset = sequenceAsset, .index0 = trackIndex};
 }
 
-ObjectRef ObjectRefs::sequenceCommand(AssetId sequenceAsset, u32 commandIndex) {
-  return ObjectRef{.kind = ObjectKind::SequenceCommand, .asset = sequenceAsset, .index0 = commandIndex};
-}
-
 ObjectRef ObjectRefs::instrument(AssetId instrumentSetAsset, u32 instrumentIndex) {
   return ObjectRef{.kind = ObjectKind::Instrument, .asset = instrumentSetAsset, .index0 = instrumentIndex};
 }
@@ -272,6 +268,13 @@ AnnotationBuilder& AnnotationBuilder::outline(SourceOutlinePolicy policy) {
 AnnotationBuilder& AnnotationBuilder::sequenceSemantic(SequenceSemantic semantic) {
   if (auto* found = map_->annotation(id_)) {
     found->sequenceSemantic = semantic;
+  }
+  return *this;
+}
+
+AnnotationBuilder& AnnotationBuilder::playbackStatus(CommandPlaybackStatus status) {
+  if (auto* found = map_->annotation(id_)) {
+    found->playbackStatus = status;
   }
   return *this;
 }

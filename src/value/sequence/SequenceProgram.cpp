@@ -68,8 +68,8 @@ const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) 
 TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
 }
 
-const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, Address address, SourceRange range,
-                                                     std::span<const u8> bytes, SourceAnnotationId annotation) {
+const SourceCommand& TrackProgramBuilder::addDecoded(Address address, SourceRange range, std::span<const u8> bytes,
+                                                     SourceAnnotationId annotation) {
   if (bytes.empty()) {
     throw std::invalid_argument("Sequence source commands must include an opcode byte");
   }
@@ -83,7 +83,6 @@ const SourceCommand& TrackProgramBuilder::addDecoded(CommandHandlerId handler, A
 
   track_.commands.push_back(SourceCommand{
       .id = CommandId{commandIndex},
-      .handler = handler,
       .opcode = bytes.front(),
       .address = address,
       .encodedSize = static_cast<u32>(bytes.size()),

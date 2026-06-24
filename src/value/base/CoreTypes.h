@@ -47,14 +47,10 @@ using TrackId = Id<TrackIdTag>;
 struct CommandIdTag;
 using CommandId = Id<CommandIdTag>;
 
-struct CommandHandlerIdTag;
-using CommandHandlerId = Id<CommandHandlerIdTag>;
-
 enum class ObjectKind : u8 {
   Asset,
   Sequence,
   SequenceTrack,
-  SequenceCommand,
   Instrument,
   Sample,
   Misc,

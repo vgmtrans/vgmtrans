@@ -840,8 +840,8 @@ template <class Command, size_t Size>
 const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, Address address,
                                      SourceRange range, const std::array<u8, Size>& bytes) {
   static_cast<void>(Command::kind);
-  const auto handler = cursorDialectHandlerId<ProbeTrackState, ProbeSequenceContext, ProbeCursorReader>(dialect);
-  return builder.addDecoded(handler, address, range, std::span<const u8>{bytes});
+  static_cast<void>(dialect);
+  return builder.addDecoded(address, range, std::span<const u8>{bytes});
 }
 
 [[nodiscard]] size_t countProbeNotesAt(const PerformanceTrack& track, u64 tick) {

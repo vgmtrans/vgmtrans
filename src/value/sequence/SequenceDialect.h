@@ -11,15 +11,10 @@
 
 #include <any>
 #include <concepts>
-#include <optional>
-#include <span>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
-#include <variant>
-#include <vector>
 
 namespace vgmtrans::core {
 
@@ -72,20 +67,6 @@ struct Effects {
 using ExecuteSourceCommand = Effects (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
                                          PerformanceEmitter& out, VmApi& vm, const std::any& context);
 using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&, const std::any& context);
-using CommandTypeToken = const void*;
-
-namespace detail {
-
-template <class Command>
-[[nodiscard]] CommandTypeToken commandTypeToken();
-
-}  // namespace detail
-
-struct CommandHandler {
-  CommandHandlerId id;
-  CommandTypeToken typeToken = nullptr;
-  ExecuteSourceCommand execute = nullptr;
-};
 
 struct SequenceDialect {
   DialectId id;
@@ -93,11 +74,8 @@ struct SequenceDialect {
   Timebase timebase;
   SequenceProgramBehavior defaultBehavior;
   CreateTrackState createTrackState = nullptr;
-  std::vector<CommandHandler> handlers;
+  ExecuteSourceCommand execute = nullptr;
   std::any context;
-
-  [[nodiscard]] const CommandHandler* handler(CommandHandlerId id) const;
-  [[nodiscard]] const CommandHandler* handlerForType(CommandTypeToken typeToken) const;
 };
 
 class SequenceDialectRegistry {
@@ -114,12 +92,6 @@ private:
 };
 
 namespace detail {
-
-template <class Command>
-[[nodiscard]] CommandTypeToken commandTypeToken() {
-  static const int token = 0;
-  return &token;
-}
 
 template <class TrackState, class Context>
 std::any createTrackState(const SequenceProgram& program, const TrackProgram& track, const std::any& context) {

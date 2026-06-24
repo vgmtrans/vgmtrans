@@ -162,6 +162,8 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS track annotation should be parented under the SSEQ header");
   expect(trackAnnotation.owner == ObjectRefs::sequenceTrack(asset.metadata.id, 0),
          "NDS track annotation should point at the semantic sequence track");
+  expect(trackAnnotation.range.offset == trackStart && trackAnnotation.range.size == 4,
+         "NDS track annotation should span decoded command bytes");
   const auto programAnnotationIds = programAnnotations.withSequenceSemantic(SourceId{4}, SequenceSemantic::Program);
   expect(programAnnotationIds.size() == 1, "NDS program command should publish one program annotation");
   const auto& programAnnotation = programAnnotations.get(programAnnotationIds[0]);
@@ -422,8 +424,9 @@ void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {
   expect(track.commands.size() == 1, "NDS unterminated variable-length command should decode as one command");
   expect(commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS unterminated variable-length command should use the truncated-command fallback");
-  expect(track.bytesFor(track.commands[0]).size() == 1 && track.bytesFor(track.commands[0])[0] == 0x80,
-         "NDS truncated command should preserve only the opcode byte");
+  expect(track.bytesFor(track.commands[0]).size() == 2 && track.bytesFor(track.commands[0])[0] == 0x80 &&
+             track.bytesFor(track.commands[0])[1] == 0x81,
+         "NDS truncated command should preserve available partial command bytes");
 }
 
 void ndsSequenceDialectLinksInvalidControlTargets() {
