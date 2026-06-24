@@ -673,6 +673,71 @@ void scanCommitRejectsRangeLessSourceAnnotations() {
          "scan commit should reject source annotations without primary ranges");
 }
 
+void scanCommitRejectsDanglingSourceAnnotationReferences() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "dangling-annotation-ref.probe"}, {0xaa});
+  const SourceRange range = sources.reader(source).range(0, 1);
+
+  const auto validate = [&](ScanResult result) {
+    const ScanCommit commit = ScanCommit::fromScanResult(sources.source(source), std::move(result));
+    std::string message;
+    try {
+      AssetStore assets;
+      commit.validate(sources, assets);
+    } catch (const std::invalid_argument& ex) {
+      message = ex.what();
+    }
+    return message;
+  };
+
+  expect(validate(ScanResult{
+             .sourceMap = SourceMap{{
+                 SourceAnnotation{
+                     .id = SourceAnnotationId{0},
+                     .range = range,
+                     .role = SourceRole::Header,
+                     .label = "Child",
+                     .parent = SourceAnnotationId{99},
+                 },
+             }},
+         }) == "Scan result contained source annotation with missing parent annotation id 99",
+         "scan commit should reject source annotations with dangling parents");
+
+  expect(validate(ScanResult{
+             .sourceMap = SourceMap{{
+                 SourceAnnotation{
+                     .id = SourceAnnotationId{0},
+                     .range = range,
+                     .role = SourceRole::Header,
+                     .label = "Link",
+                     .links = {SourceLink{
+                         .role = SourceLinkRole::Related,
+                         .target = SourceTarget{SourceAnnotationId{99}},
+                     }},
+                 },
+             }},
+         }) == "Scan result contained source annotation link to missing annotation id 99",
+         "scan commit should reject source annotation links with dangling annotation targets");
+
+  expect(validate(ScanResult{
+             .sourceMap = SourceMap{{
+                 SourceAnnotation{
+                     .id = SourceAnnotationId{0},
+                     .range = range,
+                     .role = SourceRole::Header,
+                     .label = "Header",
+                 },
+             }},
+             .diagnostics = {Diagnostic{
+                 .severity = Severity::Warning,
+                 .message = "dangling diagnostic",
+                 .range = range,
+                 .annotation = SourceAnnotationId{99},
+             }},
+         }) == "Scan result contained diagnostic for missing source annotation id 99",
+         "scan commit should reject diagnostics with dangling annotation anchors");
+}
+
 void snapshotValidationReportsWrongTypeCollectionReferences() {
   SessionSnapshotBuilder builder;
   builder.assets.push_back(SequenceProgramAsset{
@@ -1060,6 +1125,7 @@ void runValueSessionTests() {
   scanValidationReportsMultipleAdmissionErrors();
   scanCommitRejectsOutOfBoundsScanResultRanges();
   scanCommitRejectsRangeLessSourceAnnotations();
+  scanCommitRejectsDanglingSourceAnnotationReferences();
   snapshotValidationReportsWrongTypeCollectionReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionReportsDesiredCollectionWrongTypeReferences();

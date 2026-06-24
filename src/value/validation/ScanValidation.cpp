@@ -91,6 +91,55 @@ void validateSourceMapRanges(ValidationReport& report, const SourceStore& source
   }
 }
 
+[[nodiscard]] std::unordered_set<u32> sourceAnnotationIds(const SourceMap& sourceMap) {
+  std::unordered_set<u32> ids;
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (annotation.id.valid()) {
+      ids.insert(annotation.id.value);
+    }
+  }
+  return ids;
+}
+
+[[nodiscard]] bool containsAnnotationId(const std::unordered_set<u32>& ids, SourceAnnotationId id) {
+  return id.valid() && ids.contains(id.value);
+}
+
+void validateSourceMapReferences(ValidationReport& report, const SourceMap& sourceMap) {
+  const auto annotationIds = sourceAnnotationIds(sourceMap);
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (annotation.parent && !containsAnnotationId(annotationIds, *annotation.parent)) {
+      report.error("scan.source-annotation.unknown-parent",
+                   "Scan result contained source annotation with missing parent annotation id " +
+                       std::to_string(annotation.parent->value),
+                   annotation.range);
+    }
+
+    for (const auto& link : annotation.links) {
+      if (const auto* target = std::get_if<SourceAnnotationId>(&link.target);
+          target != nullptr && !containsAnnotationId(annotationIds, *target)) {
+        report.error(
+            "scan.source-annotation.unknown-target",
+            "Scan result contained source annotation link to missing annotation id " + std::to_string(target->value),
+            annotation.range);
+      }
+    }
+  }
+}
+
+void validateDiagnosticAnnotationReferences(ValidationReport& report, const std::vector<Diagnostic>& diagnostics,
+                                            const SourceMap& sourceMap) {
+  const auto annotationIds = sourceAnnotationIds(sourceMap);
+  for (const auto& diagnostic : diagnostics) {
+    if (diagnostic.annotation && !containsAnnotationId(annotationIds, *diagnostic.annotation)) {
+      report.error("scan.diagnostic.unknown-annotation",
+                   "Scan result contained diagnostic for missing source annotation id " +
+                       std::to_string(diagnostic.annotation->value),
+                   diagnostic.range);
+    }
+  }
+}
+
 void validateAsset(ValidationReport& report, const SourceStore& sources, const Asset& asset) {
   const auto& meta = metadata(asset);
   validateRange(report, sources, meta.range, "asset metadata");
@@ -192,6 +241,8 @@ ValidationReport validateScanCommit(const ScanCommit& commit, const SourceStore&
 
   validateExtractedSources(report, commit, sources);
   validateSourceMapRanges(report, sources, commit.sourceMap);
+  validateSourceMapReferences(report, commit.sourceMap);
+  validateDiagnosticAnnotationReferences(report, commit.diagnostics, commit.sourceMap);
 
   std::unordered_set<u32> batchAssetIds;
   validateAssetIds(report, commit, existingAssets, batchAssetIds);
