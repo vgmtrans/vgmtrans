@@ -74,7 +74,12 @@ void validateSampleCollectionRanges(ValidationReport& report, const SourceStore&
 
 void validateSourceMapRanges(ValidationReport& report, const SourceStore& sources, const SourceMap& sourceMap) {
   for (const auto& annotation : sourceMap.annotations()) {
-    validateRange(report, sources, annotation.range, "source annotation");
+    if (!annotation.range.valid()) {
+      report.error("scan.source-annotation.missing-range",
+                   "Scan result contained source annotation without a primary source range");
+    } else {
+      validateRange(report, sources, annotation.range, "source annotation");
+    }
     for (const auto& field : annotation.fields) {
       validateRange(report, sources, field.range, "source annotation field");
     }

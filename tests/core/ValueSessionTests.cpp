@@ -644,6 +644,35 @@ void scanCommitRejectsOutOfBoundsScanResultRanges() {
   }
 }
 
+void scanCommitRejectsRangeLessSourceAnnotations() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "range-less-annotation.probe"}, {0xaa});
+  ScanResult result{
+      .assets = {MiscAsset{
+          .metadata = badRangeMetadata(AssetId{0}, "Range-Less Annotation Fixture", sources.reader(source).range(0, 1)),
+      }},
+      .sourceMap =
+          SourceMap{{
+              SourceAnnotation{
+                  .id = SourceAnnotationId{0},
+                  .role = SourceRole::DataBlock,
+                  .label = "Range-Less Annotation",
+              },
+          }},
+  };
+  const ScanCommit commit = ScanCommit::fromScanResult(sources.source(source), std::move(result));
+
+  std::string message;
+  try {
+    AssetStore assets;
+    commit.validate(sources, assets);
+  } catch (const std::invalid_argument& ex) {
+    message = ex.what();
+  }
+  expect(message == "Scan result contained source annotation without a primary source range",
+         "scan commit should reject source annotations without primary ranges");
+}
+
 void snapshotValidationReportsWrongTypeCollectionReferences() {
   SessionSnapshotBuilder builder;
   builder.assets.push_back(SequenceProgramAsset{
@@ -1030,6 +1059,7 @@ void runValueSessionTests() {
   sessionRejectsSourceScopedMatchFactsForMissingSources();
   scanValidationReportsMultipleAdmissionErrors();
   scanCommitRejectsOutOfBoundsScanResultRanges();
+  scanCommitRejectsRangeLessSourceAnnotations();
   snapshotValidationReportsWrongTypeCollectionReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionReportsDesiredCollectionWrongTypeReferences();
