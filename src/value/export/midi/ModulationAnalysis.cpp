@@ -16,11 +16,19 @@ namespace vgmtrans::core {
 
 namespace {
 
-void observe(ObservedValueRange& range, u32 value, SourceRange sourceRange) {
+[[nodiscard]] u32 midiControllerValue(double normalized);
+
+void observe(ObservedValueRange& range, u32 value, double normalized, double normalizedCeiling,
+             SourceRange sourceRange) {
+  const double clampedNormalized = std::clamp(normalized, 0.0, 1.0);
+  const double clampedCeiling = std::clamp(normalizedCeiling, clampedNormalized, 1.0);
+  const u32 ceilingValue = midiControllerValue(clampedCeiling);
   if (!range.observed) {
     range.observed = true;
     range.min = value;
-    range.max = value;
+    range.max = std::max(value, ceilingValue);
+    range.normalizedMin = clampedNormalized;
+    range.normalizedMax = clampedCeiling;
     if (sourceRange.valid()) {
       range.firstRange = sourceRange;
     }
@@ -28,7 +36,9 @@ void observe(ObservedValueRange& range, u32 value, SourceRange sourceRange) {
   }
 
   range.min = std::min(range.min, value);
-  range.max = std::max(range.max, value);
+  range.max = std::max(range.max, std::max(value, ceilingValue));
+  range.normalizedMin = std::min(range.normalizedMin, clampedNormalized);
+  range.normalizedMax = std::max(range.normalizedMax, clampedCeiling);
 }
 
 void merge(ObservedValueRange& destination, const ObservedValueRange& source) {
@@ -41,6 +51,8 @@ void merge(ObservedValueRange& destination, const ObservedValueRange& source) {
   }
   destination.min = std::min(destination.min, source.min);
   destination.max = std::max(destination.max, source.max);
+  destination.normalizedMin = std::min(destination.normalizedMin, source.normalizedMin);
+  destination.normalizedMax = std::max(destination.normalizedMax, source.normalizedMax);
 }
 
 [[nodiscard]] u32 midiControllerValue(double normalized) {
@@ -49,18 +61,19 @@ void merge(ObservedValueRange& destination, const ObservedValueRange& source) {
 }
 
 void observePerformanceModulation(MidiTrackModulationUsage& usage, const ModulationPerformanceEvent& event) {
+  const double ceiling = event.controllerRangeMaxAmount.value_or(event.amount);
   switch (event.target) {
     case ModulationPerformanceTarget::VibratoDepth:
-      observe(usage.vibratoDepth, midiControllerValue(event.amount), SourceRange{});
+      observe(usage.vibratoDepth, midiControllerValue(event.amount), event.amount, ceiling, SourceRange{});
       break;
     case ModulationPerformanceTarget::VibratoRate:
-      observe(usage.vibratoRate, midiControllerValue(event.amount), SourceRange{});
+      observe(usage.vibratoRate, midiControllerValue(event.amount), event.amount, ceiling, SourceRange{});
       break;
     case ModulationPerformanceTarget::TremoloDepth:
-      observe(usage.tremoloDepth, midiControllerValue(event.amount), SourceRange{});
+      observe(usage.tremoloDepth, midiControllerValue(event.amount), event.amount, ceiling, SourceRange{});
       break;
     case ModulationPerformanceTarget::TremoloRate:
-      observe(usage.tremoloRate, midiControllerValue(event.amount), SourceRange{});
+      observe(usage.tremoloRate, midiControllerValue(event.amount), event.amount, ceiling, SourceRange{});
       break;
   }
 }
@@ -126,13 +139,17 @@ MidiModulationUsage analyzeMidiModulationUsage(const MidiSequence& sequence) {
           [&](const auto& typedEvent) {
             using TypedEvent = std::decay_t<decltype(typedEvent)>;
             if constexpr (std::is_same_v<TypedEvent, VibratoDepth>) {
-              observe(trackUsage.vibratoDepth, typedEvent.value, SourceRange{});
+              observe(trackUsage.vibratoDepth, typedEvent.value, static_cast<double>(typedEvent.value) / 127.0,
+                      static_cast<double>(typedEvent.value) / 127.0, SourceRange{});
             } else if constexpr (std::is_same_v<TypedEvent, VibratoFrequency>) {
-              observe(trackUsage.vibratoRate, typedEvent.value, SourceRange{});
+              observe(trackUsage.vibratoRate, typedEvent.value, static_cast<double>(typedEvent.value) / 127.0,
+                      static_cast<double>(typedEvent.value) / 127.0, SourceRange{});
             } else if constexpr (std::is_same_v<TypedEvent, TremoloDepth>) {
-              observe(trackUsage.tremoloDepth, typedEvent.value, SourceRange{});
+              observe(trackUsage.tremoloDepth, typedEvent.value, static_cast<double>(typedEvent.value) / 127.0,
+                      static_cast<double>(typedEvent.value) / 127.0, SourceRange{});
             } else if constexpr (std::is_same_v<TypedEvent, TremoloFrequency>) {
-              observe(trackUsage.tremoloRate, typedEvent.value, SourceRange{});
+              observe(trackUsage.tremoloRate, typedEvent.value, static_cast<double>(typedEvent.value) / 127.0,
+                      static_cast<double>(typedEvent.value) / 127.0, SourceRange{});
             }
           },
           event);

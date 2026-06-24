@@ -61,8 +61,8 @@ using namespace core;
     const auto sampleInfos = parseKonamiSnesSampleInfos(input.reader, *layout->spcDirAddress, instrumentInfos);
     if (!instrumentInfos.empty() && !sampleInfos.empty()) {
       static_cast<void>(result.instrumentSet(instrumentSet, [&](AssetId id) {
-        return parseKonamiSnesInstrumentSet(input, result, id, samples, layout->version, instrumentInfos, sampleInfos,
-                                            displayName);
+        return parseKonamiSnesInstrumentSet(input, result, id, samples, layout->version, *layout->spcDirAddress,
+                                            instrumentInfos, sampleInfos, displayName);
       }));
       static_cast<void>(result.sampleCollection(samples, [&](AssetId id) {
         return parseKonamiSnesSamples(input, id, sampleInfos, displayName, &result.sourceMap());

@@ -409,6 +409,7 @@ struct TrackState {
     vibrato.reset();
     pitchBase.reset();
     pitchSlide.clearMotion();
+    emittedInitialModulationCeiling = false;
   }
 
   static ModulationRanges analyzeVibratoRanges(const SequenceProgram& program, KonamiSnesVersion version) {
@@ -416,8 +417,9 @@ struct TrackState {
         .maxDepth = kMinVibratoMaxDepth,
         .maxRateFactor = vibrato::minMaxRateFactor(version),
     };
+    u8 sharedTempo = kKonamiSnesDefaultTempo;
     for (const auto& track : program.tracks) {
-      u8 tempo = kKonamiSnesDefaultTempo;
+      u8 tempo = vibrato::usesLegacy(version) ? sharedTempo : kKonamiSnesDefaultTempo;
       u8 activeRate = 0;
       u8 activeDepth = 0;
       for (const auto& command : track.commands) {
@@ -429,6 +431,9 @@ struct TrackState {
         const EventType type = eventType(version, opcode);
         if (type == EventType::Tempo && bytes.size() >= 2) {
           tempo = bytes[1];
+          if (vibrato::usesLegacy(version)) {
+            sharedTempo = tempo;
+          }
           if (vibrato::isActive(version, activeRate, activeDepth)) {
             ranges.maxRateFactor =
                 std::max(ranges.maxRateFactor, vibrato::rateFactor(version, activeRate, tempo));
@@ -507,15 +512,56 @@ struct TrackState {
   }
 
   template <class Runtime>
+  void emitInitialModulationCeiling(Runtime& rt) {
+    if (emittedInitialModulationCeiling) {
+      return;
+    }
+    emittedInitialModulationCeiling = true;
+
+    const double fullRangeCents = vibrato::maxDepthCents(rt.context.version, kDefaultVibratoMaxDepth);
+    const double maxCents = vibrato::maxDepthCents(rt.context.version, maxVibrato.maxDepth);
+    const std::optional<double> depthRangeMaxAmount =
+        fullRangeCents <= 0.0 ? std::nullopt : std::optional<double>{maxCents / fullRangeCents};
+    rt.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoDepth,
+        .amount = 0.0,
+        .pitchDepthSemitones = 0.0,
+        .controllerRangeMaxAmount = depthRangeMaxAmount,
+        .controllerRangeOnly = true,
+    });
+    lastVibratoDepthAmount = 0.0;
+
+    const double minHertz = vibrato::baseHz(rt.context.version);
+    const u16 fullRangeFactor = vibrato::defaultMaxRateFactor(rt.context.version);
+    const s32 fullRangeAmount = synthAmountFromHertzRange(minHertz, minHertz * fullRangeFactor);
+    const s32 maxRangeAmount =
+        maxVibrato.maxRateFactor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * maxVibrato.maxRateFactor);
+    const std::optional<double> rateRangeMaxAmount =
+        fullRangeAmount <= 0 || maxRangeAmount <= 0
+            ? std::nullopt
+            : std::optional<double>{static_cast<double>(maxRangeAmount) / fullRangeAmount};
+    rt.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoRate,
+        .amount = 0.0,
+        .frequencyHz = 0.0,
+        .controllerRangeMaxAmount = rateRangeMaxAmount,
+        .controllerRangeOnly = true,
+    });
+  }
+
+  template <class Runtime>
   void emitVibratoDepth(Runtime& rt, bool force = false) {
     const bool active = vibrato::isActive(rt.context.version, vibrato.rate(), vibrato.depth());
     double amount = 0.0;
     double depthSemitones = 0.0;
+    std::optional<double> rangeMaxAmount;
     if (active) {
       const double currentCents =
           vibrato::currentDepthCents(rt.context.version, vibrato.depth(), vibrato.currentDepth());
+      const double fullRangeCents = vibrato::maxDepthCents(rt.context.version, kDefaultVibratoMaxDepth);
+      amount = fullRangeCents <= 0.0 ? 0.0 : currentCents / fullRangeCents;
       const double maxCents = vibrato::maxDepthCents(rt.context.version, maxVibrato.maxDepth);
-      amount = maxCents <= 0.0 ? 0.0 : currentCents / maxCents;
+      rangeMaxAmount = fullRangeCents <= 0.0 ? 0.0 : maxCents / fullRangeCents;
       depthSemitones = currentCents / 100.0;
     }
     amount = std::clamp(amount, 0.0, 1.0);
@@ -524,6 +570,7 @@ struct TrackState {
           .target = ModulationPerformanceTarget::VibratoDepth,
           .amount = amount,
           .pitchDepthSemitones = depthSemitones,
+          .controllerRangeMaxAmount = rangeMaxAmount,
       });
       lastVibratoDepthAmount = amount;
     }
@@ -532,11 +579,22 @@ struct TrackState {
   template <class Runtime>
   void emitVibratoRate(Runtime& rt) {
     const u16 factor = vibrato::rateFactor(rt.context.version, vibrato.rate(), tempo);
-    const double amount = maxVibrato.maxRateFactor == 0 ? 0.0 : static_cast<double>(factor) / maxVibrato.maxRateFactor;
+    const u16 fullRangeFactor = vibrato::defaultMaxRateFactor(rt.context.version);
+    const double minHertz = vibrato::baseHz(rt.context.version);
+    const s32 fullRangeAmount = synthAmountFromHertzRange(minHertz, minHertz * fullRangeFactor);
+    const s32 currentRangeAmount = factor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * factor);
+    const s32 maxRangeAmount =
+        maxVibrato.maxRateFactor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * maxVibrato.maxRateFactor);
+    const double amount = fullRangeAmount <= 0 ? 0.0 : static_cast<double>(currentRangeAmount) / fullRangeAmount;
+    const std::optional<double> rangeMaxAmount =
+        fullRangeAmount <= 0 || maxRangeAmount <= 0
+            ? std::nullopt
+            : std::optional<double>{static_cast<double>(maxRangeAmount) / fullRangeAmount};
     rt.modulation(ModulationPerformanceEvent{
         .target = ModulationPerformanceTarget::VibratoRate,
         .amount = std::clamp(amount, 0.0, 1.0),
         .frequencyHz = vibrato::baseHz(rt.context.version) * factor,
+        .controllerRangeMaxAmount = rangeMaxAmount,
     });
   }
 
@@ -552,8 +610,24 @@ struct TrackState {
 
   void tickAutomation(PerformanceEmitter& out, KonamiSnesVersion version) {
     static_cast<void>(tempoFade.tickRaw([&](s32 rawTempo) {
-      tempo = static_cast<u8>(std::clamp<s32>(rawTempo, 0, 0xff));
+      const u8 newTempo = static_cast<u8>(std::clamp<s32>(rawTempo, 0, 0xff));
+      if (newTempo == tempo) {
+        return;
+      }
+      tempo = newTempo;
       out.tempo(tempoMicrosecondsPerQuarter(version, tempo));
+      if (vibrato::usesLegacy(version)) {
+        struct TickRuntime {
+          TrackState& state;
+          PerformanceEmitter& out;
+          const Context& context;
+          void modulation(ModulationPerformanceEvent event) { out.modulation(std::move(event)); }
+          void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
+          void vibratoDelay(u32 delayTicks, u8 midiValue) { out.vibratoDelay(delayTicks, midiValue); }
+        } rt{*this, out, Context{.version = version}};
+        emitVibratoRate(rt);
+        emitVibratoDelay(rt);
+      }
     }));
     static_cast<void>(volumeFade.tickRaw([&](s32 rawVolume) {
       out.level(LevelScale::linearFromLinear(linearGainFromRawVolume(static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff)))),
@@ -612,6 +686,7 @@ struct TrackState {
   std::optional<double> pitchBase;
   SequenceAutomatedValue<double> pitchSlide;
   double lastVibratoDepthAmount = -1.0;
+  bool emittedInitialModulationCeiling = false;
 };
 
 template <class Runtime>
@@ -715,6 +790,7 @@ struct KonamiSnesCursorReader {
     const u8 opcode = cmd.opcode();
     const EventType type = eventType(rt.context.version, opcode);
     auto& state = rt.state;
+    state.emitInitialModulationCeiling(rt);
 
     switch (type) {
       case EventType::Unknown0:

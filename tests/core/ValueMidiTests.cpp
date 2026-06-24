@@ -360,6 +360,74 @@ void performanceMidiRendererQuantizesPitchBendAndPortamento() {
          "MIDI renderer should quantize performance portamento milliseconds");
 }
 
+void performanceMidiRendererSkipsRedundantPitchBends() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 48,
+          .events =
+              {
+                  PitchBendRangePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .semitones = 2,
+                  },
+                  PitchBendRangePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 6},
+                      .semitones = 2,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .semitones = 0.0,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 12},
+                      .semitones = 0.0,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 24},
+                      .semitones = 1.0,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 36},
+                      .semitones = 1.0,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 48},
+                      .semitones = 0.0,
+                  },
+              },
+      }},
+  };
+
+  const auto assertPitchBends = [](const MidiSequence& midiSequence, std::string_view label) {
+    std::vector<std::pair<u64, u8>> pitchBendRanges;
+    std::vector<std::pair<u64, s16>> pitchBends;
+    for (const MidiEvent& event : midiSequence.tracks[0].events) {
+      if (const auto* range = std::get_if<PitchBendRange>(&event)) {
+        pitchBendRanges.emplace_back(range->tick, range->semitones);
+      } else if (const auto* pitchBend = std::get_if<PitchBend>(&event)) {
+        pitchBends.emplace_back(pitchBend->tick, pitchBend->value);
+      }
+    }
+    const std::vector<std::pair<u64, u8>> expectedPitchBendRanges{{0, 2}};
+    const std::vector<std::pair<u64, s16>> expectedPitchBends{
+        {0, 0},
+        {24, 4096},
+        {48, 0},
+    };
+    expect(pitchBendRanges == expectedPitchBendRanges,
+           std::string(label) + " should skip repeated pitch bend range values");
+    expect(pitchBends == expectedPitchBends, std::string(label) + " should skip repeated pitch bend values");
+  };
+
+  assertPitchBends(PerformanceMidiRenderer().render(performance), "synth-modulator MIDI lowering");
+  assertPitchBends(PerformanceMidiRenderer().render(
+                       performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation),
+                   "sequence-event MIDI lowering");
+}
+
 void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 100},
@@ -676,6 +744,7 @@ void runValueMidiTests() {
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererHonorsMidiExportOptions();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
+  performanceMidiRendererSkipsRedundantPitchBends();
   performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape();
   exportRequestSequenceLoopsAffectMidiLowering();
   modulationAnalysisReportsObservedMidiControllerRanges();

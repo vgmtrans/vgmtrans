@@ -49,7 +49,7 @@ struct ExportRequest {
   // "Sequence Loops" setting: 0 means stop at the first infinite-loop point.
   u32 sequenceLoops = 0;
   MidiExportOptions midi;
-  ModulationScalingPolicy synthModulationScaling = ModulationScalingPolicy::FullFormatRange;
+  ModulationScalingPolicy synthModulationScaling = ModulationScalingPolicy::ObservedSequenceRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
 };
 

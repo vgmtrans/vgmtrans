@@ -113,6 +113,7 @@ void addExpression(MidiTrack& track, u64 tick, u8 channel, double linearGain, Le
 struct RenderTrackState {
   std::optional<size_t> lastNoteIndex;
   u8 pitchBendRangeSemitones = 2;
+  std::optional<u8> lastPitchBendRangeSemitones;
   u8 sourcePitchBendRangeSemitones = 2;
   double sourcePitchBendSemitones = 0.0;
   double simulatedVibratoSemitones = 0.0;
@@ -215,7 +216,8 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
 
 void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u8 semitones) {
   const u8 range = std::max<u8>(2, semitones);
-  if (range == state.pitchBendRangeSemitones) {
+  if (state.lastPitchBendRangeSemitones && *state.lastPitchBendRangeSemitones == range) {
+    state.pitchBendRangeSemitones = range;
     return;
   }
   track.events.push_back(PitchBendRange{
@@ -224,13 +226,10 @@ void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u
       .semitones = range,
   });
   state.pitchBendRangeSemitones = range;
+  state.lastPitchBendRangeSemitones = range;
 }
 
-void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, bool force = true) {
-  ensurePitchBendRange(track, state, tick, channel,
-                       std::max(state.sourcePitchBendRangeSemitones, requiredPitchBendRangeSemitones(state)));
-  const s16 value = midiPitchBend(state.sourcePitchBendSemitones + state.simulatedVibratoSemitones,
-                                  state.pitchBendRangeSemitones);
+void addPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, s16 value, bool force = false) {
   if (!force && state.lastPitchBendValue && *state.lastPitchBendValue == value) {
     return;
   }
@@ -240,6 +239,14 @@ void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u
       .value = value,
   });
   state.lastPitchBendValue = value;
+}
+
+void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, bool force = true) {
+  ensurePitchBendRange(track, state, tick, channel,
+                       std::max(state.sourcePitchBendRangeSemitones, requiredPitchBendRangeSemitones(state)));
+  const s16 value = midiPitchBend(state.sourcePitchBendSemitones + state.simulatedVibratoSemitones,
+                                  state.pitchBendRangeSemitones);
+  addPitchBend(track, state, tick, channel, value, force);
 }
 
 [[nodiscard]] double tickSeconds(const Timebase& timebase, const RenderTrackState& state) {
@@ -287,14 +294,14 @@ void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tic
     state.vibratoDelayArmed = false;
     if (state.simulatedVibratoSemitones != 0.0 || state.simulatedVibratoDepthSemitones <= 0.0) {
       state.simulatedVibratoSemitones = 0.0;
-      addCombinedPitchBend(track, state, tick, channel);
+      addCombinedPitchBend(track, state, tick, channel, false);
     }
     return;
   }
 
   if (state.simulatedVibratoDepthSemitones <= 0.0) {
     state.simulatedVibratoSemitones = 0.0;
-    addCombinedPitchBend(track, state, tick, channel);
+    addCombinedPitchBend(track, state, tick, channel, false);
   }
 }
 
@@ -413,13 +420,13 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendPerformanceEvent>) {
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             state.sourcePitchBendSemitones = typedEvent.semitones;
-            addCombinedPitchBend(track, state, typedEvent.header.tick, channel);
+            addCombinedPitchBend(track, state, typedEvent.header.tick, channel, false);
           } else {
-            track.events.push_back(PitchBend{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .value = midiPitchBend(typedEvent.semitones, state.pitchBendRangeSemitones),
-            });
+            addPitchBend(track,
+                         state,
+                         typedEvent.header.tick,
+                         channel,
+                         midiPitchBend(typedEvent.semitones, state.pitchBendRangeSemitones));
           }
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
@@ -428,12 +435,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                                  std::max(state.sourcePitchBendRangeSemitones,
                                           requiredPitchBendRangeSemitones(state)));
           } else {
-            track.events.push_back(PitchBendRange{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .semitones = typedEvent.semitones,
-            });
-            state.pitchBendRangeSemitones = typedEvent.semitones;
+            ensurePitchBendRange(track, state, typedEvent.header.tick, channel, typedEvent.semitones);
           }
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
           state.vibratoDelayTicks = typedEvent.delayTicks;
@@ -485,6 +487,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .enabled = typedEvent.enabled,
           });
         } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
+          if (typedEvent.controllerRangeOnly) {
+            return;
+          }
           const u8 value = midiNormalized7(typedEvent.amount);
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             switch (typedEvent.target) {

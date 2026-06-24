@@ -246,16 +246,12 @@ struct KonamiPitch {
   };
 }
 
-[[nodiscard]] double instrumentPan(KonamiSnesVersion version, u8 rawPan) {
-  const double limit = usesLegacyPanRange(version) ? 20.0 : 40.0;
-  return std::clamp(static_cast<double>(rawPan) / limit, 0.0, 1.0);
-}
-
 [[nodiscard]] double attenuationFromVolume(u8 volume) {
-  // Legacy treats instrument volume as a rough attenuation hint. Keep the mapping
-  // intentionally gentle so sequence volume remains the primary loudness source.
-  constexpr double maxAttenuationDb = 18.0;
-  return std::clamp(1.0 - (static_cast<double>(volume) / 127.0), 0.0, 1.0) * maxAttenuationDb;
+  // Match legacy KonamiSnesRgn::loadRgn: the instrument byte decreases volume
+  // relative to an assumed pre-pan channel level of 72 rather than acting as a
+  // direct loudness value.
+  const double amplitude = std::max(1.0 - (static_cast<double>(volume) / 72.0), 0.0);
+  return amplitude <= 0.0 ? 100.0 : std::min(-20.0 * std::log10(amplitude), 100.0);
 }
 
 }  // namespace
@@ -415,12 +411,19 @@ SampleCollectionAsset parseKonamiSnesSamples(const ScanInput& input, AssetId sam
 InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResultBuilder& builder,
                                                 AssetId instrumentSetId, ScanSampleCollectionRef sampleCollection,
                                                 KonamiSnesVersion version,
+                                                u32 spcDirAddress,
                                                 const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
                                                 const std::vector<KonamiSnesSampleInfo>& sampleInfos,
                                                 std::string_view displayName) {
   std::map<u8, u32> sampleIndexBySrcn;
+  std::map<u32, u32> sampleIndexByStartAddress;
+  std::map<u32, u32> sampleIndexByRelativeStartAddress;
   for (u32 index = 0; index < sampleInfos.size(); ++index) {
     sampleIndexBySrcn.emplace(sampleInfos[index].srcn, index);
+    sampleIndexByStartAddress.emplace(sampleInfos[index].startAddress, index);
+    if (sampleInfos[index].startAddress >= spcDirAddress) {
+      sampleIndexByRelativeStartAddress.emplace(sampleInfos[index].startAddress - spcDirAddress, index);
+    }
   }
 
   u32 rootOffset = instrumentInfos.empty() ? 0 : instrumentInfos.front().address;
@@ -439,9 +442,23 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
   std::map<u32, size_t> instrumentIndexByProgram;
   std::vector<Instrument> instruments;
   for (const auto& info : instrumentInfos) {
-    const auto sampleIndex = sampleIndexBySrcn.find(info.srcn);
-    if (sampleIndex == sampleIndexBySrcn.end()) {
-      continue;
+    std::optional<u32> resolvedSampleIndex;
+    const auto srcnSample = sampleIndexBySrcn.find(info.srcn);
+    if (srcnSample != sampleIndexBySrcn.end()) {
+      const u32 sampleStart = sampleInfos[srcnSample->second].startAddress;
+      if (sampleStart >= spcDirAddress) {
+        const u32 relativeStart = sampleStart - spcDirAddress;
+        if (const auto byAbsolute = sampleIndexByStartAddress.find(relativeStart);
+            byAbsolute != sampleIndexByStartAddress.end()) {
+          resolvedSampleIndex = byAbsolute->second;
+        } else if (const auto byRelative = sampleIndexByRelativeStartAddress.find(relativeStart);
+                   byRelative != sampleIndexByRelativeStartAddress.end()) {
+          resolvedSampleIndex = byRelative->second;
+        }
+      }
+    }
+    if (!resolvedSampleIndex) {
+      resolvedSampleIndex = 0;
     }
 
     const u32 bank = info.percussion ? kDrumKitBank : (info.index >> 7);
@@ -467,13 +484,12 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
     auto& instrument = instruments[instrumentIndex];
     const auto pitch = konamiPitch(info);
     Region region{
-        .sample = builder.sampleRef(sampleCollection, sampleIndex->second),
+        .sample = builder.sampleRef(sampleCollection, *resolvedSampleIndex),
         .range = input.reader.range(info.address, instrumentHeaderSize(version)),
         .tuning = pitch.aggregate,
         .rootKey = pitch.rootKey,
         .fineTuneCents = pitch.fineTuneCents,
         .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, info.gain) : Envelope{},
-        .pan = instrumentPan(version, info.pan),
         .attenuationDb = attenuationFromVolume(info.volume),
     };
     if (info.percussion) {
@@ -507,13 +523,13 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
     if (root.valid()) {
       annotation.parent(root);
     }
-    annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, sampleIndex->second)});
+    annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, *resolvedSampleIndex)});
     builder.sourceMap()
         .annotation(SourceRole::Region, "Region", input.reader.range(info.address, instrumentHeaderSize(version)))
         .kind("konami-snes-region")
         .parent(annotation.id())
-        .description(fmt::format("Sample {}", sampleIndex->second))
-        .link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, sampleIndex->second)});
+        .description(fmt::format("Sample {}", *resolvedSampleIndex))
+        .link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, *resolvedSampleIndex)});
   }
 
   return InstrumentSetAsset{
