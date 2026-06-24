@@ -1,5 +1,10 @@
 # Value-Oriented Rewrite Plan
 
+Status: superseded by `docs/new-value-oriented-refactor-plan.md`. This file is
+kept as background for the rewrite, but the active sequence design now uses
+`SourceCommand` as a byte snapshot and `SourceAnnotation` for command inspection
+metadata. It does not use separate command handler or command kind ID registries.
+
 This document describes the next design target for the value-oriented rewrite in
 `src/value`. The current proof of concept has useful pieces: value assets,
 explicit ownership, source ranges, diagnostics, deterministic registration,
@@ -189,12 +194,12 @@ does not have a vtable.
 ```cpp
 struct SourceCommand {
   CommandId id;
-  CommandHandlerId handler;
-  CommandKindId kind;
   u8 opcode = 0;
+  Address address;
+  u32 encodedSize = 0;
   SourceRange range;
   ByteSpan bytes;
-  OperandSpan operands;
+  SourceAnnotationId annotation;
 };
 ```
 
@@ -204,9 +209,9 @@ Use small inline storage only where it is demonstrably simpler. A
 `std::vector<u8>` and `std::vector<Operand>` inside every command should be a
 transitional implementation, not the final shape.
 
-`CommandKindId` should be backed by a deterministic dialect string table. The UI
-can still show names like `capcom.volume` or `nds.notewait`, but VM dispatch
-should use `CommandHandlerId`, not string lookup.
+Command names, detail kinds, decoded operands, links, diagnostics, and playback
+status belong on the command's primary `SourceAnnotation`. VM dispatch uses the
+registered `SequenceDialect`, not annotation strings.
 
 ## Format-local Commands
 
@@ -216,7 +221,6 @@ Format authors should write local command structs. The common pattern is:
 struct Volume {
   u8 raw;
 
-  static constexpr CommandKind kind = "capcom.volume";
   static constexpr std::string_view name = "Volume";
 
   static Volume parse(CommandReader& in) {
@@ -515,7 +519,7 @@ struct SequenceDialect {
   SequenceBehavior defaultBehavior;
   DecodeOneCommand decodeOneCommand;
   CreateTrackState createTrackState;
-  std::span<const CommandHandler> handlers;
+  ExecuteSourceCommand execute;
 };
 ```
 

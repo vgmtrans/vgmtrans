@@ -318,13 +318,24 @@ ReadValue<Address> VmCommandCursor::le24RelativeAddress(std::string_view name, A
 
 ReadValue<std::string> VmCommandCursor::rawBytes(std::string_view name, size_t size) {
   const size_t begin = position_;
-  if (!requireRead(size, name)) {
-    return ReadValue<std::string>{.range = rangeAt(begin, position_ - begin), .valid = false};
+  if (failed_) {
+    return ReadValue<std::string>{.range = rangeAt(begin, 0), .valid = false};
   }
-  const auto range = rangeAt(begin, size);
-  const auto value = hexBytes(bytes_.subspan(begin, size));
-  position_ += size;
-  recordField(name, range, makeSourceValue(value), SourceValueDisplay::Hex);
+
+  const size_t readBegin = std::min(begin, bytes_.size());
+  const size_t available = bytes_.size() - readBegin;
+  const size_t consumed = std::min(size, available);
+  const auto range = rangeAt(begin, consumed);
+  const auto value = hexBytes(bytes_.subspan(readBegin, consumed));
+  position_ += consumed;
+
+  if (consumed > 0) {
+    recordField(name, range, makeSourceValue(value), SourceValueDisplay::Hex);
+  }
+  if (consumed != size) {
+    markTruncated(name, range);
+    return ReadValue<std::string>{.value = value, .range = range, .valid = false};
+  }
   return ReadValue<std::string>{.value = value, .range = range, .valid = true};
 }
 
@@ -442,14 +453,14 @@ CommandFlow VmCommandCursor::call(Address destination) {
 CommandFlow VmCommandCursor::invalidJump(Address destination, std::string_view message) {
   defaultSemantic(SequenceSemantic::Jump);
   defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
-  target(destination, SourceLinkRole::JumpTarget).warning(message);
+  warning(message);
   return flow(FlowKind::End);
 }
 
 CommandFlow VmCommandCursor::invalidCall(Address destination, std::string_view message) {
   defaultSemantic(SequenceSemantic::Call);
   defaultPlaybackStatus(CommandPlaybackStatus::AffectsControlFlow);
-  target(destination, SourceLinkRole::CallTarget).warning(message);
+  warning(message);
   return flow(FlowKind::End);
 }
 

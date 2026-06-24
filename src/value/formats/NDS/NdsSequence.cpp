@@ -218,9 +218,7 @@ struct NdsCursorReader {
         const u32 raw = cmd.varLen("raw");
         const u32 bank = raw >> 7;
         const u32 program = raw & 0x7f;
-        cmd.derived("bank", bank)
-            .derived("program", program)
-            .instrumentRef(bank, program);
+        cmd.derived("bank", bank).derived("program", program).instrumentRef(bank, program);
         rt.instrument(bank, program);
         return cmd.next();
       }
@@ -346,11 +344,35 @@ private:
   };
 }
 
-[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(ByteReader reader, u32 offset) {
+[[nodiscard]] std::string recoveryDetailKind(const SequenceDialect& dialect) {
+  return dialect.commandDetailKindPrefix.empty() ? "recovery-stop" : dialect.commandDetailKindPrefix + ".recovery-stop";
+}
+
+[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(ByteReader reader, u32 offset,
+                                                             const SequenceDialect& dialect,
+                                                             SourceMapBuilder* sourceMap,
+                                                             std::optional<SourceAnnotationId> parentAnnotation) {
   const auto bytes = reader.slice(offset, 1);
   std::vector<u8> ownedBytes{bytes.begin(), bytes.end()};
+  const auto range = reader.range(offset, static_cast<u32>(ownedBytes.size()));
+  SourceAnnotationId annotationId;
+  if (sourceMap != nullptr) {
+    auto annotation = sourceMap->command("Recovery Stop", range, SequenceSemantic::Unsupported)
+                          .kind("recovery-stop")
+                          .detailKind(recoveryDetailKind(dialect))
+                          .playbackStatus(CommandPlaybackStatus::StopsPlayback);
+    if (parentAnnotation) {
+      annotation.parent(*parentAnnotation);
+    }
+    if (!ownedBytes.empty()) {
+      annotation.field("opcode", range, ownedBytes.front(), SourceValueDisplay::Hex);
+    }
+    annotationId = annotation.id();
+  }
+
   auto command = DecodedBytecodeCommand{
-      .range = reader.range(offset, 1),
+      .range = range,
+      .annotation = annotationId,
       .bytes = std::move(ownedBytes),
   };
   command.flow = DecodeFlow::terminalFlow();
@@ -360,11 +382,10 @@ private:
 // Recovery decoder for malformed SDAT ranges that do not contain a normal SSEQ
 // header. Normal SSEQ decode stays source-driver oriented; this path repairs
 // range-level damage before source commands can be trusted.
-[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(ByteReader reader, const SequenceDialect& dialect,
-                                                         u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
-                                                         u32 trackIndex, size_t maxCommands,
-                                                         SourceMapBuilder* sourceMap,
-                                                         std::vector<Diagnostic>* diagnostics) {
+[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(
+    ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
+    u32 trackIndex, size_t maxCommands, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
+    std::optional<SourceAnnotationId> parentAnnotation, std::optional<AssetId> sequenceAsset) {
   TrackProgram track = makeTrack(startOffset, trackIndex);
   TrackProgramBuilder builder{track};
   u32 offset = startOffset;
@@ -372,13 +393,23 @@ private:
   std::set<u32> decodedOffsets;
   std::set<u32> callTargetOffsets;
   std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
-  BytecodeDecodeContext decodeContext{
+  const CursorTrackDecodeInput input{
+      .sequenceAsset = sequenceAsset,
+      .trackIndex = trackIndex,
+      .startOffset = startOffset,
       .bytecodeEnd = sequenceEnd,
       .sequenceOffset = sequenceOffset,
       .sequenceEnd = sequenceEnd,
+      .parentAnnotation = parentAnnotation,
       .sourceMap = sourceMap,
       .diagnostics = diagnostics,
+      .maxCommands = static_cast<u32>(maxCommands),
   };
+  const auto trackAnnotation = createCursorTrackAnnotation(reader, input);
+  BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
+  if (trackAnnotation) {
+    decodeContext.parentAnnotation = trackAnnotation;
+  }
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
 
   while (!pendingBlocks.empty()) {
@@ -394,7 +425,7 @@ private:
       decodedOffsets.insert(begin);
 
       auto decoded = decodeCursorCommandWithState<TrackState, Context, NdsCursorReader>(reader, offset, dialect,
-                                                                                         decodeState, decodeContext);
+                                                                                        decodeState, decodeContext);
 
       if (!block.callTarget) {
         const auto overlap = std::ranges::find_if(
@@ -402,7 +433,8 @@ private:
         if (overlap != callTargetOffsets.end()) {
           // Some malformed FAT entries fall through one byte before a real call
           // target. Stop before consuming the overlapping subroutine bytes.
-          appendDecodedBytecodeCommand(builder, terminalRecoveryCommand(reader, begin), begin);
+          appendDecodedBytecodeCommand(
+              builder, terminalRecoveryCommand(reader, begin, dialect, sourceMap, trackAnnotation), begin);
           break;
         }
       }
@@ -433,6 +465,7 @@ private:
     }
   }
 
+  updateCursorTrackAnnotation(reader, input, trackAnnotation, track);
   return track;
 }
 
@@ -493,7 +526,8 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, const NdsSequenceDescript
                                     std::optional<AssetId> sequenceAsset) {
   if (recoverMalformedSdatRange) {
     return decodeMalformedSdatRangeTrack(reader, descriptor.dialect, sequenceOffset, sequenceEnd, startOffset,
-                                         trackIndex, kMaxTrackCommands, sourceMap, diagnostics);
+                                         trackIndex, kMaxTrackCommands, sourceMap, diagnostics, parentAnnotation,
+                                         sequenceAsset);
   }
   return decodeReachableBlocks(reader, descriptor.dialect, sequenceOffset, sequenceEnd, startOffset, trackIndex,
                                sourceMap, diagnostics, parentAnnotation, sequenceAsset);
@@ -614,8 +648,8 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
 
   u32 trackIndex = 0;
   for (const u32 start : ndsSequenceTrackStarts(input.reader, sequenceOffset, range.sequenceEnd)) {
-    auto track = decodeNdsSequenceTrack(input.reader, descriptor, sequenceOffset, range.sequenceEnd, start,
-                                        trackIndex, range.recoverMalformedSdatRange, sourceMap, diagnostics,
+    auto track = decodeNdsSequenceTrack(input.reader, descriptor, sequenceOffset, range.sequenceEnd, start, trackIndex,
+                                        range.recoverMalformedSdatRange, sourceMap, diagnostics,
                                         headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt, id);
     ++trackIndex;
     asset.program.tracks.push_back(std::move(track));
