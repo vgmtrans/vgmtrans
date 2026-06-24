@@ -2954,6 +2954,8 @@ struct PerformanceModulationStats {
   double maxVibratoPitchDepthSemitones = 0.0;
   double maxVibratoNormalizedAmount = 0.0;
   double maxVibratoObservedRangeAmount = 0.0;
+  double maxVibratoRateNormalizedAmount = 0.0;
+  double maxVibratoRateObservedRangeAmount = 0.0;
   double maxVibratoRateHz = 0.0;
   double maxSourcePitchBendSemitones = 0.0;
   u32 maxVibratoDelayTicks = 0;
@@ -3157,6 +3159,11 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           }
         } else if (modulation->target == ModulationPerformanceTarget::VibratoRate) {
           ++stats.vibratoRateEvents;
+          stats.maxVibratoRateNormalizedAmount = std::max(stats.maxVibratoRateNormalizedAmount, modulation->amount);
+          if (modulation->controllerRangeMaxAmount) {
+            stats.maxVibratoRateObservedRangeAmount =
+                std::max(stats.maxVibratoRateObservedRangeAmount, *modulation->controllerRangeMaxAmount);
+          }
           if (modulation->frequencyHz) {
             stats.maxVibratoRateHz = std::max(stats.maxVibratoRateHz, *modulation->frequencyHz);
           }
@@ -3243,6 +3250,8 @@ int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u3
               << " maxAmount=" << performance.maxVibratoNormalizedAmount
               << " observedRangeAmount=" << performance.maxVibratoObservedRangeAmount
               << " rateEvents=" << performance.vibratoRateEvents << " maxRateHz=" << performance.maxVibratoRateHz
+              << " maxRateAmount=" << performance.maxVibratoRateNormalizedAmount
+              << " observedRateRangeAmount=" << performance.maxVibratoRateObservedRangeAmount
               << " delayEvents=" << performance.vibratoDelayEvents
               << " activeDelays=" << performance.activeVibratoDelayEvents
               << " maxDelayTicks=" << performance.maxVibratoDelayTicks

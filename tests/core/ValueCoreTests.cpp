@@ -33,6 +33,7 @@ void konamiSnesLayoutInfersSpcDirFromInstrumentTables();
 void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void konamiSnesSynthParsersStopAtInvalidBankedInstrument();
 void konamiSnesProgramChangeReemitsCurrentFineTune();
+void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling();
 void konamiSnesPercussionUsesPackedGsDrumBank();
 void akaoDialectDecodesLegacyRelativeJumpTargets();
 void akaoDialectDecodesConditionalBranchSideTargets();
@@ -90,6 +91,7 @@ int main() {
     konamiSnesModuleDiscoversSequenceInstrumentsAndSamples();
     konamiSnesSynthParsersStopAtInvalidBankedInstrument();
     konamiSnesProgramChangeReemitsCurrentFineTune();
+    konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling();
     konamiSnesPercussionUsesPackedGsDrumBank();
     akaoDialectDecodesLegacyRelativeJumpTargets();
     akaoDialectDecodesConditionalBranchSideTargets();

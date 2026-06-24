@@ -13,6 +13,7 @@
 #include "value/formats/ValueFormats.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
+#include "value/synth/SynthMath.h"
 
 #include "ValueFormatTestSupport.h"
 
@@ -181,6 +182,24 @@ PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
   return SequenceVm(LoopPolicy::PlayOnce).render(program, descriptor.dialect);
 }
 
+PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std::vector<std::vector<u8>>& tracks) {
+  const auto& descriptor = konamiSnesSequenceDescriptor(version);
+  std::vector<TrackProgram> programTracks;
+  programTracks.reserve(tracks.size());
+  for (u32 trackIndex = 0; trackIndex < tracks.size(); ++trackIndex) {
+    programTracks.push_back(decodeKonamiSnesSourceTrack(ByteReader(SourceId{100 + trackIndex}, tracks[trackIndex]),
+                                                        descriptor, trackIndex, 0));
+  }
+  const SequenceProgram program{
+      .dialect = descriptor.dialect.id,
+      .timebase = descriptor.dialect.timebase,
+      .sourceBaseAddress = Address{0},
+      .behavior = descriptor.dialect.defaultBehavior,
+      .tracks = std::move(programTracks),
+  };
+  return SequenceVm(LoopPolicy::PlayOnce).render(program, descriptor.dialect);
+}
+
 }  // namespace
 
 void konamiSnesLayoutDiscoversDirectHeaderAndSynthTables() {
@@ -304,6 +323,9 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(samples->samples.samples.front().encodedData.offset == 0x6000 &&
              samples->samples.samples.front().encodedData.size == 9,
          "sample should preserve the one-block BRR payload range");
+  expect(!samples->samples.samples.front().loop.enabled && samples->samples.samples.front().loop.start == 0 &&
+             samples->samples.samples.front().loop.length == 0,
+         "non-looping KonamiSnes BRR samples should keep a zero loop span");
 
   const SourceMap& sourceMap = project.sourceMap();
   const auto* sequenceHeader = annotationWithKind(sourceMap, source, SourceRole::Header, "konami-snes-sequence-header");
@@ -374,6 +396,44 @@ void konamiSnesProgramChangeReemitsCurrentFineTune() {
          "KonamiSnes should re-emit the active fine tune before same-tick program/note playback");
   expect(std::distance(events.begin(), sameTickFineTune) < std::distance(events.begin(), programChange),
          "KonamiSnes fine tune should be ordered before the same-tick program change");
+}
+
+void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
+  const PerformanceSequence performance = renderKonamiSnesProgram(
+      KONAMISNES_V2,
+      {
+          {
+              0xea, 0x37,              // tempo 55
+              0xe4, 0x00, 0x2d, 0x63,  // active legacy vibrato, rate step 45
+              0xff,
+          },
+          {
+              0xea, 0x78,  // tempo 120, seen by legacy as song-level export tempo
+              0xff,
+          },
+      });
+
+  const auto vibratoRate = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoRate &&
+           modulation->amount > 0.0;
+  });
+  expect(vibratoRate != performance.tracks[0].events.end(),
+         "KonamiSnes legacy vibrato should emit a rate modulation event");
+
+  const auto& rate = std::get<ModulationPerformanceEvent>(*vibratoRate);
+  const double baseHz = vibrato::baseHz(KONAMISNES_V2);
+  const double fullRange =
+      synthAmountFromHertzRange(baseHz, baseHz * vibrato::defaultMaxRateFactor(KONAMISNES_V2));
+  const double expectedCurrent =
+      synthAmountFromHertzRange(baseHz, baseHz * (0x2d * 0x37)) / fullRange;
+  const double expectedCeiling =
+      synthAmountFromHertzRange(baseHz, baseHz * (0x2d * 0x78)) / fullRange;
+  expect(std::abs(rate.amount - expectedCurrent) < 0.0001,
+         "KonamiSnes legacy vibrato rate should keep the current track-tempo amount");
+  expect(rate.controllerRangeMaxAmount &&
+             std::abs(*rate.controllerRangeMaxAmount - expectedCeiling) < 0.0001,
+         "KonamiSnes legacy vibrato rate ceiling should include the sequence-global tempo range");
 }
 
 void konamiSnesPercussionUsesPackedGsDrumBank() {
