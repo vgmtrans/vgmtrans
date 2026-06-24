@@ -300,7 +300,7 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
   if (behavior.initialPitchBendRangeSemitones) {
     track.events.emplace_back(PitchBendRangePerformanceEvent{
         .header = header,
-        .semitones = *behavior.initialPitchBendRangeSemitones,
+        .cents = static_cast<u16>(static_cast<u16>(*behavior.initialPitchBendRangeSemitones) * 100),
     });
   }
 }
@@ -687,6 +687,10 @@ u64 VmApi::tick() const noexcept {
   return runtime_.tick;
 }
 
+const PerformanceSequence& VmApi::sequence() const noexcept {
+  return sequence_;
+}
+
 void VmApi::diagnostic(Diagnostic diagnostic) {
   if (!diagnostic.range && command_.range.valid()) {
     diagnostic.range = command_.range;
@@ -732,11 +736,31 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     }
   }
 
+  size_t coordinationTrackCount = 0;
+  if (dialect.requiresCompleteSequencePrepass) {
+    PerformanceSequence prepassSequence{
+        .timebase = program.timebase,
+    };
+    for (const TrackProgram& track : program.tracks) {
+      prepassSequence.tracks.push_back(VmTrackExecutor(program, track, dialect, behavior, options_, prepassSequence,
+                                                       synchronizedStopTick, TrackRenderMode::Normal)
+                                           .render()
+                                           .track);
+    }
+    sequence.tracks = std::move(prepassSequence.tracks);
+    coordinationTrackCount = sequence.tracks.size();
+  }
+
   for (size_t i = 0; i < program.tracks.size(); ++i) {
     sequence.tracks.push_back(VmTrackExecutor(program, program.tracks[i], dialect, behavior, options_, sequence,
                                               synchronizedStopTick, TrackRenderMode::Normal)
                                   .render()
                                   .track);
+  }
+
+  if (coordinationTrackCount != 0) {
+    sequence.tracks.erase(sequence.tracks.begin(),
+                          sequence.tracks.begin() + static_cast<std::ptrdiff_t>(coordinationTrackCount));
   }
 
   return sequence;

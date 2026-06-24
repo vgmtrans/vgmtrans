@@ -230,7 +230,9 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
                       static_cast<u8>((value >> 7) & 0x7f)});
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendRange>) {
-          addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 0, static_cast<u16>(typedEvent.semitones << 7));
+          const u8 semitones = static_cast<u8>(std::min<u16>(typedEvent.cents / 100, 127));
+          const u8 fineCents = static_cast<u8>(std::min<u16>(typedEvent.cents % 100, 127));
+          addRpn(messages, typedEvent.tick, typedEvent.channel, 0, 0, static_cast<u16>((semitones << 7) | fineCents));
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDepth>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 1, typedEvent.value);

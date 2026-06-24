@@ -28,6 +28,7 @@ constexpr u16 kSfGenInitialFilterFc = 8;
 constexpr u16 kSfGenModLfoToVolume = 13;
 constexpr u16 kSfGenReverbEffectsSend = 16;
 constexpr u16 kSfGenPan = 17;
+constexpr u16 kSfGenDelayModLfo = 21;
 constexpr u16 kSfGenFreqModLfo = 22;
 constexpr u16 kSfGenDelayVibLfo = 23;
 constexpr u16 kSfGenFreqVibLfo = 24;
@@ -56,6 +57,7 @@ constexpr u16 kSfModModWheel = kSfModMidiContinuousController | 1;
 constexpr u16 kSfModSoundController6 = kSfModMidiContinuousController | 75;
 constexpr u16 kSfModVibratoRate = kSfModMidiContinuousController | 76;
 constexpr u16 kSfModVibratoDelay = kSfModMidiContinuousController | 78;
+constexpr u16 kSfModSoundController10 = kSfModMidiContinuousController | 79;
 constexpr u16 kSfModTremoloDepth = kSfModMidiContinuousController | 92;
 constexpr u16 kSfTransformLinear = 0;
 
@@ -299,6 +301,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
       return kSfGenModLfoToVolume;
     case SynthDestination::TremoloRate:
       return kSfGenFreqModLfo;
+    case SynthDestination::TremoloDelay:
+      return kSfGenDelayModLfo;
     case SynthDestination::Unknown:
       return std::nullopt;
   }
@@ -346,6 +350,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
       return kSfModTremoloDepth;
     case SynthDestination::TremoloRate:
       return kSfModSoundController6;
+    case SynthDestination::TremoloDelay:
+      return kSfModSoundController10;
     case SynthDestination::Pitch:
     case SynthDestination::FilterCutoff:
     case SynthDestination::Pan:
@@ -386,9 +392,9 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   // the reciprocal to preserve the requested dB attenuation.
   constexpr double emu8000InitialAttenuationScale = 2.5;
   constexpr double maxInitialAttenuation = 1440.0;
-  return static_cast<u16>(std::clamp(std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb *
-                                                 emu8000InitialAttenuationScale),
-                                     0l, static_cast<long>(maxInitialAttenuation)));
+  return static_cast<u16>(std::clamp(
+      std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb * emu8000InitialAttenuationScale), 0l,
+      static_cast<long>(maxInitialAttenuation)));
 }
 
 [[nodiscard]] std::optional<double> envelopeSeconds(u32 microseconds, std::optional<double> preciseSeconds) {
@@ -444,8 +450,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 [[nodiscard]] u32 instrumentGlobalGeneratorCount(
     const Instrument& instrument,
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
-  return static_cast<u32>(std::ranges::count_if(
-      instrument.generators, [modulationConversion](const SynthGenerator& generator) {
+  return static_cast<u32>(
+      std::ranges::count_if(instrument.generators, [modulationConversion](const SynthGenerator& generator) {
         return shouldExportSynthGenerator(generator, modulationConversion) &&
                sf2GeneratorForDestination(generator.destination).has_value();
       }));
@@ -454,8 +460,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 [[nodiscard]] u32 instrumentGlobalModulatorCount(
     const Instrument& instrument,
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
-  return static_cast<u32>(std::ranges::count_if(
-      instrument.modulators, [modulationConversion](const SynthModulator& modulator) {
+  return static_cast<u32>(
+      std::ranges::count_if(instrument.modulators, [modulationConversion](const SynthModulator& modulator) {
         return sf2ModulatorFor(modulator, nullptr, ModulationScalingPolicy::FullFormatRange, modulationConversion)
             .has_value();
       }));
@@ -639,8 +645,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }
 
 [[nodiscard]] Chunk imodChunk(std::span<const ResolvedSynthInstrument> instruments,
-                              const MidiModulationUsage* midiModulationUsage,
-                              ModulationScalingPolicy modulationScaling,
+                              const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling,
                               ModulationConversionPolicy modulationConversion) {
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
@@ -712,8 +717,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   return makeChunk("igen", std::move(payload));
 }
 
-[[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(
-    std::span<const DecodedSfSample> samples, std::span<const ResolvedSynthInstrument> instruments) {
+[[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(std::span<const DecodedSfSample> samples,
+                                                               std::span<const ResolvedSynthInstrument> instruments) {
   // SF2 sample headers have their own original-key/correction fields. Pick the first
   // region that references each sample so sample headers stay consistent with zones.
   std::vector<SfSampleHeaderInfo> info(samples.size());

@@ -76,6 +76,8 @@ public:
   void pitchBendRange(u8 semitones);
   void vibratoDelay(VibratoDelayPerformanceEvent event);
   void vibratoDelay(u32 delayTicks, u8 midiValue);
+  void tremoloDelay(TremoloDelayPerformanceEvent event);
+  void tremoloDelay(u32 delayTicks, u8 midiValue);
   void portamento(PortamentoPerformanceEvent event);
   void portamento(double timeMilliseconds, double previousKey);
   void portamentoEnable(PortamentoEnablePerformanceEvent event);
@@ -123,6 +125,7 @@ public:
   [[nodiscard]] BranchResult countedRepeatBreak(u8 slot, Address destination);
 
   [[nodiscard]] u64 tick() const noexcept;
+  [[nodiscard]] const PerformanceSequence& sequence() const noexcept;
   void diagnostic(Diagnostic diagnostic);
 
 private:

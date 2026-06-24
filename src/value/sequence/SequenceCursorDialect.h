@@ -64,8 +64,10 @@ struct DecodeCursorRuntime {
   void tuning(double) {}
   void globalTranspose(s32) {}
   void pitchBend(double) {}
+  void pitchBendRange(PitchBendRangePerformanceEvent) {}
   void pitchBendRange(u8) {}
   void vibratoDelay(u32, u8) {}
+  void tremoloDelay(u32, u8) {}
   void portamento(double, double) {}
   void portamentoEnable(bool) {}
   void portamentoTime(double) {}
@@ -76,8 +78,7 @@ struct DecodeCursorRuntime {
   void marker(std::string_view) {}
   void diagnostic(Severity, std::string_view) {}
 
-  [[nodiscard]] RepeatUntilFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays,
-                                                   Address destination) {
+  [[nodiscard]] RepeatUntilFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays, Address destination) {
     CommandFlow flow = cmd.countedRepeatUntil(slot, totalPlays, destination);
     return RepeatUntilFlow{flow, !flow.truncated};
   }
@@ -85,6 +86,7 @@ struct DecodeCursorRuntime {
   [[nodiscard]] RepeatBreakFlow countedRepeatBreak(VmCommandCursor& cmd, u8 slot, Address destination) {
     return cmd.countedRepeatBreak(slot, destination);
   }
+  void finishRepeat(u8) {}
 
   [[nodiscard]] CommandFlow conditionalFiniteBranch(VmCommandCursor& cmd, Address destination, bool) {
     return cmd.conditionalBranch(destination);
@@ -94,8 +96,8 @@ struct DecodeCursorRuntime {
 namespace detail {
 
 template <class Vm>
-[[nodiscard]] RepeatUntilFlow resolveRenderCursorRepeatUntil(VmCommandCursor& cmd, Vm& vm, u8 slot,
-                                                             u32 totalPlays, Address destination) {
+[[nodiscard]] RepeatUntilFlow resolveRenderCursorRepeatUntil(VmCommandCursor& cmd, Vm& vm, u8 slot, u32 totalPlays,
+                                                             Address destination) {
   CommandFlow flow = cmd.countedRepeatUntil(slot, totalPlays, destination);
   if (flow.truncated) {
     return RepeatUntilFlow{flow, false};
@@ -126,9 +128,37 @@ struct RenderCursorRuntime {
   TrackState& state;
   PerformanceEmitter& out;
   VmApi& vm;
+  const TrackProgram& track;
+  const SourceCommand& command;
   const Context& context;
 
   [[nodiscard]] u64 tick() const noexcept { return vm.tick(); }
+  [[nodiscard]] const SourceCommand* commandAtAddress(Address address) const {
+    const auto index = track.addressIndex.find(address);
+    if (!index) {
+      return nullptr;
+    }
+    return &track.commands.at(*index);
+  }
+  [[nodiscard]] const SourceCommand* nextCommand(const VmCommandCursor& cmd) const {
+    const Address nextAddress{command.address.value + cmd.position()};
+    return commandAtAddress(nextAddress);
+  }
+  [[nodiscard]] const SourceCommand* commandAfter(const SourceCommand& sourceCommand) const {
+    const Address nextAddress{sourceCommand.address.value + sourceCommand.encodedSize};
+    return commandAtAddress(nextAddress);
+  }
+  [[nodiscard]] std::span<const u8> commandBytes(const SourceCommand& sourceCommand) const {
+    return track.bytesFor(sourceCommand);
+  }
+  [[nodiscard]] u64 commandAddress() const noexcept { return command.address.value; }
+  [[nodiscard]] std::optional<u8> nextCommandOpcode(const VmCommandCursor& cmd) const {
+    const SourceCommand* next = nextCommand(cmd);
+    if (next == nullptr) {
+      return std::nullopt;
+    }
+    return next->opcode;
+  }
   void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false) {
     out.note(key, linearVelocity, durationTicks, extendsPrevious);
   }
@@ -160,8 +190,10 @@ struct RenderCursorRuntime {
   void tuning(double cents) { out.tuning(cents); }
   void globalTranspose(s32 semitones) { out.globalTranspose(semitones); }
   void pitchBend(double semitones) { out.pitchBend(semitones); }
+  void pitchBendRange(PitchBendRangePerformanceEvent event) { out.pitchBendRange(std::move(event)); }
   void pitchBendRange(u8 semitones) { out.pitchBendRange(semitones); }
   void vibratoDelay(u32 delayTicks, u8 midiValue) { out.vibratoDelay(delayTicks, midiValue); }
+  void tremoloDelay(u32 delayTicks, u8 midiValue) { out.tremoloDelay(delayTicks, midiValue); }
   void portamento(double timeMilliseconds, double previousKey) { out.portamento(timeMilliseconds, previousKey); }
   void portamentoEnable(bool enabled) { out.portamentoEnable(enabled); }
   void portamentoTime(double timeMilliseconds) { out.portamentoTime(timeMilliseconds); }
@@ -174,13 +206,18 @@ struct RenderCursorRuntime {
     vm.diagnostic(Diagnostic{.severity = severity, .message = std::string(message)});
   }
 
-  [[nodiscard]] RepeatUntilFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays,
-                                                   Address destination) {
+  [[nodiscard]] RepeatUntilFlow countedRepeatUntil(VmCommandCursor& cmd, u8 slot, u32 totalPlays, Address destination) {
     return detail::resolveRenderCursorRepeatUntil(cmd, vm, slot, totalPlays, destination);
   }
 
   [[nodiscard]] RepeatBreakFlow countedRepeatBreak(VmCommandCursor& cmd, u8 slot, Address destination) {
     return detail::resolveRenderCursorRepeatBreak(cmd, vm, slot, destination);
+  }
+  void finishRepeat(u8 slot) {
+    RepeatCounter counter = vm.repeatCounter(slot);
+    if (counter.active()) {
+      counter.finish();
+    }
   }
 
   [[nodiscard]] CommandFlow conditionalFiniteBranch(VmCommandCursor& cmd, Address destination, bool taken) {
@@ -255,6 +292,8 @@ struct CursorDialectDriver {
         .state = typedTrackState,
         .out = bufferedOut,
         .vm = vm,
+        .track = track,
+        .command = record,
         .context = typedContext,
     };
     VmCommandCursor cursor(CommandPhase::Render, record.range, track.bytesFor(record));
@@ -468,9 +507,9 @@ template <class TrackState, class Context, class Reader>
                                                                      decodeContext);
   };
 
-  TrackProgram track = decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
-                                                 LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands},
-                                                 decodeCommand);
+  TrackProgram track =
+      decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
+                                LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
   updateCursorTrackAnnotation(reader, input, trackAnnotation, track);
   return track;
 }

@@ -10,6 +10,8 @@
 #include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 #include "value/formats/KonamiSnes/KonamiSnesModule.h"
 #include "value/formats/KonamiSnes/KonamiSnesSequence.h"
+#include "value/formats/AkaoSnes/AkaoSnesModule.h"
+#include "value/formats/AkaoSnes/AkaoSnesSequence.h"
 #include "value/formats/Akao/AkaoModule.h"
 #include "value/formats/Akao/AkaoSequence.h"
 #include "value/formats/NDS/NdsModule.h"
@@ -26,6 +28,7 @@ void registerValueFormatModules(core::FormatRegistry& registry) {
   snes_spc::registerSnesSpcExtractor(registry);
   psf::registerPsfExtractor(registry);
   akao::registerAkaoModule(registry);
+  akao_snes::registerAkaoSnesModule(registry);
   nds::registerNdsModule(registry);
   capcom_snes::registerCapcomSnesModule(registry);
   konami_snes::registerKonamiSnesModule(registry);
@@ -33,6 +36,7 @@ void registerValueFormatModules(core::FormatRegistry& registry) {
 
 void registerValueSequenceDialects(core::SequenceDialectRegistry& registry) {
   akao::registerAkaoSequenceDialects(registry);
+  akao_snes::registerAkaoSnesSequenceDialects(registry);
   capcom_snes::registerCapcomSnesSequenceDialects(registry);
   konami_snes::registerKonamiSnesSequenceDialects(registry);
   nds::registerNdsSequenceDialect(registry);

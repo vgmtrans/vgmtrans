@@ -37,6 +37,7 @@ struct MidiExportOptions {
   MidiLevelResolution volumeResolution = MidiLevelResolution::Auto;
   MidiLevelResolution expressionResolution = MidiLevelResolution::Auto;
   bool skipChannel10 = true;
+  bool writePortMetaEvents = true;
   MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
 };
 

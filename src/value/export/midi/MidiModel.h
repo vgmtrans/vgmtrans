@@ -137,7 +137,7 @@ struct PitchBend {
 struct PitchBendRange {
   u64 tick = 0;
   u8 channel = 0;
-  u8 semitones = 2;
+  u16 cents = 200;
 };
 
 struct VibratoDepth {
