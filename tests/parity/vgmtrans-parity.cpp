@@ -467,6 +467,8 @@ u32 envelopePermille(double level) {
       return 10;
     case SynthDestination::VibratoRate:
       return 11;
+    case SynthDestination::VibratoDelay:
+      return 12;
     case SynthDestination::TremoloDepth:
       return 20;
     case SynthDestination::TremoloRate:
@@ -484,13 +486,14 @@ u32 envelopePermille(double level) {
       return destinationCode(SynthDestination::VibratoDepth);
     case ModDest::VibLfoFreq:
       return destinationCode(SynthDestination::VibratoRate);
+    case ModDest::VibLfoDelay:
+      return destinationCode(SynthDestination::VibratoDelay);
     case ModDest::ModLfoToVol:
       return destinationCode(SynthDestination::TremoloDepth);
     case ModDest::ModLfoFreq:
       return destinationCode(SynthDestination::TremoloRate);
     case ModDest::InitialAtten:
       return destinationCode(SynthDestination::VolumeAttenuation);
-    case ModDest::VibLfoDelay:
     case ModDest::ModLfoDelay:
       return destinationCode(SynthDestination::Unknown);
   }
@@ -725,8 +728,6 @@ void normalizeSummary(CapcomSnesSummary& summary) {
                     rhs.envelopeSustain, rhs.envelopeRelease);
   });
   for (auto& synth : summary.instrumentSynths) {
-    std::erase_if(synth.generators, [](const GeneratorSummary& generator) { return generator.destination == -1; });
-    std::erase_if(synth.modulators, [](const ModulatorSummary& modulator) { return modulator.destination == -1; });
     std::ranges::sort(synth.generators, [](const GeneratorSummary& lhs, const GeneratorSummary& rhs) {
       return std::tie(lhs.destination, lhs.amount) < std::tie(rhs.destination, rhs.amount);
     });

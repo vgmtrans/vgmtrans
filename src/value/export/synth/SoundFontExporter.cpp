@@ -29,6 +29,7 @@ constexpr u16 kSfGenModLfoToVolume = 13;
 constexpr u16 kSfGenReverbEffectsSend = 16;
 constexpr u16 kSfGenPan = 17;
 constexpr u16 kSfGenFreqModLfo = 22;
+constexpr u16 kSfGenDelayVibLfo = 23;
 constexpr u16 kSfGenFreqVibLfo = 24;
 constexpr u16 kSfGenAttackVolEnv = 34;
 constexpr u16 kSfGenHoldVolEnv = 35;
@@ -54,6 +55,7 @@ constexpr u16 kSfModPitchWheel = kSfModBipolar | 14;
 constexpr u16 kSfModModWheel = kSfModMidiContinuousController | 1;
 constexpr u16 kSfModSoundController6 = kSfModMidiContinuousController | 75;
 constexpr u16 kSfModVibratoRate = kSfModMidiContinuousController | 76;
+constexpr u16 kSfModVibratoDelay = kSfModMidiContinuousController | 78;
 constexpr u16 kSfModTremoloDepth = kSfModMidiContinuousController | 92;
 constexpr u16 kSfTransformLinear = 0;
 
@@ -291,6 +293,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
       return kSfGenVibLfoToPitch;
     case SynthDestination::VibratoRate:
       return kSfGenFreqVibLfo;
+    case SynthDestination::VibratoDelay:
+      return kSfGenDelayVibLfo;
     case SynthDestination::TremoloDepth:
       return kSfGenModLfoToVolume;
     case SynthDestination::TremoloRate:
@@ -335,6 +339,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
       return kSfModModWheel;
     case SynthDestination::VibratoRate:
       return kSfModVibratoRate;
+    case SynthDestination::VibratoDelay:
+      return kSfModVibratoDelay;
     case SynthDestination::TremoloDepth:
     case SynthDestination::VolumeAttenuation:
       return kSfModTremoloDepth;

@@ -184,6 +184,10 @@ constexpr u32 kDrumKitProgram = 0x00;
           .destination = SynthDestination::VibratoRate,
           .amount = synthAmountFromHertz(spec.minHertz),
       },
+      SynthGenerator{
+          .destination = SynthDestination::VibratoDelay,
+          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(spec.minDelaySeconds)),
+      },
   };
 }
 
@@ -202,6 +206,10 @@ constexpr u32 kDrumKitProgram = 0x00;
       SynthModulator{
           .destination = SynthDestination::VibratoRate,
           .amount = synthAmountFromHertzRange(spec.minHertz, spec.maxHertz),
+      },
+      SynthModulator{
+          .destination = SynthDestination::VibratoDelay,
+          .amount = synthAmountFromSecondsRange(spec.minDelaySeconds, spec.maxDelaySeconds),
       },
   };
 }
@@ -230,7 +238,7 @@ struct KonamiPitch {
   if (info.percussion) {
     root += static_cast<int>(info.percussionNote) - kPercussionBaseNote;
   }
-  const auto fineTuneCents = static_cast<s16>(fine * 100.0);
+  const auto fineTuneCents = static_cast<s16>(std::lround(fine * 100.0));
   return KonamiPitch{
       .rootKey = static_cast<u8>(std::clamp(root, 0, 127)),
       .fineTuneCents = fineTuneCents,

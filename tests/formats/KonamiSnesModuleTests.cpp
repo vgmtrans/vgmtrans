@@ -64,6 +64,18 @@ bool hasMidiEvent(const MidiTrack& track) {
   return std::ranges::any_of(track.events, [](const MidiEvent& event) { return std::holds_alternative<Event>(event); });
 }
 
+bool hasGeneratorDestination(const Instrument& instrument, SynthDestination destination) {
+  return std::ranges::any_of(instrument.generators, [destination](const SynthGenerator& generator) {
+    return generator.destination == destination;
+  });
+}
+
+bool hasModulatorDestination(const Instrument& instrument, SynthDestination destination) {
+  return std::ranges::any_of(instrument.modulators, [destination](const SynthModulator& modulator) {
+    return modulator.destination == destination;
+  });
+}
+
 std::vector<u8> makeKonamiSnesAram() {
   std::vector<u8> bytes(0x10000);
 
@@ -225,6 +237,10 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "instrument should preserve its source header range");
   expect(instrument.regions.size() == 1, "instrument should contain one sample-backed region");
   expect(!instrument.modulators.empty(), "KonamiSnes instruments should carry default vibrato modulators");
+  expect(hasGeneratorDestination(instrument, SynthDestination::VibratoDelay),
+         "KonamiSnes instruments should carry a default vibrato delay generator");
+  expect(hasModulatorDestination(instrument, SynthDestination::VibratoDelay),
+         "KonamiSnes instruments should carry a default vibrato delay modulator");
 
   const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
   expect(samples != nullptr, "third KonamiSnes asset should be a sample collection");

@@ -54,6 +54,8 @@ struct KonamiVibratoSpec {
   double maxDepthCents = 0.0;
   double minHertz = 0.0;
   double maxHertz = 0.0;
+  double minDelaySeconds = 0.0;
+  double maxDelaySeconds = 0.0;
 };
 
 namespace vibrato {
@@ -111,6 +113,22 @@ namespace vibrato {
   return (rate == 0) ? 0 : static_cast<u16>(rate * lateEraRateStep(rate));
 }
 
+[[nodiscard]] inline double delaySeconds(KonamiSnesVersion version, u8 delay, u8 tempo) {
+  if (usesLegacy(version)) {
+    const u8 safeTempo = (tempo == 0) ? 1 : tempo;
+    return ((256.0 / kKonamiSnesTimerHz) * (delay + 1.0)) / safeTempo;
+  }
+  return (delay + 1.0) / kKonamiSnesTimerHz;
+}
+
+[[nodiscard]] inline double minDelaySeconds(KonamiSnesVersion version) {
+  return usesLegacy(version) ? delaySeconds(version, 0, 0xff) : delaySeconds(version, 0, 0);
+}
+
+[[nodiscard]] inline double maxDelaySeconds(KonamiSnesVersion version) {
+  return usesLegacy(version) ? delaySeconds(version, 0xff, 1) : delaySeconds(version, 0xc7, 0);
+}
+
 [[nodiscard]] constexpr u8 delayFromArg1(KonamiSnesVersion version, u8 arg1) {
   return (!usesLegacy(version) && arg1 >= kLateEraVibratoFadeThreshold) ? 0 : arg1;
 }
@@ -132,6 +150,8 @@ namespace vibrato {
       .maxDepthCents = maxDepthCents(version, clampedMaxDepth),
       .minHertz = minHertz,
       .maxHertz = minHertz * clampedMaxRateFactor,
+      .minDelaySeconds = minDelaySeconds(version),
+      .maxDelaySeconds = maxDelaySeconds(version),
   };
 }
 

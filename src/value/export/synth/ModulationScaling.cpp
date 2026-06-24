@@ -33,6 +33,8 @@ namespace {
       return &usage.vibratoDepth;
     case SynthDestination::VibratoRate:
       return &usage.vibratoRate;
+    case SynthDestination::VibratoDelay:
+      return nullptr;
     case SynthDestination::TremoloDepth:
       return &usage.tremoloDepth;
     case SynthDestination::TremoloRate:
@@ -110,6 +112,7 @@ bool shouldExportSynthModulator(const SynthModulator& modulator, ModulationConve
   switch (modulator.destination) {
     case SynthDestination::VibratoDepth:
     case SynthDestination::VibratoRate:
+    case SynthDestination::VibratoDelay:
     case SynthDestination::TremoloDepth:
     case SynthDestination::TremoloRate:
       return false;
