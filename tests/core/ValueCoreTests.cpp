@@ -37,6 +37,7 @@ void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling();
 void konamiSnesPercussionUsesPackedGsDrumBank();
 void akaoSnesLayoutDiscoversFf4StyleAram();
 void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
+void akaoSnesV4TieExtendsShortenedPreviousNote();
 void akaoDialectDecodesLegacyRelativeJumpTargets();
 void akaoDialectDecodesConditionalBranchSideTargets();
 void akaoSequenceAnalysisUsesSourceAnnotations();
@@ -97,6 +98,7 @@ int main() {
     konamiSnesPercussionUsesPackedGsDrumBank();
     akaoSnesLayoutDiscoversFf4StyleAram();
     akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
+    akaoSnesV4TieExtendsShortenedPreviousNote();
     akaoDialectDecodesLegacyRelativeJumpTargets();
     akaoDialectDecodesConditionalBranchSideTargets();
     akaoSequenceAnalysisUsesSourceAnnotations();

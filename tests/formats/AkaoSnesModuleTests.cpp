@@ -7,6 +7,7 @@
 #include "value/formats/AkaoSnes/AkaoSnesLayout.h"
 #include "value/formats/AkaoSnes/AkaoSnesSequence.h"
 #include "value/formats/ValueFormats.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -136,4 +137,31 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
   expect(samples != nullptr, "third AkaoSnes asset should be a sample collection");
   expect(samples->samples.samples.size() == 1, "AkaoSnes synthetic scan should collect one used BRR sample");
+}
+
+void akaoSnesV4TieExtendsShortenedPreviousNote() {
+  std::vector<u8> bytes(0x40, 0xeb);
+  constexpr u32 start = 0x20;
+  bytes[start] = 0x7f;
+  bytes[start + 1] = 0xac;
+  bytes[start + 2] = 0xeb;
+
+  const AkaoSnesSequenceDescriptor descriptor = akaoSnesSequenceDescriptor(AKAOSNES_V4, AKAOSNES_V4_FF6);
+  const TrackProgram track =
+      decodeAkaoSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, start, 0x40, start, 0x40);
+  const SequenceProgram program{
+      .dialect = descriptor.dialect.id,
+      .timebase = descriptor.dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, descriptor.dialect);
+  expect(performance.diagnostics.empty(), "AkaoSnes V4 tie fixture should render without diagnostics");
+
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const auto note = std::ranges::find_if(
+      midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  expect(note != midi.tracks[0].events.end(), "AkaoSnes V4 tie fixture should render a MIDI note");
+  expect(std::get<NoteDuration>(*note).duration == 142,
+         "AkaoSnes V4 tie should extend the previous shortened note instead of leaving it at 94 ticks");
 }

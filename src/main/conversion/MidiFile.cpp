@@ -322,6 +322,26 @@ void MidiTrack::purgePrevNoteOffsBefore(u32 absTime) {
     m_prevDurNoteOffs.end());
 }
 
+void MidiTrack::retainPrevNoteOffsForExtension(u32 absTime) {
+  if (m_prevDurNoteOffs.empty()) {
+    return;
+  }
+
+  const bool hasActiveCandidate = std::ranges::any_of(m_prevDurNoteOffs,
+    [absTime](const NoteEvent *e) { return e != nullptr && e->absTime >= absTime; });
+  if (hasActiveCandidate) {
+    purgePrevNoteOffsBefore(absTime);
+    return;
+  }
+
+  const auto latest = std::ranges::max_element(m_prevDurNoteOffs, {},
+    [](const NoteEvent *e) { return e != nullptr ? e->absTime : 0; });
+  const u32 latestEndTick = latest != m_prevDurNoteOffs.end() && *latest != nullptr ? (*latest)->absTime : 0;
+  m_prevDurNoteOffs.erase(std::remove_if(m_prevDurNoteOffs.begin(), m_prevDurNoteOffs.end(),
+    [latestEndTick](const NoteEvent *e) { return e == nullptr || e->absTime < latestEndTick; }),
+    m_prevDurNoteOffs.end());
+}
+
 void MidiTrack::purgePrevNoteOffs(u32 absTime) {
   m_prevDurNoteOffs.erase(std::remove_if(m_prevDurNoteOffs.begin(), m_prevDurNoteOffs.end(),
     [absTime](const NoteEvent *e) { return e && e->absTime <= absTime; }),
