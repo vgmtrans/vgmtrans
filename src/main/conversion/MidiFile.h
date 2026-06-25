@@ -106,6 +106,7 @@ class MidiTrack {
   void insertNoteByDur(u8 channel, s8 key, s8 vel, u32 duration, u32 absTime);
   void purgePrevNoteOffs();
   void purgePrevNoteOffsBefore(u32 absTime);
+  void retainPrevNoteOffsForExtension(u32 absTime);
   void purgePrevNoteOffs(u32 absTime);
   void addControllerEvent(u8 channel,
                           u8 controllerNum,

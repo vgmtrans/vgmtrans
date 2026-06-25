@@ -1450,7 +1450,7 @@ struct TrackState {
     lfoBeforeInitialSharedTempoTrack = false;
     lfoAfterInitialSharedTempoTrack = false;
     initialSharedTempoApplied = false;
-    lastNoteEndTick.reset();
+    lastTieableNoteTick.reset();
     pitchWaitEndTick.reset();
     pitchWaitFallthrough.reset();
     pitchWaitBoundaryClassified = false;
@@ -2016,7 +2016,7 @@ struct TrackState {
   bool lfoBeforeInitialSharedTempoTrack = false;
   bool lfoAfterInitialSharedTempoTrack = false;
   bool initialSharedTempoApplied = false;
-  std::optional<u64> lastNoteEndTick;
+  std::optional<u64> lastTieableNoteTick;
   std::optional<u64> pitchWaitEndTick;
   std::optional<Address> pitchWaitFallthrough;
   bool pitchWaitBoundaryClassified = false;
@@ -2124,20 +2124,21 @@ struct AkaoSnesCursorReader {
           } else {
             rt.note((state.octave * 12) + noteIndex + state.transpose, velocity, duration);
           }
-          state.lastNoteEndTick = rt.tick() + duration;
+          state.lastTieableNoteTick = rt.tick() + length;
           return cmd.wait(length);
         }
         if (noteIndex == akaoSnesStatusNoteIndexTie(rt.context.version)) {
           state.setPitchWaitBoundary(rt, cmd, length);
           state.beginPendingPitchSlide(rt);
-          if (state.lastNoteEndTick && *state.lastNoteEndTick >= rt.tick()) {
+          if (state.lastTieableNoteTick && *state.lastTieableNoteTick >= rt.tick()) {
             rt.note(0.0, 1.0, duration, true);
-            state.lastNoteEndTick = rt.tick() + duration;
+            state.lastTieableNoteTick = rt.tick() + length;
           }
           return cmd.wait(length);
         }
         state.setPitchWaitBoundary(rt, cmd, length);
         cmd.name("Rest", SequenceSemantic::Rest);
+        state.lastTieableNoteTick.reset();
         return cmd.wait(length);
       }
 

@@ -860,15 +860,26 @@ void SeqTrack::makePrevDurNoteEnd(u32 absTime) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (parentSeq->bLoadTickByTick) {
       // Tick-by-tick parsers can leave expired duration-note ends in the
-      // pending list until another note is emitted. A tie at this exact tick is
-      // still eligible for extension; notes that ended earlier are stale.
+      // pending list until another note is emitted. A tie can still extend the
+      // most recent shortened note even when its key-off was before this tick.
       const u32 currentTick = getTime();
-      pMidiTrack->purgePrevNoteOffsBefore(currentTick);
+      pMidiTrack->retainPrevNoteOffsForExtension(currentTick);
       auto& timeline = parentSeq->timedEventIndex();
+      const bool hasActiveCandidate = std::ranges::any_of(prevDurEventIndices,
+        [&timeline, currentTick](SeqEventTimeIndex::Index idx) {
+          return timeline.endTickExclusive(idx) >= currentTick;
+        });
+      u32 latestEndTick = 0;
+      if (!hasActiveCandidate) {
+        for (auto idx : prevDurEventIndices) {
+          latestEndTick = std::max(latestEndTick, timeline.endTickExclusive(idx));
+        }
+      }
       prevDurEventIndices.erase(
         std::remove_if(prevDurEventIndices.begin(), prevDurEventIndices.end(),
-          [&timeline, currentTick](SeqEventTimeIndex::Index idx) {
-            return timeline.endTickExclusive(idx) < currentTick;
+          [&timeline, currentTick, hasActiveCandidate, latestEndTick](SeqEventTimeIndex::Index idx) {
+            const u32 endTick = timeline.endTickExclusive(idx);
+            return hasActiveCandidate ? endTick < currentTick : endTick < latestEndTick;
           }),
         prevDurEventIndices.end());
     }
