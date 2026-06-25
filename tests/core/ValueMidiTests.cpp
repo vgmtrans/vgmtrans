@@ -533,6 +533,68 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
          "sequence-event vibrato simulation should emit a delayed triangle LFO bend shape");
 }
 
+void performanceMidiRendererDoesNotDoubleDelayVibrato() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 8,
+          .events =
+              {
+                  TempoPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .microsecondsPerQuarter = 1'000'000,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .amount = 0.0,
+                      .pitchDepthSemitones = 0.0,
+                  },
+                  VibratoDelayPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .delayTicks = 2,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .amount = 1.0,
+                      .frequencyHz = 12.5,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .key = 60,
+                      .linearVelocity = 1.0,
+                      .durationTicks = 8,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 2},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .amount = 0.5,
+                      .pitchDepthSemitones = 1.0,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(
+      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+
+  std::vector<std::pair<u64, s16>> pitchBends;
+  for (const MidiEvent& event : midiSequence.tracks[0].events) {
+    if (const auto* pitchBend = std::get_if<PitchBend>(&event)) {
+      pitchBends.emplace_back(pitchBend->tick, pitchBend->value);
+    }
+  }
+
+  const std::vector<std::pair<u64, s16>> expectedPitchBends{
+      {0, 0}, {4, 2048}, {5, 4096}, {6, 2048}, {7, 0}, {8, -2048},
+  };
+  expect(pitchBends == expectedPitchBends,
+         "sequence-event vibrato simulation should not apply a second delay to source-delayed depth envelopes");
+}
+
 void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 100},
@@ -873,6 +935,7 @@ void runValueMidiTests() {
   performanceMidiRendererQuantizesPitchBendAndPortamento();
   performanceMidiRendererSkipsRedundantPitchBends();
   performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape();
+  performanceMidiRendererDoesNotDoubleDelayVibrato();
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
   exportRequestSequenceLoopsAffectMidiLowering();
   modulationAnalysisReportsObservedMidiControllerRanges();

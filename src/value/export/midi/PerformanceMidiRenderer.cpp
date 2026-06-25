@@ -306,13 +306,14 @@ void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tic
 }
 
 void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel) {
-  if (state.simulatedVibratoDepthSemitones <= 0.0 || state.vibratoFrequencyHz <= 0.0) {
+  if (!state.vibratoDelayArmed && (state.simulatedVibratoDepthSemitones <= 0.0 || state.vibratoFrequencyHz <= 0.0)) {
     return;
   }
 
   state.vibratoStartTick = tick + state.vibratoDelayTicks;
   state.vibratoCursorTick = tick;
   state.vibratoPhaseCycles = 0.0;
+  state.vibratoDelayArmed = false;
   if (state.simulatedVibratoSemitones != 0.0) {
     state.simulatedVibratoSemitones = 0.0;
     addCombinedPitchBend(track, state, tick, channel, false);
@@ -321,8 +322,8 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
 
 bool shouldRestartSimulatedVibratoForNote(const PerformanceEvent& event, const RenderTrackState& state) {
   const auto* note = std::get_if<NotePerformanceEvent>(&event);
-  return note != nullptr && !note->extendsPrevious && state.simulatedVibratoDepthSemitones > 0.0 &&
-         state.vibratoFrequencyHz > 0.0;
+  return note != nullptr && !note->extendsPrevious &&
+         (state.vibratoDelayArmed || (state.simulatedVibratoDepthSemitones > 0.0 && state.vibratoFrequencyHz > 0.0));
 }
 
 void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,

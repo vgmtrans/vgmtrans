@@ -3422,8 +3422,8 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
   return stats;
 }
 
-std::map<std::string, PerformanceModulationStats> valueKonamiSnesPerformanceModulationStats(
-    const std::filesystem::path& path, u32 sequenceLoops) {
+std::map<std::string, PerformanceModulationStats> valueFormatPerformanceModulationStats(
+    const std::filesystem::path& path, std::string_view formatName, std::string_view label, u32 sequenceLoops) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
@@ -3431,7 +3431,7 @@ std::map<std::string, PerformanceModulationStats> valueKonamiSnesPerformanceModu
   const SessionSnapshot project = session.scanPendingSources();
   if (project.collections().empty()) {
     std::ostringstream message;
-    message << "value scanner did not discover KonamiSnes performance collections";
+    message << "value scanner did not discover " << label << " performance collections";
     if (!project.diagnostics().empty()) {
       message << ": " << project.diagnostics().front().message;
     }
@@ -3440,32 +3440,30 @@ std::map<std::string, PerformanceModulationStats> valueKonamiSnesPerformanceModu
 
   std::map<std::string, PerformanceModulationStats> statsByCollection;
   for (const auto& collection : project.collections()) {
-    if (!collection.sequence) {
+    if (!valueCollectionHasSequenceFormat(project, collection, formatName)) {
       continue;
     }
     const auto* sequence = assetById<SequenceProgramAsset>(project, *collection.sequence);
-    if (sequence == nullptr || sequence->metadata.format != "KonamiSnes") {
-      continue;
-    }
     const std::string key = valueMidiCollectionKey(project, collection);
     auto [_, inserted] = statsByCollection.emplace(
         key, performanceModulationStats(sequence->program, session.dialects(), sequenceLoops));
     if (!inserted) {
-      throw std::runtime_error("duplicate KonamiSnes performance collection key: " + key);
+      throw std::runtime_error("duplicate " + std::string(label) + " performance collection key: " + key);
     }
   }
   if (statsByCollection.empty()) {
-    throw std::runtime_error("value scanner did not discover KonamiSnes performance collections");
+    throw std::runtime_error("value scanner did not discover " + std::string(label) + " performance collections");
   }
   return statsByCollection;
 }
 
-int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u32 sequenceLoops = 0) {
-  const auto valueMidis =
-      valueCollectionMidis(path, sequenceLoops, ModulationConversionPolicy::SequenceEventSimulation);
-  const auto performanceStats = valueKonamiSnesPerformanceModulationStats(path, sequenceLoops);
+int validateFormatDirectMidiSimulation(const std::filesystem::path& path, std::string_view formatName,
+                                       std::string_view label, u32 sequenceLoops = 0) {
+  const auto valueMidis = valueFormatCollectionMidis(path, formatName, label, sequenceLoops,
+                                                     ModulationConversionPolicy::SequenceEventSimulation);
+  const auto performanceStats = valueFormatPerformanceModulationStats(path, formatName, label, sequenceLoops);
   if (valueMidis.empty()) {
-    std::cout << "value KonamiSnes simulation scan did not produce MIDI collections\n";
+    std::cout << "value " << label << " simulation scan did not produce MIDI collections\n";
     return 1;
   }
 
@@ -3473,7 +3471,7 @@ int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u3
     const auto stats = simulatedModulationStats(midi);
     const auto performanceFound = performanceStats.find(collectionName);
     if (performanceFound == performanceStats.end()) {
-      std::cout << "value KonamiSnes simulation scan did not produce performance stats for '" << collectionName
+      std::cout << "value " << label << " simulation scan did not produce performance stats for '" << collectionName
                 << "'\n";
       return 1;
     }
@@ -3517,11 +3515,11 @@ int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u3
       return 1;
     }
     if (performance.activeVibratoDepthEvents != 0 && performance.maxVibratoPitchDepthSemitones <= 0.0) {
-      std::cout << "KonamiSnes performance emitted active vibrato without a physical pitch depth\n";
+      std::cout << label << " performance emitted active vibrato without a physical pitch depth\n";
       return 1;
     }
     if (performance.activeVibratoDepthEvents != 0 && performance.maxVibratoRateHz <= 0.0) {
-      std::cout << "KonamiSnes performance emitted active vibrato without a physical rate\n";
+      std::cout << label << " performance emitted active vibrato without a physical rate\n";
       return 1;
     }
     if (performance.activeVibratoDepthEvents != 0 && stats.nonCenterPitchBendCount == 0) {
@@ -3535,9 +3533,17 @@ int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u3
     }
   }
 
-  std::cout << "KonamiSnes direct MIDI simulation sanity ok: collections=" << valueMidis.size()
+  std::cout << label << " direct MIDI simulation sanity ok: collections=" << valueMidis.size()
             << " loops=" << sequenceLoops << "\n";
   return 0;
+}
+
+int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  return validateFormatDirectMidiSimulation(path, "KonamiSnes", "KonamiSnes", sequenceLoops);
+}
+
+int validateAkaoSnesDirectMidiSimulation(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  return validateFormatDirectMidiSimulation(path, "AkaoSnes", "AkaoSnes", sequenceLoops);
 }
 
 bool isTailSetupEvent(const NormalizedMidiEvent& event) {
@@ -4359,6 +4365,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity akao-direct-synth <psf-or-raw-file>\n"
       << "  vgmtrans-parity akao-direct-summary <psf-or-raw-file>\n"
       << "  vgmtrans-parity akao-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
+      << "  vgmtrans-parity akao-snes-direct-midi-sim <rsn-or-spc-file> [sequence-loops]\n"
       << "  vgmtrans-parity akao-snes-direct-synth <rsn-or-spc-file>\n"
       << "  vgmtrans-parity akao-snes-direct-summary <rsn-or-spc-file>\n"
       << "  vgmtrans-parity konami-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
@@ -4429,6 +4436,14 @@ int main(int argc, char** argv) {
 
     if (argc == 4 && std::string(argv[1]) == "akao-snes-direct-midi") {
       return compareAkaoSnesDirectMidi(argv[2], parseLoopCount(argv[3]));
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "akao-snes-direct-midi-sim") {
+      return validateAkaoSnesDirectMidiSimulation(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "akao-snes-direct-midi-sim") {
+      return validateAkaoSnesDirectMidiSimulation(argv[2], parseLoopCount(argv[3]));
     }
 
     if (argc == 3 && std::string(argv[1]) == "akao-snes-direct-synth") {
