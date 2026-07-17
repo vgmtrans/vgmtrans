@@ -51,6 +51,7 @@ enum class SequenceSemantic : u8 {
   Note,
   Rest,
   Wait,
+  // Legacy MIDI-shaped category retained for cursor dialects.
   Program,
   Level,
   Pan,
@@ -68,6 +69,7 @@ enum class SequenceSemantic : u8 {
   State,
   Meta,
   Unsupported,
+  Instrument,
 };
 
 using SourceValue = std::variant<std::monostate, bool, u64, s64, double, std::string>;
@@ -143,6 +145,7 @@ namespace ObjectRefs {
 [[nodiscard]] ObjectRef sequence(AssetId sequenceAsset);
 [[nodiscard]] ObjectRef sequenceTrack(AssetId sequenceAsset, u32 trackIndex);
 [[nodiscard]] ObjectRef instrument(AssetId instrumentSetAsset, u32 instrumentIndex);
+[[nodiscard]] ObjectRef instrumentIndex(u32 instrumentIndex);
 [[nodiscard]] ObjectRef instrumentProgram(u32 bank, u32 program);
 [[nodiscard]] ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex);
 [[nodiscard]] ObjectRef sampleIndex(u32 sampleIndex);
@@ -210,8 +213,7 @@ public:
   [[nodiscard]] std::vector<SourceAnnotationId> ownedBy(ObjectRef object) const;
   [[nodiscard]] std::vector<SourceAnnotationId> childrenOf(SourceAnnotationId parent) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withRole(SourceId source, SourceRole role) const;
-  [[nodiscard]] std::vector<SourceAnnotationId> withSequenceSemantic(SourceId source,
-                                                                     SequenceSemantic semantic) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> withSequenceSemantic(SourceId source, SequenceSemantic semantic) const;
   [[nodiscard]] std::vector<SourceLink> linksFrom(SourceAnnotationId id) const;
   [[nodiscard]] std::vector<SourceAnnotationId> linksTo(const SourceTarget& target) const;
 

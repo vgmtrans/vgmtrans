@@ -553,10 +553,11 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   // by index. The terminal EOP record is required by the SF2 table format.
   std::vector<u8> payload;
   for (u32 i = 0; i < instruments.size(); ++i) {
-    const auto& instrument = *instruments[i].instrument;
+    const auto& resolved = instruments[i];
+    const auto& instrument = *resolved.instrument;
     writeFixedString(payload, sf2Name(instrument.name, "Preset"), 20);
-    writeLe16(payload, clampU16(instrument.program));
-    writeLe16(payload, sf2Bank(instrument.bank));
+    writeLe16(payload, clampU16(resolved.program));
+    writeLe16(payload, sf2Bank(resolved.bank));
     writeLe16(payload, clampU16(i));
     writeLe32(payload, 0);
     writeLe32(payload, 0);

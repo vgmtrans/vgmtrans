@@ -568,6 +568,29 @@ void exportDiagnosticsPreserveSourceRanges() {
   expectDiagnosticRange(dlsBadRegion.diagnostics, "Region sample reference was not found", regionRange);
 }
 
+void synthExportAssignsPresetAddressFromSourceInstrumentIdentity() {
+  const SampleCollectionAsset samples{
+      .metadata = AssetMetadata{.id = AssetId{7}},
+  };
+  const InstrumentSetAsset instruments{
+      .instruments = {Instrument{
+          .identity = InstrumentIdentity{.domain = "probe.instrument", .key = 133},
+          .regions = {Region{
+              .sample = SampleRef{.collection = samples.metadata.id, .index = 0},
+          }},
+      }},
+  };
+  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instruments};
+  const std::array<const SampleCollectionAsset*, 1> sampleCollections{&samples};
+  const SynthSampleIndexMap sampleIndexes{{{samples.metadata.id.value, 0}, 0}};
+  std::vector<Diagnostic> diagnostics;
+
+  const auto resolved = resolveSynthInstruments(instrumentSets, sampleCollections, sampleIndexes, diagnostics);
+  expect(diagnostics.empty() && resolved.size() == 1, "source instrument fixture should resolve for synth export");
+  expect(resolved[0].bank == 1 && resolved[0].program == 5,
+         "synth lowering should assign preset addressing from the neutral source key");
+}
+
 }  // namespace
 
 void runValueSynthExportTests() {
@@ -579,4 +602,5 @@ void runValueSynthExportTests() {
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();
   exportDiagnosticsPreserveSourceRanges();
+  synthExportAssignsPresetAddressFromSourceInstrumentIdentity();
 }

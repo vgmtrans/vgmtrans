@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatRegistry.h"
+#include "value/scan/FormatDefinition.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -21,6 +21,7 @@ namespace vgmtrans::formats::capcom_snes {
 inline constexpr u64 kCapcomSnesAramSize = 0x10000;
 inline constexpr u32 kCapcomSnesMaxTracks = 8;
 inline constexpr u32 kCapcomSnesPpqn = 48;
+inline constexpr std::string_view kCapcomSnesInstrumentDomain = "capcom-snes.instrument";
 
 enum class CapcomSnesEngineVersion : u8 {
   none,
@@ -54,7 +55,7 @@ enum class CapcomSnesCommandKind : u32 {
   Tempo,
   DurationRate,
   Volume,
-  Program,
+  Instrument,
   Octave,
   GlobalTranspose,
   Transpose,
@@ -78,15 +79,18 @@ enum class CapcomSnesCommandKind : u32 {
 enum class CapcomSnesOperand : u32 {
   KeyIndex = 1,
   DurationIndex,
-  Raw,
+  TempoMicrosecondsPerQuarter,
+  LinearGain,
+  StereoPosition,
+  TuningCents,
+  PortamentoMillisecondsPerCent,
+  Enabled,
+  ReleaseGain,
   Attributes,
   Rate,
-  Bank,
-  Program,
+  Instrument,
   Octave,
   Semitones,
-  Tuning,
-  Time,
   Slot,
   Count,
   Destination,
@@ -123,7 +127,6 @@ struct CapcomSnesInstrumentInfo {
 [[nodiscard]] std::optional<CapcomSnesLayout> findCapcomSnesLayout(core::ByteReader reader);
 
 [[nodiscard]] const core::SequenceDialect& capcomSnesSequenceDialect();
-void registerCapcomSnesSequenceDialects(core::SequenceDialectRegistry& registry);
 
 [[nodiscard]] core::TrackProgram decodeCapcomSnesSourceTrack(
     core::ByteReader reader, CapcomSnesEngineVersion version, u32 sourceTrackNumber, u32 startAddress,
@@ -153,6 +156,6 @@ void registerCapcomSnesSequenceDialects(core::SequenceDialectRegistry& registry)
     const std::vector<CapcomSnesSampleInfo>& sampleInfos, std::string_view displayName);
 
 [[nodiscard]] core::ScanResult scanCapcomSnes(const core::ScanInput& input);
-void registerCapcomSnesModule(core::FormatRegistry& registry);
+[[nodiscard]] core::FormatDefinition capcomSnesDefinition();
 
 }  // namespace vgmtrans::formats::capcom_snes

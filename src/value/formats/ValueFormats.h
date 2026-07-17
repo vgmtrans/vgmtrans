@@ -7,16 +7,12 @@
 
 namespace vgmtrans::core {
 
-class FormatRegistry;
-class SequenceDialectRegistry;
 class Session;
 
 }  // namespace vgmtrans::core
 
 namespace vgmtrans::formats {
 
-void registerValueFormatModules(core::FormatRegistry& registry);
-void registerValueSequenceDialects(core::SequenceDialectRegistry& registry);
 void registerValueFormats(core::Session& session);
 
 }  // namespace vgmtrans::formats

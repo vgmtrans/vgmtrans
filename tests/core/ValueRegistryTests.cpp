@@ -6,9 +6,11 @@
 
 #include "ValueTestSupport.h"
 
+#include "value/scan/FormatDefinition.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceCursorDialect.h"
 #include "value/sequence/BytecodeDecode.h"
+#include "value/session/Session.h"
 
 namespace {
 
@@ -342,6 +344,18 @@ void sequenceDialectRegistryStoresCopyableDialectValues() {
   expect(threw, "sequence dialect registry should reject dialects with empty IDs");
 }
 
+void sessionRegistersOneFormatDefinitionAtTheAuthoringSurface() {
+  Session session;
+  session.registerFormat(FormatDefinition{
+      .module = probeSequenceModule(),
+      .sequenceDialect = probeSequenceDialect(),
+  });
+
+  expect(session.formats().modules().size() == 1 && session.formats().modules()[0].name == "ProbeSequence",
+         "format definition should register its scanner");
+  expect(session.dialects().contains("probe"), "format definition should register its executor family");
+}
+
 void scanResultBuilderCoversCommonScannerPlumbing() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "builder.probe"}, {0xaa, 0xbb, 0xcc});
@@ -513,6 +527,7 @@ void runValueRegistryTests() {
   cursorDialectSuppressesMalformedRenderEvents();
   formatRegistryStoresCopyableModuleValues();
   sequenceDialectRegistryStoresCopyableDialectValues();
+  sessionRegistersOneFormatDefinitionAtTheAuthoringSurface();
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderRejectsReferencedUncommittedHandles();
   scanResultBuilderRejectsWrongRoleHandleReuse();

@@ -102,12 +102,45 @@ struct SemanticOperandId {
 
 using SemanticOperandValue = std::variant<bool, u64, s64, double, Address>;
 
+// The role is intentionally small and format-independent. Format-local operand
+// IDs remain the executor's precise vocabulary; roles let generic analysis and
+// SourceMap projection recognize the few relationships shared by all drivers.
+enum class SemanticOperandRole : u8 {
+  Value,
+  NoteKey,
+  Duration,
+  Pitch,
+  Level,
+  Pan,
+  Modulation,
+  State,
+  Count,
+  Address,
+  JumpTarget,
+  CallTarget,
+  LoopTarget,
+  RepeatTarget,
+  Instrument,
+  InstrumentBank,
+  InstrumentProgram,
+};
+
 struct SemanticOperand {
   SemanticOperandId id;
+  // value is the resolved value consumed by execution. encodedValue is present
+  // when the source representation differs; the SourceMap then shows both
+  // without making playback repeat the conversion.
   SemanticOperandValue value;
-  // Empty for interpreted values derived from one or more encoded operands.
   SourceRange range;
+  std::string name;
+  SourceValueDisplay display = SourceValueDisplay::Default;
+  SemanticOperandRole role = SemanticOperandRole::Value;
+  std::optional<SemanticOperandValue> encodedValue;
+  std::string encodedName;
+  SourceValueDisplay encodedDisplay = SourceValueDisplay::Default;
 };
+
+[[nodiscard]] SourceValue semanticOperandSourceValue(const SemanticOperandValue& value);
 
 // One decoded source opcode. Source bytes are retained only for legacy dialects.
 // Semantic dialects execute kind/operands/flow and therefore cannot reparse the

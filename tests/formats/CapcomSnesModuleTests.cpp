@@ -18,9 +18,12 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -33,6 +36,103 @@ void expect(bool condition, const std::string& message) {
   if (!condition) {
     throw std::runtime_error(message);
   }
+}
+
+std::string hexAddress(u64 value) {
+  std::ostringstream out;
+  out << std::hex << std::uppercase << std::setfill('0') << std::setw(4) << value;
+  return out.str();
+}
+
+std::string snapshotNumber(double value) {
+  std::ostringstream out;
+  out << std::setprecision(9) << value;
+  return out.str();
+}
+
+std::string semanticValueSnapshot(const SemanticOperandValue& value) {
+  return std::visit(
+      [](const auto& typedValue) {
+        using T = std::decay_t<decltype(typedValue)>;
+        if constexpr (std::is_same_v<T, bool>) {
+          return std::string(typedValue ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, Address>) {
+          return "@" + hexAddress(typedValue.value);
+        } else if constexpr (std::is_same_v<T, double>) {
+          return snapshotNumber(typedValue);
+        } else {
+          return std::to_string(typedValue);
+        }
+      },
+      value);
+}
+
+std::string decodedTrackSnapshot(const TrackProgram& track) {
+  std::string snapshot;
+  for (const auto& command : track.commands) {
+    if (!snapshot.empty()) {
+      snapshot += '|';
+    }
+    snapshot += hexAddress(command.address.value) + ':' + std::to_string(command.kind.value) + ':' +
+                std::to_string(command.encodedSize);
+    for (const auto& operand : command.operands) {
+      snapshot += ',' + operand.name + '=' + semanticValueSnapshot(operand.value);
+      if (operand.encodedValue) {
+        snapshot += '<' + semanticValueSnapshot(*operand.encodedValue) + '>';
+      }
+    }
+    snapshot += ",flow=" + std::to_string(static_cast<int>(command.flow.kind));
+    if (command.flow.fallthrough) {
+      snapshot += "->" + hexAddress(command.flow.fallthrough->value);
+    }
+    for (const Address target : command.flow.staticTargets) {
+      snapshot += "=>" + hexAddress(target.value);
+    }
+  }
+  return snapshot;
+}
+
+std::string performanceTrackSnapshot(const PerformanceTrack& track) {
+  std::string snapshot;
+  for (const auto& event : track.events) {
+    if (!snapshot.empty()) {
+      snapshot += '|';
+    }
+    std::visit(
+        [&](const auto& typedEvent) {
+          using T = std::decay_t<decltype(typedEvent)>;
+          if constexpr (std::is_same_v<T, TempoPerformanceEvent>) {
+            snapshot += "tempo@" + std::to_string(typedEvent.header.tick) + '=' +
+                        std::to_string(typedEvent.microsecondsPerQuarter);
+          } else if constexpr (std::is_same_v<T, InstrumentPerformanceEvent>) {
+            snapshot +=
+                "instrument@" + std::to_string(typedEvent.header.tick) + '=' +
+                (typedEvent.sourceInstrument ? typedEvent.sourceInstrument->domain : "legacy") + ':' +
+                std::to_string(typedEvent.sourceInstrument ? typedEvent.sourceInstrument->key : typedEvent.program);
+          } else if constexpr (std::is_same_v<T, LevelPerformanceEvent>) {
+            snapshot += "level@" + std::to_string(typedEvent.header.tick) + '=' +
+                        snapshotNumber(typedEvent.linearGain) + "/q" +
+                        std::to_string(typedEvent.sourceQuantization ? typedEvent.sourceQuantization->levels : 0);
+          } else if constexpr (std::is_same_v<T, PanPerformanceEvent>) {
+            snapshot += "pan@" + std::to_string(typedEvent.header.tick) + '=' +
+                        snapshotNumber(typedEvent.stereoPosition) + ',' + snapshotNumber(typedEvent.linearGain);
+          } else if constexpr (std::is_same_v<T, ModulationPerformanceEvent>) {
+            snapshot += "mod@" + std::to_string(typedEvent.header.tick) + ':' +
+                        std::to_string(static_cast<int>(typedEvent.target)) + '=' + snapshotNumber(typedEvent.amount);
+          } else if constexpr (std::is_same_v<T, NotePerformanceEvent>) {
+            snapshot += "note@" + std::to_string(typedEvent.header.tick) + '=' + snapshotNumber(typedEvent.key) + '/' +
+                        std::to_string(typedEvent.durationTicks);
+          } else if constexpr (std::is_same_v<T, ReverbPerformanceEvent>) {
+            snapshot += "reverb@" + std::to_string(typedEvent.header.tick) + '=' + snapshotNumber(typedEvent.send);
+          } else if constexpr (std::is_same_v<T, MonoModePerformanceEvent>) {
+            snapshot += "mono@" + std::to_string(typedEvent.header.tick) + '=' + std::to_string(typedEvent.channels);
+          } else {
+            snapshot += "other@" + std::to_string(typedEvent.header.tick);
+          }
+        },
+        event);
+  }
+  return snapshot;
 }
 
 const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
@@ -173,8 +273,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto& firstTrack = sequence->program.tracks[0];
   expect(firstTrack.commands.size() == 8, "track should decode all fixture commands");
   constexpr std::array<std::string_view, 8> expectedCommandDetailKinds{
-      "capcom-snes.tempo", "capcom-snes.program", "capcom-snes.volume", "capcom-snes.pan",
-      "capcom-snes.lfo",   "capcom-snes.lfo",     "capcom-snes.note",   "capcom-snes.end",
+      "capcom-snes.tempo", "capcom-snes.instrument", "capcom-snes.volume", "capcom-snes.pan",
+      "capcom-snes.lfo",   "capcom-snes.lfo",        "capcom-snes.note",   "capcom-snes.end",
   };
   for (size_t index = 0; index < expectedCommandDetailKinds.size(); ++index) {
     expect(commandDetailKind(project.sourceMap(), firstTrack.commands[index]) == expectedCommandDetailKinds[index],
@@ -184,11 +284,14 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(firstTrack.commands[0].bytes.size == 0 &&
              firstTrack.commands[0].kind.value == static_cast<u32>(CapcomSnesCommandKind::Tempo),
          "CapcomSnes tempo should be a byte-free typed semantic command");
-  const SemanticOperand* rawTempo =
-      semanticOperand(firstTrack.commands[0], SemanticOperandId{static_cast<u32>(CapcomSnesOperand::Raw)});
-  expect(rawTempo != nullptr && std::get<u64>(rawTempo->value) == 0x1234,
-         "tempo command should preserve its parsed big-endian value as a typed operand");
-  expect(rawTempo->range.offset == 0x3001 && rawTempo->range.size == 2,
+  const SemanticOperand* tempo = semanticOperand(
+      firstTrack.commands[0], SemanticOperandId{static_cast<u32>(CapcomSnesOperand::TempoMicrosecondsPerQuarter)});
+  expect(tempo != nullptr && std::get<u64>(tempo->value) == 42191 && tempo->encodedValue &&
+             std::get<u64>(*tempo->encodedValue) == 0x1234,
+         "tempo command should retain resolved playback meaning and its encoded value");
+  expect(tempo->name == "microseconds_per_quarter" && tempo->encodedName == "raw",
+         "semantic operands should retain generic SourceMap presentation metadata");
+  expect(tempo->range.offset == 0x3001 && tempo->range.size == 2,
          "typed operands should retain their exact source range");
   expect(firstTrack.commands[0].flow.fallthrough && firstTrack.commands[0].flow.fallthrough->value == 0x3003,
          "semantic commands should retain decode-time control flow");
@@ -200,8 +303,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "program command should record its instrument reference as a source annotation link");
   const auto* programInstrument = std::get_if<ObjectRef>(&programInstrumentLink->target);
   expect(programInstrument != nullptr && programInstrument->kind == ObjectKind::Instrument &&
-             !programInstrument->asset.valid() && programInstrument->index0 == 0 && programInstrument->index1 == 0,
-         "program source link should preserve unresolved bank/program selectors");
+             !programInstrument->asset.valid() && programInstrument->index0 == 0,
+         "program source link should preserve the unresolved source instrument identity");
   expect(programAnnotation.range.offset == 0x3003 && programAnnotation.range.size == 2,
          "program source link should be anchored by the program command annotation range");
 
@@ -274,6 +377,23 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "CapcomSnes scan should annotate BRR sample payloads");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
+  const auto instrumentEvent = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<InstrumentPerformanceEvent>(event);
+  });
+  expect(instrumentEvent != performance.tracks[0].events.end(),
+         "CapcomSnes performance should select a source instrument");
+  const auto& instrumentSelection = std::get<InstrumentPerformanceEvent>(*instrumentEvent);
+  expect(instrumentSelection.sourceInstrument ==
+                 InstrumentIdentity{.domain = std::string(kCapcomSnesInstrumentDomain), .key = 0} &&
+             instrumentSelection.bank == 0 && instrumentSelection.program == 0 && !instrumentSelection.forceBankSelect,
+         "CapcomSnes performance should not pre-encode target bank/program behavior");
+  const auto levelEvent = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<LevelPerformanceEvent>(event);
+  });
+  expect(levelEvent != performance.tracks[0].events.end() &&
+             std::get<LevelPerformanceEvent>(*levelEvent).sourceQuantization &&
+             std::get<LevelPerformanceEvent>(*levelEvent).sourceQuantization->levels == 256,
+         "CapcomSnes volume should retain neutral source quantization rather than a MIDI bit width");
   const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
@@ -371,7 +491,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument set");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid instrument");
   const auto& instrument = instruments->instruments[0];
-  expect(instrument.program == 0, "instrument program should match table index");
+  expect(instrument.identity == InstrumentIdentity{.domain = std::string(kCapcomSnesInstrumentDomain), .key = 0},
+         "instrument should preserve its source-domain identity without target addressing");
   expect(instrument.range.offset == 0x4000 && instrument.range.size == 6,
          "instrument should preserve the table entry source range");
   expect(instrument.regions.size() == 1, "instrument should expose one region");
@@ -456,6 +577,37 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "collection should reference instrument set");
   expect(project.collections()[0].sampleCollections == std::vector<AssetId>{samples->metadata.id},
          "collection should reference sample collection");
+}
+
+void capcomSnesSemanticAndPerformanceSnapshotsAreStable() {
+  const auto bytes = makeCapcomSnesAram();
+  constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
+  const auto& dialect = capcomSnesSequenceDialect();
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{7}, bytes), version, 0, 0x3000);
+  const std::string decoded = decodedTrackSnapshot(track);
+  constexpr std::string_view expectedDecoded = "3000:8:3,microseconds_per_quarter=42191<4660>,flow=0->3003|"
+                                               "3003:11:2,instrument=0,flow=0->3005|"
+                                               "3005:10:2,linear_gain=0.403921569<64>,flow=0->3007|"
+                                               "3007:21:2,stereo_position=0<0>,linear_gain=0.89493202,flow=0->3009|"
+                                               "3009:23:3,type=0,value=32,flow=0->300C|"
+                                               "300C:23:3,type=2,value=32,flow=0->300F|"
+                                               "300F:1:1,duration_index=2,key_index=1,flow=0->3010|"
+                                               "3010:20:1,flow=4";
+  expect(decoded == expectedDecoded, "CapcomSnes decoded-command golden changed:\n" + decoded);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
+      .tracks = {track},
+  };
+  const std::string performance = performanceTrackSnapshot(SequenceVm().render(program, dialect).tracks[0]);
+  constexpr std::string_view expectedPerformance =
+      "reverb@0=0|mono@0=0|tempo@0=42191|instrument@0=capcom-snes.instrument:0|"
+      "level@0=0.403921569/q256|pan@0=0,0.89493202|mod@0:0=0|mod@0:0=0.251968504|"
+      "mod@0:1=0.625441449|mod@0:3=0.625441449|note@0=0/6";
+  expect(performance == expectedPerformance, "CapcomSnes neutral-performance golden changed:\n" + performance);
 }
 
 void capcomSnesModuleScansSpcThroughVirtualAramSource() {
@@ -563,7 +715,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
 
   expect(commandDetailKind(project.sourceMap(), commands[1]) == "capcom-snes.note-attributes",
          "CapcomSnes attributes opcode should decode as a local command");
-  const SourceField* attributeField = fieldWithName(commandAnnotation(project.sourceMap(), commands[1]), "raw");
+  const SourceField* attributeField = fieldWithName(commandAnnotation(project.sourceMap(), commands[1]), "attributes");
   expect(fieldEquals(attributeField, u64{0x48}),
          "CapcomSnes note attributes should preserve their raw attribute byte in source annotations");
   expect(commands[1].range.offset == 0x3002 && commands[1].range.size == 2,
@@ -625,13 +777,11 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   expect(track.addressIndex.find(Address{0x3009}).has_value(),
          "CapcomSnes source dialect should index decoded command addresses");
   const SourceAnnotation& programAnnotation = commandAnnotation(annotations, track.commands[1]);
-  const SourceField* rawProgram = fieldWithName(programAnnotation, "raw");
-  const SourceField* bankProgram = fieldWithName(programAnnotation, "bank");
-  const SourceField* programNumber = fieldWithName(programAnnotation, "program");
-  expect(fieldEquals(rawProgram, u64{0x85}) && fieldEquals(bankProgram, u64{1}) && fieldEquals(programNumber, u64{5}),
-         "CapcomSnes source command should preserve raw and decoded program operands in source annotations");
+  const SourceField* instrument = fieldWithName(programAnnotation, "instrument");
+  expect(fieldEquals(instrument, u64{0x85}),
+         "CapcomSnes source command should preserve its source instrument identity");
 
-  expect(commandAnnotation(annotations, track.commands[1]).label == "Program",
+  expect(commandAnnotation(annotations, track.commands[1]).label == "Instrument",
          "CapcomSnes dialect should describe commands through local command code");
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -778,7 +928,7 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   expect(fieldEquals(tuning, s64{-128}) && fieldEquals(cents, -50.0),
          "CapcomSnes tuning command should preserve raw and interpreted operands in source annotations");
   const SourceField* gain = fieldWithName(commandAnnotation(annotations, track.commands[5]), "gain");
-  expect(fieldEquals(gain, s64{165}),
+  expect(fieldEquals(gain, u64{165}),
          "CapcomSnes release command should keep the driver GAIN display value in source annotations");
   expect(commandAnnotation(annotations, track.commands[6]).playbackStatus == CommandPlaybackStatus::NoOp,
          "CapcomSnes no-op command should persist no-op playback status");
@@ -876,7 +1026,7 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
   expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.repeat-until",
          "CapcomSnes repeat opcode should decode as Repeat Until");
   const SourceAnnotation& repeatAnnotation = commandAnnotation(annotations, track.commands[1]);
-  expect(fieldEquals(fieldWithName(repeatAnnotation, "slot"), s64{1}) &&
+  expect(fieldEquals(fieldWithName(repeatAnnotation, "slot"), u64{1}) &&
              fieldEquals(fieldWithName(repeatAnnotation, "count"), u64{2}) &&
              fieldEquals(fieldWithName(repeatAnnotation, "destination"), u64{0x3000}),
          "CapcomSnes repeat display should preserve slot, count, and destination in source annotations");
@@ -928,7 +1078,7 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
   expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.repeat-break",
          "CapcomSnes repeat-break opcode should decode as Repeat Break");
   const SourceAnnotation& repeatBreakAnnotation = commandAnnotation(annotations, track.commands[1]);
-  expect(fieldEquals(fieldWithName(repeatBreakAnnotation, "slot"), s64{1}) &&
+  expect(fieldEquals(fieldWithName(repeatBreakAnnotation, "slot"), u64{1}) &&
              fieldEquals(fieldWithName(repeatBreakAnnotation, "attributes"), u64{16}) &&
              fieldEquals(fieldWithName(repeatBreakAnnotation, "destination"), u64{0x300a}),
          "CapcomSnes repeat-break display should preserve slot, attributes, and destination in source annotations");

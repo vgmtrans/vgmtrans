@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/model/InstrumentIdentity.h"
 #include "value/sequence/SequenceProgram.h"
 
 #include <optional>
@@ -48,9 +49,12 @@ struct TimeSignaturePerformanceEvent {
 
 struct InstrumentPerformanceEvent {
   PerformanceEventHeader header;
+  // Legacy bank/program selection remains temporarily for cursor dialects.
+  // Semantic formats set sourceInstrument and leave target addressing to export.
   u32 bank = 0;
   u32 program = 0;
   bool forceBankSelect = false;
+  std::optional<InstrumentIdentity> sourceInstrument;
 };
 
 enum class LevelPrecisionHint {
@@ -58,22 +62,30 @@ enum class LevelPrecisionHint {
   FourteenBit,
 };
 
+struct ValueQuantization {
+  // Number of distinct source-domain values, not a destination bit width.
+  // Zero means the source is continuous or its quantization is unknown.
+  u32 levels = 0;
+};
+
 struct LevelPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted loudness as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  // Source precision hint. MIDI export options may override this without
-  // changing format code.
+  // Legacy destination-shaped hint for cursor dialects. Semantic formats use
+  // sourceQuantization, and export options may override either one.
   LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit;
+  std::optional<ValueQuantization> sourceQuantization;
 };
 
 struct ExpressionPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted expression as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  // Source precision hint. MIDI export options may override this without
-  // changing format code.
+  // Legacy destination-shaped hint for cursor dialects. Semantic formats use
+  // sourceQuantization, and export options may override either one.
   LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit;
+  std::optional<ValueQuantization> sourceQuantization;
 };
 
 struct PanPerformanceEvent {

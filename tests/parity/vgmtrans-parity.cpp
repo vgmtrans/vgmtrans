@@ -3365,8 +3365,13 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           ++stats.melodicBankNoteEvents;
         }
       } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        instrument.bank = instrumentEvent->bank;
-        instrument.program = instrumentEvent->program;
+        if (instrumentEvent->sourceInstrument) {
+          instrument.bank = instrumentEvent->sourceInstrument->key >> 7;
+          instrument.program = instrumentEvent->sourceInstrument->key & 0x7f;
+        } else {
+          instrument.bank = instrumentEvent->bank;
+          instrument.program = instrumentEvent->program;
+        }
         if (instrument.bank == (0x7f << 7) && instrument.program == 0) {
           ++stats.drumBankInstrumentEvents;
         } else {

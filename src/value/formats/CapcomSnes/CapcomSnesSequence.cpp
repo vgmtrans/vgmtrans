@@ -9,6 +9,7 @@
 #include "value/base/LevelScale.h"
 #include "value/base/RecordReader.h"
 #include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <fmt/format.h>
@@ -93,7 +94,7 @@ constexpr auto kBaseOpcodeProfile = [] {
   table[0x05] = spec(CapcomSnesCommandKind::Tempo, "Tempo", SequenceSemantic::Tempo);
   table[0x06] = spec(CapcomSnesCommandKind::DurationRate, "Duration Rate");
   table[0x07] = spec(CapcomSnesCommandKind::Volume, "Volume", SequenceSemantic::Level);
-  table[0x08] = spec(CapcomSnesCommandKind::Program, "Program", SequenceSemantic::Program);
+  table[0x08] = spec(CapcomSnesCommandKind::Instrument, "Instrument", SequenceSemantic::Instrument);
   table[0x09] = spec(CapcomSnesCommandKind::Octave, "Octave");
   table[0x0a] = spec(CapcomSnesCommandKind::GlobalTranspose, "Global Transpose", SequenceSemantic::Pitch);
   table[0x0b] = spec(CapcomSnesCommandKind::Transpose, "Transpose", SequenceSemantic::Pitch);
@@ -270,16 +271,99 @@ struct Pan {
 
 }  // namespace math
 
+struct OperandSpec {
+  std::string_view name;
+  SourceValueDisplay display = SourceValueDisplay::Default;
+  SemanticOperandRole role = SemanticOperandRole::Value;
+};
+
+[[nodiscard]] constexpr OperandSpec operandSpec(CapcomSnesOperand id) {
+  switch (id) {
+    case CapcomSnesOperand::KeyIndex:
+      return {"key_index", SourceValueDisplay::Decimal, SemanticOperandRole::NoteKey};
+    case CapcomSnesOperand::DurationIndex:
+      return {"duration_index", SourceValueDisplay::Decimal, SemanticOperandRole::Duration};
+    case CapcomSnesOperand::TempoMicrosecondsPerQuarter:
+      return {"microseconds_per_quarter", SourceValueDisplay::Decimal};
+    case CapcomSnesOperand::LinearGain:
+      return {"linear_gain", SourceValueDisplay::Default, SemanticOperandRole::Level};
+    case CapcomSnesOperand::StereoPosition:
+      return {"stereo_position", SourceValueDisplay::Default, SemanticOperandRole::Pan};
+    case CapcomSnesOperand::TuningCents:
+      return {"cents", SourceValueDisplay::Cents, SemanticOperandRole::Pitch};
+    case CapcomSnesOperand::PortamentoMillisecondsPerCent:
+      return {"milliseconds_per_cent", SourceValueDisplay::Default, SemanticOperandRole::Duration};
+    case CapcomSnesOperand::Enabled:
+      return {"enabled", SourceValueDisplay::Boolean, SemanticOperandRole::State};
+    case CapcomSnesOperand::ReleaseGain:
+      return {"gain", SourceValueDisplay::Hex, SemanticOperandRole::State};
+    case CapcomSnesOperand::Attributes:
+      return {"attributes", SourceValueDisplay::Hex, SemanticOperandRole::State};
+    case CapcomSnesOperand::Rate:
+      return {"rate", SourceValueDisplay::Decimal, SemanticOperandRole::State};
+    case CapcomSnesOperand::Instrument:
+      return {"instrument", SourceValueDisplay::Decimal, SemanticOperandRole::Instrument};
+    case CapcomSnesOperand::Octave:
+      return {"octave", SourceValueDisplay::Decimal, SemanticOperandRole::Pitch};
+    case CapcomSnesOperand::Semitones:
+      return {"semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch};
+    case CapcomSnesOperand::Slot:
+      return {"slot", SourceValueDisplay::Decimal, SemanticOperandRole::State};
+    case CapcomSnesOperand::Count:
+      return {"count", SourceValueDisplay::Decimal, SemanticOperandRole::Count};
+    case CapcomSnesOperand::Destination:
+      return {"destination", SourceValueDisplay::Address, SemanticOperandRole::Address};
+    case CapcomSnesOperand::Type:
+      return {"type", SourceValueDisplay::Decimal, SemanticOperandRole::Modulation};
+    case CapcomSnesOperand::Value:
+      return {"value", SourceValueDisplay::Hex};
+    case CapcomSnesOperand::Argument:
+      return {"argument", SourceValueDisplay::Hex};
+    case CapcomSnesOperand::Preset:
+      return {"preset", SourceValueDisplay::Hex};
+  }
+  return {"value"};
+}
+
+void addOperand(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, SemanticOperandValue value,
+                SourceRange range = {}, std::optional<SemanticOperandValue> encodedValue = std::nullopt,
+                std::string_view encodedName = {}, SourceValueDisplay encodedDisplay = SourceValueDisplay::Default,
+                std::optional<SemanticOperandRole> role = std::nullopt) {
+  const auto spec = operandSpec(id);
+  operands.push_back(SemanticOperand{
+      .id = operandId(id),
+      .value = std::move(value),
+      .range = range,
+      .name = std::string(spec.name),
+      .display = spec.display,
+      .role = role.value_or(spec.role),
+      .encodedValue = std::move(encodedValue),
+      .encodedName = std::string(encodedName),
+      .encodedDisplay = encodedDisplay,
+  });
+}
+
 void addUnsigned(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, u64 value, SourceRange range = {}) {
-  operands.push_back(SemanticOperand{.id = operandId(id), .value = value, .range = range});
+  addOperand(operands, id, SemanticOperandValue{value}, range);
 }
 
 void addSigned(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, s64 value, SourceRange range = {}) {
-  operands.push_back(SemanticOperand{.id = operandId(id), .value = value, .range = range});
+  addOperand(operands, id, SemanticOperandValue{value}, range);
 }
 
-void addAddress(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, Address value, SourceRange range = {}) {
-  operands.push_back(SemanticOperand{.id = operandId(id), .value = value, .range = range});
+void addDouble(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, double value, SourceRange range = {}) {
+  addOperand(operands, id, SemanticOperandValue{value}, range);
+}
+
+void addResolved(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, SemanticOperandValue value,
+                 SemanticOperandValue encodedValue, SourceRange range, std::string_view encodedName,
+                 SourceValueDisplay encodedDisplay = SourceValueDisplay::Default) {
+  addOperand(operands, id, std::move(value), range, std::move(encodedValue), encodedName, encodedDisplay);
+}
+
+void addAddress(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, Address value, SourceRange range = {},
+                SemanticOperandRole role = SemanticOperandRole::Address) {
+  addOperand(operands, id, SemanticOperandValue{value}, range, std::nullopt, {}, SourceValueDisplay::Default, role);
 }
 
 template <class T>
@@ -309,22 +393,32 @@ template <class T>
   return static_cast<s8>(operand<s64>(command, id));
 }
 
-[[nodiscard]] std::string detailKind(const CommandSpec& command) {
-  return "capcom-snes." + sourceLocalKind(command.localKind);
+[[nodiscard]] DecodedCommandPresentation presentation(const CommandSpec& command) {
+  const std::string localKind = sourceLocalKind(command.localKind);
+  return DecodedCommandPresentation{
+      .label = std::string(command.name),
+      .localKind = localKind,
+      .detailKind = "capcom-snes." + localKind,
+      .semantic = command.semantic,
+      .playback = command.playback,
+  };
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end,
                                                    CapcomSnesEngineVersion version,
-                                                   std::optional<SourceAnnotationId> parentAnnotation,
-                                                   SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+                                                   std::vector<Diagnostic>* diagnostics) {
   RecordReader record(reader, begin, end, diagnostics);
   const auto opcodeValue = record.u8("opcode", SourceValueDisplay::Hex);
   if (!opcodeValue) {
+    const auto truncated = spec(CapcomSnesCommandKind::Unsupported, "Truncated Command", SequenceSemantic::Unsupported,
+                                CommandPlaybackStatus::Unsupported, "truncated");
     return DecodedBytecodeCommand{
         .range = record.range(),
-        .bytes = {},
+        .opcode = 0,
+        .encodedSize = std::max<u32>(1, record.size()),
         .flow = DecodeFlow::terminalFlow(),
         .kind = commandKind(CapcomSnesCommandKind::Unsupported),
+        .presentation = presentation(truncated),
         .retainBytes = false,
     };
   }
@@ -334,17 +428,13 @@ template <class T>
       opcode >= 0x20 ? ((opcode & 0x1f) == 0 ? kRestSpec : kNoteSpec) : commandSpec(version, opcode);
   std::vector<SemanticOperand> operands;
   DecodeFlow flow;
-  std::optional<std::pair<Address, SourceLinkRole>> target;
-  std::optional<std::pair<u32, u32>> instrument;
 
   if (opcode >= 0x20) {
     const u8 durationIndex = opcode >> 5;
     addUnsigned(operands, CapcomSnesOperand::DurationIndex, durationIndex, opcodeValue.range);
-    record.derived("duration_index", durationIndex);
     if ((opcode & 0x1f) != 0) {
       const u8 keyIndex = opcode & 0x1f;
       addUnsigned(operands, CapcomSnesOperand::KeyIndex, keyIndex, opcodeValue.range);
-      record.derived("key_index", keyIndex);
     }
   } else {
     switch (decodedSpec.kind) {
@@ -355,8 +445,9 @@ template <class T>
       }
       case CapcomSnesCommandKind::Tempo: {
         const auto value = record.u16be("raw");
-        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
-        record.derived("microseconds_per_quarter", math::tempoMicrosecondsPerQuarter(*value));
+        addResolved(operands, CapcomSnesOperand::TempoMicrosecondsPerQuarter,
+                    SemanticOperandValue{static_cast<u64>(math::tempoMicrosecondsPerQuarter(*value))},
+                    SemanticOperandValue{static_cast<u64>(*value)}, value.range, "raw");
         break;
       }
       case CapcomSnesCommandKind::DurationRate: {
@@ -367,20 +458,13 @@ template <class T>
       case CapcomSnesCommandKind::Volume:
       case CapcomSnesCommandKind::MasterVolume: {
         const auto value = record.u8("raw");
-        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
-        record.derived("linear_gain", math::volumeGain(version, *value));
+        addResolved(operands, CapcomSnesOperand::LinearGain, SemanticOperandValue{math::volumeGain(version, *value)},
+                    SemanticOperandValue{static_cast<u64>(*value)}, value.range, "raw");
         break;
       }
-      case CapcomSnesCommandKind::Program: {
-        const auto value = record.u8("raw");
-        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
-        const u32 bank = *value >> 7;
-        const u32 program = *value & 0x7f;
-        addUnsigned(operands, CapcomSnesOperand::Bank, bank);
-        addUnsigned(operands, CapcomSnesOperand::Program, program);
-        record.derived("bank", bank);
-        record.derived("program", program);
-        instrument = std::pair{bank, program};
+      case CapcomSnesCommandKind::Instrument: {
+        const auto value = record.u8("instrument");
+        addUnsigned(operands, CapcomSnesOperand::Instrument, *value, value.range);
         break;
       }
       case CapcomSnesCommandKind::Octave: {
@@ -396,49 +480,50 @@ template <class T>
       }
       case CapcomSnesCommandKind::Tuning: {
         const auto value = record.s8("tuning");
-        addSigned(operands, CapcomSnesOperand::Tuning, *value, value.range);
-        record.derived("cents", math::tuningCents(*value));
+        addResolved(operands, CapcomSnesOperand::TuningCents, SemanticOperandValue{math::tuningCents(*value)},
+                    SemanticOperandValue{static_cast<s64>(*value)}, value.range, "tuning",
+                    SourceValueDisplay::SignedDecimal);
         break;
       }
       case CapcomSnesCommandKind::PortamentoTime: {
         const auto value = record.u8("time");
-        addUnsigned(operands, CapcomSnesOperand::Time, *value, value.range);
+        addResolved(operands, CapcomSnesOperand::PortamentoMillisecondsPerCent,
+                    SemanticOperandValue{math::portamentoMillisecondsPerCent(*value)},
+                    SemanticOperandValue{static_cast<u64>(*value)}, value.range, "time");
         break;
       }
       case CapcomSnesCommandKind::RepeatUntil: {
         const u8 slot = opcode - 0x0e;
-        record.derived("slot", slot + 1);
-        addUnsigned(operands, CapcomSnesOperand::Slot, slot);
+        addUnsigned(operands, CapcomSnesOperand::Slot, slot + 1);
         const auto count = record.u8("count");
         const auto destination = record.u16be("destination", SourceValueDisplay::Address);
         addUnsigned(operands, CapcomSnesOperand::Count, *count, count.range);
-        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range);
-        target = std::pair{Address{*destination}, SourceLinkRole::RepeatTarget};
+        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range,
+                   SemanticOperandRole::RepeatTarget);
         break;
       }
       case CapcomSnesCommandKind::RepeatBreak: {
         const u8 slot = opcode - 0x12;
-        record.derived("slot", slot + 1);
-        addUnsigned(operands, CapcomSnesOperand::Slot, slot);
+        addUnsigned(operands, CapcomSnesOperand::Slot, slot + 1);
         const auto attributes = record.u8("attributes");
         const auto destination = record.u16be("destination", SourceValueDisplay::Address);
         addUnsigned(operands, CapcomSnesOperand::Attributes, *attributes, attributes.range);
-        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range);
-        target = std::pair{Address{*destination}, SourceLinkRole::RepeatTarget};
+        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range,
+                   SemanticOperandRole::RepeatTarget);
         break;
       }
       case CapcomSnesCommandKind::Jump: {
         const auto destination = record.u16be("destination", SourceValueDisplay::Address);
-        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range);
-        target = std::pair{Address{*destination}, SourceLinkRole::JumpTarget};
+        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range,
+                   SemanticOperandRole::JumpTarget);
         break;
       }
       case CapcomSnesCommandKind::Pan: {
         const auto value = record.u8("raw");
-        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
         const auto converted = math::pan(version, *value);
-        record.derived("stereo_position", converted.position);
-        record.derived("linear_gain", converted.gain);
+        addResolved(operands, CapcomSnesOperand::StereoPosition, SemanticOperandValue{converted.position},
+                    SemanticOperandValue{static_cast<u64>(*value)}, value.range, "raw");
+        addDouble(operands, CapcomSnesOperand::LinearGain, converted.gain);
         break;
       }
       case CapcomSnesCommandKind::Lfo: {
@@ -458,11 +543,12 @@ template <class T>
       case CapcomSnesCommandKind::EchoOnOff:
       case CapcomSnesCommandKind::ReleaseRate: {
         const auto value = record.u8("raw");
-        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
         if (decodedSpec.kind == CapcomSnesCommandKind::EchoOnOff) {
-          record.derived("enabled", (*value & 1) != 0);
+          addResolved(operands, CapcomSnesOperand::Enabled, SemanticOperandValue{(*value & 1) != 0},
+                      SemanticOperandValue{static_cast<u64>(*value)}, value.range, "raw");
         } else {
-          record.derived("gain", *value | 0xa0);
+          addResolved(operands, CapcomSnesOperand::ReleaseGain, SemanticOperandValue{static_cast<u64>(*value | 0xa0)},
+                      SemanticOperandValue{static_cast<u64>(*value)}, value.range, "raw");
         }
         break;
       }
@@ -510,34 +596,14 @@ template <class T>
     }
   }
 
-  SourceAnnotationId annotationId;
-  if (sourceMap != nullptr && record.range().valid()) {
-    auto annotation = sourceMap->command(decodedSpec.name, record.range(), decodedSpec.semantic)
-                          .kind(sourceLocalKind(decodedSpec.localKind))
-                          .detailKind(detailKind(decodedSpec))
-                          .playbackStatus(decodedSpec.playback);
-    record.addFields(annotation);
-    if (parentAnnotation) {
-      annotation.parent(*parentAnnotation);
-    }
-    if (target) {
-      annotation.link(target->second, SourceTarget{reader.range(target->first.value, 1)});
-    }
-    if (instrument) {
-      annotation.link(SourceLinkRole::UsesInstrument,
-                      SourceTarget{ObjectRefs::instrumentProgram(instrument->first, instrument->second)}, "Instrument");
-    }
-    annotationId = annotation.id();
-  }
-
-  const auto sourceBytes = record.bytes();
   return DecodedBytecodeCommand{
       .range = record.range(),
-      .annotation = annotationId,
-      .bytes = std::vector<u8>(sourceBytes.begin(), sourceBytes.end()),
+      .opcode = opcode,
+      .encodedSize = record.size(),
       .flow = std::move(flow),
       .kind = commandKind(decodedSpec.kind),
       .operands = std::move(operands),
+      .presentation = presentation(decodedSpec),
       .retainBytes = false,
   };
 }
@@ -676,19 +742,20 @@ struct TrackState {
       state.applyAttributes(unsigned8(command, CapcomSnesOperand::Attributes), out);
       break;
     case CapcomSnesCommandKind::Tempo:
-      out.tempo(math::tempoMicrosecondsPerQuarter(static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Raw))));
+      out.tempo(static_cast<u32>(operand<u64>(command, CapcomSnesOperand::TempoMicrosecondsPerQuarter)));
       break;
     case CapcomSnesCommandKind::DurationRate:
       state.durationRate = unsigned8(command, CapcomSnesOperand::Rate);
       break;
     case CapcomSnesCommandKind::Volume:
-      out.level(
-          LevelScale::linearFromLinear(math::volumeGain(state.version, unsigned8(command, CapcomSnesOperand::Raw))),
-          LevelPrecisionHint::FourteenBit);
+      out.level(LevelScale::linearFromLinear(operand<double>(command, CapcomSnesOperand::LinearGain)),
+                ValueQuantization{.levels = 256});
       break;
-    case CapcomSnesCommandKind::Program:
-      out.instrument(static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Bank)),
-                     static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Program)), true);
+    case CapcomSnesCommandKind::Instrument:
+      out.instrument(InstrumentIdentity{
+          .domain = std::string(kCapcomSnesInstrumentDomain),
+          .key = static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Instrument)),
+      });
       break;
     case CapcomSnesCommandKind::Octave:
       state.noteOctave = unsigned8(command, CapcomSnesOperand::Octave);
@@ -701,21 +768,20 @@ struct TrackState {
       state.transpose = signed8(command, CapcomSnesOperand::Semitones);
       break;
     case CapcomSnesCommandKind::Tuning:
-      out.tuning(math::tuningCents(signed8(command, CapcomSnesOperand::Tuning)));
+      out.tuning(operand<double>(command, CapcomSnesOperand::TuningCents));
       break;
     case CapcomSnesCommandKind::PortamentoTime:
-      state.portamentoMillisecondsPerCent =
-          math::portamentoMillisecondsPerCent(unsigned8(command, CapcomSnesOperand::Time));
+      state.portamentoMillisecondsPerCent = operand<double>(command, CapcomSnesOperand::PortamentoMillisecondsPerCent);
       break;
     case CapcomSnesCommandKind::RepeatUntil: {
-      const u8 slot = unsigned8(command, CapcomSnesOperand::Slot);
+      const u8 slot = unsigned8(command, CapcomSnesOperand::Slot) - 1;
       const u32 count = static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Count));
       const Address destination = operand<Address>(command, CapcomSnesOperand::Destination);
       return count == 0 ? Effects{.step = vm.declaredLoop(destination)}
                         : vm.countedRepeatUntil(slot, count + 1, destination);
     }
     case CapcomSnesCommandKind::RepeatBreak: {
-      const auto branch = vm.countedRepeatBreak(unsigned8(command, CapcomSnesOperand::Slot),
+      const auto branch = vm.countedRepeatBreak(unsigned8(command, CapcomSnesOperand::Slot) - 1,
                                                 operand<Address>(command, CapcomSnesOperand::Destination));
       if (branch.taken) {
         state.applyAttributes(unsigned8(command, CapcomSnesOperand::Attributes), out);
@@ -728,13 +794,12 @@ struct TrackState {
     case CapcomSnesCommandKind::Unsupported:
       return Effects{.step = vm.end()};
     case CapcomSnesCommandKind::Pan: {
-      const auto converted = math::pan(state.version, unsigned8(command, CapcomSnesOperand::Raw));
-      out.pan(converted.position, LevelScale::linearFromLinear(converted.gain));
+      out.pan(operand<double>(command, CapcomSnesOperand::StereoPosition),
+              LevelScale::linearFromLinear(operand<double>(command, CapcomSnesOperand::LinearGain)));
       break;
     }
     case CapcomSnesCommandKind::MasterVolume:
-      out.masterLevel(
-          LevelScale::linearFromLinear(math::volumeGain(state.version, unsigned8(command, CapcomSnesOperand::Raw))));
+      out.masterLevel(LevelScale::linearFromLinear(operand<double>(command, CapcomSnesOperand::LinearGain)));
       break;
     case CapcomSnesCommandKind::Lfo: {
       const u8 type = unsigned8(command, CapcomSnesOperand::Type);
@@ -768,7 +833,7 @@ struct TrackState {
       break;
     }
     case CapcomSnesCommandKind::EchoOnOff:
-      out.reverb((unsigned8(command, CapcomSnesOperand::Raw) & 1) != 0 ? 40.0 / 127.0 : 0.0);
+      out.reverb(operand<bool>(command, CapcomSnesOperand::Enabled) ? 40.0 / 127.0 : 0.0);
       break;
     case CapcomSnesCommandKind::EchoParam:
     case CapcomSnesCommandKind::ReleaseRate:
@@ -816,10 +881,6 @@ const SequenceDialect& capcomSnesSequenceDialect() {
   return dialect;
 }
 
-void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
-  registry.add(capcomSnesSequenceDialect());
-}
-
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVersion version, u32 sourceTrackNumber,
                                          u32 startAddress, SourceMapBuilder* sourceMap,
                                          std::vector<Diagnostic>* diagnostics,
@@ -842,8 +903,11 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVers
 
   const u32 end = static_cast<u32>(reader.size());
   auto track = decodeLinearBytecodeTrack(
-      reader, sourceTrackNumber, startAddress, LinearBytecodeDecodePolicy{.maxCommands = 4096},
-      [&](u32 offset) { return decodeCommand(reader, offset, end, version, trackAnnotation, sourceMap, diagnostics); });
+      reader, sourceTrackNumber, startAddress, LinearBytecodeDecodePolicy{.maxCommands = 4096}, [&](u32 offset) {
+        auto command = decodeCommand(reader, offset, end, version, diagnostics);
+        command.annotation = projectDecodedCommand(sourceMap, command, trackAnnotation);
+        return command;
+      });
   if (sourceMap != nullptr && trackAnnotation) {
     AnnotationBuilder{*sourceMap, *trackAnnotation}.range(trackRange(reader, track, startAddress));
   }

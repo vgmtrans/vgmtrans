@@ -39,6 +39,13 @@ void addMissingSequenceDialectDiagnostics(SessionSnapshotBuilder& snapshot, cons
 
 }  // namespace
 
+void Session::registerFormat(FormatDefinition definition) {
+  formats_.add(std::move(definition.module));
+  if (definition.sequenceDialect) {
+    dialects_.add(std::move(*definition.sequenceDialect));
+  }
+}
+
 SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
   sealRegistries();
   file.kind = SourceKind::UserLoaded;

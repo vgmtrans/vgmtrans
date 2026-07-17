@@ -134,7 +134,12 @@ std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     }
 
     for (const auto& instrument : instrumentSet->instruments) {
-      ResolvedSynthInstrument resolvedInstrument{.instrument = &instrument};
+      const u32 sourceKey = instrument.identity ? instrument.identity->key : 0;
+      ResolvedSynthInstrument resolvedInstrument{
+          .instrument = &instrument,
+          .bank = instrument.identity ? sourceKey >> 7 : instrument.bank,
+          .program = instrument.identity ? sourceKey & 0x7f : instrument.program,
+      };
       for (const auto& region : instrument.regions) {
         const auto sampleIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
         if (!sampleIndex) {

@@ -41,6 +41,10 @@ struct ResolvedSynthRegion {
 
 struct ResolvedSynthInstrument {
   const Instrument* instrument = nullptr;
+  // Target addressing is assigned during export. Source formats identify
+  // instruments by domain/key and never need to encode this convention.
+  u32 bank = 0;
+  u32 program = 0;
   std::vector<ResolvedSynthRegion> regions;
 };
 
@@ -50,28 +54,24 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 // Decode all referenced sample collections once before writing a synth container.
 // The returned samples still remember the collection-local indexes used by regions.
 [[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(
-    std::span<const SampleCollectionAsset* const> sampleCollections,
-    const SourceStore& sources,
-    std::vector<Diagnostic>& diagnostics,
-    const SynthSampleDecodeOptions& options = {});
+    std::span<const SampleCollectionAsset* const> sampleCollections, const SourceStore& sources,
+    std::vector<Diagnostic>& diagnostics, const SynthSampleDecodeOptions& options = {});
 
 [[nodiscard]] SynthSampleIndexMap synthSampleIndexMap(std::span<const DecodedSynthSample> samples);
 
 [[nodiscard]] std::optional<AssetId> firstSampleCollectionId(
     std::span<const SampleCollectionAsset* const> sampleCollections);
 
-[[nodiscard]] std::optional<u16> resolveRegionSampleIndex(
-    const Region& region,
-    std::optional<AssetId> fallbackCollection,
-    const SynthSampleIndexMap& samples,
-    std::vector<Diagnostic>& diagnostics);
+[[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region,
+                                                          std::optional<AssetId> fallbackCollection,
+                                                          const SynthSampleIndexMap& samples,
+                                                          std::vector<Diagnostic>& diagnostics);
 
 [[nodiscard]] Loop effectiveRegionLoop(const Region& region, const DecodedSynthSample& sample);
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     std::span<const InstrumentSetAsset* const> instrumentSets,
-    std::span<const SampleCollectionAsset* const> sampleCollections,
-    const SynthSampleIndexMap& samples,
+    std::span<const SampleCollectionAsset* const> sampleCollections, const SynthSampleIndexMap& samples,
     std::vector<Diagnostic>& diagnostics);
 
 }  // namespace vgmtrans::core

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -69,6 +70,19 @@ const SemanticOperand* semanticOperand(const SourceCommand& command, SemanticOpe
   const auto found =
       std::ranges::find_if(command.operands, [id](const SemanticOperand& operand) { return operand.id == id; });
   return found != command.operands.end() ? &*found : nullptr;
+}
+
+SourceValue semanticOperandSourceValue(const SemanticOperandValue& value) {
+  return std::visit(
+      [](const auto& typedValue) -> SourceValue {
+        using T = std::decay_t<decltype(typedValue)>;
+        if constexpr (std::is_same_v<T, Address>) {
+          return makeSourceValue(typedValue.value);
+        } else {
+          return makeSourceValue(typedValue);
+        }
+      },
+      value);
 }
 
 TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {

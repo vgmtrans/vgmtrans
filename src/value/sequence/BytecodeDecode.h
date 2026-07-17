@@ -15,21 +15,36 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace vgmtrans::core {
 
 class SourceMapBuilder;
 
+// Presentation is transient decode output. The durable command keeps semantic
+// operands and an annotation ID; this metadata lets one shared projector build
+// the annotation without teaching format execution about SourceMapBuilder.
+struct DecodedCommandPresentation {
+  std::string label;
+  std::string localKind;
+  std::string detailKind;
+  SequenceSemantic semantic = SequenceSemantic::Unknown;
+  CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback;
+};
+
 // Temporary decoded form used while a bytecode decoder is deciding control flow.
 // TrackProgramBuilder still owns the final immutable source-command snapshot.
 struct DecodedBytecodeCommand {
   SourceRange range;
   SourceAnnotationId annotation;
+  u8 opcode = 0;
+  u32 encodedSize = 0;
   std::vector<u8> bytes;
   DecodeFlow flow;
   SemanticCommandKind kind;
   std::vector<SemanticOperand> operands;
+  DecodedCommandPresentation presentation;
   bool retainBytes = true;
 };
 
@@ -51,8 +66,7 @@ struct BytecodeDecodeContext {
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
                                          u32 offset) {
   if (!decoded.retainBytes && decoded.kind.valid()) {
-    const u8 opcode = decoded.bytes.empty() ? 0 : decoded.bytes.front();
-    builder.addSemantic(Address{offset}, opcode, static_cast<u32>(decoded.bytes.size()), decoded.range, decoded.kind,
+    builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.kind,
                         decoded.operands, decoded.flow, decoded.annotation);
     return;
   }
