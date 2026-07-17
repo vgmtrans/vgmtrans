@@ -63,6 +63,12 @@ void PerformanceEmitter::instrument(InstrumentPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void PerformanceEmitter::instrument(InstrumentIdentity sourceInstrument) {
+  instrument(InstrumentPerformanceEvent{
+      .sourceInstrument = std::move(sourceInstrument),
+  });
+}
+
 void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect) {
   instrument(InstrumentPerformanceEvent{
       .bank = bank,
@@ -76,6 +82,13 @@ void PerformanceEmitter::level(LevelPerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
+void PerformanceEmitter::level(double linearGain, ValueQuantization sourceQuantization) {
+  level(LevelPerformanceEvent{
+      .linearGain = linearGain,
+      .sourceQuantization = sourceQuantization,
+  });
+}
+
 void PerformanceEmitter::level(double linearGain, LevelPrecisionHint precisionHint) {
   level(LevelPerformanceEvent{
       .linearGain = linearGain,
@@ -86,6 +99,13 @@ void PerformanceEmitter::level(double linearGain, LevelPrecisionHint precisionHi
 void PerformanceEmitter::expression(ExpressionPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));
+}
+
+void PerformanceEmitter::expression(double linearGain, ValueQuantization sourceQuantization) {
+  expression(ExpressionPerformanceEvent{
+      .linearGain = linearGain,
+      .sourceQuantization = sourceQuantization,
+  });
 }
 
 void PerformanceEmitter::expression(double linearGain, LevelPrecisionHint precisionHint) {

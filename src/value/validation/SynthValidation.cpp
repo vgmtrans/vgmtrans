@@ -9,6 +9,8 @@
 #include "value/synth/SynthModel.h"
 
 #include <cmath>
+#include <set>
+#include <utility>
 
 namespace vgmtrans::core {
 
@@ -43,8 +45,18 @@ void validateEnvelope(ValidationReport& report, const Envelope& envelope, Source
 
 ValidationReport validateInstrumentSet(const InstrumentSetAsset& instrumentSet) {
   ValidationReport report;
+  std::set<std::pair<std::string, u32>> identities;
 
   for (const auto& instrument : instrumentSet.instruments) {
+    if (instrument.identity) {
+      if (!instrument.identity->valid()) {
+        report.error("synth.instrument.identity", "Synth instrument had an empty identity domain",
+                     validRange(instrument.range));
+      } else if (!identities.emplace(instrument.identity->domain, instrument.identity->key).second) {
+        report.error("synth.instrument.duplicate-identity", "Synth instrument identity was duplicated in its set",
+                     validRange(instrument.range));
+      }
+    }
     if (!std::isfinite(instrument.reverb) || instrument.reverb < 0.0) {
       report.error("synth.instrument.reverb", "Synth instrument reverb send was not finite and nonnegative",
                    validRange(instrument.range));

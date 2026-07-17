@@ -9,6 +9,9 @@
 #include "value/export/midi/MidiModel.h"
 #include "value/sequence/PerformanceModel.h"
 #include "value/export/ExportTypes.h"
+#include "value/synth/SynthModel.h"
+
+#include <span>
 
 namespace vgmtrans::core {
 
@@ -16,9 +19,10 @@ namespace vgmtrans::core {
 // values become MIDI channels, ports, controller numbers, and quantized controller values.
 class PerformanceMidiRenderer {
 public:
-  [[nodiscard]] MidiSequence render(const PerformanceSequence& performance, MidiExportOptions options = {},
-                                    ModulationConversionPolicy modulationConversion =
-                                        ModulationConversionPolicy::SynthModulators) const;
+  [[nodiscard]] MidiSequence render(
+      const PerformanceSequence& performance, MidiExportOptions options = {},
+      ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
+      std::span<const InstrumentSetAsset* const> instrumentSets = {}) const;
 };
 
 }  // namespace vgmtrans::core

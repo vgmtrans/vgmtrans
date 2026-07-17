@@ -10,6 +10,7 @@
 #include "value/export/ExportTypes.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/scan/FormatRegistry.h"
+#include "value/scan/FormatDefinition.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceDialect.h"
 #include "value/session/AssetStore.h"
@@ -32,6 +33,8 @@ namespace vgmtrans::core {
 // Call snapshot() when UI, tests, or export need a stable read-only view.
 class Session {
 public:
+  void registerFormat(FormatDefinition definition);
+
   SourceId addSource(SourceFile file, std::vector<u8> bytes);
   SourceId addSourceFromPath(std::filesystem::path path);
   [[nodiscard]] SessionSnapshot removeSource(SourceId id);

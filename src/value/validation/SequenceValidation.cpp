@@ -60,12 +60,25 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
         report.error("sequence.command.semantic-bytes", "Semantic sequence command retained encoded bytes",
                      command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
       }
+      if (command.kind.valid() && command.range.valid() && command.encodedSize != command.range.size) {
+        report.error("sequence.command.semantic-size",
+                     "Semantic sequence command encoded size did not match its source range", command.range);
+      }
 
       std::unordered_set<u32> operandIds;
       operandIds.reserve(command.operands.size());
       for (const auto& operand : command.operands) {
         if (!operand.id.valid() || !operandIds.insert(operand.id.value).second) {
           report.error("sequence.command.operand-id", "Semantic sequence command had a missing or duplicate operand id",
+                       command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
+        }
+        if (command.kind.valid() && operand.name.empty()) {
+          report.error("sequence.command.operand-name", "Semantic sequence operand had no presentation name",
+                       command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
+        }
+        if (operand.encodedValue && !operand.range.valid()) {
+          report.error("sequence.command.operand-encoded-range",
+                       "Semantic operand retained an encoded value without a source range",
                        command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
         }
         if (operand.range.valid() && command.range.valid() &&

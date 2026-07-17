@@ -54,10 +54,13 @@ public:
   void timeSignature(TimeSignaturePerformanceEvent event);
   void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick);
   void instrument(InstrumentPerformanceEvent event);
+  void instrument(InstrumentIdentity sourceInstrument);
   void instrument(u32 bank, u32 program, bool forceBankSelect = false);
   void level(LevelPerformanceEvent event);
+  void level(double linearGain, ValueQuantization sourceQuantization);
   void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
   void expression(ExpressionPerformanceEvent event);
+  void expression(double linearGain, ValueQuantization sourceQuantization);
   void expression(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
   void pan(PanPerformanceEvent event);
   void pan(double stereoPosition);

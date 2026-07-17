@@ -82,9 +82,13 @@ struct MidiChannelAssignment {
   return static_cast<s16>(std::clamp<int>(static_cast<int>(std::lround(normalized * 8192.0)), -8192, 8191));
 }
 
-[[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested, LevelPrecisionHint hint) {
+[[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested, LevelPrecisionHint hint,
+                                                         std::optional<ValueQuantization> quantization = std::nullopt) {
   if (requested != MidiLevelResolution::Auto) {
     return requested;
+  }
+  if (quantization && quantization->levels > 128) {
+    return MidiLevelResolution::FourteenBit;
   }
   return hint == LevelPrecisionHint::FourteenBit ? MidiLevelResolution::FourteenBit : MidiLevelResolution::SevenBit;
 }
@@ -94,8 +98,9 @@ struct MidiChannelAssignment {
 }
 
 void addExpression(MidiTrack& track, u64 tick, u8 channel, double linearGain, LevelPrecisionHint precisionHint,
-                   const MidiExportOptions& options) {
-  if (resolveLevelResolution(options.expressionResolution, precisionHint) == MidiLevelResolution::FourteenBit) {
+                   const MidiExportOptions& options, std::optional<ValueQuantization> quantization = std::nullopt) {
+  if (resolveLevelResolution(options.expressionResolution, precisionHint, quantization) ==
+      MidiLevelResolution::FourteenBit) {
     track.events.push_back(Expression14{
         .tick = tick,
         .channel = channel,
@@ -108,6 +113,47 @@ void addExpression(MidiTrack& track, u64 tick, u8 channel, double linearGain, Le
         .value = LevelScale::midi7FromLinear(linearGain),
     });
   }
+}
+
+struct MidiInstrumentSelection {
+  u32 bank = 0;
+  u32 program = 0;
+  bool forceBankSelect = false;
+};
+
+[[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentPerformanceEvent& event,
+                                                          std::span<const InstrumentSetAsset* const> instrumentSets) {
+  if (!event.sourceInstrument) {
+    return MidiInstrumentSelection{
+        .bank = event.bank,
+        .program = event.program,
+        .forceBankSelect = event.forceBankSelect,
+    };
+  }
+
+  for (const auto* instrumentSet : instrumentSets) {
+    if (instrumentSet == nullptr) {
+      continue;
+    }
+    const auto found = std::ranges::find_if(instrumentSet->instruments, [&](const Instrument& instrument) {
+      return instrument.identity && *instrument.identity == *event.sourceInstrument;
+    });
+    if (found != instrumentSet->instruments.end()) {
+      return MidiInstrumentSelection{
+          .bank = found->bank,
+          .program = found->program,
+          .forceBankSelect = true,
+      };
+    }
+  }
+
+  // A sequential key is a deterministic fallback for incomplete collections.
+  // This is an export policy, not a bank convention imposed on format code.
+  return MidiInstrumentSelection{
+      .bank = event.sourceInstrument->key >> 7,
+      .program = event.sourceInstrument->key & 0x7f,
+      .forceBankSelect = true,
+  };
 }
 
 struct RenderTrackState {
@@ -334,7 +380,8 @@ void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, 
 
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
                   std::span<const GlobalTransposeChange> globalTransposes, const MidiExportOptions& options,
-                  ModulationConversionPolicy modulationConversion) {
+                  ModulationConversionPolicy modulationConversion,
+                  std::span<const InstrumentSetAsset* const> instrumentSets) {
   std::visit(
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
@@ -364,22 +411,23 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // Standard MIDI treats time signatures as global metadata. They are collected
           // once and written to the first MIDI track by PerformanceMidiRenderer::render.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
-          if (typedEvent.bank != 0 || typedEvent.forceBankSelect) {
+          const auto selection = instrumentSelection(typedEvent, instrumentSets);
+          if (selection.bank != 0 || selection.forceBankSelect) {
             track.events.push_back(BankSelect{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
-                .bank = static_cast<u16>(typedEvent.bank),
+                .bank = static_cast<u16>(selection.bank),
                 .writeLsb = writeBankSelectLsb(options),
             });
           }
           track.events.push_back(ProgramChange{
               .tick = typedEvent.header.tick,
               .channel = channel,
-              .program = data7(typedEvent.program),
+              .program = data7(selection.program),
           });
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
-          if (resolveLevelResolution(options.volumeResolution, typedEvent.precisionHint) ==
-              MidiLevelResolution::FourteenBit) {
+          if (resolveLevelResolution(options.volumeResolution, typedEvent.precisionHint,
+                                     typedEvent.sourceQuantization) == MidiLevelResolution::FourteenBit) {
             track.events.push_back(Volume14{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
@@ -398,7 +446,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
           } else {
             addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, typedEvent.precisionHint,
-                          options);
+                          options, typedEvent.sourceQuantization);
           }
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
           track.events.push_back(Pan{
@@ -587,7 +635,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
 }  // namespace
 
 MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performance, MidiExportOptions options,
-                                             ModulationConversionPolicy modulationConversion) const {
+                                             ModulationConversionPolicy modulationConversion,
+                                             std::span<const InstrumentSetAsset* const> instrumentSets) const {
   MidiSequence sequence{
       .timebase = performance.timebase,
       .diagnostics = performance.diagnostics,
@@ -623,7 +672,8 @@ MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performa
         }
         flushSimulatedVibrato(midiTrack, renderState, flushTick, assignment.channel, performance.timebase);
       }
-      addMidiEvent(midiTrack, renderState, event, assignment.channel, globalTransposes, options, modulationConversion);
+      addMidiEvent(midiTrack, renderState, event, assignment.channel, globalTransposes, options, modulationConversion,
+                   instrumentSets);
     }
     u64 endTick = performanceTrack.endTick;
     if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {

@@ -124,7 +124,8 @@ struct MidiLoweringResult {
                                     .sequenceLoops = request.sequenceLoops,
                                 })
                          .render(sequence.program, *dialect);
-  auto midi = PerformanceMidiRenderer().render(performance, request.midi, request.modulationConversion);
+  auto midi = PerformanceMidiRenderer().render(performance, request.midi, request.modulationConversion,
+                                               prepared.assets.instrumentSets);
   return MidiLoweringResult{
       .performance = std::move(performance),
       .sequence = std::move(midi),

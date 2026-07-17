@@ -22,28 +22,25 @@
 
 namespace vgmtrans::formats {
 
-void registerValueFormatModules(core::FormatRegistry& registry) {
-  snes_rsn::registerSnesRsnExtractor(registry);
-  snes_spc::registerSnesSpcExtractor(registry);
-  psf::registerPsfExtractor(registry);
-  akao::registerAkaoModule(registry);
-  akao_snes::registerAkaoSnesModule(registry);
-  nds::registerNdsModule(registry);
-  capcom_snes::registerCapcomSnesModule(registry);
-  konami_snes::registerKonamiSnesModule(registry);
-}
-
-void registerValueSequenceDialects(core::SequenceDialectRegistry& registry) {
-  akao::registerAkaoSequenceDialects(registry);
-  akao_snes::registerAkaoSnesSequenceDialects(registry);
-  capcom_snes::registerCapcomSnesSequenceDialects(registry);
-  konami_snes::registerKonamiSnesSequenceDialects(registry);
-  nds::registerNdsSequenceDialect(registry);
-}
-
 void registerValueFormats(core::Session& session) {
-  registerValueFormatModules(session.formats());
-  registerValueSequenceDialects(session.dialects());
+  snes_rsn::registerSnesRsnExtractor(session.formats());
+  snes_spc::registerSnesSpcExtractor(session.formats());
+  psf::registerPsfExtractor(session.formats());
+
+  // Capcom is the semantic vertical slice: one definition registers both scan
+  // and execution. The remaining direct calls are migration adapters and can
+  // disappear format by format without changing Session again.
+  session.registerFormat(capcom_snes::capcomSnesDefinition());
+
+  akao::registerAkaoModule(session.formats());
+  akao_snes::registerAkaoSnesModule(session.formats());
+  nds::registerNdsModule(session.formats());
+  konami_snes::registerKonamiSnesModule(session.formats());
+
+  akao::registerAkaoSequenceDialects(session.dialects());
+  akao_snes::registerAkaoSnesSequenceDialects(session.dialects());
+  konami_snes::registerKonamiSnesSequenceDialects(session.dialects());
+  nds::registerNdsSequenceDialect(session.dialects());
 }
 
 }  // namespace vgmtrans::formats

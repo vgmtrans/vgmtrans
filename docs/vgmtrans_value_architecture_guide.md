@@ -271,13 +271,15 @@ Each track contains decoded `SourceCommand` records. A `SourceCommand` keeps:
 - source range;
 - optional source annotation ID.
 
+Each semantic operand also keeps a stable format-local ID, presentation name, display rule, generic role, exact source range, and—when conversion is needed—both the encoded and resolved value. Execution consumes the resolved value. This prevents driver conversion formulas from being duplicated between source annotation and playback.
+
 Semantic commands do not retain encoded bytes. `commandBytes` and byte spans remain temporarily on `TrackProgram` only for unmigrated cursor dialects. The semantic executor signature intentionally receives no `TrackProgram` or byte reader, making source reparsing during playback impossible.
 
 ### 8.2 `InstrumentSetAsset`
 
 An instrument set contains `Instrument` records. Each instrument has:
 
-- bank and program;
+- a source-domain `InstrumentIdentity`;
 - name;
 - source range;
 - regions;
@@ -350,7 +352,7 @@ sourceMap.header("SSEQ Header", range)
          .field("data_offset", dataOffsetRange, dataOffset, SourceValueDisplay::Address);
 ```
 
-Sequence command readers often do this indirectly through `VmCommandCursor`. The cursor reads operands and automatically records fields, opcode values, command labels, and playback status.
+Semantic sequence decoders do not call annotation-builder methods. They return command presentation data and self-describing operands; `CommandSourceMap` projects the command label, opcode, fields, derived values, control-flow links, and instrument links generically. Legacy command readers still do this indirectly through `VmCommandCursor` until migrated.
 
 ### 9.2 Why this matters
 
@@ -362,15 +364,19 @@ The source map is one of the strongest parts of the new architecture. It makes d
 
 Scanning is the process of turning one source into values.
 
-A format module is a small function table:
+A format definition owns the scanner and its optional semantic executor family:
 
 ```text
-FormatModule
-  name
-  scan(input)
-  optional collection resolver
-  optional materializer
+FormatDefinition
+  module
+    name
+    scan(input)
+    optional collection resolver
+    optional materializer
+  optional sequence dialect
 ```
+
+`Session::registerFormat` registers both halves together. Capcom SNES uses this unified path. Direct module/dialect registration remains only for unmigrated formats.
 
 Recognition belongs at the start of `scan`, which returns an empty result when the source does not match. This ensures layout/signature discovery runs once. `canScan` remains nullable as a migration adapter for older modules and should not be added to new ones.
 
@@ -660,12 +666,13 @@ The target authoring model is plain data plus two ordinary switches:
 2. a decode switch reads the operands required by each kind and stores flow;
 3. an execution switch consumes only kinds and typed operands.
 
-A decoder uses `RecordReader` for checked sequential reads with exact ranges. It then appends a semantic command with `retainBytes = false`. Source annotations are produced during this one decode pass. Execution is deliberately smaller:
+A decoder uses `RecordReader` for checked sequential reads with exact ranges. It resolves driver values once, attaches operand names/roles/display metadata, and appends a semantic command with `retainBytes = false`. `CommandSourceMap` turns that decoded value into an annotation; the decoder itself never calls `.field()`, `.derived()`, or `.link()`. Execution is deliberately smaller:
 
 ```cpp
 switch (kind(command)) {
   case Event::Pan:
-    out.pan(driverPan(operand<u8>(command, Operand::Raw)));
+    out.pan(operand<double>(command, Operand::StereoPosition),
+            operand<double>(command, Operand::LinearGain));
     return Effects::none();
   case Event::End:
     return Effects{.step = vm.end()};
@@ -732,6 +739,8 @@ These events use musical or normalized values rather than MIDI controller bytes.
 - pitch bend is semitones;
 - modulation amount is normalized.
 
+Instrument events carry a source-domain identity rather than a pre-encoded bank/program pair. Level and expression events may carry neutral source quantization (the number of distinct source values), not a destination bit width. Legacy cursor dialects still populate their older compatibility fields.
+
 This is what makes future non-MIDI sequence export more plausible. The VM output is not locked to MIDI’s limitations.
 
 ### 14.7 MIDI rendering
@@ -747,6 +756,8 @@ This is what makes future non-MIDI sequence export more plausible. The VM output
 - MIDI controller choices;
 - end-of-track writing.
 
+It resolves source instrument identities against the collection's instrument sets, then assigns MIDI bank/program addresses. The synth export preparation layer performs the equivalent identity-to-preset lowering for SF2 and DLS.
+
 The renderer can also use modulation usage analysis to scale controller values when the export request asks for observed-range modulation scaling.
 
 ---
@@ -757,7 +768,7 @@ The synth model is shared by SF2, DLS, WAV, and future exporters. It describes i
 
 ### 15.1 Instruments and regions
 
-An `Instrument` has bank/program identity and a set of regions. A region describes when and how a sample should play:
+An `Instrument` has a source-domain identity and a set of regions. A region describes when and how a sample should play. Legacy instruments may still carry bank/program compatibility fields until their formats migrate:
 
 - key range;
 - velocity range;
@@ -962,11 +973,11 @@ The Capcom SNES module shows the “single source, explicit collection” path.
 
 The scanner finds the layout, reserves sequence/instrument/sample IDs, parses instrument/sample information when the instrument table and SPC DIR are detected, always emits the sequence, and creates one collection for the source. If synth information is unavailable, the collection still has the sequence and a warning.
 
-Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single opcode mapping. Decode reads every operand once into typed command values and stores control flow; the track keeps no command-byte pool. One `capcom-snes` executor family uses the profile stored on `SequenceProgram`, and the global scheduler supplies program-wide and per-track state. The executor cannot access source bytes by construction.
+Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single opcode mapping. Decode reads every operand once, stores encoded and resolved values where they differ, and records control flow; the track keeps no command-byte pool. Generic command projection builds its `SourceMap` view. One `capcom-snes` executor family uses the profile stored on `SequenceProgram`, and the global scheduler supplies program-wide and per-track state. The executor cannot access source bytes by construction.
 
 The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture.
 
-The layout uses the shared masked-pattern matcher, and the synth parser uses the shared SNES sample-directory/BRR reader. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once; it does not register a duplicate `canScan` probe.
+The layout uses the shared masked-pattern matcher, and the synth parser uses the shared SNES sample-directory/BRR reader. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once; it does not register a duplicate `canScan` probe. One `FormatDefinition` registers both scanner and dialect. Sequence performance and synth instruments use `capcom-snes.instrument` identities; MIDI/SF2/DLS addressing is assigned in export code.
 
 ### 19.3 Akao
 
@@ -992,14 +1003,16 @@ Akao’s same cursor reader currently runs for analysis and rendering. That flex
 
 A new format usually follows this path:
 
-### Step 1: Register a format module
+### Step 1: Register a format definition
 
-Create a `FormatModule` with:
+Create a `FormatDefinition` containing a module with:
 
 - a name;
 - `scan`;
 - optional resolver;
 - optional materializer.
+
+Add the format's single semantic dialect when it contains bytecode, then pass the definition to `Session::registerFormat`. Do not add separate module and dialect registration entry points.
 
 Put recognition at the start of `scan` and return an empty `ScanResult` for non-matches. Do not add `canScan`; it exists only for unmigrated modules.
 
@@ -1024,6 +1037,7 @@ Return `SequenceProgramAsset`, `InstrumentSetAsset`, `SampleCollectionAsset`, or
 Define:
 
 - a format-local command-kind enum and operand IDs;
+- operand names, display rules, roles, and encoded/resolved values;
 - one base opcode profile with sparse version patches;
 - one decode switch that reads typed operands and stores `DecodeFlow`;
 - a per-program profile in `SequenceProgram::config`;
@@ -1049,6 +1063,8 @@ The new model is very testable. Good tests can inspect:
 - VM performance events;
 - MIDI events after rendering;
 - exported artifacts and diagnostics.
+
+Capcom SNES also keeps an exact decoded-command and neutral-performance golden for its representative fixture. Real-corpus snapshots should use the same boundary when a redistributable or local corpus is available.
 
 ---
 
@@ -1083,6 +1099,8 @@ It is the main mechanism for HexView-style explanation of parsed bytes.
 `FormatRegistry` stores registered format modules. The session offers every source to modules in insertion order. That includes derived sources.
 
 Insertion order matters because extractors are registered before normal formats in `ValueFormats.cpp`.
+
+New formats enter through `FormatDefinition` and `Session::registerFormat`, which couples one module to its semantic dialect. The two raw registries remain public only as a migration surface for formats that still register cursor dialect matrices.
 
 ### 21.6 `ScanResultBuilder`
 
@@ -1122,7 +1140,7 @@ Each semantic command stores its format-local kind, typed operands, source prove
 
 ### 21.12 `RecordReader` and legacy `VmCommandCursor`
 
-`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, automatic field projection, and truncation diagnostics without introducing a schema language.
+`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CommandSourceMap` performs automatic projection for semantic commands; ordinary records can reuse the reader's captured fields when building their one durable annotation.
 
 `VmCommandCursor` remains the two-phase compatibility surface for unmigrated sequence dialects. It should not be used for new semantic implementations because render-phase cursors can reparse stored command bytes.
 
@@ -1185,6 +1203,8 @@ The existing tests under `tests/core` and `tests/formats` reflect this direction
 ### 22.3 Format code can be local and readable
 
 Plain opcode profiles plus explicit decode/execution switches are a strong fit for sequence drivers. They keep the driver visible without coupling playback to source encoding.
+
+Return presentation metadata with each decoded command and let `CommandSourceMap` project annotations. Command decoding should not call annotation-builder methods.
 
 The scan builder also makes simple scanners short and clear.
 
@@ -1285,7 +1305,7 @@ The remaining order is intentional:
 5. separate NDS canonical decoding from malformed-data repair;
 6. migrate the remaining layouts/synth parsers to `RecordReader` and shared platform primitives;
 7. remove all `canScan`, cursor-dialect, byte-pool, prepass, and materialization adapters;
-8. combine format and executor registration once every format has one executor family.
+8. migrate each format to one `FormatDefinition`, then remove direct access to the two raw registries.
 
 Architectural acceptance criteria:
 

@@ -77,6 +77,10 @@ ObjectRef ObjectRefs::instrument(AssetId instrumentSetAsset, u32 instrumentIndex
   return ObjectRef{.kind = ObjectKind::Instrument, .asset = instrumentSetAsset, .index0 = instrumentIndex};
 }
 
+ObjectRef ObjectRefs::instrumentIndex(u32 instrumentIndex) {
+  return ObjectRef{.kind = ObjectKind::Instrument, .index0 = instrumentIndex};
+}
+
 ObjectRef ObjectRefs::instrumentProgram(u32 bank, u32 program) {
   return ObjectRef{.kind = ObjectKind::Instrument, .index0 = bank, .index1 = program};
 }
@@ -123,15 +127,13 @@ std::vector<SourceAnnotationId> SourceMap::annotationsForSource(SourceId source)
 }
 
 std::vector<SourceAnnotationId> SourceMap::intersecting(SourceRange range) const {
-  return idsFromAnnotations(annotations_, [&](const SourceAnnotation& annotation) {
-    return rangesIntersect(annotation.range, range);
-  });
+  return idsFromAnnotations(
+      annotations_, [&](const SourceAnnotation& annotation) { return rangesIntersect(annotation.range, range); });
 }
 
 std::vector<SourceAnnotationId> SourceMap::containing(SourceRange range) const {
-  return idsFromAnnotations(annotations_, [&](const SourceAnnotation& annotation) {
-    return rangeContains(annotation.range, range);
-  });
+  return idsFromAnnotations(annotations_,
+                            [&](const SourceAnnotation& annotation) { return rangeContains(annotation.range, range); });
 }
 
 std::vector<SourceAnnotationId> SourceMap::at(SourceId source, u64 offset) const {

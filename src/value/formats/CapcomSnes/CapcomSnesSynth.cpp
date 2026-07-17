@@ -331,8 +331,11 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
     const auto pitch = capcomInstrumentPitch(info.pitchScale);
 
     Instrument instrument{
-        .bank = info.index >> 7,
-        .program = info.index & 0x7f,
+        .identity =
+            InstrumentIdentity{
+                .domain = std::string(kCapcomSnesInstrumentDomain),
+                .key = info.index,
+            },
         .name = fmt::format("Instrument {}", info.index),
         .range = input.reader.range(info.address, 6),
     };
@@ -353,8 +356,7 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
                           .role(SourceRole::Instrument)
                           .kind("capcom-snes-instrument")
                           .owner(ObjectRefs::instrument(instrumentSetId, info.index))
-                          .derived("bank", info.index >> 7)
-                          .derived("program", info.index & 0x7f);
+                          .derived("instrument", info.index);
     for (const auto& field : info.sourceFields) {
       annotation.field(field.name, field.range, field.value, field.display);
     }

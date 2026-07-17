@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
 
 #include <limits>
@@ -145,10 +146,11 @@ struct Region {
 };
 
 struct Instrument {
-  // Bank/program select the instrument. regions/generators/modulators describe
-  // how it sounds once selected.
+  // identity is the source-domain selector. bank/program remain as migration
+  // fields for formats that still encode target addresses during parsing.
   u32 bank = 0;
   u32 program = 0;
+  std::optional<InstrumentIdentity> identity;
   double reverb = kDefaultInstrumentReverbSend;
   std::string name;
   SourceRange range;

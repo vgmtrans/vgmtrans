@@ -33,7 +33,8 @@ enum class MidiBankSelectStyle {
 };
 
 struct MidiExportOptions {
-  // Auto follows the precision hints written by SequenceVm.
+  // Auto follows neutral source quantization when available, then falls back
+  // to the legacy precision hint used by unmigrated dialects.
   MidiLevelResolution volumeResolution = MidiLevelResolution::Auto;
   MidiLevelResolution expressionResolution = MidiLevelResolution::Auto;
   bool skipChannel10 = true;

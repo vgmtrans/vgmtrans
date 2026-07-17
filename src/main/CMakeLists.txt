@@ -131,6 +131,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.cpp
@@ -157,15 +158,18 @@ target_sources(vgmtransvaluecore
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
       ${PROJECT_SOURCE_DIR}/src/value/sequence/BytecodeDecode.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatDefinition.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h
       ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/InstrumentIdentity.h
       ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.h
       ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h

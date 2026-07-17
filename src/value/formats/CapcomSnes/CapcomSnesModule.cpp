@@ -5,7 +5,6 @@
  */
 
 #include "value/formats/CapcomSnes/CapcomSnes.h"
-#include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanResultBuilder.h"
 
 #include <optional>
@@ -75,11 +74,15 @@ using namespace core;
   return result.finish();
 }
 
-void registerCapcomSnesModule(FormatRegistry& registry) {
-  registry.add(FormatModule{
-      .name = "CapcomSnes",
-      .scan = scanCapcomSnes,
-  });
+FormatDefinition capcomSnesDefinition() {
+  return FormatDefinition{
+      .module =
+          FormatModule{
+              .name = "CapcomSnes",
+              .scan = scanCapcomSnes,
+          },
+      .sequenceDialect = capcomSnesSequenceDialect(),
+  };
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

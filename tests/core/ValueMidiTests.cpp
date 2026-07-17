@@ -6,6 +6,8 @@
 
 #include "ValueTestSupport.h"
 
+#include <array>
+
 namespace {
 
 void midiExporterWritesStandardMidiFile() {
@@ -370,6 +372,33 @@ void performanceMidiRendererHonorsMidiExportOptions() {
   expect(std::get<MidiPort>(forcedMidi.tracks[15].events[0]).port == 0 &&
              std::get<NoteDuration>(forcedMidi.tracks[15].events[1]).channel == 15,
          "MIDI renderer should use all 16 channels per port when channel 10 is allowed");
+}
+
+void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .events = {InstrumentPerformanceEvent{
+              .header = PerformanceEventHeader{.tick = 0},
+              .sourceInstrument = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
+          }},
+      }},
+  };
+  const InstrumentSetAsset instrumentSet{
+      .instruments = {Instrument{
+          .bank = 3,
+          .program = 9,
+          .identity = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
+      }},
+  };
+  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
+
+  const MidiSequence midi =
+      PerformanceMidiRenderer().render(performance, {}, ModulationConversionPolicy::SynthModulators, instrumentSets);
+  expect(std::get<BankSelect>(midi.tracks[0].events[1]).bank == 3 &&
+             std::get<ProgramChange>(midi.tracks[0].events[2]).program == 9,
+         "MIDI lowering should resolve source instrument identities through collection instruments");
 }
 
 void performanceMidiRendererQuantizesPitchBendAndPortamento() {
@@ -932,6 +961,7 @@ void runValueMidiTests() {
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererHonorsMidiExportOptions();
+  performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
   performanceMidiRendererSkipsRedundantPitchBends();
   performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape();
