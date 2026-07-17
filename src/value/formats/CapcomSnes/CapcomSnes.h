@@ -1,0 +1,158 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#pragma once
+
+#include "value/base/Source.h"
+#include "value/scan/FormatRegistry.h"
+#include "value/scan/ScanResultBuilder.h"
+#include "value/sequence/SequenceDialect.h"
+
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace vgmtrans::formats::capcom_snes {
+
+inline constexpr u64 kCapcomSnesAramSize = 0x10000;
+inline constexpr u32 kCapcomSnesMaxTracks = 8;
+inline constexpr u32 kCapcomSnesPpqn = 48;
+
+enum class CapcomSnesEngineVersion : u8 {
+  none,
+  v1BgmInList,
+  v2BgmUsuallyAtFixedLocation,
+  v3BgmFixedLocation,
+};
+
+struct CapcomSnesLayout {
+  // Capcom SPC snapshots have no declarative layout. These addresses are
+  // recovered from driver-code signatures before any asset is parsed.
+  CapcomSnesEngineVersion version = CapcomSnesEngineVersion::none;
+  bool hasSongList = false;
+  bool bgmAtFixedAddress = false;
+  u32 songListAddress = 0;
+  u32 bgmHeaderAddress = 0;
+  u32 sequenceHeaderAddress = 0;
+  bool priorityInHeader = false;
+  std::optional<u32> instrumentTableAddress;
+  std::optional<u32> spcDirAddress;
+};
+
+enum class CapcomSnesCommandKind : u32 {
+  Note = 1,
+  Rest,
+  ToggleTriplet,
+  ToggleSlur,
+  DottedNote,
+  ToggleOctaveUp,
+  NoteAttributes,
+  Tempo,
+  DurationRate,
+  Volume,
+  Program,
+  Octave,
+  GlobalTranspose,
+  Transpose,
+  Tuning,
+  PortamentoTime,
+  RepeatUntil,
+  RepeatBreak,
+  Jump,
+  End,
+  Pan,
+  MasterVolume,
+  Lfo,
+  EchoParam,
+  EchoOnOff,
+  ReleaseRate,
+  UnknownOneByte,
+  NoOperation,
+  Unsupported,
+};
+
+enum class CapcomSnesOperand : u32 {
+  KeyIndex = 1,
+  DurationIndex,
+  Raw,
+  Attributes,
+  Rate,
+  Bank,
+  Program,
+  Octave,
+  Semitones,
+  Tuning,
+  Time,
+  Slot,
+  Count,
+  Destination,
+  Type,
+  Value,
+  Argument,
+  Preset,
+};
+
+struct CapcomSnesSampleInfo {
+  u8 srcn = 0;
+  u32 dirEntryAddress = 0;
+  u32 startAddress = 0;
+  u32 loopAddress = 0;
+  u32 encodedLength = 0;
+  bool loops = false;
+};
+
+struct CapcomSnesInstrumentInfo {
+  u32 index = 0;
+  u32 address = 0;
+  u8 srcn = 0;
+  u8 adsr1 = 0;
+  u8 adsr2 = 0;
+  u8 gain = 0;
+  s16 pitchScale = 0;
+  u32 dirEntryAddress = 0;
+  u16 sampleStartAddress = 0;
+  u16 sampleLoopAddress = 0;
+  std::vector<core::SourceField> sourceFields;
+};
+
+[[nodiscard]] std::string capcomSnesSourceDisplayName(const core::SourceFile& source);
+[[nodiscard]] std::optional<CapcomSnesLayout> findCapcomSnesLayout(core::ByteReader reader);
+
+[[nodiscard]] const core::SequenceDialect& capcomSnesSequenceDialect();
+void registerCapcomSnesSequenceDialects(core::SequenceDialectRegistry& registry);
+
+[[nodiscard]] core::TrackProgram decodeCapcomSnesSourceTrack(
+    core::ByteReader reader, CapcomSnesEngineVersion version, u32 sourceTrackNumber, u32 startAddress,
+    core::SourceMapBuilder* sourceMap = nullptr, std::vector<core::Diagnostic>* diagnostics = nullptr,
+    std::optional<core::SourceAnnotationId> parent = std::nullopt,
+    std::optional<core::AssetId> sequenceAsset = std::nullopt);
+
+[[nodiscard]] core::SequenceProgramAsset parseCapcomSnesSequence(const core::ScanInput& input,
+                                                                 const CapcomSnesLayout& layout,
+                                                                 core::AssetId sequenceId, std::string_view displayName,
+                                                                 core::SourceMapBuilder* sourceMap = nullptr,
+                                                                 std::vector<core::Diagnostic>* diagnostics = nullptr);
+
+[[nodiscard]] std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(core::ByteReader reader,
+                                                                                   u32 instrumentTableAddress,
+                                                                                   u32 spcDirAddress);
+[[nodiscard]] std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(
+    core::ByteReader reader, const std::vector<CapcomSnesInstrumentInfo>& instruments);
+[[nodiscard]] core::SampleCollectionAsset parseCapcomSnesSamples(const core::ScanInput& input,
+                                                                 core::AssetId sampleCollectionId,
+                                                                 const std::vector<CapcomSnesSampleInfo>& sampleInfos,
+                                                                 std::string_view displayName,
+                                                                 core::SourceMapBuilder* sourceMap = nullptr);
+[[nodiscard]] core::InstrumentSetAsset parseCapcomSnesInstrumentSet(
+    const core::ScanInput& input, core::ScanResultBuilder& builder, core::AssetId instrumentSetId,
+    core::ScanSampleCollectionRef sampleCollection, const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
+    const std::vector<CapcomSnesSampleInfo>& sampleInfos, std::string_view displayName);
+
+[[nodiscard]] core::ScanResult scanCapcomSnes(const core::ScanInput& input);
+void registerCapcomSnesModule(core::FormatRegistry& registry);
+
+}  // namespace vgmtrans::formats::capcom_snes

@@ -22,7 +22,7 @@
 #include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
-#include "value/formats/CapcomSnes/CapcomSnesModule.h"
+#include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/formats/ValueFormats.h"
 #include "io/RawFile.h"
 

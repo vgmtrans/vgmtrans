@@ -28,6 +28,8 @@ public:
                                      SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
   [[nodiscard]] RangedValue<u16> u16be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default);
   [[nodiscard]] RangedValue<u16> u16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default);
+  [[nodiscard]] RangedValue<s16> s16be(std::string_view name,
+                                       SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
 
   template <class T>
   void derived(std::string_view name, T&& value, SourceValueDisplay display = SourceValueDisplay::Default) {
@@ -46,6 +48,7 @@ public:
   [[nodiscard]] bool ok() const noexcept { return !failed_; }
   [[nodiscard]] SourceRange range() const noexcept { return reader_.range(begin_, size()); }
   [[nodiscard]] std::span<const ::u8> bytes() const;
+  [[nodiscard]] std::span<const SourceField> fields() const noexcept { return fields_; }
 
 private:
   [[nodiscard]] bool require(u32 size, std::string_view field);

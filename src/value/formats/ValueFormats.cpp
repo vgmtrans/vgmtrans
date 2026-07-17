@@ -6,8 +6,7 @@
 
 #include "value/formats/ValueFormats.h"
 
-#include "value/formats/CapcomSnes/CapcomSnesModule.h"
-#include "value/formats/CapcomSnes/CapcomSnesSequence.h"
+#include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/formats/KonamiSnes/KonamiSnesModule.h"
 #include "value/formats/KonamiSnes/KonamiSnesSequence.h"
 #include "value/formats/AkaoSnes/AkaoSnesModule.h"

@@ -39,8 +39,8 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
 
     std::unordered_set<u32> commandIds;
     commandIds.reserve(track.commands.size());
-    // Commands refer into a track-level byte pool. Bad spans mean later
-    // UI/export code could read the wrong source bytes.
+    // Legacy commands refer into a track-level byte pool. Semantic commands
+    // must be byte-free and have unique, source-bounded operand identities.
     for (const auto& command : track.commands) {
       if (!command.id.valid()) {
         report.error("sequence.command.missing-id", "Sequence program contained a command without an id",
@@ -54,6 +54,26 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
       if (!byteSpanFits(command.bytes, track.commandBytes.size())) {
         report.error("sequence.command.byte-span", "Sequence command byte span was outside its track byte pool",
                      command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
+      }
+
+      if (command.kind.valid() && command.bytes.size != 0) {
+        report.error("sequence.command.semantic-bytes", "Semantic sequence command retained encoded bytes",
+                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
+      }
+
+      std::unordered_set<u32> operandIds;
+      operandIds.reserve(command.operands.size());
+      for (const auto& operand : command.operands) {
+        if (!operand.id.valid() || !operandIds.insert(operand.id.value).second) {
+          report.error("sequence.command.operand-id", "Semantic sequence command had a missing or duplicate operand id",
+                       command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
+        }
+        if (operand.range.valid() && command.range.valid() &&
+            (operand.range.source != command.range.source || operand.range.offset < command.range.offset ||
+             operand.range.endOffset() > command.range.endOffset())) {
+          report.error("sequence.command.operand-range", "Semantic operand range was outside its command range",
+                       operand.range);
+        }
       }
     }
   }

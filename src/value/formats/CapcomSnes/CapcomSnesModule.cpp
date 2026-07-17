@@ -4,11 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/CapcomSnes/CapcomSnesModule.h"
-
-#include "value/formats/CapcomSnes/CapcomSnesLayout.h"
-#include "value/formats/CapcomSnes/CapcomSnesSequence.h"
-#include "value/formats/CapcomSnes/CapcomSnesSynth.h"
+#include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanResultBuilder.h"
 
@@ -19,10 +15,6 @@
 namespace vgmtrans::formats::capcom_snes {
 
 using namespace core;
-
-[[nodiscard]] bool canScanCapcomSnes(const SourceFile&, std::span<const u8> bytes) {
-  return findCapcomSnesLayout(ByteReader(SourceId{}, bytes)).has_value();
-}
 
 [[nodiscard]] CollectionKey capcomCollectionKey(SourceId source) {
   return CollectionKey{
@@ -49,7 +41,7 @@ using namespace core;
   if (layout->instrumentTableAddress && layout->spcDirAddress) {
     instrumentInfos =
         parseCapcomSnesInstrumentInfos(input.reader, *layout->instrumentTableAddress, *layout->spcDirAddress);
-    sampleInfos = parseCapcomSnesSampleInfos(input.reader, *layout->spcDirAddress, instrumentInfos);
+    sampleInfos = parseCapcomSnesSampleInfos(input.reader, instrumentInfos);
   }
 
   const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
@@ -86,7 +78,6 @@ using namespace core;
 void registerCapcomSnesModule(FormatRegistry& registry) {
   registry.add(FormatModule{
       .name = "CapcomSnes",
-      .canScan = canScanCapcomSnes,
       .scan = scanCapcomSnes,
   });
 }

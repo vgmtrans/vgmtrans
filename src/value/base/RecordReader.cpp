@@ -58,9 +58,24 @@ RangedValue<u16> RecordReader::u16le(std::string_view name, SourceValueDisplay d
   return RangedValue<u16>{value, sourceRange};
 }
 
+RangedValue<s16> RecordReader::s16be(std::string_view name, SourceValueDisplay display) {
+  if (!require(2, name)) {
+    return {};
+  }
+  const SourceRange sourceRange = reader_.range(position_, 2);
+  const auto value = static_cast<s16>(reader_.be16(position_));
+  position_ += 2;
+  field(name, sourceRange, makeSourceValue(value), display);
+  return RangedValue<s16>{value, sourceRange};
+}
+
 void RecordReader::addFields(AnnotationBuilder annotation) const {
   for (const auto& sourceField : fields_) {
-    annotation.field(sourceField.name, sourceField.range, sourceField.value, sourceField.display);
+    if (sourceField.range.valid()) {
+      annotation.field(sourceField.name, sourceField.range, sourceField.value, sourceField.display);
+    } else {
+      annotation.derived(sourceField.name, sourceField.value, sourceField.display);
+    }
   }
 }
 

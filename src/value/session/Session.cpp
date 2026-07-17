@@ -186,18 +186,19 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
   const auto bytes = sources_.bytes(id);
 
   for (const auto& module : formats_.modules()) {
-    bool shouldScan = false;
-    try {
-      // Probe failures become diagnostics so one broken module cannot hide data
-      // that another registered module can still parse.
-      shouldScan = module.canScan(source, bytes);
-    } catch (const std::exception& ex) {
-      diagnostics_.addError(std::string(module.name) + " canScan failed: " + ex.what(),
-                            SourceRange{.source = source.id, .offset = 0, .size = source.size});
-    }
-
-    if (!shouldScan) {
-      continue;
+    if (module.canScan != nullptr) {
+      bool shouldScan = false;
+      try {
+        // Legacy probe failures become diagnostics so one broken module cannot
+        // hide data another registered module can still parse.
+        shouldScan = module.canScan(source, bytes);
+      } catch (const std::exception& ex) {
+        diagnostics_.addError(std::string(module.name) + " canScan failed: " + ex.what(),
+                              SourceRange{.source = source.id, .offset = 0, .size = source.size});
+      }
+      if (!shouldScan) {
+        continue;
+      }
     }
 
     try {
@@ -285,8 +286,8 @@ void Session::rebuildCollections() {
           auto result = module.materializeCollection(materialization);
           diagnostics_.append(std::move(result.diagnostics));
           for (auto& asset : result.assets) {
-            activeMaterializedKeys.insert(assets_.upsertMaterializedAsset(resolverId, collection.key, asset.slot,
-                                                                          std::move(asset.asset)));
+            activeMaterializedKeys.insert(
+                assets_.upsertMaterializedAsset(resolverId, collection.key, asset.slot, std::move(asset.asset)));
           }
           materializedDesired.push_back(std::move(result.collection));
         }
