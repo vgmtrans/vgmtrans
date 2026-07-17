@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/CapcomSnes/CapcomSnesLayout.h"
+#include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/scan/BytePattern.h"
 
 #include <algorithm>

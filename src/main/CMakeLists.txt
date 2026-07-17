@@ -270,11 +270,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesSequence.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesSynth.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesLayout.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesModule.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.h

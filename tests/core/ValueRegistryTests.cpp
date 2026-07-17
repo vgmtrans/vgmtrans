@@ -111,7 +111,7 @@ void cursorDialectDecodesAnnotationsAndRendersThroughVm() {
   expect(annotations.get(commandAnnotations[0]).detailKind == "cursor-probe.transpose" &&
              annotations.get(commandAnnotations[1]).detailKind == "cursor-probe.note" &&
              annotations.get(commandAnnotations[2]).detailKind == "cursor-probe.end",
-        "cursor-backed decode should store command detail metadata in source annotations");
+         "cursor-backed decode should store command detail metadata in source annotations");
   const auto& noteAnnotation = annotations.get(commandAnnotations[1]);
   expect(noteAnnotation.label == "Note" && noteAnnotation.localKind == "note" && noteAnnotation.range.offset == 2 &&
              noteAnnotation.range.size == 3,
@@ -220,8 +220,8 @@ void cursorPreserveRecordsMetadataAndBytes() {
          "preserved cursor command should use source-only meta metadata");
   expect(annotation.playbackStatus == CommandPlaybackStatus::SourceOnly,
          "preserved cursor command should persist source-only playback status");
-  const auto bytesField = std::ranges::find_if(
-      annotation.fields, [](const SourceField& field) { return field.name == "bytes"; });
+  const auto bytesField =
+      std::ranges::find_if(annotation.fields, [](const SourceField& field) { return field.name == "bytes"; });
   expect(bytesField != annotation.fields.end() && std::get<std::string>(bytesField->value) == "12 34",
          "preserved cursor command should record raw operand bytes in source annotations");
   expect(sameRange(bytesField->range, SourceRange{.source = SourceId{0}, .offset = 11, .size = 2}),
@@ -298,7 +298,6 @@ void formatRegistryStoresCopyableModuleValues() {
   registry.add(probeSequenceModule());
   registry.add(FormatModule{
       .name = std::string("DynamicProbe"),
-      .canScan = canScanProbeSequence,
       .scan = scanProbeSequence,
   });
 
@@ -309,6 +308,8 @@ void formatRegistryStoresCopyableModuleValues() {
   expect(copy.modules()[1].name == "DynamicProbe", "format registry should own dynamically registered module names");
   expect(copy.modules()[0].canScan(SourceFile{}, probeBytes),
          "format registry should preserve copied module scan predicates");
+  expect(copy.modules()[1].canScan == nullptr,
+         "format registry should accept scan-only modules without a duplicate recognition probe");
 
   bool threw = false;
   try {

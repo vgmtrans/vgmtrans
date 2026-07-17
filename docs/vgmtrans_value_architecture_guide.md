@@ -1,6 +1,6 @@
 # VGMTrans Value-Oriented Core Architecture Guide
 
-This document explains the new value-oriented VGMTrans core under `src/value`. It is written for someone who has not read the new code yet. It focuses on how the architecture fits together, how the main pieces cooperate, and what the three ported formats show about the intended authoring style.
+This document explains the new value-oriented VGMTrans core under `src/value`. It is written for someone who has not read the new code yet. It focuses on how the architecture fits together, how the main pieces cooperate, and what the ported formats show about the intended authoring style.
 
 ---
 
@@ -65,19 +65,21 @@ There are two important sub-flows inside that larger flow.
 ```text
 source bytecode
   ↓
-format command reader using VmCommandCursor
+format decoder reads each command once
   ↓
-SequenceProgram with decoded source commands
+SequenceProgram with command kinds, typed operands, and stored flow
   + SourceMap command annotations
   ↓
-SequenceVm
+global SequenceVm scheduler
   ↓
 PerformanceSequence, a target-neutral musical performance
   ↓
 MIDI renderer or another future sequence exporter
 ```
 
-The sequence parser does not directly write MIDI. It records the original commands in a `SequenceProgram`. Later, the shared VM executes those commands and produces musical events. MIDI conversion is another layer after that.
+The sequence parser does not directly write MIDI. It records semantic commands in a `SequenceProgram`; semantic executors never receive command bytes. The shared VM schedules those commands and produces musical events. MIDI conversion is another layer after that.
+
+> **Migration status:** Capcom SNES uses this semantic path. Akao, Akao SNES, Konami SNES, and NDS still use the legacy two-phase cursor adapter while they are migrated. New format code should use the semantic path; the cursor API is compatibility infrastructure, not the target architecture.
 
 ### Synth/sample flow
 
@@ -120,6 +122,7 @@ The `src/value` directory is organized around architectural layers:
 | Directory | Main job |
 |---|---|
 | `base` | Small common types, IDs, source ranges, diagnostics, source storage, byte reading. |
+| `platform` | Concrete shared platform structures, such as SNES sample-directory and BRR stream readers. |
 | `model` | Durable data model: assets, collections, match facts, snapshots, source map. |
 | `scan` | Format module API, scan result types, scan result builder, parse cursor, collection resolver helpers. |
 | `session` | Mutable stores and orchestration: add sources, scan, commit, resolve collections, export. |
@@ -127,7 +130,7 @@ The `src/value` directory is organized around architectural layers:
 | `synth` | Target-neutral instrument, region, sample, envelope, loop, codec, and sample decoding model. |
 | `export` | Collection export to MIDI, SF2, DLS, and WAV. |
 | `validation` | Checks that scanner output and snapshots are internally consistent. |
-| `formats` | Ported format modules: Akao, Capcom SNES, Nintendo DS. |
+| `formats` | Ported format modules: Akao, Akao SNES, Capcom SNES, Konami SNES, and Nintendo DS. |
 | `extractors` | Source extractors such as PSF, SPC, and RSN that create derived sources. |
 
 The key design choice is that these layers mostly point downward. Format modules use base, model, scan, sequence, and synth helpers. The session owns storage. Export reads snapshots. This keeps most code from needing to know about the whole application.
@@ -253,19 +256,22 @@ A `SequenceProgram` contains:
 - a dialect ID;
 - a timebase;
 - a source base address;
+- per-program driver profile/configuration;
 - playback behavior defaults; and
 - tracks.
 
 Each track contains decoded `SourceCommand` records. A `SourceCommand` keeps:
 
 - opcode;
+- format-local semantic command kind;
+- typed operands with source ranges;
+- decode-time control flow;
 - source address;
 - encoded size;
 - source range;
-- optional source annotation ID;
-- a span into pooled command bytes.
+- optional source annotation ID.
 
-The command bytes are pooled at track scope so every command does not need its own heap allocation.
+Semantic commands do not retain encoded bytes. `commandBytes` and byte spans remain temporarily on `TrackProgram` only for unmigrated cursor dialects. The semantic executor signature intentionally receives no `TrackProgram` or byte reader, making source reparsing during playback impossible.
 
 ### 8.2 `InstrumentSetAsset`
 
@@ -361,13 +367,12 @@ A format module is a small function table:
 ```text
 FormatModule
   name
-  canScan(source, bytes)
   scan(input)
   optional collection resolver
   optional materializer
 ```
 
-`canScan` should be cheap and non-mutating. `scan` does the real parsing and returns a `ScanResult`.
+Recognition belongs at the start of `scan`, which returns an empty result when the source does not match. This ensures layout/signature discovery runs once. `canScan` remains nullable as a migration adapter for older modules and should not be added to new ones.
 
 ### 10.1 `ScanInput`
 
@@ -573,13 +578,13 @@ resolver id + resolver-specific value
 
 The key is the durable identity of a collection. When more sources are loaded, the resolver may return a collection with the same key but more complete membership. `CollectionStore` uses the key to update the existing collection rather than creating a duplicate.
 
-### 13.5 Materialization
+### 13.5 Legacy materialization
 
-Some assets depend on resolved collection membership. Akao is the main example in this branch.
+The current Akao implementation still materializes assets after collection resolution. This is migration debt, not the target architecture.
 
 Akao sequences and sample collections are scanned separately. Only after the resolver chooses the correct sample collections can the code build a bound instrument set for that specific collection. That happens in `FormatModule::materializeCollection`.
 
-Materialization receives:
+The legacy materializer receives:
 
 - the source store;
 - the current snapshot;
@@ -593,7 +598,7 @@ The materializer returns:
 - materialized assets;
 - diagnostics.
 
-The stable slot mechanism is important. If the same collection is resolved again, its materialized instrument set can keep the same asset ID.
+The stable slot mechanism preserves asset IDs during this transition. The replacement is symbolic sample binding stored in durable instrument/sample values, followed by a pure collection binder. The intended invariant is: **collection rebuilding never accesses `SourceStore` and never reparses sequence, articulation, instrument, or sample structures.**
 
 ---
 
@@ -611,11 +616,11 @@ The result is this pipeline:
 ```text
 ByteReader
   ↓
-format command reader
+format decoder + source-map projection
   ↓
 TrackProgram / SequenceProgram
   ↓
-SequenceVm
+global SequenceVm scheduler
   ↓
 PerformanceSequence
   ↓
@@ -628,88 +633,63 @@ MidiExporter
 
 ### 14.1 `SequenceProgram`
 
-`SequenceProgram` is the parsed source program. It is not a live player. It is a record of decoded source commands.
+`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every semantic command has a format-local kind, typed operands, stored decode flow, its source address/range, and an annotation ID.
 
-It contains tracks, and each track contains `SourceCommand` records. A command has its source address and byte range, which lets the VM resolve jumps and lets the UI connect output back to bytes.
-
-The program also carries a dialect ID. The dialect ID says which driver rules should execute these commands.
+The stored flow lets walkers and validators inspect control flow without executing format code. Typed operands let execution and analysis use parsed meaning without reopening the source. A format profile belongs to this program value, so one registered executor family can handle every version of the driver.
 
 ### 14.2 `SequenceDialect`
 
-A dialect is the small piece of driver-specific behavior needed by the VM. It contains:
+A semantic dialect is the small piece of driver-specific behavior needed by the VM. It contains:
 
 - an ID;
-- a command detail kind prefix for source map annotations;
 - a timebase;
 - default behavior;
+- a program-state factory;
 - a function to create per-track state;
-- a function to execute one source command;
-- optional context.
+- a function to execute one semantic command.
 
-The dialect is registered in `SequenceDialectRegistry`. Export looks up the dialect by ID before rendering a sequence.
+The semantic executor receives the command, program state, track state, `PerformanceEmitter`, and `VmApi`. It does **not** receive a `TrackProgram`, source bytes, or global registry context. Version data is read once from `SequenceProgram::config` when state is constructed.
 
-The registry stores dialect values, not parser objects.
+The dialect is registered once in `SequenceDialectRegistry`; export looks it up by family ID. Capcom SNES, for example, registers `capcom-snes` once and stores V1/V2/V3 selection on each program.
 
-### 14.3 `VmCommandCursor`
+### 14.3 Semantic decode and execution
 
-`VmCommandCursor` is the main sequence authoring surface. It is designed so driver code looks like driver code.
+The target authoring model is plain data plus two ordinary switches:
 
-A format command reader usually looks like this:
+1. one `constexpr` opcode profile (with sparse version patches) maps encoded opcodes to semantic command kinds and presentation metadata;
+2. a decode switch reads the operands required by each kind and stores flow;
+3. an execution switch consumes only kinds and typed operands.
+
+A decoder uses `RecordReader` for checked sequential reads with exact ranges. It then appends a semantic command with `retainBytes = false`. Source annotations are produced during this one decode pass. Execution is deliberately smaller:
 
 ```cpp
-switch (cmd.opcode()) {
-  case 0xc0: {
-    cmd.name("Pan", SequenceSemantic::Pan);
-    const u8 raw = cmd.u8("pan");
-    rt.pan(convertPan(raw));
-    return cmd.next();
-  }
-
-  case 0xe1: {
-    cmd.name("Tempo", SequenceSemantic::Tempo);
-    const u16 bpm = cmd.u16le("bpm");
-    rt.tempo(microsPerQuarter(bpm));
-    return cmd.next();
-  }
-
-  case 0xff:
-    return cmd.name("End").end();
+switch (kind(command)) {
+  case Event::Pan:
+    out.pan(driverPan(operand<u8>(command, Operand::Raw)));
+    return Effects::none();
+  case Event::End:
+    return Effects{.step = vm.end()};
 }
 ```
 
-The cursor does several jobs at once:
+Do not introduce a command class hierarchy, handler-per-opcode files, a binary-schema DSL, or a generic microcode language. The point is to keep the source driver visible while removing repeated parsing.
 
-- reads operands;
-- records operand fields in the source map;
-- labels the command;
-- records command meaning, such as note, rest, tempo, pan, jump, or end;
-- records source links, such as jump targets and instrument references;
-- handles truncated commands;
-- returns a VM-neutral flow result.
-
-The cursor has two phases:
-
-- decode phase; and
-- render phase.
-
-The same command reader can run in both phases. In decode phase, it records enough information to build the `SequenceProgram` and `SourceMap`. In render phase, it emits musical events through the runtime wrapper.
-
-This reuse is elegant, but it is also one of the places where format authors need discipline. Command readers should keep their logic local and let the provided runtime wrappers decide whether an action is recorded, ignored, or emitted.
+`VmCommandCursor` and `SequenceCursorDialect` still support unmigrated formats. They retain command bytes and invoke a reader in decode and render phases. This path is deprecated because execution can reparse bytes and decode-time analysis must masquerade as playback.
 
 ### 14.4 Bytecode walkers
 
-The code provides two main track decode helpers:
+The code provides linear and reachable bytecode walkers. They accept a command decoder and build address-indexed tracks:
 
-- `decodeCursorLinearTrack`
-- `decodeCursorReachableTrack`
+- `decodeLinearBytecodeTrack`
+- `decodeReachableBytecodeBlocks`
 
-A linear track is mostly decoded in byte order. A reachable track follows static control flow such as jumps and calls so commands can be decoded even when byte order and execution order differ.
-
-The bytecode walkers build `TrackProgram` values with address indexes. The VM later uses those indexes for jumps, calls, loops, and returns.
+A linear track is mostly decoded in byte order. A reachable track follows stored static targets such as jumps and calls. Cursor-prefixed wrappers adapt legacy command readers to these same walkers.
 
 ### 14.5 `SequenceVm`
 
-`SequenceVm` executes a `SequenceProgram` through a `SequenceDialect`. It owns shared playback policy:
+For semantic dialects, `SequenceVm` owns one program state and one runtime per track. It repeatedly executes the active track with the lowest `(tick, stable track order)`. At equal ticks, an earlier track keeps control while it consumes zero-time commands until it waits or ends. This explicit rule matches multi-channel drivers and makes shared state deterministic.
+
+The VM also owns shared playback policy:
 
 - advancing ticks;
 - jump behavior;
@@ -720,9 +700,9 @@ The bytecode walkers build `TrackProgram` values with address indexes. The VM la
 - loop export policy;
 - command limits;
 - warnings for missing targets;
-- stopping all tracks at the first loop when a driver opts into that behavior.
+- stopping all tracks at the first loop for legacy drivers that opt into that behavior.
 
-This is a major improvement over format code handling these policies separately. A format command reader can say “this is a jump,” “this is a call,” “this is a declared loop,” or “this is a counted repeat.” The VM decides how that affects playback and export.
+Legacy dialects remain track-major until migrated. Their dry-run and complete-sequence-prepass options are compatibility mechanisms; semantic formats should model shared state directly instead.
 
 ### 14.6 `PerformanceSequence`
 
@@ -940,7 +920,7 @@ Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-The best part of the sequence authoring model is that command code resembles a driver interpreter. For example, NDS and Capcom SNES command readers use normal `switch` statements over opcodes. They read operands, update local track state, emit musical events through `rt`, and return flow through `cmd`.
+Command code should resemble a driver interpreter. Capcom SNES demonstrates the semantic form: an opcode profile and decode switch turn bytes into typed commands, then one execution switch updates driver state and emits performance events. NDS, Akao, Akao SNES, and Konami SNES still use normal cursor switches through the legacy adapter.
 
 That is a good match for format developers’ mental model. It avoids requiring every command to be represented as a separate class or visitor.
 
@@ -956,7 +936,7 @@ The difference is that those complexities now sit in format-specific helpers rat
 
 ---
 
-## 19. The three ported formats
+## 19. Representative ported formats
 
 ### 19.1 Nintendo DS SDAT
 
@@ -982,9 +962,11 @@ The Capcom SNES module shows the “single source, explicit collection” path.
 
 The scanner finds the layout, reserves sequence/instrument/sample IDs, parses instrument/sample information when the instrument table and SPC DIR are detected, always emits the sequence, and creates one collection for the source. If synth information is unavailable, the collection still has the sequence and a warning.
 
-The Capcom sequence reader demonstrates driver-local state well. The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Command handlers update that state and emit neutral performance events. Loop and repeat commands return VM flow helpers rather than implementing their own global loop policy.
+Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single opcode mapping. Decode reads every operand once into typed command values and stores control flow; the track keeps no command-byte pool. One `capcom-snes` executor family uses the profile stored on `SequenceProgram`, and the global scheduler supplies program-wide and per-track state. The executor cannot access source bytes by construction.
 
-The synth parser demonstrates the neutral instrument model. It walks instrument headers and SNES sample directory data, computes tuning/envelopes, builds regions, and stores BRR encoded sample ranges for later decoding.
+The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture.
+
+The layout uses the shared masked-pattern matcher, and the synth parser uses the shared SNES sample-directory/BRR reader. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once; it does not register a duplicate `canScan` probe.
 
 ### 19.3 Akao
 
@@ -1000,9 +982,9 @@ The scanner does not try to bind everything immediately. It scans sample collect
 
 The resolver creates one collection per sequence. It chooses sample collections by preferred sample-set ID and by required articulation coverage. It handles PSF-like sources more narrowly, treats missing and zero sample-set IDs as the same anonymous set, sorts attached sample collections by articulation range, and marks collections incomplete when coverage is missing.
 
-The materializer then re-reads the selected sequence and selected sample collections, builds an articulation map, and creates a bound instrument set for that specific collection. This is exactly the kind of problem that justifies the separate materialization phase: the instrument set’s final value depends on which sample collections were matched.
+The materializer currently re-reads the selected sequence and sample collections, builds an articulation map, and creates a bound instrument set. This violates the parse-once target and should be replaced with durable symbolic articulation/sample bindings plus a pure collection binder.
 
-Akao also shows the sequence reader’s flexibility. The same cursor-based decode can be used for analysis and for rendering. During analysis, the reader records custom instrument table references, drum table references, and individual articulation IDs. During rendering, it emits performance events.
+Akao’s same cursor reader currently runs for analysis and rendering. That flexibility is useful during migration, but the semantic IR should ultimately make analysis a direct inspection of decoded commands.
 
 ---
 
@@ -1015,12 +997,11 @@ A new format usually follows this path:
 Create a `FormatModule` with:
 
 - a name;
-- `canScan`;
 - `scan`;
 - optional resolver;
 - optional materializer.
 
-Register it in the format registration function.
+Put recognition at the start of `scan` and return an empty `ScanResult` for non-matches. Do not add `canScan`; it exists only for unmigrated modules.
 
 ### Step 2: Decide how collections are discovered
 
@@ -1028,27 +1009,30 @@ Use explicit collections when the scanner already knows the grouping.
 
 Use match facts and a resolver when relationships may be discovered across multiple files or depend on incomplete evidence.
 
-Use a materializer only when an asset’s value depends on resolved collection membership.
+Prefer durable symbolic references and a pure binder when an asset depends on collection membership. `materializeCollection` is a legacy adapter for Akao and should not be copied into a new format.
 
 ### Step 3: Parse source structure
 
-Use `ByteReader` and `ParseCursor` to find headers, tables, offsets, and sizes. Emit source annotations for useful source structures. Prefer source-backed annotations with fields over range-less standalone annotations.
+Use `ByteReader` for random access and `RecordReader` for sequential records. `RecordReader` performs bounds checks, returns ranged values, records fields, and reports truncation. Use focused shared platform readers such as `SnesSampleDirectory` instead of copying stream walkers into a format.
 
 ### Step 4: Build assets
 
 Return `SequenceProgramAsset`, `InstrumentSetAsset`, `SampleCollectionAsset`, or `MiscAsset` values. Use `ScanResultBuilder` to allocate IDs and metadata.
 
-### Step 5: Decode sequences through the cursor API
+### Step 5: Decode sequences into semantic commands
 
 Define:
 
+- a format-local command-kind enum and operand IDs;
+- one base opcode profile with sparse version patches;
+- one decode switch that reads typed operands and stores `DecodeFlow`;
+- a per-program profile in `SequenceProgram::config`;
+- a program-state type when the driver has shared state;
 - a `TrackState` type for driver-local mutable playback state;
-- an optional context type;
-- a cursor reader with `static CommandFlow read(Runtime&, VmCommandCursor&)`;
-- a dialect using `makeCursorDialect`;
-- a track decode function using `decodeCursorLinearTrack` or `decodeCursorReachableTrack`.
+- one semantic execution switch; and
+- a track decoder using `decodeLinearBytecodeTrack` or `decodeReachableBytecodeBlocks`.
 
-The command reader should read operands, set names/semantics, emit neutral performance events, and return flow. It should not implement global loop export policy.
+The decoder reads bytes and creates source annotations. The executor reads only the semantic command and emits neutral performance events. It should not implement global loop export policy and must never read source bytes.
 
 ### Step 6: Build synth data in the neutral model
 
@@ -1132,27 +1116,27 @@ It also validates collection references and reports missing or wrong-type assets
 
 ### 21.11 `SequenceProgram`
 
-`SequenceProgram` records decoded source commands, not exported events. It is the stable parsed form of a sequence.
+`SequenceProgram` records semantic source commands, program profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
 
-The `AddressIndex` lets the VM resolve control flow by source addresses instead of assuming vector order is execution order.
+Each semantic command stores its format-local kind, typed operands, source provenance, and decode flow. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Byte pools exist only for legacy dialects.
 
-### 21.12 `VmCommandCursor`
+### 21.12 `RecordReader` and legacy `VmCommandCursor`
 
-`VmCommandCursor` is the normal way to write sequence command readers. It reads operands, records source map fields, attaches names and semantics, creates links, handles truncation, and returns flow.
+`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, automatic field projection, and truncation diagnostics without introducing a schema language.
 
-Its two-phase use is powerful: one reader can support both decode and render.
+`VmCommandCursor` remains the two-phase compatibility surface for unmigrated sequence dialects. It should not be used for new semantic implementations because render-phase cursors can reparse stored command bytes.
 
 ### 21.13 `SequenceDialect`
 
-A dialect connects a `SequenceProgram` to executable driver behavior. It packages the track state factory, command executor, context, timebase, and default behavior.
+A semantic dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior.
 
-The implementation uses `std::any` at this boundary to store typed state and context generically. This keeps the registry simple but moves some type safety to runtime. The helper templates hide most of that from format authors.
+The implementation uses `std::any` only to erase the concrete program and track runtime-state types. Program-specific version data is not stored in dialect context; it lives on the immutable program. Legacy dialect context remains until those formats migrate.
 
 ### 21.14 `SequenceVm`
 
-`SequenceVm` is the shared interpreter for parsed sequences. It handles track execution, command limits, loops, calls, returns, repeats, synchronized loop stopping, diagnostics, and event emission.
+`SequenceVm` is the shared interpreter for parsed sequences. Semantic dialects run through a global `(tick, stable track order)` scheduler with one program state and per-track runtimes. The VM handles command limits, loops, calls, returns, repeats, diagnostics, and event emission.
 
-This centralizes behavior that would otherwise be duplicated in each format.
+Legacy dialects still use track-major execution and optional prepasses. Those paths are adapters to remove as formats migrate.
 
 ### 21.15 `PerformanceModel`
 
@@ -1200,7 +1184,7 @@ The existing tests under `tests/core` and `tests/formats` reflect this direction
 
 ### 22.3 Format code can be local and readable
 
-The cursor-based command reader style is a strong fit for sequence drivers. Most command handlers read like direct translations of source opcodes.
+Plain opcode profiles plus explicit decode/execution switches are a strong fit for sequence drivers. They keep the driver visible without coupling playback to source encoding.
 
 The scan builder also makes simple scanners short and clear.
 
@@ -1222,15 +1206,15 @@ The VM outputs neutral performance events. MIDI is one renderer, not the sequenc
 
 ## 23. Tradeoffs and risks
 
-### 23.1 The sequence cursor is powerful but subtle
+### 23.1 Semantic and legacy sequence paths coexist temporarily
 
-Using the same reader for decode and render is elegant. It reduces duplicate code. But format authors must remember that some operations happen in decode phase and some in render phase. The runtime wrappers help, but this pattern should be documented carefully for future contributors.
+Capcom uses semantic commands and global scheduling, while four format families still use the cursor adapter and track-major execution. Shared code must preserve both until migration is complete. Avoid adding features only to the legacy path; doing so increases the cost of removing it.
 
 ### 23.2 `std::any` hides some type checking
 
-`SequenceDialect` stores typed state and context through `std::any`. The helper templates make this ergonomic, but a mismatch can become a runtime issue rather than a compile-time issue.
+`SequenceDialect` type-erases program and track runtime states through `std::any`. A mismatch can become a runtime issue rather than a compile-time issue.
 
-This is probably acceptable at the registry boundary, but it is worth keeping the helper path as the normal path and avoiding hand-written dialect executors unless necessary.
+Keep casts in the one state factory/executor family for a format, cover them with focused tests, and never use `std::any` as a program-configuration property bag.
 
 ### 23.3 Source map conventions need discipline
 
@@ -1238,11 +1222,11 @@ The source map is flexible. That is useful, but flexibility can lead to inconsis
 
 A small style guide for source annotations would help future formats feel consistent in HexView and tests.
 
-### 23.4 Materialization adds a second asset lifecycle
+### 23.4 Materialization is a migration blocker
 
-Materialized assets are necessary for cases like Akao, but they add complexity: stable slots, stale removal, diagnostics, and source re-reading.
+The current Akao materializer adds stable slots, stale removal, repeated diagnostics, and source re-reading.
 
-The current design keeps that complexity contained. Future code should resist using materialization as a general cache. It should remain for assets whose value truly depends on resolved collection membership.
+Do not extend this mechanism. Replace it with symbolic bindings and a collection binder that is pure over snapshot values, then remove the second asset lifecycle.
 
 ### 23.5 Collection resolution depends on good keys
 
@@ -1260,15 +1244,15 @@ The branch would benefit from a contributor-facing guide with one page each for:
 
 - simple scanner with explicit collection;
 - scanner with match facts and resolver;
-- sequence command reader using `VmCommandCursor`;
+- semantic sequence decoder/executor with a small opcode profile;
 - synth parser using `Instrument`, `Region`, and `Sample`;
 - source map annotation conventions.
 
-### 24.2 Keep command readers boring
+### 24.2 Keep command decoding and execution boring
 
-The best command handlers in this branch are straightforward: name the command, read operands, update state, emit events, return flow.
+The decoder should read operands and store flow once. The executor should switch on command kind, update state, emit events, and return runtime flow. Neither side should hide the driver behind command objects or a schema framework.
 
-Avoid turning command readers into miniature frameworks. The shared cursor and VM already provide the framework.
+Keep opcode knowledge in one profile plus sparse patches. Avoid parallel size tables, analysis interpreters, and per-opcode handler classes.
 
 ### 24.3 Prefer explicit collections when possible
 
@@ -1286,9 +1270,34 @@ A future small convention document should define common detail-kind prefixes, fi
 
 This will help UI and tests stay stable as more formats are ported.
 
-### 24.6 Add more end-to-end tests around collection materialization
+### 24.6 Replace and then test Akao materialization
 
-Akao materialization is architecturally important. Tests should make sure stable materialized asset IDs, stale slot removal, missing coverage issues, and source removal all behave as intended.
+Add durable symbolic sample bindings, make collection rebuilding independent of `SourceStore`, and test that repeated rebuilds are pure and diagnostics do not accumulate.
+
+### 24.7 Migration roadmap and invariants
+
+The remaining order is intentional:
+
+1. add neutral control transitions for fades/slides;
+2. migrate Konami SNES to semantic commands and delete its modulation shadow interpreter;
+3. migrate Akao SNES, replacing its dialect matrix, byte rewriting, tempo scraping, prepass, and tick motion;
+4. add symbolic Akao articulation/sample binding and remove materialization source reads;
+5. separate NDS canonical decoding from malformed-data repair;
+6. migrate the remaining layouts/synth parsers to `RecordReader` and shared platform primitives;
+7. remove all `canScan`, cursor-dialect, byte-pool, prepass, and materialization adapters;
+8. combine format and executor registration once every format has one executor family.
+
+Architectural acceptance criteria:
+
+- every source structure is parsed once;
+- semantic VM execution has no byte access;
+- collection rebuilding has no source access;
+- each driver has one opcode mapping and one semantic execution switch;
+- driver profile data lives on `SequenceProgram`;
+- format code emits transitions rather than per-tick fade events;
+- value-format directories contain no MIDI, SF2, or DLS policy;
+- value formats include no old-architecture headers;
+- real-corpus decoded-command and performance parity supplements the self-test.
 
 ---
 
@@ -1302,11 +1311,10 @@ The new architecture is easiest to understand as a set of stages:
 3. ScanCommit validates results before storing them.
 4. Session stores own the accepted values.
 5. Collection resolution groups assets into export units.
-6. Materializers optionally create collection-dependent assets.
+6. A pure binder resolves durable symbolic references (legacy Akao still materializes and reparses).
 7. SessionSnapshot exposes a read-only view.
-8. SequenceVm turns source commands into neutral performance events.
+8. SequenceVm globally schedules semantic commands into neutral performance events (legacy dialects use an adapter).
 9. Exporters turn collections into files.
 ```
 
 The core idea is not just “use modern C++.” The deeper idea is to make parsed game audio data durable, inspectable, and independent of the parser that found it. That gives VGMTrans a better base for testing, UI explanation, multi-source matching, and future export formats.
-

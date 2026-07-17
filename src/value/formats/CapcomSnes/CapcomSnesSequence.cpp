@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/CapcomSnes/CapcomSnesSequence.h"
+#include "value/formats/CapcomSnes/CapcomSnes.h"
 
 #include "value/base/LevelScale.h"
 #include "value/base/RecordReader.h"
@@ -174,64 +174,14 @@ struct Pan {
   return lower + (((upper - lower) * fraction) >> 8);
 }
 
-[[nodiscard]] u8 normalizedPanStep(double position) {
-  u8 step = static_cast<u8>(std::clamp<int>(static_cast<int>(std::round(position * 126.0)), 0, 126));
-  return step == 0 ? 0 : static_cast<u8>(step + 1);
-}
-
-void powerBalance(u8 step, double& left, double& right) {
-  if (step <= 1) {
-    left = 1.0;
-    right = 0.0;
-  } else if (step == 64) {
-    left = right = std::sqrt(2.0) / 2.0;
-  } else if (step == 127) {
-    left = 0.0;
-    right = 1.0;
-  } else {
-    const double position = (step - 1) / 126.0;
-    left = std::cos(kPiOverTwo * position);
-    right = std::sin(kPiOverTwo * position);
-  }
-}
-
-[[nodiscard]] u8 linearPanStep(double position, double* gain) {
-  u8 step = 64;
-  double compensation = 1.0;
-  if (position == 0.0) {
-    step = 0;
-  } else if (position == 0.5) {
-    compensation = 1.0 / std::sqrt(2.0);
-  } else if (position == 1.0) {
-    step = 127;
-  } else {
-    step = normalizedPanStep(std::atan2(position, 1.0 - position) / kPiOverTwo);
-    double left = 0.0;
-    double right = 0.0;
-    powerBalance(step, left, right);
-    compensation = 1.0 / (left + right);
-  }
-  *gain = compensation;
-  return step;
-}
-
 [[nodiscard]] Pan panFromBalance(double sourceLeft, double sourceRight) {
-  u8 step = 64;
-  if (sourceRight == 0.0) {
-    step = 0;
-  } else if (sourceLeft == 0.0) {
-    step = 127;
-  } else if (sourceLeft != sourceRight) {
-    double ignoredGain = 1.0;
-    step = linearPanStep(sourceRight / (sourceLeft + sourceRight), &ignoredGain);
+  if (sourceLeft == 0.0 && sourceRight == 0.0) {
+    return Pan{.gain = 0.0};
   }
-
-  double targetLeft = 0.0;
-  double targetRight = 0.0;
-  powerBalance(step, targetLeft, targetRight);
+  const double angle = std::atan2(sourceRight, sourceLeft);
   return Pan{
-      .position = std::clamp((static_cast<double>(step) / 127.0) * 2.0 - 1.0, -1.0, 1.0),
-      .gain = (sourceLeft + sourceRight) / (targetLeft + targetRight),
+      .position = std::clamp((angle / kPiOverTwo) * 2.0 - 1.0, -1.0, 1.0),
+      .gain = (sourceLeft + sourceRight) / (std::cos(angle) + std::sin(angle)),
   };
 }
 
@@ -269,12 +219,7 @@ void powerBalance(u8 step, double& left, double& right) {
   const auto biasedPan = static_cast<u8>(rawPan + 0x80);
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
     const double position = biasedPan == 255 ? 1.0 : biasedPan / 256.0;
-    double gain = 1.0;
-    const u8 step = linearPanStep(position, &gain);
-    return Pan{
-        .position = std::clamp((static_cast<double>(step) / 127.0) * 2.0 - 1.0, -1.0, 1.0),
-        .gain = gain,
-    };
+    return panFromBalance(1.0 - position, position);
   }
 
   const u16 rightPosition = static_cast<u16>(biasedPan) * 20;
@@ -310,8 +255,7 @@ void powerBalance(u8 step, double& left, double& right) {
     depthCentibels =
         std::clamp(200.0 * std::log10(peak / static_cast<double>(trough)), 0.0, kTremoloMuteFloorCentibels);
   }
-  const int step = static_cast<int>(std::floor(depthCentibels * 128.0 / (2.0 * kTremoloHalfDepthCentibels) + 0.5));
-  return static_cast<double>(std::clamp(step, 0, 127)) / 127.0;
+  return std::clamp(depthCentibels / (2.0 * kTremoloHalfDepthCentibels), 0.0, 1.0);
 }
 
 [[nodiscard]] double lfoRate(u8 rawRate) {
@@ -321,8 +265,7 @@ void powerBalance(u8 step, double& left, double& right) {
   const auto cents = [](double hertz) { return 1200.0 * std::log2(hertz / 440.0) + 6900.0; };
   const double position = (cents(rawRate * kLfoStepHertz) - cents(kVibratoBaseHertz)) /
                           (cents(kVibratoMaxHertz) - cents(kVibratoBaseHertz));
-  const int step = static_cast<int>(std::lround(position * 127.0));
-  return static_cast<double>(std::clamp(step, 0, 127)) / 127.0;
+  return std::clamp(position, 0.0, 1.0);
 }
 
 }  // namespace math
@@ -524,7 +467,6 @@ template <class T>
         break;
       }
       case CapcomSnesCommandKind::UnknownOneByte: {
-        record.derived("opcode", opcode, SourceValueDisplay::Hex);
         const auto value = record.u8("value");
         addUnsigned(operands, CapcomSnesOperand::Value, *value, value.range);
         break;
@@ -854,14 +796,6 @@ struct TrackState {
   };
 }
 
-[[nodiscard]] CapcomSnesSequenceDescriptor makeDescriptor(CapcomSnesEngineVersion version) {
-  return CapcomSnesSequenceDescriptor{
-      .dialect = makeDialect(),
-      .version = version,
-      .profile = profileFor(version),
-  };
-}
-
 [[nodiscard]] SourceRange trackRange(ByteReader reader, const TrackProgram& track, u32 fallback) {
   if (track.commands.empty()) {
     return reader.range(fallback, 0);
@@ -877,31 +811,17 @@ struct TrackState {
 
 }  // namespace
 
-const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngineVersion version) {
-  static const CapcomSnesSequenceDescriptor none = makeDescriptor(CapcomSnesEngineVersion::none);
-  static const CapcomSnesSequenceDescriptor v1 = makeDescriptor(CapcomSnesEngineVersion::v1BgmInList);
-  static const CapcomSnesSequenceDescriptor v2 = makeDescriptor(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation);
-  static const CapcomSnesSequenceDescriptor v3 = makeDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
-
-  switch (version) {
-    case CapcomSnesEngineVersion::v1BgmInList:
-      return v1;
-    case CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation:
-      return v2;
-    case CapcomSnesEngineVersion::v3BgmFixedLocation:
-      return v3;
-    case CapcomSnesEngineVersion::none:
-      return none;
-  }
-  return none;
+const SequenceDialect& capcomSnesSequenceDialect() {
+  static const SequenceDialect dialect = makeDialect();
+  return dialect;
 }
 
 void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
-  registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::none).dialect);
+  registry.add(capcomSnesSequenceDialect());
 }
 
-TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequenceDescriptor& descriptor,
-                                         u32 sourceTrackNumber, u32 startAddress, SourceMapBuilder* sourceMap,
+TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVersion version, u32 sourceTrackNumber,
+                                         u32 startAddress, SourceMapBuilder* sourceMap,
                                          std::vector<Diagnostic>* diagnostics,
                                          std::optional<SourceAnnotationId> parentAnnotation,
                                          std::optional<AssetId> sequenceAsset) {
@@ -922,9 +842,8 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequ
 
   const u32 end = static_cast<u32>(reader.size());
   auto track = decodeLinearBytecodeTrack(
-      reader, sourceTrackNumber, startAddress, LinearBytecodeDecodePolicy{.maxCommands = 4096}, [&](u32 offset) {
-        return decodeCommand(reader, offset, end, descriptor.version, trackAnnotation, sourceMap, diagnostics);
-      });
+      reader, sourceTrackNumber, startAddress, LinearBytecodeDecodePolicy{.maxCommands = 4096},
+      [&](u32 offset) { return decodeCommand(reader, offset, end, version, trackAnnotation, sourceMap, diagnostics); });
   if (sourceMap != nullptr && trackAnnotation) {
     AnnotationBuilder{*sourceMap, *trackAnnotation}.range(trackRange(reader, track, startAddress));
   }
@@ -945,12 +864,12 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
                            .id();
   }
 
-  const auto& descriptor = capcomSnesSequenceDescriptor(layout.version);
+  const auto& dialect = capcomSnesSequenceDialect();
   SequenceProgram program{
-      .dialect = descriptor.dialect.id,
-      .timebase = descriptor.dialect.timebase,
-      .config = SequenceProgramConfig{.profile = descriptor.profile},
-      .behavior = descriptor.dialect.defaultBehavior,
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = profileFor(layout.version)},
+      .behavior = dialect.defaultBehavior,
   };
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   for (u32 pointerIndex = kCapcomSnesMaxTracks; pointerIndex-- > 0;) {
@@ -976,7 +895,7 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
       pointerAnnotation = annotation.id();
     }
 
-    program.tracks.push_back(decodeCapcomSnesSourceTrack(input.reader, descriptor, sourceTrackNumber, trackAddress,
+    program.tracks.push_back(decodeCapcomSnesSourceTrack(input.reader, layout.version, sourceTrackNumber, trackAddress,
                                                          sourceMap, diagnostics, pointerAnnotation, sequenceId));
   }
 
