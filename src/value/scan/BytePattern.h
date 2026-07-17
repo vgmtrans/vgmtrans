@@ -1,0 +1,49 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#pragma once
+
+#include "value/base/Source.h"
+
+#include <optional>
+#include <span>
+#include <string_view>
+
+namespace vgmtrans::core {
+
+// 'x' bytes are significant; every other mask character is a wildcard.
+struct MaskedBytePattern {
+  std::span<const u8> bytes;
+  std::string_view mask;
+
+  [[nodiscard]] bool valid() const noexcept { return !bytes.empty() && bytes.size() == mask.size(); }
+};
+
+[[nodiscard]] inline bool matchesBytePattern(ByteReader reader, u64 offset, MaskedBytePattern pattern) {
+  if (!pattern.valid() || !reader.has(offset, pattern.bytes.size())) {
+    return false;
+  }
+  for (size_t index = 0; index < pattern.bytes.size(); ++index) {
+    if (pattern.mask[index] == 'x' && reader.u8At(offset + index) != pattern.bytes[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+[[nodiscard]] inline std::optional<u32> findBytePattern(ByteReader reader, MaskedBytePattern pattern, u32 begin = 0) {
+  if (!pattern.valid() || pattern.bytes.size() > reader.size() || begin > reader.size() - pattern.bytes.size()) {
+    return std::nullopt;
+  }
+  for (u64 offset = begin; offset <= reader.size() - pattern.bytes.size(); ++offset) {
+    if (matchesBytePattern(reader, offset, pattern)) {
+      return static_cast<u32>(offset);
+    }
+  }
+  return std::nullopt;
+}
+
+}  // namespace vgmtrans::core

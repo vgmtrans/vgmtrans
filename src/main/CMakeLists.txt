@@ -134,6 +134,8 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.cpp
     ${PROJECT_SOURCE_DIR}/src/value/base/Source.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.cpp
@@ -156,6 +158,9 @@ target_sources(vgmtransvaluecore
     FILES
       ${PROJECT_SOURCE_DIR}/src/value/sequence/BytecodeDecode.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
+      ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
@@ -245,7 +250,6 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.cpp
-    formats/CapcomSnes/CapcomSnesDriverMath.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
@@ -281,7 +285,6 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsTypes.h
-      formats/CapcomSnes/CapcomSnesDriverMath.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )
 target_link_libraries(
@@ -358,6 +361,7 @@ target_sources(vgmtranscore
     formats/CapcomSnes/CapcomSnesInstr.cpp
     formats/CapcomSnes/CapcomSnesScanner.cpp
     formats/CapcomSnes/CapcomSnesSeq.cpp
+    formats/CapcomSnes/CapcomSnesDriverMath.cpp
     formats/ChunSnes/ChunSnesInstr.cpp
     formats/ChunSnes/ChunSnesScanner.cpp
     formats/ChunSnes/ChunSnesSeq.cpp

@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -29,18 +30,6 @@ struct DialectId {
 struct ByteSpan {
   u32 offset = 0;
   u32 size = 0;
-};
-
-// One decoded source opcode. Inspection metadata such as operand names, display
-// text, and semantic category lives on its SourceAnnotation.
-struct SourceCommand {
-  CommandId id;
-  u8 opcode = 0;
-  Address address;
-  u32 encodedSize = 0;
-  SourceRange range;
-  SourceAnnotationId annotation;
-  ByteSpan bytes;
 };
 
 // Where decoding can continue after an opcode. Walkers use this before playback
@@ -94,6 +83,50 @@ struct DecodeFlow {
   [[nodiscard]] bool callTarget() const noexcept { return kind == Kind::Call && !staticTargets.empty(); }
 };
 
+// Format-local numeric IDs keep the shared sequence core independent of every
+// driver's command vocabulary while still giving executors a typed, byte-free
+// instruction stream.
+struct SemanticCommandKind {
+  u32 value = 0;
+
+  [[nodiscard]] constexpr bool valid() const noexcept { return value != 0; }
+  friend constexpr bool operator==(SemanticCommandKind, SemanticCommandKind) noexcept = default;
+};
+
+struct SemanticOperandId {
+  u32 value = 0;
+
+  [[nodiscard]] constexpr bool valid() const noexcept { return value != 0; }
+  friend constexpr bool operator==(SemanticOperandId, SemanticOperandId) noexcept = default;
+};
+
+using SemanticOperandValue = std::variant<bool, u64, s64, double, Address>;
+
+struct SemanticOperand {
+  SemanticOperandId id;
+  SemanticOperandValue value;
+  // Empty for interpreted values derived from one or more encoded operands.
+  SourceRange range;
+};
+
+// One decoded source opcode. Source bytes are retained only for legacy dialects.
+// Semantic dialects execute kind/operands/flow and therefore cannot reparse the
+// source during playback.
+struct SourceCommand {
+  CommandId id;
+  u8 opcode = 0;
+  Address address;
+  u32 encodedSize = 0;
+  SourceRange range;
+  SourceAnnotationId annotation;
+  ByteSpan bytes;
+  SemanticCommandKind kind;
+  std::vector<SemanticOperand> operands;
+  DecodeFlow flow;
+};
+
+[[nodiscard]] const SemanticOperand* semanticOperand(const SourceCommand& command, SemanticOperandId id);
+
 // Maps source addresses to command indexes. The VM uses this for jumps, calls,
 // and finding the next command by source address when vector order is different.
 struct AddressIndex {
@@ -136,10 +169,17 @@ struct SequenceProgramBehavior {
   bool stopAllTracksAtFirstLoop = false;
 };
 
+// Driver/profile selection belongs to the parsed program, not the registered
+// executor. A single dialect can therefore execute every version of a format.
+struct SequenceProgramConfig {
+  u32 profile = 0;
+};
+
 struct SequenceProgram {
   DialectId dialect;
   Timebase timebase;
   Address sourceBaseAddress;
+  SequenceProgramConfig config;
   SequenceProgramBehavior behavior;
   std::vector<TrackProgram> tracks;
 };
@@ -157,7 +197,10 @@ public:
   explicit TrackProgramBuilder(TrackProgram& track);
 
   const SourceCommand& addDecoded(Address address, SourceRange range, std::span<const u8> bytes,
-                                  SourceAnnotationId annotation = {});
+                                  SourceAnnotationId annotation = {}, DecodeFlow flow = {});
+  const SourceCommand& addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
+                                   SemanticCommandKind kind, std::vector<SemanticOperand> operands, DecodeFlow flow,
+                                   SourceAnnotationId annotation = {});
 
 private:
   TrackProgram& track_;

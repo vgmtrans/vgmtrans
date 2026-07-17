@@ -6,15 +6,16 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesSequence.h"
 
-#include "formats/CapcomSnes/CapcomSnesDriverMath.h"
 #include "value/base/LevelScale.h"
-#include "value/sequence/SequenceCursorDialect.h"
-#include "value/sequence/SequenceVm.h"
+#include "value/base/RecordReader.h"
 #include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/SequenceVm.h"
 
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <any>
+#include <array>
 #include <cmath>
 #include <optional>
 #include <string>
@@ -34,28 +35,577 @@ constexpr u8 kNoteDottedMask = 0x10;
 constexpr u8 kNoteTripletMask = 0x20;
 constexpr u8 kNoteSlurredMask = 0x40;
 
-// Driver-local state used while executing decoded source commands.
-struct Context {
-  CapcomSnesEngineVersion version = CapcomSnesEngineVersion::v3BgmFixedLocation;
+[[nodiscard]] constexpr SemanticCommandKind commandKind(CapcomSnesCommandKind kind) {
+  return SemanticCommandKind{static_cast<u32>(kind)};
+}
+
+[[nodiscard]] constexpr SemanticOperandId operandId(CapcomSnesOperand operand) {
+  return SemanticOperandId{static_cast<u32>(operand)};
+}
+
+[[nodiscard]] constexpr u32 profileFor(CapcomSnesEngineVersion version) {
+  return static_cast<u32>(version);
+}
+
+[[nodiscard]] CapcomSnesEngineVersion versionFrom(const SequenceProgram& program) {
+  switch (static_cast<CapcomSnesEngineVersion>(program.config.profile)) {
+    case CapcomSnesEngineVersion::v1BgmInList:
+    case CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation:
+    case CapcomSnesEngineVersion::v3BgmFixedLocation:
+      return static_cast<CapcomSnesEngineVersion>(program.config.profile);
+    case CapcomSnesEngineVersion::none:
+      // Directly constructed programs historically implied the newest driver.
+      return CapcomSnesEngineVersion::v3BgmFixedLocation;
+  }
+  return CapcomSnesEngineVersion::v3BgmFixedLocation;
+}
+
+struct CommandSpec {
+  CapcomSnesCommandKind kind = CapcomSnesCommandKind::Unsupported;
+  std::string_view name = "Unsupported";
+  std::string_view localKind = "unsupported";
+  SequenceSemantic semantic = SequenceSemantic::Unsupported;
+  CommandPlaybackStatus playback = CommandPlaybackStatus::Unsupported;
+};
+
+[[nodiscard]] constexpr CommandSpec spec(CapcomSnesCommandKind kind, std::string_view name,
+                                         SequenceSemantic semantic = SequenceSemantic::State,
+                                         CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
+                                         std::string_view localKind = {}) {
+  return CommandSpec{
+      .kind = kind,
+      .name = name,
+      .localKind = localKind.empty() ? name : localKind,
+      .semantic = semantic,
+      .playback = playback,
+  };
+}
+
+// The base opcode profile is plain data. Version differences are sparse patches
+// below; operand reads and playback semantics stay in their respective switches.
+constexpr auto kBaseOpcodeProfile = [] {
+  std::array<CommandSpec, 0x20> table{};
+  table[0x00] = spec(CapcomSnesCommandKind::ToggleTriplet, "Toggle Triplet");
+  table[0x01] = spec(CapcomSnesCommandKind::ToggleSlur, "Toggle Slur");
+  table[0x02] = spec(CapcomSnesCommandKind::DottedNote, "Dotted Note");
+  table[0x03] = spec(CapcomSnesCommandKind::ToggleOctaveUp, "Toggle Octave Up");
+  table[0x04] = spec(CapcomSnesCommandKind::NoteAttributes, "Note Attributes");
+  table[0x05] = spec(CapcomSnesCommandKind::Tempo, "Tempo", SequenceSemantic::Tempo);
+  table[0x06] = spec(CapcomSnesCommandKind::DurationRate, "Duration Rate");
+  table[0x07] = spec(CapcomSnesCommandKind::Volume, "Volume", SequenceSemantic::Level);
+  table[0x08] = spec(CapcomSnesCommandKind::Program, "Program", SequenceSemantic::Program);
+  table[0x09] = spec(CapcomSnesCommandKind::Octave, "Octave");
+  table[0x0a] = spec(CapcomSnesCommandKind::GlobalTranspose, "Global Transpose", SequenceSemantic::Pitch);
+  table[0x0b] = spec(CapcomSnesCommandKind::Transpose, "Transpose", SequenceSemantic::Pitch);
+  table[0x0c] = spec(CapcomSnesCommandKind::Tuning, "Tuning", SequenceSemantic::Pitch);
+  table[0x0d] = spec(CapcomSnesCommandKind::PortamentoTime, "Portamento Time", SequenceSemantic::Portamento);
+  for (u8 opcode = 0x0e; opcode <= 0x11; ++opcode) {
+    table[opcode] = spec(CapcomSnesCommandKind::RepeatUntil, "Repeat Until", SequenceSemantic::Repeat,
+                         CommandPlaybackStatus::AffectsControlFlow);
+  }
+  for (u8 opcode = 0x12; opcode <= 0x15; ++opcode) {
+    table[opcode] = spec(CapcomSnesCommandKind::RepeatBreak, "Repeat Break", SequenceSemantic::RepeatBreak,
+                         CommandPlaybackStatus::AffectsControlFlow);
+  }
+  table[0x16] =
+      spec(CapcomSnesCommandKind::Jump, "Jump", SequenceSemantic::Jump, CommandPlaybackStatus::AffectsControlFlow);
+  table[0x17] = spec(CapcomSnesCommandKind::End, "End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
+  table[0x18] = spec(CapcomSnesCommandKind::Pan, "Pan", SequenceSemantic::Pan);
+  table[0x19] = spec(CapcomSnesCommandKind::MasterVolume, "Master Volume", SequenceSemantic::Level);
+  table[0x1a] = spec(CapcomSnesCommandKind::Lfo, "LFO", SequenceSemantic::Modulation);
+  table[0x1b] =
+      spec(CapcomSnesCommandKind::EchoParam, "Echo Param", SequenceSemantic::Meta, CommandPlaybackStatus::SourceOnly);
+  table[0x1c] = spec(CapcomSnesCommandKind::EchoOnOff, "Echo On/Off", SequenceSemantic::Meta);
+  table[0x1d] = spec(CapcomSnesCommandKind::ReleaseRate, "Release Rate", SequenceSemantic::Meta,
+                     CommandPlaybackStatus::SourceOnly);
+  table[0x1e] = spec(CapcomSnesCommandKind::NoOperation, "No Operation", SequenceSemantic::Meta,
+                     CommandPlaybackStatus::NoOp, "nop");
+  table[0x1f] = table[0x1e];
+  return table;
+}();
+
+struct OpcodePatch {
+  u8 opcode = 0;
+  CommandSpec replacement;
+};
+
+constexpr std::array kVersion1Patches{
+    OpcodePatch{0x1e, spec(CapcomSnesCommandKind::UnknownOneByte, "Unknown One-Byte Event", SequenceSemantic::Meta,
+                           CommandPlaybackStatus::SourceOnly, "unknown-one-byte")},
+    OpcodePatch{0x1f, spec(CapcomSnesCommandKind::UnknownOneByte, "Unknown One-Byte Event", SequenceSemantic::Meta,
+                           CommandPlaybackStatus::SourceOnly, "unknown-one-byte")},
+};
+
+[[nodiscard]] CommandSpec commandSpec(CapcomSnesEngineVersion version, u8 opcode) {
+  if (version == CapcomSnesEngineVersion::v1BgmInList) {
+    for (const auto& patch : kVersion1Patches) {
+      if (patch.opcode == opcode) {
+        return patch.replacement;
+      }
+    }
+  }
+  return kBaseOpcodeProfile[opcode];
+}
+
+constexpr CommandSpec kNoteSpec = spec(CapcomSnesCommandKind::Note, "Note", SequenceSemantic::Note);
+constexpr CommandSpec kRestSpec = spec(CapcomSnesCommandKind::Rest, "Rest", SequenceSemantic::Rest);
+
+namespace math {
+
+constexpr std::array<u8, 17> kVolumeCurve{0x00, 0x0c, 0x19, 0x26, 0x33, 0x40, 0x4c, 0x59, 0x66,
+                                          0x73, 0x80, 0x8c, 0x99, 0xb3, 0xcc, 0xe6, 0xff};
+constexpr std::array<u8, 22> kPanCurve{0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29, 0x34, 0x42, 0x51,
+                                       0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d, 0x7e, 0x7f, 0x7f};
+constexpr double kPiOverTwo = 1.57079632679489661923;
+constexpr double kLfoStepHertz = 1000.0 / 16384.0;
+constexpr double kVibratoBaseHertz = kLfoStepHertz;
+constexpr double kVibratoMaxHertz = 255.0 * kLfoStepHertz;
+constexpr double kTremoloMuteFloorCentibels = 960.0;
+constexpr double kTremoloHalfDepthCentibels = 484.0;
+
+struct Pan {
+  double position = 0.0;
+  double gain = 1.0;
+};
+
+[[nodiscard]] int interpolate(const auto& table, int index, int fraction) {
+  const int lower = table[index];
+  const int upper = table[index + 1];
+  return lower + (((upper - lower) * fraction) >> 8);
+}
+
+[[nodiscard]] u8 normalizedPanStep(double position) {
+  u8 step = static_cast<u8>(std::clamp<int>(static_cast<int>(std::round(position * 126.0)), 0, 126));
+  return step == 0 ? 0 : static_cast<u8>(step + 1);
+}
+
+void powerBalance(u8 step, double& left, double& right) {
+  if (step <= 1) {
+    left = 1.0;
+    right = 0.0;
+  } else if (step == 64) {
+    left = right = std::sqrt(2.0) / 2.0;
+  } else if (step == 127) {
+    left = 0.0;
+    right = 1.0;
+  } else {
+    const double position = (step - 1) / 126.0;
+    left = std::cos(kPiOverTwo * position);
+    right = std::sin(kPiOverTwo * position);
+  }
+}
+
+[[nodiscard]] u8 linearPanStep(double position, double* gain) {
+  u8 step = 64;
+  double compensation = 1.0;
+  if (position == 0.0) {
+    step = 0;
+  } else if (position == 0.5) {
+    compensation = 1.0 / std::sqrt(2.0);
+  } else if (position == 1.0) {
+    step = 127;
+  } else {
+    step = normalizedPanStep(std::atan2(position, 1.0 - position) / kPiOverTwo);
+    double left = 0.0;
+    double right = 0.0;
+    powerBalance(step, left, right);
+    compensation = 1.0 / (left + right);
+  }
+  *gain = compensation;
+  return step;
+}
+
+[[nodiscard]] Pan panFromBalance(double sourceLeft, double sourceRight) {
+  u8 step = 64;
+  if (sourceRight == 0.0) {
+    step = 0;
+  } else if (sourceLeft == 0.0) {
+    step = 127;
+  } else if (sourceLeft != sourceRight) {
+    double ignoredGain = 1.0;
+    step = linearPanStep(sourceRight / (sourceLeft + sourceRight), &ignoredGain);
+  }
+
+  double targetLeft = 0.0;
+  double targetRight = 0.0;
+  powerBalance(step, targetLeft, targetRight);
+  return Pan{
+      .position = std::clamp((static_cast<double>(step) / 127.0) * 2.0 - 1.0, -1.0, 1.0),
+      .gain = (sourceLeft + sourceRight) / (targetLeft + targetRight),
+  };
+}
+
+[[nodiscard]] double volumeGain(CapcomSnesEngineVersion version, u8 rawVolume) {
+  if (version == CapcomSnesEngineVersion::v1BgmInList) {
+    return rawVolume / 255.0;
+  }
+  if (rawVolume >= 0x80) {
+    return 1.0;
+  }
+  const int index = rawVolume >> 3;
+  const int fraction = ((rawVolume & 0x07) << 5) | 0x1f;
+  return static_cast<double>(interpolate(kVolumeCurve, index, fraction)) / 255.0;
+}
+
+[[nodiscard]] double tuningCents(s8 tuning) {
+  return static_cast<double>(tuning) * (100.0 / 256.0);
+}
+
+[[nodiscard]] double portamentoMillisecondsPerCent(u8 rawTime) {
+  const u8 step = static_cast<u8>((rawTime << 1) & 0xff);
+  const double centsPerUpdate = step * (100.0 / 256.0);
+  return centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
+}
+
+[[nodiscard]] u32 baseNoteTicks(u32 rawDuration) {
+  return rawDuration == 0 || rawDuration > 7 ? 0 : 192u >> (7u - rawDuration);
+}
+
+[[nodiscard]] u32 tempoMicrosecondsPerQuarter(u32 rawTempo) {
+  return rawTempo == 0 ? 60000000 : static_cast<u32>(std::round(kCapcomSnesPpqn * (125 * 0x40) * 2 * 256.0 / rawTempo));
+}
+
+[[nodiscard]] Pan pan(CapcomSnesEngineVersion version, u8 rawPan) {
+  const auto biasedPan = static_cast<u8>(rawPan + 0x80);
+  if (version == CapcomSnesEngineVersion::v1BgmInList) {
+    const double position = biasedPan == 255 ? 1.0 : biasedPan / 256.0;
+    double gain = 1.0;
+    const u8 step = linearPanStep(position, &gain);
+    return Pan{
+        .position = std::clamp((static_cast<double>(step) / 127.0) * 2.0 - 1.0, -1.0, 1.0),
+        .gain = gain,
+    };
+  }
+
+  const u16 rightPosition = static_cast<u16>(biasedPan) * 20;
+  const u16 leftPosition = 0x1400 - rightPosition;
+  const double left = interpolate(kPanCurve, leftPosition >> 8, leftPosition & 0xff) / 128.0;
+  const double right = interpolate(kPanCurve, rightPosition >> 8, rightPosition & 0xff) / 128.0;
+  return panFromBalance(left, right);
+}
+
+[[nodiscard]] double normalizedDepth(u8 value) {
+  return static_cast<double>(value) / 127.0;
+}
+
+[[nodiscard]] double tremoloDepth(CapcomSnesEngineVersion version, u8 rawDepth) {
+  int trough = 0;
+  int peak = 250;
+  if (version == CapcomSnesEngineVersion::v1BgmInList) {
+    const int depth = rawDepth & 0x7f;
+    trough = depth == 0 ? 255 : 255 - ((2 * depth * 255) >> 8);
+    peak = 255;
+  } else if (rawDepth == 0) {
+    trough = 250;
+  } else if (rawDepth >= 127) {
+    trough = 0;
+  } else {
+    const int inversePosition = 0x7e81 - rawDepth * 255;
+    const int curvePosition = inversePosition >> 3;
+    trough = interpolate(kVolumeCurve, curvePosition >> 8, curvePosition & 0xff);
+  }
+
+  double depthCentibels = kTremoloMuteFloorCentibels;
+  if (trough > 0) {
+    depthCentibels =
+        std::clamp(200.0 * std::log10(peak / static_cast<double>(trough)), 0.0, kTremoloMuteFloorCentibels);
+  }
+  const int step = static_cast<int>(std::floor(depthCentibels * 128.0 / (2.0 * kTremoloHalfDepthCentibels) + 0.5));
+  return static_cast<double>(std::clamp(step, 0, 127)) / 127.0;
+}
+
+[[nodiscard]] double lfoRate(u8 rawRate) {
+  if (rawRate == 0) {
+    return 0.0;
+  }
+  const auto cents = [](double hertz) { return 1200.0 * std::log2(hertz / 440.0) + 6900.0; };
+  const double position = (cents(rawRate * kLfoStepHertz) - cents(kVibratoBaseHertz)) /
+                          (cents(kVibratoMaxHertz) - cents(kVibratoBaseHertz));
+  const int step = static_cast<int>(std::lround(position * 127.0));
+  return static_cast<double>(std::clamp(step, 0, 127)) / 127.0;
+}
+
+}  // namespace math
+
+void addUnsigned(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, u64 value, SourceRange range = {}) {
+  operands.push_back(SemanticOperand{.id = operandId(id), .value = value, .range = range});
+}
+
+void addSigned(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, s64 value, SourceRange range = {}) {
+  operands.push_back(SemanticOperand{.id = operandId(id), .value = value, .range = range});
+}
+
+void addAddress(std::vector<SemanticOperand>& operands, CapcomSnesOperand id, Address value, SourceRange range = {}) {
+  operands.push_back(SemanticOperand{.id = operandId(id), .value = value, .range = range});
+}
+
+template <class T>
+[[nodiscard]] T operand(const SourceCommand& command, CapcomSnesOperand id) {
+  const SemanticOperand* found = semanticOperand(command, operandId(id));
+  if (found == nullptr) {
+    throw std::logic_error("CapcomSnes semantic command is missing an operand");
+  }
+  return std::get<T>(found->value);
+}
+
+template <class T>
+[[nodiscard]] T decodedOperand(const std::vector<SemanticOperand>& operands, CapcomSnesOperand id) {
+  const auto found =
+      std::ranges::find_if(operands, [id](const SemanticOperand& value) { return value.id == operandId(id); });
+  if (found == operands.end()) {
+    throw std::logic_error("CapcomSnes decoded command is missing an operand");
+  }
+  return std::get<T>(found->value);
+}
+
+[[nodiscard]] u8 unsigned8(const SourceCommand& command, CapcomSnesOperand id) {
+  return static_cast<u8>(operand<u64>(command, id));
+}
+
+[[nodiscard]] s8 signed8(const SourceCommand& command, CapcomSnesOperand id) {
+  return static_cast<s8>(operand<s64>(command, id));
+}
+
+[[nodiscard]] std::string detailKind(const CommandSpec& command) {
+  return "capcom-snes." + sourceLocalKind(command.localKind);
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end,
+                                                   CapcomSnesEngineVersion version,
+                                                   std::optional<SourceAnnotationId> parentAnnotation,
+                                                   SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+  RecordReader record(reader, begin, end, diagnostics);
+  const auto opcodeValue = record.u8("opcode", SourceValueDisplay::Hex);
+  if (!opcodeValue) {
+    return DecodedBytecodeCommand{
+        .range = record.range(),
+        .bytes = {},
+        .flow = DecodeFlow::terminalFlow(),
+        .kind = commandKind(CapcomSnesCommandKind::Unsupported),
+        .retainBytes = false,
+    };
+  }
+
+  const u8 opcode = *opcodeValue;
+  CommandSpec decodedSpec =
+      opcode >= 0x20 ? ((opcode & 0x1f) == 0 ? kRestSpec : kNoteSpec) : commandSpec(version, opcode);
+  std::vector<SemanticOperand> operands;
+  DecodeFlow flow;
+  std::optional<std::pair<Address, SourceLinkRole>> target;
+  std::optional<std::pair<u32, u32>> instrument;
+
+  if (opcode >= 0x20) {
+    const u8 durationIndex = opcode >> 5;
+    addUnsigned(operands, CapcomSnesOperand::DurationIndex, durationIndex, opcodeValue.range);
+    record.derived("duration_index", durationIndex);
+    if ((opcode & 0x1f) != 0) {
+      const u8 keyIndex = opcode & 0x1f;
+      addUnsigned(operands, CapcomSnesOperand::KeyIndex, keyIndex, opcodeValue.range);
+      record.derived("key_index", keyIndex);
+    }
+  } else {
+    switch (decodedSpec.kind) {
+      case CapcomSnesCommandKind::NoteAttributes: {
+        const auto value = record.u8("raw");
+        addUnsigned(operands, CapcomSnesOperand::Attributes, *value, value.range);
+        break;
+      }
+      case CapcomSnesCommandKind::Tempo: {
+        const auto value = record.u16be("raw");
+        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
+        record.derived("microseconds_per_quarter", math::tempoMicrosecondsPerQuarter(*value));
+        break;
+      }
+      case CapcomSnesCommandKind::DurationRate: {
+        const auto value = record.u8("rate");
+        addUnsigned(operands, CapcomSnesOperand::Rate, *value, value.range);
+        break;
+      }
+      case CapcomSnesCommandKind::Volume:
+      case CapcomSnesCommandKind::MasterVolume: {
+        const auto value = record.u8("raw");
+        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
+        record.derived("linear_gain", math::volumeGain(version, *value));
+        break;
+      }
+      case CapcomSnesCommandKind::Program: {
+        const auto value = record.u8("raw");
+        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
+        const u32 bank = *value >> 7;
+        const u32 program = *value & 0x7f;
+        addUnsigned(operands, CapcomSnesOperand::Bank, bank);
+        addUnsigned(operands, CapcomSnesOperand::Program, program);
+        record.derived("bank", bank);
+        record.derived("program", program);
+        instrument = std::pair{bank, program};
+        break;
+      }
+      case CapcomSnesCommandKind::Octave: {
+        const auto value = record.u8("octave");
+        addUnsigned(operands, CapcomSnesOperand::Octave, *value, value.range);
+        break;
+      }
+      case CapcomSnesCommandKind::GlobalTranspose:
+      case CapcomSnesCommandKind::Transpose: {
+        const auto value = record.s8("semitones");
+        addSigned(operands, CapcomSnesOperand::Semitones, *value, value.range);
+        break;
+      }
+      case CapcomSnesCommandKind::Tuning: {
+        const auto value = record.s8("tuning");
+        addSigned(operands, CapcomSnesOperand::Tuning, *value, value.range);
+        record.derived("cents", math::tuningCents(*value));
+        break;
+      }
+      case CapcomSnesCommandKind::PortamentoTime: {
+        const auto value = record.u8("time");
+        addUnsigned(operands, CapcomSnesOperand::Time, *value, value.range);
+        break;
+      }
+      case CapcomSnesCommandKind::RepeatUntil: {
+        const u8 slot = opcode - 0x0e;
+        record.derived("slot", slot + 1);
+        addUnsigned(operands, CapcomSnesOperand::Slot, slot);
+        const auto count = record.u8("count");
+        const auto destination = record.u16be("destination", SourceValueDisplay::Address);
+        addUnsigned(operands, CapcomSnesOperand::Count, *count, count.range);
+        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range);
+        target = std::pair{Address{*destination}, SourceLinkRole::RepeatTarget};
+        break;
+      }
+      case CapcomSnesCommandKind::RepeatBreak: {
+        const u8 slot = opcode - 0x12;
+        record.derived("slot", slot + 1);
+        addUnsigned(operands, CapcomSnesOperand::Slot, slot);
+        const auto attributes = record.u8("attributes");
+        const auto destination = record.u16be("destination", SourceValueDisplay::Address);
+        addUnsigned(operands, CapcomSnesOperand::Attributes, *attributes, attributes.range);
+        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range);
+        target = std::pair{Address{*destination}, SourceLinkRole::RepeatTarget};
+        break;
+      }
+      case CapcomSnesCommandKind::Jump: {
+        const auto destination = record.u16be("destination", SourceValueDisplay::Address);
+        addAddress(operands, CapcomSnesOperand::Destination, Address{*destination}, destination.range);
+        target = std::pair{Address{*destination}, SourceLinkRole::JumpTarget};
+        break;
+      }
+      case CapcomSnesCommandKind::Pan: {
+        const auto value = record.u8("raw");
+        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
+        const auto converted = math::pan(version, *value);
+        record.derived("stereo_position", converted.position);
+        record.derived("linear_gain", converted.gain);
+        break;
+      }
+      case CapcomSnesCommandKind::Lfo: {
+        const auto type = record.u8("type");
+        const auto value = record.u8("value");
+        addUnsigned(operands, CapcomSnesOperand::Type, *type, type.range);
+        addUnsigned(operands, CapcomSnesOperand::Value, *value, value.range);
+        break;
+      }
+      case CapcomSnesCommandKind::EchoParam: {
+        const auto argument = record.u8("argument");
+        const auto preset = record.u8("preset");
+        addUnsigned(operands, CapcomSnesOperand::Argument, *argument, argument.range);
+        addUnsigned(operands, CapcomSnesOperand::Preset, *preset, preset.range);
+        break;
+      }
+      case CapcomSnesCommandKind::EchoOnOff:
+      case CapcomSnesCommandKind::ReleaseRate: {
+        const auto value = record.u8("raw");
+        addUnsigned(operands, CapcomSnesOperand::Raw, *value, value.range);
+        if (decodedSpec.kind == CapcomSnesCommandKind::EchoOnOff) {
+          record.derived("enabled", (*value & 1) != 0);
+        } else {
+          record.derived("gain", *value | 0xa0);
+        }
+        break;
+      }
+      case CapcomSnesCommandKind::UnknownOneByte: {
+        record.derived("opcode", opcode, SourceValueDisplay::Hex);
+        const auto value = record.u8("value");
+        addUnsigned(operands, CapcomSnesOperand::Value, *value, value.range);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  if (!record.ok()) {
+    decodedSpec = spec(CapcomSnesCommandKind::Unsupported, "Truncated Command", SequenceSemantic::Unsupported,
+                       CommandPlaybackStatus::Unsupported, "truncated");
+    flow = DecodeFlow::terminalFlow();
+  } else {
+    const Address next{record.position()};
+    switch (decodedSpec.kind) {
+      case CapcomSnesCommandKind::End:
+      case CapcomSnesCommandKind::Unsupported:
+        flow = DecodeFlow::terminalFlow();
+        break;
+      case CapcomSnesCommandKind::Jump:
+        flow = DecodeFlow::jump(decodedOperand<Address>(operands, CapcomSnesOperand::Destination));
+        break;
+      case CapcomSnesCommandKind::RepeatUntil: {
+        const auto destination = decodedOperand<Address>(operands, CapcomSnesOperand::Destination);
+        if (decodedOperand<u64>(operands, CapcomSnesOperand::Count) == 0) {
+          flow = DecodeFlow::jump(destination);
+        } else {
+          flow = DecodeFlow{.kind = DecodeFlow::Kind::Fallthrough, .fallthrough = next, .staticTargets = {destination}};
+        }
+        break;
+      }
+      case CapcomSnesCommandKind::RepeatBreak:
+        flow = DecodeFlow{.kind = DecodeFlow::Kind::Fallthrough,
+                          .fallthrough = next,
+                          .staticTargets = {decodedOperand<Address>(operands, CapcomSnesOperand::Destination)}};
+        break;
+      default:
+        flow = DecodeFlow::fallthroughTo(next);
+        break;
+    }
+  }
+
+  SourceAnnotationId annotationId;
+  if (sourceMap != nullptr && record.range().valid()) {
+    auto annotation = sourceMap->command(decodedSpec.name, record.range(), decodedSpec.semantic)
+                          .kind(sourceLocalKind(decodedSpec.localKind))
+                          .detailKind(detailKind(decodedSpec))
+                          .playbackStatus(decodedSpec.playback);
+    record.addFields(annotation);
+    if (parentAnnotation) {
+      annotation.parent(*parentAnnotation);
+    }
+    if (target) {
+      annotation.link(target->second, SourceTarget{reader.range(target->first.value, 1)});
+    }
+    if (instrument) {
+      annotation.link(SourceLinkRole::UsesInstrument,
+                      SourceTarget{ObjectRefs::instrumentProgram(instrument->first, instrument->second)}, "Instrument");
+    }
+    annotationId = annotation.id();
+  }
+
+  const auto sourceBytes = record.bytes();
+  return DecodedBytecodeCommand{
+      .range = record.range(),
+      .annotation = annotationId,
+      .bytes = std::vector<u8>(sourceBytes.begin(), sourceBytes.end()),
+      .flow = std::move(flow),
+      .kind = commandKind(decodedSpec.kind),
+      .operands = std::move(operands),
+      .retainBytes = false,
+  };
+}
+
+struct ProgramState {
+  s32 globalTranspose = 0;
 };
 
 struct TrackState {
-  u32 consumeNoteTicks(u8 rawDuration);
-  [[nodiscard]] u32 soundingTicks(u32 length) const;
-  [[nodiscard]] s32 sourceKey(u8 keyIndex) const;
-  [[nodiscard]] double performedKey(s32 key) const;
-  [[nodiscard]] bool extendsPreviousSlurredNote(s32 key) const;
-  void finishExtendedNote();
-  void finishNote(s32 key);
-  template <class Runtime>
-  void applyAttributes(u8 attributes, Runtime& rt);
-  template <class Runtime>
-  void toggleSlur(Runtime& rt);
-  template <class Runtime>
-  void emitPortamentoIfNeeded(s32 key, Runtime& rt);
-  template <class Runtime>
-  void emitModulationDepths(Runtime& rt, bool enabled) const;
-
+  CapcomSnesEngineVersion version = CapcomSnesEngineVersion::v3BgmFixedLocation;
   u32 durationRate = 0;
   s32 transpose = 0;
   u32 noteOctave = 0;
@@ -64,516 +614,274 @@ struct TrackState {
   bool noteSlurred = false;
   bool noteOctaveUp = false;
   u8 modulationRate = 0;
-  u8 vibratoDepth = 0;
-  u8 tremoloDepth = 0;
+  double vibratoDepth = 0.0;
+  double tremoloDepth = 0.0;
   double portamentoMillisecondsPerCent = 0.0;
   u16 lastPortamentoTime = 0;
   std::optional<s32> lastSourceKey;
   bool lastNoteSlurred = false;
   bool didRest = false;
+
+  [[nodiscard]] u32 consumeNoteTicks(u8 rawDuration) {
+    u32 length = math::baseNoteTicks(rawDuration);
+    if (noteDotted) {
+      length = (length % 2 == 0 && length < 0x80) ? length + (length / 2) : 0;
+      noteDotted = false;
+    } else if (noteTriplet) {
+      length = length * 2 / 3;
+    }
+    return length;
+  }
+
+  [[nodiscard]] u32 soundingTicks(u32 length) const {
+    u32 duration = length * durationRate;
+    if (noteSlurred || duration == 0) {
+      duration = length << 8;
+    }
+    duration = (duration + 0x80) >> 8;
+    return duration == 0 ? 1 : duration;
+  }
+
+  [[nodiscard]] s32 sourceKey(u8 keyIndex) const {
+    return static_cast<s32>(keyIndex) - 1 + static_cast<s32>(noteOctave * 12) + (noteOctaveUp ? 24 : 0);
+  }
+
+  void applyAttributes(u8 attributes, PerformanceEmitter& out) {
+    const bool wasSlurred = noteSlurred;
+    noteOctave |= attributes & kNoteOctaveMask;
+    noteDotted = noteDotted || ((attributes & kNoteDottedMask) != 0);
+    noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
+    noteTriplet = (attributes & kNoteTripletMask) != 0;
+    noteSlurred = (attributes & kNoteSlurredMask) != 0;
+    if (noteSlurred != wasSlurred) {
+      out.legatoPedal(noteSlurred);
+    }
+  }
+
+  void emitModulationDepths(PerformanceEmitter& out, bool enabled) const {
+    if (vibratoDepth != 0) {
+      out.modulation(ModulationPerformanceTarget::VibratoDepth, enabled ? vibratoDepth : 0.0);
+    }
+    if (tremoloDepth != 0) {
+      out.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? tremoloDepth : 0.0);
+    }
+  }
 };
 
-// Small driver formulas kept local to the Capcom sequence reader.
-namespace math {
-
-[[nodiscard]] double tuningSemitones(s8 tuning) {
-  return static_cast<double>(tuning) / 256.0;
+[[nodiscard]] std::any createProgramState(const SequenceProgram&) {
+  return ProgramState{};
 }
 
-[[nodiscard]] double tuningCents(s8 tuning) {
-  return tuningSemitones(tuning) * 100.0;
+[[nodiscard]] std::any createTrackState(const SequenceProgram& program, const TrackProgram&) {
+  return TrackState{.version = versionFrom(program)};
 }
 
-[[nodiscard]] double portamentoMillisecondsPerCent(u8 rawTime) {
-  const u8 step = static_cast<u8>((rawTime << 1) & 0xff);
-  const double centsPerUpdate = step * (100.0 / 256.0);
-  // The Capcom voice/portamento update runs every other 8 ms timer tick.
-  return centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
-}
+[[nodiscard]] Effects executeCommand(const SourceCommand& command, std::any& programStateValue,
+                                     std::any& trackStateValue, PerformanceEmitter& out, VmApi& vm) {
+  auto& programState = std::any_cast<ProgramState&>(programStateValue);
+  auto& state = std::any_cast<TrackState&>(trackStateValue);
+  const auto kind = static_cast<CapcomSnesCommandKind>(command.kind.value);
 
-[[nodiscard]] u32 baseNoteTicks(u32 rawDuration) {
-  if (rawDuration == 0 || rawDuration > 7) {
-    return 0;
-  }
-  return 192u >> (7u - rawDuration);
-}
-
-[[nodiscard]] u32 tempoMicrosecondsPerQuarter(u32 rawTempo) {
-  if (rawTempo == 0) {
-    return 60000000;
-  }
-  // Capcom tempo is derived from the SNES timer update rate, not stored as BPM.
-  return static_cast<u32>(std::round(kCapcomSnesPpqn * (125 * 0x40) * 2 * 256.0 / rawTempo));
-}
-
-[[nodiscard]] double volumeGain(CapcomSnesEngineVersion version, u8 rawVolume) {
-  return version == CapcomSnesEngineVersion::v1BgmInList ? ::capcom_snes::calculateVolumeV1(rawVolume)
-                                                         : ::capcom_snes::calculateVolumeV2(rawVolume);
-}
-
-[[nodiscard]] ::capcom_snes::PanConversionResult panConversion(CapcomSnesEngineVersion version, u8 rawPan) {
-  const auto biasedPan = static_cast<u8>(rawPan + 0x80);
-  return version == CapcomSnesEngineVersion::v1BgmInList ? ::capcom_snes::linear8BitPanToMidi(biasedPan)
-                                                         : ::capcom_snes::calculatePanV2(biasedPan);
-}
-
-[[nodiscard]] double stereoPosition(const ::capcom_snes::PanConversionResult& converted) {
-  // Store pan on the same 0..127 steps the MIDI renderer uses so Capcom center
-  // and edge positions survive conversion without shifting left.
-  return std::clamp((static_cast<double>(converted.midiPan) / 127.0) * 2.0 - 1.0, -1.0, 1.0);
-}
-
-[[nodiscard]] u8 tremoloDepth(CapcomSnesEngineVersion version, u8 rawDepth) {
-  return ::capcom_snes::tremoloDepthToMidiValue(rawDepth, version == CapcomSnesEngineVersion::v1BgmInList);
-}
-
-[[nodiscard]] double midi7Amount(u8 value) {
-  return static_cast<double>(value) / 127.0;
-}
-
-[[nodiscard]] double lfoRateAmount(u8 rawRate) {
-  return midi7Amount(::capcom_snes::lfoRateByteToMidiValue(rawRate));
-}
-
-}  // namespace math
-
-u32 TrackState::consumeNoteTicks(u8 rawDuration) {
-  u32 length = math::baseNoteTicks(rawDuration);
-  if (noteDotted) {
-    // Dotted is consumed by the next note/rest; triplet mode persists until toggled.
-    length = (length % 2 == 0 && length < 0x80) ? length + (length / 2) : 0;
-    noteDotted = false;
-  } else if (noteTriplet) {
-    length = length * 2 / 3;
-  }
-  return length;
-}
-
-u32 TrackState::soundingTicks(u32 length) const {
-  u32 duration = length * durationRate;
-  if (noteSlurred || duration == 0) {
-    duration = length << 8;
-  }
-  duration = (duration + 0x80) >> 8;
-  return duration == 0 ? 1 : duration;
-}
-
-s32 TrackState::sourceKey(u8 keyIndex) const {
-  return static_cast<s32>(keyIndex) - 1 + static_cast<s32>(noteOctave * 12) + (noteOctaveUp ? 24 : 0);
-}
-
-double TrackState::performedKey(s32 key) const {
-  return static_cast<double>(key + transpose);
-}
-
-template <class Runtime>
-void TrackState::applyAttributes(u8 attributes, Runtime& rt) {
-  const bool wasSlurred = noteSlurred;
-  // The driver ORs octave bits instead of replacing them. Preserve that quirk until
-  // parity proves a specific version behaves differently.
-  noteOctave |= attributes & kNoteOctaveMask;
-  noteDotted = noteDotted || ((attributes & kNoteDottedMask) != 0);
-  noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
-  noteTriplet = (attributes & kNoteTripletMask) != 0;
-  noteSlurred = (attributes & kNoteSlurredMask) != 0;
-  if (noteSlurred != wasSlurred) {
-    rt.legatoPedal(noteSlurred);
-  }
-}
-
-template <class Runtime>
-void TrackState::toggleSlur(Runtime& rt) {
-  const bool wasSlurred = noteSlurred;
-  noteSlurred = !noteSlurred;
-  if (noteSlurred != wasSlurred) {
-    rt.legatoPedal(noteSlurred);
-  }
-}
-
-bool TrackState::extendsPreviousSlurredNote(s32 key) const {
-  return lastNoteSlurred && lastSourceKey && key == *lastSourceKey && !didRest;
-}
-
-void TrackState::finishExtendedNote() {
-  lastNoteSlurred = noteSlurred;
-}
-
-void TrackState::finishNote(s32 key) {
-  lastSourceKey = key;
-  didRest = false;
-  lastNoteSlurred = noteSlurred;
-}
-
-template <class Runtime>
-void TrackState::emitPortamentoIfNeeded(s32 key, Runtime& rt) {
-  if (portamentoMillisecondsPerCent <= 0.0 || !lastSourceKey) {
-    return;
-  }
-
-  const auto keyDistance = static_cast<u32>(std::abs(key - *lastSourceKey));
-  const auto portamentoTime = static_cast<u16>(keyDistance * 100 * portamentoMillisecondsPerCent);
-  if (portamentoTime != lastPortamentoTime) {
-    rt.portamento(static_cast<double>(portamentoTime), static_cast<double>(*lastSourceKey + transpose));
-    lastPortamentoTime = portamentoTime;
-  } else {
-    rt.portamentoControl(static_cast<double>(*lastSourceKey + transpose));
-  }
-}
-
-template <class Runtime>
-void TrackState::emitModulationDepths(Runtime& rt, bool enabled) const {
-  if (vibratoDepth != 0) {
-    rt.modulation(ModulationPerformanceTarget::VibratoDepth, enabled ? math::midi7Amount(vibratoDepth) : 0.0);
-  }
-  if (tremoloDepth != 0) {
-    rt.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? math::midi7Amount(tremoloDepth) : 0.0);
-  }
-}
-
-// Opcode implementations.
-template <class Runtime>
-void emitLinearVolume(Runtime& rt, u8 raw) {
-  // Capcom volume is a linear amplitude gain. MIDI rendering applies the
-  // square-root MIDI controller curve later.
-  rt.level(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)), LevelPrecisionHint::FourteenBit);
-}
-
-template <class Runtime>
-void emitLinearMasterVolume(Runtime& rt, u8 raw) {
-  rt.masterLevel(LevelScale::linearFromLinear(math::volumeGain(rt.context.version, raw)));
-}
-
-template <class Runtime>
-void emitPan(Runtime& rt, u8 raw) {
-  const auto pan = math::panConversion(rt.context.version, raw);
-  rt.pan(math::stereoPosition(pan), LevelScale::linearFromLinear(pan.volumeScale));
-}
-
-template <class Runtime>
-void applyAttributes(Runtime& rt, u8 raw) {
-  rt.state.applyAttributes(raw, rt);
-}
-
-template <class Runtime>
-void toggleSlur(Runtime& rt) {
-  rt.state.toggleSlur(rt);
-}
-
-struct CapcomSnesCursorReader {
-  template <class Runtime>
-  static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
-    const u8 opcode = cmd.opcode();
-    if (opcode >= 0x20) {
-      const auto rawDuration = static_cast<u8>(opcode >> 5);
-      if ((opcode & 0x1f) == 0) {
-        cmd.name("Rest", SequenceSemantic::Rest).derived("duration_index", rawDuration);
-        const u32 length = rt.state.consumeNoteTicks(rawDuration);
-        rt.state.didRest = true;
-        return cmd.wait(length);
+  switch (kind) {
+    case CapcomSnesCommandKind::Note:
+    case CapcomSnesCommandKind::Rest: {
+      const u32 length = state.consumeNoteTicks(unsigned8(command, CapcomSnesOperand::DurationIndex));
+      if (kind == CapcomSnesCommandKind::Rest) {
+        state.didRest = true;
+        return Effects::wait(length);
       }
 
-      cmd.name("Note", SequenceSemantic::Note);
-      const auto keyIndex = static_cast<u8>(opcode & 0x1f);
-      cmd.derived("key_index", keyIndex).derived("duration_index", rawDuration);
-
-      auto& state = rt.state;
-      const u32 length = state.consumeNoteTicks(rawDuration);
-      const s32 key = state.sourceKey(keyIndex);
+      const s32 key = state.sourceKey(unsigned8(command, CapcomSnesOperand::KeyIndex));
       const u32 duration = state.soundingTicks(length);
-      if (state.extendsPreviousSlurredNote(key)) {
-        // Repeating a key after a slurred note extends the previous note, even
-        // if this command has already cleared the current slur bit.
-        rt.note(state.performedKey(key), 1.0, duration, true);
-        state.finishExtendedNote();
-        return cmd.wait(length);
+      if (state.lastNoteSlurred && state.lastSourceKey && key == *state.lastSourceKey && !state.didRest) {
+        out.note(static_cast<double>(key + state.transpose), 1.0, duration, true);
+        state.lastNoteSlurred = state.noteSlurred;
+        return Effects::wait(length);
       }
 
-      state.emitPortamentoIfNeeded(key, rt);
-      // Slur is modeled as a one-tick overlap into the next source note.
-      rt.note(state.performedKey(key), 1.0, duration + (state.noteSlurred ? 1u : 0u));
-      state.finishNote(key);
-      return cmd.wait(length);
+      if (state.portamentoMillisecondsPerCent > 0.0 && state.lastSourceKey) {
+        const auto distance = static_cast<u32>(std::abs(key - *state.lastSourceKey));
+        const auto portamentoTime = static_cast<u16>(distance * 100 * state.portamentoMillisecondsPerCent);
+        if (portamentoTime != state.lastPortamentoTime) {
+          out.portamento(static_cast<double>(portamentoTime),
+                         static_cast<double>(*state.lastSourceKey + state.transpose));
+          state.lastPortamentoTime = portamentoTime;
+        } else {
+          out.portamentoControl(static_cast<double>(*state.lastSourceKey + state.transpose));
+        }
+      }
+      out.note(static_cast<double>(key + state.transpose), 1.0, duration + (state.noteSlurred ? 1u : 0u));
+      state.lastSourceKey = key;
+      state.didRest = false;
+      state.lastNoteSlurred = state.noteSlurred;
+      return Effects::wait(length);
     }
 
-    switch (opcode) {
-      case 0x00:
-        cmd.name("Toggle Triplet", SequenceSemantic::State);
-        rt.state.noteTriplet = !rt.state.noteTriplet;
-        return cmd.next();
-
-      case 0x01:
-        cmd.name("Toggle Slur", SequenceSemantic::State);
-        toggleSlur(rt);
-        return cmd.next();
-
-      case 0x02:
-        cmd.name("Dotted Note", SequenceSemantic::State);
-        rt.state.noteDotted = true;
-        return cmd.next();
-
-      case 0x03:
-        cmd.name("Toggle Octave Up", SequenceSemantic::State);
-        rt.state.noteOctaveUp = !rt.state.noteOctaveUp;
-        return cmd.next();
-
-      case 0x04: {
-        cmd.name("Note Attributes", SequenceSemantic::State);
-        const u8 raw = cmd.u8("raw");
-        applyAttributes(rt, raw);
-        return cmd.next();
+    case CapcomSnesCommandKind::ToggleTriplet:
+      state.noteTriplet = !state.noteTriplet;
+      break;
+    case CapcomSnesCommandKind::ToggleSlur:
+      state.noteSlurred = !state.noteSlurred;
+      out.legatoPedal(state.noteSlurred);
+      break;
+    case CapcomSnesCommandKind::DottedNote:
+      state.noteDotted = true;
+      break;
+    case CapcomSnesCommandKind::ToggleOctaveUp:
+      state.noteOctaveUp = !state.noteOctaveUp;
+      break;
+    case CapcomSnesCommandKind::NoteAttributes:
+      state.applyAttributes(unsigned8(command, CapcomSnesOperand::Attributes), out);
+      break;
+    case CapcomSnesCommandKind::Tempo:
+      out.tempo(math::tempoMicrosecondsPerQuarter(static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Raw))));
+      break;
+    case CapcomSnesCommandKind::DurationRate:
+      state.durationRate = unsigned8(command, CapcomSnesOperand::Rate);
+      break;
+    case CapcomSnesCommandKind::Volume:
+      out.level(
+          LevelScale::linearFromLinear(math::volumeGain(state.version, unsigned8(command, CapcomSnesOperand::Raw))),
+          LevelPrecisionHint::FourteenBit);
+      break;
+    case CapcomSnesCommandKind::Program:
+      out.instrument(static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Bank)),
+                     static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Program)), true);
+      break;
+    case CapcomSnesCommandKind::Octave:
+      state.noteOctave = unsigned8(command, CapcomSnesOperand::Octave);
+      break;
+    case CapcomSnesCommandKind::GlobalTranspose:
+      programState.globalTranspose = signed8(command, CapcomSnesOperand::Semitones);
+      out.globalTranspose(programState.globalTranspose);
+      break;
+    case CapcomSnesCommandKind::Transpose:
+      state.transpose = signed8(command, CapcomSnesOperand::Semitones);
+      break;
+    case CapcomSnesCommandKind::Tuning:
+      out.tuning(math::tuningCents(signed8(command, CapcomSnesOperand::Tuning)));
+      break;
+    case CapcomSnesCommandKind::PortamentoTime:
+      state.portamentoMillisecondsPerCent =
+          math::portamentoMillisecondsPerCent(unsigned8(command, CapcomSnesOperand::Time));
+      break;
+    case CapcomSnesCommandKind::RepeatUntil: {
+      const u8 slot = unsigned8(command, CapcomSnesOperand::Slot);
+      const u32 count = static_cast<u32>(operand<u64>(command, CapcomSnesOperand::Count));
+      const Address destination = operand<Address>(command, CapcomSnesOperand::Destination);
+      return count == 0 ? Effects{.step = vm.declaredLoop(destination)}
+                        : vm.countedRepeatUntil(slot, count + 1, destination);
+    }
+    case CapcomSnesCommandKind::RepeatBreak: {
+      const auto branch = vm.countedRepeatBreak(unsigned8(command, CapcomSnesOperand::Slot),
+                                                operand<Address>(command, CapcomSnesOperand::Destination));
+      if (branch.taken) {
+        state.applyAttributes(unsigned8(command, CapcomSnesOperand::Attributes), out);
       }
-
-      case 0x05: {
-        cmd.name("Tempo", SequenceSemantic::Tempo);
-        const u16 raw = cmd.u16be("raw");
-        const u32 microseconds = math::tempoMicrosecondsPerQuarter(raw);
-        cmd.derived("microseconds_per_quarter", microseconds);
-        rt.tempo(microseconds);
-        return cmd.next();
-      }
-
-      case 0x06: {
-        cmd.name("Duration Rate", SequenceSemantic::State);
-        rt.state.durationRate = cmd.u8("rate");
-        return cmd.next();
-      }
-
-      case 0x07: {
-        cmd.name("Volume", SequenceSemantic::Level);
-        const u8 raw = cmd.u8("raw");
-        cmd.derived("linear_gain", math::volumeGain(rt.context.version, raw));
-        emitLinearVolume(rt, raw);
-        return cmd.next();
-      }
-
-      case 0x08: {
-        cmd.name("Program", SequenceSemantic::Program);
-        const u8 raw = cmd.u8("raw");
-        const u32 bank = raw >> 7;
-        const u32 program = raw & 0x7f;
-        cmd.derived("bank", bank)
-            .derived("program", program)
-            .instrumentRef(bank, program);
-        rt.instrument(bank, program, true);
-        return cmd.next();
-      }
-
-      case 0x09: {
-        cmd.name("Octave", SequenceSemantic::State);
-        rt.state.noteOctave = cmd.u8("octave");
-        return cmd.next();
-      }
-
-      case 0x0a: {
-        cmd.name("Global Transpose", SequenceSemantic::Pitch);
-        rt.globalTranspose(cmd.s8("semitones"));
-        return cmd.next();
-      }
-
-      case 0x0b: {
-        cmd.name("Transpose", SequenceSemantic::Pitch);
-        rt.state.transpose = cmd.s8("semitones");
-        return cmd.next();
-      }
-
-      case 0x0c: {
-        cmd.name("Tuning", SequenceSemantic::Pitch);
-        const s8 raw = cmd.s8("tuning");
-        cmd.derived("cents", math::tuningCents(raw));
-        rt.tuning(math::tuningCents(raw));
-        return cmd.next();
-      }
-
-      case 0x0d: {
-        cmd.name("Portamento Time", SequenceSemantic::Portamento);
-        const u8 raw = cmd.u8("time");
-        // The driver stores portamento as speed; the next note turns it into
-        // time using the distance from the previous source key.
-        rt.state.portamentoMillisecondsPerCent = math::portamentoMillisecondsPerCent(raw);
-        return cmd.next();
-      }
-
-      case 0x0e:
-      case 0x0f:
-      case 0x10:
-      case 0x11: {
-        cmd.name("Repeat Until");
-        const auto slot = static_cast<u8>(opcode - 0x0e);
-        cmd.derived("slot", slot + 1);
-        const u8 count = cmd.u8("count");
-        const Address destination = cmd.address16be("destination");
-        if (count == 0) {
-          return cmd.declaredLoop(destination);
-        }
-
-        // Capcom stores the number of replays. The VM helper receives total plays.
-        return rt.countedRepeatUntil(cmd, slot, static_cast<u32>(count) + 1, destination);
-      }
-
-      case 0x12:
-      case 0x13:
-      case 0x14:
-      case 0x15: {
-        cmd.name("Repeat Break");
-        const auto slot = static_cast<u8>(opcode - 0x12);
-        cmd.derived("slot", slot + 1);
-        const u8 attributes = cmd.u8("attributes");
-        const Address destination = cmd.address16be("destination");
-        const RepeatBreakFlow branch = rt.countedRepeatBreak(cmd, slot, destination);
-        if (branch.taken()) {
-          applyAttributes(rt, attributes);
-        }
-        return branch;
-      }
-
-      case 0x16: {
-        cmd.name("Jump", SequenceSemantic::Jump);
-        return cmd.loopCandidate(cmd.address16be("destination"));
-      }
-
-      case 0x17:
-        return cmd.name("End").end();
-
-      case 0x18: {
-        cmd.name("Pan", SequenceSemantic::Pan);
-        const u8 raw = cmd.u8("raw");
-        const auto converted = math::panConversion(rt.context.version, raw);
-        cmd.derived("stereo_position", math::stereoPosition(converted)).derived("linear_gain", converted.volumeScale);
-        emitPan(rt, raw);
-        return cmd.next();
-      }
-
-      case 0x19: {
-        cmd.name("Master Volume", SequenceSemantic::Level);
-        const u8 raw = cmd.u8("raw");
-        cmd.derived("linear_gain", math::volumeGain(rt.context.version, raw));
-        emitLinearMasterVolume(rt, raw);
-        return cmd.next();
-      }
-
-      case 0x1a: {
-        cmd.name("LFO", SequenceSemantic::Modulation);
-        const u8 type = cmd.u8("type");
-        const u8 value = cmd.u8("value");
-
-        auto& state = rt.state;
-        switch (type) {
-          case 0:
-            state.vibratoDepth = value & 0x7f;
-            rt.modulation(ModulationPerformanceTarget::VibratoDepth,
-                          state.modulationRate != 0 ? math::midi7Amount(state.vibratoDepth) : 0.0);
-            break;
-
-          case 1:
-            state.tremoloDepth = math::tremoloDepth(rt.context.version, value);
-            rt.modulation(ModulationPerformanceTarget::TremoloDepth,
-                          state.modulationRate != 0 ? math::midi7Amount(state.tremoloDepth) : 0.0);
-            break;
-
-          case 2: {
-            const bool wasEnabled = state.modulationRate != 0;
-            state.modulationRate = value;
-            const bool isEnabled = state.modulationRate != 0;
-            if (!isEnabled && wasEnabled) {
-              state.emitModulationDepths(rt, false);
-            } else if (isEnabled && !wasEnabled) {
-              state.emitModulationDepths(rt, true);
-            }
-
-            const double rate = math::lfoRateAmount(value);
-            rt.modulation(ModulationPerformanceTarget::VibratoRate, rate);
-            rt.modulation(ModulationPerformanceTarget::TremoloRate, rate);
-            break;
+      return branch.effects;
+    }
+    case CapcomSnesCommandKind::Jump:
+      return Effects{.step = vm.loopCandidate(operand<Address>(command, CapcomSnesOperand::Destination))};
+    case CapcomSnesCommandKind::End:
+    case CapcomSnesCommandKind::Unsupported:
+      return Effects{.step = vm.end()};
+    case CapcomSnesCommandKind::Pan: {
+      const auto converted = math::pan(state.version, unsigned8(command, CapcomSnesOperand::Raw));
+      out.pan(converted.position, LevelScale::linearFromLinear(converted.gain));
+      break;
+    }
+    case CapcomSnesCommandKind::MasterVolume:
+      out.masterLevel(
+          LevelScale::linearFromLinear(math::volumeGain(state.version, unsigned8(command, CapcomSnesOperand::Raw))));
+      break;
+    case CapcomSnesCommandKind::Lfo: {
+      const u8 type = unsigned8(command, CapcomSnesOperand::Type);
+      const u8 value = unsigned8(command, CapcomSnesOperand::Value);
+      switch (type) {
+        case 0:
+          state.vibratoDepth = math::normalizedDepth(value & 0x7f);
+          out.modulation(ModulationPerformanceTarget::VibratoDepth,
+                         state.modulationRate != 0 ? state.vibratoDepth : 0.0);
+          break;
+        case 1:
+          state.tremoloDepth = math::tremoloDepth(state.version, value);
+          out.modulation(ModulationPerformanceTarget::TremoloDepth,
+                         state.modulationRate != 0 ? state.tremoloDepth : 0.0);
+          break;
+        case 2: {
+          const bool wasEnabled = state.modulationRate != 0;
+          state.modulationRate = value;
+          const bool enabled = state.modulationRate != 0;
+          if (enabled != wasEnabled) {
+            state.emitModulationDepths(out, enabled);
           }
-
-          default:
-            // Type 3 is the driver's reset-LFO-phase flag. SF2/DLS already
-            // reset phase on note activation, so there is nothing useful to emit yet.
-            break;
+          const double rate = math::lfoRate(value);
+          out.modulation(ModulationPerformanceTarget::VibratoRate, rate);
+          out.modulation(ModulationPerformanceTarget::TremoloRate, rate);
+          break;
         }
-        return cmd.next();
+        default:
+          break;
       }
-
-      case 0x1b:
-        cmd.name("Echo Param", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("argument"));
-        static_cast<void>(cmd.u8("preset"));
-        return cmd.next();
-
-      case 0x1c: {
-        cmd.name("Echo On/Off", SequenceSemantic::Meta);
-        const u8 raw = cmd.u8("raw");
-        cmd.derived("enabled", raw & 1);
-        rt.reverb((raw & 1) != 0 ? 40.0 / 127.0 : 0.0);
-        return cmd.next();
-      }
-
-      case 0x1d: {
-        cmd.name("Release Rate", SequenceSemantic::Meta).sourceOnly();
-        const u8 raw = cmd.u8("raw");
-        cmd.derived("gain", raw | 0xa0);
-        return cmd.next();
-      }
-
-      case 0x1e:
-      case 0x1f:
-        if (rt.context.version == CapcomSnesEngineVersion::v1BgmInList) {
-          cmd.name("Unknown One-Byte Event", SequenceSemantic::Meta).kind("unknown-one-byte").sourceOnly();
-          cmd.derived("opcode", opcode, SourceValueDisplay::Hex);
-          static_cast<void>(cmd.u8("value"));
-          return cmd.next();
-        }
-        return cmd.name("No Operation", SequenceSemantic::Meta).kind("nop").noOp().next();
-
-      default:
-        cmd.name("Unknown Opcode", SequenceSemantic::Unsupported)
-            .kind("unknown")
-            .derived("opcode", opcode, SourceValueDisplay::Hex)
-            .unsupported("Unknown Capcom SNES sequence opcode");
-        rt.diagnostic(Severity::Warning, "Unknown Capcom SNES sequence opcode");
-        return cmd.end();
+      break;
     }
+    case CapcomSnesCommandKind::EchoOnOff:
+      out.reverb((unsigned8(command, CapcomSnesOperand::Raw) & 1) != 0 ? 40.0 / 127.0 : 0.0);
+      break;
+    case CapcomSnesCommandKind::EchoParam:
+    case CapcomSnesCommandKind::ReleaseRate:
+    case CapcomSnesCommandKind::UnknownOneByte:
+    case CapcomSnesCommandKind::NoOperation:
+      break;
   }
-};
-
-[[nodiscard]] std::string dialectId(CapcomSnesEngineVersion version) {
-  switch (version) {
-    case CapcomSnesEngineVersion::v1BgmInList:
-      return "capcom-snes:v1";
-    case CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation:
-      return "capcom-snes:v2";
-    case CapcomSnesEngineVersion::v3BgmFixedLocation:
-      return "capcom-snes:v3";
-    case CapcomSnesEngineVersion::none:
-      return "capcom-snes";
-  }
-  return "capcom-snes";
+  return Effects::none();
 }
 
-[[nodiscard]] CapcomSnesSequenceDescriptor makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion version) {
-  return CapcomSnesSequenceDescriptor{
-      .dialect = makeCursorDialect<TrackState, Context, CapcomSnesCursorReader>(CursorDialectSpec<Context>{
-          .id = dialectId(version),
-          .commandDetailKindPrefix = "capcom-snes",
-          .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
-          .defaultBehavior =
-              SequenceProgramBehavior{
-                  .defaultLoopPolicy = LoopPolicy::PlayOnce,
-                  .initialReverbSend = 0.0,
-                  .initialMonoModeChannels = 0,
-              },
-          .context = Context{.version = version},
-      }),
+[[nodiscard]] SequenceDialect makeDialect() {
+  return SequenceDialect{
+      .id = DialectId{.value = "capcom-snes"},
+      .commandDetailKindPrefix = "capcom-snes",
+      .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
+      .defaultBehavior =
+          SequenceProgramBehavior{
+              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .initialReverbSend = 0.0,
+              .initialMonoModeChannels = 0,
+          },
+      .createProgramState = createProgramState,
+      .createSemanticTrackState = createTrackState,
+      .executeSemantic = executeCommand,
   };
+}
+
+[[nodiscard]] CapcomSnesSequenceDescriptor makeDescriptor(CapcomSnesEngineVersion version) {
+  return CapcomSnesSequenceDescriptor{
+      .dialect = makeDialect(),
+      .version = version,
+      .profile = profileFor(version),
+  };
+}
+
+[[nodiscard]] SourceRange trackRange(ByteReader reader, const TrackProgram& track, u32 fallback) {
+  if (track.commands.empty()) {
+    return reader.range(fallback, 0);
+  }
+  u64 begin = track.commands.front().range.offset;
+  u64 end = track.commands.front().range.endOffset();
+  for (const auto& command : track.commands) {
+    begin = std::min(begin, command.range.offset);
+    end = std::max(end, command.range.endOffset());
+  }
+  return reader.range(begin, end - begin);
 }
 
 }  // namespace
 
 const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngineVersion version) {
-  static const CapcomSnesSequenceDescriptor none = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::none);
-  static const CapcomSnesSequenceDescriptor v1 = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v1BgmInList);
-  static const CapcomSnesSequenceDescriptor v2 = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation);
-  static const CapcomSnesSequenceDescriptor v3 = makeCapcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
+  static const CapcomSnesSequenceDescriptor none = makeDescriptor(CapcomSnesEngineVersion::none);
+  static const CapcomSnesSequenceDescriptor v1 = makeDescriptor(CapcomSnesEngineVersion::v1BgmInList);
+  static const CapcomSnesSequenceDescriptor v2 = makeDescriptor(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation);
+  static const CapcomSnesSequenceDescriptor v3 = makeDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
 
   switch (version) {
     case CapcomSnesEngineVersion::v1BgmInList:
@@ -590,9 +898,6 @@ const CapcomSnesSequenceDescriptor& capcomSnesSequenceDescriptor(CapcomSnesEngin
 
 void registerCapcomSnesSequenceDialects(SequenceDialectRegistry& registry) {
   registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::none).dialect);
-  registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v1BgmInList).dialect);
-  registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation).dialect);
-  registry.add(capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation).dialect);
 }
 
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequenceDescriptor& descriptor,
@@ -600,17 +905,30 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, const CapcomSnesSequ
                                          std::vector<Diagnostic>* diagnostics,
                                          std::optional<SourceAnnotationId> parentAnnotation,
                                          std::optional<AssetId> sequenceAsset) {
-  return decodeCursorLinearTrack<TrackState, Context, CapcomSnesCursorReader>(
-      reader, descriptor.dialect,
-      CursorTrackDecodeInput{
-          .sequenceAsset = sequenceAsset,
-          .trackIndex = sourceTrackNumber,
-          .startOffset = startAddress,
-          .parentAnnotation = parentAnnotation,
-          .sourceMap = sourceMap,
-          .diagnostics = diagnostics,
-          .maxCommands = 4096,
+  std::optional<SourceAnnotationId> trackAnnotation;
+  if (sourceMap != nullptr) {
+    auto annotation = sourceMap
+                          ->annotation(SourceRole::SequenceTrack, "Track " + std::to_string(sourceTrackNumber),
+                                       reader.range(startAddress, 0))
+                          .kind("track");
+    if (sequenceAsset) {
+      annotation.owner(ObjectRefs::sequenceTrack(*sequenceAsset, sourceTrackNumber));
+    }
+    if (parentAnnotation) {
+      annotation.parent(*parentAnnotation);
+    }
+    trackAnnotation = annotation.id();
+  }
+
+  const u32 end = static_cast<u32>(reader.size());
+  auto track = decodeLinearBytecodeTrack(
+      reader, sourceTrackNumber, startAddress, LinearBytecodeDecodePolicy{.maxCommands = 4096}, [&](u32 offset) {
+        return decodeCommand(reader, offset, end, descriptor.version, trackAnnotation, sourceMap, diagnostics);
       });
+  if (sourceMap != nullptr && trackAnnotation) {
+    AnnotationBuilder{*sourceMap, *trackAnnotation}.range(trackRange(reader, track, startAddress));
+  }
+  return track;
 }
 
 SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const CapcomSnesLayout& layout, AssetId sequenceId,
@@ -621,22 +939,20 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
 
   SourceAnnotationId headerAnnotation;
   if (sourceMap != nullptr) {
-    auto header = sourceMap->header("Sequence Header", headerRange)
-                      .kind("capcom-snes-sequence-header")
-                      .owner(ObjectRefs::sequence(sequenceId));
-    headerAnnotation = header.id();
+    headerAnnotation = sourceMap->header("Sequence Header", headerRange)
+                           .kind("capcom-snes-sequence-header")
+                           .owner(ObjectRefs::sequence(sequenceId))
+                           .id();
   }
 
-  const CapcomSnesSequenceDescriptor& descriptor = capcomSnesSequenceDescriptor(layout.version);
-  const SequenceDialect& dialect = descriptor.dialect;
+  const auto& descriptor = capcomSnesSequenceDescriptor(layout.version);
   SequenceProgram program{
-      .dialect = dialect.id,
-      .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .dialect = descriptor.dialect.id,
+      .timebase = descriptor.dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
+      .behavior = descriptor.dialect.defaultBehavior,
   };
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
-  // Capcom stores track pointers in reverse channel order. Decode them in
-  // playback order so source track numbers match the driver.
   for (u32 pointerIndex = kCapcomSnesMaxTracks; pointerIndex-- > 0;) {
     const u32 sourceTrackNumber = kCapcomSnesMaxTracks - 1 - pointerIndex;
     const u32 pointerOffset = pointerBase + pointerIndex * 2;
@@ -646,22 +962,22 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
       continue;
     }
 
-    std::optional<SourceAnnotationId> trackAnnotation;
+    std::optional<SourceAnnotationId> pointerAnnotation;
     if (sourceMap != nullptr) {
-      auto pointer = sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{input.reader.range(trackAddress, 1)})
-                         .kind("capcom-snes-track-pointer")
-                         .description(fmt::format("Track starts at ${:04X}", trackAddress))
-                         .derived("source_track", sourceTrackNumber)
-                         .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
+      auto annotation =
+          sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{input.reader.range(trackAddress, 1)})
+              .kind("capcom-snes-track-pointer")
+              .description(fmt::format("Track starts at ${:04X}", trackAddress))
+              .derived("source_track", sourceTrackNumber)
+              .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
       if (headerAnnotation.valid()) {
-        pointer.parent(headerAnnotation);
+        annotation.parent(headerAnnotation);
       }
-      trackAnnotation = pointer.id();
+      pointerAnnotation = annotation.id();
     }
 
-    auto track = decodeCapcomSnesSourceTrack(input.reader, descriptor, sourceTrackNumber, trackAddress, sourceMap,
-                                             diagnostics, trackAnnotation, sequenceId);
-    program.tracks.push_back(std::move(track));
+    program.tracks.push_back(decodeCapcomSnesSourceTrack(input.reader, descriptor, sourceTrackNumber, trackAddress,
+                                                         sourceMap, diagnostics, pointerAnnotation, sequenceId));
   }
 
   return SequenceProgramAsset{
@@ -670,7 +986,7 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
               .id = sequenceId,
               .format = "CapcomSnes",
               .name = std::string(displayName),
-              .range = input.reader.range(layout.sequenceHeaderAddress, headerSize),
+              .range = headerRange,
           },
       .program = std::move(program),
   };

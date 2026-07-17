@@ -28,6 +28,9 @@ struct DecodedBytecodeCommand {
   SourceAnnotationId annotation;
   std::vector<u8> bytes;
   DecodeFlow flow;
+  SemanticCommandKind kind;
+  std::vector<SemanticOperand> operands;
+  bool retainBytes = true;
 };
 
 struct BytecodeDecodeContext {
@@ -47,7 +50,13 @@ struct BytecodeDecodeContext {
 
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
                                          u32 offset) {
-  builder.addDecoded(Address{offset}, decoded.range, decoded.bytes, decoded.annotation);
+  if (!decoded.retainBytes && decoded.kind.valid()) {
+    const u8 opcode = decoded.bytes.empty() ? 0 : decoded.bytes.front();
+    builder.addSemantic(Address{offset}, opcode, static_cast<u32>(decoded.bytes.size()), decoded.range, decoded.kind,
+                        decoded.operands, decoded.flow, decoded.annotation);
+    return;
+  }
+  builder.addDecoded(Address{offset}, decoded.range, decoded.bytes, decoded.annotation, decoded.flow);
 }
 
 // Shared limits for walking source bytecode. Formats still decide what each opcode means.
@@ -116,9 +125,9 @@ template <class DecodeCommand>
     const auto next = decoded.flow.fallthrough;
     const bool terminal = decoded.flow.terminal;
     const auto targets = decoded.flow.staticTargets;
-    const std::optional<Address> followedJump =
-        !next && policy.followUnconditionalJumps && targets.size() == 1 ? std::optional<Address>{targets.front()}
-                                                                        : std::nullopt;
+    const std::optional<Address> followedJump = !next && policy.followUnconditionalJumps && targets.size() == 1
+                                                    ? std::optional<Address>{targets.front()}
+                                                    : std::nullopt;
     appendDecodedBytecodeCommand(builder, decoded, begin);
 
     for (const Address target : targets) {

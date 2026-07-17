@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/CapcomSnes/CapcomSnesLayout.h"
+#include "value/scan/BytePattern.h"
 
 #include <algorithm>
 #include <array>
@@ -19,11 +20,6 @@ namespace vgmtrans::formats::capcom_snes {
 using namespace core;
 
 namespace {
-
-struct BytePatternView {
-  std::span<const u8> bytes;
-  std::string_view mask;
-};
 
 // These signatures identify driver routines whose operands reveal runtime table addresses.
 constexpr std::array<u8, 16> kReadSongListPattern{0x1c, 0x5d, 0xf5, 0x03, 0x0e, 0xc4, 0xc0, 0xf5,
@@ -45,34 +41,6 @@ constexpr std::string_view kDspRegInitOldMask = "x??xx??x??xx?x?";
 constexpr std::array<u8, 12> kLoadInstrTablePattern{0x8d, 0x06, 0xcf, 0xda, 0xa0, 0x60,
                                                     0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
 constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
-
-[[nodiscard]] bool matchPattern(ByteReader reader, u64 offset, BytePatternView pattern) {
-  if (!reader.has(offset, pattern.bytes.size())) {
-    return false;
-  }
-
-  for (size_t i = 0; i < pattern.bytes.size(); ++i) {
-    if (pattern.mask[i] == 'x' && reader.u8At(offset + i) != pattern.bytes[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-[[nodiscard]] std::optional<u32> searchPattern(ByteReader reader, BytePatternView pattern) {
-  // The mask lets one signature match several ROM variants where operands differ but the
-  // instruction sequence is stable.
-  if (pattern.bytes.size() != pattern.mask.size() || pattern.bytes.size() > reader.size()) {
-    return std::nullopt;
-  }
-
-  for (u64 offset = 0; offset <= reader.size() - pattern.bytes.size(); ++offset) {
-    if (matchPattern(reader, offset, pattern)) {
-      return static_cast<u32>(offset);
-    }
-  }
-  return std::nullopt;
-}
 
 [[nodiscard]] bool isValidBgmHeader(ByteReader reader, u32 address) {
   if (!reader.has(address, 17)) {
@@ -168,11 +136,12 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   u32 registerListAddress = 0;
   u32 valueListAddress = 0;
 
-  if (const auto modernOffset = searchPattern(reader, BytePatternView{kDspRegInitPattern, kDspRegInitMask})) {
+  if (const auto modernOffset = findBytePattern(reader, MaskedBytePattern{kDspRegInitPattern, kDspRegInitMask})) {
     registerCount = reader.u8At(*modernOffset + 1);
     registerListAddress = reader.le16(*modernOffset + 3) + 1;
     valueListAddress = reader.le16(*modernOffset + 9) + 1;
-  } else if (const auto oldOffset = searchPattern(reader, BytePatternView{kDspRegInitOldPattern, kDspRegInitOldMask})) {
+  } else if (const auto oldOffset =
+                 findBytePattern(reader, MaskedBytePattern{kDspRegInitOldPattern, kDspRegInitOldMask})) {
     registerCount = reader.u8At(*oldOffset + 12);
     registerListAddress = reader.le16(*oldOffset + 1);
     valueListAddress = reader.le16(*oldOffset + 5);
@@ -215,12 +184,12 @@ std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
 
   CapcomSnesLayout layout;
 
-  if (const auto offset = searchPattern(reader, BytePatternView{kReadSongListPattern, kReadSongListMask})) {
+  if (const auto offset = findBytePattern(reader, MaskedBytePattern{kReadSongListPattern, kReadSongListMask})) {
     layout.hasSongList = true;
     layout.songListAddress = std::min(reader.le16(*offset + 3), reader.le16(*offset + 8));
   }
 
-  if (const auto offset = searchPattern(reader, BytePatternView{kReadBgmAddressPattern, kReadBgmAddressMask})) {
+  if (const auto offset = findBytePattern(reader, MaskedBytePattern{kReadBgmAddressPattern, kReadBgmAddressMask})) {
     layout.bgmAtFixedAddress = true;
     layout.bgmHeaderAddress = static_cast<u32>((reader.u8At(*offset + 5) << 8) | reader.u8At(*offset + 8));
   }
@@ -261,7 +230,7 @@ std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
     return std::nullopt;
   }
 
-  if (const auto offset = searchPattern(reader, BytePatternView{kLoadInstrTablePattern, kLoadInstrTableMask})) {
+  if (const auto offset = findBytePattern(reader, MaskedBytePattern{kLoadInstrTablePattern, kLoadInstrTableMask})) {
     // The instrument table address is embedded as split operands in the loader routine.
     layout.instrumentTableAddress = static_cast<u32>(reader.u8At(*offset + 7) | (reader.u8At(*offset + 10) << 8));
   }

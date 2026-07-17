@@ -65,11 +65,17 @@ const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) 
   return &*found;
 }
 
+const SemanticOperand* semanticOperand(const SourceCommand& command, SemanticOperandId id) {
+  const auto found =
+      std::ranges::find_if(command.operands, [id](const SemanticOperand& operand) { return operand.id == id; });
+  return found != command.operands.end() ? &*found : nullptr;
+}
+
 TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
 }
 
 const SourceCommand& TrackProgramBuilder::addDecoded(Address address, SourceRange range, std::span<const u8> bytes,
-                                                     SourceAnnotationId annotation) {
+                                                     SourceAnnotationId annotation, DecodeFlow flow) {
   if (bytes.empty()) {
     throw std::invalid_argument("Sequence source commands must include an opcode byte");
   }
@@ -89,6 +95,36 @@ const SourceCommand& TrackProgramBuilder::addDecoded(Address address, SourceRang
       .range = range,
       .annotation = annotation,
       .bytes = ByteSpan{.offset = byteOffset, .size = static_cast<u32>(bytes.size())},
+      .flow = std::move(flow),
+  });
+  track_.addressIndex.add(address, commandIndex);
+  return track_.commands.back();
+}
+
+const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
+                                                      SemanticCommandKind kind, std::vector<SemanticOperand> operands,
+                                                      DecodeFlow flow, SourceAnnotationId annotation) {
+  if (encodedSize == 0) {
+    throw std::invalid_argument("Semantic sequence commands must include an opcode byte");
+  }
+  if (!kind.valid()) {
+    throw std::invalid_argument("Semantic sequence commands must have a command kind");
+  }
+  if (track_.addressIndex.find(address)) {
+    throw std::invalid_argument("Sequence command address was decoded more than once");
+  }
+
+  const auto commandIndex = static_cast<u32>(track_.commands.size());
+  track_.commands.push_back(SourceCommand{
+      .id = CommandId{commandIndex},
+      .opcode = opcode,
+      .address = address,
+      .encodedSize = encodedSize,
+      .range = range,
+      .annotation = annotation,
+      .kind = kind,
+      .operands = std::move(operands),
+      .flow = std::move(flow),
   });
   track_.addressIndex.add(address, commandIndex);
   return track_.commands.back();
