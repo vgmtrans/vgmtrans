@@ -144,8 +144,8 @@ std::vector<u8> makeCapcomSnesSpc() {
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
-  expect(session.dialects().contains("capcom-snes:v3"),
-         "value format registration should include CapcomSnes sequence dialects");
+  expect(session.dialects().contains("capcom-snes"),
+         "value format registration should include the CapcomSnes sequence dialect");
   const SourceId source = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
   const SessionSnapshot project = session.scanPendingSources();
@@ -157,7 +157,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence != nullptr, "first CapcomSnes asset should be sequence");
   expect(sequence->metadata.format == "CapcomSnes", "sequence should retain format name");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should point at fixed BGM header body");
-  expect(sequence->program.dialect.value == "capcom-snes:v3", "sequence should carry the detected CapcomSnes dialect");
+  expect(sequence->program.dialect.value == "capcom-snes", "sequence should carry the CapcomSnes dialect family");
+  expect(sequence->program.config.profile == static_cast<u32>(CapcomSnesEngineVersion::v3BgmFixedLocation),
+         "sequence should store the detected driver version as per-program configuration");
   expect(sequence->program.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
   expect(sequence->program.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
          "sequence should carry CapcomSnes default loop policy");
@@ -168,16 +170,23 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto& firstTrack = sequence->program.tracks[0];
   expect(firstTrack.commands.size() == 8, "track should decode all fixture commands");
   constexpr std::array<std::string_view, 8> expectedCommandDetailKinds{
-      "capcom-snes.tempo",  "capcom-snes.program", "capcom-snes.volume", "capcom-snes.pan",
-      "capcom-snes.lfo",    "capcom-snes.lfo",     "capcom-snes.note",   "capcom-snes.end",
+      "capcom-snes.tempo", "capcom-snes.program", "capcom-snes.volume", "capcom-snes.pan",
+      "capcom-snes.lfo",   "capcom-snes.lfo",     "capcom-snes.note",   "capcom-snes.end",
   };
   for (size_t index = 0; index < expectedCommandDetailKinds.size(); ++index) {
     expect(commandDetailKind(project.sourceMap(), firstTrack.commands[index]) == expectedCommandDetailKinds[index],
            "track should decode command " + std::to_string(index));
   }
-  expect(
-      firstTrack.bytesFor(firstTrack.commands[0])[1] == 0x12 && firstTrack.bytesFor(firstTrack.commands[0])[2] == 0x34,
-      "tempo command should preserve raw big-endian value");
+  expect(firstTrack.commandBytes.empty(), "semantic CapcomSnes tracks should not retain a command-byte pool");
+  expect(firstTrack.commands[0].bytes.size == 0 &&
+             firstTrack.commands[0].kind.value == static_cast<u32>(CapcomSnesCommandKind::Tempo),
+         "CapcomSnes tempo should be a byte-free typed semantic command");
+  const SemanticOperand* rawTempo =
+      semanticOperand(firstTrack.commands[0], SemanticOperandId{static_cast<u32>(CapcomSnesOperand::Raw)});
+  expect(rawTempo != nullptr && std::get<u64>(rawTempo->value) == 0x1234,
+         "tempo command should preserve its parsed big-endian value as a typed operand");
+  expect(firstTrack.commands[0].flow.fallthrough && firstTrack.commands[0].flow.fallthrough->value == 0x3003,
+         "semantic commands should retain decode-time control flow");
   const SourceMap& sourceMap = project.sourceMap();
   const SourceAnnotation& programAnnotation = commandAnnotation(sourceMap, firstTrack.commands[1]);
   const auto programInstrumentLink = std::ranges::find_if(
@@ -296,13 +305,12 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[14]).tick == 6,
          "builder should advance time before end of track");
 
-  const auto artifacts = session.exportCollection(project.collections()[0].id, ExportRequest{
-                                                                                   .kinds = {ExportKind::Midi},
-                                                                                   .loopPolicy = LoopPolicy::PlayOnce,
-                                                                                   .synthModulationScaling =
-                                                                                       ModulationScalingPolicy::
-                                                                                           FullFormatRange,
-                                                                               });
+  const auto artifacts = session.exportCollection(
+      project.collections()[0].id, ExportRequest{
+                                       .kinds = {ExportKind::Midi},
+                                       .loopPolicy = LoopPolicy::PlayOnce,
+                                       .synthModulationScaling = ModulationScalingPolicy::FullFormatRange,
+                                   });
   expect(artifacts.size() == 1, "value export should produce one MIDI artifact");
   expect(artifacts[0].filename == "Mega Man X.mid", "MIDI artifact should use collection name");
   expect(artifacts[0].mediaType == "audio/midi", "MIDI artifact should use audio/midi media type");
@@ -604,8 +612,8 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
   SourceMapBuilder sourceMap;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 2, 0x3000,
-                                                         &sourceMap);
+  const TrackProgram track =
+      decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 2, 0x3000, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 7,
          "CapcomSnes source dialect should decode the fixture commands, got " + std::to_string(track.commands.size()));
@@ -615,8 +623,7 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   const SourceField* rawProgram = fieldWithName(programAnnotation, "raw");
   const SourceField* bankProgram = fieldWithName(programAnnotation, "bank");
   const SourceField* programNumber = fieldWithName(programAnnotation, "program");
-  expect(fieldEquals(rawProgram, u64{0x85}) && fieldEquals(bankProgram, u64{1}) &&
-             fieldEquals(programNumber, u64{5}),
+  expect(fieldEquals(rawProgram, u64{0x85}) && fieldEquals(bankProgram, u64{1}) && fieldEquals(programNumber, u64{5}),
          "CapcomSnes source command should preserve raw and decoded program operands in source annotations");
 
   expect(commandAnnotation(annotations, track.commands[1]).label == "Program",
@@ -624,6 +631,7 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
@@ -664,6 +672,7 @@ void capcomSnesInitialDurationRateIsFullLength() {
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
@@ -687,8 +696,8 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
   SourceMapBuilder sourceMap;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
-                                                         &sourceMap);
+  const TrackProgram track =
+      decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 2, "CapcomSnes pan fixture should decode pan and end");
 
@@ -698,6 +707,7 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
@@ -740,8 +750,8 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
   SourceMapBuilder sourceMap;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
-                                                         &sourceMap);
+  const TrackProgram track =
+      decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 10, "CapcomSnes source-only commands should not truncate track decoding");
 
@@ -771,6 +781,7 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
@@ -816,6 +827,7 @@ void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey() {
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
@@ -851,8 +863,8 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
   SourceMapBuilder sourceMap;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
-                                                         &sourceMap);
+  const TrackProgram track =
+      decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 3, "CapcomSnes repeat fixture should decode note, repeat, and end");
 
@@ -867,6 +879,7 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
@@ -902,8 +915,8 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v3BgmFixedLocation);
   const SequenceDialect& dialect = descriptor.dialect;
   SourceMapBuilder sourceMap;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
-                                                         &sourceMap);
+  const TrackProgram track =
+      decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 6, "CapcomSnes repeat-break fixture should decode both branch paths");
 
@@ -918,6 +931,7 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
@@ -967,9 +981,8 @@ void capcomSnesDialectDecodesRepeatBreakSideTargets() {
   const auto repeatBreakAnnotations = annotations.withSequenceSemantic(SourceId{8}, SequenceSemantic::RepeatBreak);
   expect(repeatBreakAnnotations.size() == 1, "CapcomSnes repeat-break should publish a source annotation");
   const SourceAnnotation& repeatBreak = annotations.get(repeatBreakAnnotations.front());
-  const auto link = std::ranges::find_if(repeatBreak.links, [](const SourceLink& sourceLink) {
-    return sourceLink.role == SourceLinkRole::RepeatTarget;
-  });
+  const auto link = std::ranges::find_if(
+      repeatBreak.links, [](const SourceLink& sourceLink) { return sourceLink.role == SourceLinkRole::RepeatTarget; });
   expect(link != repeatBreak.links.end(), "CapcomSnes repeat-break should link to its side target");
   const auto* targetRange = std::get_if<SourceRange>(&link->target);
   expect(targetRange != nullptr && targetRange->source == SourceId{8} && targetRange->offset == 0x3006,
@@ -988,8 +1001,8 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
   const auto& descriptor = capcomSnesSequenceDescriptor(CapcomSnesEngineVersion::v1BgmInList);
   const SequenceDialect& dialect = descriptor.dialect;
   SourceMapBuilder sourceMap;
-  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000,
-                                                         &sourceMap);
+  const TrackProgram track =
+      decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), descriptor, 0, 0x3000, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 4, "CapcomSnes V1 unknown one-byte events should not truncate track decoding");
   expect(commandDetailKind(annotations, track.commands[0]) == "capcom-snes.unknown-one-byte",
@@ -1008,6 +1021,7 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = descriptor.profile},
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);

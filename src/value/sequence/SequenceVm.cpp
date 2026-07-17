@@ -11,6 +11,7 @@
 #include <fmt/format.h>
 #include <limits>
 #include <map>
+#include <memory>
 #include <optional>
 #include <tuple>
 #include <utility>
@@ -321,16 +322,21 @@ class VmTrackExecutor {
 public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
-                  PerformanceSequence& targetSequence, std::optional<u64> stopTick, TrackRenderMode mode)
+                  PerformanceSequence& targetSequence, std::optional<u64> stopTick, TrackRenderMode mode,
+                  std::any* programState = nullptr)
       : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
         options_(options), targetSequence_(targetSequence), stopTick_(stopTick), mode_(mode),
         performanceTrack_(PerformanceTrack{
             .id = track.id,
             .sourceTrackNumber = track.sourceTrackNumber,
         }),
-        trackState_(dialect.createTrackState != nullptr ? dialect.createTrackState(program, track, dialect.context)
-                                                        : std::any{}),
-        current_(destinationIndex(track, track.startAddress)) {
+        trackState_(
+            dialect.usesSemanticScheduler()
+                ? (dialect.createSemanticTrackState != nullptr ? dialect.createSemanticTrackState(program, track)
+                                                               : std::any{})
+                : (dialect.createTrackState != nullptr ? dialect.createTrackState(program, track, dialect.context)
+                                                       : std::any{})),
+        programState_(programState), current_(destinationIndex(track, track.startAddress)) {
     addInitialTrackEvents(performanceTrack_, behavior_);
     if (!current_ && !track_.commands.empty()) {
       current_ = 0;
@@ -338,38 +344,64 @@ public:
   }
 
   [[nodiscard]] RenderedTrack render() {
-    while (current_) {
-      if (executedCommands_ >= behavior_.commandLimit) {
-        warn("Sequence VM command limit reached", SourceRange{});
-        break;
-      }
-      if (stopTick_ && runtime_.tick >= *stopTick_) {
-        break;
-      }
-
-      const SourceCommand& command = track_.commands.at(*current_);
-      const VisitState visitState = LoopDetector::visitState(*current_, runtime_);
-      if (const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_)) {
-        if (handleLoop(*loop, *current_, visitState).kind == LoopActionKind::StopTrack) {
-          break;
-        }
-      }
-
-      if (dialect_.execute == nullptr) {
-        warn("Missing sequence dialect executor", command.range);
-        break;
-      }
-
-      PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
-      VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-      const Effects effects = dialect_.execute(command, track_, trackState_, out, vm, dialect_.context);
-      advanceTicks(command, effects.advanceTicks);
-      runtime_.lastCommand = command.id;
-      applyStep(command, effects.step);
-
-      ++executedCommands_;
+    while (active()) {
+      executeNext();
     }
 
+    return finish();
+  }
+
+  [[nodiscard]] bool active() const noexcept { return current_.has_value(); }
+  [[nodiscard]] u64 tick() const noexcept { return runtime_.tick; }
+
+  void executeNext() {
+    if (!current_) {
+      return;
+    }
+    if (executedCommands_ >= behavior_.commandLimit) {
+      warn("Sequence VM command limit reached", SourceRange{});
+      current_ = std::nullopt;
+      return;
+    }
+    if (stopTick_ && runtime_.tick >= *stopTick_) {
+      current_ = std::nullopt;
+      return;
+    }
+
+    const SourceCommand& command = track_.commands.at(*current_);
+    const VisitState visitState = LoopDetector::visitState(*current_, runtime_);
+    if (const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_)) {
+      if (handleLoop(*loop, *current_, visitState).kind == LoopActionKind::StopTrack) {
+        return;
+      }
+    }
+
+    PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
+    VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
+    Effects effects;
+    if (dialect_.usesSemanticScheduler()) {
+      if (programState_ == nullptr) {
+        warn("Missing semantic sequence program state", command.range);
+        current_ = std::nullopt;
+        return;
+      }
+      effects = dialect_.executeSemantic(command, *programState_, trackState_, out, vm);
+    } else {
+      if (dialect_.execute == nullptr) {
+        warn("Missing sequence dialect executor", command.range);
+        current_ = std::nullopt;
+        return;
+      }
+      effects = dialect_.execute(command, track_, trackState_, out, vm, dialect_.context);
+    }
+    advanceTicks(command, effects.advanceTicks);
+    runtime_.lastCommand = command.id;
+    applyStep(command, effects.step);
+
+    ++executedCommands_;
+  }
+
+  [[nodiscard]] RenderedTrack finish() {
     performanceTrack_.endTick = runtime_.tick;
     if (mode_ == TrackRenderMode::DryRunForLoopStop) {
       performanceTrack_.events.clear();
@@ -572,6 +604,7 @@ private:
   TrackRenderMode mode_ = TrackRenderMode::Normal;
   PerformanceTrack performanceTrack_;
   std::any trackState_;
+  std::any* programState_ = nullptr;
   VmTrackRuntime runtime_;
   LoopDetector loopDetector_;
   std::optional<u32> current_;
@@ -718,6 +751,41 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
   const SequenceProgramBehavior behavior = resolvedBehavior(program, dialect);
   const LoopPolicy loopPolicy = behavior.defaultLoopPolicy;
+
+  if (dialect.usesSemanticScheduler()) {
+    std::any programState = dialect.createProgramState != nullptr ? dialect.createProgramState(program) : std::any{};
+    std::vector<std::unique_ptr<VmTrackExecutor>> executors;
+    executors.reserve(program.tracks.size());
+    for (const TrackProgram& track : program.tracks) {
+      executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, sequence,
+                                                            std::nullopt, TrackRenderMode::Normal, &programState));
+    }
+
+    // Execute the earliest channel first; source track order is the stable
+    // tie-break. A channel keeps control at the same tick while it consumes
+    // zero-time commands, matching how these drivers run until their next wait.
+    while (true) {
+      size_t selected = executors.size();
+      for (size_t i = 0; i < executors.size(); ++i) {
+        if (!executors[i]->active()) {
+          continue;
+        }
+        if (selected == executors.size() || executors[i]->tick() < executors[selected]->tick()) {
+          selected = i;
+        }
+      }
+      if (selected == executors.size()) {
+        break;
+      }
+      executors[selected]->executeNext();
+    }
+
+    sequence.tracks.reserve(executors.size());
+    for (auto& executor : executors) {
+      sequence.tracks.push_back(executor->finish().track);
+    }
+    return sequence;
+  }
 
   std::optional<u64> synchronizedStopTick;
   if (loopPolicy == LoopPolicy::PlayOnce && behavior.stopAllTracksAtFirstLoop) {

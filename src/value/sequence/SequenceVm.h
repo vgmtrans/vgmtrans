@@ -145,8 +145,9 @@ struct SequenceVmOptions {
 };
 
 // SequenceVm turns a parsed source-driver program into target-neutral performance events.
-// It walks each track, asks the SequenceDialect to execute each SourceCommand, advances time
-// from the returned Effects, and handles jumps, calls, repeats, loop policy, and diagnostics.
+// Legacy dialects are walked track-by-track. Semantic dialects are globally
+// scheduled by (tick, stable track order), which matches multi-channel driver
+// execution and gives them one program-wide runtime state.
 // MIDI or other exporters consume the resulting PerformanceSequence later.
 class SequenceVm {
 public:

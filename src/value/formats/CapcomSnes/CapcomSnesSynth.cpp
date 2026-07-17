@@ -6,9 +6,9 @@
 
 #include "value/formats/CapcomSnes/CapcomSnesSynth.h"
 
+#include "value/platform/SnesSampleDirectory.h"
 #include "value/synth/SnesDsp.h"
 #include "value/synth/SynthMath.h"
-#include "formats/CapcomSnes/CapcomSnesConstants.h"
 
 #include <fmt/format.h>
 
@@ -23,55 +23,18 @@ using namespace core;
 
 namespace {
 
+constexpr double kLfoStepHertz = 1000.0 / 16384.0;
+constexpr double kVibratoBaseHertz = kLfoStepHertz;
+constexpr double kVibratoMaxHertz = 255.0 * kLfoStepHertz;
+constexpr double kTremoloBaseHertz = 2.0 * kLfoStepHertz;
+constexpr double kTremoloMaxHertz = 510.0 * kLfoStepHertz;
+constexpr s32 kTremoloHalfDepthCentibels = 484;
+
 struct InstrumentPitch {
   Tuning aggregate;
   u8 rootKey = 96;
   s16 fineTuneCents = 0;
 };
-
-[[nodiscard]] u32 sampleLength(ByteReader reader, u32 startAddress, bool& loop) {
-  u32 offset = startAddress;
-  while (true) {
-    if (!reader.has(offset, 9)) {
-      return 0;
-    }
-
-    const u8 flag = reader.u8At(offset);
-    offset += 9;
-    if ((flag & 1) != 0) {
-      // BRR end blocks carry the loop flag in bit 1 of the same header byte.
-      loop = (flag & 2) != 0;
-      break;
-    }
-  }
-  return offset - startAddress;
-}
-
-[[nodiscard]] bool sampleDirIsValid(ByteReader reader, u32 dirEntryAddress, bool validateSample) {
-  if (!reader.has(dirEntryAddress, 4)) {
-    return false;
-  }
-
-  const u16 sampleStart = reader.le16(dirEntryAddress);
-  const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
-  if (sampleLoop < sampleStart || !reader.has(sampleStart, 10)) {
-    return false;
-  }
-
-  if (validateSample) {
-    // Fast table probing can skip BRR walking; committed instruments validate the encoded stream.
-    bool loops = false;
-    const u32 length = sampleLength(reader, sampleStart, loops);
-    if (length == 0) {
-      return false;
-    }
-    if (loops && sampleLoop >= sampleStart + length) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 [[nodiscard]] bool blankInstrumentSlot(ByteReader reader, u32 address) {
   if (!reader.has(address, 6)) {
@@ -100,14 +63,11 @@ struct InstrumentPitch {
     return false;
   }
 
-  const u32 dirEntryAddress = spcDirAddress + srcn * 4;
-  if (!sampleDirIsValid(reader, dirEntryAddress, validateSample)) {
+  const auto sample = SnesSampleDirectory(reader, spcDirAddress).entry(srcn, validateSample);
+  if (!sample) {
     return false;
   }
-
-  const u16 sampleStart = reader.le16(dirEntryAddress);
-  const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
-  return sampleStart <= sampleLoop && ((sampleLoop - sampleStart) % 9) == 0;
+  return sample->loopAddressIsBlockAligned();
 }
 
 [[nodiscard]] InstrumentPitch capcomInstrumentPitch(s16 pitchScale) {
@@ -152,11 +112,11 @@ struct InstrumentPitch {
   return {
       SynthGenerator{
           .destination = SynthDestination::VibratoRate,
-          .amount = synthAmountFromHertz(::capcom_snes::kVibratoBaseHz),
+          .amount = synthAmountFromHertz(kVibratoBaseHertz),
       },
       SynthGenerator{
           .destination = SynthDestination::TremoloRate,
-          .amount = synthAmountFromHertz(::capcom_snes::kTremoloBaseHz),
+          .amount = synthAmountFromHertz(kTremoloBaseHertz),
       },
   };
 }
@@ -164,8 +124,8 @@ struct InstrumentPitch {
 [[nodiscard]] std::vector<SynthModulator> capcomInstrumentModulators() {
   // Capcom drives vibrato/tremolo from sequence controllers. These default modulators
   // describe the maximum synth response; export-time scaling can narrow it to observed use.
-  const s32 vibratoRange = synthAmountFromHertzRange(::capcom_snes::kVibratoBaseHz, ::capcom_snes::kVibratoMaxHz);
-  const s32 tremoloRange = synthAmountFromHertzRange(::capcom_snes::kTremoloBaseHz, ::capcom_snes::kTremoloMaxHz);
+  const s32 vibratoRange = synthAmountFromHertzRange(kVibratoBaseHertz, kVibratoMaxHertz);
+  const s32 tremoloRange = synthAmountFromHertzRange(kTremoloBaseHertz, kTremoloMaxHertz);
 
   return {
       SynthModulator{
@@ -187,11 +147,11 @@ struct InstrumentPitch {
       },
       SynthModulator{
           .destination = SynthDestination::TremoloDepth,
-          .amount = static_cast<s32>(::capcom_snes::kTremoloHalfDepthCentibels),
+          .amount = kTremoloHalfDepthCentibels,
       },
       SynthModulator{
           .destination = SynthDestination::VolumeAttenuation,
-          .amount = static_cast<s32>(::capcom_snes::kTremoloHalfDepthCentibels),
+          .amount = kTremoloHalfDepthCentibels,
       },
   };
 }
@@ -249,23 +209,19 @@ std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(ByteReader reader, 
   // Multiple instruments can point at the same SRCN; samples are emitted once.
   std::vector<CapcomSnesSampleInfo> samples;
   samples.reserve(srcns.size());
+  const SnesSampleDirectory directory(reader, spcDirAddress);
   for (const u8 srcn : srcns) {
-    const u32 dirEntryAddress = spcDirAddress + srcn * 4;
-    if (!sampleDirIsValid(reader, dirEntryAddress, true)) {
+    const auto entry = directory.entry(srcn);
+    if (!entry || !entry->stream) {
       continue;
     }
-
-    const u16 start = reader.le16(dirEntryAddress);
-    const u16 loop = reader.le16(dirEntryAddress + 2);
-    bool loops = false;
-    const u32 length = sampleLength(reader, start, loops);
     samples.push_back(CapcomSnesSampleInfo{
         .srcn = srcn,
-        .dirEntryAddress = dirEntryAddress,
-        .startAddress = start,
-        .loopAddress = loop,
-        .encodedLength = length,
-        .loops = loops,
+        .dirEntryAddress = static_cast<u32>(entry->entryRange.offset),
+        .startAddress = entry->startAddress,
+        .loopAddress = entry->loopAddress,
+        .encodedLength = static_cast<u32>(entry->stream->encodedData.size),
+        .loops = entry->stream->loops,
     });
   }
 
@@ -319,19 +275,19 @@ SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sam
             },
     });
     if (sourceMap != nullptr) {
-      auto row = sourceMap
-                     ->row(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(sampleInfo.srcn)),
-                           input.reader.range(sampleInfo.dirEntryAddress, 4))
-                     .role(SourceRole::Sample)
-                     .kind("snes-sample-dir-entry")
-                     .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-                     .field("start", input.reader.range(sampleInfo.dirEntryAddress, 2), sampleInfo.startAddress,
-                            SourceValueDisplay::Address)
-                     .field("loop", input.reader.range(sampleInfo.dirEntryAddress + 2, 2), sampleInfo.loopAddress,
-                            SourceValueDisplay::Address)
-                     .link(SourceLinkRole::PointsTo,
-                           SourceTarget{input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength)},
-                           "BRR data");
+      auto row =
+          sourceMap
+              ->row(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(sampleInfo.srcn)),
+                    input.reader.range(sampleInfo.dirEntryAddress, 4))
+              .role(SourceRole::Sample)
+              .kind("snes-sample-dir-entry")
+              .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
+              .field("start", input.reader.range(sampleInfo.dirEntryAddress, 2), sampleInfo.startAddress,
+                     SourceValueDisplay::Address)
+              .field("loop", input.reader.range(sampleInfo.dirEntryAddress + 2, 2), sampleInfo.loopAddress,
+                     SourceValueDisplay::Address)
+              .link(SourceLinkRole::PointsTo,
+                    SourceTarget{input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength)}, "BRR data");
       if (root.valid()) {
         row.parent(root);
       }
@@ -407,20 +363,19 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
     instrument.modulators = capcomInstrumentModulators();
 
     instruments.push_back(std::move(instrument));
-    auto annotation =
-        builder.sourceMap()
-            .row(fmt::format("Instrument {}", info.index), input.reader.range(info.address, 6))
-            .role(SourceRole::Instrument)
-            .kind("capcom-snes-instrument")
-            .owner(ObjectRefs::instrument(instrumentSetId, info.index))
-            .derived("bank", info.index >> 7)
-            .derived("program", info.index & 0x7f)
-            .field("srcn", input.reader.range(info.address, 1), info.srcn, SourceValueDisplay::Hex)
-            .field("adsr1", input.reader.range(info.address + 1, 1), info.adsr1, SourceValueDisplay::Hex)
-            .field("adsr2", input.reader.range(info.address + 2, 1), info.adsr2, SourceValueDisplay::Hex)
-            .field("gain", input.reader.range(info.address + 3, 1), info.gain, SourceValueDisplay::Hex)
-            .field("pitch_scale", input.reader.range(info.address + 4, 2), info.pitchScale,
-                   SourceValueDisplay::SignedDecimal);
+    auto annotation = builder.sourceMap()
+                          .row(fmt::format("Instrument {}", info.index), input.reader.range(info.address, 6))
+                          .role(SourceRole::Instrument)
+                          .kind("capcom-snes-instrument")
+                          .owner(ObjectRefs::instrument(instrumentSetId, info.index))
+                          .derived("bank", info.index >> 7)
+                          .derived("program", info.index & 0x7f)
+                          .field("srcn", input.reader.range(info.address, 1), info.srcn, SourceValueDisplay::Hex)
+                          .field("adsr1", input.reader.range(info.address + 1, 1), info.adsr1, SourceValueDisplay::Hex)
+                          .field("adsr2", input.reader.range(info.address + 2, 1), info.adsr2, SourceValueDisplay::Hex)
+                          .field("gain", input.reader.range(info.address + 3, 1), info.gain, SourceValueDisplay::Hex)
+                          .field("pitch_scale", input.reader.range(info.address + 4, 2), info.pitchScale,
+                                 SourceValueDisplay::SignedDecimal);
     if (root.valid()) {
       annotation.parent(root);
     }

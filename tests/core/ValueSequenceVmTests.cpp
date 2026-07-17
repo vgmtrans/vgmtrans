@@ -865,6 +865,72 @@ void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
   expectDiagnosticRange(performance.diagnostics, "Sequence jump target $0063 was not decoded", jumpRange);
 }
 
+struct ScheduledProbeProgramState {
+  u32 sharedValue = 0;
+};
+
+std::any createScheduledProbeProgramState(const SequenceProgram&) {
+  return ScheduledProbeProgramState{};
+}
+
+Effects executeScheduledProbe(const SourceCommand& command, std::any& programState, std::any&, PerformanceEmitter& out,
+                              VmApi& vm) {
+  auto& state = std::any_cast<ScheduledProbeProgramState&>(programState);
+  switch (command.kind.value) {
+    case 1:
+      state.sharedValue = command.opcode;
+      return Effects::none();
+    case 2:
+      return Effects::wait(command.opcode);
+    case 3:
+      out.note(state.sharedValue, 1.0, 1);
+      return Effects::wait(command.opcode);
+    case 4:
+      return Effects{.step = vm.end()};
+    default:
+      return Effects{.step = vm.end()};
+  }
+}
+
+void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
+  const SequenceDialect dialect{
+      .id = DialectId{.value = "scheduled-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .createProgramState = createScheduledProbeProgramState,
+      .executeSemantic = executeScheduledProbe,
+  };
+
+  TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder builder0(track0);
+  builder0.addSemantic(Address{0}, 7, 1, {}, SemanticCommandKind{1}, {}, DecodeFlow::fallthroughTo(Address{1}));
+  builder0.addSemantic(Address{1}, 4, 1, {}, SemanticCommandKind{2}, {}, DecodeFlow::fallthroughTo(Address{2}));
+  builder0.addSemantic(Address{2}, 9, 1, {}, SemanticCommandKind{1}, {}, DecodeFlow::fallthroughTo(Address{3}));
+  builder0.addSemantic(Address{3}, 0, 1, {}, SemanticCommandKind{4}, {}, DecodeFlow::terminalFlow());
+
+  TrackProgram track1{.id = TrackId{1}, .sourceTrackNumber = 1, .startAddress = Address{10}};
+  TrackProgramBuilder builder1(track1);
+  builder1.addSemantic(Address{10}, 2, 1, {}, SemanticCommandKind{3}, {}, DecodeFlow::fallthroughTo(Address{11}));
+  builder1.addSemantic(Address{11}, 0, 1, {}, SemanticCommandKind{3}, {}, DecodeFlow::fallthroughTo(Address{12}));
+  builder1.addSemantic(Address{12}, 0, 1, {}, SemanticCommandKind{4}, {}, DecodeFlow::terminalFlow());
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track0, track1},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "semantic scheduler fixture should render without diagnostics");
+  expect(performance.tracks.size() == 2 && performance.tracks[1].events.size() == 2,
+         "semantic scheduler should preserve both tracks and their events");
+
+  const auto& first = std::get<NotePerformanceEvent>(performance.tracks[1].events[0]);
+  const auto& second = std::get<NotePerformanceEvent>(performance.tracks[1].events[1]);
+  expect(first.header.tick == 0 && first.key == 7.0,
+         "stable same-tick ordering should expose track zero's shared update to track one");
+  expect(second.header.tick == 2 && second.key == 7.0,
+         "the scheduler should not run a later-tick update before an earlier track event");
+}
+
 }  // namespace
 
 void runValueSequenceVmTests() {
@@ -891,4 +957,5 @@ void runValueSequenceVmTests() {
   sequenceVmSynchronizedDryRunDoesNotDuplicateDiagnostics();
   sequenceVmDoesNotWrapCommandAddressOverflow();
   sequenceVmReportsMissingJumpTargetAfterEmittedEvents();
+  sequenceVmSchedulesSemanticTracksAgainstOneProgramState();
 }
