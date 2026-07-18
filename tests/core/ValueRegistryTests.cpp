@@ -252,7 +252,7 @@ void cursorRepeatUntilReportsFallthroughAndSkipsTruncatedVmMutation() {
   expect(fallthrough.fallsThrough(), "render cursor repeat-until should report VM fallthrough");
 
   VmCommandCursor branchCursor(CommandPhase::Render, probeRange(0, bytes.size()), bytes);
-  RepeatUntilProbeVm branchVm{.effects = Effects{.step = Step::jump(Address{4}, JumpSemantics::FiniteRepeat)}};
+  RepeatUntilProbeVm branchVm{.effects = Effects{.step = Step::jump(Address{4})}};
   const RepeatUntilFlow branch = detail::resolveRenderCursorRepeatUntil(branchCursor, branchVm, 0, 3, Address{4});
   expect(branchVm.called, "render cursor repeat-until branch should ask VM to resolve repeat state");
   expect(!branch.fallsThrough(), "render cursor repeat-until should report VM branch");

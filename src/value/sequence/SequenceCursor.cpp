@@ -697,7 +697,7 @@ Effects effectsFromCommandFlow(const CommandFlow& flow) {
       if (!flow.destination) {
         return Effects{.step = Step::end()};
       }
-      return Effects{.step = Step::jump(*flow.destination, JumpSemantics::FiniteRepeat)};
+      return Effects{.step = Step::jump(*flow.destination)};
   }
   return Effects::none();
 }

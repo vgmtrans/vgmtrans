@@ -32,7 +32,6 @@ enum class StepKind {
 enum class JumpSemantics {
   Normal,
   FiniteBranch,
-  FiniteRepeat,
   LoopCandidate,
   DeclaredLoop,
 };

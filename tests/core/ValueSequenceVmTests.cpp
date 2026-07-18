@@ -34,7 +34,9 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   };
 
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
-  expect(performance.diagnostics.empty(), "sequence VM should render the probe sequence without diagnostics");
+  expect(performance.diagnostics.empty(),
+         "sequence VM should render the probe sequence without diagnostics" +
+             (performance.diagnostics.empty() ? std::string{} : ": " + performance.diagnostics.front().message));
   expect(performance.tracks.size() == 1, "sequence VM should render one performance track");
   const PerformanceTrack& renderedTrack = performance.tracks[0];
   expect(renderedTrack.id == TrackId{2} && renderedTrack.sourceTrackNumber == 7,
@@ -364,9 +366,10 @@ void sequenceVmUsesDialectCommandLimitDefault() {
   };
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
-  expect(
-      performance.diagnostics.size() == 1 && performance.diagnostics[0].message == "Sequence VM command limit reached",
-      "sequence VM should use dialect command limit when the program has no override");
+  expect(performance.diagnostics.size() == 1 &&
+             performance.diagnostics[0].message ==
+                 "Sequence VM command limit reached: track=0, address=$0005, tick=12, executed=2, limit=2",
+         "sequence VM should report the track, address, tick, and active command limit");
   expect(performance.tracks[0].events.size() == 2,
          "dialect command limit should stop execution before the looping jump command");
   expect(performance.tracks[0].endTick == 12, "command-limit stop should preserve ticks from commands already run");
@@ -557,7 +560,41 @@ void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
 
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(),
-         "repeat replay suppression should follow command addresses, not unrelated source offsets");
+         "repeat replay should keep finite state distinct and still detect the unrelated jump loop");
+}
+
+void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder builder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x00, 0x01};
+  const std::array<u8, 5> shortRepeatBytes{0xf0, 0x00, 0x02, 0x00, 0x00};
+  const std::array<u8, 5> outerRepeatBytes{0xf0, 0x00, 0x04, 0x00, 0x00};
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeRepeatCommand>(builder, dialect, Address{3}, probeRange(3, shortRepeatBytes.size()),
+                                      shortRepeatBytes);
+  addProbeCommand<ProbeRepeatCommand>(builder, dialect, Address{8}, probeRange(8, outerRepeatBytes.size()),
+                                      outerRepeatBytes);
+  addProbeCommand<ProbeEndCommand>(builder, dialect, Address{13}, probeRange(13, endBytes.size()), endBytes);
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .behavior = SequenceProgramBehavior{.commandLimit = 100},
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "reused repeat counters should terminate through normal loop detection");
+  expect(performance.tracks[0].events.size() == 4,
+         "the VM should preserve the first playthrough before stopping the reused-counter cycle");
+  expect(performance.tracks[0].endTick == 4,
+         "the VM should stop when command, stack, and repeat-counter state recur");
 }
 
 void sequenceVmExecutesNestedCallInsideRepeat() {
@@ -946,6 +983,7 @@ void runValueSequenceVmTests() {
   sequenceVmAllowsRepeatedCallsToSameSubroutine();
   sequenceVmReplaysFiniteRepeatBlocks();
   sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets();
+  sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter();
   sequenceVmExecutesNestedCallInsideRepeat();
   sequenceVmExecutesRepeatInsideCall();
   sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken();

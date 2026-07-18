@@ -20,23 +20,6 @@ namespace vgmtrans::core {
 
 namespace detail {
 
-struct LoopSuppressionWindow {
-  Address beginAddress;
-  Address endAddress;
-  u32 stopIndex = 0;
-  bool hasAddressWindow = false;
-};
-
-[[nodiscard]] std::optional<Address> commandEndAddress(const SourceCommand& command) {
-  if (command.encodedSize == 0) {
-    return std::nullopt;
-  }
-  if (command.address.value > std::numeric_limits<u64>::max() - command.encodedSize) {
-    return std::nullopt;
-  }
-  return Address{command.address.value + command.encodedSize};
-}
-
 struct RepeatStateSnapshot {
   std::map<u8, u32> remaining;
 
@@ -45,39 +28,9 @@ struct RepeatStateSnapshot {
   }
 };
 
-[[nodiscard]] LoopSuppressionWindow loopSuppressionWindow(Address destination, const SourceCommand& command,
-                                                          u32 currentIndex) {
-  LoopSuppressionWindow window{.stopIndex = currentIndex};
-  if (const auto endAddress = commandEndAddress(command)) {
-    // This suppression covers the contiguous command-address interval between
-    // the repeat target and repeat command. Formats with non-contiguous repeat
-    // bodies should use lower-level VM flow instead of the counted-repeat helper.
-    const u64 destinationEnd =
-        destination.value == std::numeric_limits<u64>::max() ? destination.value : destination.value + 1;
-    window.beginAddress = Address{std::min(destination.value, command.address.value)};
-    window.endAddress = Address{std::max(destinationEnd, endAddress->value)};
-    window.hasAddressWindow = true;
-  }
-  return window;
-}
-
-[[nodiscard]] bool suppressesLoopDetection(const std::optional<LoopSuppressionWindow>& window,
-                                           const SourceCommand& command, u32 currentIndex) {
-  if (!window) {
-    return false;
-  }
-
-  if (window->hasAddressWindow) {
-    return command.address.value >= window->beginAddress.value && command.address.value < window->endAddress.value;
-  }
-
-  // Synthetic tests do not always use encoded command sizes. Keep the older
-  // index fallback for those programs; real bytecode should use command addresses.
-  return currentIndex <= window->stopIndex;
-}
-
-// RepeatState only tracks counters. Jump semantics decide how a repeat branch
-// affects loop detection and export policy.
+// Remaining counter values are part of VisitState, so each legitimate finite
+// pass is distinct. When the same command, call stack, and counters recur, the
+// future control flow is identical and the VM has found a real loop.
 class RepeatState {
 public:
   [[nodiscard]] bool active(u8 slot) const { return remaining_.contains(slot); }
@@ -112,7 +65,6 @@ struct VmTrackRuntime {
   u64 tick = 0;
   std::vector<u32> callStack;
   RepeatState repeat;
-  std::optional<LoopSuppressionWindow> loopSuppression;
   CommandId lastCommand;
 };
 
@@ -211,12 +163,6 @@ public:
 
   [[nodiscard]] std::optional<LoopPoint> observe(const VisitState& state, const SourceCommand& command,
                                                  const VmTrackRuntime& runtime, bool arrivedByControlFlow) {
-    // Finite repeat replays intentionally revisit commands. While replaying that
-    // body, do not treat the revisit as an infinite loop.
-    if (suppressesLoopDetection(runtime.loopSuppression, command, state.commandIndex)) {
-      return std::nullopt;
-    }
-
     if (const auto previous = visited_.find(state); previous != visited_.end()) {
       if (!arrivedByControlFlow) {
         return std::nullopt;
@@ -359,7 +305,11 @@ public:
       return;
     }
     if (executedCommands_ >= behavior_.commandLimit) {
-      warn("Sequence VM command limit reached", SourceRange{});
+      const SourceCommand& command = track_.commands.at(*current_);
+      warn(fmt::format("Sequence VM command limit reached: track={}, address=${:04X}, tick={}, executed={}, limit={}",
+                       track_.sourceTrackNumber, command.address.value, runtime_.tick, executedCommands_,
+                       behavior_.commandLimit),
+           command.range);
       current_ = std::nullopt;
       return;
     }
@@ -512,10 +462,6 @@ private:
         break;
       case JumpSemantics::FiniteBranch:
         applyPlainJump(command, destinationAddress, false, "branch");
-        break;
-      case JumpSemantics::FiniteRepeat:
-        runtime_.loopSuppression = detail::loopSuppressionWindow(destinationAddress, command, *current_);
-        applyPlainJump(command, destinationAddress, true, "repeat");
         break;
       case JumpSemantics::LoopCandidate:
         applyLoopCandidateJump(command, destinationAddress);
@@ -691,11 +637,10 @@ Effects VmApi::countedRepeatUntil(u8 slot, u32 totalPlays, Address destination) 
   }
 
   if (counter.consumeReplay()) {
-    return Effects{.step = Step::jump(destination, JumpSemantics::FiniteRepeat)};
+    return Effects{.step = jump(destination)};
   }
 
   counter.finish();
-  runtime_.loopSuppression.reset();
   return Effects{.step = next()};
 }
 
@@ -703,7 +648,6 @@ BranchResult VmApi::countedRepeatBreak(u8 slot, Address destination) {
   RepeatCounter counter = repeatCounter(slot);
   if (counter.remainingPlays() == 1) {
     counter.finish();
-    runtime_.loopSuppression.reset();
     return BranchResult{
         .taken = true,
         .effects = Effects{.step = finiteBranch(destination)},
