@@ -124,6 +124,15 @@ struct StereoBalance {
   return static_cast<double>(value) / 127.0;
 }
 
+[[nodiscard]] double vibratoDepthSemitones(u8 rawDepth) {
+  // The driver applies 128 depth steps across a +/- one-octave pitch range.
+  return static_cast<double>(rawDepth) * 12.0 / 128.0;
+}
+
+[[nodiscard]] double vibratoRateHertz(u8 rawRate) {
+  return rawRate * kLfoStepHertz;
+}
+
 [[nodiscard]] double tremoloDepth(CapcomSnesEngineVersion version, u8 rawDepth) {
   int trough = 0;
   int peak = 250;
@@ -178,7 +187,7 @@ struct TrackState {
   bool noteSlurred = false;
   bool noteOctaveUp = false;
   u8 modulationRate = 0;
-  double vibratoDepth = 0.0;
+  u8 vibratoDepth = 0;
   double tremoloDepth = 0.0;
   double portamentoMillisecondsPerCent = 0.0;
   u16 lastPortamentoTime = 0;
@@ -222,9 +231,17 @@ struct TrackState {
     }
   }
 
+  void emitVibratoDepth(PerformanceEmitter& out, bool enabled) const {
+    out.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoDepth,
+        .amount = enabled ? math::normalizedDepth(vibratoDepth) : 0.0,
+        .pitchDepthSemitones = enabled ? math::vibratoDepthSemitones(vibratoDepth) : 0.0,
+    });
+  }
+
   void emitModulationDepths(PerformanceEmitter& out, bool enabled) const {
     if (vibratoDepth != 0) {
-      out.modulation(ModulationPerformanceTarget::VibratoDepth, enabled ? vibratoDepth : 0.0);
+      emitVibratoDepth(out, enabled);
     }
     if (tremoloDepth != 0) {
       out.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? tremoloDepth : 0.0);
@@ -538,9 +555,8 @@ using OpcodeProfile = std::array<CommandDefinition, 0x20>;
         const u8 value = a.u8("value");
         switch (type) {
           case 0:  // Vibrato depth.
-            p.track.vibratoDepth = math::normalizedDepth(value & 0x7f);
-            p.out.modulation(ModulationPerformanceTarget::VibratoDepth,
-                             p.track.modulationRate != 0 ? p.track.vibratoDepth : 0.0);
+            p.track.vibratoDepth = value & 0x7f;
+            p.track.emitVibratoDepth(p.out, p.track.modulationRate != 0);
             break;
           case 1:  // Tremolo depth.
             p.track.tremoloDepth = math::tremoloDepth(p.track.version, value);
@@ -555,7 +571,11 @@ using OpcodeProfile = std::array<CommandDefinition, 0x20>;
               p.track.emitModulationDepths(p.out, enabled);
             }
             const double rate = math::lfoRate(value);
-            p.out.modulation(ModulationPerformanceTarget::VibratoRate, rate);
+            p.out.modulation(ModulationPerformanceEvent{
+                .target = ModulationPerformanceTarget::VibratoRate,
+                .amount = rate,
+                .frequencyHz = math::vibratoRateHertz(value),
+            });
             p.out.modulation(ModulationPerformanceTarget::TremoloRate, rate);
             break;
           }
