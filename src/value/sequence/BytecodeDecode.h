@@ -42,7 +42,6 @@ struct DecodedBytecodeCommand {
   u32 encodedSize = 0;
   std::vector<u8> bytes;
   DecodeFlow flow;
-  SemanticCommandKind kind;
   std::vector<SemanticOperand> operands;
   DecodedCommandPresentation presentation;
   bool retainBytes = true;
@@ -65,9 +64,9 @@ struct BytecodeDecodeContext {
 
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
                                          u32 offset) {
-  if (!decoded.retainBytes && decoded.kind.valid()) {
-    builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.kind,
-                        decoded.operands, decoded.flow, decoded.annotation);
+  if (!decoded.retainBytes) {
+    builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.operands,
+                        decoded.flow, decoded.annotation);
     return;
   }
   builder.addDecoded(Address{offset}, decoded.range, decoded.bytes, decoded.annotation, decoded.flow);

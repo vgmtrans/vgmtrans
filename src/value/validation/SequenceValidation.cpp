@@ -40,7 +40,9 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
     std::unordered_set<u32> commandIds;
     commandIds.reserve(track.commands.size());
     // Legacy commands refer into a track-level byte pool. Semantic commands
-    // must be byte-free and have unique, source-bounded operand identities.
+    // must be byte-free and have unique, source-bounded operand names. Names
+    // deliberately serve as identity so format code does not maintain a second
+    // numeric operand vocabulary solely for execution.
     for (const auto& command : track.commands) {
       if (!command.id.valid()) {
         report.error("sequence.command.missing-id", "Sequence program contained a command without an id",
@@ -56,24 +58,17 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
                      command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
       }
 
-      if (command.kind.valid() && command.bytes.size != 0) {
-        report.error("sequence.command.semantic-bytes", "Semantic sequence command retained encoded bytes",
-                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
-      }
-      if (command.kind.valid() && command.range.valid() && command.encodedSize != command.range.size) {
+      if (command.semantic() && command.range.valid() && command.encodedSize != command.range.size) {
         report.error("sequence.command.semantic-size",
                      "Semantic sequence command encoded size did not match its source range", command.range);
       }
 
-      std::unordered_set<u32> operandIds;
-      operandIds.reserve(command.operands.size());
+      std::unordered_set<std::string> operandNames;
+      operandNames.reserve(command.operands.size());
       for (const auto& operand : command.operands) {
-        if (!operand.id.valid() || !operandIds.insert(operand.id.value).second) {
-          report.error("sequence.command.operand-id", "Semantic sequence command had a missing or duplicate operand id",
-                       command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
-        }
-        if (command.kind.valid() && operand.name.empty()) {
-          report.error("sequence.command.operand-name", "Semantic sequence operand had no presentation name",
+        if (command.semantic() && (operand.name.empty() || !operandNames.insert(operand.name).second)) {
+          report.error("sequence.command.operand-name",
+                       "Semantic sequence command had a missing or duplicate operand name",
                        command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
         }
         if (operand.encodedValue && !operand.range.valid()) {

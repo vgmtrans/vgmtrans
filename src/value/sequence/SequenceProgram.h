@@ -83,28 +83,11 @@ struct DecodeFlow {
   [[nodiscard]] bool callTarget() const noexcept { return kind == Kind::Call && !staticTargets.empty(); }
 };
 
-// Format-local numeric IDs keep the shared sequence core independent of every
-// driver's command vocabulary while still giving executors a typed, byte-free
-// instruction stream.
-struct SemanticCommandKind {
-  u32 value = 0;
-
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != 0; }
-  friend constexpr bool operator==(SemanticCommandKind, SemanticCommandKind) noexcept = default;
-};
-
-struct SemanticOperandId {
-  u32 value = 0;
-
-  [[nodiscard]] constexpr bool valid() const noexcept { return value != 0; }
-  friend constexpr bool operator==(SemanticOperandId, SemanticOperandId) noexcept = default;
-};
-
 using SemanticOperandValue = std::variant<bool, u64, s64, double, Address>;
 
-// The role is intentionally small and format-independent. Format-local operand
-// IDs remain the executor's precise vocabulary; roles let generic analysis and
-// SourceMap projection recognize the few relationships shared by all drivers.
+// The role is intentionally small and format-independent. Operand names are the
+// executor's precise vocabulary; roles let generic analysis and SourceMap
+// projection recognize the few relationships shared by all drivers.
 enum class SemanticOperandRole : u8 {
   Value,
   NoteKey,
@@ -126,7 +109,6 @@ enum class SemanticOperandRole : u8 {
 };
 
 struct SemanticOperand {
-  SemanticOperandId id;
   // value is the resolved value consumed by execution. encodedValue is present
   // when the source representation differs; the SourceMap then shows both
   // without making playback repeat the conversion.
@@ -143,8 +125,8 @@ struct SemanticOperand {
 [[nodiscard]] SourceValue semanticOperandSourceValue(const SemanticOperandValue& value);
 
 // One decoded source opcode. Source bytes are retained only for legacy dialects.
-// Semantic dialects execute kind/operands/flow and therefore cannot reparse the
-// source during playback.
+// Semantic dialects execute opcode/operands/flow and therefore cannot reparse
+// the source during playback.
 struct SourceCommand {
   CommandId id;
   u8 opcode = 0;
@@ -153,12 +135,19 @@ struct SourceCommand {
   SourceRange range;
   SourceAnnotationId annotation;
   ByteSpan bytes;
-  SemanticCommandKind kind;
   std::vector<SemanticOperand> operands;
   DecodeFlow flow;
+
+  // Builders require legacy commands to have bytes. Their absence therefore
+  // identifies a semantic command without another tag or command-kind enum.
+  [[nodiscard]] bool semantic() const noexcept { return bytes.size == 0; }
 };
 
-[[nodiscard]] const SemanticOperand* semanticOperand(const SourceCommand& command, SemanticOperandId id);
+// Operand names are both their author-facing vocabulary and their durable
+// identity. Semantic commands contain only a handful of operands, so a small
+// linear lookup is clearer than making every format maintain parallel numeric
+// IDs and presentation-name tables.
+[[nodiscard]] const SemanticOperand* semanticOperand(const SourceCommand& command, std::string_view name);
 
 // Maps source addresses to command indexes. The VM uses this for jumps, calls,
 // and finding the next command by source address when vector order is different.
@@ -232,7 +221,7 @@ public:
   const SourceCommand& addDecoded(Address address, SourceRange range, std::span<const u8> bytes,
                                   SourceAnnotationId annotation = {}, DecodeFlow flow = {});
   const SourceCommand& addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
-                                   SemanticCommandKind kind, std::vector<SemanticOperand> operands, DecodeFlow flow,
+                                   std::vector<SemanticOperand> operands, DecodeFlow flow,
                                    SourceAnnotationId annotation = {});
 
 private:

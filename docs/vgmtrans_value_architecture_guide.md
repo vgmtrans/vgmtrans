@@ -67,7 +67,7 @@ source bytecode
   ↓
 format decoder reads each command once
   ↓
-SequenceProgram with command kinds, typed operands, and stored flow
+SequenceProgram with named operands and stored flow
   + SourceMap command annotations
   ↓
 global SequenceVm scheduler
@@ -263,15 +263,14 @@ A `SequenceProgram` contains:
 Each track contains decoded `SourceCommand` records. A `SourceCommand` keeps:
 
 - opcode;
-- format-local semantic command kind;
-- typed operands with source ranges;
+- named operands with resolved values and source ranges;
 - decode-time control flow;
 - source address;
 - encoded size;
 - source range;
 - optional source annotation ID.
 
-Each semantic operand also keeps a stable format-local ID, presentation name, display rule, generic role, exact source range, and—when conversion is needed—both the encoded and resolved value. Execution consumes the resolved value. This prevents driver conversion formulas from being duplicated between source annotation and playback.
+An operand's name is both its author-facing vocabulary and its durable identity. It also keeps a display rule, optional generic role, exact source range, and—when conversion is needed—both the encoded and resolved value. Execution consumes the resolved value. This prevents driver conversion formulas from being duplicated between source annotation and playback without forcing formats to declare parallel numeric operand IDs.
 
 Semantic commands do not retain encoded bytes. `commandBytes` and byte spans remain temporarily on `TrackProgram` only for unmigrated cursor dialects. The semantic executor signature intentionally receives no `TrackProgram` or byte reader, making source reparsing during playback impossible.
 
@@ -639,7 +638,7 @@ MidiExporter
 
 ### 14.1 `SequenceProgram`
 
-`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every semantic command has a format-local kind, typed operands, stored decode flow, its source address/range, and an annotation ID.
+`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every semantic command has an opcode, named operands, stored decode flow, its source address/range, and an annotation ID.
 
 The stored flow lets walkers and validators inspect control flow without executing format code. Typed operands let execution and analysis use parsed meaning without reopening the source. A format profile belongs to this program value, so one registered executor family can handle every version of the driver.
 
@@ -650,7 +649,7 @@ A semantic dialect is the small piece of driver-specific behavior needed by the 
 - an ID;
 - a timebase;
 - default behavior;
-- a program-state factory;
+- an optional program-state factory for genuinely shared driver state;
 - a function to create per-track state;
 - a function to execute one semantic command.
 
@@ -660,26 +659,25 @@ The dialect is registered once in `SequenceDialectRegistry`; export looks it up 
 
 ### 14.3 Semantic decode and execution
 
-The target authoring model is plain data plus two ordinary switches:
-
-1. one `constexpr` opcode profile (with sparse version patches) maps encoded opcodes to semantic command kinds and presentation metadata;
-2. a decode switch reads the operands required by each kind and stores flow;
-3. an execution switch consumes only kinds and typed operands.
-
-A decoder uses `RecordReader` for checked sequential reads with exact ranges. It resolves driver values once, attaches operand names/roles/display metadata, and appends a semantic command with `retainBytes = false`. `CommandSourceMap` turns that decoded value into an annotation; the decoder itself never calls `.field()`, `.derived()`, or `.link()`. Execution is deliberately smaller:
+The target authoring model is one opcode profile whose entries contain both lifecycle operations. A command's label, broad semantic, source reads, conversion, discovery flow, and playback behavior are adjacent:
 
 ```cpp
-switch (kind(command)) {
-  case Event::Pan:
-    out.pan(operand<double>(command, Operand::StereoPosition),
-            operand<double>(command, Operand::LinearGain));
-    return Effects::none();
-  case Event::End:
-    return Effects{.step = vm.end()};
-}
+profile[0x05] = command(
+    "Tempo", SequenceSemantic::Tempo,
+    [](Decode& d) {
+      d.resolved("microseconds_per_quarter", d.rawU16be("raw"), convertTempo);
+    },
+    [](Args a, Playback& p) {
+      p.out.tempo(a.u32());
+      return Effects{};
+    });
 ```
 
-Do not introduce a command class hierarchy, handler-per-opcode files, a binary-schema DSL, or a generic microcode language. The point is to keep the source driver visible while removing repeated parsing.
+`SemanticCommandDecoder` wraps `RecordReader` for checked reads, exact ranges, raw/resolved pairing, and discovery-flow bookkeeping. `SemanticCommandArgs` reads the nearby named operands during playback. Names intentionally serve as identity: a linear lookup across a handful of operands is preferable to a command-kind enum, an operand-ID enum, metadata switches, and parallel decode/execution switches.
+
+The two lifecycle entry points merely select the same profile entry by program profile and opcode. Decode invokes its `decode` function once; playback invokes its `execute` function on every runtime visit. `CommandSourceMap` projects the decoded value into an annotation, so command definitions never call `.field()`, `.derived()`, or `.link()`.
+
+Do not introduce a command class hierarchy, handler-per-opcode files, a binary-schema DSL, typed command variants, or a generic microcode language. The point is to keep the complete source-driver operation visible in one local block while removing repeated parsing and representational ceremony.
 
 `VmCommandCursor` and `SequenceCursorDialect` still support unmigrated formats. They retain command bytes and invoke a reader in decode and render phases. This path is deprecated because execution can reparse bytes and decode-time analysis must masquerade as playback.
 
@@ -931,7 +929,7 @@ Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-Command code should resemble a driver interpreter. Capcom SNES demonstrates the semantic form: an opcode profile and decode switch turn bytes into typed commands, then one execution switch updates driver state and emits performance events. NDS, Akao, Akao SNES, and Konami SNES still use normal cursor switches through the legacy adapter.
+Command code should resemble a driver interpreter. Capcom SNES demonstrates the semantic form: each opcode-profile entry places source decoding beside playback behavior. The profile replaces separate metadata, operand, flow, and execution switches. NDS, Akao, Akao SNES, and Konami SNES still use normal cursor switches through the legacy adapter.
 
 That is a good match for format developers’ mental model. It avoids requiring every command to be represented as a separate class or visitor.
 
@@ -973,7 +971,7 @@ The Capcom SNES module shows the “single source, explicit collection” path.
 
 The scanner finds the layout, reserves sequence/instrument/sample IDs, parses instrument/sample information when the instrument table and SPC DIR are detected, always emits the sequence, and creates one collection for the source. If synth information is unavailable, the collection still has the sequence and a warning.
 
-Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single opcode mapping. Decode reads every operand once, stores encoded and resolved values where they differ, and records control flow; the track keeps no command-byte pool. Generic command projection builds its `SourceMap` view. One `capcom-snes` executor family uses the profile stored on `SequenceProgram`, and the global scheduler supplies program-wide and per-track state. The executor cannot access source bytes by construction.
+Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single source of command behavior. Each entry owns presentation, source reads, conversion, discovery flow, and playback side-by-side. Decode reads every operand once, stores encoded and resolved values where they differ, and records control flow; the track keeps no command-byte pool. Generic command projection builds its `SourceMap` view. The same profile entry is selected during rendering by program profile and opcode, and the global scheduler supplies per-track state. The executor cannot access source bytes by construction.
 
 The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture.
 
@@ -1036,17 +1034,15 @@ Return `SequenceProgramAsset`, `InstrumentSetAsset`, `SampleCollectionAsset`, or
 
 Define:
 
-- a format-local command-kind enum and operand IDs;
-- operand names, display rules, roles, and encoded/resolved values;
 - one base opcode profile with sparse version patches;
-- one decode switch that reads typed operands and stores `DecodeFlow`;
+- one complete definition per command, with adjacent decode and playback lambdas;
+- operand names, display rules, roles, and encoded/resolved values directly in the decode lambda;
 - a per-program profile in `SequenceProgram::config`;
-- a program-state type when the driver has shared state;
-- a `TrackState` type for driver-local mutable playback state;
-- one semantic execution switch; and
+- a program-state type only when the driver has real shared state;
+- a `TrackState` type for driver-local mutable playback state; and
 - a track decoder using `decodeLinearBytecodeTrack` or `decodeReachableBytecodeBlocks`.
 
-The decoder reads bytes and creates source annotations. The executor reads only the semantic command and emits neutral performance events. It should not implement global loop export policy and must never read source bytes.
+Use `SemanticCommandDecoder` and `SemanticCommandArgs` to keep generic IR construction and type erasure out of format code. The decoder reads bytes once and generic projection creates source annotations. Playback reads only named resolved operands and emits neutral performance events. It should not implement global loop export policy and must never read source bytes.
 
 ### Step 6: Build synth data in the neutral model
 
@@ -1136,11 +1132,11 @@ It also validates collection references and reports missing or wrong-type assets
 
 `SequenceProgram` records semantic source commands, program profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
 
-Each semantic command stores its format-local kind, typed operands, source provenance, and decode flow. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Byte pools exist only for legacy dialects.
+Each semantic command stores its opcode, named operands, source provenance, and decode flow. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Byte pools exist only for legacy dialects.
 
-### 21.12 `RecordReader` and legacy `VmCommandCursor`
+### 21.12 `SemanticCommandDecoder`, `RecordReader`, and legacy `VmCommandCursor`
 
-`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CommandSourceMap` performs automatic projection for semantic commands; ordinary records can reuse the reader's captured fields when building their one durable annotation.
+`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `SemanticCommandDecoder` adds the narrow command-authoring conveniences for named operands, raw/resolved values, and discovery flow. `CommandSourceMap` performs automatic projection; ordinary records can reuse the reader's captured fields when building their one durable annotation.
 
 `VmCommandCursor` remains the two-phase compatibility surface for unmigrated sequence dialects. It should not be used for new semantic implementations because render-phase cursors can reparse stored command bytes.
 
@@ -1202,7 +1198,7 @@ The existing tests under `tests/core` and `tests/formats` reflect this direction
 
 ### 22.3 Format code can be local and readable
 
-Plain opcode profiles plus explicit decode/execution switches are a strong fit for sequence drivers. They keep the driver visible without coupling playback to source encoding.
+Complete opcode-profile entries are a strong fit for sequence drivers. Keeping decode and playback lambdas adjacent makes the driver visible without coupling playback to source encoding or scattering one command across several switches.
 
 Return presentation metadata with each decoded command and let `CommandSourceMap` project annotations. Command decoding should not call annotation-builder methods.
 
@@ -1270,9 +1266,9 @@ The branch would benefit from a contributor-facing guide with one page each for:
 
 ### 24.2 Keep command decoding and execution boring
 
-The decoder should read operands and store flow once. The executor should switch on command kind, update state, emit events, and return runtime flow. Neither side should hide the driver behind command objects or a schema framework.
+The decoder should read operands and store flow once. Playback should consume named resolved operands, update state, emit events, and return runtime flow. Put both operations in the same profile entry; the two lifecycle entry points should only select and invoke that entry.
 
-Keep opcode knowledge in one profile plus sparse patches. Avoid parallel size tables, analysis interpreters, and per-opcode handler classes.
+Keep opcode knowledge in one profile plus sparse patches. Avoid command-kind and operand-ID enums, parallel size/metadata tables, analysis interpreters, and per-opcode handler classes.
 
 ### 24.3 Prefer explicit collections when possible
 
@@ -1312,7 +1308,7 @@ Architectural acceptance criteria:
 - every source structure is parsed once;
 - semantic VM execution has no byte access;
 - collection rebuilding has no source access;
-- each driver has one opcode mapping and one semantic execution switch;
+- each driver has one opcode mapping with adjacent decode and playback behavior;
 - driver profile data lives on `SequenceProgram`;
 - format code emits transitions rather than per-tick fade events;
 - value-format directories contain no MIDI, SF2, or DLS policy;
