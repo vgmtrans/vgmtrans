@@ -77,14 +77,49 @@ struct Pan {
   return lower + (((upper - lower) * fraction) >> 8);
 }
 
-[[nodiscard]] Pan panFromBalance(double sourceLeft, double sourceRight) {
-  if (sourceLeft == 0.0 && sourceRight == 0.0) {
-    return Pan{.gain = 0.0};
+[[nodiscard]] u8 quantizedPan(double arcPosition) {
+  u8 midiPan = static_cast<u8>(std::clamp<int>(static_cast<int>(std::lround(arcPosition * 126.0)), 0, 126));
+  if (midiPan != 0) {
+    ++midiPan;
   }
-  const double angle = std::atan2(sourceRight, sourceLeft);
+  return midiPan;
+}
+
+[[nodiscard]] std::pair<double, double> panBalance(u8 midiPan) {
+  if (midiPan == 0 || midiPan == 1) {
+    return {1.0, 0.0};
+  }
+  if (midiPan == 64) {
+    const double center = std::sqrt(2.0) / 2.0;
+    return {center, center};
+  }
+  if (midiPan == 127) {
+    return {0.0, 1.0};
+  }
+
+  const double arcPosition = (midiPan - 1) / 126.0;
+  return {std::cos(kPiOverTwo * arcPosition), std::sin(kPiOverTwo * arcPosition)};
+}
+
+[[nodiscard]] Pan panFromBalance(double sourceLeft, double sourceRight) {
+  u8 midiPan = 64;
+  if (sourceRight == 0.0) {
+    midiPan = 0;
+  } else if (sourceLeft == sourceRight) {
+    midiPan = 64;
+  } else if (sourceLeft == 0.0) {
+    midiPan = 127;
+  } else {
+    midiPan = quantizedPan(std::atan2(sourceRight, sourceLeft) / kPiOverTwo);
+  }
+
+  // The source pan law must be represented by a discrete MIDI pan position.
+  // Base gain compensation on that same position so rounding cannot change the
+  // loudness independently of pan during export.
+  const auto [midiLeft, midiRight] = panBalance(midiPan);
   return Pan{
-      .position = std::clamp((angle / kPiOverTwo) * 2.0 - 1.0, -1.0, 1.0),
-      .gain = (sourceLeft + sourceRight) / (std::cos(angle) + std::sin(angle)),
+      .position = (static_cast<double>(midiPan) / 127.0) * 2.0 - 1.0,
+      .gain = (sourceLeft + sourceRight) / (midiLeft + midiRight),
   };
 }
 
@@ -158,7 +193,11 @@ struct Pan {
     depthCentibels =
         std::clamp(200.0 * std::log10(peak / static_cast<double>(trough)), 0.0, kTremoloMuteFloorCentibels);
   }
-  return std::clamp(depthCentibels / (2.0 * kTremoloHalfDepthCentibels), 0.0, 1.0);
+  // The driver rounds against 128 steps before clamping to a 7-bit controller.
+  // Preserve that quantization so the neutral amount lowers back to the same value.
+  const int midiValue = static_cast<int>(
+      std::floor(depthCentibels * 128.0 / (2.0 * kTremoloHalfDepthCentibels) + 0.5));
+  return std::clamp(midiValue, 0, 127) / 127.0;
 }
 
 [[nodiscard]] double lfoRate(u8 rawRate) {

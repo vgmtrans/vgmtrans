@@ -330,7 +330,10 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
     }
     const auto pitch = capcomInstrumentPitch(info.pitchScale);
 
+    // Capcom's source slot is also its sequential 128-program export address.
     Instrument instrument{
+        .bank = info.index >> 7,
+        .program = info.index & 0x7f,
         .identity =
             InstrumentIdentity{
                 .domain = std::string(kCapcomSnesInstrumentDomain),
