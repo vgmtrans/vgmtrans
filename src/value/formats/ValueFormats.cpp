@@ -14,7 +14,6 @@
 #include "value/formats/Akao/AkaoModule.h"
 #include "value/formats/Akao/AkaoSequence.h"
 #include "value/formats/NDS/NdsModule.h"
-#include "value/formats/NDS/NdsSequence.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/extractors/SnesRsnExtractor.h"
 #include "value/extractors/SnesSpcExtractor.h"
@@ -27,20 +26,18 @@ void registerValueFormats(core::Session& session) {
   snes_spc::registerSnesSpcExtractor(session.formats());
   psf::registerPsfExtractor(session.formats());
 
-  // Capcom is the semantic vertical slice: one definition registers both scan
-  // and execution. The remaining direct calls are migration adapters and can
-  // disappear format by format without changing Session again.
+  // Semantic formats register scanning and execution as one definition. The
+  // remaining direct calls are migration adapters.
   session.registerFormat(capcom_snes::capcomSnesDefinition());
+  session.registerFormat(nds::ndsDefinition());
 
   akao::registerAkaoModule(session.formats());
   akao_snes::registerAkaoSnesModule(session.formats());
-  nds::registerNdsModule(session.formats());
   konami_snes::registerKonamiSnesModule(session.formats());
 
   akao::registerAkaoSequenceDialects(session.dialects());
   akao_snes::registerAkaoSnesSequenceDialects(session.dialects());
   konami_snes::registerKonamiSnesSequenceDialects(session.dialects());
-  nds::registerNdsSequenceDialect(session.dialects());
 }
 
 }  // namespace vgmtrans::formats

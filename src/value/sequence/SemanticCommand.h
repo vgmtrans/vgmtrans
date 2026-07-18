@@ -9,6 +9,7 @@
 #include "value/base/RecordReader.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
+#include "value/sequence/SequenceDialect.h"
 
 #include <algorithm>
 #include <limits>
@@ -47,6 +48,89 @@ private:
   }
 
   const SourceCommand& command_;
+};
+
+// Formats supply their own Decode and Playback contexts, while this small
+// value owns the identical presentation/function-pointer plumbing they share.
+// Actual command behavior remains beside the opcode in the format profile.
+template <class Decode, class Playback>
+struct SemanticCommandDefinition {
+  using DecodeFunction = void (*)(Decode&);
+  using ExecuteFunction = Effects (*)(SemanticCommandArgs, Playback&);
+
+  DecodedCommandPresentation presentation;
+  DecodeFunction decode = nullptr;
+  ExecuteFunction execute = nullptr;
+  u8 opaqueOperandBytes = 0;
+
+  void decodeOperands(Decode& decoder) const {
+    if (decode != nullptr) {
+      decode(decoder);
+    } else if (opaqueOperandBytes != 0) {
+      static_cast<void>(decoder.rawBytes("bytes", opaqueOperandBytes));
+    }
+  }
+};
+
+// This is deliberately a definition factory, not an opcode schema. It removes
+// repeated metadata construction while leaving profile layout and every decode
+// and execute lambda under the format's control.
+template <class Decode, class Playback>
+class SemanticCommandDefinitions {
+public:
+  using Definition = SemanticCommandDefinition<Decode, Playback>;
+  using DecodeFunction = typename Definition::DecodeFunction;
+  using ExecuteFunction = typename Definition::ExecuteFunction;
+
+  constexpr explicit SemanticCommandDefinitions(std::string_view detailKindPrefix) : prefix_(detailKindPrefix) {}
+
+  [[nodiscard]] Definition command(std::string_view label, SequenceSemantic semantic, DecodeFunction decode,
+                                   ExecuteFunction execute,
+                                   CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
+                                   std::string_view localKind = {}) const {
+    const std::string kind = localKind.empty() ? sourceLocalKind(label) : std::string(localKind);
+    return Definition{
+        .presentation =
+            DecodedCommandPresentation{
+                .label = std::string(label),
+                .localKind = kind,
+                .detailKind = prefix_.empty() ? kind : std::string(prefix_) + "." + kind,
+                .semantic = semantic,
+                .playback = playback,
+            },
+        .decode = decode,
+        .execute = execute,
+    };
+  }
+
+  [[nodiscard]] Definition command(std::string_view label, SequenceSemantic semantic, ExecuteFunction execute,
+                                   CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
+                                   std::string_view localKind = {}) const {
+    return command(label, semantic, nullptr, execute, playback, localKind);
+  }
+
+  [[nodiscard]] Definition sourceOnly(std::string_view label, DecodeFunction decode,
+                                      std::string_view localKind = {}) const {
+    return command(label, SequenceSemantic::Meta, decode, nullptr, CommandPlaybackStatus::SourceOnly, localKind);
+  }
+
+  [[nodiscard]] Definition opaque(std::string_view label, u8 operandBytes, std::string_view localKind = {}) const {
+    auto definition = sourceOnly(label, nullptr, localKind);
+    definition.opaqueOperandBytes = operandBytes;
+    return definition;
+  }
+
+  [[nodiscard]] Definition terminal(std::string_view label, SequenceSemantic semantic, CommandPlaybackStatus playback,
+                                    std::string_view localKind = {}) const {
+    return command(label, semantic, [](Decode& decoder) { decoder.terminate(); }, nullptr, playback, localKind);
+  }
+
+  [[nodiscard]] Definition noOp(std::string_view label, std::string_view localKind = {}) const {
+    return command(label, SequenceSemantic::Meta, nullptr, nullptr, CommandPlaybackStatus::NoOp, localKind);
+  }
+
+private:
+  std::string_view prefix_;
 };
 
 template <class T>

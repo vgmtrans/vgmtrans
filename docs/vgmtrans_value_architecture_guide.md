@@ -378,7 +378,7 @@ FormatDefinition
   optional sequence dialect
 ```
 
-`Session::registerFormat` registers both halves together. Capcom SNES uses this unified path. Direct module/dialect registration remains only for unmigrated formats.
+`Session::registerFormat` registers both halves together. Capcom SNES and NDS use this unified path. Direct module/dialect registration remains only for unmigrated formats.
 
 Recognition belongs at the start of `scan`, which returns an empty result when the source does not match. This ensures layout/signature discovery runs once. `canScan` remains nullable as a migration adapter for older modules and should not be added to new ones.
 
@@ -950,6 +950,8 @@ Command code should resemble a driver interpreter. Capcom SNES and NDS demonstra
 
 That is a good match for format developers’ mental model. It avoids requiring every command to be represented as a separate class or visitor.
 
+`SemanticCommandDefinitions` supplies only the repeated definition and presentation plumbing. Formats still own the profile, opcode selection, decode lambdas, and playback lambdas in one place; the helper is deliberately not a second command schema.
+
 ### 18.5 Where complexity still appears
 
 The architecture removes a lot of accidental complexity from format code, but it does not remove real format complexity. The hard parts still appear in the right places:
@@ -981,6 +983,10 @@ The collection key includes source ID, SDAT offset, and sequence index. That mak
 NDS sequence code uses one opcode profile with adjacent decode and execution lambdas. Decode reads each command once into named operands, resolves 24-bit relative addresses, and stores jump, call, return, and terminal flow. Playback receives only those operands and a small context around persistent track registers, performance output, and VM flow. Normal SSEQ decoding follows reachable blocks, so subroutines and jump targets are discovered without a playback prepass.
 
 The same command decoder handles the `Allocate Track`, optional bootstrap rest, and `Open Track` records used to discover secondary tracks. These bootstrap commands are discarded after discovery because they run before musical track playback, but their byte layout is not parsed a second way. Malformed SDAT recovery remains a specialized walker because it must split overlapping blocks; it reuses the canonical command decoder and still produces normal `TrackProgram` and source annotations.
+
+Container-specific range recovery belongs to `NdsLayout`, beside FAT and section parsing, rather than in the sequence interpreter. `NdsModule` scans the discovered layout in dependency order and uses indexed optional bank/sample handles instead of parallel lookup maps. SWAR, SBNK, and PSG parsing remain together in `NdsSynth`: their compact shared record layouts are expressed with small helpers and a single instrument-type switch rather than a hierarchy of event or instrument classes.
+
+NDS exposes one `FormatDefinition` containing both its scanner and semantic dialect. Recognition occurs inside `scan`, so SDAT signature discovery runs once instead of being duplicated by `canScan`.
 
 ### 19.2 Capcom SNES
 

@@ -163,7 +163,6 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   const auto asset = parseNdsSequenceProgram(input, AssetId{7},
                                              NdsSequenceRange{
                                                  .offset = sequenceOffset,
-                                                 .size = 0x40,
                                                  .sequenceEnd = trackStart + 4,
                                              },
                                              "Program", &programSourceMap, &programDiagnostics);

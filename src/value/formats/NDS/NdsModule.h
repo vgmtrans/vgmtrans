@@ -6,12 +6,10 @@
 
 #pragma once
 
-namespace vgmtrans::core {
-class FormatRegistry;
-}
+#include "value/scan/FormatDefinition.h"
 
 namespace vgmtrans::formats::nds {
 
-void registerNdsModule(core::FormatRegistry& registry);
+[[nodiscard]] core::FormatDefinition ndsDefinition();
 
 }  // namespace vgmtrans::formats::nds
