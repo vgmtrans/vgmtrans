@@ -9,14 +9,11 @@
 #include "value/formats/NDS/NdsLayout.h"
 #include "value/formats/NDS/NdsSequence.h"
 #include "value/formats/NDS/NdsSynth.h"
-#include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanResultBuilder.h"
 
 #include <array>
-#include <map>
 #include <optional>
 #include <set>
-#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -48,10 +45,8 @@ namespace {
 void annotateNdsLayout(ByteReader reader, const NdsLayout& layout, SourceMapBuilder& sourceMap) {
   sourceMap.header("SDAT Header", reader.range(layout.baseOffset, 0x24))
       .field("file_size", reader.range(layout.baseOffset + 8, 4), layout.length, SourceValueDisplay::Hex)
-      .field("symb_offset", reader.range(layout.baseOffset + 0x10, 4), layout.symbOffset,
-             SourceValueDisplay::Address)
-      .field("info_offset", reader.range(layout.baseOffset + 0x18, 4), layout.infoOffset,
-             SourceValueDisplay::Address)
+      .field("symb_offset", reader.range(layout.baseOffset + 0x10, 4), layout.symbOffset, SourceValueDisplay::Address)
+      .field("info_offset", reader.range(layout.baseOffset + 0x18, 4), layout.infoOffset, SourceValueDisplay::Address)
       .field("fat_offset", reader.range(layout.baseOffset + 0x20, 4), layout.fatOffset, SourceValueDisplay::Address);
 
   if (layout.hasSymb) {
@@ -101,7 +96,7 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
     });
   }
 
-  std::map<u16, ScanInstrumentSetRef> bankAssetIds;
+  std::vector<std::optional<ScanInstrumentSetRef>> bankAssets(layout.banks.size());
   std::set<u16> referencedBanks;
   for (const auto& sequence : layout.sequences) {
     if (sequence.valid && sequence.bank < layout.banks.size()) {
@@ -124,16 +119,13 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
     for (u32 i = 0; i < bank.waveArchives.size(); ++i) {
       const u16 waveArchive = bank.waveArchives[i];
       if (waveArchive != 0xffff && waveArchive < waveAssetIds.size()) {
-        if (waveAssetIds[waveArchive]) {
-          waveCollections[i] = *waveAssetIds[waveArchive];
-        }
+        waveCollections[i] = waveAssetIds[waveArchive];
       }
     }
 
-    auto instrumentSet = result.instrumentSet([&](AssetId id) {
+    bankAssets[bankIndex] = result.instrumentSet([&](AssetId id) {
       return parseNdsInstrumentSet(input, id, *range, layout.bankNames[bankIndex], result, psg, waveCollections);
     });
-    bankAssetIds.emplace(bankIndex, instrumentSet);
   }
 
   for (u32 sequenceIndex = 0; sequenceIndex < layout.sequences.size(); ++sequenceIndex) {
@@ -147,7 +139,6 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
       continue;
     }
 
-    const auto bankAsset = bankAssetIds.find(sequence.bank);
     const std::string& name = layout.sequenceNames[sequenceIndex];
     const auto sequenceAsset = result.sequence([&](AssetId id) {
       return parseNdsSequenceProgram(
@@ -157,8 +148,8 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
 
     auto collection = result.collection(name, ndsCollectionKey(input.source.id, layout.baseOffset, sequenceIndex));
     collection.sequence(sequenceAsset).samples(psg);
-    if (bankAsset != bankAssetIds.end()) {
-      collection.instrumentSet(bankAsset->second);
+    if (sequence.bank < bankAssets.size() && bankAssets[sequence.bank]) {
+      collection.instrumentSet(*bankAssets[sequence.bank]);
     }
     if (sequence.bank < layout.banks.size()) {
       for (const u16 waveArchive : layout.banks[sequence.bank].waveArchives) {
@@ -168,10 +159,6 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
       }
     }
   }
-}
-
-[[nodiscard]] bool canScanNds(const SourceFile&, std::span<const u8> bytes) {
-  return !findNdsSdatOffsets(ByteReader(SourceId{}, bytes)).empty();
 }
 
 [[nodiscard]] ScanResult scanNds(const ScanInput& input) {
@@ -195,12 +182,15 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
 
 }  // namespace
 
-void registerNdsModule(FormatRegistry& registry) {
-  registry.add(FormatModule{
-      .name = std::string(kNdsFormatName),
-      .canScan = canScanNds,
-      .scan = scanNds,
-  });
+FormatDefinition ndsDefinition() {
+  return FormatDefinition{
+      .module =
+          FormatModule{
+              .name = std::string(kNdsFormatName),
+              .scan = scanNds,
+          },
+      .sequenceDialect = ndsSequenceDialect(),
+  };
 }
 
 }  // namespace vgmtrans::formats::nds

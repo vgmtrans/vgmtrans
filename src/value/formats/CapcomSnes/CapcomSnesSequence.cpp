@@ -332,62 +332,18 @@ private:
   CapcomSnesEngineVersion version_;
 };
 
-using DecodeFunction = void (*)(Decode&);
-using ExecuteFunction = Effects (*)(Operands, Playback&);
-
-struct CommandDefinition {
-  DecodedCommandPresentation presentation;
-  DecodeFunction decode = nullptr;
-  ExecuteFunction execute = nullptr;
-};
-
-[[nodiscard]] CommandDefinition command(std::string_view label, SequenceSemantic semantic, DecodeFunction decode,
-                                        ExecuteFunction execute,
-                                        CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
-                                        std::string_view localKind = {}) {
-  const std::string kind = localKind.empty() ? sourceLocalKind(label) : std::string(localKind);
-  return CommandDefinition{
-      .presentation =
-          DecodedCommandPresentation{
-              .label = std::string(label),
-              .localKind = kind,
-              .detailKind = "capcom-snes." + kind,
-              .semantic = semantic,
-              .playback = playback,
-          },
-      .decode = decode,
-      .execute = execute,
-  };
-}
-
-[[nodiscard]] CommandDefinition command(std::string_view label, SequenceSemantic semantic, ExecuteFunction execute,
-                                        CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
-                                        std::string_view localKind = {}) {
-  return command(label, semantic, nullptr, execute, playback, localKind);
-}
-
-[[nodiscard]] CommandDefinition terminalCommand(std::string_view label, SequenceSemantic semantic,
-                                                CommandPlaybackStatus playback, std::string_view localKind = {}) {
-  return command(label, semantic, [](Decode& d) { d.terminate(); }, nullptr, playback, localKind);
-}
-
-[[nodiscard]] CommandDefinition sourceOnlyCommand(std::string_view label, SequenceSemantic semantic,
-                                                  DecodeFunction decode, std::string_view localKind = {}) {
-  return command(label, semantic, decode, nullptr, CommandPlaybackStatus::SourceOnly, localKind);
-}
-
-[[nodiscard]] CommandDefinition noOpCommand(std::string_view label, std::string_view localKind = {}) {
-  return command(label, SequenceSemantic::Meta, nullptr, nullptr, CommandPlaybackStatus::NoOp, localKind);
-}
+using CommandDefinitions = SemanticCommandDefinitions<Decode, Playback>;
+using CommandDefinition = CommandDefinitions::Definition;
+constexpr CommandDefinitions commands{"capcom-snes"};
 
 [[nodiscard]] CommandDefinition unsupportedCommand() {
-  return terminalCommand("Unsupported", SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported,
-                         "unsupported");
+  return commands.terminal("Unsupported", SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported,
+                           "unsupported");
 }
 
 [[nodiscard]] CommandDefinition truncatedCommand() {
-  return terminalCommand("Truncated Command", SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported,
-                         "truncated");
+  return commands.terminal("Truncated Command", SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported,
+                           "truncated");
 }
 
 using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
@@ -399,35 +355,35 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
   ControlCommandProfile profile;
   profile.fill(unsupportedCommand());
 
-  profile[0x00] = command("Toggle Triplet", SequenceSemantic::State, [](Operands, Playback& p) {
+  profile[0x00] = commands.command("Toggle Triplet", SequenceSemantic::State, [](Operands, Playback& p) {
     p.track.noteTriplet = !p.track.noteTriplet;
     return Effects{};
   });
 
-  profile[0x01] = command("Toggle Slur", SequenceSemantic::State, [](Operands, Playback& p) {
+  profile[0x01] = commands.command("Toggle Slur", SequenceSemantic::State, [](Operands, Playback& p) {
     p.track.noteSlurred = !p.track.noteSlurred;
     p.out.legatoPedal(p.track.noteSlurred);
     return Effects{};
   });
 
-  profile[0x02] = command("Dotted Note", SequenceSemantic::State, [](Operands, Playback& p) {
+  profile[0x02] = commands.command("Dotted Note", SequenceSemantic::State, [](Operands, Playback& p) {
     p.track.noteDotted = true;
     return Effects{};
   });
 
-  profile[0x03] = command("Toggle Octave Up", SequenceSemantic::State, [](Operands, Playback& p) {
+  profile[0x03] = commands.command("Toggle Octave Up", SequenceSemantic::State, [](Operands, Playback& p) {
     p.track.noteOctaveUp = !p.track.noteOctaveUp;
     return Effects{};
   });
 
-  profile[0x04] = command(
+  profile[0x04] = commands.command(
       "Note Attributes", SequenceSemantic::State, [](Decode& d) { d.u8("attributes", SourceValueDisplay::Hex); },
       [](Operands a, Playback& p) {
         p.applyAttributes(a.u8("attributes"));
         return Effects{};
       });
 
-  profile[0x05] = command(
+  profile[0x05] = commands.command(
       "Tempo", SequenceSemantic::Tempo,
       [](Decode& d) { d.resolved("microseconds_per_quarter", d.rawU16be("raw"), math::tempoMicrosecondsPerQuarter); },
       [](Operands a, Playback& p) {
@@ -435,14 +391,14 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  profile[0x06] = command(
+  profile[0x06] = commands.command(
       "Duration Rate", SequenceSemantic::State, [](Decode& d) { d.u8("rate"); },
       [](Operands a, Playback& p) {
         p.track.durationRate256ths = a.u8("rate");
         return Effects{};
       });
 
-  profile[0x07] = command(
+  profile[0x07] = commands.command(
       "Volume", SequenceSemantic::Level,
       [](Decode& d) {
         const auto raw = d.rawU8("raw");
@@ -453,7 +409,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  profile[0x08] = command(
+  profile[0x08] = commands.command(
       "Instrument", SequenceSemantic::Instrument,
       [](Decode& d) { d.u8("instrument", SemanticOperandRole::Instrument); },
       [](Operands a, Playback& p) {
@@ -464,28 +420,28 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  profile[0x09] = command(
+  profile[0x09] = commands.command(
       "Octave", SequenceSemantic::State, [](Decode& d) { d.u8("octave"); },
       [](Operands a, Playback& p) {
         p.track.noteOctave = a.u8("octave");
         return Effects{};
       });
 
-  profile[0x0a] = command(
+  profile[0x0a] = commands.command(
       "Global Transpose", SequenceSemantic::Pitch, [](Decode& d) { d.s8("semitones"); },
       [](Operands a, Playback& p) {
         p.out.globalTranspose(a.s8("semitones"));
         return Effects{};
       });
 
-  profile[0x0b] = command(
+  profile[0x0b] = commands.command(
       "Transpose", SequenceSemantic::Pitch, [](Decode& d) { d.s8("semitones"); },
       [](Operands a, Playback& p) {
         p.track.transposeSemitones = a.s8("semitones");
         return Effects{};
       });
 
-  profile[0x0c] = command(
+  profile[0x0c] = commands.command(
       "Tuning", SequenceSemantic::Pitch,
       [](Decode& d) { d.resolved("cents", d.rawS8("tuning"), math::tuningCents, SourceValueDisplay::Cents); },
       [](Operands a, Playback& p) {
@@ -493,7 +449,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  profile[0x0d] = command(
+  profile[0x0d] = commands.command(
       "Portamento Time", SequenceSemantic::Portamento,
       [](Decode& d) { d.resolved("milliseconds_per_cent", d.rawU8("time"), math::portamentoMillisecondsPerCent); },
       [](Operands a, Playback& p) {
@@ -501,7 +457,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  const auto repeatUntil = command(
+  const auto repeatUntil = commands.command(
       "Repeat Until", SequenceSemantic::Repeat,
       [](Decode& d) {
         // Four opcodes select four independent repeat counters. A nonzero
@@ -523,7 +479,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
     profile[opcode] = repeatUntil;
   }
 
-  const auto repeatBreak = command(
+  const auto repeatBreak = commands.command(
       "Repeat Break", SequenceSemantic::RepeatBreak,
       [](Decode& d) {
         d.derived("slot", static_cast<u32>(d.opcode() - 0x12 + 1));
@@ -542,7 +498,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
     profile[opcode] = repeatBreak;
   }
 
-  profile[0x16] = command(
+  profile[0x16] = commands.command(
       "Jump", SequenceSemantic::Jump,
       [](Decode& d) {
         const Address destination = d.address("destination", SemanticOperandRole::JumpTarget);
@@ -551,9 +507,9 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
       [](Operands a, Playback& p) { return Effects{.step = p.vm.loopCandidate(a.address("destination"))}; },
       CommandPlaybackStatus::AffectsControlFlow);
 
-  profile[0x17] = terminalCommand("End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
+  profile[0x17] = commands.terminal("End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
 
-  profile[0x18] = command(
+  profile[0x18] = commands.command(
       "Pan", SequenceSemantic::Pan,
       [](Decode& d) {
         const auto raw = d.rawU8("raw");
@@ -566,7 +522,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  profile[0x19] = command(
+  profile[0x19] = commands.command(
       "Master Volume", SequenceSemantic::Level,
       [](Decode& d) {
         const auto raw = d.rawU8("raw");
@@ -577,7 +533,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  profile[0x1a] = command(
+  profile[0x1a] = commands.command(
       "LFO", SequenceSemantic::Modulation,
       [](Decode& d) {
         const auto parameter = static_cast<LfoParameter>(d.u8("type"));
@@ -641,12 +597,12 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  profile[0x1b] = sourceOnlyCommand("Echo Param", SequenceSemantic::Meta, [](Decode& d) {
+  profile[0x1b] = commands.sourceOnly("Echo Param", [](Decode& d) {
     d.u8("argument", SourceValueDisplay::Hex);
     d.u8("preset", SourceValueDisplay::Hex);
   });
 
-  profile[0x1c] = command(
+  profile[0x1c] = commands.command(
       "Echo On/Off", SequenceSemantic::Meta,
       [](Decode& d) {
         const auto raw = d.rawU8("raw");
@@ -657,12 +613,12 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         return Effects{};
       });
 
-  profile[0x1d] = sourceOnlyCommand("Release Rate", SequenceSemantic::Meta, [](Decode& d) {
+  profile[0x1d] = commands.sourceOnly("Release Rate", [](Decode& d) {
     const auto raw = d.rawU8("raw");
     d.resolvedValue("gain", raw, static_cast<u32>(raw.value | 0xa0), SourceValueDisplay::Hex);
   });
 
-  const auto noOperation = noOpCommand("No Operation", "nop");
+  const auto noOperation = commands.noOp("No Operation", "nop");
   profile[0x1e] = noOperation;
   profile[0x1f] = noOperation;
   return profile;
@@ -671,9 +627,8 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
 [[nodiscard]] ControlCommandProfile makeVersion1Profile() {
   // V1 assigns operands to the two slots that later drivers treat as NOPs.
   auto profile = makeBaseProfile();
-  const auto unknownOneByte = sourceOnlyCommand(
-      "Unknown One-Byte Event", SequenceSemantic::Meta, [](Decode& d) { d.u8("value", SourceValueDisplay::Hex); },
-      "unknown-one-byte");
+  const auto unknownOneByte = commands.sourceOnly(
+      "Unknown One-Byte Event", [](Decode& d) { d.u8("value", SourceValueDisplay::Hex); }, "unknown-one-byte");
   profile[0x1e] = unknownOneByte;
   profile[0x1f] = unknownOneByte;
   return profile;
@@ -682,7 +637,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
 [[nodiscard]] const CommandDefinition& noteCommand() {
   // Notes and rests pack duration into the high three opcode bits. A zero key
   // in the low five bits denotes a rest; other values are notes.
-  static const CommandDefinition definition = command(
+  static const CommandDefinition definition = commands.command(
       "Note", SequenceSemantic::Note,
       [](Decode& d) {
         d.opcodeValue("duration_index", static_cast<u32>(d.opcode() >> 5));
@@ -693,7 +648,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
 }
 
 [[nodiscard]] const CommandDefinition& restCommand() {
-  static const CommandDefinition definition = command(
+  static const CommandDefinition definition = commands.command(
       "Rest", SequenceSemantic::Rest,
       [](Decode& d) { d.opcodeValue("duration_index", static_cast<u32>(d.opcode() >> 5)); },
       [](Operands a, Playback& p) { return p.rest(a.u8("duration_index")); });
@@ -722,9 +677,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
   }
 
   const CommandDefinition& definition = definitionFor(version, decode.opcode());
-  if (definition.decode != nullptr) {
-    definition.decode(decode);
-  }
+  definition.decodeOperands(decode);
   if (!decode.ok()) {
     return decode.finish(truncatedCommand().presentation);
   }

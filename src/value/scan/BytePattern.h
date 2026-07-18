@@ -14,6 +14,18 @@
 
 namespace vgmtrans::core {
 
+[[nodiscard]] inline bool matchesBytes(ByteReader reader, u64 offset, std::string_view bytes) {
+  if (!reader.has(offset, bytes.size())) {
+    return false;
+  }
+  for (size_t index = 0; index < bytes.size(); ++index) {
+    if (reader.u8At(offset + index) != static_cast<u8>(bytes[index])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // 'x' bytes are significant; every other mask character is a wildcard.
 struct MaskedBytePattern {
   std::span<const u8> bytes;

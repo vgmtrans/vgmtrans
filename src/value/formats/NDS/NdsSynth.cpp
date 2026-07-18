@@ -6,6 +6,7 @@
 
 #include "value/formats/NDS/NdsSynth.h"
 
+#include "value/scan/BytePattern.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/synth/SynthMath.h"
 
@@ -40,18 +41,7 @@ constexpr std::array<s16, 128> kDecibelSquareTable = {
 
 constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33, 0x3F, 0x49, 0x54,
                                                  0x5C, 0x64, 0x6D, 0x74, 0x7B, 0x7F, 0x84, 0x89, 0x8F};
-
-[[nodiscard]] bool matches(ByteReader reader, u64 offset, std::string_view signature) {
-  if (!reader.has(offset, signature.size())) {
-    return false;
-  }
-  for (size_t i = 0; i < signature.size(); ++i) {
-    if (reader.u8At(offset + i) != static_cast<u8>(signature[i])) {
-      return false;
-    }
-  }
-  return true;
-}
+constexpr std::array<std::string_view, 8> kDutyNames = {"12.5%", "25%", "37.5%", "50%", "62.5%", "75%", "87.5%", "0%"};
 
 [[nodiscard]] u32 envelopeMicros(double seconds) {
   if (seconds < 0.0 || !std::isfinite(seconds)) {
@@ -209,7 +199,7 @@ void addRegion(std::vector<Region>& regions, std::optional<Region> region) {
 }  // namespace
 
 bool isNdsWaveArchive(ByteReader reader, u32 offset) {
-  return matches(reader, offset, kSwarSignature);
+  return matchesBytes(reader, offset, kSwarSignature);
 }
 
 SampleCollectionAsset parseNdsPsgSamples(const ScanInput& input, AssetId id) {
@@ -282,26 +272,21 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
   }
 
   for (u32 i = 0; i < *sampleCount; ++i) {
-    const auto tableByteOffset = checkedMul(i, 4);
-    const auto entryOffset = tableByteOffset ? checkedAdd(0x3c, *tableByteOffset) : std::nullopt;
-    if (!entryOffset) {
-      break;
-    }
-    const auto sampleRelativeOffset = archive.le32(*entryOffset, "SWAR sample offset");
+    const u64 entryOffset = 0x3c + static_cast<u64>(i) * 4;
+    const auto sampleRelativeOffset = archive.le32(entryOffset, "SWAR sample offset");
     if (!sampleRelativeOffset) {
       break;
     }
-    const auto sampleOffset = checkedAdd(range.offset, *sampleRelativeOffset);
     const auto sampleHeaderRange = archive.range(*sampleRelativeOffset, 0x0c, "SWAR sample header");
-    if (!sampleOffset || !sampleHeaderRange) {
+    if (!sampleHeaderRange) {
       continue;
     }
     SourceAnnotationId samplePointerAnnotation;
     if (sourceMap != nullptr) {
-      auto pointer = sourceMap
-          ->pointer("SWAR Sample Offset", sampleRelativeOffset.range, SourceTarget{*sampleHeaderRange})
-          .kind("swar-sample-offset")
-          .derived("sample_index", i);
+      auto pointer =
+          sourceMap->pointer("SWAR Sample Offset", sampleRelativeOffset.range, SourceTarget{*sampleHeaderRange})
+              .kind("swar-sample-offset")
+              .derived("sample_index", i);
       if (sampleTableAnnotation.valid()) {
         pointer.parent(sampleTableAnnotation);
       }
@@ -383,7 +368,7 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
       continue;
     }
     const auto dataRange = archive.range(*dataStartRelative, dataLength, "SWAR sample data");
-    if (!dataRange || dataRange->endOffset() < *sampleOffset) {
+    if (!dataRange) {
       continue;
     }
 
@@ -396,12 +381,12 @@ SampleCollectionAsset parseNdsWaveArchive(const ScanInput& input, AssetId id, Nd
     const std::string sampleName = fmt::format("Sample {}", asset.samples.samples.size());
     if (sourceMap != nullptr) {
       auto header = sourceMap->header(sampleName + " Header", *sampleHeaderRange)
-          .role(SourceRole::Sample)
-          .kind("swar-sample-header")
-          .owner(ObjectRefs::sample(id, sampleIndex))
-          .field("wave_type", waveType, SourceValueDisplay::Hex)
-          .field("loop_flag", loopFlag.range, loops, SourceValueDisplay::Boolean)
-          .field("sample_rate", rawSampleRate.range, sampleRate);
+                        .role(SourceRole::Sample)
+                        .kind("swar-sample-header")
+                        .owner(ObjectRefs::sample(id, sampleIndex))
+                        .field("wave_type", waveType, SourceValueDisplay::Hex)
+                        .field("loop_flag", loopFlag.range, loops, SourceValueDisplay::Boolean)
+                        .field("sample_rate", rawSampleRate.range, sampleRate);
       if (samplePointerAnnotation.valid()) {
         header.parent(samplePointerAnnotation);
       }
@@ -442,11 +427,11 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
 
   const u32 instrumentCount = input.reader.le32(range.offset + 0x38);
   const u64 instrumentTableSize = 4 + static_cast<u64>(instrumentCount) * 4;
-  auto pointerTable = builder.sourceMap()
-                          .table("SBNK Instrument Pointer Table",
-                                 input.reader.range(range.offset + 0x38, instrumentTableSize))
-                          .kind("sbnk-instrument-pointer-table")
-                          .field("instrument_count", input.reader.range(range.offset + 0x38, 4), instrumentCount);
+  auto pointerTable =
+      builder.sourceMap()
+          .table("SBNK Instrument Pointer Table", input.reader.range(range.offset + 0x38, instrumentTableSize))
+          .kind("sbnk-instrument-pointer-table")
+          .field("instrument_count", input.reader.range(range.offset + 0x38, 4), instrumentCount);
   for (u32 i = 0; i < instrumentCount; ++i) {
     const u32 pointerOffset = range.offset + 0x3c + i * 4;
     if (!input.reader.has(pointerOffset, 4)) {
@@ -475,40 +460,31 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
     };
 
     switch (instrumentType) {
-      case 0x01: {
-        if (!input.reader.has(instrumentOffset, 10)) {
-          break;
-        }
-        instrument.name = "Single-Region Instrument";
-        instrument.range = input.reader.range(instrumentOffset, 10);
-        const u16 sampleIndex = input.reader.le16(instrumentOffset);
-        const u16 collectionIndex = input.reader.le16(instrumentOffset + 2);
-        addRegion(instrument.regions,
-                  ndsRegion(input.reader, instrumentOffset, 10,
-                            builder.sampleRef(bankWaveCollection(waveCollections, collectionIndex), sampleIndex)));
-        break;
-      }
-      case 0x02: {
-        if (!input.reader.has(instrumentOffset, 10)) {
-          break;
-        }
-        const u8 dutyCycle = input.reader.u8At(instrumentOffset) & 0x07;
-        constexpr std::array<std::string_view, 8> dutyNames = {"12.5%", "25%", "37.5%", "50%",
-                                                               "62.5%", "75%", "87.5%", "0%"};
-        instrument.name = "PSG Wave (" + std::string(dutyNames[dutyCycle]) + ")";
-        instrument.range = input.reader.range(instrumentOffset, 10);
-        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10,
-                                                builder.sampleRef(psgCollection, dutyCycle), 0, 127, 69));
-        break;
-      }
+      case 0x01:
+      case 0x02:
       case 0x03: {
         if (!input.reader.has(instrumentOffset, 10)) {
           break;
         }
-        instrument.name = "PSG Noise";
         instrument.range = input.reader.range(instrumentOffset, 10);
-        addRegion(instrument.regions,
-                  ndsRegion(input.reader, instrumentOffset, 10, builder.sampleRef(psgCollection, 8), 0, 127, 45));
+        SampleRef sample;
+        std::optional<u8> forcedRootKey;
+        if (instrumentType == 0x01) {
+          instrument.name = "Single-Region Instrument";
+          const u16 sampleIndex = input.reader.le16(instrumentOffset);
+          const u16 collectionIndex = input.reader.le16(instrumentOffset + 2);
+          sample = builder.sampleRef(bankWaveCollection(waveCollections, collectionIndex), sampleIndex);
+        } else if (instrumentType == 0x02) {
+          const u8 dutyCycle = input.reader.u8At(instrumentOffset) & 0x07;
+          instrument.name = "PSG Wave (" + std::string(kDutyNames[dutyCycle]) + ")";
+          sample = builder.sampleRef(psgCollection, dutyCycle);
+          forcedRootKey = 69;
+        } else {
+          instrument.name = "PSG Noise";
+          sample = builder.sampleRef(psgCollection, 8);
+          forcedRootKey = 45;
+        }
+        addRegion(instrument.regions, ndsRegion(input.reader, instrumentOffset, 10, sample, 0, 127, forcedRootKey));
         break;
       }
       case 0x10: {
@@ -585,8 +561,6 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
           annotation.link(SourceLinkRole::UsesSample,
                           SourceTarget{ObjectRefs::sample(*region.sample.collection, region.sample.index)});
         }
-      }
-      for (const auto& region : instrument.regions) {
         auto regionAnnotation = builder.sourceMap()
                                     .annotation(SourceRole::Region, "Region", region.range)
                                     .kind("region")

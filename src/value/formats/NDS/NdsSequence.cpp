@@ -32,8 +32,6 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaxTrackCommands = 262144;
-constexpr std::string_view kSseqSignature{"SSEQ\xff\xfe\x00\x01", 8};
-constexpr u32 kSseqFileSizeOffset = 0x08;
 constexpr u32 kSseqDataOffsetField = 0x18;
 constexpr u32 kSseqHeaderSize = 0x1c;
 
@@ -105,52 +103,9 @@ private:
   u32 sequenceEnd_ = 0;
 };
 
-using DecodeFunction = void (*)(Decode&);
-using ExecuteFunction = Effects (*)(Operands, Playback&);
-
-struct CommandDefinition {
-  DecodedCommandPresentation presentation;
-  DecodeFunction decode = nullptr;
-  ExecuteFunction execute = nullptr;
-  u8 opaqueOperandBytes = 0;
-};
-
-[[nodiscard]] CommandDefinition command(std::string_view label, SequenceSemantic semantic, DecodeFunction decode,
-                                        ExecuteFunction execute,
-                                        CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
-                                        std::string_view localKind = {}) {
-  const std::string kind = localKind.empty() ? sourceLocalKind(label) : std::string(localKind);
-  return CommandDefinition{
-      .presentation =
-          DecodedCommandPresentation{
-              .label = std::string(label),
-              .localKind = kind,
-              .detailKind = "nds." + kind,
-              .semantic = semantic,
-              .playback = playback,
-          },
-      .decode = decode,
-      .execute = execute,
-  };
-}
-
-[[nodiscard]] CommandDefinition sourceOnlyCommand(std::string_view label, DecodeFunction decode,
-                                                  std::string_view localKind = {}) {
-  return command(label, SequenceSemantic::Meta, decode, nullptr, CommandPlaybackStatus::SourceOnly, localKind);
-}
-
-[[nodiscard]] CommandDefinition opaqueCommand(std::string_view label, u8 operandBytes,
-                                              std::string_view localKind = {}) {
-  auto definition = sourceOnlyCommand(label, nullptr, localKind);
-  definition.opaqueOperandBytes = operandBytes;
-  return definition;
-}
-
-[[nodiscard]] CommandDefinition terminalCommand(std::string_view label, SequenceSemantic semantic,
-                                                DecodeFunction decode, CommandPlaybackStatus playback,
-                                                std::string_view localKind = {}) {
-  return command(label, semantic, decode, nullptr, playback, localKind);
-}
+using CommandDefinitions = SemanticCommandDefinitions<Decode, Playback>;
+using CommandDefinition = CommandDefinitions::Definition;
+constexpr CommandDefinitions commands{"nds"};
 
 using CommandProfile = std::array<CommandDefinition, 0x80>;
 
@@ -158,60 +113,60 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
 // entries are intentionally source-only: VGMTrans preserves their bytes and
 // names without pretending to emulate NDS variables or conditionals.
 [[nodiscard]] CommandProfile makeProfile() {
-  const auto unknown = terminalCommand(
+  const auto unknown = commands.command(
       "Unknown Opcode", SequenceSemantic::Unsupported,
       [](Decode& d) {
         d.warning("Unknown NDS SSEQ opcode stopped playback");
         d.terminate();
       },
-      CommandPlaybackStatus::Unsupported, "unknown");
+      nullptr, CommandPlaybackStatus::Unsupported, "unknown");
   CommandProfile profile;
   profile.fill(unknown);
 
-  profile[0x93 - 0x80] = sourceOnlyCommand("Open Track", [](Decode& d) {
+  profile[0x93 - 0x80] = commands.sourceOnly("Open Track", [](Decode& d) {
     d.u8("track");
     static_cast<void>(d.targetAddress("destination", SemanticOperandRole::Address));
   });
-  profile[0xa0 - 0x80] = opaqueCommand("Cmd with Random Value", 5, "random-value");
-  profile[0xa1 - 0x80] = opaqueCommand("Cmd with Variable", 2, "variable-command");
-  profile[0xa2 - 0x80] = opaqueCommand("If", 0);
-  profile[0xb0 - 0x80] = opaqueCommand("Set Variable", 3);
-  profile[0xb1 - 0x80] = opaqueCommand("Add Variable", 3);
-  profile[0xb2 - 0x80] = opaqueCommand("Sub Variable", 3);
-  profile[0xb3 - 0x80] = opaqueCommand("Mul Variable", 3);
-  profile[0xb4 - 0x80] = opaqueCommand("Div Variable", 3);
-  profile[0xb5 - 0x80] = opaqueCommand("Shift Variable", 3);
-  profile[0xb6 - 0x80] = opaqueCommand("Rand Variable", 3);
-  profile[0xb8 - 0x80] = opaqueCommand("If Variable ==", 3, "if-variable-equal");
-  profile[0xb9 - 0x80] = opaqueCommand("If Variable >=", 3, "if-variable-greater-equal");
-  profile[0xba - 0x80] = opaqueCommand("If Variable >", 3, "if-variable-greater");
-  profile[0xbb - 0x80] = opaqueCommand("If Variable <=", 3, "if-variable-less-equal");
-  profile[0xbc - 0x80] = opaqueCommand("If Variable <", 3, "if-variable-less");
-  profile[0xbd - 0x80] = opaqueCommand("If Variable !=", 3, "if-variable-not-equal");
-  profile[0xc2 - 0x80] = opaqueCommand("Master Volume", 1);
-  profile[0xc6 - 0x80] = opaqueCommand("Priority", 1);
-  profile[0xc8 - 0x80] = opaqueCommand("Tie", 1);
-  profile[0xc9 - 0x80] = opaqueCommand("Portamento Control", 1);
-  profile[0xcb - 0x80] = opaqueCommand("Modulation Speed", 1);
-  profile[0xcc - 0x80] = opaqueCommand("Modulation Type", 1);
-  profile[0xcd - 0x80] = opaqueCommand("Modulation Range", 1);
-  profile[0xd0 - 0x80] = opaqueCommand("Attack Rate", 1);
-  profile[0xd1 - 0x80] = opaqueCommand("Decay Rate", 1);
-  profile[0xd2 - 0x80] = opaqueCommand("Sustain Level", 1);
-  profile[0xd3 - 0x80] = opaqueCommand("Release Rate", 1);
-  profile[0xd4 - 0x80] = opaqueCommand("Loop Start", 1);
-  profile[0xd6 - 0x80] = opaqueCommand("Print Variable", 1);
-  profile[0xe0 - 0x80] = opaqueCommand("Modulation Delay", 2);
-  profile[0xe3 - 0x80] = opaqueCommand("Sweep Pitch", 2);
-  profile[0xfc - 0x80] = opaqueCommand("Loop End", 0);
-  profile[0xfe - 0x80] = sourceOnlyCommand("Allocate Track", [](Decode& d) { d.u16le("track_mask"); });
+  profile[0xa0 - 0x80] = commands.opaque("Cmd with Random Value", 5, "random-value");
+  profile[0xa1 - 0x80] = commands.opaque("Cmd with Variable", 2, "variable-command");
+  profile[0xa2 - 0x80] = commands.opaque("If", 0);
+  profile[0xb0 - 0x80] = commands.opaque("Set Variable", 3);
+  profile[0xb1 - 0x80] = commands.opaque("Add Variable", 3);
+  profile[0xb2 - 0x80] = commands.opaque("Sub Variable", 3);
+  profile[0xb3 - 0x80] = commands.opaque("Mul Variable", 3);
+  profile[0xb4 - 0x80] = commands.opaque("Div Variable", 3);
+  profile[0xb5 - 0x80] = commands.opaque("Shift Variable", 3);
+  profile[0xb6 - 0x80] = commands.opaque("Rand Variable", 3);
+  profile[0xb8 - 0x80] = commands.opaque("If Variable ==", 3, "if-variable-equal");
+  profile[0xb9 - 0x80] = commands.opaque("If Variable >=", 3, "if-variable-greater-equal");
+  profile[0xba - 0x80] = commands.opaque("If Variable >", 3, "if-variable-greater");
+  profile[0xbb - 0x80] = commands.opaque("If Variable <=", 3, "if-variable-less-equal");
+  profile[0xbc - 0x80] = commands.opaque("If Variable <", 3, "if-variable-less");
+  profile[0xbd - 0x80] = commands.opaque("If Variable !=", 3, "if-variable-not-equal");
+  profile[0xc2 - 0x80] = commands.opaque("Master Volume", 1);
+  profile[0xc6 - 0x80] = commands.opaque("Priority", 1);
+  profile[0xc8 - 0x80] = commands.opaque("Tie", 1);
+  profile[0xc9 - 0x80] = commands.opaque("Portamento Control", 1);
+  profile[0xcb - 0x80] = commands.opaque("Modulation Speed", 1);
+  profile[0xcc - 0x80] = commands.opaque("Modulation Type", 1);
+  profile[0xcd - 0x80] = commands.opaque("Modulation Range", 1);
+  profile[0xd0 - 0x80] = commands.opaque("Attack Rate", 1);
+  profile[0xd1 - 0x80] = commands.opaque("Decay Rate", 1);
+  profile[0xd2 - 0x80] = commands.opaque("Sustain Level", 1);
+  profile[0xd3 - 0x80] = commands.opaque("Release Rate", 1);
+  profile[0xd4 - 0x80] = commands.opaque("Loop Start", 1);
+  profile[0xd6 - 0x80] = commands.opaque("Print Variable", 1);
+  profile[0xe0 - 0x80] = commands.opaque("Modulation Delay", 2);
+  profile[0xe3 - 0x80] = commands.opaque("Sweep Pitch", 2);
+  profile[0xfc - 0x80] = commands.opaque("Loop End", 0);
+  profile[0xfe - 0x80] = commands.sourceOnly("Allocate Track", [](Decode& d) { d.u16le("track_mask"); });
 
-  profile[0x80 - 0x80] = command(
+  profile[0x80 - 0x80] = commands.command(
       "Rest", SequenceSemantic::Rest,
       [](Decode& d) { d.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration); },
       [](Operands a, Playback&) { return Effects::wait(a.u32("duration")); });
 
-  profile[0x81 - 0x80] = command(
+  profile[0x81 - 0x80] = commands.command(
       "Program", SequenceSemantic::Program,
       [](Decode& d) {
         const u32 raw = d.varLen("raw");
@@ -223,7 +178,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0x94 - 0x80] = command(
+  profile[0x94 - 0x80] = commands.command(
       "Jump", SequenceSemantic::Jump,
       [](Decode& d) {
         if (const auto destination =
@@ -234,7 +189,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
       [](Operands a, Playback& p) { return Effects{.step = p.vm.jump(a.address("destination"))}; },
       CommandPlaybackStatus::AffectsControlFlow);
 
-  profile[0x95 - 0x80] = command(
+  profile[0x95 - 0x80] = commands.command(
       "Call", SequenceSemantic::Call,
       [](Decode& d) {
         if (const auto destination =
@@ -245,15 +200,15 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
       [](Operands a, Playback& p) { return Effects{.step = p.vm.call(a.address("destination"))}; },
       CommandPlaybackStatus::AffectsControlFlow);
 
-  profile[0x96 - 0x80] = terminalCommand(
+  profile[0x96 - 0x80] = commands.command(
       "Unsupported Command", SequenceSemantic::Unsupported,
       [](Decode& d) {
         d.warning("Unsupported NDS SSEQ command stopped playback");
         d.terminate();
       },
-      CommandPlaybackStatus::Unsupported, "unsupported");
+      nullptr, CommandPlaybackStatus::Unsupported, "unsupported");
 
-  profile[0xc0 - 0x80] = command(
+  profile[0xc0 - 0x80] = commands.command(
       "Pan", SequenceSemantic::Pan,
       [](Decode& d) {
         d.resolved("position", d.rawU8("pan"),
@@ -264,7 +219,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xc1 - 0x80] = command(
+  profile[0xc1 - 0x80] = commands.command(
       "Volume", SequenceSemantic::Level,
       [](Decode& d) { d.resolved("linear_gain", d.rawU8("volume"), LevelScale::linearFromMidi7); },
       [](Operands a, Playback& p) {
@@ -272,14 +227,14 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xc3 - 0x80] = command(
+  profile[0xc3 - 0x80] = commands.command(
       "Transpose", SequenceSemantic::State, [](Decode& d) { d.s8("semitones"); },
       [](Operands a, Playback& p) {
         p.track.transpose = a.s8("semitones");
         return Effects{};
       });
 
-  profile[0xc4 - 0x80] = command(
+  profile[0xc4 - 0x80] = commands.command(
       "Pitch Bend", SequenceSemantic::Pitch,
       [](Decode& d) { d.resolved("fraction", d.rawS8("bend"), [](s8 bend) { return bend / 128.0; }); },
       [](Operands a, Playback& p) {
@@ -287,7 +242,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xc5 - 0x80] = command(
+  profile[0xc5 - 0x80] = commands.command(
       "Pitch Bend Range", SequenceSemantic::Pitch, [](Decode& d) { d.u8("semitones"); },
       [](Operands a, Playback& p) {
         p.track.pitchBendRangeSemitones = a.u8("semitones");
@@ -295,7 +250,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xc7 - 0x80] = command(
+  profile[0xc7 - 0x80] = commands.command(
       "Note Wait", SequenceSemantic::State,
       [](Decode& d) {
         const auto raw = d.rawU8("raw");
@@ -306,7 +261,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xca - 0x80] = command(
+  profile[0xca - 0x80] = commands.command(
       "Modulation Depth", SequenceSemantic::Modulation,
       [](Decode& d) {
         d.resolved("amount", d.rawU8("depth"),
@@ -317,7 +272,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xce - 0x80] = command(
+  profile[0xce - 0x80] = commands.command(
       "Portamento", SequenceSemantic::Portamento,
       [](Decode& d) {
         const auto raw = d.rawU8("raw");
@@ -328,7 +283,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xcf - 0x80] = command(
+  profile[0xcf - 0x80] = commands.command(
       "Portamento Time", SequenceSemantic::Portamento,
       [](Decode& d) { d.resolved("milliseconds", d.rawU8("time"), [](u8 time) { return static_cast<double>(time); }); },
       [](Operands a, Playback& p) {
@@ -336,7 +291,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xd5 - 0x80] = command(
+  profile[0xd5 - 0x80] = commands.command(
       "Expression", SequenceSemantic::Level,
       [](Decode& d) { d.resolved("linear_gain", d.rawU8("expression"), LevelScale::linearFromMidi7); },
       [](Operands a, Playback& p) {
@@ -344,7 +299,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xe1 - 0x80] = command(
+  profile[0xe1 - 0x80] = commands.command(
       "Tempo", SequenceSemantic::Tempo,
       [](Decode& d) {
         const auto bpm = d.rawU16le("bpm");
@@ -359,18 +314,17 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
         return Effects{};
       });
 
-  profile[0xfd - 0x80] = command(
+  profile[0xfd - 0x80] = commands.command(
       "Return", SequenceSemantic::Return, [](Decode& d) { d.return_(); },
       [](Operands, Playback& p) { return Effects{.step = p.vm.return_()}; }, CommandPlaybackStatus::AffectsControlFlow);
 
-  profile[0xff - 0x80] = terminalCommand(
-      "End", SequenceSemantic::End, [](Decode& d) { d.terminate(); }, CommandPlaybackStatus::StopsPlayback);
+  profile[0xff - 0x80] = commands.terminal("End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
 
   return profile;
 }
 
 [[nodiscard]] const CommandDefinition& noteCommand() {
-  static const CommandDefinition definition = command(
+  static const CommandDefinition definition = commands.command(
       "Note", SequenceSemantic::Note,
       [](Decode& d) {
         d.opcodeValue("key", d.opcode(), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
@@ -390,8 +344,8 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
 }
 
 [[nodiscard]] CommandDefinition truncatedCommand() {
-  return terminalCommand("Truncated Command", SequenceSemantic::Unsupported, nullptr,
-                         CommandPlaybackStatus::Unsupported, "truncated");
+  return commands.terminal("Truncated Command", SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported,
+                           "truncated");
 }
 
 // Decode is the only place that reads command bytes. Execution later selects
@@ -404,11 +358,7 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
   }
 
   const CommandDefinition& definition = definitionFor(decode.opcode());
-  if (definition.decode != nullptr) {
-    definition.decode(decode);
-  } else if (definition.opaqueOperandBytes != 0) {
-    static_cast<void>(decode.rawBytes("bytes", definition.opaqueOperandBytes));
-  }
+  definition.decodeOperands(decode);
   if (!decode.ok()) {
     return decode.finish(truncatedCommand().presentation);
   }
@@ -446,29 +396,16 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
   };
 }
 
-[[nodiscard]] TrackProgram makeTrack(u32 startOffset, u32 trackIndex) {
-  return TrackProgram{
-      .id = TrackId{trackIndex},
-      .sourceTrackNumber = trackIndex,
-      .startAddress = Address{startOffset},
-  };
-}
-
 [[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(ByteReader reader, u32 offset) {
-  const SourceRange range = reader.range(offset, reader.has(offset, 1) ? 1 : 0);
   return DecodedBytecodeCommand{
-      .range = range,
-      .opcode = range.size == 0 ? u8{0} : reader.u8At(offset),
-      .encodedSize = std::max<u32>(1, range.size),
+      .range = reader.range(offset, 1),
+      .opcode = reader.u8At(offset),
+      .encodedSize = 1,
       .flow = DecodeFlow::terminalFlow(),
-      .presentation =
-          DecodedCommandPresentation{
-              .label = "Recovery Stop",
-              .localKind = "recovery-stop",
-              .detailKind = "nds.recovery-stop",
-              .semantic = SequenceSemantic::Unsupported,
-              .playback = CommandPlaybackStatus::StopsPlayback,
-          },
+      .presentation = commands
+                          .terminal("Recovery Stop", SequenceSemantic::Unsupported,
+                                    CommandPlaybackStatus::StopsPlayback, "recovery-stop")
+                          .presentation,
       .retainBytes = false,
   };
 }
@@ -477,7 +414,11 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
 // exceptional walker keeps the normal semantic command decoder, adding only
 // the overlap stop needed to avoid swallowing the subroutine's first byte.
 [[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(ByteReader reader, TrackDecodeInput input) {
-  TrackProgram track = makeTrack(input.startOffset, input.trackIndex);
+  TrackProgram track{
+      .id = TrackId{input.trackIndex},
+      .sourceTrackNumber = input.trackIndex,
+      .startAddress = Address{input.startOffset},
+  };
   TrackProgramBuilder builder{track};
   const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
   std::set<u32> decodedOffsets;
@@ -546,64 +487,11 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
   return track;
 }
 
-[[nodiscard]] bool matches(ByteReader reader, u64 offset, std::string_view signature) {
-  if (!reader.has(offset, signature.size())) {
-    return false;
-  }
-  for (size_t i = 0; i < signature.size(); ++i) {
-    if (reader.u8At(offset + i) != static_cast<u8>(signature[i])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-[[nodiscard]] std::optional<u32> nearbySseqHeader(ByteReader reader, u32 offset, u32 size) {
-  constexpr u32 kMaxPaddingBeforeSseq = 0x200;
-  const u64 searchEnd = std::min<u64>(reader.size(), static_cast<u64>(offset) + size + kMaxPaddingBeforeSseq);
-  for (u64 candidate = offset + 1; candidate + kSseqSignature.size() <= searchEnd; ++candidate) {
-    if (matches(reader, candidate, kSseqSignature)) {
-      return static_cast<u32>(candidate);
-    }
-  }
-  return std::nullopt;
-}
-
-[[nodiscard]] bool isZeroFilled(ByteReader reader, u32 begin, u32 end) {
-  for (u32 offset = begin; offset < end && reader.has(offset, 1); ++offset) {
-    if (reader.u8At(offset) != 0) {
-      return false;
-    }
-  }
-  return true;
-}
-
-[[nodiscard]] std::optional<u32> recoveredMalformedSdatSequenceOffset(ByteReader reader, u32 offset, u32 size) {
-  const auto sseqOffset = nearbySseqHeader(reader, offset, size);
-  if (!sseqOffset) {
-    return std::nullopt;
-  }
-
-  const u32 trackAddress = offset + kSseqHeaderSize;
-  const u32 paddingEnd = std::min(*sseqOffset, offset + size);
-  // Some zero-filled pseudo-sequences overlap a later SSEQ. If the padding
-  // would align the SSEQ signature as bogus note data, leave it empty.
-  if (size <= 0x100 && *sseqOffset >= trackAddress && isZeroFilled(reader, offset, paddingEnd) &&
-      ((*sseqOffset - trackAddress) % 3) == 2) {
-    return std::nullopt;
-  }
-  return sseqOffset;
-}
-
 }  // namespace
 
 const SequenceDialect& ndsSequenceDialect() {
   static const SequenceDialect dialect = makeDialect();
   return dialect;
-}
-
-void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
-  registry.add(ndsSequenceDialect());
 }
 
 TrackProgram decodeNdsSequenceTrack(ByteReader reader, TrackDecodeInput input, bool recoverMalformedSdatRange) {
@@ -678,43 +566,11 @@ std::vector<u32> ndsSequenceTrackAddresses(ByteReader reader, u32 sequenceOffset
   return trackAddresses;
 }
 
-NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 size) {
-  const bool hasSseqHeader = matches(reader, offset, kSseqSignature);
-  const u32 fatEnd = static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + size));
-  const std::optional<u32> recoveredSequenceOffset =
-      hasSseqHeader ? std::nullopt : recoveredMalformedSdatSequenceOffset(reader, offset, size);
-  const bool recoverMalformedSdatRange = recoveredSequenceOffset.has_value();
-  const bool zeroFilled = !hasSseqHeader && !recoverMalformedSdatRange && isZeroFilled(reader, offset, fatEnd);
-  const u32 decodeOffset = recoveredSequenceOffset.value_or(offset);
-  const u32 recoveredEnd = recoveredSequenceOffset && reader.has(*recoveredSequenceOffset + kSseqFileSizeOffset, 4)
-                               ? static_cast<u32>(std::min<u64>(
-                                     reader.size(), static_cast<u64>(*recoveredSequenceOffset) +
-                                                        reader.le32(*recoveredSequenceOffset + kSseqFileSizeOffset)))
-                               : static_cast<u32>(reader.size());
-  const u32 emptySequenceEnd =
-      static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + kSseqHeaderSize));
-
-  u32 sequenceEnd = fatEnd;
-  if (zeroFilled) {
-    sequenceEnd = emptySequenceEnd;
-  } else if (recoverMalformedSdatRange) {
-    sequenceEnd = recoveredEnd;
-  }
-
-  return NdsSequenceRange{
-      .offset = offset,
-      .decodeOffset = decodeOffset,
-      .size = size,
-      .sequenceEnd = sequenceEnd,
-      .recoverMalformedSdatRange = recoverMalformedSdatRange,
-  };
-}
-
 SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
                                              const std::string& name, SourceMapBuilder* sourceMap,
                                              std::vector<Diagnostic>* diagnostics) {
   const SequenceDialect& dialect = ndsSequenceDialect();
-  const u32 sequenceOffset = range.decodeOffset != 0 ? range.decodeOffset : range.offset;
+  const u32 sequenceOffset = range.offset;
   const SourceRange sequenceRange = input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset);
   SequenceProgramAsset asset{
       .metadata =
