@@ -614,8 +614,10 @@ void capcomSnesSemanticAndPerformanceSnapshotsAreStable() {
                                                "3003:8:2,instrument=0,flow=0->3005|"
                                                "3005:7:2,linear_gain=0.403921569<64>,flow=0->3007|"
                                                "3007:24:2,left_gain=0.6328125<0>,right_gain=0.6328125,flow=0->3009|"
-                                               "3009:26:3,type=0,value=32,flow=0->300C|"
-                                               "300C:26:3,type=2,value=32,flow=0->300F|"
+                                               "3009:26:3,type=0,amount=0.251968504<32>,"
+                                               "pitch_depth_semitones=3,flow=0->300C|"
+                                               "300C:26:3,type=2,enabled=true<32>,amount=0.625441449,"
+                                               "frequency_hz=1.953125,flow=0->300F|"
                                                "300F:65:1,duration_index=2,key_index=1,flow=0->3010|"
                                                "3010:23:1,flow=4";
   expect(decoded == expectedDecoded, "CapcomSnes decoded-command golden changed:\n" + decoded);
@@ -633,6 +635,93 @@ void capcomSnesSemanticAndPerformanceSnapshotsAreStable() {
       "level@0=0.403921569/q256|balance@0=0.6328125,0.6328125|mod@0:0=0|mod@0:0=0.251968504|"
       "mod@0:1=0.625441449|mod@0:3=0.625441449|note@0=0/6";
   expect(performance == expectedPerformance, "CapcomSnes neutral-performance golden changed:\n" + performance);
+}
+
+void capcomSnesLfoValuesAreResolvedDuringDecode() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x1a;
+  bytes[0x3001] = 0x00;
+  bytes[0x3002] = 0xa0;
+  bytes[0x3003] = 0x1a;
+  bytes[0x3004] = 0x01;
+  bytes[0x3005] = 0x40;
+  bytes[0x3006] = 0x1a;
+  bytes[0x3007] = 0x02;
+  bytes[0x3008] = 0x20;
+  bytes[0x3009] = 0x17;
+
+  constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version, 0, 0x3000);
+  expect(track.commands.size() == 4, "CapcomSnes LFO fixture should decode three parameters and end");
+
+  const SemanticOperand* vibratoAmount = semanticOperand(track.commands[0], "amount");
+  const SemanticOperand* vibratoDepth = semanticOperand(track.commands[0], "pitch_depth_semitones");
+  expect(vibratoAmount != nullptr && std::get<double>(vibratoAmount->value) == 32.0 / 127.0 &&
+             vibratoAmount->encodedName == "value" && vibratoAmount->encodedValue &&
+             std::get<u64>(*vibratoAmount->encodedValue) == 0xa0 && vibratoDepth != nullptr &&
+             std::get<double>(vibratoDepth->value) == 3.0,
+         "CapcomSnes vibrato decode should retain raw depth while resolving playback amount and pitch range");
+
+  const SemanticOperand* tremoloAmount = semanticOperand(track.commands[1], "amount");
+  expect(tremoloAmount != nullptr && std::get<double>(tremoloAmount->value) > 0.0 &&
+             tremoloAmount->encodedName == "value" && tremoloAmount->encodedValue &&
+             std::get<u64>(*tremoloAmount->encodedValue) == 0x40,
+         "CapcomSnes tremolo decode should resolve its playback amount before execution");
+
+  const TrackProgram version1Track =
+      decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), CapcomSnesEngineVersion::v1BgmInList, 0, 0x3000);
+  const SemanticOperand* version1TremoloAmount = semanticOperand(version1Track.commands[1], "amount");
+  expect(version1TremoloAmount != nullptr &&
+             std::get<double>(version1TremoloAmount->value) != std::get<double>(tremoloAmount->value),
+         "CapcomSnes tremolo should resolve version-dependent driver math during decode");
+
+  const SemanticOperand* enabled = semanticOperand(track.commands[2], "enabled");
+  const SemanticOperand* rateAmount = semanticOperand(track.commands[2], "amount");
+  const SemanticOperand* frequency = semanticOperand(track.commands[2], "frequency_hz");
+  expect(enabled != nullptr && std::get<bool>(enabled->value) && enabled->encodedName == "value" &&
+             enabled->encodedValue && std::get<u64>(*enabled->encodedValue) == 0x20 && rateAmount != nullptr &&
+             frequency != nullptr && std::get<double>(frequency->value) == 1.953125,
+         "CapcomSnes LFO rate decode should resolve enable state, normalized amount, and physical frequency");
+
+  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const auto emittedTremolo = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    return modulation != nullptr && modulation->target == ModulationPerformanceTarget::TremoloDepth &&
+           modulation->amount > 0.0;
+  });
+  expect(performance.diagnostics.empty() && emittedTremolo != performance.tracks[0].events.end() &&
+             std::get<ModulationPerformanceEvent>(*emittedTremolo).amount == std::get<double>(tremoloAmount->value),
+         "CapcomSnes playback should emit the tremolo amount already resolved by decode");
+}
+
+void capcomSnesRejectsMissingEngineProfile() {
+  std::vector<u8> bytes(0x4000);
+  bytes[0x3000] = 0x41;
+  bytes[0x3001] = 0x17;
+
+  constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
+  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version, 0, 0x3000);
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  bool rejected = false;
+  try {
+    static_cast<void>(SequenceVm().render(program, dialect));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  expect(rejected, "CapcomSnes playback should reject a sequence program without an engine profile");
 }
 
 void capcomSnesModuleScansSpcThroughVirtualAramSource() {

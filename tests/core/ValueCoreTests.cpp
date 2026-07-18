@@ -17,6 +17,8 @@ void runValueSynthExportTests();
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void capcomSnesSemanticAndPerformanceSnapshotsAreStable();
+void capcomSnesLfoValuesAreResolvedDuringDecode();
+void capcomSnesRejectsMissingEngineProfile();
 void capcomSnesModuleScansSpcThroughVirtualAramSource();
 void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
 void capcomSnesNoteStateCommandsAreTypedAndInterpreted();
@@ -79,6 +81,8 @@ int main() {
 
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
     capcomSnesSemanticAndPerformanceSnapshotsAreStable();
+    capcomSnesLfoValuesAreResolvedDuringDecode();
+    capcomSnesRejectsMissingEngineProfile();
     capcomSnesModuleScansSpcThroughVirtualAramSource();
     capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
     capcomSnesNoteStateCommandsAreTypedAndInterpreted();
