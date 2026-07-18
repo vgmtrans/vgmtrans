@@ -9,6 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatDefinition.h"
 #include "value/scan/ScanResultBuilder.h"
+#include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/SequenceDialect.h"
 
 #include <optional>
@@ -74,11 +75,8 @@ struct CapcomSnesInstrumentInfo {
 
 [[nodiscard]] const core::SequenceDialect& capcomSnesSequenceDialect();
 
-[[nodiscard]] core::TrackProgram decodeCapcomSnesSourceTrack(
-    core::ByteReader reader, CapcomSnesEngineVersion version, u32 sourceTrackNumber, u32 startAddress,
-    core::SourceMapBuilder* sourceMap = nullptr, std::vector<core::Diagnostic>* diagnostics = nullptr,
-    std::optional<core::SourceAnnotationId> parent = std::nullopt,
-    std::optional<core::AssetId> sequenceAsset = std::nullopt);
+[[nodiscard]] core::TrackProgram decodeCapcomSnesSourceTrack(core::ByteReader reader, CapcomSnesEngineVersion version,
+                                                             core::TrackDecodeInput input);
 
 [[nodiscard]] core::SequenceProgram decodeCapcomSnesSequence(core::ByteReader reader, const CapcomSnesLayout& layout,
                                                              core::AssetId sequenceId, core::SourceRange sequenceRange,
