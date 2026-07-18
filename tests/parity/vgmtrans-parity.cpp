@@ -1250,7 +1250,13 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
 
   std::map<std::string, std::vector<u8>> midis;
   for (const auto& collection : project.collections()) {
-    auto [_, inserted] = midis.emplace(collection.name, valueCapcomSnesMidi(session, collection.id));
+    std::vector<u8> midi;
+    try {
+      midi = valueCapcomSnesMidi(session, collection.id);
+    } catch (const std::exception& ex) {
+      throw std::runtime_error("value MIDI export failed for collection '" + collection.name + "': " + ex.what());
+    }
+    auto [_, inserted] = midis.emplace(collection.name, std::move(midi));
     if (!inserted) {
       throw std::runtime_error("duplicate value collection name from RSN: " + collection.name);
     }
