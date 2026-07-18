@@ -37,6 +37,12 @@ constexpr u8 kNoteDottedMask = 0x10;
 constexpr u8 kNoteTripletMask = 0x20;
 constexpr u8 kNoteSlurredMask = 0x40;
 
+enum class LfoParameter : u8 {
+  VibratoDepth = 0,
+  TremoloDepth = 1,
+  Rate = 2,
+};
+
 [[nodiscard]] CapcomSnesEngineVersion requireVersion(u32 profile) {
   switch (profile) {
     case static_cast<u32>(CapcomSnesEngineVersion::v1BgmInList):
@@ -200,6 +206,8 @@ struct TrackState {
   [[nodiscard]] u32 consumeNoteTicks(u8 rawDuration) {
     u32 length = math::baseNoteTicks(rawDuration);
     if (noteDotted) {
+      // Dotted is a one-shot flag in the driver; triplet remains active until
+      // another command toggles or replaces it.
       length = (length % 2 == 0 && length < 0x80) ? length + (length / 2) : 0;
       noteDotted = false;
     } else if (noteTriplet) {
@@ -220,38 +228,9 @@ struct TrackState {
   [[nodiscard]] s32 sourceKey(u8 keyIndex) const {
     return static_cast<s32>(keyIndex) - 1 + static_cast<s32>(noteOctave * 12) + (noteOctaveUp ? 24 : 0);
   }
-
-  void applyAttributes(u8 attributes, PerformanceEmitter& out) {
-    const bool wasSlurred = noteSlurred;
-    noteOctave |= attributes & kNoteOctaveMask;
-    noteDotted = noteDotted || ((attributes & kNoteDottedMask) != 0);
-    noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
-    noteTriplet = (attributes & kNoteTripletMask) != 0;
-    noteSlurred = (attributes & kNoteSlurredMask) != 0;
-    if (noteSlurred != wasSlurred) {
-      out.legatoPedal(noteSlurred);
-    }
-  }
-
-  void emitVibratoDepth(PerformanceEmitter& out) const {
-    out.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoDepth,
-        .amount = modulationEnabled ? vibratoAmount : 0.0,
-        .pitchDepthSemitones = modulationEnabled ? vibratoDepthSemitones : 0.0,
-    });
-  }
-
-  void emitModulationDepths(PerformanceEmitter& out) const {
-    if (vibratoAmount != 0.0 || vibratoDepthSemitones != 0.0) {
-      emitVibratoDepth(out);
-    }
-    if (tremoloAmount != 0.0) {
-      out.modulation(ModulationPerformanceTarget::TremoloDepth, modulationEnabled ? tremoloAmount : 0.0);
-    }
-  }
 };
 
-using Args = SemanticCommandArgs;
+using Operands = SemanticCommandArgs;
 
 // Playback gathers the mutable driver state and the two shared VM interfaces in
 // one concrete object. The generic std::any casts happen once at the dialect
@@ -260,6 +239,37 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
+
+  void applyAttributes(u8 attributes) {
+    const bool wasSlurred = track.noteSlurred;
+    // The driver merges the low octave bits into the current octave instead
+    // of replacing it. Preserve that unusual behavior for source parity.
+    track.noteOctave |= attributes & kNoteOctaveMask;
+    track.noteDotted = track.noteDotted || ((attributes & kNoteDottedMask) != 0);
+    track.noteOctaveUp = (attributes & kNoteOctaveUpMask) != 0;
+    track.noteTriplet = (attributes & kNoteTripletMask) != 0;
+    track.noteSlurred = (attributes & kNoteSlurredMask) != 0;
+    if (track.noteSlurred != wasSlurred) {
+      out.legatoPedal(track.noteSlurred);
+    }
+  }
+
+  void emitVibratoDepth() const {
+    out.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoDepth,
+        .amount = track.modulationEnabled ? track.vibratoAmount : 0.0,
+        .pitchDepthSemitones = track.modulationEnabled ? track.vibratoDepthSemitones : 0.0,
+    });
+  }
+
+  void emitModulationDepths() const {
+    if (track.vibratoAmount != 0.0 || track.vibratoDepthSemitones != 0.0) {
+      emitVibratoDepth();
+    }
+    if (track.tremoloAmount != 0.0) {
+      out.modulation(ModulationPerformanceTarget::TremoloDepth, track.modulationEnabled ? track.tremoloAmount : 0.0);
+    }
+  }
 
   void emitPortamentoTo(s32 key) {
     if (track.portamentoMillisecondsPerCent <= 0.0 || !track.lastSourceKey) {
@@ -323,7 +333,7 @@ private:
 };
 
 using DecodeFunction = void (*)(Decode&);
-using ExecuteFunction = Effects (*)(Args, Playback&);
+using ExecuteFunction = Effects (*)(Operands, Playback&);
 
 struct CommandDefinition {
   DecodedCommandPresentation presentation;
@@ -389,45 +399,45 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
   ControlCommandProfile profile;
   profile.fill(unsupportedCommand());
 
-  profile[0x00] = command("Toggle Triplet", SequenceSemantic::State, [](Args, Playback& p) {
+  profile[0x00] = command("Toggle Triplet", SequenceSemantic::State, [](Operands, Playback& p) {
     p.track.noteTriplet = !p.track.noteTriplet;
     return Effects{};
   });
 
-  profile[0x01] = command("Toggle Slur", SequenceSemantic::State, [](Args, Playback& p) {
+  profile[0x01] = command("Toggle Slur", SequenceSemantic::State, [](Operands, Playback& p) {
     p.track.noteSlurred = !p.track.noteSlurred;
     p.out.legatoPedal(p.track.noteSlurred);
     return Effects{};
   });
 
-  profile[0x02] = command("Dotted Note", SequenceSemantic::State, [](Args, Playback& p) {
+  profile[0x02] = command("Dotted Note", SequenceSemantic::State, [](Operands, Playback& p) {
     p.track.noteDotted = true;
     return Effects{};
   });
 
-  profile[0x03] = command("Toggle Octave Up", SequenceSemantic::State, [](Args, Playback& p) {
+  profile[0x03] = command("Toggle Octave Up", SequenceSemantic::State, [](Operands, Playback& p) {
     p.track.noteOctaveUp = !p.track.noteOctaveUp;
     return Effects{};
   });
 
   profile[0x04] = command(
       "Note Attributes", SequenceSemantic::State, [](Decode& d) { d.u8("attributes", SourceValueDisplay::Hex); },
-      [](Args a, Playback& p) {
-        p.track.applyAttributes(a.u8("attributes"), p.out);
+      [](Operands a, Playback& p) {
+        p.applyAttributes(a.u8("attributes"));
         return Effects{};
       });
 
   profile[0x05] = command(
       "Tempo", SequenceSemantic::Tempo,
       [](Decode& d) { d.resolved("microseconds_per_quarter", d.rawU16be("raw"), math::tempoMicrosecondsPerQuarter); },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.out.tempo(a.u32("microseconds_per_quarter"));
         return Effects{};
       });
 
   profile[0x06] = command(
       "Duration Rate", SequenceSemantic::State, [](Decode& d) { d.u8("rate"); },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.track.durationRate256ths = a.u8("rate");
         return Effects{};
       });
@@ -438,7 +448,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         const auto raw = d.rawU8("raw");
         d.resolvedValue("linear_gain", raw, math::volumeGain(d.version(), raw.value));
       },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.out.level(LevelScale::linearFromLinear(a.f64("linear_gain")), ValueQuantization{.levels = 256});
         return Effects{};
       });
@@ -446,7 +456,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
   profile[0x08] = command(
       "Instrument", SequenceSemantic::Instrument,
       [](Decode& d) { d.u8("instrument", SemanticOperandRole::Instrument); },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.out.instrument(InstrumentIdentity{
             .domain = std::string(kCapcomSnesInstrumentDomain),
             .key = a.u32("instrument"),
@@ -456,21 +466,21 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
 
   profile[0x09] = command(
       "Octave", SequenceSemantic::State, [](Decode& d) { d.u8("octave"); },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.track.noteOctave = a.u8("octave");
         return Effects{};
       });
 
   profile[0x0a] = command(
       "Global Transpose", SequenceSemantic::Pitch, [](Decode& d) { d.s8("semitones"); },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.out.globalTranspose(a.s8("semitones"));
         return Effects{};
       });
 
   profile[0x0b] = command(
       "Transpose", SequenceSemantic::Pitch, [](Decode& d) { d.s8("semitones"); },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.track.transposeSemitones = a.s8("semitones");
         return Effects{};
       });
@@ -478,7 +488,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
   profile[0x0c] = command(
       "Tuning", SequenceSemantic::Pitch,
       [](Decode& d) { d.resolved("cents", d.rawS8("tuning"), math::tuningCents, SourceValueDisplay::Cents); },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.out.tuning(a.f64("cents"));
         return Effects{};
       });
@@ -486,7 +496,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
   profile[0x0d] = command(
       "Portamento Time", SequenceSemantic::Portamento,
       [](Decode& d) { d.resolved("milliseconds_per_cent", d.rawU8("time"), math::portamentoMillisecondsPerCent); },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.track.portamentoMillisecondsPerCent = a.f64("milliseconds_per_cent");
         return Effects{};
       });
@@ -501,7 +511,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         const Address destination = d.address("destination", SemanticOperandRole::RepeatTarget);
         count == 0 ? d.jumpTo(destination) : d.branchTo(destination);
       },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         const u8 slot = a.u8("slot") - 1;
         const u32 count = a.u32("count");
         const Address destination = a.address("destination");
@@ -520,10 +530,10 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         d.u8("attributes", SourceValueDisplay::Hex);
         d.branchTo(d.address("destination", SemanticOperandRole::RepeatTarget));
       },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         const auto branch = p.vm.countedRepeatBreak(a.u8("slot") - 1, a.address("destination"));
         if (branch.taken) {
-          p.track.applyAttributes(a.u8("attributes"), p.out);
+          p.applyAttributes(a.u8("attributes"));
         }
         return branch.effects;
       },
@@ -538,7 +548,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         const Address destination = d.address("destination", SemanticOperandRole::JumpTarget);
         d.jumpTo(destination);
       },
-      [](Args a, Playback& p) { return Effects{.step = p.vm.loopCandidate(a.address("destination"))}; },
+      [](Operands a, Playback& p) { return Effects{.step = p.vm.loopCandidate(a.address("destination"))}; },
       CommandPlaybackStatus::AffectsControlFlow);
 
   profile[0x17] = terminalCommand("End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
@@ -551,7 +561,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         d.resolvedValue("left_gain", raw, balance.leftGain);
         d.derived("right_gain", balance.rightGain);
       },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.out.stereoBalance(a.f64("left_gain"), a.f64("right_gain"));
         return Effects{};
       });
@@ -562,7 +572,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         const auto raw = d.rawU8("raw");
         d.resolvedValue("linear_gain", raw, math::volumeGain(d.version(), raw.value));
       },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.out.masterLevel(LevelScale::linearFromLinear(a.f64("linear_gain")));
         return Effects{};
       });
@@ -570,21 +580,23 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
   profile[0x1a] = command(
       "LFO", SequenceSemantic::Modulation,
       [](Decode& d) {
-        const u8 type = d.u8("type");
-        switch (type) {
-          case 0: {  // Vibrato depth.
+        const auto parameter = static_cast<LfoParameter>(d.u8("type"));
+        switch (parameter) {
+          case LfoParameter::VibratoDepth: {
             const auto raw = d.rawU8("value", SourceValueDisplay::Hex);
             const u8 depth = raw.value & 0x7f;
             d.resolvedValue("amount", raw, math::normalizedDepth(depth));
             d.derived("pitch_depth_semitones", math::vibratoDepthSemitones(depth));
             break;
           }
-          case 1: {  // Tremolo depth.
+          case LfoParameter::TremoloDepth: {
             const auto raw = d.rawU8("value", SourceValueDisplay::Hex);
             d.resolvedValue("amount", raw, math::tremoloDepth(d.version(), raw.value));
             break;
           }
-          case 2: {  // Shared LFO rate; zero also disables both depths.
+          case LfoParameter::Rate: {
+            // The two modulation depths share one rate register. A zero rate
+            // disables both without forgetting their configured depths.
             const auto raw = d.rawU8("value", SourceValueDisplay::Hex);
             d.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
             d.derived("amount", math::lfoRate(raw.value));
@@ -597,23 +609,23 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
             break;
         }
       },
-      [](Args a, Playback& p) {
-        switch (a.u8("type")) {
-          case 0:  // Vibrato depth.
+      [](Operands a, Playback& p) {
+        switch (static_cast<LfoParameter>(a.u8("type"))) {
+          case LfoParameter::VibratoDepth:
             p.track.vibratoAmount = a.f64("amount");
             p.track.vibratoDepthSemitones = a.f64("pitch_depth_semitones");
-            p.track.emitVibratoDepth(p.out);
+            p.emitVibratoDepth();
             break;
-          case 1:  // Tremolo depth.
+          case LfoParameter::TremoloDepth:
             p.track.tremoloAmount = a.f64("amount");
             p.out.modulation(ModulationPerformanceTarget::TremoloDepth,
                              p.track.modulationEnabled ? p.track.tremoloAmount : 0.0);
             break;
-          case 2: {  // Shared LFO rate; zero also disables both depths.
+          case LfoParameter::Rate: {
             const bool enabled = a.boolean("enabled");
             if (enabled != p.track.modulationEnabled) {
               p.track.modulationEnabled = enabled;
-              p.track.emitModulationDepths(p.out);
+              p.emitModulationDepths();
             }
             p.out.modulation(ModulationPerformanceEvent{
                 .target = ModulationPerformanceTarget::VibratoRate,
@@ -640,7 +652,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         const auto raw = d.rawU8("raw");
         d.resolvedValue("enabled", raw, (raw.value & 1) != 0, SourceValueDisplay::Boolean);
       },
-      [](Args a, Playback& p) {
+      [](Operands a, Playback& p) {
         p.out.reverb(a.boolean("enabled") ? 40.0 / 127.0 : 0.0);
         return Effects{};
       });
@@ -676,7 +688,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
         d.opcodeValue("duration_index", static_cast<u32>(d.opcode() >> 5));
         d.opcodeValue("key_index", static_cast<u32>(d.opcode() & 0x1f));
       },
-      [](Args a, Playback& p) { return p.note(a.u8("duration_index"), a.u8("key_index")); });
+      [](Operands a, Playback& p) { return p.note(a.u8("duration_index"), a.u8("key_index")); });
   return definition;
 }
 
@@ -684,7 +696,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
   static const CommandDefinition definition = command(
       "Rest", SequenceSemantic::Rest,
       [](Decode& d) { d.opcodeValue("duration_index", static_cast<u32>(d.opcode() >> 5)); },
-      [](Args a, Playback& p) { return p.rest(a.u8("duration_index")); });
+      [](Operands a, Playback& p) { return p.rest(a.u8("duration_index")); });
   return definition;
 }
 
@@ -739,7 +751,7 @@ using ControlCommandProfile = std::array<CommandDefinition, 0x20>;
     return Effects{.step = vm.end()};
   }
   const CommandDefinition& definition = definitionFor(version, command.opcode);
-  return definition.execute != nullptr ? definition.execute(Args{command}, playback) : Effects{};
+  return definition.execute != nullptr ? definition.execute(Operands{command}, playback) : Effects{};
 }
 
 [[nodiscard]] SequenceDialect makeDialect() {
@@ -766,25 +778,12 @@ const SequenceDialect& capcomSnesSequenceDialect() {
   return dialect;
 }
 
-TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVersion version, u32 sourceTrackNumber,
-                                         u32 startAddress, SourceMapBuilder* sourceMap,
-                                         std::vector<Diagnostic>* diagnostics,
-                                         std::optional<SourceAnnotationId> parentAnnotation,
-                                         std::optional<AssetId> sequenceAsset) {
+TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVersion version, TrackDecodeInput input) {
   version = requireVersion(static_cast<u32>(version));
-  const u32 end = static_cast<u32>(reader.size());
-  return decodeSemanticLinearTrack(reader,
-                                   TrackDecodeInput{
-                                       .sequenceAsset = sequenceAsset,
-                                       .trackIndex = sourceTrackNumber,
-                                       .startOffset = startAddress,
-                                       .parentAnnotation = parentAnnotation,
-                                       .sourceMap = sourceMap,
-                                       .diagnostics = diagnostics,
-                                   },
-                                   [reader, end, version, diagnostics](u32 offset) {
-                                     return decodeCommand(reader, offset, end, version, diagnostics);
-                                   });
+  const u32 end = std::min(static_cast<u32>(reader.size()), input.bytecodeEnd);
+  return decodeSemanticLinearTrack(reader, input, [reader, end, version, diagnostics = input.diagnostics](u32 offset) {
+    return decodeCommand(reader, offset, end, version, diagnostics);
+  });
 }
 
 SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayout& layout, AssetId sequenceId,
@@ -830,8 +829,15 @@ SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayo
       pointerAnnotation = annotation.id();
     }
 
-    program.tracks.push_back(decodeCapcomSnesSourceTrack(reader, version, sourceTrackNumber, trackAddress, sourceMap,
-                                                         diagnostics, pointerAnnotation, sequenceId));
+    program.tracks.push_back(decodeCapcomSnesSourceTrack(reader, version,
+                                                         TrackDecodeInput{
+                                                             .sequenceAsset = sequenceId,
+                                                             .trackIndex = sourceTrackNumber,
+                                                             .startOffset = trackAddress,
+                                                             .parentAnnotation = pointerAnnotation,
+                                                             .sourceMap = sourceMap,
+                                                             .diagnostics = diagnostics,
+                                                         }));
   }
   return program;
 }
