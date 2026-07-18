@@ -468,8 +468,7 @@ InstrumentSetAsset parseNdsInstrumentSet(const ScanInput& input, AssetId id, Nds
             .field("type", input.reader.range(pointerOffset, 1), instrumentType, SourceValueDisplay::Hex);
     pointerAnnotation.parent(pointerTable.id());
     Instrument instrument{
-        .bank = 0,
-        .program = i,
+        .explicitAddress = InstrumentAddress{.bank = 0, .program = i},
         .reverb = 0.0,
         .name = "Instrument",
         .range = input.reader.range(instrumentOffset, 0),

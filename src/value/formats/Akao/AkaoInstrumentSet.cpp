@@ -388,8 +388,7 @@ void addMelodicInstrument(std::vector<Instrument>& instruments, ByteReader reade
   }
   const auto& last = regions.back();
   instruments.push_back(Instrument{
-      .bank = 1,
-      .program = program,
+      .explicitAddress = InstrumentAddress{.bank = 1, .program = program},
       .name = fmt::format("Instrument {}", program),
       .range = reader.range(offset, static_cast<u32>(last.range.offset + last.range.size - offset)),
       .regions = std::move(regions),
@@ -435,8 +434,7 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
                        const AkaoProfile& profile, const AkaoArtMap& artMap, std::set<u32>& required,
                        u32 program = 127) {
   Instrument drum{
-      .bank = 127,
-      .program = program,
+      .explicitAddress = InstrumentAddress{.bank = 127, .program = program},
       .name = "Drum Kit",
       .range = reader.range(offset, 0),
   };
@@ -493,8 +491,7 @@ void addSyntheticArtInstruments(std::vector<Instrument>& instruments, const Akao
         .loop = binding.art.loop,
     };
     instruments.push_back(Instrument{
-        .bank = 0,
-        .program = artId,
+        .explicitAddress = InstrumentAddress{.bank = 0, .program = artId},
         .name = fmt::format("Articulation {}", artId),
         .range = binding.art.range,
         .regions = {std::move(region)},
@@ -603,12 +600,13 @@ void annotateRegion(ByteReader reader, SourceMapBuilder& sourceMap, SourceAnnota
 
 void annotateInstrument(ByteReader reader, SourceMapBuilder& sourceMap, SourceAnnotationId parent,
                         const Instrument& instrument) {
+  const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
   auto annotation = sourceMap.annotation(SourceRole::Instrument, instrument.name, instrument.range)
-                        .kind(instrument.bank == 127 ? "akao-drum-kit" : "akao-instrument")
+                        .kind(address.bank == 127 ? "akao-drum-kit" : "akao-instrument")
                         .parent(parent)
-                        .owner(ObjectRefs::instrumentProgram(instrument.bank, instrument.program))
-                        .derived("bank", instrument.bank)
-                        .derived("program", instrument.program)
+                        .owner(ObjectRefs::instrumentProgram(address.bank, address.program))
+                        .derived("bank", address.bank)
+                        .derived("program", address.program)
                         .derived("region_count", instrument.regions.size());
   for (const Region& region : instrument.regions) {
     annotateRegion(reader, sourceMap, annotation.id(), region);

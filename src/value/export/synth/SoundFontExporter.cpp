@@ -556,8 +556,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
     const auto& resolved = instruments[i];
     const auto& instrument = *resolved.instrument;
     writeFixedString(payload, sf2Name(instrument.name, "Preset"), 20);
-    writeLe16(payload, clampU16(resolved.program));
-    writeLe16(payload, sf2Bank(resolved.bank));
+    writeLe16(payload, clampU16(resolved.address.program));
+    writeLe16(payload, sf2Bank(resolved.address.bank));
     writeLe16(payload, clampU16(i));
     writeLe32(payload, 0);
     writeLe32(payload, 0);

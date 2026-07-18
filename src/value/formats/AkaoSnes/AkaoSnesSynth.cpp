@@ -557,8 +557,7 @@ InstrumentSetAsset parseAkaoSnesInstrumentSet(const ScanInput& input, ScanResult
       instrumentIndex = instruments.size();
       instrumentIndexByProgram.emplace(programKey, instrumentIndex);
       instruments.push_back(Instrument{
-          .bank = bank,
-          .program = program,
+          .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
           .name = info.percussion ? "Drum Kit" : fmt::format("Instrument {}", static_cast<unsigned>(info.srcn)),
           .range = instrumentObjectRange(input.reader, layout),
           .generators = akaoInstrumentGenerators(layout.version),

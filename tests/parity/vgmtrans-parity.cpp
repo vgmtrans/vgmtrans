@@ -919,14 +919,10 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
     ++summary.instrumentSetCount;
     for (const auto& instrument : instrumentSet->instruments) {
-      // Match production synth export: migrated identities determine the
-      // sequential preset address, while older formats use bank/program.
-      const u32 sourceKey = instrument.identity ? instrument.identity->key : 0;
-      const u32 bank = instrument.identity ? sourceKey >> 7 : instrument.bank;
-      const u32 program = instrument.identity ? sourceKey & 0x7f : instrument.program;
+      const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
       InstrumentSynthSummary synth{
-          .bank = bank,
-          .program = program,
+          .bank = address.bank,
+          .program = address.program,
           .sourceOffset = static_cast<u32>(instrument.range.offset),
       };
       for (const auto& generator : instrument.generators) {
@@ -956,8 +952,8 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
         }
 
         summary.regions.push_back(RegionSummary{
-            .bank = bank,
-            .program = program,
+            .bank = address.bank,
+            .program = address.program,
             .sourceOffset = static_cast<u32>(region.range.offset),
             .keyLow = region.keyRange.low,
             .keyHigh = region.keyRange.high,
@@ -3380,13 +3376,16 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           ++stats.melodicBankNoteEvents;
         }
       } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        if (instrumentEvent->sourceInstrument) {
-          instrument.bank = instrumentEvent->sourceInstrument->key >> 7;
-          instrument.program = instrumentEvent->sourceInstrument->key & 0x7f;
-        } else {
-          instrument.bank = instrumentEvent->bank;
-          instrument.program = instrumentEvent->program;
-        }
+        const std::optional<InstrumentAddress> explicitAddress =
+            instrumentEvent->sourceInstrument
+                ? std::nullopt
+                : std::optional{InstrumentAddress{
+                      .bank = instrumentEvent->bank,
+                      .program = instrumentEvent->program,
+                  }};
+        const InstrumentAddress address = resolveInstrumentAddress(explicitAddress, instrumentEvent->sourceInstrument);
+        instrument.bank = address.bank;
+        instrument.program = address.program;
         if (instrument.bank == (0x7f << 7) && instrument.program == 0) {
           ++stats.drumBankInstrumentEvents;
         } else {
