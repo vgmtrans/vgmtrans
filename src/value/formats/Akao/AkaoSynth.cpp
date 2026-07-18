@@ -390,7 +390,7 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Sca
     }
   }
 
-  static_cast<void>(result.sampleCollection(ref, [&](AssetId id) {
+  result.sampleCollection(ref, [&](AssetId id) {
     return SampleCollectionAsset{
         .metadata =
             AssetMetadata{
@@ -401,7 +401,7 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Sca
             },
         .samples = std::move(parsed.samples),
     };
-  }));
+  });
 }
 
 [[nodiscard]] std::optional<ParsedSampleCollection> parseAkaoSampleCollectionBuild(

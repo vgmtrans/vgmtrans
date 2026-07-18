@@ -42,14 +42,9 @@ using namespace core;
   const auto instrumentSet = result.reserveInstrumentSet();
   const auto samples = result.reserveSampleCollection();
 
-  static_cast<void>(result.sequence(sequence, [&](AssetId id) {
-    std::vector<Diagnostic> diagnostics;
-    auto asset = parseKonamiSnesSequence(input, *layout, id, displayName, &result.sourceMap(), &diagnostics);
-    for (auto& diagnostic : diagnostics) {
-      result.diagnostic(std::move(diagnostic));
-    }
-    return asset;
-  }));
+  result.sequence(sequence, [&](AssetId id) {
+    return parseKonamiSnesSequence(input, *layout, id, displayName, &result.sourceMap(), &result.diagnostics());
+  });
 
   auto collection = result.collection(displayName, konamiCollectionKey(input.source.id));
   collection.sequence(sequence);
@@ -60,13 +55,13 @@ using namespace core;
     const auto instrumentInfos = parseKonamiSnesInstrumentInfos(input.reader, *layout);
     const auto sampleInfos = parseKonamiSnesSampleInfos(input.reader, *layout->spcDirAddress, instrumentInfos);
     if (!instrumentInfos.empty() && !sampleInfos.empty()) {
-      static_cast<void>(result.instrumentSet(instrumentSet, [&](AssetId id) {
+      result.instrumentSet(instrumentSet, [&](AssetId id) {
         return parseKonamiSnesInstrumentSet(input, result, id, samples, layout->version, *layout->spcDirAddress,
                                             instrumentInfos, sampleInfos, displayName);
-      }));
-      static_cast<void>(result.sampleCollection(samples, [&](AssetId id) {
+      });
+      result.sampleCollection(samples, [&](AssetId id) {
         return parseKonamiSnesSamples(input, id, sampleInfos, displayName, &result.sourceMap());
-      }));
+      });
       collection.instrumentSet(instrumentSet).samples(samples);
     } else {
       result.warning("KonamiSnes sequence found, but no valid instruments or samples were discovered",

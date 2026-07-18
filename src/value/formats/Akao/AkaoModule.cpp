@@ -142,14 +142,9 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     }
 
     const auto sequenceRef = result.reserveSequence();
-    static_cast<void>(result.sequence(sequenceRef, [&](AssetId id) {
-      std::vector<Diagnostic> diagnostics;
-      auto asset = parseAkaoSequenceProgram(input, id, *analysis, &result.sourceMap(), &diagnostics);
-      for (auto& diagnostic : diagnostics) {
-        result.diagnostic(std::move(diagnostic));
-      }
-      return asset;
-    }));
+    result.sequence(sequenceRef, [&](AssetId id) {
+      return parseAkaoSequenceProgram(input, id, *analysis, &result.sourceMap(), &result.diagnostics());
+    });
 
     const auto required = requiredArticulations(input.reader, *analysis);
     addSequenceFacts(result, sequenceRef, *analysis, required);

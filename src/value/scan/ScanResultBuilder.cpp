@@ -160,7 +160,11 @@ ScanMiscAssetRef ScanResultBuilder::reserveMisc() {
 }
 
 ScanSequenceAssetBuilder ScanResultBuilder::sequence(std::string name, SourceRange range) {
-  return ScanSequenceAssetBuilder(*this, reserveSequence(), std::move(name), range);
+  return sequence(reserveSequence(), std::move(name), range);
+}
+
+ScanSequenceAssetBuilder ScanResultBuilder::sequence(ScanSequenceRef ref, std::string name, SourceRange range) {
+  return ScanSequenceAssetBuilder(*this, ref, std::move(name), range);
 }
 
 ScanInstrumentSetAssetBuilder ScanResultBuilder::instrumentSet(std::string name, SourceRange range) {

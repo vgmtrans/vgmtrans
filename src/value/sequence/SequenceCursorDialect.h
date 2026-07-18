@@ -6,9 +6,10 @@
 
 #pragma once
 
+#include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/SequenceCursor.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/sequence/BytecodeDecode.h"
 
 #include <algorithm>
 #include <any>
@@ -397,18 +398,7 @@ template <class TrackState, class Context, class Reader>
   return decodeCursorCommandWithState<TrackState, Context, Reader>(reader, begin, dialect, decodeState, context);
 }
 
-struct CursorTrackDecodeInput {
-  std::optional<AssetId> sequenceAsset;
-  u32 trackIndex = 0;
-  u32 startOffset = 0;
-  u32 bytecodeEnd = std::numeric_limits<u32>::max();
-  u32 sequenceOffset = 0;
-  u32 sequenceEnd = std::numeric_limits<u32>::max();
-  std::optional<SourceAnnotationId> parentAnnotation;
-  SourceMapBuilder* sourceMap = nullptr;
-  std::vector<Diagnostic>* diagnostics = nullptr;
-  u32 maxCommands = 4096;
-};
+using CursorTrackDecodeInput = TrackDecodeInput;
 
 [[nodiscard]] inline BytecodeDecodeContext cursorBytecodeDecodeContext(CursorTrackDecodeInput input) {
   return BytecodeDecodeContext{
@@ -421,53 +411,6 @@ struct CursorTrackDecodeInput {
   };
 }
 
-[[nodiscard]] inline std::optional<SourceAnnotationId> createCursorTrackAnnotation(ByteReader reader,
-                                                                                   CursorTrackDecodeInput input) {
-  if (input.sourceMap == nullptr) {
-    return std::nullopt;
-  }
-
-  auto track = input.sourceMap
-                   ->annotation(SourceRole::SequenceTrack, "Track " + std::to_string(input.trackIndex),
-                                reader.range(input.startOffset, 0))
-                   .kind("track");
-  if (input.sequenceAsset) {
-    track.owner(ObjectRefs::sequenceTrack(*input.sequenceAsset, input.trackIndex));
-  }
-  if (input.parentAnnotation) {
-    track.parent(*input.parentAnnotation);
-  }
-  return track.id();
-}
-
-[[nodiscard]] inline SourceRange decodedTrackRange(ByteReader reader, const TrackProgram& track, u32 fallbackOffset) {
-  std::optional<SourceRange> span;
-  for (const SourceCommand& command : track.commands) {
-    if (!command.range.valid()) {
-      continue;
-    }
-    if (!span) {
-      span = command.range;
-      continue;
-    }
-    if (command.range.source != span->source) {
-      continue;
-    }
-    const u64 begin = std::min(span->offset, command.range.offset);
-    const u64 end = std::max(span->endOffset(), command.range.endOffset());
-    *span = SourceRange{.source = span->source, .offset = begin, .size = end - begin};
-  }
-  return span.value_or(reader.range(fallbackOffset, 0));
-}
-
-inline void updateCursorTrackAnnotation(ByteReader reader, CursorTrackDecodeInput input,
-                                        std::optional<SourceAnnotationId> annotation, const TrackProgram& track) {
-  if (input.sourceMap == nullptr || !annotation) {
-    return;
-  }
-  AnnotationBuilder{*input.sourceMap, *annotation}.range(decodedTrackRange(reader, track, input.startOffset));
-}
-
 [[nodiscard]] inline u32 cursorBytecodeEnd(ByteReader reader, CursorTrackDecodeInput input) {
   return input.bytecodeEnd == std::numeric_limits<u32>::max() ? static_cast<u32>(reader.size()) : input.bytecodeEnd;
 }
@@ -476,7 +419,7 @@ template <class TrackState, class Context, class Reader>
 [[nodiscard]] TrackProgram decodeCursorReachableTrack(ByteReader reader, const SequenceDialect& dialect,
                                                       CursorTrackDecodeInput input) {
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
-  const auto trackAnnotation = createCursorTrackAnnotation(reader, input);
+  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
   if (trackAnnotation) {
     decodeContext.parentAnnotation = trackAnnotation;
   }
@@ -489,7 +432,7 @@ template <class TrackState, class Context, class Reader>
   TrackProgram track =
       decodeReachableBytecodeBlocks(reader, cursorBytecodeEnd(reader, input), input.startOffset, input.trackIndex,
                                     ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
-  updateCursorTrackAnnotation(reader, input, trackAnnotation, track);
+  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
   return track;
 }
 
@@ -497,7 +440,7 @@ template <class TrackState, class Context, class Reader>
 [[nodiscard]] TrackProgram decodeCursorLinearTrack(ByteReader reader, const SequenceDialect& dialect,
                                                    CursorTrackDecodeInput input) {
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
-  const auto trackAnnotation = createCursorTrackAnnotation(reader, input);
+  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
   if (trackAnnotation) {
     decodeContext.parentAnnotation = trackAnnotation;
   }
@@ -510,7 +453,7 @@ template <class TrackState, class Context, class Reader>
   TrackProgram track =
       decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
                                 LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
-  updateCursorTrackAnnotation(reader, input, trackAnnotation, track);
+  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
   return track;
 }
 

@@ -18,4 +18,12 @@ namespace vgmtrans::core {
                                                        const DecodedBytecodeCommand& command,
                                                        std::optional<SourceAnnotationId> parent = std::nullopt);
 
+// Track annotations have the same lifecycle for semantic and cursor dialects:
+// create the parent before command decoding, then expand it to the discovered
+// command range afterward.
+[[nodiscard]] std::optional<SourceAnnotationId> createSequenceTrackAnnotation(ByteReader reader,
+                                                                              const TrackDecodeInput& input);
+void finishSequenceTrackAnnotation(ByteReader reader, const TrackDecodeInput& input,
+                                   std::optional<SourceAnnotationId> annotation, const TrackProgram& track);
+
 }  // namespace vgmtrans::core

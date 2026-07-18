@@ -8,8 +8,10 @@
 
 #include "value/model/SourceMap.h"
 
+#include <algorithm>
 #include <limits>
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace vgmtrans::core {
@@ -119,6 +121,46 @@ SourceAnnotationId projectDecodedCommand(SourceMapBuilder* sourceMap, const Deco
                     SourceTarget{ObjectRefs::instrumentProgram(*instrumentBank, *instrumentProgram)}, "Instrument");
   }
   return annotation.id();
+}
+
+std::optional<SourceAnnotationId> createSequenceTrackAnnotation(ByteReader reader, const TrackDecodeInput& input) {
+  if (input.sourceMap == nullptr) {
+    return std::nullopt;
+  }
+
+  auto track = input.sourceMap
+                   ->annotation(SourceRole::SequenceTrack, "Track " + std::to_string(input.trackIndex),
+                                reader.range(input.startOffset, 0))
+                   .kind("track");
+  if (input.sequenceAsset) {
+    track.owner(ObjectRefs::sequenceTrack(*input.sequenceAsset, input.trackIndex));
+  }
+  if (input.parentAnnotation) {
+    track.parent(*input.parentAnnotation);
+  }
+  return track.id();
+}
+
+void finishSequenceTrackAnnotation(ByteReader reader, const TrackDecodeInput& input,
+                                   std::optional<SourceAnnotationId> annotation, const TrackProgram& track) {
+  if (input.sourceMap == nullptr || !annotation) {
+    return;
+  }
+
+  std::optional<SourceRange> span;
+  for (const SourceCommand& command : track.commands) {
+    if (!command.range.valid() || (span && command.range.source != span->source)) {
+      continue;
+    }
+    if (!span) {
+      span = command.range;
+      continue;
+    }
+    const u64 begin = std::min(span->offset, command.range.offset);
+    const u64 end = std::max(span->endOffset(), command.range.endOffset());
+    *span = SourceRange{.source = span->source, .offset = begin, .size = end - begin};
+  }
+  AnnotationBuilder{*input.sourceMap, *annotation}.range(span.value_or(reader.range(input.startOffset, 0)));
 }
 
 }  // namespace vgmtrans::core

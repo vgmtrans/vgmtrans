@@ -60,7 +60,7 @@ class ScanSequenceAssetBuilder {
 public:
   ScanSequenceAssetBuilder(ScanResultBuilder& out, ScanSequenceRef ref, std::string name, SourceRange range);
 
-  [[nodiscard]] ScanSequenceRef program(SequenceProgram program);
+  ScanSequenceRef program(SequenceProgram program);
 
 private:
   ScanResultBuilder& out_;
@@ -73,7 +73,7 @@ class ScanInstrumentSetAssetBuilder {
 public:
   ScanInstrumentSetAssetBuilder(ScanResultBuilder& out, ScanInstrumentSetRef ref, std::string name, SourceRange range);
 
-  [[nodiscard]] ScanInstrumentSetRef instruments(std::vector<Instrument> instruments);
+  ScanInstrumentSetRef instruments(std::vector<Instrument> instruments);
 
 private:
   ScanResultBuilder& out_;
@@ -87,7 +87,7 @@ public:
   ScanSampleCollectionAssetBuilder(ScanResultBuilder& out, ScanSampleCollectionRef ref, std::string name,
                                    SourceRange range);
 
-  [[nodiscard]] ScanSampleCollectionRef samples(SampleCollection samples);
+  ScanSampleCollectionRef samples(SampleCollection samples);
 
 private:
   ScanResultBuilder& out_;
@@ -100,7 +100,7 @@ class ScanMiscAssetBuilder {
 public:
   ScanMiscAssetBuilder(ScanResultBuilder& out, ScanMiscAssetRef ref, std::string name, SourceRange range);
 
-  [[nodiscard]] ScanMiscAssetRef payload(std::vector<u8> payload);
+  ScanMiscAssetRef payload(std::vector<u8> payload);
 
 private:
   ScanResultBuilder& out_;
@@ -123,6 +123,7 @@ public:
   [[nodiscard]] std::string_view format() const noexcept { return format_; }
   [[nodiscard]] ParseCursor cursor(SourceRange bounds);
   [[nodiscard]] SourceMapBuilder& sourceMap() noexcept { return sourceMap_; }
+  [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }
 
   [[nodiscard]] ScanSequenceRef reserveSequence();
   [[nodiscard]] ScanInstrumentSetRef reserveInstrumentSet();
@@ -130,26 +131,27 @@ public:
   [[nodiscard]] ScanMiscAssetRef reserveMisc();
 
   template <typename Factory>
-  [[nodiscard]] ScanSequenceRef sequence(Factory&& factory) {
+  ScanSequenceRef sequence(Factory&& factory) {
     return sequence(reserveSequence(), std::forward<Factory>(factory));
   }
 
   template <typename Factory>
-  [[nodiscard]] ScanSequenceRef sequence(ScanSequenceRef ref, Factory&& factory) {
+  ScanSequenceRef sequence(ScanSequenceRef ref, Factory&& factory) {
     auto asset = std::forward<Factory>(factory)(ref.id);
     addSequenceAsset(ref, std::move(asset));
     return ref;
   }
 
+  [[nodiscard]] ScanSequenceAssetBuilder sequence(ScanSequenceRef ref, std::string name, SourceRange range);
   [[nodiscard]] ScanSequenceAssetBuilder sequence(std::string name, SourceRange range);
 
   template <typename Factory>
-  [[nodiscard]] ScanInstrumentSetRef instrumentSet(Factory&& factory) {
+  ScanInstrumentSetRef instrumentSet(Factory&& factory) {
     return instrumentSet(reserveInstrumentSet(), std::forward<Factory>(factory));
   }
 
   template <typename Factory>
-  [[nodiscard]] ScanInstrumentSetRef instrumentSet(ScanInstrumentSetRef ref, Factory&& factory) {
+  ScanInstrumentSetRef instrumentSet(ScanInstrumentSetRef ref, Factory&& factory) {
     auto asset = std::forward<Factory>(factory)(ref.id);
     addInstrumentSetAsset(ref, std::move(asset));
     return ref;
@@ -158,12 +160,12 @@ public:
   [[nodiscard]] ScanInstrumentSetAssetBuilder instrumentSet(std::string name, SourceRange range);
 
   template <typename Factory>
-  [[nodiscard]] ScanSampleCollectionRef sampleCollection(Factory&& factory) {
+  ScanSampleCollectionRef sampleCollection(Factory&& factory) {
     return sampleCollection(reserveSampleCollection(), std::forward<Factory>(factory));
   }
 
   template <typename Factory>
-  [[nodiscard]] ScanSampleCollectionRef sampleCollection(ScanSampleCollectionRef ref, Factory&& factory) {
+  ScanSampleCollectionRef sampleCollection(ScanSampleCollectionRef ref, Factory&& factory) {
     auto asset = std::forward<Factory>(factory)(ref.id);
     addSampleCollectionAsset(ref, std::move(asset));
     return ref;
@@ -172,12 +174,12 @@ public:
   [[nodiscard]] ScanSampleCollectionAssetBuilder sampleCollection(std::string name, SourceRange range);
 
   template <typename Factory>
-  [[nodiscard]] ScanMiscAssetRef misc(Factory&& factory) {
+  ScanMiscAssetRef misc(Factory&& factory) {
     return misc(reserveMisc(), std::forward<Factory>(factory));
   }
 
   template <typename Factory>
-  [[nodiscard]] ScanMiscAssetRef misc(ScanMiscAssetRef ref, Factory&& factory) {
+  ScanMiscAssetRef misc(ScanMiscAssetRef ref, Factory&& factory) {
     auto asset = std::forward<Factory>(factory)(ref.id);
     addMiscAsset(ref, std::move(asset));
     return ref;

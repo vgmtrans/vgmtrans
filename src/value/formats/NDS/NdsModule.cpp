@@ -150,14 +150,9 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
     const auto bankAsset = bankAssetIds.find(sequence.bank);
     const std::string& name = layout.sequenceNames[sequenceIndex];
     const auto sequenceAsset = result.sequence([&](AssetId id) {
-      std::vector<Diagnostic> sequenceDiagnostics;
-      auto asset = parseNdsSequenceProgram(
+      return parseNdsSequenceProgram(
           input, id, ndsSequenceRangeForFatEntry(input.reader, sequenceRange->offset, sequenceRange->size), name,
-          &result.sourceMap(), &sequenceDiagnostics);
-      for (auto& diagnostic : sequenceDiagnostics) {
-        result.diagnostic(std::move(diagnostic));
-      }
-      return asset;
+          &result.sourceMap(), &result.diagnostics());
     });
 
     auto collection = result.collection(name, ndsCollectionKey(input.source.id, layout.baseOffset, sequenceIndex));

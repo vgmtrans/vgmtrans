@@ -405,7 +405,7 @@ private:
       .diagnostics = diagnostics,
       .maxCommands = static_cast<u32>(maxCommands),
   };
-  const auto trackAnnotation = createCursorTrackAnnotation(reader, input);
+  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
   if (trackAnnotation) {
     decodeContext.parentAnnotation = trackAnnotation;
@@ -465,7 +465,7 @@ private:
     }
   }
 
-  updateCursorTrackAnnotation(reader, input, trackAnnotation, track);
+  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
   return track;
 }
 

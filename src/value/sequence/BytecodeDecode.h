@@ -58,6 +58,22 @@ struct BytecodeDecodeContext {
   std::vector<Diagnostic>* diagnostics = nullptr;
 };
 
+// Common inputs for discovering one source track. Semantic and legacy cursor
+// decoders share the track/annotation lifecycle even though they decode an
+// individual command differently.
+struct TrackDecodeInput {
+  std::optional<AssetId> sequenceAsset;
+  u32 trackIndex = 0;
+  u32 startOffset = 0;
+  u32 bytecodeEnd = std::numeric_limits<u32>::max();
+  u32 sequenceOffset = 0;
+  u32 sequenceEnd = std::numeric_limits<u32>::max();
+  std::optional<SourceAnnotationId> parentAnnotation;
+  SourceMapBuilder* sourceMap = nullptr;
+  std::vector<Diagnostic>* diagnostics = nullptr;
+  u32 maxCommands = 4096;
+};
+
 [[nodiscard]] inline bool hasBytecodeBytes(ByteReader reader, u32 offset, u32 size, u32 end) {
   return offset <= end && size <= end - offset && reader.has(offset, size);
 }
