@@ -432,7 +432,6 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       project.collections()[0].id, ExportRequest{
                                        .kinds = {ExportKind::Midi},
                                        .loopPolicy = LoopPolicy::PlayOnce,
-                                       .synthModulationScaling = ModulationScalingPolicy::FullFormatRange,
                                    });
   expect(artifacts.size() == 1, "value export should produce one MIDI artifact");
   expect(artifacts[0].filename == "Mega Man X.mid", "MIDI artifact should use collection name");

@@ -1193,8 +1193,6 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
       session.exportCollection(project.collections().front().id, ExportRequest{
                                                                      .kinds = {ExportKind::Midi},
                                                                      .loopPolicy = LoopPolicy::PlayOnce,
-                                                                     .synthModulationScaling =
-                                                                         ModulationScalingPolicy::FullFormatRange,
                                                                  });
 
   for (const auto& artifact : artifacts) {
@@ -1213,8 +1211,6 @@ std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
   const auto artifacts = session.exportCollection(collection, ExportRequest{
                                                                   .kinds = {ExportKind::Midi},
                                                                   .loopPolicy = LoopPolicy::PlayOnce,
-                                                                  .synthModulationScaling =
-                                                                      ModulationScalingPolicy::FullFormatRange,
                                                               });
 
   for (const auto& artifact : artifacts) {
@@ -1264,7 +1260,6 @@ SynthExportBytes valueCapcomSnesSynthExports(Session& session, CollectionId coll
   const auto artifacts =
       session.exportCollection(collection, ExportRequest{
                                                .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
-                                               .synthModulationScaling = ModulationScalingPolicy::FullFormatRange,
                                            });
 
   SynthExportBytes exports;
@@ -1814,7 +1809,7 @@ std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u
                                                .loopPolicy = LoopPolicy::PlayOnce,
                                                .sequenceLoops = sequenceLoops,
                                                .midi = midiOptions,
-                                               .synthModulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
+                                               .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
                                                .modulationConversion = modulationConversion,
                                            });
 

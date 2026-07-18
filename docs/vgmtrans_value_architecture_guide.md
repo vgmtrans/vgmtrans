@@ -816,7 +816,7 @@ Export is collection-centered. A caller asks to export a `Collection`, not a raw
 - loop policy;
 - number of sequence loop repeats;
 - MIDI options;
-- synth modulation scaling policy.
+- modulation scaling policy.
 
 If no output kind is specified, the default is MIDI.
 
@@ -1172,7 +1172,7 @@ It is designed for SF2/DLS/WAV export without making those formats leak into sca
 
 Export resolves a collection, renders the sequence only when needed, decodes samples only when needed, and produces artifacts with diagnostics.
 
-The export layer is careful to share work. For example, if both MIDI and observed-range synth modulation are requested, the sequence render result can be reused.
+The export layer is careful to share work. For example, if both MIDI and observed-range modulation are requested, the sequence render result can be reused.
 
 ### 21.18 `Validation`
 

@@ -94,7 +94,7 @@ struct MidiLoweringResult {
                                                    const SequenceDialectRegistry& dialects,
                                                    const ExportRequest& request) {
   // Rendering the source sequence is needed for .mid output and for observed-range
-  // synth modulation. Keep failures as diagnostics so other exports can still run.
+  // modulation. Keep failures as diagnostics so other exports can still run.
   if (!prepared.assets.diagnostics.collection.empty()) {
     return MidiLoweringResult{
         .diagnostics = prepared.assets.diagnostics.collection,
@@ -158,13 +158,13 @@ struct MidiLoweringResult {
 
   auto midiSequence = *lowering.sequence;
   if (request.modulationConversion == ModulationConversionPolicy::SynthModulators &&
-      request.synthModulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
+      request.modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
     // Apply the same observed-range scaling to MIDI controller values and synth
     // modulators so they continue to match each other.
     const auto usage = lowering.performance ? analyzePerformanceModulationUsage(*lowering.performance)
                                             : analyzeMidiModulationUsage(midiSequence);
     if (hasMidiModulationUsage(usage)) {
-      applyMidiModulationScaling(midiSequence, usage, request.synthModulationScaling);
+      applyMidiModulationScaling(midiSequence, usage, request.modulationScaling);
     }
   }
   auto bytes = MidiExporter().exportMidi(midiSequence);
@@ -244,7 +244,7 @@ struct MidiLoweringResult {
           .instrumentSets = prepared.assets.instrumentSets,
           .sampleCollections = prepared.assets.sampleCollections,
           .midiModulationUsage = midiModulation,
-          .modulationScaling = request.synthModulationScaling,
+          .modulationScaling = request.modulationScaling,
           .modulationConversion = request.modulationConversion,
       },
       sources);
@@ -272,7 +272,7 @@ struct MidiLoweringResult {
           .instrumentSets = prepared.assets.instrumentSets,
           .sampleCollections = prepared.assets.sampleCollections,
           .midiModulationUsage = midiModulation,
-          .modulationScaling = request.synthModulationScaling,
+          .modulationScaling = request.modulationScaling,
           .modulationConversion = request.modulationConversion,
       },
       sources);
@@ -329,7 +329,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     // Synth exporters only need observed MIDI modulation when the policy asks for it.
     // WAV and plain MIDI export should not pay that analysis cost.
     if (request.modulationConversion != ModulationConversionPolicy::SynthModulators ||
-        request.synthModulationScaling != ModulationScalingPolicy::ObservedSequenceRange) {
+        request.modulationScaling != ModulationScalingPolicy::ObservedSequenceRange) {
       return nullptr;
     }
     if (!midiUsageAnalyzed) {
