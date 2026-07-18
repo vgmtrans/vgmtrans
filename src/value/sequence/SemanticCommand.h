@@ -11,6 +11,7 @@
 #include "value/sequence/CommandSourceMap.h"
 
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -54,6 +55,7 @@ struct EncodedSemanticField {
   SourceRange range;
   std::string_view name;
   SourceValueDisplay display = SourceValueDisplay::Default;
+  bool valid = false;
 };
 
 // A source-aware builder for one semantic command. It is deliberately small:
@@ -62,7 +64,7 @@ struct EncodedSemanticField {
 class SemanticCommandDecoder {
 public:
   SemanticCommandDecoder(ByteReader reader, u32 begin, u32 end, std::vector<Diagnostic>* diagnostics)
-      : record_(reader, begin, end, diagnostics) {
+      : record_(reader, begin, end, diagnostics), diagnostics_(diagnostics) {
     const auto opcode = record_.u8("opcode", SourceValueDisplay::Hex);
     if (opcode) {
       opcode_ = *opcode;
@@ -86,6 +88,20 @@ public:
     return decoded(rawS8(name, display), role);
   }
 
+  u16 u16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+            SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(rawU16le(name, display), role);
+  }
+
+  u32 varLen(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+             SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(rawVarLen(name, display), role);
+  }
+
+  std::string rawBytes(std::string_view name, u32 size) {
+    return decoded(field(record_.rawBytes(name, size), name, SourceValueDisplay::Hex), SemanticOperandRole::Value);
+  }
+
   // A raw field is kept separate only when playback consumes a converted value.
   // resolved()/resolvedValue() then retain both forms in one semantic operand.
   [[nodiscard]] EncodedSemanticField<::u8> rawU8(std::string_view name,
@@ -103,6 +119,21 @@ public:
     return field(record_.u16be(name, display), name, display);
   }
 
+  [[nodiscard]] EncodedSemanticField<u16> rawU16le(std::string_view name,
+                                                   SourceValueDisplay display = SourceValueDisplay::Default) {
+    return field(record_.u16le(name, display), name, display);
+  }
+
+  [[nodiscard]] EncodedSemanticField<u32> rawU24le(std::string_view name,
+                                                   SourceValueDisplay display = SourceValueDisplay::Default) {
+    return field(record_.u24le(name, display), name, display);
+  }
+
+  [[nodiscard]] EncodedSemanticField<u32> rawVarLen(std::string_view name,
+                                                    SourceValueDisplay display = SourceValueDisplay::Default) {
+    return field(record_.varLen(name, display), name, display);
+  }
+
   template <class T>
   void opcodeValue(std::string_view name, T parsed, SourceValueDisplay display = SourceValueDisplay::Default,
                    SemanticOperandRole role = SemanticOperandRole::Value) {
@@ -112,20 +143,27 @@ public:
   template <class T>
   void derived(std::string_view name, T parsed, SourceValueDisplay display = SourceValueDisplay::Default,
                SemanticOperandRole role = SemanticOperandRole::Value) {
-    add(name, value(parsed), {}, display, role);
+    if (record_.ok()) {
+      add(name, value(parsed), {}, display, role);
+    }
   }
 
   template <class T, class Convert>
   void resolved(std::string_view name, const EncodedSemanticField<T>& source, Convert convert,
                 SourceValueDisplay display = SourceValueDisplay::Default,
                 SemanticOperandRole role = SemanticOperandRole::Value) {
-    resolvedValue(name, source, convert(source.value), display, role);
+    if (source.valid) {
+      resolvedValue(name, source, convert(source.value), display, role);
+    }
   }
 
   template <class T, class Resolved>
   void resolvedValue(std::string_view name, const EncodedSemanticField<T>& source, Resolved resolved,
                      SourceValueDisplay display = SourceValueDisplay::Default,
                      SemanticOperandRole role = SemanticOperandRole::Value) {
+    if (!source.valid) {
+      return;
+    }
     operands_.push_back(SemanticOperand{
         .value = value(resolved),
         .range = source.range,
@@ -141,17 +179,31 @@ public:
   [[nodiscard]] Address address(std::string_view name, SemanticOperandRole role) {
     const auto source = rawU16be(name, SourceValueDisplay::Address);
     const Address parsed{source.value};
-    add(name, value(parsed), source.range, SourceValueDisplay::Address, role);
+    if (source.valid) {
+      add(name, value(parsed), source.range, SourceValueDisplay::Address, role);
+    }
     return parsed;
   }
 
   // Discovery flow only tells the bytecode walker which source addresses to
   // decode. Runtime branching remains in the command's adjacent playback code.
   void jumpTo(Address destination) { flow_ = DecodeFlow::jump(destination); }
+  void callTo(Address destination) { flow_ = DecodeFlow::call(destination, Address{record_.position()}); }
+  void return_() { flow_ = DecodeFlow::return_(); }
   void branchTo(Address destination) {
     flow_ = DecodeFlow{.kind = DecodeFlow::Kind::Fallthrough, .staticTargets = {destination}};
   }
   void terminate() { flow_ = DecodeFlow::terminalFlow(); }
+
+  void warning(std::string message) {
+    if (diagnostics_ != nullptr) {
+      diagnostics_->push_back(Diagnostic{
+          .severity = Severity::Warning,
+          .message = std::move(message),
+          .range = record_.range(),
+      });
+    }
+  }
 
   [[nodiscard]] DecodedBytecodeCommand finish(DecodedCommandPresentation presentation) {
     if (!record_.ok()) {
@@ -159,14 +211,17 @@ public:
     } else if (flow_.kind == DecodeFlow::Kind::Fallthrough && !flow_.fallthrough) {
       flow_.fallthrough = Address{record_.position()};
     }
+    const bool truncated = !record_.ok();
+    const auto bytes = record_.bytes();
     return DecodedBytecodeCommand{
         .range = record_.range(),
         .opcode = opcode_,
         .encodedSize = std::max<u32>(1, record_.size()),
+        .bytes = truncated ? std::vector<::u8>{bytes.begin(), bytes.end()} : std::vector<::u8>{},
         .flow = std::move(flow_),
         .operands = std::move(operands_),
         .presentation = std::move(presentation),
-        .retainBytes = false,
+        .retainBytes = truncated,
     };
   }
 
@@ -174,8 +229,10 @@ private:
   template <class T>
   [[nodiscard]] static SemanticOperandValue value(T parsed) {
     using Value = std::remove_cvref_t<T>;
-    if constexpr (std::is_same_v<Value, Address> || std::is_same_v<Value, bool>) {
+    if constexpr (std::is_same_v<Value, Address> || std::is_same_v<Value, bool> || std::is_same_v<Value, std::string>) {
       return SemanticOperandValue{parsed};
+    } else if constexpr (std::is_same_v<Value, std::string_view>) {
+      return SemanticOperandValue{std::string(parsed)};
     } else if constexpr (std::is_floating_point_v<Value>) {
       return SemanticOperandValue{static_cast<double>(parsed)};
     } else if constexpr (std::is_signed_v<Value>) {
@@ -198,14 +255,16 @@ private:
 
   template <class T>
   T decoded(const EncodedSemanticField<T>& source, SemanticOperandRole role) {
-    add(source.name, value(source.value), source.range, source.display, role);
+    if (source.valid) {
+      add(source.name, value(source.value), source.range, source.display, role);
+    }
     return source.value;
   }
 
   template <class T>
   [[nodiscard]] static EncodedSemanticField<T> field(const RangedValue<T>& parsed, std::string_view name,
                                                      SourceValueDisplay display) {
-    return {.value = parsed.value, .range = parsed.range, .name = name, .display = display};
+    return {.value = parsed.value, .range = parsed.range, .name = name, .display = display, .valid = parsed.valid};
   }
 
   RecordReader record_;
@@ -213,6 +272,7 @@ private:
   SourceRange opcodeRange_;
   std::vector<SemanticOperand> operands_;
   DecodeFlow flow_;
+  std::vector<Diagnostic>* diagnostics_ = nullptr;
 };
 
 // The format supplies only how to decode one command. This wrapper owns the
@@ -230,6 +290,27 @@ template <class DecodeCommand>
   TrackProgram track =
       decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
                                 LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeAndProject);
+  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
+  return track;
+}
+
+// Reachable formats use the same semantic command projection as linear ones,
+// but queue static jump and call targets instead of assuming one byte stream.
+template <class DecodeCommand>
+[[nodiscard]] TrackProgram decodeSemanticReachableTrack(ByteReader reader, TrackDecodeInput input,
+                                                        DecodeCommand decodeCommand) {
+  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
+  const auto decodeAndProject = [&](u32 offset) {
+    auto command = decodeCommand(offset);
+    command.annotation = projectDecodedCommand(input.sourceMap, command, trackAnnotation);
+    return command;
+  };
+  const u32 bytecodeEnd = input.bytecodeEnd == std::numeric_limits<u32>::max()
+                              ? static_cast<u32>(reader.size())
+                              : std::min(static_cast<u32>(reader.size()), input.bytecodeEnd);
+  TrackProgram track =
+      decodeReachableBytecodeBlocks(reader, bytecodeEnd, input.startOffset, input.trackIndex,
+                                    ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeAndProject);
   finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
   return track;
 }

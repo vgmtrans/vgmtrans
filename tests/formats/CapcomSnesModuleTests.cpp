@@ -56,6 +56,8 @@ std::string semanticValueSnapshot(const SemanticOperandValue& value) {
         using T = std::decay_t<decltype(typedValue)>;
         if constexpr (std::is_same_v<T, bool>) {
           return std::string(typedValue ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, std::string>) {
+          return typedValue;
         } else if constexpr (std::is_same_v<T, Address>) {
           return "@" + hexAddress(typedValue.value);
         } else if constexpr (std::is_same_v<T, double>) {

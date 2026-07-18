@@ -42,3 +42,22 @@ ctest --test-dir cmake-build-debug --output-on-failure -L capcom-snes
 Summary, MIDI, and SF2/DLS tests are deliberately separate. One mismatch will
 not prevent CTest from reporting the other layers. Capcom SNES additionally has
 an export smoke test that checks whole-archive discovery and artifact creation.
+
+### Known NDS baseline findings
+
+The semantic NDS migration was checked against a Mega Man ZX ROM (35
+collections) and a Last Window mini2SF set (56 collections). Summary and
+SF2/DLS parity passed for every collection. MIDI comparison reached these two
+pre-existing differences between the original and value architectures:
+
+- Mega Man ZX `CRISIS`: the original path emits an extra zero pitch-bend at
+  tick 2343 before the next bend at tick 2345.
+- Last Window `SEQ_BGM_23`: the original path emits one extra pitch-bend-range
+  data-entry controller at tick zero on track 15.
+
+Both differences reproduce with the same normalized event counts, first
+mismatch, and event context at commit `0b1f6970c`, before the NDS semantic
+migration. They are renderer/output-normalization differences, not migration
+regressions. Tetris DS mini2SF parity currently stops earlier because the
+original-side corpus map contains duplicate empty collection names; this
+harness limitation also reproduces before the migration.
