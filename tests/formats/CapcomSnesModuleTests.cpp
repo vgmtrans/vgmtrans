@@ -586,7 +586,7 @@ void capcomSnesSemanticAndPerformanceSnapshotsAreStable() {
   constexpr std::string_view expectedDecoded = "3000:5:3,microseconds_per_quarter=42191<4660>,flow=0->3003|"
                                                "3003:8:2,instrument=0,flow=0->3005|"
                                                "3005:7:2,linear_gain=0.403921569<64>,flow=0->3007|"
-                                               "3007:24:2,stereo_position=0<0>,linear_gain=0.89493202,flow=0->3009|"
+                                               "3007:24:2,stereo_position=0.00787401575<0>,linear_gain=0.89493202,flow=0->3009|"
                                                "3009:26:3,type=0,value=32,flow=0->300C|"
                                                "300C:26:3,type=2,value=32,flow=0->300F|"
                                                "300F:65:1,duration_index=2,key_index=1,flow=0->3010|"
@@ -603,7 +603,7 @@ void capcomSnesSemanticAndPerformanceSnapshotsAreStable() {
   const std::string performance = performanceTrackSnapshot(SequenceVm().render(program, dialect).tracks[0]);
   constexpr std::string_view expectedPerformance =
       "reverb@0=0|mono@0=0|tempo@0=42191|instrument@0=capcom-snes.instrument:0|"
-      "level@0=0.403921569/q256|pan@0=0,0.89493202|mod@0:0=0|mod@0:0=0.251968504|"
+      "level@0=0.403921569/q256|pan@0=0.00787401575,0.89493202|mod@0:0=0|mod@0:0=0.251968504|"
       "mod@0:1=0.625441449|mod@0:3=0.625441449|note@0=0/6";
   expect(performance == expectedPerformance, "CapcomSnes neutral-performance golden changed:\n" + performance);
 }

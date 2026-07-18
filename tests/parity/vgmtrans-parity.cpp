@@ -919,9 +919,14 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
     ++summary.instrumentSetCount;
     for (const auto& instrument : instrumentSet->instruments) {
+      // Match production synth export: migrated identities determine the
+      // sequential preset address, while older formats use bank/program.
+      const u32 sourceKey = instrument.identity ? instrument.identity->key : 0;
+      const u32 bank = instrument.identity ? sourceKey >> 7 : instrument.bank;
+      const u32 program = instrument.identity ? sourceKey & 0x7f : instrument.program;
       InstrumentSynthSummary synth{
-          .bank = instrument.bank,
-          .program = instrument.program,
+          .bank = bank,
+          .program = program,
           .sourceOffset = static_cast<u32>(instrument.range.offset),
       };
       for (const auto& generator : instrument.generators) {
@@ -951,8 +956,8 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
         }
 
         summary.regions.push_back(RegionSummary{
-            .bank = instrument.bank,
-            .program = instrument.program,
+            .bank = bank,
+            .program = program,
             .sourceOffset = static_cast<u32>(region.range.offset),
             .keyLow = region.keyRange.low,
             .keyHigh = region.keyRange.high,
@@ -1192,6 +1197,8 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
       session.exportCollection(project.collections().front().id, ExportRequest{
                                                                      .kinds = {ExportKind::Midi},
                                                                      .loopPolicy = LoopPolicy::PlayOnce,
+                                                                     .synthModulationScaling =
+                                                                         ModulationScalingPolicy::FullFormatRange,
                                                                  });
 
   for (const auto& artifact : artifacts) {
@@ -1210,6 +1217,8 @@ std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
   const auto artifacts = session.exportCollection(collection, ExportRequest{
                                                                   .kinds = {ExportKind::Midi},
                                                                   .loopPolicy = LoopPolicy::PlayOnce,
+                                                                  .synthModulationScaling =
+                                                                      ModulationScalingPolicy::FullFormatRange,
                                                               });
 
   for (const auto& artifact : artifacts) {
@@ -1253,7 +1262,7 @@ SynthExportBytes valueCapcomSnesSynthExports(Session& session, CollectionId coll
   const auto artifacts =
       session.exportCollection(collection, ExportRequest{
                                                .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
-                                               .synthModulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
+                                               .synthModulationScaling = ModulationScalingPolicy::FullFormatRange,
                                            });
 
   SynthExportBytes exports;
@@ -3794,7 +3803,7 @@ int compareCapcomSnesRsnDirectMidi(const std::filesystem::path& path) {
     }
 
     std::cout << "checking " << collectionName << " via direct RSN value scan\n";
-    if (!compareMidi(legacyMidi, found->second, std::cout)) {
+    if (!compareMidi(legacyMidi, found->second, std::cout, allowExtraValueTailSetupOptions())) {
       return 1;
     }
   }
