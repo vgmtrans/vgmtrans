@@ -684,6 +684,8 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
 }
 
 void exportRequestSequenceLoopsAffectMidiLowering() {
+  expect(ExportRequest{}.sequenceLoops == 1, "the user-facing export request should default to one sequence loop");
+
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
       .id = TrackId{0},

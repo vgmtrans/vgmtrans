@@ -716,6 +716,8 @@ The VM also owns shared playback policy:
 
 Semantic loop detection compares the complete execution state that determines recurrence: command address, call stack, and repeat counters. A finite repeat therefore does not need an address-based suppression exception, and the same repeat command can be reused safely after its counter has been cleared. The command limit remains an emergency guard rather than normal loop control; its diagnostic includes track, address, tick, executed-command count, and limit.
 
+Semantic tracks share one finite export boundary. Each track records when it has completed the requested number of infinite-loop repeats, while shorter tracks keep looping until every track has reached its own endpoint or ended naturally. The scheduler then uses the longest endpoint, trims events at that common boundary, and clips notes that cross it. This prevents both early truncation by a short auxiliary loop and a lone long track continuing after every other track has stopped.
+
 Legacy dialects remain track-major until migrated. Their dry-run and complete-sequence-prepass options are compatibility mechanisms; semantic formats should model shared state directly instead.
 
 ### 14.6 `PerformanceSequence`
@@ -826,6 +828,8 @@ Export is collection-centered. A caller asks to export a `Collection`, not a raw
 - modulation scaling policy.
 
 If no output kind is specified, the default is MIDI.
+
+The user-facing sequence-loop count defaults to one extra repeat after the initial playthrough, matching the application setting. Low-level `SequenceVmOptions` still defaults to zero so tests and internal callers can explicitly render only the initial pass.
 
 `modulationScaling` defaults to `FullFormatRange`, matching source-driver semantics. `ObservedSequenceRange` is an explicit export optimization and applies consistently to MIDI controllers and SF2/DLS modulators.
 
@@ -986,7 +990,7 @@ The scanner finds the layout, reserves sequence/instrument/sample IDs, parses in
 
 Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single source of command behavior. Each entry owns presentation, source reads, conversion, discovery flow, and playback side-by-side. Decode reads every operand once, stores encoded and resolved values where they differ, and records control flow; the track keeps no command-byte pool. `decodeSemanticLinearTrack` owns walking, command projection, and track annotation finalization, so the format's track function supplies only `decodeCommand`. The same profile entry is selected during rendering by program profile and opcode, and the global scheduler supplies per-track state. The executor cannot access source bytes by construction.
 
-The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture. Pan commands retain Capcom's source-engine left/right gains; shared export code performs MIDI pan quantization and expression compensation.
+The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture. Pan commands retain Capcom's source-engine left/right gains; shared export code performs MIDI pan quantization and expression compensation. Vibrato events retain both normalized controller amounts and the driver's physical semitone depth and hertz rate, allowing `SequenceEventSimulation` to render pitch-bend motion without depending on SF2/DLS modulators.
 
 The layout uses the shared masked-pattern matcher, and the synth parser uses the shared SNES sample-directory/BRR reader. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once; it does not register a duplicate `canScan` probe. One `FormatDefinition` registers both scanner and dialect. Sequence performance and synth instruments use `capcom-snes.instrument` identities; MIDI/SF2/DLS addressing is assigned in export code.
 

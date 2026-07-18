@@ -49,7 +49,7 @@ struct ExportRequest {
   LoopPolicy loopPolicy = LoopPolicy::Default;
   // Extra repeats after the initial playthrough. This is the user-facing
   // "Sequence Loops" setting: 0 means stop at the first infinite-loop point.
-  u32 sequenceLoops = 0;
+  u32 sequenceLoops = 1;
   MidiExportOptions midi;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;

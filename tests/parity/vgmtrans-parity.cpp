@@ -1193,6 +1193,7 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
       session.exportCollection(project.collections().front().id, ExportRequest{
                                                                      .kinds = {ExportKind::Midi},
                                                                      .loopPolicy = LoopPolicy::PlayOnce,
+                                                                     .sequenceLoops = 0,
                                                                  });
 
   for (const auto& artifact : artifacts) {
@@ -1211,6 +1212,7 @@ std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
   const auto artifacts = session.exportCollection(collection, ExportRequest{
                                                                   .kinds = {ExportKind::Midi},
                                                                   .loopPolicy = LoopPolicy::PlayOnce,
+                                                                  .sequenceLoops = 0,
                                                               });
 
   for (const auto& artifact : artifacts) {
@@ -3618,6 +3620,10 @@ int validateKonamiSnesDirectMidiSimulation(const std::filesystem::path& path, u3
   return validateFormatDirectMidiSimulation(path, "KonamiSnes", "KonamiSnes", sequenceLoops);
 }
 
+int validateCapcomSnesDirectMidiSimulation(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  return validateFormatDirectMidiSimulation(path, "CapcomSnes", "CapcomSnes", sequenceLoops);
+}
+
 int validateAkaoSnesDirectMidiSimulation(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   return validateFormatDirectMidiSimulation(path, "AkaoSnes", "AkaoSnes", sequenceLoops);
 }
@@ -4255,6 +4261,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity capcom-snes-rsn-midi <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-export <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-midi <rsn-file>\n"
+      << "  vgmtrans-parity capcom-snes-rsn-direct-midi-sim <rsn-file> [sequence-loops]\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-synth <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-direct-summary <rsn-file>\n"
       << "  vgmtrans-parity capcom-snes-rsn-summary <rsn-file>\n"
@@ -4293,6 +4300,14 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-midi") {
       return compareCapcomSnesRsnDirectMidi(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-midi-sim") {
+      return validateCapcomSnesDirectMidiSimulation(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "capcom-snes-rsn-direct-midi-sim") {
+      return validateCapcomSnesDirectMidiSimulation(argv[2], parseLoopCount(argv[3]));
     }
 
     if (argc == 3 && std::string(argv[1]) == "capcom-snes-rsn-direct-export") {

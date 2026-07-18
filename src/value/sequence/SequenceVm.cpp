@@ -252,6 +252,20 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
   }
 }
 
+void endTrackAt(PerformanceTrack& track, u64 endTick) {
+  // Same-tick scheduling can emit another channel before the final loop
+  // boundary is known, so trim the completed performance rather than relying
+  // only on EndOfTrack metadata.
+  std::erase_if(track.events,
+                [endTick](const PerformanceEvent& event) { return performanceEventHeader(event).tick >= endTick; });
+  for (PerformanceEvent& event : track.events) {
+    if (auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      note->durationTicks = static_cast<u32>(std::min<u64>(note->durationTicks, endTick - note->header.tick));
+    }
+  }
+  track.endTick = endTick;
+}
+
 struct RenderedTrack {
   PerformanceTrack track;
   std::optional<u64> loopStopTick;
@@ -269,7 +283,7 @@ public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
                   PerformanceSequence& targetSequence, std::optional<u64> stopTick, TrackRenderMode mode,
-                  std::any* programState = nullptr)
+                  std::any* programState = nullptr, bool sequenceCoordinatesLoops = false)
       : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
         options_(options), targetSequence_(targetSequence), stopTick_(stopTick), mode_(mode),
         performanceTrack_(PerformanceTrack{
@@ -282,7 +296,8 @@ public:
                                                                : std::any{})
                 : (dialect.createTrackState != nullptr ? dialect.createTrackState(program, track, dialect.context)
                                                        : std::any{})),
-        programState_(programState), current_(destinationIndex(track, track.startAddress)) {
+        programState_(programState), current_(destinationIndex(track, track.startAddress)),
+        sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
     addInitialTrackEvents(performanceTrack_, behavior_);
     if (!current_ && !track_.commands.empty()) {
       current_ = 0;
@@ -299,6 +314,7 @@ public:
 
   [[nodiscard]] bool active() const noexcept { return current_.has_value(); }
   [[nodiscard]] u64 tick() const noexcept { return runtime_.tick; }
+  [[nodiscard]] std::optional<u64> loopStopTick() const noexcept { return loopStopTick_; }
 
   void executeNext() {
     if (!current_) {
@@ -381,6 +397,23 @@ private:
 
     if (loopPolicy_ == LoopPolicy::PlayOnce && loopRepeats_ < options_.sequenceLoops) {
       ++loopRepeats_;
+      loopDetector_.clear();
+      if (recordAfterClear) {
+        loopDetector_.record(*recordAfterClear,
+                             VisitRecord{.tick = loop.endTick, .command = track_.commands.at(replayIndex).id});
+      }
+      current_ = replayIndex;
+      arrivedByControlFlow_ = true;
+      return LoopAction{.kind = LoopActionKind::ContinueExecution};
+    }
+
+    if (sequenceCoordinatesLoops_ && loopPolicy_ == LoopPolicy::PlayOnce) {
+      // Keep shorter channel loops running while the scheduler discovers the
+      // longest requested endpoint. The sequence-level cutoff removes any
+      // temporary events rendered past that common boundary.
+      if (!loopStopTick_) {
+        loopStopTick_ = loop.endTick;
+      }
       loopDetector_.clear();
       if (recordAfterClear) {
         loopDetector_.record(*recordAfterClear,
@@ -559,6 +592,7 @@ private:
   std::optional<u64> loopStopTick_;
   u32 loopRepeats_ = 0;
   bool arrivedByControlFlow_ = true;
+  bool sequenceCoordinatesLoops_ = false;
 };
 
 }  // namespace
@@ -702,12 +736,14 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     executors.reserve(program.tracks.size());
     for (const TrackProgram& track : program.tracks) {
       executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, sequence,
-                                                            std::nullopt, TrackRenderMode::Normal, &programState));
+                                                            std::nullopt, TrackRenderMode::Normal, &programState,
+                                                            loopPolicy == LoopPolicy::PlayOnce));
     }
 
     // Execute the earliest channel first; source track order is the stable
     // tie-break. A channel keeps control at the same tick while it consumes
     // zero-time commands, matching how these drivers run until their next wait.
+    std::optional<u64> sequenceEndTick;
     while (true) {
       size_t selected = executors.size();
       for (size_t i = 0; i < executors.size(); ++i) {
@@ -721,12 +757,28 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
       if (selected == executors.size()) {
         break;
       }
+
       executors[selected]->executeNext();
+      const bool hasLoopBoundary =
+          std::ranges::any_of(executors, [](const auto& executor) { return executor->loopStopTick().has_value(); });
+      if (loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
+          std::ranges::all_of(executors,
+                              [](const auto& executor) { return !executor->active() || executor->loopStopTick(); })) {
+        sequenceEndTick = 0;
+        for (const auto& executor : executors) {
+          *sequenceEndTick = std::max(*sequenceEndTick, executor->loopStopTick().value_or(executor->tick()));
+        }
+        break;
+      }
     }
 
     sequence.tracks.reserve(executors.size());
     for (auto& executor : executors) {
-      sequence.tracks.push_back(executor->finish().track);
+      auto rendered = executor->finish();
+      if (sequenceEndTick) {
+        endTrackAt(rendered.track, *sequenceEndTick);
+      }
+      sequence.tracks.push_back(std::move(rendered.track));
     }
     return sequence;
   }

@@ -966,6 +966,80 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
          "the scheduler should not run a later-tick update before an earlier track event");
 }
 
+Effects executeScheduledLoopProbe(const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out,
+                                  VmApi& vm) {
+  switch (command.address.value) {
+    case 0:
+    case 100:
+    case 110:
+      out.note(60.0, 1.0, 6);
+      return Effects::wait(4);
+    case 1:
+      return Effects{.step = vm.loopCandidate(Address{0})};
+    case 101:
+      return Effects{.step = vm.loopCandidate(Address{110})};
+    case 111:
+      return Effects{.step = vm.loopCandidate(Address{110})};
+    default:
+      return Effects{.step = vm.end()};
+  }
+}
+
+void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
+  const SequenceDialect dialect{
+      .id = DialectId{.value = "scheduled-loop-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .executeSemantic = executeScheduledLoopProbe,
+  };
+
+  TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder builder0(track0);
+  builder0.addSemantic(Address{0}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{1}));
+  builder0.addSemantic(Address{1}, 0, 1, {}, {}, DecodeFlow::jump(Address{0}));
+
+  // This track first jumps into an unvisited block. A per-track loop detector
+  // stops track 0 too early while this track is still establishing its loop.
+  TrackProgram track1{.id = TrackId{1}, .startAddress = Address{100}};
+  TrackProgramBuilder builder1(track1);
+  builder1.addSemantic(Address{100}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{101}));
+  builder1.addSemantic(Address{101}, 0, 1, {}, {}, DecodeFlow::jump(Address{110}));
+  builder1.addSemantic(Address{110}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{111}));
+  builder1.addSemantic(Address{111}, 0, 1, {}, {}, DecodeFlow::jump(Address{110}));
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track0, track1},
+  };
+
+  const PerformanceSequence playOnce = SequenceVm().render(program, dialect);
+  expect(playOnce.diagnostics.empty(), "sequence-wide semantic loop fixture should not report diagnostics");
+  expect(playOnce.tracks[0].endTick == 8 && playOnce.tracks[1].endTick == 8,
+         "semantic tracks should stop together at the longest loop-budget endpoint");
+  for (const auto& track : playOnce.tracks) {
+    expect(countProbeNotesAt(track, 0) == 1 && countProbeNotesAt(track, 4) == 1,
+           "shorter semantic loops should keep playing while longer loops reach their endpoint");
+    expect(countProbeNotesAt(track, 8) == 0,
+           "semantic loop cutoff should remove events emitted at the repeated boundary");
+    const auto crossingNote = std::ranges::find_if(track.events, [](const PerformanceEvent& event) {
+      const auto* note = std::get_if<NotePerformanceEvent>(&event);
+      return note != nullptr && note->header.tick == 4;
+    });
+    expect(crossingNote != track.events.end() && std::get<NotePerformanceEvent>(*crossingNote).durationTicks == 4,
+           "semantic loop cutoff should clip notes that cross the common boundary");
+  }
+
+  const PerformanceSequence oneRepeat = SequenceVm(SequenceVmOptions{
+                                                       .loopPolicy = LoopPolicy::PlayOnce,
+                                                       .sequenceLoops = 1,
+                                                   })
+                                            .render(program, dialect);
+  expect(oneRepeat.tracks[0].endTick == 12 && oneRepeat.tracks[1].endTick == 12,
+         "one requested semantic loop should extend the longest sequence boundary once");
+  expect(countProbeNotesAt(oneRepeat.tracks[0], 8) == 1 && countProbeNotesAt(oneRepeat.tracks[1], 8) == 1,
+         "one requested semantic loop should replay every track together");
+}
+
 }  // namespace
 
 void runValueSequenceVmTests() {
@@ -994,4 +1068,5 @@ void runValueSequenceVmTests() {
   sequenceVmDoesNotWrapCommandAddressOverflow();
   sequenceVmReportsMissingJumpTargetAfterEmittedEvents();
   sequenceVmSchedulesSemanticTracksAgainstOneProgramState();
+  sequenceVmCoordinatesSemanticLoopsAtSequenceScope();
 }

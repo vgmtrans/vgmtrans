@@ -431,6 +431,31 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[14]).tick == 6,
          "builder should advance time before end of track");
 
+  const auto vibratoDepth = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoDepth &&
+           modulation->amount > 0.0;
+  });
+  const auto vibratoRate = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoRate;
+  });
+  expect(vibratoDepth != performance.tracks[0].events.end() &&
+             std::get<ModulationPerformanceEvent>(*vibratoDepth).pitchDepthSemitones == 3.0,
+         "CapcomSnes vibrato depth should retain the driver's physical pitch range");
+  expect(vibratoRate != performance.tracks[0].events.end() &&
+             std::get<ModulationPerformanceEvent>(*vibratoRate).frequencyHz == 1.953125,
+         "CapcomSnes vibrato rate should retain the driver's physical LFO frequency");
+
+  const MidiSequence simulatedMidi = PerformanceMidiRenderer().render(
+      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  expect(std::ranges::any_of(simulatedMidi.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* bend = std::get_if<PitchBend>(&event);
+                               return bend != nullptr && bend->value != 0;
+                             }),
+         "CapcomSnes sequence-event modulation should render vibrato as nonzero pitch bends");
+
   const auto artifacts = session.exportCollection(
       project.collections()[0].id, ExportRequest{
                                        .kinds = {ExportKind::Midi},
