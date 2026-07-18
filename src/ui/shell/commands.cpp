@@ -678,11 +678,11 @@ std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const st
                    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
 
     if (option == "--observed-modulation" || option == "--observed-modulation-scaling") {
-      request.synthModulationScaling = vgmtrans::core::ModulationScalingPolicy::ObservedSequenceRange;
+      request.modulationScaling = vgmtrans::core::ModulationScalingPolicy::ObservedSequenceRange;
       continue;
     }
     if (option == "--full-modulation" || option == "--full-modulation-scaling") {
-      request.synthModulationScaling = vgmtrans::core::ModulationScalingPolicy::FullFormatRange;
+      request.modulationScaling = vgmtrans::core::ModulationScalingPolicy::FullFormatRange;
       continue;
     }
 
@@ -694,7 +694,7 @@ std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const st
                      args[i].substr(modulationPrefix.size()));
         return std::nullopt;
       }
-      request.synthModulationScaling = *policy;
+      request.modulationScaling = *policy;
       continue;
     }
     if (option == "--modulation-scaling") {
@@ -707,7 +707,7 @@ std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const st
         fmt::println("Unknown modulation scaling policy '{}'. Use full or observed.", args[i]);
         return std::nullopt;
       }
-      request.synthModulationScaling = *policy;
+      request.modulationScaling = *policy;
       continue;
     }
 

@@ -43,7 +43,7 @@ struct MidiExportOptions {
 };
 
 // ExportRequest is policy, not parsed data. Callers choose which files to write
-// and how to handle loops, MIDI channels, and synth modulation scaling.
+// and how to handle loops, MIDI channels, and modulation scaling.
 struct ExportRequest {
   std::vector<ExportKind> kinds;
   LoopPolicy loopPolicy = LoopPolicy::Default;
@@ -51,7 +51,7 @@ struct ExportRequest {
   // "Sequence Loops" setting: 0 means stop at the first infinite-loop point.
   u32 sequenceLoops = 0;
   MidiExportOptions midi;
-  ModulationScalingPolicy synthModulationScaling = ModulationScalingPolicy::ObservedSequenceRange;
+  ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
 };
 
