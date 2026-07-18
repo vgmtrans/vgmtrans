@@ -21,6 +21,8 @@ namespace vgmtrans::formats::capcom_snes {
 inline constexpr u64 kCapcomSnesAramSize = 0x10000;
 inline constexpr u32 kCapcomSnesMaxTracks = 8;
 inline constexpr u32 kCapcomSnesPpqn = 48;
+inline constexpr double kCapcomSnesLfoStepHertz = 1000.0 / 16384.0;
+inline constexpr s32 kCapcomSnesTremoloHalfDepthCentibels = 484;
 inline constexpr std::string_view kCapcomSnesInstrumentDomain = "capcom-snes.instrument";
 
 enum class CapcomSnesEngineVersion : u8 {

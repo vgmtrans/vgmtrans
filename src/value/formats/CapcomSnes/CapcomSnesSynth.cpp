@@ -24,12 +24,10 @@ using namespace core;
 
 namespace {
 
-constexpr double kLfoStepHertz = 1000.0 / 16384.0;
-constexpr double kVibratoBaseHertz = kLfoStepHertz;
-constexpr double kVibratoMaxHertz = 255.0 * kLfoStepHertz;
-constexpr double kTremoloBaseHertz = 2.0 * kLfoStepHertz;
-constexpr double kTremoloMaxHertz = 510.0 * kLfoStepHertz;
-constexpr s32 kTremoloHalfDepthCentibels = 484;
+constexpr double kVibratoBaseHertz = kCapcomSnesLfoStepHertz;
+constexpr double kVibratoMaxHertz = 255.0 * kCapcomSnesLfoStepHertz;
+constexpr double kTremoloBaseHertz = 2.0 * kCapcomSnesLfoStepHertz;
+constexpr double kTremoloMaxHertz = 510.0 * kCapcomSnesLfoStepHertz;
 
 struct InstrumentPitch {
   Tuning aggregate;
@@ -114,11 +112,11 @@ struct InstrumentPitch {
       },
       SynthModulator{
           .destination = SynthDestination::TremoloDepth,
-          .amount = kTremoloHalfDepthCentibels,
+          .amount = kCapcomSnesTremoloHalfDepthCentibels,
       },
       SynthModulator{
           .destination = SynthDestination::VolumeAttenuation,
-          .amount = kTremoloHalfDepthCentibels,
+          .amount = kCapcomSnesTremoloHalfDepthCentibels,
       },
   };
 }
