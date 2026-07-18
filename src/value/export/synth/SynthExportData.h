@@ -41,10 +41,7 @@ struct ResolvedSynthRegion {
 
 struct ResolvedSynthInstrument {
   const Instrument* instrument = nullptr;
-  // Target addressing is assigned during export. Source formats identify
-  // instruments by domain/key and never need to encode this convention.
-  u32 bank = 0;
-  u32 program = 0;
+  InstrumentAddress address;
   std::vector<ResolvedSynthRegion> regions;
 };
 

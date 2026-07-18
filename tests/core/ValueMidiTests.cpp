@@ -387,8 +387,7 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
   };
   const InstrumentSetAsset instrumentSet{
       .instruments = {Instrument{
-          .bank = 3,
-          .program = 9,
+          .explicitAddress = InstrumentAddress{.bank = 3, .program = 9},
           .identity = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
       }},
   };

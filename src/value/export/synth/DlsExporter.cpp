@@ -437,11 +437,11 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] Chunk inshChunk(const ResolvedSynthInstrument& instrument) {
-  const u32 dlsBank = (instrument.bank & 0x7f) << 8;
+  const u32 dlsBank = (instrument.address.bank & 0x7f) << 8;
   std::vector<u8> payload;
   writeLe32(payload, static_cast<u32>(instrument.regions.size()));
   writeLe32(payload, dlsBank);
-  writeLe32(payload, instrument.program);
+  writeLe32(payload, instrument.address.program);
   return makeChunk("insh", std::move(payload));
 }
 

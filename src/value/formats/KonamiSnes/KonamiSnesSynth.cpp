@@ -472,8 +472,7 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
       instrumentIndex = instruments.size();
       instrumentIndexByProgram.emplace(programKey, instrumentIndex);
       instruments.push_back(Instrument{
-          .bank = bank,
-          .program = program,
+          .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
           .name = info.percussion ? "Percussion" : fmt::format("Instrument {}", info.index),
           .range = input.reader.range(info.address, instrumentHeaderSize(version)),
           .generators = konamiVibratoGenerators(version),

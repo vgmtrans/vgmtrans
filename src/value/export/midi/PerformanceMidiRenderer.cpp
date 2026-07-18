@@ -116,8 +116,7 @@ void addExpression(MidiTrack& track, u64 tick, u8 channel, double linearGain, Le
 }
 
 struct MidiInstrumentSelection {
-  u32 bank = 0;
-  u32 program = 0;
+  InstrumentAddress address;
   bool forceBankSelect = false;
 };
 
@@ -125,8 +124,7 @@ struct MidiInstrumentSelection {
                                                           std::span<const InstrumentSetAsset* const> instrumentSets) {
   if (!event.sourceInstrument) {
     return MidiInstrumentSelection{
-        .bank = event.bank,
-        .program = event.program,
+        .address = resolveInstrumentAddress(InstrumentAddress{.bank = event.bank, .program = event.program}, {}),
         .forceBankSelect = event.forceBankSelect,
     };
   }
@@ -140,8 +138,7 @@ struct MidiInstrumentSelection {
     });
     if (found != instrumentSet->instruments.end()) {
       return MidiInstrumentSelection{
-          .bank = found->bank,
-          .program = found->program,
+          .address = resolveInstrumentAddress(found->explicitAddress, found->identity),
           .forceBankSelect = true,
       };
     }
@@ -150,8 +147,7 @@ struct MidiInstrumentSelection {
   // A sequential key is a deterministic fallback for incomplete collections.
   // This is an export policy, not a bank convention imposed on format code.
   return MidiInstrumentSelection{
-      .bank = event.sourceInstrument->key >> 7,
-      .program = event.sourceInstrument->key & 0x7f,
+      .address = resolveInstrumentAddress({}, event.sourceInstrument),
       .forceBankSelect = true,
   };
 }
@@ -412,18 +408,18 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // once and written to the first MIDI track by PerformanceMidiRenderer::render.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
           const auto selection = instrumentSelection(typedEvent, instrumentSets);
-          if (selection.bank != 0 || selection.forceBankSelect) {
+          if (selection.address.bank != 0 || selection.forceBankSelect) {
             track.events.push_back(BankSelect{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
-                .bank = static_cast<u16>(selection.bank),
+                .bank = static_cast<u16>(selection.address.bank),
                 .writeLsb = writeBankSelectLsb(options),
             });
           }
           track.events.push_back(ProgramChange{
               .tick = typedEvent.header.tick,
               .channel = channel,
-              .program = data7(selection.program),
+              .program = data7(selection.address.program),
           });
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
           if (resolveLevelResolution(options.volumeResolution, typedEvent.precisionHint,

@@ -305,7 +305,8 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instruments != nullptr, "second KonamiSnes asset should be an instrument set");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid melodic instrument");
   const Instrument& instrument = instruments->instruments.front();
-  expect(instrument.program == 0 && instrument.bank == 0, "instrument should preserve its bank/program selector");
+  expect(instrument.explicitAddress == InstrumentAddress{.bank = 0, .program = 0},
+         "instrument should preserve its explicit export address");
   expect(instrument.range.offset == 0x4000 && instrument.range.size == 7,
          "instrument should preserve its source header range");
   expect(instrument.regions.size() == 1, "instrument should contain one sample-backed region");

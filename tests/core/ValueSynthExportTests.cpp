@@ -159,8 +159,7 @@ void soundFontExporterWritesSfbkRiffFile() {
               .name = "Probe Instruments",
           },
       .instruments = {Instrument{
-          .bank = 1,
-          .program = 5,
+          .explicitAddress = InstrumentAddress{.bank = 1, .program = 5},
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
@@ -330,8 +329,7 @@ void dlsExporterWritesDlsRiffFile() {
               .name = "Probe Instruments",
           },
       .instruments = {Instrument{
-          .bank = 1,
-          .program = 5,
+          .explicitAddress = InstrumentAddress{.bank = 1, .program = 5},
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
@@ -537,8 +535,7 @@ void exportDiagnosticsPreserveSourceRanges() {
               .name = "Bad Region Set",
           },
       .instruments = {Instrument{
-          .bank = 0,
-          .program = 0,
+          .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
           .name = "Lead",
           .regions = {Region{
               .sample = SampleRef{.collection = validSampleCollection.metadata.id, .index = 9},
@@ -587,7 +584,7 @@ void synthExportAssignsPresetAddressFromSourceInstrumentIdentity() {
 
   const auto resolved = resolveSynthInstruments(instrumentSets, sampleCollections, sampleIndexes, diagnostics);
   expect(diagnostics.empty() && resolved.size() == 1, "source instrument fixture should resolve for synth export");
-  expect(resolved[0].bank == 1 && resolved[0].program == 5,
+  expect(resolved[0].address == InstrumentAddress{.bank = 1, .program = 5},
          "synth lowering should assign preset addressing from the neutral source key");
 }
 
