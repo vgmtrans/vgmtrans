@@ -73,7 +73,7 @@ std::string decodedTrackSnapshot(const TrackProgram& track) {
     if (!snapshot.empty()) {
       snapshot += '|';
     }
-    snapshot += hexAddress(command.address.value) + ':' + std::to_string(command.kind.value) + ':' +
+    snapshot += hexAddress(command.address.value) + ':' + std::to_string(command.opcode) + ':' +
                 std::to_string(command.encodedSize);
     for (const auto& operand : command.operands) {
       snapshot += ',' + operand.name + '=' + semanticValueSnapshot(operand.value);
@@ -281,11 +281,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
            "track should decode command " + std::to_string(index));
   }
   expect(firstTrack.commandBytes.empty(), "semantic CapcomSnes tracks should not retain a command-byte pool");
-  expect(firstTrack.commands[0].bytes.size == 0 &&
-             firstTrack.commands[0].kind.value == static_cast<u32>(CapcomSnesCommandKind::Tempo),
-         "CapcomSnes tempo should be a byte-free typed semantic command");
-  const SemanticOperand* tempo = semanticOperand(
-      firstTrack.commands[0], SemanticOperandId{static_cast<u32>(CapcomSnesOperand::TempoMicrosecondsPerQuarter)});
+  expect(firstTrack.commands[0].semantic() && firstTrack.commands[0].opcode == 0x05,
+         "CapcomSnes tempo should be a byte-free semantic command");
+  const SemanticOperand* tempo = semanticOperand(firstTrack.commands[0], "microseconds_per_quarter");
   expect(tempo != nullptr && std::get<u64>(tempo->value) == 42191 && tempo->encodedValue &&
              std::get<u64>(*tempo->encodedValue) == 0x1234,
          "tempo command should retain resolved playback meaning and its encoded value");
@@ -585,14 +583,14 @@ void capcomSnesSemanticAndPerformanceSnapshotsAreStable() {
   const auto& dialect = capcomSnesSequenceDialect();
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{7}, bytes), version, 0, 0x3000);
   const std::string decoded = decodedTrackSnapshot(track);
-  constexpr std::string_view expectedDecoded = "3000:8:3,microseconds_per_quarter=42191<4660>,flow=0->3003|"
-                                               "3003:11:2,instrument=0,flow=0->3005|"
-                                               "3005:10:2,linear_gain=0.403921569<64>,flow=0->3007|"
-                                               "3007:21:2,stereo_position=0<0>,linear_gain=0.89493202,flow=0->3009|"
-                                               "3009:23:3,type=0,value=32,flow=0->300C|"
-                                               "300C:23:3,type=2,value=32,flow=0->300F|"
-                                               "300F:1:1,duration_index=2,key_index=1,flow=0->3010|"
-                                               "3010:20:1,flow=4";
+  constexpr std::string_view expectedDecoded = "3000:5:3,microseconds_per_quarter=42191<4660>,flow=0->3003|"
+                                               "3003:8:2,instrument=0,flow=0->3005|"
+                                               "3005:7:2,linear_gain=0.403921569<64>,flow=0->3007|"
+                                               "3007:24:2,stereo_position=0<0>,linear_gain=0.89493202,flow=0->3009|"
+                                               "3009:26:3,type=0,value=32,flow=0->300C|"
+                                               "300C:26:3,type=2,value=32,flow=0->300F|"
+                                               "300F:65:1,duration_index=2,key_index=1,flow=0->3010|"
+                                               "3010:23:1,flow=4";
   expect(decoded == expectedDecoded, "CapcomSnes decoded-command golden changed:\n" + decoded);
 
   const SequenceProgram program{

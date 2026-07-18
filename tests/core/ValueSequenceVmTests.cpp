@@ -876,20 +876,18 @@ std::any createScheduledProbeProgramState(const SequenceProgram&) {
 Effects executeScheduledProbe(const SourceCommand& command, std::any& programState, std::any&, PerformanceEmitter& out,
                               VmApi& vm) {
   auto& state = std::any_cast<ScheduledProbeProgramState&>(programState);
-  switch (command.kind.value) {
-    case 1:
-      state.sharedValue = command.opcode;
-      return Effects::none();
-    case 2:
-      return Effects::wait(command.opcode);
-    case 3:
-      out.note(state.sharedValue, 1.0, 1);
-      return Effects::wait(command.opcode);
-    case 4:
-      return Effects{.step = vm.end()};
-    default:
-      return Effects{.step = vm.end()};
+  if (command.address.value == 0 || command.address.value == 2) {
+    state.sharedValue = command.opcode;
+    return Effects::none();
   }
+  if (command.address.value == 1) {
+    return Effects::wait(command.opcode);
+  }
+  if (command.address.value == 10 || command.address.value == 11) {
+    out.note(state.sharedValue, 1.0, 1);
+    return Effects::wait(command.opcode);
+  }
+  return Effects{.step = vm.end()};
 }
 
 void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
@@ -902,16 +900,16 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder0(track0);
-  builder0.addSemantic(Address{0}, 7, 1, {}, SemanticCommandKind{1}, {}, DecodeFlow::fallthroughTo(Address{1}));
-  builder0.addSemantic(Address{1}, 4, 1, {}, SemanticCommandKind{2}, {}, DecodeFlow::fallthroughTo(Address{2}));
-  builder0.addSemantic(Address{2}, 9, 1, {}, SemanticCommandKind{1}, {}, DecodeFlow::fallthroughTo(Address{3}));
-  builder0.addSemantic(Address{3}, 0, 1, {}, SemanticCommandKind{4}, {}, DecodeFlow::terminalFlow());
+  builder0.addSemantic(Address{0}, 7, 1, {}, {}, DecodeFlow::fallthroughTo(Address{1}));
+  builder0.addSemantic(Address{1}, 4, 1, {}, {}, DecodeFlow::fallthroughTo(Address{2}));
+  builder0.addSemantic(Address{2}, 9, 1, {}, {}, DecodeFlow::fallthroughTo(Address{3}));
+  builder0.addSemantic(Address{3}, 0, 1, {}, {}, DecodeFlow::terminalFlow());
 
   TrackProgram track1{.id = TrackId{1}, .sourceTrackNumber = 1, .startAddress = Address{10}};
   TrackProgramBuilder builder1(track1);
-  builder1.addSemantic(Address{10}, 2, 1, {}, SemanticCommandKind{3}, {}, DecodeFlow::fallthroughTo(Address{11}));
-  builder1.addSemantic(Address{11}, 0, 1, {}, SemanticCommandKind{3}, {}, DecodeFlow::fallthroughTo(Address{12}));
-  builder1.addSemantic(Address{12}, 0, 1, {}, SemanticCommandKind{4}, {}, DecodeFlow::terminalFlow());
+  builder1.addSemantic(Address{10}, 2, 1, {}, {}, DecodeFlow::fallthroughTo(Address{11}));
+  builder1.addSemantic(Address{11}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{12}));
+  builder1.addSemantic(Address{12}, 0, 1, {}, {}, DecodeFlow::terminalFlow());
 
   const SequenceProgram program{
       .dialect = dialect.id,

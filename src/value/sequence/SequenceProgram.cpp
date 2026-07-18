@@ -66,9 +66,9 @@ const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) 
   return &*found;
 }
 
-const SemanticOperand* semanticOperand(const SourceCommand& command, SemanticOperandId id) {
+const SemanticOperand* semanticOperand(const SourceCommand& command, std::string_view name) {
   const auto found =
-      std::ranges::find_if(command.operands, [id](const SemanticOperand& operand) { return operand.id == id; });
+      std::ranges::find_if(command.operands, [name](const SemanticOperand& operand) { return operand.name == name; });
   return found != command.operands.end() ? &*found : nullptr;
 }
 
@@ -116,13 +116,10 @@ const SourceCommand& TrackProgramBuilder::addDecoded(Address address, SourceRang
 }
 
 const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
-                                                      SemanticCommandKind kind, std::vector<SemanticOperand> operands,
-                                                      DecodeFlow flow, SourceAnnotationId annotation) {
+                                                      std::vector<SemanticOperand> operands, DecodeFlow flow,
+                                                      SourceAnnotationId annotation) {
   if (encodedSize == 0) {
     throw std::invalid_argument("Semantic sequence commands must include an opcode byte");
-  }
-  if (!kind.valid()) {
-    throw std::invalid_argument("Semantic sequence commands must have a command kind");
   }
   if (track_.addressIndex.find(address)) {
     throw std::invalid_argument("Sequence command address was decoded more than once");
@@ -136,7 +133,6 @@ const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode
       .encodedSize = encodedSize,
       .range = range,
       .annotation = annotation,
-      .kind = kind,
       .operands = std::move(operands),
       .flow = std::move(flow),
   });

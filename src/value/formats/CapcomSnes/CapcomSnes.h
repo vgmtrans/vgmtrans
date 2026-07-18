@@ -44,62 +44,6 @@ struct CapcomSnesLayout {
   std::optional<u32> spcDirAddress;
 };
 
-enum class CapcomSnesCommandKind : u32 {
-  Note = 1,
-  Rest,
-  ToggleTriplet,
-  ToggleSlur,
-  DottedNote,
-  ToggleOctaveUp,
-  NoteAttributes,
-  Tempo,
-  DurationRate,
-  Volume,
-  Instrument,
-  Octave,
-  GlobalTranspose,
-  Transpose,
-  Tuning,
-  PortamentoTime,
-  RepeatUntil,
-  RepeatBreak,
-  Jump,
-  End,
-  Pan,
-  MasterVolume,
-  Lfo,
-  EchoParam,
-  EchoOnOff,
-  ReleaseRate,
-  UnknownOneByte,
-  NoOperation,
-  Unsupported,
-};
-
-enum class CapcomSnesOperand : u32 {
-  KeyIndex = 1,
-  DurationIndex,
-  TempoMicrosecondsPerQuarter,
-  LinearGain,
-  StereoPosition,
-  TuningCents,
-  PortamentoMillisecondsPerCent,
-  Enabled,
-  ReleaseGain,
-  Attributes,
-  Rate,
-  Instrument,
-  Octave,
-  Semitones,
-  Slot,
-  Count,
-  Destination,
-  Type,
-  Value,
-  Argument,
-  Preset,
-};
-
 struct CapcomSnesSampleInfo {
   u8 srcn = 0;
   u32 dirEntryAddress = 0;
