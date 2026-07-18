@@ -29,3 +29,73 @@ target_link_libraries(vgmtrans-parity PRIVATE vgmtranscore)
 target_compile_features(vgmtrans-parity PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-parity-self-test COMMAND vgmtrans-parity --self-test)
+set_tests_properties(vgmtrans-parity-self-test PROPERTIES LABELS "parity;self-test")
+
+# Real game files cannot live in the repository. Point these cache entries at a
+# local corpus to register focused CTest cases. Each case compares the original
+# VGMRoot/VGMSeq path with the rewritten value path in the same executable.
+set(VGMTRANS_PARITY_CAPCOM_SNES_FILE "" CACHE FILEPATH "Capcom SNES RSN file used for original/value parity")
+set(VGMTRANS_PARITY_AKAO_SNES_FILE "" CACHE FILEPATH "Akao SNES RSN or SPC file used for original/value parity")
+set(VGMTRANS_PARITY_KONAMI_SNES_FILE "" CACHE FILEPATH "Konami SNES RSN or SPC file used for original/value parity")
+set(VGMTRANS_PARITY_AKAO_FILE "" CACHE FILEPATH "Akao PSF or raw file used for original/value parity")
+set(VGMTRANS_PARITY_NDS_FILE "" CACHE FILEPATH "NDS or 2SF file used for original/value parity")
+
+function(add_vgmtrans_parity_corpus_test test_name family mode corpus_file)
+  add_test(
+    NAME "vgmtrans-parity-${test_name}"
+    COMMAND $<TARGET_FILE:vgmtrans-parity> "${mode}" "${corpus_file}")
+  set_tests_properties(
+    "vgmtrans-parity-${test_name}"
+    PROPERTIES LABELS "parity;corpus;${family}")
+endfunction()
+
+if(VGMTRANS_PARITY_CAPCOM_SNES_FILE)
+  add_vgmtrans_parity_corpus_test(
+    capcom-snes-aram-summary capcom-snes capcom-snes-rsn-summary "${VGMTRANS_PARITY_CAPCOM_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    capcom-snes-aram-midi capcom-snes capcom-snes-rsn-midi "${VGMTRANS_PARITY_CAPCOM_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    capcom-snes-direct-summary capcom-snes capcom-snes-rsn-direct-summary "${VGMTRANS_PARITY_CAPCOM_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    capcom-snes-direct-midi capcom-snes capcom-snes-rsn-direct-midi "${VGMTRANS_PARITY_CAPCOM_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    capcom-snes-direct-synth capcom-snes capcom-snes-rsn-direct-synth "${VGMTRANS_PARITY_CAPCOM_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    capcom-snes-direct-export capcom-snes capcom-snes-rsn-direct-export "${VGMTRANS_PARITY_CAPCOM_SNES_FILE}")
+endif()
+
+if(VGMTRANS_PARITY_AKAO_SNES_FILE)
+  add_vgmtrans_parity_corpus_test(
+    akao-snes-summary akao-snes akao-snes-direct-summary "${VGMTRANS_PARITY_AKAO_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    akao-snes-midi akao-snes akao-snes-direct-midi "${VGMTRANS_PARITY_AKAO_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    akao-snes-synth akao-snes akao-snes-direct-synth "${VGMTRANS_PARITY_AKAO_SNES_FILE}")
+endif()
+
+if(VGMTRANS_PARITY_KONAMI_SNES_FILE)
+  add_vgmtrans_parity_corpus_test(
+    konami-snes-summary konami-snes konami-snes-direct-summary "${VGMTRANS_PARITY_KONAMI_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    konami-snes-midi konami-snes konami-snes-direct-midi "${VGMTRANS_PARITY_KONAMI_SNES_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    konami-snes-synth konami-snes konami-snes-direct-synth "${VGMTRANS_PARITY_KONAMI_SNES_FILE}")
+endif()
+
+if(VGMTRANS_PARITY_AKAO_FILE)
+  add_vgmtrans_parity_corpus_test(
+    akao-summary akao akao-direct-summary "${VGMTRANS_PARITY_AKAO_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    akao-midi akao akao-direct-midi "${VGMTRANS_PARITY_AKAO_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    akao-synth akao akao-direct-synth "${VGMTRANS_PARITY_AKAO_FILE}")
+endif()
+
+if(VGMTRANS_PARITY_NDS_FILE)
+  add_vgmtrans_parity_corpus_test(
+    nds-summary nds nds-direct-summary "${VGMTRANS_PARITY_NDS_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    nds-midi nds nds-direct-midi "${VGMTRANS_PARITY_NDS_FILE}")
+  add_vgmtrans_parity_corpus_test(
+    nds-synth nds nds-direct-synth "${VGMTRANS_PARITY_NDS_FILE}")
+endif()
