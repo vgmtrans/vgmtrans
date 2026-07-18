@@ -134,6 +134,18 @@ void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
   });
 }
 
+void PerformanceEmitter::stereoBalance(StereoBalancePerformanceEvent event) {
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
+}
+
+void PerformanceEmitter::stereoBalance(double leftGain, double rightGain) {
+  stereoBalance(StereoBalancePerformanceEvent{
+      .leftGain = leftGain,
+      .rightGain = rightGain,
+  });
+}
+
 void PerformanceEmitter::masterLevel(MasterLevelPerformanceEvent event) {
   event.header = header();
   track_.events.emplace_back(std::move(event));

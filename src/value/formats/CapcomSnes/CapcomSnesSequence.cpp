@@ -59,68 +59,21 @@ constexpr std::array<u8, 17> kVolumeCurve{0x00, 0x0c, 0x19, 0x26, 0x33, 0x40, 0x
                                           0x73, 0x80, 0x8c, 0x99, 0xb3, 0xcc, 0xe6, 0xff};
 constexpr std::array<u8, 22> kPanCurve{0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29, 0x34, 0x42, 0x51,
                                        0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d, 0x7e, 0x7f, 0x7f};
-constexpr double kPiOverTwo = 1.57079632679489661923;
 constexpr double kLfoStepHertz = 1000.0 / 16384.0;
 constexpr double kVibratoBaseHertz = kLfoStepHertz;
 constexpr double kVibratoMaxHertz = 255.0 * kLfoStepHertz;
 constexpr double kTremoloMuteFloorCentibels = 960.0;
 constexpr double kTremoloHalfDepthCentibels = 484.0;
 
-struct Pan {
-  double position = 0.0;
-  double gain = 1.0;
+struct StereoBalance {
+  double leftGain = 1.0;
+  double rightGain = 1.0;
 };
 
 [[nodiscard]] int interpolate(const auto& table, int index, int fraction) {
   const int lower = table[index];
   const int upper = table[index + 1];
   return lower + (((upper - lower) * fraction) >> 8);
-}
-
-[[nodiscard]] u8 quantizedPan(double arcPosition) {
-  u8 midiPan = static_cast<u8>(std::clamp<int>(static_cast<int>(std::lround(arcPosition * 126.0)), 0, 126));
-  if (midiPan != 0) {
-    ++midiPan;
-  }
-  return midiPan;
-}
-
-[[nodiscard]] std::pair<double, double> panBalance(u8 midiPan) {
-  if (midiPan == 0 || midiPan == 1) {
-    return {1.0, 0.0};
-  }
-  if (midiPan == 64) {
-    const double center = std::sqrt(2.0) / 2.0;
-    return {center, center};
-  }
-  if (midiPan == 127) {
-    return {0.0, 1.0};
-  }
-
-  const double arcPosition = (midiPan - 1) / 126.0;
-  return {std::cos(kPiOverTwo * arcPosition), std::sin(kPiOverTwo * arcPosition)};
-}
-
-[[nodiscard]] Pan panFromBalance(double sourceLeft, double sourceRight) {
-  u8 midiPan = 64;
-  if (sourceRight == 0.0) {
-    midiPan = 0;
-  } else if (sourceLeft == sourceRight) {
-    midiPan = 64;
-  } else if (sourceLeft == 0.0) {
-    midiPan = 127;
-  } else {
-    midiPan = quantizedPan(std::atan2(sourceRight, sourceLeft) / kPiOverTwo);
-  }
-
-  // The source pan law must be represented by a discrete MIDI pan position.
-  // Base gain compensation on that same position so rounding cannot change the
-  // loudness independently of pan during export.
-  const auto [midiLeft, midiRight] = panBalance(midiPan);
-  return Pan{
-      .position = (static_cast<double>(midiPan) / 127.0) * 2.0 - 1.0,
-      .gain = (sourceLeft + sourceRight) / (midiLeft + midiRight),
-  };
 }
 
 [[nodiscard]] double volumeGain(CapcomSnesEngineVersion version, u8 rawVolume) {
@@ -153,18 +106,18 @@ struct Pan {
   return rawTempo == 0 ? 60000000 : static_cast<u32>(std::round(kCapcomSnesPpqn * (125 * 0x40) * 2 * 256.0 / rawTempo));
 }
 
-[[nodiscard]] Pan pan(CapcomSnesEngineVersion version, u8 rawPan) {
+[[nodiscard]] StereoBalance stereoBalance(CapcomSnesEngineVersion version, u8 rawPan) {
   const auto biasedPan = static_cast<u8>(rawPan + 0x80);
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
     const double position = biasedPan == 255 ? 1.0 : biasedPan / 256.0;
-    return panFromBalance(1.0 - position, position);
+    return StereoBalance{.leftGain = 1.0 - position, .rightGain = position};
   }
 
   const u16 rightPosition = static_cast<u16>(biasedPan) * 20;
   const u16 leftPosition = 0x1400 - rightPosition;
   const double left = interpolate(kPanCurve, leftPosition >> 8, leftPosition & 0xff) / 128.0;
   const double right = interpolate(kPanCurve, rightPosition >> 8, rightPosition & 0xff) / 128.0;
-  return panFromBalance(left, right);
+  return StereoBalance{.leftGain = left, .rightGain = right};
 }
 
 [[nodiscard]] double normalizedDepth(u8 value) {
@@ -554,12 +507,12 @@ using OpcodeProfile = std::array<CommandDefinition, 0x20>;
       "Pan", SequenceSemantic::Pan,
       [](Decode& d) {
         const auto raw = d.rawU8("raw");
-        const auto converted = math::pan(d.version(), raw.value);
-        d.resolvedValue("stereo_position", raw, converted.position);
-        d.derived("linear_gain", converted.gain);
+        const auto balance = math::stereoBalance(d.version(), raw.value);
+        d.resolvedValue("left_gain", raw, balance.leftGain);
+        d.derived("right_gain", balance.rightGain);
       },
       [](Args a, Playback& p) {
-        p.out.pan(a.f64("stereo_position"), LevelScale::linearFromLinear(a.f64("linear_gain")));
+        p.out.stereoBalance(a.f64("left_gain"), a.f64("right_gain"));
         return Effects{};
       });
 

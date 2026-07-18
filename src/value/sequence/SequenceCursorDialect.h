@@ -60,6 +60,8 @@ struct DecodeCursorRuntime {
   void pan(double) {}
   void panAt(u64, double) {}
   void pan(double, double) {}
+  void stereoBalance(double, double) {}
+  void stereoBalanceAt(u64, double, double) {}
   void masterLevel(double) {}
   void reverb(double) {}
   void tuning(double) {}
@@ -186,6 +188,10 @@ struct RenderCursorRuntime {
   void pan(double stereoPosition) { out.pan(stereoPosition); }
   void panAt(u64 tick, double stereoPosition) { out.at(tick).pan(stereoPosition); }
   void pan(double stereoPosition, double linearGain) { out.pan(stereoPosition, linearGain); }
+  void stereoBalance(double leftGain, double rightGain) { out.stereoBalance(leftGain, rightGain); }
+  void stereoBalanceAt(u64 tick, double leftGain, double rightGain) {
+    out.at(tick).stereoBalance(leftGain, rightGain);
+  }
   void masterLevel(double linearGain) { out.masterLevel(linearGain); }
   void reverb(double send) { out.reverb(send); }
   void tuning(double cents) { out.tuning(cents); }

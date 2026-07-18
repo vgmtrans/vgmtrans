@@ -116,6 +116,9 @@ std::string performanceTrackSnapshot(const PerformanceTrack& track) {
           } else if constexpr (std::is_same_v<T, PanPerformanceEvent>) {
             snapshot += "pan@" + std::to_string(typedEvent.header.tick) + '=' +
                         snapshotNumber(typedEvent.stereoPosition) + ',' + snapshotNumber(typedEvent.linearGain);
+          } else if constexpr (std::is_same_v<T, StereoBalancePerformanceEvent>) {
+            snapshot += "balance@" + std::to_string(typedEvent.header.tick) + '=' +
+                        snapshotNumber(typedEvent.leftGain) + ',' + snapshotNumber(typedEvent.rightGain);
           } else if constexpr (std::is_same_v<T, ModulationPerformanceEvent>) {
             snapshot += "mod@" + std::to_string(typedEvent.header.tick) + ':' +
                         std::to_string(static_cast<int>(typedEvent.target)) + '=' + snapshotNumber(typedEvent.amount);
@@ -585,7 +588,7 @@ void capcomSnesSemanticAndPerformanceSnapshotsAreStable() {
   constexpr std::string_view expectedDecoded = "3000:5:3,microseconds_per_quarter=42191<4660>,flow=0->3003|"
                                                "3003:8:2,instrument=0,flow=0->3005|"
                                                "3005:7:2,linear_gain=0.403921569<64>,flow=0->3007|"
-                                               "3007:24:2,stereo_position=0.00787401575<0>,linear_gain=0.89493202,flow=0->3009|"
+                                               "3007:24:2,left_gain=0.6328125<0>,right_gain=0.6328125,flow=0->3009|"
                                                "3009:26:3,type=0,value=32,flow=0->300C|"
                                                "300C:26:3,type=2,value=32,flow=0->300F|"
                                                "300F:65:1,duration_index=2,key_index=1,flow=0->3010|"
@@ -602,7 +605,7 @@ void capcomSnesSemanticAndPerformanceSnapshotsAreStable() {
   const std::string performance = performanceTrackSnapshot(SequenceVm().render(program, dialect).tracks[0]);
   constexpr std::string_view expectedPerformance =
       "reverb@0=0|mono@0=0|tempo@0=42191|instrument@0=capcom-snes.instrument:0|"
-      "level@0=0.403921569/q256|pan@0=0.00787401575,0.89493202|mod@0:0=0|mod@0:0=0.251968504|"
+      "level@0=0.403921569/q256|balance@0=0.6328125,0.6328125|mod@0:0=0|mod@0:0=0.251968504|"
       "mod@0:1=0.625441449|mod@0:3=0.625441449|note@0=0/6";
   expect(performance == expectedPerformance, "CapcomSnes neutral-performance golden changed:\n" + performance);
 }
@@ -804,10 +807,10 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
          "CapcomSnes note event should link back to the source command");
 
   const auto pan = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
-    return std::holds_alternative<PanPerformanceEvent>(event);
+    return std::holds_alternative<StereoBalancePerformanceEvent>(event);
   });
   expect(pan != performance.tracks[0].events.end(), "CapcomSnes pan command should emit a target-neutral pan event");
-  expect(std::get<PanPerformanceEvent>(*pan).header.tick == 18,
+  expect(std::get<StereoBalancePerformanceEvent>(*pan).header.tick == 18,
          "CapcomSnes pan event should occur after the note advances the VM clock");
 }
 
@@ -853,8 +856,9 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 2, "CapcomSnes pan fixture should decode pan and end");
 
-  const SourceField* linearGain = fieldWithName(commandAnnotation(annotations, track.commands[0]), "linear_gain");
-  expect(linearGain != nullptr, "CapcomSnes pan annotation should expose the source pan law gain compensation");
+  const SourceAnnotation& panAnnotation = commandAnnotation(annotations, track.commands[0]);
+  expect(fieldWithName(panAnnotation, "left_gain") != nullptr && fieldWithName(panAnnotation, "right_gain") != nullptr,
+         "CapcomSnes pan annotation should expose the source engine's stereo gains");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -866,9 +870,9 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   expect(performance.diagnostics.empty(), "CapcomSnes pan fixture should render without diagnostics");
   expect(performance.tracks[0].events.size() == 3,
          "CapcomSnes pan fixture should emit initial defaults and one pan event");
-  const auto* performancePan = std::get_if<PanPerformanceEvent>(&performance.tracks[0].events[2]);
-  expect(performancePan != nullptr && performancePan->linearGain < 1.0,
-         "CapcomSnes pan performance should retain target-neutral gain compensation");
+  const auto* performancePan = std::get_if<StereoBalancePerformanceEvent>(&performance.tracks[0].events[2]);
+  expect(performancePan != nullptr && performancePan->rightGain > performancePan->leftGain,
+         "CapcomSnes pan performance should retain the source engine's stereo balance");
 
   const MidiSequence midi = PerformanceMidiRenderer().render(performance);
   expect(midi.tracks[0].events.size() == 6,

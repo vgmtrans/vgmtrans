@@ -100,6 +100,13 @@ struct PanPerformanceEvent {
   bool hasLinearGain = false;
 };
 
+struct StereoBalancePerformanceEvent {
+  PerformanceEventHeader header;
+  // Source-engine channel gains before any target pan-law quantization.
+  double leftGain = 1.0;
+  double rightGain = 1.0;
+};
+
 struct MasterLevelPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted master loudness as linear amplitude/gain.
@@ -209,8 +216,9 @@ struct MarkerPerformanceEvent {
 
 using PerformanceEvent =
     std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
-                 LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent, MasterLevelPerformanceEvent,
-                 ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
+                 LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
+                 StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
+                 MonoModePerformanceEvent, TuningPerformanceEvent,
                  GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
                  PortamentoTimePerformanceEvent, PortamentoControlPerformanceEvent, PitchBendPerformanceEvent,
                  PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent,

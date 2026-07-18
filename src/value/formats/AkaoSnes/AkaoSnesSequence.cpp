@@ -166,40 +166,8 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
   return std::clamp(static_cast<double>(volume) / 127.0, 0.0, 1.0);
 }
 
-[[nodiscard]] u8 percentPanToLegacyMidi(double percent) {
-  u8 midiPan = static_cast<u8>(std::round(std::clamp(percent, 0.0, 1.0) * 126.0));
-  if (midiPan != 0) {
-    ++midiPan;
-  }
-  return midiPan;
-}
-
-[[nodiscard]] u8 linearPercentPanToLegacyMidi(double percent) {
-  constexpr double kPiOverTwo = 1.57079632679489661923;
-  percent = std::clamp(percent, 0.0, 1.0);
-  if (percent <= 0.0) {
-    return 0;
-  }
-  if (percent == 0.5) {
-    return 64;
-  }
-  if (percent >= 1.0) {
-    return 127;
-  }
-  return percentPanToLegacyMidi(std::atan2(percent, 1.0 - percent) / kPiOverTwo);
-}
-
-[[nodiscard]] u8 linear7BitPanToLegacyMidi(u8 rawPan) {
-  if (rawPan == 127) {
-    ++rawPan;
-  }
-  return linearPercentPanToLegacyMidi(static_cast<double>(rawPan) / 128.0);
-}
-
-[[nodiscard]] double stereoPositionFromRawPan(u8 pan) {
-  const u8 linearPan = linearPercentPanToLegacyMidi(static_cast<double>(pan) / 255.0);
-  const u8 midiPan = linear7BitPanToLegacyMidi(linearPan);
-  return std::clamp((static_cast<double>(midiPan) / 127.0) * 2.0 - 1.0, -1.0, 1.0);
+[[nodiscard]] double rightGainFromPan(u8 pan) {
+  return pan / 255.0;
 }
 
 [[nodiscard]] double tuningCents(u8 tuning) {
@@ -2178,7 +2146,8 @@ struct AkaoSnesCursorReader {
       case EventType::Pan: {
         cmd.name("Pan", SequenceSemantic::Pan);
         const u8 pan = static_cast<u8>(cmd.u8("pan") << (state.pan8Bit ? 0 : 1));
-        rt.pan(stereoPositionFromRawPan(pan));
+        const double rightGain = rightGainFromPan(pan);
+        rt.stereoBalance(1.0 - rightGain, rightGain);
         return cmd.next();
       }
 
@@ -2192,7 +2161,8 @@ struct AkaoSnesCursorReader {
         }
         const u8 pan = static_cast<u8>(cmd.u8("pan") << (state.pan8Bit ? 0 : 1));
         if (fadeLength == 0) {
-          rt.pan(stereoPositionFromRawPan(pan));
+          const double rightGain = rightGainFromPan(pan);
+          rt.stereoBalance(1.0 - rightGain, rightGain);
         } else {
           cmd.sourceOnly();
         }

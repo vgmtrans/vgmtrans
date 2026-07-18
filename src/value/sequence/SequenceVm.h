@@ -65,6 +65,8 @@ public:
   void pan(PanPerformanceEvent event);
   void pan(double stereoPosition);
   void pan(double stereoPosition, double linearGain);
+  void stereoBalance(StereoBalancePerformanceEvent event);
+  void stereoBalance(double leftGain, double rightGain);
   void masterLevel(MasterLevelPerformanceEvent event);
   void masterLevel(double linearGain);
   void reverb(ReverbPerformanceEvent event);
