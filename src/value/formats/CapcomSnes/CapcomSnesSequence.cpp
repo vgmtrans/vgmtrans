@@ -704,19 +704,6 @@ using OpcodeProfile = std::array<CommandDefinition, 0x20>;
   };
 }
 
-[[nodiscard]] SourceRange trackRange(ByteReader reader, const TrackProgram& track, u32 fallback) {
-  if (track.commands.empty()) {
-    return reader.range(fallback, 0);
-  }
-  u64 begin = track.commands.front().range.offset;
-  u64 end = track.commands.front().range.endOffset();
-  for (const auto& command : track.commands) {
-    begin = std::min(begin, command.range.offset);
-    end = std::max(end, command.range.endOffset());
-  }
-  return reader.range(begin, end - begin);
-}
-
 }  // namespace
 
 const SequenceDialect& capcomSnesSequenceDialect() {
@@ -729,43 +716,27 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVers
                                          std::vector<Diagnostic>* diagnostics,
                                          std::optional<SourceAnnotationId> parentAnnotation,
                                          std::optional<AssetId> sequenceAsset) {
-  std::optional<SourceAnnotationId> trackAnnotation;
-  if (sourceMap != nullptr) {
-    auto annotation = sourceMap
-                          ->annotation(SourceRole::SequenceTrack, "Track " + std::to_string(sourceTrackNumber),
-                                       reader.range(startAddress, 0))
-                          .kind("track");
-    if (sequenceAsset) {
-      annotation.owner(ObjectRefs::sequenceTrack(*sequenceAsset, sourceTrackNumber));
-    }
-    if (parentAnnotation) {
-      annotation.parent(*parentAnnotation);
-    }
-    trackAnnotation = annotation.id();
-  }
-
   const u32 end = static_cast<u32>(reader.size());
-  auto track = decodeLinearBytecodeTrack(
-      reader, sourceTrackNumber, startAddress, LinearBytecodeDecodePolicy{.maxCommands = 4096}, [&](u32 offset) {
-        auto command = decodeCommand(reader, offset, end, version, diagnostics);
-        command.annotation = projectDecodedCommand(sourceMap, command, trackAnnotation);
-        return command;
-      });
-  if (sourceMap != nullptr && trackAnnotation) {
-    AnnotationBuilder{*sourceMap, *trackAnnotation}.range(trackRange(reader, track, startAddress));
-  }
-  return track;
+  return decodeSemanticLinearTrack(reader,
+                                   TrackDecodeInput{
+                                       .sequenceAsset = sequenceAsset,
+                                       .trackIndex = sourceTrackNumber,
+                                       .startOffset = startAddress,
+                                       .parentAnnotation = parentAnnotation,
+                                       .sourceMap = sourceMap,
+                                       .diagnostics = diagnostics,
+                                   },
+                                   [reader, end, version, diagnostics](u32 offset) {
+                                     return decodeCommand(reader, offset, end, version, diagnostics);
+                                   });
 }
 
-SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const CapcomSnesLayout& layout, AssetId sequenceId,
-                                             std::string_view displayName, SourceMapBuilder* sourceMap,
-                                             std::vector<Diagnostic>* diagnostics) {
-  const u32 headerSize = (layout.priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
-  const SourceRange headerRange = input.reader.range(layout.sequenceHeaderAddress, headerSize);
-
+SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayout& layout, AssetId sequenceId,
+                                         SourceRange sequenceRange, SourceMapBuilder* sourceMap,
+                                         std::vector<Diagnostic>* diagnostics) {
   SourceAnnotationId headerAnnotation;
   if (sourceMap != nullptr) {
-    headerAnnotation = sourceMap->header("Sequence Header", headerRange)
+    headerAnnotation = sourceMap->header("Sequence Header", sequenceRange)
                            .kind("capcom-snes-sequence-header")
                            .owner(ObjectRefs::sequence(sequenceId))
                            .id();
@@ -782,40 +753,29 @@ SequenceProgramAsset parseCapcomSnesSequence(const ScanInput& input, const Capco
   for (u32 pointerIndex = kCapcomSnesMaxTracks; pointerIndex-- > 0;) {
     const u32 sourceTrackNumber = kCapcomSnesMaxTracks - 1 - pointerIndex;
     const u32 pointerOffset = pointerBase + pointerIndex * 2;
-    const SourceRange pointerRange = input.reader.range(pointerOffset, 2);
-    const u16 trackAddress = input.reader.be16(pointerOffset);
+    const SourceRange pointerRange = reader.range(pointerOffset, 2);
+    const u16 trackAddress = reader.be16(pointerOffset);
     if (trackAddress == 0) {
       continue;
     }
 
     std::optional<SourceAnnotationId> pointerAnnotation;
     if (sourceMap != nullptr) {
-      auto annotation =
-          sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{input.reader.range(trackAddress, 1)})
-              .kind("capcom-snes-track-pointer")
-              .description(fmt::format("Track starts at ${:04X}", trackAddress))
-              .derived("source_track", sourceTrackNumber)
-              .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
+      auto annotation = sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{reader.range(trackAddress, 1)})
+                            .kind("capcom-snes-track-pointer")
+                            .description(fmt::format("Track starts at ${:04X}", trackAddress))
+                            .derived("source_track", sourceTrackNumber)
+                            .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
       if (headerAnnotation.valid()) {
         annotation.parent(headerAnnotation);
       }
       pointerAnnotation = annotation.id();
     }
 
-    program.tracks.push_back(decodeCapcomSnesSourceTrack(input.reader, layout.version, sourceTrackNumber, trackAddress,
+    program.tracks.push_back(decodeCapcomSnesSourceTrack(reader, layout.version, sourceTrackNumber, trackAddress,
                                                          sourceMap, diagnostics, pointerAnnotation, sequenceId));
   }
-
-  return SequenceProgramAsset{
-      .metadata =
-          AssetMetadata{
-              .id = sequenceId,
-              .format = "CapcomSnes",
-              .name = std::string(displayName),
-              .range = headerRange,
-          },
-      .program = std::move(program),
-  };
+  return program;
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

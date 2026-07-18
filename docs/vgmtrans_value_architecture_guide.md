@@ -410,11 +410,13 @@ A simple scanner can read naturally:
 
 ```cpp
 ScanResultBuilder result(input, "CapcomSnes");
+const auto sequence = result.reserveSequence();
+const SourceRange sequenceRange = /* format header range */;
 
-const auto sequence = result.sequence([&](AssetId id) {
-  return parseCapcomSnesSequence(input, layout, id, displayName,
-                                 &result.sourceMap(), &diagnostics);
-});
+result.sequence(sequence, displayName, sequenceRange)
+      .program(decodeCapcomSnesSequence(
+          input.reader, layout, sequence.id, sequenceRange,
+          &result.sourceMap(), &result.diagnostics()));
 
 result.collection(displayName, capcomCollectionKey(input.source.id))
       .sequence(sequence);
@@ -689,6 +691,8 @@ The code provides linear and reachable bytecode walkers. They accept a command d
 - `decodeReachableBytecodeBlocks`
 
 A linear track is mostly decoded in byte order. A reachable track follows stored static targets such as jumps and calls. Cursor-prefixed wrappers adapt legacy command readers to these same walkers.
+
+Semantic formats normally call `decodeSemanticLinearTrack`. It wraps the linear walker with the shared track lifecycle: create the track annotation, project each already-decoded command, and finalize the track's source range. Format code supplies only the one-command decoder.
 
 ### 14.5 `SequenceVm`
 
@@ -969,9 +973,9 @@ NDS also shows that the architecture can handle recovery paths. Normal SSEQ deco
 
 The Capcom SNES module shows the “single source, explicit collection” path.
 
-The scanner finds the layout, reserves sequence/instrument/sample IDs, parses instrument/sample information when the instrument table and SPC DIR are detected, always emits the sequence, and creates one collection for the source. If synth information is unavailable, the collection still has the sequence and a warning.
+The scanner finds the layout, reserves sequence/instrument/sample IDs, parses instrument/sample information when the instrument table and SPC DIR are detected, always emits the sequence, and creates one collection for the source. It owns asset metadata while `decodeCapcomSnesSequence` returns only the neutral `SequenceProgram`. If synth information is unavailable, the collection still has the sequence and a warning.
 
-Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single source of command behavior. Each entry owns presentation, source reads, conversion, discovery flow, and playback side-by-side. Decode reads every operand once, stores encoded and resolved values where they differ, and records control flow; the track keeps no command-byte pool. Generic command projection builds its `SourceMap` view. The same profile entry is selected during rendering by program profile and opcode, and the global scheduler supplies per-track state. The executor cannot access source bytes by construction.
+Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single source of command behavior. Each entry owns presentation, source reads, conversion, discovery flow, and playback side-by-side. Decode reads every operand once, stores encoded and resolved values where they differ, and records control flow; the track keeps no command-byte pool. `decodeSemanticLinearTrack` owns walking, command projection, and track annotation finalization, so the format's track function supplies only `decodeCommand`. The same profile entry is selected during rendering by program profile and opcode, and the global scheduler supplies per-track state. The executor cannot access source bytes by construction.
 
 The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture.
 
@@ -1028,7 +1032,7 @@ Use `ByteReader` for random access and `RecordReader` for sequential records. `R
 
 ### Step 4: Build assets
 
-Return `SequenceProgramAsset`, `InstrumentSetAsset`, `SampleCollectionAsset`, or `MiscAsset` values. Use `ScanResultBuilder` to allocate IDs and metadata.
+Use `ScanResultBuilder` to allocate IDs and attach metadata. A source decoder should return the narrow neutral value it owns—for example, Capcom's sequence decoder returns `SequenceProgram` while the scanner registers it as a sequence asset.
 
 ### Step 5: Decode sequences into semantic commands
 
@@ -1040,7 +1044,7 @@ Define:
 - a per-program profile in `SequenceProgram::config`;
 - a program-state type only when the driver has real shared state;
 - a `TrackState` type for driver-local mutable playback state; and
-- a track decoder using `decodeLinearBytecodeTrack` or `decodeReachableBytecodeBlocks`.
+- a track decoder using `decodeSemanticLinearTrack` (or a reachable-block wrapper when the format requires one).
 
 Use `SemanticCommandDecoder` and `SemanticCommandArgs` to keep generic IR construction and type erasure out of format code. The decoder reads bytes once and generic projection creates source annotations. Playback reads only named resolved operands and emits neutral performance events. It should not implement global loop export policy and must never read source bytes.
 
@@ -1100,7 +1104,7 @@ New formats enter through `FormatDefinition` and `Session::registerFormat`, whic
 
 ### 21.6 `ScanResultBuilder`
 
-`ScanResultBuilder` is the intended scanner authoring API. It creates assets, explicit collections, facts, diagnostics, source annotations, and extracted sources. It tracks reserved handles and validates that referenced handles were committed.
+`ScanResultBuilder` is the intended scanner authoring API. It creates assets, explicit collections, facts, diagnostics, source annotations, and extracted sources. It tracks reserved handles and validates that referenced handles were committed. Parsers can append directly to its diagnostic collection instead of creating a temporary vector and copying diagnostics back into the result.
 
 This is a major readability win for format code.
 

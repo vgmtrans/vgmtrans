@@ -28,7 +28,7 @@ using namespace core;
     return {};
   }
 
-  // Keep this file as wiring: layout discovery, sequence parsing, and synth parsing each stay in their own file.
+  // Keep this file as wiring: layout discovery, sequence decoding, and synth parsing each stay in their own file.
   const std::string displayName = capcomSnesSourceDisplayName(input.source);
   ScanResultBuilder result(input, "CapcomSnes");
   const auto sequence = result.reserveSequence();
@@ -44,25 +44,22 @@ using namespace core;
   }
 
   const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
-  static_cast<void>(result.sequence(sequence, [&](AssetId id) {
-    std::vector<Diagnostic> sequenceDiagnostics;
-    auto asset = parseCapcomSnesSequence(input, *layout, id, displayName, &result.sourceMap(), &sequenceDiagnostics);
-    for (auto& diagnostic : sequenceDiagnostics) {
-      result.diagnostic(std::move(diagnostic));
-    }
-    return asset;
-  }));
+  const u32 headerSize = (layout->priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
+  const SourceRange sequenceRange = input.reader.range(layout->sequenceHeaderAddress, headerSize);
+  result.sequence(sequence, displayName, sequenceRange)
+      .program(decodeCapcomSnesSequence(input.reader, *layout, sequence.id, sequenceRange, &result.sourceMap(),
+                                        &result.diagnostics()));
 
   auto collection = result.collection(displayName, capcomCollectionKey(input.source.id));
   collection.sequence(sequence);
 
   if (hasInstrumentSet) {
-    static_cast<void>(result.instrumentSet(instrumentSet, [&](AssetId id) {
+    result.instrumentSet(instrumentSet, [&](AssetId id) {
       return parseCapcomSnesInstrumentSet(input, result, id, samples, instrumentInfos, sampleInfos, displayName);
-    }));
-    static_cast<void>(result.sampleCollection(samples, [&](AssetId id) {
+    });
+    result.sampleCollection(samples, [&](AssetId id) {
       return parseCapcomSnesSamples(input, id, sampleInfos, displayName, &result.sourceMap());
-    }));
+    });
     collection.instrumentSet(instrumentSet).samples(samples);
   }
 

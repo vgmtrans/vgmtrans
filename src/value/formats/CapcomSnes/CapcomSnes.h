@@ -78,11 +78,10 @@ struct CapcomSnesInstrumentInfo {
     std::optional<core::SourceAnnotationId> parent = std::nullopt,
     std::optional<core::AssetId> sequenceAsset = std::nullopt);
 
-[[nodiscard]] core::SequenceProgramAsset parseCapcomSnesSequence(const core::ScanInput& input,
-                                                                 const CapcomSnesLayout& layout,
-                                                                 core::AssetId sequenceId, std::string_view displayName,
-                                                                 core::SourceMapBuilder* sourceMap = nullptr,
-                                                                 std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgram decodeCapcomSnesSequence(core::ByteReader reader, const CapcomSnesLayout& layout,
+                                                             core::AssetId sequenceId, core::SourceRange sequenceRange,
+                                                             core::SourceMapBuilder* sourceMap = nullptr,
+                                                             std::vector<core::Diagnostic>* diagnostics = nullptr);
 
 [[nodiscard]] std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(core::ByteReader reader,
                                                                                    u32 instrumentTableAddress,

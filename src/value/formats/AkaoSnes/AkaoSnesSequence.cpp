@@ -2810,7 +2810,7 @@ TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesSequence
       .maxCommands = 16384,
   };
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
-  const auto trackAnnotation = createCursorTrackAnnotation(reader, input);
+  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
   if (trackAnnotation) {
     decodeContext.parentAnnotation = trackAnnotation;
   }
@@ -2827,7 +2827,7 @@ TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesSequence
   TrackProgram track =
       decodeReachableBytecodeBlocks(reader, cursorBytecodeEnd(reader, input), input.startOffset, input.trackIndex,
                                     ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
-  updateCursorTrackAnnotation(reader, input, trackAnnotation, track);
+  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
   return track;
 }
 

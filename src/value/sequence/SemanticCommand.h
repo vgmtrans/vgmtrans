@@ -8,6 +8,7 @@
 
 #include "value/base/RecordReader.h"
 #include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/CommandSourceMap.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -213,5 +214,24 @@ private:
   std::vector<SemanticOperand> operands_;
   DecodeFlow flow_;
 };
+
+// The format supplies only how to decode one command. This wrapper owns the
+// repeated track lifecycle: walking control flow, projecting command source-map
+// entries, and finishing the parent track annotation.
+template <class DecodeCommand>
+[[nodiscard]] TrackProgram decodeSemanticLinearTrack(ByteReader reader, TrackDecodeInput input,
+                                                     DecodeCommand decodeCommand) {
+  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
+  const auto decodeAndProject = [&](u32 offset) {
+    auto command = decodeCommand(offset);
+    command.annotation = projectDecodedCommand(input.sourceMap, command, trackAnnotation);
+    return command;
+  };
+  TrackProgram track =
+      decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
+                                LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeAndProject);
+  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
+  return track;
+}
 
 }  // namespace vgmtrans::core

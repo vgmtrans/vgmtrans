@@ -42,16 +42,12 @@ using namespace core;
   const auto instrumentSet = result.reserveInstrumentSet();
   const auto samples = result.reserveSampleCollection();
 
-  std::vector<Diagnostic> diagnostics;
   auto sequenceAsset =
-      parseAkaoSnesSequence(input, *layout, sequence.id, displayName, &result.sourceMap(), &diagnostics);
-  for (auto& diagnostic : diagnostics) {
-    result.diagnostic(std::move(diagnostic));
-  }
+      parseAkaoSnesSequence(input, *layout, sequence.id, displayName, &result.sourceMap(), &result.diagnostics());
   if (sequenceAsset.program.tracks.empty()) {
     return {};
   }
-  static_cast<void>(result.sequence(sequence, [&](AssetId) { return std::move(sequenceAsset); }));
+  result.sequence(sequence, [&](AssetId) { return std::move(sequenceAsset); });
 
   auto collection = result.collection(displayName, akaoSnesCollectionKey(input.source.id));
   collection.sequence(sequence);
@@ -62,13 +58,13 @@ using namespace core;
     const auto instrumentInfos = parseAkaoSnesInstrumentInfos(input.reader, *layout);
     const auto sampleInfos = parseAkaoSnesSampleInfos(input.reader, *layout->spcDirAddress, instrumentInfos);
     if (!instrumentInfos.empty() && !sampleInfos.empty()) {
-      static_cast<void>(result.instrumentSet(instrumentSet, [&](AssetId id) {
+      result.instrumentSet(instrumentSet, [&](AssetId id) {
         return parseAkaoSnesInstrumentSet(input, result, id, samples, *layout, instrumentInfos, sampleInfos,
                                           displayName);
-      }));
-      static_cast<void>(result.sampleCollection(samples, [&](AssetId id) {
+      });
+      result.sampleCollection(samples, [&](AssetId id) {
         return parseAkaoSnesSamples(input, id, sampleInfos, displayName, &result.sourceMap());
-      }));
+      });
       collection.instrumentSet(instrumentSet).samples(samples);
     } else {
       result.warning("AkaoSnes sequence found, but no valid instruments or samples were discovered",
