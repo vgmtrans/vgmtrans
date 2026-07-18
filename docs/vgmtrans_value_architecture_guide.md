@@ -278,12 +278,15 @@ Semantic commands do not retain encoded bytes. `commandBytes` and byte spans rem
 
 An instrument set contains `Instrument` records. Each instrument has:
 
-- a source-domain `InstrumentIdentity`;
+- an optional source-domain `InstrumentIdentity`;
+- an optional explicit `InstrumentAddress` for formats that require a particular export bank/program;
 - name;
 - source range;
 - regions;
 - default reverb;
 - synth generators and modulators.
+
+`resolveInstrumentAddress` is the only identity-to-address policy. It uses an explicit address when present; otherwise it maps the identity key sequentially across 128-program banks. MIDI, SF2, DLS, and parity summaries all use that resolver, so a format cannot accidentally assign different programs to different targets.
 
 A `Region` describes one playable zone: key range, velocity range, sample reference, tuning, envelope, optional region-local loop, pan, and attenuation.
 
@@ -711,6 +714,8 @@ The VM also owns shared playback policy:
 - warnings for missing targets;
 - stopping all tracks at the first loop for legacy drivers that opt into that behavior.
 
+Semantic loop detection compares the complete execution state that determines recurrence: command address, call stack, and repeat counters. A finite repeat therefore does not need an address-based suppression exception, and the same repeat command can be reused safely after its counter has been cleared. The command limit remains an emergency guard rather than normal loop control; its diagnostic includes track, address, tick, executed-command count, and limit.
+
 Legacy dialects remain track-major until migrated. Their dry-run and complete-sequence-prepass options are compatibility mechanisms; semantic formats should model shared state directly instead.
 
 ### 14.6 `PerformanceSequence`
@@ -723,7 +728,7 @@ The VM does not output MIDI directly. It outputs a `PerformanceSequence` made of
 - instrument;
 - level;
 - expression;
-- pan;
+- pan and source-engine stereo balance;
 - master level;
 - reverb;
 - tuning;
@@ -737,11 +742,11 @@ The VM does not output MIDI directly. It outputs a `PerformanceSequence` made of
 These events use musical or normalized values rather than MIDI controller bytes. For example:
 
 - level is linear gain;
-- pan is -1.0 to 1.0;
+- legacy pan is -1.0 to 1.0, while stereo balance is independent left/right source gain;
 - pitch bend is semitones;
 - modulation amount is normalized.
 
-Instrument events carry a source-domain identity rather than a pre-encoded bank/program pair. Level and expression events may carry neutral source quantization (the number of distinct source values), not a destination bit width. Legacy cursor dialects still populate their older compatibility fields.
+Instrument events normally carry a source-domain identity rather than a pre-encoded bank/program pair. Level and expression events may carry neutral source quantization (the number of distinct source values), not a destination bit width. Legacy cursor dialects still populate their older compatibility fields.
 
 This is what makes future non-MIDI sequence export more plausible. The VM output is not locked to MIDI’s limitations.
 
@@ -758,9 +763,11 @@ This is what makes future non-MIDI sequence export more plausible. The VM output
 - MIDI controller choices;
 - end-of-track writing.
 
-It resolves source instrument identities against the collection's instrument sets, then assigns MIDI bank/program addresses. The synth export preparation layer performs the equivalent identity-to-preset lowering for SF2 and DLS.
+It resolves source instrument identities against the collection's instrument sets, then uses the shared instrument-address resolver for MIDI bank/program selection. The synth export preparation layer uses the same resolved address for SF2 and DLS.
 
-The renderer can also use modulation usage analysis to scale controller values when the export request asks for observed-range modulation scaling.
+For stereo balance, the renderer chooses the nearest discrete equal-power MIDI pan position and emits expression compensation based on that exact quantized position. Format code emits only the source engine's left/right gains. This keeps MIDI rounding out of Capcom SNES, Akao, and Akao SNES and prevents pan and loudness from being calculated with different rounding.
+
+Full source-format modulation range is the default. The renderer can use modulation usage analysis when the caller explicitly requests observed-sequence-range scaling to trade unused range for more controller resolution.
 
 ---
 
@@ -770,7 +777,7 @@ The synth model is shared by SF2, DLS, WAV, and future exporters. It describes i
 
 ### 15.1 Instruments and regions
 
-An `Instrument` has a source-domain identity and a set of regions. A region describes when and how a sample should play. Legacy instruments may still carry bank/program compatibility fields until their formats migrate:
+An `Instrument` has an optional source-domain identity, an optional explicit export address, and a set of regions. Most formats need only the identity; explicit addressing is reserved for source formats with meaningful banks. A region describes when and how a sample should play:
 
 - key range;
 - velocity range;
@@ -819,6 +826,8 @@ Export is collection-centered. A caller asks to export a `Collection`, not a raw
 - modulation scaling policy.
 
 If no output kind is specified, the default is MIDI.
+
+`modulationScaling` defaults to `FullFormatRange`, matching source-driver semantics. `ObservedSequenceRange` is an explicit export optimization and applies consistently to MIDI controllers and SF2/DLS modulators.
 
 ### 16.1 Export preparation
 
@@ -977,7 +986,7 @@ The scanner finds the layout, reserves sequence/instrument/sample IDs, parses in
 
 Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single source of command behavior. Each entry owns presentation, source reads, conversion, discovery flow, and playback side-by-side. Decode reads every operand once, stores encoded and resolved values where they differ, and records control flow; the track keeps no command-byte pool. `decodeSemanticLinearTrack` owns walking, command projection, and track annotation finalization, so the format's track function supplies only `decodeCommand`. The same profile entry is selected during rendering by program profile and opcode, and the global scheduler supplies per-track state. The executor cannot access source bytes by construction.
 
-The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture.
+The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture. Pan commands retain Capcom's source-engine left/right gains; shared export code performs MIDI pan quantization and expression compensation.
 
 The layout uses the shared masked-pattern matcher, and the synth parser uses the shared SNES sample-directory/BRR reader. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once; it does not register a duplicate `canScan` probe. One `FormatDefinition` registers both scanner and dialect. Sequence performance and synth instruments use `capcom-snes.instrument` identities; MIDI/SF2/DLS addressing is assigned in export code.
 
@@ -1066,6 +1075,8 @@ The new model is very testable. Good tests can inspect:
 
 Capcom SNES also keeps an exact decoded-command and neutral-performance golden for its representative fixture. Real-corpus snapshots should use the same boundary when a redistributable or local corpus is available.
 
+The parity executable keeps format policy in small `ParitySuite` descriptors and shares collection-map runners for summaries, MIDI, SF2, and DLS. A play-once MIDI comparison uses the earlier End-of-Track tick for each corresponding track as an exclusive audible horizon, clipping notes that cross it. It does not guess that selected unmatched controller kinds are harmless tail setup.
+
 ---
 
 ## 21. Component-by-component breakdown
@@ -1152,19 +1163,19 @@ The implementation uses `std::any` only to erase the concrete program and track 
 
 ### 21.14 `SequenceVm`
 
-`SequenceVm` is the shared interpreter for parsed sequences. Semantic dialects run through a global `(tick, stable track order)` scheduler with one program state and per-track runtimes. The VM handles command limits, loops, calls, returns, repeats, diagnostics, and event emission.
+`SequenceVm` is the shared interpreter for parsed sequences. Semantic dialects run through a global `(tick, stable track order)` scheduler with one program state and per-track runtimes. The VM handles command limits, loops, calls, returns, repeats, diagnostics, and event emission. Recurrence keys include command, call stack, and repeat-counter state; the command limit is only a contextual emergency guard.
 
 Legacy dialects still use track-major execution and optional prepasses. Those paths are adapters to remove as formats migrate.
 
 ### 21.15 `PerformanceModel`
 
-`PerformanceModel` is the neutral musical output from the VM. Its events keep source command and source annotation IDs, so output can be traced back to source bytes.
+`PerformanceModel` is the neutral musical output from the VM. Its events keep source command and source annotation IDs, so output can be traced back to source bytes. `StereoBalancePerformanceEvent` stores source-engine left/right gains without MIDI quantization.
 
 This model is the main bridge to future non-MIDI sequence outputs.
 
 ### 21.16 `SynthModel`
 
-`SynthModel` is the neutral instrument/sample layer. It represents instruments, regions, samples, envelopes, loops, tuning, generators, modulators, and decoded PCM.
+`SynthModel` is the neutral instrument/sample layer. It represents instruments, regions, samples, envelopes, loops, tuning, generators, modulators, and decoded PCM. `resolveInstrumentAddress` provides the one export-address policy shared by MIDI, SF2, and DLS.
 
 It is designed for SF2/DLS/WAV export without making those formats leak into scanners.
 
