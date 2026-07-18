@@ -882,8 +882,9 @@ std::string valueEnvelopeName(const vgmtrans::core::Envelope& envelope) {
 }
 
 void printValueInstrument(const vgmtrans::core::Instrument& instrument, size_t index) {
+  const auto address = vgmtrans::core::resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
   fmt::println("instrument #{} bank={} program={} name='{}' range=0x{:x}:0x{:x} regions={} generators={} modulators={}",
-               index, instrument.bank, instrument.program, instrument.name, instrument.range.offset,
+               index, address.bank, address.program, instrument.name, instrument.range.offset,
                instrument.range.size, instrument.regions.size(), instrument.generators.size(),
                instrument.modulators.size());
 
@@ -922,8 +923,9 @@ bool printValueInstruments(const vgmtrans::core::SessionSnapshot& project, const
     if (args.size() <= instrumentArgIndex) {
       for (size_t i = 0; i < instrumentSetAsset->instruments.size(); ++i) {
         const auto& instrument = instrumentSetAsset->instruments[i];
-        fmt::println("  instrument #{} bank={} program={} regions={} name='{}' range=0x{:x}:0x{:x}", i, instrument.bank,
-                     instrument.program, instrument.regions.size(), instrument.name, instrument.range.offset,
+        const auto address = vgmtrans::core::resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
+        fmt::println("  instrument #{} bank={} program={} regions={} name='{}' range=0x{:x}:0x{:x}", i, address.bank,
+                     address.program, instrument.regions.size(), instrument.name, instrument.range.offset,
                      instrument.range.size);
       }
       return true;
