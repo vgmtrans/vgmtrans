@@ -7,15 +7,14 @@
 #include "value/formats/NDS/NdsSequence.h"
 
 #include "value/base/LevelScale.h"
-#include "value/sequence/SequenceCursorDialect.h"
-#include "value/sequence/SequenceVm.h"
 #include "value/sequence/BytecodeDecode.h"
-
-#include <fmt/format.h>
+#include "value/sequence/CommandSourceMap.h"
+#include "value/sequence/SemanticCommand.h"
+#include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
+#include <any>
 #include <array>
-#include <cstddef>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -23,6 +22,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace vgmtrans::formats::nds {
@@ -31,34 +31,520 @@ using namespace core;
 
 namespace {
 
-constexpr size_t kMaxTrackCommands = 262144;
+constexpr u32 kMaxTrackCommands = 262144;
 constexpr std::string_view kSseqSignature{"SSEQ\xff\xfe\x00\x01", 8};
 constexpr u32 kSseqFileSizeOffset = 0x08;
 constexpr u32 kSseqDataOffsetField = 0x18;
 constexpr u32 kSseqHeaderSize = 0x1c;
-
-struct Context {};
 
 struct PendingBlock {
   u32 offset = 0;
   bool callTarget = false;
 };
 
+// Only registers that persist from one executed source command to the next
+// belong here. Source bounds and relative-address bases are decode concerns.
 struct TrackState {
-  TrackState() = default;
-
-  explicit TrackState(const SequenceProgram& program, const TrackProgram&)
-      : sequenceDataBase(program.sourceBaseAddress.value) {}
-
-  explicit TrackState(const BytecodeDecodeContext& context)
-      : sequenceDataBase(context.sequenceOffset + kSseqHeaderSize), sequenceEnd(context.sequenceEnd) {}
-
-  u64 sequenceDataBase = 0;
-  u32 sequenceEnd = std::numeric_limits<u32>::max();
   bool noteWait = false;
   s32 transpose = 0;
   u8 pitchBendRangeSemitones = 2;
 };
+
+using Operands = SemanticCommandArgs;
+
+// Playback is the single boundary for state mutation and emitted performance
+// events. Command definitions never need the VM's type-erased state directly.
+struct Playback {
+  TrackState& track;
+  PerformanceEmitter& out;
+  VmApi& vm;
+
+  [[nodiscard]] Effects note(u8 sourceKey, u8 velocity, u32 duration) {
+    const s32 key = std::clamp<s32>(static_cast<s32>(sourceKey) + track.transpose, 0, 127);
+    out.note(static_cast<double>(key), LevelScale::linearFromMidi7(velocity), duration);
+    return track.noteWait ? Effects::wait(duration) : Effects{};
+  }
+};
+
+// NDS addresses are unsigned 24-bit offsets from the start of SSEQ data.
+// Decode resolves them to absolute source addresses so playback never needs
+// the source container's layout.
+class Decode : public SemanticCommandDecoder {
+public:
+  Decode(ByteReader reader, u32 begin, u32 end, u32 sequenceDataBase, u32 sequenceEnd,
+         std::vector<Diagnostic>* diagnostics)
+      : SemanticCommandDecoder(reader, begin, end, diagnostics), sequenceDataBase_(sequenceDataBase),
+        sequenceEnd_(sequenceEnd) {}
+
+  [[nodiscard]] Address targetAddress(std::string_view name, SemanticOperandRole validRole) {
+    const auto relative = rawU24le("relative", SourceValueDisplay::Address);
+    const Address destination{sequenceDataBase_ + relative.value};
+    resolvedValue(name, relative, destination, SourceValueDisplay::Address,
+                  targetIsValid(destination) ? validRole : SemanticOperandRole::Address);
+    return destination;
+  }
+
+  [[nodiscard]] bool targetIsValid(Address destination) const noexcept { return destination.value < sequenceEnd_; }
+
+  [[nodiscard]] std::optional<Address> controlTarget(std::string_view name, SemanticOperandRole role,
+                                                     std::string_view invalidTargetWarning) {
+    const Address destination = targetAddress(name, role);
+    if (!ok()) {
+      return std::nullopt;
+    }
+    if (!targetIsValid(destination)) {
+      warning(std::string(invalidTargetWarning));
+      terminate();
+      return std::nullopt;
+    }
+    return destination;
+  }
+
+private:
+  u32 sequenceDataBase_ = 0;
+  u32 sequenceEnd_ = 0;
+};
+
+using DecodeFunction = void (*)(Decode&);
+using ExecuteFunction = Effects (*)(Operands, Playback&);
+
+struct CommandDefinition {
+  DecodedCommandPresentation presentation;
+  DecodeFunction decode = nullptr;
+  ExecuteFunction execute = nullptr;
+  u8 opaqueOperandBytes = 0;
+};
+
+[[nodiscard]] CommandDefinition command(std::string_view label, SequenceSemantic semantic, DecodeFunction decode,
+                                        ExecuteFunction execute,
+                                        CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
+                                        std::string_view localKind = {}) {
+  const std::string kind = localKind.empty() ? sourceLocalKind(label) : std::string(localKind);
+  return CommandDefinition{
+      .presentation =
+          DecodedCommandPresentation{
+              .label = std::string(label),
+              .localKind = kind,
+              .detailKind = "nds." + kind,
+              .semantic = semantic,
+              .playback = playback,
+          },
+      .decode = decode,
+      .execute = execute,
+  };
+}
+
+[[nodiscard]] CommandDefinition sourceOnlyCommand(std::string_view label, DecodeFunction decode,
+                                                  std::string_view localKind = {}) {
+  return command(label, SequenceSemantic::Meta, decode, nullptr, CommandPlaybackStatus::SourceOnly, localKind);
+}
+
+[[nodiscard]] CommandDefinition opaqueCommand(std::string_view label, u8 operandBytes,
+                                              std::string_view localKind = {}) {
+  auto definition = sourceOnlyCommand(label, nullptr, localKind);
+  definition.opaqueOperandBytes = operandBytes;
+  return definition;
+}
+
+[[nodiscard]] CommandDefinition terminalCommand(std::string_view label, SequenceSemantic semantic,
+                                                DecodeFunction decode, CommandPlaybackStatus playback,
+                                                std::string_view localKind = {}) {
+  return command(label, semantic, decode, nullptr, playback, localKind);
+}
+
+using CommandProfile = std::array<CommandDefinition, 0x80>;
+
+// Each profile entry keeps source decoding and playback together. The opaque
+// entries are intentionally source-only: VGMTrans preserves their bytes and
+// names without pretending to emulate NDS variables or conditionals.
+[[nodiscard]] CommandProfile makeProfile() {
+  const auto unknown = terminalCommand(
+      "Unknown Opcode", SequenceSemantic::Unsupported,
+      [](Decode& d) {
+        d.warning("Unknown NDS SSEQ opcode stopped playback");
+        d.terminate();
+      },
+      CommandPlaybackStatus::Unsupported, "unknown");
+  CommandProfile profile;
+  profile.fill(unknown);
+
+  profile[0x93 - 0x80] = sourceOnlyCommand("Open Track", [](Decode& d) {
+    d.u8("track");
+    static_cast<void>(d.targetAddress("destination", SemanticOperandRole::Address));
+  });
+  profile[0xa0 - 0x80] = opaqueCommand("Cmd with Random Value", 5, "random-value");
+  profile[0xa1 - 0x80] = opaqueCommand("Cmd with Variable", 2, "variable-command");
+  profile[0xa2 - 0x80] = opaqueCommand("If", 0);
+  profile[0xb0 - 0x80] = opaqueCommand("Set Variable", 3);
+  profile[0xb1 - 0x80] = opaqueCommand("Add Variable", 3);
+  profile[0xb2 - 0x80] = opaqueCommand("Sub Variable", 3);
+  profile[0xb3 - 0x80] = opaqueCommand("Mul Variable", 3);
+  profile[0xb4 - 0x80] = opaqueCommand("Div Variable", 3);
+  profile[0xb5 - 0x80] = opaqueCommand("Shift Variable", 3);
+  profile[0xb6 - 0x80] = opaqueCommand("Rand Variable", 3);
+  profile[0xb8 - 0x80] = opaqueCommand("If Variable ==", 3, "if-variable-equal");
+  profile[0xb9 - 0x80] = opaqueCommand("If Variable >=", 3, "if-variable-greater-equal");
+  profile[0xba - 0x80] = opaqueCommand("If Variable >", 3, "if-variable-greater");
+  profile[0xbb - 0x80] = opaqueCommand("If Variable <=", 3, "if-variable-less-equal");
+  profile[0xbc - 0x80] = opaqueCommand("If Variable <", 3, "if-variable-less");
+  profile[0xbd - 0x80] = opaqueCommand("If Variable !=", 3, "if-variable-not-equal");
+  profile[0xc2 - 0x80] = opaqueCommand("Master Volume", 1);
+  profile[0xc6 - 0x80] = opaqueCommand("Priority", 1);
+  profile[0xc8 - 0x80] = opaqueCommand("Tie", 1);
+  profile[0xc9 - 0x80] = opaqueCommand("Portamento Control", 1);
+  profile[0xcb - 0x80] = opaqueCommand("Modulation Speed", 1);
+  profile[0xcc - 0x80] = opaqueCommand("Modulation Type", 1);
+  profile[0xcd - 0x80] = opaqueCommand("Modulation Range", 1);
+  profile[0xd0 - 0x80] = opaqueCommand("Attack Rate", 1);
+  profile[0xd1 - 0x80] = opaqueCommand("Decay Rate", 1);
+  profile[0xd2 - 0x80] = opaqueCommand("Sustain Level", 1);
+  profile[0xd3 - 0x80] = opaqueCommand("Release Rate", 1);
+  profile[0xd4 - 0x80] = opaqueCommand("Loop Start", 1);
+  profile[0xd6 - 0x80] = opaqueCommand("Print Variable", 1);
+  profile[0xe0 - 0x80] = opaqueCommand("Modulation Delay", 2);
+  profile[0xe3 - 0x80] = opaqueCommand("Sweep Pitch", 2);
+  profile[0xfc - 0x80] = opaqueCommand("Loop End", 0);
+  profile[0xfe - 0x80] = sourceOnlyCommand("Allocate Track", [](Decode& d) { d.u16le("track_mask"); });
+
+  profile[0x80 - 0x80] = command(
+      "Rest", SequenceSemantic::Rest,
+      [](Decode& d) { d.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration); },
+      [](Operands a, Playback&) { return Effects::wait(a.u32("duration")); });
+
+  profile[0x81 - 0x80] = command(
+      "Program", SequenceSemantic::Program,
+      [](Decode& d) {
+        const u32 raw = d.varLen("raw");
+        d.derived("bank", raw >> 7, SourceValueDisplay::Default, SemanticOperandRole::InstrumentBank);
+        d.derived("program", raw & 0x7f, SourceValueDisplay::Default, SemanticOperandRole::InstrumentProgram);
+      },
+      [](Operands a, Playback& p) {
+        p.out.instrument(a.u32("bank"), a.u32("program"));
+        return Effects{};
+      });
+
+  profile[0x94 - 0x80] = command(
+      "Jump", SequenceSemantic::Jump,
+      [](Decode& d) {
+        if (const auto destination =
+                d.controlTarget("destination", SemanticOperandRole::JumpTarget, "Jump target outside sequence data")) {
+          d.jumpTo(*destination);
+        }
+      },
+      [](Operands a, Playback& p) { return Effects{.step = p.vm.jump(a.address("destination"))}; },
+      CommandPlaybackStatus::AffectsControlFlow);
+
+  profile[0x95 - 0x80] = command(
+      "Call", SequenceSemantic::Call,
+      [](Decode& d) {
+        if (const auto destination =
+                d.controlTarget("destination", SemanticOperandRole::CallTarget, "Call target outside sequence data")) {
+          d.callTo(*destination);
+        }
+      },
+      [](Operands a, Playback& p) { return Effects{.step = p.vm.call(a.address("destination"))}; },
+      CommandPlaybackStatus::AffectsControlFlow);
+
+  profile[0x96 - 0x80] = terminalCommand(
+      "Unsupported Command", SequenceSemantic::Unsupported,
+      [](Decode& d) {
+        d.warning("Unsupported NDS SSEQ command stopped playback");
+        d.terminate();
+      },
+      CommandPlaybackStatus::Unsupported, "unsupported");
+
+  profile[0xc0 - 0x80] = command(
+      "Pan", SequenceSemantic::Pan,
+      [](Decode& d) {
+        d.resolved("position", d.rawU8("pan"),
+                   [](u8 raw) { return std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0); });
+      },
+      [](Operands a, Playback& p) {
+        p.out.pan(a.f64("position"));
+        return Effects{};
+      });
+
+  profile[0xc1 - 0x80] = command(
+      "Volume", SequenceSemantic::Level,
+      [](Decode& d) { d.resolved("linear_gain", d.rawU8("volume"), LevelScale::linearFromMidi7); },
+      [](Operands a, Playback& p) {
+        p.out.level(a.f64("linear_gain"));
+        return Effects{};
+      });
+
+  profile[0xc3 - 0x80] = command(
+      "Transpose", SequenceSemantic::State, [](Decode& d) { d.s8("semitones"); },
+      [](Operands a, Playback& p) {
+        p.track.transpose = a.s8("semitones");
+        return Effects{};
+      });
+
+  profile[0xc4 - 0x80] = command(
+      "Pitch Bend", SequenceSemantic::Pitch,
+      [](Decode& d) { d.resolved("fraction", d.rawS8("bend"), [](s8 bend) { return bend / 128.0; }); },
+      [](Operands a, Playback& p) {
+        p.out.pitchBend(a.f64("fraction") * p.track.pitchBendRangeSemitones);
+        return Effects{};
+      });
+
+  profile[0xc5 - 0x80] = command(
+      "Pitch Bend Range", SequenceSemantic::Pitch, [](Decode& d) { d.u8("semitones"); },
+      [](Operands a, Playback& p) {
+        p.track.pitchBendRangeSemitones = a.u8("semitones");
+        p.out.pitchBendRange(p.track.pitchBendRangeSemitones);
+        return Effects{};
+      });
+
+  profile[0xc7 - 0x80] = command(
+      "Note Wait", SequenceSemantic::State,
+      [](Decode& d) {
+        const auto raw = d.rawU8("raw");
+        d.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
+      },
+      [](Operands a, Playback& p) {
+        p.track.noteWait = a.boolean("enabled");
+        return Effects{};
+      });
+
+  profile[0xca - 0x80] = command(
+      "Modulation Depth", SequenceSemantic::Modulation,
+      [](Decode& d) {
+        d.resolved("amount", d.rawU8("depth"),
+                   [](u8 depth) { return std::clamp(static_cast<double>(depth) / 127.0, 0.0, 1.0); });
+      },
+      [](Operands a, Playback& p) {
+        p.out.modulation(ModulationPerformanceTarget::VibratoDepth, a.f64("amount"));
+        return Effects{};
+      });
+
+  profile[0xce - 0x80] = command(
+      "Portamento", SequenceSemantic::Portamento,
+      [](Decode& d) {
+        const auto raw = d.rawU8("raw");
+        d.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
+      },
+      [](Operands a, Playback& p) {
+        p.out.portamentoEnable(a.boolean("enabled"));
+        return Effects{};
+      });
+
+  profile[0xcf - 0x80] = command(
+      "Portamento Time", SequenceSemantic::Portamento,
+      [](Decode& d) { d.resolved("milliseconds", d.rawU8("time"), [](u8 time) { return static_cast<double>(time); }); },
+      [](Operands a, Playback& p) {
+        p.out.portamentoTime(a.f64("milliseconds"));
+        return Effects{};
+      });
+
+  profile[0xd5 - 0x80] = command(
+      "Expression", SequenceSemantic::Level,
+      [](Decode& d) { d.resolved("linear_gain", d.rawU8("expression"), LevelScale::linearFromMidi7); },
+      [](Operands a, Playback& p) {
+        p.out.expression(a.f64("linear_gain"));
+        return Effects{};
+      });
+
+  profile[0xe1 - 0x80] = command(
+      "Tempo", SequenceSemantic::Tempo,
+      [](Decode& d) {
+        const auto bpm = d.rawU16le("bpm");
+        const u32 microsecondsPerQuarter = bpm.value == 0 ? 0 : static_cast<u32>(std::round(60000000.0 / bpm.value));
+        d.resolvedValue("microseconds_per_quarter", bpm, microsecondsPerQuarter);
+      },
+      [](Operands a, Playback& p) {
+        const u32 microsecondsPerQuarter = a.u32("microseconds_per_quarter");
+        if (microsecondsPerQuarter != 0) {
+          p.out.tempo(microsecondsPerQuarter);
+        }
+        return Effects{};
+      });
+
+  profile[0xfd - 0x80] = command(
+      "Return", SequenceSemantic::Return, [](Decode& d) { d.return_(); },
+      [](Operands, Playback& p) { return Effects{.step = p.vm.return_()}; }, CommandPlaybackStatus::AffectsControlFlow);
+
+  profile[0xff - 0x80] = terminalCommand(
+      "End", SequenceSemantic::End, [](Decode& d) { d.terminate(); }, CommandPlaybackStatus::StopsPlayback);
+
+  return profile;
+}
+
+[[nodiscard]] const CommandDefinition& noteCommand() {
+  static const CommandDefinition definition = command(
+      "Note", SequenceSemantic::Note,
+      [](Decode& d) {
+        d.opcodeValue("key", d.opcode(), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+        d.u8("velocity", SemanticOperandRole::Level);
+        d.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration);
+      },
+      [](Operands a, Playback& p) { return p.note(a.u8("key"), a.u8("velocity"), a.u32("duration")); });
+  return definition;
+}
+
+[[nodiscard]] const CommandDefinition& definitionFor(u8 opcode) {
+  if (opcode <= 0x7f) {
+    return noteCommand();
+  }
+  static const CommandProfile profile = makeProfile();
+  return profile[opcode - 0x80];
+}
+
+[[nodiscard]] CommandDefinition truncatedCommand() {
+  return terminalCommand("Truncated Command", SequenceSemantic::Unsupported, nullptr,
+                         CommandPlaybackStatus::Unsupported, "truncated");
+}
+
+// Decode is the only place that reads command bytes. Execution later selects
+// the same definition by opcode and consumes only the stored named operands.
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, u32 sequenceDataBase,
+                                                   u32 sequenceEnd, std::vector<Diagnostic>* diagnostics) {
+  Decode decode(reader, begin, end, sequenceDataBase, sequenceEnd, diagnostics);
+  if (!decode.hasOpcode()) {
+    return decode.finish(truncatedCommand().presentation);
+  }
+
+  const CommandDefinition& definition = definitionFor(decode.opcode());
+  if (definition.decode != nullptr) {
+    definition.decode(decode);
+  } else if (definition.opaqueOperandBytes != 0) {
+    static_cast<void>(decode.rawBytes("bytes", definition.opaqueOperandBytes));
+  }
+  if (!decode.ok()) {
+    return decode.finish(truncatedCommand().presentation);
+  }
+  return decode.finish(definition.presentation);
+}
+
+[[nodiscard]] std::any createTrackState(const SequenceProgram&, const TrackProgram&) {
+  return TrackState{};
+}
+
+[[nodiscard]] Effects executeCommand(const SourceCommand& command, std::any&, std::any& trackStateValue,
+                                     PerformanceEmitter& out, VmApi& vm) {
+  auto& track = std::any_cast<TrackState&>(trackStateValue);
+  Playback playback{.track = track, .out = out, .vm = vm};
+
+  if (command.flow.terminal) {
+    return Effects{.step = vm.end()};
+  }
+  const CommandDefinition& definition = definitionFor(command.opcode);
+  return definition.execute != nullptr ? definition.execute(Operands{command}, playback) : Effects{};
+}
+
+[[nodiscard]] SequenceDialect makeDialect() {
+  return SequenceDialect{
+      .id = DialectId{.value = std::string(kNdsSequenceDialectId)},
+      .commandDetailKindPrefix = "nds",
+      .timebase = Timebase{.ppqn = 0x30},
+      .defaultBehavior =
+          SequenceProgramBehavior{
+              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .commandLimit = kMaxTrackCommands,
+          },
+      .createSemanticTrackState = createTrackState,
+      .executeSemantic = executeCommand,
+  };
+}
+
+[[nodiscard]] TrackProgram makeTrack(u32 startOffset, u32 trackIndex) {
+  return TrackProgram{
+      .id = TrackId{trackIndex},
+      .sourceTrackNumber = trackIndex,
+      .startAddress = Address{startOffset},
+  };
+}
+
+[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(ByteReader reader, u32 offset) {
+  const SourceRange range = reader.range(offset, reader.has(offset, 1) ? 1 : 0);
+  return DecodedBytecodeCommand{
+      .range = range,
+      .opcode = range.size == 0 ? u8{0} : reader.u8At(offset),
+      .encodedSize = std::max<u32>(1, range.size),
+      .flow = DecodeFlow::terminalFlow(),
+      .presentation =
+          DecodedCommandPresentation{
+              .label = "Recovery Stop",
+              .localKind = "recovery-stop",
+              .detailKind = "nds.recovery-stop",
+              .semantic = SequenceSemantic::Unsupported,
+              .playback = CommandPlaybackStatus::StopsPlayback,
+          },
+      .retainBytes = false,
+  };
+}
+
+// Malformed SDAT FAT ranges can overlap a real call target by one byte. This
+// exceptional walker keeps the normal semantic command decoder, adding only
+// the overlap stop needed to avoid swallowing the subroutine's first byte.
+[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(ByteReader reader, TrackDecodeInput input) {
+  TrackProgram track = makeTrack(input.startOffset, input.trackIndex);
+  TrackProgramBuilder builder{track};
+  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
+  std::set<u32> decodedOffsets;
+  std::set<u32> callTargetOffsets;
+  std::vector<PendingBlock> pendingBlocks{{.offset = input.startOffset}};
+  u32 decodedCommands = 0;
+  const u32 sequenceDataBase = input.sequenceOffset + kSseqHeaderSize;
+
+  const auto decodeAt = [&](u32 offset) {
+    auto decoded =
+        decodeCommand(reader, offset, input.bytecodeEnd, sequenceDataBase, input.sequenceEnd, input.diagnostics);
+    decoded.annotation = projectDecodedCommand(input.sourceMap, decoded, trackAnnotation);
+    return decoded;
+  };
+
+  while (!pendingBlocks.empty()) {
+    const PendingBlock block = pendingBlocks.back();
+    pendingBlocks.pop_back();
+    u32 offset = block.offset;
+
+    while (hasBytecodeBytes(reader, offset, 1, input.bytecodeEnd) && decodedCommands++ < input.maxCommands) {
+      const u32 begin = offset;
+      if (!decodedOffsets.insert(begin).second) {
+        break;
+      }
+
+      auto decoded = decodeAt(begin);
+      if (!block.callTarget) {
+        const auto overlap = std::ranges::find_if(
+            callTargetOffsets, [&](u32 target) { return begin < target && target < decoded.range.endOffset(); });
+        if (overlap != callTargetOffsets.end()) {
+          auto recovery = terminalRecoveryCommand(reader, begin);
+          recovery.annotation = projectDecodedCommand(input.sourceMap, recovery, trackAnnotation);
+          appendDecodedBytecodeCommand(builder, recovery, begin);
+          break;
+        }
+      }
+
+      if (decoded.flow.unconditionalJump()) {
+        const u32 destination = decoded.flow.staticTargets.front().value;
+        appendDecodedBytecodeCommand(builder, decoded, begin);
+        if (decodedOffsets.contains(destination)) {
+          break;
+        }
+        offset = destination;
+        continue;
+      }
+
+      if (decoded.flow.callTarget()) {
+        const u32 destination = decoded.flow.staticTargets.front().value;
+        if (!decodedOffsets.contains(destination) && callTargetOffsets.insert(destination).second) {
+          pendingBlocks.push_back(PendingBlock{.offset = destination, .callTarget = true});
+        }
+      }
+
+      const auto next = decoded.flow.fallthrough;
+      appendDecodedBytecodeCommand(builder, decoded, begin);
+      if (!next || decoded.flow.terminal) {
+        break;
+      }
+      offset = next->value;
+    }
+  }
+
+  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
+  return track;
+}
 
 [[nodiscard]] bool matches(ByteReader reader, u64 offset, std::string_view signature) {
   if (!reader.has(offset, signature.size())) {
@@ -70,32 +556,6 @@ struct TrackState {
     }
   }
   return true;
-}
-
-// Track-address discovery sometimes needs to skip a bootstrap rest command before
-// the real primary track. Keep offset unchanged if the variable-length value is
-// truncated so normal bytecode decode can still preserve the bad command.
-[[nodiscard]] std::optional<u32> readVarLen(ByteReader reader, u32& offset, u32 sequenceEnd) {
-  u32 value = 0;
-  u32 cursor = offset;
-  while (hasBytecodeBytes(reader, cursor, 1, sequenceEnd)) {
-    const u8 byte = reader.u8At(cursor++);
-    value = (value << 7) + (byte & 0x7f);
-    if ((byte & 0x80) == 0) {
-      offset = cursor;
-      return value;
-    }
-  }
-  return std::nullopt;
-}
-
-[[nodiscard]] std::optional<u32> readSseqAddress(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd,
-                                                 u32 operandOffset) {
-  if (!hasBytecodeBytes(reader, operandOffset, 3, sequenceEnd)) {
-    return std::nullopt;
-  }
-  return reader.u8At(operandOffset) + (reader.u8At(operandOffset + 1) << 8) + (reader.u8At(operandOffset + 2) << 16) +
-         sequenceOffset + kSseqHeaderSize;
 }
 
 [[nodiscard]] std::optional<u32> nearbySseqHeader(ByteReader reader, u32 offset, u32 size) {
@@ -135,443 +595,82 @@ struct TrackState {
   return sseqOffset;
 }
 
-template <class Runtime>
-[[nodiscard]] bool decodeTargetOutsideSequence(VmCommandCursor& cmd, Runtime& rt, Address destination) {
-  return cmd.phase() == CommandPhase::Decode && rt.state.sequenceEnd != std::numeric_limits<u32>::max() &&
-         destination.value >= rt.state.sequenceEnd;
-}
-
-struct PreservedCommandSpec {
-  u8 opcode;
-  std::string_view name;
-  size_t operandBytes = 0;
-  std::string_view kind = {};
-};
-
-constexpr auto kPreservedCommands = std::to_array<PreservedCommandSpec>({
-    {0x93, "Open Track", 4},
-    {0xa0, "Cmd with Random Value", 5, "random-value"},
-    {0xa1, "Cmd with Variable", 2, "variable-command"},
-    {0xa2, "If"},
-    {0xb0, "Set Variable", 3},
-    {0xb1, "Add Variable", 3},
-    {0xb2, "Sub Variable", 3},
-    {0xb3, "Mul Variable", 3},
-    {0xb4, "Div Variable", 3},
-    {0xb5, "Shift Variable", 3},
-    {0xb6, "Rand Variable", 3},
-    {0xb8, "If Variable ==", 3, "if-variable-equal"},
-    {0xb9, "If Variable >=", 3, "if-variable-greater-equal"},
-    {0xba, "If Variable >", 3, "if-variable-greater"},
-    {0xbb, "If Variable <=", 3, "if-variable-less-equal"},
-    {0xbc, "If Variable <", 3, "if-variable-less"},
-    {0xbd, "If Variable !=", 3, "if-variable-not-equal"},
-    {0xc2, "Master Volume", 1},
-    {0xc6, "Priority", 1},
-    {0xc8, "Tie", 1},
-    {0xc9, "Portamento Control", 1},
-    {0xcb, "Modulation Speed", 1},
-    {0xcc, "Modulation Type", 1},
-    {0xcd, "Modulation Range", 1},
-    {0xd0, "Attack Rate", 1},
-    {0xd1, "Decay Rate", 1},
-    {0xd2, "Sustain Level", 1},
-    {0xd3, "Release Rate", 1},
-    {0xd4, "Loop Start", 1},
-    {0xd6, "Print Variable", 1},
-    {0xe0, "Modulation Delay", 2},
-    {0xe3, "Sweep Pitch", 2},
-    {0xfc, "Loop End"},
-    {0xfe, "Allocate Track", 2},
-});
-
-[[nodiscard]] const PreservedCommandSpec* preservedCommand(u8 opcode) {
-  const auto found = std::ranges::find_if(kPreservedCommands,
-                                          [opcode](const PreservedCommandSpec& spec) { return spec.opcode == opcode; });
-  return found == kPreservedCommands.end() ? nullptr : &*found;
-}
-
-struct NdsCursorReader {
-  template <class Runtime>
-  static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
-    const u8 opcode = cmd.opcode();
-    if (opcode <= 0x7f) {
-      cmd.name("Note", SequenceSemantic::Note).derived("key", opcode, SourceValueDisplay::MidiNote);
-      const u8 velocity = cmd.u8("velocity");
-      const u32 duration = cmd.varLen("duration");
-      rt.note(static_cast<double>(std::clamp<s32>(static_cast<s32>(opcode) + rt.state.transpose, 0, 127)),
-              LevelScale::linearFromMidi7(velocity), duration);
-      return rt.state.noteWait ? cmd.wait(duration) : cmd.next();
-    }
-
-    if (const auto* preserved = preservedCommand(opcode)) {
-      return cmd.preserve(preserved->name, preserved->operandBytes, preserved->kind);
-    }
-
-    switch (opcode) {
-      case 0x80:
-        cmd.name("Rest", SequenceSemantic::Rest);
-        return cmd.wait(cmd.varLen("duration"));
-
-      case 0x81: {
-        cmd.name("Program", SequenceSemantic::Program);
-        const u32 raw = cmd.varLen("raw");
-        const u32 bank = raw >> 7;
-        const u32 program = raw & 0x7f;
-        cmd.derived("bank", bank).derived("program", program).instrumentRef(bank, program);
-        rt.instrument(bank, program);
-        return cmd.next();
-      }
-
-      case 0x94: {
-        cmd.name("Jump");
-        const Address destination =
-            cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
-        if (decodeTargetOutsideSequence(cmd, rt, destination)) {
-          return cmd.invalidJump(destination, "Jump target outside sequence data");
-        }
-        return cmd.jump(destination);
-      }
-
-      case 0x95: {
-        cmd.name("Call");
-        const Address destination =
-            cmd.le24RelativeAddress("destination", Address{static_cast<u32>(rt.state.sequenceDataBase)});
-        if (decodeTargetOutsideSequence(cmd, rt, destination)) {
-          return cmd.invalidCall(destination, "Call target outside sequence data");
-        }
-        return cmd.call(destination);
-      }
-
-      case 0x96:
-        return unsupported(cmd, rt, "Unsupported NDS SSEQ command stopped playback");
-
-      case 0xc0: {
-        cmd.name("Pan", SequenceSemantic::Pan);
-        const u8 raw = cmd.u8("pan");
-        rt.pan(std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0));
-        return cmd.next();
-      }
-
-      case 0xc1:
-        cmd.name("Volume", SequenceSemantic::Level);
-        rt.level(LevelScale::linearFromMidi7(cmd.u8("volume")));
-        return cmd.next();
-
-      case 0xc3:
-        cmd.name("Transpose", SequenceSemantic::State);
-        rt.state.transpose = cmd.s8("semitones");
-        return cmd.next();
-
-      case 0xc4: {
-        cmd.name("Pitch Bend", SequenceSemantic::Pitch);
-        const s8 bend = cmd.s8("bend");
-        rt.pitchBend((static_cast<double>(bend) / 128.0) * rt.state.pitchBendRangeSemitones);
-        return cmd.next();
-      }
-
-      case 0xc5: {
-        cmd.name("Pitch Bend Range", SequenceSemantic::Pitch);
-        const u8 semitones = cmd.u8("semitones");
-        rt.state.pitchBendRangeSemitones = semitones;
-        rt.pitchBendRange(semitones);
-        return cmd.next();
-      }
-
-      case 0xc7:
-        cmd.name("Note Wait", SequenceSemantic::State);
-        rt.state.noteWait = cmd.u8("enabled") != 0;
-        return cmd.next();
-
-      case 0xca: {
-        cmd.name("Modulation Depth", SequenceSemantic::Modulation);
-        const u8 depth = cmd.u8("depth");
-        rt.modulation(ModulationPerformanceTarget::VibratoDepth,
-                      std::clamp(static_cast<double>(depth) / 127.0, 0.0, 1.0));
-        return cmd.next();
-      }
-
-      case 0xce:
-        cmd.name("Portamento", SequenceSemantic::Portamento);
-        rt.portamentoEnable(cmd.u8("enabled") != 0);
-        return cmd.next();
-
-      case 0xcf:
-        cmd.name("Portamento Time", SequenceSemantic::Portamento);
-        rt.portamentoTime(static_cast<double>(cmd.u8("time")));
-        return cmd.next();
-
-      case 0xd5:
-        cmd.name("Expression", SequenceSemantic::Level);
-        rt.expression(LevelScale::linearFromMidi7(cmd.u8("expression")));
-        return cmd.next();
-
-      case 0xe1: {
-        cmd.name("Tempo", SequenceSemantic::Tempo);
-        const u16 bpm = cmd.u16le("bpm");
-        if (bpm != 0) {
-          rt.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
-        }
-        return cmd.next();
-      }
-
-      case 0xfd:
-        return cmd.name("Return").ret();
-
-      case 0xff:
-        return cmd.name("End").end();
-
-      default:
-        return unsupported(cmd, rt, "Unknown NDS SSEQ opcode stopped playback", "Unknown Opcode", "unknown");
-    }
-  }
-
-private:
-  template <class Runtime>
-  static CommandFlow unsupported(VmCommandCursor& cmd, Runtime& rt, std::string_view message,
-                                 std::string_view name = "Unsupported Command", std::string_view kind = "unsupported") {
-    cmd.name(name, SequenceSemantic::Unsupported).kind(kind).unsupported(message);
-    rt.diagnostic(Severity::Warning, message);
-    return cmd.end();
-  }
-};
-
-[[nodiscard]] TrackProgram makeTrack(u32 startOffset, u32 trackIndex) {
-  return TrackProgram{
-      .id = TrackId{trackIndex},
-      .sourceTrackNumber = trackIndex,
-      .startAddress = Address{startOffset},
-  };
-}
-
-[[nodiscard]] std::string recoveryDetailKind(const SequenceDialect& dialect) {
-  return dialect.commandDetailKindPrefix.empty() ? "recovery-stop" : dialect.commandDetailKindPrefix + ".recovery-stop";
-}
-
-[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(ByteReader reader, u32 offset,
-                                                             const SequenceDialect& dialect,
-                                                             SourceMapBuilder* sourceMap,
-                                                             std::optional<SourceAnnotationId> parentAnnotation) {
-  const auto bytes = reader.slice(offset, 1);
-  std::vector<u8> ownedBytes{bytes.begin(), bytes.end()};
-  const auto range = reader.range(offset, static_cast<u32>(ownedBytes.size()));
-  SourceAnnotationId annotationId;
-  if (sourceMap != nullptr) {
-    auto annotation = sourceMap->command("Recovery Stop", range, SequenceSemantic::Unsupported)
-                          .kind("recovery-stop")
-                          .detailKind(recoveryDetailKind(dialect))
-                          .playbackStatus(CommandPlaybackStatus::StopsPlayback);
-    if (parentAnnotation) {
-      annotation.parent(*parentAnnotation);
-    }
-    if (!ownedBytes.empty()) {
-      annotation.field("opcode", range, ownedBytes.front(), SourceValueDisplay::Hex);
-    }
-    annotationId = annotation.id();
-  }
-
-  auto command = DecodedBytecodeCommand{
-      .range = range,
-      .annotation = annotationId,
-      .bytes = std::move(ownedBytes),
-  };
-  command.flow = DecodeFlow::terminalFlow();
-  return command;
-}
-
-// Recovery decoder for malformed SDAT ranges that do not contain a normal SSEQ
-// header. Normal SSEQ decode stays source-driver oriented; this path repairs
-// range-level damage before source commands can be trusted.
-[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(
-    ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset, u32 sequenceEnd, u32 startOffset,
-    u32 trackIndex, size_t maxCommands, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
-    std::optional<SourceAnnotationId> parentAnnotation, std::optional<AssetId> sequenceAsset) {
-  TrackProgram track = makeTrack(startOffset, trackIndex);
-  TrackProgramBuilder builder{track};
-  u32 offset = startOffset;
-  size_t decodedCommands = 0;
-  std::set<u32> decodedOffsets;
-  std::set<u32> callTargetOffsets;
-  std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
-  const CursorTrackDecodeInput input{
-      .sequenceAsset = sequenceAsset,
-      .trackIndex = trackIndex,
-      .startOffset = startOffset,
-      .bytecodeEnd = sequenceEnd,
-      .sequenceOffset = sequenceOffset,
-      .sequenceEnd = sequenceEnd,
-      .parentAnnotation = parentAnnotation,
-      .sourceMap = sourceMap,
-      .diagnostics = diagnostics,
-      .maxCommands = static_cast<u32>(maxCommands),
-  };
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
-  if (trackAnnotation) {
-    decodeContext.parentAnnotation = trackAnnotation;
-  }
-  TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
-
-  while (!pendingBlocks.empty()) {
-    const PendingBlock block = pendingBlocks.back();
-    pendingBlocks.pop_back();
-    offset = block.offset;
-
-    while (hasBytecodeBytes(reader, offset, 1, sequenceEnd) && decodedCommands++ < maxCommands) {
-      const u32 begin = offset;
-      if (decodedOffsets.contains(begin)) {
-        break;
-      }
-      decodedOffsets.insert(begin);
-
-      auto decoded = decodeCursorCommandWithState<TrackState, Context, NdsCursorReader>(reader, offset, dialect,
-                                                                                        decodeState, decodeContext);
-
-      if (!block.callTarget) {
-        const auto overlap = std::ranges::find_if(
-            callTargetOffsets, [&](u32 target) { return begin < target && target < decoded.range.endOffset(); });
-        if (overlap != callTargetOffsets.end()) {
-          // Some malformed FAT entries fall through one byte before a real call
-          // target. Stop before consuming the overlapping subroutine bytes.
-          appendDecodedBytecodeCommand(
-              builder, terminalRecoveryCommand(reader, begin, dialect, sourceMap, trackAnnotation), begin);
-          break;
-        }
-      }
-
-      if (decoded.flow.unconditionalJump()) {
-        const u32 destination = decoded.flow.staticTargets.front().value;
-        appendDecodedBytecodeCommand(builder, decoded, begin);
-        if (decodedOffsets.contains(destination)) {
-          break;
-        }
-        offset = destination;
-        continue;
-      }
-
-      if (decoded.flow.callTarget()) {
-        const u32 destination = decoded.flow.staticTargets.front().value;
-        if (!decodedOffsets.contains(destination) && callTargetOffsets.insert(destination).second) {
-          pendingBlocks.push_back(PendingBlock{.offset = destination, .callTarget = true});
-        }
-      }
-
-      const auto next = decoded.flow.fallthrough;
-      appendDecodedBytecodeCommand(builder, decoded, begin);
-      if (!next || decoded.flow.terminal) {
-        break;
-      }
-      offset = next->value;
-    }
-  }
-
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
-  return track;
-}
-
-// Normal SSEQ decode follows statically reachable bytecode blocks from the
-// track start, preserving calls and jumps as source commands.
-[[nodiscard]] TrackProgram decodeReachableBlocks(ByteReader reader, const SequenceDialect& dialect, u32 sequenceOffset,
-                                                 u32 sequenceEnd, u32 startOffset, u32 trackIndex,
-                                                 SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
-                                                 std::optional<SourceAnnotationId> parentAnnotation,
-                                                 std::optional<AssetId> sequenceAsset) {
-  return decodeCursorReachableTrack<TrackState, Context, NdsCursorReader>(
-      reader, dialect,
-      CursorTrackDecodeInput{
-          .sequenceAsset = sequenceAsset,
-          .trackIndex = trackIndex,
-          .startOffset = startOffset,
-          .bytecodeEnd = sequenceEnd,
-          .sequenceOffset = sequenceOffset,
-          .sequenceEnd = sequenceEnd,
-          .parentAnnotation = parentAnnotation,
-          .sourceMap = sourceMap,
-          .diagnostics = diagnostics,
-          .maxCommands = static_cast<u32>(kMaxTrackCommands),
-      });
-}
-
-[[nodiscard]] NdsSequenceDescriptor makeNdsSequenceDescriptor() {
-  return NdsSequenceDescriptor{
-      .dialect = makeCursorDialect<TrackState, Context, NdsCursorReader>(CursorDialectSpec<Context>{
-          .id = std::string(kNdsSequenceDialectId),
-          .commandDetailKindPrefix = "nds",
-          .timebase = Timebase{.ppqn = 0x30},
-          .defaultBehavior =
-              SequenceProgramBehavior{
-                  .defaultLoopPolicy = LoopPolicy::PlayOnce,
-                  .commandLimit = static_cast<u32>(kMaxTrackCommands),
-              },
-          .context = Context{},
-      }),
-  };
-}
-
 }  // namespace
 
-const NdsSequenceDescriptor& ndsSequenceDescriptor() {
-  static const NdsSequenceDescriptor descriptor = makeNdsSequenceDescriptor();
-  return descriptor;
+const SequenceDialect& ndsSequenceDialect() {
+  static const SequenceDialect dialect = makeDialect();
+  return dialect;
 }
 
 void registerNdsSequenceDialect(SequenceDialectRegistry& registry) {
-  registry.add(ndsSequenceDescriptor().dialect);
+  registry.add(ndsSequenceDialect());
 }
 
-TrackProgram decodeNdsSequenceTrack(ByteReader reader, const NdsSequenceDescriptor& descriptor, u32 sequenceOffset,
-                                    u32 sequenceEnd, u32 startOffset, u32 trackIndex, bool recoverMalformedSdatRange,
-                                    SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
-                                    std::optional<SourceAnnotationId> parentAnnotation,
-                                    std::optional<AssetId> sequenceAsset) {
-  if (recoverMalformedSdatRange) {
-    return decodeMalformedSdatRangeTrack(reader, descriptor.dialect, sequenceOffset, sequenceEnd, startOffset,
-                                         trackIndex, kMaxTrackCommands, sourceMap, diagnostics, parentAnnotation,
-                                         sequenceAsset);
+TrackProgram decodeNdsSequenceTrack(ByteReader reader, TrackDecodeInput input, bool recoverMalformedSdatRange) {
+  if (input.bytecodeEnd == std::numeric_limits<u32>::max()) {
+    input.bytecodeEnd = static_cast<u32>(reader.size());
+  } else {
+    input.bytecodeEnd = std::min(input.bytecodeEnd, static_cast<u32>(reader.size()));
   }
-  return decodeReachableBlocks(reader, descriptor.dialect, sequenceOffset, sequenceEnd, startOffset, trackIndex,
-                               sourceMap, diagnostics, parentAnnotation, sequenceAsset);
+  if (input.sequenceEnd == std::numeric_limits<u32>::max()) {
+    input.sequenceEnd = input.bytecodeEnd;
+  }
+  if (recoverMalformedSdatRange) {
+    return decodeMalformedSdatRangeTrack(reader, input);
+  }
+
+  const u32 sequenceDataBase = input.sequenceOffset + kSseqHeaderSize;
+  return decodeSemanticReachableTrack(reader, input, [reader, input, sequenceDataBase](u32 offset) {
+    return decodeCommand(reader, offset, input.bytecodeEnd, sequenceDataBase, input.sequenceEnd, input.diagnostics);
+  });
 }
 
 std::vector<u32> ndsSequenceTrackAddresses(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
   std::vector<u32> extraTrackAddresses;
-  u32 offset = sequenceOffset + kSseqHeaderSize;
+  const u32 sequenceDataBase = sequenceOffset + kSseqHeaderSize;
+  u32 offset = sequenceDataBase;
   if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
     return {offset};
   }
 
-  if (reader.u8At(offset) == 0xfe) {
-    if (!hasBytecodeBytes(reader, offset, 3, sequenceEnd)) {
-      return {offset};
-    }
-    offset += 3;
-    if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
-      return {offset};
-    }
-    u8 status = reader.u8At(offset);
-    if (status == 0x80) {
-      const u32 statusOffset = offset;
-      ++offset;
-      if (!readVarLen(reader, offset, sequenceEnd)) {
-        return {statusOffset};
-      }
-      if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
-        return {offset};
-      }
-      status = reader.u8At(offset);
-    }
+  // Bootstrap commands use the same semantic decoder as normal tracks. They
+  // are discarded after discovery because the driver runs them before musical
+  // track playback; the primary track begins at the first following command.
+  const auto decodeAt = [&](u32 commandOffset) {
+    return decodeCommand(reader, commandOffset, sequenceEnd, sequenceDataBase, sequenceEnd, nullptr);
+  };
 
-    while (status == 0x93 && hasBytecodeBytes(reader, offset, 5, sequenceEnd)) {
-      if (const auto trackAddress = readSseqAddress(reader, sequenceOffset, sequenceEnd, offset + 2);
-          trackAddress && *trackAddress < sequenceEnd) {
-        extraTrackAddresses.push_back(*trackAddress);
-      }
-      offset += 5;
-      if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
-        break;
-      }
-      status = reader.u8At(offset);
+  auto command = decodeAt(offset);
+  if (command.opcode != 0xfe || command.retainBytes) {
+    return {offset};
+  }
+  offset += command.encodedSize;
+  if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
+    return {offset};
+  }
+
+  command = decodeAt(offset);
+  if (command.opcode == 0x80) {
+    if (command.retainBytes) {
+      return {offset};
     }
+    offset += command.encodedSize;
+  }
+
+  while (hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
+    command = decodeAt(offset);
+    if (command.opcode != 0x93 || command.retainBytes) {
+      break;
+    }
+    const auto destination = std::ranges::find_if(
+        command.operands, [](const SemanticOperand& operand) { return operand.name == "destination"; });
+    if (destination != command.operands.end()) {
+      if (const auto* address = std::get_if<Address>(&destination->value);
+          address != nullptr && address->value < sequenceEnd) {
+        extraTrackAddresses.push_back(address->value);
+      }
+    }
+    offset += command.encodedSize;
   }
 
   std::vector<u32> trackAddresses{offset};
@@ -614,8 +713,7 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
 SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
                                              const std::string& name, SourceMapBuilder* sourceMap,
                                              std::vector<Diagnostic>* diagnostics) {
-  const NdsSequenceDescriptor& descriptor = ndsSequenceDescriptor();
-  const SequenceDialect& dialect = descriptor.dialect;
+  const SequenceDialect& dialect = ndsSequenceDialect();
   const u32 sequenceOffset = range.decodeOffset != 0 ? range.decodeOffset : range.offset;
   const SourceRange sequenceRange = input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset);
   SequenceProgramAsset asset{
@@ -648,12 +746,21 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
 
   u32 trackIndex = 0;
   for (const u32 trackAddress : ndsSequenceTrackAddresses(input.reader, sequenceOffset, range.sequenceEnd)) {
-    auto track =
-        decodeNdsSequenceTrack(input.reader, descriptor, sequenceOffset, range.sequenceEnd, trackAddress, trackIndex,
-                               range.recoverMalformedSdatRange, sourceMap, diagnostics,
-                               headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt, id);
-    ++trackIndex;
-    asset.program.tracks.push_back(std::move(track));
+    asset.program.tracks.push_back(decodeNdsSequenceTrack(
+        input.reader,
+        TrackDecodeInput{
+            .sequenceAsset = id,
+            .trackIndex = trackIndex++,
+            .startOffset = trackAddress,
+            .bytecodeEnd = range.sequenceEnd,
+            .sequenceOffset = sequenceOffset,
+            .sequenceEnd = range.sequenceEnd,
+            .parentAnnotation = headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt,
+            .sourceMap = sourceMap,
+            .diagnostics = diagnostics,
+            .maxCommands = kMaxTrackCommands,
+        },
+        range.recoverMalformedSdatRange));
   }
 
   return asset;

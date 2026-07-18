@@ -10,6 +10,7 @@
 #include "value/model/SourceMap.h"
 
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -28,6 +29,10 @@ public:
                                      SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
   [[nodiscard]] RangedValue<u16> u16be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default);
   [[nodiscard]] RangedValue<u16> u16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default);
+  [[nodiscard]] RangedValue<u32> u24le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default);
+  [[nodiscard]] RangedValue<u32> varLen(std::string_view name,
+                                        SourceValueDisplay display = SourceValueDisplay::Default);
+  [[nodiscard]] RangedValue<std::string> rawBytes(std::string_view name, u32 size);
   [[nodiscard]] RangedValue<s16> s16be(std::string_view name,
                                        SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
 

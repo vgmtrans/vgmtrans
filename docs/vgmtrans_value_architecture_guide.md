@@ -79,7 +79,7 @@ MIDI renderer or another future sequence exporter
 
 The sequence parser does not directly write MIDI. It records semantic commands in a `SequenceProgram`; semantic executors never receive command bytes. The shared VM schedules those commands and produces musical events. MIDI conversion is another layer after that.
 
-> **Migration status:** Capcom SNES uses this semantic path. Akao, Akao SNES, Konami SNES, and NDS still use the legacy two-phase cursor adapter while they are migrated. New format code should use the semantic path; the cursor API is compatibility infrastructure, not the target architecture.
+> **Migration status:** Capcom SNES and NDS use this semantic path. Akao, Akao SNES, and Konami SNES still use the legacy two-phase cursor adapter while they are migrated. New format code should use the semantic path; the cursor API is compatibility infrastructure, not the target architecture.
 
 ### Synth/sample flow
 
@@ -695,7 +695,7 @@ The code provides linear and reachable bytecode walkers. They accept a command d
 
 A linear track is mostly decoded in byte order. A reachable track follows stored static targets such as jumps and calls. Cursor-prefixed wrappers adapt legacy command readers to these same walkers.
 
-Semantic formats normally call `decodeSemanticLinearTrack`. It wraps the linear walker with the shared track lifecycle: create the track annotation, project each already-decoded command, and finalize the track's source range. Format code supplies only the one-command decoder.
+Linear semantic formats normally call `decodeSemanticLinearTrack`; formats with static jumps and calls use `decodeSemanticReachableTrack`. Both wrap the underlying walker with the shared track lifecycle: create the track annotation, project each already-decoded command, and finalize the track's source range. Format code supplies only the one-command decoder.
 
 ### 14.5 `SequenceVm`
 
@@ -946,7 +946,7 @@ Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-Command code should resemble a driver interpreter. Capcom SNES demonstrates the semantic form: each opcode-profile entry places source decoding beside playback behavior. The profile replaces separate metadata, operand, flow, and execution switches. NDS, Akao, Akao SNES, and Konami SNES still use normal cursor switches through the legacy adapter.
+Command code should resemble a driver interpreter. Capcom SNES and NDS demonstrate the semantic form: each opcode-profile entry places source decoding beside playback behavior. The profile replaces separate metadata, operand, flow, and execution switches. Akao, Akao SNES, and Konami SNES still use normal cursor switches through the legacy adapter.
 
 That is a good match for format developers’ mental model. It avoids requiring every command to be represented as a separate class or visitor.
 
@@ -978,9 +978,9 @@ The scanner finds SDAT offsets, parses layout, annotates the SDAT header and sec
 
 The collection key includes source ID, SDAT offset, and sequence index. That makes each collection stable and unique within a source.
 
-NDS sequence code shows the cursor-based sequence style clearly. `NdsCursorReader` handles opcodes directly. For note opcodes, it records the note, reads velocity and duration, emits a note, and returns either wait or next depending on driver state. For program, pan, volume, tempo, jump, call, return, and end, the code stays close to the source-driver meaning.
+NDS sequence code uses one opcode profile with adjacent decode and execution lambdas. Decode reads each command once into named operands, resolves 24-bit relative addresses, and stores jump, call, return, and terminal flow. Playback receives only those operands and a small context around persistent track registers, performance output, and VM flow. Normal SSEQ decoding follows reachable blocks, so subroutines and jump targets are discovered without a playback prepass.
 
-NDS also shows that the architecture can handle recovery paths. Normal SSEQ decode uses reachable block decoding. Malformed SDAT recovery has a specialized path, but still produces normal `TrackProgram` and source annotations.
+The same command decoder handles the `Allocate Track`, optional bootstrap rest, and `Open Track` records used to discover secondary tracks. These bootstrap commands are discarded after discovery because they run before musical track playback, but their byte layout is not parsed a second way. Malformed SDAT recovery remains a specialized walker because it must split overlapping blocks; it reuses the canonical command decoder and still produces normal `TrackProgram` and source annotations.
 
 ### 19.2 Capcom SNES
 
@@ -1243,7 +1243,7 @@ The VM outputs neutral performance events. MIDI is one renderer, not the sequenc
 
 ### 23.1 Semantic and legacy sequence paths coexist temporarily
 
-Capcom uses semantic commands and global scheduling, while four format families still use the cursor adapter and track-major execution. Shared code must preserve both until migration is complete. Avoid adding features only to the legacy path; doing so increases the cost of removing it.
+Capcom and NDS use semantic commands and global scheduling, while three format families still use the cursor adapter and track-major execution. Shared code must preserve both until migration is complete. Avoid adding features only to the legacy path; doing so increases the cost of removing it.
 
 ### 23.2 `std::any` hides some type checking
 
@@ -1317,10 +1317,9 @@ The remaining order is intentional:
 2. migrate Konami SNES to semantic commands and delete its modulation shadow interpreter;
 3. migrate Akao SNES, replacing its dialect matrix, byte rewriting, tempo scraping, prepass, and tick motion;
 4. add symbolic Akao articulation/sample binding and remove materialization source reads;
-5. separate NDS canonical decoding from malformed-data repair;
-6. migrate the remaining layouts/synth parsers to `RecordReader` and shared platform primitives;
-7. remove all `canScan`, cursor-dialect, byte-pool, prepass, and materialization adapters;
-8. migrate each format to one `FormatDefinition`, then remove direct access to the two raw registries.
+5. migrate the remaining layouts/synth parsers to `RecordReader` and shared platform primitives;
+6. remove all `canScan`, cursor-dialect, byte-pool, prepass, and materialization adapters;
+7. migrate each format to one `FormatDefinition`, then remove direct access to the two raw registries.
 
 Architectural acceptance criteria:
 

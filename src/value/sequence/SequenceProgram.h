@@ -83,7 +83,7 @@ struct DecodeFlow {
   [[nodiscard]] bool callTarget() const noexcept { return kind == Kind::Call && !staticTargets.empty(); }
 };
 
-using SemanticOperandValue = std::variant<bool, u64, s64, double, Address>;
+using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
 
 // The role is intentionally small and format-independent. Operand names are the
 // executor's precise vocabulary; roles let generic analysis and SourceMap
