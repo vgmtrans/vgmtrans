@@ -69,6 +69,58 @@ struct MidiChannelAssignment {
   return data7(((std::clamp(stereoPosition, -1.0, 1.0) + 1.0) / 2.0) * 127.0);
 }
 
+struct LoweredStereoBalance {
+  u8 pan = 64;
+  double expressionGain = 1.0;
+};
+
+[[nodiscard]] LoweredStereoBalance lowerStereoBalance(double sourceLeft, double sourceRight) {
+  constexpr double piOverTwo = 1.57079632679489661923;
+  sourceLeft = std::max(0.0, sourceLeft);
+  sourceRight = std::max(0.0, sourceRight);
+
+  // MIDI pan has only one position value, while source engines may specify two
+  // independent channel gains. Pick the closest equal-power MIDI position,
+  // then use expression to retain the source engine's combined loudness.
+  u8 pan = 64;
+  if (sourceLeft == 0.0 && sourceRight == 0.0) {
+    pan = 64;
+  } else if (sourceRight == 0.0) {
+    pan = 0;
+  } else if (sourceLeft == sourceRight) {
+    pan = 64;
+  } else if (sourceLeft == 0.0) {
+    pan = 127;
+  } else {
+    const double arcPosition = std::atan2(sourceRight, sourceLeft) / piOverTwo;
+    pan = static_cast<u8>(std::clamp<int>(static_cast<int>(std::lround(arcPosition * 126.0)), 0, 126));
+    if (pan != 0) {
+      ++pan;
+    }
+  }
+
+  double midiLeft = 0.0;
+  double midiRight = 0.0;
+  if (pan == 0 || pan == 1) {
+    midiLeft = 1.0;
+  } else if (pan == 64) {
+    midiLeft = std::sqrt(2.0) / 2.0;
+    midiRight = midiLeft;
+  } else if (pan == 127) {
+    midiRight = 1.0;
+  } else {
+    const double arcPosition = (pan - 1) / 126.0;
+    midiLeft = std::cos(piOverTwo * arcPosition);
+    midiRight = std::sin(piOverTwo * arcPosition);
+  }
+
+  const double midiGain = midiLeft + midiRight;
+  return LoweredStereoBalance{
+      .pan = pan,
+      .expressionGain = midiGain == 0.0 ? 0.0 : (sourceLeft + sourceRight) / midiGain,
+  };
+}
+
 [[nodiscard]] u8 midiNormalized7(double amount) {
   return data7(std::clamp(amount, 0.0, 1.0) * 127.0);
 }
@@ -458,6 +510,20 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, LevelPrecisionHint::SevenBit,
                             options);
             }
+          }
+        } else if constexpr (std::is_same_v<TypedEvent, StereoBalancePerformanceEvent>) {
+          const LoweredStereoBalance lowered = lowerStereoBalance(typedEvent.leftGain, typedEvent.rightGain);
+          track.events.push_back(Pan{
+              .tick = typedEvent.header.tick,
+              .channel = channel,
+              .value = lowered.pan,
+          });
+          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            state.panExpressionGain = lowered.expressionGain;
+            addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
+          } else {
+            addExpression(track, typedEvent.header.tick, channel, lowered.expressionGain,
+                          LevelPrecisionHint::SevenBit, options);
           }
         } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
           track.events.push_back(MasterVolume{

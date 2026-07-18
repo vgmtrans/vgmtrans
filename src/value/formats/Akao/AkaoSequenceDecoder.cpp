@@ -69,34 +69,8 @@ struct AkaoTrackState {
   std::optional<u8> tieKey;
 };
 
-[[nodiscard]] u8 percentPanToMidi(double percent) {
-  u8 midiPan = static_cast<u8>(std::round(percent * 126.0));
-  if (midiPan != 0) {
-    ++midiPan;
-  }
-  return midiPan;
-}
-
-[[nodiscard]] u8 linearPan7ToMidi(u8 rawPan) {
-  if (rawPan == 127) {
-    ++rawPan;
-  }
-  const double percent = rawPan / 128.0;
-  if (percent == 0.0) {
-    return 0;
-  }
-  if (percent == 0.5) {
-    return 64;
-  }
-  if (percent == 1.0) {
-    return 127;
-  }
-  constexpr double halfPi = 1.57079632679489661923;
-  return percentPanToMidi(std::atan2(percent, 1.0 - percent) / halfPi);
-}
-
-[[nodiscard]] double stereoPositionFromMidiPan(u8 midiPan) {
-  return (midiPan / 127.0) * 2.0 - 1.0;
+[[nodiscard]] double rightGainFromLinearPan(u8 rawPan) {
+  return rawPan == 127 ? 1.0 : rawPan / 128.0;
 }
 
 [[nodiscard]] u32 akaoMidiBank(u32 bankMsb) {
@@ -519,11 +493,13 @@ struct AkaoCursorReader {
             [](auto& runtime, u64 tick, u8 value) { runtime.expressionAt(tick, akaoLinearControllerGain(value)); });
         return cmd.next();
       }
-      case 0xaa:
+      case 0xaa: {
         cmd.name("Pan", SequenceSemantic::Pan);
         rt.state.pan = cmd.u8("pan");
-        rt.pan(stereoPositionFromMidiPan(linearPan7ToMidi(static_cast<u8>(rt.state.pan))));
+        const double rightGain = rightGainFromLinearPan(static_cast<u8>(rt.state.pan));
+        rt.stereoBalance(1.0 - rightGain, rightGain);
         return cmd.next();
+      }
       case 0xab: {
         cmd.name("Pan Fade", SequenceSemantic::Pan);
         const u16 duration = akaoZeroAs256(cmd.u8("duration"));
@@ -531,7 +507,10 @@ struct AkaoCursorReader {
         cmd.derived("duration_ticks", duration);
         emitAkaoControllerSlide(
             rt, rt.state.pan, target, duration, [](u8 value) { return value; },
-            [](auto& runtime, u64 tick, u8 value) { runtime.panAt(tick, stereoPositionFromMidiPan(value)); });
+            [](auto& runtime, u64 tick, u8 value) {
+              const double rightGain = rightGainFromLinearPan(value);
+              runtime.stereoBalanceAt(tick, 1.0 - rightGain, rightGain);
+            });
         return cmd.next();
       }
       case 0xc0:

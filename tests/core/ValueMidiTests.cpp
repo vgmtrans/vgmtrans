@@ -276,17 +276,15 @@ void performanceMidiRendererWritesPanGainResetWhenRequested() {
           .endTick = 24,
           .events =
               {
-                  PanPerformanceEvent{
+                  StereoBalancePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
-                      .stereoPosition = -1.0,
-                      .linearGain = 0.5,
-                      .hasLinearGain = true,
+                      .leftGain = 0.5,
+                      .rightGain = 0.0,
                   },
-                  PanPerformanceEvent{
+                  StereoBalancePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 12},
-                      .stereoPosition = 0.0,
-                      .linearGain = 1.0,
-                      .hasLinearGain = true,
+                      .leftGain = 0.7071067811865476,
+                      .rightGain = 0.7071067811865476,
                   },
               },
       }},
