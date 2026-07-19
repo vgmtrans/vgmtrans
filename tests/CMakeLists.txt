@@ -7,6 +7,7 @@ target_sources(vgmtrans-value-core-tests
 	    formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
     core/ValueMidiTests.cpp
+    core/ValueCompilerCursorTests.cpp
     core/ValueRegistryTests.cpp
     core/ValueSequenceModelTests.cpp
     core/ValueSequenceVmTests.cpp

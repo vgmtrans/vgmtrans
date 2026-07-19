@@ -43,8 +43,10 @@ struct DecodedBytecodeCommand {
   std::vector<u8> bytes;
   DecodeFlow flow;
   std::vector<SemanticOperand> operands;
+  CommandExecution execution;
   DecodedCommandPresentation presentation;
   bool retainBytes = true;
+  bool truncated = false;
 };
 
 struct BytecodeDecodeContext {
@@ -82,7 +84,7 @@ inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const Dec
                                          u32 offset) {
   if (!decoded.retainBytes) {
     builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.operands,
-                        decoded.flow, decoded.annotation);
+                        decoded.flow, decoded.annotation, decoded.execution);
     return;
   }
   builder.addDecoded(Address{offset}, decoded.range, decoded.bytes, decoded.annotation, decoded.flow);
