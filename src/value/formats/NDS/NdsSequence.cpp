@@ -57,20 +57,6 @@ struct Playback {
     out.note(static_cast<double>(key), LevelScale::linearFromMidi7(velocity), duration);
     return track.noteWait ? Effects::wait(duration) : Effects{};
   }
-  void pitchBend(s8 bend) const {
-    out.pitchBend((bend / 128.0) * track.pitchBendRangeSemitones);
-  }
-
-  void pitchBendRange(u8 semitones) {
-    track.pitchBendRangeSemitones = semitones;
-    out.pitchBendRange(semitones);
-  }
-
-  void tempo(u16 bpm) const {
-    if (bpm != 0) {
-      out.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
-    }
-  }
 };
 
 using NdsCompilerCursor = CompilerCursor<TrackState, Playback>;
@@ -84,9 +70,9 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
                        destination.value < sequenceEnd ? role : SemanticOperandRole::Address);
 }
 
-// One source opcode is read and compiled in one block. Terminal operations
-// below install either a shared VM action or a typed Playback method; there is
-// no second opcode profile or execution switch.
+// One source opcode is read and compiled in one block. Event operations append
+// shared actions or typed Playback behavior in written order; there is no
+// second opcode profile or execution switch.
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, u32 sequenceDataBase,
                                                    u32 sequenceEnd, std::vector<Diagnostic>* diagnostics) {
   NdsCompilerCursor cursor(reader, begin, end, "nds", diagnostics);
@@ -96,11 +82,10 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
 
   if (cursor.opcode() <= 0x7f) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 key = event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote,
-                                    SemanticOperandRole::NoteKey);
+    const u8 key =
+        event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
     const u8 velocity = event.u8("velocity", SourceValueDisplay::Default, SemanticOperandRole::Level);
-    const u32 duration =
-        event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration);
+    const u32 duration = event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration);
     return event.invoke<&Playback::note>(key, velocity, duration);
   }
 
@@ -112,10 +97,10 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
     case 0x81: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
       const u32 raw = event.varLen("raw");
-      const u32 bank = event.derived("bank", raw >> 7, SourceValueDisplay::Default,
-                                     SemanticOperandRole::InstrumentBank);
-      const u32 program = event.derived("program", raw & 0x7f, SourceValueDisplay::Default,
-                                        SemanticOperandRole::InstrumentProgram);
+      const u32 bank =
+          event.derived("bank", raw >> 7, SourceValueDisplay::Default, SemanticOperandRole::InstrumentBank);
+      const u32 program =
+          event.derived("program", raw & 0x7f, SourceValueDisplay::Default, SemanticOperandRole::InstrumentProgram);
       return event.emitInstrument(bank, program);
     }
     case 0x93: {
@@ -129,9 +114,9 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
       const bool isCall = cursor.opcode() == 0x95;
       auto event = cursor.command(isCall ? "Call" : "Jump", isCall ? SequenceSemantic::Call : SequenceSemantic::Jump,
                                   CommandPlaybackStatus::AffectsControlFlow);
-      const Address destination = targetAddress(event, sequenceDataBase, sequenceEnd,
-                                                isCall ? SemanticOperandRole::CallTarget
-                                                       : SemanticOperandRole::JumpTarget);
+      const Address destination =
+          targetAddress(event, sequenceDataBase, sequenceEnd,
+                        isCall ? SemanticOperandRole::CallTarget : SemanticOperandRole::JumpTarget);
       if (!event.ok()) {
         return event.stop();
       }
@@ -195,11 +180,12 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
     }
     case 0xc4: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchBend>(event.s8("bend"));
+      return event.emitPitchBendScaledBy<&TrackState::pitchBendRangeSemitones>(event.s8("bend") / 128.0);
     }
     case 0xc5: {
       auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchBendRange>(event.u8("semitones"));
+      const u8 semitones = event.u8("semitones");
+      return event.set<&TrackState::pitchBendRangeSemitones>(semitones).emitPitchBendRange(semitones);
     }
     case 0xc6:
       return cursor.opaque("Priority", 1);
@@ -250,7 +236,8 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
       return cursor.opaque("Modulation Delay", 2);
     case 0xe1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      return event.invoke<&Playback::tempo>(event.u16le("bpm"));
+      const u16 bpm = event.u16le("bpm");
+      return bpm == 0 ? event.ignore() : event.emitTempo(static_cast<u32>(std::round(60000000.0 / bpm)));
     }
     case 0xe3:
       return cursor.opaque("Sweep Pitch", 2);
@@ -294,13 +281,14 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
       .opcode = reader.u8At(offset),
       .encodedSize = 1,
       .flow = DecodeFlow::terminalFlow(),
-      .presentation = DecodedCommandPresentation{
-          .label = "Recovery Stop",
-          .localKind = "recovery-stop",
-          .detailKind = "nds.recovery-stop",
-          .semantic = SequenceSemantic::Unsupported,
-          .playback = CommandPlaybackStatus::StopsPlayback,
-      },
+      .presentation =
+          DecodedCommandPresentation{
+              .label = "Recovery Stop",
+              .localKind = "recovery-stop",
+              .detailKind = "nds.recovery-stop",
+              .semantic = SequenceSemantic::Unsupported,
+              .playback = CommandPlaybackStatus::StopsPlayback,
+          },
       .retainBytes = false,
   };
 }

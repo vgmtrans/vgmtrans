@@ -68,7 +68,7 @@ source bytecode
 CompilerCursor reads one command once
   ↓
 SourceCommand with source metadata, stored flow,
-  positional executable values, and an executor slot
+  and ordered typed executable actions
   + SourceMap command annotation
   ↓
 SequenceVm invokes a generated typed executor
@@ -78,7 +78,7 @@ PerformanceSequence, a target-neutral musical performance
 MIDI renderer or another future sequence exporter
 ```
 
-The compiler cursor exists only while decoding. Its field reads record source metadata, and its terminal operation compiles playback behavior into source-free data. The shared VM schedules those commands and invokes generated typed executors; neither the VM nor playback can reopen command bytes. MIDI conversion remains a later layer.
+The compiler cursor exists only while decoding. Its field reads record source metadata, and its event operations append source-free typed actions in written order. Returning the event finalizes the command. The shared VM schedules commands while the compiled dialect invokes their generated executors; neither layer can reopen command bytes. MIDI conversion remains a later layer.
 
 > **Migration status:** NDS is the complete compiler-cursor prototype. Capcom SNES uses its immediate predecessor, an adjacent decode/execution profile. Akao, Akao SNES, and Konami SNES still use the old two-phase cursor adapter. Those older paths are migration scaffolding, not constraints on the target design; Git history preserves them if removing them later proves premature.
 
@@ -268,13 +268,13 @@ Each track contains decoded `SourceCommand` records. A `SourceCommand` keeps:
 - opcode;
 - named source operands with values and source ranges;
 - decode-time control flow;
-- positional executable values and an executor slot for compiled commands;
+- ordered executable actions, each containing positional values and an executor slot, for compiled commands;
 - source address;
 - encoded size;
 - source range;
 - optional source annotation ID.
 
-An operand's name is author-facing vocabulary for source inspection and analysis. It also keeps a display rule, optional generic role, exact source range, and—when useful for presentation—both encoded and resolved values. Compiler-cursor execution does not consume this named list. Its terminal operation stores only the positional values required by the generated typed executor, so playback needs neither operand IDs nor string lookup.
+An operand's name is author-facing vocabulary for source inspection and analysis. It also keeps a display rule, optional generic role, exact source range, and—when useful for presentation—both encoded and resolved values. Compiler-cursor execution does not consume this named list. Each action stores only the positional values required by its generated typed executor, so playback needs neither operand IDs nor string lookup.
 
 Complete source-free commands do not retain encoded bytes. `commandBytes` and byte spans remain temporarily on `TrackProgram` for unmigrated cursor dialects and partial malformed-command diagnostics. The source-free executor signature intentionally receives no `TrackProgram` or byte reader, making source reparsing during playback impossible.
 
@@ -647,7 +647,7 @@ MidiExporter
 
 ### 14.1 `SequenceProgram`
 
-`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every compiled command has an opcode, named source operands, stored decode flow, its source address/range, an annotation ID, positional executable values, and an automatically assigned executor slot.
+`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every compiled command has an opcode, named source operands, stored decode flow, its source address/range, an annotation ID, and an ordered list of typed executable actions.
 
 The stored flow lets walkers and validators inspect control flow without executing format code. Named operands serve source presentation and analysis; playback consumes positional executable values and performs no string lookup. A format profile belongs to this program value, so one registered executor family can handle every version of the driver.
 
@@ -697,11 +697,35 @@ case Note: {
 }
 ```
 
-`CompilerCursor` wraps `RecordReader`. Field reads automatically record names, values, exact ranges, display rules, and roles. The terminal call such as `emitLevel`, `set`, `invoke`, `jump`, or `end` records both durable execution data and discovery flow. It also selects a generated typed thunk and assigns its executor slot automatically. There is no execute switch, operand-key declaration, captured closure, or playback-time string lookup.
+`CompilerCursor` wraps `RecordReader`. Field reads automatically record names, values, exact ranges, display rules, and roles. Calls such as `emitLevel`, `set`, `invoke`, `jump`, or `end` append typed executable actions and update discovery flow. Every call returns the same `Event&`, so actions may be chained or written as separate statements. Returning the final event expression converts the builder into the decoded command.
 
-Malformed reads automatically turn the command into a terminal truncated record. Complete commands retain no source bytes. `CommandSourceMap` projects the temporary decoded record into an annotation, so ordinary command blocks do not manually build fields or links.
+This makes compound behavior explicit without inventing compound operations:
 
-Do not introduce a command class hierarchy, handler-per-opcode files, binary-schema DSL, declarative command table, typed command variant taxonomy, or generic microcode language. Keep the complete source-driver operation visible in one local block. Add a shared cursor terminal operation only when it expresses literal common behavior; use a concrete local `Playback` method for driver behavior.
+```cpp
+case PitchBendRange: {
+  auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
+  const u8 semitones = event.u8("semitones");
+  return event
+      .set<&TrackState::pitchBendRangeSemitones>(semitones)
+      .emitPitchBendRange(semitones);
+}
+```
+
+The non-chained form compiles identically:
+
+```cpp
+event.set<&TrackState::something>(value);
+event.emitExpression(expression);
+return event.wait(duration);
+```
+
+Each action selects a generated typed thunk and receives positional values. The compiled dialect executes actions in written order, combines elapsed time, and rejects conflicting control-flow results. There is no execute switch, operand-key declaration, captured closure, or playback-time string lookup.
+
+Captureless inline handlers are available for small exceptional behavior through `event.invoke(handler, arguments...)`. The handler type generates a thunk; no closure object is stored. Captures are forbidden, so decoded values remain explicit IR arguments. Prefer named operations or a nearby `Playback` method whenever they are clearer.
+
+Malformed reads automatically discard accumulated actions and turn the command into a terminal truncated record. Complete commands retain no source bytes. `CommandSourceMap` projects the temporary decoded record into an annotation, so ordinary command blocks do not manually build fields or links.
+
+Do not introduce a command class hierarchy, handler-per-opcode files, binary-schema DSL, declarative command table, typed command variant taxonomy, or format-visible microcode language. The internal action list exists only to preserve the order of ordinary imperative statements. Keep the complete source-driver operation visible in one local block, and do not hide multiple side effects behind one convenient-sounding operation.
 
 The adjacent decode/execution profile used by Capcom is the predecessor to this model, not a second style to copy. `VmCommandCursor` and `SequenceCursorDialect` still let unmigrated formats build, but live compatibility is not a design requirement: playback can reparse retained bytes, and Git history is the fallback if those adapters are removed.
 
@@ -965,11 +989,11 @@ Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-Command code should resemble a driver interpreter. NDS demonstrates the compiler-cursor form: one opcode switch reads source fields and returns the command's effect. The terminal operation compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches. Capcom SNES still uses adjacent decode/execution lambdas; Akao, Akao SNES, and Konami SNES still use normal cursor switches through the old adapter.
+Command code should resemble a driver interpreter. NDS demonstrates the compiler-cursor form: one opcode switch reads source fields and appends the command's effects in order. Returning the event compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches. Capcom SNES still uses adjacent decode/execution lambdas; Akao, Akao SNES, and Konami SNES still use normal cursor switches through the old adapter.
 
 The compiler-cursor form is the target because it keeps ordinary commands near the original interpreter's size while retaining source-free VM execution. It avoids a command class, visitor, command table, and universal operation taxonomy.
 
-`CompilerCursor` owns checked field reads, source metadata, truncation, generated executor slots, and the small set of literal VM/output operations. Formats own the opcode switch, conversions, persistent `TrackState`, and concrete `Playback` methods. There is one authoring paradigm.
+`CompilerCursor` owns checked field reads, source metadata, truncation, ordered generated actions, and the small set of literal VM/output operations. Formats own the opcode switch, conversions, persistent `TrackState`, and concrete `Playback` methods. Chained and separate calls are two layouts of the same imperative authoring paradigm.
 
 ### 18.5 Where complexity still appears
 
@@ -999,7 +1023,7 @@ The scanner finds SDAT offsets, parses layout, annotates the SDAT header and sec
 
 The collection key includes source ID, SDAT offset, and sequence index. That makes each collection stable and unique within a source.
 
-NDS sequence code uses one compiler-cursor opcode switch. Each block reads a source command once and ends in a direct output action, typed track-state operation, local `Playback` method, or VM control-flow action. The cursor records source operands for annotation while separately compiling positional execution values and an automatically assigned executor slot. Playback receives no field names or source bytes. Normal SSEQ decoding follows reachable blocks, so subroutines and jump targets are discovered without a playback prepass.
+NDS sequence code uses one compiler-cursor opcode switch. Each block reads a source command once and appends direct output actions, typed track-state operations, local `Playback` behavior, or VM control flow. Pitch-bend range, for example, visibly chains a track-state assignment and a range event rather than hiding both behind one method. The cursor records source operands for annotation while separately compiling ordered positional actions. Playback receives no field names or source bytes. Normal SSEQ decoding follows reachable blocks, so subroutines and jump targets are discovered without a playback prepass.
 
 The same command decoder handles the `Allocate Track`, optional bootstrap rest, and `Open Track` records used to discover secondary tracks. These bootstrap commands are discarded after discovery because they run before musical track playback, but their byte layout is not parsed a second way. Malformed SDAT recovery remains a specialized walker because it must split overlapping blocks; it reuses the canonical command decoder and still produces normal `TrackProgram` and source annotations.
 
@@ -1084,7 +1108,7 @@ Define:
 - a `TrackState` type for driver-local mutable playback state; and
 - a track decoder using `decodeCompilerLinearTrack` or `decodeCompilerReachableTrack`.
 
-Use `CompilerCursor` to keep IR construction, source projection, generated executor registration, truncation handling, and type erasure out of format code. Ordinary literal commands should end in `emit...`, `set`, `add`, `toggle`, or a VM flow operation. Put genuinely stateful driver behavior in a nearby typed `Playback` method and call it with `invoke`. Playback must not implement global loop export policy or read source bytes.
+Use `CompilerCursor` to keep IR construction, source projection, generated executor registration, truncation handling, and type erasure out of format code. Ordinary literal commands use `emit...`, `set`, `add`, `toggle`, or a VM flow operation. Chain operations—or write them as separate statements—when a source command has several effects. Put substantial or reused stateful driver behavior in a nearby typed `Playback` method. A captureless inline `invoke` is available for genuinely clearer one-off behavior. Playback must not implement global loop export policy or read source bytes.
 
 ### Step 6: Build synth data in the neutral model
 
@@ -1176,17 +1200,17 @@ It also validates collection references and reports missing or wrong-type assets
 
 `SequenceProgram` records decoded source commands, program profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
 
-Each compiler-cursor command stores its opcode, named source operands, source provenance, decode flow, positional executable arguments, and executor slot. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Complete compiled commands have no byte-pool entry; byte pools exist for old cursor commands and partial malformed-command diagnostics.
+Each compiler-cursor command stores its opcode, named source operands, source provenance, decode flow, and ordered executable actions. Every action has an automatically assigned executor slot and positional arguments. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Complete compiled commands have no byte-pool entry; byte pools exist for old cursor commands and partial malformed-command diagnostics.
 
 ### 21.12 `CompilerCursor`, `RecordReader`, and old `VmCommandCursor`
 
-`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CompilerCursor` adds command presentation, source operands, discovery flow, executable arguments, and generated typed executor selection. `CommandSourceMap` performs automatic projection.
+`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CompilerCursor` adds command presentation, source operands, discovery flow, ordered executable actions, and generated typed executor selection. `CommandSourceMap` performs automatic projection.
 
 `VmCommandCursor` remains a two-phase surface only because unmigrated value formats currently use it. New code must not use it. It may be deleted whenever preserving it would complicate the compiler-cursor design; its implementation remains recoverable from Git history.
 
 ### 21.13 `SequenceDialect`
 
-A source-free dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior. `CompiledCommandDialect` is the compiler-cursor adapter: it is the only layer that sees `std::any`, creates the concrete `Playback`, and dispatches the generated executor slot.
+A source-free dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior. `CompiledCommandDialect` is the compiler-cursor adapter: it is the only layer that sees `std::any`, creates the concrete `Playback`, dispatches every action in order, and combines their `Effects` for the VM.
 
 The implementation uses `std::any` only to erase the concrete program and track runtime-state types. Program-specific version data is not stored in dialect context; it lives on the immutable program. Old dialect context remains until those formats migrate.
 

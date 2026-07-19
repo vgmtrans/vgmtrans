@@ -57,6 +57,7 @@ void akaoMelodicRegionsDropAdvancingOverlaps();
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections();
 void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
+void ndsSequenceDialectComposesPitchBendRangeActions();
 void ndsSequenceDialectExecutesCallAndReturn();
 void ndsSequenceDialectDiscoversSecondaryTrackAddresses();
 void ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands();
@@ -122,6 +123,7 @@ int main() {
     akaoSampleSelectionKeepsPreferredAndRequiredCollections();
     akaoScanMaterializesInstrumentSetWithoutProvisionalAsset();
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
+    ndsSequenceDialectComposesPitchBendRangeActions();
     ndsSequenceDialectExecutesCallAndReturn();
     ndsSequenceDialectDiscoversSecondaryTrackAddresses();
     ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands();

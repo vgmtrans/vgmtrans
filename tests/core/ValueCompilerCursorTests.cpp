@@ -13,6 +13,7 @@ namespace {
 struct CompilerProbeState {
   s8 transpose = 0;
   bool enabled = false;
+  u8 pitchBendRange = 2;
 };
 
 struct CompilerProbePlayback {
@@ -47,6 +48,31 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x21:
       return cursor.command("Toggle Enabled", SequenceSemantic::State).toggle<&CompilerProbeState::enabled>();
+    case 0x22: {
+      auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
+      const u8 semitones = event.u8("semitones");
+      return event.set<&CompilerProbeState::pitchBendRange>(semitones).emitPitchBendRange(semitones);
+    }
+    case 0x23: {
+      auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
+      return event.emitPitchBendScaledBy<&CompilerProbeState::pitchBendRange>(event.s8("fraction") / 128.0);
+    }
+    case 0x24: {
+      auto event = cursor.command("Separate Actions", SequenceSemantic::State);
+      event.set<&CompilerProbeState::transpose>(event.s8("semitones"));
+      event.emitExpression(0.5);
+      return event.wait(3);
+    }
+    case 0x25: {
+      auto event = cursor.command("Inline Handler", SequenceSemantic::Pan);
+      return event.invoke([](CompilerProbePlayback& playback, u8 pan) { playback.out.pan((pan / 63.5) - 1.0); },
+                          event.u8("pan"));
+    }
+    case 0x26: {
+      auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
+      return event.invoke([](CompilerProbePlayback&) { return Effects{.step = Step::end()}; })
+          .invoke([](CompilerProbePlayback&) { return Effects{.step = Step::return_()}; });
+    }
     case 0x40:
     case 0x41:
     case 0x42:
@@ -108,16 +134,15 @@ SequenceDialect compilerProbeDialect() {
 
 TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sourceMap = nullptr,
                               std::vector<Diagnostic>* diagnostics = nullptr) {
-  return decodeCompilerReachableTrack(
-      reader,
-      TrackDecodeInput{
-          .trackIndex = 0,
-          .startOffset = 0,
-          .bytecodeEnd = end,
-          .sourceMap = sourceMap,
-          .diagnostics = diagnostics,
-      },
-      [=](u32 offset) { return decodeProbeCommand(reader, offset, end, diagnostics); });
+  return decodeCompilerReachableTrack(reader,
+                                      TrackDecodeInput{
+                                          .trackIndex = 0,
+                                          .startOffset = 0,
+                                          .bytecodeEnd = end,
+                                          .sourceMap = sourceMap,
+                                          .diagnostics = diagnostics,
+                                      },
+                                      [=](u32 offset) { return decodeProbeCommand(reader, offset, end, diagnostics); });
 }
 
 void compilerCursorCompilesAndExecutesTypedCommands() {
@@ -196,7 +221,7 @@ void compilerCursorCompilesControlFlow() {
 
 void compilerCursorCompilesRepeatsAndConditionalFields() {
   const std::vector<u8> repeatBytes{
-      0x40, 0x01,              // note
+      0x40, 0x01,                    // note
       0x61, 0x00, 0x02, 0x00, 0x00,  // play twice from address zero
       0xff,
   };
@@ -213,10 +238,44 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
          "compiled counted repeat should replay through shared VM state");
 
   const std::vector<u8> conditionalBytes{0x70, 0x01, 0x12, 0x34, 0xff};
-  const TrackProgram conditional = decodeProbeTrack(ByteReader(SourceId{10}, conditionalBytes),
-                                                     static_cast<u32>(conditionalBytes.size()));
+  const TrackProgram conditional =
+      decodeProbeTrack(ByteReader(SourceId{10}, conditionalBytes), static_cast<u32>(conditionalBytes.size()));
   expect(conditional.commands[0].operands.size() == 2 && conditional.commands[0].encodedSize == 4,
          "imperative compiler cursor should naturally decode conditional field layouts");
+}
+
+void compilerCursorComposesChainedAndSeparateActions() {
+  const std::vector<u8> bytes{
+      0x22, 0x0c,  // set and emit pitch-bend range
+      0x23, 0x40,  // bend halfway across that range
+      0x24, 0x03,  // separate state, expression, and wait actions
+      0x40, 0x01,  // note after the wait, using the new transpose
+      0x25, 0x7f,  // captureless inline handler
+      0xff,
+  };
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{12}, bytes), static_cast<u32>(bytes.size()));
+  expect(track.commands.size() == 6 && track.commands[0].execution.actions.size() == 2 &&
+             track.commands[2].execution.actions.size() == 3,
+         "chained and separate compiler-cursor calls should retain the same ordered action list");
+
+  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 4,
+         "composed actions should execute through one source command before VM scheduling continues");
+  const auto& events = performance.tracks[0].events;
+  expect(events.size() == 5 && std::get<PitchBendRangePerformanceEvent>(events[0]).cents == 1200 &&
+             std::get<PitchBendPerformanceEvent>(events[1]).semitones == 6.0 &&
+             std::get<ExpressionPerformanceEvent>(events[2]).linearGain == 0.5,
+         "composed state and output actions should execute in their written order");
+  expect(std::get<NotePerformanceEvent>(events[3]).header.tick == 3 &&
+             std::get<NotePerformanceEvent>(events[3]).key == 63.0 &&
+             std::get<PanPerformanceEvent>(events[4]).stereoPosition == 1.0,
+         "separate state calls and captureless inline handlers should preserve typed runtime behavior");
 }
 
 void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
@@ -232,11 +291,32 @@ void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
          "truncated compiler field should retain the shared RecordReader diagnostic");
 }
 
+void compilerCursorRejectsConflictingComposedFlow() {
+  const std::vector<u8> bytes{0x26, 0xff};
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{13}, bytes), static_cast<u32>(bytes.size()));
+  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  bool rejected = false;
+  try {
+    static_cast<void>(SequenceVm().render(program, dialect));
+  } catch (const std::logic_error&) {
+    rejected = true;
+  }
+  expect(rejected, "one compiled source command should not produce multiple control-flow results");
+}
+
 }  // namespace
 
 void runValueCompilerCursorTests() {
   compilerCursorCompilesAndExecutesTypedCommands();
   compilerCursorCompilesControlFlow();
   compilerCursorCompilesRepeatsAndConditionalFields();
+  compilerCursorComposesChainedAndSeparateActions();
   compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
+  compilerCursorRejectsConflictingComposedFlow();
 }
