@@ -1222,6 +1222,8 @@ Each compiler-cursor command stores its opcode, named source operands, source pr
 
 `RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CompilerCursor` adds command presentation, source operands, discovery flow, ordered executable actions, and generated typed executor selection. `CommandSourceMap` performs automatic projection.
 
+`SequenceDecodeSession` owns the repeated sequence-header, track-pointer, track, and command-annotation lifecycle for ordinary linear formats. A format still reads its pointer table explicitly and supplies the track number, pointer range, and decoded start address, keeping ordering, endianness, relocation, and null rules visible. `TrackDecodeScope` owns the corresponding single-track walk and command projection.
+
 `VmCommandCursor` remains a two-phase surface only because unmigrated value formats currently use it. New code must not use it. It may be deleted whenever preserving it would complicate the compiler-cursor design; its implementation remains recoverable from Git history.
 
 ### 21.13 `SequenceDialect`

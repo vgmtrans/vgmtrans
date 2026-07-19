@@ -7,6 +7,7 @@
 #include "value/sequence/CommandSourceMap.h"
 
 #include "value/model/SourceMap.h"
+#include "value/sequence/SequenceDialect.h"
 
 #include <algorithm>
 #include <limits>
@@ -196,6 +197,37 @@ TrackProgram TrackDecodeSession::finish() {
 TrackProgram TrackDecodeSession::finish(TrackProgram track) {
   track_ = std::move(track);
   return finish();
+}
+
+SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect,
+                                             AssetId sequenceAsset, SourceRange headerRange,
+                                             SourceMapBuilder* sourceMap)
+    : tracks_{
+          .reader = reader,
+          .sequenceAsset = sequenceAsset,
+          .sourceMap = sourceMap,
+      },
+      program_(dialect.makeProgram()), sourceKindPrefix_(dialect.commandDetailKindPrefix) {
+  if (tracks_.sourceMap == nullptr) {
+    return;
+  }
+
+  tracks_.parentAnnotation = tracks_.sourceMap->header("Sequence Header", headerRange)
+                                 .kind(sourceKindPrefix_ + "-sequence-header")
+                                 .owner(ObjectRefs::sequence(sequenceAsset))
+                                 .id();
+}
+
+void SequenceDecodeSession::annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset) {
+  if (tracks_.sourceMap == nullptr) {
+    return;
+  }
+
+  tracks_.sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{tracks_.reader.range(startOffset, 1)})
+      .kind(sourceKindPrefix_ + "-track-pointer")
+      .owner(ObjectRefs::sequenceTrack(*tracks_.sequenceAsset, trackIndex))
+      .field("destination", pointerRange, startOffset, SourceValueDisplay::Address)
+      .parent(*tracks_.parentAnnotation);
 }
 
 TrackDecodeScope makeTrackDecodeScope(ByteReader reader, const TrackDecodeInput& input) {
