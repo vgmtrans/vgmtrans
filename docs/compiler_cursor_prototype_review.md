@@ -123,9 +123,9 @@ Line counts include comments and blank lines. They measure burden imperfectly, b
 | Value cursor before `SemanticCommand` | 662 | 48 | 710 |
 | Adjacent semantic decode/execute | 625 | 35 | 660 |
 | Rejected `StandardSequenceCommand` | 399 | 26 | 425 |
-| Compiler cursor with composable actions | 504 | 28 | 532 |
+| Compiler cursor with composable actions | 472 | 28 | 500 |
 
-The compiler-cursor NDS sequence is 178 lines smaller than the old value cursor and 128 lines smaller than the semantic decode/execute version. It is 60 lines larger than the original architecture. Most of that remaining difference is not ordinary opcode code: it includes reachable-block discovery, exact source annotations, invalid-target diagnostics, and malformed overlapping-SDAT recovery.
+The compiler-cursor NDS sequence is 210 lines smaller than the old value cursor and 160 lines smaller than the semantic decode/execute version. It is 28 lines larger than the original architecture. Most of that remaining difference is not ordinary opcode code: it includes reachable-block discovery, exact source annotations, invalid-target diagnostics, and malformed overlapping-SDAT recovery.
 
 The rejected standard-command version is shortest by raw count, but its table omits the shared operation definitions and interpreter needed to understand behavior. It failed the locality criterion despite the smaller format file.
 
@@ -133,10 +133,10 @@ Broader production counts are:
 
 | Scope | Lines |
 |---|---:|
-| Current value NDS format directory | 1,713 |
+| Current value NDS format directory | 1,681 |
 | Original NDS format directory | 1,586 |
-| Generic `CompilerCursor.h` | 972 |
-| Focused compiler-cursor tests | 353 |
+| Generic `CompilerCursor.h` | 999 |
+| Focused compiler-cursor tests | 368 |
 
 The two NDS directory totals are not like-for-like: the value implementation also owns durable source maps, neutral assets, bounded recovery, and source-free VM integration. The important author-facing comparison is the sequence implementation and the individual command blocks.
 

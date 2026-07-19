@@ -29,7 +29,6 @@ struct CompilerProbePlayback {
 };
 
 using ProbeCursor = CompilerCursor<CompilerProbeState, CompilerProbePlayback>;
-using ProbeDialect = CompiledCommandDialect<CompilerProbeState, CompilerProbePlayback>;
 
 DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
                                           std::vector<Diagnostic>* diagnostics = nullptr) {
@@ -95,22 +94,22 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       return event.wait(event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration));
     }
     case 0x60: {
-      auto event = cursor.command("Jump", SequenceSemantic::Jump, CommandPlaybackStatus::AffectsControlFlow);
+      auto event = cursor.command("Jump", SequenceSemantic::Jump);
       return event.jump(event.address("destination"));
     }
     case 0x61: {
-      auto event = cursor.command("Repeat", SequenceSemantic::Repeat, CommandPlaybackStatus::AffectsControlFlow);
+      auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
       const u8 slot = event.u8("slot");
       const u32 totalPlays = event.u8("total_plays");
       const Address destination = event.address("destination");
       return event.repeatUntil(slot, totalPlays, destination);
     }
     case 0x62: {
-      auto event = cursor.command("Call", SequenceSemantic::Call, CommandPlaybackStatus::AffectsControlFlow);
+      auto event = cursor.command("Call", SequenceSemantic::Call);
       return event.call(event.address("destination"));
     }
     case 0x63:
-      return cursor.command("Return", SequenceSemantic::Return, CommandPlaybackStatus::AffectsControlFlow).return_();
+      return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0x70: {
       auto event = cursor.sourceOnly("Conditional Fields");
       const u8 wide = event.u8("wide");
@@ -132,12 +131,10 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
 }
 
 SequenceDialect compilerProbeDialect() {
-  return SequenceDialect{
+  return makeCompiledDialect<CompilerProbeState, CompilerProbePlayback>(SequenceDialect{
       .id = DialectId{.value = "compiler-probe"},
       .timebase = Timebase{.ppqn = 48},
-      .createSemanticTrackState = ProbeDialect::createTrackState,
-      .executeSemantic = ProbeDialect::execute,
-  };
+  });
 }
 
 TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sourceMap = nullptr,
@@ -205,10 +202,25 @@ void compilerCursorCompilesControlFlow() {
       0x63,              // return
       0xff,              // end
   };
-  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{8}, bytes), static_cast<u32>(bytes.size()));
+  SourceMapBuilder sourceMapBuilder;
+  const TrackProgram track =
+      decodeProbeTrack(ByteReader(SourceId{8}, bytes), static_cast<u32>(bytes.size()), &sourceMapBuilder);
+  const SourceMap sourceMap = sourceMapBuilder.finish();
   expect(track.commands.size() == 6, "reachable decoding should compile call and jump targets");
   expect(track.commands[0].flow.callTarget() && track.commands[2].flow.unconditionalJump(),
          "compiled flow should preserve discovery targets beside runtime behavior");
+  const SourceAnnotation& callAnnotation = sourceMap.get(track.commands[0].annotation);
+  const SourceAnnotation& jumpAnnotation = sourceMap.get(track.commands[2].annotation);
+  const SourceAnnotation& returnAnnotation = sourceMap.get(track.commands[4].annotation);
+  expect(callAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow &&
+             jumpAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow &&
+             returnAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
+         "compiler-cursor flow operations should annotate their playback status automatically");
+  const SemanticOperand* callDestination = semanticOperand(track.commands[0], "destination");
+  const SemanticOperand* jumpDestination = semanticOperand(track.commands[2], "destination");
+  expect(callDestination != nullptr && callDestination->role == SemanticOperandRole::CallTarget &&
+             jumpDestination != nullptr && jumpDestination->role == SemanticOperandRole::JumpTarget,
+         "compiler-cursor flow operations should annotate decoded integer addresses as targets");
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
@@ -232,6 +244,9 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
   };
   const TrackProgram track =
       decodeProbeTrack(ByteReader(SourceId{9}, repeatBytes), static_cast<u32>(repeatBytes.size()));
+  const SemanticOperand* repeatDestination = semanticOperand(track.commands[1], "destination");
+  expect(repeatDestination != nullptr && repeatDestination->role == SemanticOperandRole::RepeatTarget,
+         "compiled repeats should annotate their destination without a duplicate read-time role");
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
       .dialect = dialect.id,

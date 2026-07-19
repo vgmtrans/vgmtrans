@@ -697,6 +697,7 @@ public:
     }
 
     Event& jump(Address destination) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       targetRole(destination, SemanticOperandRole::JumpTarget);
       append<&detail::jump<Playback>>(destination);
       flow_ = DecodeFlow::jump(destination);
@@ -704,6 +705,7 @@ public:
     }
 
     Event& loopCandidate(Address destination, SemanticOperandRole role = SemanticOperandRole::LoopTarget) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       targetRole(destination, role);
       append<&detail::loopCandidate<Playback>>(destination);
       flow_ = DecodeFlow::jump(destination);
@@ -711,6 +713,7 @@ public:
     }
 
     Event& declaredLoop(Address destination, SemanticOperandRole role = SemanticOperandRole::LoopTarget) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       targetRole(destination, role);
       append<&detail::declaredLoop<Playback>>(destination);
       flow_ = DecodeFlow::jump(destination);
@@ -718,6 +721,7 @@ public:
     }
 
     Event& call(Address destination) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       targetRole(destination, SemanticOperandRole::CallTarget);
       append<&detail::call<Playback>>(destination);
       flow_ = DecodeFlow::call(destination, Address{cursor_.record_.position()});
@@ -725,12 +729,14 @@ public:
     }
 
     Event& return_() {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       append<&detail::return_<Playback>>();
       flow_ = DecodeFlow::return_();
       return *this;
     }
 
     Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       targetRole(destination, SemanticOperandRole::RepeatTarget);
       append<&detail::repeatUntil<Playback>>(slot, totalPlays, destination);
       flow_.staticTargets.push_back(destination);
@@ -740,6 +746,7 @@ public:
     // Record a conditional branch destination while a format-specific action
     // decides at runtime whether the branch is taken.
     Event& mayBranchTo(Address destination, SemanticOperandRole role = SemanticOperandRole::Address) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       targetRole(destination, role);
       flow_.staticTargets.push_back(destination);
       return *this;
@@ -786,7 +793,11 @@ public:
       const auto found = std::ranges::find_if(cursor_.operands_.rbegin(), cursor_.operands_.rend(),
                                               [destination](const SemanticOperand& operand) {
                                                 const auto* address = std::get_if<Address>(&operand.value);
-                                                return address != nullptr && address->value == destination.value;
+                                                if (address != nullptr) {
+                                                  return address->value == destination.value;
+                                                }
+                                                const auto* unsignedValue = std::get_if<u64>(&operand.value);
+                                                return unsignedValue != nullptr && *unsignedValue == destination.value;
                                               });
       if (found != cursor_.operands_.rend()) {
         found->role = role;
@@ -817,6 +828,13 @@ public:
       opcodeRange_ = opcode.range;
     }
   }
+
+  // Most extracted sequence sources use the complete byte buffer. Formats
+  // with a meaningful subrange continue to pass an explicit end offset.
+  CompilerCursor(ByteReader reader, u32 begin, std::string_view detailKindPrefix,
+                 std::vector<Diagnostic>* diagnostics = nullptr)
+      : CompilerCursor(reader, begin, static_cast<u32>(std::min<u64>(reader.size(), std::numeric_limits<u32>::max())),
+                       detailKindPrefix, diagnostics) {}
 
   [[nodiscard]] bool hasOpcode() const noexcept { return opcodeRange_.size != 0; }
   [[nodiscard]] bool ok() const noexcept { return record_.ok(); }
@@ -968,5 +986,14 @@ struct CompiledCommandDialect {
     return combined;
   }
 };
+
+// Fill the mechanical executor hooks while leaving identity, timebase, and
+// playback defaults visible in the format's ordinary SequenceDialect value.
+template <class TrackState, class Playback>
+[[nodiscard]] SequenceDialect makeCompiledDialect(SequenceDialect dialect) {
+  dialect.createSemanticTrackState = CompiledCommandDialect<TrackState, Playback>::createTrackState;
+  dialect.executeSemantic = CompiledCommandDialect<TrackState, Playback>::execute;
+  return dialect;
+}
 
 }  // namespace vgmtrans::core

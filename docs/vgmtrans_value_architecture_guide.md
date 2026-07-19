@@ -664,6 +664,8 @@ A source-free dialect is the small piece of driver-specific behavior needed by t
 
 The dialect executor receives the command, program state, track state, `PerformanceEmitter`, and `VmApi`. It does **not** receive a `TrackProgram`, source bytes, or global registry context. For compiler-cursor formats, the shared adapter creates the format's concrete `Playback` and invokes the command's generated typed thunk. Runtime-relevant version data may initialize program or track state; source-only version choices should be resolved while decoding.
 
+`makeCompiledDialect<TrackState, Playback>(dialect)` fills the mechanical track-state factory and executor hooks. The format's dialect declaration therefore only spells out its identity, timebase, defaults, and any genuinely format-specific program state.
+
 The dialect is registered once in `SequenceDialectRegistry`; export looks it up by family ID. Capcom SNES, for example, registers `capcom-snes` once and resolves its V1/V2/V3 source conversions before playback.
 
 ### 14.3 Compiler-cursor decode and execution
@@ -697,7 +699,9 @@ case Note: {
 }
 ```
 
-`CompilerCursor` wraps `RecordReader`. Field reads automatically record names, values, exact ranges, display rules, and roles. Calls such as `emitLevel`, `set`, `invoke`, `jump`, or `end` append typed executable actions and update discovery flow. Every call returns the same `Event&`, so actions may be chained or written as separate statements. Returning the final event expression converts the builder into the decoded command.
+`CompilerCursor` wraps `RecordReader`. Field reads automatically record names, values, exact ranges, display rules, and roles. Calls such as `emitLevel`, `set`, `invoke`, `jump`, or `end` append typed executable actions and update discovery flow. Control-flow operations also set `AffectsControlFlow` and assign the matching target role to the decoded address; formats should not repeat either declaration. Every call returns the same `Event&`, so actions may be chained or written as separate statements. Returning the final event expression converts the builder into the decoded command.
+
+Use the cursor constructor without an end offset when commands may read through the complete `ByteReader`. Pass an explicit end only when a real source subrange constrains command reads.
 
 This makes compound behavior explicit without inventing compound operations:
 
@@ -1118,13 +1122,13 @@ Define:
 
 - one imperative compiler-cursor opcode switch, with small version-specific dispatch helpers only when necessary;
 - one complete source block per command;
-- operand names, display rules, and roles directly on field reads;
+- operand names, display rules, and ordinary roles directly on field reads (flow operations label their own targets);
 - a per-program profile in `SequenceProgram::config`;
 - a program-state type only when the driver has real shared state;
 - a `TrackState` type for driver-local mutable playback state; and
 - a sequence-scoped `TrackDecodeScope` using `linear` or `reachable` discovery.
 
-Use `CompilerCursor` to keep IR construction, source projection, generated executor registration, truncation handling, and type erasure out of format code. Ordinary literal commands use `emit...`, `set`, `add`, `toggle`, or a VM flow operation. Chain operations—or write them as separate statements—when a source command has several effects. Use `state()` and `select()` when a simple output value depends on track state. Put substantial or reused stateful driver behavior in a nearby typed `Playback` method. A captureless inline `invoke` is available for genuinely clearer one-off behavior. Playback must not implement global loop export policy or read source bytes.
+Use `CompilerCursor` to keep IR construction, source projection, generated executor registration, truncation handling, and type erasure out of format code. Ordinary literal commands use `emit...`, `set`, `add`, `toggle`, or a VM flow operation. VM flow operations own their playback annotation and address-target role. Chain operations—or write them as separate statements—when a source command has several effects. Use `state()` and `select()` when a simple output value depends on track state. Put substantial or reused stateful driver behavior in a nearby typed `Playback` method. A captureless inline `invoke` is available for genuinely clearer one-off behavior. Playback must not implement global loop export policy or read source bytes.
 
 ### Step 6: Build synth data in the neutral model
 
@@ -1220,7 +1224,7 @@ Each compiler-cursor command stores its opcode, named source operands, source pr
 
 ### 21.12 `CompilerCursor`, `RecordReader`, and old `VmCommandCursor`
 
-`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CompilerCursor` adds command presentation, source operands, discovery flow, ordered executable actions, and generated typed executor selection. `CommandSourceMap` performs automatic projection.
+`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CompilerCursor` adds command presentation, source operands, discovery flow, ordered executable actions, and generated typed executor selection. Its flow methods supply the corresponding control-flow presentation and target metadata. `CommandSourceMap` performs automatic projection.
 
 `SequenceDecodeSession` owns the repeated sequence-header, track-pointer, track, and command-annotation lifecycle for ordinary linear formats. A format still reads its pointer table explicitly and supplies the track number, pointer range, and decoded start address, keeping ordering, endianness, relocation, and null rules visible. `TrackDecodeScope` owns the corresponding single-track walk and command projection.
 
@@ -1228,7 +1232,7 @@ Each compiler-cursor command stores its opcode, named source operands, source pr
 
 ### 21.13 `SequenceDialect`
 
-A source-free dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior. `CompiledCommandDialect` is the compiler-cursor adapter: it is the only layer that sees `std::any`, creates the concrete `Playback`, dispatches every action in order, and combines their `Effects` for the VM.
+A source-free dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior. `CompiledCommandDialect` is the compiler-cursor adapter: it is the only layer that sees `std::any`, creates the concrete `Playback`, dispatches every action in order, and combines their `Effects` for the VM. Formats normally apply that adapter with `makeCompiledDialect`, rather than naming and assigning its two generic hooks themselves.
 
 The implementation uses `std::any` only to erase the concrete program and track runtime-state types. Program-specific version data is not stored in dialect context; it lives on the immutable program. Old dialect context remains until those formats migrate.
 

@@ -59,7 +59,6 @@ struct Playback {
 };
 
 using NdsCompilerCursor = CompilerCursor<TrackState, Playback>;
-using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
 
 // NDS-specific decode state stays beside the shared track-discovery service.
 // Relative addresses and malformed-range policy are SSEQ semantics, not generic
@@ -120,8 +119,7 @@ struct SequenceDecodeContext {
     case 0x94:
     case 0x95: {
       const bool isCall = cursor.opcode() == 0x95;
-      auto event = cursor.command(isCall ? "Call" : "Jump", isCall ? SequenceSemantic::Call : SequenceSemantic::Jump,
-                                  CommandPlaybackStatus::AffectsControlFlow);
+      auto event = cursor.command(isCall ? "Call" : "Jump", isCall ? SequenceSemantic::Call : SequenceSemantic::Jump);
       const Address destination =
           targetAddress(context, event, isCall ? SemanticOperandRole::CallTarget : SemanticOperandRole::JumpTarget);
       if (!event.ok()) {
@@ -251,7 +249,7 @@ struct SequenceDecodeContext {
     case 0xfc:
       return cursor.opaque("Loop End", 0);
     case 0xfd:
-      return cursor.command("Return", SequenceSemantic::Return, CommandPlaybackStatus::AffectsControlFlow).return_();
+      return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0xfe: {
       auto event = cursor.sourceOnly("Allocate Track");
       event.u16le("track_mask");
@@ -265,21 +263,6 @@ struct SequenceDecodeContext {
       return event.stop();
     }
   }
-}
-
-[[nodiscard]] SequenceDialect makeDialect() {
-  return SequenceDialect{
-      .id = DialectId{.value = std::string(kNdsSequenceDialectId)},
-      .commandDetailKindPrefix = "nds",
-      .timebase = Timebase{.ppqn = 0x30},
-      .defaultBehavior =
-          SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
-              .commandLimit = kMaxTrackCommands,
-          },
-      .createSemanticTrackState = NdsCompiledDialect::createTrackState,
-      .executeSemantic = NdsCompiledDialect::execute,
-  };
 }
 
 [[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(const SequenceDecodeContext& context, u32 offset) {
@@ -427,7 +410,16 @@ struct SequenceDecodeContext {
 }  // namespace
 
 const SequenceDialect& ndsSequenceDialect() {
-  static const SequenceDialect dialect = makeDialect();
+  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback>(SequenceDialect{
+      .id = DialectId{.value = std::string(kNdsSequenceDialectId)},
+      .commandDetailKindPrefix = "nds",
+      .timebase = Timebase{.ppqn = 0x30},
+      .defaultBehavior =
+          SequenceProgramBehavior{
+              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .commandLimit = kMaxTrackCommands,
+          },
+  });
   return dialect;
 }
 

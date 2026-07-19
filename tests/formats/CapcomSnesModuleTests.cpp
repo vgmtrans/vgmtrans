@@ -1296,9 +1296,9 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
 
   const SourceAnnotation& unknownAnnotation = commandAnnotation(annotations, track.commands[0]);
   const SourceField* opcode = fieldWithName(unknownAnnotation, "opcode");
-  const SourceField* value = fieldWithName(unknownAnnotation, "value");
-  expect(fieldEquals(opcode, u64{0x1e}) && fieldEquals(value, u64{0xab}),
-         "CapcomSnes V1 unknown one-byte event should preserve its opcode and operand in source annotations");
+  const SourceField* bytesField = fieldWithName(unknownAnnotation, "bytes");
+  expect(fieldEquals(opcode, u64{0x1e}) && fieldEquals(bytesField, "AB"),
+         "CapcomSnes V1 opaque event should preserve its opcode and operand bytes in source annotations");
 
   const SequenceProgram program{
       .dialect = dialect.id,
