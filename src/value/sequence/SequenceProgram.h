@@ -9,6 +9,7 @@
 #include "value/model/MetadataModel.h"
 #include "value/model/SourceMap.h"
 
+#include <limits>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -85,6 +86,15 @@ struct DecodeFlow {
 
 using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
 
+struct CommandExecution {
+  static constexpr u32 kInvalidExecutor = std::numeric_limits<u32>::max();
+
+  u32 executor = kInvalidExecutor;
+  std::vector<SemanticOperandValue> arguments;
+
+  [[nodiscard]] bool valid() const noexcept { return executor != kInvalidExecutor; }
+};
+
 // The role is intentionally small and format-independent. Operand names are the
 // executor's precise vocabulary; roles let generic analysis and SourceMap
 // projection recognize the few relationships shared by all drivers.
@@ -137,6 +147,7 @@ struct SourceCommand {
   ByteSpan bytes;
   std::vector<SemanticOperand> operands;
   DecodeFlow flow;
+  CommandExecution execution;
 
   // Builders require legacy commands to have bytes. Their absence therefore
   // identifies a semantic command without another tag or command-kind enum.
@@ -222,7 +233,7 @@ public:
                                   SourceAnnotationId annotation = {}, DecodeFlow flow = {});
   const SourceCommand& addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
                                    std::vector<SemanticOperand> operands, DecodeFlow flow,
-                                   SourceAnnotationId annotation = {});
+                                   SourceAnnotationId annotation = {}, CommandExecution execution = {});
 
 private:
   TrackProgram& track_;

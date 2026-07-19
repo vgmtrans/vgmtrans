@@ -117,7 +117,7 @@ const SourceCommand& TrackProgramBuilder::addDecoded(Address address, SourceRang
 
 const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
                                                       std::vector<SemanticOperand> operands, DecodeFlow flow,
-                                                      SourceAnnotationId annotation) {
+                                                      SourceAnnotationId annotation, CommandExecution execution) {
   if (encodedSize == 0) {
     throw std::invalid_argument("Semantic sequence commands must include an opcode byte");
   }
@@ -135,6 +135,7 @@ const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode
       .annotation = annotation,
       .operands = std::move(operands),
       .flow = std::move(flow),
+      .execution = std::move(execution),
   });
   track_.addressIndex.add(address, commandIndex);
   return track_.commands.back();

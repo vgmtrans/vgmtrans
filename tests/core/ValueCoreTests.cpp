@@ -8,6 +8,7 @@
 #include <iostream>
 
 void runValueRegistryTests();
+void runValueCompilerCursorTests();
 void runValueSequenceModelTests();
 void runValueSequenceVmTests();
 void runValueSessionTests();
@@ -72,6 +73,7 @@ void ndsWaveArchiveReportsTruncatedSampleHeaders();
 int main() {
   try {
     runValueRegistryTests();
+    runValueCompilerCursorTests();
     runValueSequenceModelTests();
     runValueSequenceVmTests();
     runValueSessionTests();
