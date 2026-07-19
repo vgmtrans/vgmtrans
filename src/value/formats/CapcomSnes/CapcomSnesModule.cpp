@@ -45,7 +45,7 @@ using namespace core;
   collection.sequence(sequence);
 
   const bool hasSynth = layout->instrumentTableAddress && layout->spcDirAddress &&
-                        addCapcomSnesSynth(input, result, instrumentSet, samples, *layout->instrumentTableAddress,
+                        addCapcomSnesSynth(result, instrumentSet, samples, *layout->instrumentTableAddress,
                                            *layout->spcDirAddress, displayName);
   if (hasSynth) {
     collection.instrumentSet(instrumentSet).samples(samples);

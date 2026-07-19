@@ -82,8 +82,7 @@ struct CapcomSnesTrackDecodeOptions {
 [[nodiscard]] std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(core::ByteReader reader,
                                                                                    u32 instrumentTableAddress,
                                                                                    u32 spcDirAddress);
-[[nodiscard]] bool addCapcomSnesSynth(const core::ScanInput& input, core::ScanResultBuilder& builder,
-                                      core::ScanInstrumentSetRef instrumentSet,
+[[nodiscard]] bool addCapcomSnesSynth(core::ScanResultBuilder& builder, core::ScanInstrumentSetRef instrumentSet,
                                       core::ScanSampleCollectionRef sampleCollection, u32 instrumentTableAddress,
                                       u32 spcDirAddress, std::string_view displayName);
 

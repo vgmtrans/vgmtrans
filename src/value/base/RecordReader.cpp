@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <string>
+#include <utility>
 
 namespace vgmtrans::core {
 
@@ -144,6 +145,10 @@ void RecordReader::addFields(AnnotationBuilder annotation) const {
 
 std::span<const ::u8> RecordReader::bytes() const {
   return reader_.slice(begin_, size());
+}
+
+std::vector<SourceField> RecordReader::takeFields() noexcept {
+  return std::move(fields_);
 }
 
 bool RecordReader::require(u32 size, std::string_view fieldName) {
