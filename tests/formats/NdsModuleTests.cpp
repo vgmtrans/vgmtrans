@@ -215,6 +215,36 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS expression opcode should render as MIDI expression");
 }
 
+void ndsSequenceDialectComposesPitchBendRangeActions() {
+  std::vector<u8> bytes(0x130);
+  constexpr u32 sequenceOffset = 0x100;
+  constexpr u32 trackStart = sequenceOffset + 0x1c;
+  bytes[trackStart + 0] = 0xc5;
+  bytes[trackStart + 1] = 0x0c;
+  bytes[trackStart + 2] = 0xc4;
+  bytes[trackStart + 3] = 0x40;
+  bytes[trackStart + 4] = 0xff;
+
+  const SequenceDialect& dialect = ndsSequenceDialect();
+  const TrackProgram track =
+      decodeTestTrack(ByteReader(SourceId{16}, bytes), sequenceOffset, trackStart + 5, trackStart, 0);
+  expect(track.commands.size() == 3 && track.commands[0].execution.actions.size() == 2,
+         "NDS pitch-bend range should compile its state update and output as two explicit actions");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .sourceBaseAddress = Address{trackStart},
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  expect(performance.diagnostics.empty() && performance.tracks[0].events.size() == 2,
+         "NDS composed pitch actions should render without additional commands");
+  expect(std::get<PitchBendRangePerformanceEvent>(performance.tracks[0].events[0]).cents == 1200 &&
+             std::get<PitchBendPerformanceEvent>(performance.tracks[0].events[1]).semitones == 6.0,
+         "NDS pitch bend should observe the range state set by the preceding explicit action");
+}
+
 void ndsSequenceDialectExecutesCallAndReturn() {
   std::vector<u8> bytes(0x160);
   constexpr u32 sequenceOffset = 0x100;

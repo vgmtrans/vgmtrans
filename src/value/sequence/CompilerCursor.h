@@ -127,6 +127,26 @@ template <class Playback, auto Method, class... Arguments>
   return invokeMember<Playback, Method, Arguments...>(arguments, playback, std::index_sequence_for<Arguments...>{});
 }
 
+template <class Playback, class Handler, class... Arguments, size_t... Index>
+[[nodiscard]] Effects invokeInline(std::span<const SemanticOperandValue> arguments, Playback& playback,
+                                   std::index_sequence<Index...>) {
+  static_assert(std::is_empty_v<Handler> && std::is_default_constructible_v<Handler>,
+                "Inline compiler-cursor handlers must be captureless");
+  requireArgumentCount<Arguments...>(arguments);
+  Handler handler;
+  if constexpr (std::is_same_v<std::invoke_result_t<Handler&, Playback&, Arguments...>, Effects>) {
+    return std::invoke(handler, playback, executableArgument<Arguments>(arguments[Index])...);
+  } else {
+    std::invoke(handler, playback, executableArgument<Arguments>(arguments[Index])...);
+    return Effects{};
+  }
+}
+
+template <class Playback, class Handler, class... Arguments>
+[[nodiscard]] Effects invokeInline(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  return invokeInline<Playback, Handler, Arguments...>(arguments, playback, std::index_sequence_for<Arguments...>{});
+}
+
 template <class Playback, auto Member>
 [[nodiscard]] Effects setMember(std::span<const SemanticOperandValue> arguments, Playback& playback) {
   using Value = std::remove_cvref_t<decltype(playback.track.*Member)>;
@@ -197,6 +217,14 @@ template <class Playback>
 [[nodiscard]] Effects emitPitchBend(std::span<const SemanticOperandValue> arguments, Playback& playback) {
   requireArgumentCount<double>(arguments);
   playback.out.pitchBend(executableArgument<double>(arguments[0]));
+  return Effects{};
+}
+
+template <class Playback, auto ScaleMember>
+[[nodiscard]] Effects emitPitchBendScaledBy(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<double>(arguments);
+  const double fraction = executableArgument<double>(arguments[0]);
+  playback.out.pitchBend(fraction * static_cast<double>(playback.track.*ScaleMember));
   return Effects{};
 }
 
@@ -275,8 +303,8 @@ template <class Playback>
 }  // namespace detail
 
 // CompilerCursor gives formats one imperative command block. Reads add source
-// metadata immediately; the terminal operation records a typed executor and
-// values for later, source-free SequenceVm execution.
+// metadata immediately; event operations append typed executable actions for
+// later, source-free SequenceVm execution.
 template <class TrackState, class Playback>
 class CompilerCursor {
 public:
@@ -319,8 +347,7 @@ public:
                              SemanticOperandRole::Value);
     }
 
-    [[nodiscard]] Address address(std::string_view name,
-                                  SemanticOperandRole role = SemanticOperandRole::Address) {
+    [[nodiscard]] Address address(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Address) {
       return Address{u16be(name, SourceValueDisplay::Address, role)};
     }
 
@@ -352,115 +379,134 @@ public:
 
     void warning(std::string message) { cursor_.warning(std::move(message)); }
 
-    [[nodiscard]] DecodedBytecodeCommand ignore() { return finish({}); }
+    // Operations accumulate in source order and return the same builder. A
+    // return statement converts the final Event expression into the decoded
+    // command, so callers may freely mix chained and standalone calls.
+    Event& ignore() {
+      execution_ = {};
+      flow_ = {};
+      return *this;
+    }
 
-    [[nodiscard]] DecodedBytecodeCommand stop() { return finish({}, DecodeFlow::terminalFlow()); }
+    Event& stop() {
+      flow_ = DecodeFlow::terminalFlow();
+      return *this;
+    }
 
-    [[nodiscard]] DecodedBytecodeCommand end() {
+    Event& end() {
       presentation_.semantic = SequenceSemantic::End;
       presentation_.playback = CommandPlaybackStatus::StopsPlayback;
-      return finish({}, DecodeFlow::terminalFlow());
+      flow_ = DecodeFlow::terminalFlow();
+      return *this;
     }
 
-    [[nodiscard]] DecodedBytecodeCommand wait(u32 ticks) {
-      return finish(execution(&detail::wait<Playback>, ticks));
+    Event& wait(u32 ticks) { return append(&detail::wait<Playback>, ticks); }
+
+    Event& emitLevel(double gain) { return append(&detail::emitLevel<Playback>, gain); }
+
+    Event& emitExpression(double gain) { return append(&detail::emitExpression<Playback>, gain); }
+
+    Event& emitPan(double position) { return append(&detail::emitPan<Playback>, position); }
+
+    Event& emitStereoBalance(double leftGain, double rightGain) {
+      return append(&detail::emitStereoBalance<Playback>, leftGain, rightGain);
     }
 
-    [[nodiscard]] DecodedBytecodeCommand emitLevel(double gain) {
-      return finish(execution(&detail::emitLevel<Playback>, gain));
+    Event& emitInstrument(u32 bank, u32 program) { return append(&detail::emitInstrument<Playback>, bank, program); }
+
+    Event& emitTempo(u32 microsecondsPerQuarter) {
+      return append(&detail::emitTempo<Playback>, microsecondsPerQuarter);
     }
 
-    [[nodiscard]] DecodedBytecodeCommand emitExpression(double gain) {
-      return finish(execution(&detail::emitExpression<Playback>, gain));
+    Event& emitPitchBend(double semitones) { return append(&detail::emitPitchBend<Playback>, semitones); }
+
+    template <auto ScaleMember>
+    Event& emitPitchBendScaledBy(double fraction) {
+      return append(&detail::emitPitchBendScaledBy<Playback, ScaleMember>, fraction);
     }
 
-    [[nodiscard]] DecodedBytecodeCommand emitPan(double position) {
-      return finish(execution(&detail::emitPan<Playback>, position));
+    Event& emitPitchBendRange(::u8 semitones) { return append(&detail::emitPitchBendRange<Playback>, semitones); }
+
+    Event& emitModulation(ModulationPerformanceTarget target, double amount) {
+      return append(&detail::emitModulation<Playback>, target, amount);
     }
 
-    [[nodiscard]] DecodedBytecodeCommand emitStereoBalance(double leftGain, double rightGain) {
-      return finish(execution(&detail::emitStereoBalance<Playback>, leftGain, rightGain));
-    }
+    Event& emitPortamentoEnable(bool enabled) { return append(&detail::emitPortamentoEnable<Playback>, enabled); }
 
-    [[nodiscard]] DecodedBytecodeCommand emitInstrument(u32 bank, u32 program) {
-      return finish(execution(&detail::emitInstrument<Playback>, bank, program));
-    }
-
-    [[nodiscard]] DecodedBytecodeCommand emitTempo(u32 microsecondsPerQuarter) {
-      return finish(execution(&detail::emitTempo<Playback>, microsecondsPerQuarter));
-    }
-
-    [[nodiscard]] DecodedBytecodeCommand emitPitchBend(double semitones) {
-      return finish(execution(&detail::emitPitchBend<Playback>, semitones));
-    }
-
-    [[nodiscard]] DecodedBytecodeCommand emitPitchBendRange(::u8 semitones) {
-      return finish(execution(&detail::emitPitchBendRange<Playback>, semitones));
-    }
-
-    [[nodiscard]] DecodedBytecodeCommand emitModulation(ModulationPerformanceTarget target, double amount) {
-      return finish(execution(&detail::emitModulation<Playback>, target, amount));
-    }
-
-    [[nodiscard]] DecodedBytecodeCommand emitPortamentoEnable(bool enabled) {
-      return finish(execution(&detail::emitPortamentoEnable<Playback>, enabled));
-    }
-
-    [[nodiscard]] DecodedBytecodeCommand emitPortamentoTime(double milliseconds) {
-      return finish(execution(&detail::emitPortamentoTime<Playback>, milliseconds));
+    Event& emitPortamentoTime(double milliseconds) {
+      return append(&detail::emitPortamentoTime<Playback>, milliseconds);
     }
 
     template <auto Member, class Value>
-    [[nodiscard]] DecodedBytecodeCommand set(Value value) {
-      return finish(execution(&detail::setMember<Playback, Member>, value));
+    Event& set(Value value) {
+      return append(&detail::setMember<Playback, Member>, value);
     }
 
     template <auto Member, class Value>
-    [[nodiscard]] DecodedBytecodeCommand add(Value value) {
-      return finish(execution(&detail::addMember<Playback, Member>, value));
+    Event& add(Value value) {
+      return append(&detail::addMember<Playback, Member>, value);
     }
 
     template <auto Member>
-    [[nodiscard]] DecodedBytecodeCommand toggle() {
-      return finish(execution(&detail::toggleMember<Playback, Member>));
+    Event& toggle() {
+      return append(&detail::toggleMember<Playback, Member>);
     }
 
     template <auto Method, class... Arguments>
-    [[nodiscard]] DecodedBytecodeCommand invoke(Arguments... arguments) {
-      return finish(execution(&detail::invokeMember<Playback, Method, std::decay_t<Arguments>...>, arguments...));
+    Event& invoke(Arguments... arguments) {
+      return append(&detail::invokeMember<Playback, Method, std::decay_t<Arguments>...>, arguments...);
     }
 
-    [[nodiscard]] DecodedBytecodeCommand jump(Address destination) {
+    // A captureless inline handler is the locality escape hatch for short,
+    // one-off runtime behavior. Source values remain explicit positional
+    // arguments; no closure object enters the durable command.
+    template <class Handler, class... Arguments>
+    Event& invoke(Handler, Arguments... arguments) {
+      return append(&detail::invokeInline<Playback, std::decay_t<Handler>, std::decay_t<Arguments>...>, arguments...);
+    }
+
+    Event& jump(Address destination) {
       targetRole(destination, SemanticOperandRole::JumpTarget);
-      return finish(execution(&detail::jump<Playback>, destination), DecodeFlow::jump(destination));
+      append(&detail::jump<Playback>, destination);
+      flow_ = DecodeFlow::jump(destination);
+      return *this;
     }
 
-    [[nodiscard]] DecodedBytecodeCommand loopCandidate(Address destination) {
+    Event& loopCandidate(Address destination) {
       targetRole(destination, SemanticOperandRole::LoopTarget);
-      return finish(execution(&detail::loopCandidate<Playback>, destination), DecodeFlow::jump(destination));
+      append(&detail::loopCandidate<Playback>, destination);
+      flow_ = DecodeFlow::jump(destination);
+      return *this;
     }
 
-    [[nodiscard]] DecodedBytecodeCommand declaredLoop(Address destination) {
+    Event& declaredLoop(Address destination) {
       targetRole(destination, SemanticOperandRole::LoopTarget);
-      return finish(execution(&detail::declaredLoop<Playback>, destination), DecodeFlow::jump(destination));
+      append(&detail::declaredLoop<Playback>, destination);
+      flow_ = DecodeFlow::jump(destination);
+      return *this;
     }
 
-    [[nodiscard]] DecodedBytecodeCommand call(Address destination) {
+    Event& call(Address destination) {
       targetRole(destination, SemanticOperandRole::CallTarget);
-      return finish(execution(&detail::call<Playback>, destination),
-                    DecodeFlow::call(destination, Address{cursor_.record_.position()}));
+      append(&detail::call<Playback>, destination);
+      flow_ = DecodeFlow::call(destination, Address{cursor_.record_.position()});
+      return *this;
     }
 
-    [[nodiscard]] DecodedBytecodeCommand return_() {
-      return finish(execution(&detail::return_<Playback>), DecodeFlow::return_());
+    Event& return_() {
+      append(&detail::return_<Playback>);
+      flow_ = DecodeFlow::return_();
+      return *this;
     }
 
-    [[nodiscard]] DecodedBytecodeCommand repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
+    Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
       targetRole(destination, SemanticOperandRole::RepeatTarget);
-      DecodeFlow flow;
-      flow.staticTargets.push_back(destination);
-      return finish(execution(&detail::repeatUntil<Playback>, slot, totalPlays, destination), std::move(flow));
+      append(&detail::repeatUntil<Playback>, slot, totalPlays, destination);
+      flow_.staticTargets.push_back(destination);
+      return *this;
     }
+
+    [[nodiscard]] operator DecodedBytecodeCommand() { return finish(); }
 
   private:
     friend class CompilerCursor;
@@ -469,13 +515,14 @@ public:
         : cursor_(cursor), presentation_(std::move(presentation)) {}
 
     template <class... Arguments>
-    [[nodiscard]] CommandExecution execution(detail::CompiledExecutor<Playback> executor, Arguments... arguments) {
-      CommandExecution result{
+    Event& append(detail::CompiledExecutor<Playback> executor, Arguments... arguments) {
+      CommandAction action{
           .executor = detail::compiledExecutors<Playback>().add(executor),
       };
-      result.arguments.reserve(sizeof...(Arguments));
-      (result.arguments.push_back(detail::executableValue(arguments)), ...);
-      return result;
+      action.arguments.reserve(sizeof...(Arguments));
+      (action.arguments.push_back(detail::executableValue(arguments)), ...);
+      execution_.actions.push_back(std::move(action));
+      return *this;
     }
 
     void targetRole(Address destination, SemanticOperandRole role) {
@@ -489,12 +536,19 @@ public:
       }
     }
 
-    [[nodiscard]] DecodedBytecodeCommand finish(CommandExecution execution, DecodeFlow flow = {}) {
-      return cursor_.finish(std::move(presentation_), std::move(execution), std::move(flow));
+    [[nodiscard]] DecodedBytecodeCommand finish() {
+      if (finished_) {
+        throw std::logic_error("Compiler cursor event was finalized more than once");
+      }
+      finished_ = true;
+      return cursor_.finish(std::move(presentation_), std::move(execution_), std::move(flow_));
     }
 
     CompilerCursor& cursor_;
     DecodedCommandPresentation presentation_;
+    CommandExecution execution_;
+    DecodeFlow flow_;
+    bool finished_ = false;
   };
 
   CompilerCursor(ByteReader reader, u32 begin, u32 end, std::string_view detailKindPrefix,
@@ -515,14 +569,13 @@ public:
                               CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
                               std::string_view localKind = {}) {
     const std::string kind = localKind.empty() ? sourceLocalKind(label) : std::string(localKind);
-    return Event{*this,
-                 DecodedCommandPresentation{
-                     .label = std::string(label),
-                     .localKind = kind,
-                     .detailKind = detailKindPrefix_.empty() ? kind : detailKindPrefix_ + "." + kind,
-                     .semantic = semantic,
-                     .playback = playback,
-                 }};
+    return Event{*this, DecodedCommandPresentation{
+                            .label = std::string(label),
+                            .localKind = kind,
+                            .detailKind = detailKindPrefix_.empty() ? kind : detailKindPrefix_ + "." + kind,
+                            .semantic = semantic,
+                            .playback = playback,
+                        }};
   }
 
   [[nodiscard]] Event sourceOnly(std::string_view label, std::string_view localKind = {}) {
@@ -550,8 +603,7 @@ public:
 
 private:
   template <class T>
-  T decoded(const RangedValue<T>& field, std::string_view name, SourceValueDisplay display,
-            SemanticOperandRole role) {
+  T decoded(const RangedValue<T>& field, std::string_view name, SourceValueDisplay display, SemanticOperandRole role) {
     if (field) {
       add(name, detail::executableValue(field.value), field.range, display, role);
     }
@@ -605,8 +657,7 @@ private:
         .range = record_.range(),
         .opcode = opcode_,
         .encodedSize = std::max<u32>(1, record_.size()),
-        .bytes = truncated ? std::vector<::u8>{record_.bytes().begin(), record_.bytes().end()}
-                           : std::vector<::u8>{},
+        .bytes = truncated ? std::vector<::u8>{record_.bytes().begin(), record_.bytes().end()} : std::vector<::u8>{},
         .flow = std::move(flow),
         .operands = std::move(operands_),
         .execution = std::move(execution),
@@ -630,23 +681,34 @@ private:
 // commands and Playback methods remain fully typed.
 template <class TrackState, class Playback>
 struct CompiledCommandDialect {
-  [[nodiscard]] static std::any createTrackState(const SequenceProgram&, const TrackProgram&) {
-    return TrackState{};
-  }
+  [[nodiscard]] static std::any createTrackState(const SequenceProgram&, const TrackProgram&) { return TrackState{}; }
 
   [[nodiscard]] static Effects execute(const SourceCommand& command, std::any&, std::any& trackState,
                                        PerformanceEmitter& out, VmApi& vm) {
-    if (command.flow.terminal) {
-      return Effects{.step = vm.end()};
-    }
-    if (!command.execution.valid()) {
-      return Effects{};
-    }
-
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
     Playback playback{typedTrackState, out, vm};
-    return detail::compiledExecutors<Playback>().execute(command.execution.executor, command.execution.arguments,
-                                                          playback);
+    Effects combined;
+    for (const CommandAction& action : command.execution.actions) {
+      const Effects next = detail::compiledExecutors<Playback>().execute(action.executor, action.arguments, playback);
+      if (next.advanceTicks > std::numeric_limits<u32>::max() - combined.advanceTicks) {
+        throw std::overflow_error("Compiled sequence command advanced time beyond the supported range");
+      }
+      combined.advanceTicks += next.advanceTicks;
+      if (next.step.kind != StepKind::Next) {
+        if (combined.step.kind != StepKind::Next) {
+          throw std::logic_error("Compiled sequence command produced more than one control-flow result");
+        }
+        combined.step = next.step;
+      }
+    }
+
+    if (command.flow.terminal) {
+      if (combined.step.kind != StepKind::Next) {
+        throw std::logic_error("Terminal compiled sequence command also produced a control-flow result");
+      }
+      combined.step = vm.end();
+    }
+    return combined;
   }
 };
 

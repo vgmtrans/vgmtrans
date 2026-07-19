@@ -86,7 +86,7 @@ struct DecodeFlow {
 
 using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
 
-struct CommandExecution {
+struct CommandAction {
   static constexpr u32 kInvalidExecutor = std::numeric_limits<u32>::max();
 
   // CompilerCursor assigns this slot from a generated typed thunk. Arguments
@@ -96,6 +96,15 @@ struct CommandExecution {
   std::vector<SemanticOperandValue> arguments;
 
   [[nodiscard]] bool valid() const noexcept { return executor != kInvalidExecutor; }
+};
+
+struct CommandExecution {
+  // One source command may perform several small actions. Keeping them ordered
+  // lets format code state each effect honestly (for example, set state and
+  // then emit a controller) without inventing a hidden compound operation.
+  std::vector<CommandAction> actions;
+
+  [[nodiscard]] bool valid() const noexcept { return !actions.empty(); }
 };
 
 // The role is intentionally small and format-independent. Operand names are the
@@ -123,7 +132,7 @@ enum class SemanticOperandRole : u8 {
 
 struct SemanticOperand {
   // These values describe the source command for annotations and analysis.
-  // Compiler-cursor playback uses CommandExecution::arguments instead. The
+  // Compiler-cursor playback uses CommandAction::arguments instead. The
   // optional encoded form is useful only when showing both raw and resolved
   // values materially improves the source presentation.
   SemanticOperandValue value;

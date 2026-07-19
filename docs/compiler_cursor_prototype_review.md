@@ -6,7 +6,7 @@ Adopt the compiler-cursor architecture as the target sequence-authoring model, w
 
 The NDS prototype satisfies the important criterion that the rejected designs did not: an ordinary command is again readable as one short interpreter block. It still gives the value architecture source-once decoding, durable annotations, source-free playback, shared scheduling, and testable control flow.
 
-The result is not free. It adds 688 lines of generic compiler-cursor infrastructure and relies on templates plus a process-local executor registry. That cost is acceptable only because it is centralized and because the format surface is substantially simpler. If later formats force the cursor into a symbolic language or universal command taxonomy, revise it rather than protecting this implementation.
+The result is not free. It adds 750 lines of generic compiler-cursor infrastructure and relies on templates plus a process-local executor registry. That cost is acceptable only because it is centralized and because the format surface is substantially simpler. If later formats force the cursor into a symbolic language or universal command taxonomy, revise it rather than protecting this implementation.
 
 ## Representative command comparison
 
@@ -73,6 +73,20 @@ case 0xc3: {
 }
 ```
 
+Commands with several effects keep those effects separate and visible:
+
+```cpp
+case 0xc5: {
+  auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
+  const u8 semitones = event.u8("semitones");
+  return event
+      .set<&TrackState::pitchBendRangeSemitones>(semitones)
+      .emitPitchBendRange(semitones);
+}
+```
+
+Every operation appends one typed action and returns the same builder. Chained calls and separate statements compile to the same ordered action list. This keeps `set` and `emit` honest instead of hiding two effects behind one convenience method.
+
 Runtime-history-dependent behavior has one explicit indirection, to a concrete method beside the switch:
 
 ```cpp
@@ -97,9 +111,9 @@ Line counts include comments and blank lines. They measure burden imperfectly, b
 | Value cursor before `SemanticCommand` | 662 | 48 | 710 |
 | Adjacent semantic decode/execute | 625 | 35 | 660 |
 | Rejected `StandardSequenceCommand` | 399 | 26 | 425 |
-| Compiler cursor | 520 | 35 | 555 |
+| Compiler cursor with composable actions | 508 | 35 | 543 |
 
-The compiler-cursor NDS sequence is 155 lines smaller than the old value cursor and 105 lines smaller than the semantic decode/execute version. It is 83 lines larger than the original architecture. Most of that remaining difference is not ordinary opcode code: it includes reachable-block discovery, exact source annotations, invalid-target diagnostics, and malformed overlapping-SDAT recovery.
+The compiler-cursor NDS sequence is 167 lines smaller than the old value cursor and 117 lines smaller than the semantic decode/execute version. It is 71 lines larger than the original architecture. Most of that remaining difference is not ordinary opcode code: it includes reachable-block discovery, exact source annotations, invalid-target diagnostics, and malformed overlapping-SDAT recovery.
 
 The rejected standard-command version is shortest by raw count, but its table omits the shared operation definitions and interpreter needed to understand behavior. It failed the locality criterion despite the smaller format file.
 
@@ -107,10 +121,10 @@ Broader production counts are:
 
 | Scope | Lines |
 |---|---:|
-| Current value NDS format directory | 1,736 |
+| Current value NDS format directory | 1,724 |
 | Original NDS format directory | 1,586 |
-| New generic `CompilerCursor.h` | 688 |
-| Focused compiler-cursor tests | 242 |
+| Generic `CompilerCursor.h` | 750 |
+| Focused compiler-cursor tests | 322 |
 
 The two NDS directory totals are not like-for-like: the value implementation also owns durable source maps, neutral assets, bounded recovery, and source-free VM integration. The important author-facing comparison is the sequence implementation and the individual command blocks.
 
@@ -126,6 +140,7 @@ The two NDS directory totals are not like-for-like: the value implementation als
 | No playback string lookup | Pass |
 | No playback source-byte access | Pass |
 | No format-visible `std::any` or slot management | Pass |
+| Multiple effects remain explicit and ordered | Pass |
 | Control-flow target describes discovery and execution together | Pass |
 | Driver behavior is concrete and locally named | Pass |
 | VM still owns scheduling, loops, calls, and repeats | Pass |
@@ -137,13 +152,13 @@ The two NDS directory totals are not like-for-like: the value implementation als
 
 ### Central framework size
 
-`CompilerCursor.h` is large. Roughly half is the deliberately explicit set of checked field and terminal operations; the remainder is generated typed dispatch and track-walker integration. This is preferable to spreading the same mechanics across formats, but it must not become a home for driver-specific semantics.
+`CompilerCursor.h` is large. Roughly half is the deliberately explicit set of checked fields and executable operations; the remainder is generated typed dispatch, action composition, and track-walker integration. This is preferable to spreading the same mechanics across formats, but it must not become a home for driver-specific semantics.
 
-The rule should be: use `invoke<&Playback::method>` unless an operation is literal, format-independent, and repeated. A new shared terminal operation should make multiple format blocks smaller without adding a second authoring pathway.
+The rule should be: express state, output, time, and flow as separate operations and compose them in source order. Use `invoke<&Playback::method>` for substantial or reused driver behavior. Captureless inline handlers are permitted as an escape hatch, but decoded values must remain explicit arguments and no closure is stored.
 
 ### Executor registry
 
-Commands store a small automatically assigned slot, not a closure or manual ID. The registry is keyed by the format's concrete `Playback` type and stores generated function thunks. It is thread-safe and process-local. Slot stability across application versions is intentionally not promised because sequence-program serialization is outside the architecture's goals.
+Each command action stores a small automatically assigned slot, not a closure or manual ID. The registry is keyed by the format's concrete `Playback` type and stores generated function thunks. It is thread-safe and process-local. Slot stability across application versions is intentionally not promised because sequence-program serialization is outside the architecture's goals.
 
 ### Templates
 
@@ -162,7 +177,7 @@ Use the compiler cursor for one medium-complexity format before attempting Akao 
 During that migration:
 
 - keep one opcode switch and local `Playback` type;
-- prefer `invoke` for format-specific semantics rather than enlarging the common API;
+- prefer explicit chained actions; use `invoke` for substantial format-specific semantics;
 - reject any helper that makes an ordinary command require a second definition;
 - measure command-block and file-level readability again; and
 - delete obsolete path-specific infrastructure when its last format leaves it.
