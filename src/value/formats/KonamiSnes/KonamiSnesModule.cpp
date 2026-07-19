@@ -52,16 +52,7 @@ using namespace core;
   const bool hasSynthLayout = layout->spcDirAddress && layout->commonInstrumentTableAddress &&
                               layout->bankedInstrumentTableAddress && layout->percussionInstrumentTableAddress;
   if (hasSynthLayout) {
-    const auto instrumentInfos = parseKonamiSnesInstrumentInfos(input.reader, *layout);
-    const auto sampleInfos = parseKonamiSnesSampleInfos(input.reader, *layout->spcDirAddress, instrumentInfos);
-    if (!instrumentInfos.empty() && !sampleInfos.empty()) {
-      result.instrumentSet(instrumentSet, [&](AssetId id) {
-        return parseKonamiSnesInstrumentSet(input, result, id, samples, layout->version, *layout->spcDirAddress,
-                                            instrumentInfos, sampleInfos, displayName);
-      });
-      result.sampleCollection(samples, [&](AssetId id) {
-        return parseKonamiSnesSamples(input, id, sampleInfos, displayName, &result.sourceMap());
-      });
+    if (addKonamiSnesSynth(input, result, instrumentSet, samples, *layout, displayName)) {
       collection.instrumentSet(instrumentSet).samples(samples);
     } else {
       result.warning("KonamiSnes sequence found, but no valid instruments or samples were discovered",
@@ -72,10 +63,11 @@ using namespace core;
                    input.reader.range(0, input.reader.size()));
   }
 
-  result.sourceFact(sequence.id, FormatSpecificFact{
-                                     .kind = "konami-snes-version",
-                                     .fields = {MatchField{.name = "version", .value = konamiSnesVersionName(layout->version)}},
-                                 });
+  result.sourceFact(sequence.id,
+                    FormatSpecificFact{
+                        .kind = "konami-snes-version",
+                        .fields = {MatchField{.name = "version", .value = konamiSnesVersionName(layout->version)}},
+                    });
 
   return result.finish();
 }

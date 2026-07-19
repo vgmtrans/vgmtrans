@@ -95,6 +95,8 @@ InstrumentSetAsset and SampleCollectionAsset
   ↓
 collection resolution pairs them with sequences
   ↓
+physical modulation is lowered to target control records
+  ↓
 SF2 / DLS / WAV exporters
 ```
 
@@ -288,7 +290,7 @@ An instrument set contains `Instrument` records. Each instrument has:
 - source range;
 - regions;
 - default reverb;
-- synth generators and modulators.
+- physical vibrato/tremolo specifications, with raw generators and modulators available only as an escape hatch.
 
 `resolveInstrumentAddress` is the only identity-to-address policy. It uses an explicit address when present; otherwise it maps the identity key sequentially across 128-program banks. MIDI, SF2, DLS, and parity summaries all use that resolver, so a format cannot accidentally assign different programs to different targets.
 
@@ -854,13 +856,19 @@ An `Instrument` has an optional source-domain identity, an optional explicit exp
 
 This is flexible enough for the ported formats. Akao exposed an important need: loop information can belong to an articulation or region, not only to a raw sample. The model handles that with `Region::loop`, which can override `Sample::loop`.
 
-### 15.2 Samples
+### 15.2 Instrument modulation
+
+Ordinary instrument modulation is described in physical units: vibrato depth in cents, tremolo depth in decibels, rate ranges in hertz, and delay ranges in seconds. Format code therefore states the source driver's behavior directly instead of constructing SF2/DLS-style generator and modulator records. Export preparation lowers these specifications once into the existing low-level records, preserving target output and modulation-scaling policy. `customGenerators` and `customModulators` remain a narrow escape hatch for uncommon routing.
+
+### 15.3 Samples
 
 A `Sample` records encoded source data and decode settings. The encoded bytes stay in `SourceStore` until export. This keeps scanning cheap and preserves source-backed diagnostics.
 
 Sample codecs currently include PCM, SNES BRR, NDS IMA ADPCM, NDS PSG, PSX ADPCM, and OKI ADPCM.
 
-### 15.3 Decoded samples
+SNES formats share `SnesBrrCatalog`: it validates referenced SPC DIR entries and BRR streams, keeps SRCN order, resolves aliases that point to the same stream, builds neutral samples, and emits the standard DIR/BRR source annotations. Formats retain only their instrument-table rules and any genuinely format-specific sample-index behavior.
+
+### 15.4 Decoded samples
 
 `DecodedSample` is the temporary PCM form used by WAV, SF2, and DLS exporters. It contains interleaved signed PCM16, sample rate, channels, and loop information.
 
@@ -1061,7 +1069,7 @@ Capcom uses one imperative compiler-cursor opcode switch. Each case reads its op
 
 The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture. Pan commands retain Capcom's source-engine left/right gains; shared export code performs MIDI pan quantization and expression compensation. Vibrato events retain both normalized controller amounts and the driver's physical semitone depth and hertz rate, allowing `SequenceEventSimulation` to render pitch-bend motion without depending on SF2/DLS modulators.
 
-The layout uses the shared masked-pattern matcher, and the synth parser uses the shared SNES sample-directory/BRR reader. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once; it does not register a duplicate `canScan` probe. One `FormatDefinition` registers both scanner and dialect. Sequence performance and synth instruments use `capcom-snes.instrument` identities; MIDI/SF2/DLS addressing is assigned in export code.
+The layout uses the shared masked-pattern matcher. The synth path parses the instrument table once, supplies its referenced SRCNs to the shared BRR catalog, and directly commits the instrument and sample assets; it has no intermediate format-specific sample records, sample-construction pass, or SRCN lookup maps. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once; it does not register a duplicate `canScan` probe. One `FormatDefinition` registers both scanner and dialect. Sequence performance and synth instruments use `capcom-snes.instrument` identities; MIDI/SF2/DLS addressing is assigned in export code.
 
 ### 19.3 Akao
 
@@ -1132,7 +1140,7 @@ Use `CompilerCursor` to keep IR construction, source projection, generated execu
 
 ### Step 6: Build synth data in the neutral model
 
-Build instruments, regions, samples, envelopes, loops, tuning, generators, and modulators. Keep encoded sample bytes in `SourceStore` by storing `SourceRange`s.
+Build instruments, regions, samples, envelopes, loops, tuning, and physical modulation descriptions. Keep encoded sample bytes in `SourceStore` by storing `SourceRange`s. Use raw generators and modulators only when the source behavior cannot be expressed by the standard vibrato/tremolo model.
 
 ### Step 7: Add tests around values
 
@@ -1250,7 +1258,7 @@ This model is the main bridge to future non-MIDI sequence outputs.
 
 ### 21.16 `SynthModel`
 
-`SynthModel` is the neutral instrument/sample layer. It represents instruments, regions, samples, envelopes, loops, tuning, generators, modulators, and decoded PCM. `resolveInstrumentAddress` provides the one export-address policy shared by MIDI, SF2, and DLS.
+`SynthModel` is the neutral instrument/sample layer. It represents instruments, regions, samples, envelopes, loops, tuning, physical modulation, and decoded PCM. Export preparation lowers standard modulation to raw generator/modulator records; the model retains custom records only as an escape hatch. `resolveInstrumentAddress` provides the one export-address policy shared by MIDI, SF2, and DLS.
 
 It is designed for SF2/DLS/WAV export without making those formats leak into scanners.
 

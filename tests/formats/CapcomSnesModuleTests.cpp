@@ -531,34 +531,17 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(envelope.decay == kEnvelopeInfinite, "instrument envelope should preserve infinite SNES sustain decay");
   expect(envelope.sustain == 1000, "instrument envelope should convert SNES sustain to a linear amplitude level");
   expect(envelope.release == 0, "instrument envelope should match Capcom legacy gain-based release handling");
-  expect(instrument.generators.size() == 2, "instrument should carry legacy modulation generator settings");
-  expect(
-      instrument.generators[0].destination == SynthDestination::VibratoRate && instrument.generators[0].amount == -8479,
-      "instrument should carry legacy vibrato base frequency");
-  expect(
-      instrument.generators[1].destination == SynthDestination::TremoloRate && instrument.generators[1].amount == -7279,
-      "instrument should carry legacy tremolo base frequency");
-  expect(instrument.modulators.size() == 6, "instrument should carry legacy synth modulators");
-  expect(instrument.modulators[0].source == SynthSource::ChannelPressure &&
-             instrument.modulators[0].destination == SynthDestination::VibratoDepth &&
-             instrument.modulators[0].amount == 0,
-         "instrument should nullify channel-pressure vibrato depth like legacy export");
-  expect(!instrument.modulators[1].source && instrument.modulators[1].destination == SynthDestination::VibratoDepth &&
-             instrument.modulators[1].amount == 1200,
-         "instrument should carry legacy vibrato depth range");
-  expect(!instrument.modulators[2].source && instrument.modulators[2].destination == SynthDestination::VibratoRate &&
-             instrument.modulators[2].amount == 9669,
-         "instrument should carry legacy vibrato rate range");
-  expect(!instrument.modulators[3].source && instrument.modulators[3].destination == SynthDestination::TremoloRate &&
-             instrument.modulators[3].amount == 9669,
-         "instrument should carry legacy tremolo rate range");
-  expect(!instrument.modulators[4].source && instrument.modulators[4].destination == SynthDestination::TremoloDepth &&
-             instrument.modulators[4].amount == 484,
-         "instrument should carry legacy tremolo depth range");
-  expect(!instrument.modulators[5].source &&
-             instrument.modulators[5].destination == SynthDestination::VolumeAttenuation &&
-             instrument.modulators[5].amount == 484,
-         "instrument should carry legacy no-boost attenuation modulator");
+  expect(instrument.modulation.vibrato.has_value(), "instrument should describe Capcom vibrato");
+  expect(instrument.modulation.vibrato->maxDepthCents == 1200.0 &&
+             instrument.modulation.vibrato->rateHertz.minimum == kCapcomSnesLfoStepHertz &&
+             instrument.modulation.vibrato->rateHertz.maximum == 255.0 * kCapcomSnesLfoStepHertz,
+         "instrument should preserve the Capcom vibrato range in physical units");
+  expect(instrument.modulation.tremolo.has_value(), "instrument should describe Capcom tremolo");
+  expect(instrument.modulation.tremolo->maxDepthDb == kCapcomSnesTremoloHalfDepthCentibels / 10.0 &&
+             instrument.modulation.tremolo->rateHertz.minimum == 2.0 * kCapcomSnesLfoStepHertz &&
+             instrument.modulation.tremolo->rateHertz.maximum == 510.0 * kCapcomSnesLfoStepHertz &&
+             instrument.modulation.tremolo->gainMode == TremoloGainMode::NoBoost,
+         "instrument should preserve the Capcom no-boost tremolo range in physical units");
 
   const auto instrumentAnnotations = sourceMap.ownedBy(ObjectRefs::instrument(instruments->metadata.id, 0));
   expect(!instrumentAnnotations.empty(), "instrument set source map should expose instrument annotations");

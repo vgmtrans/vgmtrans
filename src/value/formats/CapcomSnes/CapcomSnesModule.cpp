@@ -35,15 +35,6 @@ using namespace core;
   const auto instrumentSet = result.reserveInstrumentSet();
   const auto samples = result.reserveSampleCollection();
 
-  std::vector<CapcomSnesInstrumentInfo> instrumentInfos;
-  std::vector<CapcomSnesSampleInfo> sampleInfos;
-  if (layout->instrumentTableAddress && layout->spcDirAddress) {
-    instrumentInfos =
-        parseCapcomSnesInstrumentInfos(input.reader, *layout->instrumentTableAddress, *layout->spcDirAddress);
-    sampleInfos = parseCapcomSnesSampleInfos(input.reader, instrumentInfos);
-  }
-
-  const bool hasInstrumentSet = !instrumentInfos.empty() && !sampleInfos.empty();
   const u32 headerSize = (layout->priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
   const SourceRange sequenceRange = input.reader.range(layout->sequenceHeaderAddress, headerSize);
   result.sequence(sequence, displayName, sequenceRange)
@@ -53,13 +44,10 @@ using namespace core;
   auto collection = result.collection(displayName, capcomCollectionKey(input.source.id));
   collection.sequence(sequence);
 
-  if (hasInstrumentSet) {
-    result.instrumentSet(instrumentSet, [&](AssetId id) {
-      return parseCapcomSnesInstrumentSet(input, result, id, samples, instrumentInfos, sampleInfos, displayName);
-    });
-    result.sampleCollection(samples, [&](AssetId id) {
-      return parseCapcomSnesSamples(input, id, sampleInfos, displayName, &result.sourceMap());
-    });
+  const bool hasSynth = layout->instrumentTableAddress && layout->spcDirAddress &&
+                        addCapcomSnesSynth(input, result, instrumentSet, samples, *layout->instrumentTableAddress,
+                                           *layout->spcDirAddress, displayName);
+  if (hasSynth) {
     collection.instrumentSet(instrumentSet).samples(samples);
   }
 

@@ -6,8 +6,8 @@
 
 #include "value/formats/AkaoSnes/AkaoSnesSynth.h"
 
+#include "value/platform/SnesSampleDirectory.h"
 #include "value/synth/SnesDsp.h"
-#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -15,7 +15,6 @@
 #include <cmath>
 #include <map>
 #include <optional>
-#include <set>
 #include <vector>
 
 namespace vgmtrans::formats::akao_snes {
@@ -23,6 +22,20 @@ namespace vgmtrans::formats::akao_snes {
 using namespace core;
 
 namespace {
+
+struct AkaoSnesInstrumentInfo {
+  u8 srcn = 0;
+  u32 tuningAddress = 0;
+  u32 adsrAddress = 0;
+  u8 tuning1 = 0;
+  u8 tuning2 = 0;
+  u8 adsr1 = 0xff;
+  u8 adsr2 = 0xe0;
+  bool percussion = false;
+  u8 percussionIndex = 0;
+  u8 percussionKey = 0;
+  std::optional<u8> percussionPan;
+};
 
 constexpr u8 kMinTimer0Frequency = 0x24;
 constexpr u8 kMaxTimer0Frequency = 0x2a;
@@ -109,105 +122,23 @@ constexpr u8 kMaxTimer0Frequency = 0x2a;
   return version == AKAOSNES_V4 ? maxV4DelaySeconds : maxDelaySeconds;
 }
 
-[[nodiscard]] std::vector<SynthGenerator> akaoInstrumentGenerators(AkaoSnesVersion version) {
-  std::vector<SynthGenerator> generators{
-      SynthGenerator{
-          .destination = SynthDestination::VibratoRate,
-          .amount = synthAmountFromHertz(minLfoRateHz(version)),
-      },
-      SynthGenerator{
-          .destination = SynthDestination::VibratoDelay,
-          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(0.0)),
-      },
+[[nodiscard]] InstrumentModulation akaoInstrumentModulation(AkaoSnesVersion version) {
+  InstrumentModulation modulation{
+      .vibrato =
+          VibratoSpec{
+              .maxDepthCents = maxVibratoDepthCents(version),
+              .rateHertz = {minLfoRateHz(version), maxLfoRateHz(version)},
+              .delaySeconds = ModulationRange{0.0, maxDelaySeconds(version)},
+          },
   };
-
   if (exportsTremolo(version)) {
-    generators.push_back(SynthGenerator{
-        .destination = SynthDestination::TremoloRate,
-        .amount = synthAmountFromHertz(minLfoRateHz(version)),
-    });
-    generators.push_back(SynthGenerator{
-        .destination = SynthDestination::TremoloDelay,
-        .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(0.0)),
-    });
+    modulation.tremolo = TremoloSpec{
+        .maxDepthDb = maxTremoloDepthDb(version),
+        .rateHertz = {minLfoRateHz(version), maxLfoRateHz(version)},
+        .delaySeconds = ModulationRange{0.0, maxDelaySeconds(version)},
+    };
   }
-  return generators;
-}
-
-[[nodiscard]] std::vector<SynthModulator> akaoInstrumentModulators(AkaoSnesVersion version) {
-  std::vector<SynthModulator> modulators{
-      SynthModulator{
-          .source = SynthSource::ChannelPressure,
-          .destination = SynthDestination::VibratoDepth,
-          .amount = 0,
-      },
-      SynthModulator{
-          .destination = SynthDestination::VibratoDepth,
-          .amount = static_cast<s32>(std::lround(maxVibratoDepthCents(version))),
-      },
-      SynthModulator{
-          .destination = SynthDestination::VibratoRate,
-          .amount = synthAmountFromHertzRange(minLfoRateHz(version), maxLfoRateHz(version)),
-      },
-      SynthModulator{
-          .destination = SynthDestination::VibratoDelay,
-          .amount = synthAmountFromSecondsRange(0.0, maxDelaySeconds(version)),
-      },
-  };
-
-  if (exportsTremolo(version)) {
-    modulators.push_back(SynthModulator{
-        .destination = SynthDestination::TremoloRate,
-        .amount = synthAmountFromHertzRange(minLfoRateHz(version), maxLfoRateHz(version)),
-    });
-    modulators.push_back(SynthModulator{
-        .destination = SynthDestination::TremoloDelay,
-        .amount = synthAmountFromSecondsRange(0.0, maxDelaySeconds(version)),
-    });
-    modulators.push_back(SynthModulator{
-        .destination = SynthDestination::TremoloDepth,
-        .amount = synthAmountFromDecibels(maxTremoloDepthDb(version)),
-    });
-  }
-  return modulators;
-}
-
-[[nodiscard]] u32 sampleLength(ByteReader reader, u32 startAddress, bool& loop) {
-  u32 offset = startAddress;
-  while (true) {
-    if (!reader.has(offset, 9)) {
-      return 0;
-    }
-    const u8 flags = reader.u8At(offset);
-    offset += 9;
-    if ((flags & 1) != 0) {
-      loop = (flags & 2) != 0;
-      return offset - startAddress;
-    }
-  }
-}
-
-[[nodiscard]] bool sampleDirIsValid(ByteReader reader, u32 dirEntryAddress, bool validateSample) {
-  if (!reader.has(dirEntryAddress, 4)) {
-    return false;
-  }
-  const u16 sampleStart = reader.le16(dirEntryAddress);
-  const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
-  if (sampleLoop < sampleStart || !reader.has(sampleStart, 10)) {
-    return false;
-  }
-
-  if (validateSample) {
-    bool loops = false;
-    const u32 length = sampleLength(reader, sampleStart, loops);
-    if (length == 0) {
-      return false;
-    }
-    if (loops && sampleLoop >= sampleStart + length) {
-      return false;
-    }
-  }
-  return true;
+  return modulation;
 }
 
 [[nodiscard]] std::optional<AkaoSnesInstrumentInfo> melodicInstrumentInfo(ByteReader reader,
@@ -217,7 +148,7 @@ constexpr u8 kMaxTimer0Frequency = 0x2a;
   }
 
   const u32 dirEntry = *layout.spcDirAddress + srcn * 4;
-  if (!sampleDirIsValid(reader, dirEntry, true)) {
+  if (!readSnesSampleDirectoryEntry(reader, dirEntry)) {
     return std::nullopt;
   }
 
@@ -310,9 +241,6 @@ struct AkaoPitch {
 [[nodiscard]] SourceRange instrumentInfoRowRange(ByteReader reader, const AkaoSnesInstrumentInfo& info,
                                                  AkaoSnesVersion version) {
   const u32 tuningSize = (version == AKAOSNES_V1 || version == AKAOSNES_V2) ? 1 : 2;
-  if (info.percussion) {
-    return reader.range(info.tuningAddress, tuningSize);
-  }
   return reader.range(info.tuningAddress, tuningSize);
 }
 
@@ -327,7 +255,7 @@ std::vector<AkaoSnesInstrumentInfo> parseAkaoSnesInstrumentInfos(ByteReader read
   const u8 maxSrcn = layout.version == AKAOSNES_V1 ? 0x7f : 0x3f;
   for (u8 srcn = 0; srcn <= maxSrcn; ++srcn) {
     const u32 dirEntry = *layout.spcDirAddress + srcn * 4;
-    if (!sampleDirIsValid(reader, dirEntry, true)) {
+    if (!readSnesSampleDirectoryEntry(reader, dirEntry)) {
       continue;
     }
 
@@ -397,130 +325,26 @@ std::vector<AkaoSnesInstrumentInfo> parseAkaoSnesInstrumentInfos(ByteReader read
   return infos;
 }
 
-std::vector<AkaoSnesSampleInfo> parseAkaoSnesSampleInfos(ByteReader reader, u32 spcDirAddress,
-                                                         const std::vector<AkaoSnesInstrumentInfo>& instruments) {
-  std::set<u8> srcns;
+SnesBrrCatalog readAkaoSnesSamples(ByteReader reader, u32 spcDirAddress,
+                                   const std::vector<AkaoSnesInstrumentInfo>& instruments) {
+  std::vector<u8> srcns;
+  srcns.reserve(instruments.size());
   for (const auto& instrument : instruments) {
-    srcns.insert(instrument.srcn);
+    srcns.push_back(instrument.srcn);
   }
-
-  std::vector<AkaoSnesSampleInfo> samples;
-  for (const u8 srcn : srcns) {
-    const u32 dirEntryAddress = spcDirAddress + srcn * 4;
-    if (!sampleDirIsValid(reader, dirEntryAddress, true)) {
-      continue;
-    }
-    const u16 start = reader.le16(dirEntryAddress);
-    const u16 loop = reader.le16(dirEntryAddress + 2);
-    bool loops = false;
-    const u32 length = sampleLength(reader, start, loops);
-    samples.push_back(AkaoSnesSampleInfo{
-        .srcn = srcn,
-        .dirEntryAddress = dirEntryAddress,
-        .startAddress = start,
-        .loopAddress = loop,
-        .encodedLength = length,
-        .loops = loops,
-    });
-  }
-  return samples;
+  return readSnesBrrCatalog(reader, spcDirAddress, srcns);
 }
 
-SampleCollectionAsset parseAkaoSnesSamples(const ScanInput& input, AssetId sampleCollectionId,
-                                           const std::vector<AkaoSnesSampleInfo>& sampleInfos,
-                                           std::string_view displayName, SourceMapBuilder* sourceMap) {
-  u32 rootOffset = sampleInfos.empty() ? 0 : sampleInfos.front().dirEntryAddress;
-  u32 rootEnd = rootOffset;
-  for (const auto& info : sampleInfos) {
-    rootOffset = std::min(rootOffset, info.dirEntryAddress);
-    rootEnd = std::max(rootEnd, info.dirEntryAddress + 4);
-  }
-  const u32 rootSize = rootEnd >= rootOffset ? rootEnd - rootOffset : 0;
+struct AkaoSnesInstrumentBuild {
+  SourceRange range;
+  std::vector<Instrument> instruments;
+};
 
-  SourceAnnotationId root;
-  if (sourceMap != nullptr) {
-    root = sourceMap->table("Sample DIR", input.reader.range(rootOffset, rootSize))
-               .kind("snes-sample-dir")
-               .owner(ObjectRefs::asset(sampleCollectionId))
-               .id();
-  }
-
-  SampleCollection collection;
-  collection.samples.reserve(sampleInfos.size());
-  for (u32 sampleIndex = 0; sampleIndex < sampleInfos.size(); ++sampleIndex) {
-    const auto& info = sampleInfos[sampleIndex];
-    const u32 decodedLength = (info.encodedLength / 9) * 16;
-    const u32 lastBlockAddress =
-        info.encodedLength >= 9 ? info.startAddress + info.encodedLength - 9 : info.startAddress;
-    const bool loopEnabled =
-        info.loops && info.loopAddress >= info.startAddress && info.loopAddress <= lastBlockAddress;
-    const u32 loopStart = loopEnabled ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
-    collection.samples.push_back(Sample{
-        .name = fmt::format("Sample {}", static_cast<unsigned>(info.srcn)),
-        .codec = AudioCodec::SnesBrr,
-        .encodedData = input.reader.range(info.startAddress, info.encodedLength),
-        .sampleRate = 32000,
-        .channels = 1,
-        .bitsPerSample = 16,
-        .loop =
-            Loop{
-                .enabled = loopEnabled,
-                .start = loopStart,
-                .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
-            },
-    });
-
-    if (sourceMap != nullptr) {
-      auto row = sourceMap
-                     ->row(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(info.srcn)),
-                           input.reader.range(info.dirEntryAddress, 4))
-                     .role(SourceRole::Sample)
-                     .kind("akao-snes-sample-dir-entry")
-                     .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-                     .field("start", input.reader.range(info.dirEntryAddress, 2), info.startAddress,
-                            SourceValueDisplay::Address)
-                     .field("loop", input.reader.range(info.dirEntryAddress + 2, 2), info.loopAddress,
-                            SourceValueDisplay::Address)
-                     .link(SourceLinkRole::PointsTo,
-                           SourceTarget{input.reader.range(info.startAddress, info.encodedLength)}, "BRR data");
-      if (root.valid()) {
-        row.parent(root);
-      }
-      sourceMap
-          ->section(fmt::format("Sample {} BRR Data", static_cast<unsigned>(info.srcn)),
-                    input.reader.range(info.startAddress, info.encodedLength))
-          .role(SourceRole::Payload)
-          .kind("snes-brr-payload")
-          .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-          .parent(row.id());
-    }
-  }
-
-  return SampleCollectionAsset{
-      .metadata =
-          AssetMetadata{
-              .id = sampleCollectionId,
-              .format = "AkaoSnes",
-              .name = fmt::format("{} Samples", displayName),
-              .range = input.reader.range(rootOffset, rootSize),
-          },
-      .samples = std::move(collection),
-  };
-}
-
-InstrumentSetAsset parseAkaoSnesInstrumentSet(const ScanInput& input, ScanResultBuilder& builder,
-                                              AssetId instrumentSetId, ScanSampleCollectionRef sampleCollection,
-                                              const AkaoSnesLayout& layout,
-                                              const std::vector<AkaoSnesInstrumentInfo>& instrumentInfos,
-                                              const std::vector<AkaoSnesSampleInfo>& sampleInfos,
-                                              std::string_view displayName) {
-  std::map<u8, u32> sampleIndexBySrcn;
-  std::map<u32, u32> firstSampleIndexByStartAddress;
-  for (u32 index = 0; index < sampleInfos.size(); ++index) {
-    sampleIndexBySrcn.emplace(sampleInfos[index].srcn, index);
-    firstSampleIndexByStartAddress.emplace(sampleInfos[index].startAddress, index);
-  }
-
+AkaoSnesInstrumentBuild buildAkaoSnesInstruments(const ScanInput& input, ScanResultBuilder& builder,
+                                                 ScanInstrumentSetRef instrumentSet,
+                                                 ScanSampleCollectionRef sampleCollection, const AkaoSnesLayout& layout,
+                                                 const std::vector<AkaoSnesInstrumentInfo>& instrumentInfos,
+                                                 const SnesBrrCatalog& samples) {
   u32 rootOffset = instrumentInfos.empty() ? 0 : instrumentInfos.front().tuningAddress;
   u32 rootEnd = rootOffset;
   for (const auto& info : instrumentInfos) {
@@ -536,14 +360,14 @@ InstrumentSetAsset parseAkaoSnesInstrumentSet(const ScanInput& input, ScanResult
   const SourceAnnotationId root = builder.sourceMap()
                                       .table("Instrument Tables", input.reader.range(rootOffset, rootSize))
                                       .kind("akao-snes-instrument-tables")
-                                      .owner(ObjectRefs::asset(instrumentSetId))
+                                      .owner(ObjectRefs::asset(instrumentSet.id))
                                       .id();
 
   std::map<u32, size_t> instrumentIndexByProgram;
   std::vector<Instrument> instruments;
   for (const auto& info : instrumentInfos) {
-    const auto sampleFound = sampleIndexBySrcn.find(info.srcn);
-    if (sampleFound == sampleIndexBySrcn.end()) {
+    const auto sampleIndex = samples.canonicalIndex(info.srcn);
+    if (!sampleIndex) {
       continue;
     }
 
@@ -560,19 +384,12 @@ InstrumentSetAsset parseAkaoSnesInstrumentSet(const ScanInput& input, ScanResult
           .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
           .name = info.percussion ? "Drum Kit" : fmt::format("Instrument {}", static_cast<unsigned>(info.srcn)),
           .range = instrumentObjectRange(input.reader, layout),
-          .generators = akaoInstrumentGenerators(layout.version),
-          .modulators = akaoInstrumentModulators(layout.version),
+          .modulation = akaoInstrumentModulation(layout.version),
       });
     }
-
     const auto pitch = akaoPitch(info);
-    const u32 sampleIndex = [&]() {
-      const auto firstByStart = firstSampleIndexByStartAddress.find(sampleInfos[sampleFound->second].startAddress);
-      return firstByStart == firstSampleIndexByStartAddress.end() ? sampleFound->second : firstByStart->second;
-    }();
-
     Region region{
-        .sample = builder.sampleRef(sampleCollection, sampleIndex),
+        .sample = builder.sampleRef(sampleCollection, *sampleIndex),
         .range = instrumentObjectRange(input.reader, layout),
         .tuning = pitch.aggregate,
         .rootKey = pitch.rootKey,
@@ -593,7 +410,7 @@ InstrumentSetAsset parseAkaoSnesInstrumentSet(const ScanInput& input, ScanResult
                  instrumentInfoRowRange(input.reader, info, layout.version))
             .role(SourceRole::Instrument)
             .kind(info.percussion ? "akao-snes-percussion-instrument" : "akao-snes-instrument")
-            .owner(ObjectRefs::instrument(instrumentSetId, programKey))
+            .owner(ObjectRefs::instrument(instrumentSet.id, programKey))
             .derived("bank", bank)
             .derived("program", program)
             .field("tuning",
@@ -604,22 +421,33 @@ InstrumentSetAsset parseAkaoSnesInstrumentSet(const ScanInput& input, ScanResult
       annotation.field("adsr1", input.reader.range(info.adsrAddress, 1), info.adsr1, SourceValueDisplay::Hex)
           .field("adsr2", input.reader.range(info.adsrAddress + 1, 1), info.adsr2, SourceValueDisplay::Hex);
     }
-    if (root.valid()) {
-      annotation.parent(root);
-    }
-    annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, sampleIndex)});
+    annotation.parent(root).link(SourceLinkRole::UsesSample,
+                                 SourceTarget{ObjectRefs::sample(sampleCollection.id, *sampleIndex)});
   }
 
-  return InstrumentSetAsset{
-      .metadata =
-          AssetMetadata{
-              .id = instrumentSetId,
-              .format = "AkaoSnes",
-              .name = fmt::format("{} Instruments", displayName),
-              .range = input.reader.range(rootOffset, rootSize),
-          },
+  return AkaoSnesInstrumentBuild{
+      .range = input.reader.range(rootOffset, rootSize),
       .instruments = std::move(instruments),
   };
+}
+
+bool addAkaoSnesSynth(const ScanInput& input, ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
+                      ScanSampleCollectionRef sampleCollection, const AkaoSnesLayout& layout,
+                      std::string_view displayName) {
+  const auto instrumentInfos = parseAkaoSnesInstrumentInfos(input.reader, layout);
+  const auto samples = readAkaoSnesSamples(input.reader, *layout.spcDirAddress, instrumentInfos);
+  if (instrumentInfos.empty() || samples.samples.empty()) {
+    return false;
+  }
+
+  auto instruments =
+      buildAkaoSnesInstruments(input, builder, instrumentSet, sampleCollection, layout, instrumentInfos, samples);
+  builder.instrumentSet(instrumentSet, fmt::format("{} Instruments", displayName), instruments.range)
+      .instruments(std::move(instruments.instruments));
+  builder.sampleCollection(sampleCollection, fmt::format("{} Samples", displayName), samples.directoryRange)
+      .samples(buildSnesBrrSampleCollection(input.reader, samples, sampleCollection.id, builder.sourceMap(),
+                                            "akao-snes-sample-dir-entry"));
+  return true;
 }
 
 }  // namespace vgmtrans::formats::akao_snes

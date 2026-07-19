@@ -248,6 +248,7 @@ public:
   AnnotationBuilder& playbackStatus(CommandPlaybackStatus status);
   AnnotationBuilder& field(std::string_view name, SourceRange range, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
+  AnnotationBuilder& fields(std::span<const SourceField> fields);
   template <class T>
   AnnotationBuilder& field(std::string_view name, SourceRange range, T&& value,
                            SourceValueDisplay display = SourceValueDisplay::Default) {

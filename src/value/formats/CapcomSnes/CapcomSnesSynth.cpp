@@ -9,13 +9,11 @@
 #include "value/base/RecordReader.h"
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/synth/SnesDsp.h"
-#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <string>
 
 namespace vgmtrans::formats::capcom_snes {
@@ -24,10 +22,19 @@ using namespace core;
 
 namespace {
 
-constexpr double kVibratoBaseHertz = kCapcomSnesLfoStepHertz;
-constexpr double kVibratoMaxHertz = 255.0 * kCapcomSnesLfoStepHertz;
-constexpr double kTremoloBaseHertz = 2.0 * kCapcomSnesLfoStepHertz;
-constexpr double kTremoloMaxHertz = 510.0 * kCapcomSnesLfoStepHertz;
+const InstrumentModulation kCapcomModulation{
+    .vibrato =
+        VibratoSpec{
+            .maxDepthCents = 1200.0,
+            .rateHertz = {kCapcomSnesLfoStepHertz, 255.0 * kCapcomSnesLfoStepHertz},
+        },
+    .tremolo =
+        TremoloSpec{
+            .maxDepthDb = kCapcomSnesTremoloHalfDepthCentibels / 10.0,
+            .rateHertz = {2.0 * kCapcomSnesLfoStepHertz, 510.0 * kCapcomSnesLfoStepHertz},
+            .gainMode = TremoloGainMode::NoBoost,
+        },
+};
 
 struct InstrumentPitch {
   Tuning aggregate;
@@ -73,54 +80,6 @@ struct InstrumentPitch {
   return envelope;
 }
 
-[[nodiscard]] std::vector<SynthGenerator> capcomInstrumentGenerators() {
-  return {
-      SynthGenerator{
-          .destination = SynthDestination::VibratoRate,
-          .amount = synthAmountFromHertz(kVibratoBaseHertz),
-      },
-      SynthGenerator{
-          .destination = SynthDestination::TremoloRate,
-          .amount = synthAmountFromHertz(kTremoloBaseHertz),
-      },
-  };
-}
-
-[[nodiscard]] std::vector<SynthModulator> capcomInstrumentModulators() {
-  // Capcom drives vibrato/tremolo from sequence controllers. These default modulators
-  // describe the maximum synth response; export-time scaling can narrow it to observed use.
-  const s32 vibratoRange = synthAmountFromHertzRange(kVibratoBaseHertz, kVibratoMaxHertz);
-  const s32 tremoloRange = synthAmountFromHertzRange(kTremoloBaseHertz, kTremoloMaxHertz);
-
-  return {
-      SynthModulator{
-          .source = SynthSource::ChannelPressure,
-          .destination = SynthDestination::VibratoDepth,
-          .amount = 0,
-      },
-      SynthModulator{
-          .destination = SynthDestination::VibratoDepth,
-          .amount = 1200,
-      },
-      SynthModulator{
-          .destination = SynthDestination::VibratoRate,
-          .amount = vibratoRange,
-      },
-      SynthModulator{
-          .destination = SynthDestination::TremoloRate,
-          .amount = tremoloRange,
-      },
-      SynthModulator{
-          .destination = SynthDestination::TremoloDepth,
-          .amount = kCapcomSnesTremoloHalfDepthCentibels,
-      },
-      SynthModulator{
-          .destination = SynthDestination::VolumeAttenuation,
-          .amount = kCapcomSnesTremoloHalfDepthCentibels,
-      },
-  };
-}
-
 }  // namespace
 
 std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader reader, u32 instrumentTableAddress,
@@ -129,7 +88,6 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
   // but the first impossible nonblank entry terminates discovery like legacy scanning.
   std::vector<CapcomSnesInstrumentInfo> instruments;
   const SnesSampleDirectory directory(reader, spcDirAddress);
-  std::map<u8, std::optional<SnesSampleDirectoryEntry>> directoryEntries;
 
   for (u32 instrumentIndex = 0; instrumentIndex <= 0xff; ++instrumentIndex) {
     const u32 address = instrumentTableAddress + instrumentIndex * 6;
@@ -148,12 +106,8 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
       continue;
     }
 
-    auto [sampleEntry, inserted] = directoryEntries.try_emplace(*srcn);
-    if (inserted) {
-      sampleEntry->second = directory.entry(*srcn, false);
-    }
-    const auto& sample = sampleEntry->second;
-    if (!row.ok() || *srcn >= 0x80 || (*adsr1 == 0 && *gain == 0) || !sample || !sample->loopAddressIsBlockAligned()) {
+    const auto sample = directory.entry(*srcn, false);
+    if (*srcn >= 0x80 || (*adsr1 == 0 && *gain == 0) || !sample || !sample->loopAddressIsBlockAligned()) {
       // The table is contiguous; the first impossible nonblank header ends discovery.
       break;
     }
@@ -166,9 +120,6 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
         .adsr2 = *adsr2,
         .gain = *gain,
         .pitchScale = *pitchScale,
-        .dirEntryAddress = static_cast<u32>(sample->entryRange.offset),
-        .sampleStartAddress = sample->startAddress,
-        .sampleLoopAddress = sample->loopAddress,
     };
     info.sourceFields.assign(row.fields().begin(), row.fields().end());
     instruments.push_back(std::move(info));
@@ -177,158 +128,38 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
   return instruments;
 }
 
-std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(ByteReader reader,
-                                                             const std::vector<CapcomSnesInstrumentInfo>& instruments) {
-  std::vector<const CapcomSnesInstrumentInfo*> representatives;
-  representatives.reserve(instruments.size());
-  for (const auto& instrument : instruments) {
-    const auto duplicate =
-        std::ranges::find_if(representatives, [&](const auto* existing) { return existing->srcn == instrument.srcn; });
-    if (duplicate == representatives.end()) {
-      representatives.push_back(&instrument);
-    }
+bool addCapcomSnesSynth(const ScanInput& input, ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
+                        ScanSampleCollectionRef sampleCollection, u32 instrumentTableAddress, u32 spcDirAddress,
+                        std::string_view displayName) {
+  const auto instrumentInfos = parseCapcomSnesInstrumentInfos(input.reader, instrumentTableAddress, spcDirAddress);
+  std::vector<u8> referencedSrcns;
+  referencedSrcns.reserve(instrumentInfos.size());
+  for (const auto& info : instrumentInfos) {
+    referencedSrcns.push_back(info.srcn);
   }
-  std::ranges::sort(representatives, {}, [](const auto* instrument) { return instrument->srcn; });
-
-  // Multiple instruments can point at the same SRCN; samples are emitted once.
-  std::vector<CapcomSnesSampleInfo> samples;
-  samples.reserve(representatives.size());
-  for (const auto* instrument : representatives) {
-    const auto stream = inspectSnesBrrStream(reader, instrument->sampleStartAddress);
-    if (!stream || (stream->loops && instrument->sampleLoopAddress >= stream->encodedData.endOffset())) {
-      continue;
-    }
-    samples.push_back(CapcomSnesSampleInfo{
-        .srcn = instrument->srcn,
-        .dirEntryAddress = instrument->dirEntryAddress,
-        .startAddress = instrument->sampleStartAddress,
-        .loopAddress = instrument->sampleLoopAddress,
-        .encodedLength = static_cast<u32>(stream->encodedData.size),
-        .loops = stream->loops,
-    });
+  const auto samples = readSnesBrrCatalog(input.reader, spcDirAddress, referencedSrcns);
+  if (instrumentInfos.empty() || samples.samples.empty()) {
+    return false;
   }
 
-  return samples;
-}
-
-SampleCollectionAsset parseCapcomSnesSamples(const ScanInput& input, AssetId sampleCollectionId,
-                                             const std::vector<CapcomSnesSampleInfo>& sampleInfos,
-                                             std::string_view displayName, SourceMapBuilder* sourceMap) {
-  u32 rootOffset = 0;
-  u32 rootSize = 0;
-  if (!sampleInfos.empty()) {
-    rootOffset = sampleInfos.front().dirEntryAddress;
-    const u32 lastEnd = sampleInfos.back().dirEntryAddress + 4;
-    rootSize = lastEnd - rootOffset;
-  }
-
-  SourceAnnotationId root;
-  if (sourceMap != nullptr) {
-    root = sourceMap->table("Sample DIR", input.reader.range(rootOffset, rootSize))
-               .kind("snes-sample-dir")
-               .owner(ObjectRefs::asset(sampleCollectionId))
-               .id();
-  }
-
-  SampleCollection collection;
-  collection.samples.reserve(sampleInfos.size());
-  for (u32 sampleIndex = 0; sampleIndex < sampleInfos.size(); ++sampleIndex) {
-    const auto& sampleInfo = sampleInfos[sampleIndex];
-    // SNES BRR decodes 9-byte blocks into 16 PCM frames.
-    const u32 loopStart = sampleInfo.loopAddress >= sampleInfo.startAddress
-                              ? ((sampleInfo.loopAddress - sampleInfo.startAddress) / 9) * 16
-                              : 0;
-    const u32 decodedLength = (sampleInfo.encodedLength / 9) * 16;
-    const u32 lastBlockAddress = sampleInfo.encodedLength >= 9 ? sampleInfo.startAddress + sampleInfo.encodedLength - 9
-                                                               : sampleInfo.startAddress;
-    const bool loopEnabled = sampleInfo.loops && sampleInfo.loopAddress >= sampleInfo.startAddress &&
-                             sampleInfo.loopAddress <= lastBlockAddress;
-    collection.samples.push_back(Sample{
-        .name = fmt::format("Sample {}", static_cast<unsigned>(sampleInfo.srcn)),
-        .codec = AudioCodec::SnesBrr,
-        .encodedData = input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength),
-        .sampleRate = 32000,
-        .channels = 1,
-        .bitsPerSample = 16,
-        .loop =
-            Loop{
-                .enabled = loopEnabled,
-                .start = loopStart,
-                .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
-            },
-    });
-    if (sourceMap != nullptr) {
-      auto row =
-          sourceMap
-              ->row(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(sampleInfo.srcn)),
-                    input.reader.range(sampleInfo.dirEntryAddress, 4))
-              .role(SourceRole::Sample)
-              .kind("snes-sample-dir-entry")
-              .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-              .field("start", input.reader.range(sampleInfo.dirEntryAddress, 2), sampleInfo.startAddress,
-                     SourceValueDisplay::Address)
-              .field("loop", input.reader.range(sampleInfo.dirEntryAddress + 2, 2), sampleInfo.loopAddress,
-                     SourceValueDisplay::Address)
-              .link(SourceLinkRole::PointsTo,
-                    SourceTarget{input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength)}, "BRR data");
-      if (root.valid()) {
-        row.parent(root);
-      }
-      sourceMap
-          ->section(fmt::format("Sample {} BRR Data", static_cast<unsigned>(sampleInfo.srcn)),
-                    input.reader.range(sampleInfo.startAddress, sampleInfo.encodedLength))
-          .role(SourceRole::Payload)
-          .kind("snes-brr-payload")
-          .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-          .parent(row.id());
-    }
-  }
-
-  return SampleCollectionAsset{
-      .metadata =
-          AssetMetadata{
-              .id = sampleCollectionId,
-              .format = "CapcomSnes",
-              .name = fmt::format("{} Samples", displayName),
-              .range = input.reader.range(rootOffset, rootSize),
-          },
-      .samples = std::move(collection),
-  };
-}
-
-InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResultBuilder& builder,
-                                                AssetId instrumentSetId, ScanSampleCollectionRef sampleCollection,
-                                                const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
-                                                const std::vector<CapcomSnesSampleInfo>& sampleInfos,
-                                                std::string_view displayName) {
-  // Instruments refer to samples by SRCN, while exported regions need flat sample indexes.
-  // Build both SRCN and start-address maps so duplicate BRR data stays canonical.
-  std::map<u32, u32> sampleIndexByStartAddress;
-  std::map<u8, u32> sampleIndexBySrcn;
-  for (u32 index = 0; index < sampleInfos.size(); ++index) {
-    // Canonicalize duplicate sample starts so shared BRR data exports as one sample.
-    const auto [canonical, _] = sampleIndexByStartAddress.emplace(sampleInfos[index].startAddress, index);
-    sampleIndexBySrcn[sampleInfos[index].srcn] = canonical->second;
-  }
-
-  u32 rootOffset = instrumentInfos.empty() ? 0 : instrumentInfos.front().address;
-  u32 rootSize = instrumentInfos.empty() ? 0 : (instrumentInfos.back().address + 6) - rootOffset;
+  const u32 rootOffset = instrumentInfos.front().address;
+  const u32 rootSize = (instrumentInfos.back().address + 6) - rootOffset;
   const SourceAnnotationId root = builder.sourceMap()
                                       .table("Instrument Table", input.reader.range(rootOffset, rootSize))
                                       .kind("capcom-snes-instrument-table")
-                                      .owner(ObjectRefs::asset(instrumentSetId))
+                                      .owner(ObjectRefs::asset(instrumentSet.id))
                                       .id();
 
   std::vector<Instrument> instruments;
   instruments.reserve(instrumentInfos.size());
   for (const auto& info : instrumentInfos) {
-    const auto sampleIndex = sampleIndexBySrcn.find(info.srcn);
-    if (sampleIndex == sampleIndexBySrcn.end()) {
+    const auto sampleIndex = samples.canonicalIndex(info.srcn);
+    if (!sampleIndex) {
       continue;
     }
     const auto pitch = capcomInstrumentPitch(info.pitchScale);
 
-    Instrument instrument{
+    instruments.push_back(Instrument{
         .identity =
             InstrumentIdentity{
                 .domain = std::string(kCapcomSnesInstrumentDomain),
@@ -336,33 +167,25 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
             },
         .name = fmt::format("Instrument {}", info.index),
         .range = input.reader.range(info.address, 6),
-    };
-    instrument.regions.push_back(Region{
-        .sample = builder.sampleRef(sampleCollection, sampleIndex->second),
-        .range = input.reader.range(info.address, 6),
-        .tuning = pitch.aggregate,
-        .rootKey = pitch.rootKey,
-        .fineTuneCents = pitch.fineTuneCents,
-        .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
+        .regions = {Region{
+            .sample = builder.sampleRef(sampleCollection, *sampleIndex),
+            .range = input.reader.range(info.address, 6),
+            .tuning = pitch.aggregate,
+            .rootKey = pitch.rootKey,
+            .fineTuneCents = pitch.fineTuneCents,
+            .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
+        }},
+        .modulation = kCapcomModulation,
     });
-    instrument.generators = capcomInstrumentGenerators();
-    instrument.modulators = capcomInstrumentModulators();
-
-    instruments.push_back(std::move(instrument));
     auto annotation = builder.sourceMap()
                           .row(fmt::format("Instrument {}", info.index), input.reader.range(info.address, 6))
                           .role(SourceRole::Instrument)
                           .kind("capcom-snes-instrument")
-                          .owner(ObjectRefs::instrument(instrumentSetId, info.index))
-                          .derived("instrument", info.index);
-    for (const auto& field : info.sourceFields) {
-      annotation.field(field.name, field.range, field.value, field.display);
-    }
-    if (root.valid()) {
-      annotation.parent(root);
-    }
-    annotation.link(SourceLinkRole::UsesSample,
-                    SourceTarget{ObjectRefs::sample(sampleCollection.id, sampleIndex->second)});
+                          .owner(ObjectRefs::instrument(instrumentSet.id, info.index))
+                          .derived("instrument", info.index)
+                          .fields(info.sourceFields)
+                          .parent(root);
+    annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, *sampleIndex)});
     auto envelopeAnnotation =
         builder.sourceMap()
             .annotation(SourceRole::DataBlock, "ADSR/Gain", input.reader.range(info.address + 1, 3))
@@ -378,20 +201,17 @@ InstrumentSetAsset parseCapcomSnesInstrumentSet(const ScanInput& input, ScanResu
         .annotation(SourceRole::Region, "Region", input.reader.range(info.address, 6))
         .kind("capcom-snes-region")
         .parent(annotation.id())
-        .description(fmt::format("Sample {}", sampleIndex->second))
-        .link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, sampleIndex->second)});
+        .description(fmt::format("Sample {}", *sampleIndex))
+        .link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, *sampleIndex)});
   }
 
-  return InstrumentSetAsset{
-      .metadata =
-          AssetMetadata{
-              .id = instrumentSetId,
-              .format = "CapcomSnes",
-              .name = fmt::format("{} Instruments", displayName),
-              .range = input.reader.range(rootOffset, rootSize),
-          },
-      .instruments = std::move(instruments),
-  };
+  builder
+      .instrumentSet(instrumentSet, fmt::format("{} Instruments", displayName),
+                     input.reader.range(rootOffset, rootSize))
+      .instruments(std::move(instruments));
+  builder.sampleCollection(sampleCollection, fmt::format("{} Samples", displayName), samples.directoryRange)
+      .samples(buildSnesBrrSampleCollection(input.reader, samples, sampleCollection.id, builder.sourceMap()));
+  return true;
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

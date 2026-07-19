@@ -80,29 +80,10 @@ bool hasNonZeroPitchBendAtOrAfter(const MidiTrack& track, u64 tick) {
   });
 }
 
-bool hasGeneratorDestination(const Instrument& instrument, SynthDestination destination) {
-  return std::ranges::any_of(instrument.generators, [destination](const SynthGenerator& generator) {
-    return generator.destination == destination;
-  });
-}
-
-bool hasModulatorDestination(const Instrument& instrument, SynthDestination destination) {
-  return std::ranges::any_of(instrument.modulators, [destination](const SynthModulator& modulator) {
-    return modulator.destination == destination;
-  });
-}
-
-bool hasSourceLessModulatorDestination(const Instrument& instrument, SynthDestination destination) {
-  return std::ranges::any_of(instrument.modulators, [destination](const SynthModulator& modulator) {
-    return !modulator.source && modulator.destination == destination;
-  });
-}
-
 std::vector<u8> makeKonamiSnesAram() {
   std::vector<u8> bytes(0x10000);
 
-  constexpr std::array<u8, 10> setSongHeaderAddressGG4{0x8f, 0x00, 0x0a, 0x8f, 0x20,
-                                                       0x0b, 0xcd, 0x00, 0xd8, 0x1c};
+  constexpr std::array<u8, 10> setSongHeaderAddressGG4{0x8f, 0x00, 0x0a, 0x8f, 0x20, 0x0b, 0xcd, 0x00, 0xd8, 0x1c};
   writeBytes(bytes, 0x0100, setSongHeaderAddressGG4);
 
   constexpr std::array<u8, 15> jumpToVcmdGG4{0x1c, 0xfd, 0xf6, 0xbc, 0x1a, 0x2d, 0xf6, 0xbb,
@@ -113,11 +94,10 @@ std::vector<u8> makeKonamiSnesAram() {
   constexpr std::array<u8, 6> setDirGG4{0x8f, 0x5d, 0xf2, 0x8f, 0x50, 0xf3};
   writeBytes(bytes, 0x0140, setDirGG4);
 
-  constexpr std::array<u8, 48> loadInstrGG4{
-      0x09, 0x11, 0x10, 0xfd, 0xf5, 0xa1, 0x01, 0xd0, 0x27, 0xdd, 0x68, 0x28,
-      0xb0, 0x0c, 0x8f, 0x3c, 0x04, 0x8f, 0x0a, 0x05, 0x3f, 0xee, 0x1b, 0x5f,
-      0xe2, 0x18, 0xa8, 0x28, 0x2d, 0xeb, 0x25, 0xf6, 0x20, 0x0a, 0xc4, 0x04,
-      0xf6, 0x21, 0x0a, 0xc4, 0x05, 0xae, 0x3f, 0xee, 0x1b, 0x5f, 0xe2, 0x18};
+  constexpr std::array<u8, 48> loadInstrGG4{0x09, 0x11, 0x10, 0xfd, 0xf5, 0xa1, 0x01, 0xd0, 0x27, 0xdd, 0x68, 0x28,
+                                            0xb0, 0x0c, 0x8f, 0x3c, 0x04, 0x8f, 0x0a, 0x05, 0x3f, 0xee, 0x1b, 0x5f,
+                                            0xe2, 0x18, 0xa8, 0x28, 0x2d, 0xeb, 0x25, 0xf6, 0x20, 0x0a, 0xc4, 0x04,
+                                            0xf6, 0x21, 0x0a, 0xc4, 0x05, 0xae, 0x3f, 0xee, 0x1b, 0x5f, 0xe2, 0x18};
   writeBytes(bytes, 0x0160, loadInstrGG4);
   bytes[0x0160 + 11] = 0x01;
   bytes[0x0160 + 15] = 0x00;
@@ -247,8 +227,8 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const TrackProgram& track = sequence->program.tracks.front();
   expect(track.commands.size() == 7, "KonamiSnes fixture should decode tempo, setup, note, and end commands");
   constexpr std::array<std::string_view, 7> expectedCommandDetailKinds{
-      "konami-snes.tempo", "konami-snes.program", "konami-snes.volume", "konami-snes.pan",
-      "konami-snes.vibrato", "konami-snes.note", "konami-snes.end"};
+      "konami-snes.tempo",   "konami-snes.program", "konami-snes.volume", "konami-snes.pan",
+      "konami-snes.vibrato", "konami-snes.note",    "konami-snes.end"};
   for (size_t index = 0; index < expectedCommandDetailKinds.size(); ++index) {
     expect(commandDetailKind(project.sourceMap(), track.commands[index]) == expectedCommandDetailKinds[index],
            "track should decode KonamiSnes command " + std::to_string(index));
@@ -266,7 +246,8 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
     return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoDepth &&
            modulation->amount > 0.0;
   });
-  expect(vibratoDepth != performance.tracks[0].events.end(), "KonamiSnes vibrato command should emit target-neutral depth");
+  expect(vibratoDepth != performance.tracks[0].events.end(),
+         "KonamiSnes vibrato command should emit target-neutral depth");
   const auto& vibratoDepthEvent = std::get<ModulationPerformanceEvent>(*vibratoDepth);
   const double expectedDepthCents = vibrato::currentDepthCents(KONAMISNES_V6, 0x10, 0x10 << 8);
   const double expectedDepthAmount =
@@ -310,13 +291,11 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instrument.range.offset == 0x4000 && instrument.range.size == 7,
          "instrument should preserve its source header range");
   expect(instrument.regions.size() == 1, "instrument should contain one sample-backed region");
-  expect(!instrument.modulators.empty(), "KonamiSnes instruments should carry default vibrato modulators");
-  expect(hasGeneratorDestination(instrument, SynthDestination::VibratoDelay),
-         "KonamiSnes instruments should carry a default vibrato delay generator");
-  expect(hasSourceLessModulatorDestination(instrument, SynthDestination::VibratoDepth),
-         "KonamiSnes instruments should carry default vibrato depth as a synth modulator");
-  expect(hasModulatorDestination(instrument, SynthDestination::VibratoDelay),
-         "KonamiSnes instruments should carry a default vibrato delay modulator");
+  expect(instrument.modulation.vibrato.has_value(), "KonamiSnes instruments should describe vibrato");
+  expect(instrument.modulation.vibrato->maxDepthCents > 0.0,
+         "KonamiSnes instruments should describe a positive vibrato depth range");
+  expect(instrument.modulation.vibrato->delaySeconds.has_value(),
+         "KonamiSnes instruments should describe the vibrato delay range");
 
   const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
   expect(samples != nullptr, "third KonamiSnes asset should be a sample collection");
@@ -366,7 +345,8 @@ void konamiSnesSynthParsersStopAtInvalidBankedInstrument() {
   expect(instruments.front().index == 0 && instruments.front().address == 0x4000,
          "KonamiSnes parser should preserve the sparse source instrument index and address");
   const auto samples = parseKonamiSnesSampleInfos(ByteReader(SourceId{8}, bytes), *layout->spcDirAddress, instruments);
-  expect(samples.size() == 1 && samples.front().srcn == 0 && samples.front().encodedLength == 9,
+  expect(samples.samples.size() == 1 && samples.samples.front().srcn == 0 &&
+             samples.samples.front().stream.encodedData.size == 9,
          "KonamiSnes sample parser should keep only samples used by valid instruments");
 }
 
@@ -400,19 +380,23 @@ void konamiSnesProgramChangeReemitsCurrentFineTune() {
 }
 
 void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
-  const PerformanceSequence performance = renderKonamiSnesProgram(
-      KONAMISNES_V2,
-      {
-          {
-              0xea, 0x37,              // tempo 55
-              0xe4, 0x00, 0x2d, 0x63,  // active legacy vibrato, rate step 45
-              0xff,
-          },
-          {
-              0xea, 0x78,  // tempo 120, seen by legacy as song-level export tempo
-              0xff,
-          },
-      });
+  const PerformanceSequence performance =
+      renderKonamiSnesProgram(KONAMISNES_V2, {
+                                                 {
+                                                     0xea,
+                                                     0x37,  // tempo 55
+                                                     0xe4,
+                                                     0x00,
+                                                     0x2d,
+                                                     0x63,  // active legacy vibrato, rate step 45
+                                                     0xff,
+                                                 },
+                                                 {
+                                                     0xea,
+                                                     0x78,  // tempo 120, seen by legacy as song-level export tempo
+                                                     0xff,
+                                                 },
+                                             });
 
   const auto vibratoRate = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
@@ -424,16 +408,12 @@ void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
 
   const auto& rate = std::get<ModulationPerformanceEvent>(*vibratoRate);
   const double baseHz = vibrato::baseHz(KONAMISNES_V2);
-  const double fullRange =
-      synthAmountFromHertzRange(baseHz, baseHz * vibrato::defaultMaxRateFactor(KONAMISNES_V2));
-  const double expectedCurrent =
-      synthAmountFromHertzRange(baseHz, baseHz * (0x2d * 0x37)) / fullRange;
-  const double expectedCeiling =
-      synthAmountFromHertzRange(baseHz, baseHz * (0x2d * 0x78)) / fullRange;
+  const double fullRange = synthAmountFromHertzRange(baseHz, baseHz * vibrato::defaultMaxRateFactor(KONAMISNES_V2));
+  const double expectedCurrent = synthAmountFromHertzRange(baseHz, baseHz * (0x2d * 0x37)) / fullRange;
+  const double expectedCeiling = synthAmountFromHertzRange(baseHz, baseHz * (0x2d * 0x78)) / fullRange;
   expect(std::abs(rate.amount - expectedCurrent) < 0.0001,
          "KonamiSnes legacy vibrato rate should keep the current track-tempo amount");
-  expect(rate.controllerRangeMaxAmount &&
-             std::abs(*rate.controllerRangeMaxAmount - expectedCeiling) < 0.0001,
+  expect(rate.controllerRangeMaxAmount && std::abs(*rate.controllerRangeMaxAmount - expectedCeiling) < 0.0001,
          "KonamiSnes legacy vibrato rate ceiling should include the sequence-global tempo range");
 }
 

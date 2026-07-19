@@ -294,6 +294,13 @@ AnnotationBuilder& AnnotationBuilder::field(std::string_view name, SourceRange r
   return *this;
 }
 
+AnnotationBuilder& AnnotationBuilder::fields(std::span<const SourceField> fields) {
+  if (auto* found = map_->annotation(id_)) {
+    found->fields.insert(found->fields.end(), fields.begin(), fields.end());
+  }
+  return *this;
+}
+
 AnnotationBuilder& AnnotationBuilder::derived(std::string_view name, SourceValue value, SourceValueDisplay display) {
   return field(name, SourceRange{}, std::move(value), display);
 }

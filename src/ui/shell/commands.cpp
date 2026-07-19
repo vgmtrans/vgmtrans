@@ -8,6 +8,7 @@
 
 #include "base/Types.h"
 #include "DBGVGMRoot.h"
+#include "value/export/synth/ModulationScaling.h"
 #include "value/session/Session.h"
 #include "value/formats/ValueFormats.h"
 #include "RawFile.h"
@@ -370,8 +371,8 @@ bool valueRangeContains(vgmtrans::core::SourceRange outer, vgmtrans::core::Sourc
          inner.size <= outer.endOffset() - inner.offset;
 }
 
-bool valueAnnotationBelongsToAsset(const vgmtrans::core::SourceAnnotation& annotation,
-                                   vgmtrans::core::AssetId assetId, vgmtrans::core::SourceRange assetRange) {
+bool valueAnnotationBelongsToAsset(const vgmtrans::core::SourceAnnotation& annotation, vgmtrans::core::AssetId assetId,
+                                   vgmtrans::core::SourceRange assetRange) {
   if (annotation.owner && annotation.owner->asset == assetId) {
     return true;
   }
@@ -461,7 +462,8 @@ std::string valueAnnotationDescription(const vgmtrans::core::SourceAnnotation& a
 }
 
 std::string_view valueAnnotationKind(const vgmtrans::core::SourceAnnotation& annotation) {
-  return annotation.detailKind.empty() ? std::string_view{annotation.localKind} : std::string_view{annotation.detailKind};
+  return annotation.detailKind.empty() ? std::string_view{annotation.localKind}
+                                       : std::string_view{annotation.detailKind};
 }
 
 std::string_view valuePlaybackStatusName(vgmtrans::core::CommandPlaybackStatus status) {
@@ -531,7 +533,8 @@ void printValueSourceAnnotationTree(const vgmtrans::core::SourceMap& sourceMap, 
   fmt::print("\n");
 
   for (const auto child : sourceMap.childrenOf(annotation->id)) {
-    if (const auto* childAnnotation = sourceMap.find(child); childAnnotation && valueSourceOutlineVisible(*childAnnotation)) {
+    if (const auto* childAnnotation = sourceMap.find(child);
+        childAnnotation && valueSourceOutlineVisible(*childAnnotation)) {
       printValueSourceAnnotationTree(sourceMap, child, depth + 1, maxDepth);
     }
   }
@@ -612,8 +615,8 @@ bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project, co
       const auto& command = track.commands[i];
       if (const auto* annotation = sourceMap.find(command.annotation)) {
         const std::string description = valueAnnotationDescription(*annotation);
-        const std::string status =
-            annotation->playbackStatus ? fmt::format(" status={}", valuePlaybackStatusName(*annotation->playbackStatus))
+        const std::string status = annotation->playbackStatus
+                                       ? fmt::format(" status={}", valuePlaybackStatusName(*annotation->playbackStatus))
                                        : std::string{};
         fmt::println("#{} 0x{:x}:0x{:x} annotation={} kind={}{} opcode=0x{:02x} {}{}{}", i, command.range.offset,
                      command.range.size, annotation->id.value, valueAnnotationKind(*annotation), status, command.opcode,
@@ -883,10 +886,10 @@ std::string valueEnvelopeName(const vgmtrans::core::Envelope& envelope) {
 
 void printValueInstrument(const vgmtrans::core::Instrument& instrument, size_t index) {
   const auto address = vgmtrans::core::resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
+  const auto modulation = vgmtrans::core::lowerSynthModulation(instrument.modulation);
   fmt::println("instrument #{} bank={} program={} name='{}' range=0x{:x}:0x{:x} regions={} generators={} modulators={}",
-               index, address.bank, address.program, instrument.name, instrument.range.offset,
-               instrument.range.size, instrument.regions.size(), instrument.generators.size(),
-               instrument.modulators.size());
+               index, address.bank, address.program, instrument.name, instrument.range.offset, instrument.range.size,
+               instrument.regions.size(), modulation.generators.size(), modulation.modulators.size());
 
   for (size_t i = 0; i < instrument.regions.size(); ++i) {
     const auto& region = instrument.regions[i];

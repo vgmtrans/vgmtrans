@@ -43,6 +43,8 @@ struct ResolvedSynthInstrument {
   const Instrument* instrument = nullptr;
   InstrumentAddress address;
   std::vector<ResolvedSynthRegion> regions;
+  std::vector<SynthGenerator> generators;
+  std::vector<SynthModulator> modulators;
 };
 
 using SynthSampleIndexKey = std::pair<u32, u32>;

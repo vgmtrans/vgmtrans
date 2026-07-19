@@ -6,8 +6,8 @@
 #pragma once
 
 #include "value/formats/KonamiSnes/KonamiSnesLayout.h"
+#include "value/platform/SnesSampleDirectory.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/scan/ScanTypes.h"
 
 #include <string_view>
 #include <vector>
@@ -29,32 +29,15 @@ struct KonamiSnesInstrumentInfo {
   u8 percussionNote = 0;
 };
 
-struct KonamiSnesSampleInfo {
-  u8 srcn = 0;
-  u32 dirEntryAddress = 0;
-  u32 startAddress = 0;
-  u32 loopAddress = 0;
-  u32 encodedLength = 0;
-  bool loops = false;
-};
-
 [[nodiscard]] std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(core::ByteReader reader,
                                                                                    const KonamiSnesLayout& layout);
 
-[[nodiscard]] std::vector<KonamiSnesSampleInfo> parseKonamiSnesSampleInfos(
-    core::ByteReader reader, u32 spcDirAddress, const std::vector<KonamiSnesInstrumentInfo>& instruments);
+[[nodiscard]] core::SnesBrrCatalog parseKonamiSnesSampleInfos(core::ByteReader reader, u32 spcDirAddress,
+                                                              const std::vector<KonamiSnesInstrumentInfo>& instruments);
 
-[[nodiscard]] core::SampleCollectionAsset parseKonamiSnesSamples(const core::ScanInput& input,
-                                                                 core::AssetId sampleCollectionId,
-                                                                 const std::vector<KonamiSnesSampleInfo>& sampleInfos,
-                                                                 std::string_view displayName,
-                                                                 core::SourceMapBuilder* sourceMap = nullptr);
-
-[[nodiscard]] core::InstrumentSetAsset parseKonamiSnesInstrumentSet(
-    const core::ScanInput& input, core::ScanResultBuilder& builder, core::AssetId instrumentSetId,
-    core::ScanSampleCollectionRef sampleCollection, KonamiSnesVersion version,
-    u32 spcDirAddress,
-    const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
-    const std::vector<KonamiSnesSampleInfo>& sampleInfos, std::string_view displayName);
+[[nodiscard]] bool addKonamiSnesSynth(const core::ScanInput& input, core::ScanResultBuilder& builder,
+                                      core::ScanInstrumentSetRef instrumentSet,
+                                      core::ScanSampleCollectionRef sampleCollection, const KonamiSnesLayout& layout,
+                                      std::string_view displayName);
 
 }  // namespace vgmtrans::formats::konami_snes

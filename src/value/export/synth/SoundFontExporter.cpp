@@ -448,7 +448,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] u32 instrumentGlobalGeneratorCount(
-    const Instrument& instrument,
+    const ResolvedSynthInstrument& instrument,
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
   return static_cast<u32>(
       std::ranges::count_if(instrument.generators, [modulationConversion](const SynthGenerator& generator) {
@@ -458,7 +458,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] u32 instrumentGlobalModulatorCount(
-    const Instrument& instrument,
+    const ResolvedSynthInstrument& instrument,
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
   return static_cast<u32>(
       std::ranges::count_if(instrument.modulators, [modulationConversion](const SynthModulator& modulator) {
@@ -468,7 +468,7 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
 }
 
 [[nodiscard]] bool hasInstrumentGlobalZone(
-    const Instrument& instrument,
+    const ResolvedSynthInstrument& instrument,
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
   return instrumentGlobalGeneratorCount(instrument, modulationConversion) != 0 ||
          instrumentGlobalModulatorCount(instrument, modulationConversion) != 0;
@@ -610,7 +610,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
     writeFixedString(payload, sf2Name(instrument.instrument->name, "Instrument"), 20);
     writeLe16(payload, clampU16(bagIndex));
     bagIndex += static_cast<u32>(instrument.regions.size()) +
-                (hasInstrumentGlobalZone(*instrument.instrument, modulationConversion) ? 1 : 0);
+                (hasInstrumentGlobalZone(instrument, modulationConversion) ? 1 : 0);
   }
 
   writeFixedString(payload, "EOI", 20);
@@ -626,11 +626,11 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   u32 generatorIndex = 0;
   u32 modulatorIndex = 0;
   for (const auto& instrument : instruments) {
-    if (hasInstrumentGlobalZone(*instrument.instrument, modulationConversion)) {
+    if (hasInstrumentGlobalZone(instrument, modulationConversion)) {
       writeLe16(payload, clampU16(generatorIndex));
       writeLe16(payload, clampU16(modulatorIndex));
-      generatorIndex += instrumentGlobalGeneratorCount(*instrument.instrument, modulationConversion);
-      modulatorIndex += instrumentGlobalModulatorCount(*instrument.instrument, modulationConversion);
+      generatorIndex += instrumentGlobalGeneratorCount(instrument, modulationConversion);
+      modulatorIndex += instrumentGlobalModulatorCount(instrument, modulationConversion);
     }
 
     for (size_t i = 0; i < instrument.regions.size(); ++i) {
@@ -650,7 +650,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
                               ModulationConversionPolicy modulationConversion) {
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
-    for (const auto& modulator : instrument.instrument->modulators) {
+    for (const auto& modulator : instrument.modulators) {
       const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling, modulationConversion);
       if (!record) {
         continue;
@@ -674,7 +674,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
   // then envelope/tuning/sample linkage. Unsupported SynthGenerator destinations are skipped.
   std::vector<u8> payload;
   for (const auto& instrument : instruments) {
-    for (const auto& generator : instrument.instrument->generators) {
+    for (const auto& generator : instrument.generators) {
       if (!shouldExportSynthGenerator(generator, modulationConversion)) {
         continue;
       }

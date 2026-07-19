@@ -158,6 +158,8 @@ public:
   }
 
   [[nodiscard]] ScanInstrumentSetAssetBuilder instrumentSet(std::string name, SourceRange range);
+  [[nodiscard]] ScanInstrumentSetAssetBuilder instrumentSet(ScanInstrumentSetRef ref, std::string name,
+                                                            SourceRange range);
 
   template <typename Factory>
   ScanSampleCollectionRef sampleCollection(Factory&& factory) {
@@ -172,6 +174,8 @@ public:
   }
 
   [[nodiscard]] ScanSampleCollectionAssetBuilder sampleCollection(std::string name, SourceRange range);
+  [[nodiscard]] ScanSampleCollectionAssetBuilder sampleCollection(ScanSampleCollectionRef ref, std::string name,
+                                                                  SourceRange range);
 
   template <typename Factory>
   ScanMiscAssetRef misc(Factory&& factory) {

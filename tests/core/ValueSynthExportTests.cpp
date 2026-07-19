@@ -5,6 +5,7 @@
  */
 
 #include "ValueTestSupport.h"
+#include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
 
 namespace {
@@ -86,6 +87,39 @@ void envelopePredicatesDetectPreciseOnlyData() {
   };
   expect(hasPreciseEnvelope(preciseSustain), "precise envelope predicate should detect sustain amplitude");
   expect(hasExplicitEnvelope(preciseSustain), "explicit envelope predicate should detect precise-only sustain data");
+}
+
+void physicalModulationLowersToLegacySynthControls() {
+  constexpr double stepHertz = 1000.0 / 16384.0;
+  const auto lowered = lowerSynthModulation(InstrumentModulation{
+      .vibrato =
+          VibratoSpec{
+              .maxDepthCents = 1200.0,
+              .rateHertz = {stepHertz, 255.0 * stepHertz},
+          },
+      .tremolo =
+          TremoloSpec{
+              .maxDepthDb = 48.4,
+              .rateHertz = {2.0 * stepHertz, 510.0 * stepHertz},
+              .gainMode = TremoloGainMode::NoBoost,
+          },
+  });
+
+  expect(lowered.generators.size() == 2 && lowered.generators[0].destination == SynthDestination::VibratoRate &&
+             lowered.generators[0].amount == -8479 &&
+             lowered.generators[1].destination == SynthDestination::TremoloRate &&
+             lowered.generators[1].amount == -7279,
+         "physical LFO rates should lower to the legacy synth generator values");
+  expect(
+      lowered.modulators.size() == 6 && lowered.modulators[0].source == SynthSource::ChannelPressure &&
+          lowered.modulators[0].destination == SynthDestination::VibratoDepth && lowered.modulators[0].amount == 0 &&
+          lowered.modulators[1].destination == SynthDestination::VibratoDepth && lowered.modulators[1].amount == 1200 &&
+          lowered.modulators[2].destination == SynthDestination::VibratoRate && lowered.modulators[2].amount == 9669 &&
+          lowered.modulators[3].destination == SynthDestination::TremoloRate && lowered.modulators[3].amount == 9669 &&
+          lowered.modulators[4].destination == SynthDestination::TremoloDepth && lowered.modulators[4].amount == 484 &&
+          lowered.modulators[5].destination == SynthDestination::VolumeAttenuation &&
+          lowered.modulators[5].amount == 484,
+      "physical vibrato and no-boost tremolo should preserve the legacy synth modulator records");
 }
 
 void synthEffectiveLoopExpandsEnabledZeroLengthLoop() {
@@ -174,32 +208,35 @@ void soundFontExporterWritesSfbkRiffFile() {
                   },
               .pan = 1.0,
           }},
-          .generators =
-              {
-                  SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
-                  SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
-                  SynthGenerator{.destination = SynthDestination::VibratoDelay, .amount = -1200},
-              },
-          .modulators =
-              {
-                  SynthModulator{
-                      .source = SynthSource::NoteOnVelocity,
-                      .destination = SynthDestination::VibratoDepth,
-                      .amount = 300,
-                  },
-                  SynthModulator{
-                      .source = SynthSource::ChannelPressure,
-                      .destination = SynthDestination::VibratoRate,
-                      .amount = 0,
-                  },
-                  SynthModulator{
-                      .destination = SynthDestination::VibratoDelay,
-                      .amount = 600,
-                  },
-                  SynthModulator{
-                      .destination = SynthDestination::TremoloRate,
-                      .amount = 180,
-                  },
+          .modulation =
+              InstrumentModulation{
+                  .customGenerators =
+                      {
+                          SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
+                          SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
+                          SynthGenerator{.destination = SynthDestination::VibratoDelay, .amount = -1200},
+                      },
+                  .customModulators =
+                      {
+                          SynthModulator{
+                              .source = SynthSource::NoteOnVelocity,
+                              .destination = SynthDestination::VibratoDepth,
+                              .amount = 300,
+                          },
+                          SynthModulator{
+                              .source = SynthSource::ChannelPressure,
+                              .destination = SynthDestination::VibratoRate,
+                              .amount = 0,
+                          },
+                          SynthModulator{
+                              .destination = SynthDestination::VibratoDelay,
+                              .amount = 600,
+                          },
+                          SynthModulator{
+                              .destination = SynthDestination::TremoloRate,
+                              .amount = 180,
+                          },
+                      },
               },
       }},
   };
@@ -344,32 +381,35 @@ void dlsExporterWritesDlsRiffFile() {
                   },
               .pan = 1.0,
           }},
-          .generators =
-              {
-                  SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
-                  SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
-                  SynthGenerator{.destination = SynthDestination::VibratoDelay, .amount = -1200},
-              },
-          .modulators =
-              {
-                  SynthModulator{
-                      .source = SynthSource::NoteOnVelocity,
-                      .destination = SynthDestination::VibratoDepth,
-                      .amount = 300,
-                  },
-                  SynthModulator{
-                      .source = SynthSource::ChannelPressure,
-                      .destination = SynthDestination::VibratoRate,
-                      .amount = 0,
-                  },
-                  SynthModulator{
-                      .destination = SynthDestination::VibratoDelay,
-                      .amount = 600,
-                  },
-                  SynthModulator{
-                      .destination = SynthDestination::TremoloRate,
-                      .amount = 180,
-                  },
+          .modulation =
+              InstrumentModulation{
+                  .customGenerators =
+                      {
+                          SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
+                          SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
+                          SynthGenerator{.destination = SynthDestination::VibratoDelay, .amount = -1200},
+                      },
+                  .customModulators =
+                      {
+                          SynthModulator{
+                              .source = SynthSource::NoteOnVelocity,
+                              .destination = SynthDestination::VibratoDepth,
+                              .amount = 300,
+                          },
+                          SynthModulator{
+                              .source = SynthSource::ChannelPressure,
+                              .destination = SynthDestination::VibratoRate,
+                              .amount = 0,
+                          },
+                          SynthModulator{
+                              .destination = SynthDestination::VibratoDelay,
+                              .amount = 600,
+                          },
+                          SynthModulator{
+                              .destination = SynthDestination::TremoloRate,
+                              .amount = 180,
+                          },
+                      },
               },
       }},
   };
@@ -594,6 +634,7 @@ void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   envelopePredicatesDetectPreciseOnlyData();
+  physicalModulationLowersToLegacySynthControls();
   synthEffectiveLoopExpandsEnabledZeroLengthLoop();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();

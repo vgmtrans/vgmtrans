@@ -509,7 +509,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeConnection(bytes, DlsConnection{.destination = destination, .scale = scale});
 }
 
-[[nodiscard]] Chunk art2Chunk(const Instrument& instrument, const Region& region,
+[[nodiscard]] Chunk art2Chunk(const ResolvedSynthInstrument& instrument, const Region& region,
                               const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling,
                               ModulationConversionPolicy modulationConversion) {
   // Each region gets a DLS2 articulation list. Region envelope/pan is always written;
@@ -553,7 +553,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("lar2", {makeChunk("art2", std::move(art))});
 }
 
-[[nodiscard]] Chunk rgn2Chunk(const Instrument& instrument, const ResolvedSynthRegion& resolvedRegion,
+[[nodiscard]] Chunk rgn2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion,
                               std::span<const DecodedDlsSample> samples, const MidiModulationUsage* midiModulationUsage,
                               ModulationScalingPolicy modulationScaling,
                               ModulationConversionPolicy modulationConversion) {
@@ -574,8 +574,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   std::vector<Chunk> regions;
   regions.reserve(instrument.regions.size());
   for (const auto& region : instrument.regions) {
-    regions.push_back(rgn2Chunk(*instrument.instrument, region, samples, midiModulationUsage, modulationScaling,
-                                modulationConversion));
+    regions.push_back(
+        rgn2Chunk(instrument, region, samples, midiModulationUsage, modulationScaling, modulationConversion));
   }
   return makeListChunk("lrgn", std::move(regions));
 }
