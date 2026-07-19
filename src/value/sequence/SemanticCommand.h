@@ -8,7 +8,6 @@
 
 #include "value/base/RecordReader.h"
 #include "value/sequence/BytecodeDecode.h"
-#include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/SequenceDialect.h"
 
 #include <algorithm>
@@ -358,45 +357,5 @@ private:
   DecodeFlow flow_;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
 };
-
-// The format supplies only how to decode one command. This wrapper owns the
-// repeated track lifecycle: walking control flow, projecting command source-map
-// entries, and finishing the parent track annotation.
-template <class DecodeCommand>
-[[nodiscard]] TrackProgram decodeSemanticLinearTrack(ByteReader reader, TrackDecodeInput input,
-                                                     DecodeCommand decodeCommand) {
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  const auto decodeAndProject = [&](u32 offset) {
-    auto command = decodeCommand(offset);
-    command.annotation = projectDecodedCommand(input.sourceMap, command, trackAnnotation);
-    return command;
-  };
-  TrackProgram track =
-      decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
-                                LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeAndProject);
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
-  return track;
-}
-
-// Reachable formats use the same semantic command projection as linear ones,
-// but queue static jump and call targets instead of assuming one byte stream.
-template <class DecodeCommand>
-[[nodiscard]] TrackProgram decodeSemanticReachableTrack(ByteReader reader, TrackDecodeInput input,
-                                                        DecodeCommand decodeCommand) {
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  const auto decodeAndProject = [&](u32 offset) {
-    auto command = decodeCommand(offset);
-    command.annotation = projectDecodedCommand(input.sourceMap, command, trackAnnotation);
-    return command;
-  };
-  const u32 bytecodeEnd = input.bytecodeEnd == std::numeric_limits<u32>::max()
-                              ? static_cast<u32>(reader.size())
-                              : std::min(static_cast<u32>(reader.size()), input.bytecodeEnd);
-  TrackProgram track =
-      decodeReachableBytecodeBlocks(reader, bytecodeEnd, input.startOffset, input.trackIndex,
-                                    ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeAndProject);
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
-  return track;
-}
 
 }  // namespace vgmtrans::core

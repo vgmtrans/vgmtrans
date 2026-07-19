@@ -60,9 +60,9 @@ struct BytecodeDecodeContext {
   std::vector<Diagnostic>* diagnostics = nullptr;
 };
 
-// Common inputs for discovering one source track. Semantic and legacy cursor
-// decoders share the track/annotation lifecycle even though they decode an
-// individual command differently.
+// Transitional per-track input for the old cursor adapters and public Capcom
+// test seam. New format decoders keep shared discovery settings in a
+// TrackDecodeScope and format-specific values in their own sequence context.
 struct TrackDecodeInput {
   std::optional<AssetId> sequenceAsset;
   u32 trackIndex = 0;

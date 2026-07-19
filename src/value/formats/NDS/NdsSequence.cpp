@@ -61,16 +61,15 @@ struct Playback {
 using NdsCompilerCursor = CompilerCursor<TrackState, Playback>;
 using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
 
-// Values shared by every track in one SSEQ. Keeping them here prevents format
-// orchestration from rebuilding a ten-field TrackDecodeInput for each track.
+// NDS-specific decode state stays beside the shared track-discovery service.
+// Relative addresses and malformed-range policy are SSEQ semantics, not generic
+// bytecode-walker configuration.
 struct SequenceDecodeContext {
-  ByteReader reader;
-  AssetId sequenceAsset;
+  TrackDecodeScope tracks;
   NdsSequenceRange range;
-  std::optional<SourceAnnotationId> parentAnnotation;
-  SourceMapBuilder* sourceMap = nullptr;
   std::vector<Diagnostic>* diagnostics = nullptr;
 
+  [[nodiscard]] const ByteReader& reader() const noexcept { return tracks.reader; }
   [[nodiscard]] u32 dataBase() const noexcept { return range.offset + kSseqHeaderSize; }
 };
 
@@ -86,7 +85,7 @@ struct SequenceDecodeContext {
 // shared actions or typed Playback behavior in written order; there is no
 // second opcode profile or execution switch.
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const SequenceDecodeContext& context, u32 begin) {
-  NdsCompilerCursor cursor(context.reader, begin, context.range.sequenceEnd, "nds", context.diagnostics);
+  NdsCompilerCursor cursor(context.reader(), begin, context.range.sequenceEnd, "nds", context.diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
@@ -285,8 +284,8 @@ struct SequenceDecodeContext {
 
 [[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(const SequenceDecodeContext& context, u32 offset) {
   return DecodedBytecodeCommand{
-      .range = context.reader.range(offset, 1),
-      .opcode = context.reader.u8At(offset),
+      .range = context.reader().range(offset, 1),
+      .opcode = context.reader().u8At(offset),
       .encodedSize = 1,
       .flow = DecodeFlow::terminalFlow(),
       .presentation =
@@ -304,51 +303,39 @@ struct SequenceDecodeContext {
 // Malformed SDAT FAT ranges can overlap a real call target by one byte. This
 // exceptional walker keeps the normal compiler cursor, adding only
 // the overlap stop needed to avoid swallowing the subroutine's first byte.
-[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(const SequenceDecodeContext& context, TrackDecodeInput input) {
-  TrackProgram track{
-      .id = TrackId{input.trackIndex},
-      .sourceTrackNumber = input.trackIndex,
-      .startAddress = Address{input.startOffset},
-  };
-  TrackProgramBuilder builder{track};
-  const auto trackAnnotation = createSequenceTrackAnnotation(context.reader, input);
+[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(const SequenceDecodeContext& context, u32 trackIndex,
+                                                         u32 startOffset) {
+  auto track = context.tracks.begin(trackIndex, startOffset);
   std::set<u32> decodedOffsets;
   std::set<u32> callTargetOffsets;
-  std::vector<PendingBlock> pendingBlocks{{.offset = input.startOffset}};
+  std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
   u32 decodedCommands = 0;
-
-  const auto decodeAt = [&](u32 offset) {
-    auto decoded = decodeCommand(context, offset);
-    decoded.annotation = projectDecodedCommand(input.sourceMap, decoded, trackAnnotation);
-    return decoded;
-  };
 
   while (!pendingBlocks.empty()) {
     const PendingBlock block = pendingBlocks.back();
     pendingBlocks.pop_back();
     u32 offset = block.offset;
 
-    while (hasBytecodeBytes(context.reader, offset, 1, input.bytecodeEnd) && decodedCommands++ < input.maxCommands) {
+    while (hasBytecodeBytes(context.reader(), offset, 1, context.tracks.bytecodeEnd) &&
+           decodedCommands++ < context.tracks.maxCommands) {
       const u32 begin = offset;
       if (!decodedOffsets.insert(begin).second) {
         break;
       }
 
-      auto decoded = decodeAt(begin);
+      auto decoded = decodeCommand(context, begin);
       if (!block.callTarget) {
         const auto overlap = std::ranges::find_if(
             callTargetOffsets, [&](u32 target) { return begin < target && target < decoded.range.endOffset(); });
         if (overlap != callTargetOffsets.end()) {
-          auto recovery = terminalRecoveryCommand(context, begin);
-          recovery.annotation = projectDecodedCommand(input.sourceMap, recovery, trackAnnotation);
-          appendDecodedBytecodeCommand(builder, recovery, begin);
+          track.append(terminalRecoveryCommand(context, begin), begin);
           break;
         }
       }
 
       if (decoded.flow.unconditionalJump()) {
         const u32 destination = decoded.flow.staticTargets.front().value;
-        appendDecodedBytecodeCommand(builder, decoded, begin);
+        track.append(std::move(decoded), begin);
         if (decodedOffsets.contains(destination)) {
           break;
         }
@@ -364,61 +351,45 @@ struct SequenceDecodeContext {
       }
 
       const auto next = decoded.flow.fallthrough;
-      appendDecodedBytecodeCommand(builder, decoded, begin);
-      if (!next || decoded.flow.terminal) {
+      const bool terminal = decoded.flow.terminal;
+      track.append(std::move(decoded), begin);
+      if (!next || terminal) {
         break;
       }
       offset = next->value;
     }
   }
 
-  finishSequenceTrackAnnotation(context.reader, input, trackAnnotation, track);
-  return track;
-}
-
-[[nodiscard]] TrackDecodeInput makeTrackInput(const SequenceDecodeContext& context, u32 trackIndex, u32 startOffset) {
-  return TrackDecodeInput{
-      .sequenceAsset = context.sequenceAsset,
-      .trackIndex = trackIndex,
-      .startOffset = startOffset,
-      .bytecodeEnd = context.range.sequenceEnd,
-      .sequenceOffset = context.range.offset,
-      .sequenceEnd = context.range.sequenceEnd,
-      .parentAnnotation = context.parentAnnotation,
-      .sourceMap = context.sourceMap,
-      .diagnostics = context.diagnostics,
-      .maxCommands = kMaxTrackCommands,
-  };
+  return track.finish();
 }
 
 [[nodiscard]] TrackProgram decodeTrack(const SequenceDecodeContext& context, u32 trackIndex, u32 startOffset) {
-  const TrackDecodeInput input = makeTrackInput(context, trackIndex, startOffset);
   if (context.range.recoverMalformedSdatRange) {
-    return decodeMalformedSdatRangeTrack(context, input);
+    return decodeMalformedSdatRangeTrack(context, trackIndex, startOffset);
   }
-  return decodeCompilerReachableTrack(context.reader, input,
-                                      [&](u32 offset) { return decodeCommand(context, offset); });
+  return context.tracks.reachable(trackIndex, startOffset, [&](u32 offset) { return decodeCommand(context, offset); });
 }
 
 [[nodiscard]] std::vector<u32> readTrackStarts(const SequenceDecodeContext& context) {
   std::vector<u32> secondaryTracks;
   u32 offset = context.dataBase();
-  if (!hasBytecodeBytes(context.reader, offset, 1, context.range.sequenceEnd)) {
+  if (!hasBytecodeBytes(context.reader(), offset, 1, context.range.sequenceEnd)) {
     return {offset};
   }
 
   // Allocate/Open Track records form the SSEQ bootstrap, not a musical track.
   // Read them once here; normal track decoding begins after this prefix.
-  if (context.reader.u8At(offset) != 0xfe || !hasBytecodeBytes(context.reader, offset, 3, context.range.sequenceEnd)) {
+  if (context.reader().u8At(offset) != 0xfe ||
+      !hasBytecodeBytes(context.reader(), offset, 3, context.range.sequenceEnd)) {
     return {offset};
   }
   offset += 3;
-  if (!hasBytecodeBytes(context.reader, offset, 1, context.range.sequenceEnd)) {
+  if (!hasBytecodeBytes(context.reader(), offset, 1, context.range.sequenceEnd)) {
     return {offset};
   }
 
-  if (context.reader.u8At(offset) == 0x80) {
-    RecordReader delay{context.reader, offset, context.range.sequenceEnd};
+  if (context.reader().u8At(offset) == 0x80) {
+    RecordReader delay{context.reader(), offset, context.range.sequenceEnd};
     static_cast<void>(delay.u8("opcode"));
     static_cast<void>(delay.varLen("duration"));
     if (!delay.ok()) {
@@ -427,10 +398,10 @@ struct SequenceDecodeContext {
     offset = delay.position();
   }
 
-  while (hasBytecodeBytes(context.reader, offset, 5, context.range.sequenceEnd) &&
-         context.reader.u8At(offset) == 0x93) {
-    const u32 relative = context.reader.u8At(offset + 2) | (context.reader.u8At(offset + 3) << 8) |
-                         (context.reader.u8At(offset + 4) << 16);
+  while (hasBytecodeBytes(context.reader(), offset, 5, context.range.sequenceEnd) &&
+         context.reader().u8At(offset) == 0x93) {
+    const u32 relative = context.reader().u8At(offset + 2) | (context.reader().u8At(offset + 3) << 8) |
+                         (context.reader().u8At(offset + 4) << 16);
     const u32 destination = context.dataBase() + relative;
     if (destination < context.range.sequenceEnd) {
       secondaryTracks.push_back(destination);
@@ -489,11 +460,16 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
   }
 
   const SequenceDecodeContext context{
-      .reader = input.reader,
-      .sequenceAsset = id,
+      .tracks =
+          TrackDecodeScope{
+              .reader = input.reader,
+              .bytecodeEnd = range.sequenceEnd,
+              .maxCommands = kMaxTrackCommands,
+              .sequenceAsset = id,
+              .parentAnnotation = headerAnnotation,
+              .sourceMap = sourceMap,
+          },
       .range = range,
-      .parentAnnotation = headerAnnotation,
-      .sourceMap = sourceMap,
       .diagnostics = diagnostics,
   };
   asset.program.tracks = decodeTracks(context);

@@ -8,7 +8,6 @@
 
 #include "value/base/RecordReader.h"
 #include "value/sequence/BytecodeDecode.h"
-#include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -722,40 +721,5 @@ struct CompiledCommandDialect {
     return combined;
   }
 };
-
-template <class DecodeCommand>
-[[nodiscard]] TrackProgram decodeCompilerLinearTrack(ByteReader reader, TrackDecodeInput input,
-                                                     DecodeCommand decodeCommand) {
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  const auto decodeAndProject = [&](u32 offset) {
-    auto command = decodeCommand(offset);
-    command.annotation = projectDecodedCommand(input.sourceMap, command, trackAnnotation);
-    return command;
-  };
-  TrackProgram track =
-      decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
-                                LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeAndProject);
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
-  return track;
-}
-
-template <class DecodeCommand>
-[[nodiscard]] TrackProgram decodeCompilerReachableTrack(ByteReader reader, TrackDecodeInput input,
-                                                        DecodeCommand decodeCommand) {
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  const auto decodeAndProject = [&](u32 offset) {
-    auto command = decodeCommand(offset);
-    command.annotation = projectDecodedCommand(input.sourceMap, command, trackAnnotation);
-    return command;
-  };
-  const u32 bytecodeEnd = input.bytecodeEnd == std::numeric_limits<u32>::max()
-                              ? static_cast<u32>(reader.size())
-                              : std::min(static_cast<u32>(reader.size()), input.bytecodeEnd);
-  TrackProgram track =
-      decodeReachableBytecodeBlocks(reader, bytecodeEnd, input.startOffset, input.trackIndex,
-                                    ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeAndProject);
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
-  return track;
-}
 
 }  // namespace vgmtrans::core

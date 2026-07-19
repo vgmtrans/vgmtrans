@@ -425,9 +425,9 @@ template <class TrackState, class Context, class Reader>
 [[nodiscard]] TrackProgram decodeCursorReachableTrack(ByteReader reader, const SequenceDialect& dialect,
                                                       CursorTrackDecodeInput input) {
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  if (trackAnnotation) {
-    decodeContext.parentAnnotation = trackAnnotation;
+  auto track = makeTrackDecodeScope(reader, input).begin(input.trackIndex, input.startOffset);
+  if (const auto annotation = track.annotation()) {
+    decodeContext.parentAnnotation = annotation;
   }
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
   const auto decodeCommand = [&](u32 offset) {
@@ -435,20 +435,19 @@ template <class TrackState, class Context, class Reader>
                                                                      decodeContext);
   };
 
-  TrackProgram track =
+  TrackProgram decoded =
       decodeReachableBytecodeBlocks(reader, cursorBytecodeEnd(reader, input), input.startOffset, input.trackIndex,
                                     ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
-  return track;
+  return track.finish(std::move(decoded));
 }
 
 template <class TrackState, class Context, class Reader>
 [[nodiscard]] TrackProgram decodeCursorLinearTrack(ByteReader reader, const SequenceDialect& dialect,
                                                    CursorTrackDecodeInput input) {
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  if (trackAnnotation) {
-    decodeContext.parentAnnotation = trackAnnotation;
+  auto track = makeTrackDecodeScope(reader, input).begin(input.trackIndex, input.startOffset);
+  if (const auto annotation = track.annotation()) {
+    decodeContext.parentAnnotation = annotation;
   }
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
   const auto decodeCommand = [&](u32 offset) {
@@ -456,11 +455,10 @@ template <class TrackState, class Context, class Reader>
                                                                      decodeContext);
   };
 
-  TrackProgram track =
+  TrackProgram decoded =
       decodeLinearBytecodeTrack(reader, input.trackIndex, input.startOffset,
                                 LinearBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
-  return track;
+  return track.finish(std::move(decoded));
 }
 
 }  // namespace vgmtrans::core

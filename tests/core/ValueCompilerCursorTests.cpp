@@ -6,6 +6,7 @@
 
 #include "ValueTestSupport.h"
 
+#include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
 
 namespace {
@@ -134,15 +135,12 @@ SequenceDialect compilerProbeDialect() {
 
 TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sourceMap = nullptr,
                               std::vector<Diagnostic>* diagnostics = nullptr) {
-  return decodeCompilerReachableTrack(reader,
-                                      TrackDecodeInput{
-                                          .trackIndex = 0,
-                                          .startOffset = 0,
-                                          .bytecodeEnd = end,
-                                          .sourceMap = sourceMap,
-                                          .diagnostics = diagnostics,
-                                      },
-                                      [=](u32 offset) { return decodeProbeCommand(reader, offset, end, diagnostics); });
+  const TrackDecodeScope tracks{
+      .reader = reader,
+      .bytecodeEnd = end,
+      .sourceMap = sourceMap,
+  };
+  return tracks.reachable(0, 0, [=](u32 offset) { return decodeProbeCommand(reader, offset, end, diagnostics); });
 }
 
 void compilerCursorCompilesAndExecutesTypedCommands() {
