@@ -10,9 +10,12 @@
 
 #include <limits>
 #include <optional>
+#include <string>
 #include <utility>
 
 namespace vgmtrans::core {
+
+struct SequenceDialect;
 
 // Project one already-decoded semantic command into the durable SourceMap.
 // Format decoders provide data; this function owns the annotation mechanics.
@@ -61,12 +64,6 @@ struct TrackDecodeScope {
     return TrackDecodeSession(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation, sourceMap);
   }
 
-  [[nodiscard]] TrackDecodeScope withParent(std::optional<SourceAnnotationId> parent) const {
-    TrackDecodeScope copy = *this;
-    copy.parentAnnotation = parent;
-    return copy;
-  }
-
   template <class DecodeCommand>
   [[nodiscard]] TrackProgram linear(u32 trackIndex, u32 startOffset, DecodeCommand decodeCommand) const {
     auto session = begin(trackIndex, startOffset);
@@ -88,6 +85,30 @@ struct TrackDecodeScope {
                                       ReachableBytecodeDecodePolicy{.maxCommands = maxCommands}, decodeAndProject);
     return session.finish(std::move(track));
   }
+};
+
+// Owns the generic sequence -> track-pointer/track -> command annotation
+// lifecycle. Formats still read their own headers and pass each decoded track
+// start explicitly, so binary-layout rules remain visible in format code.
+class SequenceDecodeSession {
+public:
+  SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect, AssetId sequenceAsset,
+                        SourceRange headerRange, SourceMapBuilder* sourceMap);
+
+  template <class DecodeCommand>
+  void addLinearTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand) {
+    annotateTrackPointer(trackIndex, pointerRange, startOffset);
+    program_.tracks.push_back(tracks_.linear(trackIndex, startOffset, std::move(decodeCommand)));
+  }
+
+  [[nodiscard]] SequenceProgram finish() { return std::move(program_); }
+
+private:
+  void annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset);
+
+  TrackDecodeScope tracks_;
+  SequenceProgram program_;
+  std::string sourceKindPrefix_;
 };
 
 // Temporary bridge for formats still exposing the old per-track parameter bag.

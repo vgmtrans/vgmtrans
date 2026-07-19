@@ -12,8 +12,6 @@
 #include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 
-#include <fmt/format.h>
-
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -551,49 +549,27 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVers
 SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayout& layout, AssetId sequenceId,
                                          SourceRange sequenceRange, SourceMapBuilder* sourceMap,
                                          std::vector<Diagnostic>* diagnostics) {
-  SourceAnnotationId headerAnnotation;
-  if (sourceMap != nullptr) {
-    headerAnnotation = sourceMap->header("Sequence Header", sequenceRange)
-                           .kind("capcom-snes-sequence-header")
-                           .owner(ObjectRefs::sequence(sequenceId))
-                           .id();
-  }
-
-  const auto& dialect = capcomSnesSequenceDialect();
-  SequenceProgram program = dialect.makeProgram();
-  const TrackDecodeScope tracks{
-      .reader = reader,
-      .sequenceAsset = sequenceId,
-      .sourceMap = sourceMap,
+  SequenceDecodeSession sequence{
+      reader, capcomSnesSequenceDialect(), sequenceId, sequenceRange, sourceMap,
   };
+  const u32 bytecodeEnd = static_cast<u32>(reader.size());
+  const auto decode = [&](u32 offset) {
+    return decodeCommand(reader, offset, bytecodeEnd, layout.version, diagnostics);
+  };
+
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   // Capcom stores the pointer slots in reverse track order.
   for (u32 sourceTrackNumber = 0; sourceTrackNumber < kCapcomSnesMaxTracks; ++sourceTrackNumber) {
     const u32 pointerIndex = kCapcomSnesMaxTracks - 1 - sourceTrackNumber;
     const u32 pointerOffset = pointerBase + pointerIndex * 2;
-    const SourceRange pointerRange = reader.range(pointerOffset, 2);
     const u16 trackAddress = reader.be16(pointerOffset);
     if (trackAddress == 0) {
       continue;
     }
 
-    std::optional<SourceAnnotationId> pointerAnnotation;
-    if (sourceMap != nullptr) {
-      auto annotation = sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{reader.range(trackAddress, 1)})
-                            .kind("capcom-snes-track-pointer")
-                            .description(fmt::format("Track starts at ${:04X}", trackAddress))
-                            .derived("source_track", sourceTrackNumber)
-                            .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
-      if (headerAnnotation.valid()) {
-        annotation.parent(headerAnnotation);
-      }
-      pointerAnnotation = annotation.id();
-    }
-
-    program.tracks.push_back(decodeTrack(tracks.withParent(pointerAnnotation), layout.version, sourceTrackNumber,
-                                         trackAddress, diagnostics));
+    sequence.addLinearTrack(sourceTrackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
   }
-  return program;
+  return sequence.finish();
 }
 
 }  // namespace vgmtrans::formats::capcom_snes
