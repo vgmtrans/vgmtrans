@@ -13,7 +13,6 @@
 #include "value/scan/ScanResultBuilder.h"
 
 #include <string>
-#include <vector>
 
 namespace vgmtrans::formats::akao_snes {
 
@@ -23,21 +22,14 @@ using namespace core;
   return findAkaoSnesLayout(ByteReader(SourceId{}, bytes)).has_value();
 }
 
-[[nodiscard]] CollectionKey akaoSnesCollectionKey(SourceId source) {
-  return CollectionKey{
-      .resolver = "AkaoSnes",
-      .value = "source:" + std::to_string(source.value),
-  };
-}
-
 [[nodiscard]] ScanResult scanAkaoSnes(const ScanInput& input) {
   const auto layout = findAkaoSnesLayout(input.reader);
   if (!layout) {
     return {};
   }
 
-  const std::string displayName = akaoSnesSourceDisplayName(input.source);
   ScanResultBuilder result(input, "AkaoSnes");
+  const std::string displayName = result.sourceDisplayName();
   const auto sequence = result.reserveSequence();
   const auto instrumentSet = result.reserveInstrumentSet();
   const auto samples = result.reserveSampleCollection();
@@ -49,7 +41,7 @@ using namespace core;
   }
   result.sequence(sequence, [&](AssetId) { return std::move(sequenceAsset); });
 
-  auto collection = result.collection(displayName, akaoSnesCollectionKey(input.source.id));
+  auto collection = result.sourceCollection(displayName);
   collection.sequence(sequence);
 
   const bool hasSynthLayout = layout->spcDirAddress && layout->tuningTableAddress &&

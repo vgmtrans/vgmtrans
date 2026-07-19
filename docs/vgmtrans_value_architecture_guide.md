@@ -419,21 +419,23 @@ A simple scanner can read naturally:
 
 ```cpp
 ScanResultBuilder result(input, "CapcomSnes");
+const std::string displayName = result.sourceDisplayName();
 const auto sequence = result.reserveSequence();
-const SourceRange sequenceRange = /* format header range */;
 
-result.sequence(sequence, displayName, sequenceRange)
+result.sequence(sequence, displayName, layout.sequenceHeaderRange)
       .program(decodeCapcomSnesSequence(
-          input.reader, layout, sequence.id, sequenceRange,
+          input.reader, layout, sequence.id,
           &result.sourceMap(), &result.diagnostics()));
 
-result.collection(displayName, capcomCollectionKey(input.source.id))
+result.sourceCollection(displayName)
       .sequence(sequence);
 
 return result.finish();
 ```
 
 The builder has typed handles such as `ScanSequenceRef`, `ScanInstrumentSetRef`, and `ScanSampleCollectionRef`. A scanner can reserve handles before parsing. This is important when assets need to refer to each other before all of them have been built.
+
+`sourceDisplayName()` applies the common title, filename, path, and format-name fallback. `sourceCollection()` is for formats that produce one collection per source; unlike `collection()`, changing the display name does not change that collection's identity.
 
 For example, an instrument set may need to refer to a sample collection that has not been committed yet. The scanner can reserve a sample collection ID, use it in regions, and then commit the sample collection later in the same scan result.
 

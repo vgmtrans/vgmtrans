@@ -7,7 +7,6 @@
 #include "value/formats/KonamiSnes/KonamiSnesLayout.h"
 
 #include <algorithm>
-#include <filesystem>
 #include <optional>
 #include <string_view>
 
@@ -271,19 +270,6 @@ static_assert(kLoadPercInstrGG4.bytes.size() == kLoadPercInstrGG4.mask.size());
 }
 
 }  // namespace
-
-std::string konamiSnesSourceDisplayName(const SourceFile& source) {
-  if (source.title && !source.title->empty()) {
-    return *source.title;
-  }
-  if (!source.name.empty()) {
-    return std::filesystem::path(source.name).stem().string();
-  }
-  if (!source.path.empty()) {
-    return source.path.stem().string();
-  }
-  return "KonamiSnes";
-}
 
 const char* konamiSnesVersionName(KonamiSnesVersion version) {
   switch (version) {

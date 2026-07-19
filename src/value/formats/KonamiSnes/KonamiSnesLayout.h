@@ -9,7 +9,6 @@
 #include "value/formats/KonamiSnes/KonamiSnesTypes.h"
 
 #include <optional>
-#include <string>
 
 namespace vgmtrans::formats::konami_snes {
 
@@ -27,7 +26,6 @@ struct KonamiSnesLayout {
 };
 
 [[nodiscard]] std::optional<KonamiSnesLayout> findKonamiSnesLayout(core::ByteReader reader);
-[[nodiscard]] std::string konamiSnesSourceDisplayName(const core::SourceFile& source);
 [[nodiscard]] const char* konamiSnesVersionName(KonamiSnesVersion version);
 
 }  // namespace vgmtrans::formats::konami_snes

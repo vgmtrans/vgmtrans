@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <array>
-#include <filesystem>
 #include <span>
 #include <string_view>
 
@@ -363,16 +362,6 @@ std::optional<AkaoSnesLayout> findAkaoSnesLayout(ByteReader reader) {
   }
 
   return layout;
-}
-
-std::string akaoSnesSourceDisplayName(const SourceFile& source) {
-  if (source.title && !source.title->empty()) {
-    return *source.title;
-  }
-  if (!source.name.empty()) {
-    return std::filesystem::path(source.name).stem().string();
-  }
-  return "AkaoSnes";
 }
 
 }  // namespace vgmtrans::formats::akao_snes

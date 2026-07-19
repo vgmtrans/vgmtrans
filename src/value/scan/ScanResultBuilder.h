@@ -121,6 +121,7 @@ public:
   [[nodiscard]] const SourceFile& sourceFile() const noexcept { return input_.source; }
   [[nodiscard]] ByteReader reader() const noexcept { return input_.reader; }
   [[nodiscard]] std::string_view format() const noexcept { return format_; }
+  [[nodiscard]] std::string sourceDisplayName() const;
   [[nodiscard]] ParseCursor cursor(SourceRange bounds);
   [[nodiscard]] SourceMapBuilder& sourceMap() noexcept { return sourceMap_; }
   [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }
@@ -193,6 +194,9 @@ public:
 
   [[nodiscard]] ScanCollectionBuilder collection(std::string name);
   [[nodiscard]] ScanCollectionBuilder collection(std::string name, CollectionKey key);
+  // Use when a scanner produces one collection per source and its display name
+  // should not affect collection identity.
+  [[nodiscard]] ScanCollectionBuilder sourceCollection(std::string name);
 
   // Builds a region sample reference from a scanner handle and records that the
   // sample collection must be committed before finish().

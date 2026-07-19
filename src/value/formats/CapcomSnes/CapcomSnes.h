@@ -12,7 +12,6 @@
 #include "value/sequence/SequenceDialect.h"
 
 #include <optional>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -33,15 +32,11 @@ enum class CapcomSnesEngineVersion : u8 {
 };
 
 struct CapcomSnesLayout {
-  // Capcom SPC snapshots have no declarative layout. These addresses are
+  // Capcom SPC snapshots have no declarative layout. These final locations are
   // recovered from driver-code signatures before any asset is parsed.
   CapcomSnesEngineVersion version = CapcomSnesEngineVersion::none;
-  bool hasSongList = false;
-  bool bgmAtFixedAddress = false;
-  u32 songListAddress = 0;
-  u32 bgmHeaderAddress = 0;
-  u32 sequenceHeaderAddress = 0;
-  bool priorityInHeader = false;
+  core::SourceRange sequenceHeaderRange;
+  u32 trackPointerTableAddress = 0;
   std::optional<u32> instrumentTableAddress;
   std::optional<u32> spcDirAddress;
 };
@@ -57,7 +52,6 @@ struct CapcomSnesInstrumentInfo {
   std::vector<core::SourceField> sourceFields;
 };
 
-[[nodiscard]] std::string capcomSnesSourceDisplayName(const core::SourceFile& source);
 [[nodiscard]] std::optional<CapcomSnesLayout> findCapcomSnesLayout(core::ByteReader reader);
 
 [[nodiscard]] const core::SequenceDialect& capcomSnesSequenceDialect();
@@ -75,7 +69,7 @@ struct CapcomSnesTrackDecodeOptions {
                                                              CapcomSnesTrackDecodeOptions options);
 
 [[nodiscard]] core::SequenceProgram decodeCapcomSnesSequence(core::ByteReader reader, const CapcomSnesLayout& layout,
-                                                             core::AssetId sequenceId, core::SourceRange sequenceRange,
+                                                             core::AssetId sequenceId,
                                                              core::SourceMapBuilder* sourceMap = nullptr,
                                                              std::vector<core::Diagnostic>* diagnostics = nullptr);
 
@@ -86,7 +80,6 @@ struct CapcomSnesTrackDecodeOptions {
                                       core::ScanSampleCollectionRef sampleCollection, u32 instrumentTableAddress,
                                       u32 spcDirAddress, std::string_view displayName);
 
-[[nodiscard]] core::ScanResult scanCapcomSnes(const core::ScanInput& input);
 [[nodiscard]] core::FormatDefinition capcomSnesDefinition();
 
 }  // namespace vgmtrans::formats::capcom_snes
