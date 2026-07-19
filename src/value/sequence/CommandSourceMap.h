@@ -64,6 +64,9 @@ struct TrackDecodeScope {
     return TrackDecodeSession(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation, sourceMap);
   }
 
+  // Decode a mostly sequential track. Fallthrough is visited immediately;
+  // branch and call targets are queued and decoded afterward. Commands remain
+  // in discovery order, and the reader itself supplies the bytecode boundary.
   template <class DecodeCommand>
   [[nodiscard]] TrackProgram linear(u32 trackIndex, u32 startOffset, DecodeCommand decodeCommand) const {
     auto session = begin(trackIndex, startOffset);
@@ -73,6 +76,9 @@ struct TrackDecodeScope {
     return session.finish(std::move(track));
   }
 
+  // Decode every block reachable from the track start within bytecodeEnd.
+  // Fallthrough, jumps, and calls all contribute reachable blocks; commands
+  // are stored in address order so the resulting program is stable.
   template <class DecodeCommand>
   [[nodiscard]] TrackProgram reachable(u32 trackIndex, u32 startOffset, DecodeCommand decodeCommand) const {
     auto session = begin(trackIndex, startOffset);
