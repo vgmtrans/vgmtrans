@@ -199,23 +199,6 @@ struct Playback {
     }
   }
 
-  void setModulationEnabled(bool enabled) {
-    if (enabled == track.modulationEnabled) {
-      return;
-    }
-    track.modulationEnabled = enabled;
-    if (track.vibratoAmount != 0.0 || track.vibratoDepthSemitones != 0.0) {
-      out.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::VibratoDepth,
-          .amount = enabled ? track.vibratoAmount : 0.0,
-          .pitchDepthSemitones = enabled ? track.vibratoDepthSemitones : 0.0,
-      });
-    }
-    if (track.tremoloAmount != 0.0) {
-      out.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? track.tremoloAmount : 0.0);
-    }
-  }
-
   [[nodiscard]] Effects repeatBreak(u8 slot, u8 attributes, Address destination) {
     const auto branch = vm.countedRepeatBreak(slot, destination);
     if (branch.taken) {
@@ -462,9 +445,33 @@ using CapcomCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
           const bool enabled = event.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
           const double amount = event.derived("amount", math::lfoRate(raw.value));
           const double hertz = event.derived("frequency_hz", math::vibratoRateHertz(raw.value));
-          return event.invoke<&Playback::setModulationEnabled>(enabled)
-              .emitVibratoRate(amount, hertz)
-              .emitModulation(ModulationPerformanceTarget::TremoloRate, amount);
+
+          // A zero/nonzero rate transition gates both remembered depths. Keep
+          // that conditional behavior local instead of hiding it in a setter.
+          event.invoke(
+              [](Playback& playback, bool enabled) {
+                auto& track = playback.track;
+                if (track.modulationEnabled == enabled) {
+                  return;
+                }
+
+                track.modulationEnabled = enabled;
+                if (track.vibratoAmount != 0.0 || track.vibratoDepthSemitones != 0.0) {
+                  playback.out.modulation(ModulationPerformanceEvent{
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .amount = enabled ? track.vibratoAmount : 0.0,
+                      .pitchDepthSemitones = enabled ? track.vibratoDepthSemitones : 0.0,
+                  });
+                }
+                if (track.tremoloAmount != 0.0) {
+                  playback.out.modulation(ModulationPerformanceTarget::TremoloDepth,
+                                          enabled ? track.tremoloAmount : 0.0);
+                }
+              },
+              enabled);
+
+          event.emitVibratoRate(amount, hertz);
+          return event.emitModulation(ModulationPerformanceTarget::TremoloRate, amount);
         }
         default:
           static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
