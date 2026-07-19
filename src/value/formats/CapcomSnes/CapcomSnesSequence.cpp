@@ -734,9 +734,10 @@ const SequenceDialect& capcomSnesSequenceDialect() {
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVersion version, TrackDecodeInput input) {
   version = requireVersion(static_cast<u32>(version));
   const u32 end = std::min(static_cast<u32>(reader.size()), input.bytecodeEnd);
-  return decodeSemanticLinearTrack(reader, input, [reader, end, version, diagnostics = input.diagnostics](u32 offset) {
-    return decodeCommand(reader, offset, end, version, diagnostics);
-  });
+  return makeTrackDecodeScope(reader, input)
+      .linear(input.trackIndex, input.startOffset, [reader, end, version, diagnostics = input.diagnostics](u32 offset) {
+        return decodeCommand(reader, offset, end, version, diagnostics);
+      });
 }
 
 SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayout& layout, AssetId sequenceId,

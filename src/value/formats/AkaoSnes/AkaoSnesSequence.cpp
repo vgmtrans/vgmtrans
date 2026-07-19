@@ -2780,9 +2780,9 @@ TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesSequence
       .maxCommands = 16384,
   };
   BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  if (trackAnnotation) {
-    decodeContext.parentAnnotation = trackAnnotation;
+  auto track = makeTrackDecodeScope(reader, input).begin(input.trackIndex, input.startOffset);
+  if (const auto annotation = track.annotation()) {
+    decodeContext.parentAnnotation = annotation;
   }
 
   const auto& context = cursorContext<Context>(descriptor.dialect);
@@ -2794,11 +2794,10 @@ TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesSequence
     return decoded;
   };
 
-  TrackProgram track =
+  TrackProgram decoded =
       decodeReachableBytecodeBlocks(reader, cursorBytecodeEnd(reader, input), input.startOffset, input.trackIndex,
                                     ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
-  return track;
+  return track.finish(std::move(decoded));
 }
 
 SequenceProgramAsset parseAkaoSnesSequence(const ScanInput& input, const AkaoSnesLayout& layout, AssetId sequenceId,
