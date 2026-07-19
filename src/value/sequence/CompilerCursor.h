@@ -282,6 +282,8 @@ class CompilerCursor {
 public:
   class Event {
   public:
+    [[nodiscard]] bool ok() const noexcept { return cursor_.record_.ok(); }
+
     ::u8 u8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
             SemanticOperandRole role = SemanticOperandRole::Value) {
       return cursor_.decoded(cursor_.record_.u8(name, display), name, display, role);
@@ -535,6 +537,13 @@ public:
     return command(label, SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported, localKind);
   }
 
+  [[nodiscard]] DecodedBytecodeCommand opaque(std::string_view label, u32 operandBytes,
+                                              std::string_view localKind = {}) {
+    auto event = sourceOnly(label, localKind);
+    static_cast<void>(event.rawBytes("bytes", operandBytes));
+    return event.ignore();
+  }
+
   [[nodiscard]] DecodedBytecodeCommand truncated() {
     return finish(truncatedPresentation(), {}, DecodeFlow::terminalFlow());
   }
@@ -596,11 +605,15 @@ private:
         .range = record_.range(),
         .opcode = opcode_,
         .encodedSize = std::max<u32>(1, record_.size()),
+        .bytes = truncated ? std::vector<::u8>{record_.bytes().begin(), record_.bytes().end()}
+                           : std::vector<::u8>{},
         .flow = std::move(flow),
         .operands = std::move(operands_),
         .execution = std::move(execution),
         .presentation = std::move(presentation),
-        .retainBytes = false,
+        // Partial bytes are diagnostic source data only. No compiled executor
+        // receives them, and every valid command remains completely source-free.
+        .retainBytes = truncated,
         .truncated = truncated,
     };
   }
