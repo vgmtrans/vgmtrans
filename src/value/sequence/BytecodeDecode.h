@@ -43,6 +43,7 @@ struct DecodedBytecodeCommand {
   std::vector<u8> bytes;
   DecodeFlow flow;
   std::vector<SemanticOperand> operands;
+  StandardSequenceCommand standardCommand;
   DecodedCommandPresentation presentation;
   bool retainBytes = true;
 };
@@ -82,7 +83,7 @@ inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const Dec
                                          u32 offset) {
   if (!decoded.retainBytes) {
     builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.operands,
-                        decoded.flow, decoded.annotation);
+                        decoded.flow, decoded.annotation, decoded.standardCommand);
     return;
   }
   builder.addDecoded(Address{offset}, decoded.range, decoded.bytes, decoded.annotation, decoded.flow);
@@ -200,6 +201,8 @@ struct ReachableBytecodeDecodePolicy {
 };
 
 // Follow the track start, jumps, and calls to find every command that can be reached.
+// Known block starts also bound the preceding command, preventing fallthrough
+// decoding from consuming bytes that belong to a queued jump or call target.
 // Commands are appended in address order so the parsed result is stable.
 template <class DecodeCommand>
 [[nodiscard]] TrackProgram decodeReachableBytecodeBlocks(ByteReader reader, u32 bytecodeEnd, u32 startOffset,
@@ -213,6 +216,7 @@ template <class DecodeCommand>
   TrackProgramBuilder builder{track};
   std::map<u32, DecodedBytecodeCommand> commandsByOffset;
   std::vector<u32> pendingBlocks{startOffset};
+  std::set<u32> blockStarts{startOffset};
   size_t decodedCommands = 0;
 
   while (!pendingBlocks.empty() && decodedCommands < policy.maxCommands) {
@@ -220,12 +224,15 @@ template <class DecodeCommand>
     pendingBlocks.pop_back();
     while (hasBytecodeBytes(reader, offset, 1, bytecodeEnd) && !commandsByOffset.contains(offset) &&
            decodedCommands < policy.maxCommands) {
-      auto decoded = decodeCommand(offset);
+      const auto followingBlock = blockStarts.upper_bound(offset);
+      const u32 commandEnd = followingBlock == blockStarts.end() ? bytecodeEnd : std::min(bytecodeEnd, *followingBlock);
+      auto decoded = decodeCommand(offset, commandEnd);
       ++decodedCommands;
       // Jump and call targets start new blocks. The next sequential command stays
       // in this inner loop.
       for (const Address target : decoded.flow.staticTargets) {
         if (target.value < bytecodeEnd && !commandsByOffset.contains(target.value)) {
+          blockStarts.insert(target.value);
           pendingBlocks.push_back(target.value);
         }
       }

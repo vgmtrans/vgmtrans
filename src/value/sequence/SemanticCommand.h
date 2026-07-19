@@ -219,9 +219,10 @@ public:
   }
 
   template <class T>
-  void opcodeValue(std::string_view name, T parsed, SourceValueDisplay display = SourceValueDisplay::Default,
-                   SemanticOperandRole role = SemanticOperandRole::Value) {
+  T opcodeValue(std::string_view name, T parsed, SourceValueDisplay display = SourceValueDisplay::Default,
+                SemanticOperandRole role = SemanticOperandRole::Value) {
     add(name, value(parsed), opcodeRange_, display, role);
+    return parsed;
   }
 
   template <class T>
@@ -233,12 +234,16 @@ public:
   }
 
   template <class T, class Convert>
-  void resolved(std::string_view name, const EncodedSemanticField<T>& source, Convert convert,
+  auto resolved(std::string_view name, const EncodedSemanticField<T>& source, Convert convert,
                 SourceValueDisplay display = SourceValueDisplay::Default,
-                SemanticOperandRole role = SemanticOperandRole::Value) {
+                SemanticOperandRole role = SemanticOperandRole::Value) -> std::invoke_result_t<Convert, T> {
+    using Resolved = std::invoke_result_t<Convert, T>;
+    Resolved result{};
     if (source.valid) {
-      resolvedValue(name, source, convert(source.value), display, role);
+      result = convert(source.value);
+      resolvedValue(name, source, result, display, role);
     }
+    return result;
   }
 
   template <class T, class Resolved>
@@ -269,8 +274,8 @@ public:
     return parsed;
   }
 
-  // Discovery flow only tells the bytecode walker which source addresses to
-  // decode. Runtime branching remains in the command's adjacent playback code.
+  // Stored flow tells walkers which addresses to decode. The standard executor
+  // also applies it directly; custom dialects may implement richer driver flow.
   void jumpTo(Address destination) { flow_ = DecodeFlow::jump(destination); }
   void callTo(Address destination) { flow_ = DecodeFlow::call(destination, Address{record_.position()}); }
   void return_() { flow_ = DecodeFlow::return_(); }
@@ -289,6 +294,11 @@ public:
     }
   }
 
+  template <class Command>
+  void standard(Command command) {
+    standardCommand_ = std::move(command);
+  }
+
   [[nodiscard]] DecodedBytecodeCommand finish(DecodedCommandPresentation presentation) {
     if (!record_.ok()) {
       flow_ = DecodeFlow::terminalFlow();
@@ -304,6 +314,7 @@ public:
         .bytes = truncated ? std::vector<::u8>{bytes.begin(), bytes.end()} : std::vector<::u8>{},
         .flow = std::move(flow_),
         .operands = std::move(operands_),
+        .standardCommand = std::move(standardCommand_),
         .presentation = std::move(presentation),
         .retainBytes = truncated,
     };
@@ -355,6 +366,7 @@ private:
   ::u8 opcode_ = 0;
   SourceRange opcodeRange_;
   std::vector<SemanticOperand> operands_;
+  StandardSequenceCommand standardCommand_;
   DecodeFlow flow_;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
 };
@@ -384,8 +396,8 @@ template <class DecodeCommand>
 [[nodiscard]] TrackProgram decodeSemanticReachableTrack(ByteReader reader, TrackDecodeInput input,
                                                         DecodeCommand decodeCommand) {
   const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
-  const auto decodeAndProject = [&](u32 offset) {
-    auto command = decodeCommand(offset);
+  const auto decodeAndProject = [&](u32 offset, u32 commandEnd) {
+    auto command = decodeCommand(offset, commandEnd);
     command.annotation = projectDecodedCommand(input.sourceMap, command, trackAnnotation);
     return command;
   };
