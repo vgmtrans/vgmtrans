@@ -54,6 +54,7 @@ public:
   [[nodiscard]] SourceRange range() const noexcept { return reader_.range(begin_, size()); }
   [[nodiscard]] std::span<const ::u8> bytes() const;
   [[nodiscard]] std::span<const SourceField> fields() const noexcept { return fields_; }
+  [[nodiscard]] std::vector<SourceField> takeFields() noexcept;
 
 private:
   [[nodiscard]] bool require(u32 size, std::string_view field);
