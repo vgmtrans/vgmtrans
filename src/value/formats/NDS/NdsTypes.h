@@ -25,7 +25,6 @@ struct NdsFileRange {
 struct NdsSequenceRange {
   u32 offset = 0;
   u32 sequenceEnd = 0;
-  bool recoverMalformedSdatRange = false;
 };
 
 struct NdsSequenceInfo {

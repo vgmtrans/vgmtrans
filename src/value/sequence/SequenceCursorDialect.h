@@ -430,9 +430,11 @@ template <class TrackState, class Context, class Reader>
     decodeContext.parentAnnotation = trackAnnotation;
   }
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, cursorContext<Context>(dialect));
-  const auto decodeCommand = [&](u32 offset) {
+  const auto decodeCommand = [&](u32 offset, u32 commandEnd) {
+    auto commandContext = decodeContext;
+    commandContext.bytecodeEnd = commandEnd;
     return decodeCursorCommandWithState<TrackState, Context, Reader>(reader, offset, dialect, decodeState,
-                                                                     decodeContext);
+                                                                     commandContext);
   };
 
   TrackProgram track =

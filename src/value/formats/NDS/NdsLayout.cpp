@@ -244,8 +244,8 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
   const u32 fatEnd = static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + size));
   const std::optional<u32> recoveredSequenceOffset =
       hasSseqHeader ? std::nullopt : recoveredMalformedSdatSequenceOffset(reader, offset, size);
-  const bool recoverMalformedSdatRange = recoveredSequenceOffset.has_value();
-  const bool zeroFilled = !hasSseqHeader && !recoverMalformedSdatRange && isZeroFilled(reader, offset, fatEnd);
+  const bool recoveredMalformedRange = recoveredSequenceOffset.has_value();
+  const bool zeroFilled = !hasSseqHeader && !recoveredMalformedRange && isZeroFilled(reader, offset, fatEnd);
   const u32 sequenceOffset = recoveredSequenceOffset.value_or(offset);
   const u32 recoveredEnd = recoveredSequenceOffset && reader.has(*recoveredSequenceOffset + kSseqFileSizeOffset, 4)
                                ? static_cast<u32>(std::min<u64>(
@@ -258,14 +258,13 @@ NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 
   u32 sequenceEnd = fatEnd;
   if (zeroFilled) {
     sequenceEnd = emptySequenceEnd;
-  } else if (recoverMalformedSdatRange) {
+  } else if (recoveredMalformedRange) {
     sequenceEnd = recoveredEnd;
   }
 
   return NdsSequenceRange{
       .offset = sequenceOffset,
       .sequenceEnd = sequenceEnd,
-      .recoverMalformedSdatRange = recoverMalformedSdatRange,
   };
 }
 

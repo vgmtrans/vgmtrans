@@ -143,6 +143,12 @@ private:
   const SourceCommand& command_;
 };
 
+// Standard semantic commands use one shared state/executor pair. Formats only
+// decode source values into StandardSequenceCommand; playback is source-free.
+[[nodiscard]] std::any createStandardTrackState(const SequenceProgram&, const TrackProgram&);
+[[nodiscard]] Effects executeStandardCommand(const SourceCommand& command, std::any& programState, std::any& trackState,
+                                             PerformanceEmitter& out, VmApi& vm);
+
 struct SequenceVmOptions {
   LoopPolicy loopPolicy = LoopPolicy::Default;
   // Extra runtime loop repeats after the first pass through an infinite loop.
