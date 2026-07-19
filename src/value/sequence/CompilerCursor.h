@@ -178,6 +178,14 @@ template <class Playback>
 }
 
 template <class Playback>
+[[nodiscard]] Effects emitQuantizedLevel(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<double, u32>(arguments);
+  playback.out.level(executableArgument<double>(arguments[0]),
+                     ValueQuantization{.levels = executableArgument<u32>(arguments[1])});
+  return Effects{};
+}
+
+template <class Playback>
 [[nodiscard]] Effects emitExpression(std::span<const SemanticOperandValue> arguments, Playback& playback) {
   requireArgumentCount<double>(arguments);
   playback.out.expression(executableArgument<double>(arguments[0]));
@@ -206,9 +214,55 @@ template <class Playback>
 }
 
 template <class Playback>
+[[nodiscard]] Effects emitSourceInstrument(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<std::string, u32>(arguments);
+  playback.out.instrument(InstrumentIdentity{
+      .domain = executableArgument<std::string>(arguments[0]),
+      .key = executableArgument<u32>(arguments[1]),
+  });
+  return Effects{};
+}
+
+template <class Playback>
 [[nodiscard]] Effects emitTempo(std::span<const SemanticOperandValue> arguments, Playback& playback) {
   requireArgumentCount<u32>(arguments);
   playback.out.tempo(executableArgument<u32>(arguments[0]));
+  return Effects{};
+}
+
+template <class Playback>
+[[nodiscard]] Effects emitMasterLevel(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<double>(arguments);
+  playback.out.masterLevel(executableArgument<double>(arguments[0]));
+  return Effects{};
+}
+
+template <class Playback>
+[[nodiscard]] Effects emitReverb(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<double>(arguments);
+  playback.out.reverb(executableArgument<double>(arguments[0]));
+  return Effects{};
+}
+
+template <class Playback>
+[[nodiscard]] Effects emitTuning(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<double>(arguments);
+  playback.out.tuning(executableArgument<double>(arguments[0]));
+  return Effects{};
+}
+
+template <class Playback>
+[[nodiscard]] Effects emitGlobalTranspose(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<s32>(arguments);
+  playback.out.globalTranspose(executableArgument<s32>(arguments[0]));
+  return Effects{};
+}
+
+template <class Playback, auto Member>
+[[nodiscard]] Effects emitLegatoPedalFrom(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<>(arguments);
+  static_assert(std::is_same_v<std::remove_cvref_t<decltype(playback.track.*Member)>, bool>);
+  playback.out.legatoPedal(playback.track.*Member);
   return Effects{};
 }
 
@@ -239,6 +293,17 @@ template <class Playback>
   requireArgumentCount<ModulationPerformanceTarget, double>(arguments);
   playback.out.modulation(executableArgument<ModulationPerformanceTarget>(arguments[0]),
                           executableArgument<double>(arguments[1]));
+  return Effects{};
+}
+
+template <class Playback>
+[[nodiscard]] Effects emitVibratoRate(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  requireArgumentCount<double, double>(arguments);
+  playback.out.modulation(ModulationPerformanceEvent{
+      .target = ModulationPerformanceTarget::VibratoRate,
+      .amount = executableArgument<double>(arguments[0]),
+      .frequencyHz = executableArgument<double>(arguments[1]),
+  });
   return Effects{};
 }
 
@@ -318,14 +383,29 @@ public:
 
     ::u8 u8(std::string_view name, SemanticOperandRole role) { return u8(name, SourceValueDisplay::Default, role); }
 
+    [[nodiscard]] EncodedSemanticField<::u8> rawU8(std::string_view name,
+                                                   SourceValueDisplay display = SourceValueDisplay::Default) {
+      return field(cursor_.record_.u8(name, display), name, display);
+    }
+
     ::s8 s8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
             SemanticOperandRole role = SemanticOperandRole::Value) {
       return cursor_.decoded(cursor_.record_.s8(name, display), name, display, role);
     }
 
+    [[nodiscard]] EncodedSemanticField<::s8> rawS8(std::string_view name,
+                                                   SourceValueDisplay display = SourceValueDisplay::SignedDecimal) {
+      return field(cursor_.record_.s8(name, display), name, display);
+    }
+
     u16 u16be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
               SemanticOperandRole role = SemanticOperandRole::Value) {
       return cursor_.decoded(cursor_.record_.u16be(name, display), name, display, role);
+    }
+
+    [[nodiscard]] EncodedSemanticField<u16> rawU16be(std::string_view name,
+                                                     SourceValueDisplay display = SourceValueDisplay::Default) {
+      return field(cursor_.record_.u16be(name, display), name, display);
     }
 
     u16 u16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -387,6 +467,34 @@ public:
       return derived(name, std::move(value), SourceValueDisplay::Default, role);
     }
 
+    template <class T, class Convert>
+    [[nodiscard]] auto resolved(std::string_view name, const EncodedSemanticField<T>& source, Convert convert,
+                                SourceValueDisplay display = SourceValueDisplay::Default,
+                                SemanticOperandRole role = SemanticOperandRole::Value)
+        -> std::invoke_result_t<Convert, T> {
+      using Resolved = std::invoke_result_t<Convert, T>;
+      return source.valid ? resolvedValue(name, source, std::invoke(convert, source.value), display, role) : Resolved{};
+    }
+
+    template <class T, class Resolved>
+    [[nodiscard]] Resolved resolvedValue(std::string_view name, const EncodedSemanticField<T>& source,
+                                         Resolved resolved, SourceValueDisplay display = SourceValueDisplay::Default,
+                                         SemanticOperandRole role = SemanticOperandRole::Value) {
+      if (source.valid) {
+        cursor_.operands_.push_back(SemanticOperand{
+            .value = detail::executableValue(resolved),
+            .range = source.range,
+            .name = std::string(name),
+            .display = display,
+            .role = role,
+            .encodedValue = detail::executableValue(source.value),
+            .encodedName = std::string(source.name),
+            .encodedDisplay = source.display,
+        });
+      }
+      return resolved;
+    }
+
     void warning(std::string message) { cursor_.warning(std::move(message)); }
 
     // Operations accumulate in source order and return the same builder. A
@@ -414,6 +522,10 @@ public:
 
     Event& emitLevel(double gain) { return append(&detail::emitLevel<Playback>, gain); }
 
+    Event& emitLevel(double gain, ValueQuantization quantization) {
+      return append(&detail::emitQuantizedLevel<Playback>, gain, quantization.levels);
+    }
+
     Event& emitExpression(double gain) { return append(&detail::emitExpression<Playback>, gain); }
 
     Event& emitPan(double position) { return append(&detail::emitPan<Playback>, position); }
@@ -424,8 +536,25 @@ public:
 
     Event& emitInstrument(u32 bank, u32 program) { return append(&detail::emitInstrument<Playback>, bank, program); }
 
+    Event& emitInstrument(std::string_view domain, u32 key) {
+      return append(&detail::emitSourceInstrument<Playback>, domain, key);
+    }
+
     Event& emitTempo(u32 microsecondsPerQuarter) {
       return append(&detail::emitTempo<Playback>, microsecondsPerQuarter);
+    }
+
+    Event& emitMasterLevel(double gain) { return append(&detail::emitMasterLevel<Playback>, gain); }
+
+    Event& emitReverb(double send) { return append(&detail::emitReverb<Playback>, send); }
+
+    Event& emitTuning(double cents) { return append(&detail::emitTuning<Playback>, cents); }
+
+    Event& emitGlobalTranspose(s32 semitones) { return append(&detail::emitGlobalTranspose<Playback>, semitones); }
+
+    template <auto Member>
+    Event& emitLegatoPedalFrom() {
+      return append(&detail::emitLegatoPedalFrom<Playback, Member>);
     }
 
     Event& emitPitchBend(double semitones) { return append(&detail::emitPitchBend<Playback>, semitones); }
@@ -439,6 +568,10 @@ public:
 
     Event& emitModulation(ModulationPerformanceTarget target, double amount) {
       return append(&detail::emitModulation<Playback>, target, amount);
+    }
+
+    Event& emitVibratoRate(double amount, double hertz) {
+      return append(&detail::emitVibratoRate<Playback>, amount, hertz);
     }
 
     Event& emitPortamentoEnable(bool enabled) { return append(&detail::emitPortamentoEnable<Playback>, enabled); }
@@ -482,15 +615,15 @@ public:
       return *this;
     }
 
-    Event& loopCandidate(Address destination) {
-      targetRole(destination, SemanticOperandRole::LoopTarget);
+    Event& loopCandidate(Address destination, SemanticOperandRole role = SemanticOperandRole::LoopTarget) {
+      targetRole(destination, role);
       append(&detail::loopCandidate<Playback>, destination);
       flow_ = DecodeFlow::jump(destination);
       return *this;
     }
 
-    Event& declaredLoop(Address destination) {
-      targetRole(destination, SemanticOperandRole::LoopTarget);
+    Event& declaredLoop(Address destination, SemanticOperandRole role = SemanticOperandRole::LoopTarget) {
+      targetRole(destination, role);
       append(&detail::declaredLoop<Playback>, destination);
       flow_ = DecodeFlow::jump(destination);
       return *this;
@@ -516,6 +649,14 @@ public:
       return *this;
     }
 
+    // Record a conditional branch destination while a format-specific action
+    // decides at runtime whether the branch is taken.
+    Event& mayBranchTo(Address destination, SemanticOperandRole role = SemanticOperandRole::Address) {
+      targetRole(destination, role);
+      flow_.staticTargets.push_back(destination);
+      return *this;
+    }
+
     [[nodiscard]] operator DecodedBytecodeCommand() { return finish(); }
 
   private:
@@ -533,6 +674,18 @@ public:
       (action.arguments.push_back(detail::executableValue(arguments)), ...);
       execution_.actions.push_back(std::move(action));
       return *this;
+    }
+
+    template <class T>
+    [[nodiscard]] static EncodedSemanticField<T> field(const RangedValue<T>& source, std::string_view name,
+                                                       SourceValueDisplay display) {
+      return EncodedSemanticField<T>{
+          .value = source.value,
+          .range = source.range,
+          .name = name,
+          .display = display,
+          .valid = source.valid,
+      };
     }
 
     void targetRole(Address destination, SemanticOperandRole role) {

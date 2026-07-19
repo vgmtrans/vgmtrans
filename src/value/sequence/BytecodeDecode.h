@@ -16,6 +16,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -49,6 +50,18 @@ struct DecodedBytecodeCommand {
   bool truncated = false;
 };
 
+// A source field whose encoded value is replaced by an interpreted value in
+// executable IR. SourceMap projection retains both forms without making
+// playback know about source bytes.
+template <class T>
+struct EncodedSemanticField {
+  T value{};
+  SourceRange range;
+  std::string_view name;
+  SourceValueDisplay display = SourceValueDisplay::Default;
+  bool valid = false;
+};
+
 struct BytecodeDecodeContext {
   // bytecodeEnd is the first offset the decoder must not read. sequenceEnd can be
   // smaller when a driver stores several sequences in one larger byte buffer.
@@ -60,9 +73,9 @@ struct BytecodeDecodeContext {
   std::vector<Diagnostic>* diagnostics = nullptr;
 };
 
-// Transitional per-track input for the old cursor adapters and public Capcom
-// test seam. New format decoders keep shared discovery settings in a
-// TrackDecodeScope and format-specific values in their own sequence context.
+// Transitional per-track input for the old cursor adapters. New format
+// decoders keep shared discovery settings in a TrackDecodeScope and
+// format-specific values in their own sequence context.
 struct TrackDecodeInput {
   std::optional<AssetId> sequenceAsset;
   u32 trackIndex = 0;

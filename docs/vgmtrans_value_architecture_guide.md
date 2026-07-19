@@ -80,7 +80,7 @@ MIDI renderer or another future sequence exporter
 
 The compiler cursor exists only while decoding. Its field reads record source metadata, and its event operations append source-free typed actions in written order. Returning the event finalizes the command. The shared VM schedules commands while the compiled dialect invokes their generated executors; neither layer can reopen command bytes. MIDI conversion remains a later layer.
 
-> **Migration status:** NDS is the complete compiler-cursor prototype. Capcom SNES uses its immediate predecessor, an adjacent decode/execution profile. Akao, Akao SNES, and Konami SNES still use the old two-phase cursor adapter. Those older paths are migration scaffolding, not constraints on the target design; Git history preserves them if removing them later proves premature.
+> **Migration status:** NDS and Capcom SNES use the compiler cursor. Akao, Akao SNES, and Konami SNES still use the old two-phase cursor adapter. Those older paths are migration scaffolding, not constraints on the target design; Git history preserves them if removing them later proves premature.
 
 The prototype's examples, line counts, acceptance review, limitations, and adoption recommendation are recorded in [Compiler-cursor prototype review](compiler_cursor_prototype_review.md).
 
@@ -727,7 +727,7 @@ Malformed reads automatically discard accumulated actions and turn the command i
 
 Do not introduce a command class hierarchy, handler-per-opcode files, binary-schema DSL, declarative command table, typed command variant taxonomy, or format-visible microcode language. The internal action list exists only to preserve the order of ordinary imperative statements. Keep the complete source-driver operation visible in one local block, and do not hide multiple side effects behind one convenient-sounding operation.
 
-The adjacent decode/execution profile used by Capcom is the predecessor to this model, not a second style to copy. `VmCommandCursor` and `SequenceCursorDialect` still let unmigrated formats build, but live compatibility is not a design requirement: playback can reparse retained bytes, and Git history is the fallback if those adapters are removed.
+Capcom's former adjacent decode/execution profile was the predecessor to this model and was removed after the compiler-cursor migration. `VmCommandCursor` and `SequenceCursorDialect` still let unmigrated formats build, but live compatibility is not a design requirement: playback can reparse retained bytes, and Git history is the fallback if those adapters are removed.
 
 ### 14.4 Bytecode walkers
 
@@ -989,7 +989,7 @@ Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-Command code should resemble a driver interpreter. NDS demonstrates the compiler-cursor form: one opcode switch reads source fields and appends the command's effects in order. Returning the event compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches. Capcom SNES still uses adjacent decode/execution lambdas; Akao, Akao SNES, and Konami SNES still use normal cursor switches through the old adapter.
+Command code should resemble a driver interpreter. NDS and Capcom SNES demonstrate the compiler-cursor form: one opcode switch reads source fields and appends the command's effects in order. Returning the event compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches. Akao, Akao SNES, and Konami SNES still use normal cursor switches through the old adapter.
 
 The compiler-cursor form is the target because it keeps ordinary commands near the original interpreter's size while retaining source-free VM execution. It avoids a command class, visitor, command table, and universal operation taxonomy.
 
@@ -1037,7 +1037,9 @@ The Capcom SNES module shows the “single source, explicit collection” path.
 
 The scanner finds the layout, reserves sequence/instrument/sample IDs, parses instrument/sample information when the instrument table and SPC DIR are detected, always emits the sequence, and creates one collection for the source. It owns asset metadata while `decodeCapcomSnesSequence` returns only the neutral `SequenceProgram`. If synth information is unavailable, the collection still has the sequence and a warning.
 
-Capcom is the first semantic-command vertical slice. Its base opcode profile plus two V1 patches are the single source of command behavior. Each entry owns presentation, source reads, conversion, discovery flow, and playback side-by-side. Decode reads every operand once, stores encoded and resolved values where they differ, and records control flow; the track keeps no command-byte pool. `TrackDecodeScope::linear` owns walking, command projection, and track annotation finalization, so the format's track function supplies only `decodeCommand`. The same profile entry is selected during rendering by program profile and opcode, and the global scheduler supplies per-track state. The executor cannot access source bytes by construction.
+Capcom uses one imperative compiler-cursor opcode switch. Each case reads its operands, performs version-dependent conversion, records control flow, and appends its executable effects in source order. Simple state and output commands remain entirely inline; only notes, note attributes, repeat breaks, portamento, and modulation gating call nearby `Playback` methods because they depend on execution history. There is no command-definition table, decode lambda, execute lambda, playback-time operand lookup, or second opcode selection. Complete commands retain no source bytes, and engine-version decisions are resolved during decode rather than reopened during playback.
+
+`TrackDecodeScope::linear` owns walking, command projection, and track annotation finalization. The whole-sequence parser creates one scope and changes only the source-map parent for each track pointer; its production path does not rebuild the transitional per-track input bag. Encoded/resolved cursor fields preserve both the driver byte and its interpreted value in one semantic operand and source annotation.
 
 The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture. Pan commands retain Capcom's source-engine left/right gains; shared export code performs MIDI pan quantization and expression compensation. Vibrato events retain both normalized controller amounts and the driver's physical semitone depth and hertz rate, allowing `SequenceEventSimulation` to render pitch-bend motion without depending on SF2/DLS modulators.
 
@@ -1266,7 +1268,7 @@ The existing tests under `tests/core` and `tests/formats` reflect this direction
 
 ### 22.3 Format code can be local and readable
 
-Complete opcode-profile entries are a strong fit for sequence drivers. Keeping decode and playback lambdas adjacent makes the driver visible without coupling playback to source encoding or scattering one command across several switches.
+One imperative compiler-cursor switch is a strong fit for sequence drivers. Keeping each command's reads and effects in the same case makes the driver visible without coupling playback to source encoding or scattering one command across decode and execute definitions.
 
 Return presentation metadata with each decoded command and let `CommandSourceMap` project annotations. Command decoding should not call annotation-builder methods.
 
@@ -1292,7 +1294,7 @@ The VM outputs neutral performance events. MIDI is one renderer, not the sequenc
 
 ### 23.1 Older sequence paths coexist temporarily
 
-NDS uses compiler-cursor commands and global scheduling. Capcom uses the earlier semantic profile on the same scheduler, while three format families still use the cursor adapter and track-major execution. Coexistence is a repository migration fact, not an architectural promise. Do not add features to the old paths, and remove them whenever that makes the target code materially cleaner; Git history preserves a fallback.
+NDS and Capcom use compiler-cursor commands and global scheduling, while three format families still use the cursor adapter and track-major execution. Coexistence is a repository migration fact, not an architectural promise. Do not add features to the old paths, and remove them whenever that makes the target code materially cleaner; Git history preserves a fallback.
 
 ### 23.2 `std::any` hides some type checking
 

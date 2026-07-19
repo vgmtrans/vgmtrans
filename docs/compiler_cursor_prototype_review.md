@@ -166,13 +166,13 @@ Member pointers give compile-time checking for state and local methods, but an i
 
 ### Multiple historical paths
 
-The repository temporarily contains the compiler cursor, Capcom's semantic profile, and older cursor dialects. That is migration state, not three supported authoring choices. New work should use the compiler cursor. Once affected formats migrate, delete the other paths rather than maintaining compatibility layers.
+The repository temporarily contains the compiler cursor and older cursor dialects. Capcom's intermediate semantic profile was deleted after its compiler-cursor migration. The remaining coexistence is migration state, not multiple supported authoring choices. New work should use the compiler cursor, and migrated paths should be deleted rather than maintained as compatibility layers.
 
 Preserving the old cursor in live code is not a requirement. The pre-compiler implementations remain recoverable from Git, including the pre-semantic NDS cursor before `2180c74e4` and the pre-prototype branch state at `bd975187e`.
 
 ## Recommendation for the next migration
 
-Use the compiler cursor for one medium-complexity format before attempting Akao SNES. Konami SNES is a useful next stress test because it has real control flow and driver state without Akao SNES's full dialect matrix.
+Capcom SNES supplied the medium-complexity migration: it exercises version-dependent decoding, repeat control flow, note history, portamento, and modulation while remaining substantially smaller than Akao SNES. Konami SNES is a useful next stress test because it has real control flow and driver state without Akao SNES's full dialect matrix.
 
 During that migration:
 
