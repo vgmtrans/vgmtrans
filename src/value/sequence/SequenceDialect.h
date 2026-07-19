@@ -69,10 +69,10 @@ using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram
 using TickTrackState = void (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
                                 PerformanceEmitter& out, VmApi& vm, const std::any& context);
 
-// Semantic dialects use a stricter executor boundary than legacy byte-backed
+// Source-free dialects use a stricter executor boundary than legacy byte-backed
 // dialects: playback receives no TrackProgram, byte span, or opaque dialect
-// context. All version data must already be in SequenceProgram::config and all
-// command data must already be in SourceCommand::operands.
+// context. CompilerCursor keeps decoded executable arguments in
+// SourceCommand::execution; older semantic formats may still use operands.
 using CreateProgramState = std::any (*)(const SequenceProgram&);
 using CreateSemanticTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&);
 using ExecuteSemanticCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,

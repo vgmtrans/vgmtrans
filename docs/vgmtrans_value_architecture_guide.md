@@ -65,21 +65,24 @@ There are two important sub-flows inside that larger flow.
 ```text
 source bytecode
   ↓
-format decoder reads each command once
+CompilerCursor reads one command once
   ↓
-SequenceProgram with named operands and stored flow
-  + SourceMap command annotations
+SourceCommand with source metadata, stored flow,
+  positional executable values, and an executor slot
+  + SourceMap command annotation
   ↓
-global SequenceVm scheduler
+SequenceVm invokes a generated typed executor
   ↓
 PerformanceSequence, a target-neutral musical performance
   ↓
 MIDI renderer or another future sequence exporter
 ```
 
-The sequence parser does not directly write MIDI. It records semantic commands in a `SequenceProgram`; semantic executors never receive command bytes. The shared VM schedules those commands and produces musical events. MIDI conversion is another layer after that.
+The compiler cursor exists only while decoding. Its field reads record source metadata, and its terminal operation compiles playback behavior into source-free data. The shared VM schedules those commands and invokes generated typed executors; neither the VM nor playback can reopen command bytes. MIDI conversion remains a later layer.
 
-> **Migration status:** Capcom SNES and NDS use this semantic path. Akao, Akao SNES, and Konami SNES still use the legacy two-phase cursor adapter while they are migrated. New format code should use the semantic path; the cursor API is compatibility infrastructure, not the target architecture.
+> **Migration status:** NDS is the complete compiler-cursor prototype. Capcom SNES uses its immediate predecessor, an adjacent decode/execution profile. Akao, Akao SNES, and Konami SNES still use the old two-phase cursor adapter. Those older paths are migration scaffolding, not constraints on the target design; Git history preserves them if removing them later proves premature.
+
+The prototype's examples, line counts, acceptance review, limitations, and adoption recommendation are recorded in [Compiler-cursor prototype review](compiler_cursor_prototype_review.md).
 
 ### Synth/sample flow
 
@@ -263,16 +266,17 @@ A `SequenceProgram` contains:
 Each track contains decoded `SourceCommand` records. A `SourceCommand` keeps:
 
 - opcode;
-- named operands with resolved values and source ranges;
+- named source operands with values and source ranges;
 - decode-time control flow;
+- positional executable values and an executor slot for compiled commands;
 - source address;
 - encoded size;
 - source range;
 - optional source annotation ID.
 
-An operand's name is both its author-facing vocabulary and its durable identity. It also keeps a display rule, optional generic role, exact source range, and—when conversion is needed—both the encoded and resolved value. Execution consumes the resolved value. This prevents driver conversion formulas from being duplicated between source annotation and playback without forcing formats to declare parallel numeric operand IDs.
+An operand's name is author-facing vocabulary for source inspection and analysis. It also keeps a display rule, optional generic role, exact source range, and—when useful for presentation—both encoded and resolved values. Compiler-cursor execution does not consume this named list. Its terminal operation stores only the positional values required by the generated typed executor, so playback needs neither operand IDs nor string lookup.
 
-Semantic commands do not retain encoded bytes. `commandBytes` and byte spans remain temporarily on `TrackProgram` only for unmigrated cursor dialects. The semantic executor signature intentionally receives no `TrackProgram` or byte reader, making source reparsing during playback impossible.
+Complete source-free commands do not retain encoded bytes. `commandBytes` and byte spans remain temporarily on `TrackProgram` for unmigrated cursor dialects and partial malformed-command diagnostics. The source-free executor signature intentionally receives no `TrackProgram` or byte reader, making source reparsing during playback impossible.
 
 ### 8.2 `InstrumentSetAsset`
 
@@ -366,7 +370,7 @@ The source map is one of the strongest parts of the new architecture. It makes d
 
 Scanning is the process of turning one source into values.
 
-A format definition owns the scanner and its optional semantic executor family:
+A format definition owns the scanner and its optional source-free dialect:
 
 ```text
 FormatDefinition
@@ -643,13 +647,13 @@ MidiExporter
 
 ### 14.1 `SequenceProgram`
 
-`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every semantic command has an opcode, named operands, stored decode flow, its source address/range, and an annotation ID.
+`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every compiled command has an opcode, named source operands, stored decode flow, its source address/range, an annotation ID, positional executable values, and an automatically assigned executor slot.
 
-The stored flow lets walkers and validators inspect control flow without executing format code. Typed operands let execution and analysis use parsed meaning without reopening the source. A format profile belongs to this program value, so one registered executor family can handle every version of the driver.
+The stored flow lets walkers and validators inspect control flow without executing format code. Named operands serve source presentation and analysis; playback consumes positional executable values and performs no string lookup. A format profile belongs to this program value, so one registered executor family can handle every version of the driver.
 
 ### 14.2 `SequenceDialect`
 
-A semantic dialect is the small piece of driver-specific behavior needed by the VM. It contains:
+A source-free dialect is the small piece of driver-specific behavior needed by the VM. It contains:
 
 - an ID;
 - a timebase;
@@ -658,33 +662,48 @@ A semantic dialect is the small piece of driver-specific behavior needed by the 
 - a function to create per-track state;
 - a function to execute one semantic command.
 
-The semantic executor receives the command, program state, track state, `PerformanceEmitter`, and `VmApi`. It does **not** receive a `TrackProgram`, source bytes, or global registry context. Version data is read once from `SequenceProgram::config` when state is constructed.
+The dialect executor receives the command, program state, track state, `PerformanceEmitter`, and `VmApi`. It does **not** receive a `TrackProgram`, source bytes, or global registry context. For compiler-cursor formats, the shared adapter creates the format's concrete `Playback` and invokes the command's generated typed thunk. Version data is read once from `SequenceProgram::config` when state is constructed.
 
 The dialect is registered once in `SequenceDialectRegistry`; export looks it up by family ID. Capcom SNES, for example, registers `capcom-snes` once and stores V1/V2/V3 selection on each program.
 
-### 14.3 Semantic decode and execution
+### 14.3 Compiler-cursor decode and execution
 
-The target authoring model is one opcode profile whose entries contain both lifecycle operations. A command's label, broad semantic, source reads, conversion, discovery flow, and playback behavior are adjacent:
+The target authoring model is one imperative opcode block. A command's label, source reads, conversion, discovery flow, and playback behavior appear in reading order:
 
 ```cpp
-profile[0x05] = command(
-    "Tempo", SequenceSemantic::Tempo,
-    [](Decode& d) {
-      d.resolved("microseconds_per_quarter", d.rawU16be("raw"), convertTempo);
-    },
-    [](Args a, Playback& p) {
-      p.out.tempo(a.u32());
-      return Effects{};
-    });
+case Volume: {
+  auto event = cursor.command("Volume", SequenceSemantic::Level);
+  return event.emitLevel(volumeGain(event.u8("volume")));
+}
 ```
 
-`SemanticCommandDecoder` wraps `RecordReader` for checked reads, exact ranges, raw/resolved pairing, and discovery-flow bookkeeping. `SemanticCommandArgs` reads the nearby named operands during playback. Names intentionally serve as identity: a linear lookup across a handful of operands is preferable to a command-kind enum, an operand-ID enum, metadata switches, and parallel decode/execution switches.
+State changes use typed member pointers, without IDs or a second executor definition:
 
-The two lifecycle entry points merely select the same profile entry by program profile and opcode. Decode invokes its `decode` function once; playback invokes its `execute` function on every runtime visit. `CommandSourceMap` projects the decoded value into an annotation, so command definitions never call `.field()`, `.derived()`, or `.link()`.
+```cpp
+case Transpose: {
+  auto event = cursor.command("Transpose", SequenceSemantic::State);
+  return event.set<&TrackState::transpose>(event.s8("semitones"));
+}
+```
 
-Do not introduce a command class hierarchy, handler-per-opcode files, a binary-schema DSL, typed command variants, or a generic microcode language. The point is to keep the complete source-driver operation visible in one local block while removing repeated parsing and representational ceremony.
+Only behavior that actually depends on runtime history needs a nearby `Playback` method:
 
-`VmCommandCursor` and `SequenceCursorDialect` still support unmigrated formats. They retain command bytes and invoke a reader in decode and render phases. This path is deprecated because execution can reparse bytes and decode-time analysis must masquerade as playback.
+```cpp
+case Note: {
+  auto event = cursor.command("Note", SequenceSemantic::Note);
+  const u8 key = event.opcodeBits<0, 5>("key");
+  const u32 duration = event.varLen("duration");
+  return event.invoke<&Playback::note>(key, duration);
+}
+```
+
+`CompilerCursor` wraps `RecordReader`. Field reads automatically record names, values, exact ranges, display rules, and roles. The terminal call such as `emitLevel`, `set`, `invoke`, `jump`, or `end` records both durable execution data and discovery flow. It also selects a generated typed thunk and assigns its executor slot automatically. There is no execute switch, operand-key declaration, captured closure, or playback-time string lookup.
+
+Malformed reads automatically turn the command into a terminal truncated record. Complete commands retain no source bytes. `CommandSourceMap` projects the temporary decoded record into an annotation, so ordinary command blocks do not manually build fields or links.
+
+Do not introduce a command class hierarchy, handler-per-opcode files, binary-schema DSL, declarative command table, typed command variant taxonomy, or generic microcode language. Keep the complete source-driver operation visible in one local block. Add a shared cursor terminal operation only when it expresses literal common behavior; use a concrete local `Playback` method for driver behavior.
+
+The adjacent decode/execution profile used by Capcom is the predecessor to this model, not a second style to copy. `VmCommandCursor` and `SequenceCursorDialect` still let unmigrated formats build, but live compatibility is not a design requirement: playback can reparse retained bytes, and Git history is the fallback if those adapters are removed.
 
 ### 14.4 Bytecode walkers
 
@@ -695,11 +714,11 @@ The code provides linear and reachable bytecode walkers. They accept a command d
 
 A linear track is mostly decoded in byte order. A reachable track follows stored static targets such as jumps and calls. Cursor-prefixed wrappers adapt legacy command readers to these same walkers.
 
-Linear semantic formats normally call `decodeSemanticLinearTrack`; formats with static jumps and calls use `decodeSemanticReachableTrack`. Both wrap the underlying walker with the shared track lifecycle: create the track annotation, project each already-decoded command, and finalize the track's source range. Format code supplies only the one-command decoder.
+Compiler-cursor formats call `decodeCompilerLinearTrack` or `decodeCompilerReachableTrack`. Both wrap the underlying walker with the shared track lifecycle: create the track annotation, project each already-decoded command, and finalize the track's source range. Format code supplies only the one-command decoder. Older semantic and cursor-prefixed wrappers remain temporarily for their existing formats.
 
 ### 14.5 `SequenceVm`
 
-For semantic dialects, `SequenceVm` owns one program state and one runtime per track. It repeatedly executes the active track with the lowest `(tick, stable track order)`. At equal ticks, an earlier track keeps control while it consumes zero-time commands until it waits or ends. This explicit rule matches multi-channel drivers and makes shared state deterministic.
+For source-free dialects, `SequenceVm` owns one program state and one runtime per track. It repeatedly executes the active track with the lowest `(tick, stable track order)`. At equal ticks, an earlier track keeps control while it consumes zero-time commands until it waits or ends. This explicit rule matches multi-channel drivers and makes shared state deterministic.
 
 The VM also owns shared playback policy:
 
@@ -718,7 +737,7 @@ Semantic loop detection compares the complete execution state that determines re
 
 Semantic tracks share one finite export boundary. Each track records when it has completed the requested number of infinite-loop repeats, while shorter tracks keep looping until every track has reached its own endpoint or ended naturally. The scheduler then uses the longest endpoint, trims events at that common boundary, and clips notes that cross it. This prevents both early truncation by a short auxiliary loop and a lone long track continuing after every other track has stopped.
 
-Legacy dialects remain track-major until migrated. Their dry-run and complete-sequence-prepass options are compatibility mechanisms; semantic formats should model shared state directly instead.
+Old cursor dialects remain track-major until migrated. Their dry-run and complete-sequence-prepass options are compatibility mechanisms; source-free formats should model shared state directly instead.
 
 ### 14.6 `PerformanceSequence`
 
@@ -946,11 +965,11 @@ Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-Command code should resemble a driver interpreter. Capcom SNES and NDS demonstrate the semantic form: each opcode-profile entry places source decoding beside playback behavior. The profile replaces separate metadata, operand, flow, and execution switches. Akao, Akao SNES, and Konami SNES still use normal cursor switches through the legacy adapter.
+Command code should resemble a driver interpreter. NDS demonstrates the compiler-cursor form: one opcode switch reads source fields and returns the command's effect. The terminal operation compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches. Capcom SNES still uses adjacent decode/execution lambdas; Akao, Akao SNES, and Konami SNES still use normal cursor switches through the old adapter.
 
-That is a good match for format developers’ mental model. It avoids requiring every command to be represented as a separate class or visitor.
+The compiler-cursor form is the target because it keeps ordinary commands near the original interpreter's size while retaining source-free VM execution. It avoids a command class, visitor, command table, and universal operation taxonomy.
 
-`SemanticCommandDefinitions` supplies only the repeated definition and presentation plumbing. Formats still own the profile, opcode selection, decode lambdas, and playback lambdas in one place; the helper is deliberately not a second command schema.
+`CompilerCursor` owns checked field reads, source metadata, truncation, generated executor slots, and the small set of literal VM/output operations. Formats own the opcode switch, conversions, persistent `TrackState`, and concrete `Playback` methods. There is one authoring paradigm.
 
 ### 18.5 Where complexity still appears
 
@@ -980,13 +999,13 @@ The scanner finds SDAT offsets, parses layout, annotates the SDAT header and sec
 
 The collection key includes source ID, SDAT offset, and sequence index. That makes each collection stable and unique within a source.
 
-NDS sequence code uses one opcode profile with adjacent decode and execution lambdas. Decode reads each command once into named operands, resolves 24-bit relative addresses, and stores jump, call, return, and terminal flow. Playback receives only those operands and a small context around persistent track registers, performance output, and VM flow. Normal SSEQ decoding follows reachable blocks, so subroutines and jump targets are discovered without a playback prepass.
+NDS sequence code uses one compiler-cursor opcode switch. Each block reads a source command once and ends in a direct output action, typed track-state operation, local `Playback` method, or VM control-flow action. The cursor records source operands for annotation while separately compiling positional execution values and an automatically assigned executor slot. Playback receives no field names or source bytes. Normal SSEQ decoding follows reachable blocks, so subroutines and jump targets are discovered without a playback prepass.
 
 The same command decoder handles the `Allocate Track`, optional bootstrap rest, and `Open Track` records used to discover secondary tracks. These bootstrap commands are discarded after discovery because they run before musical track playback, but their byte layout is not parsed a second way. Malformed SDAT recovery remains a specialized walker because it must split overlapping blocks; it reuses the canonical command decoder and still produces normal `TrackProgram` and source annotations.
 
 Container-specific range recovery belongs to `NdsLayout`, beside FAT and section parsing, rather than in the sequence interpreter. `NdsModule` scans the discovered layout in dependency order and uses indexed optional bank/sample handles instead of parallel lookup maps. SWAR, SBNK, and PSG parsing remain together in `NdsSynth`: their compact shared record layouts are expressed with small helpers and a single instrument-type switch rather than a hierarchy of event or instrument classes.
 
-NDS exposes one `FormatDefinition` containing both its scanner and semantic dialect. Recognition occurs inside `scan`, so SDAT signature discovery runs once instead of being duplicated by `canScan`.
+NDS exposes one `FormatDefinition` containing both its scanner and compiler-cursor dialect. Recognition occurs inside `scan`, so SDAT signature discovery runs once instead of being duplicated by `canScan`.
 
 ### 19.2 Capcom SNES
 
@@ -1033,7 +1052,7 @@ Create a `FormatDefinition` containing a module with:
 - optional resolver;
 - optional materializer.
 
-Add the format's single semantic dialect when it contains bytecode, then pass the definition to `Session::registerFormat`. Do not add separate module and dialect registration entry points.
+Add the format's single source-free dialect when it contains bytecode, then pass the definition to `Session::registerFormat`. Do not add separate module and dialect registration entry points.
 
 Put recognition at the start of `scan` and return an empty `ScanResult` for non-matches. Do not add `canScan`; it exists only for unmigrated modules.
 
@@ -1053,19 +1072,19 @@ Use `ByteReader` for random access and `RecordReader` for sequential records. `R
 
 Use `ScanResultBuilder` to allocate IDs and attach metadata. A source decoder should return the narrow neutral value it owns—for example, Capcom's sequence decoder returns `SequenceProgram` while the scanner registers it as a sequence asset.
 
-### Step 5: Decode sequences into semantic commands
+### Step 5: Compile sequence commands
 
 Define:
 
-- one base opcode profile with sparse version patches;
-- one complete definition per command, with adjacent decode and playback lambdas;
-- operand names, display rules, roles, and encoded/resolved values directly in the decode lambda;
+- one imperative compiler-cursor opcode switch, with small version-specific dispatch helpers only when necessary;
+- one complete source block per command;
+- operand names, display rules, and roles directly on field reads;
 - a per-program profile in `SequenceProgram::config`;
 - a program-state type only when the driver has real shared state;
 - a `TrackState` type for driver-local mutable playback state; and
-- a track decoder using `decodeSemanticLinearTrack` (or a reachable-block wrapper when the format requires one).
+- a track decoder using `decodeCompilerLinearTrack` or `decodeCompilerReachableTrack`.
 
-Use `SemanticCommandDecoder` and `SemanticCommandArgs` to keep generic IR construction and type erasure out of format code. The decoder reads bytes once and generic projection creates source annotations. Playback reads only named resolved operands and emits neutral performance events. It should not implement global loop export policy and must never read source bytes.
+Use `CompilerCursor` to keep IR construction, source projection, generated executor registration, truncation handling, and type erasure out of format code. Ordinary literal commands should end in `emit...`, `set`, `add`, `toggle`, or a VM flow operation. Put genuinely stateful driver behavior in a nearby typed `Playback` method and call it with `invoke`. Playback must not implement global loop export policy or read source bytes.
 
 ### Step 6: Build synth data in the neutral model
 
@@ -1121,7 +1140,7 @@ It is the main mechanism for HexView-style explanation of parsed bytes.
 
 Insertion order matters because extractors are registered before normal formats in `ValueFormats.cpp`.
 
-New formats enter through `FormatDefinition` and `Session::registerFormat`, which couples one module to its semantic dialect. The two raw registries remain public only as a migration surface for formats that still register cursor dialect matrices.
+New formats enter through `FormatDefinition` and `Session::registerFormat`, which couples one module to its source-free dialect. The two raw registries remain public only as a migration surface for formats that still register cursor dialect matrices.
 
 ### 21.6 `ScanResultBuilder`
 
@@ -1155,27 +1174,27 @@ It also validates collection references and reports missing or wrong-type assets
 
 ### 21.11 `SequenceProgram`
 
-`SequenceProgram` records semantic source commands, program profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
+`SequenceProgram` records decoded source commands, program profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
 
-Each semantic command stores its opcode, named operands, source provenance, and decode flow. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Byte pools exist only for legacy dialects.
+Each compiler-cursor command stores its opcode, named source operands, source provenance, decode flow, positional executable arguments, and executor slot. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Complete compiled commands have no byte-pool entry; byte pools exist for old cursor commands and partial malformed-command diagnostics.
 
-### 21.12 `SemanticCommandDecoder`, `RecordReader`, and legacy `VmCommandCursor`
+### 21.12 `CompilerCursor`, `RecordReader`, and old `VmCommandCursor`
 
-`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `SemanticCommandDecoder` adds the narrow command-authoring conveniences for named operands, raw/resolved values, and discovery flow. `CommandSourceMap` performs automatic projection; ordinary records can reuse the reader's captured fields when building their one durable annotation.
+`RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CompilerCursor` adds command presentation, source operands, discovery flow, executable arguments, and generated typed executor selection. `CommandSourceMap` performs automatic projection.
 
-`VmCommandCursor` remains the two-phase compatibility surface for unmigrated sequence dialects. It should not be used for new semantic implementations because render-phase cursors can reparse stored command bytes.
+`VmCommandCursor` remains a two-phase surface only because unmigrated value formats currently use it. New code must not use it. It may be deleted whenever preserving it would complicate the compiler-cursor design; its implementation remains recoverable from Git history.
 
 ### 21.13 `SequenceDialect`
 
-A semantic dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior.
+A source-free dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior. `CompiledCommandDialect` is the compiler-cursor adapter: it is the only layer that sees `std::any`, creates the concrete `Playback`, and dispatches the generated executor slot.
 
-The implementation uses `std::any` only to erase the concrete program and track runtime-state types. Program-specific version data is not stored in dialect context; it lives on the immutable program. Legacy dialect context remains until those formats migrate.
+The implementation uses `std::any` only to erase the concrete program and track runtime-state types. Program-specific version data is not stored in dialect context; it lives on the immutable program. Old dialect context remains until those formats migrate.
 
 ### 21.14 `SequenceVm`
 
-`SequenceVm` is the shared interpreter for parsed sequences. Semantic dialects run through a global `(tick, stable track order)` scheduler with one program state and per-track runtimes. The VM handles command limits, loops, calls, returns, repeats, diagnostics, and event emission. Recurrence keys include command, call stack, and repeat-counter state; the command limit is only a contextual emergency guard.
+`SequenceVm` is the shared interpreter for parsed sequences. Source-free dialects run through a global `(tick, stable track order)` scheduler with one program state and per-track runtimes. The VM handles command limits, loops, calls, returns, repeats, diagnostics, and event emission. Recurrence keys include command, call stack, and repeat-counter state; the command limit is only a contextual emergency guard.
 
-Legacy dialects still use track-major execution and optional prepasses. Those paths are adapters to remove as formats migrate.
+Old cursor dialects still use track-major execution and optional prepasses. Those paths are disposable adapters, not behavior the new design must preserve.
 
 ### 21.15 `PerformanceModel`
 
@@ -1247,9 +1266,9 @@ The VM outputs neutral performance events. MIDI is one renderer, not the sequenc
 
 ## 23. Tradeoffs and risks
 
-### 23.1 Semantic and legacy sequence paths coexist temporarily
+### 23.1 Older sequence paths coexist temporarily
 
-Capcom and NDS use semantic commands and global scheduling, while three format families still use the cursor adapter and track-major execution. Shared code must preserve both until migration is complete. Avoid adding features only to the legacy path; doing so increases the cost of removing it.
+NDS uses compiler-cursor commands and global scheduling. Capcom uses the earlier semantic profile on the same scheduler, while three format families still use the cursor adapter and track-major execution. Coexistence is a repository migration fact, not an architectural promise. Do not add features to the old paths, and remove them whenever that makes the target code materially cleaner; Git history preserves a fallback.
 
 ### 23.2 `std::any` hides some type checking
 
@@ -1285,15 +1304,15 @@ The branch would benefit from a contributor-facing guide with one page each for:
 
 - simple scanner with explicit collection;
 - scanner with match facts and resolver;
-- semantic sequence decoder/executor with a small opcode profile;
+- compiler-cursor sequence decoder with one opcode switch;
 - synth parser using `Instrument`, `Region`, and `Sample`;
 - source map annotation conventions.
 
-### 24.2 Keep command decoding and execution boring
+### 24.2 Keep command compilation boring
 
-The decoder should read operands and store flow once. Playback should consume named resolved operands, update state, emit events, and return runtime flow. Put both operations in the same profile entry; the two lifecycle entry points should only select and invoke that entry.
+Read each operand once in a short opcode block and finish with the command's effect. Literal output, state, and VM flow belong directly in that block. Only runtime-history-dependent behavior belongs in a nearby concrete `Playback` method, invoked with typed arguments.
 
-Keep opcode knowledge in one profile plus sparse patches. Avoid command-kind and operand-ID enums, parallel size/metadata tables, analysis interpreters, and per-opcode handler classes.
+Keep opcode knowledge in one switch plus small version dispatch helpers. Avoid command-kind and operand-ID enums, parallel size/metadata tables, analysis interpreters, declarative command tables, and per-opcode handler classes.
 
 ### 24.3 Prefer explicit collections when possible
 
@@ -1320,19 +1339,19 @@ Add durable symbolic sample bindings, make collection rebuilding independent of 
 The remaining order is intentional:
 
 1. add neutral control transitions for fades/slides;
-2. migrate Konami SNES to semantic commands and delete its modulation shadow interpreter;
-3. migrate Akao SNES, replacing its dialect matrix, byte rewriting, tempo scraping, prepass, and tick motion;
+2. migrate Konami SNES to compiler-cursor commands and delete its modulation shadow interpreter;
+3. migrate Akao SNES to compiler-cursor commands, replacing its dialect matrix, byte rewriting, tempo scraping, prepass, and tick motion;
 4. add symbolic Akao articulation/sample binding and remove materialization source reads;
 5. migrate the remaining layouts/synth parsers to `RecordReader` and shared platform primitives;
-6. remove all `canScan`, cursor-dialect, byte-pool, prepass, and materialization adapters;
+6. remove all `canScan`, old cursor-dialect, byte-pool, prepass, and materialization adapters;
 7. migrate each format to one `FormatDefinition`, then remove direct access to the two raw registries.
 
 Architectural acceptance criteria:
 
 - every source structure is parsed once;
-- semantic VM execution has no byte access;
+- compiler-cursor VM execution has no byte access;
 - collection rebuilding has no source access;
-- each driver has one opcode mapping with adjacent decode and playback behavior;
+- each driver has one primary opcode block per command and no separate execution mapping;
 - driver profile data lives on `SequenceProgram`;
 - format code emits transitions rather than per-tick fade events;
 - value-format directories contain no MIDI, SF2, or DLS policy;
@@ -1353,7 +1372,7 @@ The new architecture is easiest to understand as a set of stages:
 5. Collection resolution groups assets into export units.
 6. A pure binder resolves durable symbolic references (legacy Akao still materializes and reparses).
 7. SessionSnapshot exposes a read-only view.
-8. SequenceVm globally schedules semantic commands into neutral performance events (legacy dialects use an adapter).
+8. SequenceVm globally schedules source-free compiled commands into neutral performance events (old cursor dialects use an adapter).
 9. Exporters turn collections into files.
 ```
 
