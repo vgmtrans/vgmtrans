@@ -2787,11 +2787,9 @@ TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesSequence
 
   const auto& context = cursorContext<Context>(descriptor.dialect);
   TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, context);
-  const auto decodeCommand = [&](u32 offset, u32 commandEnd) {
-    auto commandContext = decodeContext;
-    commandContext.bytecodeEnd = commandEnd;
+  const auto decodeCommand = [&](u32 offset) {
     auto decoded = decodeCursorCommandWithState<TrackState, Context, AkaoSnesCursorReader>(
-        reader, offset, descriptor.dialect, decodeState, commandContext);
+        reader, offset, descriptor.dialect, decodeState, decodeContext);
     resolveStoredBranchOperand(decoded, context);
     return decoded;
   };

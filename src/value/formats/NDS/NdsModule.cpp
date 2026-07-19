@@ -140,11 +140,11 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
     }
 
     const std::string& name = layout.sequenceNames[sequenceIndex];
-    const NdsSequenceRange range =
-        ndsSequenceRangeForFatEntry(input.reader, sequenceRange->offset, sequenceRange->size);
-    const auto sequenceAsset = result.reserveSequence();
-    result.sequence(sequenceAsset, name, input.reader.range(range.offset, range.sequenceEnd - range.offset))
-        .program(decodeNdsSequence(input.reader, sequenceAsset.id, range, &result.sourceMap(), &result.diagnostics()));
+    const auto sequenceAsset = result.sequence([&](AssetId id) {
+      return parseNdsSequenceProgram(
+          input, id, ndsSequenceRangeForFatEntry(input.reader, sequenceRange->offset, sequenceRange->size), name,
+          &result.sourceMap(), &result.diagnostics());
+    });
 
     auto collection = result.collection(name, ndsCollectionKey(input.source.id, layout.baseOffset, sequenceIndex));
     collection.sequence(sequenceAsset).samples(psg);

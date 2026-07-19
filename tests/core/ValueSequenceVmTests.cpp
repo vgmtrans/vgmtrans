@@ -902,60 +902,6 @@ void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
   expectDiagnosticRange(performance.diagnostics, "Sequence jump target $0063 was not decoded", jumpRange);
 }
 
-void sequenceVmExecutesStandardCommandsWithoutFormatPlaybackCode() {
-  const SequenceDialect dialect{
-      .id = DialectId{.value = "standard-command-probe"},
-      .timebase = Timebase{.ppqn = 48},
-      .createSemanticTrackState = createStandardTrackState,
-      .executeSemantic = executeStandardCommand,
-  };
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
-  TrackProgramBuilder builder{track};
-  const auto add = [&](u32 address, StandardSequenceCommand operation) {
-    builder.addSemantic(Address{address}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{address + 1}), {},
-                        std::move(operation));
-  };
-
-  add(0, standard_command::Transpose{.semitones = 12});
-  add(1, standard_command::NoteWait{.enabled = true});
-  add(2, standard_command::PitchBendRange{.semitones = 4});
-  add(3, standard_command::PitchBend{.rangeFraction = 0.5});
-  add(4, standard_command::Instrument{.bank = 2, .program = 7});
-  add(5, standard_command::Level{.linearGain = 0.5});
-  add(6, standard_command::Pan{.position = -0.25});
-  add(7, standard_command::Expression{.linearGain = 0.75});
-  add(8, standard_command::PortamentoEnable{.enabled = true});
-  add(9, standard_command::PortamentoTime{.milliseconds = 32.0});
-  add(10, standard_command::VibratoDepth{.amount = 0.25});
-  add(11, standard_command::Note{.key = 60, .linearVelocity = 0.8, .durationTicks = 6});
-  add(12, standard_command::Wait{.ticks = 4});
-  add(13, standard_command::Tempo{.microsecondsPerQuarter = 500000});
-  builder.addSemantic(Address{14}, 0, 1, {}, {}, DecodeFlow::terminalFlow());
-
-  const SequenceProgram program{
-      .dialect = dialect.id,
-      .timebase = dialect.timebase,
-      .tracks = {track},
-  };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
-  expect(performance.diagnostics.empty(), "standard commands should execute without format playback code");
-  expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 10,
-         "note-wait and wait operations should advance the standard track clock");
-  const auto& events = performance.tracks[0].events;
-  expect(events.size() == 11, "standard commands should emit every requested performance event");
-  expect(std::get<PitchBendRangePerformanceEvent>(events[0]).cents == 400 &&
-             std::get<PitchBendPerformanceEvent>(events[1]).semitones == 2.0,
-         "standard pitch bend should use the active standard pitch range");
-  expect(std::get<InstrumentPerformanceEvent>(events[2]).bank == 2 &&
-             std::get<InstrumentPerformanceEvent>(events[2]).program == 7,
-         "standard instrument selection should preserve bank and program");
-  const auto& note = std::get<NotePerformanceEvent>(events[9]);
-  expect(note.header.tick == 0 && note.key == 72.0 && note.linearVelocity == 0.8 && note.durationTicks == 6,
-         "standard notes should apply transpose, velocity, duration, and note-wait state");
-  expect(std::get<TempoPerformanceEvent>(events[10]).header.tick == 10,
-         "standard waits should schedule following events at the advanced tick");
-}
-
 struct ScheduledProbeProgramState {
   u32 sharedValue = 0;
 };
@@ -1121,7 +1067,6 @@ void runValueSequenceVmTests() {
   sequenceVmSynchronizedDryRunDoesNotDuplicateDiagnostics();
   sequenceVmDoesNotWrapCommandAddressOverflow();
   sequenceVmReportsMissingJumpTargetAfterEmittedEvents();
-  sequenceVmExecutesStandardCommandsWithoutFormatPlaybackCode();
   sequenceVmSchedulesSemanticTracksAgainstOneProgramState();
   sequenceVmCoordinatesSemanticLoopsAtSequenceScope();
 }

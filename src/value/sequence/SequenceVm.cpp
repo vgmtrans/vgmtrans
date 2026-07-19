@@ -14,7 +14,6 @@
 #include <memory>
 #include <optional>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -84,12 +83,6 @@ using detail::RepeatStateSnapshot;
 using detail::VmTrackRuntime;
 
 constexpr u32 kFallbackCommandLimit = 100000;
-
-struct StandardTrackState {
-  bool noteWait = false;
-  s32 transpose = 0;
-  u8 pitchBendRangeSemitones = 2;
-};
 
 [[nodiscard]] Diagnostic vmWarning(std::string message, SourceRange range) {
   return Diagnostic{
@@ -721,70 +714,6 @@ void VmApi::diagnostic(Diagnostic diagnostic) {
 
 VmApi::VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command)
     : runtime_(runtime), sequence_(sequence), command_(command) {
-}
-
-std::any createStandardTrackState(const SequenceProgram&, const TrackProgram&) {
-  return StandardTrackState{};
-}
-
-Effects executeStandardCommand(const SourceCommand& command, std::any&, std::any& trackStateValue,
-                               PerformanceEmitter& out, VmApi& vm) {
-  switch (command.flow.kind) {
-    case DecodeFlow::Kind::Jump:
-      return Effects{.step = command.flow.staticTargets.empty() ? vm.end() : vm.jump(command.flow.staticTargets[0])};
-    case DecodeFlow::Kind::Call:
-      return Effects{.step = command.flow.staticTargets.empty() ? vm.end() : vm.call(command.flow.staticTargets[0])};
-    case DecodeFlow::Kind::Return:
-      return Effects{.step = vm.return_()};
-    case DecodeFlow::Kind::Terminal:
-      return Effects{.step = vm.end()};
-    case DecodeFlow::Kind::Fallthrough:
-      break;
-  }
-
-  auto& state = std::any_cast<StandardTrackState&>(trackStateValue);
-  return std::visit(
-      [&](const auto& operation) -> Effects {
-        using Operation = std::decay_t<decltype(operation)>;
-        if constexpr (std::is_same_v<Operation, std::monostate>) {
-          return Effects{};
-        } else if constexpr (std::is_same_v<Operation, standard_command::Note>) {
-          const s32 key = std::clamp<s32>(static_cast<s32>(operation.key) + state.transpose, 0, 127);
-          out.note(static_cast<double>(key), operation.linearVelocity, operation.durationTicks);
-          return state.noteWait ? Effects::wait(operation.durationTicks) : Effects{};
-        } else if constexpr (std::is_same_v<Operation, standard_command::Wait>) {
-          return Effects::wait(operation.ticks);
-        } else if constexpr (std::is_same_v<Operation, standard_command::Instrument>) {
-          out.instrument(operation.bank, operation.program);
-        } else if constexpr (std::is_same_v<Operation, standard_command::Pan>) {
-          out.pan(operation.position);
-        } else if constexpr (std::is_same_v<Operation, standard_command::Level>) {
-          out.level(operation.linearGain);
-        } else if constexpr (std::is_same_v<Operation, standard_command::Expression>) {
-          out.expression(operation.linearGain);
-        } else if constexpr (std::is_same_v<Operation, standard_command::Transpose>) {
-          state.transpose = operation.semitones;
-        } else if constexpr (std::is_same_v<Operation, standard_command::PitchBend>) {
-          out.pitchBend(operation.rangeFraction * state.pitchBendRangeSemitones);
-        } else if constexpr (std::is_same_v<Operation, standard_command::PitchBendRange>) {
-          state.pitchBendRangeSemitones = operation.semitones;
-          out.pitchBendRange(operation.semitones);
-        } else if constexpr (std::is_same_v<Operation, standard_command::NoteWait>) {
-          state.noteWait = operation.enabled;
-        } else if constexpr (std::is_same_v<Operation, standard_command::VibratoDepth>) {
-          out.modulation(ModulationPerformanceTarget::VibratoDepth, operation.amount);
-        } else if constexpr (std::is_same_v<Operation, standard_command::PortamentoEnable>) {
-          out.portamentoEnable(operation.enabled);
-        } else if constexpr (std::is_same_v<Operation, standard_command::PortamentoTime>) {
-          out.portamentoTime(operation.milliseconds);
-        } else if constexpr (std::is_same_v<Operation, standard_command::Tempo>) {
-          if (operation.microsecondsPerQuarter != 0) {
-            out.tempo(operation.microsecondsPerQuarter);
-          }
-        }
-        return Effects{};
-      },
-      command.standardCommand);
 }
 
 SequenceVm::SequenceVm(LoopPolicy loopPolicy) : options_(SequenceVmOptions{.loopPolicy = loopPolicy}) {

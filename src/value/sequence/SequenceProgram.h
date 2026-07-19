@@ -85,9 +85,9 @@ struct DecodeFlow {
 
 using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
 
-// The role is intentionally small and format-independent. Operand names preserve
-// the source driver's precise vocabulary; roles let generic analysis and
-// SourceMap projection recognize the few relationships shared by all drivers.
+// The role is intentionally small and format-independent. Operand names are the
+// executor's precise vocabulary; roles let generic analysis and SourceMap
+// projection recognize the few relationships shared by all drivers.
 enum class SemanticOperandRole : u8 {
   Value,
   NoteKey,
@@ -124,79 +124,6 @@ struct SemanticOperand {
 
 [[nodiscard]] SourceValue semanticOperandSourceValue(const SemanticOperandValue& value);
 
-// Common driver operations are durable values rather than format callbacks.
-// Formats decode source-specific representations into these values once; the
-// shared VM executes them without operand-name lookup or source-byte access.
-namespace standard_command {
-
-struct Note {
-  u8 key = 0;
-  double linearVelocity = 1.0;
-  u32 durationTicks = 0;
-};
-
-struct Wait {
-  u32 ticks = 0;
-};
-
-struct Instrument {
-  u32 bank = 0;
-  u32 program = 0;
-};
-
-struct Pan {
-  double position = 0.0;
-};
-
-struct Level {
-  double linearGain = 1.0;
-};
-
-struct Expression {
-  double linearGain = 1.0;
-};
-
-struct Transpose {
-  s32 semitones = 0;
-};
-
-struct PitchBend {
-  double rangeFraction = 0.0;
-};
-
-struct PitchBendRange {
-  u8 semitones = 2;
-};
-
-struct NoteWait {
-  bool enabled = false;
-};
-
-struct VibratoDepth {
-  double amount = 0.0;
-};
-
-struct PortamentoEnable {
-  bool enabled = false;
-};
-
-struct PortamentoTime {
-  double milliseconds = 0.0;
-};
-
-struct Tempo {
-  u32 microsecondsPerQuarter = 500000;
-};
-
-}  // namespace standard_command
-
-using StandardSequenceCommand =
-    std::variant<std::monostate, standard_command::Note, standard_command::Wait, standard_command::Instrument,
-                 standard_command::Pan, standard_command::Level, standard_command::Expression,
-                 standard_command::Transpose, standard_command::PitchBend, standard_command::PitchBendRange,
-                 standard_command::NoteWait, standard_command::VibratoDepth, standard_command::PortamentoEnable,
-                 standard_command::PortamentoTime, standard_command::Tempo>;
-
 // One decoded source opcode. Source bytes are retained only for legacy dialects.
 // Semantic dialects execute opcode/operands/flow and therefore cannot reparse
 // the source during playback.
@@ -210,7 +137,6 @@ struct SourceCommand {
   ByteSpan bytes;
   std::vector<SemanticOperand> operands;
   DecodeFlow flow;
-  StandardSequenceCommand standardCommand;
 
   // Builders require legacy commands to have bytes. Their absence therefore
   // identifies a semantic command without another tag or command-kind enum.
@@ -296,7 +222,7 @@ public:
                                   SourceAnnotationId annotation = {}, DecodeFlow flow = {});
   const SourceCommand& addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
                                    std::vector<SemanticOperand> operands, DecodeFlow flow,
-                                   SourceAnnotationId annotation = {}, StandardSequenceCommand standardCommand = {});
+                                   SourceAnnotationId annotation = {});
 
 private:
   TrackProgram& track_;

@@ -185,37 +185,6 @@ void trackProgramBuilderRejectsDuplicateCommandAddresses() {
   expect(track.commands.size() == 1, "duplicate-address rejection should not mutate the track program");
 }
 
-void reachableDecoderStopsCommandsAtKnownBlockStarts() {
-  const std::vector<u8> bytes(10);
-  const ByteReader reader(SourceId{9}, bytes);
-  u32 fallthroughBoundary = 0;
-  const auto decode = [&](u32 offset, u32 commandEnd) {
-    DecodedBytecodeCommand command{
-        .range = reader.range(offset, 1),
-        .opcode = 0,
-        .encodedSize = 1,
-        .retainBytes = false,
-    };
-    if (offset == 0) {
-      command.encodedSize = 4;
-      command.range = reader.range(offset, 4);
-      command.flow = DecodeFlow::call(Address{5}, Address{4});
-    } else {
-      command.flow = DecodeFlow::terminalFlow();
-      if (offset == 4) {
-        fallthroughBoundary = commandEnd;
-      }
-    }
-    return command;
-  };
-
-  const TrackProgram track = decodeReachableBytecodeBlocks(reader, 10, 0, 0, {}, decode);
-  expect(fallthroughBoundary == 5, "reachable decoding should bound fallthrough commands at a queued call target");
-  expect(track.commands.size() == 3 && track.commands[0].address.value == 0 && track.commands[1].address.value == 4 &&
-             track.commands[2].address.value == 5,
-         "reachable decoding should retain both sides of a known block boundary");
-}
-
 void collectionIssueHelpersValidateStoredStatus() {
   const CollectionIssue missingSequence = missingSequenceIssue();
   expect(missingSequence.severity == Severity::Warning && missingSequence.code == "missing-sequence",
@@ -257,6 +226,5 @@ void runValueSequenceModelTests() {
   vmCommandCursorRecordsStructuredResourceLinks();
   vmCommandCursorStickyFailsMalformedReads();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
-  reachableDecoderStopsCommandsAtKnownBlockStarts();
   collectionIssueHelpersValidateStoredStatus();
 }
