@@ -89,6 +89,9 @@ using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::
 struct CommandExecution {
   static constexpr u32 kInvalidExecutor = std::numeric_limits<u32>::max();
 
+  // CompilerCursor assigns this slot from a generated typed thunk. Arguments
+  // are positional executable values: playback never looks up source-field
+  // names and never needs the encoded command bytes.
   u32 executor = kInvalidExecutor;
   std::vector<SemanticOperandValue> arguments;
 
@@ -119,9 +122,10 @@ enum class SemanticOperandRole : u8 {
 };
 
 struct SemanticOperand {
-  // value is the resolved value consumed by execution. encodedValue is present
-  // when the source representation differs; the SourceMap then shows both
-  // without making playback repeat the conversion.
+  // These values describe the source command for annotations and analysis.
+  // Compiler-cursor playback uses CommandExecution::arguments instead. The
+  // optional encoded form is useful only when showing both raw and resolved
+  // values materially improves the source presentation.
   SemanticOperandValue value;
   SourceRange range;
   std::string name;
@@ -134,9 +138,10 @@ struct SemanticOperand {
 
 [[nodiscard]] SourceValue semanticOperandSourceValue(const SemanticOperandValue& value);
 
-// One decoded source opcode. Source bytes are retained only for legacy dialects.
-// Semantic dialects execute opcode/operands/flow and therefore cannot reparse
-// the source during playback.
+// One decoded source opcode. Complete compiler-cursor commands retain metadata,
+// discovery flow, and source-free execution data, but no command bytes. Legacy
+// commands retain bytes until their formats are migrated. A truncated compiled
+// command may retain partial bytes for diagnostics, never for execution.
 struct SourceCommand {
   CommandId id;
   u8 opcode = 0;
@@ -154,10 +159,8 @@ struct SourceCommand {
   [[nodiscard]] bool semantic() const noexcept { return bytes.size == 0; }
 };
 
-// Operand names are both their author-facing vocabulary and their durable
-// identity. Semantic commands contain only a handful of operands, so a small
-// linear lookup is clearer than making every format maintain parallel numeric
-// IDs and presentation-name tables.
+// Operand names are presentation vocabulary for source inspection and analysis.
+// This lookup is not part of compiler-cursor playback.
 [[nodiscard]] const SemanticOperand* semanticOperand(const SourceCommand& command, std::string_view name);
 
 // Maps source addresses to command indexes. The VM uses this for jumps, calls,

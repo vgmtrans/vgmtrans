@@ -45,7 +45,15 @@ an export smoke test that checks whole-archive discovery and artifact creation.
 
 ### Known NDS baseline findings
 
-The semantic NDS migration was checked against a Mega Man ZX ROM (35
+The compiler-cursor NDS migration was checked against a Castlevania: Dawn of
+Sorrow ROM (40 collections). Summary parity passed for all collections, as did
+every SF2 and DLS comparison. MIDI reaches a pre-existing original/value
+difference in `SDL_BGM_ARR1_`: at tick 817 on track 6, the original path emits
+pitch-bend-range data entry (`CC 6 = 2`) before expression, while the value path
+does not. The identical normalized event counts, first mismatch, and context
+reproduce at `9341da765`, before the compiler-cursor migration.
+
+The earlier semantic NDS migration was also checked against a Mega Man ZX ROM (35
 collections) and a Last Window mini2SF set (56 collections). Summary and
 SF2/DLS parity passed for every collection. MIDI comparison reached these two
 pre-existing differences between the original and value architectures:
