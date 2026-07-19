@@ -19,6 +19,7 @@
 #include "formats/NDS/NDSInstrSet.h"
 #include "value/export/ExportTypes.h"
 #include "value/export/midi/MidiExporter.h"
+#include "value/export/synth/ModulationScaling.h"
 #include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
@@ -925,10 +926,11 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
           .program = address.program,
           .sourceOffset = static_cast<u32>(instrument.range.offset),
       };
-      for (const auto& generator : instrument.generators) {
+      const auto modulation = lowerSynthModulation(instrument.modulation);
+      for (const auto& generator : modulation.generators) {
         synth.generators.push_back(summarizeGenerator(generator));
       }
-      for (const auto& modulator : instrument.modulators) {
+      for (const auto& modulator : modulation.modulators) {
         synth.modulators.push_back(summarizeModulator(modulator));
       }
       summary.instrumentSynths.push_back(std::move(synth));
@@ -1259,10 +1261,9 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
 }
 
 SynthExportBytes valueCapcomSnesSynthExports(Session& session, CollectionId collection) {
-  const auto artifacts =
-      session.exportCollection(collection, ExportRequest{
-                                               .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
-                                           });
+  const auto artifacts = session.exportCollection(collection, ExportRequest{
+                                                                  .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
+                                                              });
 
   SynthExportBytes exports;
   for (const auto& artifact : artifacts) {
@@ -1807,15 +1808,14 @@ std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesyst
 std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops,
                                     ModulationConversionPolicy modulationConversion, MidiExportOptions midiOptions,
                                     ModulationScalingPolicy modulationScaling) {
-  const auto artifacts =
-      session.exportCollection(collection, ExportRequest{
-                                               .kinds = {ExportKind::Midi},
-                                               .loopPolicy = LoopPolicy::PlayOnce,
-                                               .sequenceLoops = sequenceLoops,
-                                               .midi = midiOptions,
-                                               .modulationScaling = modulationScaling,
-                                               .modulationConversion = modulationConversion,
-                                           });
+  const auto artifacts = session.exportCollection(collection, ExportRequest{
+                                                                  .kinds = {ExportKind::Midi},
+                                                                  .loopPolicy = LoopPolicy::PlayOnce,
+                                                                  .sequenceLoops = sequenceLoops,
+                                                                  .midi = midiOptions,
+                                                                  .modulationScaling = modulationScaling,
+                                                                  .modulationConversion = modulationConversion,
+                                                              });
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -3435,13 +3435,12 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           ++stats.melodicBankNoteEvents;
         }
       } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        const std::optional<InstrumentAddress> explicitAddress =
-            instrumentEvent->sourceInstrument
-                ? std::nullopt
-                : std::optional{InstrumentAddress{
-                      .bank = instrumentEvent->bank,
-                      .program = instrumentEvent->program,
-                  }};
+        const std::optional<InstrumentAddress> explicitAddress = instrumentEvent->sourceInstrument
+                                                                     ? std::nullopt
+                                                                     : std::optional{InstrumentAddress{
+                                                                           .bank = instrumentEvent->bank,
+                                                                           .program = instrumentEvent->program,
+                                                                       }};
         const InstrumentAddress address = resolveInstrumentAddress(explicitAddress, instrumentEvent->sourceInstrument);
         instrument.bank = address.bank;
         instrument.program = address.program;
@@ -3726,8 +3725,8 @@ using SynthCollectionMap = std::map<std::string, SynthExportBytes>;
 int runMidiParity(const ParitySuite& suite, const MidiCollectionMap& legacy, const MidiCollectionMap& value,
                   u32 sequenceLoops = 0) {
   if (value.size() != legacy.size()) {
-    std::cout << suite.label << " MIDI collection count differs: legacy=" << legacy.size()
-              << " value=" << value.size() << "\n";
+    std::cout << suite.label << " MIDI collection count differs: legacy=" << legacy.size() << " value=" << value.size()
+              << "\n";
     return 1;
   }
 
@@ -3735,8 +3734,7 @@ int runMidiParity(const ParitySuite& suite, const MidiCollectionMap& legacy, con
   for (const auto& [collectionName, legacyMidi] : legacy) {
     const auto found = value.find(collectionName);
     if (found == value.end()) {
-      std::cout << "value " << suite.label << " scan did not produce MIDI for collection '" << collectionName
-                << "'\n";
+      std::cout << "value " << suite.label << " scan did not produce MIDI for collection '" << collectionName << "'\n";
       return 1;
     }
 
@@ -3747,13 +3745,12 @@ int runMidiParity(const ParitySuite& suite, const MidiCollectionMap& legacy, con
     }
   }
 
-  std::cout << suite.label << " direct MIDI parity ok: collections=" << legacy.size()
-            << " loops=" << sequenceLoops << "\n";
+  std::cout << suite.label << " direct MIDI parity ok: collections=" << legacy.size() << " loops=" << sequenceLoops
+            << "\n";
   return 0;
 }
 
-int runSummaryParity(const ParitySuite& suite, const SummaryCollectionMap& legacy,
-                     const SummaryCollectionMap& value) {
+int runSummaryParity(const ParitySuite& suite, const SummaryCollectionMap& legacy, const SummaryCollectionMap& value) {
   if (value.size() != legacy.size()) {
     std::cout << suite.label << " collection count differs: legacy=" << legacy.size() << " value=" << value.size()
               << "\n"
@@ -3781,16 +3778,16 @@ int runSummaryParity(const ParitySuite& suite, const SummaryCollectionMap& legac
 
 int runSynthParity(const ParitySuite& suite, const SynthCollectionMap& legacy, const SynthCollectionMap& value) {
   if (value.size() != legacy.size()) {
-    std::cout << suite.label << " synth collection count differs: legacy=" << legacy.size()
-              << " value=" << value.size() << "\n";
+    std::cout << suite.label << " synth collection count differs: legacy=" << legacy.size() << " value=" << value.size()
+              << "\n";
     return 1;
   }
 
   for (const auto& [collectionName, legacyExport] : legacy) {
     const auto found = value.find(collectionName);
     if (found == value.end()) {
-      std::cout << "value " << suite.label << " scan did not produce synth exports for collection '"
-                << collectionName << "'\n";
+      std::cout << "value " << suite.label << " scan did not produce synth exports for collection '" << collectionName
+                << "'\n";
       return 1;
     }
 
@@ -3822,20 +3819,17 @@ SummaryCollectionMap valueSummariesForSuite(const std::filesystem::path& path, c
   return valueCollectionSummaries(path);
 }
 
-MidiCollectionMap legacyMidisForSuite(const std::filesystem::path& path, const ParitySuite& suite,
-                                      u32 sequenceLoops) {
+MidiCollectionMap legacyMidisForSuite(const std::filesystem::path& path, const ParitySuite& suite, u32 sequenceLoops) {
   if (suite.filterCollectionsByFormat) {
     return legacyFormatCollectionMidis(path, suite.format, suite.label, sequenceLoops);
   }
   return legacyCollectionMidis(path, sequenceLoops);
 }
 
-MidiCollectionMap valueMidisForSuite(const std::filesystem::path& path, const ParitySuite& suite,
-                                     u32 sequenceLoops) {
+MidiCollectionMap valueMidisForSuite(const std::filesystem::path& path, const ParitySuite& suite, u32 sequenceLoops) {
   if (suite.filterCollectionsByFormat) {
     return valueFormatCollectionMidis(path, suite.format, suite.label, sequenceLoops,
-                                      ModulationConversionPolicy::SynthModulators, suite.midi,
-                                      suite.modulationScaling);
+                                      ModulationConversionPolicy::SynthModulators, suite.midi, suite.modulationScaling);
   }
   return valueCollectionMidis(path, sequenceLoops, ModulationConversionPolicy::SynthModulators, suite.midi,
                               suite.modulationScaling);
@@ -3930,16 +3924,14 @@ int selfTest() {
   const auto midi = MidiExporter().exportMidi(midiSequence);
   const auto normalized = normalizeMidi(midi);
 
-  expect(
-      std::ranges::any_of(
-          normalized.events,
-          [](const auto& event) { return event.kind == "tempo" && event.tick == 0 && event.a == 500000; }),
-      "self-test should normalize tempo events");
-  expect(
-      std::ranges::any_of(
-          normalized.events,
-          [](const auto& event) { return event.kind == "program" && event.channel == 2 && event.a == 12; }),
-      "self-test should normalize program changes");
+  expect(std::ranges::any_of(
+             normalized.events,
+             [](const auto& event) { return event.kind == "tempo" && event.tick == 0 && event.a == 500000; }),
+         "self-test should normalize tempo events");
+  expect(std::ranges::any_of(
+             normalized.events,
+             [](const auto& event) { return event.kind == "program" && event.channel == 2 && event.a == 12; }),
+         "self-test should normalize program changes");
   expect(std::ranges::any_of(normalized.events,
                              [](const auto& event) {
                                return event.kind == "note" && event.tick == 24 && event.channel == 2 && event.a == 64 &&
@@ -4004,8 +3996,7 @@ int compareCapcomSnesRsnDirectMidi(const std::filesystem::path& path) {
 }
 
 int compareCapcomSnesRsnDirectSynth(const std::filesystem::path& path) {
-  return runSynthParity(kCapcomSnesSuite, legacyCapcomSnesRsnSynthExports(path),
-                        valueCapcomSnesRsnSynthExports(path));
+  return runSynthParity(kCapcomSnesSuite, legacyCapcomSnesRsnSynthExports(path), valueCapcomSnesRsnSynthExports(path));
 }
 
 int compareCapcomSnesRsnDirectSummary(const std::filesystem::path& path) {
@@ -4013,8 +4004,7 @@ int compareCapcomSnesRsnDirectSummary(const std::filesystem::path& path) {
 }
 
 int compareNdsDirectSummary(const std::filesystem::path& path) {
-  return runSummaryParity(kNdsSuite, legacySummariesForSuite(path, kNdsSuite),
-                          valueSummariesForSuite(path, kNdsSuite));
+  return runSummaryParity(kNdsSuite, legacySummariesForSuite(path, kNdsSuite), valueSummariesForSuite(path, kNdsSuite));
 }
 
 int compareKonamiSnesDirectSummary(const std::filesystem::path& path) {
@@ -4092,8 +4082,7 @@ int compareNdsDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 
 }
 
 int compareNdsDirectSynth(const std::filesystem::path& path) {
-  return runSynthParity(kNdsSuite, legacySynthsForSuite(path, kNdsSuite),
-                        valueSynthsForSuite(path, kNdsSuite));
+  return runSynthParity(kNdsSuite, legacySynthsForSuite(path, kNdsSuite), valueSynthsForSuite(path, kNdsSuite));
 }
 
 int compareAkaoDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {

@@ -100,11 +100,10 @@ ScanSampleCollectionAssetBuilder::ScanSampleCollectionAssetBuilder(ScanResultBui
 }
 
 ScanSampleCollectionRef ScanSampleCollectionAssetBuilder::samples(SampleCollection samples) {
-  out_.addSampleCollectionAsset(ref_,
-                                SampleCollectionAsset{
-                                    .metadata = out_.metadata(ref_.id, std::move(name_), range_),
-                                    .samples = std::move(samples),
-                                });
+  out_.addSampleCollectionAsset(ref_, SampleCollectionAsset{
+                                          .metadata = out_.metadata(ref_.id, std::move(name_), range_),
+                                          .samples = std::move(samples),
+                                      });
   return ref_;
 }
 
@@ -168,11 +167,21 @@ ScanSequenceAssetBuilder ScanResultBuilder::sequence(ScanSequenceRef ref, std::s
 }
 
 ScanInstrumentSetAssetBuilder ScanResultBuilder::instrumentSet(std::string name, SourceRange range) {
-  return ScanInstrumentSetAssetBuilder(*this, reserveInstrumentSet(), std::move(name), range);
+  return instrumentSet(reserveInstrumentSet(), std::move(name), range);
+}
+
+ScanInstrumentSetAssetBuilder ScanResultBuilder::instrumentSet(ScanInstrumentSetRef ref, std::string name,
+                                                               SourceRange range) {
+  return ScanInstrumentSetAssetBuilder(*this, ref, std::move(name), range);
 }
 
 ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(std::string name, SourceRange range) {
-  return ScanSampleCollectionAssetBuilder(*this, reserveSampleCollection(), std::move(name), range);
+  return sampleCollection(reserveSampleCollection(), std::move(name), range);
+}
+
+ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(ScanSampleCollectionRef ref, std::string name,
+                                                                     SourceRange range) {
+  return ScanSampleCollectionAssetBuilder(*this, ref, std::move(name), range);
 }
 
 ScanMiscAssetBuilder ScanResultBuilder::misc(std::string name, SourceRange range) {

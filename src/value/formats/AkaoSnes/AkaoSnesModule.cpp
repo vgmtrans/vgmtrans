@@ -55,16 +55,7 @@ using namespace core;
   const bool hasSynthLayout = layout->spcDirAddress && layout->tuningTableAddress &&
                               (layout->version == AKAOSNES_V1 || layout->adsrTableAddress);
   if (hasSynthLayout) {
-    const auto instrumentInfos = parseAkaoSnesInstrumentInfos(input.reader, *layout);
-    const auto sampleInfos = parseAkaoSnesSampleInfos(input.reader, *layout->spcDirAddress, instrumentInfos);
-    if (!instrumentInfos.empty() && !sampleInfos.empty()) {
-      result.instrumentSet(instrumentSet, [&](AssetId id) {
-        return parseAkaoSnesInstrumentSet(input, result, id, samples, *layout, instrumentInfos, sampleInfos,
-                                          displayName);
-      });
-      result.sampleCollection(samples, [&](AssetId id) {
-        return parseAkaoSnesSamples(input, id, sampleInfos, displayName, &result.sourceMap());
-      });
+    if (addAkaoSnesSynth(input, result, instrumentSet, samples, *layout, displayName)) {
       collection.instrumentSet(instrumentSet).samples(samples);
     } else {
       result.warning("AkaoSnes sequence found, but no valid instruments or samples were discovered",

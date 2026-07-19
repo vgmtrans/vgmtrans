@@ -6,6 +6,8 @@
 
 #include "value/export/synth/ModulationScaling.h"
 
+#include "value/synth/SynthMath.h"
+
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -55,6 +57,84 @@ namespace {
 }
 
 }  // namespace
+
+LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation) {
+  LoweredSynthModulation lowered{
+      .generators = modulation.customGenerators,
+      .modulators = modulation.customModulators,
+  };
+
+  if (modulation.vibrato) {
+    const auto& vibrato = *modulation.vibrato;
+    lowered.generators.push_back(SynthGenerator{
+        .destination = SynthDestination::VibratoRate,
+        .amount = synthAmountFromHertz(vibrato.rateHertz.minimum),
+    });
+    if (vibrato.delaySeconds) {
+      lowered.generators.push_back(SynthGenerator{
+          .destination = SynthDestination::VibratoDelay,
+          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato.delaySeconds->minimum)),
+      });
+    }
+
+    lowered.modulators.push_back(SynthModulator{
+        .source = SynthSource::ChannelPressure,
+        .destination = SynthDestination::VibratoDepth,
+        .amount = 0,
+    });
+    lowered.modulators.push_back(SynthModulator{
+        .destination = SynthDestination::VibratoDepth,
+        .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
+    });
+    lowered.modulators.push_back(SynthModulator{
+        .destination = SynthDestination::VibratoRate,
+        .amount = synthAmountFromHertzRange(vibrato.rateHertz.minimum, vibrato.rateHertz.maximum),
+    });
+    if (vibrato.delaySeconds) {
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::VibratoDelay,
+          .amount = synthAmountFromSecondsRange(vibrato.delaySeconds->minimum, vibrato.delaySeconds->maximum),
+      });
+    }
+  }
+
+  if (modulation.tremolo) {
+    const auto& tremolo = *modulation.tremolo;
+    lowered.generators.push_back(SynthGenerator{
+        .destination = SynthDestination::TremoloRate,
+        .amount = synthAmountFromHertz(tremolo.rateHertz.minimum),
+    });
+    if (tremolo.delaySeconds) {
+      lowered.generators.push_back(SynthGenerator{
+          .destination = SynthDestination::TremoloDelay,
+          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(tremolo.delaySeconds->minimum)),
+      });
+    }
+
+    lowered.modulators.push_back(SynthModulator{
+        .destination = SynthDestination::TremoloRate,
+        .amount = synthAmountFromHertzRange(tremolo.rateHertz.minimum, tremolo.rateHertz.maximum),
+    });
+    if (tremolo.delaySeconds) {
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::TremoloDelay,
+          .amount = synthAmountFromSecondsRange(tremolo.delaySeconds->minimum, tremolo.delaySeconds->maximum),
+      });
+    }
+    lowered.modulators.push_back(SynthModulator{
+        .destination = SynthDestination::TremoloDepth,
+        .amount = synthAmountFromDecibels(tremolo.maxDepthDb),
+    });
+    if (tremolo.gainMode == TremoloGainMode::NoBoost) {
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::VolumeAttenuation,
+          .amount = synthAmountFromDecibels(tremolo.maxDepthDb),
+      });
+    }
+  }
+
+  return lowered;
+}
 
 u8 scaledMidiModulationControllerValue(u8 value, const ObservedValueRange* range,
                                        ModulationScalingPolicy policy) noexcept {

@@ -46,15 +46,6 @@ struct CapcomSnesLayout {
   std::optional<u32> spcDirAddress;
 };
 
-struct CapcomSnesSampleInfo {
-  u8 srcn = 0;
-  u32 dirEntryAddress = 0;
-  u32 startAddress = 0;
-  u32 loopAddress = 0;
-  u32 encodedLength = 0;
-  bool loops = false;
-};
-
 struct CapcomSnesInstrumentInfo {
   u32 index = 0;
   u32 address = 0;
@@ -63,9 +54,6 @@ struct CapcomSnesInstrumentInfo {
   u8 adsr2 = 0;
   u8 gain = 0;
   s16 pitchScale = 0;
-  u32 dirEntryAddress = 0;
-  u16 sampleStartAddress = 0;
-  u16 sampleLoopAddress = 0;
   std::vector<core::SourceField> sourceFields;
 };
 
@@ -94,17 +82,10 @@ struct CapcomSnesTrackDecodeOptions {
 [[nodiscard]] std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(core::ByteReader reader,
                                                                                    u32 instrumentTableAddress,
                                                                                    u32 spcDirAddress);
-[[nodiscard]] std::vector<CapcomSnesSampleInfo> parseCapcomSnesSampleInfos(
-    core::ByteReader reader, const std::vector<CapcomSnesInstrumentInfo>& instruments);
-[[nodiscard]] core::SampleCollectionAsset parseCapcomSnesSamples(const core::ScanInput& input,
-                                                                 core::AssetId sampleCollectionId,
-                                                                 const std::vector<CapcomSnesSampleInfo>& sampleInfos,
-                                                                 std::string_view displayName,
-                                                                 core::SourceMapBuilder* sourceMap = nullptr);
-[[nodiscard]] core::InstrumentSetAsset parseCapcomSnesInstrumentSet(
-    const core::ScanInput& input, core::ScanResultBuilder& builder, core::AssetId instrumentSetId,
-    core::ScanSampleCollectionRef sampleCollection, const std::vector<CapcomSnesInstrumentInfo>& instrumentInfos,
-    const std::vector<CapcomSnesSampleInfo>& sampleInfos, std::string_view displayName);
+[[nodiscard]] bool addCapcomSnesSynth(const core::ScanInput& input, core::ScanResultBuilder& builder,
+                                      core::ScanInstrumentSetRef instrumentSet,
+                                      core::ScanSampleCollectionRef sampleCollection, u32 instrumentTableAddress,
+                                      u32 spcDirAddress, std::string_view displayName);
 
 [[nodiscard]] core::ScanResult scanCapcomSnes(const core::ScanInput& input);
 [[nodiscard]] core::FormatDefinition capcomSnesDefinition();

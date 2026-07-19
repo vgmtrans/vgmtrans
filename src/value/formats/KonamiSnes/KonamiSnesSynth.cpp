@@ -6,8 +6,8 @@
 
 #include "value/formats/KonamiSnes/KonamiSnesSynth.h"
 
+#include "value/platform/SnesSampleDirectory.h"
 #include "value/synth/SnesDsp.h"
-#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -36,47 +36,8 @@ constexpr u32 kDrumKitProgram = 0x00;
   return usesLegacyPanRange(version) ? 0x14 : 0x28;
 }
 
-[[nodiscard]] u32 sampleLength(ByteReader reader, u32 startAddress, bool& loop) {
-  u32 offset = startAddress;
-  while (true) {
-    if (!reader.has(offset, 9)) {
-      return 0;
-    }
-    const u8 flags = reader.u8At(offset);
-    offset += 9;
-    if ((flags & 1) != 0) {
-      loop = (flags & 2) != 0;
-      break;
-    }
-  }
-  return offset - startAddress;
-}
-
-[[nodiscard]] bool sampleDirIsValid(ByteReader reader, u32 dirEntryAddress, bool validateSample) {
-  if (!reader.has(dirEntryAddress, 4)) {
-    return false;
-  }
-  const u16 sampleStart = reader.le16(dirEntryAddress);
-  const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
-  if (sampleLoop < sampleStart || !reader.has(sampleStart, 10)) {
-    return false;
-  }
-
-  if (validateSample) {
-    bool loops = false;
-    const u32 length = sampleLength(reader, sampleStart, loops);
-    if (length == 0) {
-      return false;
-    }
-    if (loops && sampleLoop >= sampleStart + length) {
-      return false;
-    }
-  }
-  return true;
-}
-
-[[nodiscard]] bool instrumentHeaderIsValid(ByteReader reader, KonamiSnesVersion version, u32 address,
-                                           u32 spcDirAddress, bool validateSample) {
+[[nodiscard]] bool instrumentHeaderIsValid(ByteReader reader, KonamiSnesVersion version, u32 address, u32 spcDirAddress,
+                                           bool validateSample) {
   const u32 headerSize = instrumentHeaderSize(version);
   if (!reader.has(address, headerSize)) {
     return false;
@@ -88,7 +49,7 @@ constexpr u32 kDrumKitProgram = 0x00;
   }
 
   const u32 dirEntryAddress = spcDirAddress + srcn * 4;
-  if (!sampleDirIsValid(reader, dirEntryAddress, validateSample)) {
+  if (!readSnesSampleDirectoryEntry(reader, dirEntryAddress, validateSample)) {
     return false;
   }
 
@@ -114,8 +75,7 @@ constexpr u32 kDrumKitProgram = 0x00;
   return tuning >= 0 ? rawKey : rawKey - 1;
 }
 
-[[nodiscard]] std::vector<KonamiSnesInstrumentInfo> collectPercussionInfos(ByteReader reader,
-                                                                           KonamiSnesVersion version,
+[[nodiscard]] std::vector<KonamiSnesInstrumentInfo> collectPercussionInfos(ByteReader reader, KonamiSnesVersion version,
                                                                            u32 tableAddress, u32 spcDirAddress) {
   std::vector<KonamiSnesInstrumentInfo> infos;
   infos.reserve(kPercussionNoteCount);
@@ -158,8 +118,7 @@ constexpr u32 kDrumKitProgram = 0x00;
 }
 
 [[nodiscard]] KonamiSnesInstrumentInfo instrumentInfo(ByteReader reader, KonamiSnesVersion version, u32 index,
-                                                      u32 address, bool percussion = false,
-                                                      u8 percussionNote = 0) {
+                                                      u32 address, bool percussion = false, u8 percussionNote = 0) {
   const bool legacyLayout = usesLegacyInstrumentLayout(version);
   return KonamiSnesInstrumentInfo{
       .index = index,
@@ -177,40 +136,15 @@ constexpr u32 kDrumKitProgram = 0x00;
   };
 }
 
-[[nodiscard]] std::vector<SynthGenerator> konamiVibratoGenerators(KonamiSnesVersion version) {
+[[nodiscard]] InstrumentModulation konamiInstrumentModulation(KonamiSnesVersion version) {
   const auto spec = vibrato::modulationSpec(version);
-  return {
-      SynthGenerator{
-          .destination = SynthDestination::VibratoRate,
-          .amount = synthAmountFromHertz(spec.minHertz),
-      },
-      SynthGenerator{
-          .destination = SynthDestination::VibratoDelay,
-          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(spec.minDelaySeconds)),
-      },
-  };
-}
-
-[[nodiscard]] std::vector<SynthModulator> konamiVibratoModulators(KonamiSnesVersion version) {
-  const auto spec = vibrato::modulationSpec(version);
-  return {
-      SynthModulator{
-          .source = SynthSource::ChannelPressure,
-          .destination = SynthDestination::VibratoDepth,
-          .amount = 0,
-      },
-      SynthModulator{
-          .destination = SynthDestination::VibratoDepth,
-          .amount = static_cast<s32>(std::lround(spec.maxDepthCents)),
-      },
-      SynthModulator{
-          .destination = SynthDestination::VibratoRate,
-          .amount = synthAmountFromHertzRange(spec.minHertz, spec.maxHertz),
-      },
-      SynthModulator{
-          .destination = SynthDestination::VibratoDelay,
-          .amount = synthAmountFromSecondsRange(spec.minDelaySeconds, spec.maxDelaySeconds),
-      },
+  return InstrumentModulation{
+      .vibrato =
+          VibratoSpec{
+              .maxDepthCents = spec.maxDepthCents,
+              .rateHertz = {spec.minHertz, spec.maxHertz},
+              .delaySeconds = ModulationRange{spec.minDelaySeconds, spec.maxDelaySeconds},
+          },
   };
 }
 
@@ -266,10 +200,10 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
 
   const u32 headerSize = instrumentHeaderSize(layout.version);
   for (u32 instrumentIndex = 0; instrumentIndex <= 0xff; ++instrumentIndex) {
-    const u32 address = instrumentIndex < layout.firstBankedInstrument
-                            ? *layout.commonInstrumentTableAddress + headerSize * instrumentIndex
-                            : *layout.bankedInstrumentTableAddress +
-                                  headerSize * (instrumentIndex - layout.firstBankedInstrument);
+    const u32 address =
+        instrumentIndex < layout.firstBankedInstrument
+            ? *layout.commonInstrumentTableAddress + headerSize * instrumentIndex
+            : *layout.bankedInstrumentTableAddress + headerSize * (instrumentIndex - layout.firstBankedInstrument);
     if (!reader.has(address, headerSize)) {
       break;
     }
@@ -291,141 +225,34 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
     infos.push_back(instrumentInfo(reader, layout.version, instrumentIndex, address));
   }
 
-  auto percussionInfos = collectPercussionInfos(reader, layout.version, *layout.percussionInstrumentTableAddress,
-                                                *layout.spcDirAddress);
-  infos.insert(infos.end(), std::make_move_iterator(percussionInfos.begin()), std::make_move_iterator(percussionInfos.end()));
+  auto percussionInfos =
+      collectPercussionInfos(reader, layout.version, *layout.percussionInstrumentTableAddress, *layout.spcDirAddress);
+  infos.insert(infos.end(), std::make_move_iterator(percussionInfos.begin()),
+               std::make_move_iterator(percussionInfos.end()));
   return infos;
 }
 
-std::vector<KonamiSnesSampleInfo> parseKonamiSnesSampleInfos(
-    ByteReader reader, u32 spcDirAddress, const std::vector<KonamiSnesInstrumentInfo>& instruments) {
+SnesBrrCatalog parseKonamiSnesSampleInfos(ByteReader reader, u32 spcDirAddress,
+                                          const std::vector<KonamiSnesInstrumentInfo>& instruments) {
   std::vector<u8> srcns;
+  srcns.reserve(instruments.size());
   for (const auto& instrument : instruments) {
-    if (std::ranges::find(srcns, instrument.srcn) == srcns.end()) {
-      srcns.push_back(instrument.srcn);
-    }
+    srcns.push_back(instrument.srcn);
   }
-  std::ranges::sort(srcns);
-
-  std::vector<KonamiSnesSampleInfo> samples;
-  for (const u8 srcn : srcns) {
-    const u32 dirEntryAddress = spcDirAddress + srcn * 4;
-    if (!sampleDirIsValid(reader, dirEntryAddress, true)) {
-      continue;
-    }
-    const u16 start = reader.le16(dirEntryAddress);
-    const u16 loop = reader.le16(dirEntryAddress + 2);
-    bool loops = false;
-    const u32 length = sampleLength(reader, start, loops);
-    samples.push_back(KonamiSnesSampleInfo{
-        .srcn = srcn,
-        .dirEntryAddress = dirEntryAddress,
-        .startAddress = start,
-        .loopAddress = loop,
-        .encodedLength = length,
-        .loops = loops,
-    });
-  }
-  return samples;
+  return readSnesBrrCatalog(reader, spcDirAddress, srcns);
 }
 
-SampleCollectionAsset parseKonamiSnesSamples(const ScanInput& input, AssetId sampleCollectionId,
-                                             const std::vector<KonamiSnesSampleInfo>& sampleInfos,
-                                             std::string_view displayName, SourceMapBuilder* sourceMap) {
-  u32 rootOffset = 0;
-  u32 rootSize = 0;
-  if (!sampleInfos.empty()) {
-    rootOffset = sampleInfos.front().dirEntryAddress;
-    rootSize = (sampleInfos.back().dirEntryAddress + 4) - rootOffset;
-  }
+struct KonamiSnesInstrumentBuild {
+  SourceRange range;
+  std::vector<Instrument> instruments;
+};
 
-  SourceAnnotationId root;
-  if (sourceMap != nullptr) {
-    root = sourceMap->table("Sample DIR", input.reader.range(rootOffset, rootSize))
-               .kind("snes-sample-dir")
-               .owner(ObjectRefs::asset(sampleCollectionId))
-               .id();
-  }
-
-  SampleCollection collection;
-  collection.samples.reserve(sampleInfos.size());
-  for (u32 sampleIndex = 0; sampleIndex < sampleInfos.size(); ++sampleIndex) {
-    const auto& info = sampleInfos[sampleIndex];
-    const u32 decodedLength = (info.encodedLength / 9) * 16;
-    const u32 lastBlockAddress = info.encodedLength >= 9 ? info.startAddress + info.encodedLength - 9 : info.startAddress;
-    const bool loopEnabled = info.loops && info.loopAddress >= info.startAddress && info.loopAddress <= lastBlockAddress;
-    const u32 loopStart = loopEnabled ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
-    collection.samples.push_back(Sample{
-        .name = fmt::format("Sample {}", static_cast<unsigned>(info.srcn)),
-        .codec = AudioCodec::SnesBrr,
-        .encodedData = input.reader.range(info.startAddress, info.encodedLength),
-        .sampleRate = 32000,
-        .channels = 1,
-        .bitsPerSample = 16,
-        .loop =
-            Loop{
-                .enabled = loopEnabled,
-                .start = loopStart,
-                .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
-            },
-    });
-
-    if (sourceMap != nullptr) {
-      auto row = sourceMap
-                     ->row(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(info.srcn)),
-                           input.reader.range(info.dirEntryAddress, 4))
-                     .role(SourceRole::Sample)
-                     .kind("snes-sample-dir-entry")
-                     .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-                     .field("start", input.reader.range(info.dirEntryAddress, 2), info.startAddress,
-                            SourceValueDisplay::Address)
-                     .field("loop", input.reader.range(info.dirEntryAddress + 2, 2), info.loopAddress,
-                            SourceValueDisplay::Address)
-                     .link(SourceLinkRole::PointsTo,
-                           SourceTarget{input.reader.range(info.startAddress, info.encodedLength)}, "BRR data");
-      if (root.valid()) {
-        row.parent(root);
-      }
-      sourceMap
-          ->section(fmt::format("Sample {} BRR Data", static_cast<unsigned>(info.srcn)),
-                    input.reader.range(info.startAddress, info.encodedLength))
-          .role(SourceRole::Payload)
-          .kind("snes-brr-payload")
-          .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-          .parent(row.id());
-    }
-  }
-
-  return SampleCollectionAsset{
-      .metadata =
-          AssetMetadata{
-              .id = sampleCollectionId,
-              .format = "KonamiSnes",
-              .name = fmt::format("{} Samples", displayName),
-              .range = input.reader.range(rootOffset, rootSize),
-          },
-      .samples = std::move(collection),
-  };
-}
-
-InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResultBuilder& builder,
-                                                AssetId instrumentSetId, ScanSampleCollectionRef sampleCollection,
-                                                KonamiSnesVersion version,
-                                                u32 spcDirAddress,
-                                                const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
-                                                const std::vector<KonamiSnesSampleInfo>& sampleInfos,
-                                                std::string_view displayName) {
-  std::map<u8, u32> sampleIndexBySrcn;
-  std::map<u32, u32> sampleIndexByStartAddress;
-  std::map<u32, u32> sampleIndexByRelativeStartAddress;
-  for (u32 index = 0; index < sampleInfos.size(); ++index) {
-    sampleIndexBySrcn.emplace(sampleInfos[index].srcn, index);
-    sampleIndexByStartAddress.emplace(sampleInfos[index].startAddress, index);
-    if (sampleInfos[index].startAddress >= spcDirAddress) {
-      sampleIndexByRelativeStartAddress.emplace(sampleInfos[index].startAddress - spcDirAddress, index);
-    }
-  }
-
+KonamiSnesInstrumentBuild buildKonamiSnesInstruments(const ScanInput& input, ScanResultBuilder& builder,
+                                                     ScanInstrumentSetRef instrumentSet,
+                                                     ScanSampleCollectionRef sampleCollection,
+                                                     KonamiSnesVersion version, u32 spcDirAddress,
+                                                     const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
+                                                     const SnesBrrCatalog& samples) {
   u32 rootOffset = instrumentInfos.empty() ? 0 : instrumentInfos.front().address;
   u32 rootEnd = rootOffset;
   for (const auto& info : instrumentInfos) {
@@ -436,24 +263,22 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
   const SourceAnnotationId root = builder.sourceMap()
                                       .table("Instrument Tables", input.reader.range(rootOffset, rootSize))
                                       .kind("konami-snes-instrument-tables")
-                                      .owner(ObjectRefs::asset(instrumentSetId))
+                                      .owner(ObjectRefs::asset(instrumentSet.id))
                                       .id();
 
   std::map<u32, size_t> instrumentIndexByProgram;
   std::vector<Instrument> instruments;
   for (const auto& info : instrumentInfos) {
     std::optional<u32> resolvedSampleIndex;
-    const auto srcnSample = sampleIndexBySrcn.find(info.srcn);
-    if (srcnSample != sampleIndexBySrcn.end()) {
-      const u32 sampleStart = sampleInfos[srcnSample->second].startAddress;
+    // Legacy regions address sample data relative to the DIR base. Preserve its
+    // absolute-first lookup before falling back to this SRCN's canonical stream.
+    if (const auto srcnSample = samples.index(info.srcn)) {
+      const u32 sampleStart = samples.samples[*srcnSample].startAddress;
       if (sampleStart >= spcDirAddress) {
         const u32 relativeStart = sampleStart - spcDirAddress;
-        if (const auto byAbsolute = sampleIndexByStartAddress.find(relativeStart);
-            byAbsolute != sampleIndexByStartAddress.end()) {
-          resolvedSampleIndex = byAbsolute->second;
-        } else if (const auto byRelative = sampleIndexByRelativeStartAddress.find(relativeStart);
-                   byRelative != sampleIndexByRelativeStartAddress.end()) {
-          resolvedSampleIndex = byRelative->second;
+        resolvedSampleIndex = samples.firstIndexStartingAt(relativeStart);
+        if (!resolvedSampleIndex) {
+          resolvedSampleIndex = samples.canonicalIndex(info.srcn);
         }
       }
     }
@@ -475,8 +300,7 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
           .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
           .name = info.percussion ? "Percussion" : fmt::format("Instrument {}", info.index),
           .range = input.reader.range(info.address, instrumentHeaderSize(version)),
-          .generators = konamiVibratoGenerators(version),
-          .modulators = konamiVibratoModulators(version),
+          .modulation = konamiInstrumentModulation(version),
       });
     }
 
@@ -499,11 +323,11 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
     auto annotation =
         builder.sourceMap()
             .row(info.percussion ? fmt::format("Percussion {}", static_cast<unsigned>(info.percussionNote))
-                                  : fmt::format("Instrument {}", info.index),
+                                 : fmt::format("Instrument {}", info.index),
                  input.reader.range(info.address, instrumentHeaderSize(version)))
             .role(SourceRole::Instrument)
             .kind(info.percussion ? "konami-snes-percussion-instrument" : "konami-snes-instrument")
-            .owner(ObjectRefs::instrument(instrumentSetId, info.percussion ? info.percussionNote : info.index))
+            .owner(ObjectRefs::instrument(instrumentSet.id, info.percussion ? info.percussionNote : info.index))
             .derived("bank", bank)
             .derived("program", program)
             .field("srcn", input.reader.range(info.address, 1), info.srcn, SourceValueDisplay::Hex)
@@ -519,10 +343,8 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
       annotation.field("pan", input.reader.range(info.address + 5, 1), info.pan, SourceValueDisplay::Default)
           .field("volume", input.reader.range(info.address + 6, 1), info.volume, SourceValueDisplay::Default);
     }
-    if (root.valid()) {
-      annotation.parent(root);
-    }
-    annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, *resolvedSampleIndex)});
+    annotation.parent(root).link(SourceLinkRole::UsesSample,
+                                 SourceTarget{ObjectRefs::sample(sampleCollection.id, *resolvedSampleIndex)});
     builder.sourceMap()
         .annotation(SourceRole::Region, "Region", input.reader.range(info.address, instrumentHeaderSize(version)))
         .kind("konami-snes-region")
@@ -531,16 +353,28 @@ InstrumentSetAsset parseKonamiSnesInstrumentSet(const ScanInput& input, ScanResu
         .link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sampleCollection.id, *resolvedSampleIndex)});
   }
 
-  return InstrumentSetAsset{
-      .metadata =
-          AssetMetadata{
-              .id = instrumentSetId,
-              .format = "KonamiSnes",
-              .name = fmt::format("{} Instruments", displayName),
-              .range = input.reader.range(rootOffset, rootSize),
-          },
+  return KonamiSnesInstrumentBuild{
+      .range = input.reader.range(rootOffset, rootSize),
       .instruments = std::move(instruments),
   };
+}
+
+bool addKonamiSnesSynth(const ScanInput& input, ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
+                        ScanSampleCollectionRef sampleCollection, const KonamiSnesLayout& layout,
+                        std::string_view displayName) {
+  const auto instrumentInfos = parseKonamiSnesInstrumentInfos(input.reader, layout);
+  const auto samples = parseKonamiSnesSampleInfos(input.reader, *layout.spcDirAddress, instrumentInfos);
+  if (instrumentInfos.empty() || samples.samples.empty()) {
+    return false;
+  }
+
+  auto instruments = buildKonamiSnesInstruments(input, builder, instrumentSet, sampleCollection, layout.version,
+                                                *layout.spcDirAddress, instrumentInfos, samples);
+  builder.instrumentSet(instrumentSet, fmt::format("{} Instruments", displayName), instruments.range)
+      .instruments(std::move(instruments.instruments));
+  builder.sampleCollection(sampleCollection, fmt::format("{} Samples", displayName), samples.directoryRange)
+      .samples(buildSnesBrrSampleCollection(input.reader, samples, sampleCollection.id, builder.sourceMap()));
+  return true;
 }
 
 }  // namespace vgmtrans::formats::konami_snes

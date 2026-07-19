@@ -6,6 +6,8 @@
 
 #include "value/export/synth/SynthExportData.h"
 
+#include "value/export/synth/ModulationScaling.h"
+
 #include "value/synth/SampleDecoder.h"
 #include "value/export/ExportDiagnostics.h"
 
@@ -134,9 +136,12 @@ std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     }
 
     for (const auto& instrument : instrumentSet->instruments) {
+      auto modulation = lowerSynthModulation(instrument.modulation);
       ResolvedSynthInstrument resolvedInstrument{
           .instrument = &instrument,
           .address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity),
+          .generators = std::move(modulation.generators),
+          .modulators = std::move(modulation.modulators),
       };
       for (const auto& region : instrument.regions) {
         const auto sampleIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
