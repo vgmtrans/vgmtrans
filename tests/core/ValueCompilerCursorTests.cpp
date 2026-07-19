@@ -219,15 +219,15 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
          "imperative compiler cursor should naturally decode conditional field layouts");
 }
 
-void compilerCursorStopsTruncatedCommandsWithoutRetainingBytes() {
+void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
   const std::vector<u8> bytes{0x10};
   std::vector<Diagnostic> diagnostics;
   const TrackProgram track =
       decodeProbeTrack(ByteReader(SourceId{11}, bytes), static_cast<u32>(bytes.size()), nullptr, &diagnostics);
   expect(track.commands.size() == 1 && track.commands[0].flow.terminal,
          "truncated compiler command should become a terminal command automatically");
-  expect(track.commandBytes.empty() && !track.commands[0].execution.valid(),
-         "truncated compiler command should retain neither source bytes nor executable behavior");
+  expect(track.bytesFor(track.commands[0]).size() == 1 && !track.commands[0].execution.valid(),
+         "truncated compiler command should retain partial diagnostic bytes but no executable behavior");
   expect(!diagnostics.empty() && diagnostics[0].code == "truncated-record",
          "truncated compiler field should retain the shared RecordReader diagnostic");
 }
@@ -238,5 +238,5 @@ void runValueCompilerCursorTests() {
   compilerCursorCompilesAndExecutesTypedCommands();
   compilerCursorCompilesControlFlow();
   compilerCursorCompilesRepeatsAndConditionalFields();
-  compilerCursorStopsTruncatedCommandsWithoutRetainingBytes();
+  compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
 }

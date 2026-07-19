@@ -9,12 +9,9 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/SemanticCommand.h"
-#include "value/sequence/SequenceVm.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
-#include <any>
-#include <array>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -48,10 +45,8 @@ struct TrackState {
   u8 pitchBendRangeSemitones = 2;
 };
 
-using Operands = SemanticCommandArgs;
-
-// Playback is the single boundary for state mutation and emitted performance
-// events. Command definitions never need the VM's type-erased state directly.
+// Only driver behavior that depends on runtime track history needs a method.
+// Ordinary commands compile directly to VM actions in decodeCommand below.
 struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
@@ -62,323 +57,220 @@ struct Playback {
     out.note(static_cast<double>(key), LevelScale::linearFromMidi7(velocity), duration);
     return track.noteWait ? Effects::wait(duration) : Effects{};
   }
+  void pitchBend(s8 bend) const {
+    out.pitchBend((bend / 128.0) * track.pitchBendRangeSemitones);
+  }
+
+  void pitchBendRange(u8 semitones) {
+    track.pitchBendRangeSemitones = semitones;
+    out.pitchBendRange(semitones);
+  }
+
+  void tempo(u16 bpm) const {
+    if (bpm != 0) {
+      out.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
+    }
+  }
 };
 
-// NDS addresses are unsigned 24-bit offsets from the start of SSEQ data.
-// Decode resolves them to absolute source addresses so playback never needs
-// the source container's layout.
-class Decode : public SemanticCommandDecoder {
-public:
-  Decode(ByteReader reader, u32 begin, u32 end, u32 sequenceDataBase, u32 sequenceEnd,
-         std::vector<Diagnostic>* diagnostics)
-      : SemanticCommandDecoder(reader, begin, end, diagnostics), sequenceDataBase_(sequenceDataBase),
-        sequenceEnd_(sequenceEnd) {}
+using NdsCompilerCursor = CompilerCursor<TrackState, Playback>;
+using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
 
-  [[nodiscard]] Address targetAddress(std::string_view name, SemanticOperandRole validRole) {
-    const auto relative = rawU24le("relative", SourceValueDisplay::Address);
-    const Address destination{sequenceDataBase_ + relative.value};
-    resolvedValue(name, relative, destination, SourceValueDisplay::Address,
-                  targetIsValid(destination) ? validRole : SemanticOperandRole::Address);
-    return destination;
-  }
-
-  [[nodiscard]] bool targetIsValid(Address destination) const noexcept { return destination.value < sequenceEnd_; }
-
-  [[nodiscard]] std::optional<Address> controlTarget(std::string_view name, SemanticOperandRole role,
-                                                     std::string_view invalidTargetWarning) {
-    const Address destination = targetAddress(name, role);
-    if (!ok()) {
-      return std::nullopt;
-    }
-    if (!targetIsValid(destination)) {
-      warning(std::string(invalidTargetWarning));
-      terminate();
-      return std::nullopt;
-    }
-    return destination;
-  }
-
-private:
-  u32 sequenceDataBase_ = 0;
-  u32 sequenceEnd_ = 0;
-};
-
-using CommandDefinitions = SemanticCommandDefinitions<Decode, Playback>;
-using CommandDefinition = CommandDefinitions::Definition;
-constexpr CommandDefinitions commands{"nds"};
-
-using CommandProfile = std::array<CommandDefinition, 0x80>;
-
-// Each profile entry keeps source decoding and playback together. The opaque
-// entries are intentionally source-only: VGMTrans preserves their bytes and
-// names without pretending to emulate NDS variables or conditionals.
-[[nodiscard]] CommandProfile makeProfile() {
-  const auto unknown = commands.command(
-      "Unknown Opcode", SequenceSemantic::Unsupported,
-      [](Decode& d) {
-        d.warning("Unknown NDS SSEQ opcode stopped playback");
-        d.terminate();
-      },
-      nullptr, CommandPlaybackStatus::Unsupported, "unknown");
-  CommandProfile profile;
-  profile.fill(unknown);
-
-  profile[0x93 - 0x80] = commands.sourceOnly("Open Track", [](Decode& d) {
-    d.u8("track");
-    static_cast<void>(d.targetAddress("destination", SemanticOperandRole::Address));
-  });
-  profile[0xa0 - 0x80] = commands.opaque("Cmd with Random Value", 5, "random-value");
-  profile[0xa1 - 0x80] = commands.opaque("Cmd with Variable", 2, "variable-command");
-  profile[0xa2 - 0x80] = commands.opaque("If", 0);
-  profile[0xb0 - 0x80] = commands.opaque("Set Variable", 3);
-  profile[0xb1 - 0x80] = commands.opaque("Add Variable", 3);
-  profile[0xb2 - 0x80] = commands.opaque("Sub Variable", 3);
-  profile[0xb3 - 0x80] = commands.opaque("Mul Variable", 3);
-  profile[0xb4 - 0x80] = commands.opaque("Div Variable", 3);
-  profile[0xb5 - 0x80] = commands.opaque("Shift Variable", 3);
-  profile[0xb6 - 0x80] = commands.opaque("Rand Variable", 3);
-  profile[0xb8 - 0x80] = commands.opaque("If Variable ==", 3, "if-variable-equal");
-  profile[0xb9 - 0x80] = commands.opaque("If Variable >=", 3, "if-variable-greater-equal");
-  profile[0xba - 0x80] = commands.opaque("If Variable >", 3, "if-variable-greater");
-  profile[0xbb - 0x80] = commands.opaque("If Variable <=", 3, "if-variable-less-equal");
-  profile[0xbc - 0x80] = commands.opaque("If Variable <", 3, "if-variable-less");
-  profile[0xbd - 0x80] = commands.opaque("If Variable !=", 3, "if-variable-not-equal");
-  profile[0xc2 - 0x80] = commands.opaque("Master Volume", 1);
-  profile[0xc6 - 0x80] = commands.opaque("Priority", 1);
-  profile[0xc8 - 0x80] = commands.opaque("Tie", 1);
-  profile[0xc9 - 0x80] = commands.opaque("Portamento Control", 1);
-  profile[0xcb - 0x80] = commands.opaque("Modulation Speed", 1);
-  profile[0xcc - 0x80] = commands.opaque("Modulation Type", 1);
-  profile[0xcd - 0x80] = commands.opaque("Modulation Range", 1);
-  profile[0xd0 - 0x80] = commands.opaque("Attack Rate", 1);
-  profile[0xd1 - 0x80] = commands.opaque("Decay Rate", 1);
-  profile[0xd2 - 0x80] = commands.opaque("Sustain Level", 1);
-  profile[0xd3 - 0x80] = commands.opaque("Release Rate", 1);
-  profile[0xd4 - 0x80] = commands.opaque("Loop Start", 1);
-  profile[0xd6 - 0x80] = commands.opaque("Print Variable", 1);
-  profile[0xe0 - 0x80] = commands.opaque("Modulation Delay", 2);
-  profile[0xe3 - 0x80] = commands.opaque("Sweep Pitch", 2);
-  profile[0xfc - 0x80] = commands.opaque("Loop End", 0);
-  profile[0xfe - 0x80] = commands.sourceOnly("Allocate Track", [](Decode& d) { d.u16le("track_mask"); });
-
-  profile[0x80 - 0x80] = commands.command(
-      "Rest", SequenceSemantic::Rest,
-      [](Decode& d) { d.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration); },
-      [](Operands a, Playback&) { return Effects::wait(a.u32("duration")); });
-
-  profile[0x81 - 0x80] = commands.command(
-      "Program", SequenceSemantic::Program,
-      [](Decode& d) {
-        const u32 raw = d.varLen("raw");
-        d.derived("bank", raw >> 7, SourceValueDisplay::Default, SemanticOperandRole::InstrumentBank);
-        d.derived("program", raw & 0x7f, SourceValueDisplay::Default, SemanticOperandRole::InstrumentProgram);
-      },
-      [](Operands a, Playback& p) {
-        p.out.instrument(a.u32("bank"), a.u32("program"));
-        return Effects{};
-      });
-
-  profile[0x94 - 0x80] = commands.command(
-      "Jump", SequenceSemantic::Jump,
-      [](Decode& d) {
-        if (const auto destination =
-                d.controlTarget("destination", SemanticOperandRole::JumpTarget, "Jump target outside sequence data")) {
-          d.jumpTo(*destination);
-        }
-      },
-      [](Operands a, Playback& p) { return Effects{.step = p.vm.jump(a.address("destination"))}; },
-      CommandPlaybackStatus::AffectsControlFlow);
-
-  profile[0x95 - 0x80] = commands.command(
-      "Call", SequenceSemantic::Call,
-      [](Decode& d) {
-        if (const auto destination =
-                d.controlTarget("destination", SemanticOperandRole::CallTarget, "Call target outside sequence data")) {
-          d.callTo(*destination);
-        }
-      },
-      [](Operands a, Playback& p) { return Effects{.step = p.vm.call(a.address("destination"))}; },
-      CommandPlaybackStatus::AffectsControlFlow);
-
-  profile[0x96 - 0x80] = commands.command(
-      "Unsupported Command", SequenceSemantic::Unsupported,
-      [](Decode& d) {
-        d.warning("Unsupported NDS SSEQ command stopped playback");
-        d.terminate();
-      },
-      nullptr, CommandPlaybackStatus::Unsupported, "unsupported");
-
-  profile[0xc0 - 0x80] = commands.command(
-      "Pan", SequenceSemantic::Pan,
-      [](Decode& d) {
-        d.resolved("position", d.rawU8("pan"),
-                   [](u8 raw) { return std::clamp((static_cast<double>(raw) / 63.5) - 1.0, -1.0, 1.0); });
-      },
-      [](Operands a, Playback& p) {
-        p.out.pan(a.f64("position"));
-        return Effects{};
-      });
-
-  profile[0xc1 - 0x80] = commands.command(
-      "Volume", SequenceSemantic::Level,
-      [](Decode& d) { d.resolved("linear_gain", d.rawU8("volume"), LevelScale::linearFromMidi7); },
-      [](Operands a, Playback& p) {
-        p.out.level(a.f64("linear_gain"));
-        return Effects{};
-      });
-
-  profile[0xc3 - 0x80] = commands.command(
-      "Transpose", SequenceSemantic::State, [](Decode& d) { d.s8("semitones"); },
-      [](Operands a, Playback& p) {
-        p.track.transpose = a.s8("semitones");
-        return Effects{};
-      });
-
-  profile[0xc4 - 0x80] = commands.command(
-      "Pitch Bend", SequenceSemantic::Pitch,
-      [](Decode& d) { d.resolved("fraction", d.rawS8("bend"), [](s8 bend) { return bend / 128.0; }); },
-      [](Operands a, Playback& p) {
-        p.out.pitchBend(a.f64("fraction") * p.track.pitchBendRangeSemitones);
-        return Effects{};
-      });
-
-  profile[0xc5 - 0x80] = commands.command(
-      "Pitch Bend Range", SequenceSemantic::Pitch, [](Decode& d) { d.u8("semitones"); },
-      [](Operands a, Playback& p) {
-        p.track.pitchBendRangeSemitones = a.u8("semitones");
-        p.out.pitchBendRange(p.track.pitchBendRangeSemitones);
-        return Effects{};
-      });
-
-  profile[0xc7 - 0x80] = commands.command(
-      "Note Wait", SequenceSemantic::State,
-      [](Decode& d) {
-        const auto raw = d.rawU8("raw");
-        d.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
-      },
-      [](Operands a, Playback& p) {
-        p.track.noteWait = a.boolean("enabled");
-        return Effects{};
-      });
-
-  profile[0xca - 0x80] = commands.command(
-      "Modulation Depth", SequenceSemantic::Modulation,
-      [](Decode& d) {
-        d.resolved("amount", d.rawU8("depth"),
-                   [](u8 depth) { return std::clamp(static_cast<double>(depth) / 127.0, 0.0, 1.0); });
-      },
-      [](Operands a, Playback& p) {
-        p.out.modulation(ModulationPerformanceTarget::VibratoDepth, a.f64("amount"));
-        return Effects{};
-      });
-
-  profile[0xce - 0x80] = commands.command(
-      "Portamento", SequenceSemantic::Portamento,
-      [](Decode& d) {
-        const auto raw = d.rawU8("raw");
-        d.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
-      },
-      [](Operands a, Playback& p) {
-        p.out.portamentoEnable(a.boolean("enabled"));
-        return Effects{};
-      });
-
-  profile[0xcf - 0x80] = commands.command(
-      "Portamento Time", SequenceSemantic::Portamento,
-      [](Decode& d) { d.resolved("milliseconds", d.rawU8("time"), [](u8 time) { return static_cast<double>(time); }); },
-      [](Operands a, Playback& p) {
-        p.out.portamentoTime(a.f64("milliseconds"));
-        return Effects{};
-      });
-
-  profile[0xd5 - 0x80] = commands.command(
-      "Expression", SequenceSemantic::Level,
-      [](Decode& d) { d.resolved("linear_gain", d.rawU8("expression"), LevelScale::linearFromMidi7); },
-      [](Operands a, Playback& p) {
-        p.out.expression(a.f64("linear_gain"));
-        return Effects{};
-      });
-
-  profile[0xe1 - 0x80] = commands.command(
-      "Tempo", SequenceSemantic::Tempo,
-      [](Decode& d) {
-        const auto bpm = d.rawU16le("bpm");
-        const u32 microsecondsPerQuarter = bpm.value == 0 ? 0 : static_cast<u32>(std::round(60000000.0 / bpm.value));
-        d.resolvedValue("microseconds_per_quarter", bpm, microsecondsPerQuarter);
-      },
-      [](Operands a, Playback& p) {
-        const u32 microsecondsPerQuarter = a.u32("microseconds_per_quarter");
-        if (microsecondsPerQuarter != 0) {
-          p.out.tempo(microsecondsPerQuarter);
-        }
-        return Effects{};
-      });
-
-  profile[0xfd - 0x80] = commands.command(
-      "Return", SequenceSemantic::Return, [](Decode& d) { d.return_(); },
-      [](Operands, Playback& p) { return Effects{.step = p.vm.return_()}; }, CommandPlaybackStatus::AffectsControlFlow);
-
-  profile[0xff - 0x80] = commands.terminal("End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
-
-  return profile;
+[[nodiscard]] Address targetAddress(NdsCompilerCursor::Event& event, u32 sequenceDataBase, u32 sequenceEnd,
+                                    SemanticOperandRole role) {
+  const u32 relative = event.u24le("relative", SourceValueDisplay::Address);
+  const Address destination{sequenceDataBase + relative};
+  return event.derived("destination", destination, SourceValueDisplay::Address,
+                       destination.value < sequenceEnd ? role : SemanticOperandRole::Address);
 }
 
-[[nodiscard]] const CommandDefinition& noteCommand() {
-  static const CommandDefinition definition = commands.command(
-      "Note", SequenceSemantic::Note,
-      [](Decode& d) {
-        d.opcodeValue("key", d.opcode(), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-        d.u8("velocity", SemanticOperandRole::Level);
-        d.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration);
-      },
-      [](Operands a, Playback& p) { return p.note(a.u8("key"), a.u8("velocity"), a.u32("duration")); });
-  return definition;
-}
-
-[[nodiscard]] const CommandDefinition& definitionFor(u8 opcode) {
-  if (opcode <= 0x7f) {
-    return noteCommand();
-  }
-  static const CommandProfile profile = makeProfile();
-  return profile[opcode - 0x80];
-}
-
-[[nodiscard]] CommandDefinition truncatedCommand() {
-  return commands.terminal("Truncated Command", SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported,
-                           "truncated");
-}
-
-// Decode is the only place that reads command bytes. Execution later selects
-// the same definition by opcode and consumes only the stored named operands.
+// One source opcode is read and compiled in one block. Terminal operations
+// below install either a shared VM action or a typed Playback method; there is
+// no second opcode profile or execution switch.
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, u32 sequenceDataBase,
                                                    u32 sequenceEnd, std::vector<Diagnostic>* diagnostics) {
-  Decode decode(reader, begin, end, sequenceDataBase, sequenceEnd, diagnostics);
-  if (!decode.hasOpcode()) {
-    return decode.finish(truncatedCommand().presentation);
+  NdsCompilerCursor cursor(reader, begin, end, "nds", diagnostics);
+  if (!cursor.hasOpcode()) {
+    return cursor.truncated();
   }
 
-  const CommandDefinition& definition = definitionFor(decode.opcode());
-  definition.decodeOperands(decode);
-  if (!decode.ok()) {
-    return decode.finish(truncatedCommand().presentation);
+  if (cursor.opcode() <= 0x7f) {
+    auto event = cursor.command("Note", SequenceSemantic::Note);
+    const u8 key = event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote,
+                                    SemanticOperandRole::NoteKey);
+    const u8 velocity = event.u8("velocity", SourceValueDisplay::Default, SemanticOperandRole::Level);
+    const u32 duration =
+        event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration);
+    return event.invoke<&Playback::note>(key, velocity, duration);
   }
-  return decode.finish(definition.presentation);
-}
 
-[[nodiscard]] std::any createTrackState(const SequenceProgram&, const TrackProgram&) {
-  return TrackState{};
-}
-
-[[nodiscard]] Effects executeCommand(const SourceCommand& command, std::any&, std::any& trackStateValue,
-                                     PerformanceEmitter& out, VmApi& vm) {
-  auto& track = std::any_cast<TrackState&>(trackStateValue);
-  Playback playback{.track = track, .out = out, .vm = vm};
-
-  if (command.flow.terminal) {
-    return Effects{.step = vm.end()};
+  switch (cursor.opcode()) {
+    case 0x80: {
+      auto event = cursor.command("Rest", SequenceSemantic::Rest);
+      return event.wait(event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration));
+    }
+    case 0x81: {
+      auto event = cursor.command("Program", SequenceSemantic::Program);
+      const u32 raw = event.varLen("raw");
+      const u32 bank = event.derived("bank", raw >> 7, SourceValueDisplay::Default,
+                                     SemanticOperandRole::InstrumentBank);
+      const u32 program = event.derived("program", raw & 0x7f, SourceValueDisplay::Default,
+                                        SemanticOperandRole::InstrumentProgram);
+      return event.emitInstrument(bank, program);
+    }
+    case 0x93: {
+      auto event = cursor.sourceOnly("Open Track");
+      event.u8("track");
+      static_cast<void>(targetAddress(event, sequenceDataBase, sequenceEnd, SemanticOperandRole::Address));
+      return event.ignore();
+    }
+    case 0x94:
+    case 0x95: {
+      const bool isCall = cursor.opcode() == 0x95;
+      auto event = cursor.command(isCall ? "Call" : "Jump", isCall ? SequenceSemantic::Call : SequenceSemantic::Jump,
+                                  CommandPlaybackStatus::AffectsControlFlow);
+      const Address destination = targetAddress(event, sequenceDataBase, sequenceEnd,
+                                                isCall ? SemanticOperandRole::CallTarget
+                                                       : SemanticOperandRole::JumpTarget);
+      if (!event.ok()) {
+        return event.stop();
+      }
+      if (destination.value >= sequenceEnd) {
+        event.warning(isCall ? "Call target outside sequence data" : "Jump target outside sequence data");
+        return event.stop();
+      }
+      return isCall ? event.call(destination) : event.jump(destination);
+    }
+    case 0x96: {
+      auto event = cursor.unsupported("Unsupported Command");
+      event.warning("Unsupported NDS SSEQ command stopped playback");
+      return event.stop();
+    }
+    case 0xa0:
+      return cursor.opaque("Cmd with Random Value", 5, "random-value");
+    case 0xa1:
+      return cursor.opaque("Cmd with Variable", 2, "variable-command");
+    case 0xa2:
+      return cursor.opaque("If", 0);
+    case 0xb0:
+      return cursor.opaque("Set Variable", 3);
+    case 0xb1:
+      return cursor.opaque("Add Variable", 3);
+    case 0xb2:
+      return cursor.opaque("Sub Variable", 3);
+    case 0xb3:
+      return cursor.opaque("Mul Variable", 3);
+    case 0xb4:
+      return cursor.opaque("Div Variable", 3);
+    case 0xb5:
+      return cursor.opaque("Shift Variable", 3);
+    case 0xb6:
+      return cursor.opaque("Rand Variable", 3);
+    case 0xb8:
+      return cursor.opaque("If Variable ==", 3, "if-variable-equal");
+    case 0xb9:
+      return cursor.opaque("If Variable >=", 3, "if-variable-greater-equal");
+    case 0xba:
+      return cursor.opaque("If Variable >", 3, "if-variable-greater");
+    case 0xbb:
+      return cursor.opaque("If Variable <=", 3, "if-variable-less-equal");
+    case 0xbc:
+      return cursor.opaque("If Variable <", 3, "if-variable-less");
+    case 0xbd:
+      return cursor.opaque("If Variable !=", 3, "if-variable-not-equal");
+    case 0xc0: {
+      auto event = cursor.command("Pan", SequenceSemantic::Pan);
+      const double position = std::clamp((event.u8("pan") / 63.5) - 1.0, -1.0, 1.0);
+      return event.emitPan(position);
+    }
+    case 0xc1: {
+      auto event = cursor.command("Volume", SequenceSemantic::Level);
+      return event.emitLevel(LevelScale::linearFromMidi7(event.u8("volume")));
+    }
+    case 0xc2:
+      return cursor.opaque("Master Volume", 1);
+    case 0xc3: {
+      auto event = cursor.command("Transpose", SequenceSemantic::State);
+      return event.set<&TrackState::transpose>(event.s8("semitones"));
+    }
+    case 0xc4: {
+      auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
+      return event.invoke<&Playback::pitchBend>(event.s8("bend"));
+    }
+    case 0xc5: {
+      auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
+      return event.invoke<&Playback::pitchBendRange>(event.u8("semitones"));
+    }
+    case 0xc6:
+      return cursor.opaque("Priority", 1);
+    case 0xc7: {
+      auto event = cursor.command("Note Wait", SequenceSemantic::State);
+      return event.set<&TrackState::noteWait>(event.u8("enabled") != 0);
+    }
+    case 0xc8:
+      return cursor.opaque("Tie", 1);
+    case 0xc9:
+      return cursor.opaque("Portamento Control", 1);
+    case 0xca: {
+      auto event = cursor.command("Modulation Depth", SequenceSemantic::Modulation);
+      const double amount = std::clamp(event.u8("depth") / 127.0, 0.0, 1.0);
+      return event.emitModulation(ModulationPerformanceTarget::VibratoDepth, amount);
+    }
+    case 0xcb:
+      return cursor.opaque("Modulation Speed", 1);
+    case 0xcc:
+      return cursor.opaque("Modulation Type", 1);
+    case 0xcd:
+      return cursor.opaque("Modulation Range", 1);
+    case 0xce: {
+      auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
+      return event.emitPortamentoEnable(event.u8("enabled") != 0);
+    }
+    case 0xcf: {
+      auto event = cursor.command("Portamento Time", SequenceSemantic::Portamento);
+      return event.emitPortamentoTime(event.u8("time"));
+    }
+    case 0xd0:
+      return cursor.opaque("Attack Rate", 1);
+    case 0xd1:
+      return cursor.opaque("Decay Rate", 1);
+    case 0xd2:
+      return cursor.opaque("Sustain Level", 1);
+    case 0xd3:
+      return cursor.opaque("Release Rate", 1);
+    case 0xd4:
+      return cursor.opaque("Loop Start", 1);
+    case 0xd5: {
+      auto event = cursor.command("Expression", SequenceSemantic::Level);
+      return event.emitExpression(LevelScale::linearFromMidi7(event.u8("expression")));
+    }
+    case 0xd6:
+      return cursor.opaque("Print Variable", 1);
+    case 0xe0:
+      return cursor.opaque("Modulation Delay", 2);
+    case 0xe1: {
+      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
+      return event.invoke<&Playback::tempo>(event.u16le("bpm"));
+    }
+    case 0xe3:
+      return cursor.opaque("Sweep Pitch", 2);
+    case 0xfc:
+      return cursor.opaque("Loop End", 0);
+    case 0xfd:
+      return cursor.command("Return", SequenceSemantic::Return, CommandPlaybackStatus::AffectsControlFlow).return_();
+    case 0xfe: {
+      auto event = cursor.sourceOnly("Allocate Track");
+      event.u16le("track_mask");
+      return event.ignore();
+    }
+    case 0xff:
+      return cursor.command("End", SequenceSemantic::End).end();
+    default: {
+      auto event = cursor.unsupported("Unknown Opcode", "unknown");
+      event.warning("Unknown NDS SSEQ opcode stopped playback");
+      return event.stop();
+    }
   }
-  const CommandDefinition& definition = definitionFor(command.opcode);
-  return definition.execute != nullptr ? definition.execute(Operands{command}, playback) : Effects{};
 }
 
 [[nodiscard]] SequenceDialect makeDialect() {
@@ -391,8 +283,8 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
           },
-      .createSemanticTrackState = createTrackState,
-      .executeSemantic = executeCommand,
+      .createSemanticTrackState = NdsCompiledDialect::createTrackState,
+      .executeSemantic = NdsCompiledDialect::execute,
   };
 }
 
@@ -402,16 +294,19 @@ using CommandProfile = std::array<CommandDefinition, 0x80>;
       .opcode = reader.u8At(offset),
       .encodedSize = 1,
       .flow = DecodeFlow::terminalFlow(),
-      .presentation = commands
-                          .terminal("Recovery Stop", SequenceSemantic::Unsupported,
-                                    CommandPlaybackStatus::StopsPlayback, "recovery-stop")
-                          .presentation,
+      .presentation = DecodedCommandPresentation{
+          .label = "Recovery Stop",
+          .localKind = "recovery-stop",
+          .detailKind = "nds.recovery-stop",
+          .semantic = SequenceSemantic::Unsupported,
+          .playback = CommandPlaybackStatus::StopsPlayback,
+      },
       .retainBytes = false,
   };
 }
 
 // Malformed SDAT FAT ranges can overlap a real call target by one byte. This
-// exceptional walker keeps the normal semantic command decoder, adding only
+// exceptional walker keeps the normal compiler cursor, adding only
 // the overlap stop needed to avoid swallowing the subroutine's first byte.
 [[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(ByteReader reader, TrackDecodeInput input) {
   TrackProgram track{
@@ -508,7 +403,7 @@ TrackProgram decodeNdsSequenceTrack(ByteReader reader, TrackDecodeInput input, b
   }
 
   const u32 sequenceDataBase = input.sequenceOffset + kSseqHeaderSize;
-  return decodeSemanticReachableTrack(reader, input, [reader, input, sequenceDataBase](u32 offset) {
+  return decodeCompilerReachableTrack(reader, input, [reader, input, sequenceDataBase](u32 offset) {
     return decodeCommand(reader, offset, input.bytecodeEnd, sequenceDataBase, input.sequenceEnd, input.diagnostics);
   });
 }
