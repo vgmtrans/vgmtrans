@@ -752,12 +752,8 @@ SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayo
   }
 
   const auto& dialect = capcomSnesSequenceDialect();
-  SequenceProgram program{
-      .dialect = dialect.id,
-      .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
-      .behavior = dialect.defaultBehavior,
-  };
+  SequenceProgram program = dialect.makeProgram();
+  program.config.profile = static_cast<u32>(version);
   const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   // Capcom stores the pointer slots in reverse track order.
   for (u32 sourceTrackNumber = 0; sourceTrackNumber < kCapcomSnesMaxTracks; ++sourceTrackNumber) {

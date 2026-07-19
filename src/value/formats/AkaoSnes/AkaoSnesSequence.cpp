@@ -2824,12 +2824,7 @@ SequenceProgramAsset parseAkaoSnesSequence(const ScanInput& input, const AkaoSne
       .dialect =
           makeDialect(layout.version, layout.minorVersion, header.romRelocBase, header.apuRelocBase, sharedTempo),
   };
-  SequenceProgram program{
-      .dialect = descriptor.dialect.id,
-      .timebase = descriptor.dialect.timebase,
-      .sourceBaseAddress = Address{layout.sequenceHeaderAddress},
-      .behavior = descriptor.dialect.defaultBehavior,
-  };
+  SequenceProgram program = descriptor.dialect.makeProgram(Address{layout.sequenceHeaderAddress});
 
   for (u32 trackNumber = 0; trackNumber < kAkaoSnesMaxTracks; ++trackNumber) {
     const u32 pointerOffset = header.trackPointerOffset + trackNumber * 2;

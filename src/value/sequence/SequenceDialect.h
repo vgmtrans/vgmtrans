@@ -93,6 +93,17 @@ struct SequenceDialect {
   ExecuteSemanticCommand executeSemantic = nullptr;
 
   [[nodiscard]] bool usesSemanticScheduler() const noexcept { return executeSemantic != nullptr; }
+
+  // Formats normally want a program with this dialect's identity, timebase,
+  // and default VM behavior. Keep that mechanical wiring out of each parser.
+  [[nodiscard]] SequenceProgram makeProgram(Address sourceBaseAddress = {}) const {
+    return SequenceProgram{
+        .dialect = id,
+        .timebase = timebase,
+        .sourceBaseAddress = sourceBaseAddress,
+        .behavior = defaultBehavior,
+    };
+  }
 };
 
 class SequenceDialectRegistry {

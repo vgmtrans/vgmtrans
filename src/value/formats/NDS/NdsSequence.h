@@ -6,11 +6,9 @@
 
 #pragma once
 
-#include "value/base/Source.h"
 #include "value/formats/NDS/NdsTypes.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
-#include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/SequenceDialect.h"
 
 #include <string>
@@ -21,11 +19,6 @@ namespace vgmtrans::formats::nds {
 inline constexpr auto kNdsSequenceDialectId = "nds:sseq";
 
 [[nodiscard]] const core::SequenceDialect& ndsSequenceDialect();
-
-[[nodiscard]] core::TrackProgram decodeNdsSequenceTrack(core::ByteReader reader, core::TrackDecodeInput input,
-                                                        bool recoverMalformedSdatRange = false);
-
-[[nodiscard]] std::vector<u32> ndsSequenceTrackAddresses(core::ByteReader reader, u32 sequenceOffset, u32 sequenceEnd);
 
 [[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(const core::ScanInput& input, core::AssetId id,
                                                                  NdsSequenceRange range, const std::string& name,
