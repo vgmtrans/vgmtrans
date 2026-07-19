@@ -9,7 +9,6 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatDefinition.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/SequenceDialect.h"
 
 #include <optional>
@@ -75,8 +74,17 @@ struct CapcomSnesInstrumentInfo {
 
 [[nodiscard]] const core::SequenceDialect& capcomSnesSequenceDialect();
 
+// Focused seam for command-decoder tests. Whole-format parsing uses one shared
+// TrackDecodeScope internally rather than rebuilding these values per track.
+struct CapcomSnesTrackDecodeOptions {
+  u32 trackIndex = 0;
+  u32 startOffset = 0;
+  core::SourceMapBuilder* sourceMap = nullptr;
+  std::vector<core::Diagnostic>* diagnostics = nullptr;
+};
+
 [[nodiscard]] core::TrackProgram decodeCapcomSnesSourceTrack(core::ByteReader reader, CapcomSnesEngineVersion version,
-                                                             core::TrackDecodeInput input);
+                                                             CapcomSnesTrackDecodeOptions options);
 
 [[nodiscard]] core::SequenceProgram decodeCapcomSnesSequence(core::ByteReader reader, const CapcomSnesLayout& layout,
                                                              core::AssetId sequenceId, core::SourceRange sequenceRange,

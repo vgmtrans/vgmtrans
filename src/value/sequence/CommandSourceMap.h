@@ -61,6 +61,12 @@ struct TrackDecodeScope {
     return TrackDecodeSession(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation, sourceMap);
   }
 
+  [[nodiscard]] TrackDecodeScope withParent(std::optional<SourceAnnotationId> parent) const {
+    TrackDecodeScope copy = *this;
+    copy.parentAnnotation = parent;
+    return copy;
+  }
+
   template <class DecodeCommand>
   [[nodiscard]] TrackProgram linear(u32 trackIndex, u32 startOffset, DecodeCommand decodeCommand) const {
     auto session = begin(trackIndex, startOffset);
