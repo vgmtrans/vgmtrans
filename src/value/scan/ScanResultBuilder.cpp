@@ -6,13 +6,14 @@
 
 #include "value/scan/ScanResultBuilder.h"
 
+#include <filesystem>
 #include <stdexcept>
 
 namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] std::string sourceCollectionKey(SourceId source, std::string_view name) {
+[[nodiscard]] std::string namedSourceCollectionKey(SourceId source, std::string_view name) {
   return "source:" + std::to_string(source.value) + ":collection:" + std::string(name);
 }
 
@@ -130,6 +131,19 @@ ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format,
       sourceMap_([this]() { return input_.ids.nextSourceAnnotationId(); }) {
 }
 
+std::string ScanResultBuilder::sourceDisplayName() const {
+  if (input_.source.title && !input_.source.title->empty()) {
+    return *input_.source.title;
+  }
+  if (!input_.source.name.empty()) {
+    return std::filesystem::path(input_.source.name).stem().string();
+  }
+  if (!input_.source.path.empty()) {
+    return input_.source.path.stem().string();
+  }
+  return format_;
+}
+
 ParseCursor ScanResultBuilder::cursor(SourceRange bounds) {
   return ParseCursor(input_.reader, bounds, result_.diagnostics);
 }
@@ -197,7 +211,7 @@ ScanCollectionBuilder ScanResultBuilder::collection(std::string name, Collection
     key.resolver = collectionResolver_;
   }
   if (key.value.empty()) {
-    key.value = sourceCollectionKey(input_.source.id, name);
+    key.value = namedSourceCollectionKey(input_.source.id, name);
   }
   const size_t index = result_.explicitCollections.size();
   result_.explicitCollections.push_back(ExplicitCollection{
@@ -205,6 +219,13 @@ ScanCollectionBuilder ScanResultBuilder::collection(std::string name, Collection
       .name = std::move(name),
   });
   return ScanCollectionBuilder(*this, index);
+}
+
+ScanCollectionBuilder ScanResultBuilder::sourceCollection(std::string name) {
+  CollectionKey key{
+      .value = "source:" + std::to_string(input_.source.id.value),
+  };
+  return collection(std::move(name), std::move(key));
 }
 
 SampleRef ScanResultBuilder::sampleRef(ScanSampleCollectionRef collection, u32 index) {
@@ -282,7 +303,7 @@ AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRa
 CollectionKey ScanResultBuilder::defaultCollectionKey(std::string_view name) const {
   return CollectionKey{
       .resolver = collectionResolver_,
-      .value = sourceCollectionKey(input_.source.id, name),
+      .value = namedSourceCollectionKey(input_.source.id, name),
   };
 }
 

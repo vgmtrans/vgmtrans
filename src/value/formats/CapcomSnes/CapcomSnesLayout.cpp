@@ -9,10 +9,8 @@
 
 #include <algorithm>
 #include <array>
-#include <filesystem>
 #include <limits>
-#include <map>
-#include <span>
+#include <optional>
 #include <string_view>
 
 namespace vgmtrans::formats::capcom_snes {
@@ -57,29 +55,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   return true;
 }
 
-[[nodiscard]] int songListLength(ByteReader reader, u16 songListAddress) {
-  int length = 0;
-  for (int songIndex = 0; songIndex <= 0x7f; ++songIndex) {
-    const u32 pointerAddress = songListAddress + songIndex * 2;
-    if (!reader.has(pointerAddress, 2)) {
-      break;
-    }
-
-    const u16 songHeaderAddress = reader.be16(pointerAddress);
-    if (songHeaderAddress == 0) {
-      ++length;
-      continue;
-    }
-    if (!isValidBgmHeader(reader, songHeaderAddress)) {
-      break;
-    }
-
-    ++length;
-  }
-  return length;
-}
-
-[[nodiscard]] u16 currentPlayAddress(ByteReader reader, CapcomSnesEngineVersion version, u8 channel) {
+[[nodiscard]] u16 currentTrackCursor(ByteReader reader, CapcomSnesEngineVersion version, u8 channel) {
+  // V1 and later drivers keep the cursor bytes in different zero-page layouts.
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
     return static_cast<u16>(reader.u8At(0x00 + channel * 2 + 1) | (reader.u8At(0x10 + channel * 2 + 1) << 8));
   }
@@ -87,23 +64,31 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 }
 
 [[nodiscard]] std::optional<u8> guessCurrentSong(ByteReader reader, CapcomSnesEngineVersion version,
-                                                 u16 songListAddress) {
+                                                 u32 songListAddress) {
   // Song-list SPC dumps only expose the current playback cursor, so choose the nearest valid header.
   std::optional<u8> guessedSongIndex;
   int bestScore = std::numeric_limits<int>::max();
 
-  const int length = songListLength(reader, songListAddress);
-  for (int songIndex = 0; songIndex < length; ++songIndex) {
-    const u16 songHeaderAddress = reader.be16(songListAddress + songIndex * 2);
+  for (u32 songIndex = 0; songIndex <= 0x7f; ++songIndex) {
+    const u32 pointerAddress = songListAddress + songIndex * 2;
+    if (!reader.has(pointerAddress, 2)) {
+      break;
+    }
+
+    const u16 songHeaderAddress = reader.be16(pointerAddress);
     if (songHeaderAddress == 0) {
       continue;
+    }
+    // The first nonzero invalid pointer marks the end of the usable list.
+    if (!isValidBgmHeader(reader, songHeaderAddress)) {
+      break;
     }
 
     int score = 0;
     int validTrackCount = 0;
     for (u32 track = 0; track < kCapcomSnesMaxTracks; ++track) {
       const u16 trackStart = reader.be16(songHeaderAddress + 1 + track * 2);
-      const u16 currentAddress = currentPlayAddress(reader, version, static_cast<u8>(7 - track));
+      const u16 currentAddress = currentTrackCursor(reader, version, static_cast<u8>(7 - track));
       if (currentAddress == 0) {
         continue;
       }
@@ -128,10 +113,7 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   return guessedSongIndex;
 }
 
-[[nodiscard]] std::map<u8, u8> initialDspRegisterMap(ByteReader reader) {
-  std::map<u8, u8> registers;
-
-  // The DIR base is usually written through the driver's DSP register initialization table.
+[[nodiscard]] std::optional<u8> initialDspRegisterValue(ByteReader reader, u8 targetRegister) {
   u32 registerCount = 0;
   u32 registerListAddress = 0;
   u32 valueListAddress = 0;
@@ -146,34 +128,24 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
     registerListAddress = reader.le16(*oldOffset + 1);
     valueListAddress = reader.le16(*oldOffset + 5);
   } else {
-    return registers;
+    return std::nullopt;
   }
 
   if (!reader.has(registerListAddress, registerCount) || !reader.has(valueListAddress, registerCount)) {
-    return registers;
+    return std::nullopt;
   }
 
+  std::optional<u8> value;
   for (u32 i = 0; i < registerCount; ++i) {
-    registers[reader.u8At(registerListAddress + i)] = reader.u8At(valueListAddress + i);
+    if (reader.u8At(registerListAddress + i) == targetRegister) {
+      // Preserve the map-based implementation's behavior for duplicate registers.
+      value = reader.u8At(valueListAddress + i);
+    }
   }
-
-  return registers;
+  return value;
 }
 
 }  // namespace
-
-std::string capcomSnesSourceDisplayName(const SourceFile& source) {
-  if (source.title && !source.title->empty()) {
-    return *source.title;
-  }
-  if (!source.name.empty()) {
-    return std::filesystem::path(source.name).stem().string();
-  }
-  if (!source.path.empty()) {
-    return source.path.stem().string();
-  }
-  return "CapcomSnes";
-}
 
 std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
   // CapcomSnes SPC dumps have no declarative header. Layout discovery reconstructs the
@@ -182,62 +154,70 @@ std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
     return std::nullopt;
   }
 
-  CapcomSnesLayout layout;
-
+  std::optional<u32> songListAddress;
   if (const auto offset = findBytePattern(reader, MaskedBytePattern{kReadSongListPattern, kReadSongListMask})) {
-    layout.hasSongList = true;
-    layout.songListAddress = std::min(reader.le16(*offset + 3), reader.le16(*offset + 8));
+    songListAddress = std::min(reader.le16(*offset + 3), reader.le16(*offset + 8));
   }
 
+  std::optional<u32> fixedBgmHeaderAddress;
   if (const auto offset = findBytePattern(reader, MaskedBytePattern{kReadBgmAddressPattern, kReadBgmAddressMask})) {
-    layout.bgmAtFixedAddress = true;
-    layout.bgmHeaderAddress = static_cast<u32>((reader.u8At(*offset + 5) << 8) | reader.u8At(*offset + 8));
+    fixedBgmHeaderAddress = static_cast<u32>((reader.u8At(*offset + 5) << 8) | reader.u8At(*offset + 8));
   }
 
-  if (layout.hasSongList) {
-    if (layout.bgmAtFixedAddress) {
-      layout.version = CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation;
+  CapcomSnesEngineVersion version = CapcomSnesEngineVersion::none;
+  if (songListAddress) {
+    if (fixedBgmHeaderAddress) {
+      version = CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation;
       const bool bgmHeaderCoversSongList =
-          layout.bgmHeaderAddress <= layout.songListAddress && layout.bgmHeaderAddress + 17 > layout.songListAddress;
+          *fixedBgmHeaderAddress <= *songListAddress && *fixedBgmHeaderAddress + 17 > *songListAddress;
       // Some v2 drivers contain both patterns, but the fixed-header operand can point into the song list.
-      if (bgmHeaderCoversSongList || !isValidBgmHeader(reader, layout.bgmHeaderAddress)) {
-        layout.bgmAtFixedAddress = false;
+      if (bgmHeaderCoversSongList || !isValidBgmHeader(reader, *fixedBgmHeaderAddress)) {
+        fixedBgmHeaderAddress.reset();
       }
     } else {
-      layout.version = CapcomSnesEngineVersion::v1BgmInList;
+      version = CapcomSnesEngineVersion::v1BgmInList;
     }
-  } else if (layout.bgmAtFixedAddress) {
-    layout.version = CapcomSnesEngineVersion::v3BgmFixedLocation;
+  } else if (fixedBgmHeaderAddress) {
+    version = CapcomSnesEngineVersion::v3BgmFixedLocation;
   } else {
     return std::nullopt;
   }
 
-  if (layout.bgmAtFixedAddress) {
-    layout.sequenceHeaderAddress = layout.bgmHeaderAddress + 1;
-    layout.priorityInHeader = false;
-  } else if (layout.hasSongList) {
+  u32 bgmHeaderAddress = 0;
+  bool priorityInHeader = false;
+  if (fixedBgmHeaderAddress) {
+    bgmHeaderAddress = *fixedBgmHeaderAddress;
+  } else {
     // Song-list entries point at headers that include a one-byte priority before track pointers.
-    const auto currentSong = guessCurrentSong(reader, layout.version, static_cast<u16>(layout.songListAddress));
+    const auto currentSong = guessCurrentSong(reader, version, *songListAddress);
     if (!currentSong) {
       return std::nullopt;
     }
-    layout.sequenceHeaderAddress = reader.be16(layout.songListAddress + (*currentSong * 2));
-    layout.priorityInHeader = true;
+    bgmHeaderAddress = reader.be16(*songListAddress + (*currentSong * 2));
+    priorityInHeader = true;
   }
 
-  if (!isValidBgmHeader(reader,
-                        layout.priorityInHeader ? layout.sequenceHeaderAddress : layout.sequenceHeaderAddress - 1)) {
+  if (!isValidBgmHeader(reader, bgmHeaderAddress)) {
     return std::nullopt;
   }
+
+  const u32 trackPointerTableAddress = bgmHeaderAddress + 1;
+  const u32 sequenceHeaderAddress = priorityInHeader ? bgmHeaderAddress : trackPointerTableAddress;
+  const u32 sequenceHeaderSize = (priorityInHeader ? 1 : 0) + kCapcomSnesMaxTracks * 2;
+  CapcomSnesLayout layout{
+      .version = version,
+      .sequenceHeaderRange = reader.range(sequenceHeaderAddress, sequenceHeaderSize),
+      .trackPointerTableAddress = trackPointerTableAddress,
+  };
 
   if (const auto offset = findBytePattern(reader, MaskedBytePattern{kLoadInstrTablePattern, kLoadInstrTableMask})) {
     // The instrument table address is embedded as split operands in the loader routine.
     layout.instrumentTableAddress = static_cast<u32>(reader.u8At(*offset + 7) | (reader.u8At(*offset + 10) << 8));
   }
 
-  const auto dspRegisters = initialDspRegisterMap(reader);
-  if (const auto found = dspRegisters.find(0x5d); found != dspRegisters.end()) {
-    layout.spcDirAddress = static_cast<u32>(found->second) << 8;
+  // DIR is normally supplied by the driver's DSP initialization table.
+  if (const auto dirPage = initialDspRegisterValue(reader, 0x5d)) {
+    layout.spcDirAddress = static_cast<u32>(*dirPage) << 8;
   }
 
   return layout;

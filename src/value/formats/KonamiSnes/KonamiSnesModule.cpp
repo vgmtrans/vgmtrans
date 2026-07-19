@@ -13,7 +13,6 @@
 #include "value/scan/ScanResultBuilder.h"
 
 #include <string>
-#include <vector>
 
 namespace vgmtrans::formats::konami_snes {
 
@@ -23,21 +22,14 @@ using namespace core;
   return findKonamiSnesLayout(ByteReader(SourceId{}, bytes)).has_value();
 }
 
-[[nodiscard]] CollectionKey konamiCollectionKey(SourceId source) {
-  return CollectionKey{
-      .resolver = "KonamiSnes",
-      .value = "source:" + std::to_string(source.value),
-  };
-}
-
 [[nodiscard]] ScanResult scanKonamiSnes(const ScanInput& input) {
   const auto layout = findKonamiSnesLayout(input.reader);
   if (!layout) {
     return {};
   }
 
-  const std::string displayName = konamiSnesSourceDisplayName(input.source);
   ScanResultBuilder result(input, "KonamiSnes");
+  const std::string displayName = result.sourceDisplayName();
   const auto sequence = result.reserveSequence();
   const auto instrumentSet = result.reserveInstrumentSet();
   const auto samples = result.reserveSampleCollection();
@@ -46,7 +38,7 @@ using namespace core;
     return parseKonamiSnesSequence(input, *layout, id, displayName, &result.sourceMap(), &result.diagnostics());
   });
 
-  auto collection = result.collection(displayName, konamiCollectionKey(input.source.id));
+  auto collection = result.sourceCollection(displayName);
   collection.sequence(sequence);
 
   const bool hasSynthLayout = layout->spcDirAddress && layout->commonInstrumentTableAddress &&

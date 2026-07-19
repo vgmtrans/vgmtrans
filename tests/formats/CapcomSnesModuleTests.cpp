@@ -167,33 +167,62 @@ void writeBytes(std::vector<u8>& bytes, size_t offset, const std::array<u8, Size
   std::ranges::copy(values, bytes.begin() + static_cast<std::ptrdiff_t>(offset));
 }
 
+constexpr std::array<u8, 16> kReadSongListPattern{0x1c, 0x5d, 0xf5, 0x03, 0x0e, 0xc4, 0xc0, 0xf5,
+                                                  0x02, 0x0e, 0xc4, 0xc1, 0x04, 0xc0, 0xf0, 0xdd};
+constexpr std::array<u8, 16> kReadBgmAddressPattern{0x6f, 0x3f, 0xef, 0x06, 0x8f, 0x0d, 0xa1, 0x8f,
+                                                    0xaf, 0xa0, 0x3f, 0x82, 0x05, 0x8d, 0x00, 0xdd};
+constexpr std::array<u8, 16> kDspRegInitPattern{0x8d, 0x03, 0xf6, 0x63, 0x04, 0xc5, 0xf2, 0x00,
+                                                0xf6, 0x66, 0x04, 0xc5, 0xf3, 0x00, 0xfe, 0xf2};
+constexpr std::array<u8, 15> kDspRegInitOldPattern{0xf5, 0xf9, 0x0b, 0xfd, 0xf5, 0x05, 0x0c, 0x3f,
+                                                   0xf2, 0x0b, 0x3d, 0xc8, 0x0c, 0xd0, 0xf1};
+constexpr std::array<u8, 12> kLoadInstrTablePattern{0x8d, 0x06, 0xcf, 0xda, 0xa0, 0x60,
+                                                    0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
+
+void addSongListReader(std::vector<u8>& bytes, u16 songListAddress) {
+  writeBytes(bytes, 0x0400, kReadSongListPattern);
+  writeLe16(bytes, 0x0403, songListAddress);
+  writeLe16(bytes, 0x0408, songListAddress);
+}
+
+void addFixedBgmReader(std::vector<u8>& bytes, u16 bgmHeaderAddress) {
+  writeBytes(bytes, 0x0500, kReadBgmAddressPattern);
+  bytes[0x0505] = static_cast<u8>(bgmHeaderAddress >> 8);
+  bytes[0x0508] = static_cast<u8>(bgmHeaderAddress & 0xff);
+}
+
+void addValidBgmHeader(std::vector<u8>& bytes, u16 headerAddress, u16 trackAddress = 0x3000) {
+  for (u32 track = 0; track < kCapcomSnesMaxTracks; ++track) {
+    writeBe16(bytes, headerAddress + 1 + track * 2, trackAddress);
+  }
+}
+
+void addModernDspInit(std::vector<u8>& bytes, u8 dirPage) {
+  writeBytes(bytes, 0x0700, kDspRegInitPattern);
+  bytes[0x0701] = 1;
+  writeLe16(bytes, 0x0703, 0x0800);
+  writeLe16(bytes, 0x0709, 0x0810);
+  bytes[0x0801] = 0x5d;
+  bytes[0x0811] = dirPage;
+}
+
+void addOldDspInit(std::vector<u8>& bytes, u8 dirPage) {
+  writeBytes(bytes, 0x0700, kDspRegInitOldPattern);
+  bytes[0x070c] = 1;
+  writeLe16(bytes, 0x0701, 0x0800);
+  writeLe16(bytes, 0x0705, 0x0810);
+  bytes[0x0800] = 0x5d;
+  bytes[0x0810] = dirPage;
+}
+
 std::vector<u8> makeCapcomSnesAram() {
   std::vector<u8> bytes(0x10000);
 
-  constexpr std::array<u8, 16> readBgmAddressPattern{0x6f, 0x3f, 0xef, 0x06, 0x8f, 0x0d, 0xa1, 0x8f,
-                                                     0xaf, 0xa0, 0x3f, 0x82, 0x05, 0x8d, 0x00, 0xdd};
-  writeBytes(bytes, 0x0500, readBgmAddressPattern);
-  bytes[0x0500 + 5] = 0x20;
-  bytes[0x0500 + 8] = 0x00;
-
-  constexpr std::array<u8, 12> loadInstrTablePattern{0x8d, 0x06, 0xcf, 0xda, 0xa0, 0x60,
-                                                     0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
-  writeBytes(bytes, 0x0600, loadInstrTablePattern);
+  addFixedBgmReader(bytes, 0x2000);
+  writeBytes(bytes, 0x0600, kLoadInstrTablePattern);
   bytes[0x0600 + 7] = 0x00;
   bytes[0x0600 + 10] = 0x40;
-
-  constexpr std::array<u8, 16> dspRegInitPattern{0x8d, 0x03, 0xf6, 0x63, 0x04, 0xc5, 0xf2, 0x00,
-                                                 0xf6, 0x66, 0x04, 0xc5, 0xf3, 0x00, 0xfe, 0xf2};
-  writeBytes(bytes, 0x0700, dspRegInitPattern);
-  bytes[0x0700 + 1] = 1;
-  writeLe16(bytes, 0x0700 + 3, 0x0800);
-  writeLe16(bytes, 0x0700 + 9, 0x0810);
-  bytes[0x0801] = 0x5d;
-  bytes[0x0811] = 0x50;
-
-  for (int track = 0; track < 8; ++track) {
-    writeBe16(bytes, 0x2001 + track * 2, 0x3000);
-  }
+  addModernDspInit(bytes, 0x50);
+  addValidBgmHeader(bytes, 0x2000);
 
   bytes[0x3000] = 0x05;
   bytes[0x3001] = 0x12;
@@ -243,6 +272,77 @@ std::vector<u8> makeCapcomSnesSpc() {
 }
 
 }  // namespace
+
+void capcomSnesLayoutSelectsSongListAndFixedHeaders() {
+  std::vector<u8> v1Bytes(0x10000);
+  addSongListReader(v1Bytes, 0x1800);
+  writeBe16(v1Bytes, 0x1800, 0x2200);
+  addValidBgmHeader(v1Bytes, 0x2200);
+  // Track zero maps to voice seven; make that the only active V1 cursor.
+  v1Bytes[0x0f] = 0x10;
+  v1Bytes[0x1f] = 0x30;
+
+  const SourceId v1Source{17};
+  const auto v1 = findCapcomSnesLayout(ByteReader(v1Source, v1Bytes));
+  expect(v1.has_value(), "V1 song-list layout should be discovered");
+  expect(v1->version == CapcomSnesEngineVersion::v1BgmInList, "song-list-only driver should be classified as V1");
+  expect(v1->sequenceHeaderRange == SourceRange{.source = v1Source, .offset = 0x2200, .size = 17} &&
+             v1->trackPointerTableAddress == 0x2201,
+         "V1 layout should retain its priority byte and expose the pointer table directly");
+
+  std::vector<u8> v2Bytes(0x10000);
+  addSongListReader(v2Bytes, 0x1800);
+  addFixedBgmReader(v2Bytes, 0x2000);
+  addValidBgmHeader(v2Bytes, 0x2000);
+
+  const auto v2 = findCapcomSnesLayout(ByteReader(SourceId{18}, v2Bytes));
+  expect(v2.has_value() && v2->version == CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation,
+         "driver with song-list and fixed-header readers should be classified as V2");
+  expect(v2->sequenceHeaderRange.offset == 0x2001 && v2->sequenceHeaderRange.size == 16 &&
+             v2->trackPointerTableAddress == 0x2001,
+         "V2 layout should select its valid fixed header without exposing discovery flags");
+}
+
+void capcomSnesLayoutFallsBackToV2SongList() {
+  std::vector<u8> bytes(0x10000);
+  addSongListReader(bytes, 0x1800);
+  addFixedBgmReader(bytes, 0x1000);  // The zero-filled header is invalid.
+  writeBe16(bytes, 0x1800, 0x2200);
+  addValidBgmHeader(bytes, 0x2200);
+  // Later drivers store voice-seven cursor bytes at $07/$0F.
+  bytes[0x07] = 0x10;
+  bytes[0x0f] = 0x30;
+
+  const auto layout = findCapcomSnesLayout(ByteReader(SourceId{19}, bytes));
+  expect(layout.has_value() && layout->version == CapcomSnesEngineVersion::v2BgmUsuallyAtFixedLocation,
+         "V2 classification should survive an unusable fixed-header operand");
+  expect(layout->sequenceHeaderRange.offset == 0x2200 && layout->sequenceHeaderRange.size == 17 &&
+             layout->trackPointerTableAddress == 0x2201,
+         "V2 should fall back to the song selected from current playback cursors");
+}
+
+void capcomSnesLayoutReadsOldAndRejectsMalformedDspInit() {
+  std::vector<u8> oldBytes(0x10000);
+  addFixedBgmReader(oldBytes, 0x2000);
+  addValidBgmHeader(oldBytes, 0x2000);
+  addOldDspInit(oldBytes, 0x50);
+
+  const auto oldLayout = findCapcomSnesLayout(ByteReader(SourceId{20}, oldBytes));
+  expect(oldLayout && oldLayout->spcDirAddress == 0x5000,
+         "old DSP initialization table should provide the SPC DIR page");
+
+  std::vector<u8> malformedBytes(0x10000);
+  addFixedBgmReader(malformedBytes, 0x2000);
+  addValidBgmHeader(malformedBytes, 0x2000);
+  writeBytes(malformedBytes, 0x0700, kDspRegInitPattern);
+  malformedBytes[0x0701] = 1;
+  writeLe16(malformedBytes, 0x0703, 0xffff);
+  writeLe16(malformedBytes, 0x0709, 0xffff);
+
+  const auto malformedLayout = findCapcomSnesLayout(ByteReader(SourceId{21}, malformedBytes));
+  expect(malformedLayout && !malformedLayout->spcDirAddress,
+         "malformed DSP initialization table should not invalidate an otherwise usable sequence layout");
+}
 
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   Session session;
@@ -588,6 +688,21 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "collection should reference instrument set");
   expect(project.collections()[0].sampleCollections == std::vector<AssetId>{samples->metadata.id},
          "collection should reference sample collection");
+}
+
+void capcomSnesModuleWarnsWhenDetectedSynthIsEmpty() {
+  Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  auto bytes = makeCapcomSnesAram();
+  std::fill(bytes.begin() + 0x4000, bytes.begin() + 0x4006, 0);
+  session.addSource(SourceFile{.name = "Empty Synth.spc"}, std::move(bytes));
+
+  const SessionSnapshot project = session.scanPendingSources();
+  expect(project.assets().size() == 1, "empty synth fixture should still preserve its sequence");
+  expect(project.diagnostics().size() == 1 &&
+             project.diagnostics()[0].message ==
+                 "CapcomSnes sequence found, but no valid instruments or samples were discovered",
+         "detected but unusable synth tables should produce a clear diagnostic");
 }
 
 void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {

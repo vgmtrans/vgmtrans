@@ -412,6 +412,27 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
          "scan result builder should preserve diagnostics");
 }
 
+void scanResultBuilderNamesSourceCollections() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "fallback.spc", .title = "Tagged Song"}, {0xaa});
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  expect(out.sourceDisplayName() == "Tagged Song", "source display name should prefer source metadata");
+  static_cast<void>(out.sourceCollection(out.sourceDisplayName()));
+
+  const ScanResult result = out.finish();
+  expect(result.explicitCollections.size() == 1, "source collection helper should create one collection");
+  expect(result.explicitCollections[0].key.resolver == "ProbeBuilder" &&
+             result.explicitCollections[0].key.value == "source:" + std::to_string(source.value),
+         "source collection identity should not depend on its display name");
+}
+
 void scanResultBuilderRejectsReferencedUncommittedHandles() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "builder-uncommitted.probe"}, {0xaa});
@@ -529,6 +550,7 @@ void runValueRegistryTests() {
   sequenceDialectRegistryStoresCopyableDialectValues();
   sessionRegistersOneFormatDefinitionAtTheAuthoringSurface();
   scanResultBuilderCoversCommonScannerPlumbing();
+  scanResultBuilderNamesSourceCollections();
   scanResultBuilderRejectsReferencedUncommittedHandles();
   scanResultBuilderRejectsWrongRoleHandleReuse();
   scanResultBuilderRejectsUncommittedSampleRefs();

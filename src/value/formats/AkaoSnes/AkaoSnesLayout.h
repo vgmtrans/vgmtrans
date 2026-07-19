@@ -9,7 +9,6 @@
 #include "value/formats/AkaoSnes/AkaoSnesTypes.h"
 
 #include <optional>
-#include <string>
 
 namespace vgmtrans::formats::akao_snes {
 
@@ -28,6 +27,5 @@ struct AkaoSnesLayout {
 };
 
 [[nodiscard]] std::optional<AkaoSnesLayout> findAkaoSnesLayout(core::ByteReader reader);
-[[nodiscard]] std::string akaoSnesSourceDisplayName(const core::SourceFile& source);
 
 }  // namespace vgmtrans::formats::akao_snes

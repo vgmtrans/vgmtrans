@@ -499,18 +499,16 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVers
 }
 
 SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayout& layout, AssetId sequenceId,
-                                         SourceRange sequenceRange, SourceMapBuilder* sourceMap,
-                                         std::vector<Diagnostic>* diagnostics) {
+                                         SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceDecodeSession sequence{
-      reader, capcomSnesSequenceDialect(), sequenceId, sequenceRange, sourceMap,
+      reader, capcomSnesSequenceDialect(), sequenceId, layout.sequenceHeaderRange, sourceMap,
   };
   const auto decode = [&](u32 offset) { return decodeCommand(reader, offset, layout.version, diagnostics); };
 
-  const u32 pointerBase = layout.sequenceHeaderAddress + (layout.priorityInHeader ? 1 : 0);
   // Capcom stores the pointer slots in reverse track order.
   for (u32 sourceTrackNumber = 0; sourceTrackNumber < kCapcomSnesMaxTracks; ++sourceTrackNumber) {
     const u32 pointerIndex = kCapcomSnesMaxTracks - 1 - sourceTrackNumber;
-    const u32 pointerOffset = pointerBase + pointerIndex * 2;
+    const u32 pointerOffset = layout.trackPointerTableAddress + pointerIndex * 2;
     const u16 trackAddress = reader.be16(pointerOffset);
     if (trackAddress == 0) {
       continue;

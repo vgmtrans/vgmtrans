@@ -16,7 +16,11 @@ void runValueSourceMapTests();
 void runValueMidiTests();
 void runValueSynthExportTests();
 
+void capcomSnesLayoutSelectsSongListAndFixedHeaders();
+void capcomSnesLayoutFallsBackToV2SongList();
+void capcomSnesLayoutReadsOldAndRejectsMalformedDspInit();
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
+void capcomSnesModuleWarnsWhenDetectedSynthIsEmpty();
 void capcomSnesCompiledAndPerformanceSnapshotsAreStable();
 void capcomSnesLfoValuesAreResolvedDuringDecode();
 void capcomSnesCompiledCommandsDoNotNeedEngineProfile();
@@ -82,7 +86,11 @@ int main() {
     runValueMidiTests();
     runValueSynthExportTests();
 
+    capcomSnesLayoutSelectsSongListAndFixedHeaders();
+    capcomSnesLayoutFallsBackToV2SongList();
+    capcomSnesLayoutReadsOldAndRejectsMalformedDspInit();
     capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
+    capcomSnesModuleWarnsWhenDetectedSynthIsEmpty();
     capcomSnesCompiledAndPerformanceSnapshotsAreStable();
     capcomSnesLfoValuesAreResolvedDuringDecode();
     capcomSnesCompiledCommandsDoNotNeedEngineProfile();
