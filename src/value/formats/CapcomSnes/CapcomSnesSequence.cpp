@@ -199,28 +199,20 @@ struct Playback {
     }
   }
 
-  void emitVibratoDepth() {
-    out.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoDepth,
-        .amount = track.modulationEnabled ? track.vibratoAmount : 0.0,
-        .pitchDepthSemitones = track.modulationEnabled ? track.vibratoDepthSemitones : 0.0,
-    });
-  }
-
-  void emitTremoloDepth() {
-    out.modulation(ModulationPerformanceTarget::TremoloDepth, track.modulationEnabled ? track.tremoloAmount : 0.0);
-  }
-
   void setModulationEnabled(bool enabled) {
     if (enabled == track.modulationEnabled) {
       return;
     }
     track.modulationEnabled = enabled;
     if (track.vibratoAmount != 0.0 || track.vibratoDepthSemitones != 0.0) {
-      emitVibratoDepth();
+      out.modulation(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoDepth,
+          .amount = enabled ? track.vibratoAmount : 0.0,
+          .pitchDepthSemitones = enabled ? track.vibratoDepthSemitones : 0.0,
+      });
     }
     if (track.tremoloAmount != 0.0) {
-      emitTremoloDepth();
+      out.modulation(ModulationPerformanceTarget::TremoloDepth, enabled ? track.tremoloAmount : 0.0);
     }
   }
 
@@ -339,7 +331,8 @@ using CapcomCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
       return cursor.command("Toggle Triplet", SequenceSemantic::State).toggle<&TrackState::noteTriplet>();
     case 0x01: {
       auto event = cursor.command("Toggle Slur", SequenceSemantic::State);
-      return event.toggle<&TrackState::noteSlurred>().emitLegatoPedalFrom<&TrackState::noteSlurred>();
+      event.toggle<&TrackState::noteSlurred>();
+      return event.emitLegatoPedal(event.state<&TrackState::noteSlurred>());
     }
     case 0x02:
       return cursor.command("Dotted Note", SequenceSemantic::State).set<&TrackState::noteDotted>(true);
@@ -447,14 +440,20 @@ using CapcomCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
           const u8 depth = raw.value & 0x7f;
           const double amount = event.resolvedValue("amount", raw, math::normalizedDepth(depth));
           const double semitones = event.derived("pitch_depth_semitones", math::vibratoDepthSemitones(depth));
+          const auto modulationEnabled = event.state<&TrackState::modulationEnabled>();
           event.set<&TrackState::vibratoAmount>(amount);
           event.set<&TrackState::vibratoDepthSemitones>(semitones);
-          return event.invoke<&Playback::emitVibratoDepth>();
+          return event.emitModulation(ModulationPerformanceTarget::VibratoDepth,
+                                      event.select(modulationEnabled, amount, 0.0),
+                                      event.select(modulationEnabled, semitones, 0.0));
         }
         case LfoParameter::TremoloDepth: {
           const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
           const double amount = event.resolvedValue("amount", raw, math::tremoloDepth(version, raw.value));
-          return event.set<&TrackState::tremoloAmount>(amount).invoke<&Playback::emitTremoloDepth>();
+          const auto modulationEnabled = event.state<&TrackState::modulationEnabled>();
+          event.set<&TrackState::tremoloAmount>(amount);
+          return event.emitModulation(ModulationPerformanceTarget::TremoloDepth,
+                                      event.select(modulationEnabled, amount, 0.0));
         }
         case LfoParameter::Rate: {
           // One rate gates both remembered depths. Zero disables modulation

@@ -19,6 +19,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -61,8 +62,121 @@ template <class T>
   }
 }
 
+// Deferred values are tiny expression types whose shape is encoded in the
+// generated executor. Only constants are stored in CommandAction::arguments;
+// state-member identities never enter the durable sequence model.
+template <class T>
+struct ConstantValue {
+  using deferred_value_tag = void;
+  using value_type = T;
+
+  T value;
+
+  void store(std::vector<SemanticOperandValue>& arguments) const { arguments.push_back(executableValue(value)); }
+
+  template <class Playback>
+  [[nodiscard]] static T evaluate(std::span<const SemanticOperandValue> arguments, size_t& next, Playback&) {
+    if (next >= arguments.size()) {
+      throw std::logic_error("Compiled sequence expression did not have enough constant arguments");
+    }
+    return executableArgument<T>(arguments[next++]);
+  }
+};
+
+template <class T>
+struct MemberPointerTraits;
+
+template <class Owner, class Value>
+struct MemberPointerTraits<Value Owner::*> {
+  using owner_type = Owner;
+  using value_type = Value;
+};
+
+template <auto Member>
+struct StateValue {
+  using deferred_value_tag = void;
+  using traits = MemberPointerTraits<std::remove_cv_t<decltype(Member)>>;
+  using owner_type = typename traits::owner_type;
+  using value_type = std::remove_cv_t<typename traits::value_type>;
+
+  void store(std::vector<SemanticOperandValue>&) const {}
+
+  template <class Playback>
+  [[nodiscard]] static value_type evaluate(std::span<const SemanticOperandValue>, size_t&, Playback& playback) {
+    return playback.track.*Member;
+  }
+};
+
+template <class T>
+concept DeferredValue = requires { typename std::remove_cvref_t<T>::deferred_value_tag; };
+
+template <class T>
+[[nodiscard]] auto defer(T value) {
+  if constexpr (DeferredValue<T>) {
+    return value;
+  } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, std::string_view>) {
+    return ConstantValue<std::string>{std::string(value)};
+  } else {
+    return ConstantValue<std::remove_cvref_t<T>>{std::move(value)};
+  }
+}
+
+template <class T>
+using DeferredValueType = typename decltype(defer(std::declval<T>()))::value_type;
+
+template <class Condition, class WhenTrue, class WhenFalse>
+struct SelectedValue {
+  using deferred_value_tag = void;
+  using value_type = std::common_type_t<typename WhenTrue::value_type, typename WhenFalse::value_type>;
+
+  Condition condition;
+  WhenTrue whenTrue;
+  WhenFalse whenFalse;
+
+  void store(std::vector<SemanticOperandValue>& arguments) const {
+    condition.store(arguments);
+    whenTrue.store(arguments);
+    whenFalse.store(arguments);
+  }
+
+  template <class Playback>
+  [[nodiscard]] static value_type evaluate(std::span<const SemanticOperandValue> arguments, size_t& next,
+                                           Playback& playback) {
+    const bool selected = static_cast<bool>(Condition::template evaluate<Playback>(arguments, next, playback));
+    const value_type trueValue =
+        static_cast<value_type>(WhenTrue::template evaluate<Playback>(arguments, next, playback));
+    const value_type falseValue =
+        static_cast<value_type>(WhenFalse::template evaluate<Playback>(arguments, next, playback));
+    return selected ? trueValue : falseValue;
+  }
+};
+
 template <class Playback>
 using CompiledExecutor = Effects (*)(std::span<const SemanticOperandValue>, Playback&);
+
+template <class Playback, auto Operation, class... Values>
+[[nodiscard]] Effects executeOperation(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+  size_t next = 0;
+  // List initialization guarantees that constants are consumed left-to-right.
+  std::tuple<typename Values::value_type...> values{
+      Values::template evaluate<Playback>(arguments, next, playback)...,
+  };
+  if (next != arguments.size()) {
+    throw std::logic_error("Compiled sequence expression had unused constant arguments");
+  }
+
+  return std::apply(
+      [&](auto&&... value) -> Effects {
+        if constexpr (std::is_same_v<std::invoke_result_t<decltype(Operation), Playback&, decltype(value)...>,
+                                     Effects>) {
+          return std::invoke(Operation, playback, std::forward<decltype(value)>(value)...);
+        } else {
+          std::invoke(Operation, playback, std::forward<decltype(value)>(value)...);
+          return Effects{};
+        }
+      },
+      std::move(values));
+}
 
 // Commands retain a small slot rather than a callback. The dialect-owned
 // registry stores one generated thunk for each operation used by the format.
@@ -102,266 +216,197 @@ template <class Playback>
   return registry;
 }
 
-template <class... Arguments>
-void requireArgumentCount(std::span<const SemanticOperandValue> arguments) {
-  if (arguments.size() != sizeof...(Arguments)) {
-    throw std::logic_error("Compiled sequence command had the wrong argument count");
-  }
-}
-
-template <class Playback, auto Method, class... Arguments, size_t... Index>
-[[nodiscard]] Effects invokeMember(std::span<const SemanticOperandValue> arguments, Playback& playback,
-                                   std::index_sequence<Index...>) {
-  requireArgumentCount<Arguments...>(arguments);
-  if constexpr (std::is_same_v<std::invoke_result_t<decltype(Method), Playback&, Arguments...>, Effects>) {
-    return std::invoke(Method, playback, executableArgument<Arguments>(arguments[Index])...);
-  } else {
-    std::invoke(Method, playback, executableArgument<Arguments>(arguments[Index])...);
-    return Effects{};
-  }
-}
-
 template <class Playback, auto Method, class... Arguments>
-[[nodiscard]] Effects invokeMember(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  return invokeMember<Playback, Method, Arguments...>(arguments, playback, std::index_sequence_for<Arguments...>{});
-}
-
-template <class Playback, class Handler, class... Arguments, size_t... Index>
-[[nodiscard]] Effects invokeInline(std::span<const SemanticOperandValue> arguments, Playback& playback,
-                                   std::index_sequence<Index...>) {
-  static_assert(std::is_empty_v<Handler> && std::is_default_constructible_v<Handler>,
-                "Inline compiler-cursor handlers must be captureless");
-  requireArgumentCount<Arguments...>(arguments);
-  Handler handler;
-  if constexpr (std::is_same_v<std::invoke_result_t<Handler&, Playback&, Arguments...>, Effects>) {
-    return std::invoke(handler, playback, executableArgument<Arguments>(arguments[Index])...);
+[[nodiscard]] Effects invokeMember(Playback& playback, Arguments... arguments) {
+  if constexpr (std::is_same_v<std::invoke_result_t<decltype(Method), Playback&, Arguments...>, Effects>) {
+    return std::invoke(Method, playback, std::move(arguments)...);
   } else {
-    std::invoke(handler, playback, executableArgument<Arguments>(arguments[Index])...);
+    std::invoke(Method, playback, std::move(arguments)...);
     return Effects{};
   }
 }
 
 template <class Playback, class Handler, class... Arguments>
-[[nodiscard]] Effects invokeInline(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  return invokeInline<Playback, Handler, Arguments...>(arguments, playback, std::index_sequence_for<Arguments...>{});
+[[nodiscard]] Effects invokeInline(Playback& playback, Arguments... arguments) {
+  static_assert(std::is_empty_v<Handler> && std::is_default_constructible_v<Handler>,
+                "Inline compiler-cursor handlers must be captureless");
+  Handler handler;
+  if constexpr (std::is_same_v<std::invoke_result_t<Handler&, Playback&, Arguments...>, Effects>) {
+    return std::invoke(handler, playback, std::move(arguments)...);
+  } else {
+    std::invoke(handler, playback, std::move(arguments)...);
+    return Effects{};
+  }
 }
 
-template <class Playback, auto Member>
-[[nodiscard]] Effects setMember(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+template <class Playback, auto Member, class Argument>
+void setMember(Playback& playback, Argument value) {
   using Value = std::remove_cvref_t<decltype(playback.track.*Member)>;
-  requireArgumentCount<Value>(arguments);
-  playback.track.*Member = executableArgument<Value>(arguments[0]);
-  return Effects{};
+  playback.track.*Member = static_cast<Value>(value);
 }
 
-template <class Playback, auto Member>
-[[nodiscard]] Effects addMember(std::span<const SemanticOperandValue> arguments, Playback& playback) {
+template <class Playback, auto Member, class Argument>
+void addMember(Playback& playback, Argument value) {
   using Value = std::remove_cvref_t<decltype(playback.track.*Member)>;
-  requireArgumentCount<Value>(arguments);
-  playback.track.*Member += executableArgument<Value>(arguments[0]);
-  return Effects{};
+  playback.track.*Member += static_cast<Value>(value);
 }
 
 template <class Playback, auto Member>
-[[nodiscard]] Effects toggleMember(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<>(arguments);
+void toggleMember(Playback& playback) {
   static_assert(std::is_same_v<std::remove_cvref_t<decltype(playback.track.*Member)>, bool>);
   playback.track.*Member = !(playback.track.*Member);
-  return Effects{};
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitLevel(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  playback.out.level(executableArgument<double>(arguments[0]));
-  return Effects{};
+void emitLevel(Playback& playback, double gain) {
+  playback.out.level(gain);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitQuantizedLevel(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double, u32>(arguments);
-  playback.out.level(executableArgument<double>(arguments[0]),
-                     ValueQuantization{.levels = executableArgument<u32>(arguments[1])});
-  return Effects{};
+void emitQuantizedLevel(Playback& playback, double gain, u32 levels) {
+  playback.out.level(gain, ValueQuantization{.levels = levels});
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitExpression(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  playback.out.expression(executableArgument<double>(arguments[0]));
-  return Effects{};
+void emitExpression(Playback& playback, double gain) {
+  playback.out.expression(gain);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitPan(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  playback.out.pan(executableArgument<double>(arguments[0]));
-  return Effects{};
+void emitPan(Playback& playback, double position) {
+  playback.out.pan(position);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitStereoBalance(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double, double>(arguments);
-  playback.out.stereoBalance(executableArgument<double>(arguments[0]), executableArgument<double>(arguments[1]));
-  return Effects{};
+void emitStereoBalance(Playback& playback, double leftGain, double rightGain) {
+  playback.out.stereoBalance(leftGain, rightGain);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitInstrument(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<u32, u32>(arguments);
-  playback.out.instrument(executableArgument<u32>(arguments[0]), executableArgument<u32>(arguments[1]));
-  return Effects{};
+void emitInstrument(Playback& playback, u32 bank, u32 program) {
+  playback.out.instrument(bank, program);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitSourceInstrument(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<std::string, u32>(arguments);
+void emitSourceInstrument(Playback& playback, std::string domain, u32 key) {
   playback.out.instrument(InstrumentIdentity{
-      .domain = executableArgument<std::string>(arguments[0]),
-      .key = executableArgument<u32>(arguments[1]),
+      .domain = std::move(domain),
+      .key = key,
   });
-  return Effects{};
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitTempo(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<u32>(arguments);
-  playback.out.tempo(executableArgument<u32>(arguments[0]));
-  return Effects{};
+void emitTempo(Playback& playback, u32 microsecondsPerQuarter) {
+  playback.out.tempo(microsecondsPerQuarter);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitMasterLevel(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  playback.out.masterLevel(executableArgument<double>(arguments[0]));
-  return Effects{};
+void emitMasterLevel(Playback& playback, double gain) {
+  playback.out.masterLevel(gain);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitReverb(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  playback.out.reverb(executableArgument<double>(arguments[0]));
-  return Effects{};
+void emitReverb(Playback& playback, double send) {
+  playback.out.reverb(send);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitTuning(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  playback.out.tuning(executableArgument<double>(arguments[0]));
-  return Effects{};
+void emitTuning(Playback& playback, double cents) {
+  playback.out.tuning(cents);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitGlobalTranspose(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<s32>(arguments);
-  playback.out.globalTranspose(executableArgument<s32>(arguments[0]));
-  return Effects{};
-}
-
-template <class Playback, auto Member>
-[[nodiscard]] Effects emitLegatoPedalFrom(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<>(arguments);
-  static_assert(std::is_same_v<std::remove_cvref_t<decltype(playback.track.*Member)>, bool>);
-  playback.out.legatoPedal(playback.track.*Member);
-  return Effects{};
+void emitGlobalTranspose(Playback& playback, s32 semitones) {
+  playback.out.globalTranspose(semitones);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitPitchBend(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  playback.out.pitchBend(executableArgument<double>(arguments[0]));
-  return Effects{};
+void emitLegatoPedal(Playback& playback, bool enabled) {
+  playback.out.legatoPedal(enabled);
+}
+
+template <class Playback>
+void emitPitchBend(Playback& playback, double semitones) {
+  playback.out.pitchBend(semitones);
 }
 
 template <class Playback, auto ScaleMember>
-[[nodiscard]] Effects emitPitchBendScaledBy(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  const double fraction = executableArgument<double>(arguments[0]);
+void emitPitchBendScaledBy(Playback& playback, double fraction) {
   playback.out.pitchBend(fraction * static_cast<double>(playback.track.*ScaleMember));
-  return Effects{};
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitPitchBendRange(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<u8>(arguments);
-  playback.out.pitchBendRange(executableArgument<u8>(arguments[0]));
-  return Effects{};
+void emitPitchBendRange(Playback& playback, u8 semitones) {
+  playback.out.pitchBendRange(semitones);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitModulation(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<ModulationPerformanceTarget, double>(arguments);
-  playback.out.modulation(executableArgument<ModulationPerformanceTarget>(arguments[0]),
-                          executableArgument<double>(arguments[1]));
-  return Effects{};
+void emitModulation(Playback& playback, ModulationPerformanceTarget target, double amount) {
+  playback.out.modulation(target, amount);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitVibratoRate(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double, double>(arguments);
+void emitPitchDepthModulation(Playback& playback, ModulationPerformanceTarget target, double amount,
+                              double pitchDepthSemitones) {
+  playback.out.modulation(ModulationPerformanceEvent{
+      .target = target,
+      .amount = amount,
+      .pitchDepthSemitones = pitchDepthSemitones,
+  });
+}
+
+template <class Playback>
+void emitVibratoRate(Playback& playback, double amount, double hertz) {
   playback.out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoRate,
-      .amount = executableArgument<double>(arguments[0]),
-      .frequencyHz = executableArgument<double>(arguments[1]),
+      .amount = amount,
+      .frequencyHz = hertz,
   });
-  return Effects{};
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitPortamentoEnable(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<bool>(arguments);
-  playback.out.portamentoEnable(executableArgument<bool>(arguments[0]));
-  return Effects{};
+void emitPortamentoEnable(Playback& playback, bool enabled) {
+  playback.out.portamentoEnable(enabled);
 }
 
 template <class Playback>
-[[nodiscard]] Effects emitPortamentoTime(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<double>(arguments);
-  playback.out.portamentoTime(executableArgument<double>(arguments[0]));
-  return Effects{};
+void emitPortamentoTime(Playback& playback, double milliseconds) {
+  playback.out.portamentoTime(milliseconds);
 }
 
 template <class Playback>
-[[nodiscard]] Effects wait(std::span<const SemanticOperandValue> arguments, Playback&) {
-  requireArgumentCount<u32>(arguments);
-  return Effects::wait(executableArgument<u32>(arguments[0]));
+[[nodiscard]] Effects wait(Playback&, u32 ticks) {
+  return Effects::wait(ticks);
 }
 
 template <class Playback>
-[[nodiscard]] Effects jump(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<Address>(arguments);
-  return Effects{.step = playback.vm.jump(executableArgument<Address>(arguments[0]))};
+[[nodiscard]] Effects jump(Playback& playback, Address destination) {
+  return Effects{.step = playback.vm.jump(destination)};
 }
 
 template <class Playback>
-[[nodiscard]] Effects loopCandidate(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<Address>(arguments);
-  return Effects{.step = playback.vm.loopCandidate(executableArgument<Address>(arguments[0]))};
+[[nodiscard]] Effects loopCandidate(Playback& playback, Address destination) {
+  return Effects{.step = playback.vm.loopCandidate(destination)};
 }
 
 template <class Playback>
-[[nodiscard]] Effects declaredLoop(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<Address>(arguments);
-  return Effects{.step = playback.vm.declaredLoop(executableArgument<Address>(arguments[0]))};
+[[nodiscard]] Effects declaredLoop(Playback& playback, Address destination) {
+  return Effects{.step = playback.vm.declaredLoop(destination)};
 }
 
 template <class Playback>
-[[nodiscard]] Effects call(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<Address>(arguments);
-  return Effects{.step = playback.vm.call(executableArgument<Address>(arguments[0]))};
+[[nodiscard]] Effects call(Playback& playback, Address destination) {
+  return Effects{.step = playback.vm.call(destination)};
 }
 
 template <class Playback>
-[[nodiscard]] Effects return_(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<>(arguments);
+[[nodiscard]] Effects return_(Playback& playback) {
   return Effects{.step = playback.vm.return_()};
 }
 
 template <class Playback>
-[[nodiscard]] Effects repeatUntil(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  requireArgumentCount<u8, u32, Address>(arguments);
-  return playback.vm.countedRepeatUntil(executableArgument<u8>(arguments[0]), executableArgument<u32>(arguments[1]),
-                                        executableArgument<Address>(arguments[2]));
+[[nodiscard]] Effects repeatUntil(Playback& playback, u8 slot, u32 totalPlays, Address destination) {
+  return playback.vm.countedRepeatUntil(slot, totalPlays, destination);
 }
 
 }  // namespace detail
@@ -518,86 +563,128 @@ public:
       return *this;
     }
 
-    Event& wait(u32 ticks) { return append(&detail::wait<Playback>, ticks); }
-
-    Event& emitLevel(double gain) { return append(&detail::emitLevel<Playback>, gain); }
-
-    Event& emitLevel(double gain, ValueQuantization quantization) {
-      return append(&detail::emitQuantizedLevel<Playback>, gain, quantization.levels);
-    }
-
-    Event& emitExpression(double gain) { return append(&detail::emitExpression<Playback>, gain); }
-
-    Event& emitPan(double position) { return append(&detail::emitPan<Playback>, position); }
-
-    Event& emitStereoBalance(double leftGain, double rightGain) {
-      return append(&detail::emitStereoBalance<Playback>, leftGain, rightGain);
-    }
-
-    Event& emitInstrument(u32 bank, u32 program) { return append(&detail::emitInstrument<Playback>, bank, program); }
-
-    Event& emitInstrument(std::string_view domain, u32 key) {
-      return append(&detail::emitSourceInstrument<Playback>, domain, key);
-    }
-
-    Event& emitTempo(u32 microsecondsPerQuarter) {
-      return append(&detail::emitTempo<Playback>, microsecondsPerQuarter);
-    }
-
-    Event& emitMasterLevel(double gain) { return append(&detail::emitMasterLevel<Playback>, gain); }
-
-    Event& emitReverb(double send) { return append(&detail::emitReverb<Playback>, send); }
-
-    Event& emitTuning(double cents) { return append(&detail::emitTuning<Playback>, cents); }
-
-    Event& emitGlobalTranspose(s32 semitones) { return append(&detail::emitGlobalTranspose<Playback>, semitones); }
-
+    // state() is a deferred read: it observes the member when the action using
+    // it executes, after any preceding set/add/toggle action in this command.
     template <auto Member>
-    Event& emitLegatoPedalFrom() {
-      return append(&detail::emitLegatoPedalFrom<Playback, Member>);
+    [[nodiscard]] auto state() const {
+      using State = detail::StateValue<Member>;
+      static_assert(std::is_same_v<typename State::owner_type, TrackState>,
+                    "Compiler cursor state members must belong to its TrackState");
+      return State{};
     }
 
-    Event& emitPitchBend(double semitones) { return append(&detail::emitPitchBend<Playback>, semitones); }
+    // Both outcomes are explicit; the boolean condition is read when the
+    // consuming action executes.
+    template <class Condition, class WhenTrue, class WhenFalse>
+    [[nodiscard]] auto select(Condition condition, WhenTrue whenTrue, WhenFalse whenFalse) const {
+      auto deferredCondition = detail::defer(std::move(condition));
+      auto deferredTrue = detail::defer(std::move(whenTrue));
+      auto deferredFalse = detail::defer(std::move(whenFalse));
+      using ConditionValue = decltype(deferredCondition);
+      using TrueValue = decltype(deferredTrue);
+      using FalseValue = decltype(deferredFalse);
+      static_assert(std::is_same_v<typename ConditionValue::value_type, bool>,
+                    "Compiler cursor select conditions must be boolean");
+      return detail::SelectedValue<ConditionValue, TrueValue, FalseValue>{
+          .condition = std::move(deferredCondition),
+          .whenTrue = std::move(deferredTrue),
+          .whenFalse = std::move(deferredFalse),
+      };
+    }
+
+    Event& wait(auto ticks) { return append<&detail::wait<Playback>>(std::move(ticks)); }
+
+    Event& emitLevel(auto gain) { return append<&detail::emitLevel<Playback>>(std::move(gain)); }
+
+    Event& emitLevel(auto gain, ValueQuantization quantization) {
+      return append<&detail::emitQuantizedLevel<Playback>>(std::move(gain), quantization.levels);
+    }
+
+    Event& emitExpression(auto gain) { return append<&detail::emitExpression<Playback>>(std::move(gain)); }
+
+    Event& emitPan(auto position) { return append<&detail::emitPan<Playback>>(std::move(position)); }
+
+    Event& emitStereoBalance(auto leftGain, auto rightGain) {
+      return append<&detail::emitStereoBalance<Playback>>(std::move(leftGain), std::move(rightGain));
+    }
+
+    Event& emitInstrument(auto bank, auto program) {
+      return append<&detail::emitInstrument<Playback>>(std::move(bank), std::move(program));
+    }
+
+    Event& emitInstrument(std::string_view domain, auto key) {
+      return append<&detail::emitSourceInstrument<Playback>>(domain, std::move(key));
+    }
+
+    Event& emitTempo(auto microsecondsPerQuarter) {
+      return append<&detail::emitTempo<Playback>>(std::move(microsecondsPerQuarter));
+    }
+
+    Event& emitMasterLevel(auto gain) { return append<&detail::emitMasterLevel<Playback>>(std::move(gain)); }
+
+    Event& emitReverb(auto send) { return append<&detail::emitReverb<Playback>>(std::move(send)); }
+
+    Event& emitTuning(auto cents) { return append<&detail::emitTuning<Playback>>(std::move(cents)); }
+
+    Event& emitGlobalTranspose(auto semitones) {
+      return append<&detail::emitGlobalTranspose<Playback>>(std::move(semitones));
+    }
+
+    Event& emitLegatoPedal(auto enabled) { return append<&detail::emitLegatoPedal<Playback>>(std::move(enabled)); }
+
+    Event& emitPitchBend(auto semitones) { return append<&detail::emitPitchBend<Playback>>(std::move(semitones)); }
 
     template <auto ScaleMember>
-    Event& emitPitchBendScaledBy(double fraction) {
-      return append(&detail::emitPitchBendScaledBy<Playback, ScaleMember>, fraction);
+    Event& emitPitchBendScaledBy(auto fraction) {
+      return append<&detail::emitPitchBendScaledBy<Playback, ScaleMember>>(std::move(fraction));
     }
 
-    Event& emitPitchBendRange(::u8 semitones) { return append(&detail::emitPitchBendRange<Playback>, semitones); }
-
-    Event& emitModulation(ModulationPerformanceTarget target, double amount) {
-      return append(&detail::emitModulation<Playback>, target, amount);
+    Event& emitPitchBendRange(auto semitones) {
+      return append<&detail::emitPitchBendRange<Playback>>(std::move(semitones));
     }
 
-    Event& emitVibratoRate(double amount, double hertz) {
-      return append(&detail::emitVibratoRate<Playback>, amount, hertz);
+    Event& emitModulation(ModulationPerformanceTarget target, auto amount) {
+      return append<&detail::emitModulation<Playback>>(target, std::move(amount));
     }
 
-    Event& emitPortamentoEnable(bool enabled) { return append(&detail::emitPortamentoEnable<Playback>, enabled); }
+    Event& emitModulation(ModulationPerformanceTarget target, auto amount, auto pitchDepthSemitones) {
+      return append<&detail::emitPitchDepthModulation<Playback>>(target, std::move(amount),
+                                                                 std::move(pitchDepthSemitones));
+    }
 
-    Event& emitPortamentoTime(double milliseconds) {
-      return append(&detail::emitPortamentoTime<Playback>, milliseconds);
+    Event& emitVibratoRate(auto amount, auto hertz) {
+      return append<&detail::emitVibratoRate<Playback>>(std::move(amount), std::move(hertz));
+    }
+
+    Event& emitPortamentoEnable(auto enabled) {
+      return append<&detail::emitPortamentoEnable<Playback>>(std::move(enabled));
+    }
+
+    Event& emitPortamentoTime(auto milliseconds) {
+      return append<&detail::emitPortamentoTime<Playback>>(std::move(milliseconds));
     }
 
     template <auto Member, class Value>
     Event& set(Value value) {
-      return append(&detail::setMember<Playback, Member>, value);
+      using Argument = detail::DeferredValueType<Value>;
+      return append<&detail::setMember<Playback, Member, Argument>>(std::move(value));
     }
 
     template <auto Member, class Value>
     Event& add(Value value) {
-      return append(&detail::addMember<Playback, Member>, value);
+      using Argument = detail::DeferredValueType<Value>;
+      return append<&detail::addMember<Playback, Member, Argument>>(std::move(value));
     }
 
     template <auto Member>
     Event& toggle() {
-      return append(&detail::toggleMember<Playback, Member>);
+      return append<&detail::toggleMember<Playback, Member>>();
     }
 
     template <auto Method, class... Arguments>
     Event& invoke(Arguments... arguments) {
-      return append(&detail::invokeMember<Playback, Method, std::decay_t<Arguments>...>, arguments...);
+      return append<&detail::invokeMember<Playback, Method, detail::DeferredValueType<Arguments>...>>(
+          std::move(arguments)...);
     }
 
     // A captureless inline handler is the locality escape hatch for short,
@@ -605,46 +692,47 @@ public:
     // arguments; no closure object enters the durable command.
     template <class Handler, class... Arguments>
     Event& invoke(Handler, Arguments... arguments) {
-      return append(&detail::invokeInline<Playback, std::decay_t<Handler>, std::decay_t<Arguments>...>, arguments...);
+      return append<&detail::invokeInline<Playback, std::decay_t<Handler>, detail::DeferredValueType<Arguments>...>>(
+          std::move(arguments)...);
     }
 
     Event& jump(Address destination) {
       targetRole(destination, SemanticOperandRole::JumpTarget);
-      append(&detail::jump<Playback>, destination);
+      append<&detail::jump<Playback>>(destination);
       flow_ = DecodeFlow::jump(destination);
       return *this;
     }
 
     Event& loopCandidate(Address destination, SemanticOperandRole role = SemanticOperandRole::LoopTarget) {
       targetRole(destination, role);
-      append(&detail::loopCandidate<Playback>, destination);
+      append<&detail::loopCandidate<Playback>>(destination);
       flow_ = DecodeFlow::jump(destination);
       return *this;
     }
 
     Event& declaredLoop(Address destination, SemanticOperandRole role = SemanticOperandRole::LoopTarget) {
       targetRole(destination, role);
-      append(&detail::declaredLoop<Playback>, destination);
+      append<&detail::declaredLoop<Playback>>(destination);
       flow_ = DecodeFlow::jump(destination);
       return *this;
     }
 
     Event& call(Address destination) {
       targetRole(destination, SemanticOperandRole::CallTarget);
-      append(&detail::call<Playback>, destination);
+      append<&detail::call<Playback>>(destination);
       flow_ = DecodeFlow::call(destination, Address{cursor_.record_.position()});
       return *this;
     }
 
     Event& return_() {
-      append(&detail::return_<Playback>);
+      append<&detail::return_<Playback>>();
       flow_ = DecodeFlow::return_();
       return *this;
     }
 
     Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
       targetRole(destination, SemanticOperandRole::RepeatTarget);
-      append(&detail::repeatUntil<Playback>, slot, totalPlays, destination);
+      append<&detail::repeatUntil<Playback>>(slot, totalPlays, destination);
       flow_.staticTargets.push_back(destination);
       return *this;
     }
@@ -665,13 +753,19 @@ public:
     Event(CompilerCursor& cursor, DecodedCommandPresentation presentation)
         : cursor_(cursor), presentation_(std::move(presentation)) {}
 
-    template <class... Arguments>
-    Event& append(detail::CompiledExecutor<Playback> executor, Arguments... arguments) {
+    template <auto Operation, class... Arguments>
+    Event& append(Arguments... arguments) {
+      return appendDeferred<Operation>(detail::defer(std::move(arguments))...);
+    }
+
+    template <auto Operation, class... Values>
+    Event& appendDeferred(Values... values) {
       CommandAction action{
-          .executor = detail::compiledExecutors<Playback>().add(executor),
+          .executor =
+              detail::compiledExecutors<Playback>().add(&detail::executeOperation<Playback, Operation, Values...>),
       };
-      action.arguments.reserve(sizeof...(Arguments));
-      (action.arguments.push_back(detail::executableValue(arguments)), ...);
+      action.arguments.reserve(sizeof...(Values));
+      (values.store(action.arguments), ...);
       execution_.actions.push_back(std::move(action));
       return *this;
     }

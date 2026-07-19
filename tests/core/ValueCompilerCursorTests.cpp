@@ -74,6 +74,13 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       return event.invoke([](CompilerProbePlayback&) { return Effects{.step = Step::end()}; })
           .invoke([](CompilerProbePlayback&) { return Effects{.step = Step::return_()}; });
     }
+    case 0x27: {
+      auto event = cursor.command("Deferred State", SequenceSemantic::State);
+      const auto enabled = event.state<&CompilerProbeState::enabled>();
+      event.toggle<&CompilerProbeState::enabled>();
+      event.emitLegatoPedal(enabled);
+      return event.emitExpression(event.select(enabled, 0.75, 0.25));
+    }
     case 0x40:
     case 0x41:
     case 0x42:
@@ -276,6 +283,31 @@ void compilerCursorComposesChainedAndSeparateActions() {
          "separate state calls and captureless inline handlers should preserve typed runtime behavior");
 }
 
+void compilerCursorEvaluatesDeferredStateInActionOrder() {
+  const std::vector<u8> bytes{0x27, 0x27, 0xff};
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{14}, bytes), static_cast<u32>(bytes.size()));
+  expect(track.commands.size() == 3 && track.commands[0].execution.actions.size() == 3,
+         "deferred-state fixture should compile toggle and both outputs as separate actions");
+  expect(track.commands[0].execution.actions[1].arguments.empty() &&
+             track.commands[0].execution.actions[2].arguments.size() == 2,
+         "state identities should require no durable arguments while select retains its two constants");
+
+  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const auto& events = performance.tracks[0].events;
+  expect(events.size() == 4 && std::get<LegatoPedalPerformanceEvent>(events[0]).enabled &&
+             !std::get<LegatoPedalPerformanceEvent>(events[2]).enabled,
+         "state() should observe each toggle immediately before the dependent output action");
+  expect(std::get<ExpressionPerformanceEvent>(events[1]).linearGain == 0.75 &&
+             std::get<ExpressionPerformanceEvent>(events[3]).linearGain == 0.25,
+         "select() should evaluate both true and false branches from runtime state");
+}
+
 void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
   const std::vector<u8> bytes{0x10};
   std::vector<Diagnostic> diagnostics;
@@ -315,6 +347,7 @@ void runValueCompilerCursorTests() {
   compilerCursorCompilesControlFlow();
   compilerCursorCompilesRepeatsAndConditionalFields();
   compilerCursorComposesChainedAndSeparateActions();
+  compilerCursorEvaluatesDeferredStateInActionOrder();
   compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
   compilerCursorRejectsConflictingComposedFlow();
 }

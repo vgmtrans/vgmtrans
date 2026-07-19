@@ -90,8 +90,9 @@ struct CommandAction {
   static constexpr u32 kInvalidExecutor = std::numeric_limits<u32>::max();
 
   // CompilerCursor assigns this slot from a generated typed thunk. Arguments
-  // are positional executable values: playback never looks up source-field
-  // names and never needs the encoded command bytes.
+  // contain its literal constants in evaluation order; deferred state-member
+  // reads live in the thunk's type. Playback never looks up source-field names
+  // and never needs the encoded command bytes.
   u32 executor = kInvalidExecutor;
   std::vector<SemanticOperandValue> arguments;
 

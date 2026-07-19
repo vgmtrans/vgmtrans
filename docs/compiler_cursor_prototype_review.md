@@ -87,7 +87,19 @@ case 0xc5: {
 
 Every operation appends one typed action and returns the same builder. Chained calls and separate statements compile to the same ordered action list. This keeps `set` and `emit` honest instead of hiding two effects behind one convenience method.
 
-Runtime-history-dependent behavior has one explicit indirection, to a concrete method beside the switch:
+Simple state-derived outputs use deferred values rather than tiny playback helpers:
+
+```cpp
+const auto enabled = event.state<&TrackState::modulationEnabled>();
+event.set<&TrackState::tremoloAmount>(amount);
+return event.emitModulation(
+    ModulationPerformanceTarget::TremoloDepth,
+    event.select(enabled, amount, 0.0));
+```
+
+`state()` reads at the point the consuming action executes, after preceding actions in the same command. `select()` makes both outcomes explicit. The deliberately restricted expression vocabulary contains constants, state reads, and selection only; inline handlers and named methods remain the escape hatches for real logic.
+
+Behavior that needs more than read-only state selection has one explicit indirection, to a concrete method beside the switch:
 
 ```cpp
 case Note: {
@@ -123,8 +135,8 @@ Broader production counts are:
 |---|---:|
 | Current value NDS format directory | 1,713 |
 | Original NDS format directory | 1,586 |
-| Generic `CompilerCursor.h` | 761 |
-| Focused compiler-cursor tests | 322 |
+| Generic `CompilerCursor.h` | 972 |
+| Focused compiler-cursor tests | 353 |
 
 The two NDS directory totals are not like-for-like: the value implementation also owns durable source maps, neutral assets, bounded recovery, and source-free VM integration. The important author-facing comparison is the sequence implementation and the individual command blocks.
 
@@ -152,9 +164,9 @@ The two NDS directory totals are not like-for-like: the value implementation als
 
 ### Central framework size
 
-`CompilerCursor.h` is large. Roughly half is the deliberately explicit set of checked fields and executable operations; the remainder is generated typed dispatch, action composition, and track-walker integration. This is preferable to spreading the same mechanics across formats, but it must not become a home for driver-specific semantics.
+`CompilerCursor.h` is large. It contains the deliberately explicit set of checked fields and executable operations, generated typed dispatch, action composition, and the restricted deferred-value machinery. This is preferable to spreading those mechanics across formats, but it must not become a home for driver-specific semantics.
 
-The rule should be: express state, output, time, and flow as separate operations and compose them in source order. Use `invoke<&Playback::method>` for substantial or reused driver behavior. Captureless inline handlers are permitted as an escape hatch, but decoded values must remain explicit arguments and no closure is stored.
+The rule should be: express state, output, time, and flow as separate operations and compose them in source order. Use `state()` and `select()` only for simple read-only state-derived values. Use `invoke<&Playback::method>` for substantial or reused driver behavior. Captureless inline handlers are permitted as an escape hatch, but decoded values must remain explicit arguments and no closure is stored.
 
 ### Executor registry
 
@@ -162,7 +174,7 @@ Each command action stores a small automatically assigned slot, not a closure or
 
 ### Templates
 
-Member pointers give compile-time checking for state and local methods, but an incorrect signature can produce a template diagnostic. The ordinary path uses shallow calls (`set`, `toggle`, `invoke`) rather than expression templates or macros. If real format work exposes unreadable errors, add focused constraints and static assertions; do not add a declarative schema to hide them.
+Member pointers give compile-time checking for state and local methods, but an incorrect signature can produce a template diagnostic. Deferred values add shallow expression templates for constants, state reads, and selection; they intentionally omit arithmetic, comparisons, mutation, and arbitrary calls. If real format work exposes unreadable errors, add focused constraints and static assertions rather than expanding the expression language or adding a declarative schema.
 
 ### Multiple historical paths
 

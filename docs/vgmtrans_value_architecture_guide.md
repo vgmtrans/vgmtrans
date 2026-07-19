@@ -662,9 +662,9 @@ A source-free dialect is the small piece of driver-specific behavior needed by t
 - a function to create per-track state;
 - a function to execute one semantic command.
 
-The dialect executor receives the command, program state, track state, `PerformanceEmitter`, and `VmApi`. It does **not** receive a `TrackProgram`, source bytes, or global registry context. For compiler-cursor formats, the shared adapter creates the format's concrete `Playback` and invokes the command's generated typed thunk. Version data is read once from `SequenceProgram::config` when state is constructed.
+The dialect executor receives the command, program state, track state, `PerformanceEmitter`, and `VmApi`. It does **not** receive a `TrackProgram`, source bytes, or global registry context. For compiler-cursor formats, the shared adapter creates the format's concrete `Playback` and invokes the command's generated typed thunk. Runtime-relevant version data may initialize program or track state; source-only version choices should be resolved while decoding.
 
-The dialect is registered once in `SequenceDialectRegistry`; export looks it up by family ID. Capcom SNES, for example, registers `capcom-snes` once and stores V1/V2/V3 selection on each program.
+The dialect is registered once in `SequenceDialectRegistry`; export looks it up by family ID. Capcom SNES, for example, registers `capcom-snes` once and resolves its V1/V2/V3 source conversions before playback.
 
 ### 14.3 Compiler-cursor decode and execution
 
@@ -686,7 +686,7 @@ case Transpose: {
 }
 ```
 
-Only behavior that actually depends on runtime history needs a nearby `Playback` method:
+Behavior that cannot be expressed as simple state reads and output values uses a nearby `Playback` method:
 
 ```cpp
 case Note: {
@@ -719,7 +719,21 @@ event.emitExpression(expression);
 return event.wait(duration);
 ```
 
-Each action selects a generated typed thunk and receives positional values. The compiled dialect executes actions in written order, combines elapsed time, and rejects conflicting control-flow results. There is no execute switch, operand-key declaration, captured closure, or playback-time string lookup.
+Simple output values that depend on runtime state remain local through deferred values. `state()` reads the member when the consuming action executes, so it observes earlier actions in the same command. `select()` explicitly supplies both results without hiding whether the false case emits zero or emits nothing:
+
+```cpp
+const auto modulationEnabled =
+    event.state<&TrackState::modulationEnabled>();
+
+event.set<&TrackState::tremoloAmount>(amount);
+return event.emitModulation(
+    ModulationPerformanceTarget::TremoloDepth,
+    event.select(modulationEnabled, amount, 0.0));
+```
+
+Deferred values deliberately support only constants, track-state reads, and selection. They are read-only and have no side effects. Do not grow them into a general expression language: use a captureless inline handler for complex one-off behavior or a nearby `Playback` method for substantial or reused behavior.
+
+Each action selects a generated typed thunk and receives positional values. Deferred expression shape and state-member identity live in that generated type; only literal constants enter the durable action arguments. The compiled dialect executes actions in written order, combines elapsed time, and rejects conflicting control-flow results. There is no execute switch, operand-key declaration, captured closure, or playback-time string lookup.
 
 Captureless inline handlers are available for small exceptional behavior through `event.invoke(handler, arguments...)`. The handler type generates a thunk; no closure object is stored. Captures are forbidden, so decoded values remain explicit IR arguments. Prefer named operations or a nearby `Playback` method whenever they are clearer.
 
@@ -1110,7 +1124,7 @@ Define:
 - a `TrackState` type for driver-local mutable playback state; and
 - a sequence-scoped `TrackDecodeScope` using `linear` or `reachable` discovery.
 
-Use `CompilerCursor` to keep IR construction, source projection, generated executor registration, truncation handling, and type erasure out of format code. Ordinary literal commands use `emit...`, `set`, `add`, `toggle`, or a VM flow operation. Chain operations—or write them as separate statements—when a source command has several effects. Put substantial or reused stateful driver behavior in a nearby typed `Playback` method. A captureless inline `invoke` is available for genuinely clearer one-off behavior. Playback must not implement global loop export policy or read source bytes.
+Use `CompilerCursor` to keep IR construction, source projection, generated executor registration, truncation handling, and type erasure out of format code. Ordinary literal commands use `emit...`, `set`, `add`, `toggle`, or a VM flow operation. Chain operations—or write them as separate statements—when a source command has several effects. Use `state()` and `select()` when a simple output value depends on track state. Put substantial or reused stateful driver behavior in a nearby typed `Playback` method. A captureless inline `invoke` is available for genuinely clearer one-off behavior. Playback must not implement global loop export policy or read source bytes.
 
 ### Step 6: Build synth data in the neutral model
 
@@ -1336,7 +1350,7 @@ The branch would benefit from a contributor-facing guide with one page each for:
 
 ### 24.2 Keep command compilation boring
 
-Read each operand once in a short opcode block and finish with the command's effect. Literal output, state, and VM flow belong directly in that block. Only runtime-history-dependent behavior belongs in a nearby concrete `Playback` method, invoked with typed arguments.
+Read each operand once in a short opcode block and finish with the command's effect. Literal output, state, and VM flow belong directly in that block. Keep simple state-derived values local with `state()` and `select()`. Use a captureless inline handler for complex one-off behavior and a nearby concrete `Playback` method for substantial or reused runtime-history behavior.
 
 Keep opcode knowledge in one switch plus small version dispatch helpers. Avoid command-kind and operand-ID enums, parallel size/metadata tables, analysis interpreters, declarative command tables, and per-opcode handler classes.
 
