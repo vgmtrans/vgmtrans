@@ -317,6 +317,8 @@ public:
       return cursor_.decoded(cursor_.record_.u8(name, display), name, display, role);
     }
 
+    ::u8 u8(std::string_view name, SemanticOperandRole role) { return u8(name, SourceValueDisplay::Default, role); }
+
     ::s8 s8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
             SemanticOperandRole role = SemanticOperandRole::Value) {
       return cursor_.decoded(cursor_.record_.s8(name, display), name, display, role);
@@ -340,6 +342,10 @@ public:
     u32 varLen(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
                SemanticOperandRole role = SemanticOperandRole::Value) {
       return cursor_.decoded(cursor_.record_.varLen(name, display), name, display, role);
+    }
+
+    u32 varLen(std::string_view name, SemanticOperandRole role) {
+      return varLen(name, SourceValueDisplay::Default, role);
     }
 
     std::string rawBytes(std::string_view name, u32 size) {
@@ -375,6 +381,11 @@ public:
         cursor_.add(name, detail::executableValue(value), {}, display, role);
       }
       return value;
+    }
+
+    template <class T>
+    T derived(std::string_view name, T value, SemanticOperandRole role) {
+      return derived(name, std::move(value), SourceValueDisplay::Default, role);
     }
 
     void warning(std::string message) { cursor_.warning(std::move(message)); }

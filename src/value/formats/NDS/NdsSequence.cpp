@@ -13,7 +13,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <optional>
 #include <set>
 #include <string>
@@ -62,20 +61,32 @@ struct Playback {
 using NdsCompilerCursor = CompilerCursor<TrackState, Playback>;
 using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
 
-[[nodiscard]] Address targetAddress(NdsCompilerCursor::Event& event, u32 sequenceDataBase, u32 sequenceEnd,
+// Values shared by every track in one SSEQ. Keeping them here prevents format
+// orchestration from rebuilding a ten-field TrackDecodeInput for each track.
+struct SequenceDecodeContext {
+  ByteReader reader;
+  AssetId sequenceAsset;
+  NdsSequenceRange range;
+  std::optional<SourceAnnotationId> parentAnnotation;
+  SourceMapBuilder* sourceMap = nullptr;
+  std::vector<Diagnostic>* diagnostics = nullptr;
+
+  [[nodiscard]] u32 dataBase() const noexcept { return range.offset + kSseqHeaderSize; }
+};
+
+[[nodiscard]] Address targetAddress(const SequenceDecodeContext& context, NdsCompilerCursor::Event& event,
                                     SemanticOperandRole role) {
   const u32 relative = event.u24le("relative", SourceValueDisplay::Address);
-  const Address destination{sequenceDataBase + relative};
+  const Address destination{context.dataBase() + relative};
   return event.derived("destination", destination, SourceValueDisplay::Address,
-                       destination.value < sequenceEnd ? role : SemanticOperandRole::Address);
+                       destination.value < context.range.sequenceEnd ? role : SemanticOperandRole::Address);
 }
 
 // One source opcode is read and compiled in one block. Event operations append
 // shared actions or typed Playback behavior in written order; there is no
 // second opcode profile or execution switch.
-[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, u32 sequenceDataBase,
-                                                   u32 sequenceEnd, std::vector<Diagnostic>* diagnostics) {
-  NdsCompilerCursor cursor(reader, begin, end, "nds", diagnostics);
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(const SequenceDecodeContext& context, u32 begin) {
+  NdsCompilerCursor cursor(context.reader, begin, context.range.sequenceEnd, "nds", context.diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
@@ -84,29 +95,27 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
     auto event = cursor.command("Note", SequenceSemantic::Note);
     const u8 key =
         event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    const u8 velocity = event.u8("velocity", SourceValueDisplay::Default, SemanticOperandRole::Level);
-    const u32 duration = event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration);
+    const u8 velocity = event.u8("velocity", SemanticOperandRole::Level);
+    const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
     return event.invoke<&Playback::note>(key, velocity, duration);
   }
 
   switch (cursor.opcode()) {
     case 0x80: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.wait(event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration));
+      return event.wait(event.varLen("duration", SemanticOperandRole::Duration));
     }
     case 0x81: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
       const u32 raw = event.varLen("raw");
-      const u32 bank =
-          event.derived("bank", raw >> 7, SourceValueDisplay::Default, SemanticOperandRole::InstrumentBank);
-      const u32 program =
-          event.derived("program", raw & 0x7f, SourceValueDisplay::Default, SemanticOperandRole::InstrumentProgram);
+      const u32 bank = event.derived("bank", raw >> 7, SemanticOperandRole::InstrumentBank);
+      const u32 program = event.derived("program", raw & 0x7f, SemanticOperandRole::InstrumentProgram);
       return event.emitInstrument(bank, program);
     }
     case 0x93: {
       auto event = cursor.sourceOnly("Open Track");
       event.u8("track");
-      static_cast<void>(targetAddress(event, sequenceDataBase, sequenceEnd, SemanticOperandRole::Address));
+      static_cast<void>(targetAddress(context, event, SemanticOperandRole::Address));
       return event.ignore();
     }
     case 0x94:
@@ -115,12 +124,11 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
       auto event = cursor.command(isCall ? "Call" : "Jump", isCall ? SequenceSemantic::Call : SequenceSemantic::Jump,
                                   CommandPlaybackStatus::AffectsControlFlow);
       const Address destination =
-          targetAddress(event, sequenceDataBase, sequenceEnd,
-                        isCall ? SemanticOperandRole::CallTarget : SemanticOperandRole::JumpTarget);
+          targetAddress(context, event, isCall ? SemanticOperandRole::CallTarget : SemanticOperandRole::JumpTarget);
       if (!event.ok()) {
         return event.stop();
       }
-      if (destination.value >= sequenceEnd) {
+      if (destination.value >= context.range.sequenceEnd) {
         event.warning(isCall ? "Call target outside sequence data" : "Jump target outside sequence data");
         return event.stop();
       }
@@ -275,10 +283,10 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
   };
 }
 
-[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(ByteReader reader, u32 offset) {
+[[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(const SequenceDecodeContext& context, u32 offset) {
   return DecodedBytecodeCommand{
-      .range = reader.range(offset, 1),
-      .opcode = reader.u8At(offset),
+      .range = context.reader.range(offset, 1),
+      .opcode = context.reader.u8At(offset),
       .encodedSize = 1,
       .flow = DecodeFlow::terminalFlow(),
       .presentation =
@@ -296,23 +304,21 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
 // Malformed SDAT FAT ranges can overlap a real call target by one byte. This
 // exceptional walker keeps the normal compiler cursor, adding only
 // the overlap stop needed to avoid swallowing the subroutine's first byte.
-[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(ByteReader reader, TrackDecodeInput input) {
+[[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(const SequenceDecodeContext& context, TrackDecodeInput input) {
   TrackProgram track{
       .id = TrackId{input.trackIndex},
       .sourceTrackNumber = input.trackIndex,
       .startAddress = Address{input.startOffset},
   };
   TrackProgramBuilder builder{track};
-  const auto trackAnnotation = createSequenceTrackAnnotation(reader, input);
+  const auto trackAnnotation = createSequenceTrackAnnotation(context.reader, input);
   std::set<u32> decodedOffsets;
   std::set<u32> callTargetOffsets;
   std::vector<PendingBlock> pendingBlocks{{.offset = input.startOffset}};
   u32 decodedCommands = 0;
-  const u32 sequenceDataBase = input.sequenceOffset + kSseqHeaderSize;
 
   const auto decodeAt = [&](u32 offset) {
-    auto decoded =
-        decodeCommand(reader, offset, input.bytecodeEnd, sequenceDataBase, input.sequenceEnd, input.diagnostics);
+    auto decoded = decodeCommand(context, offset);
     decoded.annotation = projectDecodedCommand(input.sourceMap, decoded, trackAnnotation);
     return decoded;
   };
@@ -322,7 +328,7 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
     pendingBlocks.pop_back();
     u32 offset = block.offset;
 
-    while (hasBytecodeBytes(reader, offset, 1, input.bytecodeEnd) && decodedCommands++ < input.maxCommands) {
+    while (hasBytecodeBytes(context.reader, offset, 1, input.bytecodeEnd) && decodedCommands++ < input.maxCommands) {
       const u32 begin = offset;
       if (!decodedOffsets.insert(begin).second) {
         break;
@@ -333,7 +339,7 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
         const auto overlap = std::ranges::find_if(
             callTargetOffsets, [&](u32 target) { return begin < target && target < decoded.range.endOffset(); });
         if (overlap != callTargetOffsets.end()) {
-          auto recovery = terminalRecoveryCommand(reader, begin);
+          auto recovery = terminalRecoveryCommand(context, begin);
           recovery.annotation = projectDecodedCommand(input.sourceMap, recovery, trackAnnotation);
           appendDecodedBytecodeCommand(builder, recovery, begin);
           break;
@@ -366,8 +372,85 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
     }
   }
 
-  finishSequenceTrackAnnotation(reader, input, trackAnnotation, track);
+  finishSequenceTrackAnnotation(context.reader, input, trackAnnotation, track);
   return track;
+}
+
+[[nodiscard]] TrackDecodeInput makeTrackInput(const SequenceDecodeContext& context, u32 trackIndex, u32 startOffset) {
+  return TrackDecodeInput{
+      .sequenceAsset = context.sequenceAsset,
+      .trackIndex = trackIndex,
+      .startOffset = startOffset,
+      .bytecodeEnd = context.range.sequenceEnd,
+      .sequenceOffset = context.range.offset,
+      .sequenceEnd = context.range.sequenceEnd,
+      .parentAnnotation = context.parentAnnotation,
+      .sourceMap = context.sourceMap,
+      .diagnostics = context.diagnostics,
+      .maxCommands = kMaxTrackCommands,
+  };
+}
+
+[[nodiscard]] TrackProgram decodeTrack(const SequenceDecodeContext& context, u32 trackIndex, u32 startOffset) {
+  const TrackDecodeInput input = makeTrackInput(context, trackIndex, startOffset);
+  if (context.range.recoverMalformedSdatRange) {
+    return decodeMalformedSdatRangeTrack(context, input);
+  }
+  return decodeCompilerReachableTrack(context.reader, input,
+                                      [&](u32 offset) { return decodeCommand(context, offset); });
+}
+
+[[nodiscard]] std::vector<u32> readTrackStarts(const SequenceDecodeContext& context) {
+  std::vector<u32> secondaryTracks;
+  u32 offset = context.dataBase();
+  if (!hasBytecodeBytes(context.reader, offset, 1, context.range.sequenceEnd)) {
+    return {offset};
+  }
+
+  // Allocate/Open Track records form the SSEQ bootstrap, not a musical track.
+  // Read them once here; normal track decoding begins after this prefix.
+  if (context.reader.u8At(offset) != 0xfe || !hasBytecodeBytes(context.reader, offset, 3, context.range.sequenceEnd)) {
+    return {offset};
+  }
+  offset += 3;
+  if (!hasBytecodeBytes(context.reader, offset, 1, context.range.sequenceEnd)) {
+    return {offset};
+  }
+
+  if (context.reader.u8At(offset) == 0x80) {
+    RecordReader delay{context.reader, offset, context.range.sequenceEnd};
+    static_cast<void>(delay.u8("opcode"));
+    static_cast<void>(delay.varLen("duration"));
+    if (!delay.ok()) {
+      return {offset};
+    }
+    offset = delay.position();
+  }
+
+  while (hasBytecodeBytes(context.reader, offset, 5, context.range.sequenceEnd) &&
+         context.reader.u8At(offset) == 0x93) {
+    const u32 relative = context.reader.u8At(offset + 2) | (context.reader.u8At(offset + 3) << 8) |
+                         (context.reader.u8At(offset + 4) << 16);
+    const u32 destination = context.dataBase() + relative;
+    if (destination < context.range.sequenceEnd) {
+      secondaryTracks.push_back(destination);
+    }
+    offset += 5;
+  }
+
+  std::vector<u32> starts{offset};
+  starts.insert(starts.end(), secondaryTracks.begin(), secondaryTracks.end());
+  return starts;
+}
+
+[[nodiscard]] std::vector<TrackProgram> decodeTracks(const SequenceDecodeContext& context) {
+  const std::vector<u32> starts = readTrackStarts(context);
+  std::vector<TrackProgram> tracks;
+  tracks.reserve(starts.size());
+  for (u32 trackIndex = 0; trackIndex < starts.size(); ++trackIndex) {
+    tracks.push_back(decodeTrack(context, trackIndex, starts[trackIndex]));
+  }
+  return tracks;
 }
 
 }  // namespace
@@ -375,78 +458,6 @@ using NdsCompiledDialect = CompiledCommandDialect<TrackState, Playback>;
 const SequenceDialect& ndsSequenceDialect() {
   static const SequenceDialect dialect = makeDialect();
   return dialect;
-}
-
-TrackProgram decodeNdsSequenceTrack(ByteReader reader, TrackDecodeInput input, bool recoverMalformedSdatRange) {
-  if (input.bytecodeEnd == std::numeric_limits<u32>::max()) {
-    input.bytecodeEnd = static_cast<u32>(reader.size());
-  } else {
-    input.bytecodeEnd = std::min(input.bytecodeEnd, static_cast<u32>(reader.size()));
-  }
-  if (input.sequenceEnd == std::numeric_limits<u32>::max()) {
-    input.sequenceEnd = input.bytecodeEnd;
-  }
-  if (recoverMalformedSdatRange) {
-    return decodeMalformedSdatRangeTrack(reader, input);
-  }
-
-  const u32 sequenceDataBase = input.sequenceOffset + kSseqHeaderSize;
-  return decodeCompilerReachableTrack(reader, input, [reader, input, sequenceDataBase](u32 offset) {
-    return decodeCommand(reader, offset, input.bytecodeEnd, sequenceDataBase, input.sequenceEnd, input.diagnostics);
-  });
-}
-
-std::vector<u32> ndsSequenceTrackAddresses(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd) {
-  std::vector<u32> extraTrackAddresses;
-  const u32 sequenceDataBase = sequenceOffset + kSseqHeaderSize;
-  u32 offset = sequenceDataBase;
-  if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
-    return {offset};
-  }
-
-  // Bootstrap commands use the same semantic decoder as normal tracks. They
-  // are discarded after discovery because the driver runs them before musical
-  // track playback; the primary track begins at the first following command.
-  const auto decodeAt = [&](u32 commandOffset) {
-    return decodeCommand(reader, commandOffset, sequenceEnd, sequenceDataBase, sequenceEnd, nullptr);
-  };
-
-  auto command = decodeAt(offset);
-  if (command.opcode != 0xfe || command.retainBytes) {
-    return {offset};
-  }
-  offset += command.encodedSize;
-  if (!hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
-    return {offset};
-  }
-
-  command = decodeAt(offset);
-  if (command.opcode == 0x80) {
-    if (command.retainBytes) {
-      return {offset};
-    }
-    offset += command.encodedSize;
-  }
-
-  while (hasBytecodeBytes(reader, offset, 1, sequenceEnd)) {
-    command = decodeAt(offset);
-    if (command.opcode != 0x93 || command.retainBytes) {
-      break;
-    }
-    const auto destination = std::ranges::find_if(
-        command.operands, [](const SemanticOperand& operand) { return operand.name == "destination"; });
-    if (destination != command.operands.end()) {
-      if (const auto* address = std::get_if<Address>(&destination->value);
-          address != nullptr && address->value < sequenceEnd) {
-        extraTrackAddresses.push_back(address->value);
-      }
-    }
-    offset += command.encodedSize;
-  }
-
-  std::vector<u32> trackAddresses{offset};
-  trackAddresses.insert(trackAddresses.end(), extraTrackAddresses.begin(), extraTrackAddresses.end());
-  return trackAddresses;
 }
 
 SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
@@ -463,16 +474,10 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
               .name = name,
               .range = sequenceRange,
           },
-      .program =
-          SequenceProgram{
-              .dialect = dialect.id,
-              .timebase = dialect.timebase,
-              .sourceBaseAddress = Address{sequenceOffset + kSseqHeaderSize},
-              .behavior = dialect.defaultBehavior,
-          },
+      .program = dialect.makeProgram(Address{sequenceOffset + kSseqHeaderSize}),
   };
 
-  SourceAnnotationId headerAnnotation;
+  std::optional<SourceAnnotationId> headerAnnotation;
   if (sourceMap != nullptr && input.reader.has(sequenceOffset, kSseqHeaderSize)) {
     headerAnnotation = sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, kSseqHeaderSize))
                            .kind("sseq-header")
@@ -483,24 +488,15 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
                            .id();
   }
 
-  u32 trackIndex = 0;
-  for (const u32 trackAddress : ndsSequenceTrackAddresses(input.reader, sequenceOffset, range.sequenceEnd)) {
-    asset.program.tracks.push_back(decodeNdsSequenceTrack(
-        input.reader,
-        TrackDecodeInput{
-            .sequenceAsset = id,
-            .trackIndex = trackIndex++,
-            .startOffset = trackAddress,
-            .bytecodeEnd = range.sequenceEnd,
-            .sequenceOffset = sequenceOffset,
-            .sequenceEnd = range.sequenceEnd,
-            .parentAnnotation = headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt,
-            .sourceMap = sourceMap,
-            .diagnostics = diagnostics,
-            .maxCommands = kMaxTrackCommands,
-        },
-        range.recoverMalformedSdatRange));
-  }
+  const SequenceDecodeContext context{
+      .reader = input.reader,
+      .sequenceAsset = id,
+      .range = range,
+      .parentAnnotation = headerAnnotation,
+      .sourceMap = sourceMap,
+      .diagnostics = diagnostics,
+  };
+  asset.program.tracks = decodeTracks(context);
 
   return asset;
 }

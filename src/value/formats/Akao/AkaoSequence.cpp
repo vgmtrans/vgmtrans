@@ -86,12 +86,7 @@ SequenceProgramAsset parseAkaoSequenceProgram(const ScanInput& input, AssetId id
   const SequenceDialect dialect = makeAkaoDialect(analysis.header.version);
   const u32 sequenceEnd = analysis.header.offset + analysis.header.length;
   const std::string name = fmt::format("Akao Seq {:02X}", analysis.header.sequenceId);
-  SequenceProgram program{
-      .dialect = dialect.id,
-      .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{analysis.header.offset},
-      .behavior = dialect.defaultBehavior,
-  };
+  SequenceProgram program = dialect.makeProgram(Address{analysis.header.offset});
 
   SourceAnnotationId headerAnnotation;
   if (sourceMap != nullptr) {

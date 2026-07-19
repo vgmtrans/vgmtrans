@@ -6,7 +6,7 @@ Adopt the compiler-cursor architecture as the target sequence-authoring model, w
 
 The NDS prototype satisfies the important criterion that the rejected designs did not: an ordinary command is again readable as one short interpreter block. It still gives the value architecture source-once decoding, durable annotations, source-free playback, shared scheduling, and testable control flow.
 
-The result is not free. It adds 750 lines of generic compiler-cursor infrastructure and relies on templates plus a process-local executor registry. That cost is acceptable only because it is centralized and because the format surface is substantially simpler. If later formats force the cursor into a symbolic language or universal command taxonomy, revise it rather than protecting this implementation.
+The result is not free. It adds 761 lines of generic compiler-cursor infrastructure and relies on templates plus a process-local executor registry. That cost is acceptable only because it is centralized and because the format surface is substantially simpler. If later formats force the cursor into a symbolic language or universal command taxonomy, revise it rather than protecting this implementation.
 
 ## Representative command comparison
 
@@ -111,9 +111,9 @@ Line counts include comments and blank lines. They measure burden imperfectly, b
 | Value cursor before `SemanticCommand` | 662 | 48 | 710 |
 | Adjacent semantic decode/execute | 625 | 35 | 660 |
 | Rejected `StandardSequenceCommand` | 399 | 26 | 425 |
-| Compiler cursor with composable actions | 508 | 35 | 543 |
+| Compiler cursor with composable actions | 504 | 28 | 532 |
 
-The compiler-cursor NDS sequence is 167 lines smaller than the old value cursor and 117 lines smaller than the semantic decode/execute version. It is 71 lines larger than the original architecture. Most of that remaining difference is not ordinary opcode code: it includes reachable-block discovery, exact source annotations, invalid-target diagnostics, and malformed overlapping-SDAT recovery.
+The compiler-cursor NDS sequence is 178 lines smaller than the old value cursor and 128 lines smaller than the semantic decode/execute version. It is 60 lines larger than the original architecture. Most of that remaining difference is not ordinary opcode code: it includes reachable-block discovery, exact source annotations, invalid-target diagnostics, and malformed overlapping-SDAT recovery.
 
 The rejected standard-command version is shortest by raw count, but its table omits the shared operation definitions and interpreter needed to understand behavior. It failed the locality criterion despite the smaller format file.
 
@@ -121,9 +121,9 @@ Broader production counts are:
 
 | Scope | Lines |
 |---|---:|
-| Current value NDS format directory | 1,724 |
+| Current value NDS format directory | 1,713 |
 | Original NDS format directory | 1,586 |
-| Generic `CompilerCursor.h` | 750 |
+| Generic `CompilerCursor.h` | 761 |
 | Focused compiler-cursor tests | 322 |
 
 The two NDS directory totals are not like-for-like: the value implementation also owns durable source maps, neutral assets, bounded recovery, and source-free VM integration. The important author-facing comparison is the sequence implementation and the individual command blocks.

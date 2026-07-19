@@ -57,20 +57,36 @@ void writeLe32(std::vector<u8>& bytes, size_t offset, u32 value) {
   bytes[offset + 3] = static_cast<u8>((value >> 24) & 0xff);
 }
 
+SequenceProgramAsset decodeTestProgram(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd,
+                                       bool recoverMalformedSdatRange = false, SourceMapBuilder* sourceMap = nullptr,
+                                       std::vector<Diagnostic>* diagnostics = nullptr) {
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = reader.source(), .name = "test.sseq", .size = reader.size()},
+      .reader = reader,
+      .ids = ids,
+  };
+  return parseNdsSequenceProgram(input, AssetId{1},
+                                 NdsSequenceRange{
+                                     .offset = sequenceOffset,
+                                     .sequenceEnd = sequenceEnd,
+                                     .recoverMalformedSdatRange = recoverMalformedSdatRange,
+                                 },
+                                 "Test", sourceMap, diagnostics);
+}
+
 TrackProgram decodeTestTrack(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd, u32 startOffset, u32 trackIndex,
                              bool recoverMalformedSdatRange = false, SourceMapBuilder* sourceMap = nullptr,
                              std::vector<Diagnostic>* diagnostics = nullptr) {
-  return decodeNdsSequenceTrack(reader,
-                                TrackDecodeInput{
-                                    .trackIndex = trackIndex,
-                                    .startOffset = startOffset,
-                                    .bytecodeEnd = sequenceEnd,
-                                    .sequenceOffset = sequenceOffset,
-                                    .sequenceEnd = sequenceEnd,
-                                    .sourceMap = sourceMap,
-                                    .diagnostics = diagnostics,
-                                },
-                                recoverMalformedSdatRange);
+  const SequenceProgramAsset asset =
+      decodeTestProgram(reader, sequenceOffset, sequenceEnd, recoverMalformedSdatRange, sourceMap, diagnostics);
+  const auto track = std::ranges::find_if(asset.program.tracks, [&](const TrackProgram& candidate) {
+    return candidate.sourceTrackNumber == trackIndex && candidate.startAddress.value == startOffset;
+  });
+  if (track == asset.program.tracks.end()) {
+    throw std::runtime_error("NDS test sequence did not contain the requested track");
+  }
+  return *track;
 }
 
 }  // namespace
@@ -93,17 +109,14 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
 
   const SequenceDialect& dialect = ndsSequenceDialect();
   expect(dialect.usesSemanticScheduler(), "NDS SSEQ should use the semantic sequence scheduler");
-  const auto trackAddresses =
-      ndsSequenceTrackAddresses(ByteReader(SourceId{4}, bytes), sequenceOffset, trackStart + 11);
-  expect(trackAddresses.size() == 1 && trackAddresses[0] == trackStart,
-         "NDS SSEQ track-address discovery should find the primary track");
 
   ScanIdAllocator annotationIds;
   SourceMapBuilder sourceMap([&annotationIds]() { return annotationIds.nextSourceAnnotationId(); });
   std::vector<Diagnostic> decodeDiagnostics;
   const TrackProgram track = decodeTestTrack(ByteReader(SourceId{4}, bytes), sequenceOffset, trackStart + 11,
                                              trackStart, 0, false, &sourceMap, &decodeDiagnostics);
-  expect(track.commands.size() == 5, "NDS SSEQ dialect should decode all fixture commands");
+  expect(track.startAddress.value == trackStart && track.commands.size() == 5,
+         "NDS SSEQ parser should find the primary track and decode all fixture commands");
   expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.semantic(); }),
          "NDS SSEQ should store every complete command as named semantic data");
   const SourceMap annotations = sourceMap.finish();
@@ -373,24 +386,14 @@ void ndsSequenceDialectDiscoversSecondaryTrackAddresses() {
   bytes[secondaryStart + 1] = 0x03;
   bytes[secondaryStart + 2] = 0xff;
 
-  const auto trackAddresses =
-      ndsSequenceTrackAddresses(ByteReader(SourceId{6}, bytes), sequenceOffset, secondaryStart + 3);
-  expect(trackAddresses.size() == 2 && trackAddresses[0] == primaryStart && trackAddresses[1] == secondaryStart,
-         "NDS SSEQ track-address discovery should include bootstrap secondary tracks");
-
-  const TrackProgram bootstrap =
-      decodeTestTrack(ByteReader(SourceId{6}, bytes), sequenceOffset, secondaryStart + 3, trackStart + 3, 0);
-  expect(!bootstrap.commands.empty() && bootstrap.commands[0].semantic(),
-         "NDS open-track discovery should use the same semantic command decoder as track playback");
-  const SemanticOperand* trackOperand = semanticOperand(bootstrap.commands[0], "track");
-  const SemanticOperand* destinationOperand = semanticOperand(bootstrap.commands[0], "destination");
-  expect(trackOperand != nullptr && std::get<u64>(trackOperand->value) == 2 && destinationOperand != nullptr &&
-             std::get<Address>(destinationOperand->value).value == secondaryStart,
-         "NDS Open Track should expose its track and resolved destination operands directly");
-
   SourceMapBuilder sourceMap;
-  const TrackProgram secondary = decodeTestTrack(ByteReader(SourceId{6}, bytes), sequenceOffset, secondaryStart + 3,
-                                                 trackAddresses[1], 1, false, &sourceMap);
+  const SequenceProgramAsset asset =
+      decodeTestProgram(ByteReader(SourceId{6}, bytes), sequenceOffset, secondaryStart + 3, false, &sourceMap);
+  expect(asset.program.tracks.size() == 2 && asset.program.tracks[0].startAddress.value == primaryStart &&
+             asset.program.tracks[0].commands.size() == 1 &&
+             asset.program.tracks[1].startAddress.value == secondaryStart,
+         "NDS SSEQ bootstrap should discover both track starts without becoming part of the primary track");
+  const TrackProgram& secondary = asset.program.tracks[1];
   const SourceMap annotations = sourceMap.finish();
   expect(secondary.sourceTrackNumber == 1 && secondary.commands.size() == 2,
          "NDS secondary track should decode independently from the primary bootstrap");
@@ -409,14 +412,12 @@ void ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands() {
   bytes[trackStart + 3] = 0x80;
   bytes[trackStart + 4] = 0x81;
 
-  const auto trackAddresses =
-      ndsSequenceTrackAddresses(ByteReader(SourceId{12}, bytes), sequenceOffset, trackStart + 5);
-  expect(trackAddresses.size() == 1 && trackAddresses.front() == trackStart + 3,
-         "NDS track-address discovery should not skip an unterminated bootstrap variable-length command");
-
   SourceMapBuilder sourceMap;
-  const TrackProgram track = decodeTestTrack(ByteReader(SourceId{12}, bytes), sequenceOffset, trackStart + 5,
-                                             trackAddresses.front(), 0, false, &sourceMap);
+  const SequenceProgramAsset asset =
+      decodeTestProgram(ByteReader(SourceId{12}, bytes), sequenceOffset, trackStart + 5, false, &sourceMap);
+  expect(asset.program.tracks.size() == 1 && asset.program.tracks.front().startAddress.value == trackStart + 3,
+         "NDS track discovery should keep an unterminated bootstrap delay as the primary track");
+  const TrackProgram& track = asset.program.tracks.front();
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 1 && commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS malformed bootstrap command should be preserved as a truncated source command");
@@ -488,12 +489,10 @@ void ndsSequenceDialectKeepsEmptyPlaceholderTrack() {
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
 
-  const auto trackAddresses = ndsSequenceTrackAddresses(ByteReader(SourceId{8}, bytes), sequenceOffset, trackStart);
-  expect(trackAddresses.size() == 1 && trackAddresses.front() == trackStart,
-         "NDS empty placeholder sequences should keep their first empty track");
-
-  const TrackProgram track = decodeTestTrack(ByteReader(SourceId{8}, bytes), sequenceOffset, trackStart, trackStart, 0);
-  expect(track.commands.empty(), "NDS empty placeholder tracks should not decode padding as commands");
+  const SequenceProgramAsset asset = decodeTestProgram(ByteReader(SourceId{8}, bytes), sequenceOffset, trackStart);
+  expect(asset.program.tracks.size() == 1 && asset.program.tracks.front().startAddress.value == trackStart &&
+             asset.program.tracks.front().commands.empty(),
+         "NDS empty placeholder sequences should keep one empty primary track");
 }
 
 void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {

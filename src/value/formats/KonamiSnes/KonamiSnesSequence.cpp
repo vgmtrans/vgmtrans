@@ -1609,12 +1609,7 @@ SequenceProgramAsset parseKonamiSnesSequence(const ScanInput& input, const Konam
   }
 
   const auto& descriptor = konamiSnesSequenceDescriptor(layout.version);
-  SequenceProgram program{
-      .dialect = descriptor.dialect.id,
-      .timebase = descriptor.dialect.timebase,
-      .sourceBaseAddress = Address{layout.sequenceHeaderAddress},
-      .behavior = descriptor.dialect.defaultBehavior,
-  };
+  SequenceProgram program = descriptor.dialect.makeProgram(Address{layout.sequenceHeaderAddress});
 
   for (u32 trackNumber = 0; trackNumber < trackCount; ++trackNumber) {
     const u32 pointerOffset = layout.sequenceHeaderAddress + trackNumber * 2;
