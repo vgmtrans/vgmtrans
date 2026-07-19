@@ -67,7 +67,7 @@ source bytecode
   ↓
 format decoder reads each command once
   ↓
-SequenceProgram with source operands, durable operations, and stored flow
+SequenceProgram with named operands and stored flow
   + SourceMap command annotations
   ↓
 global SequenceVm scheduler
@@ -643,9 +643,9 @@ MidiExporter
 
 ### 14.1 `SequenceProgram`
 
-`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every semantic command has an opcode, source operands, stored decode flow, its source address/range, and an annotation ID. Commands may also carry a small typed standard operation when their behavior is shared across drivers.
+`SequenceProgram` is an immutable parsed source program, not a live player. It owns driver profile/configuration and tracks of `SourceCommand` records. Every semantic command has an opcode, named operands, stored decode flow, its source address/range, and an annotation ID.
 
-The stored flow lets walkers and validators inspect control flow without executing format code. Source operands preserve the vocabulary and provenance needed for inspection; a standard operation gives playback direct typed values without looking those operands up by name. A format profile belongs to this program value only when versions of a custom driver executor need it.
+The stored flow lets walkers and validators inspect control flow without executing format code. Typed operands let execution and analysis use parsed meaning without reopening the source. A format profile belongs to this program value, so one registered executor family can handle every version of the driver.
 
 ### 14.2 `SequenceDialect`
 
@@ -664,27 +664,25 @@ The dialect is registered once in `SequenceDialectRegistry`; export looks it up 
 
 ### 14.3 Semantic decode and execution
 
-There are two semantic authoring styles, chosen by how much playback behavior is actually format-specific.
-
-For ordinary notes, waits, instruments, levels, pitch, modulation, portamento, tempo, and stored control flow, decode directly to a shared typed operation. One opcode case contains the source reads, conversion, presentation, and resulting meaning:
+The target authoring model is one opcode profile whose entries contain both lifecycle operations. A command's label, broad semantic, source reads, conversion, discovery flow, and playback behavior are adjacent:
 
 ```cpp
-case 0xe1: {
-  const auto bpm = decode.rawU16le("bpm");
-  const u32 usec = bpm.value == 0 ? 0 : 60000000 / bpm.value;
-  decode.resolvedValue("microseconds_per_quarter", bpm, usec);
-  return decode.command("Tempo", SequenceSemantic::Tempo,
-                        standard_command::Tempo{.microsecondsPerQuarter = usec});
-}
+profile[0x05] = command(
+    "Tempo", SequenceSemantic::Tempo,
+    [](Decode& d) {
+      d.resolved("microseconds_per_quarter", d.rawU16be("raw"), convertTempo);
+    },
+    [](Args a, Playback& p) {
+      p.out.tempo(a.u32());
+      return Effects{};
+    });
 ```
 
-The shared standard executor consumes the typed operation. It does not select on the source opcode or look up strings, so the format has no playback switch, playback lambda, or duplicate operand vocabulary.
+`SemanticCommandDecoder` wraps `RecordReader` for checked reads, exact ranges, raw/resolved pairing, and discovery-flow bookkeeping. `SemanticCommandArgs` reads the nearby named operands during playback. Names intentionally serve as identity: a linear lookup across a handful of operands is preferable to a command-kind enum, an operand-ID enum, metadata switches, and parallel decode/execution switches.
 
-Use a local opcode profile with adjacent decode and execution lambdas only when commands have substantial driver-specific state or behavior that the standard operations cannot honestly express. Capcom SNES currently follows this style. `SemanticCommandArgs` then gives its executor the nearby named resolved operands without byte access. Do not force a format-specific concept into a misleading standard operation merely to avoid a small local executor.
+The two lifecycle entry points merely select the same profile entry by program profile and opcode. Decode invokes its `decode` function once; playback invokes its `execute` function on every runtime visit. `CommandSourceMap` projects the decoded value into an annotation, so command definitions never call `.field()`, `.derived()`, or `.link()`.
 
-`SemanticCommandDecoder` wraps `RecordReader` for checked reads, exact ranges, raw/resolved pairing, and discovery-flow bookkeeping. `CommandSourceMap` projects the decoded value into an annotation, so decoding does not call annotation-builder methods. In both styles, source fields are read once and execution cannot reopen source bytes.
-
-Do not introduce a per-format command class hierarchy, handler-per-opcode files, binary-schema DSL, generated operand IDs, reflection, or generic microcode language. The shared operation variant should stay small and musical; it is not a schema for every source opcode. The point is to keep each source-driver operation visible in one local block while removing repeated parsing and representational ceremony.
+Do not introduce a command class hierarchy, handler-per-opcode files, a binary-schema DSL, typed command variants, or a generic microcode language. The point is to keep the complete source-driver operation visible in one local block while removing repeated parsing and representational ceremony.
 
 `VmCommandCursor` and `SequenceCursorDialect` still support unmigrated formats. They retain command bytes and invoke a reader in decode and render phases. This path is deprecated because execution can reparse bytes and decode-time analysis must masquerade as playback.
 
@@ -695,7 +693,7 @@ The code provides linear and reachable bytecode walkers. They accept a command d
 - `decodeLinearBytecodeTrack`
 - `decodeReachableBytecodeBlocks`
 
-A linear track is mostly decoded in byte order. A reachable track follows stored static targets such as jumps and calls. Every known block start also bounds the preceding command, so malformed fallthrough cannot consume bytes already identified as a jump or call target. Cursor-prefixed wrappers adapt legacy command readers to these same walkers.
+A linear track is mostly decoded in byte order. A reachable track follows stored static targets such as jumps and calls. Cursor-prefixed wrappers adapt legacy command readers to these same walkers.
 
 Linear semantic formats normally call `decodeSemanticLinearTrack`; formats with static jumps and calls use `decodeSemanticReachableTrack`. Both wrap the underlying walker with the shared track lifecycle: create the track annotation, project each already-decoded command, and finalize the track's source range. Format code supplies only the one-command decoder.
 
@@ -948,17 +946,17 @@ Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-Command code should resemble a driver interpreter. NDS demonstrates the simplest semantic form: one direct opcode switch decodes common musical behavior to shared typed operations. Capcom SNES demonstrates the custom form: one opcode profile keeps source decoding beside genuinely driver-specific playback. Akao, Akao SNES, and Konami SNES still use cursor switches through the legacy adapter.
+Command code should resemble a driver interpreter. Capcom SNES and NDS demonstrate the semantic form: each opcode-profile entry places source decoding beside playback behavior. The profile replaces separate metadata, operand, flow, and execution switches. Akao, Akao SNES, and Konami SNES still use normal cursor switches through the legacy adapter.
 
 That is a good match for format developers’ mental model. It avoids requiring every command to be represented as a separate class or visitor.
 
-Do not add a custom playback layer when standard operations already describe the behavior. When custom execution is necessary, `SemanticCommandDefinitions` supplies only repeated definition and presentation plumbing; it is deliberately not a second command schema.
+`SemanticCommandDefinitions` supplies only the repeated definition and presentation plumbing. Formats still own the profile, opcode selection, decode lambdas, and playback lambdas in one place; the helper is deliberately not a second command schema.
 
 ### 18.5 Where complexity still appears
 
 The architecture removes a lot of accidental complexity from format code, but it does not remove real format complexity. The hard parts still appear in the right places:
 
-- NDS has malformed SDAT range recovery and an SSEQ bootstrap that declares secondary track addresses.
+- NDS has malformed SDAT recovery and multiple track-address rules.
 - Capcom SNES has driver-specific pitch, pan, volume, slur, portamento, and repeat behavior.
 - Akao has version-specific bytecode, articulation tables, sample-set matching, and collection-dependent instrument construction.
 
@@ -982,15 +980,11 @@ The scanner finds SDAT offsets, parses layout, annotates the SDAT header and sec
 
 The collection key includes source ID, SDAT offset, and sequence index. That makes each collection stable and unique within a source.
 
-NDS sequence code has one direct `decodeCommand` switch. A supported case reads its fields, records the source vocabulary, converts values where needed, and constructs a durable `standard_command` value in the same block. The shared executor owns the few common persistent values—note-wait, transpose, and pitch-bend range—and emits neutral performance events. NDS therefore has no command profile, playback lambdas, format executor, operand-name playback lookup, or format-specific track-state type.
+NDS sequence code uses one opcode profile with adjacent decode and execution lambdas. Decode reads each command once into named operands, resolves 24-bit relative addresses, and stores jump, call, return, and terminal flow. Playback receives only those operands and a small context around persistent track registers, performance output, and VM flow. Normal SSEQ decoding follows reachable blocks, so subroutines and jump targets are discovered without a playback prepass.
 
-`decodeNdsSequence` is the sole production decode entry. It annotates the SSEQ header, reads `Allocate Track`, the optional bootstrap delay, and consecutive `Open Track` records once as container preamble, then decodes the discovered tracks. Those records are not fake musical commands. `NdsModule` owns asset metadata and registration while the decoder returns only `SequenceProgram`.
-
-Normal SSEQ decoding uses the shared reachable-block walker, which discovers subroutines and jump targets without a playback prepass. Because known block starts bound commands, the same walker safely truncates malformed overlapping fallthrough. NDS no longer has a specialized malformed-track walker or recovery lifecycle.
+The same command decoder handles the `Allocate Track`, optional bootstrap rest, and `Open Track` records used to discover secondary tracks. These bootstrap commands are discarded after discovery because they run before musical track playback, but their byte layout is not parsed a second way. Malformed SDAT recovery remains a specialized walker because it must split overlapping blocks; it reuses the canonical command decoder and still produces normal `TrackProgram` and source annotations.
 
 Container-specific range recovery belongs to `NdsLayout`, beside FAT and section parsing, rather than in the sequence interpreter. `NdsModule` scans the discovered layout in dependency order and uses indexed optional bank/sample handles instead of parallel lookup maps. SWAR, SBNK, and PSG parsing remain together in `NdsSynth`: their compact shared record layouts are expressed with small helpers and a single instrument-type switch rather than a hierarchy of event or instrument classes.
-
-At this migration checkpoint, `NdsSequence.cpp` fell from 625 to 399 physical lines and the whole NDS value directory fell from 1,841 to 1,604. The touched shared sequence infrastructure grew from 2,546 to 2,720 lines to add the reusable operations, executor, and boundary invariant. Across those production areas the result is 63 fewer lines, despite replacing NDS-only behavior with tested shared behavior. Tests and this guide are excluded from those measurements.
 
 NDS exposes one `FormatDefinition` containing both its scanner and semantic dialect. Recognition occurs inside `scan`, so SDAT signature discovery runs once instead of being duplicated by `canScan`.
 
@@ -1061,16 +1055,17 @@ Use `ScanResultBuilder` to allocate IDs and attach metadata. A source decoder sh
 
 ### Step 5: Decode sequences into semantic commands
 
-Start with one direct opcode switch. For commands whose meaning is already covered by the shared standard operations, each case should:
+Define:
 
-- read and record source fields;
-- convert the value once;
-- return its presentation, stored flow, and typed standard operation; and
-- remain the only opcode-to-meaning mapping in the format.
+- one base opcode profile with sparse version patches;
+- one complete definition per command, with adjacent decode and playback lambdas;
+- operand names, display rules, roles, and encoded/resolved values directly in the decode lambda;
+- a per-program profile in `SequenceProgram::config`;
+- a program-state type only when the driver has real shared state;
+- a `TrackState` type for driver-local mutable playback state; and
+- a track decoder using `decodeSemanticLinearTrack` (or a reachable-block wrapper when the format requires one).
 
-Add a format-local state and executor only for real driver-specific behavior. If several versions share that executor, use one base opcode profile with sparse patches and keep adjacent decode/playback lambdas. Store version selection in `SequenceProgram::config`. Do not create a playback layer merely to forward standard values by operand name.
-
-Use `SemanticCommandDecoder` for checked source reads and generic annotation projection. Use `decodeSemanticLinearTrack` or `decodeSemanticReachableTrack` for the shared track lifecycle. Playback must not implement global loop export policy and must never read source bytes.
+Use `SemanticCommandDecoder` and `SemanticCommandArgs` to keep generic IR construction and type erasure out of format code. The decoder reads bytes once and generic projection creates source annotations. Playback reads only named resolved operands and emits neutral performance events. It should not implement global loop export policy and must never read source bytes.
 
 ### Step 6: Build synth data in the neutral model
 
@@ -1160,9 +1155,9 @@ It also validates collection references and reports missing or wrong-type assets
 
 ### 21.11 `SequenceProgram`
 
-`SequenceProgram` records semantic source commands, optional driver profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
+`SequenceProgram` records semantic source commands, program profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
 
-Each semantic command stores its opcode, source operands, source provenance, decode flow, and optional standard operation. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Byte pools exist only for legacy dialects.
+Each semantic command stores its opcode, named operands, source provenance, and decode flow. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Byte pools exist only for legacy dialects.
 
 ### 21.12 `SemanticCommandDecoder`, `RecordReader`, and legacy `VmCommandCursor`
 
@@ -1228,7 +1223,7 @@ The existing tests under `tests/core` and `tests/formats` reflect this direction
 
 ### 22.3 Format code can be local and readable
 
-Direct opcode cases that produce standard operations are the simplest fit for ordinary sequence behavior. They keep source decoding and final meaning together while deleting format playback code entirely. Complete opcode-profile entries remain a good fit for genuinely custom drivers; keeping their decode and playback lambdas adjacent is preferable to parallel switches.
+Complete opcode-profile entries are a strong fit for sequence drivers. Keeping decode and playback lambdas adjacent makes the driver visible without coupling playback to source encoding or scattering one command across several switches.
 
 Return presentation metadata with each decoded command and let `CommandSourceMap` project annotations. Command decoding should not call annotation-builder methods.
 
@@ -1290,15 +1285,15 @@ The branch would benefit from a contributor-facing guide with one page each for:
 
 - simple scanner with explicit collection;
 - scanner with match facts and resolver;
-- semantic sequence decoder using shared operations, plus a small custom executor only when needed;
+- semantic sequence decoder/executor with a small opcode profile;
 - synth parser using `Instrument`, `Region`, and `Sample`;
 - source map annotation conventions.
 
 ### 24.2 Keep command decoding and execution boring
 
-The decoder should read operands and store flow once. Prefer returning a standard typed operation so shared playback consumes direct values. If the driver truly needs custom execution, playback should consume named resolved operands, update only real driver state, emit neutral events, and return runtime flow; put that behavior beside decode in the same profile entry.
+The decoder should read operands and store flow once. Playback should consume named resolved operands, update state, emit events, and return runtime flow. Put both operations in the same profile entry; the two lifecycle entry points should only select and invoke that entry.
 
-Keep opcode knowledge in one switch or one profile plus sparse patches. Avoid per-format command variants, command-kind and operand-ID enums, parallel size/metadata tables, analysis interpreters, and per-opcode handler classes.
+Keep opcode knowledge in one profile plus sparse patches. Avoid command-kind and operand-ID enums, parallel size/metadata tables, analysis interpreters, and per-opcode handler classes.
 
 ### 24.3 Prefer explicit collections when possible
 
@@ -1337,7 +1332,7 @@ Architectural acceptance criteria:
 - every source structure is parsed once;
 - semantic VM execution has no byte access;
 - collection rebuilding has no source access;
-- each driver has one opcode mapping whose cases show decode and final meaning together;
+- each driver has one opcode mapping with adjacent decode and playback behavior;
 - driver profile data lives on `SequenceProgram`;
 - format code emits transitions rather than per-tick fade events;
 - value-format directories contain no MIDI, SF2, or DLS policy;
