@@ -81,15 +81,14 @@ struct NdsLayout {
                                                                  core::SourceMapBuilder* sourceMap = nullptr,
                                                                  std::vector<core::Diagnostic>* diagnostics = nullptr);
 
-// SBNK instruments and SWAR/PSG samples.
-[[nodiscard]] bool isNdsWaveArchive(core::ByteReader reader, u32 offset);
-[[nodiscard]] core::SampleCollectionAsset parseNdsPsgSamples(const core::ScanInput& input, core::AssetId id);
-[[nodiscard]] core::SampleCollectionAsset parseNdsWaveArchive(const core::ScanInput& input, core::AssetId id,
-                                                              NdsFileRange range, const std::string& name,
-                                                              core::ScanResultBuilder* diagnostics = nullptr);
-[[nodiscard]] core::InstrumentSetAsset parseNdsInstrumentSet(
-    const core::ScanInput& input, core::AssetId id, NdsFileRange range, const std::string& name,
-    core::ScanResultBuilder& builder, core::ScanSampleCollectionRef psgCollection,
+// SBNK instruments and SWAR/PSG samples. These functions add complete synth
+// assets directly to the scan result and return the handles used by collections.
+[[nodiscard]] core::ScanSampleCollectionRef addNdsPsgSamples(core::ScanResultBuilder& builder);
+[[nodiscard]] std::optional<core::ScanSampleCollectionRef> addNdsWaveArchive(core::ScanResultBuilder& builder,
+                                                                             NdsFileRange range, std::string_view name);
+[[nodiscard]] std::optional<core::ScanInstrumentSetRef> addNdsInstrumentSet(
+    core::ScanResultBuilder& builder, NdsFileRange range, std::string_view name,
+    core::ScanSampleCollectionRef psgCollection,
     const std::array<std::optional<core::ScanSampleCollectionRef>, 4>& waveCollections);
 
 [[nodiscard]] core::FormatDefinition ndsDefinition();
