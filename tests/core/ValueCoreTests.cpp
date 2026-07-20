@@ -13,6 +13,7 @@ void runValueSequenceModelTests();
 void runValueSequenceVmTests();
 void runValueSessionTests();
 void runValueSourceMapTests();
+void runValueSynthBuilderTests();
 void runValueMidiTests();
 void runValueSynthExportTests();
 
@@ -40,6 +41,7 @@ void konamiSnesLayoutDiscoversDirectHeaderAndSynthTables();
 void konamiSnesLayoutInfersSpcDirFromInstrumentTables();
 void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void konamiSnesSynthParsersStopAtInvalidBankedInstrument();
+void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules();
 void konamiSnesProgramChangeReemitsCurrentFineTune();
 void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling();
 void konamiSnesPercussionUsesPackedGsDrumBank();
@@ -85,6 +87,7 @@ void ndsMalformedRecoveryKeepsExecutableJumps();
 void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds();
 void ndsSynthParserDerivesAdpcmLengthsSafely();
 void ndsWaveArchiveReportsTruncatedSampleHeaders();
+void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();
 
 int main() {
   try {
@@ -94,6 +97,7 @@ int main() {
     runValueSequenceVmTests();
     runValueSessionTests();
     runValueSourceMapTests();
+    runValueSynthBuilderTests();
     runValueMidiTests();
     runValueSynthExportTests();
 
@@ -121,6 +125,7 @@ int main() {
     konamiSnesLayoutInfersSpcDirFromInstrumentTables();
     konamiSnesModuleDiscoversSequenceInstrumentsAndSamples();
     konamiSnesSynthParsersStopAtInvalidBankedInstrument();
+    konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules();
     konamiSnesProgramChangeReemitsCurrentFineTune();
     konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling();
     konamiSnesPercussionUsesPackedGsDrumBank();
@@ -166,6 +171,7 @@ int main() {
     ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds();
     ndsSynthParserDerivesAdpcmLengthsSafely();
     ndsWaveArchiveReportsTruncatedSampleHeaders();
+    ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;

@@ -6,6 +6,7 @@
 
 #include "ValueTestSupport.h"
 
+#include "value/scan/CollectionPreparation.h"
 #include "value/session/ScanCommit.h"
 #include "value/validation/ScanValidation.h"
 #include "value/validation/SnapshotValidation.h"
@@ -165,32 +166,28 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
 }
 
 [[nodiscard]] MaterializationResult materializeProbeBankCollection(const MaterializationContext& context) {
-  MaterializationResult result{
-      .collection = context.collection,
-  };
+  CollectionPreparation prepared(context);
   if (!context.collection.sequence || context.collection.instrumentSets.empty()) {
-    return result;
+    return std::move(prepared).finish();
   }
 
   const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*context.collection.sequence);
   const auto* scannedInstrument = context.snapshot.asset<InstrumentSetAsset>(context.collection.instrumentSets[0]);
   if (sequence == nullptr || scannedInstrument == nullptr) {
-    return result;
+    return std::move(prepared).finish();
   }
 
-  const AssetId materialized = context.assetIdForSlot("bound-instrument-set");
-  InstrumentSetAsset bound = *scannedInstrument;
-  bound.metadata.id = materialized;
-  bound.metadata.name = "Materialized " + scannedInstrument->metadata.name;
-  bound.metadata.range = sequence->metadata.range;
-  bound.instruments.push_back(Instrument{.name = "Materialized Instrument"});
-
-  result.assets.push_back(MaterializedAsset{
-      .slot = "bound-instrument-set",
-      .asset = std::move(bound),
+  auto instruments = prepared.instruments("bound-instrument-set");
+  instruments.include(sequence->metadata.range);
+  for (const auto& instrument : scannedInstrument->instruments) {
+    instruments.append(instrument);
+  }
+  instruments.append(Instrument{
+      .name = "Materialized Instrument",
+      .range = sequence->metadata.range,
   });
-  result.collection.instrumentSets = {materialized};
-  return result;
+  prepared.replaceInstrumentSet("Materialized " + scannedInstrument->metadata.name, std::move(instruments));
+  return std::move(prepared).finish();
 }
 
 [[nodiscard]] FormatModule probeMaterializedBankSequenceModule() {
@@ -221,16 +218,22 @@ void sessionMaterializesResolvedCollectionsWithStableAssets() {
   expect(materialized->metadata.name == "Materialized bank-11.instr",
          "materializer should control the derived asset contents");
   expect(materialized->instruments.size() == 1, "materialized instrument set should keep derived instrument data");
+  expect(project.sourceMap().ownedBy(ObjectRefs::instrument(materializedId, 0)).size() == 1,
+         "materialized builder should publish annotations owned by the derived instrument");
 
   project = session.scanPendingSources();
   expect(project.collections()[0].instrumentSets[0] == materializedId,
          "materialized asset id should be stable across collection rebuilds");
+  expect(project.sourceMap().ownedBy(ObjectRefs::instrument(materializedId, 0)).size() == 1,
+         "rebuilding one stable materialization slot should replace rather than duplicate its annotations");
 
   project = session.removeSource(instrument);
   expect(project.collections().size() == 1, "removing one matched source should leave an incomplete collection");
   expect(project.collections()[0].instrumentSets.empty(),
          "collection should fall back to no instrument set when materialization input disappears");
   expect(project.asset(materializedId) == nullptr, "stale materialized asset should be removed with its collection");
+  expect(project.sourceMap().ownedBy(ObjectRefs::instrument(materializedId, 0)).empty(),
+         "removing a stale materialized asset should also remove its owned annotations");
 }
 
 void sessionRemovesSourceFamilyAndDiscoveredData() {

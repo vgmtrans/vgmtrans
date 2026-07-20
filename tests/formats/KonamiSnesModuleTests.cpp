@@ -145,6 +145,53 @@ std::vector<u8> makeKonamiSnesAram() {
   return bytes;
 }
 
+void writeKonamiInstrumentEntry(std::vector<u8>& bytes, u32 offset, u8 srcn) {
+  constexpr std::array<u8, 6> fields{
+      0x00,  // key
+      0x00,  // tuning
+      0x8f,  // ADSR1
+      0xe0,  // ADSR2
+      0x14,  // pan
+      0x20,  // volume
+  };
+  bytes[offset] = srcn;
+  writeBytes(bytes, offset + 1, fields);
+}
+
+std::vector<u8> makeKonamiSnesBuilderAram() {
+  std::vector<u8> bytes(0x10000);
+
+  // Programs 1-3 are deliberately empty. Program 4 therefore proves that
+  // sparse source programs do not leak into dense annotation ownership.
+  writeKonamiInstrumentEntry(bytes, 0x4000, 3);
+  bytes[0x4007] = 0xff;
+  bytes[0x400e] = 0xff;
+  bytes[0x4015] = 0xff;
+  writeKonamiInstrumentEntry(bytes, 0x401c, 2);
+  writeKonamiInstrumentEntry(bytes, 0x4200, 4);
+  bytes[0x4207] = 0xff;
+
+  // Three source entries intentionally join one percussion instrument.
+  writeKonamiInstrumentEntry(bytes, 0x4300, 1);
+  writeKonamiInstrumentEntry(bytes, 0x4307, 4);
+  writeKonamiInstrumentEntry(bytes, 0x430e, 5);
+  bytes[0x4315] = 0xff;
+  bytes[0x431a] = 0xff;
+
+  const auto directoryEntry = [&](u8 srcn, u16 start) {
+    const u32 offset = 0x5000 + static_cast<u32>(srcn) * 4;
+    writeLe16(bytes, offset, start);
+    writeLe16(bytes, offset + 2, start);
+    bytes[start] = 0x01;
+  };
+  directoryEntry(1, 0x5100);
+  directoryEntry(2, 0x5100);  // Explicit alias of SRCN 1.
+  directoryEntry(3, 0xa100);  // 0xa100 - DIR base 0x5000 resolves to 0x5100.
+  directoryEntry(4, 0x6200);
+  directoryEntry(5, 0x3000);  // Below the DIR base, so Konami falls back to sample zero.
+  return bytes;
+}
+
 PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
   std::vector<u8> bytes(commandBytes.begin(), commandBytes.end());
   const auto& dialect = konamiSnesSequenceDialect(KONAMISNES_V6);
@@ -326,6 +373,9 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       instrumentRow->links, [](const SourceLink& link) { return link.role == SourceLinkRole::UsesSample; });
   expect(instrumentSampleLink != instrumentRow->links.end(),
          "KonamiSnes instrument annotation should link to the referenced sample");
+  const auto* regionAnnotation = annotationWithKind(sourceMap, source, SourceRole::Region, "konami-snes-region");
+  expect(regionAnnotation != nullptr && regionAnnotation->owner == ObjectRefs::region(instruments->metadata.id, 0, 0),
+         "KonamiSnes region annotations should identify their durable instrument and region indexes");
   const auto* sampleDir = annotationWithKind(sourceMap, source, SourceRole::Table, "snes-sample-dir");
   expect(sampleDir != nullptr && sampleDir->range.offset == 0x5000 && sampleDir->range.size == 4,
          "KonamiSnes scan should annotate the sample DIR table");
@@ -349,6 +399,70 @@ void konamiSnesSynthParsersStopAtInvalidBankedInstrument() {
   expect(samples.samples.size() == 1 && samples.samples.front().srcn == 0 &&
              samples.samples.front().stream.encodedData.size == 9,
          "KonamiSnes sample parser should keep only samples used by valid instruments");
+}
+
+void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "konami-builder.spc"}, makeKonamiSnesBuilderAram());
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+  ScanResultBuilder result(input, "KonamiSnes");
+  const auto instrumentSet = result.reserveInstrumentSet();
+  const auto sampleCollection = result.reserveSampleCollection();
+  const KonamiSnesLayout layout{
+      .version = KONAMISNES_V6,
+      .spcDirAddress = 0x5000,
+      .commonInstrumentTableAddress = 0x4000,
+      .bankedInstrumentTableAddress = 0x4200,
+      .firstBankedInstrument = 5,
+      .percussionInstrumentTableAddress = 0x4300,
+  };
+  expect(addKonamiSnesSynth(result, instrumentSet, sampleCollection, layout, "Builder Probe"),
+         "KonamiSnes builder fixture should produce a complete synth");
+  const ScanResult scan = result.finish();
+
+  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  const auto* samples = std::get_if<SampleCollectionAsset>(&scan.assets[1]);
+  expect(instruments != nullptr && samples != nullptr && instruments->instruments.size() == 4 &&
+             samples->samples.samples.size() == 5,
+         "KonamiSnes builder should retain three melodic programs, one grouped kit, and every source sample");
+  expect(instruments->instruments[0].regions[0].sample.index == 0,
+         "KonamiSnes transformed-address lookup should resolve SRCN 3 to the BRR stream at relative address 0x5100");
+  expect(instruments->instruments[1].regions[0].sample.index == 0,
+         "two SRCNs that name one BRR stream should resolve to the same canonical sample");
+  expect(instruments->instruments[2].regions[0].sample.index == 3,
+         "ordinary Konami sample lookup should retain the SRCN's concrete sample reference");
+
+  const Instrument& percussion = instruments->instruments[3];
+  expect(percussion.explicitAddress == InstrumentAddress{.bank = 127, .program = 0} && percussion.regions.size() == 3,
+         "percussion source entries should form one drum kit through getOrAdd");
+  expect(percussion.regions[0].sample.index == 0 && percussion.regions[1].sample.index == 3 &&
+             percussion.regions[2].sample.index == 0,
+         "percussion should preserve direct, distinct, and legacy sample-zero fallback choices");
+
+  const auto sparseSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentSet.id, 1));
+  expect(sparseSources.size() == 1 && scan.sourceMap.get(sparseSources[0]).range.offset == 0x401c,
+         "sparse source program 4 should use dense instrument owner 1");
+  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentSet.id, 4)).empty(),
+         "a sparse source program must not be mistaken for a dense annotation owner");
+
+  const auto percussionSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentSet.id, 3));
+  expect(percussionSources.size() == 3, "every percussion source entry should point back to the one durable drum kit");
+  for (const SourceAnnotationId id : percussionSources) {
+    const SourceAnnotation& annotation = scan.sourceMap.get(id);
+    const auto sampleLinks = std::ranges::count_if(
+        annotation.links, [](const SourceLink& link) { return link.role == SourceLinkRole::UsesSample; });
+    expect(sampleLinks == 2,
+           "each drum-kit source record should expose the kit's complete, deduplicated sample relationship");
+  }
+  for (u32 regionIndex = 0; regionIndex < percussion.regions.size(); ++regionIndex) {
+    expect(scan.sourceMap.ownedBy(ObjectRefs::region(instrumentSet.id, 3, regionIndex)).size() == 1,
+           "each grouped percussion region should retain its own stable source owner");
+  }
 }
 
 void konamiSnesProgramChangeReemitsCurrentFineTune() {

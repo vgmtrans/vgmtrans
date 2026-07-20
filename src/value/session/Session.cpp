@@ -292,13 +292,21 @@ void Session::rebuildCollections() {
           };
           auto result = module.materializeCollection(materialization);
           diagnostics_.append(std::move(result.diagnostics));
+          std::vector<AssetId> materializedAssetIds;
+          materializedAssetIds.reserve(result.assets.size());
           for (auto& asset : result.assets) {
+            materializedAssetIds.push_back(metadata(asset.asset).id);
             activeMaterializedKeys.insert(
                 assets_.upsertMaterializedAsset(resolverId, collection.key, asset.slot, std::move(asset.asset)));
           }
+          // A rebuilt derived asset keeps its ID but may point at different
+          // source records, so its old annotations must not accumulate.
+          sourceMaps_.replaceForAssets(materializedAssetIds, std::move(result.sourceMap));
           materializedDesired.push_back(std::move(result.collection));
         }
-        static_cast<void>(assets_.removeStaleMaterializedAssets(resolverId, activeMaterializedKeys));
+        const auto removedMaterializedAssets =
+            assets_.removeStaleMaterializedAssets(resolverId, activeMaterializedKeys);
+        sourceMaps_.removeForAssets(removedMaterializedAssets);
         desired = std::move(materializedDesired);
       }
       desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),

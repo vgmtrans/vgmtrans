@@ -375,7 +375,7 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Sca
   for (const AkaoArt& art : parsed.parse.arts) {
     auto annotation =
         result.sourceMap()
-            .row(fmt::format("Articulation {}", art.artId), art.range)
+            .entry(fmt::format("Articulation {}", art.artId), art.range)
             .kind("akao-articulation")
             .parent(artTable)
             .derived("art_id", art.artId)

@@ -116,57 +116,79 @@ SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::
   return catalog;
 }
 
-SampleCollection buildSnesBrrSampleCollection(ByteReader reader, const SnesBrrCatalog& catalog,
-                                              AssetId sampleCollectionId, SourceMapBuilder& sourceMap,
-                                              std::string_view directoryEntryKind) {
-  const SourceAnnotationId root = sourceMap.table("Sample DIR", catalog.directoryRange)
-                                      .kind("snes-sample-dir")
-                                      .owner(ObjectRefs::asset(sampleCollectionId))
-                                      .id();
+std::optional<SampleRef> SnesBrrSampleRefs::findSrcn(u8 srcn) const {
+  const auto found = std::ranges::find(entries_, srcn, &Entry::srcn);
+  return found == entries_.end() ? std::nullopt : std::optional<SampleRef>{found->sample};
+}
 
-  SampleCollection collection;
-  collection.samples.reserve(catalog.samples.size());
-  for (u32 sampleIndex = 0; sampleIndex < catalog.samples.size(); ++sampleIndex) {
-    const auto& info = catalog.samples[sampleIndex];
+std::optional<SampleRef> SnesBrrSampleRefs::firstStartingAt(u32 address) const {
+  const auto found = std::ranges::find(entries_, address, &Entry::startAddress);
+  return found == entries_.end() ? std::nullopt : std::optional<SampleRef>{found->sample};
+}
+
+SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
+                                    std::string_view directoryEntryKind) {
+  samples.include(catalog.directoryRange);
+  const SourceAnnotationId root =
+      samples.source(SourceRole::Table, "Sample DIR", catalog.directoryRange, "snes-sample-dir").id();
+
+  SnesBrrSampleRefs refs;
+  refs.entries_.reserve(catalog.samples.size());
+  for (const auto& info : catalog.samples) {
     const u32 encodedLength = static_cast<u32>(info.stream.encodedData.size);
     const u32 decodedLength = (encodedLength / 9) * 16;
     const u32 lastBlockAddress = encodedLength >= 9 ? info.startAddress + encodedLength - 9 : info.startAddress;
     const bool loopEnabled =
         info.stream.loops && info.loopAddress >= info.startAddress && info.loopAddress <= lastBlockAddress;
     const u32 loopStart = loopEnabled ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
-    collection.samples.push_back(Sample{
-        .name = fmt::format("Sample {}", static_cast<unsigned>(info.srcn)),
-        .codec = AudioCodec::SnesBrr,
-        .encodedData = info.stream.encodedData,
-        .sampleRate = 32000,
-        .channels = 1,
-        .bitsPerSample = 16,
-        .loop =
-            Loop{
-                .enabled = loopEnabled,
-                .start = loopStart,
-                .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
-            },
-    });
+    auto sample = samples.add(
+        info.srcn, Sample{
+                       .name = fmt::format("Sample {}", static_cast<unsigned>(info.srcn)),
+                       .codec = AudioCodec::SnesBrr,
+                       .encodedData = info.stream.encodedData,
+                       .sampleRate = 32000,
+                       .channels = 1,
+                       .bitsPerSample = 16,
+                       .loop =
+                           Loop{
+                               .enabled = loopEnabled,
+                               .start = loopStart,
+                               .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
+                           },
+                   });
 
-    auto row = sourceMap.row(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(info.srcn)), info.directoryEntry)
-                   .role(SourceRole::Sample)
-                   .kind(directoryEntryKind)
-                   .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-                   .field("start", reader.range(static_cast<u32>(info.directoryEntry.offset), 2), info.startAddress,
-                          SourceValueDisplay::Address)
-                   .field("loop", reader.range(static_cast<u32>(info.directoryEntry.offset) + 2, 2), info.loopAddress,
-                          SourceValueDisplay::Address)
-                   .link(SourceLinkRole::PointsTo, SourceTarget{info.stream.encodedData}, "BRR data")
-                   .parent(root);
-    sourceMap.section(fmt::format("Sample {} BRR Data", static_cast<unsigned>(info.srcn)), info.stream.encodedData)
+    auto directoryEntry = sample
+                              .source(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(info.srcn)),
+                                      info.directoryEntry, directoryEntryKind)
+                              .field("start", reader.range(static_cast<u32>(info.directoryEntry.offset), 2),
+                                     info.startAddress, SourceValueDisplay::Address)
+                              .field("loop", reader.range(static_cast<u32>(info.directoryEntry.offset) + 2, 2),
+                                     info.loopAddress, SourceValueDisplay::Address)
+                              .link(SourceLinkRole::PointsTo, SourceTarget{info.stream.encodedData}, "BRR data")
+                              .parent(root);
+    sample
+        .source(fmt::format("Sample {} BRR Data", static_cast<unsigned>(info.srcn)), info.stream.encodedData,
+                "snes-brr-payload")
         .role(SourceRole::Payload)
-        .kind("snes-brr-payload")
-        .owner(ObjectRefs::sample(sampleCollectionId, sampleIndex))
-        .parent(row.id());
+        .parent(directoryEntry.id());
+
+    const auto canonical = refs.firstStartingAt(info.startAddress).value_or(sample.ref());
+    refs.entries_.push_back(SnesBrrSampleRefs::Entry{
+        .srcn = info.srcn,
+        .startAddress = info.startAddress,
+        .sample = canonical,
+    });
   }
 
-  return collection;
+  return refs;
+}
+
+SampleCollection buildSnesBrrSampleCollection(ByteReader reader, const SnesBrrCatalog& catalog,
+                                              AssetId sampleCollectionId, SourceMapBuilder& sourceMap,
+                                              std::string_view directoryEntryKind) {
+  SampleCollectionBuilder samples{sampleCollectionId, &sourceMap};
+  [[maybe_unused]] const auto refs = addSnesBrrSamples(samples, reader, catalog, directoryEntryKind);
+  return std::move(samples).finish();
 }
 
 }  // namespace vgmtrans::core

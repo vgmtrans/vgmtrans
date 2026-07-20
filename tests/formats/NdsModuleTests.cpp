@@ -913,7 +913,7 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
   ScanResultBuilder out(input, "NDS");
   const auto psg = addNdsPsgSamples(out);
   std::array<std::optional<ScanSampleCollectionRef>, 4> waves{};
-  waves[0] = out.sampleCollection("Wave", input.reader.range(0, 0)).samples({});
+  waves[0] = psg;
 
   const auto bankRef = addNdsInstrumentSet(out, input.reader.range(0, bytes.size()), "Bank", psg, waves);
   expect(bankRef.has_value(), "NDS synth parser should add a valid instrument bank");
@@ -1046,4 +1046,103 @@ void ndsWaveArchiveReportsTruncatedSampleHeaders() {
   expect(!result.diagnostics.empty(), "NDS parser should diagnose truncated SWAR sample headers");
   expect(result.diagnostics[0].message.find("SWAR sample header") != std::string::npos,
          "NDS SWAR diagnostic should name the truncated field");
+}
+
+void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives() {
+  std::vector<u8> bytes(0x300);
+  const auto writeArchive = [&](u32 base, std::span<const u32> offsets) {
+    writeText(bytes, base, std::string_view{"SWAR\xff\xfe\x00\x01", 8});
+    writeLe32(bytes, base + 0x38, static_cast<u32>(offsets.size()));
+    for (u32 i = 0; i < offsets.size(); ++i) {
+      writeLe32(bytes, base + 0x3c + i * 4, offsets[i]);
+    }
+  };
+  const auto writePcm8 = [&](u32 base, u32 relativeOffset) {
+    const u32 offset = base + relativeOffset;
+    bytes[offset] = 0;
+    bytes[offset + 1] = 0;
+    writeLe16(bytes, offset + 2, 8000);
+    writeLe16(bytes, offset + 4, 0);
+    writeLe16(bytes, offset + 6, 0);
+    writeLe16(bytes, offset + 8, 1);
+  };
+
+  constexpr std::array<u32, 3> firstOffsets{0x50, 0xfc, 0x70};
+  writeArchive(0x000, firstOffsets);
+  writePcm8(0x000, 0x50);
+  writePcm8(0x000, 0x70);
+  constexpr std::array<u32, 1> secondOffsets{0x50};
+  writeArchive(0x100, secondOffsets);
+  writePcm8(0x100, 0x50);
+
+  // Program 1 refers to the malformed sample and must be skipped. Programs 2
+  // and 4 remain and reference two different SWAR slots.
+  writeLe32(bytes, 0x238, 5);
+  writeLe32(bytes, 0x240, (0x80u << 8) | 0x01);
+  writeLe32(bytes, 0x244, (0x60u << 8) | 0x01);
+  writeLe32(bytes, 0x24c, (0x70u << 8) | 0x01);
+  const auto writeInstrument = [&](u32 offset, u16 sampleIndex, u16 archiveSlot) {
+    writeLe16(bytes, offset, sampleIndex);
+    writeLe16(bytes, offset + 2, archiveSlot);
+    bytes[offset + 4] = 60;
+    bytes[offset + 5] = 0x6d;
+    bytes[offset + 6] = 0x20;
+    bytes[offset + 7] = 0x7f;
+    bytes[offset + 8] = 0x7f;
+    bytes[offset + 9] = 64;
+  };
+  writeInstrument(0x280, 1, 0);
+  writeInstrument(0x260, 2, 0);
+  writeInstrument(0x270, 0, 2);
+
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{14}, .name = "sparse-synth.bin", .size = bytes.size()},
+      .reader = ByteReader(SourceId{14}, bytes),
+      .ids = ids,
+  };
+  ScanResultBuilder out(input, "NDS");
+  const auto psg = addNdsPsgSamples(out);
+  const auto firstWave = addNdsWaveArchive(out, input.reader.range(0x000, 0x100), "Sparse Wave");
+  const auto secondWave = addNdsWaveArchive(out, input.reader.range(0x100, 0x100), "Second Wave");
+  expect(firstWave && secondWave, "NDS builder fixture should create both wave archives");
+  const auto laterFirstWaveSample = out.sampleByKey(*firstWave, 2);
+  expect(!out.sampleByKey(*firstWave, 1) && laterFirstWaveSample && laterFirstWaveSample->index == 1,
+         "a skipped SWAR entry must not shift the lookup for a later source sample index");
+
+  std::array<std::optional<ScanSampleCollectionRef>, 4> waves{};
+  waves[0] = *firstWave;
+  waves[2] = *secondWave;
+  const auto bankRef = addNdsInstrumentSet(out, input.reader.range(0x200, 0x100), "Sparse Bank", psg, waves);
+  expect(bankRef.has_value(), "NDS builder fixture should create its instrument bank");
+  const ScanResult result = out.finish();
+
+  const auto* firstSamples = assetWithId<SampleCollectionAsset>(result, firstWave->id);
+  const auto* bank = assetWithId<InstrumentSetAsset>(result, bankRef->id);
+  expect(firstSamples != nullptr && firstSamples->samples.samples.size() == 2,
+         "NDS builder should retain the two valid samples around a malformed SWAR entry");
+  expect(bank != nullptr && bank->instruments.size() == 2,
+         "sparse SBNK programs should become two dense instruments without losing their program addresses");
+  expect(std::ranges::any_of(result.diagnostics,
+                             [](const Diagnostic& diagnostic) {
+                               return diagnostic.message == "Sample 1 in wave archive slot 0 was not found";
+                             }),
+         "an SBNK reference to a rejected SWAR entry should produce an understandable warning");
+  expect(bank->instruments[0].explicitAddress == InstrumentAddress{.bank = 0, .program = 2} &&
+             bank->instruments[0].regions[0].sample.collection == firstWave->id &&
+             bank->instruments[0].regions[0].sample.index == 1,
+         "SBNK program 2 should resolve source sample 2 to its actual dense sample index");
+  expect(bank->instruments[1].explicitAddress == InstrumentAddress{.bank = 0, .program = 4} &&
+             bank->instruments[1].regions[0].sample.collection == secondWave->id &&
+             bank->instruments[1].regions[0].sample.index == 0,
+         "an SBNK should resolve a region through any of its four independent SWAR slots");
+
+  expect(result.sourceMap.ownedBy(ObjectRefs::instrument(bankRef->id, 0)).size() == 1 &&
+             result.sourceMap.ownedBy(ObjectRefs::instrument(bankRef->id, 2)).empty(),
+         "sparse SBNK program numbers must not leak into dense instrument annotation owners");
+  expect(result.sourceMap.ownedBy(ObjectRefs::sample(firstWave->id, 1)).size() == 1 &&
+             result.sourceMap.ownedBy(ObjectRefs::sample(firstWave->id, 2)).empty(),
+         "sparse SWAR source indexes must not leak into dense sample annotation owners");
+  expect(result.sourceMap.ownedBy(ObjectRefs::region(bankRef->id, 0, 0)).size() == 1,
+         "NDS regions should retain stable instrument and region ownership");
 }

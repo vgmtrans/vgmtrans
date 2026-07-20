@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
+#include "value/synth/SynthBuilder.h"
 
 #include <optional>
 #include <span>
@@ -74,7 +75,35 @@ private:
 [[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
                                                 std::span<const u8> referencedSrcns);
 
+// Concrete references created while adding an SNES catalog. SRCNs that share
+// one BRR stream resolve to the first matching sample, preserving the driver's
+// alias behavior without exposing dense indexes to format code.
+class SnesBrrSampleRefs {
+public:
+  [[nodiscard]] std::optional<SampleRef> findSrcn(u8 srcn) const;
+  [[nodiscard]] std::optional<SampleRef> firstStartingAt(u32 address) const;
+
+private:
+  friend SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder&, ByteReader, const SnesBrrCatalog&,
+                                             std::string_view);
+
+  struct Entry {
+    u8 srcn = 0;
+    u32 startAddress = 0;
+    SampleRef sample;
+  };
+
+  std::vector<Entry> entries_;
+};
+
+// Populate the generic sample builder with neutral BRR samples and the standard
+// DIR/payload source structure used by SNES formats.
+[[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader reader,
+                                                  const SnesBrrCatalog& catalog,
+                                                  std::string_view directoryEntryKind = "snes-sample-dir-entry");
+
 // Build the neutral samples and their standard DIR/BRR source annotations.
+// Kept as a compatibility adapter for formats not yet migrated to the builder.
 [[nodiscard]] SampleCollection buildSnesBrrSampleCollection(
     ByteReader reader, const SnesBrrCatalog& catalog, AssetId sampleCollectionId, SourceMapBuilder& sourceMap,
     std::string_view directoryEntryKind = "snes-sample-dir-entry");

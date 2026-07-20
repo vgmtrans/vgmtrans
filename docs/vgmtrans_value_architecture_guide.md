@@ -225,7 +225,7 @@ The core uses typed IDs for durable references:
 
 The IDs are small values. They are not owning pointers. This matters for snapshots: a snapshot can be copied or moved without invalidating object references, because relationships are stored as IDs and rebuilt indexes.
 
-`ObjectRef` is a slightly richer reference used by source annotations and diagnostics. It can point at a whole asset, a sequence, a sequence track, an instrument, a sample, or a miscellaneous object.
+`ObjectRef` is a slightly richer reference used by source annotations and diagnostics. It can point at a whole asset, a sequence, a sequence track, an instrument, a playable region, a sample, or a miscellaneous object. Instrument, region, and sample references use their durable dense indexes, never a format's sparse table key.
 
 The architecture uses IDs as a safety boundary. Format code can describe relationships, but it does not decide where data is stored in memory or how long it lives.
 
@@ -360,6 +360,8 @@ sourceMap.header("SSEQ Header", range)
          .field("data_offset", dataOffsetRange, dataOffset, SourceValueDisplay::Address);
 ```
 
+The synth content builders use the same annotation API. Calling `source()` on a sample, instrument, or region entry supplies the appropriate role and exact `ObjectRef`; the format can then add fields, parents, descriptions, and unusual links with the ordinary `AnnotationBuilder`. This is how future logical TreeView nodes and source-oriented HexView records can meet without either view reinterpreting format rules.
+
 Semantic sequence decoders do not call annotation-builder methods. They return command presentation data and self-describing operands; `CommandSourceMap` projects the command label, opcode, fields, derived values, control-flow links, and instrument links generically. Legacy command readers still do this indirectly through `VmCommandCursor` until migrated.
 
 ### 9.2 Why this matters
@@ -440,6 +442,15 @@ The builder has typed handles such as `ScanSequenceRef`, `ScanInstrumentSetRef`,
 For example, an instrument set may need to refer to a sample collection that has not been committed yet. The scanner can reserve a sample collection ID, use it in regions, and then commit the sample collection later in the same scan result.
 
 The builder tracks whether reserved handles were actually committed. That catches a common class of scanner bugs before the result is accepted.
+
+In the normal case, synth parsers let the result reserve each asset while creating its content builder:
+
+```cpp
+auto samples = result.samples();
+auto instruments = result.instruments();
+```
+
+The overloads that accept an existing handle remain available when another object needed the ID first. Moving either completed builder into `sampleCollection(name, ...)` or `instrumentSet(name, ...)` commits an ordinary value asset. The content builder retains no lifecycle after that explicit commit. For a committed sample builder, the scan result keeps only its source-key lookup so a later instrument table can resolve sparse format indexes through the ordinary collection handle.
 
 ### 10.4 `ParseCursor`
 
@@ -596,13 +607,13 @@ resolver id + resolver-specific value
 
 The key is the durable identity of a collection. When more sources are loaded, the resolver may return a collection with the same key but more complete membership. `CollectionStore` uses the key to update the existing collection rather than creating a duplicate.
 
-### 13.5 Legacy materialization
+### 13.5 Collection-dependent preparation and legacy materialization
 
 The current Akao implementation still materializes assets after collection resolution. This is migration debt, not the target architecture.
 
 Akao sequences and sample collections are scanned separately. Only after the resolver chooses the correct sample collections can the code build a bound instrument set for that specific collection. That happens in `FormatModule::materializeCollection`.
 
-The legacy materializer receives:
+The materializer receives:
 
 - the source store;
 - the current snapshot;
@@ -615,6 +626,10 @@ The materializer returns:
 - the final desired collection;
 - materialized assets;
 - diagnostics.
+
+`CollectionPreparation` is the small assembly helper for new collection-dependent work. It begins from the resolver's immutable desired collection, creates the same `SampleCollectionBuilder` and `InstrumentSetBuilder` used during normal scanning, and can append or replace derived synth assets under stable named slots. Static formats never enter this lifecycle.
+
+Source annotations produced during preparation are returned with the materialized assets. `Session` replaces annotations owned by those stable asset IDs on every rebuild and removes them with stale materialized assets. Derived instruments, regions, and samples therefore retain the same HexView/TreeView provenance as scan-time assets instead of becoming invisible after collection resolution.
 
 The stable slot mechanism preserves asset IDs during this transition. The replacement is symbolic sample binding stored in durable instrument/sample values, followed by a pure collection binder. The intended invariant is: **collection rebuilding never accesses `SourceStore` and never reparses sequence, articulation, instrument, or sample structures.**
 
@@ -870,7 +885,49 @@ Sample codecs currently include PCM, SNES BRR, NDS IMA ADPCM, NDS PSG, PSX ADPCM
 
 SNES formats share `SnesBrrCatalog`: it validates referenced SPC DIR entries and BRR streams, keeps SRCN order, resolves aliases that point to the same stream, builds neutral samples, and emits the standard DIR/BRR source annotations. Formats retain only their instrument-table rules and any genuinely format-specific sample-index behavior.
 
-### 15.4 Decoded samples
+### 15.4 Synth content builders
+
+Normal synth conversion uses two independent content builders:
+
+- `SampleCollectionBuilder` maps format source keys to stable, dense `SampleRef` values while building one sample collection.
+- `InstrumentSetBuilder` builds one instrument set, assigns dense instrument and region ownership, and projects sample-use links.
+
+There is deliberately no object that owns “the synth.” Collections still decide which independent instrument sets and sample collections belong together, so NDS-style many-to-many relationships require no special mode.
+
+Format code constructs the durable model values directly:
+
+```cpp
+auto sample = samples.find(info.srcn);
+if (!sample) {
+  instruments.warning("Instrument sample was not found", info.range);
+  continue;
+}
+
+auto instrument = instruments.add(info.index, Instrument{
+    .identity = instrumentIdentity(info),
+    .name = instrumentName(info),
+});
+instrument.source(instrumentName(info), info.range, info.kind)
+    .fields(info.fields);
+instrument.region(*sample, Region{
+    .rootKey = rootKey(info),
+    .envelope = envelope(info),
+}).source("Region", info.range, info.regionKind);
+```
+
+`add` diagnoses an accidental duplicate grouping key. `getOrAdd` explicitly allows several source entries to contribute to one instrument, such as a percussion kit. The grouping key is temporary lookup state and never silently becomes the instrument identity or export address. `append` accepts values that need no lookup key, and pre-populated regions remain valid.
+
+KonamiSnes is a representative mixed case. It uses `getOrAdd` to state directly that several percussion entries form one kit, while `RecordReader` retains every encoded instrument field. Its unusual transformed-address sample lookup and sample-zero fallback stay in one plainly named Konami helper. The generic builder handles grouping, dense owners, ranges, and sample links without learning that format rule.
+
+NDS demonstrates separate asset lifetimes. When a SWAR sample builder is committed, `ScanResultBuilder` retains its source-key lookup for the rest of that scan. A later SBNK receives up to four ordinary sample-collection handles and resolves the encoded archive slot and source sample number with `sampleByKeyOrWarning()`. Invalid SWAR entries can therefore leave holes without shifting later references, and several banks can reuse one SWAR without a combined synth owner. The temporary source keys never enter the durable model or the NDS format interface.
+
+`source()` returns the existing `AnnotationBuilder`. The shared code supplies dense owners, basic fallback annotations, range accumulation, and order-independent sample links; the format supplies meaningful labels, fields, table structure, and descriptions. A region owner contains both its instrument and region indexes, so several disjoint source records can all point to one logical region.
+
+`value()` is a narrow escape hatch for unusual format adjustments, not a second construction path. `regionAt()` similarly permits an exact source record to be attached to a region that was already present in an ordinary `Instrument` value. The builder rechecks final model ranges during `finish()`, but additions should normally use `add`, `append`, and `region()` so stable indexing and links stay automatic.
+
+Both builders work without a source-map sink for detached value construction. Their `source()` calls remain harmless and still contribute ranges. Detached code can retain a `SampleRefLookup`; ordinary scan code gets the same behavior automatically from `ScanResultBuilder` after committing a sample builder.
+
+### 15.5 Decoded samples
 
 `DecodedSample` is the temporary PCM form used by WAV, SF2, and DLS exporters. It contains interleaved signed PCM16, sample rate, channels, and loop information.
 
@@ -1144,7 +1201,7 @@ Use `CompilerCursor` to keep IR construction, source projection, generated execu
 
 ### Step 6: Build synth data in the neutral model
 
-Build instruments, regions, samples, envelopes, loops, tuning, and physical modulation descriptions. Keep encoded sample bytes in `SourceStore` by storing `SourceRange`s. Use raw generators and modulators only when the source behavior cannot be expressed by the standard vibrato/tremolo model.
+Build instruments, regions, samples, envelopes, loops, tuning, and physical modulation descriptions as ordinary values. Add them through `SampleCollectionBuilder` and `InstrumentSetBuilder` so dense references, source owners, range accumulation, diagnostics, and sample links remain shared machinery. Keep encoded sample bytes in `SourceStore` by storing `SourceRange`s. Use raw generators and modulators only when the source behavior cannot be expressed by the standard vibrato/tremolo model.
 
 ### Step 7: Add tests around values
 
@@ -1261,6 +1318,8 @@ Old cursor dialects still use track-major execution and optional prepasses. Thos
 This model is the main bridge to future non-MIDI sequence outputs.
 
 ### 21.16 `SynthModel`
+
+`SynthModel` contains the durable neutral values. `SampleCollectionBuilder` and `InstrumentSetBuilder` are temporary authoring helpers around those values; they do not add a draft model or a combined synth lifecycle. `CollectionPreparation` reuses them only when resolved collection membership genuinely changes synth construction.
 
 `SynthModel` is the neutral instrument/sample layer. It represents instruments, regions, samples, envelopes, loops, tuning, physical modulation, and decoded PCM. Export preparation lowers standard modulation to raw generator/modulator records; the model retains custom records only as an escape hatch. `resolveInstrumentAddress` provides the one export-address policy shared by MIDI, SF2, and DLS.
 

@@ -393,7 +393,7 @@ bool valueSourceOutlineAutoVisible(vgmtrans::core::SourceRole role) {
     case vgmtrans::core::SourceRole::Sequence:
     case vgmtrans::core::SourceRole::SequenceTrack:
     case vgmtrans::core::SourceRole::Table:
-    case vgmtrans::core::SourceRole::TableRow:
+    case vgmtrans::core::SourceRole::TableEntry:
     case vgmtrans::core::SourceRole::Pointer:
     case vgmtrans::core::SourceRole::Payload:
     case vgmtrans::core::SourceRole::DataBlock:
