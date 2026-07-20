@@ -98,6 +98,8 @@ struct TrackDecodeScope {
 // start explicitly, so binary-layout rules remain visible in format code.
 class SequenceDecodeSession {
 public:
+  // maxTrackCommands is a safety cap for damaged control flow. Formats with
+  // unusually large valid tracks can raise it without replacing shared assembly.
   SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect, AssetId sequenceAsset,
                         SourceRange headerRange, SourceMapBuilder* sourceMap, u32 maxTrackCommands = 4096);
 

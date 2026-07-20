@@ -493,6 +493,8 @@ private:
           warn("Missing semantic sequence program state", command.range);
           return;
         }
+        // Source-free formats receive the same typed per-tick hook as command
+        // execution. This is where they advance fades and other ongoing motion.
         dialect_.tickSemantic(command, *programState_, trackState_, out, vm);
       } else {
         dialect_.tick(command, track_, trackState_, out, vm, dialect_.context);
@@ -743,6 +745,9 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
   const LoopPolicy loopPolicy = behavior.defaultLoopPolicy;
 
   if (dialect.usesSemanticScheduler()) {
+    // Some source-free formats must inspect the whole song before the first
+    // event can be exported. Keep one song-wide state object across an optional
+    // silent pass and the real render so the collected information is retained.
     std::any programState = dialect.createProgramState != nullptr ? dialect.createProgramState(program) : std::any{};
     const auto renderSemanticPass = [&](PerformanceSequence& target) {
       std::vector<std::unique_ptr<VmTrackExecutor>> executors;
@@ -798,13 +803,14 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     };
 
     if (dialect.semanticPrepass == SemanticPrepassMode::ScheduledPlayback) {
+      // Run commands in normal time order but discard every emitted event. This
+      // preserves song-wide interactions between tracks during collection.
       PerformanceSequence prepass{.timebase = program.timebase};
       static_cast<void>(renderSemanticPass(prepass));
     } else if (dialect.semanticPrepass == SemanticPrepassMode::DecodedCommands) {
-      // Static range collection sometimes needs every decoded command, even
-      // when playback control flow will not visit every source block. Execute
-      // the same compiled actions once in stable track/command order and ignore
-      // their timing and flow results.
+      // Some limits must include every valid source block, even when a jump
+      // skips that block during normal playback. Run each already-decoded
+      // command once in stable order and discard its events, timing, and jumps.
       PerformanceSequence prepass{.timebase = program.timebase};
       for (const TrackProgram& track : program.tracks) {
         std::any trackState =
@@ -823,6 +829,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     }
     if (dialect.semanticPrepass != SemanticPrepassMode::None) {
       if (dialect.finishSemanticPrepass != nullptr) {
+        // Tell the format that collection is complete before fresh track state
+        // is created for the real render.
         dialect.finishSemanticPrepass(programState);
       }
     }

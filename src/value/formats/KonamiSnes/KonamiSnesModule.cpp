@@ -32,12 +32,16 @@ using namespace core;
       .program(
           decodeKonamiSnesSequence(input.reader, *layout, sequence.id, &result.sourceMap(), &result.diagnostics()));
 
+  // A sequence is useful on its own, so publish it even when the snapshot does
+  // not contain enough information to reconstruct instruments and samples.
   auto collection = result.sourceCollection(displayName);
   collection.sequence(sequence);
 
   const bool hasSynthLayout = layout->spcDirAddress && layout->commonInstrumentTableAddress &&
                               layout->bankedInstrumentTableAddress && layout->percussionInstrumentTableAddress;
   if (hasSynthLayout) {
+    // Reserve synth IDs only after every required table was found. This avoids
+    // leaving empty assets in sequence-only scan results.
     const auto instrumentSet = result.reserveInstrumentSet();
     const auto samples = result.reserveSampleCollection();
     if (addKonamiSnesSynth(result, instrumentSet, samples, *layout, displayName)) {

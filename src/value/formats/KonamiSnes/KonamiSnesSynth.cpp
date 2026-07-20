@@ -25,6 +25,8 @@ namespace {
 
 constexpr u8 kPercussionNoteCount = 0x60;
 constexpr u8 kPercussionBaseNote = 0x3c;
+// Konami's percussion mode selects one shared kit. Bank 127 is the conventional
+// MIDI drum bank, while each source row becomes one key region in that kit.
 constexpr u32 kDrumKitBank = 0x7f;
 constexpr u32 kDrumKitProgram = 0x00;
 
@@ -55,9 +57,13 @@ constexpr u32 kDrumKitProgram = 0x00;
 
   const u16 sampleStart = reader.le16(dirEntryAddress);
   const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
+  // BRR data is stored in nine-byte blocks, so a loop point can only land on a
+  // block boundary at or after the sample start.
   return sampleStart <= sampleLoop && ((sampleLoop - sampleStart) % 9) == 0;
 }
 
+// Drum tables have no explicit length. Pan and volume are checked as well as
+// the sample reference so unrelated RAM is unlikely to be mistaken for rows.
 [[nodiscard]] bool percussionHeaderIsValid(ByteReader reader, KonamiSnesVersion version, u32 address,
                                            u32 spcDirAddress) {
   if (!instrumentHeaderIsValid(reader, version, address, spcDirAddress, true)) {
@@ -72,6 +78,8 @@ constexpr u32 kDrumKitProgram = 0x00;
 [[nodiscard]] int percussionKey(ByteReader reader, u32 address) {
   const s8 rawKey = reader.s8At(address + 1);
   const s8 tuning = reader.s8At(address + 2);
+  // Key and tuning form one signed 8.8 value. A negative fractional byte
+  // borrows one from the integer byte when converted back to a whole key.
   return tuning >= 0 ? rawKey : rawKey - 1;
 }
 
@@ -89,6 +97,9 @@ constexpr u32 kDrumKitProgram = 0x00;
       break;
     }
     if (!percussionHeaderIsValid(reader, version, address, spcDirAddress)) {
+      // Empty or damaged drum slots may appear inside the table. Implausible
+      // pan or pitch values indicate that the table has ended; otherwise skip
+      // this slot and keep looking for later valid keys.
       const bool legacyLayout = usesLegacyInstrumentLayout(version);
       const u8 pan = reader.u8At(address + (legacyLayout ? 6 : 5));
       if (pan > percussionPanLimit(version)) {
@@ -110,6 +121,8 @@ constexpr u32 kDrumKitProgram = 0x00;
 [[nodiscard]] KonamiSnesInstrumentInfo instrumentInfo(ByteReader reader, KonamiSnesVersion version, u32 index,
                                                       u32 address, bool percussion, u8 percussionNote) {
   const bool legacyLayout = usesLegacyInstrumentLayout(version);
+  // The early eight-byte row stores GAIN separately. The later seven-byte row
+  // drops that byte and uses ADSR2 as the fallback GAIN value.
   return KonamiSnesInstrumentInfo{
       .index = index,
       .address = address,
@@ -127,6 +140,8 @@ constexpr u32 kDrumKitProgram = 0x00;
 }
 
 [[nodiscard]] InstrumentModulation konamiInstrumentModulation(KonamiSnesVersion version) {
+  // Instrument exports describe the widest values the driver can produce.
+  // Song-specific controller limits are added later by sequence playback.
   const auto spec = vibrato::modulationSpec(version);
   return InstrumentModulation{
       .vibrato =
@@ -145,8 +160,14 @@ struct KonamiPitch {
 };
 
 [[nodiscard]] KonamiPitch konamiPitch(const KonamiSnesInstrumentInfo& info) {
+  // The key byte is the whole-number part of pitch and tuning is its fractional
+  // part. Join them before doing arithmetic so negative fractions keep their
+  // intended value.
   const s8 key = info.tuning >= 0 ? info.key : static_cast<s8>(info.key - 1);
   const s16 fullTuning = static_cast<s16>((static_cast<u8>(key) << 8) | static_cast<u8>(info.tuning));
+  // Konami tuned samples for a pitch ratio of 4286/4096 instead of an exact
+  // power-of-two step. Apply that small hardware correction before splitting
+  // the result into a MIDI root key and fine tuning.
   const double pitchFixer = std::log2(4286.0 / 4096.0) * 12.0;
   double coarse = 0.0;
   double fine = std::modf((fullTuning / 256.0) + pitchFixer, &coarse);
@@ -160,6 +181,8 @@ struct KonamiPitch {
 
   int root = 72 - static_cast<int>(coarse);
   if (info.percussion) {
+    // Drum rows are authored relative to source note 60. Moving the region to
+    // its actual drum key must move the root by the same amount.
     root += static_cast<int>(info.percussionNote) - kPercussionBaseNote;
   }
   const auto fineTuneCents = static_cast<s16>(std::lround(fine * 100.0));
@@ -190,6 +213,8 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
 
   const u32 headerSize = instrumentHeaderSize(layout.version);
   for (u32 instrumentIndex = 0; instrumentIndex <= 0xff; ++instrumentIndex) {
+    // Programs below the split come from a shared table. Programs at or above
+    // it come from the bank selected when this SPC snapshot was captured.
     const u32 address =
         instrumentIndex < layout.firstBankedInstrument
             ? *layout.commonInstrumentTableAddress + headerSize * instrumentIndex
@@ -198,6 +223,8 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
       break;
     }
     if (!instrumentHeaderIsValid(reader, layout.version, address, *layout.spcDirAddress, false)) {
+      // The shared table may be sparse, but the selected bank is stored as one
+      // packed run. A bad shared row is a hole; a bad banked row ends the run.
       if (instrumentIndex < layout.firstBankedInstrument) {
         continue;
       }
@@ -209,6 +236,8 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
 
     const u8 srcn = reader.u8At(address);
     const u32 dirEntry = *layout.spcDirAddress + srcn * 4;
+    // A sample may not begin inside the directory entry that points to it. This
+    // extra check filters out self-referential rows in unused RAM.
     if (!reader.has(dirEntry, 4) || reader.le16(dirEntry) < dirEntry + 4) {
       continue;
     }
@@ -224,6 +253,8 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
 
 SnesBrrCatalog parseKonamiSnesSampleInfos(ByteReader reader, u32 spcDirAddress,
                                           const std::vector<KonamiSnesInstrumentInfo>& instruments) {
+  // Read only samples referenced by accepted instruments. The shared sample
+  // reader removes duplicate sample numbers and follows each stream to its end.
   std::vector<u8> srcns;
   srcns.reserve(instruments.size());
   for (const auto& instrument : instruments) {
@@ -243,6 +274,9 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(ScanResultBuilder& builder,
                                                      const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
                                                      const SnesBrrCatalog& samples) {
   const ByteReader reader = builder.reader();
+  // Rows can come from three separate tables. Their combined source annotation
+  // spans the lowest through highest discovered row so every child has one
+  // visible parent in the source map.
   u32 rootOffset = instrumentInfos.empty() ? 0 : instrumentInfos.front().address;
   u32 rootEnd = rootOffset;
   for (const auto& info : instrumentInfos) {
@@ -260,8 +294,9 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(ScanResultBuilder& builder,
   std::vector<Instrument> instruments;
   for (const auto& info : instrumentInfos) {
     std::optional<u32> resolvedSampleIndex;
-    // Legacy regions address sample data relative to the DIR base. Preserve its
-    // absolute-first lookup before falling back to this SRCN's canonical stream.
+    // The older exporter subtracted the sample-directory base before matching
+    // sample data. Try that transformed address first to preserve existing
+    // output; if it has no match, use the sample named by this instrument row.
     if (const auto srcnSample = samples.index(info.srcn)) {
       const u32 sampleStart = samples.samples[*srcnSample].startAddress;
       if (sampleStart >= spcDirAddress) {
@@ -280,6 +315,8 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(ScanResultBuilder& builder,
     const u32 program = info.percussion ? kDrumKitProgram : (info.index & 0x7f);
     const u32 programKey = (bank << 7) | program;
 
+    // Melodic rows normally create separate programs. Every percussion row has
+    // the same address and therefore joins the one drum kit as another region.
     size_t instrumentIndex = 0;
     if (const auto found = instrumentIndexByProgram.find(programKey); found != instrumentIndexByProgram.end()) {
       instrumentIndex = found->second;
@@ -302,6 +339,8 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(ScanResultBuilder& builder,
         .tuning = pitch.aggregate,
         .rootKey = pitch.rootKey,
         .fineTuneCents = pitch.fineTuneCents,
+        // ADSR1 bit 7 chooses the DSP's ADSR envelope. When clear, the driver
+        // uses GAIN behavior that cannot be represented as the same envelope.
         .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, info.gain) : Envelope{},
         .attenuationDb = attenuationFromVolume(info.volume),
     };
@@ -355,6 +394,8 @@ bool addKonamiSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseKonamiSnesInstrumentInfos(reader, layout);
   const auto samples = parseKonamiSnesSampleInfos(reader, *layout.spcDirAddress, instrumentInfos);
+  // Do not publish half of a synth. An instrument set without sample data (or
+  // vice versa) cannot produce a usable export.
   if (instrumentInfos.empty() || samples.samples.empty()) {
     return false;
   }

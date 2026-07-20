@@ -69,10 +69,9 @@ using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram
 using TickTrackState = void (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
                                 PerformanceEmitter& out, VmApi& vm, const std::any& context);
 
-// Source-free dialects use a stricter executor boundary than legacy byte-backed
-// dialects: playback receives no TrackProgram, byte span, or opaque dialect
-// context. CompilerCursor keeps decoded executable arguments in
-// SourceCommand::execution; older semantic formats may still use operands.
+// Source-free formats play only the command values saved during decoding. They
+// do not receive the original track, raw bytes, or loosely typed extra settings.
+// Older formats may still read operands through the original callback below.
 using CreateProgramState = std::any (*)(const SequenceProgram&);
 using CreateSemanticTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&);
 using ExecuteSemanticCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
@@ -82,8 +81,14 @@ using TickSemanticTrackState = void (*)(const SourceCommand&, std::any& programS
 using FinishSemanticPrepass = void (*)(std::any& programState);
 
 enum class SemanticPrepassMode {
+  // Render immediately; the format does not need information from later
+  // commands before it can emit the first event.
   None,
+  // Run a silent first pass in normal time order. Use this when one track can
+  // change a song-wide value that another track reads.
   ScheduledPlayback,
+  // Visit every decoded command once in source order. Use this to collect
+  // limits from blocks that normal control flow might skip.
   DecodedCommands,
 };
 
