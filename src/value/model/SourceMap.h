@@ -30,7 +30,7 @@ enum class SourceRole : u8 {
   Sequence,
   SequenceTrack,
   Table,
-  TableRow,
+  TableEntry,
   Field,
   Pointer,
   Payload,
@@ -145,6 +145,7 @@ namespace ObjectRefs {
 [[nodiscard]] ObjectRef sequence(AssetId sequenceAsset);
 [[nodiscard]] ObjectRef sequenceTrack(AssetId sequenceAsset, u32 trackIndex);
 [[nodiscard]] ObjectRef instrument(AssetId instrumentSetAsset, u32 instrumentIndex);
+[[nodiscard]] ObjectRef region(AssetId instrumentSetAsset, u32 instrumentIndex, u32 regionIndex);
 [[nodiscard]] ObjectRef instrumentIndex(u32 instrumentIndex);
 [[nodiscard]] ObjectRef instrumentProgram(u32 bank, u32 program);
 [[nodiscard]] ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex);
@@ -269,6 +270,8 @@ public:
   AnnotationBuilder& link(SourceLinkRole role, SourceTarget target, std::string_view label = {});
 
 private:
+  [[nodiscard]] SourceAnnotation* annotation() const;
+
   SourceMapBuilder* map_ = nullptr;
   SourceAnnotationId id_;
 };
@@ -283,7 +286,7 @@ public:
   [[nodiscard]] AnnotationBuilder section(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder header(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder table(std::string_view label, SourceRange range);
-  [[nodiscard]] AnnotationBuilder row(std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder entry(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder field(std::string_view label, SourceRange range, SourceValue value);
   template <class T>
   [[nodiscard]] AnnotationBuilder field(std::string_view label, SourceRange range, T&& value) {

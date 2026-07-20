@@ -38,6 +38,7 @@ struct MaterializationContext {
 struct MaterializationResult {
   DesiredCollection collection;
   std::vector<MaterializedAsset> assets;
+  SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;
 };
 

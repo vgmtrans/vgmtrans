@@ -656,6 +656,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(regionAnnotationId != instrumentChildren.end(), "instrument set source map should expose region annotations");
   const SourceAnnotation& regionAnnotation = sourceMap.get(*regionAnnotationId);
   expect(regionAnnotation.parent == instrumentAnnotation.id, "region annotation should point back to its instrument");
+  expect(regionAnnotation.owner == ObjectRefs::region(instruments->metadata.id, 0, 0),
+         "region annotation should identify its durable instrument and region indexes");
   expect(regionAnnotation.range.offset == 0x4000 && regionAnnotation.range.size == 6,
          "region annotation should preserve the instrument header source range");
   const auto adsrAnnotationId = std::ranges::find_if(instrumentChildren, [&](SourceAnnotationId id) {
@@ -874,6 +876,31 @@ void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy() {
   expect(infos.size() == 2, "CapcomSnes instrument parsing should skip blank table slots like legacy");
   expect(infos[0].index == 0 && infos[1].index == 2,
          "CapcomSnes instrument parsing should preserve sparse instrument indexes");
+
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(sourceId),
+      .reader = sources.reader(sourceId),
+      .ids = ids,
+  };
+  ScanResultBuilder result(input, "CapcomSnes");
+  const auto instrumentSet = result.reserveInstrumentSet();
+  const auto sampleCollection = result.reserveSampleCollection();
+  expect(addCapcomSnesSynth(result, instrumentSet, sampleCollection, 0x4000, 0x5000, "Sparse"),
+         "CapcomSnes synth builder fixture should accept sparse instrument entries");
+  const ScanResult scan = result.finish();
+  const auto* builtInstruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  expect(builtInstruments != nullptr && builtInstruments->instruments.size() == 2,
+         "CapcomSnes builder should retain both sparse instruments");
+  expect(builtInstruments->instruments[1].identity && builtInstruments->instruments[1].identity->key == 2,
+         "a sparse source identity should remain distinct from its dense model position");
+  const auto secondInstrumentSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentSet.id, 1));
+  expect(secondInstrumentSources.size() == 1 && scan.sourceMap.get(secondInstrumentSources[0]).range.offset == 0x400c,
+         "CapcomSnes annotations should use dense instrument ownership while preserving sparse source ranges");
+  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentSet.id, 2)).empty(),
+         "a sparse source program must not leak into the dense annotation owner");
+  expect(scan.sourceMap.ownedBy(ObjectRefs::region(instrumentSet.id, 1, 0)).size() == 1,
+         "CapcomSnes sparse instruments should expose stable region ownership");
 
   std::vector<u8> fullTable(0x10000);
   writeLe16(fullTable, 0x5000, 0x6000);

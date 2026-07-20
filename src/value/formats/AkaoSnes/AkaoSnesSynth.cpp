@@ -405,7 +405,7 @@ AkaoSnesInstrumentBuild buildAkaoSnesInstruments(const ScanInput& input, ScanRes
 
     auto annotation =
         builder.sourceMap()
-            .row(info.percussion ? fmt::format("Percussion {}", static_cast<unsigned>(info.percussionIndex))
+            .entry(info.percussion ? fmt::format("Percussion {}", static_cast<unsigned>(info.percussionIndex))
                                  : fmt::format("Instrument {}", static_cast<unsigned>(info.srcn)),
                  instrumentInfoRowRange(input.reader, info, layout.version))
             .role(SourceRole::Instrument)

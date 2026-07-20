@@ -189,6 +189,15 @@ ScanInstrumentSetAssetBuilder ScanResultBuilder::instrumentSet(ScanInstrumentSet
   return ScanInstrumentSetAssetBuilder(*this, ref, std::move(name), range);
 }
 
+ScanInstrumentSetRef ScanResultBuilder::instrumentSet(std::string name, InstrumentSetBuilder&& instruments) {
+  const ScanInstrumentSetRef ref{.id = instruments.assetId()};
+  auto values = std::move(instruments).finish();
+  // finish() also accounts for ranges supplied late through value(), so the
+  // asset range must be read afterward.
+  const SourceRange range = instruments.range();
+  return instrumentSet(ref, std::move(name), range).instruments(std::move(values));
+}
+
 ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(std::string name, SourceRange range) {
   return sampleCollection(reserveSampleCollection(), std::move(name), range);
 }
@@ -196,6 +205,35 @@ ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(std::string
 ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(ScanSampleCollectionRef ref, std::string name,
                                                                      SourceRange range) {
   return ScanSampleCollectionAssetBuilder(*this, ref, std::move(name), range);
+}
+
+ScanSampleCollectionRef ScanResultBuilder::sampleCollection(std::string name, SampleCollectionBuilder&& samples) {
+  const ScanSampleCollectionRef ref{.id = samples.assetId()};
+  auto lookup = samples.refs();
+  auto values = std::move(samples).finish();
+  // A format can fill encodedData through value(); finish() incorporates that
+  // range before the enclosing asset is committed.
+  const SourceRange range = samples.range();
+  sampleLookups_.insert_or_assign(ref.id.value, std::move(lookup));
+  return sampleCollection(ref, std::move(name), range).samples(std::move(values));
+}
+
+InstrumentSetBuilder ScanResultBuilder::instruments() {
+  return instruments(reserveInstrumentSet());
+}
+
+InstrumentSetBuilder ScanResultBuilder::instruments(ScanInstrumentSetRef ref) {
+  reserveHandle(ref.id, CollectionMemberRole::InstrumentSet);
+  return InstrumentSetBuilder{ref.id, &sourceMap_, &result_.diagnostics};
+}
+
+SampleCollectionBuilder ScanResultBuilder::samples() {
+  return samples(reserveSampleCollection());
+}
+
+SampleCollectionBuilder ScanResultBuilder::samples(ScanSampleCollectionRef ref) {
+  reserveHandle(ref.id, CollectionMemberRole::SampleCollection);
+  return SampleCollectionBuilder{ref.id, &sourceMap_, &result_.diagnostics};
 }
 
 ScanMiscAssetBuilder ScanResultBuilder::misc(std::string name, SourceRange range) {
@@ -241,6 +279,30 @@ SampleRef ScanResultBuilder::sampleRef(std::optional<ScanSampleCollectionRef> co
     return sampleRef(*collection, index);
   }
   return SampleRef{.index = index};
+}
+
+std::optional<SampleRef> ScanResultBuilder::sampleByKey(ScanSampleCollectionRef collection, u64 sourceKey) {
+  const auto lookup = sampleLookups_.find(collection.id.value);
+  if (lookup == sampleLookups_.end()) {
+    return std::nullopt;
+  }
+  const auto sample = lookup->second.find(sourceKey);
+  if (sample) {
+    markReferenced(collection.id, CollectionMemberRole::SampleCollection);
+  }
+  return sample;
+}
+
+std::optional<SampleRef> ScanResultBuilder::sampleByKeyOrWarning(std::optional<ScanSampleCollectionRef> collection,
+                                                                 u64 sourceKey, std::string description,
+                                                                 SourceRange range) {
+  if (collection) {
+    if (const auto sample = sampleByKey(*collection, sourceKey)) {
+      return sample;
+    }
+  }
+  warning(std::move(description) + " was not found", range);
+  return std::nullopt;
 }
 
 void ScanResultBuilder::fact(AssetId asset, MatchScope scope, MatchFactPayload payload) {

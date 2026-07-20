@@ -52,6 +52,7 @@ enum class ObjectKind : u8 {
   Sequence,
   SequenceTrack,
   Instrument,
+  Region,
   Sample,
   Misc,
 };

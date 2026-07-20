@@ -111,6 +111,7 @@ target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionPreparation.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
@@ -127,6 +128,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/session/ScanCommit.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SynthBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
@@ -164,6 +166,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionPreparation.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatDefinition.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
@@ -194,6 +197,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SynthBuilder.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.h
       ${PROJECT_SOURCE_DIR}/src/value/base/Source.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SynthModel.h

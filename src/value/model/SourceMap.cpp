@@ -77,6 +77,15 @@ ObjectRef ObjectRefs::instrument(AssetId instrumentSetAsset, u32 instrumentIndex
   return ObjectRef{.kind = ObjectKind::Instrument, .asset = instrumentSetAsset, .index0 = instrumentIndex};
 }
 
+ObjectRef ObjectRefs::region(AssetId instrumentSetAsset, u32 instrumentIndex, u32 regionIndex) {
+  return ObjectRef{
+      .kind = ObjectKind::Region,
+      .asset = instrumentSetAsset,
+      .index0 = instrumentIndex,
+      .index1 = regionIndex,
+  };
+}
+
 ObjectRef ObjectRefs::instrumentIndex(u32 instrumentIndex) {
   return ObjectRef{.kind = ObjectKind::Instrument, .index0 = instrumentIndex};
 }
@@ -201,22 +210,26 @@ void SourceMap::buildIndexes() {
 AnnotationBuilder::AnnotationBuilder(SourceMapBuilder& map, SourceAnnotationId id) : map_(&map), id_(id) {
 }
 
+SourceAnnotation* AnnotationBuilder::annotation() const {
+  return map_ != nullptr ? map_->annotation(id_) : nullptr;
+}
+
 AnnotationBuilder& AnnotationBuilder::role(SourceRole role) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->role = role;
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::range(SourceRange range) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->range = range;
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::label(std::string_view label) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->label = std::string(label);
     if (found->localKind.empty()) {
       found->localKind = sourceLocalKind(label);
@@ -226,56 +239,56 @@ AnnotationBuilder& AnnotationBuilder::label(std::string_view label) {
 }
 
 AnnotationBuilder& AnnotationBuilder::description(std::string_view description) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->description = std::string(description);
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::kind(std::string_view localKindOverride) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->localKind = std::string(localKindOverride);
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::detailKind(std::string_view detailKind) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->detailKind = std::string(detailKind);
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::parent(SourceAnnotationId parent) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->parent = parent;
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::owner(ObjectRef owner) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->owner = owner;
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::outline(SourceOutlinePolicy policy) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->outline = policy;
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::sequenceSemantic(SequenceSemantic semantic) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->sequenceSemantic = semantic;
   }
   return *this;
 }
 
 AnnotationBuilder& AnnotationBuilder::playbackStatus(CommandPlaybackStatus status) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->playbackStatus = status;
   }
   return *this;
@@ -283,7 +296,7 @@ AnnotationBuilder& AnnotationBuilder::playbackStatus(CommandPlaybackStatus statu
 
 AnnotationBuilder& AnnotationBuilder::field(std::string_view name, SourceRange range, SourceValue value,
                                             SourceValueDisplay display) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->fields.push_back(SourceField{
         .name = std::string(name),
         .range = range,
@@ -295,7 +308,7 @@ AnnotationBuilder& AnnotationBuilder::field(std::string_view name, SourceRange r
 }
 
 AnnotationBuilder& AnnotationBuilder::fields(std::span<const SourceField> fields) {
-  if (auto* found = map_->annotation(id_)) {
+  if (auto* found = annotation()) {
     found->fields.insert(found->fields.end(), fields.begin(), fields.end());
   }
   return *this;
@@ -306,12 +319,17 @@ AnnotationBuilder& AnnotationBuilder::derived(std::string_view name, SourceValue
 }
 
 AnnotationBuilder& AnnotationBuilder::link(SourceLinkRole role, SourceTarget target, std::string_view label) {
-  if (auto* found = map_->annotation(id_)) {
-    found->links.push_back(SourceLink{
-        .role = role,
-        .target = std::move(target),
-        .label = std::string(label),
+  if (auto* found = annotation()) {
+    const auto duplicate = std::ranges::find_if(found->links, [&](const SourceLink& link) {
+      return link.role == role && link.target == target && link.label == label;
     });
+    if (duplicate == found->links.end()) {
+      found->links.push_back(SourceLink{
+          .role = role,
+          .target = std::move(target),
+          .label = std::string(label),
+      });
+    }
   }
   return *this;
 }
@@ -339,8 +357,8 @@ AnnotationBuilder SourceMapBuilder::table(std::string_view label, SourceRange ra
   return add(SourceRole::Table, label, range);
 }
 
-AnnotationBuilder SourceMapBuilder::row(std::string_view label, SourceRange range) {
-  return add(SourceRole::TableRow, label, range);
+AnnotationBuilder SourceMapBuilder::entry(std::string_view label, SourceRange range) {
+  return add(SourceRole::TableEntry, label, range);
 }
 
 AnnotationBuilder SourceMapBuilder::field(std::string_view label, SourceRange range, SourceValue value) {

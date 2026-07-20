@@ -9,6 +9,7 @@
 #include "value/scan/ParseCursor.h"
 #include "value/scan/ScanTypes.h"
 #include "value/model/SourceMap.h"
+#include "value/synth/SynthBuilder.h"
 
 #include <cstddef>
 #include <string>
@@ -161,6 +162,7 @@ public:
   [[nodiscard]] ScanInstrumentSetAssetBuilder instrumentSet(std::string name, SourceRange range);
   [[nodiscard]] ScanInstrumentSetAssetBuilder instrumentSet(ScanInstrumentSetRef ref, std::string name,
                                                             SourceRange range);
+  ScanInstrumentSetRef instrumentSet(std::string name, InstrumentSetBuilder&& instruments);
 
   template <typename Factory>
   ScanSampleCollectionRef sampleCollection(Factory&& factory) {
@@ -177,6 +179,15 @@ public:
   [[nodiscard]] ScanSampleCollectionAssetBuilder sampleCollection(std::string name, SourceRange range);
   [[nodiscard]] ScanSampleCollectionAssetBuilder sampleCollection(ScanSampleCollectionRef ref, std::string name,
                                                                   SourceRange range);
+  ScanSampleCollectionRef sampleCollection(std::string name, SampleCollectionBuilder&& samples);
+
+  // These factories inject scan-owned annotation and diagnostic sinks. The
+  // no-argument forms reserve an asset ID for the common case. Pass an
+  // existing handle only when another object needed that ID first.
+  [[nodiscard]] InstrumentSetBuilder instruments();
+  [[nodiscard]] InstrumentSetBuilder instruments(ScanInstrumentSetRef ref);
+  [[nodiscard]] SampleCollectionBuilder samples();
+  [[nodiscard]] SampleCollectionBuilder samples(ScanSampleCollectionRef ref);
 
   template <typename Factory>
   ScanMiscAssetRef misc(Factory&& factory) {
@@ -202,6 +213,14 @@ public:
   // sample collection must be committed before finish().
   [[nodiscard]] SampleRef sampleRef(ScanSampleCollectionRef collection, u32 index);
   [[nodiscard]] SampleRef sampleRef(std::optional<ScanSampleCollectionRef> collection, u32 index);
+
+  // A consumed SampleCollectionBuilder leaves its source-key lookup here for
+  // the rest of the scan. Later instrument tables can therefore resolve sparse
+  // source keys without carrying a second format-specific handle.
+  [[nodiscard]] std::optional<SampleRef> sampleByKey(ScanSampleCollectionRef collection, u64 sourceKey);
+  [[nodiscard]] std::optional<SampleRef> sampleByKeyOrWarning(std::optional<ScanSampleCollectionRef> collection,
+                                                              u64 sourceKey, std::string description,
+                                                              SourceRange range);
 
   void fact(AssetId asset, MatchScope scope, MatchFactPayload payload);
   void sourceFact(AssetId asset, MatchFactPayload payload);
@@ -250,6 +269,7 @@ private:
     bool referenced = false;
   };
   std::unordered_map<u32, HandleState> handles_;
+  std::unordered_map<u32, SampleRefLookup> sampleLookups_;
 };
 
 }  // namespace vgmtrans::core

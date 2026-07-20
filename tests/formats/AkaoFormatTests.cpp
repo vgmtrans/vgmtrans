@@ -593,7 +593,7 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
   expect(artTable != nullptr && artTable->range.offset == artOffset && artTable->range.size == 0x10,
          "Akao sample scan should annotate the articulation table");
   const auto* artRow =
-      annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::TableRow, "akao-articulation");
+      annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::TableEntry, "akao-articulation");
   expect(artRow != nullptr && artRow->range.offset == artOffset && artRow->range.size == 0x10,
          "Akao sample scan should annotate articulation rows");
   expect(fieldEquals(fieldWithName(*artRow, "art_id"), u64{5}),

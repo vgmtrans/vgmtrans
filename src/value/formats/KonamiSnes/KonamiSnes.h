@@ -45,7 +45,7 @@ inline constexpr u8 kMinVibratoMaxDepth = 0x10;
 inline constexpr u8 kMinVibratoMaxRateStep = 0x09;
 inline constexpr u8 kLateEraVibratoFadeThreshold = 0xc8;
 
-// Versions 1-3 store an extra GAIN byte in each instrument row. Later
+// Versions 1-3 store an extra GAIN byte in each instrument entry. Later
 // versions reuse the ADSR2 byte as GAIN when ADSR is disabled.
 [[nodiscard]] constexpr bool usesLegacyInstrumentLayout(KonamiSnesVersion version) {
   return version >= KONAMISNES_V1 && version <= KONAMISNES_V3;
@@ -211,6 +211,7 @@ struct KonamiSnesInstrumentInfo {
   u8 volume = 0;
   bool percussion = false;
   u8 percussionNote = 0;
+  std::vector<core::SourceField> sourceFields;
 };
 
 [[nodiscard]] std::optional<KonamiSnesLayout> findKonamiSnesLayout(core::ByteReader reader);

@@ -6,8 +6,10 @@
 
 #include "value/validation/SnapshotValidation.h"
 
+#include <map>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace vgmtrans::core {
@@ -67,6 +69,98 @@ void validateCollectionAssetRef(ValidationReport& report, const SessionSnapshot&
   }
 }
 
+void collectionFinding(ValidationReport& report, const Collection& collection, Severity severity, std::string code,
+                       std::string message, std::optional<SourceRange> range = std::nullopt,
+                       std::optional<AssetId> asset = std::nullopt) {
+  report.add(ValidationFinding{
+      .severity = severity,
+      .code = std::move(code),
+      .message = std::move(message),
+      .range = range,
+      .asset = asset,
+      .collection = collection.id,
+  });
+}
+
+void validateCollectionSynth(ValidationReport& report, const SessionSnapshot& snapshot, const Collection& collection) {
+  std::unordered_map<u32, const SampleCollectionAsset*> sampleCollections;
+  for (const AssetId id : collection.sampleCollections) {
+    if (const auto* samples = snapshot.asset<SampleCollectionAsset>(id)) {
+      sampleCollections.emplace(id.value, samples);
+    }
+  }
+
+  std::map<std::pair<std::string, u32>, AssetId> identities;
+  std::map<std::pair<u32, u32>, AssetId> explicitAddresses;
+  for (const AssetId instrumentSetId : collection.instrumentSets) {
+    const auto* instrumentSet = snapshot.asset<InstrumentSetAsset>(instrumentSetId);
+    if (instrumentSet == nullptr) {
+      continue;
+    }
+    for (const auto& instrument : instrumentSet->instruments) {
+      if (instrument.identity && instrument.identity->valid()) {
+        const auto key = std::pair{instrument.identity->domain, instrument.identity->key};
+        const auto [found, inserted] = identities.try_emplace(key, instrumentSetId);
+        if (!inserted && found->second != instrumentSetId) {
+          collectionFinding(report, collection, Severity::Error, "snapshot.collection.duplicate-instrument-identity",
+                            "Collection contains the same instrument identity in more than one instrument set",
+                            instrument.range.valid() ? std::optional<SourceRange>{instrument.range} : std::nullopt,
+                            instrumentSetId);
+        }
+      }
+      if (instrument.explicitAddress) {
+        const auto key = std::pair{instrument.explicitAddress->bank, instrument.explicitAddress->program};
+        const auto [found, inserted] = explicitAddresses.try_emplace(key, instrumentSetId);
+        if (!inserted && found->second != instrumentSetId) {
+          collectionFinding(report, collection, Severity::Warning, "snapshot.collection.conflicting-instrument-address",
+                            "Collection contains the same explicit bank and program in more than one instrument set",
+                            instrument.range.valid() ? std::optional<SourceRange>{instrument.range} : std::nullopt,
+                            instrumentSetId);
+        }
+      }
+
+      for (const auto& region : instrument.regions) {
+        const SampleCollectionAsset* samples = nullptr;
+        // Older values omitted the sample collection because one collection
+        // was the only possible target. Preserve that case, but never guess
+        // when no target or several targets exist.
+        if (region.sample.collection) {
+          const auto found = sampleCollections.find(region.sample.collection->value);
+          if (found == sampleCollections.end()) {
+            collectionFinding(
+                report, collection, Severity::Error, "snapshot.collection.region-sample-collection-missing",
+                "Instrument region references a sample collection that is not attached to its collection",
+                region.range.valid() ? std::optional<SourceRange>{region.range} : std::nullopt, instrumentSetId);
+            continue;
+          }
+          samples = found->second;
+        } else if (sampleCollections.empty()) {
+          collectionFinding(report, collection, Severity::Error, "snapshot.collection.region-sample-collection-missing",
+                            "Instrument region has no sample collection to use",
+                            region.range.valid() ? std::optional<SourceRange>{region.range} : std::nullopt,
+                            instrumentSetId);
+          continue;
+        } else if (sampleCollections.size() > 1) {
+          collectionFinding(
+              report, collection, Severity::Error, "snapshot.collection.region-sample-collection-ambiguous",
+              "Instrument region omits its sample collection in a collection with several sample sets",
+              region.range.valid() ? std::optional<SourceRange>{region.range} : std::nullopt, instrumentSetId);
+          continue;
+        } else {
+          samples = sampleCollections.begin()->second;
+        }
+
+        if (region.sample.index >= samples->samples.samples.size()) {
+          collectionFinding(report, collection, Severity::Error, "snapshot.collection.region-sample-index-invalid",
+                            "Instrument region sample index is outside its referenced sample collection",
+                            region.range.valid() ? std::optional<SourceRange>{region.range} : std::nullopt,
+                            instrumentSetId);
+        }
+      }
+    }
+  }
+}
+
 }  // namespace
 
 ValidationReport validateSessionSnapshotState(std::span<const Asset> assets, std::span<const Collection> collections) {
@@ -123,6 +217,7 @@ ValidationReport validateSessionSnapshot(const SessionSnapshot& snapshot) {
     for (const auto id : collection.miscAssets) {
       validateCollectionAssetRef(report, snapshot, id, CollectionAssetRole::Misc);
     }
+    validateCollectionSynth(report, snapshot, collection);
   }
 
   return report;
