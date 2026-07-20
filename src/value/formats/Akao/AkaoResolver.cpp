@@ -4,13 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/Akao/AkaoResolver.h"
-
-#include "value/formats/Akao/AkaoInstrumentSet.h"
-#include "value/formats/Akao/AkaoSequence.h"
-#include "value/formats/Akao/AkaoSynth.h"
-#include "value/formats/Akao/AkaoTypes.h"
-#include "value/formats/Akao/AkaoVersion.h"
+#include "value/formats/Akao/Akao.h"
+#include "value/scan/CollectionPreparation.h"
 #include "value/scan/CollectionResolver.h"
 
 #include <algorithm>
@@ -45,8 +40,8 @@ struct SampleFactEntry {
   std::optional<SourceId> sourceId;
   const SourceFile* source = nullptr;
   std::optional<u32> sampleSetId;
-  u32 firstArt = 0;
-  u32 artCount = 0;
+  u32 firstArticulationId = 0;
+  u32 articulationCount = 0;
   u32 sourceOffset = 0;
 };
 
@@ -60,8 +55,9 @@ struct SampleFactEntry {
   return source != nullptr && extensionIsPsf(source->path);
 }
 
-[[nodiscard]] bool covers(const AkaoSampleCandidate& sample, u32 artId) {
-  return artId >= sample.firstArt && artId < sample.firstArt + sample.artCount;
+[[nodiscard]] bool covers(const AkaoSampleCandidate& sample, u32 articulationId) {
+  return articulationId >= sample.firstArticulationId &&
+         articulationId < sample.firstArticulationId + sample.articulationCount;
 }
 
 [[nodiscard]] bool sameSource(const std::optional<SourceId>& a, const std::optional<SourceId>& b) {
@@ -78,9 +74,9 @@ struct SampleFactEntry {
 [[nodiscard]] CollectionKey collectionKey(const SequenceFactEntry& sequence) {
   return CollectionKey{
       .resolver = std::string(kAkaoCollectionResolver),
-      .value = "seq:" + std::to_string(sequence.sequenceId) + ":source:" +
-               std::to_string(sequence.sourceId ? sequence.sourceId->value : 0) + ":offset:" +
-               std::to_string(sequence.offset),
+      .value = "seq:" + std::to_string(sequence.sequenceId) +
+               ":source:" + std::to_string(sequence.sourceId ? sequence.sourceId->value : 0) +
+               ":offset:" + std::to_string(sequence.offset),
   };
 }
 
@@ -136,8 +132,7 @@ template <class AssetT>
   std::vector<SampleFactEntry> entries;
   const auto sampleSets = idValuesByAsset<SampleCollectionAsset>(index, kAkaoSampleSetDomain);
   const auto offsets = offsetsByAsset<SampleCollectionAsset>(index);
-  for (const auto& view :
-       index.sampleCoverageFacts<SampleCollectionAsset>(kAkaoFormatName, kAkaoArticulationDomain)) {
+  for (const auto& view : index.sampleCoverageFacts<SampleCollectionAsset>(kAkaoFormatName, kAkaoArticulationDomain)) {
     const auto assetId = view.asset.metadata.id.value;
     const auto sampleSet = sampleSets.find(assetId);
     const auto offset = offsets.find(assetId);
@@ -146,8 +141,8 @@ template <class AssetT>
         .sourceId = view.fact.scope.source,
         .source = view.source,
         .sampleSetId = sampleSet != sampleSets.end() ? std::optional<u32>{sampleSet->second} : std::nullopt,
-        .firstArt = view.payload.first,
-        .artCount = view.payload.count,
+        .firstArticulationId = view.payload.first,
+        .articulationCount = view.payload.count,
         .sourceOffset = offset != offsets.end() ? static_cast<u32>(offset->second) : 0,
     });
   }
@@ -160,9 +155,9 @@ template <class AssetT>
   for (const auto& view :
        index.sampleRequirementFacts<SequenceProgramAsset>(kAkaoFormatName, kAkaoArticulationDomain)) {
     auto& required = requiredBySequence[view.asset.metadata.id.value];
-    for (const u32 art : view.payload.required) {
-      if (art != 0) {
-        required.insert(art);
+    for (const u32 articulation : view.payload.required) {
+      if (articulation != 0) {
+        required.insert(articulation);
       }
     }
   }
@@ -170,7 +165,7 @@ template <class AssetT>
 }
 
 [[nodiscard]] std::vector<SampleFactEntry> candidateSamples(const SequenceFactEntry& sequence,
-                                                           const std::vector<SampleFactEntry>& samples) {
+                                                            const std::vector<SampleFactEntry>& samples) {
   std::vector<SampleFactEntry> candidates;
   const bool isolated = psfLike(sequence.source);
   for (const auto& sample : samples) {
@@ -195,8 +190,7 @@ void markCoveredArticulations(std::set<u32>& remaining, const AkaoSampleCandidat
 
 std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& sequence,
                                                       const std::vector<SampleFactEntry>& samples,
-                                                      std::set<u32>& remaining,
-                                                      CollectionAssembly& collection) {
+                                                      std::set<u32>& remaining, CollectionAssembly& collection) {
   auto candidates = candidateSamples(sequence, samples);
   std::vector<AkaoSampleCandidate> sampleCandidates;
   sampleCandidates.reserve(candidates.size());
@@ -205,8 +199,8 @@ std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& s
     sampleCandidates.push_back(AkaoSampleCandidate{
         .index = i,
         .sampleSetId = candidate.sampleSetId,
-        .firstArt = candidate.firstArt,
-        .artCount = candidate.artCount,
+        .firstArticulationId = candidate.firstArticulationId,
+        .articulationCount = candidate.articulationCount,
         .sourceOffset = candidate.sourceOffset,
     });
   }
@@ -248,8 +242,8 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
     });
   } else if (!remaining.empty()) {
     std::string message = "Akao sample collections do not cover required articulation ids:";
-    for (const u32 art : remaining) {
-      message += " " + std::to_string(art);
+    for (const u32 articulation : remaining) {
+      message += " " + std::to_string(articulation);
     }
     collection.incomplete(CollectionIssue{
         .severity = Severity::Warning,
@@ -270,24 +264,6 @@ inline constexpr std::string_view kBoundInstrumentSetSlot = "akao.bound-instrume
   };
 }
 
-[[nodiscard]] CollectionIssue materializationIssue(std::string message, std::optional<SourceRange> range = std::nullopt) {
-  return CollectionIssue{
-      .severity = Severity::Warning,
-      .code = "materialization-failed",
-      .message = std::move(message),
-      .range = range,
-  };
-}
-
-MaterializationResult failMaterialization(MaterializationResult result, std::string message,
-                                          std::optional<SourceRange> range = std::nullopt) {
-  result.collection.instrumentSets.clear();
-  result.collection.status = CollectionStatus::Incomplete;
-  result.collection.issues.push_back(materializationIssue(message, range));
-  result.diagnostics.push_back(materializationWarning(std::move(message), range));
-  return result;
-}
-
 [[nodiscard]] std::optional<ScanInput> scanInputForRange(const MaterializationContext& context, SourceRange range) {
   if (!range.valid() || !context.sources.contains(range.source)) {
     return std::nullopt;
@@ -305,14 +281,15 @@ MaterializationResult failMaterialization(MaterializationResult result, std::str
   const SourceRange range = sampleCollection.metadata.range;
   auto input = scanInputForRange(context, range);
   if (!input) {
-    diagnostics.push_back(materializationWarning("Akao materialization could not read selected sample collection source",
-                                                range.valid() ? std::optional<SourceRange>{range} : std::nullopt));
+    diagnostics.push_back(
+        materializationWarning("Akao materialization could not read selected sample collection source",
+                               range.valid() ? std::optional<SourceRange>{range} : std::nullopt));
     return std::nullopt;
   }
 
   const ScanSampleCollectionRef ref{.id = sampleCollection.metadata.id};
   if (const auto hardcoded = ff7HardcodedAkaoSampleLocation(input->reader)) {
-    const u32 hardcodedOffset = std::min(hardcoded->instrAllOffset, hardcoded->instrDatOffset);
+    const u32 hardcodedOffset = std::min(hardcoded->sampleHeaderOffset, hardcoded->articulationTableOffset);
     if (range.offset == hardcodedOffset) {
       return parseAkaoSampleCollectionData(*input, ref, *hardcoded);
     }
@@ -331,9 +308,9 @@ MaterializationResult failMaterialization(MaterializationResult result, std::str
   return parseAkaoSampleCollectionData(*input, ref, static_cast<u32>(range.offset), version);
 }
 
-[[nodiscard]] AkaoArtMap buildResolvedArtMap(const MaterializationContext& context,
-                                             std::vector<Diagnostic>& diagnostics) {
-  AkaoArtMap artMap;
+[[nodiscard]] AkaoArticulationMap buildResolvedArticulations(const MaterializationContext& context,
+                                                             std::vector<Diagnostic>& diagnostics) {
+  AkaoArticulationMap articulations;
   for (const AssetId sampleId : context.collection.sampleCollections) {
     const auto* sampleCollection = context.snapshot.asset<SampleCollectionAsset>(sampleId);
     if (sampleCollection == nullptr) {
@@ -342,18 +319,18 @@ MaterializationResult failMaterialization(MaterializationResult result, std::str
     auto parsed = parseSampleCollectionForBinding(context, *sampleCollection, diagnostics);
     if (!parsed) {
       diagnostics.push_back(materializationWarning("Akao materialization could not parse selected sample collection",
-                                                  sampleCollection->metadata.range));
+                                                   sampleCollection->metadata.range));
       continue;
     }
-    for (const auto& art : parsed->arts) {
-      artMap[art.artId] = AkaoArtBinding{
+    for (const auto& articulation : parsed->articulations) {
+      articulations[articulation.articulationId] = AkaoArticulationBinding{
           .collection = ScanSampleCollectionRef{.id = sampleCollection->metadata.id},
-          .sampleIndex = art.sampleIndex,
-          .art = art,
+          .sampleIndex = articulation.sampleIndex,
+          .articulation = articulation,
       };
     }
   }
-  return artMap;
+  return articulations;
 }
 
 }  // namespace
@@ -381,7 +358,8 @@ std::vector<std::size_t> selectAkaoSampleCandidates(std::optional<u32> sequenceS
       continue;
     }
     const bool associated = sameSampleSet(sequenceSampleSet, sample.sampleSetId);
-    const bool matchesRequired = std::ranges::any_of(remaining, [&](u32 art) { return covers(sample, art); });
+    const bool matchesRequired =
+        std::ranges::any_of(remaining, [&](u32 articulation) { return covers(sample, articulation); });
     if (!associated && !matchesRequired) {
       continue;
     }
@@ -392,7 +370,7 @@ std::vector<std::size_t> selectAkaoSampleCandidates(std::optional<u32> sequenceS
     }
   }
 
-  std::ranges::sort(selected, {}, &AkaoSampleCandidate::firstArt);
+  std::ranges::sort(selected, {}, &AkaoSampleCandidate::firstArticulationId);
 
   std::vector<std::size_t> indexes;
   indexes.reserve(selected.size());
@@ -427,48 +405,44 @@ std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& contex
 }
 
 MaterializationResult materializeAkaoCollection(const MaterializationContext& context) {
-  MaterializationResult result{
-      .collection = context.collection,
-  };
   if (!context.collection.sequence || context.collection.sampleCollections.empty()) {
-    return result;
+    return MaterializationResult{.collection = context.collection};
   }
 
   const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*context.collection.sequence);
   if (sequence == nullptr) {
-    return result;
+    return MaterializationResult{.collection = context.collection};
   }
 
+  CollectionPreparation prepared(context);
   const SourceRange sequenceRange = sequence->metadata.range;
   auto input = scanInputForRange(context, sequenceRange);
   if (!input) {
-    return failMaterialization(std::move(result), "Akao materialization could not read sequence source",
+    return prepared.incomplete("Akao materialization could not read sequence source",
                                sequenceRange.valid() ? std::optional<SourceRange>{sequenceRange} : std::nullopt);
   }
   if (sequenceRange.offset > std::numeric_limits<u32>::max()) {
-    return failMaterialization(std::move(result),
-                               "Akao sequence source offset is outside the supported address range", sequenceRange);
+    return prepared.incomplete("Akao sequence source offset is outside the supported address range", sequenceRange);
   }
 
-  auto analysis = analyzeAkaoSequence(input->reader, input->source, static_cast<u32>(sequenceRange.offset));
+  auto analysis = analyzeAkaoSequence(*input, *sequence);
   if (!analysis) {
-    return failMaterialization(std::move(result), "Akao materialization could not re-analyze sequence", sequenceRange);
+    return prepared.incomplete("Akao materialization could not re-analyze sequence", sequenceRange);
   }
 
-  auto artMap = buildResolvedArtMap(context, result.diagnostics);
-  if (artMap.empty()) {
-    return failMaterialization(std::move(result), "Akao materialization produced no articulation bindings",
-                               sequenceRange);
+  // Akao instruments cannot be finalized during the initial scan: the chosen
+  // collection may combine several sample sets, and each articulation must
+  // point into the set that actually supplied it. Build that lookup only after
+  // collection matching has made the selection.
+  auto articulations = buildResolvedArticulations(context, prepared.diagnostics());
+  if (articulations.empty()) {
+    return prepared.incomplete("Akao materialization produced no articulation bindings", sequenceRange);
   }
 
-  const AssetId boundInstrumentSet = context.assetIdForSlot(kBoundInstrumentSetSlot);
-  auto parsed = parseAkaoInstrumentSet(*input, boundInstrumentSet, *analysis, artMap);
-  result.assets.push_back(MaterializedAsset{
-      .slot = std::string(kBoundInstrumentSetSlot),
-      .asset = std::move(parsed.asset),
-  });
-  result.collection.instrumentSets = {boundInstrumentSet};
-  return result;
+  auto instruments = prepared.instruments(kBoundInstrumentSetSlot);
+  buildAkaoInstrumentSet(*input, *analysis, articulations, instruments);
+  prepared.replaceInstrumentSet(akaoInstrumentSetName(*analysis), std::move(instruments));
+  return std::move(prepared).finish();
 }
 
 }  // namespace vgmtrans::formats::akao

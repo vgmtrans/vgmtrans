@@ -57,7 +57,7 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void akaoSnesV4TieExtendsShortenedPreviousNote();
 void akaoDialectDecodesLegacyRelativeJumpTargets();
 void akaoDialectDecodesConditionalBranchSideTargets();
-void akaoSequenceAnalysisUsesSourceAnnotations();
+void akaoSequenceAnalysisUsesSemanticOperands();
 void akaoTablePointersUseNonControlSourceLinks();
 void akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks();
 void akaoRepeatSourceLinksUseSpecificRolesOnly();
@@ -141,7 +141,7 @@ int main() {
     akaoSnesV4TieExtendsShortenedPreviousNote();
     akaoDialectDecodesLegacyRelativeJumpTargets();
     akaoDialectDecodesConditionalBranchSideTargets();
-    akaoSequenceAnalysisUsesSourceAnnotations();
+    akaoSequenceAnalysisUsesSemanticOperands();
     akaoTablePointersUseNonControlSourceLinks();
     akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks();
     akaoRepeatSourceLinksUseSpecificRolesOnly();

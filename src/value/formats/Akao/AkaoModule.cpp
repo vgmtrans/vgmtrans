@@ -4,16 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/Akao/AkaoModule.h"
-
-#include "value/formats/Akao/AkaoInstrumentSet.h"
-#include "value/formats/Akao/AkaoResolver.h"
-#include "value/formats/Akao/AkaoSequence.h"
-#include "value/formats/Akao/AkaoSynth.h"
-#include "value/formats/Akao/AkaoTypes.h"
-#include "value/formats/Akao/AkaoVersion.h"
-#include "value/scan/FormatRegistry.h"
-#include "value/scan/ScanResultBuilder.h"
+#include "value/formats/Akao/Akao.h"
 
 #include <string>
 #include <utility>
@@ -77,13 +68,13 @@ void addSampleFacts(ScanResultBuilder& result, const AkaoSampleCollectionParse& 
   result.sourceFact(parsed.ref.id, OffsetOrderFact{.offset = parsed.offset});
   result.sourceFact(parsed.ref.id, SampleCoverageFact{
                                        .domain = std::string(kAkaoArticulationDomain),
-                                       .first = parsed.firstArtId,
-                                       .count = parsed.artCount,
+                                       .first = parsed.firstArticulationId,
+                                       .count = parsed.articulationCount,
                                    });
 }
 
 void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const AkaoSequenceAnalysis& analysis,
-                      std::span<const u32> requiredArts) {
+                      std::span<const u32> requiredArticulations) {
   result.sourceFact(sequence.id,
                     IdMatchFact{.domain = std::string(kAkaoSequenceIdDomain), .value = analysis.header.sequenceId});
   if (analysis.header.sampleSetId) {
@@ -92,9 +83,9 @@ void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const
   }
   result.sourceFact(sequence.id, OffsetOrderFact{.offset = analysis.header.offset});
   std::vector<u32> required;
-  for (const u32 art : requiredArts) {
-    if (art != 0) {
-      required.push_back(art);
+  for (const u32 articulation : requiredArticulations) {
+    if (articulation != 0) {
+      required.push_back(articulation);
     }
   }
   if (!required.empty()) {
@@ -136,18 +127,15 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     if (!isAkaoSequenceCandidate(input.reader, offset)) {
       continue;
     }
-    auto analysis = analyzeAkaoSequence(input.reader, input.source, offset);
-    if (!analysis) {
+    const auto sequenceRef = result.reserveSequence();
+    auto parsed = parseAkaoSequence(input, sequenceRef.id, offset, &result.sourceMap(), &result.diagnostics());
+    if (!parsed) {
       continue;
     }
 
-    const auto sequenceRef = result.reserveSequence();
-    result.sequence(sequenceRef, [&](AssetId id) {
-      return parseAkaoSequenceProgram(input, id, *analysis, &result.sourceMap(), &result.diagnostics());
-    });
-
-    const auto required = requiredArticulations(input.reader, *analysis);
-    addSequenceFacts(result, sequenceRef, *analysis, required);
+    const auto required = requiredArticulations(input.reader, parsed->analysis);
+    addSequenceFacts(result, sequenceRef, parsed->analysis, required);
+    result.sequence(sequenceRef, [&](AssetId) { return std::move(parsed->asset); });
   }
 }
 
