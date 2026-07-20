@@ -44,6 +44,16 @@ const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId 
   return nullptr;
 }
 
+template <typename T>
+const T* assetWithId(const ScanResult& result, AssetId id) {
+  for (const auto& asset : result.assets) {
+    if (const auto* typed = std::get_if<T>(&asset); typed != nullptr && typed->metadata.id == id) {
+      return typed;
+    }
+  }
+  return nullptr;
+}
+
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value & 0xff);
   bytes[offset + 1] = static_cast<u8>((value >> 8) & 0xff);
@@ -644,27 +654,33 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
       .ids = ids,
   };
   ScanResultBuilder out(input, "NDS");
-  const auto psg = out.reserveSampleCollection();
+  const auto psg = addNdsPsgSamples(out);
   std::array<std::optional<ScanSampleCollectionRef>, 4> waves{};
-  waves[0] = out.reserveSampleCollection();
+  waves[0] = out.sampleCollection("Wave", input.reader.range(0, 0)).samples({});
 
-  const auto bank = parseNdsInstrumentSet(
-      input, AssetId{2}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Bank", out, psg, waves);
-  expect(bank.instruments.size() == 1 && bank.instruments[0].regions.size() == 1,
+  const auto bankRef =
+      addNdsInstrumentSet(out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Bank", psg, waves);
+  expect(bankRef.has_value(), "NDS synth parser should add a valid instrument bank");
+
+  bytes[0x45] = 0x80;
+  const auto malformedBankRef = addNdsInstrumentSet(
+      out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Malformed Bank", psg, waves);
+  expect(malformedBankRef.has_value(), "NDS synth parser should retain an empty malformed bank");
+
+  const ScanResult result = out.finish();
+  const auto* bank = assetWithId<InstrumentSetAsset>(result, bankRef->id);
+  const auto* malformedBank = assetWithId<InstrumentSetAsset>(result, malformedBankRef->id);
+  expect(bank != nullptr && bank->instruments.size() == 1 && bank->instruments[0].regions.size() == 1,
          "NDS synth parser should keep a valid instrument with infinite release");
-  const Envelope& envelope = bank.instruments[0].regions[0].envelope;
+  const Envelope& envelope = bank->instruments[0].regions[0].envelope;
   expect(envelope.release == kEnvelopeInfinite, "NDS infinite release should remain explicit in coarse envelope units");
   expect(!envelope.releaseSeconds.has_value(),
          "NDS infinite release should not use a negative precise-seconds sentinel");
-  expect(validateInstrumentSet(bank).empty(), "NDS infinite release should pass synth validation");
+  expect(validateInstrumentSet(*bank).empty(), "NDS infinite release should pass synth validation");
+  expect(malformedBank != nullptr && malformedBank->instruments.empty(),
+         "NDS synth parser should skip regions with malformed envelope-rate bytes");
 
-  bytes[0x45] = 0x80;
-  const auto malformedBank =
-      parseNdsInstrumentSet(input, AssetId{4}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())},
-                            "Malformed Bank", out, psg, waves);
-  expect(malformedBank.instruments.empty(), "NDS synth parser should skip regions with malformed envelope-rate bytes");
-
-  const SourceMap annotations = out.sourceMap().finish();
+  const SourceMap& annotations = result.sourceMap;
   const auto* pointerTable =
       annotationWithKind(annotations, SourceId{11}, SourceRole::Table, "sbnk-instrument-pointer-table");
   expect(pointerTable != nullptr && pointerTable->range.offset == 0x38 && pointerTable->range.size == 8,
@@ -711,15 +727,25 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
   };
 
   ScanResultBuilder out(input, "NDS");
-  const auto wave = parseNdsWaveArchive(
-      input, AssetId{5}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Wave", &out);
-  expect(wave.samples.samples.size() == 1, "NDS parser should keep non-looping ADPCM with loop offset zero");
-  const Sample& sample = wave.samples.samples[0];
+  const auto waveRef =
+      addNdsWaveArchive(out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Wave");
+  expect(waveRef.has_value(), "NDS parser should add a valid SWAR");
+
+  bytes[0x41] = 1;
+  const auto malformedLoopRef =
+      addNdsWaveArchive(out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Malformed Wave");
+  expect(malformedLoopRef.has_value(), "NDS parser should retain a SWAR containing an invalid loop");
+
+  const ScanResult result = out.finish();
+  const auto* wave = assetWithId<SampleCollectionAsset>(result, waveRef->id);
+  const auto* malformedLoop = assetWithId<SampleCollectionAsset>(result, malformedLoopRef->id);
+  expect(wave != nullptr && wave->samples.samples.size() == 1,
+         "NDS parser should keep non-looping ADPCM with loop offset zero");
+  const Sample& sample = wave->samples.samples[0];
   expect(sample.encodedData.offset == 0x50 && sample.encodedData.size == 4,
          "NDS ADPCM encoded data should skip the predictor header");
   expect(!sample.loop.enabled && sample.loop.start == 0 && sample.loop.length == 9,
          "NDS non-looping ADPCM should keep sane decoded loop metadata");
-  const ScanResult result = out.finish();
   const auto* waveHeader = annotationWithKind(result.sourceMap, SourceId{12}, SourceRole::Header, "swar-header");
   expect(waveHeader != nullptr && waveHeader->range.offset == 0 && waveHeader->range.size == 0x3c,
          "NDS SWAR parser should annotate the archive header");
@@ -732,10 +758,7 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
   expect(sampleHeader != nullptr && sampleHeader->range.offset == 0x40 && sampleHeader->range.size == 0x0c,
          "NDS SWAR parser should annotate parsed sample headers");
 
-  bytes[0x41] = 1;
-  const auto malformedLoop = parseNdsWaveArchive(
-      input, AssetId{6}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Malformed Wave");
-  expect(malformedLoop.samples.samples.empty(),
+  expect(malformedLoop != nullptr && malformedLoop->samples.samples.empty(),
          "NDS parser should skip looped ADPCM with an unusable loop offset instead of underflowing");
 }
 
@@ -760,11 +783,13 @@ void ndsWaveArchiveReportsTruncatedSampleHeaders() {
   };
   ScanResultBuilder out(input, "NDS");
 
-  const auto wave = parseNdsWaveArchive(
-      input, AssetId{7}, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Truncated Wave", &out);
-  expect(wave.samples.samples.empty(), "NDS parser should skip truncated SWAR sample headers");
+  const auto waveRef =
+      addNdsWaveArchive(out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Truncated Wave");
+  expect(waveRef.has_value(), "NDS parser should retain a SWAR with truncated samples");
 
   const ScanResult result = out.finish();
+  const auto* wave = assetWithId<SampleCollectionAsset>(result, waveRef->id);
+  expect(wave != nullptr && wave->samples.samples.empty(), "NDS parser should skip truncated SWAR sample headers");
   expect(!result.diagnostics.empty(), "NDS parser should diagnose truncated SWAR sample headers");
   expect(result.diagnostics[0].message.find("SWAR sample header") != std::string::npos,
          "NDS SWAR diagnostic should name the truncated field");

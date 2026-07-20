@@ -62,7 +62,7 @@ void annotateNdsLayout(ByteReader reader, const NdsLayout& layout, SourceMapBuil
 void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBuilder& result) {
   // Build dependencies before dependents: PSG samples are universal, SWAR collections feed
   // banks, banks feed sequences, and sequences finally become exportable collections.
-  const auto psg = result.sampleCollection([&](AssetId id) { return parseNdsPsgSamples(input, id); });
+  const auto psg = addNdsPsgSamples(result);
 
   std::vector<std::optional<ScanSampleCollectionRef>> waveAssetIds(layout.waveArchives.size());
   std::set<u16> referencedWaveArchives;
@@ -84,12 +84,7 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
       result.warning("NDS wave archive FAT entry was invalid", input.reader.range(layout.baseOffset, layout.length));
       continue;
     }
-    if (!isNdsWaveArchive(input.reader, range->offset)) {
-      continue;
-    }
-    waveAssetIds[waveArchiveIndex] = result.sampleCollection([&](AssetId id) {
-      return parseNdsWaveArchive(input, id, *range, layout.waveArchiveNames[waveArchiveIndex], &result);
-    });
+    waveAssetIds[waveArchiveIndex] = addNdsWaveArchive(result, *range, layout.waveArchiveNames[waveArchiveIndex]);
   }
 
   std::vector<std::optional<ScanInstrumentSetRef>> bankAssets(layout.banks.size());
@@ -119,9 +114,7 @@ void scanNdsLayout(const ScanInput& input, const NdsLayout& layout, ScanResultBu
       }
     }
 
-    bankAssets[bankIndex] = result.instrumentSet([&](AssetId id) {
-      return parseNdsInstrumentSet(input, id, *range, layout.bankNames[bankIndex], result, psg, waveCollections);
-    });
+    bankAssets[bankIndex] = addNdsInstrumentSet(result, *range, layout.bankNames[bankIndex], psg, waveCollections);
   }
 
   for (u32 sequenceIndex = 0; sequenceIndex < layout.sequences.size(); ++sequenceIndex) {
