@@ -7,8 +7,7 @@
 #include "value/formats/ValueFormats.h"
 
 #include "value/formats/CapcomSnes/CapcomSnes.h"
-#include "value/formats/KonamiSnes/KonamiSnesModule.h"
-#include "value/formats/KonamiSnes/KonamiSnesSequence.h"
+#include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/formats/AkaoSnes/AkaoSnesModule.h"
 #include "value/formats/AkaoSnes/AkaoSnesSequence.h"
 #include "value/formats/Akao/AkaoModule.h"

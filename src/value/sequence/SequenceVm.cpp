@@ -475,7 +475,11 @@ private:
     if (ticks == 0) {
       return;
     }
-    if (dialect_.tick == nullptr) {
+    if (dialect_.usesSemanticScheduler() && dialect_.tickSemantic == nullptr) {
+      runtime_.tick += ticks;
+      return;
+    }
+    if (!dialect_.usesSemanticScheduler() && dialect_.tick == nullptr) {
       runtime_.tick += ticks;
       return;
     }
@@ -484,7 +488,15 @@ private:
       ++runtime_.tick;
       PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
       VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-      dialect_.tick(command, track_, trackState_, out, vm, dialect_.context);
+      if (dialect_.usesSemanticScheduler()) {
+        if (programState_ == nullptr) {
+          warn("Missing semantic sequence program state", command.range);
+          return;
+        }
+        dialect_.tickSemantic(command, *programState_, trackState_, out, vm);
+      } else {
+        dialect_.tick(command, track_, trackState_, out, vm, dialect_.context);
+      }
     }
   }
 
@@ -732,54 +744,89 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
   if (dialect.usesSemanticScheduler()) {
     std::any programState = dialect.createProgramState != nullptr ? dialect.createProgramState(program) : std::any{};
-    std::vector<std::unique_ptr<VmTrackExecutor>> executors;
-    executors.reserve(program.tracks.size());
-    for (const TrackProgram& track : program.tracks) {
-      executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, sequence,
-                                                            std::nullopt, TrackRenderMode::Normal, &programState,
-                                                            loopPolicy == LoopPolicy::PlayOnce));
-    }
-
-    // Execute the earliest channel first; source track order is the stable
-    // tie-break. A channel keeps control at the same tick while it consumes
-    // zero-time commands, matching how these drivers run until their next wait.
-    std::optional<u64> sequenceEndTick;
-    while (true) {
-      size_t selected = executors.size();
-      for (size_t i = 0; i < executors.size(); ++i) {
-        if (!executors[i]->active()) {
-          continue;
-        }
-        if (selected == executors.size() || executors[i]->tick() < executors[selected]->tick()) {
-          selected = i;
-        }
-      }
-      if (selected == executors.size()) {
-        break;
+    const auto renderSemanticPass = [&](PerformanceSequence& target) {
+      std::vector<std::unique_ptr<VmTrackExecutor>> executors;
+      executors.reserve(program.tracks.size());
+      for (const TrackProgram& track : program.tracks) {
+        executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, target,
+                                                              std::nullopt, TrackRenderMode::Normal, &programState,
+                                                              loopPolicy == LoopPolicy::PlayOnce));
       }
 
-      executors[selected]->executeNext();
-      const bool hasLoopBoundary =
-          std::ranges::any_of(executors, [](const auto& executor) { return executor->loopStopTick().has_value(); });
-      if (loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
-          std::ranges::all_of(executors,
-                              [](const auto& executor) { return !executor->active() || executor->loopStopTick(); })) {
-        sequenceEndTick = 0;
-        for (const auto& executor : executors) {
-          *sequenceEndTick = std::max(*sequenceEndTick, executor->loopStopTick().value_or(executor->tick()));
+      // Execute the earliest channel first; source track order is the stable
+      // tie-break. A channel keeps control at the same tick while it consumes
+      // zero-time commands, matching how these drivers run until their next wait.
+      std::optional<u64> sequenceEndTick;
+      while (true) {
+        size_t selected = executors.size();
+        for (size_t i = 0; i < executors.size(); ++i) {
+          if (!executors[i]->active()) {
+            continue;
+          }
+          if (selected == executors.size() || executors[i]->tick() < executors[selected]->tick()) {
+            selected = i;
+          }
         }
-        break;
-      }
-    }
+        if (selected == executors.size()) {
+          break;
+        }
 
-    sequence.tracks.reserve(executors.size());
-    for (auto& executor : executors) {
-      auto rendered = executor->finish();
-      if (sequenceEndTick) {
-        endTrackAt(rendered.track, *sequenceEndTick);
+        executors[selected]->executeNext();
+        const bool hasLoopBoundary =
+            std::ranges::any_of(executors, [](const auto& executor) { return executor->loopStopTick().has_value(); });
+        if (loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
+            std::ranges::all_of(executors,
+                                [](const auto& executor) { return !executor->active() || executor->loopStopTick(); })) {
+          sequenceEndTick = 0;
+          for (const auto& executor : executors) {
+            *sequenceEndTick = std::max(*sequenceEndTick, executor->loopStopTick().value_or(executor->tick()));
+          }
+          break;
+        }
       }
-      sequence.tracks.push_back(std::move(rendered.track));
+
+      std::vector<PerformanceTrack> tracks;
+      tracks.reserve(executors.size());
+      for (auto& executor : executors) {
+        auto rendered = executor->finish();
+        if (sequenceEndTick) {
+          endTrackAt(rendered.track, *sequenceEndTick);
+        }
+        tracks.push_back(std::move(rendered.track));
+      }
+      return tracks;
+    };
+
+    if (dialect.semanticPrepass == SemanticPrepassMode::ScheduledPlayback) {
+      PerformanceSequence prepass{.timebase = program.timebase};
+      static_cast<void>(renderSemanticPass(prepass));
+    } else if (dialect.semanticPrepass == SemanticPrepassMode::DecodedCommands) {
+      // Static range collection sometimes needs every decoded command, even
+      // when playback control flow will not visit every source block. Execute
+      // the same compiled actions once in stable track/command order and ignore
+      // their timing and flow results.
+      PerformanceSequence prepass{.timebase = program.timebase};
+      for (const TrackProgram& track : program.tracks) {
+        std::any trackState =
+            dialect.createSemanticTrackState != nullptr ? dialect.createSemanticTrackState(program, track) : std::any{};
+        PerformanceTrack output{
+            .id = track.id,
+            .sourceTrackNumber = track.sourceTrackNumber,
+        };
+        VmTrackRuntime runtime;
+        for (const SourceCommand& command : track.commands) {
+          PerformanceEmitter out{output, command.id, command.annotation, 0};
+          VmApi vm = detail::VmApiAccess::make(runtime, prepass, command);
+          static_cast<void>(dialect.executeSemantic(command, programState, trackState, out, vm));
+        }
+      }
     }
+    if (dialect.semanticPrepass != SemanticPrepassMode::None) {
+      if (dialect.finishSemanticPrepass != nullptr) {
+        dialect.finishSemanticPrepass(programState);
+      }
+    }
+    sequence.tracks = renderSemanticPass(sequence);
     return sequence;
   }
 

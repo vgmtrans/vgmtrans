@@ -4,11 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/KonamiSnes/KonamiSnesModule.h"
-
-#include "value/formats/KonamiSnes/KonamiSnesLayout.h"
-#include "value/formats/KonamiSnes/KonamiSnesSequence.h"
-#include "value/formats/KonamiSnes/KonamiSnesSynth.h"
+#include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanResultBuilder.h"
 
@@ -31,12 +27,10 @@ using namespace core;
   ScanResultBuilder result(input, "KonamiSnes");
   const std::string displayName = result.sourceDisplayName();
   const auto sequence = result.reserveSequence();
-  const auto instrumentSet = result.reserveInstrumentSet();
-  const auto samples = result.reserveSampleCollection();
 
-  result.sequence(sequence, [&](AssetId id) {
-    return parseKonamiSnesSequence(input, *layout, id, displayName, &result.sourceMap(), &result.diagnostics());
-  });
+  result.sequence(sequence, displayName, konamiSnesSequenceHeaderRange(input.reader, *layout))
+      .program(
+          decodeKonamiSnesSequence(input.reader, *layout, sequence.id, &result.sourceMap(), &result.diagnostics()));
 
   auto collection = result.sourceCollection(displayName);
   collection.sequence(sequence);
@@ -44,7 +38,9 @@ using namespace core;
   const bool hasSynthLayout = layout->spcDirAddress && layout->commonInstrumentTableAddress &&
                               layout->bankedInstrumentTableAddress && layout->percussionInstrumentTableAddress;
   if (hasSynthLayout) {
-    if (addKonamiSnesSynth(input, result, instrumentSet, samples, *layout, displayName)) {
+    const auto instrumentSet = result.reserveInstrumentSet();
+    const auto samples = result.reserveSampleCollection();
+    if (addKonamiSnesSynth(result, instrumentSet, samples, *layout, displayName)) {
       collection.instrumentSet(instrumentSet).samples(samples);
     } else {
       result.warning("KonamiSnes sequence found, but no valid instruments or samples were discovered",

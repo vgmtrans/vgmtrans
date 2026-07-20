@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/KonamiSnes/KonamiSnesSynth.h"
+#include "value/formats/KonamiSnes/KonamiSnes.h"
 
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/synth/SnesDsp.h"
@@ -75,6 +75,9 @@ constexpr u32 kDrumKitProgram = 0x00;
   return tuning >= 0 ? rawKey : rawKey - 1;
 }
 
+[[nodiscard]] KonamiSnesInstrumentInfo instrumentInfo(ByteReader reader, KonamiSnesVersion version, u32 index,
+                                                      u32 address, bool percussion = false, u8 percussionNote = 0);
+
 [[nodiscard]] std::vector<KonamiSnesInstrumentInfo> collectPercussionInfos(ByteReader reader, KonamiSnesVersion version,
                                                                            u32 tableAddress, u32 spcDirAddress) {
   std::vector<KonamiSnesInstrumentInfo> infos;
@@ -98,27 +101,14 @@ constexpr u32 kDrumKitProgram = 0x00;
       continue;
     }
 
-    const bool legacyLayout = usesLegacyInstrumentLayout(version);
-    infos.push_back(KonamiSnesInstrumentInfo{
-        .index = (kDrumKitBank << 7) | kDrumKitProgram,
-        .address = address,
-        .srcn = reader.u8At(address),
-        .key = reader.s8At(address + 1),
-        .tuning = reader.s8At(address + 2),
-        .adsr1 = reader.u8At(address + 3),
-        .adsr2 = reader.u8At(address + 4),
-        .gain = legacyLayout ? reader.u8At(address + 5) : reader.u8At(address + 4),
-        .pan = reader.u8At(address + (legacyLayout ? 6 : 5)),
-        .volume = reader.u8At(address + (legacyLayout ? 7 : 6)),
-        .percussion = true,
-        .percussionNote = percussionNote,
-    });
+    infos.push_back(
+        instrumentInfo(reader, version, (kDrumKitBank << 7) | kDrumKitProgram, address, true, percussionNote));
   }
   return infos;
 }
 
 [[nodiscard]] KonamiSnesInstrumentInfo instrumentInfo(ByteReader reader, KonamiSnesVersion version, u32 index,
-                                                      u32 address, bool percussion = false, u8 percussionNote = 0) {
+                                                      u32 address, bool percussion, u8 percussionNote) {
   const bool legacyLayout = usesLegacyInstrumentLayout(version);
   return KonamiSnesInstrumentInfo{
       .index = index,
@@ -247,12 +237,12 @@ struct KonamiSnesInstrumentBuild {
   std::vector<Instrument> instruments;
 };
 
-KonamiSnesInstrumentBuild buildKonamiSnesInstruments(const ScanInput& input, ScanResultBuilder& builder,
-                                                     ScanInstrumentSetRef instrumentSet,
+KonamiSnesInstrumentBuild buildKonamiSnesInstruments(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
                                                      ScanSampleCollectionRef sampleCollection,
                                                      KonamiSnesVersion version, u32 spcDirAddress,
                                                      const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
                                                      const SnesBrrCatalog& samples) {
+  const ByteReader reader = builder.reader();
   u32 rootOffset = instrumentInfos.empty() ? 0 : instrumentInfos.front().address;
   u32 rootEnd = rootOffset;
   for (const auto& info : instrumentInfos) {
@@ -261,7 +251,7 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(const ScanInput& input, Sca
   }
   const u32 rootSize = rootEnd >= rootOffset ? rootEnd - rootOffset : 0;
   const SourceAnnotationId root = builder.sourceMap()
-                                      .table("Instrument Tables", input.reader.range(rootOffset, rootSize))
+                                      .table("Instrument Tables", reader.range(rootOffset, rootSize))
                                       .kind("konami-snes-instrument-tables")
                                       .owner(ObjectRefs::asset(instrumentSet.id))
                                       .id();
@@ -299,7 +289,7 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(const ScanInput& input, Sca
       instruments.push_back(Instrument{
           .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
           .name = info.percussion ? "Percussion" : fmt::format("Instrument {}", info.index),
-          .range = input.reader.range(info.address, instrumentHeaderSize(version)),
+          .range = reader.range(info.address, instrumentHeaderSize(version)),
           .modulation = konamiInstrumentModulation(version),
       });
     }
@@ -308,7 +298,7 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(const ScanInput& input, Sca
     const auto pitch = konamiPitch(info);
     Region region{
         .sample = builder.sampleRef(sampleCollection, *resolvedSampleIndex),
-        .range = input.reader.range(info.address, instrumentHeaderSize(version)),
+        .range = reader.range(info.address, instrumentHeaderSize(version)),
         .tuning = pitch.aggregate,
         .rootKey = pitch.rootKey,
         .fineTuneCents = pitch.fineTuneCents,
@@ -324,29 +314,29 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(const ScanInput& input, Sca
         builder.sourceMap()
             .row(info.percussion ? fmt::format("Percussion {}", static_cast<unsigned>(info.percussionNote))
                                  : fmt::format("Instrument {}", info.index),
-                 input.reader.range(info.address, instrumentHeaderSize(version)))
+                 reader.range(info.address, instrumentHeaderSize(version)))
             .role(SourceRole::Instrument)
             .kind(info.percussion ? "konami-snes-percussion-instrument" : "konami-snes-instrument")
             .owner(ObjectRefs::instrument(instrumentSet.id, info.percussion ? info.percussionNote : info.index))
             .derived("bank", bank)
             .derived("program", program)
-            .field("srcn", input.reader.range(info.address, 1), info.srcn, SourceValueDisplay::Hex)
-            .field("key", input.reader.range(info.address + 1, 1), info.key, SourceValueDisplay::SignedDecimal)
-            .field("tuning", input.reader.range(info.address + 2, 1), info.tuning, SourceValueDisplay::SignedDecimal)
-            .field("adsr1", input.reader.range(info.address + 3, 1), info.adsr1, SourceValueDisplay::Hex)
-            .field("adsr2", input.reader.range(info.address + 4, 1), info.adsr2, SourceValueDisplay::Hex);
+            .field("srcn", reader.range(info.address, 1), info.srcn, SourceValueDisplay::Hex)
+            .field("key", reader.range(info.address + 1, 1), info.key, SourceValueDisplay::SignedDecimal)
+            .field("tuning", reader.range(info.address + 2, 1), info.tuning, SourceValueDisplay::SignedDecimal)
+            .field("adsr1", reader.range(info.address + 3, 1), info.adsr1, SourceValueDisplay::Hex)
+            .field("adsr2", reader.range(info.address + 4, 1), info.adsr2, SourceValueDisplay::Hex);
     if (usesLegacyInstrumentLayout(version)) {
-      annotation.field("gain", input.reader.range(info.address + 5, 1), info.gain, SourceValueDisplay::Hex)
-          .field("pan", input.reader.range(info.address + 6, 1), info.pan, SourceValueDisplay::Default)
-          .field("volume", input.reader.range(info.address + 7, 1), info.volume, SourceValueDisplay::Default);
+      annotation.field("gain", reader.range(info.address + 5, 1), info.gain, SourceValueDisplay::Hex)
+          .field("pan", reader.range(info.address + 6, 1), info.pan, SourceValueDisplay::Default)
+          .field("volume", reader.range(info.address + 7, 1), info.volume, SourceValueDisplay::Default);
     } else {
-      annotation.field("pan", input.reader.range(info.address + 5, 1), info.pan, SourceValueDisplay::Default)
-          .field("volume", input.reader.range(info.address + 6, 1), info.volume, SourceValueDisplay::Default);
+      annotation.field("pan", reader.range(info.address + 5, 1), info.pan, SourceValueDisplay::Default)
+          .field("volume", reader.range(info.address + 6, 1), info.volume, SourceValueDisplay::Default);
     }
     annotation.parent(root).link(SourceLinkRole::UsesSample,
                                  SourceTarget{ObjectRefs::sample(sampleCollection.id, *resolvedSampleIndex)});
     builder.sourceMap()
-        .annotation(SourceRole::Region, "Region", input.reader.range(info.address, instrumentHeaderSize(version)))
+        .annotation(SourceRole::Region, "Region", reader.range(info.address, instrumentHeaderSize(version)))
         .kind("konami-snes-region")
         .parent(annotation.id())
         .description(fmt::format("Sample {}", *resolvedSampleIndex))
@@ -354,26 +344,27 @@ KonamiSnesInstrumentBuild buildKonamiSnesInstruments(const ScanInput& input, Sca
   }
 
   return KonamiSnesInstrumentBuild{
-      .range = input.reader.range(rootOffset, rootSize),
+      .range = reader.range(rootOffset, rootSize),
       .instruments = std::move(instruments),
   };
 }
 
-bool addKonamiSnesSynth(const ScanInput& input, ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
+bool addKonamiSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
                         ScanSampleCollectionRef sampleCollection, const KonamiSnesLayout& layout,
                         std::string_view displayName) {
-  const auto instrumentInfos = parseKonamiSnesInstrumentInfos(input.reader, layout);
-  const auto samples = parseKonamiSnesSampleInfos(input.reader, *layout.spcDirAddress, instrumentInfos);
+  const ByteReader reader = builder.reader();
+  const auto instrumentInfos = parseKonamiSnesInstrumentInfos(reader, layout);
+  const auto samples = parseKonamiSnesSampleInfos(reader, *layout.spcDirAddress, instrumentInfos);
   if (instrumentInfos.empty() || samples.samples.empty()) {
     return false;
   }
 
-  auto instruments = buildKonamiSnesInstruments(input, builder, instrumentSet, sampleCollection, layout.version,
+  auto instruments = buildKonamiSnesInstruments(builder, instrumentSet, sampleCollection, layout.version,
                                                 *layout.spcDirAddress, instrumentInfos, samples);
   builder.instrumentSet(instrumentSet, fmt::format("{} Instruments", displayName), instruments.range)
       .instruments(std::move(instruments.instruments));
   builder.sampleCollection(sampleCollection, fmt::format("{} Samples", displayName), samples.directoryRange)
-      .samples(buildSnesBrrSampleCollection(input.reader, samples, sampleCollection.id, builder.sourceMap()));
+      .samples(buildSnesBrrSampleCollection(reader, samples, sampleCollection.id, builder.sourceMap()));
   return true;
 }
 

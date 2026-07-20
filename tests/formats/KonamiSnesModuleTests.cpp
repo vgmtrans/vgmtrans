@@ -4,10 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/KonamiSnes/KonamiSnesLayout.h"
-#include "value/formats/KonamiSnes/KonamiSnesModule.h"
-#include "value/formats/KonamiSnes/KonamiSnesSequence.h"
-#include "value/formats/KonamiSnes/KonamiSnesSynth.h"
+#include "value/formats/KonamiSnes/KonamiSnes.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/ValueFormats.h"
@@ -150,34 +147,38 @@ std::vector<u8> makeKonamiSnesAram() {
 
 PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
   std::vector<u8> bytes(commandBytes.begin(), commandBytes.end());
-  const auto& descriptor = konamiSnesSequenceDescriptor(KONAMISNES_V6);
-  TrackProgram track = decodeKonamiSnesSourceTrack(ByteReader(SourceId{9}, bytes), descriptor, 0, 0);
+  const auto& dialect = konamiSnesSequenceDialect(KONAMISNES_V6);
+  TrackProgram track = decodeKonamiSnesSourceTrack(ByteReader(SourceId{9}, bytes), KONAMISNES_V6, 0, 0);
   const SequenceProgram program{
-      .dialect = descriptor.dialect.id,
-      .timebase = descriptor.dialect.timebase,
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
       .sourceBaseAddress = Address{0},
-      .behavior = descriptor.dialect.defaultBehavior,
+      .config = SequenceProgramConfig{.profile = KONAMISNES_V6},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, descriptor.dialect);
+  return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
 }
 
-PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std::vector<std::vector<u8>>& tracks) {
-  const auto& descriptor = konamiSnesSequenceDescriptor(version);
+PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std::vector<std::vector<u8>>& tracks,
+                                            u32 sequenceLoops = 0) {
+  const auto& dialect = konamiSnesSequenceDialect(version);
   std::vector<TrackProgram> programTracks;
   programTracks.reserve(tracks.size());
   for (u32 trackIndex = 0; trackIndex < tracks.size(); ++trackIndex) {
     programTracks.push_back(decodeKonamiSnesSourceTrack(ByteReader(SourceId{100 + trackIndex}, tracks[trackIndex]),
-                                                        descriptor, trackIndex, 0));
+                                                        version, trackIndex, 0));
   }
   const SequenceProgram program{
-      .dialect = descriptor.dialect.id,
-      .timebase = descriptor.dialect.timebase,
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
       .sourceBaseAddress = Address{0},
-      .behavior = descriptor.dialect.defaultBehavior,
+      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = std::move(programTracks),
   };
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, descriptor.dialect);
+  return SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = sequenceLoops})
+      .render(program, dialect);
 }
 
 }  // namespace
@@ -434,4 +435,174 @@ void konamiSnesPercussionUsesPackedGsDrumBank() {
   expect(drumBank != events.end(), "KonamiSnes percussion should emit a drum bank select");
   expect(std::get<BankSelect>(*drumBank).bank == (0x7f << 7),
          "KonamiSnes percussion should use the packed GS bank field so MIDI serializes bank MSB 127");
+}
+
+void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
+  const std::vector<u8> flowBytes{
+      0xfc, 0x08, 0x00, 0x0c, 0x00,        // V1 jump plus alternate discovery target
+      0xff, 0x00, 0x00, 0xfe, 0x0c, 0x00,  // call alternate target
+      0xff,                                // return from the call
+      0xff,                                // alternate target
+  };
+  const TrackProgram flow = decodeKonamiSnesSourceTrack(ByteReader(SourceId{30}, flowBytes), KONAMISNES_V1, 0, 0);
+  const auto conditionalIndex = flow.addressIndex.find(Address{0});
+  const auto callIndex = flow.addressIndex.find(Address{8});
+  expect(conditionalIndex && callIndex, "Konami compiler decoding should retain reachable branch and call blocks");
+  const SourceCommand& conditional = flow.commands[*conditionalIndex];
+  const SourceCommand& call = flow.commands[*callIndex];
+  expect(conditional.flow.staticTargets.size() == 2 && conditional.flow.staticTargets[0].value == 8 &&
+             conditional.flow.staticTargets[1].value == 12,
+         "Konami conditional jump should expose both decoded branch targets");
+  expect(call.flow.callTarget() && call.flow.staticTargets.front().value == 12,
+         "Konami call should expose its decoded little-endian target");
+  expect(flow.commandBytes.empty() &&
+             std::ranges::all_of(flow.commands, [](const SourceCommand& command) { return command.semantic(); }),
+         "valid Konami compiler commands should not retain or reopen source bytes");
+
+  const std::vector<u8> truncatedBytes{0xe4, 0x01, 0x20};
+  std::vector<Diagnostic> diagnostics;
+  const TrackProgram truncated =
+      decodeKonamiSnesSourceTrack(ByteReader(SourceId{31}, truncatedBytes), KONAMISNES_V6, 0, 0, nullptr, &diagnostics);
+  expect(truncated.commands.size() == 1 && truncated.commands[0].flow.terminal &&
+             !truncated.commands[0].execution.valid() && truncated.bytesFor(truncated.commands[0]).size() == 3,
+         "truncated Konami commands should keep diagnostic bytes but no executable behavior");
+  expect(!diagnostics.empty() && diagnostics.front().code == "truncated-record",
+         "truncated Konami operands should use the shared compiler-cursor diagnostic");
+}
+
+void konamiSnesCompilerCursorUsesVersionedOperandLengths() {
+  const auto firstSize = [](KonamiSnesVersion version, std::vector<u8> bytes) {
+    const TrackProgram track = decodeKonamiSnesSourceTrack(ByteReader(SourceId{32}, bytes), version, 0, 0);
+    return track.commands.front().encodedSize;
+  };
+
+  expect(firstSize(KONAMISNES_V1, {0xf3, 0x00, 0x02, 0x40, 0xff}) == 4,
+         "V1 pitch slide should use its four-byte command layout");
+  expect(firstSize(KONAMISNES_V2, {0xf3, 0x00, 0x00, 0x40, 0xff}) == 4,
+         "zero-length V2 pitch slide should omit reserved and delta operands");
+  expect(firstSize(KONAMISNES_V2, {0xf3, 0x00, 0x02, 0x40, 0x00, 0x34, 0x12, 0xff}) == 7,
+         "active V2 pitch slide should include reserved and delta operands");
+  expect(firstSize(KONAMISNES_V6, {0xf3, 0x00, 0x02, 0x40, 0x34, 0x12, 0xff}) == 6,
+         "late pitch slide should use its six-byte command layout");
+  expect(firstSize(KONAMISNES_V1, {0x63, 0xaa, 0xff}) == 2 && firstSize(KONAMISNES_V6, {0x63, 0xff}) == 1,
+         "unknown low opcodes should retain their version-dependent operand lengths");
+}
+
+void konamiSnesEveryVersionRendersSourceFreeCommands() {
+  constexpr std::array<KonamiSnesVersion, 6> versions{
+      KONAMISNES_V1, KONAMISNES_V2, KONAMISNES_V3, KONAMISNES_V4, KONAMISNES_V5, KONAMISNES_V6,
+  };
+  for (const KonamiSnesVersion version : versions) {
+    const PerformanceSequence performance =
+        renderKonamiSnesProgram(version, {{0xea, 0x80, 0x3c, 0x03, 0x7f, 0x7f, 0xe0, 0x02, 0xff}});
+    expect(performance.diagnostics.empty() && performance.tracks.size() == 1 && performance.tracks[0].endTick == 5,
+           "every Konami engine version should render the common tempo/note/rest command path");
+  }
+}
+
+void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
+  const PerformanceSequence called = renderKonamiSnesProgram(KONAMISNES_V6, {{0xfe, 0x06, 0x00,  // call note subroutine
+                                                                              0xe0, 0x02,        // rest after return
+                                                                              0xff, 0x3c, 0x03, 0x7f, 0x7f, 0xff}});
+  expect(called.diagnostics.empty() && called.tracks[0].endTick == 5,
+         "compiled Konami call and context-sensitive end/return should preserve timing");
+  expect(std::ranges::count_if(
+             called.tracks[0].events,
+             [](const PerformanceEvent& event) { return std::holds_alternative<NotePerformanceEvent>(event); }) == 1,
+         "compiled Konami call should execute its decoded subroutine exactly once");
+
+  const PerformanceSequence looped =
+      renderKonamiSnesProgram(KONAMISNES_V6,
+                              {{0xe6,                    // loop starts at the following note
+                                0x3c, 0x04, 0x7f, 0x40,  // full-length note
+                                0xe7, 0x02, 0x01, 0x01,  // play twice and change volume/pitch on replay
+                                0xff}});
+  const auto noteCount = std::ranges::count_if(looped.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  expect(looped.diagnostics.empty() && looped.tracks[0].endTick == 8 && noteCount == 2,
+         "both Konami loop counter state and accumulated replay changes should execute through the shared VM");
+
+  const PerformanceSequence looped2 =
+      renderKonamiSnesProgram(KONAMISNES_V6, {{0xe8, 0x3c, 0x04, 0x7f, 0x40, 0xe9, 0x02, 0x00, 0x00, 0xff}});
+  expect(looped2.diagnostics.empty() && looped2.tracks[0].endTick == 8 &&
+             std::ranges::count_if(looped2.tracks[0].events,
+                                   [](const PerformanceEvent& event) {
+                                     return std::holds_alternative<NotePerformanceEvent>(event);
+                                   }) == 2,
+         "the second Konami loop counter should remain independent and replay through the shared VM");
+
+  const PerformanceSequence tied =
+      renderKonamiSnesProgram(KONAMISNES_V6, {{0x3c, 0x04, 0x7f, 0x7f,  // full-length note enables slur
+                                               0xbc, 0xff,              // compressed same note extends it
+                                               0xe1, 0x02, 0x7f,        // explicit tie extends it again
+                                               0xe0, 0x03,              // rest breaks the chain
+                                               0xec, 0x02, 0xf2, 0x10,  // transpose and fine tuning
+                                               0x3e, 0x02, 0x40, 0x7f,  // note with an inline late-engine slide
+                                               0xf3, 0x00, 0x02, 0x40, 0, 0, 0xff}});
+  expect(tied.diagnostics.empty() && tied.tracks[0].endTick == 15,
+         "compressed notes, ties, rests, and inline pitch slides should preserve their combined wait time");
+  expect(std::ranges::any_of(
+             tied.tracks[0].events,
+             [](const PerformanceEvent& event) { return std::holds_alternative<PitchBendPerformanceEvent>(event); }),
+         "inline pitch slide should tick through the typed automation callback");
+}
+
+void konamiSnesCompiledAutomationTicksFades() {
+  const PerformanceSequence performance =
+      renderKonamiSnesProgram(KONAMISNES_V6, {{0xea, 0x80,              // tempo
+                                               0xee, 0xff,              // volume
+                                               0xe3, 0x14,              // pan
+                                               0xe4, 0x00, 0x20, 0x10,  // vibrato
+                                               0xeb, 0x70, 0xfc,        // tempo fade by negative fixed step
+                                               0xef, 0xc0, 0xfc,        // volume fade
+                                               0xf8, 0x10, 0xff,        // pan fade
+                                               0xe0, 0x08, 0xff}});
+  const auto& events = performance.tracks[0].events;
+  expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 8,
+         "compiled Konami fades should advance only through the waiting command");
+  expect(std::ranges::any_of(events,
+                             [](const PerformanceEvent& event) {
+                               const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
+                               return tempo != nullptr && tempo->header.tick > 0;
+                             }) &&
+             std::ranges::any_of(events,
+                                 [](const PerformanceEvent& event) {
+                                   const auto* level = std::get_if<LevelPerformanceEvent>(&event);
+                                   return level != nullptr && level->header.tick > 0;
+                                 }) &&
+             std::ranges::any_of(events,
+                                 [](const PerformanceEvent& event) {
+                                   const auto* pan = std::get_if<PanPerformanceEvent>(&event);
+                                   return pan != nullptr && pan->header.tick > 0;
+                                 }),
+         "tempo, volume, and pan fades should emit from the typed per-tick callback");
+}
+
+void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion() {
+  const PerformanceSequence performance = renderKonamiSnesProgram(
+      KONAMISNES_V6, {
+                         {0xe6, 0xe0, 0x04, 0xe7, 0x00, 0x01, 0x01},  // declared loop ignores finite-loop deltas
+                         {0xe0, 0x0a, 0xff},                          // non-looping track ends at tick ten
+                     });
+  expect(performance.diagnostics.empty() && performance.tracks.size() == 2 && performance.tracks[0].endTick == 10 &&
+             performance.tracks[1].endTick == 10,
+         "play-once rendering should coordinate a Konami global loop boundary across all tracks");
+  expect(std::ranges::none_of(
+             performance.tracks[0].events,
+             [](const PerformanceEvent& event) { return std::holds_alternative<TuningPerformanceEvent>(event); }),
+         "declared Konami loops should not apply finite-loop pitch or volume deltas");
+
+  const PerformanceSequence repeated =
+      renderKonamiSnesProgram(KONAMISNES_V6, {{0xe6, 0x3c, 0x04, 0x40, 0x7f, 0xe7, 0x00, 0x00, 0x00}}, 1);
+  expect(repeated.diagnostics.empty() && repeated.tracks[0].endTick == 8 &&
+             std::ranges::count_if(repeated.tracks[0].events,
+                                   [](const PerformanceEvent& event) {
+                                     return std::holds_alternative<NotePerformanceEvent>(event);
+                                   }) == 2,
+         "requested Konami sequence loops should replay the declared loop through shared loop policy");
+  const MidiSequence repeatedMidi = PerformanceMidiRenderer().render(repeated);
+  expect(std::ranges::count_if(repeatedMidi.tracks[0].events,
+                               [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); }) == 2,
+         "requested Konami loop playback should remain visible in default MIDI output");
 }

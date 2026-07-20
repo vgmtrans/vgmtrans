@@ -458,6 +458,11 @@ public:
       return cursor_.decoded(cursor_.record_.u16le(name, display), name, display, role);
     }
 
+    s16 s16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
+              SemanticOperandRole role = SemanticOperandRole::Value) {
+      return cursor_.decoded(cursor_.record_.s16le(name, display), name, display, role);
+    }
+
     u32 u24le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
               SemanticOperandRole role = SemanticOperandRole::Value) {
       return cursor_.decoded(cursor_.record_.u24le(name, display), name, display, role);
@@ -477,8 +482,16 @@ public:
                              SemanticOperandRole::Value);
     }
 
+    [[nodiscard]] std::optional<::u8> peekU8() const { return cursor_.record_.peekU8(); }
+
+    [[nodiscard]] Address nextAddress() const { return Address{cursor_.record_.position()}; }
+
     [[nodiscard]] Address address(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Address) {
       return Address{u16be(name, SourceValueDisplay::Address, role)};
+    }
+
+    [[nodiscard]] Address addressLe(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Address) {
+      return Address{u16le(name, SourceValueDisplay::Address, role)};
     }
 
     template <::u8 Shift, ::u8 Width>
@@ -735,6 +748,22 @@ public:
       return *this;
     }
 
+    // Some drivers use one opcode for both top-level end and subroutine
+    // return. Discovery treats it as a block return while a typed runtime
+    // action chooses the actual result from call history.
+    Event& discoverReturn() {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      flow_ = DecodeFlow::return_();
+      return *this;
+    }
+
+    // Marks a typed action whose destination comes from runtime state. Static
+    // discovery still follows the command's ordinary fallthrough.
+    Event& runtimeControlFlow() {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      return *this;
+    }
+
     Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       targetRole(destination, SemanticOperandRole::RepeatTarget);
@@ -956,45 +985,107 @@ private:
 
 // This adapter is the only place a compiled format sees std::any. Format
 // commands and Playback methods remain fully typed.
-template <class TrackState, class Playback>
+struct EmptyCompiledProgramState {};
+
+template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
 struct CompiledCommandDialect {
-  [[nodiscard]] static std::any createTrackState(const SequenceProgram&, const TrackProgram&) { return TrackState{}; }
+  [[nodiscard]] static std::any createProgramState(const SequenceProgram& program) {
+    if constexpr (std::constructible_from<ProgramState, const SequenceProgram&>) {
+      return ProgramState{program};
+    } else {
+      return ProgramState{};
+    }
+  }
 
-  [[nodiscard]] static Effects execute(const SourceCommand& command, std::any&, std::any& trackState,
-                                       PerformanceEmitter& out, VmApi& vm) {
+  [[nodiscard]] static std::any createTrackState(const SequenceProgram& program, const TrackProgram& track) {
+    if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&>) {
+      return TrackState{program, track};
+    } else if constexpr (std::constructible_from<TrackState, const SequenceProgram&>) {
+      return TrackState{program};
+    } else if constexpr (std::constructible_from<TrackState, const TrackProgram&>) {
+      return TrackState{track};
+    } else {
+      return TrackState{};
+    }
+  }
+
+  template <class Execute>
+  [[nodiscard]] static Effects withPlayback(std::any& programState, std::any& trackState, PerformanceEmitter& out,
+                                            VmApi& vm, Execute execute) {
+    auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    Playback playback{typedTrackState, out, vm};
-    Effects combined;
-    for (const CommandAction& action : command.execution.actions) {
-      const Effects next = detail::compiledExecutors<Playback>().execute(action.executor, action.arguments, playback);
-      if (next.advanceTicks > std::numeric_limits<u32>::max() - combined.advanceTicks) {
-        throw std::overflow_error("Compiled sequence command advanced time beyond the supported range");
-      }
-      combined.advanceTicks += next.advanceTicks;
-      if (next.step.kind != StepKind::Next) {
-        if (combined.step.kind != StepKind::Next) {
-          throw std::logic_error("Compiled sequence command produced more than one control-flow result");
-        }
-        combined.step = next.step;
-      }
+    if constexpr (requires { Playback{typedTrackState, out, vm, typedProgramState}; }) {
+      Playback playback{typedTrackState, out, vm, typedProgramState};
+      return execute(playback);
+    } else {
+      Playback playback{typedTrackState, out, vm};
+      return execute(playback);
     }
+  }
 
-    if (command.flow.terminal) {
-      if (combined.step.kind != StepKind::Next) {
-        throw std::logic_error("Terminal compiled sequence command also produced a control-flow result");
+  [[nodiscard]] static Effects execute(const SourceCommand& command, std::any& programState, std::any& trackState,
+                                       PerformanceEmitter& out, VmApi& vm) {
+    return withPlayback(programState, trackState, out, vm, [&](Playback& playback) {
+      if constexpr (requires { playback.beforeCommand(); }) {
+        playback.beforeCommand();
       }
-      combined.step = vm.end();
+      Effects combined;
+      for (const CommandAction& action : command.execution.actions) {
+        const Effects next = detail::compiledExecutors<Playback>().execute(action.executor, action.arguments, playback);
+        if (next.advanceTicks > std::numeric_limits<u32>::max() - combined.advanceTicks) {
+          throw std::overflow_error("Compiled sequence command advanced time beyond the supported range");
+        }
+        combined.advanceTicks += next.advanceTicks;
+        if (next.step.kind != StepKind::Next) {
+          if (combined.step.kind != StepKind::Next) {
+            throw std::logic_error("Compiled sequence command produced more than one control-flow result");
+          }
+          combined.step = next.step;
+        }
+      }
+
+      if (command.flow.terminal) {
+        if (combined.step.kind != StepKind::Next) {
+          throw std::logic_error("Terminal compiled sequence command also produced a control-flow result");
+        }
+        combined.step = vm.end();
+      }
+      return combined;
+    });
+  }
+
+  static void tick(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
+                   VmApi& vm) {
+    static_cast<void>(withPlayback(programState, trackState, out, vm, [](Playback& playback) {
+      if constexpr (requires { playback.tick(); }) {
+        playback.tick();
+      }
+      return Effects{};
+    }));
+  }
+
+  static void finishPrepass(std::any& programState) {
+    auto& typedProgramState = std::any_cast<ProgramState&>(programState);
+    if constexpr (requires { typedProgramState.finishPrepass(); }) {
+      typedProgramState.finishPrepass();
     }
-    return combined;
   }
 };
 
 // Fill the mechanical executor hooks while leaving identity, timebase, and
 // playback defaults visible in the format's ordinary SequenceDialect value.
-template <class TrackState, class Playback>
+template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
 [[nodiscard]] SequenceDialect makeCompiledDialect(SequenceDialect dialect) {
-  dialect.createSemanticTrackState = CompiledCommandDialect<TrackState, Playback>::createTrackState;
-  dialect.executeSemantic = CompiledCommandDialect<TrackState, Playback>::execute;
+  using Compiled = CompiledCommandDialect<TrackState, Playback, ProgramState>;
+  dialect.createProgramState = Compiled::createProgramState;
+  dialect.createSemanticTrackState = Compiled::createTrackState;
+  dialect.executeSemantic = Compiled::execute;
+  if constexpr (requires(Playback& playback) { playback.tick(); }) {
+    dialect.tickSemantic = Compiled::tick;
+  }
+  if constexpr (requires(ProgramState& state) { state.finishPrepass(); }) {
+    dialect.finishSemanticPrepass = Compiled::finishPrepass;
+  }
   return dialect;
 }
 

@@ -3,12 +3,23 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+
 #pragma once
 
 #include "base/Types.h"
+#include "value/base/Source.h"
+#include "value/platform/SnesSampleDirectory.h"
+#include "value/scan/ScanResultBuilder.h"
+#include "value/sequence/SequenceDialect.h"
 
 #include <algorithm>
 #include <optional>
+#include <string_view>
+#include <vector>
+
+namespace vgmtrans::core {
+class FormatRegistry;
+}
 
 namespace vgmtrans::formats::konami_snes {
 
@@ -85,8 +96,7 @@ namespace vibrato {
 
 [[nodiscard]] inline double currentDepthCents(KonamiSnesVersion version, u8 targetDepth, u16 currentDepth) {
   if (usesLegacy(version)) {
-    return (targetDepth < 0x80) ? (currentDepth * (100.0 / (32.0 * 256.0)))
-                                : (currentDepth * (100.0 / (8.0 * 256.0)));
+    return (targetDepth < 0x80) ? (currentDepth * (100.0 / (32.0 * 256.0))) : (currentDepth * (100.0 / (8.0 * 256.0)));
   }
   return (currentDepth < 0x8000) ? (currentDepth * (100.0 / (128.0 * 256.0)))
                                  : ((currentDepth - (126.0 * 256.0)) * (50.0 / 256.0));
@@ -107,16 +117,14 @@ namespace vibrato {
 
 [[nodiscard]] inline u16 rateFactor(KonamiSnesVersion version, u8 rate, u8 tempo) {
   if (usesLegacy(version)) {
-    const u8 safeTempo = (tempo == 0) ? 1 : tempo;
-    return static_cast<u16>(legacyRateStep(rate) * safeTempo);
+    return static_cast<u16>(legacyRateStep(rate) * ((tempo == 0) ? 1 : tempo));
   }
   return (rate == 0) ? 0 : static_cast<u16>(rate * lateEraRateStep(rate));
 }
 
 [[nodiscard]] inline double delaySeconds(KonamiSnesVersion version, u8 delay, u8 tempo) {
   if (usesLegacy(version)) {
-    const u8 safeTempo = (tempo == 0) ? 1 : tempo;
-    return ((256.0 / kKonamiSnesTimerHz) * (delay + 1.0)) / safeTempo;
+    return ((256.0 / kKonamiSnesTimerHz) * (delay + 1.0)) / ((tempo == 0) ? 1 : tempo);
   }
   return (delay + 1.0) / kKonamiSnesTimerHz;
 }
@@ -139,8 +147,7 @@ namespace vibrato {
              : 0;
 }
 
-[[nodiscard]] inline KonamiVibratoSpec modulationSpec(KonamiSnesVersion version,
-                                                      u8 maxDepth = kDefaultVibratoMaxDepth,
+[[nodiscard]] inline KonamiVibratoSpec modulationSpec(KonamiSnesVersion version, u8 maxDepth = kDefaultVibratoMaxDepth,
                                                       u16 maxRateFactor = 0) {
   const u8 clampedMaxDepth = std::max(maxDepth, kMinVibratoMaxDepth);
   const u16 effectiveMaxRateFactor = maxRateFactor != 0 ? maxRateFactor : defaultMaxRateFactor(version);
@@ -156,5 +163,56 @@ namespace vibrato {
 }
 
 }  // namespace vibrato
+
+struct KonamiSnesLayout {
+  KonamiSnesVersion version = KONAMISNES_NONE;
+  u32 sequenceHeaderAddress = 0;
+  std::optional<u32> spcDirAddress;
+  std::optional<u32> commonInstrumentTableAddress;
+  std::optional<u32> bankedInstrumentTableAddress;
+  u8 firstBankedInstrument = 0;
+  std::optional<u32> percussionInstrumentTableAddress;
+};
+
+struct KonamiSnesInstrumentInfo {
+  u32 index = 0;
+  u32 address = 0;
+  u8 srcn = 0;
+  s8 key = 0;
+  s8 tuning = 0;
+  u8 adsr1 = 0;
+  u8 adsr2 = 0;
+  u8 gain = 0;
+  u8 pan = 0;
+  u8 volume = 0;
+  bool percussion = false;
+  u8 percussionNote = 0;
+};
+
+[[nodiscard]] std::optional<KonamiSnesLayout> findKonamiSnesLayout(core::ByteReader reader);
+[[nodiscard]] const char* konamiSnesVersionName(KonamiSnesVersion version);
+
+[[nodiscard]] const core::SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version);
+void registerKonamiSnesSequenceDialects(core::SequenceDialectRegistry& registry);
+[[nodiscard]] core::TrackProgram decodeKonamiSnesSourceTrack(
+    core::ByteReader reader, KonamiSnesVersion version, u32 sourceTrackNumber, u32 startAddress,
+    core::SourceMapBuilder* sourceMap = nullptr, std::vector<core::Diagnostic>* diagnostics = nullptr,
+    std::optional<core::SourceAnnotationId> parent = std::nullopt,
+    std::optional<core::AssetId> sequenceAsset = std::nullopt);
+[[nodiscard]] core::SourceRange konamiSnesSequenceHeaderRange(core::ByteReader reader, const KonamiSnesLayout& layout);
+[[nodiscard]] core::SequenceProgram decodeKonamiSnesSequence(core::ByteReader reader, const KonamiSnesLayout& layout,
+                                                             core::AssetId sequenceId,
+                                                             core::SourceMapBuilder* sourceMap = nullptr,
+                                                             std::vector<core::Diagnostic>* diagnostics = nullptr);
+
+[[nodiscard]] std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(core::ByteReader reader,
+                                                                                   const KonamiSnesLayout& layout);
+[[nodiscard]] core::SnesBrrCatalog parseKonamiSnesSampleInfos(core::ByteReader reader, u32 spcDirAddress,
+                                                              const std::vector<KonamiSnesInstrumentInfo>& instruments);
+[[nodiscard]] bool addKonamiSnesSynth(core::ScanResultBuilder& builder, core::ScanInstrumentSetRef instrumentSet,
+                                      core::ScanSampleCollectionRef sampleCollection, const KonamiSnesLayout& layout,
+                                      std::string_view displayName);
+
+void registerKonamiSnesModule(core::FormatRegistry& registry);
 
 }  // namespace vgmtrans::formats::konami_snes
