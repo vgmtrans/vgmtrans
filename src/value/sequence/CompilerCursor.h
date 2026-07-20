@@ -865,8 +865,10 @@ public:
     return command(label, SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported, localKind);
   }
 
-  [[nodiscard]] DecodedBytecodeCommand opaque(std::string_view label, u32 operandBytes,
-                                              std::string_view localKind = {}) {
+  // Records the command and its raw operands for source inspection, but
+  // compiles no playback behavior and continues to the next command.
+  [[nodiscard]] DecodedBytecodeCommand ignored(std::string_view label, u32 operandBytes,
+                                               std::string_view localKind = {}) {
     auto event = sourceOnly(label, localKind);
     static_cast<void>(event.rawBytes("bytes", operandBytes));
     return event.ignore();

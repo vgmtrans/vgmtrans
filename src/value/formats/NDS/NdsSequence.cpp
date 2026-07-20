@@ -137,37 +137,37 @@ struct SequenceDecodeContext {
       return event.stop();
     }
     case 0xa0:
-      return cursor.opaque("Cmd with Random Value", 5, "random-value");
+      return cursor.ignored("Cmd with Random Value", 5, "random-value");
     case 0xa1:
-      return cursor.opaque("Cmd with Variable", 2, "variable-command");
+      return cursor.ignored("Cmd with Variable", 2, "variable-command");
     case 0xa2:
-      return cursor.opaque("If", 0);
+      return cursor.ignored("If", 0);
     case 0xb0:
-      return cursor.opaque("Set Variable", 3);
+      return cursor.ignored("Set Variable", 3);
     case 0xb1:
-      return cursor.opaque("Add Variable", 3);
+      return cursor.ignored("Add Variable", 3);
     case 0xb2:
-      return cursor.opaque("Sub Variable", 3);
+      return cursor.ignored("Sub Variable", 3);
     case 0xb3:
-      return cursor.opaque("Mul Variable", 3);
+      return cursor.ignored("Mul Variable", 3);
     case 0xb4:
-      return cursor.opaque("Div Variable", 3);
+      return cursor.ignored("Div Variable", 3);
     case 0xb5:
-      return cursor.opaque("Shift Variable", 3);
+      return cursor.ignored("Shift Variable", 3);
     case 0xb6:
-      return cursor.opaque("Rand Variable", 3);
+      return cursor.ignored("Rand Variable", 3);
     case 0xb8:
-      return cursor.opaque("If Variable ==", 3, "if-variable-equal");
+      return cursor.ignored("If Variable ==", 3, "if-variable-equal");
     case 0xb9:
-      return cursor.opaque("If Variable >=", 3, "if-variable-greater-equal");
+      return cursor.ignored("If Variable >=", 3, "if-variable-greater-equal");
     case 0xba:
-      return cursor.opaque("If Variable >", 3, "if-variable-greater");
+      return cursor.ignored("If Variable >", 3, "if-variable-greater");
     case 0xbb:
-      return cursor.opaque("If Variable <=", 3, "if-variable-less-equal");
+      return cursor.ignored("If Variable <=", 3, "if-variable-less-equal");
     case 0xbc:
-      return cursor.opaque("If Variable <", 3, "if-variable-less");
+      return cursor.ignored("If Variable <", 3, "if-variable-less");
     case 0xbd:
-      return cursor.opaque("If Variable !=", 3, "if-variable-not-equal");
+      return cursor.ignored("If Variable !=", 3, "if-variable-not-equal");
     case 0xc0: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       const double position = std::clamp((event.u8("pan") / 63.5) - 1.0, -1.0, 1.0);
@@ -178,7 +178,7 @@ struct SequenceDecodeContext {
       return event.emitLevel(LevelScale::linearFromMidi7(event.u8("volume")));
     }
     case 0xc2:
-      return cursor.opaque("Master Volume", 1);
+      return cursor.ignored("Master Volume", 1);
     case 0xc3: {
       auto event = cursor.command("Transpose", SequenceSemantic::State);
       return event.set<&TrackState::transpose>(event.s8("semitones"));
@@ -193,26 +193,26 @@ struct SequenceDecodeContext {
       return event.set<&TrackState::pitchBendRangeSemitones>(semitones).emitPitchBendRange(semitones);
     }
     case 0xc6:
-      return cursor.opaque("Priority", 1);
+      return cursor.ignored("Priority", 1);
     case 0xc7: {
       auto event = cursor.command("Note Wait", SequenceSemantic::State);
       return event.set<&TrackState::noteWait>(event.u8("enabled") != 0);
     }
     case 0xc8:
-      return cursor.opaque("Tie", 1);
+      return cursor.ignored("Tie", 1);
     case 0xc9:
-      return cursor.opaque("Portamento Control", 1);
+      return cursor.ignored("Portamento Control", 1);
     case 0xca: {
       auto event = cursor.command("Modulation Depth", SequenceSemantic::Modulation);
       const double amount = std::clamp(event.u8("depth") / 127.0, 0.0, 1.0);
       return event.emitModulation(ModulationPerformanceTarget::VibratoDepth, amount);
     }
     case 0xcb:
-      return cursor.opaque("Modulation Speed", 1);
+      return cursor.ignored("Modulation Speed", 1);
     case 0xcc:
-      return cursor.opaque("Modulation Type", 1);
+      return cursor.ignored("Modulation Type", 1);
     case 0xcd:
-      return cursor.opaque("Modulation Range", 1);
+      return cursor.ignored("Modulation Range", 1);
     case 0xce: {
       auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
       return event.emitPortamentoEnable(event.u8("enabled") != 0);
@@ -222,32 +222,32 @@ struct SequenceDecodeContext {
       return event.emitPortamentoTime(event.u8("time"));
     }
     case 0xd0:
-      return cursor.opaque("Attack Rate", 1);
+      return cursor.ignored("Attack Rate", 1);
     case 0xd1:
-      return cursor.opaque("Decay Rate", 1);
+      return cursor.ignored("Decay Rate", 1);
     case 0xd2:
-      return cursor.opaque("Sustain Level", 1);
+      return cursor.ignored("Sustain Level", 1);
     case 0xd3:
-      return cursor.opaque("Release Rate", 1);
+      return cursor.ignored("Release Rate", 1);
     case 0xd4:
-      return cursor.opaque("Loop Start", 1);
+      return cursor.ignored("Loop Start", 1);
     case 0xd5: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);
       return event.emitExpression(LevelScale::linearFromMidi7(event.u8("expression")));
     }
     case 0xd6:
-      return cursor.opaque("Print Variable", 1);
+      return cursor.ignored("Print Variable", 1);
     case 0xe0:
-      return cursor.opaque("Modulation Delay", 2);
+      return cursor.ignored("Modulation Delay", 2);
     case 0xe1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const u16 bpm = event.u16le("bpm");
       return bpm == 0 ? event.ignore() : event.emitTempo(static_cast<u32>(std::round(60000000.0 / bpm)));
     }
     case 0xe3:
-      return cursor.opaque("Sweep Pitch", 2);
+      return cursor.ignored("Sweep Pitch", 2);
     case 0xfc:
-      return cursor.opaque("Loop End", 0);
+      return cursor.ignored("Loop End", 0);
     case 0xfd:
       return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0xfe: {

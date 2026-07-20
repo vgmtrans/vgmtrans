@@ -459,7 +459,7 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
     case 0x1e:
     case 0x1f:
       if (version == CapcomSnesEngineVersion::v1BgmInList) {
-        return cursor.opaque("Unknown One-Byte Event", 1, "unknown-one-byte");
+        return cursor.ignored("Unknown One-Byte Event", 1, "unknown-one-byte");
       }
       return cursor.noOp("No Operation", "nop");
     default:
