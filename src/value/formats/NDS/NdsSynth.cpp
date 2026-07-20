@@ -283,7 +283,7 @@ ScanSampleCollectionRef addNdsPsgSamples(ScanResultBuilder& builder) {
   return builder.sampleCollection("NDS PSG samples", builder.reader().range(0, 0)).samples(std::move(samples));
 }
 
-std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& builder, NdsFileRange range,
+std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& builder, SourceRange range,
                                                          std::string_view name) {
   const ByteReader reader = builder.reader();
   if (!matchesBytes(reader, range.offset, kSwarSignature)) {
@@ -291,8 +291,7 @@ std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& buil
   }
 
   const auto ref = builder.reserveSampleCollection();
-  const SourceRange archiveRange = reader.range(range.offset, range.size);
-  auto archive = builder.cursor(archiveRange);
+  auto archive = builder.cursor(range);
   if (const auto header = archive.range(0, 0x3c, "SWAR header")) {
     builder.sourceMap().header("SWAR Header", *header).kind("swar-header");
   }
@@ -300,11 +299,11 @@ std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& buil
   SampleCollection samples;
   const auto sampleCount = archive.le32(0x38, "SWAR sample count");
   if (!sampleCount) {
-    return builder.sampleCollection(ref, std::string(name), archiveRange).samples(std::move(samples));
+    return builder.sampleCollection(ref, std::string(name), range).samples(std::move(samples));
   }
   const auto sampleTableRange = archive.range(0x3c, static_cast<u64>(*sampleCount) * 4, "SWAR sample offset table");
   if (!sampleTableRange) {
-    return builder.sampleCollection(ref, std::string(name), archiveRange).samples(std::move(samples));
+    return builder.sampleCollection(ref, std::string(name), range).samples(std::move(samples));
   }
   const SourceAnnotationId sampleTable = builder.sourceMap()
                                              .table("SWAR Sample Offset Table", *sampleTableRange)
@@ -336,17 +335,16 @@ std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& buil
     }
   }
 
-  return builder.sampleCollection(ref, std::string(name), archiveRange).samples(std::move(samples));
+  return builder.sampleCollection(ref, std::string(name), range).samples(std::move(samples));
 }
 
 std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
-    ScanResultBuilder& builder, NdsFileRange range, std::string_view name, ScanSampleCollectionRef psgCollection,
+    ScanResultBuilder& builder, SourceRange range, std::string_view name, ScanSampleCollectionRef psgCollection,
     const std::array<std::optional<ScanSampleCollectionRef>, 4>& waveCollections) {
   // SBNK instruments fan out by type: single region, PSG pulse/noise, drumset, or
   // key-split multi-region. Each case fills the same Instrument fields.
   const ByteReader reader = builder.reader();
-  const SourceRange bankRange = reader.range(range.offset, range.size);
-  auto bank = builder.cursor(bankRange);
+  auto bank = builder.cursor(range);
   const auto instrumentCount = bank.le32(0x38, "SBNK instrument count");
   if (!instrumentCount) {
     return std::nullopt;
@@ -506,7 +504,7 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
     instruments.push_back(std::move(instrument));
   }
 
-  builder.instrumentSet(ref, std::string(name), bankRange).instruments(std::move(instruments));
+  builder.instrumentSet(ref, std::string(name), range).instruments(std::move(instruments));
   return ref;
 }
 

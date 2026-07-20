@@ -14,6 +14,7 @@
 #include "ValueFormatTestSupport.h"
 
 #include <array>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -66,22 +67,149 @@ void writeLe32(std::vector<u8>& bytes, size_t offset, u32 value) {
   bytes[offset + 3] = static_cast<u8>((value >> 24) & 0xff);
 }
 
+void writeText(std::vector<u8>& bytes, size_t offset, std::string_view text) {
+  std::ranges::copy(text, bytes.begin() + static_cast<std::ptrdiff_t>(offset));
+}
+
+std::vector<u8> makeNdsSdat(bool withSymbols = true, bool includeUnusedBank = false) {
+  constexpr u32 base = 0x20;
+  constexpr u32 symb = 0x80;
+  constexpr u32 info = 0x120;
+  constexpr u32 fat = 0x220;
+  constexpr u32 sequenceFile = 0x300;
+  constexpr u32 bankFile = 0x340;
+  constexpr u32 waveFile = 0x380;
+  constexpr u32 unusedBankFile = 0x3c0;
+  constexpr u32 unusedWaveFile = 0x400;
+  constexpr u32 bankCount = 2;
+  constexpr u32 waveCount = 2;
+  const u32 visibleBankCount = includeUnusedBank ? bankCount : 1;
+  const u32 visibleWaveCount = includeUnusedBank ? waveCount : 1;
+  const u32 fileCount = includeUnusedBank ? 5 : 3;
+
+  std::vector<u8> bytes(0x480);
+  writeText(bytes, base, std::string_view{"SDAT\xff\xfe\x00\x01", 8});
+  writeLe32(bytes, base + 0x08, static_cast<u32>(bytes.size()) - base - 8);
+  writeLe16(bytes, base + 0x0c, 0x40);
+  writeLe16(bytes, base + 0x0e, withSymbols ? 4 : 3);
+  if (withSymbols) {
+    writeLe32(bytes, base + 0x10, symb - base);
+    writeLe32(bytes, base + 0x14, info - symb);
+  }
+  writeLe32(bytes, base + 0x18, info - base);
+  writeLe32(bytes, base + 0x1c, fat - info);
+  writeLe32(bytes, base + 0x20, fat - base);
+  writeLe32(bytes, base + 0x24, 12 + fileCount * 0x10);
+
+  if (withSymbols) {
+    writeText(bytes, symb, "SYMB");
+    writeLe32(bytes, symb + 4, info - symb);
+    writeLe32(bytes, symb + 0x08, 0x20);
+    writeLe32(bytes, symb + 0x10, 0x28);
+    writeLe32(bytes, symb + 0x14, 0x34);
+    writeLe32(bytes, symb + 0x20, 1);
+    writeLe32(bytes, symb + 0x24, 0x50);
+    writeLe32(bytes, symb + 0x28, visibleBankCount);
+    writeLe32(bytes, symb + 0x2c, 0x60);
+    if (includeUnusedBank) {
+      writeLe32(bytes, symb + 0x30, 0x70);
+    }
+    writeLe32(bytes, symb + 0x34, visibleWaveCount);
+    writeLe32(bytes, symb + 0x38, 0x80);
+    if (includeUnusedBank) {
+      writeLe32(bytes, symb + 0x3c, 0x90);
+    }
+    writeText(bytes, symb + 0x50, "Sequence");
+    writeText(bytes, symb + 0x60, "Bank Used");
+    writeText(bytes, symb + 0x70, "Bank Unused");
+    writeText(bytes, symb + 0x80, "Wave Used");
+    writeText(bytes, symb + 0x90, "Wave Unused");
+  }
+
+  writeText(bytes, info, "INFO");
+  writeLe32(bytes, info + 4, fat - info);
+  writeLe32(bytes, info + 0x08, 0x20);
+  writeLe32(bytes, info + 0x10, 0x28);
+  writeLe32(bytes, info + 0x14, 0x34);
+  writeLe32(bytes, info + 0x20, 1);
+  writeLe32(bytes, info + 0x24, 0x60);
+  writeLe32(bytes, info + 0x28, visibleBankCount);
+  writeLe32(bytes, info + 0x2c, 0x70);
+  if (includeUnusedBank) {
+    writeLe32(bytes, info + 0x30, 0x80);
+  }
+  writeLe32(bytes, info + 0x34, visibleWaveCount);
+  writeLe32(bytes, info + 0x38, 0x90);
+  if (includeUnusedBank) {
+    writeLe32(bytes, info + 0x3c, 0xa0);
+  }
+
+  writeLe16(bytes, info + 0x60, 0);
+  writeLe16(bytes, info + 0x64, 0);
+  writeLe16(bytes, info + 0x70, 1);
+  writeLe16(bytes, info + 0x74, 0);
+  for (u32 slot = 1; slot < 4; ++slot) {
+    writeLe16(bytes, info + 0x74 + slot * 2, 0xffff);
+  }
+  writeLe16(bytes, info + 0x90, 2);
+  if (includeUnusedBank) {
+    writeLe16(bytes, info + 0x80, 3);
+    writeLe16(bytes, info + 0x84, 1);
+    for (u32 slot = 1; slot < 4; ++slot) {
+      writeLe16(bytes, info + 0x84 + slot * 2, 0xffff);
+    }
+    writeLe16(bytes, info + 0xa0, 4);
+  }
+
+  writeText(bytes, fat, "FAT ");
+  writeLe32(bytes, fat + 4, 12 + fileCount * 0x10);
+  writeLe32(bytes, fat + 8, fileCount);
+  const auto fatEntry = [&](u32 fileId, u32 offset, u32 size) {
+    const u32 entry = fat + 12 + fileId * 0x10;
+    writeLe32(bytes, entry, offset - base);
+    writeLe32(bytes, entry + 4, size);
+  };
+  fatEntry(0, sequenceFile, 0x1d);
+  fatEntry(1, bankFile, 0x3c);
+  fatEntry(2, waveFile, 0x3c);
+  if (includeUnusedBank) {
+    fatEntry(3, unusedBankFile, 0x3c);
+    fatEntry(4, unusedWaveFile, 0x3c);
+  }
+
+  writeText(bytes, sequenceFile, std::string_view{"SSEQ\xff\xfe\x00\x01", 8});
+  writeLe32(bytes, sequenceFile + 8, 0x1d);
+  writeLe32(bytes, sequenceFile + 0x18, 0x1c);
+  bytes[sequenceFile + 0x1c] = 0xff;
+  for (const u32 offset : {bankFile, unusedBankFile}) {
+    writeText(bytes, offset, std::string_view{"SBNK\xff\xfe\x00\x01", 8});
+    writeLe32(bytes, offset + 0x38, 0);
+  }
+  for (const u32 offset : {waveFile, unusedWaveFile}) {
+    writeText(bytes, offset, std::string_view{"SWAR\xff\xfe\x00\x01", 8});
+    writeLe32(bytes, offset + 0x38, 0);
+  }
+  return bytes;
+}
+
 SequenceProgramAsset decodeTestProgram(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd,
                                        bool recoverMalformedSdatRange = false, SourceMapBuilder* sourceMap = nullptr,
                                        std::vector<Diagnostic>* diagnostics = nullptr) {
-  ScanIdAllocator ids;
-  ScanInput input{
-      .source = SourceFile{.id = reader.source(), .name = "test.sseq", .size = reader.size()},
-      .reader = reader,
-      .ids = ids,
+  const NdsSequenceRange range{
+      .offset = sequenceOffset,
+      .sequenceEnd = sequenceEnd,
+      .recoverMalformedSdatRange = recoverMalformedSdatRange,
   };
-  return parseNdsSequenceProgram(input, AssetId{1},
-                                 NdsSequenceRange{
-                                     .offset = sequenceOffset,
-                                     .sequenceEnd = sequenceEnd,
-                                     .recoverMalformedSdatRange = recoverMalformedSdatRange,
-                                 },
-                                 "Test", sourceMap, diagnostics);
+  return SequenceProgramAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{1},
+              .format = std::string(kNdsFormatName),
+              .name = "Test",
+              .range = reader.range(sequenceOffset, sequenceEnd - sequenceOffset),
+          },
+      .program = parseNdsSequenceProgram(reader, AssetId{1}, range, sourceMap, diagnostics),
+  };
 }
 
 TrackProgram decodeTestTrack(ByteReader reader, u32 sequenceOffset, u32 sequenceEnd, u32 startOffset, u32 trackIndex,
@@ -99,6 +227,135 @@ TrackProgram decodeTestTrack(ByteReader reader, u32 sequenceOffset, u32 sequence
 }
 
 }  // namespace
+
+void ndsLayoutResolvesNamesFilesAndDependencies() {
+  auto bytes = makeNdsSdat();
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{20}, .name = "layout.sdat", .size = bytes.size()},
+      .reader = ByteReader(SourceId{20}, bytes),
+      .ids = ids,
+  };
+  ScanResultBuilder builder(input, "NDS");
+  const auto layout = parseNdsLayout(builder, 0x20);
+  expect(layout.has_value(), "NDS layout parser should accept a complete SDAT");
+  expect(layout->range == input.reader.range(0x20, bytes.size() - 0x20),
+         "NDS layout should preserve the bounded SDAT source range");
+  expect(layout->sequences.size() == 1 && layout->sequences[0].name == "Sequence" &&
+             layout->sequences[0].file == input.reader.range(0x300, 0x1d) && layout->sequences[0].bank == 0,
+         "NDS layout should resolve a named sequence, its FAT range, and its bank");
+  expect(layout->banks.size() == 1 && layout->banks[0].name == "Bank Used" &&
+             layout->banks[0].file == input.reader.range(0x340, 0x3c) && layout->banks[0].waveArchives[0] == 0 &&
+             !layout->banks[0].waveArchives[1],
+         "NDS layout should resolve bank files and sanitize unused wave slots");
+  expect(layout->waveArchives.size() == 1 && layout->waveArchives[0].name == "Wave Used" &&
+             layout->waveArchives[0].file == input.reader.range(0x380, 0x3c),
+         "NDS layout should resolve named wave-archive FAT ranges");
+
+  const ScanResult result = builder.finish();
+  expect(result.diagnostics.empty(), "NDS layout parser should not diagnose a complete SDAT");
+  expect(annotationWithKind(result.sourceMap, SourceId{20}, SourceRole::Header, "sdat-header") != nullptr &&
+             annotationWithKind(result.sourceMap, SourceId{20}, SourceRole::Section, "sdat-symb") != nullptr &&
+             annotationWithKind(result.sourceMap, SourceId{20}, SourceRole::Section, "sdat-info") != nullptr &&
+             annotationWithKind(result.sourceMap, SourceId{20}, SourceRole::Table, "sdat-fat") != nullptr,
+         "NDS layout parsing should annotate its header and structural sections in one pass");
+
+  bytes = makeNdsSdat(false);
+  ScanInput unnamedInput{
+      .source = SourceFile{.id = SourceId{21}, .name = "unnamed.sdat", .size = bytes.size()},
+      .reader = ByteReader(SourceId{21}, bytes),
+      .ids = ids,
+  };
+  ScanResultBuilder unnamedBuilder(unnamedInput, "NDS");
+  const auto unnamed = parseNdsLayout(unnamedBuilder, 0x20);
+  expect(unnamed && unnamed->sequences[0].name == "SSEQ_0000" && unnamed->banks[0].name == "SBNK_0000" &&
+             unnamed->waveArchives[0].name == "SWAR_0000",
+         "NDS layouts without SYMB should use stable fallback names");
+  expect(unnamedBuilder.finish().diagnostics.empty(), "a missing optional SYMB section should not be diagnosed");
+}
+
+void ndsLayoutBoundsMalformedTablesAndPointers() {
+  auto bytes = makeNdsSdat(false);
+  constexpr u32 info = 0x120;
+  constexpr u32 fat = 0x220;
+  writeLe32(bytes, info + 0x20, std::numeric_limits<u32>::max());
+  writeLe32(bytes, info + 0x2c, 0xfffffff0);
+  writeLe32(bytes, fat + 12 + 2 * 0x10, 0xfffffff0);
+
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{22}, .name = "malformed.sdat", .size = bytes.size()},
+      .reader = ByteReader(SourceId{22}, bytes),
+      .ids = ids,
+  };
+  ScanResultBuilder builder(input, "NDS");
+  const auto layout = parseNdsLayout(builder, 0x20);
+  expect(layout && layout->sequences.empty(),
+         "NDS layout should reject a huge truncated count before reserving sequence entries");
+  expect(layout->banks.size() == 1 && !layout->banks[0].file,
+         "NDS layout should retain a named slot but reject an overflowing INFO record pointer");
+  expect(layout->waveArchives.size() == 1 && !layout->waveArchives[0].file,
+         "NDS layout should reject a FAT entry whose resolved offset overflows the source address space");
+
+  const ScanResult result = builder.finish();
+  const auto hasDiagnostic = [&](std::string_view text) {
+    return std::ranges::any_of(result.diagnostics, [&](const Diagnostic& diagnostic) {
+      return diagnostic.message.find(text) != std::string::npos;
+    });
+  };
+  expect(hasDiagnostic("sequence INFO list was truncated") && hasDiagnostic("INFO record pointer was invalid") &&
+             hasDiagnostic("FAT entry pointed outside the source"),
+         "NDS layout should diagnose bounded-list, INFO-pointer, and FAT-pointer failures precisely");
+}
+
+void ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles() {
+  std::vector<u8> bytes(0x100);
+  writeText(bytes, 0x10, std::string_view{"SSEQ\xff\xfe\x00\x01", 8});
+  const ByteReader reader(SourceId{23}, bytes);
+  const NdsSequenceRange normal = ndsSequenceRangeForFatEntry(reader, reader.range(0x10, 0x20));
+  expect(normal.offset == 0x10 && normal.sequenceEnd == 0x30 && !normal.recoverMalformedSdatRange,
+         "NDS sequence ranges should preserve normal SSEQ FAT bounds");
+
+  const NdsSequenceRange empty = ndsSequenceRangeForFatEntry(reader, reader.range(0x30, 0x08));
+  expect(empty.offset == 0x30 && empty.sequenceEnd == 0x4c && !empty.recoverMalformedSdatRange,
+         "NDS zero-filled placeholder ranges should expose one empty SSEQ header");
+
+  bytes[0x50] = 1;
+  const NdsSequenceRange headerless =
+      ndsSequenceRangeForFatEntry(ByteReader(SourceId{23}, bytes), ByteReader(SourceId{23}, bytes).range(0x50, 4));
+  expect(headerless.offset == 0x50 && headerless.sequenceEnd == 0x54 && !headerless.recoverMalformedSdatRange,
+         "NDS ordinary headerless files should retain their FAT bounds");
+
+  std::ranges::fill(bytes, 0);
+  writeText(bytes, 0x40, std::string_view{"SSEQ\xff\xfe\x00\x01", 8});
+  writeLe32(bytes, 0x48, 0x20);
+  const ByteReader recoveredReader(SourceId{23}, bytes);
+  const NdsSequenceRange recovered = ndsSequenceRangeForFatEntry(recoveredReader, recoveredReader.range(0x20, 0x10));
+  expect(recovered.offset == 0x40 && recovered.sequenceEnd == 0x60 && recovered.recoverMalformedSdatRange,
+         "NDS malformed FAT ranges should recover a nearby SSEQ and its declared size");
+}
+
+void ndsModuleOnlyBuildsDependenciesOfReferencedBanks() {
+  const auto bytes = makeNdsSdat(true, true);
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{24}, .name = "dependencies.sdat", .size = bytes.size()},
+      .reader = ByteReader(SourceId{24}, bytes),
+      .ids = ids,
+  };
+  const ScanResult result = ndsDefinition().module.scan(input);
+  expect(result.diagnostics.empty(), "NDS module should scan a complete dependency fixture without diagnostics");
+  expect(result.assets.size() == 4 && result.explicitCollections.size() == 1,
+         "NDS module should create PSG, one used wave archive, one used bank, and one sequence");
+  const auto hasAssetNamed = [&](std::string_view name) {
+    return std::ranges::any_of(result.assets, [&](const Asset& asset) {
+      return std::visit([&](const auto& typed) { return typed.metadata.name == name; }, asset);
+    });
+  };
+  expect(hasAssetNamed("Bank Used") && hasAssetNamed("Wave Used") && !hasAssetNamed("Bank Unused") &&
+             !hasAssetNamed("Wave Unused"),
+         "NDS module should not emit orphan assets owned only by an unused bank");
+}
 
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   std::vector<u8> bytes(0x140);
@@ -182,23 +439,23 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   };
   SourceMapBuilder programSourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
   std::vector<Diagnostic> programDiagnostics;
-  const auto asset = parseNdsSequenceProgram(input, AssetId{7},
-                                             NdsSequenceRange{
-                                                 .offset = sequenceOffset,
-                                                 .sequenceEnd = trackStart + 4,
-                                             },
-                                             "Program", &programSourceMap, &programDiagnostics);
-  expect(asset.program.tracks.size() == 1 && asset.program.tracks[0].commands.size() == 2,
+  const auto sourceProgram = parseNdsSequenceProgram(input.reader, AssetId{7},
+                                                     NdsSequenceRange{
+                                                         .offset = sequenceOffset,
+                                                         .sequenceEnd = trackStart + 4,
+                                                     },
+                                                     &programSourceMap, &programDiagnostics);
+  expect(sourceProgram.tracks.size() == 1 && sourceProgram.tracks[0].commands.size() == 2,
          "NDS program source-link fixture should still decode program and end commands");
   const SourceMap programAnnotations = programSourceMap.finish();
   const auto* sseqHeader = annotationWithKind(programAnnotations, SourceId{4}, SourceRole::Header, "sseq-header");
-  expect(sseqHeader != nullptr && sseqHeader->owner == ObjectRefs::sequence(asset.metadata.id),
+  expect(sseqHeader != nullptr && sseqHeader->owner == ObjectRefs::sequence(AssetId{7}),
          "NDS SSEQ header annotation should point at the semantic sequence asset");
   const auto trackAnnotations = programAnnotations.withRole(SourceId{4}, SourceRole::SequenceTrack);
   expect(trackAnnotations.size() == 1, "NDS sequence parse should publish a track annotation");
   const SourceAnnotation& trackAnnotation = programAnnotations.get(trackAnnotations.front());
   expect(trackAnnotation.parent == sseqHeader->id, "NDS track annotation should be parented under the SSEQ header");
-  expect(trackAnnotation.owner == ObjectRefs::sequenceTrack(asset.metadata.id, 0),
+  expect(trackAnnotation.owner == ObjectRefs::sequenceTrack(AssetId{7}, 0),
          "NDS track annotation should point at the semantic sequence track");
   expect(trackAnnotation.range.offset == trackStart && trackAnnotation.range.size == 4,
          "NDS track annotation should span decoded command bytes");
@@ -658,13 +915,12 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
   std::array<std::optional<ScanSampleCollectionRef>, 4> waves{};
   waves[0] = out.sampleCollection("Wave", input.reader.range(0, 0)).samples({});
 
-  const auto bankRef =
-      addNdsInstrumentSet(out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Bank", psg, waves);
+  const auto bankRef = addNdsInstrumentSet(out, input.reader.range(0, bytes.size()), "Bank", psg, waves);
   expect(bankRef.has_value(), "NDS synth parser should add a valid instrument bank");
 
   bytes[0x45] = 0x80;
-  const auto malformedBankRef = addNdsInstrumentSet(
-      out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Malformed Bank", psg, waves);
+  const auto malformedBankRef =
+      addNdsInstrumentSet(out, input.reader.range(0, bytes.size()), "Malformed Bank", psg, waves);
   expect(malformedBankRef.has_value(), "NDS synth parser should retain an empty malformed bank");
 
   const ScanResult result = out.finish();
@@ -727,13 +983,11 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
   };
 
   ScanResultBuilder out(input, "NDS");
-  const auto waveRef =
-      addNdsWaveArchive(out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Wave");
+  const auto waveRef = addNdsWaveArchive(out, input.reader.range(0, bytes.size()), "Wave");
   expect(waveRef.has_value(), "NDS parser should add a valid SWAR");
 
   bytes[0x41] = 1;
-  const auto malformedLoopRef =
-      addNdsWaveArchive(out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Malformed Wave");
+  const auto malformedLoopRef = addNdsWaveArchive(out, input.reader.range(0, bytes.size()), "Malformed Wave");
   expect(malformedLoopRef.has_value(), "NDS parser should retain a SWAR containing an invalid loop");
 
   const ScanResult result = out.finish();
@@ -783,8 +1037,7 @@ void ndsWaveArchiveReportsTruncatedSampleHeaders() {
   };
   ScanResultBuilder out(input, "NDS");
 
-  const auto waveRef =
-      addNdsWaveArchive(out, NdsFileRange{.offset = 0, .size = static_cast<u32>(bytes.size())}, "Truncated Wave");
+  const auto waveRef = addNdsWaveArchive(out, input.reader.range(0, bytes.size()), "Truncated Wave");
   expect(waveRef.has_value(), "NDS parser should retain a SWAR with truncated samples");
 
   const ScanResult result = out.finish();
