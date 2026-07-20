@@ -80,7 +80,7 @@ MIDI renderer or another future sequence exporter
 
 The compiler cursor exists only while decoding. Its field reads record source metadata, and its event operations append source-free typed actions in written order. Returning the event finalizes the command. The shared VM schedules commands while the compiled dialect invokes their generated executors; neither layer can reopen command bytes. MIDI conversion remains a later layer.
 
-> **Migration status:** NDS and Capcom SNES use the compiler cursor. Akao, Akao SNES, and Konami SNES still use the old two-phase cursor adapter. Those older paths are migration scaffolding, not constraints on the target design; Git history preserves them if removing them later proves premature.
+> **Migration status:** NDS, Capcom SNES, and Konami SNES use the compiler cursor. Akao and Akao SNES still use the old two-phase cursor adapter. Those older paths are migration scaffolding, not constraints on the target design; Git history preserves them if removing them later proves premature.
 
 The prototype's examples, line counts, acceptance review, limitations, and adoption recommendation are recorded in [Compiler-cursor prototype review](compiler_cursor_prototype_review.md).
 
@@ -1017,11 +1017,13 @@ Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-Command code should resemble a driver interpreter. NDS and Capcom SNES demonstrate the compiler-cursor form: one opcode switch reads source fields and appends the command's effects in order. Returning the event compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches. Akao, Akao SNES, and Konami SNES still use normal cursor switches through the old adapter.
+Command code should resemble a driver interpreter. NDS, Capcom SNES, and Konami SNES demonstrate the compiler-cursor form: one opcode switch reads source fields and appends the command's effects in order. Returning the event compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches. Akao and Akao SNES still use normal cursor switches through the old adapter.
 
 The compiler-cursor form is the target because it keeps ordinary commands near the original interpreter's size while retaining source-free VM execution. It avoids a command class, visitor, command table, and universal operation taxonomy.
 
 `CompilerCursor` owns checked field reads, source metadata, truncation, ordered generated actions, and the small set of literal VM/output operations. Formats own the opcode switch, conversions, persistent `TrackState`, and concrete `Playback` methods. Chained and separate calls are two layouts of the same imperative authoring paradigm.
+
+Compiled dialects may also provide typed track initialization, a typed per-tick `Playback::tick()`, and a typed whole-sequence prepass state. The shared VM performs that prepass by executing the already-compiled commands, so formats can collect history-dependent ranges without reopening bytes or maintaining a second control-flow interpreter. Konami SNES uses this for vibrato controller ceilings.
 
 ### 18.5 Where complexity still appears
 
@@ -1395,12 +1397,11 @@ Add durable symbolic sample bindings, make collection rebuilding independent of 
 The remaining order is intentional:
 
 1. add neutral control transitions for fades/slides;
-2. migrate Konami SNES to compiler-cursor commands and delete its modulation shadow interpreter;
-3. migrate Akao SNES to compiler-cursor commands, replacing its dialect matrix, byte rewriting, tempo scraping, prepass, and tick motion;
-4. add symbolic Akao articulation/sample binding and remove materialization source reads;
-5. migrate the remaining layouts/synth parsers to `RecordReader` and shared platform primitives;
-6. remove all `canScan`, old cursor-dialect, byte-pool, prepass, and materialization adapters;
-7. migrate each format to one `FormatDefinition`, then remove direct access to the two raw registries.
+2. migrate Akao SNES to compiler-cursor commands, replacing its dialect matrix, byte rewriting, tempo scraping, format-specific analysis, and tick motion;
+3. add symbolic Akao articulation/sample binding and remove materialization source reads;
+4. migrate the remaining layouts/synth parsers to `RecordReader` and shared platform primitives;
+5. remove all `canScan`, old cursor-dialect, byte-pool, and materialization adapters;
+6. migrate each format to one `FormatDefinition`, then remove direct access to the two raw registries.
 
 Architectural acceptance criteria:
 

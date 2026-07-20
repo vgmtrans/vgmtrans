@@ -35,6 +35,9 @@ public:
   [[nodiscard]] RangedValue<std::string> rawBytes(std::string_view name, u32 size);
   [[nodiscard]] RangedValue<s16> s16be(std::string_view name,
                                        SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
+  [[nodiscard]] RangedValue<s16> s16le(std::string_view name,
+                                       SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
+  [[nodiscard]] std::optional<::u8> peekU8() const;
 
   template <class T>
   void derived(std::string_view name, T&& value, SourceValueDisplay display = SourceValueDisplay::Default) {

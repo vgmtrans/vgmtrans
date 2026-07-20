@@ -99,7 +99,7 @@ struct TrackDecodeScope {
 class SequenceDecodeSession {
 public:
   SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect, AssetId sequenceAsset,
-                        SourceRange headerRange, SourceMapBuilder* sourceMap);
+                        SourceRange headerRange, SourceMapBuilder* sourceMap, u32 maxTrackCommands = 4096);
 
   template <class DecodeCommand>
   void addLinearTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand) {

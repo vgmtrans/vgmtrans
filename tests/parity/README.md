@@ -69,3 +69,19 @@ migration. They are renderer/output-normalization differences, not migration
 regressions. Tetris DS mini2SF parity currently stops earlier because the
 original-side corpus map contains duplicate empty collection names; this
 harness limitation also reproduces before the migration.
+
+### Konami SNES compiler-cursor baseline
+
+Immediately before the Konami SNES compiler-cursor migration, the complete
+`vgmtrans-value-core-tests` suite and the parity harness self-test passed. No
+Konami SPC or RSN corpus was configured or present in the development
+environment, so original/value real-file summary, MIDI, requested-loop MIDI,
+simulation, and synth comparisons could not be recorded there.
+
+The checked-in synthetic Konami fixture supplies the executable fallback
+baseline: module summary/source-map structure, default MIDI modulation,
+sequence-event vibrato simulation, synth/sample construction, program tuning,
+early-engine global vibrato range behavior, percussion banking, calls,
+context-sensitive return/end, both loop-state families, compressed notes,
+ties, rests, pitch slides, versioned operand lengths, truncation, and
+play-once global loop coordination.

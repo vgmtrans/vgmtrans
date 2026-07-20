@@ -77,6 +77,15 @@ using CreateProgramState = std::any (*)(const SequenceProgram&);
 using CreateSemanticTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&);
 using ExecuteSemanticCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
                                            PerformanceEmitter& out, VmApi& vm);
+using TickSemanticTrackState = void (*)(const SourceCommand&, std::any& programState, std::any& trackState,
+                                        PerformanceEmitter& out, VmApi& vm);
+using FinishSemanticPrepass = void (*)(std::any& programState);
+
+enum class SemanticPrepassMode {
+  None,
+  ScheduledPlayback,
+  DecodedCommands,
+};
 
 struct SequenceDialect {
   DialectId id;
@@ -91,6 +100,9 @@ struct SequenceDialect {
   CreateProgramState createProgramState = nullptr;
   CreateSemanticTrackState createSemanticTrackState = nullptr;
   ExecuteSemanticCommand executeSemantic = nullptr;
+  TickSemanticTrackState tickSemantic = nullptr;
+  FinishSemanticPrepass finishSemanticPrepass = nullptr;
+  SemanticPrepassMode semanticPrepass = SemanticPrepassMode::None;
 
   [[nodiscard]] bool usesSemanticScheduler() const noexcept { return executeSemantic != nullptr; }
 

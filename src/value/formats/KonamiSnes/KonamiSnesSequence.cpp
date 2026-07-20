@@ -4,26 +4,24 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/KonamiSnes/KonamiSnesSequence.h"
+#include "value/formats/KonamiSnes/KonamiSnes.h"
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
-#include "value/sequence/SequenceCursorDialect.h"
+#include "value/sequence/CommandSourceMap.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <any>
 #include <array>
 #include <cmath>
 #include <limits>
 #include <optional>
-#include <set>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -33,211 +31,62 @@ using namespace core;
 
 namespace {
 
-enum class EventType {
-  Unknown0,
-  Unknown1,
-  Unknown2,
-  Unknown3,
-  Unknown4,
-  Unknown5,
-  Note,
-  PercussionOn,
-  PercussionOff,
-  Gain,
-  InstantTuning,
-  Rest,
-  Tie,
-  Pan,
-  Vibrato,
-  RandomPitch,
-  ProgramChange,
-  LoopStart,
-  LoopEnd,
-  LoopStart2,
-  LoopEnd2,
-  Tempo,
-  TempoFadeV1,
-  TempoFadeV2,
-  TransposeAbs,
-  Adsr1,
-  Adsr2,
-  Volume,
-  VolumeFadeV1,
-  VolumeFadeV2,
-  Portamento,
-  PitchEnvelopeV1,
-  PitchEnvelopeV2,
-  Tuning,
-  PitchSlideV1,
-  PitchSlideV2,
-  PitchSlideV3,
-  Echo,
-  EchoParam,
-  VoltaStart,
-  VoltaEnd,
-  PanFadeV1,
-  PanFadeV2,
-  VibratoFade,
-  AdsrGain,
-  ProgramChangeVolume,
-  ConditionalJumpV1,
-  LinearPitchEnvelopeV2,
-  Goto,
-  Call,
-  End,
-  Unsupported,
-};
+constexpr u32 kMaxTrackCommands = 8192;
 
-constexpr std::array<u8, 21> kPanVolumeLeftV1{
-    0x00, 0x05, 0x0c, 0x14, 0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x59,
-    0x62, 0x69, 0x6f, 0x74, 0x78, 0x7b, 0x7d, 0x7e, 0x7e, 0x7f};
-constexpr std::array<u8, 21> kPanVolumeRightV1{
-    0x7f, 0x7e, 0x7e, 0x7d, 0x7b, 0x78, 0x74, 0x6f, 0x69, 0x62, 0x59,
-    0x50, 0x46, 0x3c, 0x32, 0x28, 0x1e, 0x14, 0x0c, 0x05, 0x00};
-constexpr std::array<u8, 21> kPanVolumeLeftV2{
-    0x00, 0x0a, 0x18, 0x28, 0x3c, 0x50, 0x64, 0x78, 0x8c, 0xa0, 0xb2,
-    0xc4, 0xd2, 0xde, 0xe8, 0xf0, 0xf6, 0xfa, 0xfc, 0xfc, 0xfe};
-constexpr std::array<u8, 21> kPanVolumeRightV2{
-    0xfe, 0xfc, 0xfc, 0xfa, 0xf6, 0xf0, 0xe8, 0xde, 0xd2, 0xc4, 0xb2,
-    0xa0, 0x8c, 0x78, 0x64, 0x50, 0x3c, 0x28, 0x18, 0x0a, 0x00};
-constexpr std::array<u8, 42> kPanTable{
-    0x00, 0x04, 0x08, 0x0e, 0x14, 0x1a, 0x20, 0x28, 0x30, 0x38, 0x40, 0x48, 0x50, 0x5a,
-    0x64, 0x6e, 0x78, 0x82, 0x8c, 0x96, 0xa0, 0xa8, 0xb0, 0xb8, 0xc0, 0xc8, 0xd0, 0xd6,
-    0xdc, 0xe0, 0xe4, 0xe8, 0xec, 0xf0, 0xf4, 0xf6, 0xf8, 0xfa, 0xfc, 0xfe, 0xfe, 0xfe};
+constexpr std::array<u8, 21> kPanVolumeLeftV1{0x00, 0x05, 0x0c, 0x14, 0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x59,
+                                              0x62, 0x69, 0x6f, 0x74, 0x78, 0x7b, 0x7d, 0x7e, 0x7e, 0x7f};
+constexpr std::array<u8, 21> kPanVolumeRightV1{0x7f, 0x7e, 0x7e, 0x7d, 0x7b, 0x78, 0x74, 0x6f, 0x69, 0x62, 0x59,
+                                               0x50, 0x46, 0x3c, 0x32, 0x28, 0x1e, 0x14, 0x0c, 0x05, 0x00};
+constexpr std::array<u8, 21> kPanVolumeLeftV2{0x00, 0x0a, 0x18, 0x28, 0x3c, 0x50, 0x64, 0x78, 0x8c, 0xa0, 0xb2,
+                                              0xc4, 0xd2, 0xde, 0xe8, 0xf0, 0xf6, 0xfa, 0xfc, 0xfc, 0xfe};
+constexpr std::array<u8, 21> kPanVolumeRightV2{0xfe, 0xfc, 0xfc, 0xfa, 0xf6, 0xf0, 0xe8, 0xde, 0xd2, 0xc4, 0xb2,
+                                               0xa0, 0x8c, 0x78, 0x64, 0x50, 0x3c, 0x28, 0x18, 0x0a, 0x00};
+constexpr std::array<u8, 42> kPanTable{0x00, 0x04, 0x08, 0x0e, 0x14, 0x1a, 0x20, 0x28, 0x30, 0x38, 0x40,
+                                       0x48, 0x50, 0x5a, 0x64, 0x6e, 0x78, 0x82, 0x8c, 0x96, 0xa0, 0xa8,
+                                       0xb0, 0xb8, 0xc0, 0xc8, 0xd0, 0xd6, 0xdc, 0xe0, 0xe4, 0xe8, 0xec,
+                                       0xf0, 0xf4, 0xf6, 0xf8, 0xfa, 0xfc, 0xfe, 0xfe, 0xfe};
 constexpr std::array<u8, 128> kVolumeTable{
-    0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02,
-    0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x04, 0x04,
-    0x04, 0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x07, 0x07, 0x08, 0x08,
-    0x09, 0x09, 0x0a, 0x0a, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e, 0x0f, 0x10, 0x10,
-    0x11, 0x12, 0x13, 0x14, 0x15, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1b, 0x1c, 0x1d, 0x1e, 0x20, 0x22,
-    0x23, 0x24, 0x26, 0x28, 0x2a, 0x2c, 0x2d, 0x2f, 0x31, 0x33, 0x35, 0x38, 0x3a, 0x3d, 0x40, 0x43,
-    0x46, 0x49, 0x4c, 0x4f, 0x52, 0x56, 0x5a, 0x5e, 0x62, 0x66, 0x6b, 0x6f, 0x73, 0x77, 0x7b, 0x7f};
+    0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+    0x02, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x05, 0x06,
+    0x06, 0x07, 0x07, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d,
+    0x0e, 0x0f, 0x10, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1b, 0x1c, 0x1d, 0x1e, 0x20,
+    0x22, 0x23, 0x24, 0x26, 0x28, 0x2a, 0x2c, 0x2d, 0x2f, 0x31, 0x33, 0x35, 0x38, 0x3a, 0x3d, 0x40, 0x43, 0x46, 0x49,
+    0x4c, 0x4f, 0x52, 0x56, 0x5a, 0x5e, 0x62, 0x66, 0x6b, 0x6f, 0x73, 0x77, 0x7b, 0x7f};
 
-struct Context {
-  KonamiSnesVersion version = KONAMISNES_NONE;
+enum class PitchSlideKind : u8 {
+  V1,
+  V2,
+  V3,
 };
 
-[[nodiscard]] EventType eventType(KonamiSnesVersion version, u8 opcode) {
-  if (opcode <= 0x5f || opcode >= 0x80) {
-    if (opcode <= 0x5f || opcode <= 0xdf) {
-      return EventType::Note;
-    }
-  }
+enum class FadeTarget : u8 {
+  Tempo,
+  Volume,
+  Pan,
+};
 
-  if ((version == KONAMISNES_V5 || version == KONAMISNES_V6) && opcode >= 0x70 && opcode <= 0x7f) {
-    return EventType::InstantTuning;
-  }
+struct DecodedPitchSlide {
+  PitchSlideKind kind = PitchSlideKind::V1;
+  u8 delay = 0;
+  u8 length = 0;
+  u8 targetNote = 0;
+};
 
-  if (opcode == 0x60) {
-    return EventType::PercussionOn;
-  }
-  if (opcode == 0x61) {
-    return EventType::PercussionOff;
-  }
-  if (opcode == 0x62 && version != KONAMISNES_V1) {
-    return EventType::Gain;
-  }
-  if (opcode < 0xe0) {
-    if (version == KONAMISNES_V1 && (opcode == 0x62 || opcode == 0x63)) {
-      return EventType::Unknown1;
-    }
-    if (version == KONAMISNES_V1 && opcode == 0x64) {
-      return EventType::Unknown2;
-    }
-    return EventType::Unknown0;
-  }
+struct ModulationRanges {
+  u8 maxDepth = kMinVibratoMaxDepth;
+  u16 maxRateFactor = 0;
+};
 
-  switch (opcode) {
-    case 0xe0:
-      return EventType::Rest;
-    case 0xe1:
-      return EventType::Tie;
-    case 0xe2:
-      return EventType::ProgramChange;
-    case 0xe3:
-      return EventType::Pan;
-    case 0xe4:
-      return EventType::Vibrato;
-    case 0xe5:
-      return EventType::RandomPitch;
-    case 0xe6:
-      return EventType::LoopStart;
-    case 0xe7:
-      return EventType::LoopEnd;
-    case 0xe8:
-      return EventType::LoopStart2;
-    case 0xe9:
-      return EventType::LoopEnd2;
-    case 0xea:
-      return EventType::Tempo;
-    case 0xeb:
-      return (version == KONAMISNES_V5 || version == KONAMISNES_V6) ? EventType::TempoFadeV2
-                                                                    : EventType::TempoFadeV1;
-    case 0xec:
-      return EventType::TransposeAbs;
-    case 0xed:
-      return (version == KONAMISNES_V5 || version == KONAMISNES_V6) ? EventType::Adsr1 : EventType::Unknown3;
-    case 0xee:
-      return EventType::Volume;
-    case 0xef:
-      return (version == KONAMISNES_V5 || version == KONAMISNES_V6) ? EventType::VolumeFadeV2
-                                                                    : EventType::VolumeFadeV1;
-    case 0xf0:
-      return EventType::Portamento;
-    case 0xf1:
-      return (version == KONAMISNES_V5 || version == KONAMISNES_V6) ? EventType::PitchEnvelopeV2
-                                                                    : EventType::PitchEnvelopeV1;
-    case 0xf2:
-      return EventType::Tuning;
-    case 0xf3:
-      if (version == KONAMISNES_V1) {
-        return EventType::PitchSlideV1;
-      }
-      if (version == KONAMISNES_V5 || version == KONAMISNES_V6) {
-        return EventType::PitchSlideV3;
-      }
-      return EventType::PitchSlideV2;
-    case 0xf4:
-      return EventType::Echo;
-    case 0xf5:
-      return EventType::EchoParam;
-    case 0xf6:
-      return EventType::VoltaStart;
-    case 0xf7:
-      return EventType::VoltaEnd;
-    case 0xf8:
-      return (version == KONAMISNES_V5 || version == KONAMISNES_V6) ? EventType::PanFadeV2 : EventType::PanFadeV1;
-    case 0xf9:
-      return EventType::VibratoFade;
-    case 0xfa:
-      return version >= KONAMISNES_V4 ? EventType::AdsrGain : EventType::Unknown3;
-    case 0xfb:
-      return version >= KONAMISNES_V4 ? EventType::Adsr2 : EventType::Unknown1;
-    case 0xfc:
-      if (version == KONAMISNES_V1) {
-        return EventType::ConditionalJumpV1;
-      }
-      if (version == KONAMISNES_V2) {
-        return EventType::LinearPitchEnvelopeV2;
-      }
-      if (version >= KONAMISNES_V4) {
-        return EventType::ProgramChangeVolume;
-      }
-      return EventType::Unknown2;
-    case 0xfd:
-      return EventType::Goto;
-    case 0xfe:
-      return EventType::Call;
-    case 0xff:
-      return EventType::End;
-    default:
-      return EventType::Unsupported;
-  }
+[[nodiscard]] constexpr bool isLateVersion(KonamiSnesVersion version) {
+  return version == KONAMISNES_V5 || version == KONAMISNES_V6;
 }
 
-[[nodiscard]] bool isPitchSlide(EventType type) {
-  return type == EventType::PitchSlideV1 || type == EventType::PitchSlideV2 || type == EventType::PitchSlideV3;
+[[nodiscard]] constexpr PitchSlideKind pitchSlideKind(KonamiSnesVersion version) {
+  if (version == KONAMISNES_V1) {
+    return PitchSlideKind::V1;
+  }
+  return isLateVersion(version) ? PitchSlideKind::V3 : PitchSlideKind::V2;
 }
 
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(KonamiSnesVersion version, u8 tempo) {
@@ -266,21 +115,19 @@ struct Context {
 
 [[nodiscard]] u8 vibratoDelayMidiValue(KonamiSnesVersion version, u8 delay, u8 tempo) {
   const s32 minAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato::minDelaySeconds(version)));
-  const s32 rangeAmount = synthAmountFromSecondsRange(vibrato::minDelaySeconds(version),
-                                                      vibrato::maxDelaySeconds(version));
+  const s32 rangeAmount =
+      synthAmountFromSecondsRange(vibrato::minDelaySeconds(version), vibrato::maxDelaySeconds(version));
   if (rangeAmount == 0) {
     return 0;
   }
   const s32 currentAmount =
       synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato::delaySeconds(version, delay, tempo)));
   return static_cast<u8>(std::clamp<s32>(
-      static_cast<s32>(std::lround(128.0 * (currentAmount - minAmount) / static_cast<double>(rangeAmount))),
-      0,
-      127));
+      static_cast<s32>(std::lround(128.0 * (currentAmount - minAmount) / static_cast<double>(rangeAmount))), 0, 127));
 }
 
-[[nodiscard]] double tuningSemitones(s8 tuning) {
-  return tuning * 4.0 / 256.0;
+[[nodiscard]] double tuningCents(s8 tuning) {
+  return tuning * (400.0 / 256.0);
 }
 
 [[nodiscard]] constexpr u32 midiBank(u32 bankMsb) {
@@ -288,59 +135,34 @@ struct Context {
 }
 
 [[nodiscard]] double linearGainFromRawVolume(u8 volume) {
-  return std::clamp(static_cast<double>(volume) / 255.0, 0.0, 1.0);
-}
-
-[[nodiscard]] double stereoPositionFromPan(KonamiSnesVersion version, u8 pan) {
-  u8 left = 0;
-  u8 right = 0;
-  if (version == KONAMISNES_V1) {
-    pan = std::min<u8>(pan, 20);
-    left = kPanVolumeLeftV1[pan];
-    right = kPanVolumeRightV1[pan];
-  } else if (version == KONAMISNES_V2) {
-    pan = std::min<u8>(pan, 20);
-    left = kPanVolumeLeftV2[pan];
-    right = kPanVolumeRightV2[pan];
-  } else {
-    pan = std::min<u8>(pan, 40);
-    left = kPanTable[40 - pan];
-    right = kPanTable[pan];
-  }
-  const double total = static_cast<double>(left) + static_cast<double>(right);
-  if (total <= 0.0) {
-    return 0.0;
-  }
-  return std::clamp((static_cast<double>(right) / total) * 2.0 - 1.0, -1.0, 1.0);
+  return static_cast<double>(volume) / 255.0;
 }
 
 [[nodiscard]] u8 clampPan(KonamiSnesVersion version, u8 pan) {
   return std::min(pan, version <= KONAMISNES_V2 ? u8{20} : u8{40});
 }
 
-struct ControllerFade {
-  SequenceFixedPointMotionPlan<s32> motion;
-};
-
-struct PitchSlide {
-  EventType type = EventType::PitchSlideV1;
-  u8 delay = 0;
-  u8 length = 0;
-  u8 targetNote = 0;
-  double targetSemitones = 0.0;
-  double deltaSemitones = 0.0;
-};
+// Converts the driver's version-specific pan table into the shared -1..1 scale.
+[[nodiscard]] double stereoPositionFromPan(KonamiSnesVersion version, u8 rawPan) {
+  const u8 pan = clampPan(version, rawPan);
+  u8 left = 0;
+  u8 right = 0;
+  if (version == KONAMISNES_V1) {
+    left = kPanVolumeLeftV1[pan];
+    right = kPanVolumeRightV1[pan];
+  } else if (version == KONAMISNES_V2) {
+    left = kPanVolumeLeftV2[pan];
+    right = kPanVolumeRightV2[pan];
+  } else {
+    left = kPanTable[40 - pan];
+    right = kPanTable[pan];
+  }
+  const double total = static_cast<double>(left) + right;
+  return total == 0.0 ? 0.0 : std::clamp((right / total) * 2.0 - 1.0, -1.0, 1.0);
+}
 
 class LfoState {
 public:
-  void reset() {
-    delay_ = 0;
-    rate_ = 0;
-    depth_ = 0;
-    currentDepth_.reset(0);
-    reusableFadeTicks_ = 0;
-  }
-
   void configure(u8 delay, u8 rate, u8 depth) {
     delay_ = delay;
     rate_ = rate;
@@ -349,9 +171,7 @@ public:
     reusableFadeTicks_ = 0;
   }
 
-  void setReusableFade(u8 ticks) {
-    reusableFadeTicks_ = ticks;
-  }
+  void setReusableFade(u8 ticks) { reusableFadeTicks_ = ticks; }
 
   void beginReusableFade() {
     if (reusableFadeTicks_ == 0) {
@@ -359,9 +179,8 @@ public:
     }
     currentDepth_.setCurrent(0);
     const auto target = static_cast<s32>(depth_) << 8;
-    const auto step = reusableFadeTicks_ == 0 ? 0 : target / reusableFadeTicks_;
-    static_cast<void>(
-        currentDepth_.begin(SequenceMotionPlan<s32>::targetOverTicksWithStep(target, step, reusableFadeTicks_, delay_)));
+    static_cast<void>(currentDepth_.begin(SequenceMotionPlan<s32>::targetOverTicksWithStep(
+        target, target / reusableFadeTicks_, reusableFadeTicks_, delay_)));
   }
 
   [[nodiscard]] bool fadeActive() const { return currentDepth_.active(); }
@@ -381,366 +200,71 @@ private:
   u8 reusableFadeTicks_ = 0;
 };
 
-struct ModulationRanges {
-  u8 maxDepth = kMinVibratoMaxDepth;
-  u16 maxRateFactor = 0;
-};
-
-struct LegacyRangeVisitState {
-  u32 commandIndex = 0;
-  std::vector<u32> callStack;
-  u8 loopCount = 0;
-  u8 loopCount2 = 0;
-
-  friend bool operator<(const LegacyRangeVisitState& lhs, const LegacyRangeVisitState& rhs) {
-    return std::tie(lhs.commandIndex, lhs.callStack, lhs.loopCount, lhs.loopCount2) <
-           std::tie(rhs.commandIndex, rhs.callStack, rhs.loopCount, rhs.loopCount2);
-  }
-};
-
-struct LegacyRangeTrackState {
-  const TrackProgram* track = nullptr;
-  u32 trackOrder = 0;
-  std::optional<u32> commandIndex;
-  u64 tick = 0;
-  u8 noteLength = 0;
-  u8 activeRate = 0;
-  u8 activeDepth = 0;
-  std::optional<Address> loopReturnAddress;
-  std::optional<Address> loopReturnAddress2;
-  u8 loopCount = 0;
-  u8 loopCount2 = 0;
-  std::vector<u32> callStack;
-  std::set<LegacyRangeVisitState> visited;
-
-  [[nodiscard]] bool active() const noexcept { return track != nullptr && commandIndex.has_value(); }
-  [[nodiscard]] bool activeVibrato(KonamiSnesVersion version) const noexcept {
-    return vibrato::isActive(version, activeRate, activeDepth);
-  }
-};
-
-[[nodiscard]] std::optional<u32> nextCommandIndex(const TrackProgram& track, u32 index) {
-  if (index < track.commands.size()) {
-    const SourceCommand& command = track.commands[index];
-    if (command.encodedSize > 0) {
-      if (command.address.value > std::numeric_limits<u64>::max() - command.encodedSize) {
-        return std::nullopt;
-      }
-      if (const auto byAddress = track.addressIndex.find(Address{command.address.value + command.encodedSize})) {
-        return byAddress;
-      }
-    }
-  }
-
-  const u32 next = index + 1;
-  if (next >= track.commands.size()) {
-    return std::nullopt;
-  }
-  return next;
-}
-
-[[nodiscard]] std::optional<u32> commandIndexForAddress(const TrackProgram& track, Address address) {
-  return track.addressIndex.find(address);
-}
-
-void updateLegacyVibratoRateRange(ModulationRanges& ranges, const LegacyRangeTrackState& state,
-                                  KonamiSnesVersion version, u8 tempo) {
-  if (!state.activeVibrato(version)) {
-    return;
-  }
-  ranges.maxRateFactor = std::max(ranges.maxRateFactor, vibrato::rateFactor(version, state.activeRate, tempo));
-}
-
-[[nodiscard]] u32 legacyRangeNoteWait(std::span<const u8> bytes, LegacyRangeTrackState& state) {
-  if (bytes.empty()) {
-    return 0;
-  }
-
-  size_t cursor = 1;
-  if ((bytes[0] & 0x80) == 0 && cursor < bytes.size()) {
-    state.noteLength = bytes[cursor++];
-  }
-  return state.noteLength;
-}
-
-void advanceLegacyRangeTrack(LegacyRangeTrackState& state, std::optional<u32> nextIndex, u32 advanceTicks) {
-  state.commandIndex = nextIndex;
-  state.tick += advanceTicks;
-}
-
-[[nodiscard]] ModulationRanges analyzeLegacyVibratoRanges(const SequenceProgram& program, KonamiSnesVersion version) {
-  ModulationRanges ranges{
-      .maxDepth = kMinVibratoMaxDepth,
-      .maxRateFactor = vibrato::minMaxRateFactor(version),
+// The shared VM performs this prepass with the same compiled commands used for
+// playback. It observes modulation limits without reopening source bytes or
+// duplicating Konami calls, loops, timing, or opcode interpretation.
+struct ProgramState {
+  struct ActiveVibrato {
+    u8 rate = 0;
+    u8 depth = 0;
   };
 
-  std::vector<LegacyRangeTrackState> tracks;
-  tracks.reserve(program.tracks.size());
-  for (u32 trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
-    const auto& track = program.tracks[trackIndex];
-    tracks.push_back(LegacyRangeTrackState{
-        .track = &track,
-        .trackOrder = trackIndex,
-        .commandIndex = commandIndexForAddress(track, track.startAddress).value_or(0),
-    });
-    if (track.commands.empty()) {
-      tracks.back().commandIndex = std::nullopt;
+  explicit ProgramState(const SequenceProgram& program)
+      : version(static_cast<KonamiSnesVersion>(program.config.profile)),
+        ranges{.maxDepth = kMinVibratoMaxDepth, .maxRateFactor = vibrato::minMaxRateFactor(version)},
+        activeVibrato(program.tracks.size()) {}
+
+  void observeVibrato(u32 trackNumber, u8 rate, u8 depth, u8 trackTempo) {
+    if (!collecting) {
+      return;
     }
+    if (trackNumber >= activeVibrato.size()) {
+      activeVibrato.resize(trackNumber + 1);
+    }
+    activeVibrato[trackNumber] = ActiveVibrato{.rate = rate, .depth = depth};
+    if (!vibrato::isActive(version, rate, depth)) {
+      return;
+    }
+    ranges.maxDepth = std::max(ranges.maxDepth, depth);
+    const u8 tempo = vibrato::usesLegacy(version) ? globalTempo : trackTempo;
+    ranges.maxRateFactor = std::max(ranges.maxRateFactor, vibrato::rateFactor(version, rate, tempo));
   }
 
-  u8 globalTempo = kKonamiSnesDefaultTempo;
-  u32 commandCount = 0;
-  constexpr u32 kMaxRangeAnalysisCommands = 100000;
-  while (commandCount++ < kMaxRangeAnalysisCommands) {
-    auto current =
-        std::ranges::min_element(tracks, [](const LegacyRangeTrackState& lhs, const LegacyRangeTrackState& rhs) {
-          if (!lhs.active()) {
-            return false;
-          }
-          if (!rhs.active()) {
-            return true;
-          }
-          return std::tie(lhs.tick, lhs.trackOrder) < std::tie(rhs.tick, rhs.trackOrder);
-        });
-    if (current == tracks.end() || !current->active()) {
-      break;
+  void observeTempo(u8 tempo) {
+    if (!collecting || !vibrato::usesLegacy(version)) {
+      return;
     }
-
-    const auto& track = *current->track;
-    const u32 commandIndex = *current->commandIndex;
-    if (commandIndex >= track.commands.size()) {
-      current->commandIndex = std::nullopt;
-      continue;
-    }
-
-    const LegacyRangeVisitState visit{
-        .commandIndex = commandIndex,
-        .callStack = current->callStack,
-        .loopCount = current->loopCount,
-        .loopCount2 = current->loopCount2,
-    };
-    if (!current->visited.insert(visit).second) {
-      current->commandIndex = std::nullopt;
-      continue;
-    }
-
-    const SourceCommand& command = track.commands[commandIndex];
-    const auto bytes = track.bytesFor(command);
-    if (bytes.empty()) {
-      advanceLegacyRangeTrack(*current, nextCommandIndex(track, commandIndex), 0);
-      continue;
-    }
-
-    const EventType type = eventType(version, bytes[0]);
-    const auto next = nextCommandIndex(track, commandIndex);
-    switch (type) {
-      case EventType::Note:
-        advanceLegacyRangeTrack(*current, next, legacyRangeNoteWait(bytes, *current));
-        break;
-
-      case EventType::Rest:
-      case EventType::Tie:
-        if (bytes.size() >= 2) {
-          current->noteLength = bytes[1];
-          advanceLegacyRangeTrack(*current, next, bytes[1]);
-        } else {
-          advanceLegacyRangeTrack(*current, next, 0);
-        }
-        break;
-
-      case EventType::Tempo:
-        if (bytes.size() >= 2) {
-          globalTempo = bytes[1];
-          for (const auto& trackState : tracks) {
-            updateLegacyVibratoRateRange(ranges, trackState, version, globalTempo);
-          }
-        }
-        advanceLegacyRangeTrack(*current, next, 0);
-        break;
-
-      case EventType::Vibrato:
-        if (bytes.size() >= 4) {
-          current->activeRate = bytes[2];
-          current->activeDepth = bytes[3];
-          if (current->activeVibrato(version)) {
-            ranges.maxDepth = std::max(ranges.maxDepth, current->activeDepth);
-            updateLegacyVibratoRateRange(ranges, *current, version, globalTempo);
-          }
-        }
-        advanceLegacyRangeTrack(*current, next, 0);
-        break;
-
-      case EventType::LoopStart:
-        if (command.address.value <= std::numeric_limits<u64>::max() - command.encodedSize) {
-          current->loopReturnAddress = Address{command.address.value + command.encodedSize};
-        }
-        advanceLegacyRangeTrack(*current, next, 0);
-        break;
-
-      case EventType::LoopEnd:
-        if (bytes.size() >= 2 && current->loopReturnAddress) {
-          const u8 times = bytes[1];
-          if (times == 0) {
-            current->commandIndex = std::nullopt;
-          } else {
-            ++current->loopCount;
-            if (current->loopCount != times) {
-              current->commandIndex = commandIndexForAddress(track, *current->loopReturnAddress);
-            } else {
-              current->loopCount = 0;
-              advanceLegacyRangeTrack(*current, next, 0);
-            }
-          }
-        } else {
-          advanceLegacyRangeTrack(*current, next, 0);
-        }
-        break;
-
-      case EventType::LoopStart2:
-        if (command.address.value <= std::numeric_limits<u64>::max() - command.encodedSize) {
-          current->loopReturnAddress2 = Address{command.address.value + command.encodedSize};
-        }
-        advanceLegacyRangeTrack(*current, next, 0);
-        break;
-
-      case EventType::LoopEnd2:
-        if (bytes.size() >= 2 && current->loopReturnAddress2) {
-          const u8 times = bytes[1];
-          if (times == 0) {
-            current->commandIndex = std::nullopt;
-          } else {
-            ++current->loopCount2;
-            if (current->loopCount2 != times) {
-              current->commandIndex = commandIndexForAddress(track, *current->loopReturnAddress2);
-            } else {
-              current->loopCount2 = 0;
-              advanceLegacyRangeTrack(*current, next, 0);
-            }
-          }
-        } else {
-          advanceLegacyRangeTrack(*current, next, 0);
-        }
-        break;
-
-      case EventType::ConditionalJumpV1:
-        if (bytes.size() >= 3) {
-          current->commandIndex = commandIndexForAddress(track, Address{static_cast<u64>(bytes[1] | (bytes[2] << 8))});
-        } else {
-          current->commandIndex = std::nullopt;
-        }
-        break;
-
-      case EventType::Goto:
-        if (bytes.size() >= 3) {
-          current->commandIndex = commandIndexForAddress(track, Address{static_cast<u64>(bytes[1] | (bytes[2] << 8))});
-        } else {
-          current->commandIndex = std::nullopt;
-        }
-        break;
-
-      case EventType::Call:
-        if (bytes.size() >= 3) {
-          if (next) {
-            current->callStack.push_back(*next);
-          }
-          current->commandIndex = commandIndexForAddress(track, Address{static_cast<u64>(bytes[1] | (bytes[2] << 8))});
-        } else {
-          current->commandIndex = std::nullopt;
-        }
-        break;
-
-      case EventType::End:
-        if (!current->callStack.empty()) {
-          current->commandIndex = current->callStack.back();
-          current->callStack.pop_back();
-        } else {
-          current->commandIndex = std::nullopt;
-        }
-        break;
-
-      default:
-        advanceLegacyRangeTrack(*current, next, 0);
-        break;
-    }
-  }
-
-  return ranges;
-}
-
-struct TrackState {
-  TrackState() = default;
-  TrackState(const SequenceProgram& program, const TrackProgram&, const Context& context)
-      : maxVibrato(analyzeVibratoRanges(program, context.version)) {
-    reset(context.version);
-  }
-
-  void reset(KonamiSnesVersion version) {
-    noteLength = 0;
-    noteDurationRate = 0;
-    loopReturnAddress = {};
-    loopReturnAddress2 = {};
-    percussion = false;
-    inSubroutine = false;
-    instrument = 0;
-    prevNoteKey.reset();
-    prevNoteSlurred = false;
-    seqTuningCents = 0.0;
-    loopVolumeDelta = 0;
-    loopPitchDelta = 0;
-    loopVolumeDelta2 = 0;
-    loopPitchDelta2 = 0;
-    tempo = kKonamiSnesDefaultTempo;
-    volumeFade.reset(0xff);
-    panFade.reset(version <= KONAMISNES_V2 ? 10 : 20);
-    tempoFade.reset(kKonamiSnesDefaultTempo);
-    vibrato.reset();
-    pitchBase.reset();
-    pitchSlide.clearMotion();
-    emittedInitialModulationCeiling = false;
-    lastEmittedTuningCents = std::numeric_limits<double>::quiet_NaN();
-  }
-
-  static ModulationRanges analyzeVibratoRanges(const SequenceProgram& program, KonamiSnesVersion version) {
-    if (vibrato::usesLegacy(version)) {
-      return analyzeLegacyVibratoRanges(program, version);
-    }
-
-    ModulationRanges ranges{
-        .maxDepth = kMinVibratoMaxDepth,
-        .maxRateFactor = vibrato::minMaxRateFactor(version),
-    };
-    for (const auto& track : program.tracks) {
-      u8 tempo = kKonamiSnesDefaultTempo;
-      u8 activeRate = 0;
-      u8 activeDepth = 0;
-      for (const auto& command : track.commands) {
-        const auto bytes = track.bytesFor(command);
-        if (bytes.empty()) {
-          continue;
-        }
-        const u8 opcode = bytes[0];
-        const EventType type = eventType(version, opcode);
-        if (type == EventType::Tempo && bytes.size() >= 2) {
-          tempo = bytes[1];
-          if (vibrato::isActive(version, activeRate, activeDepth)) {
-            ranges.maxRateFactor =
-                std::max(ranges.maxRateFactor, vibrato::rateFactor(version, activeRate, tempo));
-          }
-        } else if (type == EventType::Vibrato && bytes.size() >= 4) {
-          activeRate = bytes[2];
-          activeDepth = bytes[3];
-          if (vibrato::isActive(version, activeRate, activeDepth)) {
-            ranges.maxDepth = std::max(ranges.maxDepth, activeDepth);
-            ranges.maxRateFactor =
-                std::max(ranges.maxRateFactor, vibrato::rateFactor(version, activeRate, tempo));
-          }
-        }
+    globalTempo = tempo;
+    for (const auto& active : activeVibrato) {
+      if (vibrato::isActive(version, active.rate, active.depth)) {
+        ranges.maxRateFactor = std::max(ranges.maxRateFactor, vibrato::rateFactor(version, active.rate, globalTempo));
       }
     }
-    return ranges;
   }
 
-  [[nodiscard]] u8 noteDuration(KonamiSnesVersion version, u8 length) const {
+  void finishPrepass() {
+    collecting = false;
+    globalTempo = kKonamiSnesDefaultTempo;
+    activeVibrato.clear();
+  }
+
+  KonamiSnesVersion version = KONAMISNES_NONE;
+  ModulationRanges ranges;
+  std::vector<ActiveVibrato> activeVibrato;
+  u8 globalTempo = kKonamiSnesDefaultTempo;
+  bool collecting = true;
+};
+
+// Only values that persist from one executed command to the next live here.
+struct TrackState {
+  TrackState(const SequenceProgram& program, const TrackProgram& track)
+      : version(static_cast<KonamiSnesVersion>(program.config.profile)), trackNumber(track.sourceTrackNumber) {
+    panFade.reset(version <= KONAMISNES_V2 ? 10 : 20);
+    volumeFade.reset(0xff);
+    tempoFade.reset(kKonamiSnesDefaultTempo);
+  }
+
+  [[nodiscard]] u8 noteDuration(u8 length) const {
     const u8 maxRate = noteDurationRateMax(version);
     if (noteDurationRate == maxRate) {
       return length;
@@ -748,6 +272,10 @@ struct TrackState {
     const u8 duration = version == KONAMISNES_V1 ? static_cast<u8>((length * noteDurationRate) / 100)
                                                  : static_cast<u8>((length * (noteDurationRate << 1)) >> 8);
     return std::max<u8>(duration, 1);
+  }
+
+  [[nodiscard]] double totalTuningCents() const {
+    return sequenceTuningCents + static_cast<double>(loopPitchDelta + loopPitchDelta2) * (100.0 / 32.0);
   }
 
   [[nodiscard]] double noteSemitones(u8 key, bool includeTuning = true) const {
@@ -758,202 +286,13 @@ struct TrackState {
     return semitones;
   }
 
-  [[nodiscard]] double totalTuningCents() const {
-    return seqTuningCents + static_cast<double>(loopPitchDelta + loopPitchDelta2) * (100.0 / 32.0);
-  }
-
-  template <class Runtime>
-  void applyEffectiveTuning(Runtime& rt, bool force = false) {
-    const double cents = totalTuningCents();
-    const bool hasEmittedTuning = std::isfinite(lastEmittedTuningCents);
-    const bool hasNonZeroTuning = std::abs(cents) > 0.001;
-    const bool changed = hasEmittedTuning && std::abs(lastEmittedTuningCents - cents) > 0.001;
-    if ((!hasEmittedTuning && hasNonZeroTuning) || changed || (force && (hasEmittedTuning || hasNonZeroTuning))) {
-      rt.tuning(cents);
-      lastEmittedTuningCents = cents;
-    }
-  }
-
-  template <class Runtime>
-  void resetPitchForNote(u8 key, Runtime&) {
-    pitchSlide.clearMotion();
-    if (percussion) {
-      pitchBase.reset();
-      return;
-    }
-    pitchBase = noteSemitones(key, true);
-    pitchSlide.setCurrent(*pitchBase);
-  }
-
-  template <class Runtime>
-  void beginPitchSlide(const PitchSlide& slide, Runtime& rt) {
-    if (!pitchBase || slide.length == 0) {
-      rt.pitchBendRange(2);
-      return;
-    }
-    const double startDeviation = std::abs(pitchSlide.current() - *pitchBase);
-    const double targetDeviation = std::abs(slide.targetSemitones - *pitchBase);
-    const u8 range = static_cast<u8>(std::max<int>(2, static_cast<int>(std::ceil(std::max(startDeviation, targetDeviation)))));
-    rt.pitchBendRange(range);
-    const double step = slide.length == 0 ? 0.0 : (slide.targetSemitones - pitchSlide.current()) / slide.length;
-    static_cast<void>(pitchSlide.begin(SequenceMotionPlan<double>::targetOverTicksWithStep(
-        slide.targetSemitones, step, slide.length, slide.delay)));
-  }
-
-  template <class Runtime>
-  void emitInitialModulationCeiling(Runtime& rt) {
-    if (emittedInitialModulationCeiling) {
-      return;
-    }
-    emittedInitialModulationCeiling = true;
-
-    const double fullRangeCents = vibrato::maxDepthCents(rt.context.version, kDefaultVibratoMaxDepth);
-    const double maxCents = vibrato::maxDepthCents(rt.context.version, maxVibrato.maxDepth);
-    const std::optional<double> depthRangeMaxAmount =
-        fullRangeCents <= 0.0 ? std::nullopt : std::optional<double>{maxCents / fullRangeCents};
-    rt.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoDepth,
-        .amount = 0.0,
-        .pitchDepthSemitones = 0.0,
-        .controllerRangeMaxAmount = depthRangeMaxAmount,
-        .controllerRangeOnly = true,
-    });
-    lastVibratoDepthAmount = 0.0;
-
-    const double minHertz = vibrato::baseHz(rt.context.version);
-    const u16 fullRangeFactor = vibrato::defaultMaxRateFactor(rt.context.version);
-    const s32 fullRangeAmount = synthAmountFromHertzRange(minHertz, minHertz * fullRangeFactor);
-    const s32 maxRangeAmount =
-        maxVibrato.maxRateFactor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * maxVibrato.maxRateFactor);
-    const std::optional<double> rateRangeMaxAmount =
-        fullRangeAmount <= 0 || maxRangeAmount <= 0
-            ? std::nullopt
-            : std::optional<double>{static_cast<double>(maxRangeAmount) / fullRangeAmount};
-    rt.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoRate,
-        .amount = 0.0,
-        .frequencyHz = 0.0,
-        .controllerRangeMaxAmount = rateRangeMaxAmount,
-        .controllerRangeOnly = true,
-    });
-  }
-
-  template <class Runtime>
-  void emitVibratoDepth(Runtime& rt, bool force = false) {
-    const bool active = vibrato::isActive(rt.context.version, vibrato.rate(), vibrato.depth());
-    double amount = 0.0;
-    double depthSemitones = 0.0;
-    std::optional<double> rangeMaxAmount;
-    if (active) {
-      const double currentCents =
-          vibrato::currentDepthCents(rt.context.version, vibrato.depth(), vibrato.currentDepth());
-      const double fullRangeCents = vibrato::maxDepthCents(rt.context.version, kDefaultVibratoMaxDepth);
-      amount = fullRangeCents <= 0.0 ? 0.0 : currentCents / fullRangeCents;
-      const double maxCents = vibrato::maxDepthCents(rt.context.version, maxVibrato.maxDepth);
-      rangeMaxAmount = fullRangeCents <= 0.0 ? 0.0 : maxCents / fullRangeCents;
-      // The Konami depth conversion is a full exported pitch swing; pitch-bend
-      // simulation needs peak deviation from center.
-      depthSemitones = currentCents / 400.0;
-    }
-    amount = std::clamp(amount, 0.0, 1.0);
-    if (force || std::abs(amount - lastVibratoDepthAmount) > 0.0001) {
-      rt.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::VibratoDepth,
-          .amount = amount,
-          .pitchDepthSemitones = depthSemitones,
-          .controllerRangeMaxAmount = rangeMaxAmount,
-      });
-      lastVibratoDepthAmount = amount;
-    }
-  }
-
-  template <class Runtime>
-  void emitVibratoRate(Runtime& rt) {
-    const u16 factor = vibrato::rateFactor(rt.context.version, vibrato.rate(), tempo);
-    const u16 fullRangeFactor = vibrato::defaultMaxRateFactor(rt.context.version);
-    const double minHertz = vibrato::baseHz(rt.context.version);
-    const s32 fullRangeAmount = synthAmountFromHertzRange(minHertz, minHertz * fullRangeFactor);
-    const s32 currentRangeAmount = factor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * factor);
-    const s32 maxRangeAmount =
-        maxVibrato.maxRateFactor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * maxVibrato.maxRateFactor);
-    const double amount = fullRangeAmount <= 0 ? 0.0 : static_cast<double>(currentRangeAmount) / fullRangeAmount;
-    const std::optional<double> rangeMaxAmount =
-        fullRangeAmount <= 0 || maxRangeAmount <= 0
-            ? std::nullopt
-            : std::optional<double>{static_cast<double>(maxRangeAmount) / fullRangeAmount};
-    rt.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoRate,
-        .amount = std::clamp(amount, 0.0, 1.0),
-        .frequencyHz = vibrato::baseHz(rt.context.version) * factor,
-        .controllerRangeMaxAmount = rangeMaxAmount,
-    });
-  }
-
-  template <class Runtime>
-  void emitVibratoDelay(Runtime& rt) {
-    if (!vibrato::isActive(rt.context.version, vibrato.rate(), vibrato.depth())) {
-      rt.vibratoDelay(0, 0);
-      return;
-    }
-    rt.vibratoDelay(vibratoDelayTicks(rt.context.version, vibrato.delay(), tempo),
-                    vibratoDelayMidiValue(rt.context.version, vibrato.delay(), tempo));
-  }
-
-  void tickAutomation(PerformanceEmitter& out, KonamiSnesVersion version) {
-    static_cast<void>(tempoFade.tickRaw([&](s32 rawTempo) {
-      const u8 newTempo = static_cast<u8>(std::clamp<s32>(rawTempo, 0, 0xff));
-      if (newTempo == tempo) {
-        return;
-      }
-      tempo = newTempo;
-      out.tempo(tempoMicrosecondsPerQuarter(version, tempo));
-      if (vibrato::usesLegacy(version)) {
-        struct TickRuntime {
-          TrackState& state;
-          PerformanceEmitter& out;
-          const Context& context;
-          void modulation(ModulationPerformanceEvent event) { out.modulation(std::move(event)); }
-          void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
-          void vibratoDelay(u32 delayTicks, u8 midiValue) { out.vibratoDelay(delayTicks, midiValue); }
-        } rt{*this, out, Context{.version = version}};
-        emitVibratoRate(rt);
-        emitVibratoDelay(rt);
-      }
-    }));
-    static_cast<void>(volumeFade.tickRaw([&](s32 rawVolume) {
-      out.level(LevelScale::linearFromLinear(linearGainFromRawVolume(static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff)))),
-                LevelPrecisionHint::FourteenBit);
-    }));
-    static_cast<void>(panFade.tickRaw([&](s32 rawPan) {
-      out.pan(stereoPositionFromPan(version, clampPan(version, static_cast<u8>(std::clamp<s32>(rawPan, 0, 0xff)))));
-    }));
-    if (pitchBase && pitchSlide.active()) {
-      const auto pitchTick = pitchSlide.tick();
-      if (pitchTick.status != SequenceMotionStatus::Inactive && pitchTick.status != SequenceMotionStatus::Delayed) {
-        out.pitchBend(pitchSlide.current() - *pitchBase);
-      }
-    }
-    if (vibrato.fadeActive()) {
-      const auto fadeTick = vibrato.tickFade();
-      if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
-        struct TickRuntime {
-          TrackState& state;
-          PerformanceEmitter& out;
-          const Context& context;
-          void modulation(ModulationPerformanceEvent event) { out.modulation(std::move(event)); }
-          void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
-          void vibratoDelay(u32 delayTicks, u8 midiValue) { out.vibratoDelay(delayTicks, midiValue); }
-        } rt{*this, out, Context{.version = version}};
-        emitVibratoDepth(rt);
-      }
-    }
-  }
-
+  KonamiSnesVersion version = KONAMISNES_NONE;
+  u32 trackNumber = 0;
   u8 noteLength = 0;
   u8 noteDurationRate = 0;
   s32 transpose = 0;
-  std::optional<Address> loopReturnAddress;
-  std::optional<Address> loopReturnAddress2;
+  Address loopReturnAddress;
+  Address loopReturnAddress2;
   s16 loopVolumeDelta = 0;
   s16 loopPitchDelta = 0;
   s16 loopVolumeDelta2 = 0;
@@ -961,541 +300,700 @@ struct TrackState {
   bool percussion = false;
   bool inSubroutine = false;
   u8 instrument = 0;
-  std::optional<u8> prevNoteKey;
-  bool prevNoteSlurred = false;
-  double seqTuningCents = 0.0;
+  std::optional<u8> previousNoteKey;
+  bool previousNoteSlurred = false;
+  double sequenceTuningCents = 0.0;
   double lastEmittedTuningCents = std::numeric_limits<double>::quiet_NaN();
   u8 tempo = kKonamiSnesDefaultTempo;
   SequenceFixedPointAutomation<s32> panFade;
   SequenceFixedPointAutomation<s32> volumeFade;
   SequenceFixedPointAutomation<s32> tempoFade;
   LfoState vibrato;
-  ModulationRanges maxVibrato{
-      .maxDepth = kMinVibratoMaxDepth,
-      .maxRateFactor = vibrato::minMaxRateFactor(KONAMISNES_V1),
-  };
   std::optional<double> pitchBase;
   SequenceAutomatedValue<double> pitchSlide;
   double lastVibratoDepthAmount = -1.0;
   bool emittedInitialModulationCeiling = false;
 };
 
-template <class Runtime>
-void emitVolume(Runtime& rt, u8 rawVolume) {
-  rt.state.volumeFade.setCurrentRaw(rawVolume);
-  rt.level(LevelScale::linearFromLinear(linearGainFromRawVolume(rawVolume)), LevelPrecisionHint::FourteenBit);
-}
+// History-dependent driver behavior stays close to the opcode switch below.
+struct Playback {
+  TrackState& track;
+  PerformanceEmitter& out;
+  VmApi& vm;
+  ProgramState& program;
 
-template <class Runtime>
-void emitPan(Runtime& rt, u8 rawPan) {
-  const u8 pan = clampPan(rt.context.version, rawPan);
-  rt.state.panFade.setCurrentRaw(pan);
-  rt.pan(stereoPositionFromPan(rt.context.version, pan));
-}
+  void beforeCommand() { emitInitialModulationCeiling(); }
 
-template <class Runtime>
-void applyTuning(Runtime& rt, s8 tuning) {
-  rt.state.seqTuningCents = tuningSemitones(tuning) * 100.0;
-  rt.state.applyEffectiveTuning(rt);
-}
-
-template <class Runtime>
-PitchSlide readPitchSlideOperands(Runtime& rt, VmCommandCursor& cmd, EventType type) {
-  PitchSlide slide{
-      .type = type,
-      .delay = cmd.u8("slide_delay"),
-      .length = cmd.u8("slide_length"),
-      .targetNote = cmd.u8("target_note"),
-  };
-  slide.targetSemitones = rt.state.noteSemitones(slide.targetNote, type == EventType::PitchSlideV1);
-  if (type == EventType::PitchSlideV2) {
-    if (slide.length != 0) {
-      static_cast<void>(cmd.u8("reserved"));
-      const s16 delta = cmd.s16le("delta");
-      slide.deltaSemitones = delta / 256.0;
+  void note(u8 key, u8 sourceVelocity) {
+    u8 velocity =
+        static_cast<u8>(std::clamp<int>(sourceVelocity + track.loopVolumeDelta + track.loopVolumeDelta2, 1, 127));
+    if (track.version != KONAMISNES_V1) {
+      velocity = kVolumeTable[velocity];
     }
-  } else if (type == EventType::PitchSlideV3) {
-    const s16 delta = cmd.s16le("delta");
-    slide.deltaSemitones = (delta / 256.0) * (256.0 / std::max<u8>(rt.state.tempo, 1));
-  } else if (slide.length != 0 && rt.state.pitchBase) {
-    slide.deltaSemitones = (slide.targetSemitones - rt.state.pitchSlide.current()) / slide.length;
+
+    applyEffectiveTuning();
+    const u8 duration = track.noteDuration(track.noteLength);
+    const bool tied = track.previousNoteSlurred && track.previousNoteKey && key == *track.previousNoteKey;
+    resetPitchForNote(key);
+    out.pitchBend(0.0);
+    track.vibrato.beginReusableFade();
+    if (track.vibrato.fadeActive()) {
+      emitVibratoDepth(true);
+    }
+    if (tied) {
+      out.note(track.noteSemitones(key, false), LevelScale::linearFromLinear(velocity / 127.0), duration, true);
+    } else {
+      out.note(track.percussion ? key : track.noteSemitones(key, false), LevelScale::linearFromLinear(velocity / 127.0),
+               duration);
+      track.previousNoteKey = key;
+    }
+    track.previousNoteSlurred = track.noteDurationRate == noteDurationRateMax(track.version) && !track.percussion;
   }
-  cmd.derived("target_semitones", slide.targetSemitones);
+
+  void tie() {
+    if (!track.previousNoteSlurred) {
+      return;
+    }
+    out.note(0.0, 1.0, track.noteDuration(track.noteLength), true);
+    track.previousNoteSlurred = track.noteDurationRate == noteDurationRateMax(track.version);
+  }
+
+  void percussionOn() {
+    if (!track.percussion) {
+      out.instrument(midiBank(0x7f), 0, true);
+      track.percussion = true;
+    }
+  }
+
+  void percussionOff() {
+    if (track.percussion) {
+      out.instrument(midiBank(track.instrument >> 7), track.instrument & 0x7f, true);
+      track.percussion = false;
+    }
+  }
+
+  void programChange(u8 programNumber) {
+    applyEffectiveTuning(true);
+    track.instrument = programNumber;
+    out.instrument(midiBank(programNumber >> 7), programNumber & 0x7f, true);
+    pan(track.version <= KONAMISNES_V2 ? 10 : 20);
+  }
+
+  void programChangeAndVolume(u8 volumeValue, u8 programNumber) {
+    applyEffectiveTuning(true);
+    track.instrument = programNumber;
+    out.instrument(midiBank(programNumber >> 7), programNumber & 0x7f, true);
+    volume(volumeValue);
+    pan(track.version <= KONAMISNES_V2 ? 10 : 20);
+  }
+
+  void volume(u8 rawVolume) {
+    track.volumeFade.setCurrentRaw(rawVolume);
+    out.level(LevelScale::linearFromLinear(linearGainFromRawVolume(rawVolume)), LevelPrecisionHint::FourteenBit);
+  }
+
+  void pan(u8 rawPan) {
+    const u8 value = clampPan(track.version, rawPan);
+    track.panFade.setCurrentRaw(value);
+    out.pan(stereoPositionFromPan(track.version, value));
+  }
+
+  void tuning(s8 value) {
+    track.sequenceTuningCents = tuningCents(value);
+    applyEffectiveTuning();
+  }
+
+  void tempo(u8 value) {
+    track.tempo = value;
+    track.tempoFade.setCurrentRaw(value);
+    program.observeTempo(value);
+    out.tempo(tempoMicrosecondsPerQuarter(track.version, value));
+    if (vibrato::usesLegacy(track.version)) {
+      emitVibratoRate();
+      emitVibratoDelay();
+    }
+  }
+
+  void configureVibrato(u8 delay, u8 rate, u8 depth, u8 builtInFade) {
+    track.vibrato.configure(delay, rate, depth);
+    if (builtInFade != 0) {
+      track.vibrato.setReusableFade(builtInFade);
+    }
+    program.observeVibrato(track.trackNumber, rate, depth, track.tempo);
+    emitVibratoDelay();
+    emitVibratoDepth(true);
+    emitVibratoRate();
+  }
+
+  void beginPitchSlide(PitchSlideKind kind, u8 delay, u8 length, u8 targetNote) {
+    if (!track.pitchBase || length == 0) {
+      out.pitchBendRange(2);
+      return;
+    }
+    const double target = track.noteSemitones(targetNote, kind == PitchSlideKind::V1);
+    const double startDeviation = std::abs(track.pitchSlide.current() - *track.pitchBase);
+    const double targetDeviation = std::abs(target - *track.pitchBase);
+    const auto range =
+        static_cast<u8>(std::max<int>(2, static_cast<int>(std::ceil(std::max(startDeviation, targetDeviation)))));
+    out.pitchBendRange(range);
+    static_cast<void>(track.pitchSlide.begin(SequenceMotionPlan<double>::targetOverTicksWithStep(
+        target, (target - track.pitchSlide.current()) / length, length, delay)));
+  }
+
+  void beginFade(FadeTarget target, bool stepBased, u8 destination, u8 ticks, s8 step) {
+    const u8 clampedDestination = target == FadeTarget::Pan ? clampPan(track.version, destination) : destination;
+    const SequenceFixedPointMotionPlan<s32> motion =
+        stepBased
+            ? SequenceFixedPointMotion<s32>::toRawTargetByFixedStep(clampedDestination, static_cast<s32>(step) * 16)
+            : SequenceFixedPointMotion<s32>::toRawTarget(clampedDestination, ticks);
+    switch (target) {
+      case FadeTarget::Tempo:
+        static_cast<void>(track.tempoFade.begin(motion));
+        break;
+      case FadeTarget::Volume:
+        static_cast<void>(track.volumeFade.begin(motion));
+        break;
+      case FadeTarget::Pan:
+        static_cast<void>(track.panFade.begin(motion));
+        break;
+    }
+  }
+
+  [[nodiscard]] Effects loopEnd(u8 slot, u8 times, s8 volumeDelta, s8 pitchDelta) {
+    const Address destination = slot == 0 ? track.loopReturnAddress : track.loopReturnAddress2;
+    if (destination.value == 0) {
+      return {};
+    }
+    if (times == 0) {
+      return Effects{.step = vm.declaredLoop(destination)};
+    }
+
+    Effects effects = vm.countedRepeatUntil(slot, times, destination);
+    s16& accumulatedVolume = slot == 0 ? track.loopVolumeDelta : track.loopVolumeDelta2;
+    s16& accumulatedPitch = slot == 0 ? track.loopPitchDelta : track.loopPitchDelta2;
+    if (effects.step.kind == StepKind::Next) {
+      accumulatedVolume = 0;
+      accumulatedPitch = 0;
+    } else {
+      accumulatedVolume += volumeDelta;
+      accumulatedPitch += pitchDelta;
+    }
+    applyEffectiveTuning();
+    return effects;
+  }
+
+  [[nodiscard]] Effects endOrReturn() {
+    if (track.inSubroutine) {
+      track.inSubroutine = false;
+      return Effects{.step = vm.return_()};
+    }
+    return Effects{.step = vm.end()};
+  }
+
+  void tick() {
+    static_cast<void>(track.tempoFade.tickRaw([&](s32 rawTempo) {
+      const u8 value = static_cast<u8>(std::clamp<s32>(rawTempo, 0, 0xff));
+      if (value == track.tempo) {
+        return;
+      }
+      track.tempo = value;
+      out.tempo(tempoMicrosecondsPerQuarter(track.version, value));
+      if (vibrato::usesLegacy(track.version)) {
+        emitVibratoRate();
+        emitVibratoDelay();
+      }
+    }));
+    static_cast<void>(track.volumeFade.tickRaw([&](s32 rawVolume) {
+      const auto value = static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff));
+      out.level(LevelScale::linearFromLinear(linearGainFromRawVolume(value)), LevelPrecisionHint::FourteenBit);
+    }));
+    static_cast<void>(track.panFade.tickRaw([&](s32 rawPan) {
+      const auto value = static_cast<u8>(std::clamp<s32>(rawPan, 0, 0xff));
+      out.pan(stereoPositionFromPan(track.version, value));
+    }));
+    if (track.pitchBase && track.pitchSlide.active()) {
+      const auto pitchTick = track.pitchSlide.tick();
+      if (pitchTick.status != SequenceMotionStatus::Inactive && pitchTick.status != SequenceMotionStatus::Delayed) {
+        out.pitchBend(track.pitchSlide.current() - *track.pitchBase);
+      }
+    }
+    if (track.vibrato.fadeActive()) {
+      const auto fadeTick = track.vibrato.tickFade();
+      if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
+        emitVibratoDepth();
+      }
+    }
+  }
+
+private:
+  void applyEffectiveTuning(bool force = false) {
+    const double cents = track.totalTuningCents();
+    const bool emitted = std::isfinite(track.lastEmittedTuningCents);
+    const bool nonZero = std::abs(cents) > 0.001;
+    const bool changed = emitted && std::abs(track.lastEmittedTuningCents - cents) > 0.001;
+    if ((!emitted && nonZero) || changed || (force && (emitted || nonZero))) {
+      out.tuning(cents);
+      track.lastEmittedTuningCents = cents;
+    }
+  }
+
+  void resetPitchForNote(u8 key) {
+    track.pitchSlide.clearMotion();
+    if (track.percussion) {
+      track.pitchBase.reset();
+      return;
+    }
+    track.pitchBase = track.noteSemitones(key);
+    track.pitchSlide.setCurrent(*track.pitchBase);
+  }
+
+  void emitInitialModulationCeiling() {
+    if (track.emittedInitialModulationCeiling) {
+      return;
+    }
+    track.emittedInitialModulationCeiling = true;
+
+    const double fullRangeCents = vibrato::maxDepthCents(track.version, kDefaultVibratoMaxDepth);
+    const double maxCents = vibrato::maxDepthCents(track.version, program.ranges.maxDepth);
+    out.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoDepth,
+        .amount = 0.0,
+        .pitchDepthSemitones = 0.0,
+        .controllerRangeMaxAmount =
+            fullRangeCents <= 0.0 ? std::nullopt : std::optional<double>{maxCents / fullRangeCents},
+        .controllerRangeOnly = true,
+    });
+    track.lastVibratoDepthAmount = 0.0;
+
+    const double minHertz = vibrato::baseHz(track.version);
+    const s32 fullRangeAmount =
+        synthAmountFromHertzRange(minHertz, minHertz * vibrato::defaultMaxRateFactor(track.version));
+    const s32 maxRangeAmount = program.ranges.maxRateFactor == 0
+                                   ? 0
+                                   : synthAmountFromHertzRange(minHertz, minHertz * program.ranges.maxRateFactor);
+    out.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoRate,
+        .amount = 0.0,
+        .frequencyHz = 0.0,
+        .controllerRangeMaxAmount = fullRangeAmount <= 0 || maxRangeAmount <= 0
+                                        ? std::nullopt
+                                        : std::optional<double>{static_cast<double>(maxRangeAmount) / fullRangeAmount},
+        .controllerRangeOnly = true,
+    });
+  }
+
+  void emitVibratoDepth(bool force = false) {
+    const bool active = vibrato::isActive(track.version, track.vibrato.rate(), track.vibrato.depth());
+    double amount = 0.0;
+    double depthSemitones = 0.0;
+    std::optional<double> rangeMaxAmount;
+    if (active) {
+      const double currentCents =
+          vibrato::currentDepthCents(track.version, track.vibrato.depth(), track.vibrato.currentDepth());
+      const double fullRangeCents = vibrato::maxDepthCents(track.version, kDefaultVibratoMaxDepth);
+      amount = fullRangeCents <= 0.0 ? 0.0 : currentCents / fullRangeCents;
+      const double maxCents = vibrato::maxDepthCents(track.version, program.ranges.maxDepth);
+      rangeMaxAmount = fullRangeCents <= 0.0 ? 0.0 : maxCents / fullRangeCents;
+      // Konami depth is a full swing; simulation needs deviation from center.
+      depthSemitones = currentCents / 400.0;
+    }
+    amount = std::clamp(amount, 0.0, 1.0);
+    if (force || std::abs(amount - track.lastVibratoDepthAmount) > 0.0001) {
+      out.modulation(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoDepth,
+          .amount = amount,
+          .pitchDepthSemitones = depthSemitones,
+          .controllerRangeMaxAmount = rangeMaxAmount,
+      });
+      track.lastVibratoDepthAmount = amount;
+    }
+  }
+
+  void emitVibratoRate() {
+    const u16 factor = vibrato::rateFactor(track.version, track.vibrato.rate(), track.tempo);
+    const double minHertz = vibrato::baseHz(track.version);
+    const s32 fullRangeAmount =
+        synthAmountFromHertzRange(minHertz, minHertz * vibrato::defaultMaxRateFactor(track.version));
+    const s32 currentAmount = factor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * factor);
+    const s32 maxAmount = program.ranges.maxRateFactor == 0
+                              ? 0
+                              : synthAmountFromHertzRange(minHertz, minHertz * program.ranges.maxRateFactor);
+    out.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoRate,
+        .amount =
+            fullRangeAmount <= 0 ? 0.0 : std::clamp(static_cast<double>(currentAmount) / fullRangeAmount, 0.0, 1.0),
+        .frequencyHz = minHertz * factor,
+        .controllerRangeMaxAmount = fullRangeAmount <= 0 || maxAmount <= 0
+                                        ? std::nullopt
+                                        : std::optional<double>{static_cast<double>(maxAmount) / fullRangeAmount},
+    });
+  }
+
+  void emitVibratoDelay() {
+    if (!vibrato::isActive(track.version, track.vibrato.rate(), track.vibrato.depth())) {
+      out.vibratoDelay(0, 0);
+      return;
+    }
+    out.vibratoDelay(vibratoDelayTicks(track.version, track.vibrato.delay(), track.tempo),
+                     vibratoDelayMidiValue(track.version, track.vibrato.delay(), track.tempo));
+  }
+};
+
+using KonamiCursor = CompilerCursor<TrackState, Playback>;
+
+// Pitch slides can be standalone commands or an immediate suffix of a note or
+// rest. This reads the version-specific suffix once into the containing event.
+[[nodiscard]] DecodedPitchSlide readPitchSlide(KonamiCursor::Event& event, KonamiSnesVersion version) {
+  DecodedPitchSlide slide{
+      .kind = pitchSlideKind(version),
+      .delay = event.u8("slide_delay"),
+      .length = event.u8("slide_length", SemanticOperandRole::Duration),
+      .targetNote = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey),
+  };
+  if (slide.kind == PitchSlideKind::V2 && slide.length != 0) {
+    static_cast<void>(event.u8("reserved", SourceValueDisplay::Hex));
+    static_cast<void>(event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+  } else if (slide.kind == PitchSlideKind::V3) {
+    static_cast<void>(event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+  }
   return slide;
 }
 
-template <class Runtime>
-std::optional<PitchSlide> consumeInlinePitchSlide(Runtime& rt, VmCommandCursor& cmd) {
-  const auto opcode = cmd.peekU8();
-  if (!opcode) {
+[[nodiscard]] std::optional<DecodedPitchSlide> readInlinePitchSlide(KonamiCursor::Event& event,
+                                                                    KonamiSnesVersion version) {
+  if (event.peekU8() != 0xf3) {
     return std::nullopt;
   }
-  const EventType type = eventType(rt.context.version, *opcode);
-  if (!isPitchSlide(type)) {
-    return std::nullopt;
-  }
-  static_cast<void>(cmd.u8("pitch_slide_opcode"));
-  return readPitchSlideOperands(rt, cmd, type);
+  static_cast<void>(event.u8("pitch_slide_opcode", SourceValueDisplay::Hex));
+  return readPitchSlide(event, version);
 }
 
-CommandFlow unknownEvent(VmCommandCursor& cmd, u8 argCount) {
-  cmd.name("Unknown Event", SequenceSemantic::Unsupported).kind("unknown").sourceOnly();
-  cmd.derived("opcode", cmd.opcode(), SourceValueDisplay::Hex);
-  for (u8 i = 0; i < argCount; ++i) {
-    static_cast<void>(cmd.u8(fmt::format("arg{}", i + 1)));
-  }
-  return cmd.next();
+void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide) {
+  event.invoke<&Playback::beginPitchSlide>(slide.kind, slide.delay, slide.length, slide.targetNote);
 }
 
-template <class Runtime>
-ControllerFade readFade(Runtime& rt, VmCommandCursor& cmd, EventType type) {
-  ControllerFade fade;
-  switch (type) {
-    case EventType::TempoFadeV1:
-    case EventType::VolumeFadeV1:
-    case EventType::PanFadeV1: {
-      const u8 ticks = cmd.u8("length");
-      const u8 target = cmd.u8("target");
-      const u8 clampedTarget = (type == EventType::PanFadeV1) ? clampPan(rt.context.version, target) : target;
-      fade.motion = SequenceFixedPointMotion<s32>::toRawTarget(clampedTarget, ticks);
-      break;
+[[nodiscard]] DecodedBytecodeCommand unknownCommand(KonamiCursor& cursor, u8 argumentCount) {
+  auto event = cursor.sourceOnly("Unknown Event", "unknown");
+  for (u8 index = 0; index < argumentCount; ++index) {
+    static_cast<void>(event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex));
+  }
+  return event.ignore();
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, KonamiSnesVersion version,
+                                                   std::vector<Diagnostic>* diagnostics) {
+  KonamiCursor cursor(reader, begin, "konami-snes", diagnostics);
+  if (!cursor.hasOpcode()) {
+    return cursor.truncated();
+  }
+
+  const u8 opcode = cursor.opcode();
+  if (opcode <= 0x5f || (opcode >= 0x80 && opcode <= 0xdf)) {
+    auto event = cursor.command("Note", SequenceSemantic::Note);
+    const u8 key = event.opcodeValue("key", static_cast<u8>(opcode & 0x7f), SourceValueDisplay::MidiNote,
+                                     SemanticOperandRole::NoteKey);
+    if ((opcode & 0x80) == 0) {
+      event.set<&TrackState::noteLength>(event.u8("length", SemanticOperandRole::Duration));
     }
-    case EventType::TempoFadeV2:
-    case EventType::VolumeFadeV2:
-    case EventType::PanFadeV2: {
-      const u8 target = cmd.u8("target");
-      const auto rawStep = static_cast<s32>(static_cast<s8>(cmd.u8("step")) << 4);
-      const u8 clampedTarget = (type == EventType::PanFadeV2) ? clampPan(rt.context.version, target) : target;
-      fade.motion = SequenceFixedPointMotion<s32>::toRawTargetByFixedStep(clampedTarget, rawStep);
-      break;
+    u8 velocity = event.u8("velocity_or_duration", SemanticOperandRole::Level);
+    if ((velocity & 0x80) == 0) {
+      const u8 rate = event.derived("duration_rate", std::min(velocity, noteDurationRateMax(version)),
+                                    SemanticOperandRole::Duration);
+      event.set<&TrackState::noteDurationRate>(rate);
+      velocity = event.u8("velocity", SemanticOperandRole::Level);
+    }
+    velocity = static_cast<u8>(std::max<int>(velocity & 0x7f, 1));
+    event.invoke<&Playback::note>(key, velocity);
+    if (const auto slide = readInlinePitchSlide(event, version)) {
+      appendPitchSlide(event, *slide);
+    } else {
+      event.emitPitchBendRange(2);
+    }
+    return event.wait(event.state<&TrackState::noteLength>());
+  }
+
+  if (opcode >= 0x70 && opcode <= 0x7f && isLateVersion(version)) {
+    auto event = cursor.command("Instant Tuning", SequenceSemantic::Pitch);
+    s8 tuning = opcode & 0x0f;
+    if (tuning > 8) {
+      tuning -= 16;
+    }
+    event.opcodeValue("tuning", tuning);
+    return event.invoke<&Playback::tuning>(tuning);
+  }
+
+  switch (opcode) {
+    case 0x60:
+      return cursor.command("Percussion On", SequenceSemantic::Program).invoke<&Playback::percussionOn>();
+    case 0x61:
+      return cursor.command("Percussion Off", SequenceSemantic::Program).invoke<&Playback::percussionOff>();
+    case 0x62:
+      if (version == KONAMISNES_V1) {
+        return unknownCommand(cursor, 1);
+      } else {
+        auto event = cursor.sourceOnly("GAIN");
+        static_cast<void>(event.u8("gain_amount", SourceValueDisplay::Hex));
+        return event.ignore();
+      }
+    case 0x63:
+      return unknownCommand(cursor, version == KONAMISNES_V1 ? 1 : 0);
+    case 0x64:
+      return unknownCommand(cursor, version == KONAMISNES_V1 ? 2 : 0);
+    case 0x65:
+    case 0x66:
+    case 0x67:
+    case 0x68:
+    case 0x69:
+    case 0x6a:
+    case 0x6b:
+    case 0x6c:
+    case 0x6d:
+    case 0x6e:
+    case 0x6f:
+    case 0x70:
+    case 0x71:
+    case 0x72:
+    case 0x73:
+    case 0x74:
+    case 0x75:
+    case 0x76:
+    case 0x77:
+    case 0x78:
+    case 0x79:
+    case 0x7a:
+    case 0x7b:
+    case 0x7c:
+    case 0x7d:
+    case 0x7e:
+    case 0x7f:
+      return unknownCommand(cursor, 0);
+    case 0xe0: {
+      auto event = cursor.command("Rest", SequenceSemantic::Rest);
+      event.set<&TrackState::noteLength>(event.u8("length", SemanticOperandRole::Duration));
+      if (const auto slide = readInlinePitchSlide(event, version)) {
+        appendPitchSlide(event, *slide);
+      }
+      event.set<&TrackState::previousNoteSlurred>(false);
+      return event.wait(event.state<&TrackState::noteLength>());
+    }
+    case 0xe1: {
+      auto event = cursor.command("Tie", SequenceSemantic::Note);
+      event.set<&TrackState::noteLength>(event.u8("length", SemanticOperandRole::Duration));
+      const u8 rate = std::min(event.u8("duration_rate", SemanticOperandRole::Duration), noteDurationRateMax(version));
+      event.set<&TrackState::noteDurationRate>(rate);
+      event.invoke<&Playback::tie>();
+      return event.wait(event.state<&TrackState::noteLength>());
+    }
+    case 0xe2: {
+      auto event = cursor.command("Program", SequenceSemantic::Program);
+      const u8 program = event.u8("program", SemanticOperandRole::Instrument);
+      event.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
+      event.derived("program_number", program & 0x7f, SemanticOperandRole::InstrumentProgram);
+      return event.invoke<&Playback::programChange>(program);
+    }
+    case 0xe3: {
+      auto event = cursor.command("Pan", SequenceSemantic::Pan);
+      const u8 raw = event.u8("pan", SemanticOperandRole::Pan);
+      const bool instrumentPanOff = version <= KONAMISNES_V2 ? raw == 0x15 : raw == 0x2a;
+      const bool instrumentPanOn = version <= KONAMISNES_V2 ? raw == 0x16 : raw == 0x2c;
+      event.derived("instrument_pan_off", instrumentPanOff);
+      event.derived("instrument_pan_on", instrumentPanOn);
+      return instrumentPanOff || instrumentPanOn ? event.ignore() : event.invoke<&Playback::pan>(raw);
+    }
+    case 0xe4: {
+      auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
+      const u8 arg1 = event.u8("delay_or_fade", SemanticOperandRole::Modulation);
+      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      const u8 delay = event.derived("delay", vibrato::delayFromArg1(version, arg1));
+      const u8 fade = event.derived("built_in_fade", vibrato::inlineFadeLength(version, arg1));
+      return event.invoke<&Playback::configureVibrato>(delay, rate, depth, fade);
+    }
+    case 0xe5: {
+      auto event = cursor.sourceOnly("Random Pitch");
+      static_cast<void>(event.u8("rate"));
+      static_cast<void>(event.u16le("pitch_mask", SourceValueDisplay::Hex));
+      return event.ignore();
+    }
+    case 0xe6: {
+      auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
+      const Address destination = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
+                                                SemanticOperandRole::LoopTarget);
+      return event.set<&TrackState::loopReturnAddress>(destination);
+    }
+    case 0xe7:
+    case 0xe9: {
+      auto event = cursor.command(opcode == 0xe7 ? "Loop End" : "Loop End #2", SequenceSemantic::Repeat);
+      const u8 slot = event.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
+      const u8 times = event.u8("times", SemanticOperandRole::Count);
+      const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      event.invoke<&Playback::loopEnd>(slot, times, volumeDelta, pitchDelta);
+      return event.runtimeControlFlow();
+    }
+    case 0xe8: {
+      auto event = cursor.command("Loop Start #2", SequenceSemantic::Loop);
+      const Address destination = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
+                                                SemanticOperandRole::LoopTarget);
+      return event.set<&TrackState::loopReturnAddress2>(destination);
+    }
+    case 0xea: {
+      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
+      const u8 tempo = event.u8("tempo");
+      event.derived("microseconds_per_quarter", tempoMicrosecondsPerQuarter(version, tempo));
+      return event.invoke<&Playback::tempo>(tempo);
+    }
+    case 0xeb:
+    case 0xef:
+    case 0xf8: {
+      const FadeTarget target =
+          opcode == 0xeb ? FadeTarget::Tempo : (opcode == 0xef ? FadeTarget::Volume : FadeTarget::Pan);
+      const SequenceSemantic semantic =
+          opcode == 0xeb ? SequenceSemantic::Tempo : (opcode == 0xef ? SequenceSemantic::Level : SequenceSemantic::Pan);
+      auto event =
+          cursor.command(opcode == 0xeb ? "Tempo Fade" : (opcode == 0xef ? "Volume Fade" : "Pan Fade"), semantic);
+      if (isLateVersion(version)) {
+        const u8 destination = event.u8("target");
+        const s8 step = event.s8("step");
+        return event.invoke<&Playback::beginFade>(target, true, destination, u8{0}, step);
+      }
+      const u8 ticks = event.u8("length", SemanticOperandRole::Duration);
+      const u8 destination = event.u8("target");
+      return event.invoke<&Playback::beginFade>(target, false, destination, ticks, s8{0});
+    }
+    case 0xec: {
+      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
+      return event.set<&TrackState::transpose>(
+          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+    }
+    case 0xed:
+      if (isLateVersion(version)) {
+        auto event = cursor.sourceOnly("ADSR(1)");
+        static_cast<void>(event.u8("adsr1", SourceValueDisplay::Hex));
+        return event.ignore();
+      }
+      return unknownCommand(cursor, 3);
+    case 0xee: {
+      auto event = cursor.command("Volume", SequenceSemantic::Level);
+      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
+    }
+    case 0xf0: {
+      auto event = cursor.sourceOnly("Portamento");
+      static_cast<void>(event.u8("speed"));
+      return event.ignore();
+    }
+    case 0xf1: {
+      auto event = cursor.sourceOnly("Pitch Envelope");
+      static_cast<void>(event.u8("delay"));
+      if (isLateVersion(version)) {
+        static_cast<void>(event.u8("length", SemanticOperandRole::Duration));
+        static_cast<void>(event.u8("offset", SemanticOperandRole::Pitch));
+        static_cast<void>(event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      } else {
+        static_cast<void>(event.u8("speed"));
+        static_cast<void>(event.u8("depth", SemanticOperandRole::Pitch));
+      }
+      return event.ignore();
+    }
+    case 0xf2: {
+      auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
+      return event.invoke<&Playback::tuning>(
+          event.s8("tuning", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+    }
+    case 0xf3: {
+      auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
+      appendPitchSlide(event, readPitchSlide(event, version));
+      return event;
+    }
+    case 0xf4: {
+      auto event = cursor.sourceOnly("Echo");
+      static_cast<void>(event.u8("channels", SourceValueDisplay::Hex));
+      static_cast<void>(event.u8("volume_left"));
+      static_cast<void>(event.u8("volume_right"));
+      return event.ignore();
+    }
+    case 0xf5: {
+      auto event = cursor.sourceOnly("Echo Param");
+      static_cast<void>(event.u8("delay"));
+      static_cast<void>(event.u8("feedback"));
+      static_cast<void>(event.u8("arg3", SourceValueDisplay::Hex));
+      return event.ignore();
+    }
+    case 0xf6:
+      return cursor.sourceOnly("Loop With Volta Start").ignore();
+    case 0xf7:
+      return cursor.sourceOnly("Loop With Volta End").ignore();
+    case 0xf9: {
+      auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
+      return event.invoke([](Playback& playback, u8 length) { playback.track.vibrato.setReusableFade(length); },
+                          event.u8("length", SemanticOperandRole::Duration));
+    }
+    case 0xfa:
+      if (version >= KONAMISNES_V4) {
+        auto event = cursor.sourceOnly("ADSR/Gain");
+        static_cast<void>(event.u8("adsr1", SourceValueDisplay::Hex));
+        static_cast<void>(event.u8("adsr2", SourceValueDisplay::Hex));
+        static_cast<void>(event.u8("gain", SourceValueDisplay::Hex));
+        return event.ignore();
+      }
+      return unknownCommand(cursor, 3);
+    case 0xfb:
+      if (version >= KONAMISNES_V4) {
+        auto event = cursor.sourceOnly("ADSR(2)");
+        static_cast<void>(event.u8("adsr2", SourceValueDisplay::Hex));
+        return event.ignore();
+      }
+      return unknownCommand(cursor, 1);
+    case 0xfc:
+      if (version == KONAMISNES_V1) {
+        auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
+        const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
+        const Address alternate = event.addressLe("alternate_destination", SemanticOperandRole::JumpTarget);
+        event.jump(destination);
+        return event.mayBranchTo(alternate, SemanticOperandRole::JumpTarget);
+      }
+      if (version == KONAMISNES_V2) {
+        auto event = cursor.sourceOnly("Linear Pitch Envelope");
+        static_cast<void>(event.u8("delta_fraction", SemanticOperandRole::Pitch));
+        static_cast<void>(event.u8("delta_integer", SemanticOperandRole::Pitch));
+        return event.ignore();
+      }
+      if (version >= KONAMISNES_V4) {
+        auto event = cursor.command("Program And Volume", SequenceSemantic::Program);
+        const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+        const u8 program = event.u8("program", SemanticOperandRole::Instrument);
+        event.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
+        event.derived("program_number", program & 0x7f, SemanticOperandRole::InstrumentProgram);
+        return event.invoke<&Playback::programChangeAndVolume>(volume, program);
+      }
+      return unknownCommand(cursor, 2);
+    case 0xfd: {
+      auto event = cursor.command("Jump", SequenceSemantic::Jump);
+      return event.loopCandidate(event.addressLe("destination", SemanticOperandRole::JumpTarget));
+    }
+    case 0xfe: {
+      auto event = cursor.command("Pattern Play", SequenceSemantic::Call);
+      const Address destination = event.addressLe("destination", SemanticOperandRole::CallTarget);
+      event.set<&TrackState::inSubroutine>(true);
+      return event.call(destination);
+    }
+    case 0xff: {
+      auto event = cursor.command("End", SequenceSemantic::End);
+      event.invoke<&Playback::endOrReturn>();
+      return event.discoverReturn();
     }
     default:
-      break;
+      return cursor.unsupported("Unknown Opcode", "unknown").stop();
   }
-  return fade;
 }
-
-struct KonamiSnesCursorReader {
-  template <class Runtime>
-  static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
-    const u8 opcode = cmd.opcode();
-    const EventType type = eventType(rt.context.version, opcode);
-    auto& state = rt.state;
-    state.emitInitialModulationCeiling(rt);
-
-    switch (type) {
-      case EventType::Unknown0:
-        return unknownEvent(cmd, 0);
-      case EventType::Unknown1:
-        return unknownEvent(cmd, 1);
-      case EventType::Unknown2:
-        return unknownEvent(cmd, 2);
-      case EventType::Unknown3:
-        return unknownEvent(cmd, 3);
-      case EventType::Unknown4:
-        return unknownEvent(cmd, 4);
-      case EventType::Unknown5:
-        return unknownEvent(cmd, 5);
-
-      case EventType::Note: {
-        cmd.name("Note", SequenceSemantic::Note);
-        const u8 key = opcode & 0x7f;
-        cmd.derived("key", key);
-        u8 length = state.noteLength;
-        if ((opcode & 0x80) == 0) {
-          length = cmd.u8("length");
-          state.noteLength = length;
-        }
-        u8 velocity = cmd.u8("velocity_or_duration");
-        if ((velocity & 0x80) == 0) {
-          state.noteDurationRate = std::min(velocity, noteDurationRateMax(rt.context.version));
-          velocity = cmd.u8("velocity");
-        }
-        velocity &= 0x7f;
-        if (velocity == 0) {
-          velocity = 1;
-        }
-        velocity = static_cast<u8>(std::clamp<int>(velocity + state.loopVolumeDelta + state.loopVolumeDelta2, 1, 127));
-        if (rt.context.version != KONAMISNES_V1) {
-          velocity = kVolumeTable[velocity];
-        }
-
-        state.applyEffectiveTuning(rt);
-        const u8 duration = state.noteDuration(rt.context.version, length);
-        const bool tied = state.prevNoteSlurred && state.prevNoteKey && key == *state.prevNoteKey;
-        state.resetPitchForNote(key, rt);
-        const auto slide = consumeInlinePitchSlide(rt, cmd);
-        rt.pitchBend(0.0);
-        state.vibrato.beginReusableFade();
-        if (state.vibrato.fadeActive()) {
-          state.emitVibratoDepth(rt, true);
-        }
-        if (tied) {
-          rt.note(state.noteSemitones(key, false), LevelScale::linearFromLinear(velocity / 127.0), duration, true);
-        } else {
-          rt.note(state.percussion ? key : state.noteSemitones(key, false),
-                  LevelScale::linearFromLinear(velocity / 127.0), duration);
-          state.prevNoteKey = key;
-        }
-        if (slide) {
-          state.beginPitchSlide(*slide, rt);
-        } else {
-          rt.pitchBendRange(2);
-        }
-        state.prevNoteSlurred = state.noteDurationRate == noteDurationRateMax(rt.context.version) && !state.percussion;
-        return cmd.wait(length);
-      }
-
-      case EventType::PercussionOn:
-        cmd.name("Percussion On", SequenceSemantic::Program);
-        if (!state.percussion) {
-          rt.instrument(midiBank(0x7f), 0, true);
-          state.percussion = true;
-        }
-        return cmd.next();
-
-      case EventType::PercussionOff:
-        cmd.name("Percussion Off", SequenceSemantic::Program);
-        if (state.percussion) {
-          rt.instrument(midiBank(state.instrument >> 7), state.instrument & 0x7f, true);
-          state.percussion = false;
-        }
-        return cmd.next();
-
-      case EventType::Gain:
-        cmd.name("GAIN", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("gain_amount"));
-        return cmd.next();
-
-      case EventType::InstantTuning: {
-        cmd.name("Instant Tuning", SequenceSemantic::Pitch);
-        s8 tuning = opcode & 0x0f;
-        if (tuning > 8) {
-          tuning -= 16;
-        }
-        cmd.derived("tuning", tuning);
-        applyTuning(rt, tuning);
-        return cmd.next();
-      }
-
-      case EventType::Rest: {
-        cmd.name("Rest", SequenceSemantic::Rest);
-        state.noteLength = cmd.u8("length");
-        const auto slide = consumeInlinePitchSlide(rt, cmd);
-        if (slide) {
-          state.beginPitchSlide(*slide, rt);
-        }
-        state.prevNoteSlurred = false;
-        return cmd.wait(state.noteLength);
-      }
-
-      case EventType::Tie: {
-        cmd.name("Tie", SequenceSemantic::Note);
-        state.noteLength = cmd.u8("length");
-        state.noteDurationRate = std::min<u8>(cmd.u8("duration_rate"), noteDurationRateMax(rt.context.version));
-        const u8 duration = state.noteDuration(rt.context.version, state.noteLength);
-        if (state.prevNoteSlurred) {
-          rt.note(0.0, 1.0, duration, true);
-          state.prevNoteSlurred = state.noteDurationRate == noteDurationRateMax(rt.context.version);
-        }
-        return cmd.wait(state.noteLength);
-      }
-
-      case EventType::ProgramChange: {
-        cmd.name("Program", SequenceSemantic::Program);
-        const u8 program = cmd.u8("program");
-        state.applyEffectiveTuning(rt, true);
-        state.instrument = program;
-        cmd.derived("bank", program >> 7).derived("program_number", program & 0x7f).instrumentRef(program >> 7, program & 0x7f);
-        rt.instrument(midiBank(program >> 7), program & 0x7f, true);
-        emitPan(rt, rt.context.version <= KONAMISNES_V2 ? 10 : 20);
-        return cmd.next();
-      }
-
-      case EventType::ProgramChangeVolume: {
-        cmd.name("Program And Volume", SequenceSemantic::Program);
-        const u8 volume = cmd.u8("volume");
-        const u8 program = cmd.u8("program");
-        state.applyEffectiveTuning(rt, true);
-        state.instrument = program;
-        rt.instrument(midiBank(program >> 7), program & 0x7f, true);
-        emitVolume(rt, volume);
-        emitPan(rt, rt.context.version <= KONAMISNES_V2 ? 10 : 20);
-        return cmd.next();
-      }
-
-      case EventType::Pan: {
-        cmd.name("Pan", SequenceSemantic::Pan);
-        const u8 raw = cmd.u8("pan");
-        const bool instrumentPanOff = rt.context.version <= KONAMISNES_V2 ? raw == 0x15 : raw == 0x2a;
-        const bool instrumentPanOn = rt.context.version <= KONAMISNES_V2 ? raw == 0x16 : raw == 0x2c;
-        cmd.derived("instrument_pan_off", instrumentPanOff).derived("instrument_pan_on", instrumentPanOn);
-        if (!instrumentPanOff && !instrumentPanOn) {
-          emitPan(rt, raw);
-        }
-        return cmd.next();
-      }
-
-      case EventType::Vibrato: {
-        cmd.name("Vibrato", SequenceSemantic::Modulation);
-        const u8 arg1 = cmd.u8("delay_or_fade");
-        const u8 rate = cmd.u8("rate");
-        const u8 depth = cmd.u8("depth");
-        const u8 builtInFade = vibrato::inlineFadeLength(rt.context.version, arg1);
-        const u8 delay = vibrato::delayFromArg1(rt.context.version, arg1);
-        state.vibrato.configure(delay, rate, depth);
-        if (builtInFade != 0) {
-          state.vibrato.setReusableFade(builtInFade);
-        }
-        state.emitVibratoDelay(rt);
-        state.emitVibratoDepth(rt, true);
-        state.emitVibratoRate(rt);
-        return cmd.next();
-      }
-
-      case EventType::RandomPitch:
-        cmd.name("Random Pitch", SequenceSemantic::Modulation).sourceOnly();
-        static_cast<void>(cmd.u8("rate"));
-        static_cast<void>(cmd.u16le("pitch_mask"));
-        return cmd.next();
-
-      case EventType::LoopStart:
-        cmd.name("Loop Start", SequenceSemantic::Loop);
-        state.loopReturnAddress = cmd.addressAtCursor();
-        return cmd.next();
-
-      case EventType::LoopEnd: {
-        cmd.name("Loop End", SequenceSemantic::Repeat);
-        const u8 times = cmd.u8("times");
-        const s8 volumeDelta = cmd.s8("volume_delta");
-        const s8 pitchDelta = cmd.s8("pitch_delta");
-        if (!state.loopReturnAddress) {
-          return cmd.next();
-        }
-        if (times == 0) {
-          return cmd.declaredLoop(*state.loopReturnAddress);
-        }
-        const auto flow = rt.countedRepeatUntil(cmd, 0, times, *state.loopReturnAddress);
-        if (flow.fallsThrough()) {
-          state.loopVolumeDelta = 0;
-          state.loopPitchDelta = 0;
-        } else {
-          state.loopVolumeDelta += volumeDelta;
-          state.loopPitchDelta += pitchDelta;
-        }
-        state.applyEffectiveTuning(rt);
-        return flow;
-      }
-
-      case EventType::LoopStart2:
-        cmd.name("Loop Start #2", SequenceSemantic::Loop);
-        state.loopReturnAddress2 = cmd.addressAtCursor();
-        return cmd.next();
-
-      case EventType::LoopEnd2: {
-        cmd.name("Loop End #2", SequenceSemantic::Repeat);
-        const u8 times = cmd.u8("times");
-        const s8 volumeDelta = cmd.s8("volume_delta");
-        const s8 pitchDelta = cmd.s8("pitch_delta");
-        if (!state.loopReturnAddress2) {
-          return cmd.next();
-        }
-        if (times == 0) {
-          return cmd.declaredLoop(*state.loopReturnAddress2);
-        }
-        const auto flow = rt.countedRepeatUntil(cmd, 1, times, *state.loopReturnAddress2);
-        if (flow.fallsThrough()) {
-          state.loopVolumeDelta2 = 0;
-          state.loopPitchDelta2 = 0;
-        } else {
-          state.loopVolumeDelta2 += volumeDelta;
-          state.loopPitchDelta2 += pitchDelta;
-        }
-        state.applyEffectiveTuning(rt);
-        return flow;
-      }
-
-      case EventType::Tempo: {
-        cmd.name("Tempo", SequenceSemantic::Tempo);
-        const u8 tempo = cmd.u8("tempo");
-        state.tempo = tempo;
-        state.tempoFade.setCurrentRaw(tempo);
-        const u32 microseconds = tempoMicrosecondsPerQuarter(rt.context.version, tempo);
-        cmd.derived("microseconds_per_quarter", microseconds);
-        rt.tempo(microseconds);
-        if (vibrato::usesLegacy(rt.context.version)) {
-          state.emitVibratoRate(rt);
-          state.emitVibratoDelay(rt);
-        }
-        return cmd.next();
-      }
-
-      case EventType::TempoFadeV1:
-      case EventType::TempoFadeV2: {
-        cmd.name("Tempo Fade", SequenceSemantic::Tempo);
-        const auto fade = readFade(rt, cmd, type);
-        static_cast<void>(state.tempoFade.begin(fade.motion));
-        return cmd.next();
-      }
-
-      case EventType::TransposeAbs:
-        cmd.name("Transpose", SequenceSemantic::Pitch);
-        state.transpose = cmd.s8("semitones");
-        return cmd.next();
-
-      case EventType::Adsr1:
-        cmd.name("ADSR(1)", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("adsr1"));
-        return cmd.next();
-
-      case EventType::Adsr2:
-        cmd.name("ADSR(2)", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("adsr2"));
-        return cmd.next();
-
-      case EventType::Volume: {
-        cmd.name("Volume", SequenceSemantic::Level);
-        emitVolume(rt, cmd.u8("volume"));
-        return cmd.next();
-      }
-
-      case EventType::VolumeFadeV1:
-      case EventType::VolumeFadeV2: {
-        cmd.name("Volume Fade", SequenceSemantic::Level);
-        const auto fade = readFade(rt, cmd, type);
-        static_cast<void>(state.volumeFade.begin(fade.motion));
-        return cmd.next();
-      }
-
-      case EventType::Portamento:
-        cmd.name("Portamento", SequenceSemantic::Portamento).sourceOnly();
-        static_cast<void>(cmd.u8("speed"));
-        return cmd.next();
-
-      case EventType::PitchEnvelopeV1:
-        cmd.name("Pitch Envelope", SequenceSemantic::Pitch).sourceOnly();
-        static_cast<void>(cmd.u8("delay"));
-        static_cast<void>(cmd.u8("speed"));
-        static_cast<void>(cmd.u8("depth"));
-        return cmd.next();
-
-      case EventType::PitchEnvelopeV2:
-        cmd.name("Pitch Envelope", SequenceSemantic::Pitch).sourceOnly();
-        static_cast<void>(cmd.u8("delay"));
-        static_cast<void>(cmd.u8("length"));
-        static_cast<void>(cmd.u8("offset"));
-        static_cast<void>(cmd.s16le("delta"));
-        return cmd.next();
-
-      case EventType::Tuning:
-        cmd.name("Tuning", SequenceSemantic::Pitch);
-        applyTuning(rt, cmd.s8("tuning"));
-        return cmd.next();
-
-      case EventType::PitchSlideV1:
-      case EventType::PitchSlideV2:
-      case EventType::PitchSlideV3: {
-        cmd.name("Pitch Slide", SequenceSemantic::Pitch);
-        const auto slide = readPitchSlideOperands(rt, cmd, type);
-        state.beginPitchSlide(slide, rt);
-        return cmd.next();
-      }
-
-      case EventType::Echo:
-        cmd.name("Echo", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("channels"));
-        static_cast<void>(cmd.u8("volume_left"));
-        static_cast<void>(cmd.u8("volume_right"));
-        return cmd.next();
-
-      case EventType::EchoParam:
-        cmd.name("Echo Param", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("delay"));
-        static_cast<void>(cmd.u8("feedback"));
-        static_cast<void>(cmd.u8("arg3"));
-        return cmd.next();
-
-      case EventType::VoltaStart:
-        cmd.name("Loop With Volta Start", SequenceSemantic::RepeatBreak).sourceOnly();
-        return cmd.next();
-
-      case EventType::VoltaEnd:
-        cmd.name("Loop With Volta End", SequenceSemantic::RepeatBreak).sourceOnly();
-        return cmd.next();
-
-      case EventType::PanFadeV1:
-      case EventType::PanFadeV2: {
-        cmd.name("Pan Fade", SequenceSemantic::Pan);
-        const auto fade = readFade(rt, cmd, type);
-        static_cast<void>(state.panFade.begin(fade.motion));
-        return cmd.next();
-      }
-
-      case EventType::VibratoFade: {
-        cmd.name("Vibrato Fade", SequenceSemantic::Modulation);
-        state.vibrato.setReusableFade(cmd.u8("length"));
-        return cmd.next();
-      }
-
-      case EventType::AdsrGain:
-        cmd.name("ADSR/Gain", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("adsr1"));
-        static_cast<void>(cmd.u8("adsr2"));
-        static_cast<void>(cmd.u8("gain"));
-        return cmd.next();
-
-      case EventType::ConditionalJumpV1: {
-        cmd.name("Conditional Jump", SequenceSemantic::Jump);
-        const Address destination = cmd.address16le("destination");
-        const Address alternate = cmd.address16le("alternate_destination");
-        cmd.target(alternate, SourceLinkRole::JumpTarget);
-        return cmd.jump(destination);
-      }
-
-      case EventType::LinearPitchEnvelopeV2:
-        cmd.name("Linear Pitch Envelope", SequenceSemantic::Pitch).sourceOnly();
-        static_cast<void>(cmd.u8("delta_fraction"));
-        static_cast<void>(cmd.u8("delta_integer"));
-        return cmd.next();
-
-      case EventType::Goto:
-        cmd.name("Jump", SequenceSemantic::Jump);
-        return cmd.loopCandidate(cmd.address16le("destination"));
-
-      case EventType::Call:
-        cmd.name("Pattern Play", SequenceSemantic::Call);
-        if (cmd.phase() == CommandPhase::Render) {
-          state.inSubroutine = true;
-        }
-        return cmd.call(cmd.address16le("destination"));
-
-      case EventType::End:
-        cmd.name("End", SequenceSemantic::End);
-        if (cmd.phase() == CommandPhase::Render && state.inSubroutine) {
-          state.inSubroutine = false;
-          return cmd.ret();
-        }
-        return cmd.end();
-
-      case EventType::Unsupported:
-        cmd.name("Unknown Opcode", SequenceSemantic::Unsupported)
-            .kind("unknown")
-            .derived("opcode", opcode, SourceValueDisplay::Hex)
-            .unsupported("Unknown Konami SNES sequence opcode");
-        rt.diagnostic(Severity::Warning, "Unknown Konami SNES sequence opcode");
-        return cmd.end();
-    }
-    return cmd.end();
-  }
-};
 
 [[nodiscard]] std::string dialectId(KonamiSnesVersion version) {
   return fmt::format("konami-snes:{}", konamiSnesVersionName(version));
 }
 
-[[nodiscard]] KonamiSnesSequenceDescriptor makeDescriptor(KonamiSnesVersion version) {
-  auto dialect = makeCursorDialect<TrackState, Context, KonamiSnesCursorReader>(CursorDialectSpec<Context>{
-      .id = dialectId(version),
+[[nodiscard]] SequenceDialect makeDialect(KonamiSnesVersion version) {
+  return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+      .id = DialectId{.value = dialectId(version)},
       .commandDetailKindPrefix = "konami-snes",
       .timebase = Timebase{.ppqn = kKonamiSnesPpqn},
       .defaultBehavior =
@@ -1504,35 +1002,22 @@ struct KonamiSnesCursorReader {
               .initialLevel = 1.0,
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 2,
-              .stopAllTracksAtFirstLoop = false,
           },
-      .context = Context{.version = version},
+      .semanticPrepass =
+          vibrato::usesLegacy(version) ? SemanticPrepassMode::ScheduledPlayback : SemanticPrepassMode::DecodedCommands,
   });
-  dialect.tick = [](const SourceCommand& command, const TrackProgram& track, std::any& trackState,
-                    PerformanceEmitter& out, VmApi& vm, const std::any& context) {
-    static_cast<void>(command);
-    static_cast<void>(track);
-    static_cast<void>(vm);
-    auto& state = std::any_cast<TrackState&>(trackState);
-    const auto& typedContext = std::any_cast<const Context&>(context);
-    state.tickAutomation(out, typedContext.version);
-  };
-  return KonamiSnesSequenceDescriptor{
-      .dialect = std::move(dialect),
-  };
 }
 
 }  // namespace
 
-const KonamiSnesSequenceDescriptor& konamiSnesSequenceDescriptor(KonamiSnesVersion version) {
-  static const KonamiSnesSequenceDescriptor none = makeDescriptor(KONAMISNES_NONE);
-  static const KonamiSnesSequenceDescriptor v1 = makeDescriptor(KONAMISNES_V1);
-  static const KonamiSnesSequenceDescriptor v2 = makeDescriptor(KONAMISNES_V2);
-  static const KonamiSnesSequenceDescriptor v3 = makeDescriptor(KONAMISNES_V3);
-  static const KonamiSnesSequenceDescriptor v4 = makeDescriptor(KONAMISNES_V4);
-  static const KonamiSnesSequenceDescriptor v5 = makeDescriptor(KONAMISNES_V5);
-  static const KonamiSnesSequenceDescriptor v6 = makeDescriptor(KONAMISNES_V6);
-
+const SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version) {
+  static const SequenceDialect none = makeDialect(KONAMISNES_NONE);
+  static const SequenceDialect v1 = makeDialect(KONAMISNES_V1);
+  static const SequenceDialect v2 = makeDialect(KONAMISNES_V2);
+  static const SequenceDialect v3 = makeDialect(KONAMISNES_V3);
+  static const SequenceDialect v4 = makeDialect(KONAMISNES_V4);
+  static const SequenceDialect v5 = makeDialect(KONAMISNES_V5);
+  static const SequenceDialect v6 = makeDialect(KONAMISNES_V6);
   switch (version) {
     case KONAMISNES_V1:
       return v1;
@@ -1553,100 +1038,71 @@ const KonamiSnesSequenceDescriptor& konamiSnesSequenceDescriptor(KonamiSnesVersi
 }
 
 void registerKonamiSnesSequenceDialects(SequenceDialectRegistry& registry) {
-  registry.add(konamiSnesSequenceDescriptor(KONAMISNES_NONE).dialect);
-  registry.add(konamiSnesSequenceDescriptor(KONAMISNES_V1).dialect);
-  registry.add(konamiSnesSequenceDescriptor(KONAMISNES_V2).dialect);
-  registry.add(konamiSnesSequenceDescriptor(KONAMISNES_V3).dialect);
-  registry.add(konamiSnesSequenceDescriptor(KONAMISNES_V4).dialect);
-  registry.add(konamiSnesSequenceDescriptor(KONAMISNES_V5).dialect);
-  registry.add(konamiSnesSequenceDescriptor(KONAMISNES_V6).dialect);
+  registry.add(konamiSnesSequenceDialect(KONAMISNES_NONE));
+  registry.add(konamiSnesSequenceDialect(KONAMISNES_V1));
+  registry.add(konamiSnesSequenceDialect(KONAMISNES_V2));
+  registry.add(konamiSnesSequenceDialect(KONAMISNES_V3));
+  registry.add(konamiSnesSequenceDialect(KONAMISNES_V4));
+  registry.add(konamiSnesSequenceDialect(KONAMISNES_V5));
+  registry.add(konamiSnesSequenceDialect(KONAMISNES_V6));
 }
 
-TrackProgram decodeKonamiSnesSourceTrack(ByteReader reader, const KonamiSnesSequenceDescriptor& descriptor,
-                                         u32 sourceTrackNumber, u32 startAddress, SourceMapBuilder* sourceMap,
+TrackProgram decodeKonamiSnesSourceTrack(ByteReader reader, KonamiSnesVersion version, u32 sourceTrackNumber,
+                                         u32 startAddress, SourceMapBuilder* sourceMap,
                                          std::vector<Diagnostic>* diagnostics,
                                          std::optional<SourceAnnotationId> parentAnnotation,
                                          std::optional<AssetId> sequenceAsset) {
-  return decodeCursorLinearTrack<TrackState, Context, KonamiSnesCursorReader>(
-      reader, descriptor.dialect,
-      CursorTrackDecodeInput{
-          .sequenceAsset = sequenceAsset,
-          .trackIndex = sourceTrackNumber,
-          .startOffset = startAddress,
-          .parentAnnotation = parentAnnotation,
-          .sourceMap = sourceMap,
-          .diagnostics = diagnostics,
-          .maxCommands = 8192,
-      });
+  const TrackDecodeScope tracks{
+      .reader = reader,
+      .maxCommands = kMaxTrackCommands,
+      .sequenceAsset = sequenceAsset,
+      .parentAnnotation = parentAnnotation,
+      .sourceMap = sourceMap,
+  };
+  return tracks.linear(sourceTrackNumber, startAddress,
+                       [&](u32 offset) { return decodeCommand(reader, offset, version, diagnostics); });
 }
 
-SequenceProgramAsset parseKonamiSnesSequence(const ScanInput& input, const KonamiSnesLayout& layout,
-                                             AssetId sequenceId, std::string_view displayName,
-                                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+SourceRange konamiSnesSequenceHeaderRange(ByteReader reader, const KonamiSnesLayout& layout) {
   u32 trackCount = kKonamiSnesMaxTracks;
   for (u32 trackNumber = 0; trackNumber < kKonamiSnesMaxTracks; ++trackNumber) {
     const u32 pointerOffset = layout.sequenceHeaderAddress + trackNumber * 2;
-    if (!input.reader.has(pointerOffset, 2)) {
+    if (!reader.has(pointerOffset, 2)) {
       trackCount = trackNumber;
       break;
     }
-    const u16 trackAddress = input.reader.le16(pointerOffset);
+    const u16 trackAddress = reader.le16(pointerOffset);
     if (trackAddress >= layout.sequenceHeaderAddress &&
         trackAddress - layout.sequenceHeaderAddress < kKonamiSnesMaxTracks * 2) {
       trackCount = (trackAddress - layout.sequenceHeaderAddress) / 2;
       break;
     }
   }
+  return reader.range(layout.sequenceHeaderAddress, trackCount * 2);
+}
 
-  const SourceRange headerRange = input.reader.range(layout.sequenceHeaderAddress, trackCount * 2);
-  SourceAnnotationId headerAnnotation;
-  if (sourceMap != nullptr) {
-    auto header = sourceMap->header("Sequence Header", headerRange)
-                      .kind("konami-snes-sequence-header")
-                      .owner(ObjectRefs::sequence(sequenceId))
-                      .field("version", headerRange, konamiSnesVersionName(layout.version));
-    headerAnnotation = header.id();
-  }
+SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayout& layout, AssetId sequenceId,
+                                         SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+  const SourceRange headerRange = konamiSnesSequenceHeaderRange(reader, layout);
+  const u32 trackCount = headerRange.size / 2;
 
-  const auto& descriptor = konamiSnesSequenceDescriptor(layout.version);
-  SequenceProgram program = descriptor.dialect.makeProgram(Address{layout.sequenceHeaderAddress});
-
+  const auto& dialect = konamiSnesSequenceDialect(layout.version);
+  SequenceDecodeSession sequence{
+      reader, dialect, sequenceId, headerRange, sourceMap, kMaxTrackCommands,
+  };
+  const auto decode = [&](u32 offset) { return decodeCommand(reader, offset, layout.version, diagnostics); };
   for (u32 trackNumber = 0; trackNumber < trackCount; ++trackNumber) {
     const u32 pointerOffset = layout.sequenceHeaderAddress + trackNumber * 2;
-    const SourceRange pointerRange = input.reader.range(pointerOffset, 2);
-    const u16 trackAddress = input.reader.le16(pointerOffset);
-    if (trackAddress == 0 || !input.reader.has(trackAddress, 1)) {
+    const u16 trackAddress = reader.le16(pointerOffset);
+    if (trackAddress == 0 || !reader.has(trackAddress, 1)) {
       continue;
     }
-
-    std::optional<SourceAnnotationId> trackAnnotation;
-    if (sourceMap != nullptr) {
-      auto pointer = sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{input.reader.range(trackAddress, 1)})
-                         .kind("konami-snes-track-pointer")
-                         .description(fmt::format("Track starts at ${:04X}", trackAddress))
-                         .derived("source_track", trackNumber)
-                         .field("destination", pointerRange, trackAddress, SourceValueDisplay::Address);
-      if (headerAnnotation.valid()) {
-        pointer.parent(headerAnnotation);
-      }
-      trackAnnotation = pointer.id();
-    }
-
-    auto track = decodeKonamiSnesSourceTrack(input.reader, descriptor, trackNumber, trackAddress, sourceMap,
-                                             diagnostics, trackAnnotation, sequenceId);
-    program.tracks.push_back(std::move(track));
+    sequence.addLinearTrack(trackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
   }
 
-  return SequenceProgramAsset{
-      .metadata =
-          AssetMetadata{
-              .id = sequenceId,
-              .format = "KonamiSnes",
-              .name = std::string(displayName),
-              .range = headerRange,
-          },
-      .program = std::move(program),
-  };
+  SequenceProgram program = sequence.finish();
+  program.config.profile = static_cast<u32>(layout.version);
+  return program;
 }
 
 }  // namespace vgmtrans::formats::konami_snes

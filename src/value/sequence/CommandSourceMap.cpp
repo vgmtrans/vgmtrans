@@ -201,9 +201,10 @@ TrackProgram TrackDecodeSession::finish(TrackProgram track) {
 
 SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect,
                                              AssetId sequenceAsset, SourceRange headerRange,
-                                             SourceMapBuilder* sourceMap)
+                                             SourceMapBuilder* sourceMap, u32 maxTrackCommands)
     : tracks_{
           .reader = reader,
+          .maxCommands = maxTrackCommands,
           .sequenceAsset = sequenceAsset,
           .sourceMap = sourceMap,
       },
