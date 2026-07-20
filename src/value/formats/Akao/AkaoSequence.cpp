@@ -79,10 +79,6 @@ struct TrackState {
   return rawPan == 127 ? 1.0 : rawPan / 128.0;
 }
 
-[[nodiscard]] u32 akaoMidiBank(u32 bankMsb) {
-  return bankMsb << 7;
-}
-
 [[nodiscard]] u16 akaoZeroAs256(u8 rawValue) {
   return rawValue == 0 ? 256 : rawValue;
 }
@@ -91,157 +87,20 @@ struct TrackState {
   return LevelScale::linearFromLinear(value / 127.0);
 }
 
-[[nodiscard]] double akaoMillisecondsPerTick(u32 microsecondsPerQuarter) {
-  return microsecondsPerQuarter / 1000.0 / static_cast<double>(kAkaoPpqn);
-}
-
 [[nodiscard]] double akaoTuningScale(s8 tuning) {
   const int divisor = tuning >= 0 ? 128 : 256;
   return tuning / static_cast<double>(divisor);
 }
 
-[[nodiscard]] double akaoTuningCents(s8 tuning) {
-  return (akaoTuningScale(tuning) / std::log(2.0)) * 1200.0;
-}
-
-[[nodiscard]] double akaoTuningPitchBendSemitones(s8 tuning) {
-  constexpr double legacyPitchBendRangeSemitones = 12.0;
-  const double percent = akaoTuningScale(tuning) / std::log(2.0);
-  const auto bend = static_cast<s16>(std::clamp(static_cast<int>(percent * 8192.0), -8192, 8191));
-  return (bend / 8192.0) * legacyPitchBendRangeSemitones;
-}
-
-[[nodiscard]] u32 akaoMicrosPerQuarterFromBpm(double bpm) {
-  return static_cast<u32>(std::round(60000000.0 / std::max(1.0, bpm)));
-}
-
-// History-dependent behavior stays close to the command switch, but outside
-// it. Every argument comes from a compiled command or the typed track state;
-// playback never reopens source bytes.
+// Playback holds the few runtime services shared by several commands. One-off
+// behavior stays beside the opcode that invokes it below.
 struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
 
-  [[nodiscard]] Effects rest(u32 encodedDelta, u32 fallbackDelta) {
-    const u32 delta = consumeDelta(encodedDelta, fallbackDelta);
-    track.tieKey.reset();
-    return Effects::wait(delta);
-  }
+  void instrument(u32 bank, u32 program) { out.instrument(bank << 7, program, true); }
 
-  [[nodiscard]] Effects tie(u32 encodedDelta, u32 fallbackDelta, bool modern) {
-    const u32 delta = consumeDelta(encodedDelta, fallbackDelta);
-    if (track.tieKey) {
-      out.note(*track.tieKey, LevelScale::linearFromMidi7(kNoteVelocity), soundingTicks(delta, modern), true);
-    }
-    return Effects::wait(delta);
-  }
-
-  [[nodiscard]] Effects note(u8 relativeKey, u32 encodedDelta, u32 fallbackDelta, bool modern) {
-    const u32 delta = consumeDelta(encodedDelta, fallbackDelta);
-    const u8 sourceKey =
-        track.drum && !modern ? static_cast<u8>(24 + relativeKey) : static_cast<u8>(track.octave * 12 + relativeKey);
-    const u8 key = static_cast<u8>(std::clamp<int>(static_cast<int>(sourceKey) + track.transpose, 0, 127));
-    if (track.portamento && track.previousKey) {
-      out.portamentoControl(*track.previousKey);
-    }
-    out.note(key, LevelScale::linearFromMidi7(kNoteVelocity), soundingTicks(delta, modern));
-    track.previousKey = key;
-    track.tieKey = key;
-    return Effects::wait(delta);
-  }
-
-  void instrument(u32 bank, u32 program) { out.instrument(akaoMidiBank(bank), program, true); }
-
-  void timeSignature(u8 ticksPerBeat, u8 beatsPerMeasure) {
-    if (ticksPerBeat == 0 || beatsPerMeasure == 0) {
-      return;
-    }
-    const u8 denominator = static_cast<u8>((kAkaoPpqn * 4) / ticksPerBeat);
-    out.timeSignature(beatsPerMeasure, denominator, ticksPerBeat);
-  }
-
-  void tempoFade(u16 duration, double targetBpm, u32 targetMicrosecondsPerQuarter) {
-    const u64 startTick = vm.tick();
-    const double increment = (targetBpm - track.tempoBpm) / static_cast<double>(duration);
-    for (u16 i = 0; i < duration; ++i) {
-      const double bpm = track.tempoBpm + increment * (i + 1);
-      out.at(startTick + i).tempo(akaoMicrosPerQuarterFromBpm(bpm));
-    }
-    track.tempoBpm = targetBpm;
-    track.microsecondsPerQuarter = targetMicrosecondsPerQuarter;
-  }
-
-  void volumeFade(u16 duration, u8 target) {
-    controllerSlide(
-        track.volume, target, duration,
-        [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
-        [&](u64 tick, u8 value) { out.at(tick).level(akaoLinearControllerGain(value)); });
-  }
-
-  void expressionFade(u16 duration, u8 target) {
-    controllerSlide(
-        track.expression, target, duration,
-        [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
-        [&](u64 tick, u8 value) { out.at(tick).expression(akaoLinearControllerGain(value)); });
-  }
-
-  void panFade(u16 duration, u8 target) {
-    controllerSlide(
-        track.pan, target, duration, [](u8 value) { return value; },
-        [&](u64 tick, u8 value) {
-          const double rightGain = rightGainFromLinearPan(value);
-          out.at(tick).stereoBalance(1.0 - rightGain, rightGain);
-        });
-  }
-
-  void octaveDown() {
-    if (track.octave > 0) {
-      --track.octave;
-    }
-  }
-
-  void relativeTranspose(s8 relative) {
-    track.transpose = static_cast<s8>(std::clamp<int>(static_cast<int>(track.transpose) + relative, -128, 127));
-  }
-
-  void relativeTuning(s8 relative) {
-    track.tuning = static_cast<s8>(std::clamp<int>(static_cast<int>(track.tuning) + relative, -128, 127));
-    out.tuning(akaoTuningCents(track.tuning));
-  }
-
-  void portamentoOn(u16 speed) {
-    out.portamentoTime(akaoMillisecondsPerTick(track.microsecondsPerQuarter) * speed);
-    out.portamentoEnable(true);
-    track.portamento = true;
-  }
-
-  void fixedDuration(s8 relativeLength) {
-    track.fixedDuration =
-        static_cast<u16>(std::clamp<int>(static_cast<int>(track.lastDeltaTime) + relativeLength, 1, 255));
-  }
-
-  void repeatStart(Address address) { track.repeats.start(address); }
-
-  [[nodiscard]] Effects repeatUntil(u16 totalPlays) {
-    const u8 slot = track.repeats.layer;
-    const Address target = track.repeats.current();
-    track.repeats.completeCurrentPlay();
-    Effects effects = vm.countedRepeatUntil(slot, totalPlays, target);
-    if (effects.step.kind == StepKind::Next) {
-      track.repeats.finishFallthrough();
-    }
-    return effects;
-  }
-
-  [[nodiscard]] Effects repeatBranch(u16 matchingPlay, Address destination) {
-    if (track.repeats.currentCompletedPlays() + 1 == matchingPlay) {
-      return Effects{.step = vm.finiteBranch(destination)};
-    }
-    return {};
-  }
-
-private:
   [[nodiscard]] u32 consumeDelta(u32 encodedDelta, u32 fallbackDelta) {
     u32 delta = encodedDelta;
     if (track.useOneTimeDuration) {
@@ -350,14 +209,6 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
   return event.emitTempo(micros);
 }
 
-[[nodiscard]] DecodedBytecodeCommand tempoFade(AkaoEvent& event, const AkaoProfile& profile) {
-  const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
-  const u16 raw = event.u16le("tempo");
-  const double bpm = event.derived("target_beats_per_minute", profile.tempoBpm(raw));
-  const u32 micros = event.derived("target_microseconds_per_quarter", profile.tempoMicrosPerQuarter(raw));
-  return event.invoke<&Playback::tempoFade>(duration, bpm, micros);
-}
-
 [[nodiscard]] DecodedBytecodeCommand timeSignature(AkaoEvent& event) {
   // The driver stores the metronome interval first and numerator second.
   const u8 ticksPerBeat = event.u8("ticks_per_beat");
@@ -367,34 +218,33 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     event.derived("denominator", static_cast<u8>((kAkaoPpqn * 4) / ticksPerBeat));
     event.derived("midi_clocks_per_metronome_click", ticksPerBeat);
   }
-  return event.invoke<&Playback::timeSignature>(ticksPerBeat, beatsPerMeasure);
+  return event.invoke(
+      [](Playback& playback, u8 ticks, u8 beats) {
+        if (ticks == 0 || beats == 0) {
+          return;
+        }
+        const u8 denominator = static_cast<u8>((kAkaoPpqn * 4) / ticks);
+        playback.out.timeSignature(beats, denominator, ticks);
+      },
+      ticksPerBeat, beatsPerMeasure);
 }
 
 [[nodiscard]] DecodedBytecodeCommand jumpOrLoop(AkaoEvent& event, Address destination, u32 commandAddress) {
   return destination.value <= commandAddress ? event.loopCandidate(destination) : event.jump(destination);
 }
 
-[[nodiscard]] DecodedBytecodeCommand repeatStart(AkaoEvent& event, RepeatStack& repeats) {
-  const Address address = event.nextAddress();
-  repeats.start(address);
-  return event.invoke<&Playback::repeatStart>(address);
-}
-
-[[nodiscard]] DecodedBytecodeCommand repeatUntil(AkaoEvent& event, RepeatStack& repeats) {
-  const u16 count = event.resolved("count", event.rawU8("raw_count"), akaoZeroAs256);
-  const Address target = repeats.current();
-  repeats.completeCurrentPlay();
-  repeats.finishFallthrough();
-  event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-  event.mayBranchTo(target, SemanticOperandRole::RepeatTarget).runtimeControlFlow();
-  return event.invoke<&Playback::repeatUntil>(count);
-}
-
 [[nodiscard]] DecodedBytecodeCommand repeatBranch(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset) {
   const u16 count = event.resolved("count", event.rawU8("raw_count"), akaoZeroAs256);
   const Address destination = relativeAddress(event, profile, operandOffset, "relative");
   event.mayBranchTo(destination).runtimeControlFlow();
-  return event.invoke<&Playback::repeatBranch>(count, destination);
+  return event.invoke(
+      [](Playback& playback, u16 matchingPlay, Address branchDestination) -> Effects {
+        if (playback.track.repeats.currentCompletedPlays() + 1 == matchingPlay) {
+          return Effects{.step = playback.vm.finiteBranch(branchDestination)};
+        }
+        return {};
+      },
+      count, destination);
 }
 
 [[nodiscard]] DecodedBytecodeCommand passiveBranch(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset,
@@ -420,7 +270,23 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0x01: {
       auto event = subCommand(cursor, "Tempo Fade", SequenceSemantic::Tempo);
-      return tempoFade(event, profile);
+      const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
+      const u16 raw = event.u16le("tempo");
+      const double bpm = event.derived("target_beats_per_minute", profile.tempoBpm(raw));
+      const u32 micros = event.derived("target_microseconds_per_quarter", profile.tempoMicrosPerQuarter(raw));
+      return event.invoke(
+          [](Playback& playback, u16 fadeTicks, double targetBpm, u32 targetMicros) {
+            const u64 startTick = playback.vm.tick();
+            const double increment = (targetBpm - playback.track.tempoBpm) / fadeTicks;
+            for (u16 i = 0; i < fadeTicks; ++i) {
+              const double fadedBpm = playback.track.tempoBpm + increment * (i + 1);
+              const u32 fadedMicros = static_cast<u32>(std::round(60000000.0 / std::max(1.0, fadedBpm)));
+              playback.out.at(startTick + i).tempo(fadedMicros);
+            }
+            playback.track.tempoBpm = targetBpm;
+            playback.track.microsecondsPerQuarter = targetMicros;
+          },
+          duration, bpm, micros);
     }
     case 0x04: {
       auto event = subCommand(cursor, "Drum Kit On", SequenceSemantic::Program);
@@ -473,7 +339,14 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       auto event = subCommand(cursor, "Volume Fade", SequenceSemantic::Level);
       const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
       const u8 target = event.u8("target_volume", SemanticOperandRole::Level);
-      return event.invoke<&Playback::volumeFade>(duration, target);
+      return event.invoke(
+          [](Playback& playback, u16 fadeTicks, u8 targetVolume) {
+            playback.controllerSlide(
+                playback.track.volume, targetVolume, fadeTicks,
+                [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
+                [&](u64 tick, u8 value) { playback.out.at(tick).level(akaoLinearControllerGain(value)); });
+          },
+          duration, target);
     }
     case 0x14: {
       auto event = subCommand(cursor, "Program Change (Key-Split Instrument)", SequenceSemantic::Program);
@@ -514,12 +387,27 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     if (rest) {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
       const u32 delta = inlineDuration ? event.u8("duration", SemanticOperandRole::Duration) : fallbackDelta;
-      return event.invoke<&Playback::rest>(delta, fallbackDelta);
+      return event.invoke(
+          [](Playback& playback, u32 encodedDelta, u32 defaultDelta) -> Effects {
+            const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
+            playback.track.tieKey.reset();
+            return Effects::wait(duration);
+          },
+          delta, fallbackDelta);
     }
     if (tie) {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
       const u32 delta = inlineDuration ? event.u8("duration", SemanticOperandRole::Duration) : fallbackDelta;
-      return event.invoke<&Playback::tie>(delta, fallbackDelta, modern);
+      return event.invoke(
+          [](Playback& playback, u32 encodedDelta, u32 defaultDelta, bool modernDriver) -> Effects {
+            const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
+            if (playback.track.tieKey) {
+              playback.out.note(*playback.track.tieKey, LevelScale::linearFromMidi7(kNoteVelocity),
+                                playback.soundingTicks(duration, modernDriver), true);
+            }
+            return Effects::wait(duration);
+          },
+          delta, fallbackDelta, modern);
     }
 
     auto event = cursor.command("Note", SequenceSemantic::Note);
@@ -528,7 +416,24 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     const u8 relativeKey = event.opcodeValue("scale_step", static_cast<u8>(noteByte / 11), SourceValueDisplay::Default,
                                              SemanticOperandRole::NoteKey);
     const u32 delta = inlineDuration ? event.u8("duration", SemanticOperandRole::Duration) : fallbackDelta;
-    return event.invoke<&Playback::note>(relativeKey, delta, fallbackDelta, modern);
+    return event.invoke(
+        [](Playback& playback, u8 scaleStep, u32 encodedDelta, u32 defaultDelta, bool modernDriver) -> Effects {
+          const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
+          const u8 sourceKey = playback.track.drum && !modernDriver
+                                   ? static_cast<u8>(24 + scaleStep)
+                                   : static_cast<u8>(playback.track.octave * 12 + scaleStep);
+          const u8 key =
+              static_cast<u8>(std::clamp<int>(static_cast<int>(sourceKey) + playback.track.transpose, 0, 127));
+          if (playback.track.portamento && playback.track.previousKey) {
+            playback.out.portamentoControl(*playback.track.previousKey);
+          }
+          playback.out.note(key, LevelScale::linearFromMidi7(kNoteVelocity),
+                            playback.soundingTicks(duration, modernDriver));
+          playback.track.previousKey = key;
+          playback.track.tieKey = key;
+          return Effects::wait(duration);
+        },
+        relativeKey, delta, fallbackDelta, modern);
   }
 
   if (status >= 0x9a && status <= 0x9f) {
@@ -563,8 +468,14 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xa6:
       return cursor.command("Octave Up", SequenceSemantic::State).add<&TrackState::octave>(1u);
-    case 0xa7:
-      return cursor.command("Octave Down", SequenceSemantic::State).invoke<&Playback::octaveDown>();
+    case 0xa7: {
+      auto event = cursor.command("Octave Down", SequenceSemantic::State);
+      return event.invoke([](Playback& playback) {
+        if (playback.track.octave > 0) {
+          --playback.track.octave;
+        }
+      });
+    }
     case 0xa8: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);
       const u8 expression = event.u8("expression", SemanticOperandRole::Level);
@@ -575,7 +486,14 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       auto event = cursor.command("Expression Fade", SequenceSemantic::Level);
       const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
       const u8 target = event.u8("target_expression", SemanticOperandRole::Level);
-      return event.invoke<&Playback::expressionFade>(duration, target);
+      return event.invoke(
+          [](Playback& playback, u16 fadeTicks, u8 targetExpression) {
+            playback.controllerSlide(
+                playback.track.expression, targetExpression, fadeTicks,
+                [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
+                [&](u64 tick, u8 value) { playback.out.at(tick).expression(akaoLinearControllerGain(value)); });
+          },
+          duration, target);
     }
     case 0xaa: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
@@ -588,7 +506,16 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
       const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
       const u8 target = event.u8("target_pan", SemanticOperandRole::Pan);
-      return event.invoke<&Playback::panFade>(duration, target);
+      return event.invoke(
+          [](Playback& playback, u16 fadeTicks, u8 targetPan) {
+            playback.controllerSlide(
+                playback.track.pan, targetPan, fadeTicks, [](u8 value) { return value; },
+                [&](u64 tick, u8 value) {
+                  const double rightGain = rightGainFromLinearPan(value);
+                  playback.out.at(tick).stereoBalance(1.0 - rightGain, rightGain);
+                });
+          },
+          duration, target);
     }
     case 0xc0: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
@@ -596,7 +523,13 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xc1: {
       auto event = cursor.command("Transpose (Relative)", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::relativeTranspose>(event.s8("semitones", SemanticOperandRole::Pitch));
+      const s8 semitones = event.s8("semitones", SemanticOperandRole::Pitch);
+      return event.invoke(
+          [](Playback& playback, s8 relative) {
+            playback.track.transpose =
+                static_cast<s8>(std::clamp<int>(static_cast<int>(playback.track.transpose) + relative, -128, 127));
+          },
+          semitones);
     }
     case 0xc2:
       return cursor.sourceOnly("Reverb On");
@@ -604,11 +537,32 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       return cursor.sourceOnly("Reverb Off");
     case 0xc8: {
       auto event = cursor.command("Repeat Start", SequenceSemantic::Repeat);
-      return repeatStart(event, repeats);
+      const Address start = event.nextAddress();
+      // Decoding and playback walk the track independently, so each needs its
+      // own copy of the repeat stack.
+      repeats.start(start);
+      return event.invoke([](Playback& playback, Address address) { playback.track.repeats.start(address); }, start);
     }
     case 0xc9: {
       auto event = cursor.command("Repeat Until", SequenceSemantic::Repeat);
-      return repeatUntil(event, repeats);
+      const u16 count = event.resolved("count", event.rawU8("raw_count"), akaoZeroAs256);
+      const Address target = repeats.current();
+      repeats.completeCurrentPlay();
+      repeats.finishFallthrough();
+      event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      event.mayBranchTo(target, SemanticOperandRole::RepeatTarget).runtimeControlFlow();
+      return event.invoke(
+          [](Playback& playback, u16 totalPlays) -> Effects {
+            const u8 slot = playback.track.repeats.layer;
+            const Address start = playback.track.repeats.current();
+            playback.track.repeats.completeCurrentPlay();
+            Effects effects = playback.vm.countedRepeatUntil(slot, totalPlays, start);
+            if (effects.step.kind == StepKind::Next) {
+              playback.track.repeats.finishFallthrough();
+            }
+            return effects;
+          },
+          count);
     }
     case 0xca: {
       auto event = cursor.command("Repeat Again", SequenceSemantic::Repeat);
@@ -628,16 +582,37 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
       const s8 tuning = event.s8("tuning", SemanticOperandRole::Pitch);
       event.set<&TrackState::tuning>(tuning);
-      return event.emitPitchBend(akaoTuningPitchBendSemitones(tuning));
+      // Preserve Akao's original pitch resolution by first rounding through
+      // the 14-bit bend value used with its twelve-semitone bend range.
+      constexpr double pitchBendRangeSemitones = 12.0;
+      const double percent = akaoTuningScale(tuning) / std::log(2.0);
+      const auto bend = static_cast<s16>(std::clamp(static_cast<int>(percent * 8192.0), -8192, 8191));
+      return event.emitPitchBend((bend / 8192.0) * pitchBendRangeSemitones);
     }
     case 0xd9: {
       auto event = cursor.command("Tuning (Relative)", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::relativeTuning>(event.s8("tuning", SemanticOperandRole::Pitch));
+      const s8 tuning = event.s8("tuning", SemanticOperandRole::Pitch);
+      return event.invoke(
+          [](Playback& playback, s8 relative) {
+            playback.track.tuning =
+                static_cast<s8>(std::clamp<int>(static_cast<int>(playback.track.tuning) + relative, -128, 127));
+            const double cents = (akaoTuningScale(playback.track.tuning) / std::log(2.0)) * 1200.0;
+            playback.out.tuning(cents);
+          },
+          tuning);
     }
     case 0xda: {
       auto event = cursor.command("Portamento On", SequenceSemantic::Portamento);
       const u16 speed = event.resolved("ticks", event.rawU8("speed"), akaoZeroAs256);
-      return event.invoke<&Playback::portamentoOn>(speed);
+      return event.invoke(
+          [](Playback& playback, u16 ticks) {
+            const double millisecondsPerTick =
+                playback.track.microsecondsPerQuarter / 1000.0 / static_cast<double>(kAkaoPpqn);
+            playback.out.portamentoTime(millisecondsPerTick * ticks);
+            playback.out.portamentoEnable(true);
+            playback.track.portamento = true;
+          },
+          speed);
     }
     case 0xdb: {
       auto event = cursor.command("Portamento Off", SequenceSemantic::Portamento);
@@ -646,7 +621,13 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xdc: {
       auto event = cursor.command("Fixed Note Length", SequenceSemantic::State);
-      return event.invoke<&Playback::fixedDuration>(event.s8("relative_length", SemanticOperandRole::Duration));
+      const s8 relativeLength = event.s8("relative_length", SemanticOperandRole::Duration);
+      return event.invoke(
+          [](Playback& playback, s8 relative) {
+            playback.track.fixedDuration =
+                static_cast<u16>(std::clamp<int>(static_cast<int>(playback.track.lastDeltaTime) + relative, 1, 255));
+          },
+          relativeLength);
     }
     case 0xe8:
       if (profile.legacyFamily()) {
