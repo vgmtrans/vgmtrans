@@ -123,12 +123,6 @@ struct StereoBalance {
   return std::clamp(midiValue, 0, 127) / 127.0;
 }
 
-[[nodiscard]] double lfoRate(u8 rawRate) {
-  // Pitch-space distance from driver rate 1 to 255; the common frequency
-  // factor cancels from the logarithmic ratio.
-  return rawRate == 0 ? 0.0 : std::log2(rawRate) / std::log2(255.0);
-}
-
 }  // namespace math
 
 // Only registers that persist from one executed command to the next belong in
@@ -408,7 +402,9 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
         case LfoParameter::Rate: {
           const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
           const bool enabled = event.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
-          const double amount = event.derived("amount", math::lfoRate(raw.value));
+          // Express rates 1-255 as logarithmic pitch-space positions.
+          const double normalizedRate = raw.value == 0 ? 0.0 : std::log2(raw.value) / std::log2(255.0);
+          const double amount = event.derived("amount", normalizedRate);
           const double hertz = event.derived("frequency_hz", raw.value * kCapcomSnesLfoStepHertz);
 
           // Zero disables both remembered depths without forgetting them.
