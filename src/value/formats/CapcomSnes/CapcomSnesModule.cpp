@@ -15,6 +15,8 @@ using namespace core;
 
 namespace {
 
+// Turns one recognized Capcom snapshot into a sequence collection and adds its
+// instruments and samples when both required table locations were found.
 [[nodiscard]] ScanResult scanCapcomSnes(const ScanInput& input) {
   const auto layout = findCapcomSnesLayout(input.reader);
   if (!layout) {

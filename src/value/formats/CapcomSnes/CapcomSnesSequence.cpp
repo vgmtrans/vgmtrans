@@ -48,12 +48,14 @@ struct StereoBalance {
   double rightGain = 1.0;
 };
 
+// Blends between two neighboring values in one of the driver's lookup tables.
 [[nodiscard]] int interpolate(const auto& table, int index, int fraction) {
   const int lower = table[index];
   const int upper = table[index + 1];
   return lower + (((upper - lower) * fraction) >> 8);
 }
 
+// Converts Capcom's volume byte into the level used by the shared playback code.
 [[nodiscard]] double volumeGain(CapcomSnesEngineVersion version, u8 rawVolume) {
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
     return rawVolume / 255.0;
@@ -66,20 +68,24 @@ struct StereoBalance {
   return static_cast<double>(interpolate(kVolumeCurve, index, fraction)) / 255.0;
 }
 
+// Converts Capcom's portamento speed into the time needed for a small pitch step.
 [[nodiscard]] double portamentoMillisecondsPerCent(u8 rawTime) {
   const u8 step = static_cast<u8>((rawTime << 1) & 0xff);
   const double centsPerUpdate = step * (100.0 / 256.0);
   return centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
 }
 
+// Converts the duration bits packed into a note opcode into sequence ticks.
 [[nodiscard]] u32 baseNoteTicks(u8 rawDuration) {
   return rawDuration == 0 || rawDuration > 7 ? 0 : 192u >> (7u - rawDuration);
 }
 
+// Converts Capcom's tempo value into the standard duration of one quarter note.
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(u16 rawTempo) {
   return rawTempo == 0 ? 60000000 : static_cast<u32>(std::round(kCapcomSnesPpqn * (125 * 0x40) * 2 * 256.0 / rawTempo));
 }
 
+// Converts Capcom's pan byte into separate left and right channel levels.
 [[nodiscard]] StereoBalance stereoBalance(CapcomSnesEngineVersion version, u8 rawPan) {
   const auto biasedPan = static_cast<u8>(rawPan + 0x80);
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
@@ -94,6 +100,7 @@ struct StereoBalance {
   return StereoBalance{.leftGain = left, .rightGain = right};
 }
 
+// Converts Capcom's tremolo depth into the normalized amount used by playback.
 [[nodiscard]] double tremoloDepth(CapcomSnesEngineVersion version, u8 rawDepth) {
   int trough = 0;
   int peak = 250;
@@ -153,6 +160,7 @@ struct Playback {
   PerformanceEmitter& out;
   VmApi& vm;
 
+  // Applies the packed note flags and emits a pedal change when slur mode changes.
   void applyAttributes(u8 attributes) {
     const bool wasSlurred = track.noteSlurred;
     // The driver merges the low octave bits into the current octave instead
@@ -167,6 +175,7 @@ struct Playback {
     }
   }
 
+  // Applies a repeat break's note flags only when that break is actually taken.
   [[nodiscard]] Effects repeatBreak(u8 slot, u8 attributes, Address destination) {
     const auto branch = vm.countedRepeatBreak(slot, destination);
     if (branch.taken) {
@@ -175,12 +184,14 @@ struct Playback {
     return branch.effects;
   }
 
+  // Advances through a rest and prevents the next note from extending the last one.
   [[nodiscard]] Effects rest(u8 durationIndex) {
     const u32 length = consumeNoteTicks(durationIndex);
     track.didRest = true;
     return Effects::wait(length);
   }
 
+  // Calculates and emits one note, including slurs and portamento from the last note.
   [[nodiscard]] Effects note(u8 durationIndex, u8 keyIndex) {
     const u32 length = consumeNoteTicks(durationIndex);
     const s32 octave = static_cast<s32>(track.noteOctave) + (track.noteOctaveUp ? 2 : 0);
@@ -204,6 +215,7 @@ struct Playback {
   }
 
 private:
+  // Calculates one note's length and consumes the one-shot dotted-note flag.
   [[nodiscard]] u32 consumeNoteTicks(u8 rawDuration) {
     u32 length = math::baseNoteTicks(rawDuration);
     if (track.noteDotted) {
@@ -216,6 +228,7 @@ private:
     return length;
   }
 
+  // Shortens a note by the current duration rate unless it is slurred.
   [[nodiscard]] u32 soundingTicks(u32 length) const {
     u32 duration = length * track.durationRate256ths;
     if (track.noteSlurred || duration == 0) {
@@ -225,6 +238,7 @@ private:
     return duration == 0 ? 1 : duration;
   }
 
+  // Starts or updates the glide from the previous source note to this one.
   void emitPortamentoTo(s32 key) {
     if (track.portamentoMillisecondsPerCent <= 0.0 || !track.lastSourceKey) {
       return;
@@ -484,6 +498,8 @@ const SequenceDialect& capcomSnesSequenceDialect() {
   return dialect;
 }
 
+// Decodes one known track directly for focused tests and callers that already
+// know its starting address.
 TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVersion version,
                                          CapcomSnesTrackDecodeOptions options) {
   const TrackDecodeScope tracks{
@@ -494,6 +510,8 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVers
                        [&](u32 offset) { return decodeCommand(reader, offset, version, options.diagnostics); });
 }
 
+// Reads the eight track pointers from the discovered song header and decodes
+// every track that is present.
 SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayout& layout, AssetId sequenceId,
                                          SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceDecodeSession sequence{

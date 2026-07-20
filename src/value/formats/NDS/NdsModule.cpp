@@ -23,6 +23,7 @@ struct BankAssets {
   std::array<std::optional<ScanSampleCollectionRef>, 4> samples;
 };
 
+// Gives each sequence collection a stable identity within its source SDAT.
 [[nodiscard]] CollectionKey ndsCollectionKey(SourceId source, u64 sdatOffset, u32 sequenceIndex) {
   return CollectionKey{
       .resolver = std::string(kNdsFormatName),
@@ -31,6 +32,8 @@ struct BankAssets {
   };
 }
 
+// Builds the assets described by one SDAT. Dependencies are created first so
+// each sequence collection can attach its bank and samples directly.
 void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
   const ByteReader reader = result.reader();
   const auto psg = addNdsPsgSamples(result);
@@ -106,6 +109,7 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
   }
 }
 
+// Finds and scans every SDAT container embedded in the input source.
 [[nodiscard]] ScanResult scanNds(const ScanInput& input) {
   ScanResultBuilder result(input, std::string(kNdsFormatName));
   for (const u32 offset : findNdsSdatOffsets(input.reader)) {

@@ -39,10 +39,13 @@ struct FatTable {
   u32 count = 0;
 };
 
+// Checks that a smaller byte range fits completely inside a larger one.
 [[nodiscard]] bool contains(SourceRange bounds, u64 offset, u64 size) {
   return offset >= bounds.offset && offset <= bounds.endOffset() && size <= bounds.endOffset() - offset;
 }
 
+// Reads a section's location and size from the SDAT header. A section is returned
+// only when all of its bytes are present inside this SDAT.
 [[nodiscard]] std::optional<SourceRange> sectionRange(ByteReader reader, SourceRange sdat, u32 baseOffset,
                                                       u32 headerField, u32 minimumSize) {
   const u32 relativeOffset = reader.le32(baseOffset + headerField);
@@ -54,10 +57,11 @@ struct FatTable {
   return reader.range(offset, size);
 }
 
+// Finds one of the pointer lists stored in INFO or SYMB. The whole list must be
+// present before its count is trusted, which keeps damaged files from causing
+// unreasonable allocations.
 [[nodiscard]] std::optional<OffsetList> offsetList(ScanResultBuilder& builder, SourceRange section, u32 pointerField,
                                                    std::string_view description) {
-  // INFO and SYMB lists begin with a count followed by relative pointers. Check
-  // the entire pointer table before its count can drive an allocation.
   const ByteReader reader = builder.reader();
   const u64 fieldOffset = section.offset + pointerField;
   if (!contains(section, fieldOffset, 4)) {
@@ -79,6 +83,8 @@ struct FatTable {
   return OffsetList{.range = reader.range(listOffset, size), .count = count};
 }
 
+// Follows one pointer from an INFO list to its record. Missing records are allowed;
+// pointers outside INFO are rejected and reported.
 [[nodiscard]] std::optional<u64> recordOffset(ScanResultBuilder& builder, SourceRange info, const OffsetList& list,
                                               u32 index, u32 size) {
   const ByteReader reader = builder.reader();
@@ -95,6 +101,8 @@ struct FatTable {
   return offset;
 }
 
+// Reads an asset name from SYMB. If the name is missing or unusable, a stable
+// name such as SSEQ_0000 is returned instead.
 [[nodiscard]] std::string nameAt(ByteReader reader, const std::optional<SourceRange>& symb,
                                  const std::optional<OffsetList>& names, u32 index, std::string_view prefix) {
   if (symb && names && index < names->count) {
@@ -112,6 +120,8 @@ struct FatTable {
   return fmt::format("{}_{:04d}", prefix, index);
 }
 
+// Checks that every declared FAT entry is present, then exposes the bounded list
+// used to look up the files stored in this SDAT.
 [[nodiscard]] FatTable fatTable(ScanResultBuilder& builder, SourceRange fat) {
   const ByteReader reader = builder.reader();
   const u32 count = reader.le32(fat.offset + 8);
@@ -123,6 +133,8 @@ struct FatTable {
   return FatTable{.entries = reader.range(fat.offset + 12, size), .count = count};
 }
 
+// Looks up a file ID in FAT and turns its SDAT-relative location into a safe
+// range in the source file.
 [[nodiscard]] std::optional<SourceRange> fileRange(ScanResultBuilder& builder, u32 baseOffset, const FatTable& fat,
                                                    u16 fileId, SourceRange fileIdRange) {
   const ByteReader reader = builder.reader();
@@ -142,6 +154,8 @@ struct FatTable {
   return reader.range(offset, size);
 }
 
+// Searches shortly beyond a bad FAT location for the SSEQ header that the entry
+// was probably meant to reference.
 [[nodiscard]] std::optional<u32> nearbySseqHeader(ByteReader reader, u32 offset, u32 size) {
   constexpr u32 kMaxPaddingBeforeSseq = 0x200;
   const u64 searchEnd = std::min<u64>(reader.size(), static_cast<u64>(offset) + size + kMaxPaddingBeforeSseq);
@@ -153,6 +167,7 @@ struct FatTable {
   return std::nullopt;
 }
 
+// Returns true when every available byte in the range is zero.
 [[nodiscard]] bool isZeroFilled(ByteReader reader, u32 begin, u32 end) {
   for (u32 offset = begin; offset < end && reader.has(offset, 1); ++offset) {
     if (reader.u8At(offset) != 0) {
@@ -162,6 +177,8 @@ struct FatTable {
   return true;
 }
 
+// Chooses a nearby SSEQ header for a malformed FAT entry, while avoiding a known
+// kind of zero-filled placeholder that can otherwise look like sequence data.
 [[nodiscard]] std::optional<u32> recoveredMalformedSdatSequenceOffset(ByteReader reader, u32 offset, u32 size) {
   const auto sseqOffset = nearbySseqHeader(reader, offset, size);
   if (!sseqOffset) {
@@ -181,6 +198,7 @@ struct FatTable {
 
 }  // namespace
 
+// Finds every plausible SDAT container embedded in the source.
 std::vector<u32> findNdsSdatOffsets(ByteReader reader) {
   std::vector<u32> offsets;
   for (u64 offset = 0; offset <= std::numeric_limits<u32>::max() && offset + kSdatSignature.size() <= reader.size();
@@ -193,6 +211,9 @@ std::vector<u32> findNdsSdatOffsets(ByteReader reader) {
   return offsets;
 }
 
+// Reads one SDAT into named sequence, bank, and wave-archive entries. File ranges
+// and relationships are resolved here so the module does not need to reopen the
+// SDAT tables later.
 std::optional<NdsLayout> parseNdsLayout(ScanResultBuilder& builder, u32 baseOffset) {
   const ByteReader reader = builder.reader();
   if (!matchesBytes(reader, baseOffset, kSdatSignature) || !reader.has(baseOffset, 0x28)) {
@@ -283,6 +304,8 @@ std::optional<NdsLayout> parseNdsLayout(ScanResultBuilder& builder, u32 baseOffs
   return layout;
 }
 
+// Chooses the usable sequence bounds for a normal file, an empty placeholder, or
+// a malformed FAT entry that points just before the real SSEQ.
 NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, SourceRange file) {
   const u32 offset = static_cast<u32>(file.offset);
   const u32 size = static_cast<u32>(file.size);

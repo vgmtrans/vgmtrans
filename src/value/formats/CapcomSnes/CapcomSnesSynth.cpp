@@ -42,6 +42,8 @@ struct InstrumentPitch {
   s16 fineTuneCents = 0;
 };
 
+// Converts Capcom's pitch scale into the root key and fine tuning used by the
+// shared instrument model.
 [[nodiscard]] InstrumentPitch capcomInstrumentPitch(s16 pitchScale) {
   constexpr int baseUnityKey = 96;
   constexpr double referencePitch = 0x10b0 / 4096.0;
@@ -67,6 +69,7 @@ struct InstrumentPitch {
   };
 }
 
+// Converts Capcom's ADSR and gain bytes into the shared envelope model.
 [[nodiscard]] Envelope capcomInstrumentEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
   Envelope envelope = (adsr1 & 0x80) != 0 ? snesDspEnvelope(adsr1, adsr2, gain) : Envelope{};
 
@@ -80,10 +83,10 @@ struct InstrumentPitch {
 
 }  // namespace
 
+// Reads consecutive six-byte instrument rows. Blank slots are skipped, and the
+// first unusable nonblank row marks the end of the table.
 std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader reader, u32 instrumentTableAddress,
                                                                      u32 spcDirAddress) {
-  // Instrument table length is inferred, not explicitly stored. Blank slots are skipped,
-  // but the first impossible nonblank entry terminates discovery like legacy scanning.
   std::vector<CapcomSnesInstrumentInfo> instruments;
   const SnesSampleDirectory directory(reader, spcDirAddress);
 
@@ -125,6 +128,8 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
   return instruments;
 }
 
+// Builds Capcom's instruments and samples together, then links every instrument
+// region to its matching sample.
 bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
                         ScanSampleCollectionRef sampleCollection, u32 instrumentTableAddress, u32 spcDirAddress,
                         std::string_view displayName) {
