@@ -445,7 +445,7 @@ void ndsSequenceDialectAnnotatesIgnoredOperandBytes() {
          "NDS ignored command should keep its source operand without retaining playback bytes");
   const SemanticOperand* ignoredBytes = semanticOperand(ignored, "bytes");
   expect(ignoredBytes != nullptr && std::get<std::string>(ignoredBytes->value) == "12 34",
-         "NDS ignored command should keep its opaque operand as a named semantic value");
+         "NDS ignored command should keep its raw operand as a named semantic value");
 
   const SourceField* bytesField = fieldWithName(commandAnnotation(annotations, ignored), "bytes");
   expect(fieldEquals(bytesField, "12 34"),
