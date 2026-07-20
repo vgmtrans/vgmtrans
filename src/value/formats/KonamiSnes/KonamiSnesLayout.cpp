@@ -18,6 +18,11 @@ using namespace std::string_view_literals;
 
 namespace {
 
+// Konami reused this driver across several games, but moved its RAM variables
+// and tables between builds. These signatures match instructions run by the
+// SNES sound CPU; '?' leaves changing addresses and constants unchecked.
+// The short names identify representative driver builds, not game-specific
+// parsing paths.
 constexpr MaskedBytePattern kSetSongHeaderAddressGG4{
     "\x8f\x00\x0a\x8f\x39\x0b\xcd\x00\xd8\x1c"sv,
     "x??x??xxx?"sv,
@@ -141,8 +146,9 @@ constexpr MaskedBytePattern kLoadPercInstrGG4{
   return reader.le16(pointerOffset);
 }
 
-// Walks BRR blocks until the end flag so inferred DIR candidates can be
-// rejected when their sample pointers do not describe a complete stream.
+// Walk the sample's nine-byte compressed blocks until an end flag appears.
+// This rejects proposed directories whose pointers do not lead to a complete
+// sample.
 [[nodiscard]] u32 inferredSampleLength(ByteReader reader, u32 startAddress, bool& loops) {
   u32 offset = startAddress;
   while (true) {
@@ -158,8 +164,8 @@ constexpr MaskedBytePattern kLoadPercInstrGG4{
   }
 }
 
-// A candidate DIR row must point forward to aligned BRR data, and a looping
-// stream must keep its loop point inside that stream.
+// A proposed sample-directory row must point forward to the start of a
+// nine-byte block. A looping sample must keep its loop point inside the sample.
 [[nodiscard]] bool sampleDirEntryLooksValid(ByteReader reader, u32 spcDirAddress, u8 srcn) {
   const u32 dirEntryAddress = spcDirAddress + srcn * 4;
   if (!reader.has(dirEntryAddress, 4)) {
@@ -187,8 +193,9 @@ constexpr MaskedBytePattern kLoadPercInstrGG4{
   return srcn != 0xff && sampleDirEntryLooksValid(reader, spcDirAddress, srcn);
 }
 
-// Scores a page-aligned DIR candidate against a small sample of every detected
-// instrument table; two agreeing rows are enough to avoid random-page matches.
+// Test each possible sample-directory page against a few rows from every
+// instrument table. Requiring two matching rows avoids treating random RAM as
+// a directory.
 [[nodiscard]] u32 scoreInferredSpcDir(ByteReader reader, const KonamiSnesLayout& layout, u32 candidateDir) {
   if (!layout.commonInstrumentTableAddress || !layout.bankedInstrumentTableAddress ||
       !layout.percussionInstrumentTableAddress) {
@@ -216,8 +223,9 @@ constexpr MaskedBytePattern kLoadPercInstrGG4{
   return score;
 }
 
-// Some drivers never write DSP DIR in recognizable code. In that case the
-// instrument SRCNs and structurally valid BRR streams reveal the active page.
+// Some drivers do not set the sample-directory register in recognizable code.
+// In that case, sample numbers from instrument rows and valid compressed sample
+// data reveal which page is active.
 [[nodiscard]] std::optional<u32> inferSpcDirAddress(ByteReader reader, const KonamiSnesLayout& layout) {
   u32 bestDir = 0;
   u32 bestScore = 0;
@@ -257,6 +265,8 @@ const char* konamiSnesVersionName(KonamiSnesVersion version) {
 }
 
 std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
+  // All addresses belong to the SNES sound CPU's 64 KiB memory. Refuse partial
+  // dumps so a matching byte sequence cannot point outside the supplied data.
   if (reader.size() != kKonamiSnesAramSize) {
     return std::nullopt;
   }
@@ -271,6 +281,8 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
   // Early engines select a five-byte song-list row; later engines keep the
   // active header address directly in driver RAM.
   if (const auto directHeaderOffset = findBytePattern(reader, kSetSongHeaderAddressGG4)) {
+    // The two immediate bytes are the low and high halves of the RAM variable
+    // that currently holds the song header address.
     songHeaderAddress = reader.u8At(*directHeaderOffset + 1) | (reader.u8At(*directHeaderOffset + 4) << 8);
     vcmdLengthItemSize = 2;
   } else if (const auto pntbSongListOffset = findBytePattern(reader, kReadSongListPNTB)) {
@@ -312,6 +324,8 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
   }
 
   const u32 vcmdTableSize = (vcmd6xCountInList + 0x20) * vcmdLengthItemSize;
+  // Every driver has 32 commands from 0xe0 through 0xff. Early builds prepend
+  // two or five extra handlers for commands in the 0x60 range.
   if (!reader.has(vcmdLengthTableAddress, vcmdTableSize)) {
     return std::nullopt;
   }
@@ -359,9 +373,12 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
   if (!reader.has(songHeaderAddress, 2)) {
     return std::nullopt;
   }
+  // The header itself is a compact list of track pointers. Its first pointer
+  // later tells the sequence parser how many entries are present.
   layout.sequenceHeaderAddress = songHeaderAddress;
 
-  // Prefer the explicit DSP DIR write when the driver code contains one.
+  // The SNES DIR register selects the page containing the sample directory.
+  // Prefer an explicit write to that register when the driver code has one.
   if (const auto gg4DirOffset = findBytePattern(reader, kSetDIRGG4)) {
     layout.spcDirAddress = static_cast<u32>(reader.u8At(*gg4DirOffset + 4)) << 8;
   } else if (const auto cntr3DirOffset = findBytePattern(reader, kSetDIRCNTR3)) {
@@ -397,6 +414,9 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
   }
 
   switch (pattern) {
+    // The offsets below point at immediate operands in each matched loader.
+    // Although the instruction sequences differ, all five reveal the common
+    // table, the first banked program, the selected bank table, and drums.
     case InstrumentPattern::Jop: {
       layout.commonInstrumentTableAddress =
           reader.u8At(loadInstrumentOffset + 8) | (reader.u8At(loadInstrumentOffset + 11) << 8);
@@ -449,6 +469,9 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
   }
 
   if (!layout.spcDirAddress) {
+    // Some snapshots were captured after sample-directory setup had run or use
+    // an unrecognized setup sequence. Validate every possible page against the
+    // instrument rows rather than discarding otherwise valid data.
     layout.spcDirAddress = inferSpcDirAddress(reader, layout);
   }
 

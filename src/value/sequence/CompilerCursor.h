@@ -482,8 +482,12 @@ public:
                              SemanticOperandRole::Value);
     }
 
+    // Look ahead without consuming or annotating the byte. This is useful when
+    // a command may have an optional suffix identified by its own opcode.
     [[nodiscard]] std::optional<::u8> peekU8() const { return cursor_.record_.peekU8(); }
 
+    // Some commands implicitly refer to the byte immediately after themselves,
+    // such as a loop start with no encoded destination.
     [[nodiscard]] Address nextAddress() const { return Address{cursor_.record_.position()}; }
 
     [[nodiscard]] Address address(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Address) {
@@ -990,6 +994,8 @@ struct EmptyCompiledProgramState {};
 template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
 struct CompiledCommandDialect {
   [[nodiscard]] static std::any createProgramState(const SequenceProgram& program) {
+    // A format can read immutable program settings in its constructor. Formats
+    // that need no settings keep working with an ordinary default constructor.
     if constexpr (std::constructible_from<ProgramState, const SequenceProgram&>) {
       return ProgramState{program};
     } else {
@@ -998,6 +1004,8 @@ struct CompiledCommandDialect {
   }
 
   [[nodiscard]] static std::any createTrackState(const SequenceProgram& program, const TrackProgram& track) {
+    // Choose the most informative constructor the state type provides. This
+    // keeps version and track identity out of loosely typed extra settings.
     if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&>) {
       return TrackState{program, track};
     } else if constexpr (std::constructible_from<TrackState, const SequenceProgram&>) {
@@ -1014,6 +1022,8 @@ struct CompiledCommandDialect {
                                             VmApi& vm, Execute execute) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
+    // Playback may ask for song-wide state as a fourth reference. Simpler
+    // formats continue to use the original three-reference form.
     if constexpr (requires { Playback{typedTrackState, out, vm, typedProgramState}; }) {
       Playback playback{typedTrackState, out, vm, typedProgramState};
       return execute(playback);
@@ -1026,6 +1036,8 @@ struct CompiledCommandDialect {
   [[nodiscard]] static Effects execute(const SourceCommand& command, std::any& programState, std::any& trackState,
                                        PerformanceEmitter& out, VmApi& vm) {
     return withPlayback(programState, trackState, out, vm, [&](Playback& playback) {
+      // Formats use this optional hook for information that must be emitted
+      // before whichever command happens to be first.
       if constexpr (requires { playback.beforeCommand(); }) {
         playback.beforeCommand();
       }
@@ -1056,6 +1068,8 @@ struct CompiledCommandDialect {
 
   static void tick(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
                    VmApi& vm) {
+    // Rebuild the lightweight Playback view for each elapsed tick so active
+    // fades can use the current emitter and VM position without storing either.
     static_cast<void>(withPlayback(programState, trackState, out, vm, [](Playback& playback) {
       if constexpr (requires { playback.tick(); }) {
         playback.tick();
@@ -1066,6 +1080,8 @@ struct CompiledCommandDialect {
 
   static void finishPrepass(std::any& programState) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
+    // Give the format one clear boundary between silent collection and the
+    // real render. Collected results remain in the same typed object.
     if constexpr (requires { typedProgramState.finishPrepass(); }) {
       typedProgramState.finishPrepass();
     }

@@ -33,6 +33,9 @@ namespace {
 
 constexpr u32 kMaxTrackCommands = 8192;
 
+// These are the driver's own lookup tables. Using the original values keeps
+// center position and loudness changes faithful; replacing them with smooth
+// formulas would noticeably change the exported mix.
 constexpr std::array<u8, 21> kPanVolumeLeftV1{0x00, 0x05, 0x0c, 0x14, 0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x59,
                                               0x62, 0x69, 0x6f, 0x74, 0x78, 0x7b, 0x7d, 0x7e, 0x7e, 0x7f};
 constexpr std::array<u8, 21> kPanVolumeRightV1{0x7f, 0x7e, 0x7e, 0x7d, 0x7b, 0x78, 0x74, 0x6f, 0x69, 0x62, 0x59,
@@ -55,6 +58,7 @@ constexpr std::array<u8, 128> kVolumeTable{
     0x4c, 0x4f, 0x52, 0x56, 0x5a, 0x5e, 0x62, 0x66, 0x6b, 0x6f, 0x73, 0x77, 0x7b, 0x7f};
 
 enum class PitchSlideKind : u8 {
+  // Each family stores different extra fields and applies tuning differently.
   V1,
   V2,
   V3,
@@ -67,6 +71,8 @@ enum class FadeTarget : u8 {
 };
 
 struct DecodedPitchSlide {
+  // Source bytes are reduced to the four values playback actually needs. The
+  // unused reserved and delta fields remain visible in source annotations.
   PitchSlideKind kind = PitchSlideKind::V1;
   u8 delay = 0;
   u8 length = 0;
@@ -90,7 +96,11 @@ struct ModulationRanges {
 }
 
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(KonamiSnesVersion version, u8 tempo) {
+  // One driver tick is timerFrequency * 125 microseconds, scaled by the inverse
+  // tempo byte. Convert that tick length to one MIDI quarter note (48 ticks).
   if (tempo == 0) {
+    // The hardware would effectively stop advancing music. Use a finite, very
+    // slow tempo so exporters can still represent the command.
     return 60000000;
   }
   return static_cast<u32>(std::lround(kKonamiSnesPpqn * (125.0 * timerFrequency(version)) * 256.0 / tempo));
@@ -102,6 +112,8 @@ struct ModulationRanges {
 }
 
 [[nodiscard]] u32 vibratoDelayTicks(KonamiSnesVersion version, u8 delay, u8 tempo) {
+  // Vibrato delay is measured by a different counter from note duration.
+  // Convert both to seconds first, then express the result in sequence ticks.
   const double tickSeconds = sequenceTickSeconds(version, tempo);
   if (tickSeconds <= 0.0 || !std::isfinite(tickSeconds)) {
     return 0;
@@ -114,6 +126,8 @@ struct ModulationRanges {
 }
 
 [[nodiscard]] u8 vibratoDelayMidiValue(KonamiSnesVersion version, u8 delay, u8 tempo) {
+  // The synth model stores delay on a normalized controller. Convert seconds
+  // through the same logarithmic range used by the synth exporter.
   const s32 minAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato::minDelaySeconds(version)));
   const s32 rangeAmount =
       synthAmountFromSecondsRange(vibrato::minDelaySeconds(version), vibrato::maxDelaySeconds(version));
@@ -131,6 +145,7 @@ struct ModulationRanges {
 }
 
 [[nodiscard]] constexpr u32 midiBank(u32 bankMsb) {
+  // InstrumentAddress packs MIDI bank MSB and LSB into one 14-bit number.
   return bankMsb << 7;
 }
 
@@ -161,6 +176,8 @@ struct ModulationRanges {
   return total == 0.0 ? 0.0 : std::clamp((right / total) * 2.0 - 1.0, -1.0, 1.0);
 }
 
+// Holds one track's vibrato settings and its optional depth fade. The fade is
+// restarted for each note, matching how the driver applies delayed vibrato.
 class LfoState {
 public:
   void configure(u8 delay, u8 rate, u8 depth) {
@@ -179,6 +196,8 @@ public:
     }
     currentDepth_.setCurrent(0);
     const auto target = static_cast<s32>(depth_) << 8;
+    // Depth uses eight fractional bits so short fades can still make smooth
+    // progress when the target byte is small.
     static_cast<void>(currentDepth_.begin(SequenceMotionPlan<s32>::targetOverTicksWithStep(
         target, target / reusableFadeTicks_, reusableFadeTicks_, delay_)));
   }
@@ -200,9 +219,9 @@ private:
   u8 reusableFadeTicks_ = 0;
 };
 
-// The shared VM performs this prepass with the same compiled commands used for
-// playback. It observes modulation limits without reopening source bytes or
-// duplicating Konami calls, loops, timing, or opcode interpretation.
+// Before producing output, the shared VM silently runs the same decoded
+// commands once to find the song's widest vibrato settings. No source bytes are
+// reopened, and calls, loops, timing, and opcode meaning stay in one place.
 struct ProgramState {
   struct ActiveVibrato {
     u8 rate = 0;
@@ -226,6 +245,8 @@ struct ProgramState {
       return;
     }
     ranges.maxDepth = std::max(ranges.maxDepth, depth);
+    // Early drivers share one song tempo across all channels. Later drivers do
+    // not tie vibrato speed to tempo, so the track value is enough there.
     const u8 tempo = vibrato::usesLegacy(version) ? globalTempo : trackTempo;
     ranges.maxRateFactor = std::max(ranges.maxRateFactor, vibrato::rateFactor(version, rate, tempo));
   }
@@ -235,6 +256,8 @@ struct ProgramState {
       return;
     }
     globalTempo = tempo;
+    // A tempo command can raise the speed of vibrato already running on any
+    // early-engine track. Recheck those tracks instead of only future commands.
     for (const auto& active : activeVibrato) {
       if (vibrato::isActive(version, active.rate, active.depth)) {
         ranges.maxRateFactor = std::max(ranges.maxRateFactor, vibrato::rateFactor(version, active.rate, globalTempo));
@@ -243,6 +266,8 @@ struct ProgramState {
   }
 
   void finishPrepass() {
+    // Playback reuses the collected limits but must not keep changing them.
+    // Reset temporary song-wide state so the real render starts cleanly.
     collecting = false;
     globalTempo = kKonamiSnesDefaultTempo;
     activeVibrato.clear();
@@ -269,12 +294,17 @@ struct TrackState {
     if (noteDurationRate == maxRate) {
       return length;
     }
+    // V1 stores a percentage from 0-100. Later versions store a 7-bit fraction
+    // of the note length. The driver always gives a sounding note at least one
+    // tick, even when integer rounding would produce zero.
     const u8 duration = version == KONAMISNES_V1 ? static_cast<u8>((length * noteDurationRate) / 100)
                                                  : static_cast<u8>((length * (noteDurationRate << 1)) >> 8);
     return std::max<u8>(duration, 1);
   }
 
   [[nodiscard]] double totalTuningCents() const {
+    // Loop pitch changes are stored in 1/32-semitone units and accumulate
+    // independently for the two nested loop slots.
     return sequenceTuningCents + static_cast<double>(loopPitchDelta + loopPitchDelta2) * (100.0 / 32.0);
   }
 
@@ -288,15 +318,23 @@ struct TrackState {
 
   KonamiSnesVersion version = KONAMISNES_NONE;
   u32 trackNumber = 0;
+
+  // Note bytes can omit length or duration rate and reuse these values.
   u8 noteLength = 0;
   u8 noteDurationRate = 0;
   s32 transpose = 0;
+
+  // The driver provides two independent counted-loop slots. Each remembers
+  // where to return and how much volume and pitch have accumulated on replays.
   Address loopReturnAddress;
   Address loopReturnAddress2;
   s16 loopVolumeDelta = 0;
   s16 loopPitchDelta = 0;
   s16 loopVolumeDelta2 = 0;
   s16 loopPitchDelta2 = 0;
+
+  // Instrument mode and the previous note decide whether a new source command
+  // starts a note, extends a slur, or addresses the drum kit.
   bool percussion = false;
   bool inSubroutine = false;
   u8 instrument = 0;
@@ -305,10 +343,16 @@ struct TrackState {
   double sequenceTuningCents = 0.0;
   double lastEmittedTuningCents = std::numeric_limits<double>::quiet_NaN();
   u8 tempo = kKonamiSnesDefaultTempo;
+
+  // Fades retain fractional progress between note ticks. Their raw values are
+  // converted to exported tempo, gain, or pan only when a tick changes them.
   SequenceFixedPointAutomation<s32> panFade;
   SequenceFixedPointAutomation<s32> volumeFade;
   SequenceFixedPointAutomation<s32> tempoFade;
   LfoState vibrato;
+
+  // A slide is stored as an absolute note pitch, but exported pitch bends are
+  // measured relative to the note that began the slide.
   std::optional<double> pitchBase;
   SequenceAutomatedValue<double> pitchSlide;
   double lastVibratoDepthAmount = -1.0;
@@ -322,9 +366,13 @@ struct Playback {
   VmApi& vm;
   ProgramState& program;
 
+  // Controller limits must precede the first musical event, regardless of
+  // which opcode appears first on this track.
   void beforeCommand() { emitInitialModulationCeiling(); }
 
   void note(u8 key, u8 sourceVelocity) {
+    // Counted loops alter velocity before the later engines pass it through
+    // their nonlinear loudness table.
     u8 velocity =
         static_cast<u8>(std::clamp<int>(sourceVelocity + track.loopVolumeDelta + track.loopVolumeDelta2, 1, 127));
     if (track.version != KONAMISNES_V1) {
@@ -333,6 +381,8 @@ struct Playback {
 
     applyEffectiveTuning();
     const u8 duration = track.noteDuration(track.noteLength);
+    // A full-length note leaves the voice open. Repeating the same key then
+    // extends that voice instead of retriggering its sample and envelope.
     const bool tied = track.previousNoteSlurred && track.previousNoteKey && key == *track.previousNoteKey;
     resetPitchForNote(key);
     out.pitchBend(0.0);
@@ -351,6 +401,8 @@ struct Playback {
   }
 
   void tie() {
+    // The explicit tie command is ignored unless the preceding note was left
+    // open. This prevents a tie after a rest from reviving an older note.
     if (!track.previousNoteSlurred) {
       return;
     }
@@ -359,6 +411,8 @@ struct Playback {
   }
 
   void percussionOn() {
+    // Percussion commands do not change the remembered melodic instrument;
+    // leaving percussion mode restores that program below.
     if (!track.percussion) {
       out.instrument(midiBank(0x7f), 0, true);
       track.percussion = true;
@@ -373,6 +427,8 @@ struct Playback {
   }
 
   void programChange(u8 programNumber) {
+    // Changing samples also reapplies the current fine tuning and resets pan,
+    // both of which the original driver performs as part of instrument setup.
     applyEffectiveTuning(true);
     track.instrument = programNumber;
     out.instrument(midiBank(programNumber >> 7), programNumber & 0x7f, true);
@@ -380,6 +436,8 @@ struct Playback {
   }
 
   void programChangeAndVolume(u8 volumeValue, u8 programNumber) {
+    // Later engines combine program and volume in one command but otherwise
+    // perform the same instrument setup as a normal program change.
     applyEffectiveTuning(true);
     track.instrument = programNumber;
     out.instrument(midiBank(programNumber >> 7), programNumber & 0x7f, true);
@@ -408,6 +466,8 @@ struct Playback {
     track.tempoFade.setCurrentRaw(value);
     program.observeTempo(value);
     out.tempo(tempoMicrosecondsPerQuarter(track.version, value));
+    // Only early vibrato depends on tempo, so an active effect needs new rate
+    // and delay controller values when tempo changes.
     if (vibrato::usesLegacy(track.version)) {
       emitVibratoRate();
       emitVibratoDelay();
@@ -417,6 +477,8 @@ struct Playback {
   void configureVibrato(u8 delay, u8 rate, u8 depth, u8 builtInFade) {
     track.vibrato.configure(delay, rate, depth);
     if (builtInFade != 0) {
+      // In later versions a large first argument means "fade in over N ticks"
+      // rather than "wait N ticks before starting."
       track.vibrato.setReusableFade(builtInFade);
     }
     program.observeVibrato(track.trackNumber, rate, depth, track.tempo);
@@ -426,6 +488,8 @@ struct Playback {
   }
 
   void beginPitchSlide(PitchSlideKind kind, u8 delay, u8 length, u8 targetNote) {
+    // A slide before any melodic note has no pitch to bend from. Keep the
+    // default bend range but do not invent a starting note.
     if (!track.pitchBase || length == 0) {
       out.pitchBendRange(2);
       return;
@@ -435,6 +499,8 @@ struct Playback {
     const double targetDeviation = std::abs(target - *track.pitchBase);
     const auto range =
         static_cast<u8>(std::max<int>(2, static_cast<int>(std::ceil(std::max(startDeviation, targetDeviation)))));
+    // MIDI must declare a range wide enough for both the current position and
+    // the target. Two semitones remains the minimum for ordinary notes.
     out.pitchBendRange(range);
     static_cast<void>(track.pitchSlide.begin(SequenceMotionPlan<double>::targetOverTicksWithStep(
         target, (target - track.pitchSlide.current()) / length, length, delay)));
@@ -442,6 +508,8 @@ struct Playback {
 
   void beginFade(FadeTarget target, bool stepBased, u8 destination, u8 ticks, s8 step) {
     const u8 clampedDestination = target == FadeTarget::Pan ? clampPan(track.version, destination) : destination;
+    // Versions 1-4 provide a duration and let the driver calculate the step.
+    // Versions 5-6 provide the signed step directly and stop at the target.
     const SequenceFixedPointMotionPlan<s32> motion =
         stepBased
             ? SequenceFixedPointMotion<s32>::toRawTargetByFixedStep(clampedDestination, static_cast<s32>(step) * 16)
@@ -462,9 +530,13 @@ struct Playback {
   [[nodiscard]] Effects loopEnd(u8 slot, u8 times, s8 volumeDelta, s8 pitchDelta) {
     const Address destination = slot == 0 ? track.loopReturnAddress : track.loopReturnAddress2;
     if (destination.value == 0) {
+      // A malformed end without a matching start falls through, matching the
+      // driver's harmless behavior instead of jumping to address zero.
       return {};
     }
     if (times == 0) {
+      // Zero means the song's repeating loop, not a 256-pass counted loop.
+      // Volume and pitch changes belong only to finite repeats.
       return Effects{.step = vm.declaredLoop(destination)};
     }
 
@@ -472,9 +544,12 @@ struct Playback {
     s16& accumulatedVolume = slot == 0 ? track.loopVolumeDelta : track.loopVolumeDelta2;
     s16& accumulatedPitch = slot == 0 ? track.loopPitchDelta : track.loopPitchDelta2;
     if (effects.step.kind == StepKind::Next) {
+      // Leaving the loop removes its accumulated changes so later notes start
+      // from the values that were active before the loop.
       accumulatedVolume = 0;
       accumulatedPitch = 0;
     } else {
+      // Apply the change once per replay, after the first pass has completed.
       accumulatedVolume += volumeDelta;
       accumulatedPitch += pitchDelta;
     }
@@ -483,6 +558,8 @@ struct Playback {
   }
 
   [[nodiscard]] Effects endOrReturn() {
+    // Opcode 0xff serves two roles. A call marks the track as being inside a
+    // pattern; the next 0xff returns from it, while a top-level 0xff ends music.
     if (track.inSubroutine) {
       track.inSubroutine = false;
       return Effects{.step = vm.return_()};
@@ -491,6 +568,8 @@ struct Playback {
   }
 
   void tick() {
+    // Commands start motion, but only note/rest time advances it. Emit changes
+    // on each elapsed music tick so MIDI and event simulation see the ramp.
     static_cast<void>(track.tempoFade.tickRaw([&](s32 rawTempo) {
       const u8 value = static_cast<u8>(std::clamp<s32>(rawTempo, 0, 0xff));
       if (value == track.tempo) {
@@ -531,6 +610,8 @@ private:
     const bool emitted = std::isfinite(track.lastEmittedTuningCents);
     const bool nonZero = std::abs(cents) > 0.001;
     const bool changed = emitted && std::abs(track.lastEmittedTuningCents - cents) > 0.001;
+    // Avoid redundant zero-tuning events, but force a repeat when a new sample
+    // must inherit tuning that was already sent for the previous instrument.
     if ((!emitted && nonZero) || changed || (force && (emitted || nonZero))) {
       out.tuning(cents);
       track.lastEmittedTuningCents = cents;
@@ -538,6 +619,8 @@ private:
   }
 
   void resetPitchForNote(u8 key) {
+    // A new note cancels any unfinished slide. Drum notes have no melodic base,
+    // so later slide commands cannot bend them as pitched instruments.
     track.pitchSlide.clearMotion();
     if (track.percussion) {
       track.pitchBase.reset();
@@ -553,6 +636,8 @@ private:
     }
     track.emittedInitialModulationCeiling = true;
 
+    // MIDI synth controls need their maximum before the first live value. The
+    // silent first pass found the largest depth and speed used in this song.
     const double fullRangeCents = vibrato::maxDepthCents(track.version, kDefaultVibratoMaxDepth);
     const double maxCents = vibrato::maxDepthCents(track.version, program.ranges.maxDepth);
     out.modulation(ModulationPerformanceEvent{
@@ -594,8 +679,9 @@ private:
       amount = fullRangeCents <= 0.0 ? 0.0 : currentCents / fullRangeCents;
       const double maxCents = vibrato::maxDepthCents(track.version, program.ranges.maxDepth);
       rangeMaxAmount = fullRangeCents <= 0.0 ? 0.0 : maxCents / fullRangeCents;
-      // Konami depth is a full swing; simulation needs deviation from center.
-      depthSemitones = currentCents / 400.0;
+      // The driver value is already the farthest pitch moves from the note.
+      // Convert cents to semitones without reducing that distance again.
+      depthSemitones = currentCents / 100.0;
     }
     amount = std::clamp(amount, 0.0, 1.0);
     if (force || std::abs(amount - track.lastVibratoDepthAmount) > 0.0001) {
@@ -612,6 +698,9 @@ private:
   void emitVibratoRate() {
     const u16 factor = vibrato::rateFactor(track.version, track.vibrato.rate(), track.tempo);
     const double minHertz = vibrato::baseHz(track.version);
+    // MIDI's controller is normalized, while the synth model's frequency
+    // range is logarithmic. Convert current, song maximum, and engine maximum
+    // through the same scale before comparing them.
     const s32 fullRangeAmount =
         synthAmountFromHertzRange(minHertz, minHertz * vibrato::defaultMaxRateFactor(track.version));
     const s32 currentAmount = factor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * factor);
@@ -631,6 +720,8 @@ private:
 
   void emitVibratoDelay() {
     if (!vibrato::isActive(track.version, track.vibrato.rate(), track.vibrato.depth())) {
+      // Clear both the simulation delay and the synth controller when vibrato
+      // is disabled by either a zero rate or zero depth.
       out.vibratoDelay(0, 0);
       return;
     }
@@ -650,6 +741,9 @@ using KonamiCursor = CompilerCursor<TrackState, Playback>;
       .length = event.u8("slide_length", SemanticOperandRole::Duration),
       .targetNote = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey),
   };
+  // The driver carries a precalculated delta in later layouts. Playback derives
+  // the same motion from target and length, but the original field is still
+  // read and annotated so source inspection remains complete.
   if (slide.kind == PitchSlideKind::V2 && slide.length != 0) {
     static_cast<void>(event.u8("reserved", SourceValueDisplay::Hex));
     static_cast<void>(event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
@@ -673,6 +767,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 }
 
 [[nodiscard]] DecodedBytecodeCommand unknownCommand(KonamiCursor& cursor, u8 argumentCount) {
+  // Known driver versions assign these slots different meanings. Preserve the
+  // correct byte length without guessing at behavior that is not understood.
   auto event = cursor.sourceOnly("Unknown Event", "unknown");
   for (u8 index = 0; index < argumentCount; ++index) {
     static_cast<void>(event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex));
@@ -688,6 +784,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   }
 
   const u8 opcode = cursor.opcode();
+  // Notes use the opcode itself as the key. Opcodes below 0x60 include a new
+  // length byte; opcodes 0x80-0xdf reuse the previous length with bit 7 set.
   if (opcode <= 0x5f || (opcode >= 0x80 && opcode <= 0xdf)) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
     const u8 key = event.opcodeValue("key", static_cast<u8>(opcode & 0x7f), SourceValueDisplay::MidiNote,
@@ -696,6 +794,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       event.set<&TrackState::noteLength>(event.u8("length", SemanticOperandRole::Duration));
     }
     u8 velocity = event.u8("velocity_or_duration", SemanticOperandRole::Level);
+    // A clear high bit means this byte is a new duration rate and another byte
+    // follows for velocity. A set high bit means it is velocity by itself.
     if ((velocity & 0x80) == 0) {
       const u8 rate = event.derived("duration_rate", std::min(velocity, noteDurationRateMax(version)),
                                     SemanticOperandRole::Duration);
@@ -713,6 +813,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   }
 
   if (opcode >= 0x70 && opcode <= 0x7f && isLateVersion(version)) {
+    // Later engines reserve this opcode range for a signed four-bit tuning
+    // adjustment. Values 9-15 therefore represent -7 through -1.
     auto event = cursor.command("Instant Tuning", SequenceSemantic::Pitch);
     s8 tuning = opcode & 0x0f;
     if (tuning > 8) {
@@ -796,6 +898,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       const u8 raw = event.u8("pan", SemanticOperandRole::Pan);
       const bool instrumentPanOff = version <= KONAMISNES_V2 ? raw == 0x15 : raw == 0x2a;
       const bool instrumentPanOn = version <= KONAMISNES_V2 ? raw == 0x16 : raw == 0x2c;
+      // The two values immediately beyond the normal pan range toggle an
+      // internal instrument-pan feature; they are not audible pan positions.
       event.derived("instrument_pan_off", instrumentPanOff);
       event.derived("instrument_pan_on", instrumentPanOn);
       return instrumentPanOff || instrumentPanOn ? event.ignore() : event.invoke<&Playback::pan>(raw);
@@ -817,6 +921,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xe6: {
       auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
+      // Loop start has no operand. Its return address is simply the byte after
+      // this opcode, recorded now so loop end can jump back during playback.
       const Address destination = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
                                                 SemanticOperandRole::LoopTarget);
       return event.set<&TrackState::loopReturnAddress>(destination);
@@ -852,6 +958,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
           opcode == 0xeb ? SequenceSemantic::Tempo : (opcode == 0xef ? SequenceSemantic::Level : SequenceSemantic::Pan);
       auto event =
           cursor.command(opcode == 0xeb ? "Tempo Fade" : (opcode == 0xef ? "Volume Fade" : "Pan Fade"), semantic);
+      // The command stays two operands long in every version, but their meaning
+      // changes from duration/target to target/signed-step in versions 5-6.
       if (isLateVersion(version)) {
         const u8 destination = event.u8("target");
         const s8 step = event.s8("step");
@@ -945,6 +1053,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       }
       return unknownCommand(cursor, 1);
     case 0xfc:
+      // Konami repeatedly reassigned opcode 0xfc. Keep each version next to the
+      // others so its changing operand length and behavior are easy to compare.
       if (version == KONAMISNES_V1) {
         auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
         const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
@@ -969,11 +1079,15 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       return unknownCommand(cursor, 2);
     case 0xfd: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
+      // Backward jumps normally form the song loop. The shared VM decides
+      // whether to preserve, replay, or stop when it reaches that loop.
       return event.loopCandidate(event.addressLe("destination", SemanticOperandRole::JumpTarget));
     }
     case 0xfe: {
       auto event = cursor.command("Pattern Play", SequenceSemantic::Call);
       const Address destination = event.addressLe("destination", SemanticOperandRole::CallTarget);
+      // The format uses the same 0xff opcode for return and track end, so retain
+      // enough history to choose the right meaning when 0xff executes.
       event.set<&TrackState::inSubroutine>(true);
       return event.call(destination);
     }
@@ -1003,6 +1117,10 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 2,
           },
+      // Early vibrato depends on the order in which tempo commands run across
+      // all tracks, so collect its limits with normal playback scheduling.
+      // Later vibrato is independent of tempo; visiting each decoded command
+      // once also includes valid blocks that a particular playthrough skips.
       .semanticPrepass =
           vibrato::usesLegacy(version) ? SemanticPrepassMode::ScheduledPlayback : SemanticPrepassMode::DecodedCommands,
   });
@@ -1052,6 +1170,8 @@ TrackProgram decodeKonamiSnesSourceTrack(ByteReader reader, KonamiSnesVersion ve
                                          std::vector<Diagnostic>* diagnostics,
                                          std::optional<SourceAnnotationId> parentAnnotation,
                                          std::optional<AssetId> sequenceAsset) {
+  // The shared track walker follows calls and branch targets discovered by each
+  // command, then stores every reachable block in one source-free program.
   const TrackDecodeScope tracks{
       .reader = reader,
       .maxCommands = kMaxTrackCommands,
@@ -1064,6 +1184,9 @@ TrackProgram decodeKonamiSnesSourceTrack(ByteReader reader, KonamiSnesVersion ve
 }
 
 SourceRange konamiSnesSequenceHeaderRange(ByteReader reader, const KonamiSnesLayout& layout) {
+  // There is no track-count byte. Track data begins immediately after the
+  // pointer list, so the first pointer that lands inside the possible 16-byte
+  // header reveals how many two-byte entries precede it.
   u32 trackCount = kKonamiSnesMaxTracks;
   for (u32 trackNumber = 0; trackNumber < kKonamiSnesMaxTracks; ++trackNumber) {
     const u32 pointerOffset = layout.sequenceHeaderAddress + trackNumber * 2;
@@ -1101,6 +1224,8 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
   }
 
   SequenceProgram program = sequence.finish();
+  // Track and playback state use the profile to select the already-decoded
+  // engine rules; they never reopen the source bytes to identify the version.
   program.config.profile = static_cast<u32>(layout.version);
   return program;
 }

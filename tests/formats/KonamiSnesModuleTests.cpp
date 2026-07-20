@@ -256,7 +256,7 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::abs(vibratoDepthEvent.amount - expectedDepthAmount) < 0.0001,
          "KonamiSnes vibrato depth should be normalized against the full synth range");
   expect(vibratoDepthEvent.pitchDepthSemitones &&
-             std::abs(*vibratoDepthEvent.pitchDepthSemitones - (expectedDepthCents / 400.0)) < 0.0001,
+             std::abs(*vibratoDepthEvent.pitchDepthSemitones - (expectedDepthCents / 100.0)) < 0.0001,
          "KonamiSnes vibrato depth should retain peak pitch swing for sequence-event simulation");
   const auto vibratoDelay = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<VibratoDelayPerformanceEvent>(event);
@@ -498,6 +498,27 @@ void konamiSnesEveryVersionRendersSourceFreeCommands() {
     expect(performance.diagnostics.empty() && performance.tracks.size() == 1 && performance.tracks[0].endTick == 5,
            "every Konami engine version should render the common tempo/note/rest command path");
   }
+}
+
+void konamiSnesSequenceSimulationPreservesDriverVibratoDepth() {
+  const PerformanceSequence performance =
+      renderKonamiSnesProgram(KONAMISNES_V1, {{0xea, 0x80,              // tempo
+                                               0xe4, 0x00, 0x40, 0x07,  // Axelay-style vibrato
+                                               0xe0, 0x04, 0xff}});
+  expect(performance.diagnostics.empty(), "KonamiSnes vibrato fixture should render without diagnostics");
+
+  const MidiSequence midi = PerformanceMidiRenderer().render(
+      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  s16 maximumBend = 0;
+  for (const MidiEvent& event : midi.tracks[0].events) {
+    if (const auto* bend = std::get_if<PitchBend>(&event)) {
+      maximumBend = std::max<s16>(maximumBend, static_cast<s16>(std::abs(bend->value)));
+    }
+  }
+
+  // Axelay's driver turns depth 7 into a peak offset of 7/32 semitones.
+  // With MIDI's two-semitone bend range, that offset is a bend value of 896.
+  expect(maximumBend == 896, "KonamiSnes sequence simulation should preserve the driver's full vibrato depth");
 }
 
 void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
