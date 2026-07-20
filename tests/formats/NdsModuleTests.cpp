@@ -8,8 +8,7 @@
 #include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/formats/NDS/NdsSequence.h"
-#include "value/formats/NDS/NdsSynth.h"
+#include "value/formats/NDS/Nds.h"
 #include "value/validation/SynthValidation.h"
 
 #include "ValueFormatTestSupport.h"

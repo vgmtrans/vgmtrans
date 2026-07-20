@@ -280,11 +280,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSynth.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )
 target_link_libraries(
