@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/NDS/NdsSequence.h"
+#include "value/formats/NDS/Nds.h"
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"

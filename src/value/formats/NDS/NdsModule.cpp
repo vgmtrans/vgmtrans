@@ -4,11 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/NDS/NdsModule.h"
-
-#include "value/formats/NDS/NdsLayout.h"
-#include "value/formats/NDS/NdsSequence.h"
-#include "value/formats/NDS/NdsSynth.h"
+#include "value/formats/NDS/Nds.h"
 #include "value/scan/ScanResultBuilder.h"
 
 #include <array>

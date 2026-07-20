@@ -13,7 +13,7 @@
 #include "value/formats/AkaoSnes/AkaoSnesSequence.h"
 #include "value/formats/Akao/AkaoModule.h"
 #include "value/formats/Akao/AkaoSequence.h"
-#include "value/formats/NDS/NdsModule.h"
+#include "value/formats/NDS/Nds.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/extractors/SnesRsnExtractor.h"
 #include "value/extractors/SnesSpcExtractor.h"

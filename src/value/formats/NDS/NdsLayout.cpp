@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/NDS/NdsLayout.h"
+#include "value/formats/NDS/Nds.h"
 #include "value/scan/BytePattern.h"
 
 #include <fmt/format.h>
