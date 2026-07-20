@@ -129,6 +129,7 @@ enum class SemanticOperandRole : u8 {
   Instrument,
   InstrumentBank,
   InstrumentProgram,
+  InstrumentTablePointer,
 };
 
 struct SemanticOperand {

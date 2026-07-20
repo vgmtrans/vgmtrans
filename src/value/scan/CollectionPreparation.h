@@ -30,6 +30,7 @@ public:
   [[nodiscard]] const SessionSnapshot& snapshot() const noexcept { return context_.snapshot; }
   [[nodiscard]] const DesiredCollection& baseCollection() const noexcept { return context_.collection; }
   [[nodiscard]] const DesiredCollection& collection() const noexcept { return result_.collection; }
+  [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }
 
   [[nodiscard]] InstrumentSetBuilder instruments(std::string_view slot);
   [[nodiscard]] SampleCollectionBuilder samples(std::string_view slot);

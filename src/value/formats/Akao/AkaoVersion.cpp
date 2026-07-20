@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/Akao/AkaoVersion.h"
+#include "value/formats/Akao/Akao.h"
 
 #include <algorithm>
 #include <cctype>
@@ -118,11 +118,11 @@ AkaoPs1Version guessSampleVersion(ByteReader reader, u32 offset) {
     if (!reader.has(offset + 0x1c, 4)) {
       return AkaoPs1Version::Unknown;
     }
-    const u32 artCount = reader.le32(offset + 0x1c);
-    if (!reader.has(offset, artCount * 0x10ull)) {
+    const u32 articulationCount = reader.le32(offset + 0x1c);
+    if (!reader.has(offset, articulationCount * 0x10ull)) {
       return AkaoPs1Version::Unknown;
     }
-    for (u32 i = 0; i < artCount; ++i) {
+    for (u32 i = 0; i < articulationCount; ++i) {
       if (reader.u8At(offset + i * 0x10 + 0x0b) != 0) {
         return AkaoPs1Version::Version3_0;
       }
@@ -283,15 +283,15 @@ bool AkaoProfile::hasLegacySampleHeader() const noexcept {
   return !version3OrLater() && version >= AkaoPs1Version::Version1_1;
 }
 
-bool AkaoProfile::hasCompactArtRows() const noexcept {
+bool AkaoProfile::hasCompactArticulations() const noexcept {
   return version >= AkaoPs1Version::Version3_1;
 }
 
-u32 AkaoProfile::artRowSize() const noexcept {
-  return hasCompactArtRows() ? 0x10 : 0x40;
+u32 AkaoProfile::articulationSize() const noexcept {
+  return hasCompactArticulations() ? 0x10 : 0x40;
 }
 
-u32 AkaoProfile::legacySampleEndingArtId(ByteReader reader, u32 offset) const {
+u32 AkaoProfile::legacySampleEndingArticulationId(ByteReader reader, u32 offset) const {
   if (version == AkaoPs1Version::Version1_1) {
     return 0x80;
   }
@@ -310,9 +310,9 @@ u32 AkaoProfile::legacyDrumRegionBytes() const noexcept {
   return version >= AkaoPs1Version::Version2 ? 6 : 5;
 }
 
-bool AkaoProfile::legacyDrumRowIsBlank(ByteReader reader, u32 rowOffset) const {
-  return reader.le32(rowOffset) == 0 && reader.u8At(rowOffset + 4) == 0 &&
-         (version < AkaoPs1Version::Version2 || reader.u8At(rowOffset + 5) == 0);
+bool AkaoProfile::legacyDrumRegionIsBlank(ByteReader reader, u32 regionOffset) const {
+  return reader.le32(regionOffset) == 0 && reader.u8At(regionOffset + 4) == 0 &&
+         (version < AkaoPs1Version::Version2 || reader.u8At(regionOffset + 5) == 0);
 }
 
 u32 AkaoProfile::trackAllocationBitsOffset() const noexcept {

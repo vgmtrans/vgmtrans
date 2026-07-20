@@ -4,11 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/Akao/AkaoInstrumentSet.h"
-#include "value/formats/Akao/AkaoModule.h"
-#include "value/formats/Akao/AkaoResolver.h"
-#include "value/formats/Akao/AkaoSequence.h"
-#include "value/formats/Akao/AkaoSequenceDecoder.h"
+#include "value/formats/Akao/Akao.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -73,9 +69,8 @@ const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId 
 
 TrackProgram decodeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end,
                                 SourceMapBuilder* sourceMap = nullptr, SourceId source = SourceId{20}) {
-  const SequenceDialect dialect = makeAkaoDialect(version);
-  return decodeAkaoTrack(ByteReader(source, bytes), dialect,
-                         CursorTrackDecodeInput{
+  return decodeAkaoTrack(ByteReader(source, bytes), version,
+                         TrackDecodeInput{
                              .startOffset = start,
                              .bytecodeEnd = end,
                              .sequenceEnd = end,
@@ -91,7 +86,7 @@ AkaoSequenceAnalysis analyzeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Ve
       .length = end,
       .version = version,
   };
-  analyzeAkaoTrack(ByteReader(SourceId{20}, bytes), analysis, start);
+  analysis.references = akaoSequenceReferences(decodeFixtureTrack(bytes, version, start, end));
   return analysis;
 }
 
@@ -140,7 +135,7 @@ void akaoDialectDecodesConditionalBranchSideTargets() {
          "Akao conditional branch should expose the branch target as static flow");
 }
 
-void akaoSequenceAnalysisUsesSourceAnnotations() {
+void akaoSequenceAnalysisUsesSemanticOperands() {
   std::vector<u8> bytes(0x90, 0xa0);
   constexpr u32 start = 0x20;
   constexpr u32 customTable = 0x60;
@@ -154,12 +149,12 @@ void akaoSequenceAnalysisUsesSourceAnnotations() {
   bytes[start + 8] = 0xa0;
 
   const auto analysis = analyzeFixtureTrack(bytes, AkaoPs1Version::Version1_1, start, 0x90);
-  expect(analysis.customInstrumentOffsets.contains(customTable),
-         "Akao analysis should collect custom instrument tables from command-reader facts");
-  expect(analysis.drumInstrumentOffsets.contains(drumTable),
-         "Akao analysis should collect drum tables from command-reader facts");
-  expect(analysis.usesIndividualArts && analysis.individualArtIds.contains(9),
-         "Akao analysis should collect individual articulation ids from command-reader facts");
+  expect(analysis.references.customInstrumentTableOffsets.contains(customTable),
+         "Akao analysis should collect custom instrument tables from semantic operands");
+  expect(analysis.references.drumInstrumentTableOffsets.contains(drumTable),
+         "Akao analysis should collect drum tables from semantic operands");
+  expect(analysis.references.usesIndividualArticulations && analysis.references.individualArticulationIds.contains(9),
+         "Akao analysis should collect individual articulation ids from semantic operands");
 }
 
 void akaoTablePointersUseNonControlSourceLinks() {
@@ -176,15 +171,15 @@ void akaoTablePointersUseNonControlSourceLinks() {
 
   ScanIdAllocator ids;
   SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_1);
-  static_cast<void>(decodeAkaoTrack(ByteReader(source, bytes), dialect,
-                                    CursorTrackDecodeInput{
-                                        .startOffset = start,
-                                        .bytecodeEnd = 0x90,
-                                        .sequenceEnd = 0x90,
-                                        .sourceMap = &sourceMap,
-                                        .maxCommands = 64,
-                                    }));
+  [[maybe_unused]] const TrackProgram customTrack =
+      decodeAkaoTrack(ByteReader(source, bytes), AkaoPs1Version::Version1_1,
+                      TrackDecodeInput{
+                          .startOffset = start,
+                          .bytecodeEnd = 0x90,
+                          .sequenceEnd = 0x90,
+                          .sourceMap = &sourceMap,
+                          .maxCommands = 64,
+                      });
 
   const SourceMap annotations = sourceMap.finish();
   const SourceAnnotation& custom = commandAnnotationAt(annotations, source, start);
@@ -194,8 +189,7 @@ void akaoTablePointersUseNonControlSourceLinks() {
   expect(!hasLinkRole(custom, SourceLinkRole::JumpTarget),
          "Akao custom instrument table command should not expose a jump target");
   expect(hasLinkRole(drum, SourceLinkRole::PointsTo), "Akao drum table command should point to data, not control flow");
-  expect(!hasLinkRole(drum, SourceLinkRole::JumpTarget),
-         "Akao drum table command should not expose a jump target");
+  expect(!hasLinkRole(drum, SourceLinkRole::JumpTarget), "Akao drum table command should not expose a jump target");
 }
 
 void akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks() {
@@ -228,19 +222,18 @@ void akaoRepeatSourceLinksUseSpecificRolesOnly() {
 
   ScanIdAllocator repeatUntilIds;
   SourceMapBuilder repeatUntilMap([&repeatUntilIds]() { return repeatUntilIds.nextSourceAnnotationId(); });
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version3_2);
-  static_cast<void>(decodeAkaoTrack(ByteReader(source, repeatUntilBytes), dialect,
-                                    CursorTrackDecodeInput{
-                                        .startOffset = start,
-                                        .bytecodeEnd = 0x40,
-                                        .sequenceEnd = 0x40,
-                                        .sourceMap = &repeatUntilMap,
-                                        .maxCommands = 64,
-                                    }));
+  [[maybe_unused]] const TrackProgram repeatUntilTrack =
+      decodeAkaoTrack(ByteReader(source, repeatUntilBytes), AkaoPs1Version::Version3_2,
+                      TrackDecodeInput{
+                          .startOffset = start,
+                          .bytecodeEnd = 0x40,
+                          .sequenceEnd = 0x40,
+                          .sourceMap = &repeatUntilMap,
+                          .maxCommands = 64,
+                      });
   const SourceMap repeatUntilAnnotations = repeatUntilMap.finish();
   const SourceAnnotation& repeatUntil = commandAnnotationAt(repeatUntilAnnotations, source, start + 1);
-  expect(hasLinkRole(repeatUntil, SourceLinkRole::RepeatTarget),
-         "Akao repeat-until should expose a repeat target");
+  expect(hasLinkRole(repeatUntil, SourceLinkRole::RepeatTarget), "Akao repeat-until should expose a repeat target");
   expect(!hasLinkRole(repeatUntil, SourceLinkRole::JumpTarget),
          "Akao repeat-until should not also expose a generic jump target");
 
@@ -250,14 +243,15 @@ void akaoRepeatSourceLinksUseSpecificRolesOnly() {
 
   ScanIdAllocator repeatAgainIds;
   SourceMapBuilder repeatAgainMap([&repeatAgainIds]() { return repeatAgainIds.nextSourceAnnotationId(); });
-  static_cast<void>(decodeAkaoTrack(ByteReader(source, repeatAgainBytes), dialect,
-                                    CursorTrackDecodeInput{
-                                        .startOffset = start,
-                                        .bytecodeEnd = 0x40,
-                                        .sequenceEnd = 0x40,
-                                        .sourceMap = &repeatAgainMap,
-                                        .maxCommands = 64,
-                                    }));
+  [[maybe_unused]] const TrackProgram repeatAgainTrack =
+      decodeAkaoTrack(ByteReader(source, repeatAgainBytes), AkaoPs1Version::Version3_2,
+                      TrackDecodeInput{
+                          .startOffset = start,
+                          .bytecodeEnd = 0x40,
+                          .sequenceEnd = 0x40,
+                          .sourceMap = &repeatAgainMap,
+                          .maxCommands = 64,
+                      });
   const SourceMap repeatAgainAnnotations = repeatAgainMap.finish();
   const SourceAnnotation& repeatAgain = commandAnnotationAt(repeatAgainAnnotations, source, start + 1);
   expect(hasLinkRole(repeatAgain, SourceLinkRole::LoopTarget), "Akao repeat-again should expose a loop target");
@@ -286,7 +280,8 @@ void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange() {
          "Akao v1.0 overlay balance should not consume the following expression command");
 
   AkaoSequenceAnalysis analysis = analyzeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40);
-  expect(analysis.individualArtIds.contains(0x54) && analysis.individualArtIds.contains(0x53),
+  expect(analysis.references.individualArticulationIds.contains(0x54) &&
+             analysis.references.individualArticulationIds.contains(0x53),
          "Akao v1.0 overlay voice should require both articulations");
 
   const SequenceProgram program{
@@ -429,7 +424,8 @@ void akaoRequiredArticulationsComeFromInstrumentRows() {
   };
 
   const auto required = requiredArticulations(ByteReader(SourceId{22}, bytes), analysis);
-  expect(required == std::vector<u32>{5}, "Akao required articulations should include parsed melodic row art ids");
+  expect(required == std::vector<u32>{5},
+         "Akao required articulations should include parsed melodic region articulation ids");
 }
 
 void akaoMelodicRegionsDropAdvancingOverlaps() {
@@ -466,29 +462,34 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
       .ids = ids,
   };
 
-  const auto parsed = parseAkaoInstrumentSet(input, AssetId{99}, analysis, {});
-  expect(parsed.asset.instruments.size() == 1, "Akao overlap fixture should parse one melodic instrument");
-  const auto& regions = parsed.asset.instruments.front().regions;
-  expect(regions.size() == 3, "Akao advancing overlapping key rows should match legacy filtering");
+  InstrumentSetBuilder builder{AssetId{99}};
+  buildAkaoInstrumentSet(input, analysis, {}, builder);
+  const auto instruments = std::move(builder).finish();
+  expect(instruments.size() == 1, "Akao overlap fixture should parse one melodic instrument");
+  const auto& regions = instruments.front().regions;
+  expect(regions.size() == 3, "Akao advancing overlapping key regions should match legacy filtering");
   expect(regions[0].keyRange.low == 0 && regions[0].keyRange.high == 0x20,
          "Akao first overlap fixture region should keep its high key");
   expect(regions[1].keyRange.low == 0x21 && regions[1].keyRange.high == 0x2d,
          "Akao second overlap fixture region should be contiguous");
   expect(regions[2].keyRange.low == 0x2e && regions[2].keyRange.high == 0x7f,
-         "Akao row after dropped overlap should bridge the uncovered key range");
+         "Akao region after dropped overlap should bridge the uncovered key range");
 }
 
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
   const std::vector<AkaoSampleCandidate> candidates{
-      AkaoSampleCandidate{.index = 0, .sampleSetId = 0, .firstArt = 0, .artCount = 32, .sourceOffset = 0},
-      AkaoSampleCandidate{.index = 1, .sampleSetId = 5, .firstArt = 32, .artCount = 81, .sourceOffset = 1},
-      AkaoSampleCandidate{.index = 2, .sampleSetId = 29, .firstArt = 128, .artCount = 22, .sourceOffset = 2},
+      AkaoSampleCandidate{
+          .index = 0, .sampleSetId = 0, .firstArticulationId = 0, .articulationCount = 32, .sourceOffset = 0},
+      AkaoSampleCandidate{
+          .index = 1, .sampleSetId = 5, .firstArticulationId = 32, .articulationCount = 81, .sourceOffset = 1},
+      AkaoSampleCandidate{
+          .index = 2, .sampleSetId = 29, .firstArticulationId = 128, .articulationCount = 22, .sourceOffset = 2},
   };
   const std::vector<u32> required{32, 128};
 
   const auto selected = selectAkaoSampleCandidates(29, required, candidates);
   expect(selected == std::vector<std::size_t>{1, 2},
-         "Akao sample selection should combine the preferred sample set with required-art coverage");
+         "Akao sample selection should combine the preferred sample set with required-articulation coverage");
 }
 
 void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
@@ -583,22 +584,25 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
   const auto* instrument =
       annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Instrument, "akao-instrument");
   expect(instrument != nullptr && instrument->range.offset == melodicRegionOffset && instrument->range.size == 8,
-         "Akao scan should annotate parsed instrument rows without waiting for materialization");
+         "Akao scan should annotate parsed instrument data without waiting for materialization");
   const auto* region = annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Region, "akao-region");
   expect(region != nullptr && region->range.offset == melodicRegionOffset && region->range.size == 8,
-         "Akao scan should annotate parsed region rows");
-  expect(fieldEquals(fieldWithName(*region, "art_id"), u64{5}), "Akao region annotation should expose the art id");
-  const auto* artTable =
+         "Akao scan should annotate parsed regions");
+  expect(fieldEquals(fieldWithName(*region, "articulation_id"), u64{5}),
+         "Akao region annotation should expose the articulation id");
+  const auto* articulationTable =
       annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Table, "akao-articulation-table");
-  expect(artTable != nullptr && artTable->range.offset == artOffset && artTable->range.size == 0x10,
+  expect(articulationTable != nullptr && articulationTable->range.offset == artOffset &&
+             articulationTable->range.size == 0x10,
          "Akao sample scan should annotate the articulation table");
-  const auto* artRow =
+  const auto* articulationEntry =
       annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::TableEntry, "akao-articulation");
-  expect(artRow != nullptr && artRow->range.offset == artOffset && artRow->range.size == 0x10,
-         "Akao sample scan should annotate articulation rows");
-  expect(fieldEquals(fieldWithName(*artRow, "art_id"), u64{5}),
-         "Akao articulation annotation should expose the art id");
-  expect(hasLinkRole(*artRow, SourceLinkRole::UsesSample),
+  expect(articulationEntry != nullptr && articulationEntry->range.offset == artOffset &&
+             articulationEntry->range.size == 0x10,
+         "Akao sample scan should annotate articulation entries");
+  expect(fieldEquals(fieldWithName(*articulationEntry, "articulation_id"), u64{5}),
+         "Akao articulation annotation should expose the articulation id");
+  expect(hasLinkRole(*articulationEntry, SourceLinkRole::UsesSample),
          "Akao articulation annotation should link to the sample it resolves to");
 
   const auto* materialized = project.asset<InstrumentSetAsset>(collection.instrumentSets.front());
@@ -606,6 +610,22 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
   expect(!materialized->instruments.empty(), "Akao materialized instrument set should contain parsed instruments");
   expect(materialized->instruments.front().regions.front().sample.collection == collection.sampleCollections.front(),
          "Akao materialized region should bind to the resolved sample collection");
+
+  const AssetId materializedId = collection.instrumentSets.front();
+  const auto materializedInstruments = project.sourceMap().withRole(SourceId{0}, SourceRole::Instrument);
+  const auto ownedInstrument = std::ranges::find_if(materializedInstruments, [&](SourceAnnotationId id) {
+    return project.sourceMap().get(id).owner == ObjectRefs::instrument(materializedId, 0);
+  });
+  expect(ownedInstrument != materializedInstruments.end(),
+         "Akao materialization should retain a durable source owner for each instrument");
+  const auto materializedRegions = project.sourceMap().withRole(SourceId{0}, SourceRole::Region);
+  const auto ownedRegion = std::ranges::find_if(materializedRegions, [&](SourceAnnotationId id) {
+    return project.sourceMap().get(id).owner == ObjectRefs::region(materializedId, 0, 0);
+  });
+  expect(ownedRegion != materializedRegions.end(),
+         "Akao materialization should retain a durable source owner for each region");
+  expect(hasLinkRole(project.sourceMap().get(*ownedRegion), SourceLinkRole::UsesSample),
+         "Akao materialized region annotation should link to its selected sample collection");
 
   const auto requirement = std::ranges::find_if(project.matchFacts(), [&](const MatchFact& fact) {
     const auto* payload = std::get_if<SampleRequirementFact>(&fact.payload);

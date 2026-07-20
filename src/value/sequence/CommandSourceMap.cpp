@@ -81,6 +81,8 @@ void finishTrackAnnotation(ByteReader reader, u32 startOffset, SourceMapBuilder*
 
 [[nodiscard]] std::optional<SourceLinkRole> linkRole(SemanticOperandRole role) {
   switch (role) {
+    case SemanticOperandRole::InstrumentTablePointer:
+      return SourceLinkRole::PointsTo;
     case SemanticOperandRole::JumpTarget:
       return SourceLinkRole::JumpTarget;
     case SemanticOperandRole::CallTarget:

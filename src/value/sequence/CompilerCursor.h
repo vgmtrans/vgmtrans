@@ -438,6 +438,10 @@ public:
       return cursor_.decoded(cursor_.record_.s8(name, display), name, display, role);
     }
 
+    ::s8 s8(std::string_view name, SemanticOperandRole role) {
+      return s8(name, SourceValueDisplay::SignedDecimal, role);
+    }
+
     [[nodiscard]] EncodedSemanticField<::s8> rawS8(std::string_view name,
                                                    SourceValueDisplay display = SourceValueDisplay::SignedDecimal) {
       return field(cursor_.record_.s8(name, display), name, display);

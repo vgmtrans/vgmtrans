@@ -4,9 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/Akao/AkaoSynth.h"
-
-#include "value/formats/Akao/AkaoVersion.h"
+#include "value/formats/Akao/Akao.h"
 
 #include <algorithm>
 #include <cmath>
@@ -29,12 +27,12 @@ constexpr u32 kPsxAdpcmBlockBytes = 16;
 constexpr u32 kPsxAdpcmBlockSamples = 28;
 
 struct ArticulationTable {
-  u32 artsOffset = 0;
-  u32 artSize = 0;
+  u32 articulationTableOffset = 0;
+  u32 articulationSize = 0;
   u32 sampleSectionOffset = 0;
   u32 sampleSectionSize = 0;
-  u32 firstArtId = 0;
-  u32 artCount = 0;
+  u32 firstArticulationId = 0;
+  u32 articulationCount = 0;
   std::optional<u16> sampleSetId;
 };
 
@@ -43,9 +41,14 @@ struct PsxSampleInfo {
   Loop loop;
 };
 
+struct ParsedSample {
+  u32 sourceOffset = 0;
+  Sample value;
+};
+
 struct ParsedSampleCollection {
   AkaoSampleCollectionParse parse;
-  SampleCollection samples;
+  std::vector<ParsedSample> samples;
   std::string name;
   SourceRange range;
   ArticulationTable table;
@@ -133,31 +136,32 @@ struct ParsedSampleCollection {
     }
     table.sampleSetId = reader.le16(offset + 4);
     table.sampleSectionSize = reader.le32(offset + 0x14);
-    table.firstArtId = reader.le32(offset + 0x18);
-    table.artCount = reader.le32(offset + 0x1c);
-    table.artSize = profile.artRowSize();
-    table.artsOffset = offset + 0x40;
+    table.firstArticulationId = reader.le32(offset + 0x18);
+    table.articulationCount = reader.le32(offset + 0x1c);
+    table.articulationSize = profile.articulationSize();
+    table.articulationTableOffset = offset + 0x40;
   } else if (profile.hasLegacySampleHeader()) {
     if (!reader.has(offset, 0x40)) {
       return std::nullopt;
     }
     table.sampleSectionSize = reader.le32(offset + 0x14);
-    table.firstArtId = reader.le32(offset + 0x18);
-    const u32 endingArtId = profile.legacySampleEndingArtId(reader, offset);
-    if (endingArtId < table.firstArtId) {
+    table.firstArticulationId = reader.le32(offset + 0x18);
+    const u32 endingArticulationId = profile.legacySampleEndingArticulationId(reader, offset);
+    if (endingArticulationId < table.firstArticulationId) {
       return std::nullopt;
     }
-    table.artCount = endingArtId - table.firstArtId;
-    table.artSize = 0x40;
-    table.artsOffset = offset + 0x40;
+    table.articulationCount = endingArticulationId - table.firstArticulationId;
+    table.articulationSize = 0x40;
+    table.articulationTableOffset = offset + 0x40;
   } else {
     return std::nullopt;
   }
 
-  if (table.artCount == 0 || table.artCount > 300 || !reader.has(table.artsOffset, table.artSize * table.artCount)) {
+  if (table.articulationCount == 0 || table.articulationCount > 300 ||
+      !reader.has(table.articulationTableOffset, table.articulationSize * table.articulationCount)) {
     return std::nullopt;
   }
-  table.sampleSectionOffset = table.artsOffset + table.artSize * table.artCount;
+  table.sampleSectionOffset = table.articulationTableOffset + table.articulationSize * table.articulationCount;
   if (table.sampleSectionOffset > reader.size()) {
     return std::nullopt;
   }
@@ -171,14 +175,15 @@ struct ParsedSampleCollection {
   return table;
 }
 
-[[nodiscard]] ArticulationTable hardcodedSampleHeader(ByteReader reader, AkaoInstrDatLocation location) {
+[[nodiscard]] ArticulationTable splitSampleHeader(ByteReader reader, AkaoSplitSampleLocation location) {
   ArticulationTable table{
-      .artsOffset = location.instrDatOffset,
-      .artSize = 0x40,
-      .sampleSectionOffset = location.instrAllOffset + 0x10,
-      .sampleSectionSize = reader.has(location.instrAllOffset + 4, 4) ? reader.le32(location.instrAllOffset + 4) : 0,
-      .firstArtId = location.firstArtId,
-      .artCount = location.artCount,
+      .articulationTableOffset = location.articulationTableOffset,
+      .articulationSize = 0x40,
+      .sampleSectionOffset = location.sampleHeaderOffset + 0x10,
+      .sampleSectionSize =
+          reader.has(location.sampleHeaderOffset + 4, 4) ? reader.le32(location.sampleHeaderOffset + 4) : 0,
+      .firstArticulationId = location.firstArticulationId,
+      .articulationCount = location.articulationCount,
   };
   if (table.sampleSectionOffset < reader.size()) {
     table.sampleSectionSize =
@@ -194,90 +199,101 @@ struct ParsedSampleCollection {
   return table;
 }
 
-[[nodiscard]] std::optional<AkaoArt> readArt(ByteReader reader, const ArticulationTable& table, AkaoPs1Version version,
-                                             u32 index, u32 spuDestAddress) {
+[[nodiscard]] std::optional<AkaoArticulation> readArticulation(ByteReader reader, const ArticulationTable& table,
+                                                               AkaoPs1Version version, u32 index,
+                                                               u32 spuDestinationAddress) {
   const AkaoProfile profile = akaoProfile(version);
-  const u32 artOffset = table.artsOffset + index * table.artSize;
-  AkaoArt art{
-      .artId = table.firstArtId + index,
-      .range = reader.range(artOffset, table.artSize),
+  const u32 articulationOffset = table.articulationTableOffset + index * table.articulationSize;
+  AkaoArticulation articulation{
+      .articulationId = table.firstArticulationId + index,
+      .range = reader.range(articulationOffset, table.articulationSize),
   };
-  if (profile.hasCompactArtRows()) {
-    const s16 rawFineTune = leS16(reader, artOffset + 8);
+  if (profile.hasCompactArticulations()) {
+    // The later driver stores a signed fixed-point pitch multiplier. Convert
+    // it once to the root-key and fine-tuning values expected by synth export.
+    const s16 rawFineTune = leS16(reader, articulationOffset + 8);
     const double multiplier =
         rawFineTune >= 0 ? 1.0 + (rawFineTune / 32768.0) : (static_cast<u16>(rawFineTune) / 65536.0);
     const double cents = log2Cents(multiplier);
     const s8 coarse = coarseTuneFromCents(cents);
-    art.sampleOffset = reader.le32(artOffset);
-    art.loopPoint = reader.le32(artOffset + 4) - art.sampleOffset;
-    art.fineTuneCents = fineTuneFromCents(cents);
-    art.unityKey = static_cast<u8>(reader.le16(artOffset + 0x0a) - coarse);
-    art.adsr1 = reader.le16(artOffset + 0x0c);
-    art.adsr2 = reader.le16(artOffset + 0x0e);
-    return art;
+    articulation.sampleOffset = reader.le32(articulationOffset);
+    articulation.loopPoint = reader.le32(articulationOffset + 4) - articulation.sampleOffset;
+    articulation.fineTuneCents = fineTuneFromCents(cents);
+    articulation.unityKey = static_cast<u8>(reader.le16(articulationOffset + 0x0a) - coarse);
+    articulation.adsr1 = reader.le16(articulationOffset + 0x0c);
+    articulation.adsr2 = reader.le16(articulationOffset + 0x0e);
+    return articulation;
   }
 
   if (version == AkaoPs1Version::Version3_0) {
-    const double cents = log2Cents(reader.le32(artOffset + 8) / static_cast<double>(4096 * 256));
+    // Version 3.0 uses the older expanded articulation record, but its sample
+    // addresses are already relative to this collection's sample section.
+    const double cents = log2Cents(reader.le32(articulationOffset + 8) / static_cast<double>(4096 * 256));
     const s8 coarse = coarseTuneFromCents(cents);
-    art.sampleOffset = reader.le32(artOffset);
-    art.loopPoint = reader.le32(artOffset + 4) - art.sampleOffset;
-    art.fineTuneCents = fineTuneFromCents(cents);
-    art.unityKey = static_cast<u8>(72 - coarse);
-    art.adsr1 = composePsxAdsr1((reader.u8At(artOffset + 0x3d) & 4) >> 2, reader.u8At(artOffset + 0x38),
-                                reader.u8At(artOffset + 0x39), reader.u8At(artOffset + 0x3a));
-    art.adsr2 = composePsxAdsr2((reader.u8At(artOffset + 0x3e) & 4) >> 2, (reader.u8At(artOffset + 0x3e) & 2) >> 1,
-                                reader.u8At(artOffset + 0x3b), (reader.u8At(artOffset + 0x3f) & 4) >> 2,
-                                reader.u8At(artOffset + 0x3c));
-    return art;
+    articulation.sampleOffset = reader.le32(articulationOffset);
+    articulation.loopPoint = reader.le32(articulationOffset + 4) - articulation.sampleOffset;
+    articulation.fineTuneCents = fineTuneFromCents(cents);
+    articulation.unityKey = static_cast<u8>(72 - coarse);
+    articulation.adsr1 =
+        composePsxAdsr1((reader.u8At(articulationOffset + 0x3d) & 4) >> 2, reader.u8At(articulationOffset + 0x38),
+                        reader.u8At(articulationOffset + 0x39), reader.u8At(articulationOffset + 0x3a));
+    articulation.adsr2 =
+        composePsxAdsr2((reader.u8At(articulationOffset + 0x3e) & 4) >> 2,
+                        (reader.u8At(articulationOffset + 0x3e) & 2) >> 1, reader.u8At(articulationOffset + 0x3b),
+                        (reader.u8At(articulationOffset + 0x3f) & 4) >> 2, reader.u8At(articulationOffset + 0x3c));
+    return articulation;
   }
 
-  const u32 sampleStartAddress = reader.le32(artOffset);
-  const u32 loopStartAddress = reader.le32(artOffset + 4);
-  if (sampleStartAddress < spuDestAddress || loopStartAddress < spuDestAddress ||
+  // Earlier drivers store absolute SPU addresses. The sample collection header
+  // tells us where the upload begins, so normalize both addresses back to
+  // offsets within the encoded sample data.
+  const u32 sampleStartAddress = reader.le32(articulationOffset);
+  const u32 loopStartAddress = reader.le32(articulationOffset + 4);
+  if (sampleStartAddress < spuDestinationAddress || loopStartAddress < spuDestinationAddress ||
       sampleStartAddress > loopStartAddress) {
     return std::nullopt;
   }
-  const double cents = log2Cents(reader.le32(artOffset + 0x10) / 4096.0);
+  const double cents = log2Cents(reader.le32(articulationOffset + 0x10) / 4096.0);
   const s8 coarse = coarseTuneFromCents(cents);
-  art.sampleOffset = sampleStartAddress - spuDestAddress;
-  art.loopPoint = loopStartAddress - sampleStartAddress;
-  art.fineTuneCents = fineTuneFromCents(cents);
-  art.unityKey = static_cast<u8>(72 - coarse);
-  art.adsr1 = composePsxAdsr1((reader.u8At(artOffset + 0x0d) & 4) >> 2, reader.u8At(artOffset + 8),
-                              reader.u8At(artOffset + 9), reader.u8At(artOffset + 0x0a));
-  art.adsr2 = composePsxAdsr2((reader.u8At(artOffset + 0x0e) & 4) >> 2, (reader.u8At(artOffset + 0x0e) & 2) >> 1,
-                              reader.u8At(artOffset + 0x0b), (reader.u8At(artOffset + 0x0f) & 4) >> 2,
-                              reader.u8At(artOffset + 0x0c));
-  return art;
+  articulation.sampleOffset = sampleStartAddress - spuDestinationAddress;
+  articulation.loopPoint = loopStartAddress - sampleStartAddress;
+  articulation.fineTuneCents = fineTuneFromCents(cents);
+  articulation.unityKey = static_cast<u8>(72 - coarse);
+  articulation.adsr1 =
+      composePsxAdsr1((reader.u8At(articulationOffset + 0x0d) & 4) >> 2, reader.u8At(articulationOffset + 8),
+                      reader.u8At(articulationOffset + 9), reader.u8At(articulationOffset + 0x0a));
+  articulation.adsr2 =
+      composePsxAdsr2((reader.u8At(articulationOffset + 0x0e) & 4) >> 2,
+                      (reader.u8At(articulationOffset + 0x0e) & 2) >> 1, reader.u8At(articulationOffset + 0x0b),
+                      (reader.u8At(articulationOffset + 0x0f) & 4) >> 2, reader.u8At(articulationOffset + 0x0c));
+  return articulation;
 }
 
 [[nodiscard]] std::optional<ParsedSampleCollection> parseSampleCollectionWithTable(
     const ScanInput& input, ScanSampleCollectionRef ref, u32 offset, u32 length, AkaoPs1Version version,
     ArticulationTable table, std::string name) {
-  if (table.artCount == 0 || table.sampleSectionSize == 0) {
+  if (table.articulationCount == 0 || table.sampleSectionSize == 0) {
     return std::nullopt;
   }
-  const u32 spuDestAddress = akaoProfile(version).spuDestinationAddress(input.reader, offset);
-  std::vector<AkaoArt> arts;
-  arts.reserve(table.artCount);
-  for (u32 i = 0; i < table.artCount; ++i) {
-    if (auto art = readArt(input.reader, table, version, i, spuDestAddress)) {
-      arts.push_back(*art);
+  const u32 spuDestinationAddress = akaoProfile(version).spuDestinationAddress(input.reader, offset);
+  std::vector<AkaoArticulation> articulations;
+  articulations.reserve(table.articulationCount);
+  for (u32 i = 0; i < table.articulationCount; ++i) {
+    if (auto articulation = readArticulation(input.reader, table, version, i, spuDestinationAddress)) {
+      articulations.push_back(*articulation);
     }
   }
-  if (arts.empty()) {
+  if (articulations.empty()) {
     return std::nullopt;
   }
 
   std::set<u32> sampleOffsets;
-  for (const auto& art : arts) {
-    sampleOffsets.insert(art.sampleOffset);
+  for (const auto& articulation : articulations) {
+    sampleOffsets.insert(articulation.sampleOffset);
   }
 
-  SampleCollection collection;
   std::map<u32, u32> sampleIndexByOffset;
-  std::map<u32, u32> encodedLengthByOffset;
+  std::vector<ParsedSample> samples;
   const u32 sampleSectionEnd = table.sampleSectionOffset + table.sampleSectionSize;
   for (const u32 sampleOffset : sampleOffsets) {
     const u32 sampleAddress = table.sampleSectionOffset + sampleOffset;
@@ -289,38 +305,44 @@ struct ParsedSampleCollection {
     if (encodedLength == 0) {
       continue;
     }
-    const u32 sampleIndex = static_cast<u32>(collection.samples.size());
+    const u32 sampleIndex = static_cast<u32>(samples.size());
     sampleIndexByOffset.emplace(sampleOffset, sampleIndex);
-    encodedLengthByOffset.emplace(sampleOffset, encodedLength);
-    collection.samples.push_back(Sample{
-        .name = fmt::format("Sample {}", sampleIndex),
-        .codec = AudioCodec::PsxAdpcm,
-        .encodedData = input.reader.range(sampleAddress, encodedLength),
-        .sampleRate = kPsxSampleRate,
-        .channels = 1,
-        .bitsPerSample = 16,
-        .loop = sampleInfo.loop,
+    samples.push_back(ParsedSample{
+        .sourceOffset = sampleOffset,
+        .value =
+            Sample{
+                .name = fmt::format("Sample {}", sampleIndex),
+                .codec = AudioCodec::PsxAdpcm,
+                .encodedData = input.reader.range(sampleAddress, encodedLength),
+                .sampleRate = kPsxSampleRate,
+                .channels = 1,
+                .bitsPerSample = 16,
+                .loop = sampleInfo.loop,
+            },
     });
   }
-  if (collection.samples.empty()) {
+  if (samples.empty()) {
     return std::nullopt;
   }
 
-  for (auto& art : arts) {
-    if (auto found = sampleIndexByOffset.find(art.sampleOffset); found != sampleIndexByOffset.end()) {
-      art.sampleIndex = found->second;
-      const u32 encodedLength = encodedLengthByOffset.find(art.sampleOffset)->second;
-      Loop& sampleLoop = collection.samples[art.sampleIndex].loop;
+  // Loop intent is split between ADPCM block flags and the articulation table.
+  // Preserve block flags when complete, and use the articulation point only to
+  // supply information the sample stream omitted.
+  for (auto& articulation : articulations) {
+    if (auto found = sampleIndexByOffset.find(articulation.sampleOffset); found != sampleIndexByOffset.end()) {
+      articulation.sampleIndex = found->second;
+      const u32 encodedLength = static_cast<u32>(samples[articulation.sampleIndex].value.encodedData.size);
+      Loop& sampleLoop = samples[articulation.sampleIndex].value.loop;
       if (sampleLoop.enabled && sampleLoop.start == 0 && sampleLoop.length == 0) {
-        const u32 loopStart = art.loopPoint < encodedLength ? psxDecodedOffset(art.loopPoint) : 0;
-        art.loop = Loop{
+        const u32 loopStart = articulation.loopPoint < encodedLength ? psxDecodedOffset(articulation.loopPoint) : 0;
+        articulation.loop = Loop{
             .enabled = true,
             .start = loopStart,
             .length = loopStart < psxDecodedFrames(encodedLength) ? psxDecodedFrames(encodedLength) - loopStart : 0,
         };
-      } else if (!sampleLoop.enabled && sampleLoop.start == 0 && sampleLoop.length == 0 && art.loopPoint != 0 &&
-                 art.loopPoint < encodedLength) {
-        const u32 loopStart = psxDecodedOffset(art.loopPoint);
+      } else if (!sampleLoop.enabled && sampleLoop.start == 0 && sampleLoop.length == 0 &&
+                 articulation.loopPoint != 0 && articulation.loopPoint < encodedLength) {
+        const u32 loopStart = psxDecodedOffset(articulation.loopPoint);
         sampleLoop.start = loopStart;
         sampleLoop.length =
             loopStart < psxDecodedFrames(encodedLength) ? psxDecodedFrames(encodedLength) - loopStart : 0;
@@ -337,11 +359,11 @@ struct ParsedSampleCollection {
               .offset = offset,
               .length = length,
               .version = version,
-              .firstArtId = table.firstArtId,
-              .artCount = table.artCount,
-              .arts = std::move(arts),
+              .firstArticulationId = table.firstArticulationId,
+              .articulationCount = table.articulationCount,
+              .articulations = std::move(articulations),
           },
-      .samples = std::move(collection),
+      .samples = std::move(samples),
       .name = std::move(name),
       .range = range,
       .table = table,
@@ -350,62 +372,52 @@ struct ParsedSampleCollection {
 
 void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, ScanSampleCollectionRef ref,
                           ParsedSampleCollection& parsed) {
-  const SourceAnnotationId root = result.sourceMap()
-                                      .annotation(SourceRole::SampleCollection, parsed.name, parsed.range)
-                                      .kind("akao-sample-collection")
-                                      .owner(ObjectRefs::asset(ref.id))
-                                      .id();
-  for (u32 i = 0; i < parsed.samples.samples.size(); ++i) {
-    result.sourceMap()
-        .annotation(SourceRole::Sample, parsed.samples.samples[i].name, parsed.samples.samples[i].encodedData)
-        .kind("psx-adpcm-sample")
-        .owner(ObjectRefs::sample(ref.id, i))
+  auto samples = result.samples(ref);
+  samples.include(parsed.range);
+  const SourceAnnotationId root =
+      samples.source(SourceRole::SampleCollection, parsed.name, parsed.range, "akao-sample-collection").id();
+  for (auto& parsedSample : parsed.samples) {
+    // Source offsets may be sparse and shared by many articulations. The
+    // builder keeps that lookup separate from the dense sample indexes stored
+    // in the finished collection.
+    const std::string name = parsedSample.value.name;
+    const SourceRange range = parsedSample.value.encodedData;
+    samples.add(parsedSample.sourceOffset, std::move(parsedSample.value))
+        .source(name, range, "psx-adpcm-sample")
         .parent(root);
   }
-  const SourceRange artTableRange =
-      input.reader.range(parsed.table.artsOffset, parsed.table.artSize * parsed.table.artCount);
-  const SourceAnnotationId artTable =
-      result.sourceMap()
-          .table("Akao Articulation Table", artTableRange)
-          .kind("akao-articulation-table")
-          .parent(root)
-          .derived("first_art_id", parsed.table.firstArtId)
-          .derived("art_count", parsed.table.artCount)
-          .id();
-  for (const AkaoArt& art : parsed.parse.arts) {
-    auto annotation =
-        result.sourceMap()
-            .entry(fmt::format("Articulation {}", art.artId), art.range)
-            .kind("akao-articulation")
-            .parent(artTable)
-            .derived("art_id", art.artId)
-            .derived("unity_key", art.unityKey, SourceValueDisplay::MidiNote)
-            .derived("fine_tune_cents", art.fineTuneCents, SourceValueDisplay::Cents)
-            .derived("sample_offset", art.sampleOffset, SourceValueDisplay::Address)
-            .derived("loop_point", art.loopPoint, SourceValueDisplay::Address)
-            .derived("adsr1", art.adsr1, SourceValueDisplay::Hex)
-            .derived("adsr2", art.adsr2, SourceValueDisplay::Hex);
-    if (art.sampleIndex < parsed.samples.samples.size()) {
-      annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(ref.id, art.sampleIndex)});
+  const SourceRange articulationTableRange = input.reader.range(
+      parsed.table.articulationTableOffset, parsed.table.articulationSize * parsed.table.articulationCount);
+  const SourceAnnotationId articulationTable = result.sourceMap()
+                                                   .table("Akao Articulation Table", articulationTableRange)
+                                                   .kind("akao-articulation-table")
+                                                   .parent(root)
+                                                   .derived("first_articulation_id", parsed.table.firstArticulationId)
+                                                   .derived("articulation_count", parsed.table.articulationCount)
+                                                   .id();
+  for (const AkaoArticulation& articulation : parsed.parse.articulations) {
+    auto annotation = result.sourceMap()
+                          .entry(fmt::format("Articulation {}", articulation.articulationId), articulation.range)
+                          .kind("akao-articulation")
+                          .parent(articulationTable)
+                          .derived("articulation_id", articulation.articulationId)
+                          .derived("unity_key", articulation.unityKey, SourceValueDisplay::MidiNote)
+                          .derived("fine_tune_cents", articulation.fineTuneCents, SourceValueDisplay::Cents)
+                          .derived("sample_offset", articulation.sampleOffset, SourceValueDisplay::Address)
+                          .derived("loop_point", articulation.loopPoint, SourceValueDisplay::Address)
+                          .derived("adsr1", articulation.adsr1, SourceValueDisplay::Hex)
+                          .derived("adsr2", articulation.adsr2, SourceValueDisplay::Hex);
+    if (articulation.sampleIndex < parsed.samples.size()) {
+      annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(ref.id, articulation.sampleIndex)});
     }
   }
 
-  result.sampleCollection(ref, [&](AssetId id) {
-    return SampleCollectionAsset{
-        .metadata =
-            AssetMetadata{
-                .id = id,
-                .format = std::string(kAkaoFormatName),
-                .name = parsed.name,
-                .range = parsed.range,
-            },
-        .samples = std::move(parsed.samples),
-    };
-  });
+  result.sampleCollection(parsed.name, std::move(samples));
 }
 
-[[nodiscard]] std::optional<ParsedSampleCollection> parseAkaoSampleCollectionBuild(
-    const ScanInput& input, ScanSampleCollectionRef ref, u32 offset, AkaoPs1Version version) {
+[[nodiscard]] std::optional<ParsedSampleCollection> parseAkaoSampleCollectionBuild(const ScanInput& input,
+                                                                                   ScanSampleCollectionRef ref,
+                                                                                   u32 offset, AkaoPs1Version version) {
   if (version == AkaoPs1Version::Unknown) {
     version = guessSampleVersion(input.reader, offset);
   }
@@ -420,32 +432,34 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Sca
       fmt::format("Akao Sample Collection {:02X}", table->sampleSetId.value_or(input.reader.le16(offset + 4))));
 }
 
-[[nodiscard]] std::optional<ParsedSampleCollection> parseAkaoSampleCollectionBuild(
-    const ScanInput& input, ScanSampleCollectionRef ref, AkaoInstrDatLocation location) {
-  if (!input.reader.has(location.instrAllOffset, 8) || !input.reader.has(location.instrDatOffset, 1)) {
+[[nodiscard]] std::optional<ParsedSampleCollection> parseAkaoSampleCollectionBuild(const ScanInput& input,
+                                                                                   ScanSampleCollectionRef ref,
+                                                                                   AkaoSplitSampleLocation location) {
+  if (!input.reader.has(location.sampleHeaderOffset, 8) || !input.reader.has(location.articulationTableOffset, 1)) {
     return std::nullopt;
   }
-  auto table = hardcodedSampleHeader(input.reader, location);
-  if (!input.reader.has(table.artsOffset, table.artSize * table.artCount) || table.sampleSectionSize == 0) {
+  auto table = splitSampleHeader(input.reader, location);
+  if (!input.reader.has(table.articulationTableOffset, table.articulationSize * table.articulationCount) ||
+      table.sampleSectionSize == 0) {
     return std::nullopt;
   }
-  const u32 offset = std::min(location.instrAllOffset, location.instrDatOffset);
-  const u32 endOffset =
-      std::max(table.sampleSectionOffset + table.sampleSectionSize, table.artsOffset + table.artSize * table.artCount);
+  const u32 offset = std::min(location.sampleHeaderOffset, location.articulationTableOffset);
+  const u32 endOffset = std::max(table.sampleSectionOffset + table.sampleSectionSize,
+                                 table.articulationTableOffset + table.articulationSize * table.articulationCount);
   return parseSampleCollectionWithTable(input, ref, offset, endOffset - offset, AkaoPs1Version::Version1_0, table,
                                         "Akao Sample Collection FF7");
 }
 
 }  // namespace
 
-std::optional<AkaoInstrDatLocation> ff7HardcodedAkaoSampleLocation(ByteReader reader) {
+std::optional<AkaoSplitSampleLocation> ff7HardcodedAkaoSampleLocation(ByteReader reader) {
   if (reader.size() >= 0x1a8000 && reader.has(0xe0000, 4) && reader.has(0x156000, 4) &&
       reader.le32(0xe0000) == 0x1010 && reader.le32(0x156000) == 0x1010) {
-    return AkaoInstrDatLocation{
-        .instrAllOffset = 0xe0000,
-        .instrDatOffset = 0x156000,
-        .firstArtId = 0,
-        .artCount = 128,
+    return AkaoSplitSampleLocation{
+        .sampleHeaderOffset = 0xe0000,
+        .articulationTableOffset = 0x156000,
+        .firstArticulationId = 0,
+        .articulationCount = 128,
     };
   }
   return std::nullopt;
@@ -476,7 +490,7 @@ std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const Sca
 
 std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const ScanInput& input,
                                                                        ScanSampleCollectionRef ref,
-                                                                       AkaoInstrDatLocation location) {
+                                                                       AkaoSplitSampleLocation location) {
   auto parsed = parseAkaoSampleCollectionBuild(input, ref, location);
   if (!parsed) {
     return std::nullopt;
@@ -497,7 +511,7 @@ std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInp
 
 std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInput& input, ScanResultBuilder& result,
                                                                    ScanSampleCollectionRef ref,
-                                                                   AkaoInstrDatLocation location) {
+                                                                   AkaoSplitSampleLocation location) {
   auto parsed = parseAkaoSampleCollectionBuild(input, ref, location);
   if (!parsed) {
     return std::nullopt;
