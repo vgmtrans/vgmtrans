@@ -745,10 +745,10 @@ using KonamiCursor = CompilerCursor<TrackState, Playback>;
   // the same motion from target and length, but the original field is still
   // read and annotated so source inspection remains complete.
   if (slide.kind == PitchSlideKind::V2 && slide.length != 0) {
-    static_cast<void>(event.u8("reserved", SourceValueDisplay::Hex));
-    static_cast<void>(event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+    event.u8("reserved", SourceValueDisplay::Hex);
+    event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
   } else if (slide.kind == PitchSlideKind::V3) {
-    static_cast<void>(event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+    event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
   }
   return slide;
 }
@@ -758,7 +758,7 @@ using KonamiCursor = CompilerCursor<TrackState, Playback>;
   if (event.peekU8() != 0xf3) {
     return std::nullopt;
   }
-  static_cast<void>(event.u8("pitch_slide_opcode", SourceValueDisplay::Hex));
+  event.u8("pitch_slide_opcode", SourceValueDisplay::Hex);
   return readPitchSlide(event, version);
 }
 
@@ -771,7 +771,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   // correct byte length without guessing at behavior that is not understood.
   auto event = cursor.sourceOnly("Unknown Event", "unknown");
   for (u8 index = 0; index < argumentCount; ++index) {
-    static_cast<void>(event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex));
+    event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex);
   }
   return event.ignore();
 }
@@ -834,7 +834,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         return unknownCommand(cursor, 1);
       } else {
         auto event = cursor.sourceOnly("GAIN");
-        static_cast<void>(event.u8("gain_amount", SourceValueDisplay::Hex));
+        event.u8("gain_amount", SourceValueDisplay::Hex);
         return event.ignore();
       }
     case 0x63:
@@ -915,8 +915,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xe5: {
       auto event = cursor.sourceOnly("Random Pitch");
-      static_cast<void>(event.u8("rate"));
-      static_cast<void>(event.u16le("pitch_mask", SourceValueDisplay::Hex));
+      event.u8("rate");
+      event.u16le("pitch_mask", SourceValueDisplay::Hex);
       return event.ignore();
     }
     case 0xe6: {
@@ -977,7 +977,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     case 0xed:
       if (isLateVersion(version)) {
         auto event = cursor.sourceOnly("ADSR(1)");
-        static_cast<void>(event.u8("adsr1", SourceValueDisplay::Hex));
+        event.u8("adsr1", SourceValueDisplay::Hex);
         return event.ignore();
       }
       return unknownCommand(cursor, 3);
@@ -987,19 +987,19 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xf0: {
       auto event = cursor.sourceOnly("Portamento");
-      static_cast<void>(event.u8("speed"));
+      event.u8("speed");
       return event.ignore();
     }
     case 0xf1: {
       auto event = cursor.sourceOnly("Pitch Envelope");
-      static_cast<void>(event.u8("delay"));
+      event.u8("delay");
       if (isLateVersion(version)) {
-        static_cast<void>(event.u8("length", SemanticOperandRole::Duration));
-        static_cast<void>(event.u8("offset", SemanticOperandRole::Pitch));
-        static_cast<void>(event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+        event.u8("length", SemanticOperandRole::Duration);
+        event.u8("offset", SemanticOperandRole::Pitch);
+        event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
       } else {
-        static_cast<void>(event.u8("speed"));
-        static_cast<void>(event.u8("depth", SemanticOperandRole::Pitch));
+        event.u8("speed");
+        event.u8("depth", SemanticOperandRole::Pitch);
       }
       return event.ignore();
     }
@@ -1015,16 +1015,16 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xf4: {
       auto event = cursor.sourceOnly("Echo");
-      static_cast<void>(event.u8("channels", SourceValueDisplay::Hex));
-      static_cast<void>(event.u8("volume_left"));
-      static_cast<void>(event.u8("volume_right"));
+      event.u8("channels", SourceValueDisplay::Hex);
+      event.u8("volume_left");
+      event.u8("volume_right");
       return event.ignore();
     }
     case 0xf5: {
       auto event = cursor.sourceOnly("Echo Param");
-      static_cast<void>(event.u8("delay"));
-      static_cast<void>(event.u8("feedback"));
-      static_cast<void>(event.u8("arg3", SourceValueDisplay::Hex));
+      event.u8("delay");
+      event.u8("feedback");
+      event.u8("arg3", SourceValueDisplay::Hex);
       return event.ignore();
     }
     case 0xf6:
@@ -1039,16 +1039,16 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     case 0xfa:
       if (version >= KONAMISNES_V4) {
         auto event = cursor.sourceOnly("ADSR/Gain");
-        static_cast<void>(event.u8("adsr1", SourceValueDisplay::Hex));
-        static_cast<void>(event.u8("adsr2", SourceValueDisplay::Hex));
-        static_cast<void>(event.u8("gain", SourceValueDisplay::Hex));
+        event.u8("adsr1", SourceValueDisplay::Hex);
+        event.u8("adsr2", SourceValueDisplay::Hex);
+        event.u8("gain", SourceValueDisplay::Hex);
         return event.ignore();
       }
       return unknownCommand(cursor, 3);
     case 0xfb:
       if (version >= KONAMISNES_V4) {
         auto event = cursor.sourceOnly("ADSR(2)");
-        static_cast<void>(event.u8("adsr2", SourceValueDisplay::Hex));
+        event.u8("adsr2", SourceValueDisplay::Hex);
         return event.ignore();
       }
       return unknownCommand(cursor, 1);
@@ -1064,8 +1064,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       }
       if (version == KONAMISNES_V2) {
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
-        static_cast<void>(event.u8("delta_fraction", SemanticOperandRole::Pitch));
-        static_cast<void>(event.u8("delta_integer", SemanticOperandRole::Pitch));
+        event.u8("delta_fraction", SemanticOperandRole::Pitch);
+        event.u8("delta_integer", SemanticOperandRole::Pitch);
         return event.ignore();
       }
       if (version >= KONAMISNES_V4) {

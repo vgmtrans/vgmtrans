@@ -448,14 +448,14 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
           return event.emitModulation(ModulationPerformanceTarget::TremoloRate, amount);
         }
         default:
-          static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+          event.u8("value", SourceValueDisplay::Hex);
           return event.ignore();
       }
     }
     case 0x1b: {
       auto event = cursor.sourceOnly("Echo Param");
-      static_cast<void>(event.u8("argument", SourceValueDisplay::Hex));
-      static_cast<void>(event.u8("preset", SourceValueDisplay::Hex));
+      event.u8("argument", SourceValueDisplay::Hex);
+      event.u8("preset", SourceValueDisplay::Hex);
       return event.ignore();
     }
     case 0x1c: {
