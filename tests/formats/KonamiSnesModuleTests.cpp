@@ -553,6 +553,24 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
                                    }) == 2,
          "the second Konami loop counter should remain independent and replay through the shared VM");
 
+  const PerformanceSequence volta =
+      renderKonamiSnesProgram(KONAMISNES_V1, {{0xf6,                    // shared section starts here
+                                               0x3c, 0x01, 0x64, 0x7f,  // shared note
+                                               0xf7,                    // first ending starts
+                                               0x3d, 0x01, 0x64, 0x7f,  // first-ending note
+                                               0xf7,                    // replay shared section
+                                               0x3e, 0x01, 0x64, 0x7f,  // second-ending note
+                                               0xf7, 0xff}});            // replay shared section, then exit
+  std::vector<double> voltaKeys;
+  for (const PerformanceEvent& event : volta.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      voltaKeys.push_back(note->key);
+    }
+  }
+  const std::vector<double> expectedVoltaKeys{60.0, 61.0, 60.0, 62.0, 60.0};
+  expect(volta.diagnostics.empty() && volta.tracks[0].endTick == 5 && voltaKeys == expectedVoltaKeys,
+         "Konami V1 volta markers should replay shared notes and select each ending in order");
+
   const PerformanceSequence tied =
       renderKonamiSnesProgram(KONAMISNES_V6, {{0x3c, 0x04, 0x7f, 0x7f,  // full-length note enables slur
                                                0xbc, 0xff,              // compressed same note extends it
