@@ -333,6 +333,14 @@ struct TrackState {
   s16 loopVolumeDelta2 = 0;
   s16 loopPitchDelta2 = 0;
 
+  // Early drivers use adjacent end markers as alternate endings. These fields
+  // remember whether playback should return to the shared section or skip to
+  // the next ending when it reaches the next marker.
+  Address voltaLoopStart;
+  Address voltaLoopEnd;
+  bool voltaEndMeansPlayFromStart = false;
+  bool voltaEndMeansPlayNextVolta = false;
+
   // Instrument mode and the previous note decide whether a new source command
   // starts a note, extends a slur, or addresses the drum kit.
   bool percussion = false;
@@ -555,6 +563,34 @@ struct Playback {
     }
     applyEffectiveTuning();
     return effects;
+  }
+
+  void beginVoltaLoop(Address start) {
+    track.voltaLoopStart = start;
+    track.voltaLoopEnd = {};
+    track.voltaEndMeansPlayFromStart = false;
+    track.voltaEndMeansPlayNextVolta = false;
+  }
+
+  [[nodiscard]] Effects voltaEnd(Address next) {
+    if (track.voltaEndMeansPlayFromStart) {
+      // The second marker closes the first ending and replays the shared part.
+      track.voltaEndMeansPlayFromStart = false;
+      track.voltaEndMeansPlayNextVolta = true;
+      track.voltaLoopEnd = next;
+      return Effects{.step = vm.finiteBranch(track.voltaLoopStart)};
+    }
+
+    if (track.voltaEndMeansPlayNextVolta) {
+      // On replay, the first marker skips the ending that already played.
+      track.voltaEndMeansPlayFromStart = true;
+      track.voltaEndMeansPlayNextVolta = false;
+      return Effects{.step = vm.finiteBranch(track.voltaLoopEnd)};
+    }
+
+    // The first marker begins the first ending; playback simply continues.
+    track.voltaEndMeansPlayFromStart = true;
+    return {};
   }
 
   [[nodiscard]] Effects endOrReturn() {
@@ -1027,10 +1063,17 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       event.u8("arg3", SourceValueDisplay::Hex);
       return event.ignore();
     }
-    case 0xf6:
-      return cursor.sourceOnly("Loop With Volta Start").ignore();
-    case 0xf7:
-      return cursor.sourceOnly("Loop With Volta End").ignore();
+    case 0xf6: {
+      auto event = cursor.command("Loop With Volta Start", SequenceSemantic::Repeat);
+      const Address start = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
+                                          SemanticOperandRole::RepeatTarget);
+      return event.invoke<&Playback::beginVoltaLoop>(start);
+    }
+    case 0xf7: {
+      auto event = cursor.command("Loop With Volta End", SequenceSemantic::Repeat);
+      event.invoke<&Playback::voltaEnd>(event.nextAddress());
+      return event.runtimeControlFlow();
+    }
     case 0xf9: {
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
       return event.invoke([](Playback& playback, u8 length) { playback.track.vibrato.setReusableFade(length); },
