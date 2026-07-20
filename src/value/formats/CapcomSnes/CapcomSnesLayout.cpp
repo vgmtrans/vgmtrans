@@ -40,6 +40,8 @@ constexpr std::array<u8, 12> kLoadInstrTablePattern{0x8d, 0x06, 0xcf, 0xda, 0xa0
                                                     0x98, 0xac, 0xa0, 0x98, 0x47, 0xa1};
 constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 
+// Checks that an address contains a complete song header with believable track
+// pointers. This prevents unrelated code or data from being mistaken for a song.
 [[nodiscard]] bool isValidBgmHeader(ByteReader reader, u32 address) {
   if (!reader.has(address, 17)) {
     return false;
@@ -55,17 +57,19 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   return true;
 }
 
+// Reads the driver's saved playback position for one channel. Older and newer
+// driver versions store these bytes in different places.
 [[nodiscard]] u16 currentTrackCursor(ByteReader reader, CapcomSnesEngineVersion version, u8 channel) {
-  // V1 and later drivers keep the cursor bytes in different zero-page layouts.
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
     return static_cast<u16>(reader.u8At(0x00 + channel * 2 + 1) | (reader.u8At(0x10 + channel * 2 + 1) << 8));
   }
   return static_cast<u16>(reader.u8At(0x00 + channel) | (reader.u8At(0x08 + channel) << 8));
 }
 
+// Chooses the song whose track starts are closest to the saved playback positions.
+// This is how a snapshot with a song list is matched to the song currently playing.
 [[nodiscard]] std::optional<u8> guessCurrentSong(ByteReader reader, CapcomSnesEngineVersion version,
                                                  u32 songListAddress) {
-  // Song-list SPC dumps only expose the current playback cursor, so choose the nearest valid header.
   std::optional<u8> guessedSongIndex;
   int bestScore = std::numeric_limits<int>::max();
 
@@ -113,6 +117,8 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
   return guessedSongIndex;
 }
 
+// Reads the last initial value assigned to one DSP register. Capcom uses this
+// table to tell the sound hardware where its sample directory begins.
 [[nodiscard]] std::optional<u8> initialDspRegisterValue(ByteReader reader, u8 targetRegister) {
   u32 registerCount = 0;
   u32 registerListAddress = 0;
@@ -147,9 +153,10 @@ constexpr std::string_view kLoadInstrTableMask = "xxxx?xx??x??";
 
 }  // namespace
 
+// Finds the song, engine version, instrument table, and sample directory used by
+// the current Capcom snapshot. The snapshot has no header that lists them, so the
+// locations are recovered from recognizable pieces of driver code.
 std::optional<CapcomSnesLayout> findCapcomSnesLayout(ByteReader reader) {
-  // CapcomSnes SPC dumps have no declarative header. Layout discovery reconstructs the
-  // current driver's table addresses by recognizing small snippets of SPC700 code.
   if (reader.size() != kCapcomSnesAramSize) {
     return std::nullopt;
   }

@@ -58,6 +58,7 @@ enum class InstrumentType : u8 {
   KeySplit = 0x11,
 };
 
+// Converts a time in seconds into the whole microseconds stored in an envelope.
 [[nodiscard]] u32 envelopeMicros(double seconds) {
   if (seconds < 0.0 || !std::isfinite(seconds)) {
     return kEnvelopeInfinite;
@@ -69,10 +70,12 @@ enum class InstrumentType : u8 {
   return static_cast<u32>(std::lround(std::max(0.0, micros)));
 }
 
+// Converts a level from zero-to-one into thousandths for the shared envelope.
 [[nodiscard]] u32 envelopePermille(double level) {
   return static_cast<u32>(std::lround(std::clamp(level, 0.0, 1.0) * 1000.0));
 }
 
+// Converts an NDS decay or release byte into the rate used by the sound hardware.
 [[nodiscard]] u16 fallingRate(u8 decayTime) {
   if (decayTime == 0x7f) {
     return 0xffff;
@@ -86,6 +89,8 @@ enum class InstrumentType : u8 {
   return static_cast<u16>(0x1e00 / (0x7e - decayTime));
 }
 
+// Converts the four NDS envelope bytes into common attack, decay, sustain, and
+// release values.
 [[nodiscard]] std::optional<Envelope> ndsEnvelope(ByteReader reader, u64 offset) {
   // NDS envelopes use driver rate tables rather than SF2/DLS units. Preserve both rounded
   // microseconds and precise seconds so exporters can choose the most accurate conversion.
@@ -134,10 +139,12 @@ enum class InstrumentType : u8 {
   };
 }
 
+// Converts the NDS pan byte into the zero-to-one position stored in a region.
 [[nodiscard]] double ndsPan(u8 pan) {
   return pan == 64 ? 0.5 : static_cast<double>(pan) / 127.0;
 }
 
+// Reads the tuning, envelope, and pan shared by every kind of NDS instrument region.
 [[nodiscard]] std::optional<Region> parseNdsRegion(ByteReader reader, SourceRange range, SampleRef sample,
                                                    KeyRange keys = {},
                                                    std::optional<u8> rootKeyOverride = std::nullopt) {
@@ -162,6 +169,8 @@ enum class InstrumentType : u8 {
   };
 }
 
+// Reads a sample-backed region and connects its wave-archive and sample numbers
+// to the matching sample asset.
 [[nodiscard]] std::optional<Region> parseNdsSampleRegion(
     ScanResultBuilder& builder, ByteReader reader, SourceRange range,
     const std::array<std::optional<ScanSampleCollectionRef>, 4>& waveCollections, KeyRange keys = {}) {
@@ -177,6 +186,7 @@ enum class InstrumentType : u8 {
   return parseNdsRegion(reader, range, builder.sampleRef(collection, sampleIndex), keys);
 }
 
+// Reads one SWAV entry and describes how its encoded sample data should be played.
 [[nodiscard]] std::optional<Sample> parseNdsWave(ScanResultBuilder& builder, ParseCursor& archive,
                                                  AssetId sampleCollection, u32 relativeOffset, SourceRange headerRange,
                                                  u32 sampleIndex, SourceAnnotationId parent) {
@@ -265,9 +275,9 @@ enum class InstrumentType : u8 {
 
 }  // namespace
 
+// Creates the built-in pulse and noise sounds used by NDS instruments that do
+// not refer to a wave archive.
 ScanSampleCollectionRef addNdsPsgSamples(ScanResultBuilder& builder) {
-  // PSG wave/noise instruments do not reference SWAR sample data. Emit a synthetic sample
-  // collection so they can still participate in the same Instrument/Region model.
   SampleCollection samples;
   for (u32 i = 0; i <= 8; ++i) {
     samples.samples.push_back(Sample{
@@ -283,6 +293,8 @@ ScanSampleCollectionRef addNdsPsgSamples(ScanResultBuilder& builder) {
   return builder.sampleCollection("NDS PSG samples", builder.reader().range(0, 0)).samples(std::move(samples));
 }
 
+// Reads every valid sample from one NDS wave archive and adds the resulting
+// collection to the scan result.
 std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& builder, SourceRange range,
                                                          std::string_view name) {
   const ByteReader reader = builder.reader();
@@ -338,11 +350,11 @@ std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& buil
   return builder.sampleCollection(ref, std::string(name), range).samples(std::move(samples));
 }
 
+// Reads the instruments in one NDS bank, including single-sample, pulse, noise,
+// drum, and key-split instruments.
 std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
     ScanResultBuilder& builder, SourceRange range, std::string_view name, ScanSampleCollectionRef psgCollection,
     const std::array<std::optional<ScanSampleCollectionRef>, 4>& waveCollections) {
-  // SBNK instruments fan out by type: single region, PSG pulse/noise, drumset, or
-  // key-split multi-region. Each case fills the same Instrument fields.
   const ByteReader reader = builder.reader();
   auto bank = builder.cursor(range);
   const auto instrumentCount = bank.le32(0x38, "SBNK instrument count");

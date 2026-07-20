@@ -72,6 +72,8 @@ struct SequenceDecodeContext {
   [[nodiscard]] u32 dataBase() const noexcept { return range.offset + kSseqHeaderSize; }
 };
 
+// Reads a three-byte relative address and records both that value and the final
+// destination it points to.
 [[nodiscard]] Address targetAddress(const SequenceDecodeContext& context, NdsCompilerCursor::Event& event,
                                     SemanticOperandRole role) {
   const u32 relative = event.u24le("relative", SourceValueDisplay::Address);
@@ -265,6 +267,8 @@ struct SequenceDecodeContext {
   }
 }
 
+// Creates the stop command used when malformed data overlaps the first byte of
+// a real subroutine.
 [[nodiscard]] DecodedBytecodeCommand terminalRecoveryCommand(const SequenceDecodeContext& context, u32 offset) {
   return DecodedBytecodeCommand{
       .range = context.reader().range(offset, 1),
@@ -346,6 +350,8 @@ struct SequenceDecodeContext {
   return track.finish();
 }
 
+// Chooses the normal track reader or the special recovery path used by a few
+// malformed SDAT files.
 [[nodiscard]] TrackProgram decodeTrack(const SequenceDecodeContext& context, u32 trackIndex, u32 startOffset) {
   if (context.range.recoverMalformedSdatRange) {
     return decodeMalformedSdatRangeTrack(context, trackIndex, startOffset);
@@ -353,6 +359,8 @@ struct SequenceDecodeContext {
   return context.tracks.reachable(trackIndex, startOffset, [&](u32 offset) { return decodeCommand(context, offset); });
 }
 
+// Reads the opening track setup and returns the start of the main track followed
+// by any additional tracks it opens.
 [[nodiscard]] std::vector<u32> readTrackStarts(const SequenceDecodeContext& context) {
   std::vector<u32> secondaryTracks;
   u32 offset = context.dataBase();
@@ -360,8 +368,6 @@ struct SequenceDecodeContext {
     return {offset};
   }
 
-  // Allocate/Open Track records form the SSEQ bootstrap, not a musical track.
-  // Read them once here; normal track decoding begins after this prefix.
   if (context.reader().u8At(offset) != 0xfe ||
       !hasBytecodeBytes(context.reader(), offset, 3, context.range.sequenceEnd)) {
     return {offset};
@@ -397,6 +403,7 @@ struct SequenceDecodeContext {
   return starts;
 }
 
+// Decodes every track found in the sequence's opening setup.
 [[nodiscard]] std::vector<TrackProgram> decodeTracks(const SequenceDecodeContext& context) {
   const std::vector<u32> starts = readTrackStarts(context);
   std::vector<TrackProgram> tracks;
@@ -423,6 +430,8 @@ const SequenceDialect& ndsSequenceDialect() {
   return dialect;
 }
 
+// Creates the sequence program, describes its header, and decodes all tracks
+// within the selected file range.
 SequenceProgram parseNdsSequenceProgram(ByteReader reader, AssetId id, NdsSequenceRange range,
                                         SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SequenceDialect& dialect = ndsSequenceDialect();
