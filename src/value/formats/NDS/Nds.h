@@ -22,12 +22,6 @@ namespace vgmtrans::formats::nds {
 inline constexpr std::string_view kNdsFormatName = "NDS";
 inline constexpr auto kNdsSequenceDialectId = "nds:sseq";
 
-// SDAT container locations and table-of-contents entries.
-struct NdsFileRange {
-  u32 offset = 0;
-  u32 size = 0;
-};
-
 struct NdsSequenceRange {
   u32 offset = 0;
   u32 sequenceEnd = 0;
@@ -35,59 +29,51 @@ struct NdsSequenceRange {
 };
 
 struct NdsSequenceInfo {
-  bool valid = false;
-  u16 fileId = 0xffff;
-  u16 bank = 0xffff;
+  std::string name;
+  std::optional<core::SourceRange> file;
+  std::optional<u16> bank;
 };
 
 struct NdsBankInfo {
-  bool valid = false;
-  u16 fileId = 0xffff;
-  std::array<u16, 4> waveArchives{0xffff, 0xffff, 0xffff, 0xffff};
+  std::string name;
+  std::optional<core::SourceRange> file;
+  std::array<std::optional<u16>, 4> waveArchives;
 };
 
 struct NdsWaveArchiveInfo {
-  bool valid = false;
-  u16 fileId = 0xffff;
+  std::string name;
+  std::optional<core::SourceRange> file;
 };
 
 struct NdsLayout {
-  // Parsed SDAT table-of-contents. File IDs refer into FAT; sequence/bank/wave indexes
-  // refer into INFO/SYMB tables.
-  u32 baseOffset = 0;
-  u32 length = 0;
-  u32 symbOffset = 0;
-  u32 infoOffset = 0;
-  u32 fatOffset = 0;
-  bool hasSymb = false;
-  std::vector<std::string> sequenceNames;
-  std::vector<std::string> bankNames;
-  std::vector<std::string> waveArchiveNames;
+  // Names and FAT ranges are resolved here so the module only needs to follow
+  // sequence -> bank -> wave-archive relationships.
+  core::SourceRange range;
   std::vector<NdsSequenceInfo> sequences;
   std::vector<NdsBankInfo> banks;
   std::vector<NdsWaveArchiveInfo> waveArchives;
 };
 
-// SDAT discovery and bounded subfile ranges.
+// SDAT discovery and layout parsing.
 [[nodiscard]] std::vector<u32> findNdsSdatOffsets(core::ByteReader reader);
-[[nodiscard]] std::optional<NdsLayout> parseNdsLayout(core::ByteReader reader, u32 baseOffset);
-[[nodiscard]] std::optional<NdsFileRange> ndsFileRange(core::ByteReader reader, const NdsLayout& layout, u16 fileId);
-[[nodiscard]] NdsSequenceRange ndsSequenceRangeForFatEntry(core::ByteReader reader, u32 offset, u32 size);
+[[nodiscard]] std::optional<NdsLayout> parseNdsLayout(core::ScanResultBuilder& builder, u32 baseOffset);
+[[nodiscard]] NdsSequenceRange ndsSequenceRangeForFatEntry(core::ByteReader reader, core::SourceRange file);
 
 // SSEQ bytecode decoding and playback semantics.
 [[nodiscard]] const core::SequenceDialect& ndsSequenceDialect();
-[[nodiscard]] core::SequenceProgramAsset parseNdsSequenceProgram(const core::ScanInput& input, core::AssetId id,
-                                                                 NdsSequenceRange range, const std::string& name,
-                                                                 core::SourceMapBuilder* sourceMap = nullptr,
-                                                                 std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgram parseNdsSequenceProgram(core::ByteReader reader, core::AssetId id,
+                                                            NdsSequenceRange range,
+                                                            core::SourceMapBuilder* sourceMap = nullptr,
+                                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 
 // SBNK instruments and SWAR/PSG samples. These functions add complete synth
 // assets directly to the scan result and return the handles used by collections.
 [[nodiscard]] core::ScanSampleCollectionRef addNdsPsgSamples(core::ScanResultBuilder& builder);
 [[nodiscard]] std::optional<core::ScanSampleCollectionRef> addNdsWaveArchive(core::ScanResultBuilder& builder,
-                                                                             NdsFileRange range, std::string_view name);
+                                                                             core::SourceRange range,
+                                                                             std::string_view name);
 [[nodiscard]] std::optional<core::ScanInstrumentSetRef> addNdsInstrumentSet(
-    core::ScanResultBuilder& builder, NdsFileRange range, std::string_view name,
+    core::ScanResultBuilder& builder, core::SourceRange range, std::string_view name,
     core::ScanSampleCollectionRef psgCollection,
     const std::array<std::optional<core::ScanSampleCollectionRef>, 4>& waveCollections);
 

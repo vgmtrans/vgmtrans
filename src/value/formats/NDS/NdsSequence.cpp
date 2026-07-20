@@ -423,38 +423,27 @@ const SequenceDialect& ndsSequenceDialect() {
   return dialect;
 }
 
-SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id, NdsSequenceRange range,
-                                             const std::string& name, SourceMapBuilder* sourceMap,
-                                             std::vector<Diagnostic>* diagnostics) {
+SequenceProgram parseNdsSequenceProgram(ByteReader reader, AssetId id, NdsSequenceRange range,
+                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SequenceDialect& dialect = ndsSequenceDialect();
   const u32 sequenceOffset = range.offset;
-  const SourceRange sequenceRange = input.reader.range(sequenceOffset, range.sequenceEnd - sequenceOffset);
-  SequenceProgramAsset asset{
-      .metadata =
-          AssetMetadata{
-              .id = id,
-              .format = std::string(kNdsFormatName),
-              .name = name,
-              .range = sequenceRange,
-          },
-      .program = dialect.makeProgram(Address{sequenceOffset + kSseqHeaderSize}),
-  };
+  SequenceProgram program = dialect.makeProgram(Address{sequenceOffset + kSseqHeaderSize});
 
   std::optional<SourceAnnotationId> headerAnnotation;
-  if (sourceMap != nullptr && input.reader.has(sequenceOffset, kSseqHeaderSize)) {
-    headerAnnotation = sourceMap->header("SSEQ Header", input.reader.range(sequenceOffset, kSseqHeaderSize))
-                           .kind("sseq-header")
-                           .owner(ObjectRefs::sequence(id))
-                           .field("data_offset", input.reader.range(sequenceOffset + kSseqDataOffsetField, 4),
-                                  sequenceOffset + input.reader.le32(sequenceOffset + kSseqDataOffsetField),
-                                  SourceValueDisplay::Address)
-                           .id();
+  if (sourceMap != nullptr && reader.has(sequenceOffset, kSseqHeaderSize)) {
+    headerAnnotation =
+        sourceMap->header("SSEQ Header", reader.range(sequenceOffset, kSseqHeaderSize))
+            .kind("sseq-header")
+            .owner(ObjectRefs::sequence(id))
+            .field("data_offset", reader.range(sequenceOffset + kSseqDataOffsetField, 4),
+                   sequenceOffset + reader.le32(sequenceOffset + kSseqDataOffsetField), SourceValueDisplay::Address)
+            .id();
   }
 
   const SequenceDecodeContext context{
       .tracks =
           TrackDecodeScope{
-              .reader = input.reader,
+              .reader = reader,
               .bytecodeEnd = range.sequenceEnd,
               .maxCommands = kMaxTrackCommands,
               .sequenceAsset = id,
@@ -464,9 +453,9 @@ SequenceProgramAsset parseNdsSequenceProgram(const ScanInput& input, AssetId id,
       .range = range,
       .diagnostics = diagnostics,
   };
-  asset.program.tracks = decodeTracks(context);
+  program.tracks = decodeTracks(context);
 
-  return asset;
+  return program;
 }
 
 }  // namespace vgmtrans::formats::nds

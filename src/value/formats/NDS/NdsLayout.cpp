@@ -29,79 +29,123 @@ constexpr u32 kMaxNameLength = 128;
 constexpr u32 kSseqFileSizeOffset = 0x08;
 constexpr u32 kSseqHeaderSize = 0x1c;
 
-[[nodiscard]] std::string fallbackName(std::string_view prefix, u32 index) {
+struct OffsetList {
+  SourceRange range;
+  u32 count = 0;
+};
+
+struct FatTable {
+  SourceRange entries;
+  u32 count = 0;
+};
+
+[[nodiscard]] bool contains(SourceRange bounds, u64 offset, u64 size) {
+  return offset >= bounds.offset && offset <= bounds.endOffset() && size <= bounds.endOffset() - offset;
+}
+
+[[nodiscard]] std::optional<SourceRange> sectionRange(ByteReader reader, SourceRange sdat, u32 baseOffset,
+                                                      u32 headerField, u32 minimumSize) {
+  const u32 relativeOffset = reader.le32(baseOffset + headerField);
+  const u32 size = reader.le32(baseOffset + headerField + 4);
+  const u64 offset = static_cast<u64>(baseOffset) + relativeOffset;
+  if (relativeOffset == 0 || size < minimumSize || !contains(sdat, offset, size) || !reader.has(offset, size)) {
+    return std::nullopt;
+  }
+  return reader.range(offset, size);
+}
+
+[[nodiscard]] std::optional<OffsetList> offsetList(ScanResultBuilder& builder, SourceRange section, u32 pointerField,
+                                                   std::string_view description) {
+  // INFO and SYMB lists begin with a count followed by relative pointers. Check
+  // the entire pointer table before its count can drive an allocation.
+  const ByteReader reader = builder.reader();
+  const u64 fieldOffset = section.offset + pointerField;
+  if (!contains(section, fieldOffset, 4)) {
+    return std::nullopt;
+  }
+
+  const u64 listOffset = section.offset + reader.le32(fieldOffset);
+  if (!contains(section, listOffset, 4)) {
+    builder.warning(fmt::format("NDS {} pointer was invalid", description), reader.range(fieldOffset, 4));
+    return std::nullopt;
+  }
+
+  const u32 count = reader.le32(listOffset);
+  const u64 size = 4 + static_cast<u64>(count) * 4;
+  if (!contains(section, listOffset, size)) {
+    builder.warning(fmt::format("NDS {} was truncated", description), reader.range(listOffset, 4));
+    return std::nullopt;
+  }
+  return OffsetList{.range = reader.range(listOffset, size), .count = count};
+}
+
+[[nodiscard]] std::optional<u64> recordOffset(ScanResultBuilder& builder, SourceRange info, const OffsetList& list,
+                                              u32 index, u32 size) {
+  const ByteReader reader = builder.reader();
+  const u64 pointerOffset = list.range.offset + 4 + static_cast<u64>(index) * 4;
+  const u32 relativeOffset = reader.le32(pointerOffset);
+  const u64 offset = info.offset + relativeOffset;
+  if (relativeOffset == 0) {
+    return std::nullopt;
+  }
+  if (!contains(info, offset, size)) {
+    builder.warning("NDS INFO record pointer was invalid", reader.range(pointerOffset, 4));
+    return std::nullopt;
+  }
+  return offset;
+}
+
+[[nodiscard]] std::string nameAt(ByteReader reader, const std::optional<SourceRange>& symb,
+                                 const std::optional<OffsetList>& names, u32 index, std::string_view prefix) {
+  if (symb && names && index < names->count) {
+    const u64 pointerOffset = names->range.offset + 4 + static_cast<u64>(index) * 4;
+    const u64 nameOffset = symb->offset + reader.le32(pointerOffset);
+    if (contains(*symb, nameOffset, 1)) {
+      const u64 limit = std::min<u64>(kMaxNameLength, symb->endOffset() - nameOffset);
+      const auto bytes = reader.slice(nameOffset, limit);
+      const std::string name(bytes.begin(), std::ranges::find(bytes, u8{0}));
+      if (!name.empty()) {
+        return name;
+      }
+    }
+  }
   return fmt::format("{}_{:04d}", prefix, index);
 }
 
-[[nodiscard]] std::string nullTerminatedString(ByteReader reader, u64 offset, u64 maxLength) {
-  if (offset >= reader.size()) {
+[[nodiscard]] FatTable fatTable(ScanResultBuilder& builder, SourceRange fat) {
+  const ByteReader reader = builder.reader();
+  const u32 count = reader.le32(fat.offset + 8);
+  const u64 size = static_cast<u64>(count) * 0x10;
+  if (!contains(fat, fat.offset + 12, size)) {
+    builder.warning("NDS FAT file table was truncated", reader.range(fat.offset + 8, 4));
     return {};
   }
-  const u64 limit = std::min<u64>(maxLength, reader.size() - offset);
-  std::string result;
-  result.reserve(static_cast<size_t>(limit));
-  for (u64 i = 0; i < limit; ++i) {
-    const u8 value = reader.u8At(offset + i);
-    if (value == 0) {
-      break;
-    }
-    result.push_back(static_cast<char>(value));
-  }
-  return result;
+  return FatTable{.entries = reader.range(fat.offset + 12, size), .count = count};
 }
 
-[[nodiscard]] u32 readCountFromInfoList(ByteReader reader, u32 infoOffset, u32 tablePointerField) {
-  if (!reader.has(infoOffset + tablePointerField, 4)) {
-    return 0;
-  }
-  const u32 listOffset = reader.le32(infoOffset + tablePointerField) + infoOffset;
-  if (!reader.has(listOffset, 4)) {
-    return 0;
-  }
-  return reader.le32(listOffset);
-}
-
-struct InfoRecord {
-  u32 relativeOffset = 0;
-  u32 sourceOffset = 0;
-};
-
-[[nodiscard]] std::optional<InfoRecord> infoRecord(ByteReader reader, u32 infoOffset, u32 listOffset, u32 index) {
-  const u64 pointerOffset = static_cast<u64>(listOffset) + 4 + static_cast<u64>(index) * 4;
-  if (!reader.has(pointerOffset, 4)) {
+[[nodiscard]] std::optional<SourceRange> fileRange(ScanResultBuilder& builder, u32 baseOffset, const FatTable& fat,
+                                                   u16 fileId, SourceRange fileIdRange) {
+  const ByteReader reader = builder.reader();
+  if (fileId >= fat.count) {
+    builder.warning("NDS file ID was outside the FAT", fileIdRange);
     return std::nullopt;
   }
-  const u32 relative = reader.le32(pointerOffset);
-  if (relative > std::numeric_limits<u32>::max() - infoOffset) {
+
+  const u64 entry = fat.entries.offset + static_cast<u64>(fileId) * 0x10;
+  const u64 offset = static_cast<u64>(baseOffset) + reader.le32(entry);
+  const u32 size = reader.le32(entry + 4);
+  if (offset > std::numeric_limits<u32>::max() || size > std::numeric_limits<u32>::max() - offset ||
+      !reader.has(offset, size)) {
+    builder.warning("NDS FAT entry pointed outside the source", reader.range(entry, 8));
     return std::nullopt;
   }
-  return InfoRecord{.relativeOffset = relative, .sourceOffset = infoOffset + relative};
-}
-
-[[nodiscard]] std::vector<std::string> readNames(ByteReader reader, u32 symbOffset, u32 pointerListField, u32 count,
-                                                 std::string_view fallbackPrefix, bool hasSymb) {
-  std::vector<std::string> names;
-  names.reserve(count);
-  std::optional<u32> pointerList;
-  if (hasSymb && reader.has(symbOffset + pointerListField, 4)) {
-    pointerList = reader.le32(symbOffset + pointerListField) + symbOffset;
-  }
-
-  for (u32 i = 0; i < count; ++i) {
-    std::string name;
-    if (pointerList && reader.has(*pointerList + 4 + i * 4, 4)) {
-      const u32 nameOffset = reader.le32(*pointerList + 4 + i * 4) + symbOffset;
-      name = nullTerminatedString(reader, nameOffset, kMaxNameLength);
-    }
-    names.push_back(name.empty() ? fallbackName(fallbackPrefix, i) : std::move(name));
-  }
-  return names;
+  return reader.range(offset, size);
 }
 
 [[nodiscard]] std::optional<u32> nearbySseqHeader(ByteReader reader, u32 offset, u32 size) {
   constexpr u32 kMaxPaddingBeforeSseq = 0x200;
   const u64 searchEnd = std::min<u64>(reader.size(), static_cast<u64>(offset) + size + kMaxPaddingBeforeSseq);
-  for (u64 candidate = offset + 1; candidate + kSseqSignature.size() <= searchEnd; ++candidate) {
+  for (u64 candidate = static_cast<u64>(offset) + 1; candidate + kSseqSignature.size() <= searchEnd; ++candidate) {
     if (matchesBytes(reader, candidate, kSseqSignature)) {
       return static_cast<u32>(candidate);
     }
@@ -125,7 +169,7 @@ struct InfoRecord {
   }
 
   const u32 trackAddress = offset + kSseqHeaderSize;
-  const u32 paddingEnd = std::min(*sseqOffset, offset + size);
+  const u32 paddingEnd = static_cast<u32>(std::min<u64>(*sseqOffset, static_cast<u64>(offset) + size));
   // Some zero-filled pseudo-sequences overlap a later SSEQ. If the padding
   // would align the SSEQ signature as bogus note data, leave it empty.
   if (size <= 0x100 && *sseqOffset >= trackAddress && isZeroFilled(reader, offset, paddingEnd) &&
@@ -139,7 +183,8 @@ struct InfoRecord {
 
 std::vector<u32> findNdsSdatOffsets(ByteReader reader) {
   std::vector<u32> offsets;
-  for (u64 offset = 0; offset + kSdatSignature.size() <= reader.size(); ++offset) {
+  for (u64 offset = 0; offset <= std::numeric_limits<u32>::max() && offset + kSdatSignature.size() <= reader.size();
+       ++offset) {
     if (matchesBytes(reader, offset, kSdatSignature) && reader.has(offset + 0x10, 4) &&
         reader.le32(offset + 0x10) < 0x10000) {
       offsets.push_back(static_cast<u32>(offset));
@@ -148,125 +193,125 @@ std::vector<u32> findNdsSdatOffsets(ByteReader reader) {
   return offsets;
 }
 
-std::optional<NdsLayout> parseNdsLayout(ByteReader reader, u32 baseOffset) {
-  // SDAT stores most offsets relative to section starts. Normalize them to source offsets
-  // immediately so later parsers can use SourceRange directly.
-  if (!matchesBytes(reader, baseOffset, kSdatSignature) || !reader.has(baseOffset + 0x24, 4)) {
+std::optional<NdsLayout> parseNdsLayout(ScanResultBuilder& builder, u32 baseOffset) {
+  const ByteReader reader = builder.reader();
+  if (!matchesBytes(reader, baseOffset, kSdatSignature) || !reader.has(baseOffset, 0x28)) {
+    const u64 warningOffset = std::min<u64>(baseOffset, reader.size());
+    builder.warning("NDS SDAT header was invalid",
+                    reader.range(warningOffset, std::min<u64>(0x28, reader.size() - warningOffset)));
     return std::nullopt;
   }
 
-  NdsLayout layout{
-      .baseOffset = baseOffset,
-      .length = reader.le32(baseOffset + 8) + 8,
-      .symbOffset = reader.le32(baseOffset + 0x10) + baseOffset,
-      .infoOffset = reader.le32(baseOffset + 0x18) + baseOffset,
-      .fatOffset = reader.le32(baseOffset + 0x20) + baseOffset,
-  };
-  layout.hasSymb = layout.symbOffset != baseOffset && reader.has(layout.symbOffset, 0x18);
-  if (!reader.has(layout.infoOffset, 0x18) || !reader.has(layout.fatOffset, 0x0c)) {
+  const u64 declaredSize = static_cast<u64>(reader.le32(baseOffset + 8)) + 8;
+  const u64 availableSize = reader.size() - baseOffset;
+  const SourceRange sdat = reader.range(baseOffset, std::min(declaredSize, availableSize));
+  const auto symb = sectionRange(reader, sdat, baseOffset, 0x10, 0x18);
+  const auto info = sectionRange(reader, sdat, baseOffset, 0x18, 0x18);
+  const auto fat = sectionRange(reader, sdat, baseOffset, 0x20, 0x0c);
+  if (!info || !fat) {
+    builder.warning("NDS SDAT section table was invalid", reader.range(baseOffset, 0x28));
     return std::nullopt;
   }
 
-  const u32 sequenceCount = readCountFromInfoList(reader, layout.infoOffset, 0x08);
-  const u32 bankCount = readCountFromInfoList(reader, layout.infoOffset, 0x10);
-  const u32 waveArchiveCount = readCountFromInfoList(reader, layout.infoOffset, 0x14);
+  const u32 headerSize = reader.le16(baseOffset + 0x0c);
+  const u32 annotatedHeaderSize = headerSize >= 0x28 && reader.has(baseOffset, headerSize) ? headerSize : 0x28;
+  builder.sourceMap()
+      .header("SDAT Header", reader.range(baseOffset, annotatedHeaderSize))
+      .field("file_size", reader.range(baseOffset + 8, 4), declaredSize, SourceValueDisplay::Hex)
+      .field("symb_offset", reader.range(baseOffset + 0x10, 4), symb ? symb->offset : 0, SourceValueDisplay::Address)
+      .field("info_offset", reader.range(baseOffset + 0x18, 4), info->offset, SourceValueDisplay::Address)
+      .field("fat_offset", reader.range(baseOffset + 0x20, 4), fat->offset, SourceValueDisplay::Address);
+  if (symb) {
+    builder.sourceMap().section("SYMB Section", *symb).kind("sdat-symb");
+  }
+  builder.sourceMap().section("INFO Section", *info).kind("sdat-info");
+  builder.sourceMap().table("FAT File Table", *fat).kind("sdat-fat");
 
-  layout.sequenceNames = readNames(reader, layout.symbOffset, 0x08, sequenceCount, "SSEQ", layout.hasSymb);
-  layout.bankNames = readNames(reader, layout.symbOffset, 0x10, bankCount, "SBNK", layout.hasSymb);
-  layout.waveArchiveNames = readNames(reader, layout.symbOffset, 0x14, waveArchiveCount, "SWAR", layout.hasSymb);
+  const auto sequences = offsetList(builder, *info, 0x08, "sequence INFO list");
+  const auto banks = offsetList(builder, *info, 0x10, "bank INFO list");
+  const auto waves = offsetList(builder, *info, 0x14, "wave-archive INFO list");
+  const u32 sequenceCount = sequences ? sequences->count : 0;
+  const u32 bankCount = banks ? banks->count : 0;
+  const u32 waveCount = waves ? waves->count : 0;
 
-  const u32 sequenceInfoList = reader.le32(layout.infoOffset + 0x08) + layout.infoOffset;
+  const auto sequenceNames = symb ? offsetList(builder, *symb, 0x08, "sequence name list") : std::nullopt;
+  const auto bankNames = symb ? offsetList(builder, *symb, 0x10, "bank name list") : std::nullopt;
+  const auto waveNames = symb ? offsetList(builder, *symb, 0x14, "wave-archive name list") : std::nullopt;
+  const FatTable files = fatTable(builder, *fat);
+
+  NdsLayout layout{.range = sdat};
   layout.sequences.reserve(sequenceCount);
-  for (u32 i = 0; i < sequenceCount; ++i) {
-    NdsSequenceInfo info;
-    if (const auto record = infoRecord(reader, layout.infoOffset, sequenceInfoList, i)) {
-      if (record->relativeOffset != 0 && reader.has(record->sourceOffset, 6)) {
-        info.valid = true;
-        info.fileId = reader.le16(record->sourceOffset);
-        info.bank = reader.le16(record->sourceOffset + 4);
-      } else if (reader.has(record->sourceOffset + 4, 2)) {
-        info.bank = reader.le16(record->sourceOffset + 4);
+  for (u32 index = 0; index < sequenceCount; ++index) {
+    NdsSequenceInfo sequence{.name = nameAt(reader, symb, sequenceNames, index, "SSEQ")};
+    if (const auto record = recordOffset(builder, *info, *sequences, index, 6)) {
+      const u16 fileId = reader.le16(*record);
+      sequence.file = fileRange(builder, baseOffset, files, fileId, reader.range(*record, 2));
+      const u16 bank = reader.le16(*record + 4);
+      if (bank < bankCount) {
+        sequence.bank = bank;
       }
     }
-    layout.sequences.push_back(info);
+    layout.sequences.push_back(std::move(sequence));
   }
 
-  const u32 bankInfoList = reader.le32(layout.infoOffset + 0x10) + layout.infoOffset;
   layout.banks.reserve(bankCount);
-  for (u32 i = 0; i < bankCount; ++i) {
-    NdsBankInfo info;
-    if (const auto record = infoRecord(reader, layout.infoOffset, bankInfoList, i)) {
-      if (record->relativeOffset != 0 && reader.has(record->sourceOffset, 12)) {
-        info.valid = true;
-        info.fileId = reader.le16(record->sourceOffset);
-        for (u32 j = 0; j < info.waveArchives.size(); ++j) {
-          const u16 waveArchive = reader.le16(record->sourceOffset + 4 + j * 2);
-          info.waveArchives[j] = waveArchive >= waveArchiveCount ? 0xffff : waveArchive;
+  for (u32 index = 0; index < bankCount; ++index) {
+    NdsBankInfo bank{.name = nameAt(reader, symb, bankNames, index, "SBNK")};
+    if (const auto record = recordOffset(builder, *info, *banks, index, 12)) {
+      const u16 fileId = reader.le16(*record);
+      bank.file = fileRange(builder, baseOffset, files, fileId, reader.range(*record, 2));
+      for (u32 slot = 0; slot < bank.waveArchives.size(); ++slot) {
+        const u16 wave = reader.le16(*record + 4 + slot * 2);
+        if (wave < waveCount) {
+          bank.waveArchives[slot] = wave;
         }
       }
     }
-    layout.banks.push_back(info);
+    layout.banks.push_back(std::move(bank));
   }
 
-  const u32 waveArchiveInfoList = reader.le32(layout.infoOffset + 0x14) + layout.infoOffset;
-  layout.waveArchives.reserve(waveArchiveCount);
-  for (u32 i = 0; i < waveArchiveCount; ++i) {
-    NdsWaveArchiveInfo info;
-    if (const auto record = infoRecord(reader, layout.infoOffset, waveArchiveInfoList, i)) {
-      if (record->relativeOffset != 0 && reader.has(record->sourceOffset, 2)) {
-        info.valid = true;
-        info.fileId = reader.le16(record->sourceOffset);
-      }
+  layout.waveArchives.reserve(waveCount);
+  for (u32 index = 0; index < waveCount; ++index) {
+    NdsWaveArchiveInfo wave{.name = nameAt(reader, symb, waveNames, index, "SWAR")};
+    if (const auto record = recordOffset(builder, *info, *waves, index, 2)) {
+      const u16 fileId = reader.le16(*record);
+      wave.file = fileRange(builder, baseOffset, files, fileId, reader.range(*record, 2));
     }
-    layout.waveArchives.push_back(info);
+    layout.waveArchives.push_back(std::move(wave));
   }
 
   return layout;
 }
 
-std::optional<NdsFileRange> ndsFileRange(ByteReader reader, const NdsLayout& layout, u16 fileId) {
-  const u64 fatEntry = static_cast<u64>(layout.fatOffset) + 12 + static_cast<u64>(fileId) * 0x10;
-  if (!reader.has(fatEntry, 8)) {
-    return std::nullopt;
+NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, SourceRange file) {
+  const u32 offset = static_cast<u32>(file.offset);
+  const u32 size = static_cast<u32>(file.size);
+  const u32 fatEnd = static_cast<u32>(std::min<u64>(reader.size(), file.endOffset()));
+  if (matchesBytes(reader, offset, kSseqSignature)) {
+    return NdsSequenceRange{.offset = offset, .sequenceEnd = fatEnd};
   }
 
-  const u32 offset = reader.le32(fatEntry) + layout.baseOffset;
-  const u32 size = reader.le32(fatEntry + 4);
-  if (!reader.has(offset, size)) {
-    return std::nullopt;
+  if (const auto recovered = recoveredMalformedSdatSequenceOffset(reader, offset, size)) {
+    u32 sequenceEnd = static_cast<u32>(reader.size());
+    if (reader.has(*recovered + kSseqFileSizeOffset, 4)) {
+      sequenceEnd = static_cast<u32>(
+          std::min<u64>(reader.size(), static_cast<u64>(*recovered) + reader.le32(*recovered + kSseqFileSizeOffset)));
+    }
+    return NdsSequenceRange{
+        .offset = *recovered,
+        .sequenceEnd = sequenceEnd,
+        .recoverMalformedSdatRange = true,
+    };
   }
 
-  return NdsFileRange{.offset = offset, .size = size};
-}
-
-NdsSequenceRange ndsSequenceRangeForFatEntry(ByteReader reader, u32 offset, u32 size) {
-  const bool hasSseqHeader = matchesBytes(reader, offset, kSseqSignature);
-  const u32 fatEnd = static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + size));
-  const std::optional<u32> recoveredSequenceOffset =
-      hasSseqHeader ? std::nullopt : recoveredMalformedSdatSequenceOffset(reader, offset, size);
-  const bool recoverMalformedSdatRange = recoveredSequenceOffset.has_value();
-  const bool zeroFilled = !hasSseqHeader && !recoverMalformedSdatRange && isZeroFilled(reader, offset, fatEnd);
-  const u32 sequenceOffset = recoveredSequenceOffset.value_or(offset);
-  const u32 recoveredEnd = recoveredSequenceOffset && reader.has(*recoveredSequenceOffset + kSseqFileSizeOffset, 4)
-                               ? static_cast<u32>(std::min<u64>(
-                                     reader.size(), static_cast<u64>(*recoveredSequenceOffset) +
-                                                        reader.le32(*recoveredSequenceOffset + kSseqFileSizeOffset)))
-                               : static_cast<u32>(reader.size());
-  const u32 emptySequenceEnd =
-      static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + kSseqHeaderSize));
-
-  u32 sequenceEnd = fatEnd;
-  if (zeroFilled) {
-    sequenceEnd = emptySequenceEnd;
-  } else if (recoverMalformedSdatRange) {
-    sequenceEnd = recoveredEnd;
+  if (isZeroFilled(reader, offset, fatEnd)) {
+    return NdsSequenceRange{
+        .offset = offset,
+        .sequenceEnd = static_cast<u32>(std::min<u64>(reader.size(), static_cast<u64>(offset) + kSseqHeaderSize)),
+    };
   }
 
-  return NdsSequenceRange{
-      .offset = sequenceOffset,
-      .sequenceEnd = sequenceEnd,
-      .recoverMalformedSdatRange = recoverMalformedSdatRange,
-  };
+  return NdsSequenceRange{.offset = offset, .sequenceEnd = fatEnd};
 }
 
 }  // namespace vgmtrans::formats::nds
