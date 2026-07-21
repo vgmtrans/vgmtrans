@@ -4,24 +4,21 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/AkaoSnes/AkaoSnesSequence.h"
+#include "value/formats/AkaoSnes/AkaoSnes.h"
 
 #include "value/base/LevelScale.h"
-#include "value/sequence/SequenceCursorDialect.h"
+#include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/CommandSourceMap.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SynthMath.h"
 
-#include <fmt/format.h>
-
 #include <algorithm>
-#include <any>
 #include <array>
 #include <cmath>
 #include <limits>
 #include <optional>
-#include <span>
-#include <string>
-#include <utility>
+#include <unordered_set>
 #include <vector>
 
 namespace vgmtrans::formats::akao_snes {
@@ -30,8 +27,6 @@ using namespace core;
 
 namespace {
 
-constexpr u8 kMinTimer0Frequency = 0x24;
-constexpr u8 kMaxTimer0Frequency = 0x2a;
 constexpr u16 kDefaultPitchBendRangeCents = 200;
 constexpr s32 kNominalDspPitch = 0x1000;
 constexpr s32 kPitchFractionScale = 0x100;
@@ -40,8 +35,6 @@ enum class EventType {
   Unknown0,
   Unknown1,
   Unknown2,
-  Unknown3,
-  Unknown4,
   Note,
   Nop,
   Nop1,
@@ -118,15 +111,6 @@ enum class EventType {
   PlaySfx,
 };
 
-struct Context {
-  AkaoSnesVersion version = AKAOSNES_NONE;
-  AkaoSnesMinorVersion minorVersion = AKAOSNES_NOMINORVERSION;
-  u32 romRelocBase = 0;
-  u32 apuRelocBase = 0;
-  std::optional<u8> initialSharedTempo;
-  std::optional<u32> initialSharedTempoTrack;
-};
-
 constexpr std::array<u8, 15> kNoteDurationsV1{0xc0, 0x90, 0x60, 0x48, 0x40, 0x30, 0x24, 0x20,
                                               0x18, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03};
 constexpr std::array<u8, 15> kNoteDurationsV2V3{0xc0, 0x90, 0x60, 0x40, 0x48, 0x30, 0x20, 0x24,
@@ -150,16 +134,6 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
   }
   const u8 timer = akaoSnesTimer0Frequency(version, minorVersion);
   return static_cast<u32>(std::lround(kAkaoSnesPpqn * (125.0 * timer) * 256.0 / tempo));
-}
-
-[[nodiscard]] u8 tempoFromMicrosecondsPerQuarter(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion,
-                                                 u32 microsecondsPerQuarter) {
-  if (microsecondsPerQuarter == 0) {
-    return 0;
-  }
-  const u8 timer = akaoSnesTimer0Frequency(version, minorVersion);
-  const int tempo = static_cast<int>(std::lround(kAkaoSnesPpqn * (125.0 * timer) * 256.0 / microsecondsPerQuarter));
-  return static_cast<u8>(std::clamp(tempo, 0, 255));
 }
 
 [[nodiscard]] double levelFromLegacyMidiVolume(u8 volume) {
@@ -280,27 +254,9 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
   return version == AKAOSNES_V3 ? static_cast<u8>((magnitude * 2) + 1) : static_cast<u8>(magnitude + 1);
 }
 
-[[nodiscard]] double frameRateHz(u8 timer0Frequency) {
-  return 8000.0 / timer0Frequency;
-}
-
 [[nodiscard]] double lfoRateHz(AkaoSnesVersion version, u8 rate, u8 depth, u8 timer0Frequency) {
   const u16 frames = effectiveRateFrames(version, rate, depth);
-  return frames == 0 ? 0.0 : frameRateHz(timer0Frequency) / (2.0 * frames);
-}
-
-[[nodiscard]] double minLfoRateHz(AkaoSnesVersion) {
-  return 1.0 / 16.0;
-}
-
-[[nodiscard]] double maxLfoRateHz(AkaoSnesVersion version) {
-  if (version == AKAOSNES_V1) {
-    return frameRateHz(kMinTimer0Frequency) / (2.0 * 2.0);
-  }
-  if (version == AKAOSNES_V2) {
-    return frameRateHz(kMinTimer0Frequency) / 2.0;
-  }
-  return 8000.0 / kMinTimer0Frequency / 2.0;
+  return frames == 0 ? 0.0 : akaoSnesFrameRateHz(timer0Frequency) / (2.0 * frames);
 }
 
 [[nodiscard]] u16 v4LfoStep(u8 rate, u8 depth) {
@@ -423,7 +379,7 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
     return 0.0;
   }
   const u8 safeTempo = tempo == 0 ? 1 : tempo;
-  return ticks * (256.0 / (frameRateHz(timer0Frequency) * safeTempo));
+  return ticks * (256.0 / (akaoSnesFrameRateHz(timer0Frequency) * safeTempo));
 }
 
 [[nodiscard]] u32 driverFramesToTicks(double frames, u8 tempo) {
@@ -453,16 +409,6 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
     return tremoloDepthDbForAmplitude(64.0);
   }
   return 0.0;
-}
-
-[[nodiscard]] double maxDelaySeconds(AkaoSnesVersion version) {
-  constexpr double kMaxV1DelaySeconds = 254.0 * 256.0 / (8000.0 / kMinTimer0Frequency);
-  constexpr double kMaxV4DelaySeconds = 254.0 * 256.0 / ((8000.0 / kMaxTimer0Frequency) * 1.0);
-  constexpr double kMaxDelaySeconds = 255.0 * 256.0 / ((8000.0 / kMaxTimer0Frequency) * 1.0);
-  if (version == AKAOSNES_V1) {
-    return kMaxV1DelaySeconds;
-  }
-  return version == AKAOSNES_V4 ? kMaxV4DelaySeconds : kMaxDelaySeconds;
 }
 
 [[nodiscard]] u8 midiValueForAmountInRange(s32 currentAmount, s32 minAmount, s32 maxAmount) {
@@ -543,13 +489,13 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
 }
 
 [[nodiscard]] u8 rateMidiValue(AkaoSnesVersion version, u8 rate, u8 depth, u8 timer0Frequency) {
-  return midiValueForHertzInRange(lfoRateHz(version, rate, depth, timer0Frequency), minLfoRateHz(version),
-                                  maxLfoRateHz(version));
+  const AkaoSnesLfoRateRange range = akaoSnesLfoRateRange(version);
+  return midiValueForHertzInRange(lfoRateHz(version, rate, depth, timer0Frequency), range.minimum, range.maximum);
 }
 
 [[nodiscard]] u8 delayMidiValue(AkaoSnesVersion version, u8 delay, u8 tempo, u8 timer0Frequency) {
   return midiValueForSecondsInRange(delaySeconds(version, delay, tempo, timer0Frequency), 0.0,
-                                    maxDelaySeconds(version));
+                                    akaoSnesMaxLfoDelaySeconds(version));
 }
 
 [[nodiscard]] u32 v1VibratoRampTicks(u8 rate, u8 tempo) {
@@ -1091,12 +1037,6 @@ enum class LfoTarget {
   Tremolo,
 };
 
-struct LfoParams {
-  u8 delay = 0;
-  u8 rate = 0;
-  u8 depth = 0;
-};
-
 class LfoState {
 public:
   void reset() {
@@ -1196,184 +1136,98 @@ struct SharedTempoChange {
   u64 tick = 0;
   u8 tempo = 0;
   u32 sourceTrackNumber = 0;
+  u64 order = 0;
 };
 
-[[nodiscard]] std::optional<size_t> zeroTimeCommandSize(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion,
-                                                        std::span<const u8> bytes) {
-  if (bytes.empty()) {
-    return std::nullopt;
-  }
-
-  const auto require = [&](size_t size) -> std::optional<size_t> {
-    return bytes.size() >= size ? std::optional<size_t>(size) : std::nullopt;
-  };
-
-  switch (eventType(version, minorVersion, bytes.front())) {
-    case EventType::Note:
-    case EventType::Goto:
-    case EventType::LoopBreak:
-    case EventType::CpuControlledJump:
-    case EventType::End:
-      return std::nullopt;
-
-    case EventType::TempoFade:
-    case EventType::VolumeFade:
-    case EventType::PanFade:
-      return require(version == AKAOSNES_V1 ? 4 : 3);
-
-    case EventType::PitchEnvelopeOn:
-    case EventType::TremoloOn:
-    case EventType::VibratoOn:
-    case EventType::PanLfoOnWithDelay:
-      return require(4);
-
-    case EventType::EchoFeedbackFir:
-    case EventType::EchoVolumeFade:
-    case EventType::EchoFeedbackFade:
-    case EventType::EchoFirFade:
-    case EventType::PitchSlide:
-    case EventType::PanLfoOn:
-    case EventType::CpuControlledJumpV2:
-      return require(3);
-
-    case EventType::Nop1:
-    case EventType::Tempo:
-    case EventType::Volume:
-    case EventType::Pan:
-    case EventType::EchoVolume:
-    case EventType::Octave:
-    case EventType::TransposeAbs:
-    case EventType::TransposeRel:
-    case EventType::Tuning:
-    case EventType::ProgramChange:
-    case EventType::VolumeEnvelope:
-    case EventType::GainRelease:
-    case EventType::DurationRate:
-    case EventType::NoiseFreq:
-    case EventType::LoopStart:
-    case EventType::AdsrAr:
-    case EventType::AdsrDr:
-    case EventType::AdsrSl:
-    case EventType::AdsrSr:
-    case EventType::MasterVolume:
-    case EventType::OneTimeDuration:
-    case EventType::JumpToSfxLo:
-    case EventType::JumpToSfxHi:
-    case EventType::EchoFeedback:
-    case EventType::EchoFir:
-    case EventType::CpuControlledSetValue:
-    case EventType::VolumeAlt:
-    case EventType::IgnoreMasterVolumeByPrognum:
-    case EventType::PlaySfx:
-    case EventType::Unknown1:
-      return require(2);
-
-    case EventType::Nop:
-    case EventType::PitchEnvelopeOff:
-    case EventType::TremoloOff:
-    case EventType::VibratoOff:
-    case EventType::PanLfoOff:
-    case EventType::NoiseOn:
-    case EventType::NoiseOff:
-    case EventType::PitchModOn:
-    case EventType::PitchModOff:
-    case EventType::EchoOn:
-    case EventType::EchoOff:
-    case EventType::OctaveUp:
-    case EventType::OctaveDown:
-    case EventType::LoopEnd:
-    case EventType::LoopRestart:
-    case EventType::SlurOn:
-    case EventType::SlurOff:
-    case EventType::LegatoOn:
-    case EventType::LegatoOff:
-    case EventType::AdsrDefault:
-    case EventType::PercOn:
-    case EventType::PercOff:
-    case EventType::IgnoreMasterVolume:
-    case EventType::IgnoreMasterVolumeBroken:
-    case EventType::IncCpuSharedCounter:
-    case EventType::ZeroCpuSharedCounter:
-    case EventType::Unknown0:
-      return require(1);
-
-    case EventType::Unknown2:
-    case EventType::Unknown3:
-    case EventType::Unknown4:
-      return std::nullopt;
-  }
-
-  return std::nullopt;
-}
-
-[[nodiscard]] std::optional<u8> tempoFromPreludeCommand(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion,
-                                                        std::span<const u8> bytes) {
-  if (bytes.empty()) {
-    return std::nullopt;
-  }
-
-  const EventType type = eventType(version, minorVersion, bytes.front());
-  if (type == EventType::Tempo && bytes.size() >= 2) {
-    u8 rawTempo = bytes[1];
-    if (minorVersion == AKAOSNES_V4_FM || minorVersion == AKAOSNES_V4_CT) {
-      rawTempo = static_cast<u8>(rawTempo + ((rawTempo * 0x14) >> 8));
+struct ProgramState {
+  explicit ProgramState(const SequenceProgram& program) : profile(decodeAkaoSnesProfile(program.config.profile)) {
+    for (const TrackProgram& track : program.tracks) {
+      for (const SourceCommand& command : track.commands) {
+        const Address fallthrough{command.address.value + command.encodedSize};
+        const auto nextIndex = track.addressIndex.find(fallthrough);
+        if (!nextIndex) {
+          continue;
+        }
+        const SourceCommand& next = track.commands[*nextIndex];
+        if (next.flow.terminal) {
+          terminalPitchBoundaries.insert(fallthrough.value);
+          continue;
+        }
+        const SemanticOperand* envelopeOff = semanticOperand(next, "pitch_envelope_off");
+        const bool* clearsEnvelope = envelopeOff == nullptr ? nullptr : std::get_if<bool>(&envelopeOff->value);
+        if (clearsEnvelope == nullptr || !*clearsEnvelope) {
+          continue;
+        }
+        const Address afterOff{next.address.value + next.encodedSize};
+        const auto afterIndex = track.addressIndex.find(afterOff);
+        if (!afterIndex) {
+          continue;
+        }
+        const SourceCommand& after = track.commands[*afterIndex];
+        if (after.flow.terminal) {
+          terminalPitchBoundaries.insert(fallthrough.value);
+          continue;
+        }
+        if (!after.flow.unconditionalJump()) {
+          continue;
+        }
+        if (after.flow.staticTargets.front().value <= command.address.value) {
+          terminalPitchBoundaries.insert(fallthrough.value);
+        }
+      }
     }
-    return rawTempo;
   }
 
-  if (type != EventType::TempoFade) {
-    return std::nullopt;
-  }
-
-  if (version == AKAOSNES_V1) {
-    if (bytes.size() >= 4 && bytes[1] == 0 && bytes[2] == 0) {
-      return bytes[3];
+  void observeTempo(u32 sourceTrackNumber, u64 tick, u8 tempo) {
+    if (!collecting) {
+      return;
     }
-    return std::nullopt;
+    tempoChanges.push_back(SharedTempoChange{
+        .tick = tick,
+        .tempo = tempo,
+        .sourceTrackNumber = sourceTrackNumber,
+        .order = nextOrder++,
+    });
   }
 
-  if (bytes.size() >= 3 && bytes[1] == 0) {
-    u8 rawTempo = bytes[2];
-    if (minorVersion == AKAOSNES_V4_FM || minorVersion == AKAOSNES_V4_CT) {
-      rawTempo = static_cast<u8>(rawTempo + ((rawTempo * 0x14) >> 8));
-    }
-    return rawTempo;
+  void finishPrepass() {
+    std::ranges::stable_sort(tempoChanges, [](const SharedTempoChange& lhs, const SharedTempoChange& rhs) {
+      return lhs.tick < rhs.tick || (lhs.tick == rhs.tick && lhs.order < rhs.order);
+    });
+    collecting = false;
   }
 
-  return std::nullopt;
-}
-
-[[nodiscard]] std::optional<u8> initialSharedTempoInPrelude(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion,
-                                                            std::span<const u8> bytes) {
-  size_t offset = 0;
-  while (offset < bytes.size()) {
-    const std::span<const u8> remaining = bytes.subspan(offset);
-    const auto size = zeroTimeCommandSize(version, minorVersion, remaining);
-    if (!size) {
+  [[nodiscard]] std::optional<InitialSharedTempoHint> initialTempo() const {
+    if (tempoChanges.empty() || tempoChanges.front().tick != 0) {
       return std::nullopt;
     }
-
-    if (const auto tempo = tempoFromPreludeCommand(version, minorVersion, remaining)) {
-      return tempo;
-    }
-
-    offset += *size;
+    return InitialSharedTempoHint{
+        .tempo = tempoChanges.front().tempo,
+        .sourceTrackNumber = tempoChanges.front().sourceTrackNumber,
+    };
   }
-  return std::nullopt;
-}
 
-[[nodiscard]] std::optional<InitialSharedTempoHint> initialSharedTempoFromProgram(const SequenceProgram& program,
-                                                                                  const Context& context) {
-  for (const TrackProgram& track : program.tracks) {
-    if (const auto tempo = initialSharedTempoInPrelude(context.version, context.minorVersion, track.commandBytes)) {
-      return InitialSharedTempoHint{
-          .tempo = *tempo,
-          .sourceTrackNumber = track.sourceTrackNumber,
-      };
+  [[nodiscard]] std::optional<u8> tempoAt(u64 tick) const {
+    std::optional<u8> tempo;
+    for (const auto& change : tempoChanges) {
+      if (change.tick > tick) {
+        break;
+      }
+      tempo = change.tempo;
     }
+    return tempo;
   }
-  return std::nullopt;
-}
+
+  [[nodiscard]] bool terminalPitchBoundary(Address fallthrough) const {
+    return terminalPitchBoundaries.contains(fallthrough.value);
+  }
+
+  AkaoSnesProfile profile;
+  std::vector<SharedTempoChange> tempoChanges;
+  std::unordered_set<u64> terminalPitchBoundaries;
+  bool collecting = true;
+  u64 nextOrder = 0;
+};
 
 struct PitchEnvelopeState {
   bool enabled = false;
@@ -1391,18 +1245,12 @@ struct PitchEnvelopeState {
 
 struct TrackState {
   TrackState() = default;
-  TrackState(const BytecodeDecodeContext&, const Context& context) { reset(context); }
-  TrackState(const SequenceProgram& program, const TrackProgram& track, const Context& context) {
-    reset(context);
-    if (const auto hint = initialSharedTempoFromProgram(program, context)) {
-      initialSharedTempo = hint->tempo;
-      initialSharedTempoTrack = hint->sourceTrackNumber;
-      lfoBeforeInitialSharedTempoTrack = track.sourceTrackNumber < hint->sourceTrackNumber;
-      lfoAfterInitialSharedTempoTrack = track.sourceTrackNumber > hint->sourceTrackNumber;
-    }
+  TrackState(const SequenceProgram& program, const TrackProgram& track) {
+    reset(decodeAkaoSnesProfile(program.config.profile));
+    trackNumber = track.sourceTrackNumber;
   }
 
-  void reset(const Context& context) {
+  void reset(AkaoSnesProfile profile) {
     octave = 6;
     transpose = 0;
     onetimeDuration = 0;
@@ -1412,20 +1260,10 @@ struct TrackState {
     nonPercussionProgram = 0;
     loopLevel = 0;
     tempo = kAkaoSnesDefaultTempo;
-    pan8Bit = akaoSnesUses8BitPan(context.version, context.minorVersion);
-    initialSharedTempo = context.initialSharedTempo;
-    initialSharedTempoTrack = context.initialSharedTempoTrack;
-    lfoBeforeInitialSharedTempoTrack = false;
-    lfoAfterInitialSharedTempoTrack = false;
-    initialSharedTempoApplied = false;
+    pan8Bit = akaoSnesUses8BitPan(profile.version, profile.minorVersion);
+    sharedTempoApplied = false;
     lastTieableNoteTick.reset();
-    pitchWaitEndTick.reset();
-    pitchWaitFallthrough.reset();
-    pitchWaitBoundaryClassified = false;
-    pitchWaitStopsPitchEnvelope = false;
-    sharedTempoCacheBuilt = false;
-    sharedTempoChanges.clear();
-    sharedTempoCursor = 0;
+    pitchAutomationStopTick.reset();
     pitchEnvelope = {};
     pitchBaseValid = false;
     pitchBase = kNominalDspPitch * kPitchFractionScale;
@@ -1445,86 +1283,8 @@ struct TrackState {
     tremolo.reset();
   }
 
-  template <class Runtime>
-  void emitTempo(Runtime& rt, u8 rawTempo) {
-    if (rt.context.minorVersion == AKAOSNES_V4_FM || rt.context.minorVersion == AKAOSNES_V4_CT) {
-      rawTempo = static_cast<u8>(rawTempo + ((rawTempo * 0x14) >> 8));
-    }
-    tempo = rawTempo;
-    if (initialSharedTempo && rawTempo == *initialSharedTempo) {
-      initialSharedTempoApplied = true;
-    }
-    rt.tempo(tempoMicrosecondsPerQuarter(rt.context.version, rt.context.minorVersion, rawTempo));
-    syncLfoRateAndDelay(rt, LfoTarget::Vibrato);
-    syncLfoRateAndDelay(rt, LfoTarget::Tremolo);
-  }
-
-  template <class Runtime>
-  void syncSharedTempoAtTick(Runtime& rt) {
-    const std::optional<u8> sharedTempo = rt.sharedTempoAtTick();
-    if (!sharedTempo) {
-      return;
-    }
-    tempo = *sharedTempo;
-    initialSharedTempoApplied = true;
-    syncLfoRateAndDelay(rt, LfoTarget::Vibrato);
-    syncLfoRateAndDelay(rt, LfoTarget::Tremolo);
-  }
-
-  template <class Runtime>
-  void emitProgram(Runtime& rt, u8 program) {
-    nonPercussionProgram = program;
-    if (!percussion) {
-      rt.instrument(0, program);
-    }
-  }
-
-  template <class Runtime>
-  void emitPitchBendRange(Runtime& rt, u16 cents) {
-    const u16 range = std::max<u16>(kDefaultPitchBendRangeCents, cents);
-    if (currentPitchBendRangeCents == range) {
-      return;
-    }
-    rt.pitchBendRange(PitchBendRangePerformanceEvent{
-        .cents = range,
-    });
-    currentPitchBendRangeCents = range;
-  }
-
-  template <class Runtime>
-  void emitPitchBendSemitones(Runtime& rt, double semitones, s16 midiBendValue) {
-    if (currentPitchBendValue == midiBendValue) {
-      return;
-    }
-    rt.pitchBend(semitones);
-    currentPitchBendValue = midiBendValue;
-  }
-
-  template <class Runtime>
-  void emitPitchBendForCurrentPitch(Runtime& rt) {
-    const s16 value = akaoSnesPitchBendValue(currentPitch, pitchBase, currentPitchBendRangeCents);
-    emitPitchBendSemitones(rt, akaoSnesPitchCents(currentPitch, pitchBase) / 100.0, value);
-  }
-
   [[nodiscard]] bool pitchBendAtRest() const {
     return currentPitchBendRangeCents == kDefaultPitchBendRangeCents && currentPitchBendValue == 0;
-  }
-
-  template <class Runtime>
-  void resetPitchBendForNewNote(Runtime& rt) {
-    pitchBaseValid = false;
-    pitchSlideActive = false;
-    pitchSlideStepsRemaining = 0;
-    pitchSlideNoteValid = false;
-    if (pitchBendAtRest()) {
-      return;
-    }
-    if (akaoSnesSupportsPitchEnvelope(rt.context.version) && pitchEnvelope.enabled) {
-      emitPitchBendSemitones(rt, 0.0, 0);
-      return;
-    }
-    emitPitchBendRange(rt, kDefaultPitchBendRangeCents);
-    emitPitchBendSemitones(rt, 0.0, 0);
   }
 
   void setPitchEnvelope(AkaoSnesVersion version, s8 semitones, u8 delay, u8 length) {
@@ -1541,43 +1301,6 @@ struct TrackState {
 
   void clearPitchEnvelope() { pitchEnvelope = {}; }
 
-  template <class Runtime>
-  void beginPitchEnvelopeForNote(Runtime& rt) {
-    if (!akaoSnesSupportsPitchEnvelope(rt.context.version) || !pitchEnvelope.enabled || !pitchBaseValid) {
-      return;
-    }
-    const s32 targetPitch = akaoSnesPitchForSemitoneOffset(pitchEnvelope.semitones);
-    const s32 rawDiff = (targetPitch - pitchBase) / kPitchFractionScale;
-    const s32 rawMagnitude = rawDiff < 0 ? -rawDiff : rawDiff;
-    const s32 signedMagnitude = pitchEnvelope.semitones < 0 ? -rawMagnitude : rawMagnitude;
-    pitchEnvelope.targetOffset = signedMagnitude * kPitchFractionScale;
-    pitchEnvelope.activeDelay = pitchEnvelope.delay;
-    pitchEnvelope.activeCount = rt.context.version == AKAOSNES_V1 ? pitchEnvelope.length : 0;
-    pitchEnvelope.progress = 0;
-    pitchEnvelope.active = pitchEnvelope.targetOffset != 0 && pitchEnvelope.progressStep != 0;
-    currentPitch = pitchBase;
-
-    if (pitchEnvelope.active) {
-      emitPitchBendRange(rt, akaoSnesPitchBendRangeCents(pitchBase, pitchBase + pitchEnvelope.targetOffset,
-                                                         kDefaultPitchBendRangeCents));
-    }
-  }
-
-  template <class Runtime>
-  void beginNotePitch(Runtime& rt, u8 note, bool validForPitchBend) {
-    resetPitchBendForNewNote(rt);
-    if (!validForPitchBend) {
-      return;
-    }
-    pitchBase = kNominalDspPitch * kPitchFractionScale;
-    currentPitch = pitchBase;
-    pitchBaseValid = true;
-    pitchSlideBaseNote = akaoSnesCorrectedNote(note, transpose);
-    pitchSlideCurrentNote = pitchSlideBaseNote;
-    pitchSlideNoteValid = true;
-    beginPitchEnvelopeForNote(rt);
-  }
-
   void setPendingPitchSlide(u16 steps, s8 semitones) {
     pendingPitchSlideSteps = steps;
     pendingPitchSlideSemitones = semitones;
@@ -1589,82 +1312,6 @@ struct TrackState {
   void clearPendingPitchSlide() {
     pendingPitchSlideSteps = 0;
     pendingPitchSlideSemitones = 0;
-  }
-
-  template <class Runtime>
-  void updatePitchSlide(Runtime& rt) {
-    if (!pitchSlideActive || !pitchBaseValid) {
-      return;
-    }
-    if (pitchSlideStepsRemaining == 0) {
-      pitchSlideActive = false;
-      return;
-    }
-
-    --pitchSlideStepsRemaining;
-    currentPitch = pitchSlideStepsRemaining == 0 ? pitchSlideFinalPitch : currentPitch + pitchSlideStep;
-    emitPitchBendForCurrentPitch(rt);
-    if (pitchSlideStepsRemaining == 0) {
-      pitchSlideActive = false;
-    }
-  }
-
-  template <class Runtime>
-  void beginPendingPitchSlide(Runtime& rt) {
-    if (pendingPitchSlideSteps == 0 || pendingPitchSlideSemitones == 0) {
-      clearPendingPitchSlide();
-      return;
-    }
-
-    const u16 steps = pendingPitchSlideSteps;
-    const s8 semitones = pendingPitchSlideSemitones;
-    clearPendingPitchSlide();
-
-    if (!pitchBaseValid || !pitchSlideNoteValid) {
-      return;
-    }
-
-    pitchSlideCurrentNote = static_cast<s16>(pitchSlideCurrentNote + semitones);
-    const s32 targetPitch = akaoSnesPitchForSemitoneOffset(pitchSlideCurrentNote - pitchSlideBaseNote);
-    pitchSlideStep = akaoSnesPitchSlideStep(rt.context.version, currentPitch, targetPitch, steps);
-    pitchSlideFinalPitch = currentPitch + (pitchSlideStep * static_cast<s32>(steps));
-    const u16 rangeCents =
-        std::max(akaoSnesPitchBendRangeCents(pitchBase, targetPitch, kDefaultPitchBendRangeCents),
-                 akaoSnesPitchBendRangeCents(pitchBase, pitchSlideFinalPitch, kDefaultPitchBendRangeCents));
-    emitPitchBendRange(rt, rangeCents);
-    emitPitchBendForCurrentPitch(rt);
-    pitchSlideStepsRemaining = steps;
-    pitchSlideActive = true;
-    updatePitchSlide(rt);
-  }
-
-  template <class Runtime>
-  void setPitchWaitBoundary(Runtime& rt, VmCommandCursor& cmd, u32 waitTicks) {
-    pitchWaitEndTick = rt.tick() + waitTicks;
-    pitchWaitFallthrough = cmd.addressAtCursor();
-    pitchWaitBoundaryClassified = false;
-    pitchWaitStopsPitchEnvelope = false;
-    if constexpr (requires(const Runtime& runtime, const VmCommandCursor& cursor) { runtime.nextCommand(cursor); }) {
-      pitchWaitBoundaryClassified = true;
-      if (const SourceCommand* next = rt.nextCommand(cmd)) {
-        const EventType nextType = eventType(rt.context.version, rt.context.minorVersion, next->opcode);
-        pitchWaitStopsPitchEnvelope = nextType == EventType::End;
-        if (!pitchWaitStopsPitchEnvelope && nextType == EventType::PitchEnvelopeOff) {
-          if (const SourceCommand* after = rt.commandAfter(*next)) {
-            const EventType afterType = eventType(rt.context.version, rt.context.minorVersion, after->opcode);
-            if (afterType == EventType::End) {
-              pitchWaitStopsPitchEnvelope = true;
-            } else if (afterType == EventType::Goto) {
-              const auto bytes = rt.commandBytes(*after);
-              if (bytes.size() >= 3) {
-                const u16 destination = static_cast<u16>(bytes[1] | (bytes[2] << 8));
-                pitchWaitStopsPitchEnvelope = destination <= rt.commandAddress();
-              }
-            }
-          }
-        }
-      }
-    }
   }
 
   [[nodiscard]] bool pitchEnvelopeDelayElapsed() {
@@ -1705,25 +1352,6 @@ struct TrackState {
     currentOffset =
         akaoSnesPitchEnvelopeOffset(pitchEnvelope.targetOffset, static_cast<u8>(pitchEnvelope.progress >> 8));
     return true;
-  }
-
-  template <class Runtime>
-  void updatePitchEnvelope(Runtime& rt) {
-    if (!akaoSnesSupportsPitchEnvelope(rt.context.version) || !pitchEnvelope.active || !pitchBaseValid) {
-      return;
-    }
-    if (rt.terminalPitchWaitBoundary()) {
-      return;
-    }
-    if (!pitchEnvelopeDelayElapsed()) {
-      return;
-    }
-    s32 currentOffset = 0;
-    if (!advancePitchEnvelopeTick(rt.context.version, currentOffset)) {
-      return;
-    }
-    currentPitch = pitchBase + currentOffset;
-    emitPitchBendForCurrentPitch(rt);
   }
 
   void configureVibratoFade(AkaoSnesVersion version) {
@@ -1776,198 +1404,7 @@ struct TrackState {
     return static_cast<u8>(std::clamp<int>((fullDepth * depth + (targetDepth / 2)) / targetDepth, 0, 127));
   }
 
-  template <class Runtime>
-  void emitVibratoDepth(Runtime& rt, u8 midiDepth, bool force = false) {
-    vibrato.emitDepth(
-        midiDepth,
-        [&](u8 outputDepth) {
-          const double amount = static_cast<double>(outputDepth) / 127.0;
-          rt.modulation(ModulationPerformanceEvent{
-              .target = ModulationPerformanceTarget::VibratoDepth,
-              .amount = amount,
-              .pitchDepthSemitones = (amount * maxVibratoDepthCents(rt.context.version)) / 100.0,
-              .controllerRangeMaxAmount = 1.0,
-          });
-        },
-        force);
-  }
-
-  template <class Runtime>
-  void emitTremoloDepth(Runtime& rt, u8 midiDepth, bool force = false) {
-    tremolo.emitDepth(
-        midiDepth,
-        [&](u8 outputDepth) {
-          rt.modulation(ModulationPerformanceEvent{
-              .target = ModulationPerformanceTarget::TremoloDepth,
-              .amount = static_cast<double>(outputDepth) / 127.0,
-              .controllerRangeMaxAmount = 1.0,
-          });
-        },
-        force);
-  }
-
-  template <class Runtime>
-  void setLfoOutputDepth(Runtime& rt, LfoTarget target, u8 depth, bool force = false) {
-    if (target == LfoTarget::Vibrato) {
-      emitVibratoDepth(rt, depth, force);
-    } else {
-      emitTremoloDepth(rt, depth, force);
-    }
-  }
-
-  template <class Runtime>
-  void clearLfoRateAndDelay(Runtime& rt, LfoTarget target) {
-    if (target == LfoTarget::Vibrato) {
-      rt.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::VibratoRate,
-          .amount = 0.0,
-          .controllerRangeMaxAmount = 1.0,
-      });
-      rt.vibratoDelay(0, 0);
-    } else {
-      rt.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::TremoloRate,
-          .amount = 0.0,
-          .controllerRangeMaxAmount = 1.0,
-      });
-      rt.tremoloDelay(0, 0);
-    }
-  }
-
-  template <class Runtime>
-  void syncLfoRateAndDelay(Runtime& rt, LfoTarget target) {
-    const bool isVibrato = target == LfoTarget::Vibrato;
-    LfoState& lfo = isVibrato ? vibrato : tremolo;
-    if (!isLfoActive(rt.context.version, lfo.rate(), lfo.depth())) {
-      return;
-    }
-    if (isVibrato) {
-      configureVibratoFade(rt.context.version);
-    } else {
-      configureTremoloFade(rt.context.version);
-    }
-    const u8 rateValue = rateMidiValue(rt.context.version, lfo.rate(), lfo.depth(),
-                                       akaoSnesTimer0Frequency(rt.context.version, rt.context.minorVersion));
-    if (isVibrato) {
-      rt.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::VibratoRate,
-          .amount = static_cast<double>(rateValue) / 127.0,
-          .frequencyHz = lfoRateHz(rt.context.version, lfo.rate(), lfo.depth(),
-                                   akaoSnesTimer0Frequency(rt.context.version, rt.context.minorVersion)),
-          .controllerRangeMaxAmount = 1.0,
-      });
-      rt.vibratoDelay(lfoDelayTicks(rt.context.version, lfo.delay()),
-                      delayMidiValue(rt.context.version, lfo.delay(), tempo,
-                                     akaoSnesTimer0Frequency(rt.context.version, rt.context.minorVersion)));
-    } else {
-      rt.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::TremoloRate,
-          .amount = static_cast<double>(rateValue) / 127.0,
-          .frequencyHz = lfoRateHz(rt.context.version, lfo.rate(), lfo.depth(),
-                                   akaoSnesTimer0Frequency(rt.context.version, rt.context.minorVersion)),
-          .controllerRangeMaxAmount = 1.0,
-      });
-      rt.tremoloDelay(lfoDelayTicks(rt.context.version, lfo.delay()),
-                      delayMidiValue(rt.context.version, lfo.delay(), tempo,
-                                     akaoSnesTimer0Frequency(rt.context.version, rt.context.minorVersion)));
-    }
-  }
-
-  template <class Runtime>
-  void applyLfo(Runtime& rt, LfoTarget target, const LfoParams& params) {
-    const bool isVibrato = target == LfoTarget::Vibrato;
-    const bool supported = isVibrato || exportsTremolo(rt.context.version);
-    const bool active = supported && isLfoActive(rt.context.version, params.rate, params.depth);
-    LfoState& lfo = isVibrato ? vibrato : tremolo;
-    lfo.configure(params.delay, params.rate, params.depth);
-    if (initialSharedTempo && !initialSharedTempoApplied && lfoAfterInitialSharedTempoTrack) {
-      tempo = *initialSharedTempo;
-      initialSharedTempoApplied = true;
-    }
-    if (isVibrato) {
-      configureVibratoFade(rt.context.version);
-    } else {
-      configureTremoloFade(rt.context.version);
-    }
-    u8 midiDepth = 0;
-    if (active) {
-      midiDepth = isVibrato ? vibratoDepthMidiValue(rt.context.version, params.rate, params.depth)
-                            : tremoloDepthMidiValue(rt.context.version, params.rate, params.depth, params.delay);
-    }
-    if (isVibrato && rt.context.version == AKAOSNES_V4 && active && vibrato.hasReusableFade()) {
-      const u32 delay = lfoDelayTicks(rt.context.version, vibrato.delay());
-      const s32 initialDepth = vibrato.configuredDepth(8) / 4;
-      vibrato.beginReusableFade(delay, vibrato.configuredDepth(8), initialDepth);
-      midiDepth = delay == 0 ? vibratoFadeDepthMidiValue(rt.context.version, initialDepth) : 0;
-    }
-    setLfoOutputDepth(rt, target, midiDepth, true);
-    if (active) {
-      syncLfoRateAndDelay(rt, target);
-      if (rt.tick() == 0 && initialSharedTempo && lfoBeforeInitialSharedTempoTrack && *initialSharedTempo != tempo) {
-        tempo = *initialSharedTempo;
-        initialSharedTempoApplied = true;
-        syncLfoRateAndDelay(rt, target);
-      }
-    } else {
-      clearLfoRateAndDelay(rt, target);
-    }
-  }
-
-  template <class Runtime>
-  void clearLfo(Runtime& rt, LfoTarget target) {
-    LfoState& lfo = target == LfoTarget::Vibrato ? vibrato : tremolo;
-    lfo.setDepth(0);
-    lfo.clearReusableFade();
-    setLfoOutputDepth(rt, target, 0, true);
-  }
-
-  template <class Runtime>
-  void beginVibratoForNote(Runtime& rt) {
-    if (rt.context.version == AKAOSNES_V2 || !vibrato.hasReusableFade() ||
-        !isLfoActive(rt.context.version, vibrato.rate(), vibrato.depth())) {
-      return;
-    }
-    const u32 delay = lfoDelayTicks(rt.context.version, vibrato.delay());
-    const s32 initialDepth = rt.context.version == AKAOSNES_V4 ? vibrato.configuredDepth(8) / 4 : 0;
-    vibrato.beginReusableFade(delay, vibrato.configuredDepth(8), initialDepth);
-    emitVibratoDepth(rt, delay == 0 ? vibratoFadeDepthMidiValue(rt.context.version, initialDepth) : 0, true);
-  }
-
-  template <class Runtime>
-  void beginTremoloForNote(Runtime& rt) {
-    if (rt.context.version != AKAOSNES_V3 || !tremolo.hasReusableFade()) {
-      return;
-    }
-    tremolo.beginReusableFadeToConfiguredDepth(8);
-    emitTremoloDepth(rt, 0, true);
-  }
-
-  template <class Runtime>
-  void updateVibratoFade(Runtime& rt) {
-    if (rt.context.version == AKAOSNES_V2 || !vibrato.fadeActive()) {
-      return;
-    }
-    const auto fadeTick = vibrato.tickFade();
-    if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
-      const s32 current = vibrato.clampToConfiguredDepth(fadeTick.current, 8);
-      vibrato.setCurrentDepthPreservingMotion(current);
-      emitVibratoDepth(rt, vibratoFadeDepthMidiValue(rt.context.version, current));
-    }
-  }
-
-  template <class Runtime>
-  void updateTremoloFade(Runtime& rt) {
-    if (rt.context.version != AKAOSNES_V3 || !tremolo.fadeActive()) {
-      return;
-    }
-    const auto fadeTick = tremolo.tickFade();
-    if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
-      const s32 current = tremolo.clampToConfiguredDepth(fadeTick.current, 8);
-      tremolo.setCurrentDepthPreservingMotion(current);
-      emitTremoloDepth(rt, tremoloFadeDepthMidiValue(rt.context.version, current));
-    }
-  }
-
+  u32 trackNumber = 0;
   u8 octave = 6;
   s8 transpose = 0;
   u8 onetimeDuration = 0;
@@ -1979,19 +1416,9 @@ struct TrackState {
   std::array<LoopFrame, 4> loops{};
   u8 tempo = kAkaoSnesDefaultTempo;
   bool pan8Bit = true;
-  std::optional<u8> initialSharedTempo;
-  std::optional<u32> initialSharedTempoTrack;
-  bool lfoBeforeInitialSharedTempoTrack = false;
-  bool lfoAfterInitialSharedTempoTrack = false;
-  bool initialSharedTempoApplied = false;
+  bool sharedTempoApplied = false;
   std::optional<u64> lastTieableNoteTick;
-  std::optional<u64> pitchWaitEndTick;
-  std::optional<Address> pitchWaitFallthrough;
-  bool pitchWaitBoundaryClassified = false;
-  bool pitchWaitStopsPitchEnvelope = false;
-  bool sharedTempoCacheBuilt = false;
-  std::vector<SharedTempoChange> sharedTempoChanges;
-  size_t sharedTempoCursor = 0;
+  std::optional<u64> pitchAutomationStopTick;
   PitchEnvelopeState pitchEnvelope;
   bool pitchBaseValid = false;
   s32 pitchBase = kNominalDspPitch * kPitchFractionScale;
@@ -2011,593 +1438,840 @@ struct TrackState {
   LfoState tremolo;
 };
 
-CommandFlow readUnknown(VmCommandCursor& cmd, u8 operandCount) {
-  cmd.name("Unknown Event", SequenceSemantic::Unsupported).kind("unknown").sourceOnly();
-  cmd.derived("opcode", cmd.opcode(), SourceValueDisplay::Hex);
-  for (u8 i = 0; i < operandCount; ++i) {
-    static_cast<void>(cmd.u8(fmt::format("arg{}", i + 1)));
+struct Playback {
+  TrackState& track;
+  PerformanceEmitter& out;
+  VmApi& vm;
+  ProgramState& program;
+  const AkaoSnesProfile& context;
+
+  Playback(TrackState& track, PerformanceEmitter& out, VmApi& vm, ProgramState& program)
+      : track(track), out(out), vm(vm), program(program), context(program.profile) {}
+
+  [[nodiscard]] bool terminalPitchWaitBoundary() const {
+    return track.pitchAutomationStopTick && vm.tick() == *track.pitchAutomationStopTick;
   }
-  return cmd.next();
-}
 
-template <class Runtime>
-CommandFlow readLfo(Runtime& rt, VmCommandCursor& cmd, std::string_view name, LfoTarget target) {
-  cmd.name(name, SequenceSemantic::Modulation);
-  LfoParams params;
-  if (rt.context.version == AKAOSNES_V2) {
-    params.depth = cmd.u8("depth");
-    params.delay = cmd.u8("delay");
-    params.rate = cmd.u8("rate");
-  } else {
-    params.delay = cmd.u8("delay");
-    params.rate = cmd.u8("rate");
-    params.depth = cmd.u8("depth");
+  void pan(u8 rawPan) {
+    const u8 panValue = static_cast<u8>(rawPan << (track.pan8Bit ? 0 : 1));
+    const double rightGain = rightGainFromPan(panValue);
+    out.stereoBalance(1.0 - rightGain, rightGain);
   }
-  rt.state.applyLfo(rt, target, params);
-  return cmd.next();
-}
 
-template <class Runtime>
-u16 readRelocatedAddress(Runtime& rt, VmCommandCursor& cmd, std::string_view name) {
-  const u16 raw = cmd.u16le(name);
-  const u16 resolved = relocatedAddress(raw, rt.context.romRelocBase, rt.context.apuRelocBase);
-  cmd.derived(std::string(name) + "_resolved", resolved, SourceValueDisplay::Address);
-  return resolved;
-}
+  void emitPitchBendRange(u16 cents) {
+    const u16 range = std::max<u16>(kDefaultPitchBendRangeCents, cents);
+    if (track.currentPitchBendRangeCents == range) {
+      return;
+    }
+    out.pitchBendRange(PitchBendRangePerformanceEvent{.cents = range});
+    track.currentPitchBendRangeCents = range;
+  }
 
-struct AkaoSnesCursorReader {
-  template <class Runtime>
-  static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
-    const u8 opcode = cmd.opcode();
-    const EventType type = eventType(rt.context.version, rt.context.minorVersion, opcode);
-    auto& state = rt.state;
+  void emitPitchBendSemitones(double semitones, s16 midiBendValue) {
+    if (track.currentPitchBendValue == midiBendValue) {
+      return;
+    }
+    out.pitchBend(semitones);
+    track.currentPitchBendValue = midiBendValue;
+  }
 
-    switch (type) {
-      case EventType::Unknown0:
-        return readUnknown(cmd, 0);
-      case EventType::Unknown1:
-        return readUnknown(cmd, 1);
-      case EventType::Unknown2:
-        return readUnknown(cmd, 2);
-      case EventType::Unknown3:
-        return readUnknown(cmd, 3);
-      case EventType::Unknown4:
-        return readUnknown(cmd, 4);
+  void emitPitchBendForCurrentPitch() {
+    const s16 value = akaoSnesPitchBendValue(track.currentPitch, track.pitchBase, track.currentPitchBendRangeCents);
+    emitPitchBendSemitones(akaoSnesPitchCents(track.currentPitch, track.pitchBase) / 100.0, value);
+  }
 
-      case EventType::Note: {
-        cmd.name("Note", SequenceSemantic::Note);
-        const u8 tableSize = akaoSnesNoteDurationTableSize(rt.context.version);
-        const u8 durationIndex = opcode % tableSize;
-        const u8 noteIndex = opcode / tableSize;
-        cmd.derived("duration_index", durationIndex).derived("note_index", noteIndex);
-        u8 length = noteDuration(rt.context.version, durationIndex);
-        if (state.onetimeDuration != 0) {
-          length = state.onetimeDuration;
-          state.onetimeDuration = 0;
-        }
-        const u8 duration =
-            (!state.slur && !state.legato) ? ((length > 2) ? static_cast<u8>(length - 2) : u8{1}) : length;
-        if (noteIndex < 12) {
-          const double velocity = kAkaoSnesNoteVelocity / 127.0;
-          state.setPitchWaitBoundary(rt, cmd, length);
-          const u8 note = static_cast<u8>((state.octave * 12) + noteIndex);
-          state.beginNotePitch(rt, note, !state.percussion);
-          state.beginPendingPitchSlide(rt);
-          if (!state.slur && !state.legato) {
-            state.beginVibratoForNote(rt);
-            state.beginTremoloForNote(rt);
-          }
-          if (state.percussion) {
-            rt.note(kAkaoSnesDrumKeyBias + noteIndex - state.transpose, velocity, duration);
-          } else {
-            rt.note((state.octave * 12) + noteIndex + state.transpose, velocity, duration);
-          }
-          state.lastTieableNoteTick = rt.tick() + length;
-          return cmd.wait(length);
-        }
-        if (noteIndex == akaoSnesStatusNoteIndexTie(rt.context.version)) {
-          state.setPitchWaitBoundary(rt, cmd, length);
-          state.beginPendingPitchSlide(rt);
-          if (state.lastTieableNoteTick && *state.lastTieableNoteTick >= rt.tick()) {
-            rt.note(0.0, 1.0, duration, true);
-            state.lastTieableNoteTick = rt.tick() + length;
-          }
-          return cmd.wait(length);
-        }
-        state.setPitchWaitBoundary(rt, cmd, length);
-        cmd.name("Rest", SequenceSemantic::Rest);
-        state.lastTieableNoteTick.reset();
-        return cmd.wait(length);
+  void resetPitchBendForNewNote() {
+    track.pitchBaseValid = false;
+    track.pitchSlideActive = false;
+    track.pitchSlideStepsRemaining = 0;
+    track.pitchSlideNoteValid = false;
+    if (track.pitchBendAtRest()) {
+      return;
+    }
+    if (akaoSnesSupportsPitchEnvelope(context.version) && track.pitchEnvelope.enabled) {
+      emitPitchBendSemitones(0.0, 0);
+      return;
+    }
+    emitPitchBendRange(kDefaultPitchBendRangeCents);
+    emitPitchBendSemitones(0.0, 0);
+  }
+
+  void beginPitchEnvelopeForNote() {
+    auto& envelope = track.pitchEnvelope;
+    if (!akaoSnesSupportsPitchEnvelope(context.version) || !envelope.enabled || !track.pitchBaseValid) {
+      return;
+    }
+    const s32 targetPitch = akaoSnesPitchForSemitoneOffset(envelope.semitones);
+    const s32 rawDiff = (targetPitch - track.pitchBase) / kPitchFractionScale;
+    const s32 rawMagnitude = rawDiff < 0 ? -rawDiff : rawDiff;
+    envelope.targetOffset = (envelope.semitones < 0 ? -rawMagnitude : rawMagnitude) * kPitchFractionScale;
+    envelope.activeDelay = envelope.delay;
+    envelope.activeCount = context.version == AKAOSNES_V1 ? envelope.length : 0;
+    envelope.progress = 0;
+    envelope.active = envelope.targetOffset != 0 && envelope.progressStep != 0;
+    track.currentPitch = track.pitchBase;
+    if (envelope.active) {
+      emitPitchBendRange(akaoSnesPitchBendRangeCents(track.pitchBase, track.pitchBase + envelope.targetOffset,
+                                                     kDefaultPitchBendRangeCents));
+    }
+  }
+
+  void beginNotePitch(u8 note, bool validForPitchBend) {
+    resetPitchBendForNewNote();
+    if (!validForPitchBend) {
+      return;
+    }
+    track.pitchBase = kNominalDspPitch * kPitchFractionScale;
+    track.currentPitch = track.pitchBase;
+    track.pitchBaseValid = true;
+    track.pitchSlideBaseNote = akaoSnesCorrectedNote(note, track.transpose);
+    track.pitchSlideCurrentNote = track.pitchSlideBaseNote;
+    track.pitchSlideNoteValid = true;
+    beginPitchEnvelopeForNote();
+  }
+
+  void updatePitchSlide() {
+    if (!track.pitchSlideActive || !track.pitchBaseValid) {
+      return;
+    }
+    if (track.pitchSlideStepsRemaining == 0) {
+      track.pitchSlideActive = false;
+      return;
+    }
+    --track.pitchSlideStepsRemaining;
+    track.currentPitch =
+        track.pitchSlideStepsRemaining == 0 ? track.pitchSlideFinalPitch : track.currentPitch + track.pitchSlideStep;
+    emitPitchBendForCurrentPitch();
+    if (track.pitchSlideStepsRemaining == 0) {
+      track.pitchSlideActive = false;
+    }
+  }
+
+  void beginPendingPitchSlide() {
+    if (track.pendingPitchSlideSteps == 0 || track.pendingPitchSlideSemitones == 0) {
+      track.clearPendingPitchSlide();
+      return;
+    }
+    const u16 steps = track.pendingPitchSlideSteps;
+    const s8 semitones = track.pendingPitchSlideSemitones;
+    track.clearPendingPitchSlide();
+    if (!track.pitchBaseValid || !track.pitchSlideNoteValid) {
+      return;
+    }
+    track.pitchSlideCurrentNote = static_cast<s16>(track.pitchSlideCurrentNote + semitones);
+    const s32 targetPitch = akaoSnesPitchForSemitoneOffset(track.pitchSlideCurrentNote - track.pitchSlideBaseNote);
+    track.pitchSlideStep = akaoSnesPitchSlideStep(context.version, track.currentPitch, targetPitch, steps);
+    track.pitchSlideFinalPitch = track.currentPitch + (track.pitchSlideStep * static_cast<s32>(steps));
+    emitPitchBendRange(std::max(
+        akaoSnesPitchBendRangeCents(track.pitchBase, targetPitch, kDefaultPitchBendRangeCents),
+        akaoSnesPitchBendRangeCents(track.pitchBase, track.pitchSlideFinalPitch, kDefaultPitchBendRangeCents)));
+    emitPitchBendForCurrentPitch();
+    track.pitchSlideStepsRemaining = steps;
+    track.pitchSlideActive = true;
+    updatePitchSlide();
+  }
+
+  void setPitchWaitBoundary(Address fallthrough, u32 waitTicks) {
+    track.pitchAutomationStopTick =
+        program.terminalPitchBoundary(fallthrough) ? std::optional<u64>{vm.tick() + waitTicks} : std::nullopt;
+  }
+
+  void updatePitchEnvelope() {
+    if (!akaoSnesSupportsPitchEnvelope(context.version) || !track.pitchEnvelope.active || !track.pitchBaseValid ||
+        terminalPitchWaitBoundary() || !track.pitchEnvelopeDelayElapsed()) {
+      return;
+    }
+    s32 currentOffset = 0;
+    if (!track.advancePitchEnvelopeTick(context.version, currentOffset)) {
+      return;
+    }
+    track.currentPitch = track.pitchBase + currentOffset;
+    emitPitchBendForCurrentPitch();
+  }
+
+  Effects note(u8 durationIndex, u8 noteIndex, Address fallthrough) {
+    u8 length = noteDuration(context.version, durationIndex);
+    if (track.onetimeDuration != 0) {
+      length = track.onetimeDuration;
+      track.onetimeDuration = 0;
+    }
+    const u8 duration = (!track.slur && !track.legato) ? (length > 2 ? static_cast<u8>(length - 2) : u8{1}) : length;
+    setPitchWaitBoundary(fallthrough, length);
+
+    if (noteIndex < 12) {
+      const double velocity = kAkaoSnesNoteVelocity / 127.0;
+      const u8 note = static_cast<u8>((track.octave * 12) + noteIndex);
+      beginNotePitch(note, !track.percussion);
+      beginPendingPitchSlide();
+      if (!track.slur && !track.legato) {
+        beginVibratoForNote();
+        beginTremoloForNote();
       }
-
-      case EventType::Nop:
-        cmd.name("NOP", SequenceSemantic::Meta).noOp();
-        return cmd.next();
-
-      case EventType::Nop1:
-        cmd.name("NOP", SequenceSemantic::Meta).noOp();
-        static_cast<void>(cmd.u8("arg1"));
-        return cmd.next();
-
-      case EventType::Volume: {
-        cmd.name("Volume", SequenceSemantic::Level);
-        const u8 volume = static_cast<u8>(cmd.u8("volume") >> 1);
-        rt.level(levelFromLegacyMidiVolume(volume));
-        return cmd.next();
+      if (track.percussion) {
+        out.note(kAkaoSnesDrumKeyBias + noteIndex - track.transpose, velocity, duration);
+      } else {
+        out.note((track.octave * 12) + noteIndex + track.transpose, velocity, duration);
       }
-
-      case EventType::VolumeFade: {
-        cmd.name("Volume Fade", SequenceSemantic::Level);
-        u16 fadeLength = 0;
-        if (rt.context.version == AKAOSNES_V1) {
-          fadeLength = cmd.u16le("length");
-        } else {
-          fadeLength = cmd.u8("length");
-        }
-        const u8 volume = static_cast<u8>(cmd.u8("volume") >> 1);
-        if (fadeLength == 0) {
-          rt.level(levelFromLegacyMidiVolume(volume));
-        } else {
-          cmd.sourceOnly();
-        }
-        return cmd.next();
-      }
-
-      case EventType::Pan: {
-        cmd.name("Pan", SequenceSemantic::Pan);
-        const u8 pan = static_cast<u8>(cmd.u8("pan") << (state.pan8Bit ? 0 : 1));
-        const double rightGain = rightGainFromPan(pan);
-        rt.stereoBalance(1.0 - rightGain, rightGain);
-        return cmd.next();
-      }
-
-      case EventType::PanFade: {
-        cmd.name("Pan Fade", SequenceSemantic::Pan);
-        u16 fadeLength = 0;
-        if (rt.context.version == AKAOSNES_V1) {
-          fadeLength = cmd.u16le("length");
-        } else {
-          fadeLength = cmd.u8("length");
-        }
-        const u8 pan = static_cast<u8>(cmd.u8("pan") << (state.pan8Bit ? 0 : 1));
-        if (fadeLength == 0) {
-          const double rightGain = rightGainFromPan(pan);
-          rt.stereoBalance(1.0 - rightGain, rightGain);
-        } else {
-          cmd.sourceOnly();
-        }
-        return cmd.next();
-      }
-
-      case EventType::PitchEnvelopeOn: {
-        cmd.name("Pitch Envelope On", SequenceSemantic::Pitch);
-        s8 semitones = 0;
-        u8 delay = 0;
-        u8 length = 0;
-        if (rt.context.version == AKAOSNES_V1) {
-          delay = cmd.u8("delay");
-          length = cmd.u8("length");
-          semitones = cmd.s8("semitones");
-          state.setPitchEnvelope(rt.context.version, semitones, static_cast<u8>(delay + 1), length);
-        } else {
-          semitones = cmd.s8("semitones");
-          delay = cmd.u8("delay");
-          length = cmd.u8("length");
-          state.setPitchEnvelope(rt.context.version, semitones, delay, length);
-        }
-        return cmd.next();
-      }
-
-      case EventType::PitchEnvelopeOff:
-        cmd.name("Pitch Envelope Off", SequenceSemantic::Pitch);
-        state.clearPitchEnvelope();
-        return cmd.next();
-
-      case EventType::PitchSlide:
-        cmd.name("Pitch Slide", SequenceSemantic::Pitch);
-        state.setPendingPitchSlide(static_cast<u16>(cmd.u8("time")) + 1, cmd.s8("semitones"));
-        return cmd.next();
-
-      case EventType::VibratoOn:
-        return readLfo(rt, cmd, "Vibrato", LfoTarget::Vibrato);
-
-      case EventType::VibratoOff:
-        cmd.name("Vibrato Off", SequenceSemantic::Modulation);
-        state.clearLfo(rt, LfoTarget::Vibrato);
-        return cmd.next();
-
-      case EventType::TremoloOn:
-        return readLfo(rt, cmd, "Tremolo", LfoTarget::Tremolo);
-
-      case EventType::TremoloOff:
-        cmd.name("Tremolo Off", SequenceSemantic::Modulation);
-        state.clearLfo(rt, LfoTarget::Tremolo);
-        return cmd.next();
-
-      case EventType::PanLfoOn:
-        cmd.name("Pan LFO", SequenceSemantic::Modulation).sourceOnly();
-        static_cast<void>(cmd.u8("depth"));
-        static_cast<void>(cmd.u8("rate"));
-        return cmd.next();
-
-      case EventType::PanLfoOnWithDelay:
-        cmd.name("Pan LFO", SequenceSemantic::Modulation).sourceOnly();
-        static_cast<void>(cmd.u8("delay"));
-        static_cast<void>(cmd.u8("rate"));
-        static_cast<void>(cmd.u8("depth"));
-        return cmd.next();
-
-      case EventType::PanLfoOff:
-      case EventType::NoiseOn:
-      case EventType::NoiseOff:
-      case EventType::PitchModOn:
-      case EventType::PitchModOff:
-      case EventType::EchoOn:
-      case EventType::EchoOff:
-      case EventType::AdsrDefault:
-      case EventType::SlurOn:
-      case EventType::SlurOff:
-      case EventType::LegatoOn:
-      case EventType::LegatoOff:
-      case EventType::IncCpuSharedCounter:
-      case EventType::ZeroCpuSharedCounter:
-      case EventType::IgnoreMasterVolume:
-      case EventType::IgnoreMasterVolumeBroken:
-      case EventType::LoopRestart:
-        cmd.name("State Change", SequenceSemantic::Meta).sourceOnly();
-        if (type == EventType::SlurOn) {
-          state.slur = true;
-        } else if (type == EventType::SlurOff) {
-          state.slur = false;
-        } else if (type == EventType::LegatoOn) {
-          state.legato = true;
-        } else if (type == EventType::LegatoOff) {
-          state.legato = false;
-        }
-        return cmd.next();
-
-      case EventType::NoiseFreq:
-        cmd.name("Noise Frequency", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("frequency"));
-        return cmd.next();
-
-      case EventType::Octave:
-        cmd.name("Octave", SequenceSemantic::Pitch);
-        state.octave = cmd.u8("octave");
-        return cmd.next();
-
-      case EventType::OctaveUp:
-        cmd.name("Octave Up", SequenceSemantic::Pitch);
-        ++state.octave;
-        return cmd.next();
-
-      case EventType::OctaveDown:
-        cmd.name("Octave Down", SequenceSemantic::Pitch);
-        --state.octave;
-        return cmd.next();
-
-      case EventType::TransposeAbs:
-        cmd.name("Transpose", SequenceSemantic::Pitch);
-        state.transpose = cmd.s8("semitones");
-        return cmd.next();
-
-      case EventType::TransposeRel:
-        cmd.name("Transpose Relative", SequenceSemantic::Pitch);
-        state.transpose = static_cast<s8>(state.transpose + static_cast<s8>(cmd.s8("semitones")));
-        return cmd.next();
-
-      case EventType::Tuning:
-        cmd.name("Tuning", SequenceSemantic::Pitch);
-        rt.tuning(tuningCents(cmd.u8("tuning")));
-        return cmd.next();
-
-      case EventType::ProgramChange: {
-        cmd.name("Program", SequenceSemantic::Program);
-        const u8 program = cmd.u8("program");
-        cmd.instrumentRef(0, program);
-        state.emitProgram(rt, program);
-        return cmd.next();
-      }
-
-      case EventType::VolumeEnvelope:
-        cmd.name("Volume Envelope", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("envelope"));
-        return cmd.next();
-
-      case EventType::GainRelease:
-        cmd.name("Gain Release", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("gain"));
-        return cmd.next();
-
-      case EventType::DurationRate:
-        cmd.name("Duration Rate", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("rate"));
-        return cmd.next();
-
-      case EventType::AdsrAr:
-      case EventType::AdsrDr:
-      case EventType::AdsrSl:
-      case EventType::AdsrSr:
-        cmd.name("ADSR", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("value"));
-        return cmd.next();
-
-      case EventType::LoopStart: {
-        cmd.name("Loop Start", SequenceSemantic::Loop);
-        const u8 count = cmd.u8("count");
-        const u32 totalPlays = count == 0 ? 0u : static_cast<u32>(count + 1);
-        const u8 slot = state.loopLevel % state.loops.size();
-        state.loops[slot] = LoopFrame{
-            .start = cmd.addressAtCursor(),
-            .totalPlays = totalPlays,
-            .remainingPlays = totalPlays,
-            .incrementCount = rt.context.version == AKAOSNES_V4 ? u8{1} : u8{0},
-        };
-        state.loopLevel = static_cast<u8>((state.loopLevel + 1) % state.loops.size());
-        return cmd.next();
-      }
-
-      case EventType::LoopEnd: {
-        cmd.name("Loop End", SequenceSemantic::Repeat);
-        const u8 slot = (state.loopLevel == 0 ? static_cast<u8>(state.loops.size()) : state.loopLevel) - 1;
-        LoopFrame& frame = state.loops[slot];
-        if (rt.context.version == AKAOSNES_V4) {
-          ++frame.incrementCount;
-        }
-        if (frame.totalPlays == 0) {
-          return cmd.declaredLoop(frame.start);
-        }
-        const auto flow = rt.countedRepeatUntil(cmd, slot, frame.totalPlays, frame.start);
-        if (flow.fallsThrough()) {
-          state.loopLevel = slot;
-          frame.remainingPlays = 1;
-        } else if (frame.remainingPlays > 1) {
-          --frame.remainingPlays;
-        }
-        return flow;
-      }
-
-      case EventType::OneTimeDuration:
-        cmd.name("Duration One-Time", SequenceSemantic::Meta);
-        state.onetimeDuration = cmd.u8("duration");
-        return cmd.next();
-
-      case EventType::JumpToSfxLo:
-      case EventType::JumpToSfxHi:
-        cmd.name("Jump To SFX", SequenceSemantic::Unsupported).sourceOnly();
-        static_cast<void>(cmd.u8("sfx"));
-        return cmd.stop();
-
-      case EventType::End:
-        cmd.name("End", SequenceSemantic::End);
-        return cmd.end();
-
-      case EventType::Tempo:
-        cmd.name("Tempo", SequenceSemantic::Tempo);
-        state.emitTempo(rt, cmd.u8("tempo"));
-        return cmd.next();
-
-      case EventType::TempoFade: {
-        cmd.name("Tempo Fade", SequenceSemantic::Tempo);
-        u16 fadeLength = 0;
-        if (rt.context.version == AKAOSNES_V1) {
-          fadeLength = cmd.u16le("length");
-        } else {
-          fadeLength = cmd.u8("length");
-        }
-        const u8 tempo = cmd.u8("tempo");
-        if (fadeLength == 0) {
-          state.emitTempo(rt, tempo);
-        } else {
-          cmd.sourceOnly();
-        }
-        return cmd.next();
-      }
-
-      case EventType::EchoVolume:
-        cmd.name("Echo Volume", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("volume"));
-        return cmd.next();
-
-      case EventType::EchoVolumeFade:
-        cmd.name("Echo Volume Fade", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("length"));
-        static_cast<void>(cmd.u8("volume"));
-        return cmd.next();
-
-      case EventType::EchoFeedbackFir:
-        cmd.name("Echo Feedback/FIR", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("feedback"));
-        static_cast<void>(cmd.u8("fir"));
-        return cmd.next();
-
-      case EventType::MasterVolume:
-        cmd.name("Master Volume", SequenceSemantic::Level);
-        rt.masterLevel(levelFromLegacyMidiVolume(static_cast<u8>(cmd.u8("volume") >> 1)));
-        return cmd.next();
-
-      case EventType::LoopBreak: {
-        cmd.name("Loop Break", SequenceSemantic::RepeatBreak);
-        const u8 count = cmd.u8("count");
-        const Address destination{readRelocatedAddress(rt, cmd, "destination")};
-        cmd.target(destination, SourceLinkRole::JumpTarget);
-        const u8 slot = (state.loopLevel == 0 ? static_cast<u8>(state.loops.size()) : state.loopLevel) - 1;
-        LoopFrame& frame = state.loops[slot];
-        if (rt.context.version != AKAOSNES_V4) {
-          ++frame.incrementCount;
-        }
-        const bool taken = count == frame.incrementCount;
-        if (taken) {
-          if (rt.context.version == AKAOSNES_V1) {
-            if (frame.remainingPlays != 0) {
-              --frame.remainingPlays;
-              if (frame.remainingPlays == 0) {
-                state.loopLevel = slot;
-              }
-            }
-          } else if (rt.context.version != AKAOSNES_V2 && rt.context.version != AKAOSNES_V3) {
-            if (frame.remainingPlays <= 1) {
-              state.loopLevel = slot;
-            }
-          }
-          rt.finishRepeat(slot);
-        }
-        return rt.conditionalFiniteBranch(cmd, destination, taken);
-      }
-
-      case EventType::Goto: {
-        cmd.name("Jump", SequenceSemantic::Jump);
-        return cmd.loopCandidate(Address{readRelocatedAddress(rt, cmd, "destination")});
-      }
-
-      case EventType::EchoFeedbackFade:
-      case EventType::EchoFirFade:
-      case EventType::EchoFeedback:
-      case EventType::EchoFir:
-        cmd.name("Echo", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("value"));
-        if (type == EventType::EchoFeedbackFade || type == EventType::EchoFirFade) {
-          static_cast<void>(cmd.u8("target"));
-        }
-        return cmd.next();
-
-      case EventType::CpuControlledSetValue:
-        cmd.name("CPU-Controlled Set Value", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("value"));
-        return cmd.next();
-
-      case EventType::CpuControlledJump: {
-        cmd.name("CPU-Controlled Jump", SequenceSemantic::Jump);
-        const Address destination{readRelocatedAddress(rt, cmd, "destination")};
-        return cmd.conditionalBranch(destination);
-      }
-
-      case EventType::CpuControlledJumpV2:
-        cmd.name("CPU-Controlled Jump", SequenceSemantic::Jump).sourceOnly();
-        static_cast<void>(cmd.u8("arg") & 0x0f);
-        cmd.target(Address{readRelocatedAddress(rt, cmd, "destination")}, SourceLinkRole::JumpTarget);
-        return cmd.next();
-
-      case EventType::PercOn:
-        cmd.name("Percussion On", SequenceSemantic::Program);
-        state.percussion = true;
-        rt.instrument(kAkaoSnesDrumKitBank << 7, kAkaoSnesDrumKitProgram);
-        return cmd.next();
-
-      case EventType::PercOff:
-        cmd.name("Percussion Off", SequenceSemantic::Program);
-        state.percussion = false;
-        rt.instrument(0, state.nonPercussionProgram);
-        return cmd.next();
-
-      case EventType::VolumeAlt:
-        cmd.name("Expression", SequenceSemantic::Level);
-        rt.expression(levelFromLegacyMidiVolume(cmd.u8("volume") & 0x7f));
-        return cmd.next();
-
-      case EventType::IgnoreMasterVolumeByPrognum:
-        cmd.name("Ignore Master Volume By Program", SequenceSemantic::Meta).sourceOnly();
-        static_cast<void>(cmd.u8("program"));
-        return cmd.next();
-
-      case EventType::PlaySfx:
-        cmd.name("Play SFX", SequenceSemantic::Unsupported).sourceOnly();
-        static_cast<void>(cmd.u8("arg"));
-        return cmd.next();
+      track.lastTieableNoteTick = vm.tick() + length;
+      return Effects::wait(length);
     }
 
-    return cmd.end();
+    if (noteIndex == akaoSnesStatusNoteIndexTie(context.version)) {
+      beginPendingPitchSlide();
+      if (track.lastTieableNoteTick && *track.lastTieableNoteTick >= vm.tick()) {
+        out.note(0.0, 1.0, duration, true);
+        track.lastTieableNoteTick = vm.tick() + length;
+      }
+      return Effects::wait(length);
+    }
+
+    track.lastTieableNoteTick.reset();
+    return Effects::wait(length);
   }
+
+  void setPitchEnvelope(s8 semitones, u8 delay, u8 length) {
+    track.setPitchEnvelope(context.version, semitones, delay, length);
+  }
+  void clearPitchEnvelope() { track.clearPitchEnvelope(); }
+  void setPitchSlide(u16 steps, s8 semitones) { track.setPendingPitchSlide(steps, semitones); }
+
+  void emitVibratoDepth(u8 midiDepth, bool force = false) {
+    track.vibrato.emitDepth(
+        midiDepth,
+        [&](u8 outputDepth) {
+          const double amount = static_cast<double>(outputDepth) / 127.0;
+          out.modulation(ModulationPerformanceEvent{
+              .target = ModulationPerformanceTarget::VibratoDepth,
+              .amount = amount,
+              .pitchDepthSemitones = (amount * maxVibratoDepthCents(context.version)) / 100.0,
+              .controllerRangeMaxAmount = 1.0,
+          });
+        },
+        force);
+  }
+
+  void emitTremoloDepth(u8 midiDepth, bool force = false) {
+    track.tremolo.emitDepth(
+        midiDepth,
+        [&](u8 outputDepth) {
+          out.modulation(ModulationPerformanceEvent{
+              .target = ModulationPerformanceTarget::TremoloDepth,
+              .amount = static_cast<double>(outputDepth) / 127.0,
+              .controllerRangeMaxAmount = 1.0,
+          });
+        },
+        force);
+  }
+
+  void setLfoOutputDepth(LfoTarget target, u8 depth, bool force = false) {
+    if (target == LfoTarget::Vibrato) {
+      emitVibratoDepth(depth, force);
+    } else {
+      emitTremoloDepth(depth, force);
+    }
+  }
+
+  void clearLfoRateAndDelay(LfoTarget target) {
+    if (target == LfoTarget::Vibrato) {
+      out.modulation(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoRate,
+          .amount = 0.0,
+          .controllerRangeMaxAmount = 1.0,
+      });
+      out.vibratoDelay(0, 0);
+    } else {
+      out.modulation(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::TremoloRate,
+          .amount = 0.0,
+          .controllerRangeMaxAmount = 1.0,
+      });
+      out.tremoloDelay(0, 0);
+    }
+  }
+
+  void syncLfoRateAndDelay(LfoTarget target) {
+    const bool isVibrato = target == LfoTarget::Vibrato;
+    LfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
+    if (!isLfoActive(context.version, lfo.rate(), lfo.depth())) {
+      return;
+    }
+    if (isVibrato) {
+      track.configureVibratoFade(context.version);
+    } else {
+      track.configureTremoloFade(context.version);
+    }
+    const u8 timer = akaoSnesTimer0Frequency(context.version, context.minorVersion);
+    const u8 rateValue = rateMidiValue(context.version, lfo.rate(), lfo.depth(), timer);
+    if (isVibrato) {
+      out.modulation(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoRate,
+          .amount = static_cast<double>(rateValue) / 127.0,
+          .frequencyHz = lfoRateHz(context.version, lfo.rate(), lfo.depth(), timer),
+          .controllerRangeMaxAmount = 1.0,
+      });
+      out.vibratoDelay(lfoDelayTicks(context.version, lfo.delay()),
+                       delayMidiValue(context.version, lfo.delay(), track.tempo, timer));
+    } else {
+      out.modulation(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::TremoloRate,
+          .amount = static_cast<double>(rateValue) / 127.0,
+          .frequencyHz = lfoRateHz(context.version, lfo.rate(), lfo.depth(), timer),
+          .controllerRangeMaxAmount = 1.0,
+      });
+      out.tremoloDelay(lfoDelayTicks(context.version, lfo.delay()),
+                       delayMidiValue(context.version, lfo.delay(), track.tempo, timer));
+    }
+  }
+
+  void setLfo(LfoTarget target, u8 delay, u8 rate, u8 depth) {
+    const bool isVibrato = target == LfoTarget::Vibrato;
+    const bool active = (isVibrato || exportsTremolo(context.version)) && isLfoActive(context.version, rate, depth);
+    LfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
+    lfo.configure(delay, rate, depth);
+    const auto initialTempo = program.initialTempo();
+    const bool beforeInitialTempoTrack = initialTempo && track.trackNumber < initialTempo->sourceTrackNumber;
+    const bool afterInitialTempoTrack = initialTempo && track.trackNumber > initialTempo->sourceTrackNumber;
+    if (initialTempo && !track.sharedTempoApplied && afterInitialTempoTrack) {
+      track.tempo = initialTempo->tempo;
+      track.sharedTempoApplied = true;
+    }
+    if (isVibrato) {
+      track.configureVibratoFade(context.version);
+    } else {
+      track.configureTremoloFade(context.version);
+    }
+    u8 midiDepth = 0;
+    if (active) {
+      midiDepth = isVibrato ? vibratoDepthMidiValue(context.version, rate, depth)
+                            : tremoloDepthMidiValue(context.version, rate, depth, delay);
+    }
+    if (isVibrato && context.version == AKAOSNES_V4 && active && track.vibrato.hasReusableFade()) {
+      const u32 delayTicks = lfoDelayTicks(context.version, track.vibrato.delay());
+      const s32 initialDepth = track.vibrato.configuredDepth(8) / 4;
+      track.vibrato.beginReusableFade(delayTicks, track.vibrato.configuredDepth(8), initialDepth);
+      midiDepth = delayTicks == 0 ? track.vibratoFadeDepthMidiValue(context.version, initialDepth) : 0;
+    }
+    setLfoOutputDepth(target, midiDepth, true);
+    if (active) {
+      syncLfoRateAndDelay(target);
+      if (vm.tick() == 0 && initialTempo && beforeInitialTempoTrack && initialTempo->tempo != track.tempo) {
+        track.tempo = initialTempo->tempo;
+        track.sharedTempoApplied = true;
+        syncLfoRateAndDelay(target);
+      }
+    } else {
+      clearLfoRateAndDelay(target);
+    }
+  }
+
+  void clearLfo(LfoTarget target) {
+    LfoState& lfo = target == LfoTarget::Vibrato ? track.vibrato : track.tremolo;
+    lfo.setDepth(0);
+    lfo.clearReusableFade();
+    setLfoOutputDepth(target, 0, true);
+  }
+
+  void beginVibratoForNote() {
+    if (context.version == AKAOSNES_V2 || !track.vibrato.hasReusableFade() ||
+        !isLfoActive(context.version, track.vibrato.rate(), track.vibrato.depth())) {
+      return;
+    }
+    const u32 delay = lfoDelayTicks(context.version, track.vibrato.delay());
+    const s32 initialDepth = context.version == AKAOSNES_V4 ? track.vibrato.configuredDepth(8) / 4 : 0;
+    track.vibrato.beginReusableFade(delay, track.vibrato.configuredDepth(8), initialDepth);
+    emitVibratoDepth(delay == 0 ? track.vibratoFadeDepthMidiValue(context.version, initialDepth) : 0, true);
+  }
+
+  void beginTremoloForNote() {
+    if (context.version != AKAOSNES_V3 || !track.tremolo.hasReusableFade()) {
+      return;
+    }
+    track.tremolo.beginReusableFadeToConfiguredDepth(8);
+    emitTremoloDepth(0, true);
+  }
+
+  void updateVibratoFade() {
+    if (context.version == AKAOSNES_V2 || !track.vibrato.fadeActive()) {
+      return;
+    }
+    const auto fadeTick = track.vibrato.tickFade();
+    if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
+      const s32 current = track.vibrato.clampToConfiguredDepth(fadeTick.current, 8);
+      track.vibrato.setCurrentDepthPreservingMotion(current);
+      emitVibratoDepth(track.vibratoFadeDepthMidiValue(context.version, current));
+    }
+  }
+
+  void updateTremoloFade() {
+    if (context.version != AKAOSNES_V3 || !track.tremolo.fadeActive()) {
+      return;
+    }
+    const auto fadeTick = track.tremolo.tickFade();
+    if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
+      const s32 current = track.tremolo.clampToConfiguredDepth(fadeTick.current, 8);
+      track.tremolo.setCurrentDepthPreservingMotion(current);
+      emitTremoloDepth(track.tremoloFadeDepthMidiValue(context.version, current));
+    }
+  }
+
+  void programChange(u8 programNumber) {
+    track.nonPercussionProgram = programNumber;
+    if (!track.percussion) {
+      out.instrument(0, programNumber);
+    }
+  }
+
+  void tempoChange(u8 rawTempo) {
+    if (context.minorVersion == AKAOSNES_V4_FM || context.minorVersion == AKAOSNES_V4_CT) {
+      rawTempo = static_cast<u8>(rawTempo + ((rawTempo * 0x14) >> 8));
+    }
+    track.tempo = rawTempo;
+    program.observeTempo(track.trackNumber, vm.tick(), rawTempo);
+    if (const auto initial = program.initialTempo(); initial && rawTempo == initial->tempo) {
+      track.sharedTempoApplied = true;
+    }
+    out.tempo(tempoMicrosecondsPerQuarter(context.version, context.minorVersion, rawTempo));
+    syncLfoRateAndDelay(LfoTarget::Vibrato);
+    syncLfoRateAndDelay(LfoTarget::Tremolo);
+  }
+
+  void syncSharedTempoAtTick() {
+    const std::optional<u8> sharedTempo = program.tempoAt(vm.tick());
+    if (!sharedTempo || (track.sharedTempoApplied && track.tempo == *sharedTempo)) {
+      return;
+    }
+    track.tempo = *sharedTempo;
+    track.sharedTempoApplied = true;
+    syncLfoRateAndDelay(LfoTarget::Vibrato);
+    syncLfoRateAndDelay(LfoTarget::Tremolo);
+  }
+
+  void loopStart(u8 count, Address start) {
+    const u32 totalPlays = count == 0 ? 0u : static_cast<u32>(count + 1);
+    const u8 slot = track.loopLevel % track.loops.size();
+    track.loops[slot] = LoopFrame{
+        .start = start,
+        .totalPlays = totalPlays,
+        .remainingPlays = totalPlays,
+        .incrementCount = context.version == AKAOSNES_V4 ? u8{1} : u8{0},
+    };
+    track.loopLevel = static_cast<u8>((track.loopLevel + 1) % track.loops.size());
+  }
+
+  Effects loopEnd() {
+    const u8 slot = (track.loopLevel == 0 ? static_cast<u8>(track.loops.size()) : track.loopLevel) - 1;
+    LoopFrame& frame = track.loops[slot];
+    if (context.version == AKAOSNES_V4) {
+      ++frame.incrementCount;
+    }
+    if (frame.totalPlays == 0) {
+      return Effects{.step = vm.declaredLoop(frame.start)};
+    }
+    Effects effects = vm.countedRepeatUntil(slot, frame.totalPlays, frame.start);
+    if (effects.step.kind == StepKind::Next) {
+      track.loopLevel = slot;
+      frame.remainingPlays = 1;
+    } else if (frame.remainingPlays > 1) {
+      --frame.remainingPlays;
+    }
+    return effects;
+  }
+
+  Effects loopBreak(u8 count, Address destination) {
+    const u8 slot = (track.loopLevel == 0 ? static_cast<u8>(track.loops.size()) : track.loopLevel) - 1;
+    LoopFrame& frame = track.loops[slot];
+    if (context.version != AKAOSNES_V4) {
+      ++frame.incrementCount;
+    }
+    if (count != frame.incrementCount) {
+      return Effects{};
+    }
+    if (context.version == AKAOSNES_V1) {
+      if (frame.remainingPlays != 0 && --frame.remainingPlays == 0) {
+        track.loopLevel = slot;
+      }
+    } else if (context.version != AKAOSNES_V2 && context.version != AKAOSNES_V3 && frame.remainingPlays <= 1) {
+      track.loopLevel = slot;
+    }
+    RepeatCounter counter = vm.repeatCounter(slot);
+    if (counter.active()) {
+      counter.finish();
+    }
+    return Effects{.step = vm.finiteBranch(destination)};
+  }
+
+  void percussionOn() {
+    track.percussion = true;
+    out.instrument(kAkaoSnesDrumKitBank << 7, kAkaoSnesDrumKitProgram);
+  }
+  void percussionOff() {
+    track.percussion = false;
+    out.instrument(0, track.nonPercussionProgram);
+  }
+
+  void tickAutomation() {
+    syncSharedTempoAtTick();
+    if (terminalPitchWaitBoundary()) {
+      return;
+    }
+    updateVibratoFade();
+    updateTremoloFade();
+    updatePitchSlide();
+    updatePitchEnvelope();
+  }
+
+  void tick() { tickAutomation(); }
 };
 
-void tickAkaoSnesTrack(const SourceCommand&, const TrackProgram& track, std::any& trackState, PerformanceEmitter& out,
-                       VmApi& vm, const std::any& context) {
-  auto& state = std::any_cast<TrackState&>(trackState);
-  const auto& typedContext = std::any_cast<const Context&>(context);
-  struct TickRuntime {
-    TrackState& state;
-    PerformanceEmitter& out;
-    VmApi& vm;
-    const TrackProgram& track;
-    const Context& context;
+using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
 
-    [[nodiscard]] u64 tick() const noexcept { return vm.tick(); }
-    [[nodiscard]] bool terminalPitchWaitBoundary() const {
-      if (!state.pitchWaitEndTick || !state.pitchWaitFallthrough || vm.tick() != *state.pitchWaitEndTick) {
-        return false;
-      }
-      if (state.pitchWaitBoundaryClassified) {
-        return state.pitchWaitStopsPitchEnvelope;
-      }
-      if (state.pitchWaitStopsPitchEnvelope) {
-        return true;
-      }
-      const auto index = track.addressIndex.find(*state.pitchWaitFallthrough);
-      if (!index) {
-        return false;
-      }
-      const EventType nextType = eventType(context.version, context.minorVersion, track.commands.at(*index).opcode);
-      return nextType == EventType::End;
-    }
-    [[nodiscard]] std::optional<u8> sharedTempoAtTick() {
-      if (!state.sharedTempoCacheBuilt) {
-        for (const PerformanceTrack& renderedTrack : vm.sequence().tracks) {
-          for (const PerformanceEvent& event : renderedTrack.events) {
-            if (const auto* tempoEvent = std::get_if<TempoPerformanceEvent>(&event)) {
-              state.sharedTempoChanges.push_back(SharedTempoChange{
-                  .tick = tempoEvent->header.tick,
-                  .tempo = tempoFromMicrosecondsPerQuarter(context.version, context.minorVersion,
-                                                           tempoEvent->microsecondsPerQuarter),
-                  .sourceTrackNumber = renderedTrack.sourceTrackNumber,
-              });
-            }
-          }
-        }
-        std::ranges::stable_sort(state.sharedTempoChanges, {}, &SharedTempoChange::tick);
-        state.sharedTempoCacheBuilt = true;
-      }
-
-      while (state.sharedTempoCursor < state.sharedTempoChanges.size() &&
-             state.sharedTempoChanges[state.sharedTempoCursor].tick < vm.tick()) {
-        ++state.sharedTempoCursor;
-      }
-      std::optional<u8> tempo;
-      size_t cursor = state.sharedTempoCursor;
-      while (cursor < state.sharedTempoChanges.size() && state.sharedTempoChanges[cursor].tick == vm.tick()) {
-        if (state.sharedTempoChanges[cursor].sourceTrackNumber != track.sourceTrackNumber) {
-          tempo = state.sharedTempoChanges[cursor].tempo;
-        }
-        ++cursor;
-      }
-      return tempo;
-    }
-    void modulation(ModulationPerformanceEvent event) { out.modulation(std::move(event)); }
-    void modulation(ModulationPerformanceTarget target, double amount) { out.modulation(target, amount); }
-    void vibratoDelay(u32 delayTicks, u8 midiValue) { out.vibratoDelay(delayTicks, midiValue); }
-    void tremoloDelay(u32 delayTicks, u8 midiValue) { out.tremoloDelay(delayTicks, midiValue); }
-    void pitchBend(double semitones) { out.pitchBend(semitones); }
-    void pitchBendRange(PitchBendRangePerformanceEvent event) { out.pitchBendRange(std::move(event)); }
-  } rt{state, out, vm, track, typedContext};
-
-  state.syncSharedTempoAtTick(rt);
-  if (rt.terminalPitchWaitBoundary()) {
-    return;
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, AkaoSnesProfile profile,
+                                                   u32 romRelocBase, u32 apuRelocBase,
+                                                   std::vector<Diagnostic>* diagnostics) {
+  AkaoSnesCursor cursor(reader, begin, end, "akao-snes", diagnostics);
+  if (!cursor.hasOpcode()) {
+    return cursor.truncated();
   }
-  state.updateVibratoFade(rt);
-  state.updateTremoloFade(rt);
-  state.updatePitchSlide(rt);
-  state.updatePitchEnvelope(rt);
+
+  const u8 opcode = cursor.opcode();
+  const EventType type = eventType(profile.version, profile.minorVersion, opcode);
+  const auto relocated = [&](auto& event, SemanticOperandRole role = SemanticOperandRole::Address) {
+    const auto stored = event.rawU16le("stored_destination", SourceValueDisplay::Address);
+    return event.resolved(
+        "destination", stored,
+        [&](u16 address) { return Address{relocatedAddress(address, romRelocBase, apuRelocBase)}; },
+        SourceValueDisplay::Address, role);
+  };
+  const auto ignored = [&](u8 operandCount) -> DecodedBytecodeCommand {
+    auto event = cursor.unsupported("Unknown Event", "unknown");
+    event.opcodeValue("opcode", opcode, SourceValueDisplay::Hex);
+    event.rawBytes("arguments", operandCount);
+    return event.ignore();
+  };
+
+  switch (type) {
+    case EventType::Unknown0:
+      return ignored(0);
+    case EventType::Unknown1:
+      return ignored(1);
+    case EventType::Unknown2:
+      return ignored(2);
+
+    case EventType::Note: {
+      const u8 tableSize = akaoSnesNoteDurationTableSize(profile.version);
+      const u8 durationIndex = opcode % tableSize;
+      const u8 noteIndex = opcode / tableSize;
+      const bool rest = noteIndex >= 12 && noteIndex != akaoSnesStatusNoteIndexTie(profile.version);
+      auto event = cursor.command(rest ? "Rest" : "Note", rest ? SequenceSemantic::Rest : SequenceSemantic::Note);
+      event.opcodeValue("duration_index", durationIndex);
+      event.opcodeValue("note_index", noteIndex);
+      return event.invoke<&Playback::note>(durationIndex, noteIndex, event.nextAddress());
+    }
+
+    case EventType::Nop:
+      return cursor.noOp("NOP");
+    case EventType::Nop1: {
+      auto event = cursor.noOp("NOP");
+      event.u8("arg1");
+      return event;
+    }
+
+    case EventType::Volume: {
+      auto event = cursor.command("Volume", SequenceSemantic::Level);
+      return event.emitLevel(levelFromLegacyMidiVolume(static_cast<u8>(event.u8("volume") >> 1)));
+    }
+    case EventType::VolumeFade: {
+      auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
+      const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
+      const double level = levelFromLegacyMidiVolume(static_cast<u8>(event.u8("volume") >> 1));
+      if (length != 0) {
+        return event.ignore();
+      }
+      return event.emitLevel(level);
+    }
+    case EventType::Pan: {
+      auto event = cursor.command("Pan", SequenceSemantic::Pan);
+      return event.invoke<&Playback::pan>(event.u8("pan"));
+    }
+    case EventType::PanFade: {
+      auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
+      const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
+      const u8 pan = event.u8("pan");
+      if (length != 0) {
+        return event.ignore();
+      }
+      return event.invoke<&Playback::pan>(pan);
+    }
+
+    case EventType::PitchEnvelopeOn: {
+      auto event = cursor.command("Pitch Envelope On", SequenceSemantic::Pitch);
+      if (profile.version == AKAOSNES_V1) {
+        const u8 delay = event.u8("delay");
+        const u8 length = event.u8("length");
+        const s8 semitones = event.s8("semitones");
+        return event.invoke<&Playback::setPitchEnvelope>(semitones, static_cast<u8>(delay + 1), length);
+      }
+      const s8 semitones = event.s8("semitones");
+      const u8 delay = event.u8("delay");
+      const u8 length = event.u8("length");
+      return event.invoke<&Playback::setPitchEnvelope>(semitones, delay, length);
+    }
+    case EventType::PitchEnvelopeOff: {
+      auto event = cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch);
+      event.derived("pitch_envelope_off", true, SemanticOperandRole::State);
+      return event.invoke<&Playback::clearPitchEnvelope>();
+    }
+    case EventType::PitchSlide: {
+      auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
+      const u16 steps = static_cast<u16>(event.u8("time")) + 1;
+      return event.invoke<&Playback::setPitchSlide>(steps, event.s8("semitones"));
+    }
+
+    case EventType::VibratoOn:
+    case EventType::TremoloOn: {
+      const LfoTarget target = type == EventType::VibratoOn ? LfoTarget::Vibrato : LfoTarget::Tremolo;
+      auto event = cursor.command(type == EventType::VibratoOn ? "Vibrato" : "Tremolo", SequenceSemantic::Modulation);
+      u8 delay = 0;
+      u8 rate = 0;
+      u8 depth = 0;
+      if (profile.version == AKAOSNES_V2) {
+        depth = event.u8("depth");
+        delay = event.u8("delay");
+        rate = event.u8("rate");
+      } else {
+        delay = event.u8("delay");
+        rate = event.u8("rate");
+        depth = event.u8("depth");
+      }
+      return event.invoke<&Playback::setLfo>(target, delay, rate, depth);
+    }
+    case EventType::VibratoOff:
+      return cursor.command("Vibrato Off", SequenceSemantic::Modulation)
+          .invoke<&Playback::clearLfo>(LfoTarget::Vibrato);
+    case EventType::TremoloOff:
+      return cursor.command("Tremolo Off", SequenceSemantic::Modulation)
+          .invoke<&Playback::clearLfo>(LfoTarget::Tremolo);
+    case EventType::PanLfoOn: {
+      auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+      event.u8("depth");
+      event.u8("rate");
+      return event;
+    }
+    case EventType::PanLfoOnWithDelay: {
+      auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+      event.u8("delay");
+      event.u8("rate");
+      event.u8("depth");
+      return event;
+    }
+
+    case EventType::PanLfoOff:
+    case EventType::NoiseOn:
+    case EventType::NoiseOff:
+    case EventType::PitchModOn:
+    case EventType::PitchModOff:
+    case EventType::EchoOn:
+    case EventType::EchoOff:
+    case EventType::AdsrDefault:
+    case EventType::SlurOn:
+    case EventType::SlurOff:
+    case EventType::LegatoOn:
+    case EventType::LegatoOff:
+    case EventType::IncCpuSharedCounter:
+    case EventType::ZeroCpuSharedCounter:
+    case EventType::IgnoreMasterVolume:
+    case EventType::IgnoreMasterVolumeBroken:
+    case EventType::LoopRestart: {
+      auto event = cursor.sourceOnly("State Change");
+      if (type == EventType::SlurOn) {
+        event.set<&TrackState::slur>(true);
+      } else if (type == EventType::SlurOff) {
+        event.set<&TrackState::slur>(false);
+      } else if (type == EventType::LegatoOn) {
+        event.set<&TrackState::legato>(true);
+      } else if (type == EventType::LegatoOff) {
+        event.set<&TrackState::legato>(false);
+      }
+      return event;
+    }
+
+    case EventType::NoiseFreq: {
+      auto event = cursor.sourceOnly("Noise Frequency");
+      event.u8("frequency");
+      return event;
+    }
+    case EventType::Octave: {
+      auto event = cursor.command("Octave", SequenceSemantic::Pitch);
+      return event.set<&TrackState::octave>(event.u8("octave"));
+    }
+    case EventType::OctaveUp:
+      return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(u8{1});
+    case EventType::OctaveDown:
+      return cursor.command("Octave Down", SequenceSemantic::Pitch).add<&TrackState::octave>(s8{-1});
+    case EventType::TransposeAbs: {
+      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
+      return event.set<&TrackState::transpose>(event.s8("semitones"));
+    }
+    case EventType::TransposeRel: {
+      auto event = cursor.command("Transpose Relative", SequenceSemantic::Pitch);
+      return event.add<&TrackState::transpose>(event.s8("semitones"));
+    }
+    case EventType::Tuning: {
+      auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
+      return event.emitTuning(tuningCents(event.u8("tuning")));
+    }
+    case EventType::ProgramChange: {
+      auto event = cursor.command("Program", SequenceSemantic::Program);
+      event.derived("bank", u8{0}, SemanticOperandRole::InstrumentBank);
+      const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
+      return event.invoke<&Playback::programChange>(program);
+    }
+
+    case EventType::VolumeEnvelope: {
+      auto event = cursor.sourceOnly("Volume Envelope");
+      event.u8("envelope");
+      return event;
+    }
+    case EventType::GainRelease: {
+      auto event = cursor.sourceOnly("Gain Release");
+      event.u8("gain");
+      return event;
+    }
+    case EventType::DurationRate: {
+      auto event = cursor.sourceOnly("Duration Rate");
+      event.u8("rate");
+      return event;
+    }
+    case EventType::AdsrAr:
+    case EventType::AdsrDr:
+    case EventType::AdsrSl:
+    case EventType::AdsrSr: {
+      auto event = cursor.sourceOnly("ADSR");
+      event.u8("value");
+      return event;
+    }
+
+    case EventType::LoopStart: {
+      auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
+      const u8 count = event.u8("count");
+      return event.invoke<&Playback::loopStart>(count, event.nextAddress());
+    }
+    case EventType::LoopEnd:
+      return cursor.command("Loop End", SequenceSemantic::Repeat).invoke<&Playback::loopEnd>().runtimeControlFlow();
+    case EventType::OneTimeDuration: {
+      auto event = cursor.command("Duration One-Time", SequenceSemantic::Meta);
+      return event.set<&TrackState::onetimeDuration>(event.u8("duration"));
+    }
+    case EventType::JumpToSfxLo:
+    case EventType::JumpToSfxHi: {
+      auto event = cursor.unsupported("Jump To SFX");
+      event.u8("sfx");
+      return event.stop();
+    }
+    case EventType::End:
+      return cursor.command("End", SequenceSemantic::End).end();
+    case EventType::Tempo: {
+      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
+      return event.invoke<&Playback::tempoChange>(event.u8("tempo"));
+    }
+    case EventType::TempoFade: {
+      auto event = cursor.command("Tempo Fade", SequenceSemantic::Tempo);
+      const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
+      const u8 tempo = event.u8("tempo");
+      if (length != 0) {
+        return event.ignore();
+      }
+      return event.invoke<&Playback::tempoChange>(tempo);
+    }
+
+    case EventType::EchoVolume: {
+      auto event = cursor.sourceOnly("Echo Volume");
+      event.u8("volume");
+      return event;
+    }
+    case EventType::EchoVolumeFade: {
+      auto event = cursor.sourceOnly("Echo Volume Fade");
+      event.u8("length");
+      event.u8("volume");
+      return event;
+    }
+    case EventType::EchoFeedbackFir: {
+      auto event = cursor.sourceOnly("Echo Feedback/FIR");
+      event.u8("feedback");
+      event.u8("fir");
+      return event;
+    }
+    case EventType::MasterVolume: {
+      auto event = cursor.command("Master Volume", SequenceSemantic::Level);
+      return event.emitMasterLevel(levelFromLegacyMidiVolume(static_cast<u8>(event.u8("volume") >> 1)));
+    }
+    case EventType::LoopBreak: {
+      auto event = cursor.command("Loop Break", SequenceSemantic::RepeatBreak);
+      const u8 count = event.u8("count");
+      const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
+      return event.invoke<&Playback::loopBreak>(count, destination)
+          .mayBranchTo(destination, SemanticOperandRole::JumpTarget)
+          .runtimeControlFlow();
+    }
+    case EventType::Goto: {
+      auto event = cursor.command("Jump", SequenceSemantic::Jump);
+      return event.loopCandidate(relocated(event, SemanticOperandRole::LoopTarget));
+    }
+
+    case EventType::EchoFeedbackFade:
+    case EventType::EchoFirFade:
+    case EventType::EchoFeedback:
+    case EventType::EchoFir: {
+      auto event = cursor.sourceOnly("Echo");
+      event.u8("value");
+      if (type == EventType::EchoFeedbackFade || type == EventType::EchoFirFade) {
+        event.u8("target");
+      }
+      return event;
+    }
+    case EventType::CpuControlledSetValue: {
+      auto event = cursor.sourceOnly("CPU-Controlled Set Value");
+      event.u8("value");
+      return event;
+    }
+    case EventType::CpuControlledJump: {
+      auto event =
+          cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::AffectsControlFlow);
+      const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
+      return event.mayBranchTo(destination, SemanticOperandRole::JumpTarget);
+    }
+    case EventType::CpuControlledJumpV2: {
+      auto event = cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::SourceOnly);
+      event.u8("arg");
+      relocated(event, SemanticOperandRole::JumpTarget);
+      return event;
+    }
+    case EventType::PercOn:
+      return cursor.command("Percussion On", SequenceSemantic::Program).invoke<&Playback::percussionOn>();
+    case EventType::PercOff:
+      return cursor.command("Percussion Off", SequenceSemantic::Program).invoke<&Playback::percussionOff>();
+    case EventType::VolumeAlt: {
+      auto event = cursor.command("Expression", SequenceSemantic::Level);
+      return event.emitExpression(levelFromLegacyMidiVolume(event.u8("volume") & 0x7f));
+    }
+    case EventType::IgnoreMasterVolumeByPrognum: {
+      auto event = cursor.sourceOnly("Ignore Master Volume By Program");
+      event.u8("program");
+      return event;
+    }
+    case EventType::PlaySfx: {
+      auto event = cursor.unsupported("Play SFX");
+      event.u8("arg");
+      return event;
+    }
+  }
+
+  return cursor.truncated();
 }
 
-[[nodiscard]] std::string dialectId(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion) {
-  return fmt::format("akao-snes:{}:{}", akaoSnesVersionName(version), akaoSnesMinorVersionName(minorVersion));
-}
-
-[[nodiscard]] SequenceDialect makeDialect(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion,
-                                          u32 romRelocBase = 0, u32 apuRelocBase = 0,
-                                          std::optional<InitialSharedTempoHint> initialSharedTempo = std::nullopt) {
-  SequenceDialect dialect = makeCursorDialect<TrackState, Context, AkaoSnesCursorReader>(CursorDialectSpec<Context>{
-      .id = dialectId(version, minorVersion),
+[[nodiscard]] const SequenceDialect& sharedDialect() {
+  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+      .id = DialectId{.value = "akao-snes"},
       .commandDetailKindPrefix = "akao-snes",
       .timebase = Timebase{.ppqn = kAkaoSnesPpqn},
       .defaultBehavior =
@@ -2606,19 +2280,8 @@ void tickAkaoSnesTrack(const SourceCommand&, const TrackProgram& track, std::any
               .initialReverbSend = 0.0,
               .stopAllTracksAtFirstLoop = false,
           },
-      .context =
-          Context{
-              .version = version,
-              .minorVersion = minorVersion,
-              .romRelocBase = romRelocBase,
-              .apuRelocBase = apuRelocBase,
-              .initialSharedTempo = initialSharedTempo ? std::optional<u8>(initialSharedTempo->tempo) : std::nullopt,
-              .initialSharedTempoTrack =
-                  initialSharedTempo ? std::optional<u32>(initialSharedTempo->sourceTrackNumber) : std::nullopt,
-          },
+      .semanticPrepass = SemanticPrepassMode::ScheduledPlayback,
   });
-  dialect.tick = tickAkaoSnesTrack;
-  dialect.requiresCompleteSequencePrepass = true;
   return dialect;
 }
 
@@ -2669,206 +2332,83 @@ struct SequenceHeaderInfo {
   return info;
 }
 
-[[nodiscard]] std::optional<InitialSharedTempoHint> initialSharedTempo(ByteReader reader, const AkaoSnesLayout& layout,
-                                                                       const SequenceHeaderInfo& header) {
+}  // namespace
+
+const SequenceDialect& akaoSnesSequenceDialect() {
+  return sharedDialect();
+}
+
+TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesTrackDecodeOptions& options) {
+  TrackDecodeInput input{
+      .sequenceAsset = options.sequenceAsset,
+      .trackIndex = options.sourceTrackNumber,
+      .startOffset = options.startAddress,
+      .bytecodeEnd = options.bytecodeEnd,
+      .sequenceOffset = options.startAddress,
+      .sequenceEnd = options.bytecodeEnd,
+      .parentAnnotation = options.parentAnnotation,
+      .sourceMap = options.sourceMap,
+      .diagnostics = options.diagnostics,
+      .maxCommands = 16384,
+  };
+  return makeTrackDecodeScope(reader, input).reachable(input.trackIndex, input.startOffset, [&](u32 offset) {
+    return decodeCommand(reader, offset, options.bytecodeEnd, options.profile, options.romRelocBase,
+                         options.apuRelocBase, options.diagnostics);
+  });
+}
+
+SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& layout, AssetId sequenceId,
+                                      SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+  const SequenceHeaderInfo header = sequenceHeaderInfo(reader, layout);
+  const SourceRange headerRange = reader.range(header.headerOffset, header.headerSize);
+  SequenceDecodeSession session(reader, sharedDialect(), sequenceId, headerRange, sourceMap, 16384, header.sequenceEnd);
+  if (sourceMap != nullptr) {
+    if (const auto annotation = session.headerAnnotation()) {
+      auto source = AnnotationBuilder{*sourceMap, *annotation}
+                        .derived("version", akaoSnesVersionName(layout.version))
+                        .derived("minor_version", akaoSnesMinorVersionName(layout.minorVersion))
+                        .derived("apu_reloc_base", header.apuRelocBase, SourceValueDisplay::Address);
+      if (akaoSnesRelocatable(layout.version) && reader.has(header.headerOffset, 2)) {
+        source.field("rom_reloc_base", reader.range(header.headerOffset, 2), reader.le16(header.headerOffset),
+                     SourceValueDisplay::Address);
+        const u32 endPointerOffset = layout.version == AKAOSNES_V4 ? header.headerOffset + 2
+                                                                   : header.trackPointerOffset + kAkaoSnesMaxTracks * 2;
+        if (reader.has(endPointerOffset, 2)) {
+          source.field("stored_sequence_end", reader.range(endPointerOffset, 2), reader.le16(endPointerOffset),
+                       SourceValueDisplay::Address);
+        }
+      }
+      source.derived("sequence_end", header.sequenceEnd, SourceValueDisplay::Address);
+    }
+  }
+  const AkaoSnesProfile profile{.version = layout.version, .minorVersion = layout.minorVersion};
+
   for (u32 trackNumber = 0; trackNumber < kAkaoSnesMaxTracks; ++trackNumber) {
     const u32 pointerOffset = header.trackPointerOffset + trackNumber * 2;
     if (!reader.has(pointerOffset, 2)) {
       break;
     }
     const u16 rawTrackAddress = reader.le16(pointerOffset);
-    if (rawTrackAddress == 0) {
-      continue;
-    }
-    const u16 trackAddress = relocatedAddress(rawTrackAddress, header.romRelocBase, header.apuRelocBase);
-    if (!reader.has(trackAddress, 1)) {
-      continue;
-    }
-    const u32 readableEnd = std::min<u32>(header.sequenceEnd, reader.size());
-    const size_t available = trackAddress < readableEnd ? readableEnd - trackAddress : 0;
-    if (available == 0) {
-      continue;
-    }
-    const auto bytes = reader.slice(trackAddress, available);
-    if (const auto tempo = initialSharedTempoInPrelude(layout.version, layout.minorVersion, bytes)) {
-      return InitialSharedTempoHint{
-          .tempo = *tempo,
-          .sourceTrackNumber = trackNumber,
-      };
-    }
-  }
-
-  return std::nullopt;
-}
-
-[[nodiscard]] u16 readLe16FromBytes(const std::vector<u8>& bytes, size_t offset) {
-  if (offset + 2 > bytes.size()) {
-    return 0;
-  }
-  return static_cast<u16>(bytes[offset] | (bytes[offset + 1] << 8));
-}
-
-void rewriteLe16InBytes(std::vector<u8>& bytes, size_t offset, u16 value) {
-  if (offset + 2 > bytes.size()) {
-    return;
-  }
-  bytes[offset] = static_cast<u8>(value & 0xff);
-  bytes[offset + 1] = static_cast<u8>((value >> 8) & 0xff);
-}
-
-void resolveStoredBranchOperand(DecodedBytecodeCommand& decoded, const Context& context) {
-  if (decoded.bytes.empty() || (context.romRelocBase == 0 && context.apuRelocBase == 0)) {
-    return;
-  }
-
-  const EventType type = eventType(context.version, context.minorVersion, decoded.bytes.front());
-  std::optional<size_t> operandOffset;
-  switch (type) {
-    case EventType::Goto:
-    case EventType::CpuControlledJump:
-      operandOffset = 1;
-      break;
-    case EventType::LoopBreak:
-    case EventType::CpuControlledJumpV2:
-      operandOffset = 2;
-      break;
-    default:
-      break;
-  }
-  if (!operandOffset || *operandOffset + 2 > decoded.bytes.size()) {
-    return;
-  }
-
-  const u16 raw = readLe16FromBytes(decoded.bytes, *operandOffset);
-  rewriteLe16InBytes(decoded.bytes, *operandOffset, relocatedAddress(raw, context.romRelocBase, context.apuRelocBase));
-}
-
-}  // namespace
-
-AkaoSnesSequenceDescriptor akaoSnesSequenceDescriptor(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion) {
-  return AkaoSnesSequenceDescriptor{.dialect = makeDialect(version, minorVersion)};
-}
-
-void registerAkaoSnesSequenceDialects(SequenceDialectRegistry& registry) {
-  const std::array<AkaoSnesMinorVersion, 14> minors{
-      AKAOSNES_NOMINORVERSION, AKAOSNES_V1_FF4, AKAOSNES_V2_RS1, AKAOSNES_V3_FF5,   AKAOSNES_V3_SD2,
-      AKAOSNES_V3_FFMQ,        AKAOSNES_V4_RS2, AKAOSNES_V4_LAL, AKAOSNES_V4_FF6,   AKAOSNES_V4_FM,
-      AKAOSNES_V4_CT,          AKAOSNES_V4_RS3, AKAOSNES_V4_GH,  AKAOSNES_V4_BSGAME};
-  for (const AkaoSnesVersion version : {AKAOSNES_NONE, AKAOSNES_V1, AKAOSNES_V2, AKAOSNES_V3, AKAOSNES_V4}) {
-    for (const AkaoSnesMinorVersion minor : minors) {
-      registry.add(makeDialect(version, minor));
-    }
-  }
-}
-
-TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesSequenceDescriptor& descriptor,
-                                       u32 sourceTrackNumber, u32 startAddress, u32 bytecodeEnd, u32 sequenceOffset,
-                                       u32 sequenceEnd, SourceMapBuilder* sourceMap,
-                                       std::vector<Diagnostic>* diagnostics,
-                                       std::optional<SourceAnnotationId> parentAnnotation,
-                                       std::optional<AssetId> sequenceAsset) {
-  CursorTrackDecodeInput input{
-      .sequenceAsset = sequenceAsset,
-      .trackIndex = sourceTrackNumber,
-      .startOffset = startAddress,
-      .bytecodeEnd = bytecodeEnd,
-      .sequenceOffset = sequenceOffset,
-      .sequenceEnd = sequenceEnd,
-      .parentAnnotation = parentAnnotation,
-      .sourceMap = sourceMap,
-      .diagnostics = diagnostics,
-      .maxCommands = 16384,
-  };
-  BytecodeDecodeContext decodeContext = cursorBytecodeDecodeContext(input);
-  auto track = makeTrackDecodeScope(reader, input).begin(input.trackIndex, input.startOffset);
-  if (const auto annotation = track.annotation()) {
-    decodeContext.parentAnnotation = annotation;
-  }
-
-  const auto& context = cursorContext<Context>(descriptor.dialect);
-  TrackState decodeState = makeDecodeCursorState<TrackState, Context>(decodeContext, context);
-  const auto decodeCommand = [&](u32 offset) {
-    auto decoded = decodeCursorCommandWithState<TrackState, Context, AkaoSnesCursorReader>(
-        reader, offset, descriptor.dialect, decodeState, decodeContext);
-    resolveStoredBranchOperand(decoded, context);
-    return decoded;
-  };
-
-  TrackProgram decoded =
-      decodeReachableBytecodeBlocks(reader, cursorBytecodeEnd(reader, input), input.startOffset, input.trackIndex,
-                                    ReachableBytecodeDecodePolicy{.maxCommands = input.maxCommands}, decodeCommand);
-  return track.finish(std::move(decoded));
-}
-
-SequenceProgramAsset parseAkaoSnesSequence(const ScanInput& input, const AkaoSnesLayout& layout, AssetId sequenceId,
-                                           std::string_view displayName, SourceMapBuilder* sourceMap,
-                                           std::vector<Diagnostic>* diagnostics) {
-  const SequenceHeaderInfo header = sequenceHeaderInfo(input.reader, layout);
-  const SourceRange headerRange = input.reader.range(header.headerOffset, header.headerSize);
-  SourceAnnotationId headerAnnotation;
-  if (sourceMap != nullptr) {
-    auto annotation = sourceMap->header("Sequence Header", headerRange)
-                          .kind("akao-snes-sequence-header")
-                          .owner(ObjectRefs::sequence(sequenceId))
-                          .field("version", headerRange, akaoSnesVersionName(layout.version))
-                          .derived("minor_version", akaoSnesMinorVersionName(layout.minorVersion))
-                          .derived("apu_reloc_base", header.apuRelocBase, SourceValueDisplay::Address)
-                          .derived("rom_reloc_base", header.romRelocBase, SourceValueDisplay::Address)
-                          .derived("sequence_end", header.sequenceEnd, SourceValueDisplay::Address);
-    headerAnnotation = annotation.id();
-  }
-
-  const std::optional<InitialSharedTempoHint> sharedTempo = initialSharedTempo(input.reader, layout, header);
-  AkaoSnesSequenceDescriptor descriptor{
-      .dialect =
-          makeDialect(layout.version, layout.minorVersion, header.romRelocBase, header.apuRelocBase, sharedTempo),
-  };
-  SequenceProgram program = descriptor.dialect.makeProgram(Address{layout.sequenceHeaderAddress});
-
-  for (u32 trackNumber = 0; trackNumber < kAkaoSnesMaxTracks; ++trackNumber) {
-    const u32 pointerOffset = header.trackPointerOffset + trackNumber * 2;
-    if (!input.reader.has(pointerOffset, 2)) {
-      break;
-    }
-    const u16 rawTrackAddress = input.reader.le16(pointerOffset);
     const u16 trackAddress = relocatedAddress(rawTrackAddress, header.romRelocBase, header.apuRelocBase);
     const bool rawZeroIsNull = layout.version == AKAOSNES_V1 || layout.version == AKAOSNES_V2;
     if ((rawZeroIsNull && rawTrackAddress == 0) || trackAddress == header.sequenceEnd) {
       continue;
     }
 
-    std::optional<SourceAnnotationId> pointerAnnotation;
-    if (sourceMap != nullptr) {
-      auto pointer =
-          sourceMap
-              ->pointer("Track Pointer", input.reader.range(pointerOffset, 2),
-                        SourceTarget{input.reader.range(trackAddress, 1)})
-              .kind("akao-snes-track-pointer")
-              .owner(ObjectRefs::sequenceTrack(sequenceId, trackNumber))
-              .derived("source_track", trackNumber)
-              .field("destination", input.reader.range(pointerOffset, 2), trackAddress, SourceValueDisplay::Address);
-      if (headerAnnotation.valid()) {
-        pointer.parent(headerAnnotation);
-      }
-      pointerAnnotation = pointer.id();
-    }
-
-    auto track = decodeAkaoSnesSourceTrack(input.reader, descriptor, trackNumber, trackAddress, header.sequenceEnd,
-                                           layout.sequenceHeaderAddress, header.sequenceEnd, sourceMap, diagnostics,
-                                           pointerAnnotation, sequenceId);
-    program.tracks.push_back(std::move(track));
+    session.addReachableTrack(
+        trackNumber, reader.range(pointerOffset, 2), trackAddress,
+        [&](u32 offset) {
+          return decodeCommand(reader, offset, header.sequenceEnd, profile, header.romRelocBase, header.apuRelocBase,
+                               diagnostics);
+        },
+        rawTrackAddress);
   }
 
-  return SequenceProgramAsset{
-      .metadata =
-          AssetMetadata{
-              .id = sequenceId,
-              .format = "AkaoSnes",
-              .name = std::string(displayName),
-              .range = headerRange,
-          },
-      .program = std::move(program),
-  };
+  SequenceProgram program = session.finish();
+  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
+  program.config.profile = encodeAkaoSnesProfile(profile);
+
+  return program;
 }
 
 }  // namespace vgmtrans::formats::akao_snes

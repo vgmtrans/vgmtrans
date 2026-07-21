@@ -462,6 +462,11 @@ public:
       return cursor_.decoded(cursor_.record_.u16le(name, display), name, display, role);
     }
 
+    [[nodiscard]] EncodedSemanticField<u16> rawU16le(std::string_view name,
+                                                     SourceValueDisplay display = SourceValueDisplay::Default) {
+      return field(cursor_.record_.u16le(name, display), name, display);
+    }
+
     s16 s16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
               SemanticOperandRole role = SemanticOperandRole::Value) {
       return cursor_.decoded(cursor_.record_.s16le(name, display), name, display, role);

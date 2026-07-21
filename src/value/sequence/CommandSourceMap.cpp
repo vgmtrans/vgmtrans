@@ -203,9 +203,10 @@ TrackProgram TrackDecodeSession::finish(TrackProgram track) {
 
 SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect,
                                              AssetId sequenceAsset, SourceRange headerRange,
-                                             SourceMapBuilder* sourceMap, u32 maxTrackCommands)
+                                             SourceMapBuilder* sourceMap, u32 maxTrackCommands, u32 bytecodeEnd)
     : tracks_{
           .reader = reader,
+          .bytecodeEnd = bytecodeEnd,
           .maxCommands = maxTrackCommands,
           .sequenceAsset = sequenceAsset,
           .sourceMap = sourceMap,
@@ -221,16 +222,23 @@ SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceDi
                                  .id();
 }
 
-void SequenceDecodeSession::annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset) {
+void SequenceDecodeSession::annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset,
+                                                 std::optional<u64> encodedStartOffset) {
   if (tracks_.sourceMap == nullptr) {
     return;
   }
 
-  tracks_.sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{tracks_.reader.range(startOffset, 1)})
-      .kind(sourceKindPrefix_ + "-track-pointer")
-      .owner(ObjectRefs::sequenceTrack(*tracks_.sequenceAsset, trackIndex))
-      .field("destination", pointerRange, startOffset, SourceValueDisplay::Address)
-      .parent(*tracks_.parentAnnotation);
+  auto pointer =
+      tracks_.sourceMap->pointer("Track Pointer", pointerRange, SourceTarget{tracks_.reader.range(startOffset, 1)})
+          .kind(sourceKindPrefix_ + "-track-pointer")
+          .owner(ObjectRefs::sequenceTrack(*tracks_.sequenceAsset, trackIndex));
+  if (encodedStartOffset) {
+    pointer.field("stored_destination", pointerRange, *encodedStartOffset, SourceValueDisplay::Address)
+        .derived("destination", startOffset, SourceValueDisplay::Address);
+  } else {
+    pointer.field("destination", pointerRange, startOffset, SourceValueDisplay::Address);
+  }
+  pointer.parent(*tracks_.parentAnnotation);
 }
 
 TrackDecodeScope makeTrackDecodeScope(ByteReader reader, const TrackDecodeInput& input) {
