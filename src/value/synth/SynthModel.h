@@ -9,7 +9,6 @@
 #include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
 
-#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -42,17 +41,9 @@ struct Tuning {
   s32 cents = 0;
 };
 
-inline constexpr u32 kEnvelopeInfinite = std::numeric_limits<u32>::max();
-
 struct Envelope {
-  // The all-zero default means no explicit envelope was parsed.
-  // Time fields are microseconds. kEnvelopeInfinite means the stage has no finite duration.
-  u32 attack = 0;
-  u32 hold = 0;
-  u32 decay = 0;
-  // Linear amplitude level, where 1000 is full scale.
-  u32 sustain = 0;
-  u32 release = 0;
+  // An absent value means the stage was not specified. Positive infinity means
+  // the stage has no finite duration. Sustain is linear amplitude in [0, 1].
   std::optional<double> attackSeconds;
   std::optional<double> holdSeconds;
   std::optional<double> decaySeconds;
@@ -60,66 +51,10 @@ struct Envelope {
   std::optional<double> sustainAmplitude;
 };
 
-[[nodiscard]] inline bool hasCoarseEnvelope(const Envelope& envelope) {
-  return envelope.attack != 0 || envelope.hold != 0 || envelope.decay != 0 || envelope.sustain != 0 ||
-         envelope.release != 0;
-}
-
-[[nodiscard]] inline bool hasPreciseEnvelope(const Envelope& envelope) {
+[[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
   return envelope.attackSeconds.has_value() || envelope.holdSeconds.has_value() || envelope.decaySeconds.has_value() ||
          envelope.releaseSeconds.has_value() || envelope.sustainAmplitude.has_value();
 }
-
-[[nodiscard]] inline bool hasAnyEnvelopeData(const Envelope& envelope) {
-  return hasCoarseEnvelope(envelope) || hasPreciseEnvelope(envelope);
-}
-
-[[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
-  return hasAnyEnvelopeData(envelope);
-}
-
-enum class SynthDestination {
-  // Amounts are exporter-neutral musical units where possible: cents for pitch,
-  // centibels/decibels for attenuation-like level changes, and format-specific
-  // scale units only when the target format requires them later.
-  Pitch,
-  FilterCutoff,
-  VolumeAttenuation,
-  Pan,
-  VibratoDepth,
-  VibratoRate,
-  VibratoDelay,
-  TremoloDepth,
-  TremoloRate,
-  TremoloDelay,
-  Unknown,
-};
-
-enum class SynthSource {
-  NoteOnVelocity,
-  KeyNumber,
-  Lfo,
-  Envelope,
-  MidiController,
-  ChannelPressure,
-  PolyPressure,
-  PitchWheel,
-  Unknown,
-};
-
-struct SynthGenerator {
-  // A generator is an unconditional contribution, such as a base vibrato depth/rate.
-  SynthDestination destination = SynthDestination::Unknown;
-  s32 amount = 0;
-};
-
-struct SynthModulator {
-  // Empty source means the modulation is always active, such as a default vibrato
-  // amount attached to an instrument.
-  std::optional<SynthSource> source;
-  SynthDestination destination = SynthDestination::Unknown;
-  s32 amount = 0;
-};
 
 struct ModulationRange {
   double minimum = 0.0;
@@ -146,14 +81,11 @@ struct TremoloSpec {
   std::optional<ModulationRange> delaySeconds;
 };
 
-// Formats describe ordinary vibrato and tremolo in physical units. Exporters
-// lower those values to their generator/modulator encodings. The custom lists
-// are an escape hatch for uncommon routing that cannot use the standard model.
+// Formats describe vibrato and tremolo in physical units. Exporters lower
+// those values to their target-specific generator/modulator encodings.
 struct InstrumentModulation {
   std::optional<VibratoSpec> vibrato;
   std::optional<TremoloSpec> tremolo;
-  std::vector<SynthGenerator> customGenerators;
-  std::vector<SynthModulator> customModulators;
 };
 
 struct Loop {
@@ -169,10 +101,10 @@ struct Region {
   VelocityRange velocityRange;
   SampleRef sample;
   SourceRange range;
-  Tuning tuning;
-  std::optional<u8> rootKey;
-  s16 coarseTuneSemitones = 0;
-  s16 fineTuneCents = 0;
+  // Exact region unity key before the independent Sample::pitch correction. A
+  // fractional value preserves sub-semitone tuning without target-specific
+  // root/coarse/fine fields.
+  double unityKey = 60.0;
   Envelope envelope;
   std::optional<Loop> loop;
   // Synth region pan is unipolar: 0.0 left, 0.5 center, 1.0 right.

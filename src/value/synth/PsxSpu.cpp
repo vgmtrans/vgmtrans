@@ -63,11 +63,6 @@ namespace {
   return secondsToFullAttenuation * (weight * shortScale + (1.0 - weight) * longScale);
 }
 
-[[nodiscard]] u32 envelopeMicros(double seconds) {
-  return static_cast<u32>(
-      std::clamp(std::llround(seconds * 1'000'000.0), 0ll, static_cast<long long>(std::numeric_limits<u32>::max())));
-}
-
 }  // namespace
 
 Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
@@ -253,12 +248,8 @@ Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
   const double releaseSeconds = linearAmplitudeDecayToDbDecay(samples / sampleRate);
 
   return Envelope{
-      .attack = envelopeMicros(attackSeconds),
-      .decay = decaySeconds < 0.0 ? kEnvelopeInfinite : envelopeMicros(decaySeconds),
-      .sustain = static_cast<u32>(std::round(sustainAmplitude * 1000.0)),
-      .release = envelopeMicros(releaseSeconds),
       .attackSeconds = attackSeconds,
-      .decaySeconds = decaySeconds,
+      .decaySeconds = decaySeconds < 0.0 ? std::numeric_limits<double>::infinity() : decaySeconds,
       .releaseSeconds = releaseSeconds,
       .sustainAmplitude = sustainAmplitude,
   };

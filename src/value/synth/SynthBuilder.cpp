@@ -7,6 +7,7 @@
 #include "value/synth/SynthBuilder.h"
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <utility>
 
@@ -51,39 +52,25 @@ void annotateLoop(AnnotationBuilder& annotation, const Loop& loop) {
   }
 }
 
-void annotateCoarseEnvelopeTime(AnnotationBuilder& annotation, std::string_view stage, u32 microseconds) {
-  if (microseconds == kEnvelopeInfinite) {
-    annotation.derived(std::string(stage) + "_infinite", true, SourceValueDisplay::Boolean);
-  } else {
-    annotation.derived(std::string(stage) + "_microseconds", microseconds);
-  }
-}
-
 void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
   if (envelope.attackSeconds) {
-    annotation.derived("attack_seconds", *envelope.attackSeconds);
-  } else if (hasCoarseEnvelope(envelope)) {
-    annotateCoarseEnvelopeTime(annotation, "attack", envelope.attack);
+    annotation.derived(std::isinf(*envelope.attackSeconds) ? "attack_infinite" : "attack_seconds",
+                       std::isinf(*envelope.attackSeconds) ? SourceValue{true} : SourceValue{*envelope.attackSeconds});
   }
   if (envelope.holdSeconds) {
-    annotation.derived("hold_seconds", *envelope.holdSeconds);
-  } else if (envelope.hold != 0) {
-    annotateCoarseEnvelopeTime(annotation, "hold", envelope.hold);
+    annotation.derived(std::isinf(*envelope.holdSeconds) ? "hold_infinite" : "hold_seconds",
+                       std::isinf(*envelope.holdSeconds) ? SourceValue{true} : SourceValue{*envelope.holdSeconds});
   }
   if (envelope.decaySeconds) {
-    annotation.derived("decay_seconds", *envelope.decaySeconds);
-  } else if (hasCoarseEnvelope(envelope)) {
-    annotateCoarseEnvelopeTime(annotation, "decay", envelope.decay);
+    annotation.derived(std::isinf(*envelope.decaySeconds) ? "decay_infinite" : "decay_seconds",
+                       std::isinf(*envelope.decaySeconds) ? SourceValue{true} : SourceValue{*envelope.decaySeconds});
   }
   if (envelope.sustainAmplitude) {
     annotation.derived("sustain_level", *envelope.sustainAmplitude, SourceValueDisplay::Percent);
-  } else if (hasCoarseEnvelope(envelope)) {
-    annotation.derived("sustain_level", envelope.sustain / 1000.0, SourceValueDisplay::Percent);
   }
   if (envelope.releaseSeconds) {
-    annotation.derived("release_seconds", *envelope.releaseSeconds);
-  } else if (hasCoarseEnvelope(envelope)) {
-    annotateCoarseEnvelopeTime(annotation, "release", envelope.release);
+    annotation.derived(std::isinf(*envelope.releaseSeconds) ? "release_infinite" : "release_seconds",
+                       std::isinf(*envelope.releaseSeconds) ? SourceValue{true} : SourceValue{*envelope.releaseSeconds});
   }
 }
 
@@ -141,13 +128,7 @@ void annotateSynthValue(AnnotationBuilder annotation, const Region& region) {
       .derived("velocity_high", region.velocityRange.high)
       .derived("pan", region.pan, SourceValueDisplay::Percent)
       .derived("attenuation_db", region.attenuationDb, SourceValueDisplay::Decibels);
-  if (region.rootKey) {
-    annotation.derived("root_key", *region.rootKey, SourceValueDisplay::MidiNote);
-  }
-  const s32 tuningCents = region.tuning.cents + region.coarseTuneSemitones * 100 + region.fineTuneCents;
-  if (tuningCents != 0) {
-    annotation.derived("tuning_cents", tuningCents, SourceValueDisplay::Cents);
-  }
+  annotation.derived("unity_key", region.unityKey, SourceValueDisplay::MidiNote);
   if (region.loop) {
     annotateLoop(annotation, *region.loop);
   }

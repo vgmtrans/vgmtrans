@@ -445,7 +445,7 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
               enabled);
 
           event.emitVibratoRate(amount, hertz);
-          return event.emitModulation(ModulationPerformanceTarget::TremoloRate, amount);
+          return event.emitTremoloRate(amount, hertz);
         }
         default:
           event.u8("value", SourceValueDisplay::Hex);

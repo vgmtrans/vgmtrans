@@ -51,7 +51,7 @@ enum class SequenceSemantic : u8 {
   Note,
   Rest,
   Wait,
-  // Legacy MIDI-shaped category retained for cursor dialects.
+  // Common source-level classification; this does not prescribe an export format.
   Program,
   Level,
   Pan,

@@ -271,31 +271,21 @@ struct RenderedTrack {
   std::optional<u64> loopStopTick;
 };
 
-enum class TrackRenderMode {
-  Normal,
-  DryRunForLoopStop,
-};
-
 // VmTrackExecutor owns the mutable playback state for one track. SequenceVm keeps
 // whole-sequence coordination, such as synchronized stopping across tracks.
 class VmTrackExecutor {
 public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
-                  PerformanceSequence& targetSequence, std::optional<u64> stopTick, TrackRenderMode mode,
+                  PerformanceSequence& targetSequence, std::optional<u64> stopTick,
                   std::any* programState = nullptr, bool sequenceCoordinatesLoops = false)
       : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
-        options_(options), targetSequence_(targetSequence), stopTick_(stopTick), mode_(mode),
+        options_(options), targetSequence_(targetSequence), stopTick_(stopTick),
         performanceTrack_(PerformanceTrack{
             .id = track.id,
             .sourceTrackNumber = track.sourceTrackNumber,
         }),
-        trackState_(
-            dialect.usesSemanticScheduler()
-                ? (dialect.createSemanticTrackState != nullptr ? dialect.createSemanticTrackState(program, track)
-                                                               : std::any{})
-                : (dialect.createTrackState != nullptr ? dialect.createTrackState(program, track, dialect.context)
-                                                       : std::any{})),
+        trackState_(dialect.createTrackState != nullptr ? dialect.createTrackState(program, track) : std::any{}),
         programState_(programState), current_(destinationIndex(track, track.startAddress)),
         sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
     addInitialTrackEvents(performanceTrack_, behavior_);
@@ -344,22 +334,12 @@ public:
 
     PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-    Effects effects;
-    if (dialect_.usesSemanticScheduler()) {
-      if (programState_ == nullptr) {
-        warn("Missing semantic sequence program state", command.range);
-        current_ = std::nullopt;
-        return;
-      }
-      effects = dialect_.executeSemantic(command, *programState_, trackState_, out, vm);
-    } else {
-      if (dialect_.execute == nullptr) {
-        warn("Missing sequence dialect executor", command.range);
-        current_ = std::nullopt;
-        return;
-      }
-      effects = dialect_.execute(command, track_, trackState_, out, vm, dialect_.context);
+    if (programState_ == nullptr || dialect_.execute == nullptr) {
+      warn("Missing sequence dialect executor state", command.range);
+      current_ = std::nullopt;
+      return;
     }
+    const Effects effects = dialect_.execute(command, *programState_, trackState_, out, vm);
     advanceTicks(command, effects.advanceTicks);
     runtime_.lastCommand = command.id;
     applyStep(command, effects.step);
@@ -369,9 +349,6 @@ public:
 
   [[nodiscard]] RenderedTrack finish() {
     performanceTrack_.endTick = runtime_.tick;
-    if (mode_ == TrackRenderMode::DryRunForLoopStop) {
-      performanceTrack_.events.clear();
-    }
     return RenderedTrack{
         .track = std::move(performanceTrack_),
         .loopStopTick = loopStopTick_ ? loopStopTick_ : firstLoopTick_,
@@ -475,11 +452,7 @@ private:
     if (ticks == 0) {
       return;
     }
-    if (dialect_.usesSemanticScheduler() && dialect_.tickSemantic == nullptr) {
-      runtime_.tick += ticks;
-      return;
-    }
-    if (!dialect_.usesSemanticScheduler() && dialect_.tick == nullptr) {
+    if (dialect_.tick == nullptr) {
       runtime_.tick += ticks;
       return;
     }
@@ -488,17 +461,11 @@ private:
       ++runtime_.tick;
       PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
       VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-      if (dialect_.usesSemanticScheduler()) {
-        if (programState_ == nullptr) {
-          warn("Missing semantic sequence program state", command.range);
-          return;
-        }
-        // Source-free formats receive the same typed per-tick hook as command
-        // execution. This is where they advance fades and other ongoing motion.
-        dialect_.tickSemantic(command, *programState_, trackState_, out, vm);
-      } else {
-        dialect_.tick(command, track_, trackState_, out, vm, dialect_.context);
+      if (programState_ == nullptr) {
+        warn("Missing sequence program state", command.range);
+        return;
       }
+      dialect_.tick(command, *programState_, trackState_, out, vm);
     }
   }
 
@@ -581,9 +548,6 @@ private:
   }
 
   void warn(std::string message, SourceRange range) {
-    if (mode_ == TrackRenderMode::DryRunForLoopStop) {
-      return;
-    }
     targetSequence_.diagnostics.push_back(vmWarning(std::move(message), range));
   }
 
@@ -594,7 +558,6 @@ private:
   const SequenceVmOptions& options_;
   PerformanceSequence& targetSequence_;
   std::optional<u64> stopTick_;
-  TrackRenderMode mode_ = TrackRenderMode::Normal;
   PerformanceTrack performanceTrack_;
   std::any trackState_;
   std::any* programState_ = nullptr;
@@ -744,17 +707,17 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
   const SequenceProgramBehavior behavior = resolvedBehavior(program, dialect);
   const LoopPolicy loopPolicy = behavior.defaultLoopPolicy;
 
-  if (dialect.usesSemanticScheduler()) {
-    // Some source-free formats must inspect the whole song before the first
-    // event can be exported. Keep one song-wide state object across an optional
-    // silent pass and the real render so the collected information is retained.
+  if (dialect.execute != nullptr) {
+    // Some formats must inspect the whole song before the first event can be
+    // exported. Keep one song-wide state object across an optional silent pass
+    // and the real render so collected information is retained.
     std::any programState = dialect.createProgramState != nullptr ? dialect.createProgramState(program) : std::any{};
     const auto renderSemanticPass = [&](PerformanceSequence& target) {
       std::vector<std::unique_ptr<VmTrackExecutor>> executors;
       executors.reserve(program.tracks.size());
       for (const TrackProgram& track : program.tracks) {
         executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, target,
-                                                              std::nullopt, TrackRenderMode::Normal, &programState,
+                                                              std::nullopt, &programState,
                                                               loopPolicy == LoopPolicy::PlayOnce));
       }
 
@@ -802,19 +765,19 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
       return tracks;
     };
 
-    if (dialect.semanticPrepass == SemanticPrepassMode::ScheduledPlayback) {
+    if (dialect.prepass == SemanticPrepassMode::ScheduledPlayback) {
       // Run commands in normal time order but discard every emitted event. This
       // preserves song-wide interactions between tracks during collection.
       PerformanceSequence prepass{.timebase = program.timebase};
       static_cast<void>(renderSemanticPass(prepass));
-    } else if (dialect.semanticPrepass == SemanticPrepassMode::DecodedCommands) {
+    } else if (dialect.prepass == SemanticPrepassMode::DecodedCommands) {
       // Some limits must include every valid source block, even when a jump
       // skips that block during normal playback. Run each already-decoded
       // command once in stable order and discard its events, timing, and jumps.
       PerformanceSequence prepass{.timebase = program.timebase};
       for (const TrackProgram& track : program.tracks) {
         std::any trackState =
-            dialect.createSemanticTrackState != nullptr ? dialect.createSemanticTrackState(program, track) : std::any{};
+            dialect.createTrackState != nullptr ? dialect.createTrackState(program, track) : std::any{};
         PerformanceTrack output{
             .id = track.id,
             .sourceTrackNumber = track.sourceTrackNumber,
@@ -823,65 +786,22 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
         for (const SourceCommand& command : track.commands) {
           PerformanceEmitter out{output, command.id, command.annotation, 0};
           VmApi vm = detail::VmApiAccess::make(runtime, prepass, command);
-          static_cast<void>(dialect.executeSemantic(command, programState, trackState, out, vm));
+          static_cast<void>(dialect.execute(command, programState, trackState, out, vm));
         }
       }
     }
-    if (dialect.semanticPrepass != SemanticPrepassMode::None) {
-      if (dialect.finishSemanticPrepass != nullptr) {
+    if (dialect.prepass != SemanticPrepassMode::None) {
+      if (dialect.finishPrepass != nullptr) {
         // Tell the format that collection is complete before fresh track state
         // is created for the real render.
-        dialect.finishSemanticPrepass(programState);
+        dialect.finishPrepass(programState);
       }
     }
     sequence.tracks = renderSemanticPass(sequence);
     return sequence;
   }
 
-  std::optional<u64> synchronizedStopTick;
-  if (loopPolicy == LoopPolicy::PlayOnce && behavior.stopAllTracksAtFirstLoop) {
-    // First find when each track reaches its loop. Then render all tracks again,
-    // stopping them at the earliest loop tick.
-    PerformanceSequence dryRunSequence{
-        .timebase = program.timebase,
-    };
-    for (const TrackProgram& track : program.tracks) {
-      const auto rendered = VmTrackExecutor(program, track, dialect, behavior, options_, dryRunSequence, std::nullopt,
-                                            TrackRenderMode::DryRunForLoopStop)
-                                .render();
-      if (rendered.loopStopTick && (!synchronizedStopTick || *rendered.loopStopTick < *synchronizedStopTick)) {
-        synchronizedStopTick = rendered.loopStopTick;
-      }
-    }
-  }
-
-  size_t coordinationTrackCount = 0;
-  if (dialect.requiresCompleteSequencePrepass) {
-    PerformanceSequence prepassSequence{
-        .timebase = program.timebase,
-    };
-    for (const TrackProgram& track : program.tracks) {
-      prepassSequence.tracks.push_back(VmTrackExecutor(program, track, dialect, behavior, options_, prepassSequence,
-                                                       synchronizedStopTick, TrackRenderMode::Normal)
-                                           .render()
-                                           .track);
-    }
-    sequence.tracks = std::move(prepassSequence.tracks);
-    coordinationTrackCount = sequence.tracks.size();
-  }
-
-  for (size_t i = 0; i < program.tracks.size(); ++i) {
-    sequence.tracks.push_back(VmTrackExecutor(program, program.tracks[i], dialect, behavior, options_, sequence,
-                                              synchronizedStopTick, TrackRenderMode::Normal)
-                                  .render()
-                                  .track);
-  }
-
-  if (coordinationTrackCount != 0) {
-    sequence.tracks.erase(sequence.tracks.begin(),
-                          sequence.tracks.begin() + static_cast<std::ptrdiff_t>(coordinationTrackCount));
-  }
-
+  sequence.diagnostics.push_back(vmWarning("Sequence dialect has no executor", {}));
   return sequence;
 }
 
@@ -930,9 +850,6 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
   } else if (dialect.defaultBehavior.initialPitchBendRangeSemitones) {
     behavior.initialPitchBendRangeSemitones = dialect.defaultBehavior.initialPitchBendRangeSemitones;
   }
-
-  behavior.stopAllTracksAtFirstLoop =
-      program.behavior.stopAllTracksAtFirstLoop || dialect.defaultBehavior.stopAllTracksAtFirstLoop;
 
   return behavior;
 }

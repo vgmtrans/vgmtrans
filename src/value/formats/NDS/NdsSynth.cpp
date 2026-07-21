@@ -60,23 +60,6 @@ enum class InstrumentType : u8 {
   KeySplit = 0x11,
 };
 
-// Converts a time in seconds into the whole microseconds stored in an envelope.
-[[nodiscard]] u32 envelopeMicros(double seconds) {
-  if (seconds < 0.0 || !std::isfinite(seconds)) {
-    return kEnvelopeInfinite;
-  }
-  const double micros = seconds * 1'000'000.0;
-  if (micros >= static_cast<double>(std::numeric_limits<u32>::max())) {
-    return std::numeric_limits<u32>::max();
-  }
-  return static_cast<u32>(std::lround(std::max(0.0, micros)));
-}
-
-// Converts a level from zero-to-one into thousandths for the shared envelope.
-[[nodiscard]] u32 envelopePermille(double level) {
-  return static_cast<u32>(std::lround(std::clamp(level, 0.0, 1.0) * 1000.0));
-}
-
 // Converts an NDS decay or release byte into the rate used by the sound hardware.
 [[nodiscard]] u16 fallingRate(u8 decayTime) {
   if (decayTime == 0x7f) {
@@ -94,8 +77,8 @@ enum class InstrumentType : u8 {
 // Converts the four NDS envelope bytes into common attack, decay, sustain, and
 // release values.
 [[nodiscard]] std::optional<Envelope> ndsEnvelope(u8 attackTime, u8 decayTime, u8 sustainLevel, u8 releaseTime) {
-  // NDS envelopes use driver rate tables rather than SF2/DLS units. Preserve both rounded
-  // microseconds and precise seconds so exporters can choose the most accurate conversion.
+  // NDS envelopes use driver rate tables rather than SF2/DLS units. Convert
+  // them once to the shared physical representation.
   if (attackTime > 0x7f || decayTime > 0x7f || sustainLevel > 0x7f || releaseTime > 0x7f) {
     return std::nullopt;
   }
@@ -122,14 +105,10 @@ enum class InstrumentType : u8 {
   const u16 realDecay = fallingRate(decayTime);
   const u16 realRelease = fallingRate(releaseTime);
   const double decaySeconds = decayTime == 0x7f ? 0.001 : ((0x16980 / realDecay) * kEnvelopeIntervalSeconds);
-  const std::optional<double> releaseSeconds =
-      releaseTime == 0x7f ? std::nullopt : std::optional<double>{(0x16980 / realRelease) * kEnvelopeIntervalSeconds};
+  const double releaseSeconds = releaseTime == 0x7f ? std::numeric_limits<double>::infinity()
+                                                    : (0x16980 / realRelease) * kEnvelopeIntervalSeconds;
 
   return Envelope{
-      .attack = envelopeMicros(attackSeconds),
-      .decay = envelopeMicros(decaySeconds),
-      .sustain = envelopePermille(sustainAmplitude),
-      .release = releaseSeconds ? envelopeMicros(*releaseSeconds) : kEnvelopeInfinite,
       .attackSeconds = attackSeconds,
       .decaySeconds = decaySeconds,
       .releaseSeconds = releaseSeconds,
@@ -202,7 +181,7 @@ struct ParsedNdsRegion {
               .keyRange = keys,
               .sample = *sample,
               .range = range,
-              .rootKey = effectiveRootKey,
+              .unityKey = static_cast<double>(effectiveRootKey),
               .envelope = *envelope,
               .pan = panPositionFrom7Bit(*pan),
           },

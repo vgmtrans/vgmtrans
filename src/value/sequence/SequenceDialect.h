@@ -63,22 +63,15 @@ struct Effects {
   [[nodiscard]] static constexpr Effects wait(u32 ticks) noexcept { return Effects{.advanceTicks = ticks}; }
 };
 
-using ExecuteSourceCommand = Effects (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
-                                         PerformanceEmitter& out, VmApi& vm, const std::any& context);
-using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&, const std::any& context);
-using TickTrackState = void (*)(const SourceCommand&, const TrackProgram&, std::any& trackState,
-                                PerformanceEmitter& out, VmApi& vm, const std::any& context);
-
-// Source-free formats play only the command values saved during decoding. They
-// do not receive the original track, raw bytes, or loosely typed extra settings.
-// Older formats may still read operands through the original callback below.
+// Formats play only command values saved during decoding. They do not receive
+// the original source bytes or loosely typed format context.
 using CreateProgramState = std::any (*)(const SequenceProgram&);
-using CreateSemanticTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&);
-using ExecuteSemanticCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
-                                           PerformanceEmitter& out, VmApi& vm);
-using TickSemanticTrackState = void (*)(const SourceCommand&, std::any& programState, std::any& trackState,
-                                        PerformanceEmitter& out, VmApi& vm);
-using FinishSemanticPrepass = void (*)(std::any& programState);
+using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&);
+using ExecuteCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
+                                   PerformanceEmitter& out, VmApi& vm);
+using TickTrackState = void (*)(const SourceCommand&, std::any& programState, std::any& trackState,
+                                PerformanceEmitter& out, VmApi& vm);
+using FinishPrepass = void (*)(std::any& programState);
 
 enum class SemanticPrepassMode {
   // Render immediately; the format does not need information from later
@@ -97,19 +90,12 @@ struct SequenceDialect {
   std::string commandDetailKindPrefix;
   Timebase timebase;
   SequenceProgramBehavior defaultBehavior;
-  CreateTrackState createTrackState = nullptr;
-  ExecuteSourceCommand execute = nullptr;
-  TickTrackState tick = nullptr;
-  std::any context;
-  bool requiresCompleteSequencePrepass = false;
   CreateProgramState createProgramState = nullptr;
-  CreateSemanticTrackState createSemanticTrackState = nullptr;
-  ExecuteSemanticCommand executeSemantic = nullptr;
-  TickSemanticTrackState tickSemantic = nullptr;
-  FinishSemanticPrepass finishSemanticPrepass = nullptr;
-  SemanticPrepassMode semanticPrepass = SemanticPrepassMode::None;
-
-  [[nodiscard]] bool usesSemanticScheduler() const noexcept { return executeSemantic != nullptr; }
+  CreateTrackState createTrackState = nullptr;
+  ExecuteCommand execute = nullptr;
+  TickTrackState tick = nullptr;
+  FinishPrepass finishPrepass = nullptr;
+  SemanticPrepassMode prepass = SemanticPrepassMode::None;
 
   // Formats normally want a program with this dialect's identity, timebase,
   // and default VM behavior. Keep that mechanical wiring out of each parser.
@@ -135,20 +121,5 @@ private:
   std::unordered_map<std::string, SequenceDialect> dialects_;
   bool sealed_ = false;
 };
-
-namespace detail {
-
-template <class TrackState, class Context>
-std::any createTrackState(const SequenceProgram& program, const TrackProgram& track, const std::any& context) {
-  if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&, const Context&>) {
-    return TrackState{program, track, std::any_cast<const Context&>(context)};
-  } else if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&>) {
-    return TrackState{program, track};
-  } else {
-    return TrackState{};
-  }
-}
-
-}  // namespace detail
 
 }  // namespace vgmtrans::core

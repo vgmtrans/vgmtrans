@@ -742,6 +742,77 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
          "sequence-event vibrato simulation should restart the delay and phase for each new note");
 }
 
+void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks =
+          {
+              PerformanceTrack{
+                  .id = TrackId{0},
+                  .sourceTrackNumber = 0,
+                  .endTick = 8,
+                  .events = {TempoPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .microsecondsPerQuarter = 1'000'000,
+                  }},
+              },
+              PerformanceTrack{
+                  .id = TrackId{1},
+                  .sourceTrackNumber = 1,
+                  .endTick = 8,
+                  .events =
+                      {
+                          TremoloDelayPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 0},
+                              .delayTicks = 2,
+                          },
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 0},
+                              .target = ModulationPerformanceTarget::TremoloRate,
+                              .amount = 1.0,
+                              .frequencyHz = 25.0,
+                          },
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 0},
+                              .target = ModulationPerformanceTarget::TremoloDepth,
+                              .amount = 1.0,
+                          },
+                          NotePerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 0},
+                              .key = 60,
+                              .linearVelocity = 1.0,
+                              .durationTicks = 8,
+                          },
+                          TempoPerformanceEvent{
+                              .header = PerformanceEventHeader{.tick = 4},
+                              .microsecondsPerQuarter = 1'000'000,
+                          },
+                      },
+              },
+          },
+  };
+
+  const MidiSequence midiSequence = PerformanceMidiRenderer().render(
+      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+
+  std::vector<std::pair<u64, u8>> expressions;
+  for (const MidiEvent& event : midiSequence.tracks[1].events) {
+    if (const auto* expression = std::get_if<Expression>(&event)) {
+      expressions.emplace_back(expression->tick, expression->value);
+    }
+  }
+  const std::vector<std::pair<u64, u8>> expectedExpressions{
+      {2, 127}, {3, 110}, {4, 90}, {5, 110}, {6, 127}, {7, 110}, {8, 90},
+  };
+  expect(expressions == expectedExpressions,
+         "sequence-event tremolo should use a delayed LFO instead of static attenuation");
+  expect(std::ranges::count_if(midiSequence.tracks[0].events,
+                               [](const MidiEvent& event) { return std::holds_alternative<Tempo>(event); }) == 1 &&
+             std::ranges::none_of(midiSequence.tracks[1].events,
+                                  [](const MidiEvent& event) { return std::holds_alternative<Tempo>(event); }),
+         "tempo output should remain anchored to its source track while driving simulation globally");
+}
+
 void exportRequestSequenceLoopsAffectMidiLowering() {
   expect(ExportRequest{}.sequenceLoops == 1, "the user-facing export request should default to one sequence loop");
 
@@ -1026,6 +1097,7 @@ void runValueMidiTests() {
   performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape();
   performanceMidiRendererDoesNotDoubleDelayVibrato();
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
+  performanceMidiRendererSimulatesTremoloUsingGlobalTempo();
   exportRequestSequenceLoopsAffectMidiLowering();
   modulationAnalysisReportsObservedMidiControllerRanges();
   modulationAnalysisReportsObservedPerformanceRanges();

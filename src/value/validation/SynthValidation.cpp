@@ -21,11 +21,10 @@ namespace {
 }
 
 void validateEnvelope(ValidationReport& report, const Envelope& envelope, SourceRange range) {
-  // Coarse integer envelopes use legacy sentinel values, but precise envelope
-  // fields are real units and should never be negative or non-finite.
+  // Positive infinity explicitly represents a stage with no finite duration.
   const auto checkSeconds = [&](const std::optional<double> value, std::string_view code, std::string_view name) {
-    if (value && (!std::isfinite(*value) || *value < 0.0)) {
-      report.error(std::string(code), "Synth envelope " + std::string(name) + " time was not finite and nonnegative",
+    if (value && (std::isnan(*value) || *value < 0.0)) {
+      report.error(std::string(code), "Synth envelope " + std::string(name) + " time was negative or NaN",
                    validRange(range));
     }
   };
@@ -35,8 +34,10 @@ void validateEnvelope(ValidationReport& report, const Envelope& envelope, Source
   checkSeconds(envelope.decaySeconds, "synth.envelope.decay", "decay");
   checkSeconds(envelope.releaseSeconds, "synth.envelope.release", "release");
 
-  if (envelope.sustainAmplitude && (!std::isfinite(*envelope.sustainAmplitude) || *envelope.sustainAmplitude < 0.0)) {
-    report.error("synth.envelope.sustain", "Synth envelope sustain amplitude was not finite and nonnegative",
+  if (envelope.sustainAmplitude &&
+      (!std::isfinite(*envelope.sustainAmplitude) || *envelope.sustainAmplitude < 0.0 ||
+       *envelope.sustainAmplitude > 1.0)) {
+    report.error("synth.envelope.sustain", "Synth envelope sustain amplitude was outside the 0.0 to 1.0 range",
                  validRange(range));
   }
 }
@@ -70,6 +71,9 @@ ValidationReport validateInstrumentSet(const InstrumentSetAsset& instrumentSet) 
       }
       if (!std::isfinite(region.attenuationDb)) {
         report.error("synth.region.attenuation", "Synth region attenuation was not finite", validRange(region.range));
+      }
+      if (!std::isfinite(region.unityKey)) {
+        report.error("synth.region.unity-key", "Synth region unity key was not finite", validRange(region.range));
       }
       validateEnvelope(report, region.envelope, region.range);
     }

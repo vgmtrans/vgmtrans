@@ -961,8 +961,6 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
             .trackIndex = trackIndex,
             .startOffset = layout->trackAddresses[trackIndex],
             .bytecodeEnd = sequenceEnd,
-            .sequenceOffset = offset,
-            .sequenceEnd = sequenceEnd,
             .parentAnnotation = headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt,
             .sourceMap = sourceMap,
             .diagnostics = diagnostics,

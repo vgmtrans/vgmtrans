@@ -87,11 +87,11 @@ ObjectRef ObjectRefs::region(AssetId instrumentSetAsset, u32 instrumentIndex, u3
 }
 
 ObjectRef ObjectRefs::instrumentIndex(u32 instrumentIndex) {
-  return ObjectRef{.kind = ObjectKind::Instrument, .index0 = instrumentIndex};
+  return ObjectRef{.kind = ObjectKind::InstrumentIndex, .index0 = instrumentIndex};
 }
 
 ObjectRef ObjectRefs::instrumentProgram(u32 bank, u32 program) {
-  return ObjectRef{.kind = ObjectKind::Instrument, .index0 = bank, .index1 = program};
+  return ObjectRef{.kind = ObjectKind::InstrumentProgram, .index0 = bank, .index1 = program};
 }
 
 ObjectRef ObjectRefs::sample(AssetId sampleSetAsset, u32 sampleIndex) {
@@ -99,7 +99,7 @@ ObjectRef ObjectRefs::sample(AssetId sampleSetAsset, u32 sampleIndex) {
 }
 
 ObjectRef ObjectRefs::sampleIndex(u32 sampleIndex) {
-  return ObjectRef{.kind = ObjectKind::Sample, .index0 = sampleIndex};
+  return ObjectRef{.kind = ObjectKind::SampleIndex, .index0 = sampleIndex};
 }
 
 ObjectRef ObjectRefs::misc(AssetId miscAsset) {

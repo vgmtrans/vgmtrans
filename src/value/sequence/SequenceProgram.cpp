@@ -28,13 +28,6 @@ std::optional<u32> AddressIndex::find(Address address) const {
   return found->second;
 }
 
-std::span<const u8> TrackProgram::bytesFor(const SourceCommand& command) const {
-  if (command.bytes.offset + command.bytes.size > commandBytes.size()) {
-    throw std::out_of_range("SourceCommand byte span is outside its TrackProgram pool");
-  }
-  return std::span<const u8>(commandBytes).subspan(command.bytes.offset, command.bytes.size);
-}
-
 const TrackProgram* trackById(const SequenceProgram& program, TrackId id) {
   if (id.valid() && id.value < program.tracks.size()) {
     const auto& track = program.tracks[id.value];
@@ -86,33 +79,6 @@ SourceValue semanticOperandSourceValue(const SemanticOperandValue& value) {
 }
 
 TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
-}
-
-const SourceCommand& TrackProgramBuilder::addDecoded(Address address, SourceRange range, std::span<const u8> bytes,
-                                                     SourceAnnotationId annotation, DecodeFlow flow) {
-  if (bytes.empty()) {
-    throw std::invalid_argument("Sequence source commands must include an opcode byte");
-  }
-  if (track_.addressIndex.find(address)) {
-    throw std::invalid_argument("Sequence command address was decoded more than once");
-  }
-
-  const auto commandIndex = static_cast<u32>(track_.commands.size());
-  const auto byteOffset = static_cast<u32>(track_.commandBytes.size());
-  track_.commandBytes.insert(track_.commandBytes.end(), bytes.begin(), bytes.end());
-
-  track_.commands.push_back(SourceCommand{
-      .id = CommandId{commandIndex},
-      .opcode = bytes.front(),
-      .address = address,
-      .encodedSize = static_cast<u32>(bytes.size()),
-      .range = range,
-      .annotation = annotation,
-      .bytes = ByteSpan{.offset = byteOffset, .size = static_cast<u32>(bytes.size())},
-      .flow = std::move(flow),
-  });
-  track_.addressIndex.add(address, commandIndex);
-  return track_.commands.back();
 }
 
 const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,

@@ -247,20 +247,12 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   return static_cast<s8>(std::clamp<s32>(value, std::numeric_limits<s8>::min(), std::numeric_limits<s8>::max()));
 }
 
-[[nodiscard]] SfRegionPitch sf2RegionPitch(const Region& region, const DecodedSfSample& sample) {
-  // If a region provides an explicit root key, trust its coarse/fine tuning fields. When
-  // it does not, fold region and sample pitch into the default-key tuning generators.
-  if (region.rootKey) {
-    return SfRegionPitch{
-        .rootKey = *region.rootKey,
-        .coarseTune = region.coarseTuneSemitones,
-        .fineTune = region.fineTuneCents,
-    };
-  }
-
-  const auto [coarseTune, fineTune] = splitTuneCents(region.tuning.cents + sample.pitch.cents);
+[[nodiscard]] SfRegionPitch sf2RegionPitch(const Region& region) {
+  const auto rootKey = static_cast<u8>(std::clamp(std::lround(region.unityKey), 0l, 127l));
+  const auto tuningCents = static_cast<s32>(std::lround((rootKey - region.unityKey) * 100.0));
+  const auto [coarseTune, fineTune] = splitTuneCents(tuningCents);
   return SfRegionPitch{
-      .rootKey = kDefaultRootKey,
+      .rootKey = rootKey,
       .coarseTune = coarseTune,
       .fineTune = fineTune,
   };
@@ -397,49 +389,19 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
       static_cast<long>(maxInitialAttenuation)));
 }
 
-[[nodiscard]] std::optional<double> envelopeSeconds(u32 microseconds, std::optional<double> preciseSeconds) {
-  // Some source drivers use envelope timing that does not round cleanly to integer microseconds.
-  // Prefer a precise seconds value when the format provides one.
-  if (preciseSeconds && *preciseSeconds >= 0.0 && std::isfinite(*preciseSeconds)) {
-    return *preciseSeconds;
-  }
-  if (microseconds == 0 || microseconds == kEnvelopeInfinite) {
-    return std::nullopt;
-  }
-  return static_cast<double>(microseconds) / 1'000'000.0;
-}
-
-[[nodiscard]] s16 sf2EnvelopeTimecents(u32 microseconds, std::optional<double> preciseSeconds) {
-  const auto seconds = envelopeSeconds(microseconds, preciseSeconds);
-  if (seconds && *seconds > 0.0) {
+[[nodiscard]] s16 sf2EnvelopeTimecents(std::optional<double> seconds) {
+  if (seconds && std::isfinite(*seconds) && *seconds > 0.0) {
     return clampS16(static_cast<s32>(std::lround(1200.0 * std::log2(*seconds))));
-  }
-  if (microseconds == kEnvelopeInfinite) {
-    return std::numeric_limits<s16>::min();
-  }
-  if (microseconds == 0) {
-    return std::numeric_limits<s16>::min();
   }
   return std::numeric_limits<s16>::min();
 }
 
 [[nodiscard]] s16 sf2SustainAttenuation(const Envelope& envelope) {
   constexpr long maxSustainAttenuationCentibels = 1000;
-  if (envelope.sustainAmplitude) {
-    const double amplitude = std::clamp(*envelope.sustainAmplitude, 0.0, 1.0);
-    const double attenuationDb = amplitude == 0.0 ? 100.0 : std::min(-20.0 * std::log10(amplitude), 100.0);
-    return clampS16(static_cast<s32>(std::clamp(attenuationDb * 10.0, 0.0, 1000.0)));
-  }
-  if (envelope.sustain == 0) {
-    return 0;
-  }
-
-  const double amplitude = std::clamp(static_cast<double>(envelope.sustain) / 1000.0, 0.0, 1.0);
-  if (amplitude >= 1.0) {
-    return 0;
-  }
-
-  return static_cast<s16>(std::clamp(std::lround(-200.0 * std::log10(amplitude)), 0l, maxSustainAttenuationCentibels));
+  const double amplitude = std::clamp(envelope.sustainAmplitude.value_or(1.0), 0.0, 1.0);
+  const double attenuationDb = amplitude == 0.0 ? 100.0 : std::min(-20.0 * std::log10(amplitude), 100.0);
+  return clampS16(static_cast<s32>(
+      std::clamp(attenuationDb * 10.0, 0.0, static_cast<double>(maxSustainAttenuationCentibels))));
 }
 
 [[nodiscard]] u32 instrumentRegionGeneratorCount(const Region& region) {
@@ -689,7 +651,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
     for (const auto& sfRegion : instrument.regions) {
       const auto& region = *sfRegion.region;
       const auto& sample = samplesByIndex[sfRegion.sampleIndex];
-      const auto pitch = sf2RegionPitch(region, sample);
+      const auto pitch = sf2RegionPitch(region);
 
       writeRangeGen(payload, kSfGenKeyRange, region.keyRange.low, region.keyRange.high);
       writeRangeGen(payload, kSfGenVelRange, region.velocityRange.low, region.velocityRange.high);
@@ -699,15 +661,11 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
       writeAmountGen(payload, kSfGenCoarseTune, pitch.coarseTune);
       writeAmountGen(payload, kSfGenFineTune, pitch.fineTune);
       const bool explicitEnvelope = hasExplicitEnvelope(region.envelope);
-      writeAmountGen(payload, kSfGenAttackVolEnv,
-                     sf2EnvelopeTimecents(region.envelope.attack, region.envelope.attackSeconds));
-      writeAmountGen(payload, kSfGenHoldVolEnv,
-                     sf2EnvelopeTimecents(region.envelope.hold, region.envelope.holdSeconds));
-      writeAmountGen(payload, kSfGenDecayVolEnv,
-                     sf2EnvelopeTimecents(region.envelope.decay, region.envelope.decaySeconds));
+      writeAmountGen(payload, kSfGenAttackVolEnv, sf2EnvelopeTimecents(region.envelope.attackSeconds));
+      writeAmountGen(payload, kSfGenHoldVolEnv, sf2EnvelopeTimecents(region.envelope.holdSeconds));
+      writeAmountGen(payload, kSfGenDecayVolEnv, sf2EnvelopeTimecents(region.envelope.decaySeconds));
       writeAmountGen(payload, kSfGenSustainVolEnv, explicitEnvelope ? sf2SustainAttenuation(region.envelope) : 0);
-      writeAmountGen(payload, kSfGenReleaseVolEnv,
-                     sf2EnvelopeTimecents(region.envelope.release, region.envelope.releaseSeconds));
+      writeAmountGen(payload, kSfGenReleaseVolEnv, sf2EnvelopeTimecents(region.envelope.releaseSeconds));
       writeWordGen(payload, kSfGenOverridingRootKey, pitch.rootKey);
       writeWordGen(payload, kSfGenSampleModes, effectiveSfLoop(region, sample).enabled ? 1 : 0);
       writeWordGen(payload, kSfGenSampleId, sfRegion.sampleIndex);
@@ -732,7 +690,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
       if (sfRegion.sampleIndex >= info.size() || assigned[sfRegion.sampleIndex]) {
         continue;
       }
-      const auto pitch = sf2RegionPitch(*sfRegion.region, samples[sfRegion.sampleIndex]);
+      const auto pitch = sf2RegionPitch(*sfRegion.region);
       info[sfRegion.sampleIndex].pitch =
           sf2SampleHeaderPitch(pitch.rootKey, clampS16(samples[sfRegion.sampleIndex].pitch.cents));
       info[sfRegion.sampleIndex].loop = effectiveSfLoop(*sfRegion.region, samples[sfRegion.sampleIndex]);

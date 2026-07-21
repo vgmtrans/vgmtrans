@@ -5,6 +5,8 @@
  */
 
 #include "ValueTestSupport.h"
+#include "value/session/ScanCommit.h"
+#include "value/validation/ScanValidation.h"
 
 namespace {
 
@@ -137,6 +139,98 @@ void sourceMapRejectsDuplicateAnnotationIds() {
   expect(builderThrew, "source map builder should reject duplicate annotation ids from its allocator");
 }
 
+void sourceMapStoreRejectsCrossScanAnnotationIdCollisions() {
+  SourceMapStore store;
+  store.append(SourceMap{{SourceAnnotation{
+      .id = SourceAnnotationId{7},
+      .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
+      .label = "First",
+  }}});
+
+  bool threw = false;
+  try {
+    store.append(SourceMap{{SourceAnnotation{
+        .id = SourceAnnotationId{7},
+        .range = SourceRange{.source = SourceId{2}, .offset = 0, .size = 1},
+        .label = "Second",
+    }}});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw, "source map store should reject annotation ids already owned by another scan");
+  expect(store.all().annotations().size() == 1,
+         "a rejected source map append should leave the existing annotations unchanged");
+}
+
+void scanCommitPreflightsSourceAnnotationIdCollisions() {
+  AssetStore assets;
+  MatchFactStore matchFacts;
+  ExplicitCollectionStore explicitCollections;
+  SourceMapStore sourceMaps;
+  DiagnosticStore diagnostics;
+  sourceMaps.append(SourceMap{{SourceAnnotation{
+      .id = SourceAnnotationId{7},
+      .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
+      .label = "Existing",
+  }}});
+
+  ScanCommit commit{
+      .source = SourceId{2},
+      .assets = {MiscAsset{.metadata = AssetMetadata{.id = AssetId{3}, .name = "Uncommitted"}}},
+      .sourceMap = SourceMap{{SourceAnnotation{
+          .id = SourceAnnotationId{7},
+          .range = SourceRange{.source = SourceId{2}, .offset = 0, .size = 1},
+          .label = "Colliding",
+      }}},
+  };
+
+  bool threw = false;
+  try {
+    commit.commit(assets, matchFacts, explicitCollections, sourceMaps, diagnostics);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw, "scan commit should reject source annotation ids owned by an earlier scan");
+  expect(assets.all().empty(), "source annotation collision should be rejected before scan assets are published");
+  expect(sourceMaps.all().annotations().size() == 1,
+         "source annotation collision should not mutate the existing source map store");
+}
+
+void scanValidationRejectsSourceAnnotationParentCycles() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "cycle.bin"}, {0, 0});
+  ScanCommit commit{
+      .source = source,
+      .sourceSize = 2,
+      .sourceMap = SourceMap{{
+          SourceAnnotation{
+              .id = SourceAnnotationId{1},
+              .range = SourceRange{.source = source, .offset = 0, .size = 1},
+              .label = "First",
+              .parent = SourceAnnotationId{2},
+          },
+          SourceAnnotation{
+              .id = SourceAnnotationId{2},
+              .range = SourceRange{.source = source, .offset = 1, .size = 1},
+              .label = "Second",
+              .parent = SourceAnnotationId{1},
+          },
+      }},
+  };
+  const ValidationReport report = validateScanCommit(commit, sources, AssetStore{});
+  expect(std::ranges::any_of(report.findings(), [](const ValidationFinding& finding) {
+           return finding.code == "scan.source-annotation.parent-cycle";
+         }),
+         "scan admission should reject cyclic annotation parents before a TreeView can recurse through them");
+}
+
+void objectSelectorsHaveDistinctKinds() {
+  expect(ObjectRefs::instrumentIndex(2) != ObjectRefs::instrumentProgram(2, 0),
+         "an instrument table index should not collide with a bank/program selector");
+  expect(ObjectRefs::sampleIndex(3) != ObjectRefs::sample(AssetId{0}, 3),
+         "an unresolved sample index should not collide with a concrete sample object");
+}
+
 void diagnosticsCanReferenceSourceAnnotationsAndObjects() {
   ScanIdAllocator ids;
   SourceMapBuilder builder([&ids]() { return ids.nextSourceAnnotationId(); });
@@ -192,6 +286,10 @@ void runValueSourceMapTests() {
   sourceMapBuilderRecordsAnnotationsFieldsAndLinks();
   sourceAnnotationsCarryOutlinePolicyForTreeConsumers();
   sourceMapRejectsDuplicateAnnotationIds();
+  sourceMapStoreRejectsCrossScanAnnotationIdCollisions();
+  scanCommitPreflightsSourceAnnotationIdCollisions();
+  scanValidationRejectsSourceAnnotationParentCycles();
+  objectSelectorsHaveDistinctKinds();
   diagnosticsCanReferenceSourceAnnotationsAndObjects();
   sessionSnapshotCarriesScannerSourceMap();
 }

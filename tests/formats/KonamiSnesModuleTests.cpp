@@ -569,17 +569,16 @@ void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
          "Konami conditional jump should expose both decoded branch targets");
   expect(call.flow.callTarget() && call.flow.staticTargets.front().value == 12,
          "Konami call should expose its decoded little-endian target");
-  expect(flow.commandBytes.empty() &&
-             std::ranges::all_of(flow.commands, [](const SourceCommand& command) { return command.semantic(); }),
-         "valid Konami compiler commands should not retain or reopen source bytes");
+  expect(std::ranges::all_of(flow.commands, [](const SourceCommand& command) { return command.encodedSize != 0; }),
+         "valid Konami compiler commands should retain semantic IR and source ranges");
 
   const std::vector<u8> truncatedBytes{0xe4, 0x01, 0x20};
   std::vector<Diagnostic> diagnostics;
   const TrackProgram truncated =
       decodeKonamiSnesSourceTrack(ByteReader(SourceId{31}, truncatedBytes), KONAMISNES_V6, 0, 0, nullptr, &diagnostics);
   expect(truncated.commands.size() == 1 && truncated.commands[0].flow.terminal &&
-             !truncated.commands[0].execution.valid() && truncated.bytesFor(truncated.commands[0]).size() == 3,
-         "truncated Konami commands should keep diagnostic bytes but no executable behavior");
+             !truncated.commands[0].execution.valid() && truncated.commands[0].range.size == 3,
+         "truncated Konami commands should keep their partial source range but no executable behavior");
   expect(!diagnostics.empty() && diagnostics.front().code == "truncated-record",
          "truncated Konami operands should use the shared compiler-cursor diagnostic");
 }

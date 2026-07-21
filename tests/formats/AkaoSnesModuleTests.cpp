@@ -265,7 +265,6 @@ void akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes() {
   expect(
       track.commands.size() == 2 && track.commands[0].address.value == start && track.commands[1].address.value == 0x40,
       "AkaoSnes reachable decode should follow the effective relocated jump target");
-  expect(track.commandBytes.empty(), "valid compiled AkaoSnes commands should not retain source bytes for playback");
   const SourceAnnotation& jump = commandAnnotation(annotations, track.commands[0]);
   expect(fieldEquals(fieldWithName(jump, "stored_destination"), u64{0x10}) &&
              fieldEquals(fieldWithName(jump, "destination"), u64{0x40}),
@@ -337,7 +336,6 @@ void akaoSnesCompilerCursorCoversVersionBoundariesAndDurations() {
         decodeTrack(bytes, versionCase.profile, start, start + static_cast<u32>(versionCase.durations.size()) + 1);
     expect(track.commands.size() == versionCase.durations.size() + 1,
            "each AkaoSnes duration-table entry should decode as one note command");
-    expect(track.commandBytes.empty(), "complete duration-table commands should retain semantic IR, not bytes");
 
     const PerformanceSequence performance = renderTracks(versionCase.profile, {std::move(track)});
     expect(performance.diagnostics.empty(), "duration-table fixtures should render without diagnostics");
@@ -414,7 +412,7 @@ void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation() {
     bytes[start + 1 + unknown.operandCount] = endOpcode(unknown.profile);
     const TrackProgram track = decodeTrack(bytes, unknown.profile, start, start + 2 + unknown.operandCount);
     expect(!track.commands.empty() && track.commands.front().encodedSize == 1 + unknown.operandCount &&
-               track.commands.front().semantic() && !track.commands.front().execution.valid(),
+               !track.commands.front().execution.valid(),
            "bounded unknown AkaoSnes commands should retain their exact length as non-executable semantic IR");
   }
 
@@ -424,7 +422,7 @@ void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation() {
   std::vector<Diagnostic> diagnostics;
   const TrackProgram truncated = decodeTrack(truncatedBytes, ff6, start, start + 2, 0, &diagnostics);
   expect(truncated.commands.size() == 1 && truncated.commands.front().range.offset == start &&
-             truncated.commands.front().range.size == 2 && truncated.commandBytes.size() == 2,
+             truncated.commands.front().range.size == 2,
          "a truncated AkaoSnes operand should stop at and retain only the exact available source range");
   expect(!diagnostics.empty(), "a truncated AkaoSnes operand should report a diagnostic");
 

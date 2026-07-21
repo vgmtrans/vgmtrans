@@ -374,7 +374,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   bytes[trackStart + 10] = 0xff;
 
   const SequenceDialect& dialect = ndsSequenceDialect();
-  expect(dialect.usesSemanticScheduler(), "NDS SSEQ should use the semantic sequence scheduler");
+  expect(dialect.execute != nullptr, "NDS SSEQ should register a compiled command executor");
 
   ScanIdAllocator annotationIds;
   SourceMapBuilder sourceMap([&annotationIds]() { return annotationIds.nextSourceAnnotationId(); });
@@ -383,7 +383,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
                                              trackStart, 0, false, &sourceMap, &decodeDiagnostics);
   expect(track.startAddress.value == trackStart && track.commands.size() == 5,
          "NDS SSEQ parser should find the primary track and decode all fixture commands");
-  expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.semantic(); }),
+  expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.encodedSize != 0; }),
          "NDS SSEQ should store every complete command as named semantic data");
   const SourceMap annotations = sourceMap.finish();
   expect(commandDetailKind(annotations, track.commands[0]) == "nds.note-wait",
@@ -467,7 +467,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   expect(instrumentLink != programAnnotation.links.end(),
          "NDS program command should record a structured instrument source link");
   const auto* instrumentTarget = std::get_if<ObjectRef>(&instrumentLink->target);
-  expect(instrumentTarget != nullptr && instrumentTarget->kind == ObjectKind::Instrument &&
+  expect(instrumentTarget != nullptr && instrumentTarget->kind == ObjectKind::InstrumentProgram &&
              !instrumentTarget->asset.valid() && instrumentTarget->index0 == 1 && instrumentTarget->index1 == 5,
          "NDS program source link should preserve unresolved bank/program selectors");
   expect(programDiagnostics.empty(), "NDS program source-link decode should not emit diagnostics");
@@ -708,8 +708,8 @@ void ndsSequenceDialectAnnotatesIgnoredOperandBytes() {
   const SourceCommand& ignored = track.commands[0];
   expect(commandDetailKind(annotations, ignored) == "nds.modulation-delay",
          "NDS ignored opcode should stay annotated as its source-driver command");
-  expect(ignored.semantic() && track.bytesFor(ignored).empty(),
-         "NDS ignored command should keep its source operand without retaining playback bytes");
+  expect(ignored.encodedSize == 3 && !ignored.execution.valid(),
+         "NDS ignored command should keep its source operand without playback behavior");
   const SemanticOperand* ignoredBytes = semanticOperand(ignored, "bytes");
   expect(ignoredBytes != nullptr && std::get<std::string>(ignoredBytes->value) == "12 34",
          "NDS ignored command should keep its raw operand as a named semantic value");
@@ -737,9 +737,8 @@ void ndsSequenceDialectAnnotatesPartialIgnoredOperandBytes() {
   expect(track.commands.size() == 1, "NDS partial ignored-command fixture should decode one truncated command");
   expect(commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS partial ignored command should use the truncated-command fallback");
-  expect(track.bytesFor(track.commands[0]).size() == 2 && track.bytesFor(track.commands[0])[0] == 0xe0 &&
-             track.bytesFor(track.commands[0])[1] == 0x12,
-         "NDS partial ignored command should preserve the opcode and available operand byte");
+  expect(track.commands[0].range.size == 2,
+         "NDS partial ignored command should preserve the opcode and available operand source range");
 
   const SourceField* bytesField = fieldWithName(commandAnnotation(annotations, track.commands[0]), "bytes");
   expect(fieldEquals(bytesField, "12"),
@@ -776,9 +775,8 @@ void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {
   expect(track.commands.size() == 1, "NDS unterminated variable-length command should decode as one command");
   expect(commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS unterminated variable-length command should use the truncated-command fallback");
-  expect(track.bytesFor(track.commands[0]).size() == 2 && track.bytesFor(track.commands[0])[0] == 0x80 &&
-             track.bytesFor(track.commands[0])[1] == 0x81,
-         "NDS truncated command should preserve available partial command bytes");
+  expect(track.commands[0].range.size == 2,
+         "NDS truncated command should preserve its available partial source range");
 }
 
 void ndsSequenceDialectDoesNotLinkInvalidControlTargets() {
@@ -891,7 +889,7 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
          "NDS recovered jump loop should render one pass through the subroutine loop");
 }
 
-void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
+void ndsSynthParserPreservesInfiniteRelease() {
   std::vector<u8> bytes(0x80);
   writeLe32(bytes, 0x38, 1);
   writeLe32(bytes, 0x3c, (0x40u << 8) | 0x01);
@@ -929,9 +927,8 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
   expect(bank != nullptr && bank->instruments.size() == 1 && bank->instruments[0].regions.size() == 1,
          "NDS synth parser should keep a valid instrument with infinite release");
   const Envelope& envelope = bank->instruments[0].regions[0].envelope;
-  expect(envelope.release == kEnvelopeInfinite, "NDS infinite release should remain explicit in coarse envelope units");
-  expect(!envelope.releaseSeconds.has_value(),
-         "NDS infinite release should not use a negative precise-seconds sentinel");
+  expect(envelope.releaseSeconds && std::isinf(*envelope.releaseSeconds),
+         "NDS infinite release should remain explicit in physical envelope units");
   expect(validateInstrumentSet(*bank).empty(), "NDS infinite release should pass synth validation");
   expect(malformedBank != nullptr && malformedBank->instruments.empty(),
          "NDS synth parser should skip regions with malformed envelope-rate bytes");

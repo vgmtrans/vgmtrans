@@ -283,7 +283,6 @@ struct SequenceDecodeContext {
               .semantic = SequenceSemantic::Unsupported,
               .playback = CommandPlaybackStatus::StopsPlayback,
           },
-      .retainBytes = false,
   };
 }
 

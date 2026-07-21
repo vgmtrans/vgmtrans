@@ -59,10 +59,7 @@ namespace {
 }  // namespace
 
 LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation) {
-  LoweredSynthModulation lowered{
-      .generators = modulation.customGenerators,
-      .modulators = modulation.customModulators,
-  };
+  LoweredSynthModulation lowered;
 
   if (modulation.vibrato) {
     const auto& vibrato = *modulation.vibrato;

@@ -92,7 +92,7 @@ void ndsSequenceDialectKeepsEmptyPlaceholderTrack();
 void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
 void ndsSequenceDialectDoesNotLinkInvalidControlTargets();
 void ndsMalformedRecoveryKeepsExecutableJumps();
-void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds();
+void ndsSynthParserPreservesInfiniteRelease();
 void ndsSynthParserDerivesAdpcmLengthsSafely();
 void ndsWaveArchiveReportsTruncatedSampleHeaders();
 void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();
@@ -184,7 +184,7 @@ int main() {
     ndsSequenceDialectMarksUnterminatedVarLenAsTruncated();
     ndsSequenceDialectDoesNotLinkInvalidControlTargets();
     ndsMalformedRecoveryKeepsExecutableJumps();
-    ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds();
+    ndsSynthParserPreservesInfiniteRelease();
     ndsSynthParserDerivesAdpcmLengthsSafely();
     ndsWaveArchiveReportsTruncatedSampleHeaders();
     ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();

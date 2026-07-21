@@ -22,7 +22,8 @@ namespace vgmtrans::core {
 // diagnostics.
 class RecordReader {
 public:
-  RecordReader(ByteReader reader, u32 offset, u32 end, std::vector<Diagnostic>* diagnostics = nullptr);
+  RecordReader(ByteReader reader, u32 offset, u32 end, std::vector<Diagnostic>* diagnostics = nullptr,
+               bool captureFields = true);
 
   [[nodiscard]] RangedValue<::u8> u8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default);
   [[nodiscard]] RangedValue<::s8> s8(std::string_view name,
@@ -63,6 +64,9 @@ public:
 
   template <class T>
   void derived(std::string_view name, T&& value, SourceValueDisplay display = SourceValueDisplay::Default) {
+    if (!captureFields_) {
+      return;
+    }
     fields_.push_back(SourceField{
         .name = std::string(name),
         .value = makeSourceValue(std::forward<T>(value)),
@@ -91,6 +95,7 @@ private:
   u32 end_ = 0;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
   std::vector<SourceField> fields_;
+  bool captureFields_ = true;
   bool failed_ = false;
 };
 

@@ -34,8 +34,8 @@ void psxAdsrRegistersAndEnvelopeAreSharedValues() {
   const Envelope ps2 = psxSpuEnvelope(adsr1, adsr2, PsxSpuGeneration::Ps2);
   expect(ps1.attackSeconds && ps1.decaySeconds && ps1.releaseSeconds && ps1.sustainAmplitude,
          "PSX ADSR conversion should retain precise envelope values");
-  expect(ps1.attack > 0 && ps1.release > 0 && ps1.sustain <= 1000,
-         "PSX ADSR conversion should also populate the common rounded envelope");
+  expect(*ps1.attackSeconds > 0.0 && *ps1.releaseSeconds > 0.0 && *ps1.sustainAmplitude <= 1.0,
+         "PSX ADSR conversion should populate canonical physical envelope units");
   expect(ps2.attackSeconds && std::abs((*ps2.attackSeconds / *ps1.attackSeconds) -
                                        (static_cast<double>(kPs1SpuSampleRate) / kPs2SpuSampleRate)) < 1e-9,
          "PS2 ADSR timing should use the SPU2 sample rate without changing the register model");

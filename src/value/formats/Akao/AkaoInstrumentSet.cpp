@@ -44,9 +44,9 @@ void applyArticulationToRegion(Region& region, const AkaoArticulationBinding* bi
   }
   const AkaoArticulation& articulation = binding->articulation;
   region.sample = SampleRef{.collection = binding->collection.id, .index = binding->sampleIndex};
-  region.rootKey = drum ? static_cast<u8>(articulation.unityKey + region.keyRange.low - drumRelativeUnityKey)
-                        : articulation.unityKey;
-  region.fineTuneCents = articulation.fineTuneCents;
+  const double rootKey = drum ? articulation.unityKey + region.keyRange.low - drumRelativeUnityKey
+                              : articulation.unityKey;
+  region.unityKey = rootKey - (articulation.fineTuneCents / 100.0);
   region.envelope = akaoRegionEnvelope(articulation, attackRate, sustainRate, sustainMode, releaseRate);
   region.loop = articulation.loop;
 }
@@ -208,8 +208,7 @@ void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
         .velocityRange = VelocityRange{.low = 0, .high = 127},
         .sample = SampleRef{.collection = binding.collection.id, .index = binding.sampleIndex},
         .range = binding.articulation.source.range,
-        .rootKey = binding.articulation.unityKey,
-        .fineTuneCents = binding.articulation.fineTuneCents,
+        .unityKey = binding.articulation.unityKey - (binding.articulation.fineTuneCents / 100.0),
         .envelope = psxSpuEnvelope(binding.articulation.adsr1, binding.articulation.adsr2),
         .loop = binding.articulation.loop,
     };

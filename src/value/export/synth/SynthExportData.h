@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
+#include "value/export/synth/ModulationScaling.h"
 #include "value/synth/SynthModel.h"
 
 #include <map>

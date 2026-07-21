@@ -2054,9 +2054,8 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .initialReverbSend = 0.0,
-              .stopAllTracksAtFirstLoop = false,
           },
-      .semanticPrepass = SemanticPrepassMode::ScheduledPlayback,
+      .prepass = SemanticPrepassMode::ScheduledPlayback,
   });
   return dialect;
 }
@@ -2117,8 +2116,6 @@ TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesTrackDec
       .trackIndex = options.sourceTrackNumber,
       .startOffset = options.startAddress,
       .bytecodeEnd = options.bytecodeEnd,
-      .sequenceOffset = options.startAddress,
-      .sequenceEnd = options.bytecodeEnd,
       .parentAnnotation = options.parentAnnotation,
       .sourceMap = options.sourceMap,
       .diagnostics = options.diagnostics,

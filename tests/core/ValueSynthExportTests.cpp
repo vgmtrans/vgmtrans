@@ -64,29 +64,18 @@ void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
          "NDS IMA ADPCM decoder should reject initial predictor indexes outside the step table");
 }
 
-void envelopePredicatesDetectPreciseOnlyData() {
-  expect(!hasCoarseEnvelope(Envelope{}), "empty envelope should not report coarse envelope data");
-  expect(!hasPreciseEnvelope(Envelope{}), "empty envelope should not report precise envelope data");
+void envelopePredicateDetectsCanonicalData() {
   expect(!hasExplicitEnvelope(Envelope{}), "empty envelope should not report explicit envelope data");
 
-  const Envelope coarse{
-      .attack = 1,
-  };
-  expect(hasCoarseEnvelope(coarse), "coarse envelope predicate should detect integer envelope fields");
-  expect(hasAnyEnvelopeData(coarse), "any-envelope predicate should detect coarse envelope data");
-
-  const Envelope precise{
+  const Envelope timed{
       .attackSeconds = 0.25,
   };
-  expect(!hasCoarseEnvelope(precise), "precise-only envelope should not report coarse envelope data");
-  expect(hasPreciseEnvelope(precise), "precise envelope predicate should detect seconds fields");
-  expect(hasExplicitEnvelope(precise), "explicit envelope predicate should detect precise-only envelope data");
+  expect(hasExplicitEnvelope(timed), "envelope predicate should detect a specified stage time");
 
-  const Envelope preciseSustain{
+  const Envelope sustain{
       .sustainAmplitude = 0.5,
   };
-  expect(hasPreciseEnvelope(preciseSustain), "precise envelope predicate should detect sustain amplitude");
-  expect(hasExplicitEnvelope(preciseSustain), "explicit envelope predicate should detect precise-only sustain data");
+  expect(hasExplicitEnvelope(sustain), "envelope predicate should detect a specified sustain amplitude");
 }
 
 void physicalModulationLowersToLegacySynthControls() {
@@ -164,6 +153,7 @@ void wavExporterWritesPcm16RiffFile() {
 }
 
 void soundFontExporterWritesSfbkRiffFile() {
+  constexpr double lfoStepHertz = 1000.0 / 16384.0;
   SourceStore sources;
   const auto sourceId = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
@@ -198,44 +188,29 @@ void soundFontExporterWritesSfbkRiffFile() {
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
               .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
-              .tuning = Tuning{.cents = 125},
+              .unityKey = 58.75,
               .envelope =
                   Envelope{
-                      .attack = 1'000'000,
-                      .decay = 2'000'000,
-                      .sustain = 500,
-                      .release = 250'000,
+                      .attackSeconds = 1.0,
+                      .decaySeconds = 2.0,
+                      .releaseSeconds = 0.25,
+                      .sustainAmplitude = 0.5,
                   },
               .pan = 1.0,
           }},
           .modulation =
               InstrumentModulation{
-                  .customGenerators =
-                      {
-                          SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
-                          SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
-                          SynthGenerator{.destination = SynthDestination::VibratoDelay, .amount = -1200},
+                  .vibrato =
+                      VibratoSpec{
+                          .maxDepthCents = 120.0,
+                          .rateHertz = {lfoStepHertz, 255.0 * lfoStepHertz},
+                          .delaySeconds = ModulationRange{1.0, 2.0},
                       },
-                  .customModulators =
-                      {
-                          SynthModulator{
-                              .source = SynthSource::NoteOnVelocity,
-                              .destination = SynthDestination::VibratoDepth,
-                              .amount = 300,
-                          },
-                          SynthModulator{
-                              .source = SynthSource::ChannelPressure,
-                              .destination = SynthDestination::VibratoRate,
-                              .amount = 0,
-                          },
-                          SynthModulator{
-                              .destination = SynthDestination::VibratoDelay,
-                              .amount = 600,
-                          },
-                          SynthModulator{
-                              .destination = SynthDestination::TremoloRate,
-                              .amount = 180,
-                          },
+                  .tremolo =
+                      TremoloSpec{
+                          .maxDepthDb = 48.4,
+                          .rateHertz = {2.0 * lfoStepHertz, 510.0 * lfoStepHertz},
+                          .gainMode = TremoloGainMode::NoBoost,
                       },
               },
       }},
@@ -286,27 +261,27 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write default preset reverb send");
   expect(chunkSize(result.bytes, "ibag") == 12, "SoundFont ibag chunk should include a global generator zone");
   expect(soundFontBagAt(result.bytes, "ibag", 0, 0, 0), "SoundFont global zone should start at generator index 0");
-  expect(soundFontBagAt(result.bytes, "ibag", 1, 3, 4),
+  expect(soundFontBagAt(result.bytes, "ibag", 1, 3, 7),
          "SoundFont region zone should start after instrument generators and modulators");
-  expect(soundFontBagAt(result.bytes, "ibag", 2, 17, 4),
+  expect(soundFontBagAt(result.bytes, "ibag", 2, 17, 7),
          "SoundFont terminal bag should include all generators and modulators");
-  expect(chunkSize(result.bytes, "imod") == 50, "SoundFont imod chunk should include modulators plus terminal");
-  expect(soundFontImodContains(result.bytes, 2, 6, 300),
-         "SoundFont export should write explicit velocity-to-vibrato modulator");
-  expect(soundFontImodContains(result.bytes, 13, 24, 0),
-         "SoundFont export should write explicit channel-pressure-to-vibrato-rate modulator");
-  expect(soundFontImodContains(result.bytes, 206, 23, 600),
+  expect(chunkSize(result.bytes, "imod") == 80, "SoundFont imod chunk should include physical LFO modulators");
+  expect(soundFontImodContains(result.bytes, 13, 6, 0),
+         "SoundFont export should allow channel pressure to control physical vibrato depth");
+  expect(soundFontImodContains(result.bytes, 129, 6, 36),
+         "SoundFont export should scale physical vibrato depth from observed MIDI usage");
+  expect(soundFontImodContains(result.bytes, 206, 23, 1209),
          "SoundFont export should write default vibrato-delay modulator");
-  expect(soundFontImodContains(result.bytes, 203, 22, 17),
+  expect(soundFontImodContains(result.bytes, 203, 22, 914),
          "SoundFont export should scale default tremolo-rate modulator from observed MIDI usage");
   expect(chunkSize(result.bytes, "igen") == 72, "SoundFont igen chunk should include global and region generators");
   expect(chunkSize(result.bytes, "shdr") == 92, "SoundFont shdr chunk should include one sample and terminal record");
-  expect(soundFontIgenContainsAmount(result.bytes, 6, 120),
-         "SoundFont export should write instrument vibrato depth generator");
-  expect(soundFontIgenContainsAmount(result.bytes, 24, 240),
-         "SoundFont export should write instrument vibrato rate generator");
-  expect(soundFontIgenContainsAmount(result.bytes, 23, -1200),
+  expect(soundFontIgenContainsAmount(result.bytes, 24, -8479),
+         "SoundFont export should write physical vibrato frequency");
+  expect(soundFontIgenContainsAmount(result.bytes, 23, 0),
          "SoundFont export should write instrument vibrato delay generator");
+  expect(soundFontIgenContainsAmount(result.bytes, 22, -7279),
+         "SoundFont export should write physical tremolo frequency");
   expect(soundFontIgenContainsAmount(result.bytes, 34, 0),
          "SoundFont export should write attackVolEnv from Region envelope");
   expect(soundFontIgenContainsAmount(result.bytes, 35, -32768),
@@ -328,15 +303,16 @@ void soundFontExporterWritesSfbkRiffFile() {
       sources);
   expect(simulatedResult.diagnostics.empty(),
          "SoundFont sequence-event simulation export should not report diagnostics for valid values");
-  expect(!soundFontIgenContainsAmount(simulatedResult.bytes, 6, 120) &&
-             !soundFontIgenContainsAmount(simulatedResult.bytes, 24, 240) &&
-             !soundFontIgenContainsAmount(simulatedResult.bytes, 23, -1200),
-         "SoundFont sequence-event simulation export should suppress synth vibrato generators");
-  expect(!soundFontImodContains(simulatedResult.bytes, 206, 23, 600),
+  expect(!soundFontIgenContainsAmount(simulatedResult.bytes, 24, -8479) &&
+             !soundFontIgenContainsAmount(simulatedResult.bytes, 23, 0) &&
+             !soundFontIgenContainsAmount(simulatedResult.bytes, 22, -7279),
+         "SoundFont sequence-event simulation export should suppress synth LFO generators");
+  expect(!soundFontImodContains(simulatedResult.bytes, 206, 23, 1209),
          "SoundFont sequence-event simulation export should suppress synth vibrato-delay modulators");
 }
 
 void dlsExporterWritesDlsRiffFile() {
+  constexpr double lfoStepHertz = 1000.0 / 16384.0;
   SourceStore sources;
   const auto sourceId = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
@@ -371,44 +347,29 @@ void dlsExporterWritesDlsRiffFile() {
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
               .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
-              .tuning = Tuning{.cents = 125},
+              .unityKey = 58.75,
               .envelope =
                   Envelope{
-                      .attack = 1'000'000,
-                      .decay = 2'000'000,
-                      .sustain = 500,
-                      .release = 250'000,
+                      .attackSeconds = 1.0,
+                      .decaySeconds = 2.0,
+                      .releaseSeconds = 0.25,
+                      .sustainAmplitude = 0.5,
                   },
               .pan = 1.0,
           }},
           .modulation =
               InstrumentModulation{
-                  .customGenerators =
-                      {
-                          SynthGenerator{.destination = SynthDestination::VibratoDepth, .amount = 120},
-                          SynthGenerator{.destination = SynthDestination::VibratoRate, .amount = 240},
-                          SynthGenerator{.destination = SynthDestination::VibratoDelay, .amount = -1200},
+                  .vibrato =
+                      VibratoSpec{
+                          .maxDepthCents = 120.0,
+                          .rateHertz = {lfoStepHertz, 255.0 * lfoStepHertz},
+                          .delaySeconds = ModulationRange{1.0, 2.0},
                       },
-                  .customModulators =
-                      {
-                          SynthModulator{
-                              .source = SynthSource::NoteOnVelocity,
-                              .destination = SynthDestination::VibratoDepth,
-                              .amount = 300,
-                          },
-                          SynthModulator{
-                              .source = SynthSource::ChannelPressure,
-                              .destination = SynthDestination::VibratoRate,
-                              .amount = 0,
-                          },
-                          SynthModulator{
-                              .destination = SynthDestination::VibratoDelay,
-                              .amount = 600,
-                          },
-                          SynthModulator{
-                              .destination = SynthDestination::TremoloRate,
-                              .amount = 180,
-                          },
+                  .tremolo =
+                      TremoloSpec{
+                          .maxDepthDb = 48.4,
+                          .rateHertz = {2.0 * lfoStepHertz, 510.0 * lfoStepHertz},
+                          .gainMode = TremoloGainMode::NoBoost,
                       },
               },
       }},
@@ -453,7 +414,7 @@ void dlsExporterWritesDlsRiffFile() {
   expect(chunkSize(result.bytes, "colh") == 4, "DLS colh chunk should store one u32 count");
   expect(chunkSize(result.bytes, "ptbl") == 12, "DLS ptbl chunk should include one pool cue");
   expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
-  expect(chunkSize(result.bytes, "art2") == 152,
+  expect(chunkSize(result.bytes, "art2") == 188,
          "DLS art2 chunk should include pan, envelope, generator, and modulator connections");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0206, 0),
          "DLS export should write EG1 attack time from Region envelope");
@@ -465,17 +426,15 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should write EG1 sustain level from Region envelope");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0209, -157286400),
          "DLS export should write EG1 release time from Region envelope");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0009, 0x0003, 7864320),
-         "DLS export should write instrument vibrato depth generator");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0000, 0x0114, 15728640),
-         "DLS export should write instrument vibrato rate generator");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0000, 0x0115, -78643200),
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0000, 0x0114, -8479 * 65536),
+         "DLS export should write physical vibrato frequency");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0000, 0x0115, 0),
          "DLS export should write instrument vibrato delay generator");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0009, 0x0002, 0x0003, 19660800),
-         "DLS export should write explicit velocity-to-vibrato modulator");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0114, 0),
-         "DLS export should write explicit channel-pressure-to-vibrato-rate modulator");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0104, 1114112),
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0000, 0x0104, -7279 * 65536),
+         "DLS export should write physical tremolo frequency");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0009, 0x0081, 0x0003, 36 * 65536),
+         "DLS export should scale physical vibrato depth from observed MIDI usage");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0104, 914 * 65536),
          "DLS export should scale default tremolo-rate modulator from observed MIDI usage");
 
   const auto simulatedResult = DlsExporter().exportDls(
@@ -488,10 +447,54 @@ void dlsExporterWritesDlsRiffFile() {
       sources);
   expect(simulatedResult.diagnostics.empty(),
          "DLS sequence-event simulation export should not report diagnostics for valid values");
-  expect(!dlsArt2ContainsConnection(simulatedResult.bytes, 0x0009, 0x0003, 7864320) &&
-             !dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0114, 15728640) &&
-             !dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0115, -78643200),
-         "DLS sequence-event simulation export should suppress synth vibrato generators");
+  expect(!dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0114, -8479 * 65536) &&
+             !dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0115, 0) &&
+             !dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0104, -7279 * 65536),
+         "DLS sequence-event simulation export should suppress synth LFO generators");
+}
+
+void standaloneSynthExportsKeepNativeModulation() {
+  constexpr double lfoStepHertz = 1000.0 / 16384.0;
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
+  SampleCollectionAsset samples{
+      .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Samples"},
+      .samples = SampleCollection{.samples = {Sample{
+                                      .codec = AudioCodec::SnesBrr,
+                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                                      .sampleRate = 16000,
+                                  }}},
+  };
+  InstrumentSetAsset instruments{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
+      .instruments = {Instrument{
+          .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
+          .modulation = InstrumentModulation{.vibrato = VibratoSpec{
+                                                 .maxDepthCents = 100.0,
+                                                 .rateHertz = {lfoStepHertz, lfoStepHertz},
+                                             }},
+      }},
+  };
+
+  SessionSnapshotBuilder builder;
+  builder.assets.emplace_back(instruments);
+  builder.assets.emplace_back(samples);
+  builder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Probe",
+      .instrumentSets = {instruments.metadata.id},
+      .sampleCollections = {samples.metadata.id},
+  });
+  SequenceDialectRegistry dialects;
+  const auto artifacts = exportCollection(
+      builder.finish(), sources, CollectionId{0},
+      ExportRequest{.kinds = {ExportKind::SoundFont2, ExportKind::Dls}}, dialects);
+
+  expect(artifacts.size() == 2, "standalone synth export should produce both requested containers");
+  expect(soundFontIgenContainsAmount(artifacts[0].bytes, 24, -8479),
+         "standalone SoundFont export should retain native modulation when no MIDI replacement exists");
+  expect(dlsArt2ContainsConnection(artifacts[1].bytes, 0x0000, 0x0114, -8479 * 65536),
+         "standalone DLS export should retain native modulation when no MIDI replacement exists");
 }
 
 void exportDiagnosticsPreserveSourceRanges() {
@@ -633,12 +636,13 @@ void synthExportAssignsPresetAddressFromSourceInstrumentIdentity() {
 void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
-  envelopePredicatesDetectPreciseOnlyData();
+  envelopePredicateDetectsCanonicalData();
   physicalModulationLowersToLegacySynthControls();
   synthEffectiveLoopExpandsEnabledZeroLengthLoop();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();
+  standaloneSynthExportsKeepNativeModulation();
   exportDiagnosticsPreserveSourceRanges();
   synthExportAssignsPresetAddressFromSourceInstrumentIdentity();
 }

@@ -40,6 +40,9 @@ void ScanCommit::validate(const SourceStore& sources, const AssetStore& existing
 void ScanCommit::commit(AssetStore& assetStore, MatchFactStore& matchFactStore,
                         ExplicitCollectionStore& explicitCollectionStore, SourceMapStore& sourceMapStore,
                         DiagnosticStore& diagnosticStore) {
+  // Preflight the only cross-store invariant that can fail after scan
+  // validation, before publishing any part of the commit.
+  sourceMapStore.validateAppend(sourceMap);
   assetStore.append(std::move(assets), source);
   matchFactStore.append(std::move(matchFacts));
   explicitCollectionStore.append(std::move(explicitCollections), source);

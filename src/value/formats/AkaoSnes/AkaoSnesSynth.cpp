@@ -143,13 +143,7 @@ struct InstrumentReadResult {
   };
 }
 
-struct AkaoPitch {
-  u8 rootKey = 69;
-  s16 fineTuneCents = 0;
-  Tuning aggregate;
-};
-
-[[nodiscard]] AkaoPitch akaoPitch(const AkaoSnesInstrumentInfo& info) {
+[[nodiscard]] double akaoUnityKey(const AkaoSnesInstrumentInfo& info) {
   double pitchScale = 0.0;
   if (info.tuning1 <= 0x7f) {
     pitchScale = 1.0 + (static_cast<double>(info.tuning1) / 256.0);
@@ -174,11 +168,7 @@ struct AkaoPitch {
   }
 
   const s16 fineTune = static_cast<s16>(fine * 100.0);
-  return AkaoPitch{
-      .rootKey = static_cast<u8>(std::clamp(root, 0, 127)),
-      .fineTuneCents = fineTune,
-      .aggregate = Tuning{.cents = static_cast<s32>((root - 69) * 100 + fineTune)},
-  };
+  return std::clamp(root, 0, 127) - (fineTune / 100.0);
 }
 
 std::vector<AkaoSnesInstrumentInfo> parseAkaoSnesInstrumentInfos(ByteReader reader, const AkaoSnesLayout& layout,
@@ -314,12 +304,10 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
       }
     }
 
-    const auto pitch = akaoPitch(info);
+    const double unityKey = akaoUnityKey(info);
     Region region{
         .range = info.tuning.range,
-        .tuning = pitch.aggregate,
-        .rootKey = pitch.rootKey,
-        .fineTuneCents = pitch.fineTuneCents,
+        .unityKey = unityKey,
         .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, 0xa0) : Envelope{},
         .pan = info.percussionPan ? std::clamp(static_cast<double>(*info.percussionPan) / 127.0, 0.0, 1.0) : 0.5,
     };
