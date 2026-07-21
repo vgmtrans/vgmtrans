@@ -144,13 +144,7 @@ constexpr u32 kDrumKitProgram = 0x00;
   };
 }
 
-struct KonamiPitch {
-  u8 rootKey = 72;
-  s16 fineTuneCents = 0;
-  Tuning aggregate;
-};
-
-[[nodiscard]] KonamiPitch konamiPitch(const KonamiSnesInstrumentInfo& info) {
+[[nodiscard]] double konamiUnityKey(const KonamiSnesInstrumentInfo& info) {
   // The key byte is the whole-number part of pitch and tuning is its fractional
   // part. Join them before doing arithmetic so negative fractions keep their
   // intended value.
@@ -177,11 +171,7 @@ struct KonamiPitch {
     root += static_cast<int>(info.percussionNote) - kPercussionBaseNote;
   }
   const auto fineTuneCents = static_cast<s16>(std::lround(fine * 100.0));
-  return KonamiPitch{
-      .rootKey = static_cast<u8>(std::clamp(root, 0, 127)),
-      .fineTuneCents = fineTuneCents,
-      .aggregate = Tuning{.cents = static_cast<s32>((root - 72) * 100 + fineTuneCents)},
-  };
+  return std::clamp(root, 0, 127) - (fineTuneCents / 100.0);
 }
 
 [[nodiscard]] double attenuationFromVolume(u8 volume) {
@@ -323,11 +313,9 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
                 info.percussion ? "konami-snes-percussion-instrument" : "konami-snes-instrument")
         .parent(root);
 
-    const auto pitch = konamiPitch(info);
+    const double unityKey = konamiUnityKey(info);
     Region region{
-        .tuning = pitch.aggregate,
-        .rootKey = pitch.rootKey,
-        .fineTuneCents = pitch.fineTuneCents,
+        .unityKey = unityKey,
         // ADSR1 bit 7 chooses the DSP's ADSR envelope. When clear, the driver
         // uses GAIN behavior that cannot be represented as the same envelope.
         .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, info.gain) : Envelope{},

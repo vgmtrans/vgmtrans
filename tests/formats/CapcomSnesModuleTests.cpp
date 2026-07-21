@@ -372,7 +372,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   const auto* dialect = session.dialects().find(sequence->program.dialect.value);
   expect(dialect != nullptr, "registered dialect should interpret the scanned sequence program");
-  expect(dialect->usesSemanticScheduler(), "CapcomSnes should use the global semantic scheduler path");
+  expect(dialect->execute != nullptr, "CapcomSnes should register a compiled command executor");
   const auto& firstTrack = sequence->program.tracks[0];
   expect(firstTrack.commands.size() == 8, "track should decode all fixture commands");
   constexpr std::array<std::string_view, 8> expectedCommandDetailKinds{
@@ -383,9 +383,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
     expect(commandDetailKind(project.sourceMap(), firstTrack.commands[index]) == expectedCommandDetailKinds[index],
            "track should decode command " + std::to_string(index));
   }
-  expect(firstTrack.commandBytes.empty(), "compiled CapcomSnes tracks should not retain a command-byte pool");
-  expect(firstTrack.commands[0].semantic() && firstTrack.commands[0].opcode == 0x05,
-         "CapcomSnes tempo should be a byte-free compiled command");
+  expect(firstTrack.commands[0].opcode == 0x05,
+         "CapcomSnes tempo should be a compiled command with source metadata");
   const SemanticOperand* tempo = semanticOperand(firstTrack.commands[0], "microseconds_per_quarter");
   expect(tempo != nullptr && std::get<u64>(tempo->value) == 42191 && tempo->encodedValue &&
              std::get<u64>(*tempo->encodedValue) == 0x1234,
@@ -403,7 +402,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(programInstrumentLink != programAnnotation.links.end(),
          "program command should record its instrument reference as a source annotation link");
   const auto* programInstrument = std::get_if<ObjectRef>(&programInstrumentLink->target);
-  expect(programInstrument != nullptr && programInstrument->kind == ObjectKind::Instrument &&
+  expect(programInstrument != nullptr && programInstrument->kind == ObjectKind::InstrumentIndex &&
              !programInstrument->asset.valid() && programInstrument->index0 == 0,
          "program source link should preserve the unresolved source instrument identity");
   expect(programAnnotation.range.offset == 0x3003 && programAnnotation.range.size == 2,
@@ -629,10 +628,14 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instrument.regions[0].range.offset == 0x4000 && instrument.regions[0].range.size == 6,
          "region should preserve the instrument header source range");
   const auto& envelope = instrument.regions[0].envelope;
-  expect(envelope.attack == 63, "instrument envelope should convert SNES attack to microseconds");
-  expect(envelope.decay == kEnvelopeInfinite, "instrument envelope should preserve infinite SNES sustain decay");
-  expect(envelope.sustain == 1000, "instrument envelope should convert SNES sustain to a linear amplitude level");
-  expect(envelope.release == 0, "instrument envelope should match Capcom legacy gain-based release handling");
+  expect(envelope.attackSeconds && std::abs(*envelope.attackSeconds - 0.0000625) < 0.000001,
+         "instrument envelope should convert SNES attack to seconds");
+  expect(envelope.decaySeconds && std::isinf(*envelope.decaySeconds),
+         "instrument envelope should preserve infinite SNES sustain decay");
+  expect(envelope.sustainAmplitude == 1.0,
+         "instrument envelope should convert SNES sustain to linear amplitude");
+  expect(envelope.releaseSeconds == 0.0,
+         "instrument envelope should match Capcom legacy gain-based release handling");
   expect(instrument.modulation.vibrato.has_value(), "instrument should describe Capcom vibrato");
   expect(instrument.modulation.vibrato->maxDepthCents == 1200.0 &&
              instrument.modulation.vibrato->rateHertz.minimum == kCapcomSnesLfoStepHertz &&

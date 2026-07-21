@@ -274,6 +274,12 @@ void Session::rebuildCollections() {
     try {
       auto desired = module.resolveCollections(context);
       if (module.materializeCollection != nullptr) {
+        // Materializers are format code and may fail on any collection. Apply
+        // the resolver's whole batch to copies first so one late failure cannot
+        // publish earlier derived assets, annotations, or diagnostics.
+        auto stagedAssets = assets_;
+        auto stagedSourceMaps = sourceMaps_;
+        std::vector<Diagnostic> stagedDiagnostics;
         std::vector<DesiredCollection> materializedDesired;
         std::set<std::string> activeMaterializedKeys;
         for (auto& collection : desired) {
@@ -287,26 +293,30 @@ void Session::rebuildCollections() {
               .ids = ids_,
               .assetIdForSlot =
                   [&](std::string_view slot) {
-                    return assets_.materializedAssetId(resolverId, collection.key, slot, ids_);
+                    return stagedAssets.materializedAssetId(resolverId, collection.key, slot, ids_);
                   },
           };
           auto result = module.materializeCollection(materialization);
-          diagnostics_.append(std::move(result.diagnostics));
+          stagedDiagnostics.insert(stagedDiagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
+                                   std::make_move_iterator(result.diagnostics.end()));
           std::vector<AssetId> materializedAssetIds;
           materializedAssetIds.reserve(result.assets.size());
           for (auto& asset : result.assets) {
             materializedAssetIds.push_back(metadata(asset.asset).id);
             activeMaterializedKeys.insert(
-                assets_.upsertMaterializedAsset(resolverId, collection.key, asset.slot, std::move(asset.asset)));
+                stagedAssets.upsertMaterializedAsset(resolverId, collection.key, asset.slot, std::move(asset.asset)));
           }
           // A rebuilt derived asset keeps its ID but may point at different
           // source records, so its old annotations must not accumulate.
-          sourceMaps_.replaceForAssets(materializedAssetIds, std::move(result.sourceMap));
+          stagedSourceMaps.replaceForAssets(materializedAssetIds, std::move(result.sourceMap));
           materializedDesired.push_back(std::move(result.collection));
         }
         const auto removedMaterializedAssets =
-            assets_.removeStaleMaterializedAssets(resolverId, activeMaterializedKeys);
-        sourceMaps_.removeForAssets(removedMaterializedAssets);
+            stagedAssets.removeStaleMaterializedAssets(resolverId, activeMaterializedKeys);
+        stagedSourceMaps.removeForAssets(removedMaterializedAssets);
+        assets_ = std::move(stagedAssets);
+        sourceMaps_ = std::move(stagedSourceMaps);
+        diagnostics_.append(std::move(stagedDiagnostics));
         desired = std::move(materializedDesired);
       }
       desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),

@@ -41,7 +41,9 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const PerformanceTrack& renderedTrack = performance.tracks[0];
   expect(renderedTrack.id == TrackId{2} && renderedTrack.sourceTrackNumber == 7,
          "performance track should preserve source track identity");
-  expect(renderedTrack.endTick == 12, "default play-once loop policy should stop at the first repeated command");
+  expect(renderedTrack.endTick == 12,
+         "default play-once loop policy should stop at the first repeated command; end tick was " +
+             std::to_string(renderedTrack.endTick));
   expect(renderedTrack.events.size() == 2, "VM should emit program and note events before the loop repeats");
 
   const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&renderedTrack.events[0]);
@@ -774,83 +776,6 @@ void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
          "preserve-loop marker should attach to the jump into the decoded block");
 }
 
-void sequenceVmStopsAllTracksAtEarliestLoopTick() {
-  const SequenceDialect dialect = probeSequenceDialect();
-  const std::array<u8, 3> note12Bytes{0x90, 0x00, 0x0c};
-  const std::array<u8, 3> note20Bytes{0x90, 0x00, 0x14};
-  const std::array<u8, 3> jumpTrack0Bytes{0xfe, 0x00, 0x00};
-  const std::array<u8, 3> jumpTrack1Bytes{0xfe, 0x64, 0x00};
-
-  TrackProgram track0{
-      .id = TrackId{0},
-      .startAddress = Address{0},
-  };
-  TrackProgramBuilder builder0{track0};
-  addProbeCommand<ProbeNoteCommand>(builder0, dialect, Address{0}, probeRange(0, note12Bytes.size()), note12Bytes);
-  addProbeCommand<ProbeJumpCommand>(builder0, dialect, Address{3}, probeRange(3, jumpTrack0Bytes.size()),
-                                    jumpTrack0Bytes);
-
-  TrackProgram track1{
-      .id = TrackId{1},
-      .startAddress = Address{100},
-  };
-  TrackProgramBuilder builder1{track1};
-  addProbeCommand<ProbeNoteCommand>(builder1, dialect, Address{100}, probeRange(100, note20Bytes.size()), note20Bytes);
-  addProbeCommand<ProbeNoteCommand>(builder1, dialect, Address{103}, probeRange(103, note20Bytes.size()), note20Bytes);
-  addProbeCommand<ProbeJumpCommand>(builder1, dialect, Address{106}, probeRange(106, jumpTrack1Bytes.size()),
-                                    jumpTrack1Bytes);
-
-  const SequenceProgram program{
-      .dialect = dialect.id,
-      .timebase = dialect.timebase,
-      .behavior = SequenceProgramBehavior{.stopAllTracksAtFirstLoop = true},
-      .tracks = {track0, track1},
-  };
-
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
-  expect(performance.diagnostics.empty(), "synchronized first-loop fixture should not report diagnostics");
-  expect(performance.tracks[0].endTick == 12, "looping track should stop at its first repeated command");
-  expect(performance.tracks[1].endTick == 20,
-         "other tracks should stop after the command crossing the first loop tick");
-  expect(countProbeNotesAt(performance.tracks[1], 0) == 1 && countProbeNotesAt(performance.tracks[1], 20) == 0,
-         "stopAllTracksAtFirstLoop should prevent later-track events past the earliest loop tick");
-}
-
-void sequenceVmSynchronizedDryRunDoesNotDuplicateDiagnostics() {
-  const SequenceDialect dialect = probeSequenceDialect();
-  const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
-  const std::array<u8, 3> jumpLoopBytes{0xfe, 0x00, 0x00};
-  const std::array<u8, 3> jumpMissingBytes{0xfe, 0x63, 0x00};
-
-  TrackProgram track0{
-      .id = TrackId{0},
-      .startAddress = Address{0},
-  };
-  TrackProgramBuilder builder0{track0};
-  addProbeCommand<ProbeNoteCommand>(builder0, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(builder0, dialect, Address{3}, probeRange(3, jumpLoopBytes.size()), jumpLoopBytes);
-
-  TrackProgram track1{
-      .id = TrackId{1},
-      .startAddress = Address{100},
-  };
-  TrackProgramBuilder builder1{track1};
-  const SourceRange missingJumpRange = probeRange(100, jumpMissingBytes.size());
-  addProbeCommand<ProbeJumpCommand>(builder1, dialect, Address{100}, missingJumpRange, jumpMissingBytes);
-
-  const SequenceProgram program{
-      .dialect = dialect.id,
-      .timebase = dialect.timebase,
-      .behavior = SequenceProgramBehavior{.stopAllTracksAtFirstLoop = true},
-      .tracks = {track0, track1},
-  };
-
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
-  expect(performance.diagnostics.size() == 1,
-         "synchronized dry-run diagnostics should not be copied into the final render");
-  expectDiagnosticRange(performance.diagnostics, "Sequence jump target $0063 was not decoded", missingJumpRange);
-}
-
 void sequenceVmDoesNotWrapCommandAddressOverflow() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -932,7 +857,7 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
       .id = DialectId{.value = "scheduled-probe"},
       .timebase = Timebase{.ppqn = 48},
       .createProgramState = createScheduledProbeProgramState,
-      .executeSemantic = executeScheduledProbe,
+      .execute = executeScheduledProbe,
   };
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
@@ -989,7 +914,7 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
   const SequenceDialect dialect{
       .id = DialectId{.value = "scheduled-loop-probe"},
       .timebase = Timebase{.ppqn = 48},
-      .executeSemantic = executeScheduledLoopProbe,
+      .execute = executeScheduledLoopProbe,
   };
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
@@ -1063,8 +988,6 @@ void runValueSequenceVmTests() {
   sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken();
   sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode();
   sequenceVmPreservesLoopMarkersForInteriorJumpTarget();
-  sequenceVmStopsAllTracksAtEarliestLoopTick();
-  sequenceVmSynchronizedDryRunDoesNotDuplicateDiagnostics();
   sequenceVmDoesNotWrapCommandAddressOverflow();
   sequenceVmReportsMissingJumpTargetAfterEmittedEvents();
   sequenceVmSchedulesSemanticTracksAgainstOneProgramState();

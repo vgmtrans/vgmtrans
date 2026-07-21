@@ -1164,7 +1164,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       // all tracks, so collect its limits with normal playback scheduling.
       // Later vibrato is independent of tempo; visiting each decoded command
       // once also includes valid blocks that a particular playthrough skips.
-      .semanticPrepass =
+      .prepass =
           vibrato::usesLegacy(version) ? SemanticPrepassMode::ScheduledPlayback : SemanticPrepassMode::DecodedCommands,
   });
 }

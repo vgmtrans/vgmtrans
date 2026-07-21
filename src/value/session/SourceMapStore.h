@@ -18,6 +18,7 @@ namespace vgmtrans::core {
 // snapshot.
 class SourceMapStore {
 public:
+  void validateAppend(const SourceMap& sourceMap) const;
   void append(SourceMap sourceMap);
   void removeForSources(const std::vector<SourceId>& sources);
   void replaceForAssets(const std::vector<AssetId>& assets, SourceMap sourceMap);

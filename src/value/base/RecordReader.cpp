@@ -31,9 +31,10 @@ namespace {
 
 }  // namespace
 
-RecordReader::RecordReader(ByteReader reader, u32 offset, u32 end, std::vector<Diagnostic>* diagnostics)
+RecordReader::RecordReader(ByteReader reader, u32 offset, u32 end, std::vector<Diagnostic>* diagnostics,
+                           bool captureFields)
     : reader_(reader), begin_(offset), position_(offset), end_(static_cast<u32>(std::min<u64>(end, reader.size()))),
-      diagnostics_(diagnostics) {
+      diagnostics_(diagnostics), captureFields_(captureFields) {
 }
 
 RangedValue<::u8> RecordReader::u8(std::string_view name, SourceValueDisplay display) {
@@ -317,6 +318,9 @@ std::optional<u32> RecordReader::requireAt(u32 relativeOffset, u32 size, std::st
 }
 
 void RecordReader::field(std::string_view name, SourceRange range, SourceValue value, SourceValueDisplay display) {
+  if (!captureFields_) {
+    return;
+  }
   fields_.push_back(SourceField{
       .name = std::string(name),
       .range = range,

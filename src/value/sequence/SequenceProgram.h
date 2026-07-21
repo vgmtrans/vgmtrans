@@ -28,11 +28,6 @@ struct DialectId {
   friend bool operator==(const DialectId&, const DialectId&) noexcept = default;
 };
 
-struct ByteSpan {
-  u32 offset = 0;
-  u32 size = 0;
-};
-
 // Where decoding can continue after an opcode. Walkers use this before playback
 // so jumps and calls can point at commands that have already been decoded.
 struct DecodeFlow {
@@ -149,10 +144,9 @@ struct SemanticOperand {
 
 [[nodiscard]] SourceValue semanticOperandSourceValue(const SemanticOperandValue& value);
 
-// One decoded source opcode. Complete compiler-cursor commands retain metadata,
-// discovery flow, and source-free execution data, but no command bytes. Legacy
-// commands retain bytes until their formats are migrated. A truncated compiled
-// command may retain partial bytes for diagnostics, never for execution.
+// One decoded source opcode. Commands retain source metadata, discovery flow,
+// and source-free execution data. Encoded bytes remain in SourceStore and are
+// reached through range when a view needs them.
 struct SourceCommand {
   CommandId id;
   u8 opcode = 0;
@@ -160,14 +154,9 @@ struct SourceCommand {
   u32 encodedSize = 0;
   SourceRange range;
   SourceAnnotationId annotation;
-  ByteSpan bytes;
   std::vector<SemanticOperand> operands;
   DecodeFlow flow;
   CommandExecution execution;
-
-  // Builders require legacy commands to have bytes. Their absence therefore
-  // identifies a semantic command without another tag or command-kind enum.
-  [[nodiscard]] bool semantic() const noexcept { return bytes.size == 0; }
 };
 
 // Operand names are presentation vocabulary for source inspection and analysis.
@@ -190,11 +179,6 @@ struct TrackProgram {
   std::vector<SourceCommand> commands;
   AddressIndex addressIndex;
 
-  // Command bytes are pooled at track scope so the parsed snapshot avoids one
-  // heap allocation per command.
-  std::vector<u8> commandBytes;
-
-  [[nodiscard]] std::span<const u8> bytesFor(const SourceCommand& command) const;
 };
 
 // Driver settings that affect playback but are not individual source commands,
@@ -203,17 +187,13 @@ struct SequenceProgramBehavior {
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
   // Zero means "use the next default": program -> dialect -> VM fallback.
   u32 commandLimit = 0;
-  // Some legacy drivers rely on channel defaults that are not source opcodes.
-  // Keep them in behavior so formats opt in explicitly and exporters can emit
-  // stable initialization without attaching it to a fake source command.
+  // Some drivers rely on channel defaults that are not source opcodes. Keep
+  // them in behavior so formats opt in explicitly and exporters can emit stable
+  // initialization without attaching it to a fake source command.
   std::optional<double> initialLevel;
   std::optional<double> initialReverbSend;
   std::optional<u8> initialMonoModeChannels;
   std::optional<u8> initialPitchBendRangeSemitones;
-  // Some tick-by-tick drivers stop every track as soon as any track exhausts
-  // the export loop budget. Formats opt in when that global stop is part of
-  // the source driver's playback model.
-  bool stopAllTracksAtFirstLoop = false;
 };
 
 // Driver/profile selection belongs to the parsed program, not the registered
@@ -243,8 +223,6 @@ class TrackProgramBuilder {
 public:
   explicit TrackProgramBuilder(TrackProgram& track);
 
-  const SourceCommand& addDecoded(Address address, SourceRange range, std::span<const u8> bytes,
-                                  SourceAnnotationId annotation = {}, DecodeFlow flow = {});
   const SourceCommand& addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
                                    std::vector<SemanticOperand> operands, DecodeFlow flow,
                                    SourceAnnotationId annotation = {}, CommandExecution execution = {});

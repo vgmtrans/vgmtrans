@@ -356,9 +356,9 @@ void emitPitchDepthModulation(Playback& playback, ModulationPerformanceTarget ta
 }
 
 template <class Playback>
-void emitVibratoRate(Playback& playback, double amount, double hertz) {
+void emitModulationRate(Playback& playback, ModulationPerformanceTarget target, double amount, double hertz) {
   playback.out.modulation(ModulationPerformanceEvent{
-      .target = ModulationPerformanceTarget::VibratoRate,
+      .target = target,
       .amount = amount,
       .frequencyHz = hertz,
   });
@@ -680,7 +680,13 @@ public:
     }
 
     Event& emitVibratoRate(auto amount, auto hertz) {
-      return append<&detail::emitVibratoRate<Playback>>(std::move(amount), std::move(hertz));
+      return append<&detail::emitModulationRate<Playback>>(ModulationPerformanceTarget::VibratoRate,
+                                                           std::move(amount), std::move(hertz));
+    }
+
+    Event& emitTremoloRate(auto amount, auto hertz) {
+      return append<&detail::emitModulationRate<Playback>>(ModulationPerformanceTarget::TremoloRate,
+                                                           std::move(amount), std::move(hertz));
     }
 
     Event& emitPortamentoEnable(auto enabled) {
@@ -869,7 +875,7 @@ public:
 
   CompilerCursor(ByteReader reader, u32 begin, u32 end, std::string_view detailKindPrefix,
                  std::vector<Diagnostic>* diagnostics = nullptr)
-      : record_(reader, begin, end, diagnostics), detailKindPrefix_(detailKindPrefix), diagnostics_(diagnostics) {
+      : record_(reader, begin, end, diagnostics, false), detailKindPrefix_(detailKindPrefix), diagnostics_(diagnostics) {
     const auto opcode = record_.u8("opcode", SourceValueDisplay::Hex);
     if (opcode) {
       opcode_ = *opcode;
@@ -982,15 +988,10 @@ private:
         .range = record_.range(),
         .opcode = opcode_,
         .encodedSize = std::max<u32>(1, record_.size()),
-        .bytes = truncated ? std::vector<::u8>{record_.bytes().begin(), record_.bytes().end()} : std::vector<::u8>{},
         .flow = std::move(flow),
         .operands = std::move(operands_),
         .execution = std::move(execution),
         .presentation = std::move(presentation),
-        // Partial bytes are diagnostic source data only. No compiled executor
-        // receives them, and every valid command remains completely source-free.
-        .retainBytes = truncated,
-        .truncated = truncated,
     };
   }
 
@@ -1109,13 +1110,13 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
 [[nodiscard]] SequenceDialect makeCompiledDialect(SequenceDialect dialect) {
   using Compiled = CompiledCommandDialect<TrackState, Playback, ProgramState>;
   dialect.createProgramState = Compiled::createProgramState;
-  dialect.createSemanticTrackState = Compiled::createTrackState;
-  dialect.executeSemantic = Compiled::execute;
+  dialect.createTrackState = Compiled::createTrackState;
+  dialect.execute = Compiled::execute;
   if constexpr (requires(Playback& playback) { playback.tick(); }) {
-    dialect.tickSemantic = Compiled::tick;
+    dialect.tick = Compiled::tick;
   }
   if constexpr (requires(ProgramState& state) { state.finishPrepass(); }) {
-    dialect.finishSemanticPrepass = Compiled::finishPrepass;
+    dialect.finishPrepass = Compiled::finishPrepass;
   }
   return dialect;
 }

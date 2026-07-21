@@ -54,6 +54,9 @@ enum class ObjectKind : u8 {
   Instrument,
   Region,
   Sample,
+  InstrumentIndex,
+  InstrumentProgram,
+  SampleIndex,
   Misc,
 };
 
@@ -92,7 +95,6 @@ struct RangedValue {
   [[nodiscard]] explicit operator bool() const noexcept { return valid; }
   [[nodiscard]] const T& operator*() const noexcept { return value; }
   [[nodiscard]] T& operator*() noexcept { return value; }
-  [[nodiscard]] operator T() const noexcept { return value; }
 };
 
 enum class Severity {

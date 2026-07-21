@@ -13,6 +13,7 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <variant>
 
@@ -123,6 +124,50 @@ void validateSourceMapReferences(ValidationReport& report, const SourceMap& sour
             "Scan result contained source annotation link to missing annotation id " + std::to_string(target->value),
             annotation.range);
       }
+    }
+  }
+}
+
+void validateSourceMapParentCycles(ValidationReport& report, const SourceMap& sourceMap) {
+  std::unordered_map<u32, const SourceAnnotation*> annotations;
+  annotations.reserve(sourceMap.annotations().size());
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (annotation.id.valid()) {
+      annotations.emplace(annotation.id.value, &annotation);
+    }
+  }
+
+  // 1 means the annotation is on the current parent path; 2 means its entire
+  // parent chain has already been checked.
+  std::unordered_map<u32, u8> state;
+  state.reserve(annotations.size());
+  for (const auto& [rootId, root] : annotations) {
+    if (state[rootId] == 2) {
+      continue;
+    }
+
+    std::vector<u32> path;
+    const SourceAnnotation* current = root;
+    while (current != nullptr) {
+      const u32 id = current->id.value;
+      if (state[id] == 1) {
+        report.error("scan.source-annotation.parent-cycle",
+                     "Scan result contained a cycle in source annotation parents", current->range);
+        break;
+      }
+      if (state[id] == 2) {
+        break;
+      }
+      state[id] = 1;
+      path.push_back(id);
+      if (!current->parent) {
+        break;
+      }
+      const auto parent = annotations.find(current->parent->value);
+      current = parent != annotations.end() ? parent->second : nullptr;
+    }
+    for (const u32 id : path) {
+      state[id] = 2;
     }
   }
 }
@@ -242,6 +287,7 @@ ValidationReport validateScanCommit(const ScanCommit& commit, const SourceStore&
   validateExtractedSources(report, commit, sources);
   validateSourceMapRanges(report, sources, commit.sourceMap);
   validateSourceMapReferences(report, commit.sourceMap);
+  validateSourceMapParentCycles(report, commit.sourceMap);
   validateDiagnosticAnnotationReferences(report, commit.diagnostics, commit.sourceMap);
 
   std::unordered_set<u32> batchAssetIds;

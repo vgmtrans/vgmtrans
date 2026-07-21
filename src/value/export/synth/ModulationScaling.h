@@ -10,7 +10,50 @@
 #include "value/synth/SynthModel.h"
 #include "value/export/ExportPolicy.h"
 
+#include <optional>
+#include <vector>
+
 namespace vgmtrans::core {
+
+// Export-lowering vocabulary. These records are deliberately outside the
+// synth model: format authors describe physical modulation there, and only
+// exporters need routing destinations and controller sources.
+enum class SynthDestination {
+  Pitch,
+  FilterCutoff,
+  VolumeAttenuation,
+  Pan,
+  VibratoDepth,
+  VibratoRate,
+  VibratoDelay,
+  TremoloDepth,
+  TremoloRate,
+  TremoloDelay,
+  Unknown,
+};
+
+enum class SynthSource {
+  NoteOnVelocity,
+  KeyNumber,
+  Lfo,
+  Envelope,
+  MidiController,
+  ChannelPressure,
+  PolyPressure,
+  PitchWheel,
+  Unknown,
+};
+
+struct SynthGenerator {
+  SynthDestination destination = SynthDestination::Unknown;
+  s32 amount = 0;
+};
+
+struct SynthModulator {
+  std::optional<SynthSource> source;
+  SynthDestination destination = SynthDestination::Unknown;
+  s32 amount = 0;
+};
 
 struct LoweredSynthModulation {
   std::vector<SynthGenerator> generators;

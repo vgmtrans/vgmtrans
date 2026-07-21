@@ -36,15 +36,8 @@ const InstrumentModulation kCapcomModulation{
         },
 };
 
-struct InstrumentPitch {
-  Tuning tuning;
-  u8 rootKey = 96;
-  s16 fineTuneCents = 0;
-};
-
-// Converts Capcom's pitch scale into the root key and fine tuning used by the
-// shared instrument model.
-[[nodiscard]] InstrumentPitch capcomInstrumentPitch(s16 pitchScale) {
+// Converts Capcom's pitch scale into an exact sample unity key.
+[[nodiscard]] double capcomInstrumentUnityKey(s16 pitchScale) {
   constexpr int baseUnityKey = 96;
   constexpr double referencePitch = 0x10b0 / 4096.0;
 
@@ -62,11 +55,7 @@ struct InstrumentPitch {
   }
 
   const int rootKey = baseUnityKey - coarse;
-  return InstrumentPitch{
-      .tuning = Tuning{.cents = (rootKey - baseUnityKey) * 100 + fine},
-      .rootKey = static_cast<u8>(std::clamp(rootKey, 0, 127)),
-      .fineTuneCents = static_cast<s16>(fine),
-  };
+  return std::clamp(rootKey, 0, 127) - (fine / 100.0);
 }
 
 // Converts Capcom's ADSR and gain bytes into the shared envelope model.
@@ -76,7 +65,6 @@ struct InstrumentPitch {
   const u8 sustainLevel = adsr2 >> 5;
   const auto releaseStartEnvelopeLevel = static_cast<s16>((sustainLevel << 8) | 0xff);
   const double releaseSeconds = snesDspGainEnvelopeSeconds(gain, releaseStartEnvelopeLevel, 0);
-  envelope.release = static_cast<u32>(std::lround(std::max(0.0, releaseSeconds) * 1'000'000.0));
   envelope.releaseSeconds = releaseSeconds;
   return envelope;
 }
@@ -161,7 +149,7 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
     if (!sample) {
       continue;
     }
-    const auto pitch = capcomInstrumentPitch(info.pitchScale);
+    const double unityKey = capcomInstrumentUnityKey(info.pitchScale);
     const SourceRange range = info.source.range;
     const std::string name = fmt::format("Instrument {}", info.index);
 
@@ -180,9 +168,7 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
     instrument
         .region(*sample,
                 Region{
-                    .tuning = pitch.tuning,
-                    .rootKey = pitch.rootKey,
-                    .fineTuneCents = pitch.fineTuneCents,
+                    .unityKey = unityKey,
                     .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
                 })
         .source("Region", range, "capcom-snes-region")

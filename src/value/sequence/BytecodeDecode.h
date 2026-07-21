@@ -41,13 +41,10 @@ struct DecodedBytecodeCommand {
   SourceAnnotationId annotation;
   u8 opcode = 0;
   u32 encodedSize = 0;
-  std::vector<u8> bytes;
   DecodeFlow flow;
   std::vector<SemanticOperand> operands;
   CommandExecution execution;
   DecodedCommandPresentation presentation;
-  bool retainBytes = true;
-  bool truncated = false;
 };
 
 // A source field whose encoded value is replaced by an interpreted value in
@@ -62,27 +59,12 @@ struct EncodedSemanticField {
   bool valid = false;
 };
 
-struct BytecodeDecodeContext {
-  // bytecodeEnd is the first offset the decoder must not read. sequenceEnd can be
-  // smaller when a driver stores several sequences in one larger byte buffer.
-  u32 bytecodeEnd = std::numeric_limits<u32>::max();
-  u32 sequenceOffset = 0;
-  u32 sequenceEnd = std::numeric_limits<u32>::max();
-  std::optional<SourceAnnotationId> parentAnnotation;
-  SourceMapBuilder* sourceMap = nullptr;
-  std::vector<Diagnostic>* diagnostics = nullptr;
-};
-
-// Transitional per-track input for the old cursor adapters. New format
-// decoders keep shared discovery settings in a TrackDecodeScope and
-// format-specific values in their own sequence context.
+// Per-track source discovery settings shared by format decoders.
 struct TrackDecodeInput {
   std::optional<AssetId> sequenceAsset;
   u32 trackIndex = 0;
   u32 startOffset = 0;
   u32 bytecodeEnd = std::numeric_limits<u32>::max();
-  u32 sequenceOffset = 0;
-  u32 sequenceEnd = std::numeric_limits<u32>::max();
   std::optional<SourceAnnotationId> parentAnnotation;
   SourceMapBuilder* sourceMap = nullptr;
   std::vector<Diagnostic>* diagnostics = nullptr;
@@ -95,12 +77,8 @@ struct TrackDecodeInput {
 
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
                                          u32 offset) {
-  if (!decoded.retainBytes) {
-    builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.operands,
-                        decoded.flow, decoded.annotation, decoded.execution);
-    return;
-  }
-  builder.addDecoded(Address{offset}, decoded.range, decoded.bytes, decoded.annotation, decoded.flow);
+  builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.operands,
+                      decoded.flow, decoded.annotation, decoded.execution);
 }
 
 // Shared limits for walking source bytecode. Formats still decide what each opcode means.

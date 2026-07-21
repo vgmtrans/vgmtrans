@@ -14,7 +14,7 @@
 #include "value/base/LevelScale.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
-#include "value/sequence/SequenceCursorDialect.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SampleDecoder.h"
@@ -683,10 +683,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
-struct ProbeSequenceContext {
-  double linearVelocity = 0.75;
-};
-
 struct ProbeTrackState {
   u32 program = 0;
 };
@@ -749,83 +745,100 @@ struct ProbeEndCommand {
   static constexpr std::string_view name = "End";
 };
 
-struct ProbeCursorReader {
-  template <class Runtime>
-  static CommandFlow read(Runtime& rt, VmCommandCursor& cmd) {
-    switch (cmd.opcode()) {
-      case 0x80:
-        cmd.name(ProbeProgramCommand::name, SequenceSemantic::Program).kind("program");
-        rt.state.program = cmd.u8("program");
-        rt.instrument(0, rt.state.program);
-        return cmd.next();
-      case 0x90: {
-        cmd.name(ProbeNoteCommand::name, SequenceSemantic::Note).kind("note");
-        const u8 key = cmd.u8("key");
-        const u8 duration = cmd.u8("duration");
-        rt.note(static_cast<double>(rt.state.program * 12 + key), rt.context.linearVelocity, duration);
-        return cmd.wait(duration);
-      }
-      case 0xfe:
-        return cmd.name(ProbeJumpCommand::name, SequenceSemantic::Jump, ProbeJumpCommand::playbackStatus)
-            .kind("jump")
-            .jump(cmd.address16le("destination"));
-      case 0xfb:
-        return cmd.name(ProbeDeclaredLoopCommand::name, SequenceSemantic::Loop, ProbeDeclaredLoopCommand::playbackStatus)
-            .kind("declared-loop")
-            .declaredLoop(cmd.address16le("destination"));
-      case 0xfc:
-        return cmd.name(ProbeLoopCandidateCommand::name, SequenceSemantic::Loop,
-                        ProbeLoopCandidateCommand::playbackStatus)
-            .kind("loop-candidate")
-            .loopCandidate(cmd.address16le("destination"));
-      case 0xc0:
-        return cmd.name(ProbeCallCommand::name, SequenceSemantic::Call, ProbeCallCommand::playbackStatus)
-            .kind("call")
-            .call(cmd.address16le("destination"));
-      case 0xfd:
-        return cmd.name(ProbeReturnCommand::name, SequenceSemantic::Return, ProbeReturnCommand::playbackStatus)
-            .kind("return")
-            .ret();
-      case 0xf0: {
-        cmd.name(ProbeRepeatCommand::name, SequenceSemantic::Loop, ProbeRepeatCommand::playbackStatus).kind("repeat");
-        const u8 slot = cmd.u8("slot");
-        const u8 count = cmd.u8("count");
-        const Address destination = cmd.address16le("destination");
-        return rt.countedRepeatUntil(cmd, slot, count, destination);
-      }
-      case 0xf1: {
-        cmd.name(ProbeRepeatBreakCommand::name, SequenceSemantic::Loop, ProbeRepeatBreakCommand::playbackStatus)
-            .kind("repeat-break");
-        const u8 slot = cmd.u8("slot");
-        const Address destination = cmd.address16le("destination");
-        const RepeatBreakFlow branch = rt.countedRepeatBreak(cmd, slot, destination);
-        if (branch.taken()) {
-          rt.instrument(0, 99);
-        }
-        return branch;
-      }
-      case 0xff:
-        return cmd.name(ProbeEndCommand::name, SequenceSemantic::Unknown, ProbeEndCommand::playbackStatus)
-            .kind("end")
-            .end();
-      default:
-        return cmd.name("Unsupported Opcode", SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported)
-            .kind("unsupported")
-            .unsupported("Unsupported probe opcode")
-            .end();
+struct ProbePlayback {
+  ProbeTrackState& track;
+  PerformanceEmitter& out;
+  VmApi& vm;
+
+  Effects note(u8 key, u32 duration) {
+    out.note(static_cast<double>(track.program * 12 + key), 0.5, duration);
+    return Effects::wait(duration);
+  }
+
+  Effects repeatBreak(u8 slot, Address destination) {
+    const BranchResult branch = vm.countedRepeatBreak(slot, destination);
+    if (branch.taken) {
+      out.instrument(0, 99);
     }
+    return branch.effects;
   }
 };
 
+using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
+
+[[nodiscard]] DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin) {
+  ProbeCompilerCursor cursor(reader, begin, "probe");
+  if (!cursor.hasOpcode()) {
+    return cursor.truncated();
+  }
+
+  switch (cursor.opcode()) {
+    case 0x80: {
+      auto event = cursor.command(ProbeProgramCommand::name, SequenceSemantic::Program, {}, "program");
+      event.set<&ProbeTrackState::program>(event.u8("program"));
+      return event.emitInstrument(0, event.state<&ProbeTrackState::program>());
+    }
+    case 0x90: {
+      auto event = cursor.command(ProbeNoteCommand::name, SequenceSemantic::Note, {}, "note");
+      const u8 key = event.u8("key");
+      const u8 duration = event.u8("duration");
+      return event.invoke<&ProbePlayback::note>(key, duration);
+    }
+    case 0xfe: {
+      auto event = cursor.command(ProbeJumpCommand::name, SequenceSemantic::Jump,
+                                  ProbeJumpCommand::playbackStatus, "jump");
+      return event.jump(event.addressLe("destination"));
+    }
+    case 0xfb: {
+      auto event = cursor.command(ProbeDeclaredLoopCommand::name, SequenceSemantic::Loop,
+                                  ProbeDeclaredLoopCommand::playbackStatus, "declared-loop");
+      return event.declaredLoop(event.addressLe("destination"));
+    }
+    case 0xfc: {
+      auto event = cursor.command(ProbeLoopCandidateCommand::name, SequenceSemantic::Loop,
+                                  ProbeLoopCandidateCommand::playbackStatus, "loop-candidate");
+      return event.loopCandidate(event.addressLe("destination"));
+    }
+    case 0xc0: {
+      auto event = cursor.command(ProbeCallCommand::name, SequenceSemantic::Call,
+                                  ProbeCallCommand::playbackStatus, "call");
+      return event.call(event.addressLe("destination"));
+    }
+    case 0xfd:
+      return cursor.command(ProbeReturnCommand::name, SequenceSemantic::Return,
+                            ProbeReturnCommand::playbackStatus, "return")
+          .return_();
+    case 0xf0: {
+      auto event = cursor.command(ProbeRepeatCommand::name, SequenceSemantic::Loop,
+                                  ProbeRepeatCommand::playbackStatus, "repeat");
+      const u8 slot = event.u8("slot");
+      const u8 count = event.u8("count");
+      const Address destination = event.addressLe("destination");
+      return event.repeatUntil(slot, count, destination);
+    }
+    case 0xf1: {
+      auto event = cursor.command(ProbeRepeatBreakCommand::name, SequenceSemantic::Loop,
+                                  ProbeRepeatBreakCommand::playbackStatus, "repeat-break");
+      const u8 slot = event.u8("slot");
+      const Address destination = event.addressLe("destination");
+      return event.invoke<&ProbePlayback::repeatBreak>(slot, destination).mayBranchTo(destination);
+    }
+    case 0xff:
+      return cursor.command(ProbeEndCommand::name, SequenceSemantic::End,
+                            ProbeEndCommand::playbackStatus, "end")
+          .end();
+    default:
+      return cursor.unsupported("Unsupported Opcode").stop();
+  }
+}
+
 [[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior = {}) {
-  return makeCursorDialect<ProbeTrackState, ProbeSequenceContext, ProbeCursorReader>(
-      CursorDialectSpec<ProbeSequenceContext>{
-          .id = "probe",
-          .commandDetailKindPrefix = "probe",
-          .timebase = Timebase{.ppqn = 48},
-          .defaultBehavior = behavior,
-          .context = ProbeSequenceContext{.linearVelocity = 0.5},
-      });
+  return makeCompiledDialect<ProbeTrackState, ProbePlayback>(SequenceDialect{
+      .id = DialectId{.value = "probe"},
+      .commandDetailKindPrefix = "probe",
+      .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = behavior,
+  });
 }
 
 [[nodiscard]] SourceRange probeRange(u64 offset, u64 size) {
@@ -841,7 +854,10 @@ const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const Sequenc
                                      SourceRange range, const std::array<u8, Size>& bytes) {
   static_cast<void>(Command::kind);
   static_cast<void>(dialect);
-  return builder.addDecoded(address, range, std::span<const u8>{bytes});
+  const ByteReader reader(range.source, std::span<const u8>{bytes});
+  auto decoded = decodeProbeCommand(reader, 0);
+  return builder.addSemantic(address, decoded.opcode, decoded.encodedSize, range, std::move(decoded.operands),
+                             std::move(decoded.flow), decoded.annotation, std::move(decoded.execution));
 }
 
 [[nodiscard]] size_t countProbeNotesAt(const PerformanceTrack& track, u64 tick) {

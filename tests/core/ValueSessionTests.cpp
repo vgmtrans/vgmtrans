@@ -236,6 +236,44 @@ void sessionMaterializesResolvedCollectionsWithStableAssets() {
          "removing a stale materialized asset should also remove its owned annotations");
 }
 
+[[nodiscard]] MaterializationResult materializeProbeBankThenFail(const MaterializationContext& context) {
+  CollectionPreparation prepared(context);
+  auto instruments = prepared.instruments("staged-instrument-set");
+  instruments.append(Instrument{.name = "Staged Instrument"});
+  prepared.replaceInstrumentSet("Staged Instruments", std::move(instruments));
+  auto result = std::move(prepared).finish();
+  if (context.collection.key.value == "bank:12") {
+    throw std::runtime_error("second materialization exploded");
+  }
+  return result;
+}
+
+[[nodiscard]] FormatModule probeFailingMaterializationModule() {
+  auto module = probeBankSequenceModule();
+  module.materializeCollection = materializeProbeBankThenFail;
+  return module;
+}
+
+void sessionStagesAllResolverMaterializationsBeforePublishing() {
+  Session session;
+  session.formats().add(probeFailingMaterializationModule());
+  session.formats().add(probeBankInstrumentModule());
+  session.dialects().add(probeSequenceDialect());
+
+  session.addSource(SourceFile{.name = "bank-11.seq"}, {0xcc, 11});
+  session.addSource(SourceFile{.name = "bank-11.instr"}, {0xdd, 11});
+  session.addSource(SourceFile{.name = "bank-12.seq"}, {0xcc, 12});
+  session.addSource(SourceFile{.name = "bank-12.instr"}, {0xdd, 12});
+  const SessionSnapshot project = session.scanPendingSources();
+
+  expect(project.assets().size() == 4,
+         "a late materialization failure should not publish an earlier collection's staged asset");
+  expect(project.collections().empty(),
+         "a failed resolver batch should not reconcile only the collections materialized before the failure");
+  static_cast<void>(diagnosticWithMessage(
+      project.diagnostics(), "ProbeBankSequence resolveCollections failed: second materialization exploded"));
+}
+
 void sessionRemovesSourceFamilyAndDiscoveredData() {
   Session session;
   session.formats().add(probeSequenceModule());
@@ -1116,6 +1154,7 @@ void runValueSessionTests() {
   sessionKeepsScannerKnownCollectionsWithoutResolver();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
   sessionMaterializesResolvedCollectionsWithStableAssets();
+  sessionStagesAllResolverMaterializationsBeforePublishing();
   sessionRemovesSourceFamilyAndDiscoveredData();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();
   sessionResolverFailureDoesNotWipeExistingCollections();

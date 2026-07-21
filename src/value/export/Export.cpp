@@ -237,7 +237,8 @@ struct MidiLoweringResult {
 }
 
 [[nodiscard]] Artifact exportSoundFont2(const PreparedCollectionExport& prepared, const SourceStore& sources,
-                                        const ExportRequest& request, const MidiModulationUsage* midiModulation) {
+                                        const ExportRequest& request, const MidiModulationUsage* midiModulation,
+                                        ModulationConversionPolicy modulationConversion) {
   auto result = SoundFontExporter().exportSoundFont(
       SoundFontInput{
           .name = prepared.baseName,
@@ -245,7 +246,7 @@ struct MidiLoweringResult {
           .sampleCollections = prepared.assets.sampleCollections,
           .midiModulationUsage = midiModulation,
           .modulationScaling = request.modulationScaling,
-          .modulationConversion = request.modulationConversion,
+          .modulationConversion = modulationConversion,
       },
       sources);
   // Asset-resolution diagnostics describe missing references; exporter diagnostics
@@ -265,7 +266,8 @@ struct MidiLoweringResult {
 }
 
 [[nodiscard]] Artifact exportDls(const PreparedCollectionExport& prepared, const SourceStore& sources,
-                                 const ExportRequest& request, const MidiModulationUsage* midiModulation) {
+                                 const ExportRequest& request, const MidiModulationUsage* midiModulation,
+                                 ModulationConversionPolicy modulationConversion) {
   auto result = DlsExporter().exportDls(
       DlsInput{
           .name = prepared.baseName,
@@ -273,7 +275,7 @@ struct MidiLoweringResult {
           .sampleCollections = prepared.assets.sampleCollections,
           .midiModulationUsage = midiModulation,
           .modulationScaling = request.modulationScaling,
-          .modulationConversion = request.modulationConversion,
+          .modulationConversion = modulationConversion,
       },
       sources);
   // Keep DLS diagnostic merging parallel to SF2 so callers can compare both exports
@@ -315,6 +317,8 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   std::optional<MidiLoweringResult> midiLowering;
   std::optional<MidiModulationUsage> midiUsage;
   bool midiUsageAnalyzed = false;
+  const auto kinds = requestedKinds(request);
+  const bool exportsMidi = std::ranges::find(kinds, ExportKind::Midi) != kinds.end();
 
   const auto requireMidiLowering = [&]() -> const MidiLoweringResult& {
     // Several requested files can depend on the same rendered sequence. Render it
@@ -328,8 +332,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   const auto requireMidiModulationUsage = [&]() -> const MidiModulationUsage* {
     // Synth exporters only need observed MIDI modulation when the policy asks for it.
     // WAV and plain MIDI export should not pay that analysis cost.
-    if (request.modulationConversion != ModulationConversionPolicy::SynthModulators ||
-        request.modulationScaling != ModulationScalingPolicy::ObservedSequenceRange) {
+    if (request.modulationScaling != ModulationScalingPolicy::ObservedSequenceRange) {
       return nullptr;
     }
     if (!midiUsageAnalyzed) {
@@ -339,7 +342,20 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     return midiUsage ? &*midiUsage : nullptr;
   };
 
-  for (const auto kind : requestedKinds(request)) {
+  const auto synthModulationConversion = [&]() {
+    if (request.modulationConversion == ModulationConversionPolicy::SynthModulators) {
+      return ModulationConversionPolicy::SynthModulators;
+    }
+    // Sequence-event simulation is a replacement, not a reason to discard an
+    // instrument's modulation. Keep native modulation unless a MIDI artifact
+    // was requested and successfully materialized alongside the synth file.
+    if (!exportsMidi || !requireMidiLowering().sequence) {
+      return ModulationConversionPolicy::SynthModulators;
+    }
+    return ModulationConversionPolicy::SequenceEventSimulation;
+  };
+
+  for (const auto kind : kinds) {
     switch (kind) {
       case ExportKind::Midi:
         artifacts.push_back(exportMidi(prepared, request, requireMidiLowering()));
@@ -350,12 +366,24 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
                          std::make_move_iterator(wavArtifacts.end()));
         break;
       }
-      case ExportKind::SoundFont2:
-        artifacts.push_back(exportSoundFont2(prepared, sources, request, requireMidiModulationUsage()));
+      case ExportKind::SoundFont2: {
+        const auto conversion = synthModulationConversion();
+        artifacts.push_back(exportSoundFont2(prepared, sources, request,
+                                             conversion == ModulationConversionPolicy::SynthModulators
+                                                 ? requireMidiModulationUsage()
+                                                 : nullptr,
+                                             conversion));
         break;
-      case ExportKind::Dls:
-        artifacts.push_back(exportDls(prepared, sources, request, requireMidiModulationUsage()));
+      }
+      case ExportKind::Dls: {
+        const auto conversion = synthModulationConversion();
+        artifacts.push_back(exportDls(prepared, sources, request,
+                                      conversion == ModulationConversionPolicy::SynthModulators
+                                          ? requireMidiModulationUsage()
+                                          : nullptr,
+                                      conversion));
         break;
+      }
     }
   }
 

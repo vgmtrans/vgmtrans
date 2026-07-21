@@ -13,14 +13,6 @@
 
 namespace vgmtrans::core {
 
-namespace {
-
-[[nodiscard]] bool byteSpanFits(ByteSpan span, size_t poolSize) noexcept {
-  return span.offset <= poolSize && span.size <= poolSize - span.offset;
-}
-
-}  // namespace
-
 ValidationReport validateSequenceProgram(const SequenceProgram& program) {
   ValidationReport report;
 
@@ -39,10 +31,9 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
 
     std::unordered_set<u32> commandIds;
     commandIds.reserve(track.commands.size());
-    // Legacy commands refer into a track-level byte pool. Semantic commands
-    // must be byte-free and have unique, source-bounded operand names. Names
-    // deliberately serve as identity so format code does not maintain a second
-    // numeric operand vocabulary solely for execution.
+    // Operand names are unique and source-bounded. Names deliberately serve as
+    // identity so format code does not maintain a second numeric operand
+    // vocabulary solely for execution.
     for (const auto& command : track.commands) {
       if (!command.id.valid()) {
         report.error("sequence.command.missing-id", "Sequence program contained a command without an id",
@@ -53,12 +44,7 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
                      command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
       }
 
-      if (!byteSpanFits(command.bytes, track.commandBytes.size())) {
-        report.error("sequence.command.byte-span", "Sequence command byte span was outside its track byte pool",
-                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
-      }
-
-      if (command.semantic() && command.range.valid() && command.encodedSize != command.range.size) {
+      if (command.range.valid() && command.encodedSize != command.range.size) {
         report.error("sequence.command.semantic-size",
                      "Semantic sequence command encoded size did not match its source range", command.range);
       }
@@ -66,7 +52,7 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
       std::unordered_set<std::string> operandNames;
       operandNames.reserve(command.operands.size());
       for (const auto& operand : command.operands) {
-        if (command.semantic() && (operand.name.empty() || !operandNames.insert(operand.name).second)) {
+        if (operand.name.empty() || !operandNames.insert(operand.name).second) {
           report.error("sequence.command.operand-name",
                        "Semantic sequence command had a missing or duplicate operand name",
                        command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);

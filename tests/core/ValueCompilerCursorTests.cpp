@@ -166,7 +166,8 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
     sourceMap = sourceMapBuilder.finish();
   }
 
-  expect(track.commandBytes.empty(), "compiler-cursor commands should not retain source bytes");
+  expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.encodedSize != 0; }),
+         "compiler-cursor commands should retain source ranges instead of source bytes");
   expect(track.commands.size() == 8, "compiler cursor should decode every probe command once");
   expect(track.commands[0].execution.valid() && track.commands[1].execution.valid() &&
              track.commands[2].execution.valid() && track.commands[3].execution.valid(),
@@ -340,8 +341,8 @@ void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
       decodeProbeTrack(ByteReader(SourceId{11}, bytes), static_cast<u32>(bytes.size()), nullptr, &diagnostics);
   expect(track.commands.size() == 1 && track.commands[0].flow.terminal,
          "truncated compiler command should become a terminal command automatically");
-  expect(track.bytesFor(track.commands[0]).size() == 1 && !track.commands[0].execution.valid(),
-         "truncated compiler command should retain partial diagnostic bytes but no executable behavior");
+  expect(track.commands[0].range.size == 1 && !track.commands[0].execution.valid(),
+         "truncated compiler command should retain its partial source range but no executable behavior");
   expect(!diagnostics.empty() && diagnostics[0].code == "truncated-record",
          "truncated compiler field should retain the shared RecordReader diagnostic");
 }

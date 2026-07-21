@@ -61,28 +61,11 @@ struct SnesEnvelopeSeconds {
   return std::min(-20.0 * std::log10(amp), maxAttenuationDb);
 }
 
-[[nodiscard]] u32 microsFromSeconds(double seconds) {
+[[nodiscard]] double envelopeSeconds(double seconds) {
   if (seconds < 0.0 || !std::isfinite(seconds)) {
-    return kEnvelopeInfinite;
-  }
-
-  constexpr double microsPerSecond = 1000000.0;
-  const double micros = seconds * microsPerSecond;
-  if (micros >= static_cast<double>(std::numeric_limits<u32>::max())) {
-    return std::numeric_limits<u32>::max();
-  }
-  return static_cast<u32>(std::lround(std::max(0.0, micros)));
-}
-
-[[nodiscard]] std::optional<double> preciseSeconds(double seconds) {
-  if (seconds < 0.0 || !std::isfinite(seconds)) {
-    return std::nullopt;
+    return std::numeric_limits<double>::infinity();
   }
   return std::max(0.0, seconds);
-}
-
-[[nodiscard]] u32 permilleFromLevel(double level) {
-  return static_cast<u32>(std::lround(std::clamp(level, 0.0, 1.0) * 1000.0));
 }
 
 [[nodiscard]] GainEnvelope emulateGainEnvelope(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
@@ -270,24 +253,16 @@ Envelope snesDspEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
   }
 
   return Envelope{
-      .attack = microsFromSeconds(envelope.attack),
-      .decay = microsFromSeconds(envelope.decay),
-      .sustain = permilleFromLevel(envelope.sustainLevel),
-      .release = microsFromSeconds(envelope.release),
-      .attackSeconds = preciseSeconds(envelope.attack),
+      .attackSeconds = envelopeSeconds(envelope.attack),
       .holdSeconds = 0.0,
-      .decaySeconds = preciseSeconds(envelope.decay),
-      .releaseSeconds = preciseSeconds(envelope.release),
+      .decaySeconds = envelopeSeconds(envelope.decay),
+      .releaseSeconds = envelopeSeconds(envelope.release),
       .sustainAmplitude = std::clamp(envelope.sustainLevel, 0.0, 1.0),
   };
 }
 
 double snesDspGainEnvelopeSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
   return emulateGainEnvelope(gain, envelopeFrom, envelopeTo).seconds;
-}
-
-u32 snesDspGainEnvelopeMicros(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
-  return microsFromSeconds(snesDspGainEnvelopeSeconds(gain, envelopeFrom, envelopeTo));
 }
 
 }  // namespace vgmtrans::core

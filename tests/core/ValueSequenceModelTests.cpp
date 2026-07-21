@@ -6,8 +6,6 @@
 
 #include "ValueTestSupport.h"
 
-#include "value/sequence/SequenceCursor.h"
-
 namespace {
 
 void levelScaleRoundTripsMidiValues() {
@@ -45,130 +43,24 @@ void byteReaderChecksBoundsAndEndian() {
   expect(threw, "reader should throw on out-of-range access");
 }
 
-void sourceCommandsPreserveBytes() {
+void sourceCommandsRetainOnlySemanticData() {
   const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{
-      .id = TrackId{0},
-      .startAddress = Address{0},
-  };
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder{track};
   const std::array<u8, 2> programBytes{0x80, 0x05};
-  const SourceCommand& command = addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0},
-                                                                      probeRange(0, programBytes.size()), programBytes);
+  const SourceRange range = probeRange(0, programBytes.size());
+  const SourceCommand& command =
+      addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, range, programBytes);
 
   expect(track.commands.size() == 1, "track builder should append one source command");
-  expect(track.commandBytes.size() == programBytes.size(), "track builder should pool command bytes");
-  expect(track.bytesFor(command)[0] == 0x80 && track.bytesFor(command)[1] == 0x05,
-         "source command should point back to its stored bytes");
-}
-
-void vmCommandCursorRecordsCommandAnnotations() {
-  ScanIdAllocator ids;
-  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
-  std::vector<Diagnostic> diagnostics;
-  const std::array<u8, 2> bytes{0xc4, 0x40};
-  VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap, &diagnostics);
-
-  const u8 pan = cmd.name("Pan").semantic(SequenceSemantic::Pan).u8("pan");
-  const CommandFlow flow = cmd.next();
-  expect(flow.kind == FlowKind::Next && !flow.truncated, "cursor next flow should stay simple for valid commands");
-  expect(pan == 0x40, "cursor should read valid command operands");
-
-  const SourceMap map = sourceMap.finish();
-  const auto& annotation = map.get(cmd.annotation());
-  expect(annotation.label == "Pan" && annotation.localKind == "pan",
-         "cursor should record command display name and slugified kind");
-  expect(annotation.role == SourceRole::Command && annotation.sequenceSemantic == SequenceSemantic::Pan,
-         "cursor should record command role and broad sequence semantic");
-  expect(annotation.fields.size() == 2, "cursor should record opcode and operand fields");
-  expect(annotation.fields[0].name == "opcode" && std::get<u64>(annotation.fields[0].value) == 0xc4,
-         "cursor should record opcode field");
-  expect(annotation.fields[1].name == "pan" && std::get<u64>(annotation.fields[1].value) == 0x40 &&
-             sameRange(annotation.fields[1].range, probeRange(1, 1)),
-         "cursor should record operand value and source range");
-  expect(diagnostics.empty(), "valid cursor reads should not produce diagnostics");
-}
-
-void vmCommandCursorSupportsKindOverrideAndTargetLinks() {
-  ScanIdAllocator ids;
-  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
-  const std::array<u8, 3> bytes{0x94, 0x12, 0x34};
-  VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap);
-
-  const Address destination =
-      cmd.name("End of Track").kind("jump").semantic(SequenceSemantic::Jump).address16be("destination");
-  const CommandFlow flow = cmd.jump(destination);
-  expect(flow.kind == FlowKind::Jump && flow.destination && flow.destination->value == 0x1234,
-         "cursor jump flow should preserve destination");
-
-  const SourceMap map = sourceMap.finish();
-  const auto& annotation = map.get(cmd.annotation());
-  expect(annotation.localKind == "jump", "cursor kind override should replace slugified label");
-  expect(annotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
-         "cursor jump helper should persist control-flow playback status");
-  expect(annotation.links.size() == 1 && annotation.links[0].role == SourceLinkRole::JumpTarget,
-         "cursor jump helper should record a structured target link");
-  const auto* target = std::get_if<SourceRange>(&annotation.links[0].target);
-  expect(target != nullptr && target->source == SourceId{0} && target->offset == 0x1234 && target->size == 1,
-         "cursor target link should point at the destination source range");
-}
-
-void vmCommandCursorRecordsStructuredResourceLinks() {
-  ScanIdAllocator ids;
-  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
-  const std::array<u8, 1> bytes{0x81};
-  VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap);
-
-  static_cast<void>(cmd.name("Program").semantic(SequenceSemantic::Program).instrumentRef(2, 17).sampleRef(5).next());
-
-  const SourceMap map = sourceMap.finish();
-  const auto& annotation = map.get(cmd.annotation());
-  expect(annotation.links.size() == 2, "cursor resource helpers should record structured links");
-  expect(annotation.links[0].role == SourceLinkRole::UsesInstrument,
-         "cursor instrument helper should use the instrument link role");
-  const auto* instrumentTarget = std::get_if<ObjectRef>(&annotation.links[0].target);
-  expect(instrumentTarget != nullptr && instrumentTarget->kind == ObjectKind::Instrument &&
-             !instrumentTarget->asset.valid() && instrumentTarget->index0 == 2 && instrumentTarget->index1 == 17,
-         "cursor instrument helper should preserve unresolved bank/program selectors");
-  expect(annotation.links[1].role == SourceLinkRole::UsesSample,
-         "cursor sample helper should use the sample link role");
-  const auto* sampleTarget = std::get_if<ObjectRef>(&annotation.links[1].target);
-  expect(sampleTarget != nullptr && sampleTarget->kind == ObjectKind::Sample && !sampleTarget->asset.valid() &&
-             sampleTarget->index0 == 5,
-         "cursor sample helper should preserve unresolved sample indexes");
-}
-
-void vmCommandCursorStickyFailsMalformedReads() {
-  ScanIdAllocator ids;
-  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
-  std::vector<Diagnostic> diagnostics;
-  const std::array<u8, 1> bytes{0xc4};
-  VmCommandCursor cmd(CommandPhase::Decode, probeRange(0, bytes.size()), bytes, &sourceMap, &diagnostics);
-
-  const auto pan = cmd.name("Pan").semantic(SequenceSemantic::Pan).u8("pan");
-  const CommandFlow flow = cmd.next();
-  expect(!pan.valid && pan.value == 0 && sameRange(pan.range, probeRange(1, 0)),
-         "cursor should return invalid read metadata instead of throwing on missing operands");
-  expect(flow.kind == FlowKind::Stop && flow.truncated,
-         "cursor should turn normal flow helpers into truncated stop flow after a failed read");
-  expect(diagnostics.size() == 1 && diagnostics[0].message == "Truncated sequence command while reading pan",
-         "cursor should report malformed reads without per-command boilerplate");
-
-  const SourceMap map = sourceMap.finish();
-  const auto& annotation = map.get(cmd.annotation());
-  const auto truncated =
-      std::ranges::find_if(annotation.fields, [](const SourceField& field) { return field.name == "truncated"; });
-  expect(truncated != annotation.fields.end() && std::get<bool>(truncated->value),
-         "cursor should mark malformed command annotations as truncated");
-  expect(annotation.fields.size() == 2, "malformed cursor should record opcode and truncated marker only");
+  expect(command.range == range && command.encodedSize == programBytes.size(),
+         "source command should retain the range needed to inspect encoded bytes");
+  expect(command.execution.valid(), "source command should retain compiled playback actions");
 }
 
 void trackProgramBuilderRejectsDuplicateCommandAddresses() {
   const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{
-      .id = TrackId{0},
-      .startAddress = Address{0},
-  };
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder{track};
 
   const std::array<u8, 2> programBytes{0x80, 0x05};
@@ -220,11 +112,7 @@ void collectionIssueHelpersValidateStoredStatus() {
 void runValueSequenceModelTests() {
   levelScaleRoundTripsMidiValues();
   byteReaderChecksBoundsAndEndian();
-  sourceCommandsPreserveBytes();
-  vmCommandCursorRecordsCommandAnnotations();
-  vmCommandCursorSupportsKindOverrideAndTargetLinks();
-  vmCommandCursorRecordsStructuredResourceLinks();
-  vmCommandCursorStickyFailsMalformedReads();
+  sourceCommandsRetainOnlySemanticData();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
   collectionIssueHelpersValidateStoredStatus();
 }

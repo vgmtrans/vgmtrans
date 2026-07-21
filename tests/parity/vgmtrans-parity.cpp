@@ -450,12 +450,15 @@ u32 loopFramesFromLegacyValue(const VGMSamp& sample, u32 value, LoopMeasure meas
   return value / static_cast<u32>(bytesPerFrame);
 }
 
-u32 envelopeMicros(double seconds) {
-  if (seconds < 0.0 || !std::isfinite(seconds)) {
-    return kEnvelopeInfinite;
+u32 envelopeMicros(std::optional<double> seconds) {
+  if (!seconds) {
+    return 0;
+  }
+  if (*seconds < 0.0 || !std::isfinite(*seconds)) {
+    return std::numeric_limits<u32>::max();
   }
   constexpr double microsPerSecond = 1000000.0;
-  const double micros = seconds * microsPerSecond;
+  const double micros = *seconds * microsPerSecond;
   if (micros >= static_cast<double>(std::numeric_limits<u32>::max())) {
     return std::numeric_limits<u32>::max();
   }
@@ -714,7 +717,7 @@ void appendLegacyInstruments(CapcomSnesSummary& summary, std::span<VGMInstrSet* 
             .velocityLow = region->velLow,
             .velocityHigh = region->velHigh,
             .sampleSourceOffset = legacyRegionSampleOffset(*region, samples).value_or(0),
-            .tuningCents = region->unityKey >= 0 ? static_cast<s32>((region->unityKey - 96) * 100 + region->fineTune)
+            .tuningCents = region->unityKey >= 0 ? static_cast<s32>((region->unityKey - 96) * 100 - region->fineTune)
                                                  : region->fineTune,
             .envelopeAttack = envelopeMicros(region->attack_time),
             .envelopeDecay = envelopeMicros(region->decay_time),
@@ -948,10 +951,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
           }
         }
 
-        s32 tuningCents = region.tuning.cents;
-        if (region.rootKey) {
-          tuningCents = static_cast<s32>((static_cast<s32>(*region.rootKey) - 96) * 100 + region.fineTuneCents);
-        }
+        const s32 tuningCents = static_cast<s32>(std::lround((region.unityKey - 96.0) * 100.0));
 
         summary.regions.push_back(RegionSummary{
             .bank = address.bank,
@@ -963,10 +963,10 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
             .velocityHigh = region.velocityRange.high,
             .sampleSourceOffset = sampleSourceOffset,
             .tuningCents = tuningCents,
-            .envelopeAttack = region.envelope.attack,
-            .envelopeDecay = region.envelope.decay,
-            .envelopeSustain = region.envelope.sustain,
-            .envelopeRelease = region.envelope.release,
+            .envelopeAttack = envelopeMicros(region.envelope.attackSeconds),
+            .envelopeDecay = envelopeMicros(region.envelope.decaySeconds),
+            .envelopeSustain = envelopePermille(region.envelope.sustainAmplitude.value_or(0.0)),
+            .envelopeRelease = envelopeMicros(region.envelope.releaseSeconds),
         });
       }
     }
@@ -1196,6 +1196,8 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
                                                                      .kinds = {ExportKind::Midi},
                                                                      .loopPolicy = LoopPolicy::PlayOnce,
                                                                      .sequenceLoops = 0,
+                                                                     .modulationConversion =
+                                                                         ModulationConversionPolicy::SynthModulators,
                                                                  });
 
   for (const auto& artifact : artifacts) {
@@ -1215,6 +1217,8 @@ std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
                                                                   .kinds = {ExportKind::Midi},
                                                                   .loopPolicy = LoopPolicy::PlayOnce,
                                                                   .sequenceLoops = 0,
+                                                                  .modulationConversion =
+                                                                      ModulationConversionPolicy::SynthModulators,
                                                               });
 
   for (const auto& artifact : artifacts) {
@@ -2366,6 +2370,25 @@ void sortSf2Zone(Sf2Zone& zone) {
   });
 }
 
+void normalizeSf2ZonePitch(Sf2Zone& zone) {
+  const auto root = std::ranges::find(zone.generators, u16{58}, &Sf2Generator::operation);
+  if (root == zone.generators.end()) {
+    return;
+  }
+  const auto coarse = std::ranges::find(zone.generators, u16{51}, &Sf2Generator::operation);
+  const auto fine = std::ranges::find(zone.generators, u16{52}, &Sf2Generator::operation);
+  const s32 unityCents = static_cast<s32>(root->amount) * 100 -
+                         (coarse != zone.generators.end() ? static_cast<s32>(coarse->amount) * 100 : 0) -
+                         (fine != zone.generators.end() ? static_cast<s32>(fine->amount) : 0);
+  std::erase_if(zone.generators, [](const Sf2Generator& generator) {
+    return generator.operation == 51 || generator.operation == 52 || generator.operation == 58;
+  });
+  zone.generators.push_back(Sf2Generator{
+      .operation = 58,
+      .amount = static_cast<s16>(unityCents),
+  });
+}
+
 Sf2Zone readSf2Zone(const std::vector<Sf2Bag>& bags, const std::vector<Sf2Generator>& generators,
                     const std::vector<Sf2Modulator>& modulators, size_t bagIndex) {
   expect(bagIndex + 1 < bags.size(), "SF2 bag index is missing terminal bag");
@@ -2379,6 +2402,7 @@ Sf2Zone readSf2Zone(const std::vector<Sf2Bag>& bags, const std::vector<Sf2Genera
       .generators = {generators.begin() + bag.generatorIndex, generators.begin() + nextBag.generatorIndex},
       .modulators = {modulators.begin() + bag.modulatorIndex, modulators.begin() + nextBag.modulatorIndex},
   };
+  normalizeSf2ZonePitch(zone);
   sortSf2Zone(zone);
   return zone;
 }
@@ -2458,7 +2482,10 @@ NormalizedSf2 normalizeSf2(std::span<const u8> bytes) {
         .loopStart = loopStart - start,
         .loopEnd = loopEnd - start,
         .sampleRate = le32At(bytes, offset + 36),
-        .originalPitch = bytes[offset + 40],
+        // Every exported region has overridingRootKey, so the sample header's
+        // copied root is representational rather than audible. Zone tuning is
+        // normalized above; retain only the independent pitch correction here.
+        .originalPitch = 0,
         .pitchCorrection = static_cast<s8>(bytes[offset + 41]),
         .sampleLink = le16At(bytes, offset + 42),
         .sampleType = le16At(bytes, offset + 44),
@@ -2542,9 +2569,21 @@ DlsRegionSummary normalizeDlsRegion(std::span<const u8> bytes, const RiffNode& r
   if (connections.empty()) {
     connections = readDlsConnections(bytes, childChunk(regionList, "art1"));
   }
+  auto sample = chunkBytes(bytes, childChunk(regionList, "wsmp"));
+  if (sample.size() >= 8) {
+    const s32 rootKey = static_cast<s32>(sample[4] | (sample[5] << 8));
+    const s16 fineTune = static_cast<s16>(sample[6] | (sample[7] << 8));
+    const s32 unityCents = rootKey * 100 - fineTune;
+    const s32 canonicalRoot = static_cast<s32>(std::lround(unityCents / 100.0));
+    const s16 canonicalFine = static_cast<s16>(canonicalRoot * 100 - unityCents);
+    sample[4] = static_cast<u8>(canonicalRoot & 0xff);
+    sample[5] = static_cast<u8>((canonicalRoot >> 8) & 0xff);
+    sample[6] = static_cast<u8>(canonicalFine & 0xff);
+    sample[7] = static_cast<u8>((static_cast<u16>(canonicalFine) >> 8) & 0xff);
+  }
   return DlsRegionSummary{
       .header = chunkBytes(bytes, childChunk(regionList, "rgnh")),
-      .sample = chunkBytes(bytes, childChunk(regionList, "wsmp")),
+      .sample = std::move(sample),
       .link = chunkBytes(bytes, childChunk(regionList, "wlnk")),
       .connections = std::move(connections),
   };

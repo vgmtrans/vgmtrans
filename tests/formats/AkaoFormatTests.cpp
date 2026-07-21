@@ -74,7 +74,6 @@ TrackProgram decodeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version ver
                          TrackDecodeInput{
                              .startOffset = start,
                              .bytecodeEnd = end,
-                             .sequenceEnd = end,
                              .sourceMap = sourceMap,
                              .maxCommands = 64,
                          });
@@ -177,7 +176,6 @@ void akaoTablePointersUseNonControlSourceLinks() {
                       TrackDecodeInput{
                           .startOffset = start,
                           .bytecodeEnd = 0x90,
-                          .sequenceEnd = 0x90,
                           .sourceMap = &sourceMap,
                           .maxCommands = 64,
                       });
@@ -228,7 +226,6 @@ void akaoRepeatSourceLinksUseSpecificRolesOnly() {
                       TrackDecodeInput{
                           .startOffset = start,
                           .bytecodeEnd = 0x40,
-                          .sequenceEnd = 0x40,
                           .sourceMap = &repeatUntilMap,
                           .maxCommands = 64,
                       });
@@ -249,7 +246,6 @@ void akaoRepeatSourceLinksUseSpecificRolesOnly() {
                       TrackDecodeInput{
                           .startOffset = start,
                           .bytecodeEnd = 0x40,
-                          .sequenceEnd = 0x40,
                           .sourceMap = &repeatAgainMap,
                           .maxCommands = 64,
                       });
