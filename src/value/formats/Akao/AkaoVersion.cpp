@@ -20,21 +20,8 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] std::string lowerCopy(std::string text) {
-  std::ranges::transform(text, text.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-  return text;
-}
-
 [[nodiscard]] bool containsAny(std::string_view text, std::initializer_list<std::string_view> needles) {
   return std::ranges::any_of(needles, [text](std::string_view needle) { return text.find(needle) != text.npos; });
-}
-
-[[nodiscard]] double akaoTempoBpm(AkaoPs1Version version, u16 tempo) {
-  if (tempo == 0) {
-    return 1.0;
-  }
-  const u16 freq = version == AkaoPs1Version::Version1_0 ? 0x43d1 : 0x44e8;
-  return 60.0 / (kAkaoPpqn * (65536.0 / tempo) * (freq / (33868800.0 / 8)));
 }
 
 }  // namespace
@@ -75,7 +62,8 @@ AkaoPs1Version determineVersionFromSource(const SourceFile& source) {
     haystack += " ";
     haystack += source.path.string();
   }
-  haystack = lowerCopy(std::move(haystack));
+  std::ranges::transform(haystack, haystack.begin(),
+                         [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
 
   if (containsAny(haystack, {"chocobo dungeon 2", "final fantasy viii", "final fantasy 8", "chocobo racing",
                              "saga frontier 2", "racing lagoon"})) {
@@ -335,7 +323,11 @@ u32 AkaoProfile::sequenceLength(ByteReader reader, u32 offset) const {
 }
 
 double AkaoProfile::tempoBpm(u16 tempo) const {
-  return akaoTempoBpm(version, tempo);
+  if (tempo == 0) {
+    return 1.0;
+  }
+  const u16 frequency = version == AkaoPs1Version::Version1_0 ? 0x43d1 : 0x44e8;
+  return 60.0 / (kAkaoPpqn * (65536.0 / tempo) * (frequency / (33868800.0 / 8)));
 }
 
 u32 AkaoProfile::tempoMicrosPerQuarter(u16 tempo) const {

@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <filesystem>
 #include <limits>
 #include <map>
 #include <optional>
@@ -45,23 +44,18 @@ struct SampleFactEntry {
   u32 sourceOffset = 0;
 };
 
-[[nodiscard]] bool extensionIsPsf(const std::filesystem::path& path) {
-  std::string ext = path.extension().string();
+[[nodiscard]] bool psfLike(const SourceFile* source) {
+  if (source == nullptr) {
+    return false;
+  }
+  std::string ext = source->path.extension().string();
   std::ranges::transform(ext, ext.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
   return ext == ".psf" || ext == ".minipsf" || ext == ".psflib";
-}
-
-[[nodiscard]] bool psfLike(const SourceFile* source) {
-  return source != nullptr && extensionIsPsf(source->path);
 }
 
 [[nodiscard]] bool covers(const AkaoSampleCandidate& sample, u32 articulationId) {
   return articulationId >= sample.firstArticulationId &&
          articulationId < sample.firstArticulationId + sample.articulationCount;
-}
-
-[[nodiscard]] bool sameSource(const std::optional<SourceId>& a, const std::optional<SourceId>& b) {
-  return a && b && *a == *b;
 }
 
 [[nodiscard]] bool sameSampleSet(std::optional<u32> sequenceSampleSet, std::optional<u32> sampleSet) {
@@ -164,20 +158,6 @@ template <class AssetT>
   return requiredBySequence;
 }
 
-[[nodiscard]] std::vector<SampleFactEntry> candidateSamples(const SequenceFactEntry& sequence,
-                                                            const std::vector<SampleFactEntry>& samples) {
-  std::vector<SampleFactEntry> candidates;
-  const bool isolated = psfLike(sequence.source);
-  for (const auto& sample : samples) {
-    if (isolated && !sameSource(sequence.sourceId, sample.sourceId)) {
-      continue;
-    }
-    candidates.push_back(sample);
-  }
-  std::ranges::sort(candidates, std::ranges::greater{}, &SampleFactEntry::sourceOffset);
-  return candidates;
-}
-
 void markCoveredArticulations(std::set<u32>& remaining, const AkaoSampleCandidate& sample) {
   for (auto it = remaining.begin(); it != remaining.end();) {
     if (covers(sample, *it)) {
@@ -191,7 +171,16 @@ void markCoveredArticulations(std::set<u32>& remaining, const AkaoSampleCandidat
 std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& sequence,
                                                       const std::vector<SampleFactEntry>& samples,
                                                       std::set<u32>& remaining, CollectionAssembly& collection) {
-  auto candidates = candidateSamples(sequence, samples);
+  std::vector<SampleFactEntry> candidates;
+  const bool isolated = psfLike(sequence.source);
+  for (const auto& sample : samples) {
+    const bool sameSource = sequence.sourceId && sample.sourceId && *sequence.sourceId == *sample.sourceId;
+    if (!isolated || sameSource) {
+      candidates.push_back(sample);
+    }
+  }
+  std::ranges::sort(candidates, std::ranges::greater{}, &SampleFactEntry::sourceOffset);
+
   std::vector<AkaoSampleCandidate> sampleCandidates;
   sampleCandidates.reserve(candidates.size());
   for (std::size_t i = 0; i < candidates.size(); ++i) {
