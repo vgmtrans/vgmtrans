@@ -298,6 +298,65 @@ void performanceMidiRendererWritesPanGainResetWhenRequested() {
          "full-gain compensated pan should reset expression to full scale");
 }
 
+void performanceMidiRendererCombinesExpressionWithPanGain() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 36,
+          .events =
+              {
+                  ExpressionPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .linearGain = 0.25,
+                  },
+                  StereoBalancePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 12},
+                      .leftGain = 0.5,
+                      .rightGain = 0.0,
+                  },
+                  StereoBalancePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 24},
+                      .leftGain = 1.0,
+                      .rightGain = 0.0,
+                  },
+                  PanPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 36},
+                      .stereoPosition = 0.0,
+                      .linearGain = 0.25,
+                      .hasLinearGain = true,
+                  },
+              },
+      }},
+  };
+
+  const auto expressionValues = [&](ModulationConversionPolicy policy) {
+    const MidiSequence midi = PerformanceMidiRenderer().render(performance, MidiExportOptions{}, policy);
+    std::vector<u8> values;
+    for (const MidiEvent& event : midi.tracks[0].events) {
+      if (const auto* expression = std::get_if<Expression>(&event)) {
+        values.push_back(expression->value);
+      }
+    }
+    return values;
+  };
+
+  const std::vector<u8> expected{64, 45, 64, 32};
+  expect(expressionValues(ModulationConversionPolicy::SynthModulators) == expected,
+         "synth-modulator MIDI lowering should multiply pan compensation by source expression");
+  expect(expressionValues(ModulationConversionPolicy::SequenceEventSimulation) == expected,
+         "sequence-event MIDI lowering should multiply pan compensation by source expression");
+
+  PerformanceSequence precisePerformance = performance;
+  std::get<ExpressionPerformanceEvent>(precisePerformance.tracks[0].events[0]).precisionHint =
+      LevelPrecisionHint::FourteenBit;
+  const MidiSequence preciseMidi = PerformanceMidiRenderer().render(precisePerformance);
+  expect(std::count_if(preciseMidi.tracks[0].events.begin(), preciseMidi.tracks[0].events.end(),
+                       [](const MidiEvent& event) { return std::holds_alternative<Expression14>(event); }) == 4,
+         "pan compensation should preserve the source expression's precision");
+}
+
 void performanceMidiRendererHonorsMidiExportOptions() {
   PerformanceSequence performance{.timebase = Timebase{.ppqn = 48},
                                   .tracks = {
@@ -959,6 +1018,7 @@ void runValueMidiTests() {
   performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererWritesPanGainResetWhenRequested();
+  performanceMidiRendererCombinesExpressionWithPanGain();
   performanceMidiRendererHonorsMidiExportOptions();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
