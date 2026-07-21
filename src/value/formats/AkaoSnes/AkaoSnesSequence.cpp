@@ -1287,28 +1287,6 @@ struct TrackState {
     return currentPitchBendRangeCents == kDefaultPitchBendRangeCents && currentPitchBendValue == 0;
   }
 
-  void setPitchEnvelope(AkaoSnesVersion version, s8 semitones, u8 delay, u8 length) {
-    if (semitones == 0 || length == 0) {
-      clearPitchEnvelope();
-      return;
-    }
-    pitchEnvelope.enabled = true;
-    pitchEnvelope.semitones = semitones;
-    pitchEnvelope.delay = delay;
-    pitchEnvelope.length = length;
-    pitchEnvelope.progressStep = akaoSnesPitchEnvelopeProgressStep(version, length);
-  }
-
-  void clearPitchEnvelope() { pitchEnvelope = {}; }
-
-  void setPendingPitchSlide(u16 steps, s8 semitones) {
-    pendingPitchSlideSteps = steps;
-    pendingPitchSlideSemitones = semitones;
-    if (pendingPitchSlideSemitones == 0) {
-      clearPendingPitchSlide();
-    }
-  }
-
   void clearPendingPitchSlide() {
     pendingPitchSlideSteps = 0;
     pendingPitchSlideSemitones = 0;
@@ -1438,6 +1416,8 @@ struct TrackState {
   LfoState tremolo;
 };
 
+// Playback holds the history-dependent services shared by several commands or
+// substantial enough to name. Short one-off effects stay beside their opcode.
 struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
@@ -1629,12 +1609,6 @@ struct Playback {
     return Effects::wait(length);
   }
 
-  void setPitchEnvelope(s8 semitones, u8 delay, u8 length) {
-    track.setPitchEnvelope(context.version, semitones, delay, length);
-  }
-  void clearPitchEnvelope() { track.clearPitchEnvelope(); }
-  void setPitchSlide(u16 steps, s8 semitones) { track.setPendingPitchSlide(steps, semitones); }
-
   void emitVibratoDepth(u8 midiDepth, bool force = false) {
     track.vibrato.emitDepth(
         midiDepth,
@@ -1814,13 +1788,6 @@ struct Playback {
     }
   }
 
-  void programChange(u8 programNumber) {
-    track.nonPercussionProgram = programNumber;
-    if (!track.percussion) {
-      out.instrument(0, programNumber);
-    }
-  }
-
   void tempoChange(u8 rawTempo) {
     if (context.minorVersion == AKAOSNES_V4_FM || context.minorVersion == AKAOSNES_V4_CT) {
       rawTempo = static_cast<u8>(rawTempo + ((rawTempo * 0x14) >> 8));
@@ -1844,18 +1811,6 @@ struct Playback {
     track.sharedTempoApplied = true;
     syncLfoRateAndDelay(LfoTarget::Vibrato);
     syncLfoRateAndDelay(LfoTarget::Tremolo);
-  }
-
-  void loopStart(u8 count, Address start) {
-    const u32 totalPlays = count == 0 ? 0u : static_cast<u32>(count + 1);
-    const u8 slot = track.loopLevel % track.loops.size();
-    track.loops[slot] = LoopFrame{
-        .start = start,
-        .totalPlays = totalPlays,
-        .remainingPlays = totalPlays,
-        .incrementCount = context.version == AKAOSNES_V4 ? u8{1} : u8{0},
-    };
-    track.loopLevel = static_cast<u8>((track.loopLevel + 1) % track.loops.size());
   }
 
   Effects loopEnd() {
@@ -1898,15 +1853,6 @@ struct Playback {
       counter.finish();
     }
     return Effects{.step = vm.finiteBranch(destination)};
-  }
-
-  void percussionOn() {
-    track.percussion = true;
-    out.instrument(kAkaoSnesDrumKitBank << 7, kAkaoSnesDrumKitProgram);
-  }
-  void percussionOff() {
-    track.percussion = false;
-    out.instrument(0, track.nonPercussionProgram);
   }
 
   void tickAutomation() {
@@ -2005,26 +1951,50 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
 
     case EventType::PitchEnvelopeOn: {
       auto event = cursor.command("Pitch Envelope On", SequenceSemantic::Pitch);
+      s8 semitones = 0;
+      u8 delay = 0;
+      u8 length = 0;
       if (profile.version == AKAOSNES_V1) {
-        const u8 delay = event.u8("delay");
-        const u8 length = event.u8("length");
-        const s8 semitones = event.s8("semitones");
-        return event.invoke<&Playback::setPitchEnvelope>(semitones, static_cast<u8>(delay + 1), length);
+        delay = static_cast<u8>(event.u8("delay") + 1);
+        length = event.u8("length");
+        semitones = event.s8("semitones");
+      } else {
+        semitones = event.s8("semitones");
+        delay = event.u8("delay");
+        length = event.u8("length");
       }
-      const s8 semitones = event.s8("semitones");
-      const u8 delay = event.u8("delay");
-      const u8 length = event.u8("length");
-      return event.invoke<&Playback::setPitchEnvelope>(semitones, delay, length);
+      return event.invoke(
+          [](Playback& playback, s8 pitch, u8 wait, u8 duration) {
+            if (pitch == 0 || duration == 0) {
+              playback.track.pitchEnvelope = {};
+              return;
+            }
+            auto& envelope = playback.track.pitchEnvelope;
+            envelope.enabled = true;
+            envelope.semitones = pitch;
+            envelope.delay = wait;
+            envelope.length = duration;
+            envelope.progressStep = akaoSnesPitchEnvelopeProgressStep(playback.context.version, duration);
+          },
+          semitones, delay, length);
     }
     case EventType::PitchEnvelopeOff: {
       auto event = cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch);
       event.derived("pitch_envelope_off", true, SemanticOperandRole::State);
-      return event.invoke<&Playback::clearPitchEnvelope>();
+      return event.invoke([](Playback& playback) { playback.track.pitchEnvelope = {}; });
     }
     case EventType::PitchSlide: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
       const u16 steps = static_cast<u16>(event.u8("time")) + 1;
-      return event.invoke<&Playback::setPitchSlide>(steps, event.s8("semitones"));
+      return event.invoke(
+          [](Playback& playback, u16 duration, s8 pitch) {
+            playback.track.pendingPitchSlideSteps = duration;
+            playback.track.pendingPitchSlideSemitones = pitch;
+            if (pitch == 0) {
+              playback.track.clearPendingPitchSlide();
+            }
+          },
+          steps, event.s8("semitones"));
     }
 
     case EventType::VibratoOn:
@@ -2124,7 +2094,14 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Program", SequenceSemantic::Program);
       event.derived("bank", u8{0}, SemanticOperandRole::InstrumentBank);
       const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      return event.invoke<&Playback::programChange>(program);
+      return event.invoke(
+          [](Playback& playback, u8 programNumber) {
+            playback.track.nonPercussionProgram = programNumber;
+            if (!playback.track.percussion) {
+              playback.out.instrument(0, programNumber);
+            }
+          },
+          program);
     }
 
     case EventType::VolumeEnvelope: {
@@ -2154,7 +2131,19 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
     case EventType::LoopStart: {
       auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
       const u8 count = event.u8("count");
-      return event.invoke<&Playback::loopStart>(count, event.nextAddress());
+      return event.invoke(
+          [](Playback& playback, u8 repeatCount, Address start) {
+            const u32 totalPlays = repeatCount == 0 ? 0u : static_cast<u32>(repeatCount + 1);
+            const u8 slot = playback.track.loopLevel % playback.track.loops.size();
+            playback.track.loops[slot] = LoopFrame{
+                .start = start,
+                .totalPlays = totalPlays,
+                .remainingPlays = totalPlays,
+                .incrementCount = playback.context.version == AKAOSNES_V4 ? u8{1} : u8{0},
+            };
+            playback.track.loopLevel = static_cast<u8>((playback.track.loopLevel + 1) % playback.track.loops.size());
+          },
+          count, event.nextAddress());
     }
     case EventType::LoopEnd:
       return cursor.command("Loop End", SequenceSemantic::Repeat).invoke<&Playback::loopEnd>().runtimeControlFlow();
@@ -2247,9 +2236,15 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       return event;
     }
     case EventType::PercOn:
-      return cursor.command("Percussion On", SequenceSemantic::Program).invoke<&Playback::percussionOn>();
+      return cursor.command("Percussion On", SequenceSemantic::Program).invoke([](Playback& playback) {
+        playback.track.percussion = true;
+        playback.out.instrument(kAkaoSnesDrumKitBank << 7, kAkaoSnesDrumKitProgram);
+      });
     case EventType::PercOff:
-      return cursor.command("Percussion Off", SequenceSemantic::Program).invoke<&Playback::percussionOff>();
+      return cursor.command("Percussion Off", SequenceSemantic::Program).invoke([](Playback& playback) {
+        playback.track.percussion = false;
+        playback.out.instrument(0, playback.track.nonPercussionProgram);
+      });
     case EventType::VolumeAlt: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);
       return event.emitExpression(levelFromLegacyMidiVolume(event.u8("volume") & 0x7f));
