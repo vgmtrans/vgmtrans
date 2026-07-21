@@ -60,6 +60,7 @@ void akaoSnesV4TieExtendsShortenedPreviousNote();
 void akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
 void akaoSnesCompilerCursorCoversVersionBoundariesAndDurations();
 void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
+void akaoSnesCompiledAutomationTicksControllerAndTempoFades();
 void akaoSnesCompilerCursorCoversLoopsAndCpuBranches();
 void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo();
 void akaoDialectDecodesLegacyRelativeJumpTargets();
@@ -151,6 +152,7 @@ int main() {
     akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
     akaoSnesCompilerCursorCoversVersionBoundariesAndDurations();
     akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
+    akaoSnesCompiledAutomationTicksControllerAndTempoFades();
     akaoSnesCompilerCursorCoversLoopsAndCpuBranches();
     akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo();
     akaoDialectDecodesLegacyRelativeJumpTargets();

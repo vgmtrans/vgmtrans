@@ -574,6 +574,7 @@ public:
     Event& ignore() {
       execution_ = {};
       flow_ = {};
+      presentation_.playback = initialPlayback_;
       return *this;
     }
 
@@ -800,7 +801,7 @@ public:
     friend class CompilerCursor;
 
     Event(CompilerCursor& cursor, DecodedCommandPresentation presentation)
-        : cursor_(cursor), presentation_(std::move(presentation)) {}
+        : cursor_(cursor), presentation_(std::move(presentation)), initialPlayback_(presentation_.playback) {}
 
     template <auto Operation, class... Arguments>
     Event& append(Arguments... arguments) {
@@ -809,6 +810,10 @@ public:
 
     template <auto Operation, class... Values>
     Event& appendDeferred(Values... values) {
+      if (presentation_.playback == CommandPlaybackStatus::SourceOnly ||
+          presentation_.playback == CommandPlaybackStatus::NoOp) {
+        presentation_.playback = CommandPlaybackStatus::AffectsPlayback;
+      }
       CommandAction action{
           .executor =
               detail::compiledExecutors<Playback>().add(&detail::executeOperation<Playback, Operation, Values...>),
@@ -856,6 +861,7 @@ public:
 
     CompilerCursor& cursor_;
     DecodedCommandPresentation presentation_;
+    CommandPlaybackStatus initialPlayback_;
     CommandExecution execution_;
     DecodeFlow flow_;
     bool finished_ = false;

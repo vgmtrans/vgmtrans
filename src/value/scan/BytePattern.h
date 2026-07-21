@@ -56,6 +56,13 @@ struct MaskedBytePattern {
   [[nodiscard]] bool valid() const noexcept { return size() != 0 && size() == mask.size(); }
 };
 
+template <size_t ByteCount, size_t MaskCount>
+[[nodiscard]] consteval MaskedBytePattern makeMaskedBytePattern(const char (&bytes)[ByteCount],
+                                                                const char (&mask)[MaskCount]) {
+  static_assert(ByteCount == MaskCount, "byte pattern and mask must have equal lengths");
+  return {std::string_view{bytes, ByteCount - 1}, std::string_view{mask, MaskCount - 1}};
+}
+
 [[nodiscard]] inline bool matchesBytePattern(ByteReader reader, u64 offset, MaskedBytePattern pattern) {
   if (!pattern.valid() || !reader.has(offset, pattern.size())) {
     return false;

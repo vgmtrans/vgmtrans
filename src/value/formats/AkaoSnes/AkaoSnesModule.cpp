@@ -26,9 +26,10 @@ using namespace core;
   if (program.tracks.empty()) {
     return {};
   }
-  const u32 headerSize = layout->version == AKAOSNES_V3 ? (layout->minorVersion == AKAOSNES_V3_FFMQ ? 18 : 20)
-                                                        : (layout->version == AKAOSNES_V4 ? 20 : 16);
-  result.sequence(sequence, displayName, input.reader.range(layout->sequenceHeaderAddress, headerSize))
+  result
+      .sequence(sequence, displayName,
+                input.reader.range(layout->sequenceHeaderAddress,
+                                   akaoSnesSequenceHeaderSize(layout->version, layout->minorVersion)))
       .program(std::move(program));
 
   auto collection = result.sourceCollection(displayName);

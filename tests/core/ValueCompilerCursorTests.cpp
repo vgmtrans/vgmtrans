@@ -80,6 +80,13 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       event.emitLegatoPedal(enabled);
       return event.emitExpression(event.select(enabled, 0.75, 0.25));
     }
+    case 0x28:
+      return cursor.sourceOnly("Promoted Action").set<&CompilerProbeState::enabled>(true);
+    case 0x29: {
+      auto event = cursor.sourceOnly("Ignored Action");
+      event.set<&CompilerProbeState::enabled>(false);
+      return event.ignore();
+    }
     case 0x40:
     case 0x41:
     case 0x42:
@@ -151,7 +158,7 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   TrackProgram track;
   SourceMap sourceMap;
   {
-    const std::vector<u8> bytes{0x10, 0x40, 0x20, 0x02, 0x21, 0x43, 0x04, 0x50, 0x03, 0xff};
+    const std::vector<u8> bytes{0x10, 0x40, 0x20, 0x02, 0x21, 0x43, 0x04, 0x50, 0x03, 0x28, 0x29, 0xff};
     const ByteReader reader(SourceId{7}, bytes);
     ScanIdAllocator ids;
     SourceMapBuilder sourceMapBuilder([&ids]() { return ids.nextSourceAnnotationId(); });
@@ -160,17 +167,20 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   }
 
   expect(track.commandBytes.empty(), "compiler-cursor commands should not retain source bytes");
-  expect(track.commands.size() == 6, "compiler cursor should decode every probe command once");
+  expect(track.commands.size() == 8, "compiler cursor should decode every probe command once");
   expect(track.commands[0].execution.valid() && track.commands[1].execution.valid() &&
              track.commands[2].execution.valid() && track.commands[3].execution.valid(),
          "output, state, toggle, and local handlers should compile to executor slots");
 
   const auto annotations = sourceMap.withRole(SourceId{7}, SourceRole::Command);
-  expect(annotations.size() == 6, "compiler cursor should project one annotation per source command");
+  expect(annotations.size() == 8, "compiler cursor should project one annotation per source command");
   const SourceAnnotation& volume = sourceMap.get(annotations[0]);
   expect(volume.label == "Volume" && volume.fields.size() == 2 && volume.fields[1].name == "volume" &&
              volume.fields[1].range.offset == 1,
          "field reads should automatically preserve names and exact source ranges");
+  expect(sourceMap.get(annotations[5]).playbackStatus == CommandPlaybackStatus::AffectsPlayback &&
+             sourceMap.get(annotations[6]).playbackStatus == CommandPlaybackStatus::SourceOnly,
+         "compiled actions should promote source-only presentation unless the event is explicitly ignored");
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{

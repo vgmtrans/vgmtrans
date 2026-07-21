@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -161,6 +162,7 @@ void akaoSnesLayoutDiscoversFf4StyleAram() {
   expect(layout->sequenceHeaderAddress == 0x2000, "sequence header address should come from legacy V1 header reader");
   expect(layout->spcDirAddress == 0x5000, "SPC DIR address should come from legacy V1 DIR loader");
   expect(layout->tuningTableAddress == 0x5200, "V1 tuning table address should come from legacy instrument loader");
+  expect(!layout->adsrTableAddress, "V1 layouts should not invent an ADSR table at ARAM offset zero");
 }
 
 void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
@@ -227,11 +229,14 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       annotationWithKind(project.sourceMap(), source, SourceRole::Sample, "akao-snes-sample-dir-entry");
   const SourceAnnotation* payload =
       annotationWithKind(project.sourceMap(), source, SourceRole::Payload, "snes-brr-payload");
+  const SourceAnnotation* adsrTable =
+      annotationWithKind(project.sourceMap(), source, SourceRole::Table, "akao-snes-adsr-table");
   expect(directory != nullptr && directory->range == SourceRange{.source = source, .offset = 0x5000, .size = 4} &&
              directoryEntry != nullptr &&
              directoryEntry->range == SourceRange{.source = source, .offset = 0x5000, .size = 4} &&
              payload != nullptr && payload->range == SourceRange{.source = source, .offset = 0x6000, .size = 9},
          "AkaoSnes synth source maps should retain the exact DIR entry and BRR payload ranges");
+  expect(adsrTable == nullptr, "V1 synth source maps should not contain a nonexistent ADSR table");
 }
 
 void akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes() {
@@ -422,6 +427,91 @@ void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation() {
              truncated.commands.front().range.size == 2 && truncated.commandBytes.size() == 2,
          "a truncated AkaoSnes operand should stop at and retain only the exact available source range");
   expect(!diagnostics.empty(), "a truncated AkaoSnes operand should report a diagnostic");
+
+  ScanIdAllocator ids;
+  SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
+  std::vector<u8> stateBytes(0x40, 0xec);
+  stateBytes[start] = 0xe4;
+  const TrackProgram stateTrack = decodeAkaoSnesSourceTrack(
+      ByteReader(SourceId{8}, stateBytes),
+      AkaoSnesTrackDecodeOptions{
+          .profile = ff6, .startAddress = start, .bytecodeEnd = start + 2, .sourceMap = &sourceMap});
+  const SourceMap stateAnnotations = sourceMap.finish();
+  const SourceAnnotation& slur = commandAnnotation(stateAnnotations, stateTrack.commands.front());
+  expect(slur.label == "Slur On" && slur.sequenceSemantic == SequenceSemantic::State &&
+             slur.playbackStatus == CommandPlaybackStatus::AffectsPlayback,
+         "state-changing commands should expose exact playback-affecting presentation");
+
+  ScanIdAllocator unknownIds;
+  SourceMapBuilder unknownSourceMap([&unknownIds]() { return unknownIds.nextSourceAnnotationId(); });
+  const AkaoSnesProfile ff4{.version = AKAOSNES_V1, .minorVersion = AKAOSNES_V1_FF4};
+  std::vector<u8> unknownBytes(0x40, 0xf1);
+  unknownBytes[start] = 0xf6;
+  const TrackProgram unknownTrack = decodeAkaoSnesSourceTrack(
+      ByteReader(SourceId{8}, unknownBytes),
+      AkaoSnesTrackDecodeOptions{
+          .profile = ff4, .startAddress = start, .bytecodeEnd = start + 2, .sourceMap = &unknownSourceMap});
+  const SourceMap unknownAnnotations = unknownSourceMap.finish();
+  const SourceAnnotation& unknown = commandAnnotation(unknownAnnotations, unknownTrack.commands.front());
+  expect(std::ranges::count(unknown.fields, std::string_view{"opcode"}, &SourceField::name) == 1,
+         "unknown commands should project their opcode field exactly once");
+}
+
+void akaoSnesCompiledAutomationTicksControllerAndTempoFades() {
+  constexpr u32 start = 0x20;
+  const AkaoSnesProfile ff6{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};
+  std::vector<u8> bytes(0x80, 0xec);
+  size_t offset = start;
+  bytes[offset++] = 0xc4;
+  bytes[offset++] = 0xff;
+  bytes[offset++] = 0xc5;
+  bytes[offset++] = 4;
+  bytes[offset++] = 0x7f;
+  bytes[offset++] = 0xc6;
+  bytes[offset++] = 0x40;
+  bytes[offset++] = 0xc7;
+  bytes[offset++] = 4;
+  bytes[offset++] = 0;
+  bytes[offset++] = 0xf0;
+  bytes[offset++] = 0x20;
+  bytes[offset++] = 0xf1;
+  bytes[offset++] = 4;
+  bytes[offset++] = 0x40;
+  bytes[offset++] = 0xc0;
+  bytes[offset++] = 0xec;
+
+  const PerformanceSequence performance = renderTracks(ff6, {decodeTrack(bytes, ff6, start, static_cast<u32>(offset))});
+  expect(performance.diagnostics.empty(), "valid AkaoSnes fade fixtures should render without diagnostics");
+  const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks.front());
+  const auto pans = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(performance.tracks.front());
+  expect(levels.size() == 5 && levels.back()->header.tick == 4 &&
+             std::abs(levels.back()->linearGain - (63.0 / 127.0)) < 1e-9,
+         "volume fades should advance once per driver tick and land exactly on their target");
+  expect(pans.size() == 5 && pans.back()->header.tick == 4 && pans.back()->rightGain == 0.0,
+         "pan fades should advance once per driver tick and land exactly on their target");
+  expect(tempos.size() == 5 && tempos.back()->header.tick == 4 && tempos.back()->microsecondsPerQuarter == 936000,
+         "tempo fades should emit their intermediate shared tempo changes and final target");
+
+  constexpr u32 lfoTrackStart = 0x50;
+  bytes[lfoTrackStart] = 0xc9;
+  bytes[lfoTrackStart + 1] = 0;
+  bytes[lfoTrackStart + 2] = 0x20;
+  bytes[lfoTrackStart + 3] = 0x20;
+  bytes[lfoTrackStart + 4] = 0xc0;
+  bytes[lfoTrackStart + 5] = 0xec;
+  std::vector<TrackProgram> tracks;
+  tracks.push_back(decodeTrack(bytes, ff6, lfoTrackStart, lfoTrackStart + 6, 0));
+  tracks.push_back(decodeTrack(bytes, ff6, start + 10, static_cast<u32>(offset), 1));
+  const PerformanceSequence sharedTempo = renderTracks(ff6, std::move(tracks));
+  const auto delays = eventsOfType<VibratoDelayPerformanceEvent>(sharedTempo.tracks.front());
+  expect(std::ranges::all_of(std::array<u64, 4>{1, 2, 3, 4},
+                             [&](u64 tick) {
+                               return std::ranges::any_of(delays, [tick](const VibratoDelayPerformanceEvent* delay) {
+                                 return delay->header.tick == tick;
+                               });
+                             }),
+         "tempo-fade steps should resynchronize tempo-dependent LFOs on other tracks");
 }
 
 void akaoSnesCompilerCursorCoversLoopsAndCpuBranches() {
