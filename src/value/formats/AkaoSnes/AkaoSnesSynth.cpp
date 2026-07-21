@@ -50,72 +50,19 @@ struct InstrumentReadResult {
   std::optional<AkaoSnesInstrumentInfo> info;
 };
 
-[[nodiscard]] double vibratoDepthCentsForAmplitude(double amplitude) {
-  if (amplitude <= 0.0) {
-    return 0.0;
-  }
-  const double ratio = 15.0 * amplitude / 32768.0;
-  const double centsUp = 1200.0 * std::log2(1.0 + ratio);
-  const double centsDown = -1200.0 * std::log2(1.0 - ratio);
-  return std::max(centsUp, centsDown);
-}
-
-[[nodiscard]] double v1VibratoDepthCentsForHighByte(u8 amplitude) {
-  if (amplitude == 0) {
-    return 0.0;
-  }
-  return 1200.0 * std::log2(1.0 + (static_cast<double>(amplitude) / 3072.0));
-}
-
-[[nodiscard]] double maxVibratoDepthCents(AkaoSnesVersion version) {
-  switch (version) {
-    case AKAOSNES_V1:
-      return v1VibratoDepthCentsForHighByte(255);
-    case AKAOSNES_V2:
-      return 1200.0 * std::log2(1.0 + (15.0 * 127.0 / 32768.0));
-    case AKAOSNES_V3:
-      return vibratoDepthCentsForAmplitude(127.0);
-    case AKAOSNES_V4:
-    default:
-      return vibratoDepthCentsForAmplitude(64.0);
-  }
-}
-
-[[nodiscard]] double tremoloDepthDbForAmplitude(double amplitude) {
-  if (amplitude <= 0.0) {
-    return 0.0;
-  }
-  const double troughScale = std::max(1.0 / 1024.0, 1.0 - (amplitude / 128.0));
-  return -20.0 * std::log10(troughScale);
-}
-
-[[nodiscard]] bool exportsTremolo(AkaoSnesVersion version) {
-  return version == AKAOSNES_V3 || version == AKAOSNES_V4;
-}
-
-[[nodiscard]] double maxTremoloDepthDb(AkaoSnesVersion version) {
-  if (version == AKAOSNES_V3) {
-    return tremoloDepthDbForAmplitude(127.0);
-  }
-  if (version == AKAOSNES_V4) {
-    return tremoloDepthDbForAmplitude(64.0);
-  }
-  return 0.0;
-}
-
 [[nodiscard]] InstrumentModulation akaoInstrumentModulation(AkaoSnesVersion version) {
   const AkaoSnesLfoRateRange rate = akaoSnesLfoRateRange(version);
   InstrumentModulation modulation{
       .vibrato =
           VibratoSpec{
-              .maxDepthCents = maxVibratoDepthCents(version),
+              .maxDepthCents = akaoSnesMaxVibratoDepthCents(version),
               .rateHertz = {rate.minimum, rate.maximum},
               .delaySeconds = ModulationRange{0.0, akaoSnesMaxLfoDelaySeconds(version)},
           },
   };
-  if (exportsTremolo(version)) {
+  if (akaoSnesExportsTremolo(version)) {
     modulation.tremolo = TremoloSpec{
-        .maxDepthDb = maxTremoloDepthDb(version),
+        .maxDepthDb = akaoSnesMaxTremoloDepthDb(version),
         .rateHertz = {rate.minimum, rate.maximum},
         .delaySeconds = ModulationRange{0.0, akaoSnesMaxLfoDelaySeconds(version)},
     };
@@ -241,18 +188,13 @@ std::vector<AkaoSnesInstrumentInfo> parseAkaoSnesInstrumentInfos(ByteReader read
     return infos;
   }
 
-  struct CachedInstrument {
-    bool attempted = false;
-    InstrumentReadResult result;
-  };
-  std::array<CachedInstrument, 128> cache;
+  std::array<std::optional<InstrumentReadResult>, 128> cache;
   const auto instrument = [&](u8 srcn) -> const InstrumentReadResult& {
     auto& cached = cache[srcn];
-    if (!cached.attempted) {
-      cached.attempted = true;
-      cached.result = readMelodicInstrument(reader, layout, srcn, diagnostics);
+    if (!cached) {
+      cached = readMelodicInstrument(reader, layout, srcn, diagnostics);
     }
-    return cached.result;
+    return *cached;
   };
 
   const u8 maxSrcn = layout.version == AKAOSNES_V1 ? 0x7f : 0x3f;
@@ -315,10 +257,10 @@ SnesBrrCatalog readAkaoSnesSamples(ByteReader reader, u32 spcDirAddress,
 void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader, const AkaoSnesLayout& layout,
                             const std::vector<AkaoSnesInstrumentInfo>& instrumentInfos,
                             const SnesBrrSampleRefs& sampleRefs) {
+  const u8 highest = std::ranges::max(instrumentInfos, {}, &AkaoSnesInstrumentInfo::srcn).srcn;
   std::optional<SourceAnnotationId> tuningTable;
   if (layout.tuningTableAddress) {
     const u32 stride = layout.version == AKAOSNES_V1 || layout.version == AKAOSNES_V2 ? 1 : 2;
-    const u8 highest = std::ranges::max(instrumentInfos, {}, &AkaoSnesInstrumentInfo::srcn).srcn;
     tuningTable = instruments
                       .source(SourceRole::Table, "Tuning Table",
                               reader.range(*layout.tuningTableAddress, (static_cast<u32>(highest) + 1) * stride),
@@ -327,7 +269,6 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
   }
   std::optional<SourceAnnotationId> adsrTable;
   if (layout.adsrTableAddress) {
-    const u8 highest = std::ranges::max(instrumentInfos, {}, &AkaoSnesInstrumentInfo::srcn).srcn;
     adsrTable =
         instruments
             .source(SourceRole::Table, "ADSR Table",
@@ -344,11 +285,6 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
             .id();
   }
 
-  // The legacy format exposed the table origin as the durable object range.
-  // Exact per-program records remain separate selectable source annotations.
-  const u32 tuningStride = layout.version == AKAOSNES_V1 || layout.version == AKAOSNES_V2 ? 1 : 2;
-  const SourceRange objectRange = reader.range(*layout.tuningTableAddress, tuningStride);
-
   for (const auto& info : instrumentInfos) {
     const auto sample = sampleRefs.findSrcn(info.srcn);
     if (!sample) {
@@ -359,29 +295,14 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
     const u32 bank = info.percussion ? kAkaoSnesDrumKitBank : 0;
     const u32 program = info.percussion ? kAkaoSnesDrumKitProgram : info.srcn;
     const u32 programKey = (bank << 7) | program;
-    auto instrument =
-        info.percussion
-            ? instruments.getOrAdd(programKey,
-                                   Instrument{
-                                       .explicitAddress =
-                                           InstrumentAddress{
-                                               .bank = bank,
-                                               .program = program,
-                                           },
-                                       .name = "Drum Kit",
-                                       .range = objectRange,
-                                       .modulation = akaoInstrumentModulation(layout.version),
-                                   })
-            : instruments.add(programKey, Instrument{
-                                              .explicitAddress =
-                                                  InstrumentAddress{
-                                                      .bank = bank,
-                                                      .program = program,
-                                                  },
-                                              .name = fmt::format("Instrument {}", static_cast<unsigned>(info.srcn)),
-                                              .range = objectRange,
-                                              .modulation = akaoInstrumentModulation(layout.version),
-                                          });
+    Instrument model{
+        .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
+        .name = info.percussion ? "Drum Kit" : fmt::format("Instrument {}", static_cast<unsigned>(info.srcn)),
+        .range = info.tuning.range,
+        .modulation = akaoInstrumentModulation(layout.version),
+    };
+    auto instrument = info.percussion ? instruments.getOrAdd(programKey, std::move(model))
+                                      : instruments.add(programKey, std::move(model));
     auto tuning = instrument.source("Tuning Entry", info.tuning, "akao-snes-tuning-entry");
     if (tuningTable) {
       tuning.parent(*tuningTable);
@@ -395,7 +316,7 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
 
     const auto pitch = akaoPitch(info);
     Region region{
-        .range = objectRange,
+        .range = info.tuning.range,
         .tuning = pitch.aggregate,
         .rootKey = pitch.rootKey,
         .fineTuneCents = pitch.fineTuneCents,
@@ -426,8 +347,11 @@ bool addAkaoSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumen
                       std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseAkaoSnesInstrumentInfos(reader, layout, &builder.diagnostics());
+  if (instrumentInfos.empty() || !layout.spcDirAddress) {
+    return false;
+  }
   const auto sampleCatalog = readAkaoSnesSamples(reader, *layout.spcDirAddress, instrumentInfos);
-  if (instrumentInfos.empty() || sampleCatalog.samples.empty()) {
+  if (sampleCatalog.samples.empty()) {
     return false;
   }
 

@@ -11,6 +11,8 @@
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
+#include <algorithm>
+#include <cmath>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -65,8 +67,6 @@ struct AkaoSnesProfile {
 inline constexpr u32 kAkaoSnesAramSize = 0x10000;
 inline constexpr u32 kAkaoSnesMaxTracks = 8;
 inline constexpr u16 kAkaoSnesPpqn = 48;
-inline constexpr u8 kAkaoSnesDefaultTempo = 0x20;
-inline constexpr u8 kAkaoSnesNoteVelocity = 100;
 inline constexpr u8 kAkaoSnesDrumKeyBias = 60;
 inline constexpr u32 kAkaoSnesDrumKitBank = 0x7f;
 inline constexpr u32 kAkaoSnesDrumKitProgram = 0;
@@ -81,10 +81,6 @@ inline constexpr u32 kAkaoSnesDrumKitProgram = 0;
 
 [[nodiscard]] constexpr u8 akaoSnesStatusNoteIndexTie(AkaoSnesVersion version) {
   return (version == AKAOSNES_V1 || version == AKAOSNES_V2) ? 13 : 12;
-}
-
-[[nodiscard]] constexpr u8 akaoSnesStatusNoteIndexRest(AkaoSnesVersion version) {
-  return (version == AKAOSNES_V1 || version == AKAOSNES_V2) ? 12 : 13;
 }
 
 [[nodiscard]] constexpr u8 akaoSnesStatusNoteMax(AkaoSnesVersion version) {
@@ -114,6 +110,10 @@ inline constexpr u32 kAkaoSnesDrumKitProgram = 0;
   return minorVersion == AKAOSNES_V4_RS2 || minorVersion == AKAOSNES_V4_LAL;
 }
 
+[[nodiscard]] constexpr bool akaoSnesUses8BitPan(AkaoSnesProfile profile) {
+  return akaoSnesUses8BitPan(profile.version, profile.minorVersion);
+}
+
 [[nodiscard]] constexpr double akaoSnesFrameRateHz(u8 timer0Frequency) {
   return 8000.0 / timer0Frequency;
 }
@@ -135,6 +135,55 @@ struct AkaoSnesLfoRateRange {
   constexpr double v4 = 254.0 * 256.0 / (8000.0 / 0x2a);
   constexpr double other = 255.0 * 256.0 / (8000.0 / 0x2a);
   return version == AKAOSNES_V1 ? v1 : (version == AKAOSNES_V4 ? v4 : other);
+}
+
+[[nodiscard]] inline double akaoSnesVibratoDepthCentsForAmplitude(double amplitude) {
+  if (amplitude <= 0.0) {
+    return 0.0;
+  }
+  const double ratio = 15.0 * amplitude / 32768.0;
+  return std::max(1200.0 * std::log2(1.0 + ratio), -1200.0 * std::log2(1.0 - ratio));
+}
+
+[[nodiscard]] inline double akaoSnesV1VibratoDepthCents(u8 amplitude) {
+  return amplitude == 0 ? 0.0 : 1200.0 * std::log2(1.0 + (static_cast<double>(amplitude) / 3072.0));
+}
+
+[[nodiscard]] inline double akaoSnesMaxVibratoDepthCents(AkaoSnesVersion version) {
+  switch (version) {
+    case AKAOSNES_V1:
+      return akaoSnesV1VibratoDepthCents(255);
+    case AKAOSNES_V2:
+      return 1200.0 * std::log2(1.0 + (15.0 * 127.0 / 32768.0));
+    case AKAOSNES_V3:
+      return akaoSnesVibratoDepthCentsForAmplitude(127.0);
+    case AKAOSNES_V4:
+    default:
+      return akaoSnesVibratoDepthCentsForAmplitude(64.0);
+  }
+}
+
+[[nodiscard]] inline double akaoSnesTremoloDepthDbForAmplitude(double amplitude) {
+  if (amplitude <= 0.0) {
+    return 0.0;
+  }
+  return -20.0 * std::log10(std::max(1.0 / 1024.0, 1.0 - (amplitude / 128.0)));
+}
+
+[[nodiscard]] constexpr bool akaoSnesExportsTremolo(AkaoSnesVersion version) {
+  return version == AKAOSNES_V3 || version == AKAOSNES_V4;
+}
+
+[[nodiscard]] inline double akaoSnesMaxTremoloDepthDb(AkaoSnesVersion version) {
+  return version == AKAOSNES_V3   ? akaoSnesTremoloDepthDbForAmplitude(127.0)
+         : version == AKAOSNES_V4 ? akaoSnesTremoloDepthDbForAmplitude(64.0)
+                                  : 0.0;
+}
+
+[[nodiscard]] constexpr u32 akaoSnesSequenceHeaderSize(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion) {
+  return version == AKAOSNES_V3   ? (minorVersion == AKAOSNES_V3_FFMQ ? 18 : 20)
+         : version == AKAOSNES_V4 ? 20
+                                  : kAkaoSnesMaxTracks * 2;
 }
 
 [[nodiscard]] constexpr std::string_view akaoSnesVersionName(AkaoSnesVersion version) {
