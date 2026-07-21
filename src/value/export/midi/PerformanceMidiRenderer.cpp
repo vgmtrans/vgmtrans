@@ -221,6 +221,8 @@ struct RenderTrackState {
   std::optional<s16> lastPitchBendValue;
   u32 microsecondsPerQuarter = 500000;
   double sourceExpressionGain = 1.0;
+  LevelPrecisionHint sourceExpressionPrecisionHint = LevelPrecisionHint::SevenBit;
+  std::optional<ValueQuantization> sourceExpressionQuantization;
   double panExpressionGain = 1.0;
   double simulatedTremoloGain = 1.0;
 };
@@ -420,10 +422,14 @@ bool shouldRestartSimulatedVibratoForNote(const PerformanceEvent& event, const R
          (state.vibratoDelayArmed || (state.simulatedVibratoDepthSemitones > 0.0 && state.vibratoFrequencyHz > 0.0));
 }
 
+// Source expression, pan-law compensation, and simulated tremolo all use MIDI
+// expression. Write their product so changing one cannot erase the others.
 void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
-                           const MidiExportOptions& options) {
+                           const MidiExportOptions& options, ModulationConversionPolicy modulationConversion) {
+  const bool simulatingTremolo = modulationConversion == ModulationConversionPolicy::SequenceEventSimulation;
   addExpression(track, tick, channel, state.sourceExpressionGain * state.panExpressionGain * state.simulatedTremoloGain,
-                LevelPrecisionHint::SevenBit, options);
+                simulatingTremolo ? LevelPrecisionHint::SevenBit : state.sourceExpressionPrecisionHint, options,
+                simulatingTremolo ? std::nullopt : state.sourceExpressionQuantization);
 }
 
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
@@ -490,12 +496,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           }
         } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
           state.sourceExpressionGain = typedEvent.linearGain;
-          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-            addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
-          } else {
-            addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, typedEvent.precisionHint,
-                          options, typedEvent.sourceQuantization);
-          }
+          state.sourceExpressionPrecisionHint = typedEvent.precisionHint;
+          state.sourceExpressionQuantization = typedEvent.sourceQuantization;
+          addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion);
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
           track.events.push_back(Pan{
               .tick = typedEvent.header.tick,
@@ -503,13 +506,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .value = midiPan(typedEvent.stereoPosition),
           });
           if (typedEvent.hasLinearGain) {
-            if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-              state.panExpressionGain = typedEvent.linearGain;
-              addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
-            } else {
-              addExpression(track, typedEvent.header.tick, channel, typedEvent.linearGain, LevelPrecisionHint::SevenBit,
-                            options);
-            }
+            state.panExpressionGain = typedEvent.linearGain;
+            addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion);
           }
         } else if constexpr (std::is_same_v<TypedEvent, StereoBalancePerformanceEvent>) {
           const LoweredStereoBalance lowered = lowerStereoBalance(typedEvent.leftGain, typedEvent.rightGain);
@@ -518,13 +516,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .channel = channel,
               .value = lowered.pan,
           });
-          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-            state.panExpressionGain = lowered.expressionGain;
-            addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
-          } else {
-            addExpression(track, typedEvent.header.tick, channel, lowered.expressionGain,
-                          LevelPrecisionHint::SevenBit, options);
-          }
+          state.panExpressionGain = lowered.expressionGain;
+          addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion);
         } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
           track.events.push_back(MasterVolume{
               .tick = typedEvent.header.tick,
@@ -640,7 +633,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               case ModulationPerformanceTarget::TremoloDepth:
                 state.simulatedTremoloGain =
                     std::clamp(1.0 - (std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5), 0.0, 1.0);
-                addCombinedExpression(track, state, typedEvent.header.tick, channel, options);
+                addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion);
                 break;
               case ModulationPerformanceTarget::VibratoRate:
                 state.vibratoFrequencyHz = typedEvent.frequencyHz.value_or(state.vibratoFrequencyHz);
