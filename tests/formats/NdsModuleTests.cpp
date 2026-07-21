@@ -950,6 +950,14 @@ void ndsSynthParserKeepsInfiniteReleaseOutOfPreciseSeconds() {
   const auto sampleLink = std::ranges::find_if(
       instrument->links, [](const SourceLink& link) { return link.role == SourceLinkRole::UsesSample; });
   expect(sampleLink != instrument->links.end(), "NDS instrument annotations should link to referenced samples");
+  const auto* region = annotationWithKind(annotations, SourceId{11}, SourceRole::Region, "sbnk-region");
+  expect(region != nullptr && region->range.offset == 0x40 && region->range.size == 10,
+         "NDS region annotations should preserve their exact source range");
+  const auto sampleIndex = std::ranges::find(region->fields, "sample_index", &SourceField::name);
+  const auto attack = std::ranges::find(region->fields, "attack", &SourceField::name);
+  expect(sampleIndex != region->fields.end() && sampleIndex->range.offset == 0x40 && sampleIndex->range.size == 2 &&
+             attack != region->fields.end() && attack->range.offset == 0x45 && attack->range.size == 1,
+         "NDS region annotations should preserve exact sample and articulation fields");
 }
 
 void ndsSynthParserDerivesAdpcmLengthsSafely() {

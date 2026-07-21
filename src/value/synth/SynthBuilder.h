@@ -18,6 +18,13 @@
 
 namespace vgmtrans::core {
 
+// Add the stable, exporter-neutral properties of a synth value to a source
+// annotation. Builders do this automatically at finish time; scanners that
+// describe values before materialization can use the same projection directly.
+void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample);
+void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrument);
+void annotateSynthValue(AnnotationBuilder annotation, const Region& region);
+
 // A read-only copy of a sample builder's source-key lookup. Formats that
 // discover instruments after committing their sample asset can retain this
 // small value without retaining construction state.
@@ -57,6 +64,8 @@ public:
   // Asset-level source structures, such as a sample directory table, use this
   // escape hatch while still receiving the correct asset owner automatically.
   AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
+  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
+                           std::string_view kind = {});
 
   SampleCollectionBuilder& include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
@@ -77,6 +86,7 @@ public:
     [[nodiscard]] SampleRef ref() const;
     [[nodiscard]] Sample& value() const;
     AnnotationBuilder source(std::string_view label, SourceRange range, std::string_view kind = {}) const;
+    AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
 
   private:
     friend class SampleCollectionBuilder;
@@ -98,6 +108,7 @@ private:
   [[nodiscard]] AnnotationBuilder addEntrySource(u32 index, std::string_view label, SourceRange range,
                                                  std::string_view kind);
   void addFallbackSources();
+  void annotateValues();
   void recordRange(SourceRange range, bool explicitlyIncluded);
   void report(Severity severity, std::string code, std::string message, SourceRange range);
 
@@ -133,6 +144,8 @@ public:
   [[nodiscard]] std::optional<Entry> find(u64 groupingKey);
 
   AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
+  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
+                           std::string_view kind = {});
 
   InstrumentSetBuilder& include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
@@ -152,6 +165,7 @@ public:
     [[nodiscard]] explicit operator bool() const noexcept;
     [[nodiscard]] Instrument& value() const;
     AnnotationBuilder source(std::string_view label, SourceRange range, std::string_view kind = {}) const;
+    AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
     RegionEntry region(SampleRef sample, Region region) const;
     RegionEntry regionAt(u32 regionIndex) const;
 
@@ -171,6 +185,7 @@ public:
     [[nodiscard]] explicit operator bool() const noexcept;
     [[nodiscard]] Region& value() const;
     AnnotationBuilder source(std::string_view label, SourceRange range, std::string_view kind = {}) const;
+    AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
 
   private:
     friend class InstrumentSetBuilder;
@@ -211,6 +226,7 @@ private:
                                                   SourceRange range, std::string_view kind);
   void syncPrepopulatedRegions(u32 instrumentIndex);
   void addFallbackSources();
+  void annotateValues();
   void linkInstrumentSamples(u32 instrumentIndex, SourceAnnotationId annotation);
   void linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label);
   void recordInstrumentRange(u32 index, SourceRange range);

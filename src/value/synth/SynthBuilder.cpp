@@ -44,7 +44,115 @@ SourceTarget sampleTarget(SampleRef sample) {
   return SourceTarget{ObjectRefs::sampleIndex(sample.index)};
 }
 
+void annotateLoop(AnnotationBuilder& annotation, const Loop& loop) {
+  annotation.derived("loop_enabled", loop.enabled, SourceValueDisplay::Boolean);
+  if (loop.enabled) {
+    annotation.derived("loop_start", loop.start).derived("loop_length", loop.length);
+  }
+}
+
+void annotateCoarseEnvelopeTime(AnnotationBuilder& annotation, std::string_view stage, u32 microseconds) {
+  if (microseconds == kEnvelopeInfinite) {
+    annotation.derived(std::string(stage) + "_infinite", true, SourceValueDisplay::Boolean);
+  } else {
+    annotation.derived(std::string(stage) + "_microseconds", microseconds);
+  }
+}
+
+void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
+  if (envelope.attackSeconds) {
+    annotation.derived("attack_seconds", *envelope.attackSeconds);
+  } else if (hasCoarseEnvelope(envelope)) {
+    annotateCoarseEnvelopeTime(annotation, "attack", envelope.attack);
+  }
+  if (envelope.holdSeconds) {
+    annotation.derived("hold_seconds", *envelope.holdSeconds);
+  } else if (envelope.hold != 0) {
+    annotateCoarseEnvelopeTime(annotation, "hold", envelope.hold);
+  }
+  if (envelope.decaySeconds) {
+    annotation.derived("decay_seconds", *envelope.decaySeconds);
+  } else if (hasCoarseEnvelope(envelope)) {
+    annotateCoarseEnvelopeTime(annotation, "decay", envelope.decay);
+  }
+  if (envelope.sustainAmplitude) {
+    annotation.derived("sustain_level", *envelope.sustainAmplitude, SourceValueDisplay::Percent);
+  } else if (hasCoarseEnvelope(envelope)) {
+    annotation.derived("sustain_level", envelope.sustain / 1000.0, SourceValueDisplay::Percent);
+  }
+  if (envelope.releaseSeconds) {
+    annotation.derived("release_seconds", *envelope.releaseSeconds);
+  } else if (hasCoarseEnvelope(envelope)) {
+    annotateCoarseEnvelopeTime(annotation, "release", envelope.release);
+  }
+}
+
+[[nodiscard]] std::string_view audioCodecName(AudioCodec codec) {
+  switch (codec) {
+    case AudioCodec::Unknown:
+      return "Unknown";
+    case AudioCodec::PcmS8:
+      return "PCM 8-bit";
+    case AudioCodec::PcmS16:
+      return "PCM 16-bit";
+    case AudioCodec::SnesBrr:
+      return "SNES BRR";
+    case AudioCodec::NdsImaAdpcm:
+      return "NDS IMA ADPCM";
+    case AudioCodec::NdsPsg:
+      return "NDS PSG";
+    case AudioCodec::PsxAdpcm:
+      return "PSX ADPCM";
+    case AudioCodec::OkiAdpcm:
+      return "OKI ADPCM";
+  }
+  return "Unknown";
+}
+
 }  // namespace
+
+void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample) {
+  annotation.derived("codec", audioCodecName(sample.codec), SourceValueDisplay::Enum)
+      .derived("encoded_bytes", sample.encodedData.size)
+      .derived("effective_sample_rate", sample.sampleRate)
+      .derived("channels", sample.channels)
+      .derived("bits_per_sample", sample.bitsPerSample);
+  annotateLoop(annotation, sample.loop);
+  if (sample.pitch.cents != 0) {
+    annotation.derived("pitch_cents", sample.pitch.cents, SourceValueDisplay::Cents);
+  }
+  if (sample.attenuationDb != 0.0) {
+    annotation.derived("attenuation_db", sample.attenuationDb, SourceValueDisplay::Decibels);
+  }
+}
+
+void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrument) {
+  const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
+  annotation.derived("bank", address.bank)
+      .derived("program", address.program)
+      .derived("region_count", instrument.regions.size())
+      .derived("reverb", instrument.reverb, SourceValueDisplay::Percent);
+}
+
+void annotateSynthValue(AnnotationBuilder annotation, const Region& region) {
+  annotation.derived("key_low", region.keyRange.low, SourceValueDisplay::MidiNote)
+      .derived("key_high", region.keyRange.high, SourceValueDisplay::MidiNote)
+      .derived("velocity_low", region.velocityRange.low)
+      .derived("velocity_high", region.velocityRange.high)
+      .derived("pan", region.pan, SourceValueDisplay::Percent)
+      .derived("attenuation_db", region.attenuationDb, SourceValueDisplay::Decibels);
+  if (region.rootKey) {
+    annotation.derived("root_key", *region.rootKey, SourceValueDisplay::MidiNote);
+  }
+  const s32 tuningCents = region.tuning.cents + region.coarseTuneSemitones * 100 + region.fineTuneCents;
+  if (tuningCents != 0) {
+    annotation.derived("tuning_cents", tuningCents, SourceValueDisplay::Cents);
+  }
+  if (region.loop) {
+    annotateLoop(annotation, *region.loop);
+  }
+  annotateEnvelope(annotation, region.envelope);
+}
 
 SampleRefLookup::SampleRefLookup(AssetId collection, std::unordered_map<u64, u32> indexes)
     : collection_(collection), indexes_(std::move(indexes)) {
@@ -126,6 +234,11 @@ AnnotationBuilder SampleCollectionBuilder::source(SourceRole role, std::string_v
   return annotation;
 }
 
+AnnotationBuilder SampleCollectionBuilder::source(SourceRole role, std::string_view label, const SourceRecord& record,
+                                                  std::string_view kind) {
+  return source(role, label, record.range, kind).fields(record.fields);
+}
+
 SampleCollectionBuilder& SampleCollectionBuilder::include(SourceRange range) {
   recordRange(range, true);
   return *this;
@@ -156,6 +269,7 @@ SampleCollection SampleCollectionBuilder::finish() && {
     recordRange(sample.encodedData, false);
   }
   addFallbackSources();
+  annotateValues();
   finished_ = true;
   return SampleCollection{.samples = std::move(samples_)};
 }
@@ -184,6 +298,11 @@ Sample& SampleCollectionBuilder::Entry::value() const {
 AnnotationBuilder SampleCollectionBuilder::Entry::source(std::string_view label, SourceRange range,
                                                          std::string_view kind) const {
   return *this ? builder_->addEntrySource(index_, label, range, kind) : AnnotationBuilder{};
+}
+
+AnnotationBuilder SampleCollectionBuilder::Entry::source(std::string_view label, const SourceRecord& record,
+                                                         std::string_view kind) const {
+  return source(label, record.range, kind).fields(record.fields);
 }
 
 bool SampleCollectionBuilder::validIndex(u32 index) const noexcept {
@@ -216,6 +335,17 @@ void SampleCollectionBuilder::addFallbackSources() {
     auto annotation = sourceMap_->annotation(SourceRole::Sample, label, samples_[index].encodedData)
                           .owner(ObjectRefs::sample(asset_, index));
     states_[index].sources.push_back(annotation.id());
+  }
+}
+
+void SampleCollectionBuilder::annotateValues() {
+  if (sourceMap_ == nullptr) {
+    return;
+  }
+  for (u32 index = 0; index < samples_.size(); ++index) {
+    for (const SourceAnnotationId source : states_[index].sources) {
+      annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, samples_[index]);
+    }
   }
 }
 
@@ -296,6 +426,11 @@ AnnotationBuilder InstrumentSetBuilder::source(SourceRole role, std::string_view
   return annotation;
 }
 
+AnnotationBuilder InstrumentSetBuilder::source(SourceRole role, std::string_view label, const SourceRecord& record,
+                                               std::string_view kind) {
+  return source(role, label, record.range, kind).fields(record.fields);
+}
+
 InstrumentSetBuilder& InstrumentSetBuilder::include(SourceRange range) {
   recordRange(range, true);
   return *this;
@@ -330,6 +465,7 @@ std::vector<Instrument> InstrumentSetBuilder::finish() && {
     }
   }
   addFallbackSources();
+  annotateValues();
   finished_ = true;
   return std::move(instruments_);
 }
@@ -351,6 +487,11 @@ Instrument& InstrumentSetBuilder::Entry::value() const {
 AnnotationBuilder InstrumentSetBuilder::Entry::source(std::string_view label, SourceRange range,
                                                       std::string_view kind) const {
   return *this ? builder_->addInstrumentSource(index_, label, range, kind) : AnnotationBuilder{};
+}
+
+AnnotationBuilder InstrumentSetBuilder::Entry::source(std::string_view label, const SourceRecord& record,
+                                                      std::string_view kind) const {
+  return source(label, record.range, kind).fields(record.fields);
 }
 
 InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::Entry::region(SampleRef sample, Region region) const {
@@ -386,6 +527,11 @@ Region& InstrumentSetBuilder::RegionEntry::value() const {
 AnnotationBuilder InstrumentSetBuilder::RegionEntry::source(std::string_view label, SourceRange range,
                                                             std::string_view kind) const {
   return *this ? builder_->addRegionSource(instrumentIndex_, regionIndex_, label, range, kind) : AnnotationBuilder{};
+}
+
+AnnotationBuilder InstrumentSetBuilder::RegionEntry::source(std::string_view label, const SourceRecord& record,
+                                                            std::string_view kind) const {
+  return source(label, record.range, kind).fields(record.fields);
 }
 
 bool InstrumentSetBuilder::validInstrument(u32 index) const noexcept {
@@ -505,6 +651,24 @@ void InstrumentSetBuilder::addFallbackSources() {
       }
       regionState.sources.push_back(annotation.id());
       linkSample(annotation.id(), region.sample, "Sample");
+    }
+  }
+}
+
+void InstrumentSetBuilder::annotateValues() {
+  if (sourceMap_ == nullptr) {
+    return;
+  }
+  for (u32 instrumentIndex = 0; instrumentIndex < instruments_.size(); ++instrumentIndex) {
+    const auto& instrument = instruments_[instrumentIndex];
+    const auto& state = states_[instrumentIndex];
+    for (const SourceAnnotationId source : state.sources) {
+      annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, instrument);
+    }
+    for (u32 regionIndex = 0; regionIndex < instrument.regions.size(); ++regionIndex) {
+      for (const SourceAnnotationId source : state.regions[regionIndex].sources) {
+        annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, instrument.regions[regionIndex]);
+      }
     }
   }
 }

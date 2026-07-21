@@ -200,7 +200,6 @@ struct KonamiSnesLayout {
 
 struct KonamiSnesInstrumentInfo {
   u32 index = 0;
-  u32 address = 0;
   u8 srcn = 0;
   s8 key = 0;
   s8 tuning = 0;
@@ -211,7 +210,7 @@ struct KonamiSnesInstrumentInfo {
   u8 volume = 0;
   bool percussion = false;
   u8 percussionNote = 0;
-  std::vector<core::SourceField> sourceFields;
+  core::SourceRecord source;
 };
 
 [[nodiscard]] std::optional<KonamiSnesLayout> findKonamiSnesLayout(core::ByteReader reader);

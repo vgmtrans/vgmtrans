@@ -106,6 +106,7 @@ struct AkaoSequenceReferences {
 struct AkaoSequenceAnalysis {
   AkaoSequenceHeader header;
   AkaoSequenceReferences references;
+  std::vector<u32> requiredArticulations;
 };
 
 struct AkaoSequenceParse {
@@ -117,7 +118,7 @@ struct AkaoSequenceParse {
 // its location, tuning, loop, and envelope all travel together.
 struct AkaoArticulation {
   u32 articulationId = 0;
-  core::SourceRange range;
+  core::SourceRecord source;
   u8 unityKey = 60;
   s16 fineTuneCents = 0;
   u32 sampleOffset = 0;
@@ -156,14 +157,6 @@ struct AkaoSplitSampleLocation {
   u32 articulationCount = 0;
 };
 
-struct AkaoSampleCandidate {
-  std::size_t index = 0;
-  std::optional<u32> sampleSetId;
-  u32 firstArticulationId = 0;
-  u32 articulationCount = 0;
-  u32 sourceOffset = 0;
-};
-
 [[nodiscard]] core::SequenceDialect makeAkaoDialect(AkaoPs1Version version);
 [[nodiscard]] core::TrackProgram decodeAkaoTrack(core::ByteReader reader, AkaoPs1Version version,
                                                  core::TrackDecodeInput input);
@@ -197,14 +190,10 @@ void registerAkaoSequenceDialects(core::SequenceDialectRegistry& registry);
 [[nodiscard]] std::string akaoInstrumentSetName(const AkaoSequenceAnalysis& sequence);
 void buildAkaoInstrumentSet(const core::ScanInput& input, const AkaoSequenceAnalysis& sequence,
                             const AkaoArticulationMap& articulations, core::InstrumentSetBuilder& instruments);
-[[nodiscard]] std::vector<u32> requiredArticulations(core::ByteReader reader, const AkaoSequenceAnalysis& sequence);
-void annotateAkaoInstrumentStructures(core::ByteReader reader, const AkaoSequenceAnalysis& sequence,
-                                      core::SourceMapBuilder& sourceMap,
-                                      std::optional<core::SourceAnnotationId> parent = std::nullopt);
+[[nodiscard]] std::vector<u32> analyzeAkaoInstrumentStructures(
+    core::ByteReader reader, const AkaoSequenceAnalysis& sequence, core::SourceMapBuilder* sourceMap = nullptr,
+    std::optional<core::SourceAnnotationId> parent = std::nullopt);
 
-[[nodiscard]] std::vector<std::size_t> selectAkaoSampleCandidates(std::optional<u32> sequenceSampleSet,
-                                                                  std::span<const u32> requiredArticulations,
-                                                                  std::span<const AkaoSampleCandidate> candidates);
 [[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(const core::MatchContext& context);
 [[nodiscard]] core::MaterializationResult materializeAkaoCollection(const core::MaterializationContext& context);
 

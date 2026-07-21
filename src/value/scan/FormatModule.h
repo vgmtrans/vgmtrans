@@ -9,8 +9,9 @@
 #include "value/model/SessionSnapshot.h"
 #include "value/scan/ScanTypes.h"
 
-#include <span>
 #include <functional>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,6 +34,54 @@ struct MaterializationContext {
   const DesiredCollection& collection;
   ScanIdAllocator& ids;
   std::function<AssetId(std::string_view)> assetIdForSlot;
+
+  [[nodiscard]] const SequenceProgramAsset* sequenceAsset() const {
+    return collection.sequence ? snapshot.asset<SequenceProgramAsset>(*collection.sequence) : nullptr;
+  }
+
+  [[nodiscard]] std::vector<const InstrumentSetAsset*> selectedInstrumentSets() const {
+    std::vector<const InstrumentSetAsset*> assets;
+    assets.reserve(collection.instrumentSets.size());
+    for (const AssetId id : collection.instrumentSets) {
+      if (const auto* asset = snapshot.asset<InstrumentSetAsset>(id)) {
+        assets.push_back(asset);
+      }
+    }
+    return assets;
+  }
+
+  [[nodiscard]] std::vector<const SampleCollectionAsset*> selectedSampleCollections() const {
+    std::vector<const SampleCollectionAsset*> assets;
+    assets.reserve(collection.sampleCollections.size());
+    for (const AssetId id : collection.sampleCollections) {
+      if (const auto* asset = snapshot.asset<SampleCollectionAsset>(id)) {
+        assets.push_back(asset);
+      }
+    }
+    return assets;
+  }
+
+  [[nodiscard]] std::vector<const MiscAsset*> selectedMiscAssets() const {
+    std::vector<const MiscAsset*> assets;
+    assets.reserve(collection.miscAssets.size());
+    for (const AssetId id : collection.miscAssets) {
+      if (const auto* asset = snapshot.asset<MiscAsset>(id)) {
+        assets.push_back(asset);
+      }
+    }
+    return assets;
+  }
+
+  [[nodiscard]] std::optional<ScanInput> inputFor(SourceRange range) const {
+    if (!range.valid() || !sources.contains(range.source)) {
+      return std::nullopt;
+    }
+    return ScanInput{
+        .source = sources.source(range.source),
+        .reader = sources.reader(range.source),
+        .ids = ids,
+    };
+  }
 };
 
 struct MaterializationResult {

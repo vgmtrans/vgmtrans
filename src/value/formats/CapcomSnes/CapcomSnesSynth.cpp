@@ -115,13 +115,12 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
 
     instruments.push_back(CapcomSnesInstrumentInfo{
         .index = instrumentIndex,
-        .address = address,
         .srcn = *srcn,
         .adsr1 = *adsr1,
         .adsr2 = *adsr2,
         .gain = *gain,
         .pitchScale = *pitchScale,
-        .sourceFields = record.takeFields(),
+        .source = std::move(record).finish(),
     });
   }
 
@@ -148,8 +147,8 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
   auto samples = builder.samples(sampleCollection);
   const auto sampleRefs = addSnesBrrSamples(samples, reader, sampleCatalog);
 
-  const u32 rootOffset = instrumentInfos.front().address;
-  const u32 rootSize = (instrumentInfos.back().address + 6) - rootOffset;
+  const u32 rootOffset = static_cast<u32>(instrumentInfos.front().source.range.offset);
+  const u32 rootSize = static_cast<u32>(instrumentInfos.back().source.range.endOffset() - rootOffset);
   const SourceRange instrumentTableRange = reader.range(rootOffset, rootSize);
   auto instruments = builder.instruments(instrumentSet);
   instruments.include(instrumentTableRange);
@@ -163,7 +162,7 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
       continue;
     }
     const auto pitch = capcomInstrumentPitch(info.pitchScale);
-    const SourceRange range = reader.range(info.address, 6);
+    const SourceRange range = info.source.range;
     const std::string name = fmt::format("Instrument {}", info.index);
 
     auto instrument = instruments.add(info.index, Instrument{
@@ -175,10 +174,8 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
                                                       .name = name,
                                                       .modulation = kCapcomModulation,
                                                   });
-    auto annotation = instrument.source(name, range, "capcom-snes-instrument")
-                          .derived("instrument", info.index)
-                          .fields(info.sourceFields)
-                          .parent(root);
+    auto annotation =
+        instrument.source(name, info.source, "capcom-snes-instrument").derived("instrument", info.index).parent(root);
 
     instrument
         .region(*sample,
@@ -192,11 +189,11 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
         .description(fmt::format("Sample {}", sample->index));
 
     auto envelopeAnnotation = builder.sourceMap()
-                                  .annotation(SourceRole::DataBlock, "ADSR/Gain", reader.range(info.address + 1, 3))
+                                  .annotation(SourceRole::DataBlock, "ADSR/Gain", reader.range(range.offset + 1, 3))
                                   .kind("capcom-snes-adsr-gain")
                                   .parent(annotation.id())
                                   .outline(SourceOutlinePolicy::Show);
-    for (const auto& field : info.sourceFields) {
+    for (const auto& field : info.source.fields) {
       if (field.name == "adsr1" || field.name == "adsr2" || field.name == "gain") {
         envelopeAnnotation.field(field.name, field.range, field.value, field.display);
       }

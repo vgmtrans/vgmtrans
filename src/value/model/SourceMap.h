@@ -127,6 +127,14 @@ struct SourceField {
   SourceValueDisplay display = SourceValueDisplay::Default;
 };
 
+// The source description of one parsed structure. Keeping its span and fields
+// together lets format code pass a record to synth builders without separately
+// carrying an address, a length, and a parallel field list.
+struct SourceRecord {
+  SourceRange range;
+  std::vector<SourceField> fields;
+};
+
 enum class SourceLinkRole : u8 {
   PointsTo,
   JumpTarget,

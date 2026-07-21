@@ -38,88 +38,9 @@ constexpr u32 kDrumKitProgram = 0x00;
   return usesLegacyPanRange(version) ? 0x14 : 0x28;
 }
 
-[[nodiscard]] bool instrumentHeaderIsValid(ByteReader reader, KonamiSnesVersion version, u32 address, u32 spcDirAddress,
-                                           bool validateSample) {
-  const u32 headerSize = instrumentHeaderSize(version);
-  if (!reader.has(address, headerSize)) {
-    return false;
-  }
-
-  const u8 srcn = reader.u8At(address);
-  if (srcn == 0xff) {
-    return false;
-  }
-
-  const u32 dirEntryAddress = spcDirAddress + srcn * 4;
-  if (!readSnesSampleDirectoryEntry(reader, dirEntryAddress, validateSample)) {
-    return false;
-  }
-
-  const u16 sampleStart = reader.le16(dirEntryAddress);
-  const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
-  // BRR data is stored in nine-byte blocks, so a loop point can only land on a
-  // block boundary at or after the sample start.
-  return sampleStart <= sampleLoop && ((sampleLoop - sampleStart) % 9) == 0;
-}
-
-// Drum tables have no explicit length. Pan and volume are checked as well as
-// the sample reference so unrelated RAM is unlikely to be mistaken for entries.
-[[nodiscard]] bool percussionHeaderIsValid(ByteReader reader, KonamiSnesVersion version, u32 address,
-                                           u32 spcDirAddress) {
-  if (!instrumentHeaderIsValid(reader, version, address, spcDirAddress, true)) {
-    return false;
-  }
-  const bool legacyLayout = usesLegacyInstrumentLayout(version);
-  const u8 pan = reader.u8At(address + (legacyLayout ? 6 : 5));
-  const u8 volume = reader.u8At(address + (legacyLayout ? 7 : 6));
-  return pan <= percussionPanLimit(version) && volume <= 0x7f;
-}
-
-[[nodiscard]] int percussionKey(ByteReader reader, u32 address) {
-  const s8 rawKey = reader.s8At(address + 1);
-  const s8 tuning = reader.s8At(address + 2);
-  // Key and tuning form one signed 8.8 value. A negative fractional byte
-  // borrows one from the integer byte when converted back to a whole key.
-  return tuning >= 0 ? rawKey : rawKey - 1;
-}
-
-[[nodiscard]] KonamiSnesInstrumentInfo instrumentInfo(ByteReader reader, KonamiSnesVersion version, u32 index,
-                                                      u32 address, bool percussion = false, u8 percussionNote = 0);
-
-[[nodiscard]] std::vector<KonamiSnesInstrumentInfo> collectPercussionInfos(ByteReader reader, KonamiSnesVersion version,
-                                                                           u32 tableAddress, u32 spcDirAddress) {
-  std::vector<KonamiSnesInstrumentInfo> infos;
-  infos.reserve(kPercussionNoteCount);
-  const u32 headerSize = instrumentHeaderSize(version);
-  for (u8 percussionNote = 0; percussionNote < kPercussionNoteCount; ++percussionNote) {
-    const u32 address = tableAddress + headerSize * percussionNote;
-    if (!reader.has(address, headerSize)) {
-      break;
-    }
-    if (!percussionHeaderIsValid(reader, version, address, spcDirAddress)) {
-      // Empty or damaged drum slots may appear inside the table. Implausible
-      // pan or pitch values indicate that the table has ended; otherwise skip
-      // this slot and keep looking for later valid keys.
-      const bool legacyLayout = usesLegacyInstrumentLayout(version);
-      const u8 pan = reader.u8At(address + (legacyLayout ? 6 : 5));
-      if (pan > percussionPanLimit(version)) {
-        break;
-      }
-      const int key = percussionKey(reader, address);
-      if (!instrumentHeaderIsValid(reader, version, address, spcDirAddress, true) && (key < -40 || key > 40)) {
-        break;
-      }
-      continue;
-    }
-
-    infos.push_back(
-        instrumentInfo(reader, version, (kDrumKitBank << 7) | kDrumKitProgram, address, true, percussionNote));
-  }
-  return infos;
-}
-
-[[nodiscard]] KonamiSnesInstrumentInfo instrumentInfo(ByteReader reader, KonamiSnesVersion version, u32 index,
-                                                      u32 address, bool percussion, u8 percussionNote) {
+[[nodiscard]] KonamiSnesInstrumentInfo parseInstrumentInfo(ByteReader reader, KonamiSnesVersion version, u32 index,
+                                                           u32 address, bool percussion = false,
+                                                           u8 percussionNote = 0) {
   const bool legacyLayout = usesLegacyInstrumentLayout(version);
   // The early eight-byte entry stores GAIN separately. The later seven-byte entry
   // drops that byte and uses ADSR2 as the fallback GAIN value.
@@ -137,7 +58,6 @@ constexpr u32 kDrumKitProgram = 0x00;
   const auto volume = record.u8("volume");
   return KonamiSnesInstrumentInfo{
       .index = index,
-      .address = address,
       .srcn = *srcn,
       .key = *key,
       .tuning = *tuning,
@@ -148,8 +68,66 @@ constexpr u32 kDrumKitProgram = 0x00;
       .volume = *volume,
       .percussion = percussion,
       .percussionNote = percussionNote,
-      .sourceFields = record.takeFields(),
+      .source = std::move(record).finish(),
   };
+}
+
+[[nodiscard]] bool instrumentHeaderIsValid(ByteReader reader, const KonamiSnesInstrumentInfo& info, u32 spcDirAddress,
+                                           bool validateSample) {
+  if (info.srcn == 0xff) {
+    return false;
+  }
+
+  const u32 dirEntryAddress = spcDirAddress + info.srcn * 4;
+  if (!readSnesSampleDirectoryEntry(reader, dirEntryAddress, validateSample)) {
+    return false;
+  }
+
+  const u16 sampleStart = reader.le16(dirEntryAddress);
+  const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
+  // BRR data is stored in nine-byte blocks, so a loop point can only land on a
+  // block boundary at or after the sample start.
+  return sampleStart <= sampleLoop && ((sampleLoop - sampleStart) % 9) == 0;
+}
+
+[[nodiscard]] int percussionKey(const KonamiSnesInstrumentInfo& info) {
+  // Key and tuning form one signed 8.8 value. A negative fractional byte
+  // borrows one from the integer byte when converted back to a whole key.
+  return info.tuning >= 0 ? info.key : info.key - 1;
+}
+
+[[nodiscard]] std::vector<KonamiSnesInstrumentInfo> collectPercussionInfos(ByteReader reader, KonamiSnesVersion version,
+                                                                           u32 tableAddress, u32 spcDirAddress) {
+  std::vector<KonamiSnesInstrumentInfo> infos;
+  infos.reserve(kPercussionNoteCount);
+  const u32 headerSize = instrumentHeaderSize(version);
+  for (u8 percussionNote = 0; percussionNote < kPercussionNoteCount; ++percussionNote) {
+    const u32 address = tableAddress + headerSize * percussionNote;
+    if (!reader.has(address, headerSize)) {
+      break;
+    }
+    auto info =
+        parseInstrumentInfo(reader, version, (kDrumKitBank << 7) | kDrumKitProgram, address, true, percussionNote);
+    const bool sampleIsValid = instrumentHeaderIsValid(reader, info, spcDirAddress, true);
+    // Drum tables have no explicit length. Pan and volume are checked as well
+    // as the sample reference so unrelated RAM is unlikely to look like data.
+    if (!sampleIsValid || info.pan > percussionPanLimit(version) || info.volume > 0x7f) {
+      // Empty or damaged drum slots may appear inside the table. Implausible
+      // pan or pitch values indicate that the table has ended; otherwise skip
+      // this slot and keep looking for later valid keys.
+      if (info.pan > percussionPanLimit(version)) {
+        break;
+      }
+      const int key = percussionKey(info);
+      if (!sampleIsValid && (key < -40 || key > 40)) {
+        break;
+      }
+      continue;
+    }
+
+    infos.push_back(std::move(info));
+  }
+  return infos;
 }
 
 [[nodiscard]] InstrumentModulation konamiInstrumentModulation(KonamiSnesVersion version) {
@@ -235,7 +213,8 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
     if (!reader.has(address, headerSize)) {
       break;
     }
-    if (!instrumentHeaderIsValid(reader, layout.version, address, *layout.spcDirAddress, false)) {
+    auto info = parseInstrumentInfo(reader, layout.version, instrumentIndex, address);
+    if (!instrumentHeaderIsValid(reader, info, *layout.spcDirAddress, false)) {
       // The shared table may be sparse, but the selected bank is stored as one
       // packed run. A bad shared entry is a hole; a bad banked entry ends the run.
       if (instrumentIndex < layout.firstBankedInstrument) {
@@ -243,18 +222,17 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
       }
       break;
     }
-    if (!instrumentHeaderIsValid(reader, layout.version, address, *layout.spcDirAddress, true)) {
+    if (!instrumentHeaderIsValid(reader, info, *layout.spcDirAddress, true)) {
       continue;
     }
 
-    const u8 srcn = reader.u8At(address);
-    const u32 dirEntry = *layout.spcDirAddress + srcn * 4;
+    const u32 dirEntry = *layout.spcDirAddress + info.srcn * 4;
     // A sample may not begin inside the directory entry that points to it. This
     // extra check filters out self-referential entries in unused RAM.
     if (!reader.has(dirEntry, 4) || reader.le16(dirEntry) < dirEntry + 4) {
       continue;
     }
-    infos.push_back(instrumentInfo(reader, layout.version, instrumentIndex, address));
+    infos.push_back(std::move(info));
   }
 
   auto percussionInfos =
@@ -309,11 +287,11 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
   // Entries can come from three separate tables. Their common source parent
   // spans the lowest through highest entry while each exact record remains
   // separately selectable in HexView.
-  u32 rootOffset = instrumentInfos.front().address;
-  u32 rootEnd = rootOffset + instrumentHeaderSize(version);
+  u32 rootOffset = static_cast<u32>(instrumentInfos.front().source.range.offset);
+  u32 rootEnd = static_cast<u32>(instrumentInfos.front().source.range.endOffset());
   for (const auto& info : instrumentInfos) {
-    rootOffset = std::min(rootOffset, info.address);
-    rootEnd = std::max(rootEnd, info.address + instrumentHeaderSize(version));
+    rootOffset = std::min(rootOffset, static_cast<u32>(info.source.range.offset));
+    rootEnd = std::max(rootEnd, static_cast<u32>(info.source.range.endOffset()));
   }
   const SourceRange tableRange = reader.range(rootOffset, rootEnd - rootOffset);
   instruments.include(tableRange);
@@ -323,14 +301,14 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
   for (const auto& info : instrumentInfos) {
     const auto sample = konamiSampleRef(info, spcDirAddress, sampleCatalog, sampleRefs);
     if (!sample) {
-      instruments.warning("Instrument sample was not found", reader.range(info.address, instrumentHeaderSize(version)));
+      instruments.warning("Instrument sample was not found", info.source.range);
       continue;
     }
 
     const u32 bank = info.percussion ? kDrumKitBank : (info.index >> 7);
     const u32 program = info.percussion ? kDrumKitProgram : (info.index & 0x7f);
     const u32 programKey = (bank << 7) | program;
-    const SourceRange entryRange = reader.range(info.address, instrumentHeaderSize(version));
+    const SourceRange entryRange = info.source.range;
     const std::string entryName = info.percussion
                                       ? fmt::format("Percussion {}", static_cast<unsigned>(info.percussionNote))
                                       : fmt::format("Instrument {}", info.index);
@@ -341,10 +319,8 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
                                              .modulation = konamiInstrumentModulation(version),
                                          });
     instrument
-        .source(entryName, entryRange, info.percussion ? "konami-snes-percussion-instrument" : "konami-snes-instrument")
-        .derived("bank", bank)
-        .derived("program", program)
-        .fields(info.sourceFields)
+        .source(entryName, info.source,
+                info.percussion ? "konami-snes-percussion-instrument" : "konami-snes-instrument")
         .parent(root);
 
     const auto pitch = konamiPitch(info);

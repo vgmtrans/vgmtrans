@@ -6,6 +6,10 @@
 
 #include "value/formats/Akao/Akao.h"
 
+#include "value/base/RecordReader.h"
+#include "value/synth/PsxAdpcm.h"
+#include "value/synth/PsxSpu.h"
+
 #include <algorithm>
 #include <cmath>
 #include <fmt/format.h>
@@ -22,10 +26,6 @@ using namespace core;
 
 namespace {
 
-constexpr u32 kPsxSampleRate = 44100;
-constexpr u32 kPsxAdpcmBlockBytes = 16;
-constexpr u32 kPsxAdpcmBlockSamples = 28;
-
 struct ArticulationTable {
   u32 articulationTableOffset = 0;
   u32 articulationSize = 0;
@@ -34,11 +34,6 @@ struct ArticulationTable {
   u32 firstArticulationId = 0;
   u32 articulationCount = 0;
   std::optional<u16> sampleSetId;
-};
-
-struct PsxSampleInfo {
-  u32 encodedLength = 0;
-  Loop loop;
 };
 
 struct ParsedSample {
@@ -54,16 +49,6 @@ struct ParsedSampleCollection {
   ArticulationTable table;
 };
 
-[[nodiscard]] u16 composePsxAdsr1(u8 attackMode, u8 attackRate, u8 decayRate, u8 sustainLevel) {
-  return static_cast<u16>(((attackMode & 1) << 15) | ((attackRate & 0x7f) << 8) | ((decayRate & 0x0f) << 4) |
-                          (sustainLevel & 0x0f));
-}
-
-[[nodiscard]] u16 composePsxAdsr2(u8 sustainMode, u8 sustainDirection, u8 sustainRate, u8 releaseMode, u8 releaseRate) {
-  return static_cast<u16>(((sustainMode & 1) << 15) | ((sustainDirection & 1) << 14) | ((sustainRate & 0x7f) << 6) |
-                          ((releaseMode & 1) << 5) | (releaseRate & 0x1f));
-}
-
 [[nodiscard]] double log2Cents(double multiplier) {
   return multiplier > 0.0 ? std::log(multiplier) / std::log(2.0) * 1200.0 : 0.0;
 }
@@ -74,50 +59,6 @@ struct ParsedSampleCollection {
 
 [[nodiscard]] s16 fineTuneFromCents(double cents) {
   return static_cast<s16>(static_cast<int>(cents) % 100);
-}
-
-[[nodiscard]] u32 psxDecodedFrames(u32 encodedBytes) {
-  return (encodedBytes / kPsxAdpcmBlockBytes) * kPsxAdpcmBlockSamples;
-}
-
-[[nodiscard]] u32 psxDecodedOffset(u32 encodedOffset) {
-  return (encodedOffset / kPsxAdpcmBlockBytes) * kPsxAdpcmBlockSamples;
-}
-
-[[nodiscard]] PsxSampleInfo psxSampleInfo(ByteReader reader, u32 offset, u32 endOffset) {
-  u32 cursor = offset;
-  std::optional<u32> loopStartBytes;
-  bool loops = false;
-  while (cursor + kPsxAdpcmBlockBytes <= endOffset && reader.has(cursor, kPsxAdpcmBlockBytes)) {
-    const u8 flags = reader.u8At(cursor + 1);
-    if ((flags & 4) != 0) {
-      loopStartBytes = cursor - offset;
-    }
-    cursor += kPsxAdpcmBlockBytes;
-    if ((flags & 1) != 0) {
-      loops = (flags & 2) != 0;
-      const u32 encodedLength = cursor - offset;
-      return PsxSampleInfo{
-          .encodedLength = encodedLength,
-          .loop =
-              Loop{
-                  .enabled = loops,
-                  .start = loopStartBytes ? psxDecodedOffset(*loopStartBytes) : 0,
-                  .length = loopStartBytes ? psxDecodedOffset(encodedLength - *loopStartBytes) : 0,
-              },
-      };
-    }
-  }
-  const u32 encodedLength = cursor > offset ? cursor - offset : 0;
-  return PsxSampleInfo{
-      .encodedLength = encodedLength,
-      .loop =
-          Loop{
-              .enabled = false,
-              .start = loopStartBytes ? psxDecodedOffset(*loopStartBytes) : 0,
-              .length = loopStartBytes ? psxDecodedOffset(encodedLength - *loopStartBytes) : 0,
-          },
-  };
 }
 
 [[nodiscard]] std::optional<ArticulationTable> sampleHeader(ByteReader reader, u32 offset, AkaoPs1Version version) {
@@ -202,66 +143,87 @@ struct ParsedSampleCollection {
   const u32 articulationOffset = table.articulationTableOffset + index * table.articulationSize;
   AkaoArticulation articulation{
       .articulationId = table.firstArticulationId + index,
-      .range = reader.range(articulationOffset, table.articulationSize),
   };
+  RecordReader record(reader, articulationOffset, articulationOffset + table.articulationSize);
+  const auto finishSource = [&]() { return std::move(record).finish(); };
   if (profile.hasCompactArticulations()) {
     // The later driver stores a signed fixed-point pitch multiplier. Convert
     // it once to the root-key and fine-tuning values expected by synth export.
-    const s16 rawFineTune = static_cast<s16>(reader.le16(articulationOffset + 8));
+    const u32 sampleOffset = *record.u32leAt(0, "sample_offset", SourceValueDisplay::Address);
+    const u32 loopAddress = *record.u32leAt(4, "loop_address", SourceValueDisplay::Address);
+    const s16 rawFineTune = *record.s16leAt(8, "pitch_multiplier");
+    const u16 unityKey = *record.u16leAt(0x0a, "unity_key", SourceValueDisplay::MidiNote);
+    const u16 adsr1 = *record.u16leAt(0x0c, "adsr1", SourceValueDisplay::Hex);
+    const u16 adsr2 = *record.u16leAt(0x0e, "adsr2", SourceValueDisplay::Hex);
     const double multiplier =
         rawFineTune >= 0 ? 1.0 + (rawFineTune / 32768.0) : (static_cast<u16>(rawFineTune) / 65536.0);
     const double cents = log2Cents(multiplier);
     const s8 coarse = coarseTuneFromCents(cents);
-    articulation.sampleOffset = reader.le32(articulationOffset);
-    articulation.loopPoint = reader.le32(articulationOffset + 4) - articulation.sampleOffset;
+    articulation.sampleOffset = sampleOffset;
+    articulation.loopPoint = loopAddress - articulation.sampleOffset;
     articulation.fineTuneCents = fineTuneFromCents(cents);
-    articulation.unityKey = static_cast<u8>(reader.le16(articulationOffset + 0x0a) - coarse);
-    articulation.adsr1 = reader.le16(articulationOffset + 0x0c);
-    articulation.adsr2 = reader.le16(articulationOffset + 0x0e);
+    articulation.unityKey = static_cast<u8>(unityKey - coarse);
+    articulation.adsr1 = adsr1;
+    articulation.adsr2 = adsr2;
+    articulation.source = finishSource();
     return articulation;
   }
 
   if (version == AkaoPs1Version::Version3_0) {
     // Version 3.0 uses the older expanded articulation record, but its sample
     // addresses are already relative to this collection's sample section.
-    const double cents = log2Cents(reader.le32(articulationOffset + 8) / static_cast<double>(4096 * 256));
+    const u32 sampleOffset = *record.u32leAt(0, "sample_offset", SourceValueDisplay::Address);
+    const u32 loopAddress = *record.u32leAt(4, "loop_address", SourceValueDisplay::Address);
+    const u32 pitch = *record.u32leAt(8, "pitch_multiplier");
+    const u8 attackRate = *record.u8At(0x38, "attack_rate");
+    const u8 decayRate = *record.u8At(0x39, "decay_rate");
+    const u8 sustainLevel = *record.u8At(0x3a, "sustain_level");
+    const u8 sustainRate = *record.u8At(0x3b, "sustain_rate");
+    const u8 releaseRate = *record.u8At(0x3c, "release_rate");
+    const u8 attackMode = *record.u8At(0x3d, "attack_mode", SourceValueDisplay::Hex);
+    const u8 sustainMode = *record.u8At(0x3e, "sustain_mode", SourceValueDisplay::Hex);
+    const u8 releaseMode = *record.u8At(0x3f, "release_mode", SourceValueDisplay::Hex);
+    const double cents = log2Cents(pitch / static_cast<double>(4096 * 256));
     const s8 coarse = coarseTuneFromCents(cents);
-    articulation.sampleOffset = reader.le32(articulationOffset);
-    articulation.loopPoint = reader.le32(articulationOffset + 4) - articulation.sampleOffset;
+    articulation.sampleOffset = sampleOffset;
+    articulation.loopPoint = loopAddress - articulation.sampleOffset;
     articulation.fineTuneCents = fineTuneFromCents(cents);
     articulation.unityKey = static_cast<u8>(72 - coarse);
-    articulation.adsr1 =
-        composePsxAdsr1((reader.u8At(articulationOffset + 0x3d) & 4) >> 2, reader.u8At(articulationOffset + 0x38),
-                        reader.u8At(articulationOffset + 0x39), reader.u8At(articulationOffset + 0x3a));
-    articulation.adsr2 =
-        composePsxAdsr2((reader.u8At(articulationOffset + 0x3e) & 4) >> 2,
-                        (reader.u8At(articulationOffset + 0x3e) & 2) >> 1, reader.u8At(articulationOffset + 0x3b),
-                        (reader.u8At(articulationOffset + 0x3f) & 4) >> 2, reader.u8At(articulationOffset + 0x3c));
+    articulation.adsr1 = composePsxAdsr1((attackMode & 4) >> 2, attackRate, decayRate, sustainLevel);
+    articulation.adsr2 = composePsxAdsr2((sustainMode & 4) >> 2, (sustainMode & 2) >> 1, sustainRate,
+                                         (releaseMode & 4) >> 2, releaseRate);
+    articulation.source = finishSource();
     return articulation;
   }
 
   // Earlier drivers store absolute SPU addresses. The sample collection header
   // tells us where the upload begins, so normalize both addresses back to
   // offsets within the encoded sample data.
-  const u32 sampleStartAddress = reader.le32(articulationOffset);
-  const u32 loopStartAddress = reader.le32(articulationOffset + 4);
+  const u32 sampleStartAddress = *record.u32leAt(0, "sample_address", SourceValueDisplay::Address);
+  const u32 loopStartAddress = *record.u32leAt(4, "loop_address", SourceValueDisplay::Address);
+  const u8 attackRate = *record.u8At(8, "attack_rate");
+  const u8 decayRate = *record.u8At(9, "decay_rate");
+  const u8 sustainLevel = *record.u8At(0x0a, "sustain_level");
+  const u8 sustainRate = *record.u8At(0x0b, "sustain_rate");
+  const u8 releaseRate = *record.u8At(0x0c, "release_rate");
+  const u8 attackMode = *record.u8At(0x0d, "attack_mode", SourceValueDisplay::Hex);
+  const u8 sustainMode = *record.u8At(0x0e, "sustain_mode", SourceValueDisplay::Hex);
+  const u8 releaseMode = *record.u8At(0x0f, "release_mode", SourceValueDisplay::Hex);
+  const u32 pitch = *record.u32leAt(0x10, "pitch_multiplier");
   if (sampleStartAddress < spuDestinationAddress || loopStartAddress < spuDestinationAddress ||
       sampleStartAddress > loopStartAddress) {
     return std::nullopt;
   }
-  const double cents = log2Cents(reader.le32(articulationOffset + 0x10) / 4096.0);
+  const double cents = log2Cents(pitch / 4096.0);
   const s8 coarse = coarseTuneFromCents(cents);
   articulation.sampleOffset = sampleStartAddress - spuDestinationAddress;
   articulation.loopPoint = loopStartAddress - sampleStartAddress;
   articulation.fineTuneCents = fineTuneFromCents(cents);
   articulation.unityKey = static_cast<u8>(72 - coarse);
-  articulation.adsr1 =
-      composePsxAdsr1((reader.u8At(articulationOffset + 0x0d) & 4) >> 2, reader.u8At(articulationOffset + 8),
-                      reader.u8At(articulationOffset + 9), reader.u8At(articulationOffset + 0x0a));
+  articulation.adsr1 = composePsxAdsr1((attackMode & 4) >> 2, attackRate, decayRate, sustainLevel);
   articulation.adsr2 =
-      composePsxAdsr2((reader.u8At(articulationOffset + 0x0e) & 4) >> 2,
-                      (reader.u8At(articulationOffset + 0x0e) & 2) >> 1, reader.u8At(articulationOffset + 0x0b),
-                      (reader.u8At(articulationOffset + 0x0f) & 4) >> 2, reader.u8At(articulationOffset + 0x0c));
+      composePsxAdsr2((sustainMode & 4) >> 2, (sustainMode & 2) >> 1, sustainRate, (releaseMode & 4) >> 2, releaseRate);
+  articulation.source = finishSource();
   return articulation;
 }
 
@@ -296,9 +258,8 @@ struct ParsedSampleCollection {
     if (sampleAddress >= sampleSectionEnd || !input.reader.has(sampleAddress, 1)) {
       continue;
     }
-    const PsxSampleInfo sampleInfo = psxSampleInfo(input.reader, sampleAddress, sampleSectionEnd);
-    const u32 encodedLength = sampleInfo.encodedLength;
-    if (encodedLength == 0) {
+    const auto sampleInfo = inspectPsxAdpcmStream(input.reader, sampleAddress, sampleSectionEnd);
+    if (!sampleInfo) {
       continue;
     }
     const u32 sampleIndex = static_cast<u32>(samples.size());
@@ -309,11 +270,11 @@ struct ParsedSampleCollection {
             Sample{
                 .name = fmt::format("Sample {}", sampleIndex),
                 .codec = AudioCodec::PsxAdpcm,
-                .encodedData = input.reader.range(sampleAddress, encodedLength),
-                .sampleRate = kPsxSampleRate,
+                .encodedData = sampleInfo->encodedData,
+                .sampleRate = kPs1SpuSampleRate,
                 .channels = 1,
                 .bitsPerSample = 16,
-                .loop = sampleInfo.loop,
+                .loop = sampleInfo->loop,
             },
     });
   }
@@ -330,18 +291,20 @@ struct ParsedSampleCollection {
       const u32 encodedLength = static_cast<u32>(samples[articulation.sampleIndex].value.encodedData.size);
       Loop& sampleLoop = samples[articulation.sampleIndex].value.loop;
       if (sampleLoop.enabled && sampleLoop.start == 0 && sampleLoop.length == 0) {
-        const u32 loopStart = articulation.loopPoint < encodedLength ? psxDecodedOffset(articulation.loopPoint) : 0;
+        const u32 loopStart =
+            articulation.loopPoint < encodedLength ? psxAdpcmDecodedOffset(articulation.loopPoint) : 0;
         articulation.loop = Loop{
             .enabled = true,
             .start = loopStart,
-            .length = loopStart < psxDecodedFrames(encodedLength) ? psxDecodedFrames(encodedLength) - loopStart : 0,
+            .length =
+                loopStart < psxAdpcmDecodedFrames(encodedLength) ? psxAdpcmDecodedFrames(encodedLength) - loopStart : 0,
         };
       } else if (!sampleLoop.enabled && sampleLoop.start == 0 && sampleLoop.length == 0 &&
                  articulation.loopPoint != 0 && articulation.loopPoint < encodedLength) {
-        const u32 loopStart = psxDecodedOffset(articulation.loopPoint);
+        const u32 loopStart = psxAdpcmDecodedOffset(articulation.loopPoint);
         sampleLoop.start = loopStart;
         sampleLoop.length =
-            loopStart < psxDecodedFrames(encodedLength) ? psxDecodedFrames(encodedLength) - loopStart : 0;
+            loopStart < psxAdpcmDecodedFrames(encodedLength) ? psxAdpcmDecodedFrames(encodedLength) - loopStart : 0;
       }
     }
   }
@@ -393,16 +356,17 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Sca
                                                    .id();
   for (const AkaoArticulation& articulation : parsed.parse.articulations) {
     auto annotation = result.sourceMap()
-                          .entry(fmt::format("Articulation {}", articulation.articulationId), articulation.range)
+                          .entry(fmt::format("Articulation {}", articulation.articulationId), articulation.source.range)
                           .kind("akao-articulation")
                           .parent(articulationTable)
+                          .fields(articulation.source.fields)
                           .derived("articulation_id", articulation.articulationId)
-                          .derived("unity_key", articulation.unityKey, SourceValueDisplay::MidiNote)
+                          .derived("effective_unity_key", articulation.unityKey, SourceValueDisplay::MidiNote)
                           .derived("fine_tune_cents", articulation.fineTuneCents, SourceValueDisplay::Cents)
-                          .derived("sample_offset", articulation.sampleOffset, SourceValueDisplay::Address)
+                          .derived("effective_sample_offset", articulation.sampleOffset, SourceValueDisplay::Address)
                           .derived("loop_point", articulation.loopPoint, SourceValueDisplay::Address)
-                          .derived("adsr1", articulation.adsr1, SourceValueDisplay::Hex)
-                          .derived("adsr2", articulation.adsr2, SourceValueDisplay::Hex);
+                          .derived("effective_adsr1", articulation.adsr1, SourceValueDisplay::Hex)
+                          .derived("effective_adsr2", articulation.adsr2, SourceValueDisplay::Hex);
     if (articulation.sampleIndex < parsed.samples.size()) {
       annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(ref.id, articulation.sampleIndex)});
     }

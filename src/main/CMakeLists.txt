@@ -127,6 +127,8 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/scan/ParseCursor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/ScanCommit.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/PsxAdpcm.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/PsxSpu.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SynthBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp

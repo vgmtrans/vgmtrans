@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "value/base/RecordReader.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/scan/CollectionPreparation.h"
 #include "value/validation/SnapshotValidation.h"
@@ -29,6 +30,29 @@ bool hasLink(const SourceAnnotation& annotation, SourceLinkRole role, const Sour
                              [&](const SourceLink& link) { return link.role == role && link.target == target; });
 }
 
+const SourceField* fieldNamed(const SourceAnnotation& annotation, std::string_view name) {
+  const auto found = std::ranges::find(annotation.fields, name, &SourceField::name);
+  return found == annotation.fields.end() ? nullptr : &*found;
+}
+
+bool unsignedFieldEquals(const SourceAnnotation& annotation, std::string_view name, u64 expected) {
+  const SourceField* field = fieldNamed(annotation, name);
+  const auto* value = field == nullptr ? nullptr : std::get_if<u64>(&field->value);
+  return value != nullptr && *value == expected;
+}
+
+void recordReaderFinishesOnePortableSourceValue() {
+  const SourceId source{29};
+  const std::vector<u8> bytes{0, 0, 0, 0, 0x12, 0x34, 0, 0, 0x78, 0x56, 0, 0};
+  RecordReader reader(ByteReader(source, bytes), 4, 12);
+  expect(*reader.u16leAt(4, "later") == 0x5678 && *reader.u16leAt(0, "first") == 0x3412,
+         "positioned record reads should express fixed layouts without manual address arithmetic");
+  const SourceRecord record = std::move(reader).finish();
+  expect(record.range == SourceRange{.source = source, .offset = 4, .size = 8} && record.fields.size() == 2 &&
+             record.fields[0].range.offset == 8 && record.fields[1].range.offset == 4,
+         "a finished source record should keep one covering range and every exact field range");
+}
+
 void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   const SourceId source{30};
   const AssetId asset{40};
@@ -44,10 +68,16 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
                                   .encodedData = SourceRange{.source = source, .offset = 100, .size = 9},
                               });
   expect(first.ref().index == 0, "first sample source key should receive dense index zero");
-  first.source("First Entry", SourceRange{.source = source, .offset = 8, .size = 4}, "probe-sample-entry")
-      .field("srcn", SourceRange{.source = source, .offset = 8, .size = 1}, u8{7}, SourceValueDisplay::Hex)
-      .parent(root.id())
-      .outline(SourceOutlinePolicy::Show);
+  const SourceRecord firstRecord{
+      .range = SourceRange{.source = source, .offset = 8, .size = 4},
+      .fields = {SourceField{
+          .name = "srcn",
+          .range = SourceRange{.source = source, .offset = 8, .size = 1},
+          .value = makeSourceValue(u8{7}),
+          .display = SourceValueDisplay::Hex,
+      }},
+  };
+  first.source("First Entry", firstRecord, "probe-sample-entry").parent(root.id()).outline(SourceOutlinePolicy::Show);
   auto alias = samples.alias(9, 7);
   alias.source("Alias Entry", SourceRange{.source = source, .offset = 12, .size = 4}, "probe-sample-alias")
       .parent(root.id());
@@ -78,9 +108,12 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   const auto firstSources = annotations.ownedBy(ObjectRefs::sample(asset, 0));
   expect(firstSources.size() == 2, "an alias should add provenance to the existing sample rather than duplicate it");
   const SourceAnnotation& firstAnnotation = annotations.get(firstSources[0]);
-  expect(firstAnnotation.outline == SourceOutlinePolicy::Show && firstAnnotation.fields.size() == 1 &&
-             firstAnnotation.fields[0].range == SourceRange{.source = source, .offset = 8, .size = 1} &&
-             firstAnnotation.fields[0].display == SourceValueDisplay::Hex,
+  const SourceField* srcn = fieldNamed(firstAnnotation, "srcn");
+  expect(firstAnnotation.outline == SourceOutlinePolicy::Show && srcn != nullptr &&
+             srcn->range == SourceRange{.source = source, .offset = 8, .size = 1} &&
+             srcn->display == SourceValueDisplay::Hex && unsignedFieldEquals(firstAnnotation, "channels", 1) &&
+             unsignedFieldEquals(firstAnnotation, "bits_per_sample", 16) &&
+             unsignedFieldEquals(firstAnnotation, "effective_sample_rate", 0),
          "synth source records should retain field ranges, display hints, and outline presentation for future views");
   const auto fallbackSources = annotations.ownedBy(ObjectRefs::sample(asset, 1));
   expect(fallbackSources.size() == 1 && annotations.get(fallbackSources[0]).range == collection.samples[1].encodedData,
@@ -99,8 +132,10 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
   const SourceRange table{.source = source, .offset = 0, .size = 80};
   instruments.include(table);
 
-  auto kit = instruments.getOrAdd(700, Instrument{.name = "Drum Kit"});
-  auto firstRegion = kit.region(SampleRef{.collection = samplesAsset, .index = 3}, Region{});
+  auto kit = instruments.getOrAdd(
+      700, Instrument{.explicitAddress = InstrumentAddress{.bank = 127, .program = 5}, .name = "Drum Kit"});
+  auto firstRegion = kit.region(SampleRef{.collection = samplesAsset, .index = 3},
+                                Region{.keyRange = KeyRange{.low = 36, .high = 36}});
   const auto firstRegionSource =
       firstRegion.source("Kick", SourceRange{.source = source, .offset = 20, .size = 4}, "probe-kick");
   firstRegion.source("Kick Tuning", SourceRange{.source = source, .offset = 60, .size = 2}, "probe-kick-tuning");
@@ -148,6 +183,11 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
                      SourceTarget{ObjectRefs::sample(samplesAsset, 4)}) &&
              instrumentAnnotation.links.size() == 2,
          "instrument sample links should stay complete and unique regardless of call order");
+  expect(unsignedFieldEquals(instrumentAnnotation, "bank", 127) &&
+             unsignedFieldEquals(instrumentAnnotation, "program", 5) &&
+             unsignedFieldEquals(instrumentAnnotation, "region_count", 2) &&
+             unsignedFieldEquals(annotations.get(firstRegionSource.id()), "key_low", 36),
+         "builder finish should project final synth properties without format-authored annotation bookkeeping");
 
   const auto firstRegionSources = annotations.ownedBy(ObjectRefs::region(instrumentsAsset, 0, 0));
   expect(firstRegionSources.size() == 2 && annotations.get(firstRegionSource.id()).parent == std::nullopt,
@@ -582,6 +622,7 @@ void collectionValidationRejectsAmbiguousSynthBindings() {
 }  // namespace
 
 void runValueSynthBuilderTests() {
+  recordReaderFinishesOnePortableSourceValue();
   sampleBuilderKeepsKeysDenseAndAnnotationsOwned();
   instrumentBuilderGroupsEntriesAndProjectsRegionIdentity();
   scanResultBuilderCommitsSynthBuildersExplicitly();

@@ -124,8 +124,7 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
       continue;
     }
 
-    const auto required = requiredArticulations(input.reader, parsed->analysis);
-    addSequenceFacts(result, sequenceRef, parsed->analysis, required);
+    addSequenceFacts(result, sequenceRef, parsed->analysis, parsed->analysis.requiredArticulations);
     result.sequence(sequenceRef, [&](AssetId) { return std::move(parsed->asset); });
   }
 }
