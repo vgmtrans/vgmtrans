@@ -157,8 +157,8 @@ using AkaoEvent = AkaoCursor::Event;
   return event;
 }
 
-[[nodiscard]] AkaoEvent subSourceOnly(AkaoCursor& cursor, std::string label, std::string_view kind) {
-  auto event = cursor.sourceOnly(std::move(label), kind);
+[[nodiscard]] AkaoEvent subSourceOnly(AkaoCursor& cursor, std::string_view label, std::string_view kind) {
+  auto event = cursor.sourceOnly(label, kind);
   event.u8("sub_event", SourceValueDisplay::Hex);
   return event;
 }
@@ -754,7 +754,7 @@ struct SequenceLayout {
     return std::nullopt;
   }
 
-  const AkaoProfile profile = akaoProfile(version);
+  const AkaoProfile profile{.version = version};
   const u32 minimumHeaderSize = profile.version3OrLater() ? 0x38 : profile.trackAllocationBitsOffset() + 4;
   if (!reader.has(offset, minimumHeaderSize)) {
     return std::nullopt;
@@ -810,9 +810,10 @@ struct SequenceLayout {
 }  // namespace
 
 SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
+  const std::string id = dialectId(version);
   return makeCompiledDialect<TrackState, Playback>(SequenceDialect{
-      .id = DialectId{.value = dialectId(version)},
-      .commandDetailKindPrefix = dialectId(version),
+      .id = DialectId{.value = id},
+      .commandDetailKindPrefix = id,
       .timebase = Timebase{.ppqn = kAkaoPpqn},
       .defaultBehavior =
           SequenceProgramBehavior{
@@ -826,7 +827,7 @@ SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
 
 TrackProgram decodeAkaoTrack(ByteReader reader, AkaoPs1Version version, TrackDecodeInput input) {
   RepeatStack repeats;
-  const AkaoProfile profile = akaoProfile(version);
+  const AkaoProfile profile{.version = version};
   const u32 bytecodeEnd =
       input.bytecodeEnd == std::numeric_limits<u32>::max() ? static_cast<u32>(reader.size()) : input.bytecodeEnd;
   const auto command = [&](u32 offset) {
@@ -930,7 +931,7 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
   }
 
   AkaoSequenceAnalysis analysis{.header = layout->header};
-  const AkaoProfile profile = akaoProfile(analysis.header.version);
+  const AkaoProfile profile{.version = analysis.header.version};
   const u32 sequenceEnd = offset + analysis.header.length;
   const SequenceDialect dialect = makeAkaoDialect(analysis.header.version);
   const std::string name = fmt::format("Akao Seq {:02X}", analysis.header.sequenceId);

@@ -49,7 +49,6 @@ enum class AkaoPs1Version : u8 {
 struct AkaoProfile {
   AkaoPs1Version version = AkaoPs1Version::Unknown;
 
-  [[nodiscard]] bool known() const noexcept { return version != AkaoPs1Version::Unknown; }
   [[nodiscard]] bool legacyFamily() const noexcept;
   [[nodiscard]] bool version3OrLater() const noexcept;
   [[nodiscard]] bool version32() const noexcept { return version == AkaoPs1Version::Version3_2; }
@@ -74,10 +73,6 @@ struct AkaoProfile {
   [[nodiscard]] double tempoBpm(u16 tempo) const;
   [[nodiscard]] u32 tempoMicrosPerQuarter(u16 tempo) const;
 };
-
-[[nodiscard]] constexpr AkaoProfile akaoProfile(AkaoPs1Version version) noexcept {
-  return AkaoProfile{.version = version};
-}
 
 [[nodiscard]] std::string versionName(AkaoPs1Version version);
 [[nodiscard]] std::string dialectId(AkaoPs1Version version);

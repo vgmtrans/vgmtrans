@@ -16,15 +16,6 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] bool hasAkaoSignature(ByteReader reader) {
-  for (u64 offset = 0; offset + 0x10 <= reader.size(); ++offset) {
-    if (reader.be32(offset) == kAkaoSignature) {
-      return true;
-    }
-  }
-  return false;
-}
-
 [[nodiscard]] std::vector<u32> akaoOffsets(ByteReader reader) {
   std::vector<u32> offsets;
   for (u64 offset = 0; offset + 0x10 <= reader.size(); ++offset) {
@@ -39,7 +30,7 @@ namespace {
   if (!reader.has(offset, 0x10) || reader.be32(offset) != kAkaoSignature || reader.le16(offset + 6) == 0) {
     return false;
   }
-  const AkaoProfile profile = akaoProfile(guessSequenceVersion(reader, offset));
+  const AkaoProfile profile{.version = guessSequenceVersion(reader, offset)};
   const u32 bitsOffset = profile.trackAllocationBitsOffset();
   if (!reader.has(offset + bitsOffset, 4)) {
     return false;
@@ -103,7 +94,7 @@ void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, st
     if (input.reader.le16(offset + 6) != 0 || !isPossibleAkaoSampleCollection(input.reader, offset)) {
       continue;
     }
-    AkaoPs1Version version =
+    const AkaoPs1Version version =
         sourceVersion == AkaoPs1Version::Unknown ? guessSampleVersion(input.reader, offset) : sourceVersion;
     auto ref = result.reserveSampleCollection();
     if (auto parsed = parseAkaoSampleCollection(input, result, ref, offset, version)) {
@@ -144,7 +135,12 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
   if (ff7HardcodedAkaoSampleLocation(reader)) {
     return true;
   }
-  return hasAkaoSignature(reader);
+  for (u64 offset = 0; offset + 0x10 <= reader.size(); ++offset) {
+    if (reader.be32(offset) == kAkaoSignature) {
+      return true;
+    }
+  }
+  return false;
 }
 
 [[nodiscard]] ScanResult scanAkao(const ScanInput& input) {
