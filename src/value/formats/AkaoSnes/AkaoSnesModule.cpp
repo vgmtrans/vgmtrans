@@ -4,13 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/AkaoSnes/AkaoSnesModule.h"
-
-#include "value/formats/AkaoSnes/AkaoSnesLayout.h"
-#include "value/formats/AkaoSnes/AkaoSnesSequence.h"
-#include "value/formats/AkaoSnes/AkaoSnesSynth.h"
-#include "value/scan/FormatRegistry.h"
-#include "value/scan/ScanResultBuilder.h"
+#include "value/formats/AkaoSnes/AkaoSnes.h"
 
 #include <string>
 
@@ -18,28 +12,24 @@ namespace vgmtrans::formats::akao_snes {
 
 using namespace core;
 
-[[nodiscard]] bool canScanAkaoSnes(const SourceFile&, std::span<const u8> bytes) {
-  return findAkaoSnesLayout(ByteReader(SourceId{}, bytes)).has_value();
-}
-
 [[nodiscard]] ScanResult scanAkaoSnes(const ScanInput& input) {
   const auto layout = findAkaoSnesLayout(input.reader);
   if (!layout) {
     return {};
   }
 
-  ScanResultBuilder result(input, "AkaoSnes");
+  ScanResultBuilder result(input, std::string(kAkaoSnesFormatName));
   const std::string displayName = result.sourceDisplayName();
   const auto sequence = result.reserveSequence();
-  const auto instrumentSet = result.reserveInstrumentSet();
-  const auto samples = result.reserveSampleCollection();
-
-  auto sequenceAsset =
-      parseAkaoSnesSequence(input, *layout, sequence.id, displayName, &result.sourceMap(), &result.diagnostics());
-  if (sequenceAsset.program.tracks.empty()) {
+  SequenceProgram program =
+      parseAkaoSnesSequence(input.reader, *layout, sequence.id, &result.sourceMap(), &result.diagnostics());
+  if (program.tracks.empty()) {
     return {};
   }
-  result.sequence(sequence, [&](AssetId) { return std::move(sequenceAsset); });
+  const u32 headerSize = layout->version == AKAOSNES_V3 ? (layout->minorVersion == AKAOSNES_V3_FFMQ ? 18 : 20)
+                                                        : (layout->version == AKAOSNES_V4 ? 20 : 16);
+  result.sequence(sequence, displayName, input.reader.range(layout->sequenceHeaderAddress, headerSize))
+      .program(std::move(program));
 
   auto collection = result.sourceCollection(displayName);
   collection.sequence(sequence);
@@ -47,7 +37,9 @@ using namespace core;
   const bool hasSynthLayout = layout->spcDirAddress && layout->tuningTableAddress &&
                               (layout->version == AKAOSNES_V1 || layout->adsrTableAddress);
   if (hasSynthLayout) {
-    if (addAkaoSnesSynth(input, result, instrumentSet, samples, *layout, displayName)) {
+    const auto instrumentSet = result.reserveInstrumentSet();
+    const auto samples = result.reserveSampleCollection();
+    if (addAkaoSnesSynth(result, instrumentSet, samples, *layout, displayName)) {
       collection.instrumentSet(instrumentSet).samples(samples);
     } else {
       result.warning("AkaoSnes sequence found, but no valid instruments or samples were discovered",
@@ -72,12 +64,11 @@ using namespace core;
   return result.finish();
 }
 
-void registerAkaoSnesModule(FormatRegistry& registry) {
-  registry.add(FormatModule{
-      .name = "AkaoSnes",
-      .canScan = canScanAkaoSnes,
-      .scan = scanAkaoSnes,
-  });
+FormatDefinition akaoSnesDefinition() {
+  return FormatDefinition{
+      .module = {.name = std::string(kAkaoSnesFormatName), .scan = scanAkaoSnes},
+      .sequenceDialect = akaoSnesSequenceDialect(),
+  };
 }
 
 }  // namespace vgmtrans::formats::akao_snes

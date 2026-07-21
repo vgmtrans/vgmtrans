@@ -8,8 +8,7 @@
 
 #include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/formats/KonamiSnes/KonamiSnes.h"
-#include "value/formats/AkaoSnes/AkaoSnesModule.h"
-#include "value/formats/AkaoSnes/AkaoSnesSequence.h"
+#include "value/formats/AkaoSnes/AkaoSnes.h"
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/NDS/Nds.h"
 #include "value/extractors/PsfExtractor.h"
@@ -28,13 +27,12 @@ void registerValueFormats(core::Session& session) {
   // remaining direct calls are migration adapters.
   session.registerFormat(capcom_snes::capcomSnesDefinition());
   session.registerFormat(nds::ndsDefinition());
+  session.registerFormat(akao_snes::akaoSnesDefinition());
 
   akao::registerAkaoModule(session.formats());
-  akao_snes::registerAkaoSnesModule(session.formats());
   konami_snes::registerKonamiSnesModule(session.formats());
 
   akao::registerAkaoSequenceDialects(session.dialects());
-  akao_snes::registerAkaoSnesSequenceDialects(session.dialects());
   konami_snes::registerKonamiSnesSequenceDialects(session.dialects());
 }
 

@@ -267,11 +267,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/Akao.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesLayout.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesSequence.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesSynth.h
-      ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h

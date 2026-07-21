@@ -101,18 +101,30 @@ public:
   // maxTrackCommands is a safety cap for damaged control flow. Formats with
   // unusually large valid tracks can raise it without replacing shared assembly.
   SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect, AssetId sequenceAsset,
-                        SourceRange headerRange, SourceMapBuilder* sourceMap, u32 maxTrackCommands = 4096);
+                        SourceRange headerRange, SourceMapBuilder* sourceMap, u32 maxTrackCommands = 4096,
+                        u32 bytecodeEnd = std::numeric_limits<u32>::max());
 
   template <class DecodeCommand>
-  void addLinearTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand) {
-    annotateTrackPointer(trackIndex, pointerRange, startOffset);
+  void addLinearTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand,
+                      std::optional<u64> encodedStartOffset = std::nullopt) {
+    annotateTrackPointer(trackIndex, pointerRange, startOffset, encodedStartOffset);
     program_.tracks.push_back(tracks_.linear(trackIndex, startOffset, std::move(decodeCommand)));
   }
+
+  template <class DecodeCommand>
+  void addReachableTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand,
+                         std::optional<u64> encodedStartOffset = std::nullopt) {
+    annotateTrackPointer(trackIndex, pointerRange, startOffset, encodedStartOffset);
+    program_.tracks.push_back(tracks_.reachable(trackIndex, startOffset, std::move(decodeCommand)));
+  }
+
+  [[nodiscard]] std::optional<SourceAnnotationId> headerAnnotation() const noexcept { return tracks_.parentAnnotation; }
 
   [[nodiscard]] SequenceProgram finish() { return std::move(program_); }
 
 private:
-  void annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset);
+  void annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset,
+                            std::optional<u64> encodedStartOffset);
 
   TrackDecodeScope tracks_;
   SequenceProgram program_;

@@ -203,7 +203,10 @@ public:
   }
 
 private:
-  const MatchContext& context_;
+  // MatchContext is a small pair of references. Store the pair itself so an
+  // index constructed from a temporary MatchContext does not retain a dangling
+  // reference to that wrapper.
+  MatchContext context_;
 };
 
 struct SampleCoverageProvider {
