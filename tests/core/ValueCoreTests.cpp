@@ -9,6 +9,7 @@
 
 void runValueRegistryTests();
 void runValueCompilerCursorTests();
+void runValueCollectionResolverTests();
 void runValueSequenceModelTests();
 void runValueSequenceVmTests();
 void runValueSessionTests();
@@ -16,6 +17,7 @@ void runValueSourceMapTests();
 void runValueSynthBuilderTests();
 void runValueMidiTests();
 void runValueSynthExportTests();
+void runValuePsxTests();
 
 void capcomSnesLayoutSelectsSongListAndFixedHeaders();
 void capcomSnesLayoutFallsBackToV2SongList();
@@ -93,6 +95,7 @@ int main() {
   try {
     runValueRegistryTests();
     runValueCompilerCursorTests();
+    runValueCollectionResolverTests();
     runValueSequenceModelTests();
     runValueSequenceVmTests();
     runValueSessionTests();
@@ -100,6 +103,7 @@ int main() {
     runValueSynthBuilderTests();
     runValueMidiTests();
     runValueSynthExportTests();
+    runValuePsxTests();
 
     capcomSnesLayoutSelectsSongListAndFixedHeaders();
     capcomSnesLayoutFallsBackToV2SongList();

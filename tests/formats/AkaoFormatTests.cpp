@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/Akao/Akao.h"
+#include "value/scan/CollectionResolver.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -423,7 +424,7 @@ void akaoRequiredArticulationsComeFromInstrumentRows() {
       .sampleSetId = 1,
   };
 
-  const auto required = requiredArticulations(ByteReader(SourceId{22}, bytes), analysis);
+  const auto required = analyzeAkaoInstrumentStructures(ByteReader(SourceId{22}, bytes), analysis);
   expect(required == std::vector<u32>{5},
          "Akao required articulations should include parsed melodic region articulation ids");
 }
@@ -477,19 +478,17 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
 }
 
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
-  const std::vector<AkaoSampleCandidate> candidates{
-      AkaoSampleCandidate{
-          .index = 0, .sampleSetId = 0, .firstArticulationId = 0, .articulationCount = 32, .sourceOffset = 0},
-      AkaoSampleCandidate{
-          .index = 1, .sampleSetId = 5, .firstArticulationId = 32, .articulationCount = 81, .sourceOffset = 1},
-      AkaoSampleCandidate{
-          .index = 2, .sampleSetId = 29, .firstArticulationId = 128, .articulationCount = 22, .sourceOffset = 2},
+  const std::vector<SampleCoverageProvider> candidates{
+      SampleCoverageProvider{.index = 0, .groupId = 0, .first = 0, .count = 32, .priority = 0},
+      SampleCoverageProvider{.index = 1, .groupId = 5, .first = 32, .count = 81, .priority = 1},
+      SampleCoverageProvider{.index = 2, .groupId = 29, .first = 128, .count = 22, .priority = 2},
   };
   const std::vector<u32> required{32, 128};
 
-  const auto selected = selectAkaoSampleCandidates(29, required, candidates);
-  expect(selected == std::vector<std::size_t>{1, 2},
-         "Akao sample selection should combine the preferred sample set with required-articulation coverage");
+  const auto selected = selectSampleCoverage(29, required, candidates);
+  expect(
+      selected.providers == std::vector<std::size_t>{1, 2} && selected.missing.empty() && selected.preferredGroupFound,
+      "Akao sample selection should combine the preferred sample set with required-articulation coverage");
 }
 
 void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {

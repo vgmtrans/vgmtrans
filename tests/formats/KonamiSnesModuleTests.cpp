@@ -393,7 +393,7 @@ void konamiSnesSynthParsersStopAtInvalidBankedInstrument() {
   expect(layout.has_value(), "KonamiSnes fixture should expose a layout for synth parser tests");
   const auto instruments = parseKonamiSnesInstrumentInfos(ByteReader(SourceId{8}, bytes), *layout);
   expect(instruments.size() == 1, "KonamiSnes parser should stop at the first invalid banked instrument");
-  expect(instruments.front().index == 0 && instruments.front().address == 0x4000,
+  expect(instruments.front().index == 0 && instruments.front().source.range.offset == 0x4000,
          "KonamiSnes parser should preserve the sparse source instrument index and address");
   const auto samples = parseKonamiSnesSampleInfos(ByteReader(SourceId{8}, bytes), *layout->spcDirAddress, instruments);
   expect(samples.samples.size() == 1 && samples.samples.front().srcn == 0 &&

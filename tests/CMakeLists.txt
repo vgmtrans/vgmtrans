@@ -1,13 +1,15 @@
 add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
-	    formats/CapcomSnesModuleTests.cpp
-	    formats/KonamiSnesModuleTests.cpp
-	    formats/AkaoSnesModuleTests.cpp
-	    formats/AkaoFormatTests.cpp
+    formats/CapcomSnesModuleTests.cpp
+    formats/KonamiSnesModuleTests.cpp
+    formats/AkaoSnesModuleTests.cpp
+    formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
-    core/ValueMidiTests.cpp
+    core/ValueCollectionResolverTests.cpp
     core/ValueCompilerCursorTests.cpp
+    core/ValueMidiTests.cpp
+    core/ValuePsxTests.cpp
     core/ValueRegistryTests.cpp
     core/ValueSequenceModelTests.cpp
     core/ValueSequenceVmTests.cpp

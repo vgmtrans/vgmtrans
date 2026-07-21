@@ -6,6 +6,8 @@
 
 #include "value/synth/SampleDecoder.h"
 
+#include "value/synth/PsxAdpcm.h"
+
 #include <algorithm>
 #include <cmath>
 #include <iterator>
@@ -115,13 +117,10 @@ void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
   index = std::clamp(index + kNdsImaIndexTable[data4Bit & 7], 0, 88);
 }
 
-void decodePsxAdpcmBlock(std::span<s16, 28> output, std::span<const u8, 16> block, s32& previous1, s32& previous2) {
+void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::span<const u8, kPsxAdpcmBlockBytes> block,
+                         s32& previous1, s32& previous2) {
   static constexpr s16 kCoef[5][2] = {
-      {0, 0},
-      {60, 0},
-      {115, -52},
-      {98, -55},
-      {122, -60},
+      {0, 0}, {60, 0}, {115, -52}, {98, -55}, {122, -60},
   };
 
   const u8 shift = std::min<u8>(block[0] & 0x0f, 12);
@@ -316,15 +315,16 @@ void decodePsxAdpcmBlock(std::span<s16, 28> output, std::span<const u8, 16> bloc
       .channels = sample.channels,
       .loop = sample.loop,
   };
-  decoded.pcm.reserve((encoded.size() / 16) * 28);
+  decoded.pcm.reserve((encoded.size() / kPsxAdpcmBlockBytes) * kPsxAdpcmFramesPerBlock);
 
   s32 previous1 = 0;
   s32 previous2 = 0;
-  for (size_t offset = 0; offset + 16 <= encoded.size(); offset += 16) {
+  for (size_t offset = 0; offset + kPsxAdpcmBlockBytes <= encoded.size(); offset += kPsxAdpcmBlockBytes) {
     const auto outputOffset = decoded.pcm.size();
-    decoded.pcm.resize(outputOffset + 28);
-    decodePsxAdpcmBlock(std::span<s16, 28>(decoded.pcm.data() + outputOffset, 28),
-                        std::span<const u8, 16>(encoded.data() + offset, 16), previous1, previous2);
+    decoded.pcm.resize(outputOffset + kPsxAdpcmFramesPerBlock);
+    decodePsxAdpcmBlock(
+        std::span<s16, kPsxAdpcmFramesPerBlock>(decoded.pcm.data() + outputOffset, kPsxAdpcmFramesPerBlock),
+        std::span<const u8, kPsxAdpcmBlockBytes>(encoded.data() + offset, kPsxAdpcmBlockBytes), previous1, previous2);
   }
   return decoded;
 }

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 
@@ -34,11 +35,24 @@ void addMember(DesiredCollection& collection, AssetId asset, CollectionMemberRol
   }
 }
 
+[[nodiscard]] bool covers(const SampleCoverageProvider& provider, u32 value) {
+  return value >= provider.first && static_cast<u64>(value) < static_cast<u64>(provider.first) + provider.count;
+}
+
+void markCovered(std::set<u32>& remaining, const SampleCoverageProvider& provider) {
+  for (auto it = remaining.begin(); it != remaining.end();) {
+    if (covers(provider, *it)) {
+      it = remaining.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
 }  // namespace
 
 std::optional<MatchFieldValue> fieldValue(const FormatSpecificFact& fact, std::string_view name) {
-  const auto found =
-      std::ranges::find_if(fact.fields, [name](const MatchField& field) { return field.name == name; });
+  const auto found = std::ranges::find_if(fact.fields, [name](const MatchField& field) { return field.name == name; });
   if (found == fact.fields.end()) {
     return std::nullopt;
   }
@@ -99,10 +113,54 @@ const SourceFile* MatchFactIndex::sourceFor(const MatchFact& fact) const {
   if (!fact.scope.source) {
     return nullptr;
   }
-  const auto found = std::ranges::find_if(context_.snapshot.sources(), [&](const SourceFile& source) {
-    return source.id == *fact.scope.source;
-  });
+  const auto found = std::ranges::find_if(context_.snapshot.sources(),
+                                          [&](const SourceFile& source) { return source.id == *fact.scope.source; });
   return found == context_.snapshot.sources().end() ? nullptr : &*found;
+}
+
+SampleCoverageSelection selectSampleCoverage(std::optional<u32> preferredGroup, std::span<const u32> required,
+                                             std::span<const SampleCoverageProvider> providers) {
+  std::vector<SampleCoverageProvider> ordered(providers.begin(), providers.end());
+  std::ranges::sort(ordered, std::ranges::greater{}, &SampleCoverageProvider::priority);
+
+  std::set<u32> remaining(required.begin(), required.end());
+  std::vector<SampleCoverageProvider> selected;
+  bool preferredFound = false;
+  if (preferredGroup && *preferredGroup > 0) {
+    const auto preferred = std::ranges::find_if(ordered, [&](const SampleCoverageProvider& provider) {
+      return provider.groupId && *provider.groupId == *preferredGroup;
+    });
+    if (preferred != ordered.end()) {
+      preferredFound = true;
+      selected.push_back(*preferred);
+      markCovered(remaining, *preferred);
+    }
+  }
+
+  for (const auto& provider : ordered) {
+    if (std::ranges::find(selected, provider.index, &SampleCoverageProvider::index) != selected.end()) {
+      continue;
+    }
+    const bool associated = preferredGroup.value_or(0) == provider.groupId.value_or(0);
+    const bool contributes = std::ranges::any_of(remaining, [&](u32 value) { return covers(provider, value); });
+    if (!associated && !contributes) {
+      continue;
+    }
+    selected.push_back(provider);
+    markCovered(remaining, provider);
+    if (remaining.empty()) {
+      break;
+    }
+  }
+
+  std::ranges::sort(selected, {}, &SampleCoverageProvider::first);
+  SampleCoverageSelection result{.preferredGroupFound = preferredFound};
+  result.providers.reserve(selected.size());
+  for (const auto& provider : selected) {
+    result.providers.push_back(provider.index);
+  }
+  result.missing.assign(remaining.begin(), remaining.end());
+  return result;
 }
 
 CollectionAssembly::CollectionAssembly(CollectionKey key, std::string name)

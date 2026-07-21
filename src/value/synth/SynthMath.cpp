@@ -63,4 +63,17 @@ double synthSecondsRangeMinimum(double seconds) {
   return std::max(seconds, kSf2MinNormalDelaySeconds);
 }
 
+double linearAmplitudeToAttenuationDb(double amplitude, double silenceDb) {
+  if (amplitude <= 0.0) {
+    return silenceDb;
+  }
+  return -20.0 * std::log10(std::min(1.0, amplitude));
+}
+
+double panPositionFrom7Bit(u8 pan) {
+  // Preserve exact center. A 128-step scale would otherwise put value
+  // 64 slightly to the right when divided by the maximum value of 127.
+  return pan == 64 ? 0.5 : static_cast<double>(pan) / 127.0;
+}
+
 }  // namespace vgmtrans::core

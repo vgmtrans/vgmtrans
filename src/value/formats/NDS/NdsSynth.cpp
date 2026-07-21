@@ -9,6 +9,7 @@
 #include "value/base/RecordReader.h"
 #include "value/scan/BytePattern.h"
 #include "value/scan/ScanResultBuilder.h"
+#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -20,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace vgmtrans::formats::nds {
 
@@ -91,13 +93,9 @@ enum class InstrumentType : u8 {
 
 // Converts the four NDS envelope bytes into common attack, decay, sustain, and
 // release values.
-[[nodiscard]] std::optional<Envelope> ndsEnvelope(ByteReader reader, u64 offset) {
+[[nodiscard]] std::optional<Envelope> ndsEnvelope(u8 attackTime, u8 decayTime, u8 sustainLevel, u8 releaseTime) {
   // NDS envelopes use driver rate tables rather than SF2/DLS units. Preserve both rounded
   // microseconds and precise seconds so exporters can choose the most accurate conversion.
-  const u8 attackTime = reader.u8At(offset + 1);
-  const u8 decayTime = reader.u8At(offset + 2);
-  const u8 sustainLevel = reader.u8At(offset + 3);
-  const u8 releaseTime = reader.u8At(offset + 4);
   if (attackTime > 0x7f || decayTime > 0x7f || sustainLevel > 0x7f || releaseTime > 0x7f) {
     return std::nullopt;
   }
@@ -139,56 +137,77 @@ enum class InstrumentType : u8 {
   };
 }
 
-// Converts the NDS pan byte into the zero-to-one position stored in a region.
-[[nodiscard]] double ndsPan(u8 pan) {
-  return pan == 64 ? 0.5 : static_cast<double>(pan) / 127.0;
-}
+struct ParsedNdsRegion {
+  Region region;
+  SourceRecord source;
+};
 
-// Reads the tuning, envelope, and pan shared by every kind of NDS instrument region.
-[[nodiscard]] std::optional<Region> parseNdsRegion(ByteReader reader, SourceRange range, SampleRef sample,
-                                                   KeyRange keys = {},
-                                                   std::optional<u8> rootKeyOverride = std::nullopt) {
-  if (!range.valid() || range.source != reader.source() || range.size < 6 || !reader.has(range.offset, range.size)) {
-    return std::nullopt;
-  }
-  const u64 articulationOffset = range.endOffset() - 6;
-  const u8 rootKey = reader.u8At(articulationOffset);
-  const u8 pan = reader.u8At(articulationOffset + 5);
-  const auto envelope = ndsEnvelope(reader, articulationOffset);
-  if (!envelope || rootKey > 0x7f || pan > 0x7f) {
-    return std::nullopt;
-  }
-
-  return Region{
-      .keyRange = keys,
-      .sample = sample,
-      .range = range,
-      .rootKey = rootKeyOverride.value_or(rootKey),
-      .envelope = *envelope,
-      .pan = ndsPan(pan),
-  };
-}
-
-// Reads a sample-backed region and connects its wave-archive and sample numbers
-// to the matching sample asset.
-[[nodiscard]] std::optional<Region> parseNdsSampleRegion(
-    ScanResultBuilder& builder, ByteReader reader, SourceRange range,
+// All SBNK region kinds end with the same ten-byte body. Drum and key-split
+// entries add a two-byte type prefix, which is retained in the source record.
+[[nodiscard]] std::optional<ParsedNdsRegion> parseNdsRegion(
+    ScanResultBuilder& builder, SourceRange range, InstrumentType type, ScanSampleCollectionRef psgCollection,
     const std::array<std::optional<ScanSampleCollectionRef>, 4>& waveCollections, KeyRange keys = {}) {
-  // Every sample-backed SBNK region ends with a four-byte sample reference and
-  // the same six-byte articulation, regardless of its enclosing instrument type.
-  if (range.size < 10) {
+  if ((range.size != 10 && range.size != 12) || range.endOffset() > std::numeric_limits<u32>::max()) {
     return std::nullopt;
   }
-  const u64 sampleOffset = range.endOffset() - 10;
-  const u16 sampleIndex = reader.le16(sampleOffset);
-  const u16 collectionIndex = reader.le16(sampleOffset + 2);
-  const auto collection = collectionIndex < waveCollections.size() ? waveCollections[collectionIndex] : std::nullopt;
-  const auto sample = builder.sampleByKeyOrWarning(
-      collection, sampleIndex, fmt::format("Sample {} in wave archive slot {}", sampleIndex, collectionIndex), range);
+
+  RecordReader record(builder.reader(), static_cast<u32>(range.offset), static_cast<u32>(range.endOffset()),
+                      &builder.diagnostics());
+  const u32 bodyOffset = static_cast<u32>(range.size - 10);
+  if (bodyOffset == 2) {
+    const auto regionType = record.u16leAt(0, "region_type", SourceValueDisplay::Hex);
+    if (!regionType) {
+      return std::nullopt;
+    }
+  }
+  const auto sourceIndex = record.u16leAt(bodyOffset, "sample_index");
+  const auto collectionIndex = record.u16leAt(bodyOffset + 2, "wave_archive");
+  const auto rootKey = record.u8At(bodyOffset + 4, "root_key", SourceValueDisplay::MidiNote);
+  const auto attack = record.u8At(bodyOffset + 5, "attack");
+  const auto decay = record.u8At(bodyOffset + 6, "decay");
+  const auto sustain = record.u8At(bodyOffset + 7, "sustain");
+  const auto release = record.u8At(bodyOffset + 8, "release");
+  const auto pan = record.u8At(bodyOffset + 9, "pan");
+  if (!record.ok()) {
+    return std::nullopt;
+  }
+
+  std::optional<SampleRef> sample;
+  u8 effectiveRootKey = *rootKey;
+  if (type == InstrumentType::Sample) {
+    const auto collection =
+        *collectionIndex < waveCollections.size() ? waveCollections[*collectionIndex] : std::nullopt;
+    sample = builder.sampleByKeyOrWarning(
+        collection, *sourceIndex, fmt::format("Sample {} in wave archive slot {}", *sourceIndex, *collectionIndex),
+        range);
+  } else {
+    const bool pulse = type == InstrumentType::PsgWave;
+    const u32 psgIndex = pulse ? (*sourceIndex & 0x07) : 8;
+    const std::string description = pulse ? fmt::format("PSG duty sample {}", psgIndex) : "PSG noise sample";
+    sample = builder.sampleByKeyOrWarning(psgCollection, psgIndex, description, range);
+    effectiveRootKey = pulse ? 69 : 45;
+  }
   if (!sample) {
     return std::nullopt;
   }
-  return parseNdsRegion(reader, range, *sample, keys);
+
+  const auto envelope = ndsEnvelope(*attack, *decay, *sustain, *release);
+  if (!envelope || *rootKey > 0x7f || *pan > 0x7f) {
+    return std::nullopt;
+  }
+
+  return ParsedNdsRegion{
+      .region =
+          Region{
+              .keyRange = keys,
+              .sample = *sample,
+              .range = range,
+              .rootKey = effectiveRootKey,
+              .envelope = *envelope,
+              .pan = panPositionFrom7Bit(*pan),
+          },
+      .source = std::move(record).finish(),
+  };
 }
 
 // Reads one SWAV entry and adds it under the source index used by SBNK records.
@@ -258,7 +277,7 @@ void addNdsWave(ScanResultBuilder& builder, ParseCursor& archive, SampleCollecti
   }
 
   const std::string sampleName = fmt::format("Sample {}", sampleIndex);
-  header.derived("effective_sample_rate", sampleRate);
+  const SourceRecord source = std::move(header).finish();
   samples
       .add(sampleIndex,
            Sample{
@@ -269,8 +288,7 @@ void addNdsWave(ScanResultBuilder& builder, ParseCursor& archive, SampleCollecti
                .bitsPerSample = static_cast<u16>(type == WaveType::Pcm8 ? 8 : 16),
                .loop = Loop{.enabled = loops, .start = loopStart, .length = loopLength},
            })
-      .source(sampleName + " Header", headerRange, "swar-sample-header")
-      .fields(header.takeFields())
+      .source(sampleName + " Header", source, "swar-sample-header")
       .parent(parent);
 }
 
@@ -402,6 +420,12 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
         .name = "Instrument",
         .range = reader.range(instrumentOffset, 0),
     };
+    std::vector<ParsedNdsRegion> parsedRegions;
+    const auto addRegion = [&](std::optional<ParsedNdsRegion> parsed) {
+      if (parsed) {
+        parsedRegions.push_back(std::move(*parsed));
+      }
+    };
 
     switch (type) {
       case InstrumentType::Sample:
@@ -412,26 +436,16 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
           break;
         }
         instrument.range = *recordRange;
-        std::optional<Region> region;
+        auto region = parseNdsRegion(builder, *recordRange, type, psgCollection, waveCollections);
         if (type == InstrumentType::Sample) {
           instrument.name = "Single-Region Instrument";
-          region = parseNdsSampleRegion(builder, reader, *recordRange, waveCollections);
         } else if (type == InstrumentType::PsgWave) {
-          const u8 dutyCycle = reader.u8At(instrumentOffset) & 0x07;
+          const u32 dutyCycle = region ? region->region.sample.index : 0;
           instrument.name = "PSG Wave (" + std::string(kDutyNames[dutyCycle]) + ")";
-          if (const auto sample = builder.sampleByKeyOrWarning(
-                  psgCollection, dutyCycle, fmt::format("PSG duty sample {}", dutyCycle), *recordRange)) {
-            region = parseNdsRegion(reader, *recordRange, *sample, {}, 69);
-          }
         } else {
           instrument.name = "PSG Noise";
-          if (const auto sample = builder.sampleByKeyOrWarning(psgCollection, 8, "PSG noise sample", *recordRange)) {
-            region = parseNdsRegion(reader, *recordRange, *sample, {}, 45);
-          }
         }
-        if (region) {
-          instrument.regions.push_back(std::move(*region));
-        }
+        addRegion(std::move(region));
         break;
       }
       case InstrumentType::Drumset: {
@@ -451,10 +465,8 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
         for (u32 r = 0; r < regionCount; ++r) {
           const SourceRange regionRange = reader.range(instrumentOffset + 2 + r * 12, 12);
           const auto key = static_cast<u8>(lowKey + r);
-          if (auto region = parseNdsSampleRegion(builder, reader, regionRange, waveCollections,
-                                                 KeyRange{.low = key, .high = key})) {
-            instrument.regions.push_back(std::move(*region));
-          }
+          addRegion(parseNdsRegion(builder, regionRange, InstrumentType::Sample, psgCollection, waveCollections,
+                                   KeyRange{.low = key, .high = key}));
         }
         break;
       }
@@ -483,9 +495,7 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
           const SourceRange regionRange = reader.range(instrumentOffset + 8 + r * 12, 12);
           const u8 keyLow = r == 0 ? 0 : static_cast<u8>(keyRanges[r - 1] + 1);
           const KeyRange keys{.low = keyLow, .high = keyRanges[r]};
-          if (auto region = parseNdsSampleRegion(builder, reader, regionRange, waveCollections, keys)) {
-            instrument.regions.push_back(std::move(*region));
-          }
+          addRegion(parseNdsRegion(builder, regionRange, InstrumentType::Sample, psgCollection, waveCollections, keys));
         }
         break;
       }
@@ -493,15 +503,16 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
         break;
     }
 
-    if (instrument.regions.empty()) {
+    if (parsedRegions.empty()) {
       continue;
     }
 
     auto entry = instruments.add(i, std::move(instrument));
-    entry.source(entry.value().name, entry.value().range, "sbnk-instrument")
-        .derived("program", i)
-        .derived("region_count", entry.value().regions.size())
-        .parent(pointerAnnotation.id());
+    entry.source(entry.value().name, entry.value().range, "sbnk-instrument").parent(pointerAnnotation.id());
+    for (auto& parsed : parsedRegions) {
+      const SampleRef sample = parsed.region.sample;
+      entry.region(sample, std::move(parsed.region)).source("Region", parsed.source, "sbnk-region");
+    }
   }
 
   return builder.instrumentSet(std::string(name), std::move(instruments));

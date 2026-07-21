@@ -8,8 +8,11 @@
 
 #include "value/scan/FormatModule.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <initializer_list>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -40,6 +43,59 @@ struct AssetMatchView {
   const SourceFile* source = nullptr;
 };
 
+// All matching facts for one asset, joined once. Format resolvers can ask the
+// resulting value for common facts without rebuilding maps keyed by AssetId.
+template <class AssetT>
+struct AssetFacts {
+  const AssetT* assetValue = nullptr;
+  std::optional<SourceId> sourceId;
+  const SourceFile* source = nullptr;
+  std::vector<const MatchFact*> facts;
+
+  [[nodiscard]] const AssetT& asset() const { return *assetValue; }
+
+  [[nodiscard]] std::optional<u32> id(std::string_view domain) const {
+    for (const MatchFact* fact : facts) {
+      if (const auto* value = std::get_if<IdMatchFact>(&fact->payload); value != nullptr && value->domain == domain) {
+        return value->value;
+      }
+    }
+    return std::nullopt;
+  }
+
+  [[nodiscard]] std::optional<u64> offset() const {
+    for (const MatchFact* fact : facts) {
+      if (const auto* value = std::get_if<OffsetOrderFact>(&fact->payload)) {
+        return value->offset;
+      }
+    }
+    return std::nullopt;
+  }
+
+  [[nodiscard]] std::optional<SampleCoverageFact> coverage(std::string_view domain) const {
+    for (const MatchFact* fact : facts) {
+      if (const auto* value = std::get_if<SampleCoverageFact>(&fact->payload);
+          value != nullptr && value->domain == domain) {
+        return *value;
+      }
+    }
+    return std::nullopt;
+  }
+
+  [[nodiscard]] std::vector<u32> requirements(std::string_view domain) const {
+    std::vector<u32> values;
+    for (const MatchFact* fact : facts) {
+      if (const auto* requirement = std::get_if<SampleRequirementFact>(&fact->payload);
+          requirement != nullptr && requirement->domain == domain) {
+        values.insert(values.end(), requirement->required.begin(), requirement->required.end());
+      }
+    }
+    std::ranges::sort(values);
+    values.erase(std::ranges::unique(values).begin(), values.end());
+    return values;
+  }
+};
+
 // Read-only index over the accumulated match facts. Resolvers stay pure, but this
 // avoids hand-written variant/type/source lookups in every format-specific resolver.
 class MatchFactIndex {
@@ -48,6 +104,38 @@ public:
 
   [[nodiscard]] const MatchContext& context() const noexcept { return context_; }
   [[nodiscard]] const SourceFile* sourceFor(const MatchFact& fact) const;
+
+  template <class AssetT>
+  [[nodiscard]] std::vector<AssetFacts<AssetT>> assets(std::string_view format) const {
+    std::vector<AssetFacts<AssetT>> matches;
+    for (const auto& fact : context_.snapshot.matchFacts()) {
+      if (!format.empty() && fact.format != format) {
+        continue;
+      }
+      const auto* asset = assetById<AssetT>(context_.snapshot, fact.asset);
+      if (asset == nullptr) {
+        continue;
+      }
+      auto found = std::ranges::find_if(
+          matches, [&](const AssetFacts<AssetT>& entry) { return entry.asset().metadata.id == fact.asset; });
+      if (found == matches.end()) {
+        matches.push_back(AssetFacts<AssetT>{
+            .assetValue = asset,
+            .sourceId = fact.scope.source,
+            .source = sourceFor(fact),
+            .facts = {&fact},
+        });
+      } else {
+        found->facts.push_back(&fact);
+        if (!found->sourceId && fact.scope.source) {
+          found->sourceId = fact.scope.source;
+          found->source = sourceFor(fact);
+        }
+      }
+    }
+    std::ranges::sort(matches, {}, [](const AssetFacts<AssetT>& entry) { return entry.asset().metadata.id.value; });
+    return matches;
+  }
 
   template <class AssetT, class PayloadT, class Predicate>
   [[nodiscard]] std::vector<AssetMatchView<AssetT, PayloadT>> facts(std::string_view format,
@@ -117,6 +205,29 @@ public:
 private:
   const MatchContext& context_;
 };
+
+struct SampleCoverageProvider {
+  // index is an opaque caller-owned identity returned in the selection.
+  std::size_t index = 0;
+  std::optional<u32> groupId;
+  u32 first = 0;
+  u32 count = 0;
+  // Later or otherwise preferred providers should use a larger priority.
+  u64 priority = 0;
+};
+
+struct SampleCoverageSelection {
+  std::vector<std::size_t> providers;
+  std::vector<u32> missing;
+  bool preferredGroupFound = false;
+};
+
+// Choose the preferred sample group, then add the few source-associated or
+// coverage-contributing providers needed by the sequence. Missing and zero
+// group ids intentionally compare equal for formats with anonymous sets.
+[[nodiscard]] SampleCoverageSelection selectSampleCoverage(std::optional<u32> preferredGroup,
+                                                           std::span<const u32> required,
+                                                           std::span<const SampleCoverageProvider> providers);
 
 // Small mutable helper for building one DesiredCollection deterministically.
 // It owns duplicate suppression and common missing-role status/issue handling,

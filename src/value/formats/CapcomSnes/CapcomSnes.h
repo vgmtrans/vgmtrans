@@ -43,13 +43,12 @@ struct CapcomSnesLayout {
 
 struct CapcomSnesInstrumentInfo {
   u32 index = 0;
-  u32 address = 0;
   u8 srcn = 0;
   u8 adsr1 = 0;
   u8 adsr2 = 0;
   u8 gain = 0;
   s16 pitchScale = 0;
-  std::vector<core::SourceField> sourceFields;
+  core::SourceRecord source;
 };
 
 [[nodiscard]] std::optional<CapcomSnesLayout> findCapcomSnesLayout(core::ByteReader reader);

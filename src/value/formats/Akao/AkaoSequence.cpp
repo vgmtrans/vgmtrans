@@ -973,10 +973,8 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
     program.tracks.push_back(std::move(track));
   }
 
-  if (sourceMap != nullptr) {
-    annotateAkaoInstrumentStructures(reader, analysis, *sourceMap,
-                                     headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt);
-  }
+  analysis.requiredArticulations = analyzeAkaoInstrumentStructures(
+      reader, analysis, sourceMap, headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt);
 
   return AkaoSequenceParse{
       .asset =

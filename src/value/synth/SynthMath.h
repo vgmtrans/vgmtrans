@@ -16,5 +16,7 @@ namespace vgmtrans::core {
 [[nodiscard]] s32 synthAmountFromCentibels(double centibels);
 [[nodiscard]] s32 synthAmountFromDecibels(double decibels);
 [[nodiscard]] double synthSecondsRangeMinimum(double seconds);
+[[nodiscard]] double linearAmplitudeToAttenuationDb(double amplitude, double silenceDb = 96.0);
+[[nodiscard]] double panPositionFrom7Bit(u8 pan);
 
 }  // namespace vgmtrans::core
