@@ -50,6 +50,8 @@ public:
   [[nodiscard]] core::CollectionPlayback preparePlayback(core::CollectionId id,
                                                          const core::PlaybackRequest& request) const;
   [[nodiscard]] core::Artifact exportSequenceMidi(core::AssetId id, const core::SequenceExportRequest& request) const;
+  [[nodiscard]] core::Artifact exportInstrumentSet(core::AssetId id, core::ExportKind kind,
+                                                   const core::ExportRequest& request) const;
   [[nodiscard]] std::vector<core::Artifact> exportCollection(core::CollectionId id,
                                                              const core::ExportRequest& request) const;
 

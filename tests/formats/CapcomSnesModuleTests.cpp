@@ -576,6 +576,18 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(artifacts[0].bytes == MidiExporter().exportMidi(midiSequence),
          "Session MIDI export should match direct builder/exporter output");
 
+  const Artifact individualMidi = session.exportSequenceMidi(
+      sequence->metadata.id, SequenceExportRequest{.loopPolicy = LoopPolicy::PlayOnce});
+  const auto contextualMidi = session.exportCollection(
+      project.collections()[0].id,
+      ExportRequest{
+          .kinds = {ExportKind::Midi},
+          .loopPolicy = LoopPolicy::PlayOnce,
+          .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+      });
+  expect(contextualMidi.size() == 1 && individualMidi.bytes == contextualMidi[0].bytes,
+         "individual sequence export should use its first collection's prepared MIDI context");
+
   const auto wavArtifacts = session.exportCollection(project.collections()[0].id, ExportRequest{
                                                                                       .kinds = {ExportKind::Wav},
                                                                                   });
@@ -622,6 +634,12 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument set");
+  const Artifact individualSf2 = session.exportInstrumentSet(
+      instruments->metadata.id, ExportKind::SoundFont2, ExportRequest{});
+  const Artifact individualDls = session.exportInstrumentSet(
+      instruments->metadata.id, ExportKind::Dls, ExportRequest{});
+  expect(individualSf2.bytes == sf2Artifacts[0].bytes && individualDls.bytes == dlsArtifacts[0].bytes,
+         "individual instrument export should use its first collection's complete synth context");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid instrument");
   const auto& instrument = instruments->instruments[0];
   expect(instrument.identity == InstrumentIdentity{.domain = std::string(kCapcomSnesInstrumentDomain), .key = 0},

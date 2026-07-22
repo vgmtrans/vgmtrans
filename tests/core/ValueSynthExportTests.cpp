@@ -479,21 +479,16 @@ void standaloneSynthExportsKeepNativeModulation() {
   SessionSnapshotBuilder builder;
   builder.assets.emplace_back(instruments);
   builder.assets.emplace_back(samples);
-  builder.collections.push_back(Collection{
-      .id = CollectionId{0},
-      .name = "Probe",
-      .instrumentSets = {instruments.metadata.id},
-      .sampleCollections = {samples.metadata.id},
-  });
+  const SessionSnapshot snapshot = builder.finish();
   SequenceDialectRegistry dialects;
-  const auto artifacts = exportCollection(
-      builder.finish(), sources, CollectionId{0},
-      ExportRequest{.kinds = {ExportKind::SoundFont2, ExportKind::Dls}}, dialects);
+  const Artifact soundFont = exportInstrumentSet(snapshot, sources, instruments.metadata.id,
+                                                 ExportKind::SoundFont2, ExportRequest{}, dialects);
+  const Artifact dls = exportInstrumentSet(snapshot, sources, instruments.metadata.id,
+                                           ExportKind::Dls, ExportRequest{}, dialects);
 
-  expect(artifacts.size() == 2, "standalone synth export should produce both requested containers");
-  expect(soundFontIgenContainsAmount(artifacts[0].bytes, 24, -8479),
+  expect(soundFontIgenContainsAmount(soundFont.bytes, 24, -8479),
          "standalone SoundFont export should retain native modulation when no MIDI replacement exists");
-  expect(dlsArt2ContainsConnection(artifacts[1].bytes, 0x0000, 0x0114, -8479 * 65536),
+  expect(dlsArt2ContainsConnection(dls.bytes, 0x0000, 0x0114, -8479 * 65536),
          "standalone DLS export should retain native modulation when no MIDI replacement exists");
 }
 

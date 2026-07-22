@@ -110,6 +110,18 @@ const Collection* SessionSnapshot::collection(CollectionId id) const {
   return &collections_[found->second];
 }
 
+const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) const {
+  for (const auto& collection : collections_) {
+    if (collection.sequence == asset ||
+        std::ranges::find(collection.instrumentSets, asset) != collection.instrumentSets.end() ||
+        std::ranges::find(collection.sampleCollections, asset) != collection.sampleCollections.end() ||
+        std::ranges::find(collection.miscAssets, asset) != collection.miscAssets.end()) {
+      return &collection;
+    }
+  }
+  return nullptr;
+}
+
 SessionSnapshot SessionSnapshotBuilder::finish() {
   auto indexDiagnostics = validateSessionSnapshotState(assets, collections).diagnostics();
   diagnostics.insert(diagnostics.end(), std::make_move_iterator(indexDiagnostics.begin()),

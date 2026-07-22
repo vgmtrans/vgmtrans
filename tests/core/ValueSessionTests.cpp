@@ -1065,6 +1065,22 @@ void sessionExportsASequenceWithoutACollection() {
          "session should export an uncollected sequence as Standard MIDI");
 }
 
+void snapshotFindsTheFirstCollectionContainingAnAsset() {
+  SessionSnapshotBuilder builder;
+  builder.assets.emplace_back(MiscAsset{.metadata = AssetMetadata{.id = AssetId{4}, .name = "Shared"}});
+  builder.collections = {
+      Collection{.id = CollectionId{8}, .name = "First", .miscAssets = {AssetId{4}}},
+      Collection{.id = CollectionId{9}, .name = "Second", .miscAssets = {AssetId{4}}},
+  };
+  const SessionSnapshot snapshot = builder.finish();
+
+  const auto* collection = snapshot.firstCollectionContaining(AssetId{4});
+  expect(collection != nullptr && collection->id == CollectionId{8},
+         "asset association lookup should preserve collection order");
+  expect(snapshot.firstCollectionContaining(AssetId{99}) == nullptr,
+         "asset association lookup should return null for an unassociated asset");
+}
+
 }  // namespace
 
 void runValueSessionTests() {
@@ -1098,4 +1114,5 @@ void runValueSessionTests() {
   sessionAddsSourceFromPath();
   sessionExportsAllCollections();
   sessionExportsASequenceWithoutACollection();
+  snapshotFindsTheFirstCollectionContainingAnAsset();
 }
