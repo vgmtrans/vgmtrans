@@ -9,9 +9,7 @@
 #include "value/model/SessionSnapshot.h"
 #include "value/scan/ScanTypes.h"
 
-#include <set>
 #include <string>
-#include <string_view>
 #include <variant>
 #include <unordered_map>
 #include <unordered_set>
@@ -35,29 +33,14 @@ public:
   }
 
   void append(std::vector<Asset> assets, SourceId owner);
-  [[nodiscard]] AssetId materializedAssetId(std::string_view resolverId, const CollectionKey& collection,
-                                            std::string_view slot, ScanIdAllocator& ids);
-  [[nodiscard]] std::string upsertMaterializedAsset(std::string_view resolverId, const CollectionKey& collection,
-                                                    std::string_view slot, Asset asset);
-  [[nodiscard]] std::unordered_set<u32> removeStaleMaterializedAssets(std::string_view resolverId,
-                                                                      const std::set<std::string>& activeKeys);
   [[nodiscard]] std::unordered_set<u32> removeForSources(const std::vector<SourceId>& sources);
 
 private:
-  struct MaterializedAssetRecord {
-    AssetId id;
-    std::string resolver;
-  };
-
   void rebuildIndex();
-  [[nodiscard]] std::string materializedKey(std::string_view resolverId, const CollectionKey& collection,
-                                            std::string_view slot) const;
 
   std::vector<Asset> assets_;
   std::unordered_map<u32, size_t> assetsById_;
   std::unordered_map<u32, SourceId> sourceOwners_;
-  std::unordered_map<std::string, MaterializedAssetRecord> materializedAssets_;
-  std::unordered_map<u32, std::string> materializedKeysById_;
 };
 
 }  // namespace vgmtrans::core

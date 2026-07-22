@@ -111,8 +111,8 @@ target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionPreparation.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.cpp
@@ -124,7 +124,6 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/session/ExplicitCollectionStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/SourceMapStore.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/scan/ParseCursor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/ScanCommit.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/PsxAdpcm.cpp
@@ -167,7 +166,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
-      ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionPreparation.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatDefinition.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
@@ -177,6 +175,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.h
       ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.h
@@ -186,7 +185,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/session/ExplicitCollectionStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.h
       ${PROJECT_SOURCE_DIR}/src/value/session/SourceMapStore.h
-      ${PROJECT_SOURCE_DIR}/src/value/scan/ParseCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/session/SourceIdSet.h
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.h

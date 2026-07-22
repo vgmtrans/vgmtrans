@@ -9,16 +9,14 @@
 #include "value/scan/FormatModule.h"
 #include "value/sequence/SequenceDialect.h"
 
-#include <optional>
+#include <vector>
 
 namespace vgmtrans::core {
 
-// One registration value owns a scanner and, when the format contains source
-// bytecode, its executor family. Transitional formats may still use the two
-// registries directly until they are migrated to a single semantic dialect.
+// One registration value owns a scanner and any sequence executors it needs.
 struct FormatDefinition {
   FormatModule module;
-  std::optional<SequenceDialect> sequenceDialect;
+  std::vector<SequenceDialect> sequenceDialects;
 };
 
 }  // namespace vgmtrans::core

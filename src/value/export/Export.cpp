@@ -11,6 +11,7 @@
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
 #include "value/model/SessionSnapshot.h"
+#include "value/scan/FormatRegistry.h"
 #include "value/synth/SampleDecoder.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/base/Source.h"
@@ -72,6 +73,7 @@ namespace {
 struct PreparedCollectionExport {
   std::string baseName;
   CollectionAssets assets;
+  std::vector<InstrumentSetAsset> preparedInstrumentSets;
 };
 
 struct MidiLoweringResult {
@@ -80,14 +82,49 @@ struct MidiLoweringResult {
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] PreparedCollectionExport prepareCollectionExport(CollectionAssets assets) {
+[[nodiscard]] PreparedCollectionExport prepareCollectionExport(CollectionAssets assets, const SessionSnapshot& snapshot,
+                                                               const SourceStore& sources,
+                                                               const FormatRegistry* formats) {
   // Prepare once per collection so all requested artifacts share names, resolved assets,
   // and reference diagnostics.
   const std::string baseName = assets.collection != nullptr ? artifactBaseName(*assets.collection) : "collection";
-  return PreparedCollectionExport{
+  PreparedCollectionExport prepared{
       .baseName = baseName,
       .assets = std::move(assets),
   };
+  if (formats == nullptr || prepared.assets.collection == nullptr) {
+    return prepared;
+  }
+
+  for (const auto& module : formats->modules()) {
+    const std::string_view resolver =
+        module.collectionResolverId.empty() ? std::string_view(module.name) : module.collectionResolverId;
+    if (module.prepareCollection == nullptr || resolver != prepared.assets.collection->key.resolver) {
+      continue;
+    }
+
+    try {
+      auto result = module.prepareCollection(CollectionPrepareContext{
+          .sources = sources,
+          .snapshot = snapshot,
+          .collection = *prepared.assets.collection,
+      });
+      prepared.assets.diagnostics.instrumentSets.insert(prepared.assets.diagnostics.instrumentSets.end(),
+                                                        std::make_move_iterator(result.diagnostics.begin()),
+                                                        std::make_move_iterator(result.diagnostics.end()));
+      prepared.preparedInstrumentSets = std::move(result.instrumentSets);
+      prepared.assets.instrumentSets.reserve(prepared.assets.instrumentSets.size() +
+                                             prepared.preparedInstrumentSets.size());
+      for (const auto& instrumentSet : prepared.preparedInstrumentSets) {
+        prepared.assets.instrumentSets.push_back(&instrumentSet);
+      }
+    } catch (const std::exception& ex) {
+      prepared.assets.diagnostics.instrumentSets.push_back(
+          exportError(module.name + " collection preparation failed: " + ex.what()));
+    }
+    break;
+  }
+  return prepared;
 }
 
 [[nodiscard]] MidiLoweringResult lowerMidiSequence(const PreparedCollectionExport& prepared,
@@ -250,7 +287,7 @@ struct MidiLoweringResult {
       },
       sources);
   // Asset-resolution diagnostics describe missing references; exporter diagnostics
-  // describe failures encountered while materializing the container.
+  // describe failures encountered while writing the container.
   auto diagnostics = prepared.assets.diagnostics.instrumentSets;
   diagnostics.insert(diagnostics.end(), prepared.assets.diagnostics.sampleCollections.begin(),
                      prepared.assets.diagnostics.sampleCollections.end());
@@ -298,7 +335,7 @@ struct MidiLoweringResult {
 
 std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
                                        CollectionId collection, const ExportRequest& request,
-                                       const SequenceDialectRegistry& dialects) {
+                                       const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {
   auto resolved = resolveCollectionAssets(snapshot, collection);
   if (resolved.collection == nullptr) {
     auto diagnostics = resolved.diagnostics.collection;
@@ -313,7 +350,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   }
 
   std::vector<Artifact> artifacts;
-  const auto prepared = prepareCollectionExport(std::move(resolved));
+  const auto prepared = prepareCollectionExport(std::move(resolved), snapshot, sources, formats);
   std::optional<MidiLoweringResult> midiLowering;
   std::optional<MidiModulationUsage> midiUsage;
   bool midiUsageAnalyzed = false;
@@ -348,7 +385,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     }
     // Sequence-event simulation is a replacement, not a reason to discard an
     // instrument's modulation. Keep native modulation unless a MIDI artifact
-    // was requested and successfully materialized alongside the synth file.
+    // was requested and successfully written alongside the synth file.
     if (!exportsMidi || !requireMidiLowering().sequence) {
       return ModulationConversionPolicy::SynthModulators;
     }
@@ -368,20 +405,18 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
       }
       case ExportKind::SoundFont2: {
         const auto conversion = synthModulationConversion();
-        artifacts.push_back(exportSoundFont2(prepared, sources, request,
-                                             conversion == ModulationConversionPolicy::SynthModulators
-                                                 ? requireMidiModulationUsage()
-                                                 : nullptr,
-                                             conversion));
+        artifacts.push_back(exportSoundFont2(
+            prepared, sources, request,
+            conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
+            conversion));
         break;
       }
       case ExportKind::Dls: {
         const auto conversion = synthModulationConversion();
-        artifacts.push_back(exportDls(prepared, sources, request,
-                                      conversion == ModulationConversionPolicy::SynthModulators
-                                          ? requireMidiModulationUsage()
-                                          : nullptr,
-                                      conversion));
+        artifacts.push_back(exportDls(
+            prepared, sources, request,
+            conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
+            conversion));
         break;
       }
     }
@@ -392,13 +427,14 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
 
 std::vector<CollectionExport> exportAllCollections(const SessionSnapshot& snapshot, const SourceStore& sources,
                                                    const ExportRequest& request,
-                                                   const SequenceDialectRegistry& dialects) {
+                                                   const SequenceDialectRegistry& dialects,
+                                                   const FormatRegistry* formats) {
   std::vector<CollectionExport> exports;
   exports.reserve(snapshot.collections().size());
   for (const auto& collection : snapshot.collections()) {
     exports.push_back(CollectionExport{
         .collection = collection.id,
-        .artifacts = exportCollection(snapshot, sources, collection.id, request, dialects),
+        .artifacts = exportCollection(snapshot, sources, collection.id, request, dialects, formats),
     });
   }
   return exports;

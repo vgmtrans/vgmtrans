@@ -70,13 +70,13 @@ const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId 
 
 TrackProgram decodeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end,
                                 SourceMapBuilder* sourceMap = nullptr, SourceId source = SourceId{20}) {
-  return decodeAkaoTrack(ByteReader(source, bytes), version,
-                         TrackDecodeInput{
-                             .startOffset = start,
-                             .bytecodeEnd = end,
-                             .sourceMap = sourceMap,
-                             .maxCommands = 64,
-                         });
+  const TrackDecodeScope tracks{
+      .reader = ByteReader(source, bytes),
+      .bytecodeEnd = end,
+      .maxCommands = 64,
+      .sourceMap = sourceMap,
+  };
+  return decodeAkaoTrack(version, tracks, 0, start);
 }
 
 AkaoSequenceAnalysis analyzeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end) {
@@ -172,13 +172,7 @@ void akaoTablePointersUseNonControlSourceLinks() {
   ScanIdAllocator ids;
   SourceMapBuilder sourceMap([&ids]() { return ids.nextSourceAnnotationId(); });
   [[maybe_unused]] const TrackProgram customTrack =
-      decodeAkaoTrack(ByteReader(source, bytes), AkaoPs1Version::Version1_1,
-                      TrackDecodeInput{
-                          .startOffset = start,
-                          .bytecodeEnd = 0x90,
-                          .sourceMap = &sourceMap,
-                          .maxCommands = 64,
-                      });
+      decodeFixtureTrack(bytes, AkaoPs1Version::Version1_1, start, 0x90, &sourceMap, source);
 
   const SourceMap annotations = sourceMap.finish();
   const SourceAnnotation& custom = commandAnnotationAt(annotations, source, start);
@@ -222,13 +216,7 @@ void akaoRepeatSourceLinksUseSpecificRolesOnly() {
   ScanIdAllocator repeatUntilIds;
   SourceMapBuilder repeatUntilMap([&repeatUntilIds]() { return repeatUntilIds.nextSourceAnnotationId(); });
   [[maybe_unused]] const TrackProgram repeatUntilTrack =
-      decodeAkaoTrack(ByteReader(source, repeatUntilBytes), AkaoPs1Version::Version3_2,
-                      TrackDecodeInput{
-                          .startOffset = start,
-                          .bytecodeEnd = 0x40,
-                          .sourceMap = &repeatUntilMap,
-                          .maxCommands = 64,
-                      });
+      decodeFixtureTrack(repeatUntilBytes, AkaoPs1Version::Version3_2, start, 0x40, &repeatUntilMap, source);
   const SourceMap repeatUntilAnnotations = repeatUntilMap.finish();
   const SourceAnnotation& repeatUntil = commandAnnotationAt(repeatUntilAnnotations, source, start + 1);
   expect(hasLinkRole(repeatUntil, SourceLinkRole::RepeatTarget), "Akao repeat-until should expose a repeat target");
@@ -242,13 +230,7 @@ void akaoRepeatSourceLinksUseSpecificRolesOnly() {
   ScanIdAllocator repeatAgainIds;
   SourceMapBuilder repeatAgainMap([&repeatAgainIds]() { return repeatAgainIds.nextSourceAnnotationId(); });
   [[maybe_unused]] const TrackProgram repeatAgainTrack =
-      decodeAkaoTrack(ByteReader(source, repeatAgainBytes), AkaoPs1Version::Version3_2,
-                      TrackDecodeInput{
-                          .startOffset = start,
-                          .bytecodeEnd = 0x40,
-                          .sourceMap = &repeatAgainMap,
-                          .maxCommands = 64,
-                      });
+      decodeFixtureTrack(repeatAgainBytes, AkaoPs1Version::Version3_2, start, 0x40, &repeatAgainMap, source);
   const SourceMap repeatAgainAnnotations = repeatAgainMap.finish();
   const SourceAnnotation& repeatAgain = commandAnnotationAt(repeatAgainAnnotations, source, start + 1);
   expect(hasLinkRole(repeatAgain, SourceLinkRole::LoopTarget), "Akao repeat-again should expose a loop target");
@@ -467,8 +449,8 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
   InstrumentSetBuilder builder{AssetId{99}};
   buildAkaoInstrumentSet(input, analysis, {}, builder);
   const auto instruments = std::move(builder).finish();
-  expect(instruments.size() == 1, "Akao overlap fixture should parse one melodic instrument");
-  const auto& regions = instruments.front().regions;
+  expect(instruments.values.size() == 1, "Akao overlap fixture should parse one melodic instrument");
+  const auto& regions = instruments.values.front().regions;
   expect(regions.size() == 3, "Akao advancing overlapping key regions should match legacy filtering");
   expect(regions[0].keyRange.low == 0 && regions[0].keyRange.high == 0x20,
          "Akao first overlap fixture region should keep its high key");
@@ -492,7 +474,7 @@ void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
       "Akao sample selection should combine the preferred sample set with required-articulation coverage");
 }
 
-void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
+void akaoScanPreparesInstrumentSetWithoutProvisionalAsset() {
   std::vector<u8> bytes(0x280);
 
   constexpr u32 sequenceOffset = 0x00;
@@ -526,8 +508,7 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
   bytes[sampleDataOffset + 1] = 1;
 
   Session session;
-  registerAkaoModule(session.formats());
-  registerAkaoSequenceDialects(session.dialects());
+  session.registerFormat(akaoDefinition());
   session.addSource(SourceFile{.name = "Chrono Cross synthetic.psf"}, bytes);
   const SessionSnapshot project = session.scanPendingSources();
 
@@ -551,15 +532,12 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
 
   expect(sequenceAssets == 1, "Akao synthetic scan should produce one sequence asset");
   expect(sampleAssets == 1, "Akao synthetic scan should produce one sample collection asset");
-  expect(instrumentAssets == 1, "Akao synthetic scan should expose only the materialized instrument set asset");
+  expect(instrumentAssets == 0, "Akao collection-specific instruments should not become scanned assets");
   expect(project.collections().size() == 1, "Akao synthetic scan should resolve one collection");
   const auto& collection = project.collections().front();
   expect(collection.sequence == sequenceId, "Akao collection should reference the scanned sequence");
   expect(collection.sampleCollections.size() == 1, "Akao collection should reference the scanned sample collection");
-  expect(collection.instrumentSets.size() == 1, "Akao collection should reference the materialized instrument set");
-  expect(collection.instrumentSets.front() != collection.sequence &&
-             collection.instrumentSets.front() != collection.sampleCollections.front(),
-         "Akao materialized instrument set should be distinct from scanned assets");
+  expect(collection.instrumentSets.empty(), "Akao instruments should be prepared only when the collection is used");
   const auto sequenceHeaders = project.sourceMap().withRole(SourceId{0}, SourceRole::Header);
   const auto header = std::ranges::find_if(sequenceHeaders, [&](SourceAnnotationId id) {
     const SourceAnnotation& annotation = project.sourceMap().get(id);
@@ -584,7 +562,7 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
   const auto* instrument =
       annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Instrument, "akao-instrument");
   expect(instrument != nullptr && instrument->range.offset == melodicRegionOffset && instrument->range.size == 8,
-         "Akao scan should annotate parsed instrument data without waiting for materialization");
+         "Akao scan should annotate parsed instrument data before export preparation");
   const auto* region = annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Region, "akao-region");
   expect(region != nullptr && region->range.offset == melodicRegionOffset && region->range.size == 8,
          "Akao scan should annotate parsed regions");
@@ -605,28 +583,6 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
   expect(hasLinkRole(*articulationEntry, SourceLinkRole::UsesSample),
          "Akao articulation annotation should link to the sample it resolves to");
 
-  const auto* materialized = project.asset<InstrumentSetAsset>(collection.instrumentSets.front());
-  expect(materialized != nullptr, "Akao materialized instrument set should be present");
-  expect(!materialized->instruments.empty(), "Akao materialized instrument set should contain parsed instruments");
-  expect(materialized->instruments.front().regions.front().sample.collection == collection.sampleCollections.front(),
-         "Akao materialized region should bind to the resolved sample collection");
-
-  const AssetId materializedId = collection.instrumentSets.front();
-  const auto materializedInstruments = project.sourceMap().withRole(SourceId{0}, SourceRole::Instrument);
-  const auto ownedInstrument = std::ranges::find_if(materializedInstruments, [&](SourceAnnotationId id) {
-    return project.sourceMap().get(id).owner == ObjectRefs::instrument(materializedId, 0);
-  });
-  expect(ownedInstrument != materializedInstruments.end(),
-         "Akao materialization should retain a durable source owner for each instrument");
-  const auto materializedRegions = project.sourceMap().withRole(SourceId{0}, SourceRole::Region);
-  const auto ownedRegion = std::ranges::find_if(materializedRegions, [&](SourceAnnotationId id) {
-    return project.sourceMap().get(id).owner == ObjectRefs::region(materializedId, 0, 0);
-  });
-  expect(ownedRegion != materializedRegions.end(),
-         "Akao materialization should retain a durable source owner for each region");
-  expect(hasLinkRole(project.sourceMap().get(*ownedRegion), SourceLinkRole::UsesSample),
-         "Akao materialized region annotation should link to its selected sample collection");
-
   const auto requirement = std::ranges::find_if(project.matchFacts(), [&](const MatchFact& fact) {
     const auto* payload = std::get_if<SampleRequirementFact>(&fact.payload);
     return fact.format == kAkaoFormatName && fact.asset == sequenceId && payload != nullptr &&
@@ -634,4 +590,8 @@ void akaoScanMaterializesInstrumentSetWithoutProvisionalAsset() {
   });
   expect(requirement != project.matchFacts().end(),
          "Akao articulation requirements should be sequence facts, not provisional instrument facts");
+
+  const auto artifacts = session.exportCollection(collection.id, ExportRequest{.kinds = {ExportKind::Dls}});
+  expect(artifacts.size() == 1 && !artifacts[0].bytes.empty(),
+         "Akao export should prepare its collection-specific instruments on demand");
 }

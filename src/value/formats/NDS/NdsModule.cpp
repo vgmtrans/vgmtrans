@@ -125,7 +125,7 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
 FormatDefinition ndsDefinition() {
   return FormatDefinition{
       .module = {.name = std::string(kNdsFormatName), .scan = scanNds},
-      .sequenceDialect = ndsSequenceDialect(),
+      .sequenceDialects = {ndsSequenceDialect()},
   };
 }
 

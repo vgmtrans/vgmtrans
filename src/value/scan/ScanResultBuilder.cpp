@@ -144,10 +144,6 @@ std::string ScanResultBuilder::sourceDisplayName() const {
   return format_;
 }
 
-ParseCursor ScanResultBuilder::cursor(SourceRange bounds) {
-  return ParseCursor(input_.reader, bounds, result_.diagnostics);
-}
-
 ScanSequenceRef ScanResultBuilder::reserveSequence() {
   const auto id = input_.ids.nextAssetId();
   reserveHandle(id, CollectionMemberRole::Sequence);
@@ -190,12 +186,9 @@ ScanInstrumentSetAssetBuilder ScanResultBuilder::instrumentSet(ScanInstrumentSet
 }
 
 ScanInstrumentSetRef ScanResultBuilder::instrumentSet(std::string name, InstrumentSetBuilder&& instruments) {
-  const ScanInstrumentSetRef ref{.id = instruments.assetId()};
-  auto values = std::move(instruments).finish();
-  // finish() also accounts for ranges supplied late through value(), so the
-  // asset range must be read afterward.
-  const SourceRange range = instruments.range();
-  return instrumentSet(ref, std::move(name), range).instruments(std::move(values));
+  auto built = std::move(instruments).finish();
+  const ScanInstrumentSetRef ref{.id = built.asset};
+  return instrumentSet(ref, std::move(name), built.range).instruments(std::move(built.values));
 }
 
 ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(std::string name, SourceRange range) {
@@ -208,14 +201,10 @@ ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(ScanSampleC
 }
 
 ScanSampleCollectionRef ScanResultBuilder::sampleCollection(std::string name, SampleCollectionBuilder&& samples) {
-  const ScanSampleCollectionRef ref{.id = samples.assetId()};
-  auto lookup = samples.refs();
-  auto values = std::move(samples).finish();
-  // A format can fill encodedData through value(); finish() incorporates that
-  // range before the enclosing asset is committed.
-  const SourceRange range = samples.range();
-  sampleLookups_.insert_or_assign(ref.id.value, std::move(lookup));
-  return sampleCollection(ref, std::move(name), range).samples(std::move(values));
+  auto built = std::move(samples).finish();
+  const ScanSampleCollectionRef ref{.id = built.asset};
+  sampleLookups_.insert_or_assign(ref.id.value, std::move(built.refs));
+  return sampleCollection(ref, std::move(name), built.range).samples(std::move(built.value));
 }
 
 InstrumentSetBuilder ScanResultBuilder::instruments() {

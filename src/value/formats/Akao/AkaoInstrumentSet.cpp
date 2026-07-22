@@ -44,8 +44,8 @@ void applyArticulationToRegion(Region& region, const AkaoArticulationBinding* bi
   }
   const AkaoArticulation& articulation = binding->articulation;
   region.sample = SampleRef{.collection = binding->collection.id, .index = binding->sampleIndex};
-  const double rootKey = drum ? articulation.unityKey + region.keyRange.low - drumRelativeUnityKey
-                              : articulation.unityKey;
+  const double rootKey =
+      drum ? articulation.unityKey + region.keyRange.low - drumRelativeUnityKey : articulation.unityKey;
   region.unityKey = rootKey - (articulation.fineTuneCents / 100.0);
   region.envelope = akaoRegionEnvelope(articulation, attackRate, sustainRate, sustainMode, releaseRate);
   region.loop = articulation.loop;
@@ -343,7 +343,7 @@ void annotateInstrumentLayout(ByteReader reader, SourceMapBuilder& sourceMap, So
 void publishInstrument(ByteReader reader, InstrumentSetBuilder& out, Instrument instrument) {
   // Parsing returns complete values because the same parser also describes the
   // sequence's instrument layout during scanning. Passing those values through
-  // the builder here gives every materialized instrument and region a stable
+  // the builder here gives every prepared instrument and region a stable
   // source owner and records which selected sample it uses.
   const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
   const std::string name = instrument.name;

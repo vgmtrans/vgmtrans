@@ -6,8 +6,6 @@
 
 #include "value/extractors/SnesRsnExtractor.h"
 
-#include "value/scan/FormatRegistry.h"
-
 #include "unarr.h"
 
 #include <algorithm>
@@ -107,12 +105,8 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
   return result;
 }
 
-void registerSnesRsnExtractor(FormatRegistry& registry) {
-  registry.add(FormatModule{
-      .name = "SnesRsn",
-      .canScan = canScanSnesRsn,
-      .scan = scanSnesRsn,
-  });
+FormatDefinition snesRsnExtractorDefinition() {
+  return FormatDefinition{.module = {.name = "SnesRsn", .canScan = canScanSnesRsn, .scan = scanSnesRsn}};
 }
 
 }  // namespace vgmtrans::formats::snes_rsn

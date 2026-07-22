@@ -6,8 +6,6 @@
 
 #include "value/extractors/SnesSpcExtractor.h"
 
-#include "value/scan/FormatRegistry.h"
-
 #include <algorithm>
 #include <filesystem>
 #include <optional>
@@ -147,12 +145,8 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
   return result;
 }
 
-void registerSnesSpcExtractor(FormatRegistry& registry) {
-  registry.add(FormatModule{
-      .name = "SnesSpc",
-      .canScan = canScanSnesSpc,
-      .scan = scanSnesSpc,
-  });
+FormatDefinition snesSpcExtractorDefinition() {
+  return FormatDefinition{.module = {.name = "SnesSpc", .canScan = canScanSnesSpc, .scan = scanSnesSpc}};
 }
 
 }  // namespace vgmtrans::formats::snes_spc

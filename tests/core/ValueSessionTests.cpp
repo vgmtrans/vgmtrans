@@ -6,7 +6,6 @@
 
 #include "ValueTestSupport.h"
 
-#include "value/scan/CollectionPreparation.h"
 #include "value/session/ScanCommit.h"
 #include "value/validation/ScanValidation.h"
 #include "value/validation/SnapshotValidation.h"
@@ -15,9 +14,8 @@ namespace {
 
 void sessionScansValuesAndDerivedSources() {
   Session session;
-  session.formats().add(probeSequenceModule());
-  session.formats().add(probeMiscModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(probeMiscModule());
 
   const auto sourceId = session.addSource(SourceFile{.name = "probe.spc"}, {0xaa, 0x34, 0x12});
   expect(sourceId == SourceId{0}, "first source should get SourceId 0");
@@ -74,7 +72,7 @@ void sessionScansValuesAndDerivedSources() {
 
 void sessionReportsUnregisteredSequenceDialect() {
   Session session;
-  session.formats().add(probeSequenceModule());
+  session.registerFormat(probeSequenceModule());
 
   session.addSource(SourceFile{.name = "missing-dialect.probe"}, {0xaa});
   const SessionSnapshot project = session.scanPendingSources();
@@ -98,8 +96,7 @@ void sessionReportsUnregisteredSequenceDialect() {
 
 void sessionScansIndividualSourcesWithoutDuplicating() {
   Session session;
-  session.formats().add(probeSequenceModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   SessionSnapshot project = session.scanSource(first);
@@ -123,8 +120,7 @@ void sessionScansIndividualSourcesWithoutDuplicating() {
 
 void sessionKeepsScannerKnownCollectionsWithoutResolver() {
   Session session;
-  session.formats().add(probeExplicitCollectionModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
 
   const auto source = session.addSource(SourceFile{.name = "explicit.probe"}, {0xab});
   SessionSnapshot project = session.scanSource(source);
@@ -139,9 +135,8 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
 
 void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   Session session;
-  session.formats().add(probeBankSequenceModule());
-  session.formats().add(probeBankInstrumentModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeBankSequenceModule(), probeSequenceDialect());
+  session.registerFormat(probeBankInstrumentModule());
 
   const auto instrument = session.addSource(SourceFile{.name = "bank-7.instr"}, {0xdd, 7});
   SessionSnapshot project = session.scanSource(instrument);
@@ -165,120 +160,10 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
          "completed bank collection should retain the instrument reference");
 }
 
-[[nodiscard]] MaterializationResult materializeProbeBankCollection(const MaterializationContext& context) {
-  CollectionPreparation prepared(context);
-  if (!context.collection.sequence || context.collection.instrumentSets.empty()) {
-    return std::move(prepared).finish();
-  }
-
-  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*context.collection.sequence);
-  const auto* scannedInstrument = context.snapshot.asset<InstrumentSetAsset>(context.collection.instrumentSets[0]);
-  if (sequence == nullptr || scannedInstrument == nullptr) {
-    return std::move(prepared).finish();
-  }
-
-  auto instruments = prepared.instruments("bound-instrument-set");
-  instruments.include(sequence->metadata.range);
-  for (const auto& instrument : scannedInstrument->instruments) {
-    instruments.append(instrument);
-  }
-  instruments.append(Instrument{
-      .name = "Materialized Instrument",
-      .range = sequence->metadata.range,
-  });
-  prepared.replaceInstrumentSet("Materialized " + scannedInstrument->metadata.name, std::move(instruments));
-  return std::move(prepared).finish();
-}
-
-[[nodiscard]] FormatModule probeMaterializedBankSequenceModule() {
-  auto module = probeBankSequenceModule();
-  module.materializeCollection = materializeProbeBankCollection;
-  return module;
-}
-
-void sessionMaterializesResolvedCollectionsWithStableAssets() {
-  Session session;
-  session.formats().add(probeMaterializedBankSequenceModule());
-  session.formats().add(probeBankInstrumentModule());
-  session.dialects().add(probeSequenceDialect());
-
-  const auto instrument = session.addSource(SourceFile{.name = "bank-11.instr"}, {0xdd, 11});
-  session.addSource(SourceFile{.name = "bank-11.seq"}, {0xcc, 11});
-  SessionSnapshot project = session.scanPendingSources();
-  expect(project.collections().size() == 1, "materialized bank files should produce one collection");
-  expect(project.assets().size() == 3, "materialization should add a derived collection asset");
-
-  const auto& collection = project.collections()[0];
-  expect(collection.instrumentSets.size() == 1, "materialized collection should expose one instrument set");
-  expect(collection.instrumentSets[0] != AssetId{0} && collection.instrumentSets[0] != AssetId{1},
-         "materialized collection should not expose either scanned input asset as its final instrument set");
-  const AssetId materializedId = collection.instrumentSets[0];
-  const auto* materialized = project.asset<InstrumentSetAsset>(materializedId);
-  expect(materialized != nullptr, "materialized instrument set should be present in the snapshot");
-  expect(materialized->metadata.name == "Materialized bank-11.instr",
-         "materializer should control the derived asset contents");
-  expect(materialized->instruments.size() == 1, "materialized instrument set should keep derived instrument data");
-  expect(project.sourceMap().ownedBy(ObjectRefs::instrument(materializedId, 0)).size() == 1,
-         "materialized builder should publish annotations owned by the derived instrument");
-
-  project = session.scanPendingSources();
-  expect(project.collections()[0].instrumentSets[0] == materializedId,
-         "materialized asset id should be stable across collection rebuilds");
-  expect(project.sourceMap().ownedBy(ObjectRefs::instrument(materializedId, 0)).size() == 1,
-         "rebuilding one stable materialization slot should replace rather than duplicate its annotations");
-
-  project = session.removeSource(instrument);
-  expect(project.collections().size() == 1, "removing one matched source should leave an incomplete collection");
-  expect(project.collections()[0].instrumentSets.empty(),
-         "collection should fall back to no instrument set when materialization input disappears");
-  expect(project.asset(materializedId) == nullptr, "stale materialized asset should be removed with its collection");
-  expect(project.sourceMap().ownedBy(ObjectRefs::instrument(materializedId, 0)).empty(),
-         "removing a stale materialized asset should also remove its owned annotations");
-}
-
-[[nodiscard]] MaterializationResult materializeProbeBankThenFail(const MaterializationContext& context) {
-  CollectionPreparation prepared(context);
-  auto instruments = prepared.instruments("staged-instrument-set");
-  instruments.append(Instrument{.name = "Staged Instrument"});
-  prepared.replaceInstrumentSet("Staged Instruments", std::move(instruments));
-  auto result = std::move(prepared).finish();
-  if (context.collection.key.value == "bank:12") {
-    throw std::runtime_error("second materialization exploded");
-  }
-  return result;
-}
-
-[[nodiscard]] FormatModule probeFailingMaterializationModule() {
-  auto module = probeBankSequenceModule();
-  module.materializeCollection = materializeProbeBankThenFail;
-  return module;
-}
-
-void sessionStagesAllResolverMaterializationsBeforePublishing() {
-  Session session;
-  session.formats().add(probeFailingMaterializationModule());
-  session.formats().add(probeBankInstrumentModule());
-  session.dialects().add(probeSequenceDialect());
-
-  session.addSource(SourceFile{.name = "bank-11.seq"}, {0xcc, 11});
-  session.addSource(SourceFile{.name = "bank-11.instr"}, {0xdd, 11});
-  session.addSource(SourceFile{.name = "bank-12.seq"}, {0xcc, 12});
-  session.addSource(SourceFile{.name = "bank-12.instr"}, {0xdd, 12});
-  const SessionSnapshot project = session.scanPendingSources();
-
-  expect(project.assets().size() == 4,
-         "a late materialization failure should not publish an earlier collection's staged asset");
-  expect(project.collections().empty(),
-         "a failed resolver batch should not reconcile only the collections materialized before the failure");
-  static_cast<void>(diagnosticWithMessage(
-      project.diagnostics(), "ProbeBankSequence resolveCollections failed: second materialization exploded"));
-}
-
 void sessionRemovesSourceFamilyAndDiscoveredData() {
   Session session;
-  session.formats().add(probeSequenceModule());
-  session.formats().add(probeMiscModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(probeMiscModule());
 
   const auto source = session.addSource(SourceFile{.name = "remove-me.probe"}, {0xaa, 0x34});
   SessionSnapshot project = session.scanSource(source);
@@ -322,9 +207,8 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
 
 void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   Session session;
-  session.formats().add(probeBankSequenceModule());
-  session.formats().add(probeBankInstrumentModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeBankSequenceModule(), probeSequenceDialect());
+  session.registerFormat(probeBankInstrumentModule());
 
   const auto instrument = session.addSource(SourceFile{.name = "bank-9.instr"}, {0xdd, 9});
   const auto sequence = session.addSource(SourceFile{.name = "bank-9.seq"}, {0xcc, 9});
@@ -355,8 +239,7 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
 
 void sessionResolverFailureDoesNotWipeExistingCollections() {
   Session session;
-  session.formats().add(fragileProbeSequenceModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(fragileProbeSequenceModule(), probeSequenceDialect());
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   SessionSnapshot project = session.scanSource(first);
@@ -373,8 +256,7 @@ void sessionResolverFailureDoesNotWipeExistingCollections() {
 
 void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
   Session session;
-  session.formats().add(fragileProbeSequenceModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(fragileProbeSequenceModule(), probeSequenceDialect());
 
   const auto source = session.addSource(SourceFile{.name = "stale-on-failure.probe"}, {0xaa});
   SessionSnapshot project = session.scanSource(source);
@@ -396,33 +278,24 @@ void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
 
 void sessionRejectsLateRegistryMutation() {
   Session session;
-  session.formats().add(probeSequenceModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
 
   session.addSource(SourceFile{.name = "sealed.probe"}, {0xaa});
 
   bool formatFailed = false;
   try {
-    session.formats().add(probeMiscModule());
+    session.registerFormat(probeMiscModule());
   } catch (const std::logic_error&) {
     formatFailed = true;
   }
   expect(formatFailed, "format registry should be sealed after session mutation starts");
-
-  bool dialectFailed = false;
-  try {
-    session.dialects().add(probeSequenceDialect());
-  } catch (const std::logic_error&) {
-    dialectFailed = true;
-  }
-  expect(dialectFailed, "sequence dialect registry should be sealed after session mutation starts");
 
   Session scannedEmptySession;
   static_cast<void>(scannedEmptySession.scanPendingSources());
 
   bool emptyScanSealed = false;
   try {
-    scannedEmptySession.formats().add(probeSequenceModule());
+    scannedEmptySession.registerFormat(probeSequenceModule());
   } catch (const std::logic_error&) {
     emptyScanSealed = true;
   }
@@ -431,7 +304,7 @@ void sessionRejectsLateRegistryMutation() {
 
 void sessionRejectsDuplicateAssetIdsAtScanCommit() {
   Session session;
-  session.formats().add(probeDuplicateAssetModule());
+  session.registerFormat(probeDuplicateAssetModule());
 
   session.addSource(SourceFile{.name = "duplicate.probe"}, {0xee});
   const SessionSnapshot project = session.scanPendingSources();
@@ -443,8 +316,8 @@ void sessionRejectsDuplicateAssetIdsAtScanCommit() {
 
 void sessionRejectsExtractedSourcesWithMissingParents() {
   Session session;
-  session.formats().add(probeBadExtractedSourceModule());
-  session.formats().add(probeMiscModule());
+  session.registerFormat(probeBadExtractedSourceModule());
+  session.registerFormat(probeMiscModule());
 
   session.addSource(SourceFile{.name = "bad-derived-parent.probe"}, {0xf1});
   const SessionSnapshot project = session.scanPendingSources();
@@ -458,7 +331,7 @@ void sessionRejectsExtractedSourcesWithMissingParents() {
 
 void sessionRejectsMatchFactsForMissingAssets() {
   Session session;
-  session.formats().add(probeBadFactAssetModule());
+  session.registerFormat(probeBadFactAssetModule());
 
   session.addSource(SourceFile{.name = "bad-fact-asset.probe"}, {0xf2});
   const SessionSnapshot project = session.scanPendingSources();
@@ -471,7 +344,7 @@ void sessionRejectsMatchFactsForMissingAssets() {
 
 void sessionRejectsSourceScopedMatchFactsForMissingSources() {
   Session session;
-  session.formats().add(probeBadFactSourceModule());
+  session.registerFormat(probeBadFactSourceModule());
 
   session.addSource(SourceFile{.name = "bad-fact-source.probe"}, {0xf3});
   const SessionSnapshot project = session.scanPendingSources();
@@ -557,15 +430,14 @@ void scanValidationReportsMultipleAdmissionErrors() {
       auto metadata = badRangeMetadata(assetId, "Bad Item Range", goodRange);
       return ScanResult{
           .assets = {MiscAsset{.metadata = std::move(metadata)}},
-          .sourceMap =
-              SourceMap{{
-                  SourceAnnotation{
-                      .id = SourceAnnotationId{0},
-                      .range = badRange,
-                      .role = SourceRole::DataBlock,
-                      .label = "Bad Annotation",
-                  },
-              }},
+          .sourceMap = SourceMap{{
+              SourceAnnotation{
+                  .id = SourceAnnotationId{0},
+                  .range = badRange,
+                  .role = SourceRole::DataBlock,
+                  .label = "Bad Annotation",
+              },
+          }},
       };
     }
 
@@ -692,14 +564,13 @@ void scanCommitRejectsRangeLessSourceAnnotations() {
       .assets = {MiscAsset{
           .metadata = badRangeMetadata(AssetId{0}, "Range-Less Annotation Fixture", sources.reader(source).range(0, 1)),
       }},
-      .sourceMap =
-          SourceMap{{
-              SourceAnnotation{
-                  .id = SourceAnnotationId{0},
-                  .role = SourceRole::DataBlock,
-                  .label = "Range-Less Annotation",
-              },
-          }},
+      .sourceMap = SourceMap{{
+          SourceAnnotation{
+              .id = SourceAnnotationId{0},
+              .role = SourceRole::DataBlock,
+              .label = "Range-Less Annotation",
+          },
+      }},
   };
   const ScanCommit commit = ScanCommit::fromScanResult(sources.source(source), std::move(result));
 
@@ -811,7 +682,7 @@ void snapshotValidationReportsWrongTypeCollectionReferences() {
 
 void sessionReportsDesiredCollectionMissingAssetReferences() {
   Session session;
-  session.formats().add(missingAssetCollectionResolverModule());
+  session.registerFormat(missingAssetCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "missing-refs.probe"}, {0x00});
   const SessionSnapshot project = session.scanPendingSources();
@@ -838,9 +709,8 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
 
 void sessionReportsDesiredCollectionWrongTypeReferences() {
   Session session;
-  session.formats().add(probeSequenceModule());
-  session.formats().add(wrongTypeCollectionResolverModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(wrongTypeCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "wrong-type.probe"}, {0xaa});
   const SessionSnapshot project = session.scanPendingSources();
@@ -848,8 +718,7 @@ void sessionReportsDesiredCollectionWrongTypeReferences() {
     return collection.key.resolver == "ProbeWrongTypeRefs";
   });
   expect(found != project.collections().end(), "wrong-type resolver should publish a collection shell");
-  expect(found->status == CollectionStatus::Incomplete,
-         "collection with wrong-type references should be incomplete");
+  expect(found->status == CollectionStatus::Incomplete, "collection with wrong-type references should be incomplete");
   expect(found->instrumentSets.empty(), "wrong-type instrument reference should be stripped");
   expect(found->sampleCollections.empty(), "wrong-type sample reference should be stripped");
   expect(found->miscAssets.empty(), "wrong-type misc reference should be stripped");
@@ -869,7 +738,7 @@ void sessionReportsDesiredCollectionWrongTypeReferences() {
 
 void sessionReportsDuplicateDesiredCollectionKeys() {
   Session session;
-  session.formats().add(duplicateKeyCollectionResolverModule());
+  session.registerFormat(duplicateKeyCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "duplicate-keys.probe"}, {0x00});
   const SessionSnapshot project = session.scanPendingSources();
@@ -1083,8 +952,8 @@ void assetStoreRebuildsLookupIndexAfterRemoval() {
          "asset store removal should report assets owned by the removed source");
   expect(!assets.contains(AssetId{0}) && !assets.contains(AssetId{1}),
          "asset store should remove deleted asset ids from the lookup index");
-  expect(assets.all().size() == 1 && assets.findAs<SampleCollectionAsset>(AssetId{2}) ==
-                                      std::get_if<SampleCollectionAsset>(&assets.all()[0]),
+  expect(assets.all().size() == 1 &&
+             assets.findAs<SampleCollectionAsset>(AssetId{2}) == std::get_if<SampleCollectionAsset>(&assets.all()[0]),
          "asset store lookup index should be rebuilt after removal compacts the asset vector");
 }
 
@@ -1099,8 +968,7 @@ void sessionAddsSourceFromPath() {
   }
 
   Session session;
-  session.formats().add(probeSequenceModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
 
   const auto sourceId = session.addSourceFromPath(path);
   expect(sourceId == SourceId{0}, "path source should get SourceId 0");
@@ -1120,8 +988,7 @@ void sessionAddsSourceFromPath() {
 
 void sessionExportsAllCollections() {
   Session session;
-  session.formats().add(probeSequenceModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
 
   session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
@@ -1153,8 +1020,6 @@ void runValueSessionTests() {
   sessionScansIndividualSourcesWithoutDuplicating();
   sessionKeepsScannerKnownCollectionsWithoutResolver();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
-  sessionMaterializesResolvedCollectionsWithStableAssets();
-  sessionStagesAllResolverMaterializationsBeforePublishing();
   sessionRemovesSourceFamilyAndDiscoveredData();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();
   sessionResolverFailureDoesNotWipeExistingCollections();

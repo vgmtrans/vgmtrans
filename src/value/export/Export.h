@@ -11,16 +11,19 @@
 namespace vgmtrans::core {
 
 class SequenceDialectRegistry;
+class FormatRegistry;
 class SessionSnapshot;
 class SourceStore;
 
 [[nodiscard]] std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
                                                      CollectionId collection, const ExportRequest& request,
-                                                     const SequenceDialectRegistry& dialects);
+                                                     const SequenceDialectRegistry& dialects,
+                                                     const FormatRegistry* formats = nullptr);
 
 [[nodiscard]] std::vector<CollectionExport> exportAllCollections(const SessionSnapshot& snapshot,
                                                                  const SourceStore& sources,
                                                                  const ExportRequest& request,
-                                                                 const SequenceDialectRegistry& dialects);
+                                                                 const SequenceDialectRegistry& dialects,
+                                                                 const FormatRegistry* formats = nullptr);
 
 }  // namespace vgmtrans::core

@@ -55,28 +55,6 @@ void SourceMapStore::removeForSources(const std::vector<SourceId>& sources) {
   });
 }
 
-void SourceMapStore::replaceForAssets(const std::vector<AssetId>& assets, SourceMap sourceMap) {
-  std::unordered_set<u32> assetIds;
-  assetIds.reserve(assets.size());
-  for (const AssetId asset : assets) {
-    if (asset.valid()) {
-      assetIds.insert(asset.value);
-    }
-  }
-  auto replacement = annotations_;
-  std::erase_if(replacement, [&](const SourceAnnotation& annotation) {
-    return annotation.owner && annotation.owner->asset.valid() && assetIds.contains(annotation.owner->asset.value);
-  });
-  appendUnique(replacement, sourceMap);
-  annotations_ = std::move(replacement);
-}
-
-void SourceMapStore::removeForAssets(const std::unordered_set<u32>& assets) {
-  std::erase_if(annotations_, [&](const SourceAnnotation& annotation) {
-    return annotation.owner && annotation.owner->asset.valid() && assets.contains(annotation.owner->asset.value);
-  });
-}
-
 SourceMap SourceMapStore::all() const {
   return SourceMap{annotations_};
 }

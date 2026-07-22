@@ -5,31 +5,15 @@
  */
 
 #include "value/export/audio/WavExporter.h"
+#include "value/export/BinaryWriter.h"
 
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
-#include <string_view>
 
 namespace vgmtrans::core {
 
 namespace {
-
-void writeAscii(std::vector<u8>& bytes, std::string_view text) {
-  bytes.insert(bytes.end(), text.begin(), text.end());
-}
-
-void writeLe16(std::vector<u8>& bytes, u16 value) {
-  bytes.push_back(static_cast<u8>(value & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 8) & 0xff));
-}
-
-void writeLe32(std::vector<u8>& bytes, u32 value) {
-  bytes.push_back(static_cast<u8>(value & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 8) & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 16) & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 24) & 0xff));
-}
 
 [[nodiscard]] u16 validChannels(u8 channels) {
   return std::max<u8>(channels, 1);

@@ -2156,17 +2156,15 @@ const SequenceDialect& akaoSnesSequenceDialect() {
 }
 
 TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesTrackDecodeOptions& options) {
-  TrackDecodeInput input{
-      .sequenceAsset = options.sequenceAsset,
-      .trackIndex = options.sourceTrackNumber,
-      .startOffset = options.startAddress,
+  const TrackDecodeScope tracks{
+      .reader = reader,
       .bytecodeEnd = options.bytecodeEnd,
+      .maxCommands = 16384,
+      .sequenceAsset = options.sequenceAsset,
       .parentAnnotation = options.parentAnnotation,
       .sourceMap = options.sourceMap,
-      .diagnostics = options.diagnostics,
-      .maxCommands = 16384,
   };
-  return makeTrackDecodeScope(reader, input).reachable(input.trackIndex, input.startOffset, [&](u32 offset) {
+  return tracks.reachable(options.sourceTrackNumber, options.startAddress, [&](u32 offset) {
     return decodeCommand(reader, offset, options.bytecodeEnd, options.profile, options.romRelocBase,
                          options.apuRelocBase, options.diagnostics);
   });

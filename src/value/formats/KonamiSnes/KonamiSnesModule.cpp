@@ -64,12 +64,11 @@ using namespace core;
   return result.finish();
 }
 
-void registerKonamiSnesModule(FormatRegistry& registry) {
-  registry.add(FormatModule{
-      .name = "KonamiSnes",
-      .canScan = canScanKonamiSnes,
-      .scan = scanKonamiSnes,
-  });
+FormatDefinition konamiSnesDefinition() {
+  return FormatDefinition{
+      .module = {.name = "KonamiSnes", .canScan = canScanKonamiSnes, .scan = scanKonamiSnes},
+      .sequenceDialects = konamiSnesSequenceDialects(),
+  };
 }
 
 }  // namespace vgmtrans::formats::konami_snes

@@ -6,8 +6,6 @@
 
 #include "value/extractors/PsfExtractor.h"
 
-#include "value/scan/FormatRegistry.h"
-
 #include <zlib.h>
 
 #include <algorithm>
@@ -350,12 +348,8 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   return result;
 }
 
-void registerPsfExtractor(FormatRegistry& registry) {
-  registry.add(FormatModule{
-      .name = "PSF",
-      .canScan = canScanPsf,
-      .scan = scanPsf,
-  });
+FormatDefinition psfExtractorDefinition() {
+  return FormatDefinition{.module = {.name = "PSF", .canScan = canScanPsf, .scan = scanPsf}};
 }
 
 }  // namespace vgmtrans::formats::psf

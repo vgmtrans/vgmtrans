@@ -49,10 +49,12 @@ Session stores
   ↓
 Collection resolution
   groups assets into exportable collections
-  may materialize collection-dependent assets
   ↓
 SessionSnapshot
   read-only copy of the current session state
+  ↓
+Collection preparation
+  may build transient collection-specific values
   ↓
 Export
   collection → MIDI, SF2, DLS, WAV, or future formats
@@ -80,7 +82,7 @@ MIDI renderer or another future sequence exporter
 
 The compiler cursor exists only while decoding. Its field reads record source metadata, and its event operations append source-free typed actions in written order. Returning the event finalizes the command. The shared VM schedules commands while the compiled dialect invokes their generated executors; neither layer can reopen command bytes. MIDI conversion remains a later layer.
 
-> **Migration status:** NDS, Capcom SNES, and Konami SNES use the compiler cursor. Akao and Akao SNES still use the old two-phase cursor adapter. Those older paths are migration scaffolding, not constraints on the target design; Git history preserves them if removing them later proves premature.
+All five ported sequence families use the compiler cursor and source-free command execution.
 
 The prototype's examples, line counts, acceptance review, limitations, and adoption recommendation are recorded in [Compiler-cursor prototype review](compiler_cursor_prototype_review.md).
 
@@ -200,7 +202,7 @@ It provides helpers such as:
 - `range`
 - `has`
 
-The intended pattern is simple: scanner code uses `has()` or `ParseCursor` when malformed data should be handled gracefully, and direct reads when the caller has already checked the range.
+The intended pattern is simple: scanner code uses `has()` or `RecordReader` when malformed data should be handled gracefully, and direct reads when the caller has already checked the range.
 
 ### 6.3 `SourceRange`
 
@@ -278,7 +280,7 @@ Each track contains decoded `SourceCommand` records. A `SourceCommand` keeps:
 
 An operand's name is author-facing vocabulary for source inspection and analysis. It also keeps a display rule, optional generic role, exact source range, and—when useful for presentation—both encoded and resolved values. Compiler-cursor execution does not consume this named list. Each action stores only the positional values required by its generated typed executor, so playback needs neither operand IDs nor string lookup.
 
-Complete source-free commands do not retain encoded bytes. `commandBytes` and byte spans remain temporarily on `TrackProgram` for unmigrated cursor dialects and partial malformed-command diagnostics. The source-free executor signature intentionally receives no `TrackProgram` or byte reader, making source reparsing during playback impossible.
+Complete source-free commands do not retain encoded bytes. The executor signature intentionally receives no `TrackProgram` or byte reader, making source reparsing during playback impossible.
 
 ### 8.2 `InstrumentSetAsset`
 
@@ -362,7 +364,7 @@ sourceMap.header("SSEQ Header", range)
 
 The synth content builders use the same annotation API. Calling `source()` on a sample, instrument, or region entry supplies the appropriate role and exact `ObjectRef`; the format can then add fields, parents, descriptions, and unusual links with the ordinary `AnnotationBuilder`. This is how future logical TreeView nodes and source-oriented HexView records can meet without either view reinterpreting format rules.
 
-Semantic sequence decoders do not call annotation-builder methods. They return command presentation data and self-describing operands; `CommandSourceMap` projects the command label, opcode, fields, derived values, control-flow links, and instrument links generically. Legacy command readers still do this indirectly through `VmCommandCursor` until migrated.
+Semantic sequence decoders do not call annotation-builder methods. They return command presentation data and self-describing operands; `CommandSourceMap` projects the command label, opcode, fields, derived values, control-flow links, and instrument links generically.
 
 ### 9.2 Why this matters
 
@@ -374,7 +376,7 @@ The source map is one of the strongest parts of the new architecture. It makes d
 
 Scanning is the process of turning one source into values.
 
-A format definition owns the scanner and its optional source-free dialect:
+A format definition owns the scanner and any source-free dialects it needs:
 
 ```text
 FormatDefinition
@@ -382,11 +384,11 @@ FormatDefinition
     name
     scan(input)
     optional collection resolver
-    optional materializer
-  optional sequence dialect
+    optional collection preparer
+  zero or more sequence dialects
 ```
 
-`Session::registerFormat` registers both halves together. Capcom SNES and NDS use this unified path. Direct module/dialect registration remains only for unmigrated formats.
+`Session::registerFormat` registers the whole definition. The mutable format and dialect registries are not exposed separately.
 
 Recognition belongs at the start of `scan`, which returns an empty result when the source does not match. This ensures layout/signature discovery runs once. `canScan` remains nullable as a migration adapter for older modules and should not be added to new ones.
 
@@ -452,11 +454,9 @@ auto instruments = result.instruments();
 
 The overloads that accept an existing handle remain available when another object needed the ID first. Moving either completed builder into `sampleCollection(name, ...)` or `instrumentSet(name, ...)` commits an ordinary value asset. The content builder retains no lifecycle after that explicit commit. For a committed sample builder, the scan result keeps only its source-key lookup so a later instrument table can resolve sparse format indexes through the ordinary collection handle.
 
-### 10.4 `ParseCursor`
+### 10.4 Random-access records
 
-`ParseCursor` is a checked parser helper for non-sequence data. It records diagnostics for malformed reads and returns ranged values. Those ranged values can be passed directly into source map fields.
-
-It fits the same philosophy as `VmCommandCursor`, but for structured headers and tables rather than sequence bytecode.
+`RecordReader` handles both sequential records and fixed layouts. Its `*At` and `rangeAt` methods read relative to the record start, report malformed fields, and return ranged values that can be passed directly into source map fields.
 
 ---
 
@@ -523,7 +523,7 @@ Each store owns one kind of session data:
 
 | Store | Job |
 |---|---|
-| `AssetStore` | Owns assets, indexes by ID, tracks source ownership, keeps stable IDs for materialized assets. |
+| `AssetStore` | Owns scanned assets, indexes by ID, and tracks source ownership. |
 | `MatchFactStore` | Stores match facts and removes them when related sources/assets are removed. |
 | `ExplicitCollectionStore` | Stores scanner-known collections and turns them into desired collections. |
 | `SourceMapStore` | Stores raw annotations and publishes a combined `SourceMap`. |
@@ -607,31 +607,13 @@ resolver id + resolver-specific value
 
 The key is the durable identity of a collection. When more sources are loaded, the resolver may return a collection with the same key but more complete membership. `CollectionStore` uses the key to update the existing collection rather than creating a duplicate.
 
-### 13.5 Collection-dependent preparation and legacy materialization
+### 13.5 Collection-dependent preparation
 
-The current Akao implementation still materializes assets after collection resolution. This is migration debt, not the target architecture.
+Akao sequences and sample collections are scanned separately. After the resolver chooses the sample collections, export may need a collection-specific instrument set whose regions point at those chosen samples.
 
-Akao sequences and sample collections are scanned separately. Only after the resolver chooses the correct sample collections can the code build a bound instrument set for that specific collection. That happens in `FormatModule::materializeCollection`.
+`FormatModule::prepareCollection` receives the source store, current snapshot, and resolved collection. It returns transient instrument sets and diagnostics. Exporters consume those values directly; they never enter `AssetStore`, receive persistent IDs, or participate in collection rebuilding and stale removal.
 
-The materializer receives:
-
-- the source store;
-- the current snapshot;
-- the resolver’s desired collection;
-- the ID allocator;
-- a callback that returns a stable asset ID for a named materialization slot.
-
-The materializer returns:
-
-- the final desired collection;
-- materialized assets;
-- diagnostics.
-
-`CollectionPreparation` is the small assembly helper for new collection-dependent work. It begins from the resolver's immutable desired collection, creates the same `SampleCollectionBuilder` and `InstrumentSetBuilder` used during normal scanning, and can append or replace derived synth assets under stable named slots. Static formats never enter this lifecycle.
-
-Source annotations produced during preparation are returned with the materialized assets. `Session` replaces annotations owned by those stable asset IDs on every rebuild and removes them with stale materialized assets. Derived instruments, regions, and samples therefore retain the same HexView/TreeView provenance as scan-time assets instead of becoming invisible after collection resolution.
-
-The stable slot mechanism preserves asset IDs during this transition. The replacement is symbolic sample binding stored in durable instrument/sample values, followed by a pure collection binder. The intended invariant is: **collection rebuilding never accesses `SourceStore` and never reparses sequence, articulation, instrument, or sample structures.**
+The remaining Akao debt is source rereading during preparation. Durable symbolic articulation data would let preparation operate only on snapshot values, but that is independent of the removed second asset lifecycle.
 
 ---
 
@@ -764,7 +746,7 @@ Malformed reads automatically discard accumulated actions and turn the command i
 
 Do not introduce a command class hierarchy, handler-per-opcode files, binary-schema DSL, declarative command table, typed command variant taxonomy, or format-visible microcode language. The internal action list exists only to preserve the order of ordinary imperative statements. Keep the complete source-driver operation visible in one local block, and do not hide multiple side effects behind one convenient-sounding operation.
 
-Capcom's former adjacent decode/execution profile was the predecessor to this model and was removed after the compiler-cursor migration. `VmCommandCursor` and `SequenceCursorDialect` still let unmigrated formats build, but live compatibility is not a design requirement: playback can reparse retained bytes, and Git history is the fallback if those adapters are removed.
+Capcom's former adjacent decode/execution profile was the predecessor to this model and was removed after the compiler-cursor migration.
 
 ### 14.4 Bytecode walkers
 
@@ -773,9 +755,9 @@ The code provides linear and reachable bytecode walkers. They accept a command d
 - `decodeLinearBytecodeTrack`
 - `decodeReachableBytecodeBlocks`
 
-A linear track is mostly decoded in byte order. A reachable track follows stored static targets such as jumps and calls. Cursor-prefixed wrappers adapt legacy command readers to these same walkers.
+A linear track is mostly decoded in byte order. A reachable track follows stored static targets such as jumps and calls.
 
-Compiler-cursor formats keep one `TrackDecodeScope` in their sequence decode context and call `tracks.linear(...)` or `tracks.reachable(...)`. The scope holds sequence-wide discovery limits and source-map ownership, then wraps the underlying walker with the shared track lifecycle: create the track annotation, project each already-decoded command, and finalize the track's source range. Relative-address bases, semantic bounds, and diagnostics remain in the format decoder because they affect command meaning rather than track discovery. Exceptional walkers call `tracks.begin(...)`, append decoded commands, and finish the session without rebuilding that lifecycle. The old per-track input bag remains temporarily at migration boundaries.
+Formats keep one `TrackDecodeScope` in their sequence decode context and call `tracks.linear(...)` or `tracks.reachable(...)`. The scope holds sequence-wide discovery limits and source-map ownership, then wraps the underlying walker with the shared track lifecycle: create the track annotation, project each decoded command, and finalize the track's source range. Relative-address bases, semantic bounds, and diagnostics remain in the format decoder because they affect command meaning rather than track discovery. Exceptional walkers call `tracks.begin(...)`, append decoded commands, and finish the session without rebuilding that lifecycle.
 
 ### 14.5 `SequenceVm`
 
@@ -797,8 +779,6 @@ The VM also owns shared playback policy:
 Semantic loop detection compares the complete execution state that determines recurrence: command address, call stack, and repeat counters. A finite repeat therefore does not need an address-based suppression exception, and the same repeat command can be reused safely after its counter has been cleared. The command limit remains an emergency guard rather than normal loop control; its diagnostic includes track, address, tick, executed-command count, and limit.
 
 Semantic tracks share one finite export boundary. Each track records when it has completed the requested number of infinite-loop repeats, while shorter tracks keep looping until every track has reached its own endpoint or ended naturally. The scheduler then uses the longest endpoint, trims events at that common boundary, and clips notes that cross it. This prevents both early truncation by a short auxiliary loop and a lone long track continuing after every other track has stopped.
-
-Old cursor dialects remain track-major until migrated. Their dry-run and complete-sequence-prepass options are compatibility mechanisms; source-free formats should model shared state directly instead.
 
 ### 14.6 `PerformanceSequence`
 
@@ -1067,14 +1047,14 @@ For a format where sources may arrive separately or relationships are incomplete
 scan sequences and sample collections independently
 emit facts about each asset
 resolver groups assets later
-optional materializer builds collection-dependent assets
+optional export preparation builds collection-dependent values
 ```
 
 Akao follows this shape.
 
 ### 18.4 Sequence command readers
 
-Command code should resemble a driver interpreter. NDS, Capcom SNES, and Konami SNES demonstrate the compiler-cursor form: one opcode switch reads source fields and appends the command's effects in order. Returning the event compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches. Akao and Akao SNES still use normal cursor switches through the old adapter.
+Command code should resemble a driver interpreter. Every ported sequence format uses the compiler-cursor form: one opcode switch reads source fields and appends the command's effects in order. Returning the event compiles discovery and playback behavior together, replacing separate metadata, operand, flow, and execution switches.
 
 The compiler-cursor form is the target because it keeps ordinary commands near the original interpreter's size while retaining source-free VM execution. It avoids a command class, visitor, command table, and universal operation taxonomy.
 
@@ -1146,9 +1126,7 @@ The scanner does not try to bind everything immediately. It scans sample collect
 
 The resolver creates one collection per sequence. It chooses sample collections by preferred sample-set ID and by required articulation coverage. It handles PSF-like sources more narrowly, treats missing and zero sample-set IDs as the same anonymous set, sorts attached sample collections by articulation range, and marks collections incomplete when coverage is missing.
 
-The materializer currently re-reads the selected sequence and sample collections, builds an articulation map, and creates a bound instrument set. This violates the parse-once target and should be replaced with durable symbolic articulation/sample bindings plus a pure collection binder.
-
-Akao’s same cursor reader currently runs for analysis and rendering. That flexibility is useful during migration, but the semantic IR should ultimately make analysis a direct inspection of decoded commands.
+The export preparer currently re-reads the selected sequence and sample collections, builds an articulation map, and creates a bound instrument set. Durable symbolic articulation/sample bindings would remove that remaining parse-once violation.
 
 ---
 
@@ -1163,9 +1141,9 @@ Create a `FormatDefinition` containing a module with:
 - a name;
 - `scan`;
 - optional resolver;
-- optional materializer.
+- optional collection preparer.
 
-Add the format's single source-free dialect when it contains bytecode, then pass the definition to `Session::registerFormat`. Do not add separate module and dialect registration entry points.
+Add any source-free dialects the format needs, then pass the definition to `Session::registerFormat`. Do not add separate module and dialect registration entry points.
 
 Put recognition at the start of `scan` and return an empty `ScanResult` for non-matches. Do not add `canScan`; it exists only for unmigrated modules.
 
@@ -1175,7 +1153,7 @@ Use explicit collections when the scanner already knows the grouping.
 
 Use match facts and a resolver when relationships may be discovered across multiple files or depend on incomplete evidence.
 
-Prefer durable symbolic references and a pure binder when an asset depends on collection membership. `materializeCollection` is a legacy adapter for Akao and should not be copied into a new format.
+Prefer durable symbolic references and transient export preparation when an asset depends on collection membership. Prepared values should not be inserted into session stores.
 
 ### Step 3: Parse source structure
 
@@ -1253,7 +1231,7 @@ It is the main mechanism for HexView-style explanation of parsed bytes.
 
 Insertion order matters because extractors are registered before normal formats in `ValueFormats.cpp`.
 
-New formats enter through `FormatDefinition` and `Session::registerFormat`, which couples one module to its source-free dialect. The two raw registries remain public only as a migration surface for formats that still register cursor dialect matrices.
+Formats enter through `FormatDefinition` and `Session::registerFormat`, which registers one module and all of its source-free dialects together.
 
 ### 21.6 `ScanResultBuilder`
 
@@ -1269,9 +1247,7 @@ This is the line between temporary scanner output and durable session state.
 
 ### 21.8 `AssetStore`
 
-`AssetStore` owns assets and tracks which source produced them. It also manages materialized assets and keeps stable IDs for materialization slots.
-
-This is important for collection-dependent assets such as Akao bound instrument sets.
+`AssetStore` owns scanned assets and tracks which source produced them. Collection-specific prepared values remain outside the store.
 
 ### 21.9 `CollectionStore`
 
@@ -1289,27 +1265,23 @@ It also validates collection references and reports missing or wrong-type assets
 
 `SequenceProgram` records decoded source commands, program profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
 
-Each compiler-cursor command stores its opcode, named source operands, source provenance, decode flow, and ordered executable actions. Every action has an automatically assigned executor slot and positional arguments. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order. Complete compiled commands have no byte-pool entry; byte pools exist for old cursor commands and partial malformed-command diagnostics.
+Each compiler-cursor command stores its opcode, named source operands, source provenance, decode flow, and ordered executable actions. Every action has an automatically assigned executor slot and positional arguments. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order.
 
-### 21.12 `CompilerCursor`, `RecordReader`, and old `VmCommandCursor`
+### 21.12 `CompilerCursor` and `RecordReader`
 
 `RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CompilerCursor` adds command presentation, source operands, discovery flow, ordered executable actions, and generated typed executor selection. Its flow methods supply the corresponding control-flow presentation and target metadata. `CommandSourceMap` performs automatic projection.
 
 `SequenceDecodeSession` owns the repeated sequence-header, track-pointer, track, and command-annotation lifecycle for ordinary linear formats. A format still reads its pointer table explicitly and supplies the track number, pointer range, and decoded start address, keeping ordering, endianness, relocation, and null rules visible. `TrackDecodeScope` owns the corresponding single-track walk and command projection.
 
-`VmCommandCursor` remains a two-phase surface only because unmigrated value formats currently use it. New code must not use it. It may be deleted whenever preserving it would complicate the compiler-cursor design; its implementation remains recoverable from Git history.
-
 ### 21.13 `SequenceDialect`
 
 A source-free dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior. `CompiledCommandDialect` is the compiler-cursor adapter: it is the only layer that sees `std::any`, creates the concrete `Playback`, dispatches every action in order, and combines their `Effects` for the VM. Formats normally apply that adapter with `makeCompiledDialect`, rather than naming and assigning its two generic hooks themselves.
 
-The implementation uses `std::any` only to erase the concrete program and track runtime-state types. Program-specific version data is not stored in dialect context; it lives on the immutable program. Old dialect context remains until those formats migrate.
+The implementation uses `std::any` only to erase the concrete program and track runtime-state types. Program-specific version data is not stored in dialect context; it lives on the immutable program.
 
 ### 21.14 `SequenceVm`
 
 `SequenceVm` is the shared interpreter for parsed sequences. Source-free dialects run through a global `(tick, stable track order)` scheduler with one program state and per-track runtimes. The VM handles command limits, loops, calls, returns, repeats, diagnostics, and event emission. Recurrence keys include command, call stack, and repeat-counter state; the command limit is only a contextual emergency guard.
-
-Old cursor dialects still use track-major execution and optional prepasses. Those paths are disposable adapters, not behavior the new design must preserve.
 
 ### 21.15 `PerformanceModel`
 
@@ -1319,7 +1291,7 @@ This model is the main bridge to future non-MIDI sequence outputs.
 
 ### 21.16 `SynthModel`
 
-`SynthModel` contains the durable neutral values. `SampleCollectionBuilder` and `InstrumentSetBuilder` are temporary authoring helpers around those values; they do not add a draft model or a combined synth lifecycle. `CollectionPreparation` reuses them only when resolved collection membership genuinely changes synth construction.
+`SynthModel` contains the durable neutral values. `SampleCollectionBuilder` and `InstrumentSetBuilder` are temporary authoring helpers around those values; they do not add a draft model or a combined synth lifecycle. Exceptional collection-specific values may be prepared transiently for export, but never enter the asset store.
 
 `SynthModel` is the neutral instrument/sample layer. It represents instruments, regions, samples, envelopes, loops, tuning, physical modulation, and decoded PCM. Export preparation lowers standard modulation to raw generator/modulator records; the model retains custom records only as an escape hatch. `resolveInstrumentAddress` provides the one export-address policy shared by MIDI, SF2, and DLS.
 
@@ -1383,9 +1355,9 @@ The VM outputs neutral performance events. MIDI is one renderer, not the sequenc
 
 ## 23. Tradeoffs and risks
 
-### 23.1 Older sequence paths coexist temporarily
+### 23.1 Versioned dialect families remain
 
-NDS and Capcom use compiler-cursor commands and global scheduling, while three format families still use the cursor adapter and track-major execution. Coexistence is a repository migration fact, not an architectural promise. Do not add features to the old paths, and remove them whenever that makes the target code materially cleaner; Git history preserves a fallback.
+Akao and Konami SNES still register several dialect values because some execution policy differs by driver version. Their immutable programs also carry a version profile, so future consolidation is possible if it removes more code than it adds.
 
 ### 23.2 `std::any` hides some type checking
 
@@ -1399,11 +1371,9 @@ The source map is flexible. That is useful, but flexibility can lead to inconsis
 
 A small style guide for source annotations would help future formats feel consistent in HexView and tests.
 
-### 23.4 Materialization is a migration blocker
+### 23.4 Akao preparation still rereads source data
 
-The current Akao materializer adds stable slots, stale removal, repeated diagnostics, and source re-reading.
-
-Do not extend this mechanism. Replace it with symbolic bindings and a collection binder that is pure over snapshot values, then remove the second asset lifecycle.
+The second asset lifecycle is gone, but Akao export preparation still re-reads selected source structures. Durable symbolic bindings would make this step pure over snapshot values and complete the parse-once goal.
 
 ### 23.5 Collection resolution depends on good keys
 
@@ -1447,20 +1417,18 @@ A future small convention document should define common detail-kind prefixes, fi
 
 This will help UI and tests stay stable as more formats are ported.
 
-### 24.6 Replace and then test Akao materialization
+### 24.6 Finish Akao symbolic binding
 
-Add durable symbolic sample bindings, make collection rebuilding independent of `SourceStore`, and test that repeated rebuilds are pure and diagnostics do not accumulate.
+Add durable symbolic sample bindings so export preparation no longer re-reads sequence and sample structures. Collection rebuilding is already independent of `SourceStore`.
 
 ### 24.7 Migration roadmap and invariants
 
 The remaining order is intentional:
 
-1. add neutral control transitions for fades/slides;
-2. migrate Akao SNES to compiler-cursor commands, replacing its dialect matrix, byte rewriting, tempo scraping, format-specific analysis, and tick motion;
-3. add symbolic Akao articulation/sample binding and remove materialization source reads;
-4. migrate the remaining layouts/synth parsers to `RecordReader` and shared platform primitives;
-5. remove all `canScan`, old cursor-dialect, byte-pool, and materialization adapters;
-6. migrate each format to one `FormatDefinition`, then remove direct access to the two raw registries.
+1. add symbolic Akao articulation/sample binding and remove preparation source reads;
+2. migrate remaining layouts and synth parsers to `RecordReader` and shared platform primitives;
+3. remove the remaining `canScan` recognition adapters;
+4. standardize source annotation naming and roles.
 
 Architectural acceptance criteria:
 
@@ -1486,9 +1454,9 @@ The new architecture is easiest to understand as a set of stages:
 3. ScanCommit validates results before storing them.
 4. Session stores own the accepted values.
 5. Collection resolution groups assets into export units.
-6. A pure binder resolves durable symbolic references (legacy Akao still materializes and reparses).
+6. Export preparation builds any transient collection-specific values.
 7. SessionSnapshot exposes a read-only view.
-8. SequenceVm globally schedules source-free compiled commands into neutral performance events (old cursor dialects use an adapter).
+8. SequenceVm globally schedules source-free compiled commands into neutral performance events.
 9. Exporters turn collections into files.
 ```
 

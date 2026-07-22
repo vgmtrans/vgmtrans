@@ -528,57 +528,23 @@ Add a platform adapter only when it removes repeated, genuinely platform-specifi
 
 ## Collection-dependent construction: the `useColl()` replacement
 
-Build collection-specific structural changes at the earliest point where all required dependencies and matching decisions are known. If that point is after collection resolution, materialize the derived values once before exporters consume them. Never implement the change by temporarily mutating a shared instrument set during each export.
+Build collection-specific structural changes at the earliest point where all required dependencies and matching decisions are known. If that point is after collection resolution, prepare the derived values transiently when exporters consume them. Never implement the change by mutating a shared instrument set.
 
 Do not defer construction merely because legacy code used `useColl()`. When a scanner already has the sequence data, instrument tables, sample tables, and an unambiguous collection relationship, it should build the sequence-specific instrument set during the normal scan with the same two builders. Use collection preparation only when matching or binding information genuinely becomes available after independently scanned assets are resolved. This keeps simple one-source formats on the simple path.
 
-Provide one optional `CollectionPreparation` assembly helper over the existing collection materialization stage. It is the collection-specific counterpart to `ScanResultBuilder`, not a synth builder and not part of the static-format common path.
-
-Its responsibilities are:
-
-- expose the resolved collection and its base assets read-only;
-- allocate stable derived asset IDs by named slot;
-- create the same `SampleCollectionBuilder` and `InstrumentSetBuilder` instances for derived assets;
-- collect derived ordinary assets and diagnostics;
-- explicitly keep, append, replace, or remove collection asset references;
-- finish one deterministic prepared collection result.
-
-The intended exceptional flow is approximately:
-
-```cpp
-CollectionPreparation prepared(context);
-
-const auto* base = context.snapshot.asset<InstrumentSetAsset>(baseInstrumentSetId);
-if (base == nullptr) {
-  return prepared.incomplete("Base instrument set was not found");
-}
-
-auto instruments = prepared.instruments("effective-instruments");
-for (const auto& instrument : base->instruments) {
-  instruments.append(instrument);  // ordinary value copy
-}
-
-// Apply a decoded, sequence-owned drum-kit or override recipe here using the
-// same add/getOrAdd/find/region vocabulary as scan-time construction.
-
-prepared.replaceInstrumentSet("Effective Instruments", std::move(instruments));
-return std::move(prepared).finish();
-```
-
-The exact helper names may follow existing `MaterializationContext` conventions, but the semantic boundaries are fixed:
+Use the format module's optional export-preparation callback only for this exceptional path. It receives the resolved collection and snapshot and returns ordinary transient instrument values plus diagnostics. The semantic boundaries are:
 
 - base assets are immutable;
-- derived assets are ordinary values with stable IDs;
-- preparation is deterministic and independent of export target;
+- prepared values do not receive persistent asset IDs or enter session stores;
+- preparation is deterministic and shared by the synth exporters;
 - static formats define no callback and pay no authoring cost;
-- multiple base and derived instrument sets and sample collections are supported;
-- no `useColl()`, `unuseColl()`, temporary-object sink, mutation, or reset lifecycle reappears under new names.
+- no `useColl()`, `unuseColl()`, mutation, reset, or second asset lifecycle reappears under new names.
 
 Formats may either build a derived set from scratch or copy ordinary base values into an `InstrumentSetBuilder`. Use `append` for untouched copied instruments; use `add(formatKey, instrument)` when later overrides need `find(formatKey)` and `value()`. Do not create a generic patch language, recipe schema, or overlay hierarchy merely to avoid copying small value objects.
 
 Sequence-owned preparation data should be decoded into durable values when the surrounding format architecture already has an appropriate place for it. The synth-builder framework must not solve this by adding opaque payloads, a universal recipe tree, or format-specific alternatives to the core asset variant.
 
-Akao's current parse-twice materialization debt is a separate problem. This framework must let its binder feed resolved `SampleRef`s into `InstrumentSetBuilder`, but it must not broaden the common synth API solely to redesign Akao recipe persistence in the same change.
+Akao's current source re-read during export preparation is a separate problem. Do not broaden the common synth API solely to redesign Akao recipe persistence.
 
 ## Classify legacy `useColl()` behavior instead of forcing it through one hook
 
@@ -666,7 +632,7 @@ Audit Akao PS1 against:
 - several selected sample collections;
 - articulation-to-sample binding;
 - synthetic articulation instruments;
-- collection-specific instrument materialization;
+- collection-specific instrument preparation;
 - detached `InstrumentSetBuilder` use with already-resolved `SampleRef`s.
 
 Implement bounded general improvements exposed by the audit. Do not turn Akao's format-specific articulation catalog or binder into mandatory concepts for ordinary formats. If a full migration broadens this goal substantially, document the remaining work and prove the builder boundary with focused binder tests.
@@ -747,7 +713,7 @@ Internal machinery is justified only when it substantially reduces author-facing
 Do not start these steps until the user separately authorizes execution of this goal.
 
 1. Record baseline line counts and representative summary, source-map, MIDI, SF2, DLS, and WAV outputs for CapcomSnes, KonamiSnes, NDS, and relevant Akao cases.
-2. Write compiling API fixtures for the common example, percussion `getOrAdd`, NDS cross-collection lookup, detached construction, and collection preparation. Use them to settle minor C++ signatures before implementation spreads.
+2. Write compiling API fixtures for the common example, percussion `getOrAdd`, NDS cross-collection lookup, and detached construction. Use them to settle minor C++ signatures before implementation spreads.
 3. Implement `SampleCollectionBuilder`, `InstrumentSetBuilder`, their nested entry proxies, stable key maps, range accumulation, diagnostics, source projection, and explicit finish.
 4. Add the small `ScanResultBuilder` factories and consuming commit overloads.
 5. Rename table-row source vocabulary to table-entry vocabulary where the migration touches it.
@@ -756,7 +722,7 @@ Do not start these steps until the user separately authorizes execution of this 
 8. Migrate KonamiSnes, including percussion grouping, disjoint source tables, and its explicit sample-selection quirk.
 9. Migrate NDS and prove multiple independent sample collections, sparse source keys, and scan-owned lookup lifetime separation.
 10. Audit/migrate AkaoSnes and exercise detached construction through the Akao binder without redesigning Akao recipe persistence.
-11. Add the small `CollectionPreparation` assembly helper and synthetic SuzukiSnes/NinSnes-style fixtures. Do not implement SuzukiSnes.
+11. Prove exceptional collection-specific preparation with focused SuzukiSnes/NinSnes-style fixtures. Do not implement SuzukiSnes.
 12. Extend collection-level validation for cross-set identities, addresses, and sample references.
 13. Run all parity checks, report intentional corrections, and compare format code plus total framework size against the baseline.
 

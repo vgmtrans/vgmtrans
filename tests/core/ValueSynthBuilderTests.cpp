@@ -6,13 +6,11 @@
 
 #include "value/base/RecordReader.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/scan/CollectionPreparation.h"
 #include "value/validation/SnapshotValidation.h"
 
 #include <algorithm>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 using namespace vgmtrans::core;
@@ -87,15 +85,16 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
                                     .encodedData = SourceRange{.source = source, .offset = 200, .size = 18},
                                 });
   expect(second.ref().index == 1, "a sparse source key should still receive the next dense index");
-  const SampleRefLookup retained = samples.refs();
-
   expect(!samples.add(7, Sample{}), "a duplicate source key should not return a usable entry");
   expect(!samples.alias(11, 99), "an alias to a missing key should not return a usable entry");
   expect(samples.size() == 2, "rejected sample keys must not change later dense indexes");
   expect(samples.range() == directory, "an included table range should remain the asset's primary range");
 
-  const SampleCollection collection = std::move(samples).finish();
+  const auto built = std::move(samples).finish();
+  const auto& collection = built.value;
+  const auto& retained = built.refs;
   const SourceMap annotations = sourceMap.finish();
+  expect(built.range == directory, "finish should return the final sample collection range");
   expect(collection.samples.size() == 2, "sample builder should finish ordinary sample values");
   expect(retained.find(7) && retained.find(7)->index == 0 && retained.find(9) && retained.find(9)->index == 0,
          "retained lookup should preserve direct and alias mappings after finish");
@@ -163,8 +162,10 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
   instruments.append(Instrument{.name = "Derived", .regions = {Region{}}});
 
   expect(instruments.range() == table, "an explicit instrument table should remain the asset's primary range");
-  const auto values = std::move(instruments).finish();
+  const auto built = std::move(instruments).finish();
+  const auto& values = built.values;
   const SourceMap annotations = sourceMap.finish();
+  expect(built.range == table, "finish should return the final instrument set range");
   expect(values.size() == 3 && values[0].regions.size() == 2,
          "instrument builder should finish grouped, sparse, and appended ordinary values");
   expect(values[0].range == SourceRange{.source = source, .offset = 16, .size = 8},
@@ -372,171 +373,15 @@ void detachedBuildersUseTheSameAuthoringSurface() {
   instrument.region(concreteSample, Region{})
       .source("Detached Region", SourceRange{.source = source, .offset = 44, .size = 4});
 
-  const SampleCollection sampleValues = std::move(samples).finish();
+  const auto sampleValues = std::move(samples).finish();
   const auto instrumentValues = std::move(instruments).finish();
-  expect(sampleValues.samples.size() == 1 && instrumentValues.size() == 1 && instrumentValues[0].regions.size() == 1,
+  expect(sampleValues.value.samples.size() == 1 && instrumentValues.values.size() == 1 &&
+             instrumentValues.values[0].regions.size() == 1,
          "detached builders should finish ordinary values through the scan-time vocabulary");
-  expect(instrumentValues[0].range == SourceRange{.source = source, .offset = 40, .size = 4} &&
-             instrumentValues[0].regions[0].range == SourceRange{.source = source, .offset = 44, .size = 4},
+  expect(instrumentValues.values[0].range == SourceRange{.source = source, .offset = 40, .size = 4} &&
+             instrumentValues.values[0].regions[0].range == SourceRange{.source = source, .offset = 44, .size = 4},
          "detached source calls should still accumulate durable object ranges");
   expect(diagnostics.empty(), "valid detached construction should not report diagnostics");
-}
-
-void collectionPreparationBuildsImmutableSequenceSpecificAssets() {
-  const SourceId source{33};
-  const AssetId baseInstrumentsId{70};
-  const AssetId baseSamplesId{71};
-  SessionSnapshotBuilder snapshotBuilder;
-  snapshotBuilder.assets.push_back(InstrumentSetAsset{
-      .metadata =
-          AssetMetadata{
-              .id = baseInstrumentsId,
-              .format = "Probe",
-              .name = "Base Instruments",
-              .range = SourceRange{.source = source, .offset = 10, .size = 8},
-          },
-      .instruments = {Instrument{
-          .identity = InstrumentIdentity{.domain = "probe", .key = 3},
-          .name = "Base Instrument",
-          .range = SourceRange{.source = source, .offset = 10, .size = 4},
-          .regions = {Region{
-              .sample = SampleRef{.collection = baseSamplesId, .index = 0},
-              .range = SourceRange{.source = source, .offset = 11, .size = 1},
-          }},
-      }},
-  });
-  snapshotBuilder.assets.push_back(SampleCollectionAsset{
-      .metadata =
-          AssetMetadata{
-              .id = baseSamplesId,
-              .format = "Probe",
-              .name = "Base Samples",
-              .range = SourceRange{.source = source, .offset = 20, .size = 8},
-          },
-      .samples = SampleCollection{.samples = {Sample{
-                                      .name = "Base Sample",
-                                      .encodedData = SourceRange{.source = source, .offset = 20, .size = 8},
-                                  }}},
-  });
-  const SessionSnapshot snapshot = snapshotBuilder.finish();
-  SourceStore sources;
-  ScanIdAllocator ids;
-  std::unordered_map<std::string, AssetId> stableSlots;
-  u32 nextAsset = 100;
-
-  const auto prepare = [&](std::string key, u8 drumKey) {
-    DesiredCollection collection{
-        .key = CollectionKey{.resolver = "Probe", .value = std::move(key)},
-        .name = "Prepared Probe",
-        .instrumentSets = {baseInstrumentsId},
-        .sampleCollections = {baseSamplesId},
-    };
-    MaterializationContext context{
-        .sources = sources,
-        .snapshot = snapshot,
-        .collection = collection,
-        .ids = ids,
-        .assetIdForSlot =
-            [&](std::string_view slot) {
-              const std::string stableKey = collection.key.value + ":" + std::string(slot);
-              const auto [found, inserted] = stableSlots.try_emplace(stableKey, AssetId{nextAsset});
-              if (inserted) {
-                ++nextAsset;
-              }
-              return found->second;
-            },
-    };
-
-    CollectionPreparation prepared(context);
-    const auto* base = prepared.snapshot().asset<InstrumentSetAsset>(baseInstrumentsId);
-    expect(base != nullptr, "collection preparation should expose immutable base assets");
-    auto instruments = prepared.instruments("effective-instruments");
-    for (const auto& value : base->instruments) {
-      instruments.add(value.identity->key, value);
-    }
-    auto copied = instruments.find(3);
-    expect(copied.has_value(), "copied instruments should remain addressable by an explicit format key");
-    copied->value().name = "Sequence Override";
-    auto drumKit = instruments.add(900, Instrument{.name = "Sequence Drum Kit"});
-    drumKit.region(SampleRef{.collection = baseSamplesId, .index = 0}, Region{
-                                                                           .keyRange =
-                                                                               KeyRange{
-                                                                                   .low = drumKey,
-                                                                                   .high = drumKey,
-                                                                               },
-                                                                           .range =
-                                                                               SourceRange{
-                                                                                   .source = source,
-                                                                                   .offset = drumKey,
-                                                                                   .size = 1,
-                                                                               },
-                                                                       });
-    prepared.replaceInstrumentSet("Effective Instruments", std::move(instruments));
-
-    auto extraSamples = prepared.samples("sequence-samples");
-    extraSamples.add(0, Sample{
-                            .name = "Sequence Sample",
-                            .encodedData = SourceRange{.source = source, .offset = 50, .size = 4},
-                        });
-    prepared.appendSampleCollection("Sequence Samples", std::move(extraSamples));
-    return std::move(prepared).finish();
-  };
-
-  const MaterializationResult first = prepare("sequence-a", 40);
-  const MaterializationResult second = prepare("sequence-b", 41);
-  const MaterializationResult firstAgain = prepare("sequence-a", 40);
-  expect(first.assets.size() == 2 && second.assets.size() == 2,
-         "collection preparation should collect several independently derived synth assets");
-  expect(first.collection.instrumentSets.size() == 1 && first.collection.sampleCollections.size() == 2,
-         "replace and append operations should update only their intended collection references");
-  expect(first.collection.instrumentSets[0] != second.collection.instrumentSets[0],
-         "different sequences should receive different derived instrument-set ids");
-  expect(first.collection.instrumentSets[0] == firstAgain.collection.instrumentSets[0],
-         "one collection slot should retain a stable derived asset id across rebuilds");
-
-  const auto* firstInstruments = std::get_if<InstrumentSetAsset>(&first.assets[0].asset);
-  const auto* secondInstruments = std::get_if<InstrumentSetAsset>(&second.assets[0].asset);
-  expect(firstInstruments != nullptr && secondInstruments != nullptr && firstInstruments->instruments.size() == 2 &&
-             secondInstruments->instruments.size() == 2,
-         "each prepared collection should contain its copied instrument and sequence drum kit");
-  expect(firstInstruments->instruments[1].regions[0].keyRange.low == 40 &&
-             secondInstruments->instruments[1].regions[0].keyRange.low == 41,
-         "sequence-specific recipes should produce independent immutable values");
-  expect(first.sourceMap.ownedBy(ObjectRefs::instrument(first.collection.instrumentSets[0], 0)).size() == 1 &&
-             first.sourceMap.ownedBy(ObjectRefs::region(first.collection.instrumentSets[0], 1, 0)).size() == 1 &&
-             first.sourceMap.ownedBy(ObjectRefs::sample(first.collection.sampleCollections[1], 0)).size() == 1,
-         "prepared assets should rebind source annotations to their stable derived object identities");
-  const auto* unchangedBase = snapshot.asset<InstrumentSetAsset>(baseInstrumentsId);
-  expect(unchangedBase != nullptr && unchangedBase->instruments[0].name == "Base Instrument" &&
-             unchangedBase->instruments.size() == 1,
-         "collection preparation must never mutate its shared base instrument set");
-
-  DesiredCollection incompleteCollection{
-      .key = CollectionKey{.resolver = "Probe", .value = "incomplete"},
-      .name = "Incomplete Probe",
-  };
-  MaterializationContext incompleteContext{
-      .sources = sources,
-      .snapshot = snapshot,
-      .collection = incompleteCollection,
-      .ids = ids,
-      .assetIdForSlot = [](std::string_view) { return AssetId{200}; },
-  };
-  CollectionPreparation incomplete(incompleteContext);
-  auto abandoned = incomplete.instruments("abandoned-instruments");
-  abandoned
-      .add(0,
-           Instrument{
-               .name = "Abandoned Instrument",
-               .range = SourceRange{.source = source, .offset = 60, .size = 2},
-           })
-      .source("Abandoned Instrument", SourceRange{.source = source, .offset = 60, .size = 2});
-  const auto incompleteResult = incomplete.incomplete("Base instrument set was not found");
-  expect(incompleteResult.collection.status == CollectionStatus::Incomplete &&
-             incompleteResult.collection.issues.size() == 1 && incompleteResult.diagnostics.size() == 1,
-         "collection preparation should report one coherent issue and diagnostic when binding cannot finish");
-  expect(incompleteResult.assets.empty() && incompleteResult.sourceMap.annotations().empty(),
-         "an incomplete preparation should discard partial derived assets and their source annotations");
 }
 
 void collectionValidationRejectsAmbiguousSynthBindings() {
@@ -629,6 +474,5 @@ void runValueSynthBuilderTests() {
   scanResultBuilderRetainsSampleKeysAndExposesExistingRegions();
   valueEscapeHatchContributesFinalRanges();
   detachedBuildersUseTheSameAuthoringSurface();
-  collectionPreparationBuildsImmutableSequenceSpecificAssets();
   collectionValidationRejectsAmbiguousSynthBindings();
 }

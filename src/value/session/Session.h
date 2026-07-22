@@ -34,6 +34,8 @@ namespace vgmtrans::core {
 class Session {
 public:
   void registerFormat(FormatDefinition definition);
+  void registerFormat(FormatModule module);
+  void registerFormat(FormatModule module, SequenceDialect dialect);
 
   SourceId addSource(SourceFile file, std::vector<u8> bytes);
   SourceId addSourceFromPath(std::filesystem::path path);
@@ -48,9 +50,7 @@ public:
 
   [[nodiscard]] const SourceStore& sources() const noexcept { return sources_; }
   [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }
-  [[nodiscard]] FormatRegistry& formats() noexcept { return formats_; }
   [[nodiscard]] const SequenceDialectRegistry& dialects() const noexcept { return dialects_; }
-  [[nodiscard]] SequenceDialectRegistry& dialects() noexcept { return dialects_; }
 
 private:
   void sealRegistries() noexcept;

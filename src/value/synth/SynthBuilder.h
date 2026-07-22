@@ -20,7 +20,7 @@ namespace vgmtrans::core {
 
 // Add the stable, exporter-neutral properties of a synth value to a source
 // annotation. Builders do this automatically at finish time; scanners that
-// describe values before materialization can use the same projection directly.
+// describe values before building them can use the same projection directly.
 void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample);
 void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrument);
 void annotateSynthValue(AnnotationBuilder annotation, const Region& region);
@@ -42,6 +42,13 @@ private:
   std::unordered_map<u64, u32> indexes_;
 };
 
+struct BuiltSampleCollection {
+  AssetId asset;
+  SampleCollection value;
+  SampleRefLookup refs;
+  SourceRange range;
+};
+
 // Builds one sample collection while keeping sparse source keys, dense model
 // indexes, and source annotations synchronized.
 class SampleCollectionBuilder {
@@ -59,7 +66,6 @@ public:
   Entry add(u64 sourceKey, Sample sample);
   Entry alias(u64 aliasKey, u64 existingKey);
   [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
-  [[nodiscard]] SampleRefLookup refs() const;
 
   // Asset-level source structures, such as a sample directory table, use this
   // escape hatch while still receiving the correct asset owner automatically.
@@ -76,7 +82,7 @@ public:
   void warning(std::string message, SourceRange range = {});
   void error(std::string message, SourceRange range = {});
 
-  [[nodiscard]] SampleCollection finish() &&;
+  [[nodiscard]] BuiltSampleCollection finish() &&;
 
   class Entry {
   public:
@@ -123,6 +129,12 @@ private:
   bool finished_ = false;
 };
 
+struct BuiltInstrumentSet {
+  AssetId asset;
+  std::vector<Instrument> values;
+  SourceRange range;
+};
+
 // Builds one instrument set while assigning durable dense identities to
 // instruments and regions and projecting their sample relationships.
 class InstrumentSetBuilder {
@@ -156,7 +168,7 @@ public:
   void warning(std::string message, SourceRange range = {});
   void error(std::string message, SourceRange range = {});
 
-  [[nodiscard]] std::vector<Instrument> finish() &&;
+  [[nodiscard]] BuiltInstrumentSet finish() &&;
 
   class Entry {
   public:

@@ -76,23 +76,6 @@ void matchFactsAreJoinedOncePerAsset() {
   const auto coverage = sampleSets[0].coverage("articulation");
   expect(sampleSets.size() == 1 && coverage && coverage->first == 5 && coverage->count == 4,
          "sample coverage should be available from the same aggregated fact surface");
-
-  DesiredCollection collection{
-      .sequence = sequenceId,
-      .sampleCollections = {samplesId},
-  };
-  ScanIdAllocator ids;
-  const MaterializationContext context{
-      .sources = sources,
-      .snapshot = snapshot,
-      .collection = collection,
-      .ids = ids,
-      .assetIdForSlot = [](std::string_view) { return AssetId{100}; },
-  };
-  const auto input = context.inputFor(snapshot.asset<SequenceProgramAsset>(sequenceId)->metadata.range);
-  expect(context.sequenceAsset() != nullptr && context.selectedSampleCollections().size() == 1 && input &&
-             input->reader.source() == source && !context.inputFor(SourceRange{}),
-         "materialization should resolve selected assets and source input through one common context API");
 }
 
 }  // namespace
