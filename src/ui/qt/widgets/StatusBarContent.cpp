@@ -7,8 +7,6 @@
 
 #include "StatusBarContent.h"
 
-#include "services/NotificationCenter.h"
-
 #include <QHBoxLayout>
 #include <QIcon>
 
@@ -54,7 +52,6 @@ StatusBarContent::StatusBarContent(QWidget *parent) : QWidget(parent)
   this->setLayout(layout);
   this->setMaximumHeight(maxHeight);
 
-  connect(NotificationCenter::the(), &NotificationCenter::statusUpdated, this, &StatusBarContent::setStatus);
 }
 
 void StatusBarContent::setStatus(const QString& name, const QString& description, const QIcon* icon, int offset, int size) const {

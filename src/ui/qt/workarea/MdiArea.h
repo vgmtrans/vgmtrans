@@ -6,14 +6,19 @@
 
 #pragma once
 
+#include "value/base/CoreTypes.h"
+
 #include <unordered_map>
 
 #include <QMdiArea>
 #include <QMdiSubWindow>
 
-class VGMFile;
 class QEvent;
 class QPaintEvent;
+
+namespace vgmtrans::ui {
+class WorkspaceController;
+}
 
 class MdiArea : public QMdiArea {
   Q_OBJECT
@@ -32,8 +37,13 @@ public:
   MdiArea(MdiArea &&) = delete;
   MdiArea &operator=(MdiArea &&) = delete;
 
-  void newView(VGMFile *file);
-  void removeView(const VGMFile *file);
+  void setWorkspace(vgmtrans::ui::WorkspaceController* workspace);
+  void newView(vgmtrans::core::AssetId asset);
+  void workspaceChanged();
+  void selectAsset(vgmtrans::core::AssetId asset, QWidget* caller);
+
+signals:
+  void assetSelected(vgmtrans::core::AssetId asset, QWidget* caller);
 
 protected:
   void changeEvent(QEvent *event) override;
@@ -43,8 +53,8 @@ private:
   MdiArea(QWidget *parent = nullptr);
   void updateBackgroundColor();
   void onSubWindowActivated(QMdiSubWindow *window);
-  void onVGMFileSelected(const VGMFile *file, QWidget *caller);
   static void ensureMaximizedSubWindow(QMdiSubWindow *window);
-  std::unordered_map<const VGMFile *, QMdiSubWindow *> fileToWindowMap;
-  std::unordered_map<QMdiSubWindow *, VGMFile *> windowToFileMap;
+  vgmtrans::ui::WorkspaceController* m_workspace{};
+  std::unordered_map<u32, QMdiSubWindow *> assetToWindowMap;
+  std::unordered_map<QMdiSubWindow *, u32> windowToAssetMap;
 };

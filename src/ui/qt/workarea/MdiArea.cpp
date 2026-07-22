@@ -6,14 +6,11 @@
 
 #include "MdiArea.h"
 
+#include "application/WorkspaceController.h"
 #include "InstructionHintLayout.h"
 #include "Metrics.h"
-#include "QtVGMRoot.h"
-#include "services/NotificationCenter.h"
 #include "UIHelpers.h"
-#include <VGMColl.h>
-#include <VGMFile.h>
-#include "VGMFileView.h"
+#include "widgets/EmptyStateWidget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -124,12 +121,6 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   updateBackgroundColor();
 
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
-  connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &MdiArea::onVGMFileSelected);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, [this]() { viewport()->update(); });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, this, [this]() { viewport()->update(); });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, this, [this]() { viewport()->update(); });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, this,[this]() { viewport()->update(); });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMFile, this, [this](const VGMFile *file) { removeView(file); });
 
   if (auto *tab_bar = findChild<QTabBar *>()) {
     tab_bar->setStyleSheet(QString{"QTabBar::tab { height: %1; }"}.arg(Size::VTab));
@@ -203,8 +194,9 @@ void MdiArea::paintEvent(QPaintEvent *event) {
   QColor accent = palette().color(QPalette::WindowText);
   accent.setAlphaF(0.4);
 
-  const bool hasRawFiles = !qtVGMRoot.rawFiles().empty();
-  const bool hasCollections = !qtVGMRoot.vgmColls().empty();
+  const bool hasRawFiles = m_workspace != nullptr && !m_workspace->snapshot().sources().empty();
+  const bool hasCollections =
+      m_workspace != nullptr && !m_workspace->snapshot().collections().empty();
   const QRect areaRect = viewport()->rect();
   const QFont baseFont = painter.font();
 
@@ -264,45 +256,59 @@ void MdiArea::updateBackgroundColor() {
   setBackground(palette().color(QPalette::Window));
 }
 
-void MdiArea::newView(VGMFile *file) {
-  auto it = fileToWindowMap.find(file);
-  // Check if a fileview for this vgmfile already exists
-  if (it != fileToWindowMap.end()) {
-    // If it does, let's focus it
-    auto *vgmfile_view = it->second;
-    vgmfile_view->setFocus();
-  } else {
-    // No VGMFileView could be found, we have to make one
-    auto *vgmfile_view = new VGMFileView(file);
-    auto tab = addSubWindow(vgmfile_view, Qt::SubWindow);
-    fileToWindowMap.insert(std::make_pair(file, tab));
-    windowToFileMap.insert(std::make_pair(tab, file));
-    tab->showMaximized();
-    tab->setFocus();
-
-#ifdef Q_OS_MAC
-    auto newTitle = " " + vgmfile_view->windowTitle() + " ";
-    vgmfile_view->setWindowTitle(newTitle);
-#endif
-  }
+void MdiArea::setWorkspace(vgmtrans::ui::WorkspaceController* workspace) {
+  m_workspace = workspace;
+  workspaceChanged();
 }
 
-void MdiArea::removeView(const VGMFile *file) {
-  // Let's check if we have a VGMFileView to remove
-  auto it = fileToWindowMap.find(file);
-  if (it == fileToWindowMap.end()) {
-    return; // Already removed
+void MdiArea::newView(vgmtrans::core::AssetId asset) {
+  if (m_workspace == nullptr) {
+    return;
+  }
+  const auto* value = m_workspace->snapshot().asset(asset);
+  if (value == nullptr) {
+    return;
   }
 
-  QMdiSubWindow *window = it->second;
-  windowToFileMap.erase(window);
-  fileToWindowMap.erase(it);
-
-  if (window) {
-    // Close the tab (automatically deletes it)
-    // Workaround for QTBUG-5446 (removeMdiSubWindow would be a better option)
-    window->close();
+  if (const auto it = assetToWindowMap.find(asset.value); it != assetToWindowMap.end()) {
+    setActiveSubWindow(it->second);
+    it->second->setFocus();
+    return;
   }
+
+  const QString name = QString::fromStdString(vgmtrans::core::metadata(*value).name);
+  auto* placeholder = new EmptyStateWidget(
+      {QStringLiteral(":/icons/magnify.svg"), name, 2, 2.0, 0.4});
+  placeholder->setEmptyStateShown(true);
+  placeholder->setWindowTitle(name);
+  QMdiSubWindow* window = addSubWindow(placeholder, Qt::SubWindow);
+  assetToWindowMap.emplace(asset.value, window);
+  windowToAssetMap.emplace(window, asset.value);
+  connect(window, &QObject::destroyed, this, [this, assetValue = asset.value, window]() {
+    assetToWindowMap.erase(assetValue);
+    windowToAssetMap.erase(window);
+  });
+  window->showMaximized();
+  window->setFocus();
+#ifdef Q_OS_MAC
+  placeholder->setWindowTitle(QStringLiteral(" %1 ").arg(name));
+#endif
+}
+
+void MdiArea::workspaceChanged() {
+  if (m_workspace != nullptr) {
+    for (auto it = assetToWindowMap.begin(); it != assetToWindowMap.end();) {
+      if (m_workspace->snapshot().asset(vgmtrans::core::AssetId{it->first}) != nullptr) {
+        ++it;
+        continue;
+      }
+      QMdiSubWindow* window = it->second;
+      windowToAssetMap.erase(window);
+      it = assetToWindowMap.erase(it);
+      window->close();
+    }
+  }
+  viewport()->update();
 }
 
 void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
@@ -319,31 +325,30 @@ void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
     subWindow->widget()->setHidden(subWindow != window);
   }
 
-  if (window) {
-    auto it = windowToFileMap.find(window);
-    if (it != windowToFileMap.end()) {
-      VGMFile *file = it->second;
-      NotificationCenter::the()->selectVGMFile(file, this);
-    }
+  if (const auto it = windowToAssetMap.find(window); it != windowToAssetMap.end()) {
+    emit assetSelected(vgmtrans::core::AssetId{it->second}, this);
   }
 }
 
-void MdiArea::onVGMFileSelected(const VGMFile *file, QWidget *caller) {
-  if (caller == this || file == nullptr)
+void MdiArea::selectAsset(vgmtrans::core::AssetId asset, QWidget* caller) {
+  if (caller == this || !asset.valid()) {
     return;
+  }
 
-  auto it = fileToWindowMap.find(file);
-  if (it != fileToWindowMap.end()) {
+  const auto it = assetToWindowMap.find(asset.value);
+  if (it == assetToWindowMap.end()) {
+    return;
+  }
 
-    QWidget* focusedWidget = QApplication::focusWidget();
-    bool callerHadFocus = focusedWidget && caller && caller->isAncestorOf(focusedWidget);
-    QMdiSubWindow *window = it->second;
-    setActiveSubWindow(window);
+  QWidget* focusedWidget = QApplication::focusWidget();
+  const bool callerHadFocus = caller != nullptr && focusedWidget != nullptr &&
+      (focusedWidget == caller || caller->isAncestorOf(focusedWidget));
+  setActiveSubWindow(it->second);
 
-    // Reassert the focus back to the caller
-    if (caller && callerHadFocus) {
-      caller->setFocus();
-    }
+  // Selecting an item may activate its analysis tab, but keyboard focus stays
+  // in the list that initiated the selection.
+  if (callerHadFocus) {
+    caller->setFocus();
   }
 }
 

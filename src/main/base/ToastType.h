@@ -6,4 +6,9 @@
 
 #pragma once
 
-#include "value/base/Types.h"
+enum class ToastType {
+  Info,
+  Warning,
+  Error,
+  Success,
+};

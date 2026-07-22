@@ -6,11 +6,15 @@
 
 #pragma once
 
-#include "Root.h"
+#include "PlaybackPosition.h"
+#include "main/base/ToastType.h"
 
 #include <QList>
 #include <QMainWindow>
 #include <QUrl>
+
+#include <filesystem>
+#include <span>
 
 class QWidget;
 class QDockWidget;
@@ -18,9 +22,11 @@ class MenuBar;
 class MainWindowDockLayout;
 class PlaybackControls;
 class Logger;
-class VGMCollListView;
-class VGMCollView;
+class QListView;
+class QSortFilterProxyModel;
 class StatusBarContent;
+class TableView;
+class CollectionListView;
 class ToastHost;
 class WindowBar;
 class QDragEnterEvent;
@@ -34,15 +40,34 @@ namespace QWK {
 class WidgetWindowAgent;
 }
 
+namespace vgmtrans::ui {
+class CollectionContentsModel;
+class WorkspaceController;
+}
+
 class MainWindow final : public QMainWindow {
   Q_OBJECT
 
 public:
-  MainWindow();
+  explicit MainWindow(vgmtrans::ui::WorkspaceController& workspace);
+  void openPaths(std::span<const std::filesystem::path> paths);
   void showEvent(QShowEvent* event) override;
   void showDragOverlay();
   void hideDragOverlay();
   void handleDroppedUrls(const QList<QUrl>& urls);
+  void setCollectionStitchAvailable(bool available);
+  void setCollectionStitchOpen(bool open);
+
+public slots:
+  void showToast(const QString& message, ToastType type, int durationMs = 3000);
+
+signals:
+  void manualCollectionRequested();
+  void collectionStitchRequested();
+  void playbackToggleRequested();
+  void playbackStopRequested();
+  void playbackSeekRequested(int position, PositionChangeOrigin origin);
+  void seekModifierActiveChanged(bool active);
 
 protected:
   void dragEnterEvent(QDragEnterEvent *event) override;
@@ -54,6 +79,13 @@ protected:
   bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
+  enum class SelectionStatusKind {
+    Source,
+    Asset,
+    Collection,
+    CollectionContents,
+  };
+
   void createElements();
   void configureWindowAgent();
   void createStatusBar();
@@ -63,7 +95,16 @@ private:
 
   void openFile();
   void openFileInternal(const QString& filename);
-  void showToast(const QString& message, ToastType type, int duration_ms);
+  void updateSelectionStatus(const QModelIndex& index,
+                             SelectionStatusKind kind);
+
+  vgmtrans::ui::WorkspaceController& m_workspace;
+  TableView* m_rawfile_listview{};
+  TableView* m_vgmfile_listview{};
+  CollectionListView* m_coll_listview{};
+  QListView* m_coll_view{};
+  QSortFilterProxyModel* m_collection_filter{};
+  vgmtrans::ui::CollectionContentsModel* m_collection_contents_model{};
 
   QDockWidget *m_rawfile_dock{};
   QDockWidget *m_vgmfile_dock{};
@@ -73,9 +114,7 @@ private:
   PlaybackControls *m_playback_controls{};
   StatusBarContent *statusBarContent{};
   Logger *m_logger{};
-  VGMCollListView *m_coll_listview{};
   QToolButton *m_stitchButton{};
-  VGMCollView *m_coll_view{};
   ToastHost *m_toastHost{};
   WindowBar *m_windowBar{};
   QWidget *m_dragOverlay{};

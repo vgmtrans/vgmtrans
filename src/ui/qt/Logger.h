@@ -1,8 +1,9 @@
 /*
- * VGMTrans (c) 2002-2021
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+
 #pragma once
 
 #include <QDockWidget>
@@ -12,20 +13,21 @@
 class QPlainTextEdit;
 class QTimer;
 class QToolButton;
-class LogItem;
 class TitleBar;
-enum LogLevel : int;
 
-class Logger : public QDockWidget {
+namespace vgmtrans::ui {
+class WorkspaceController;
+}
+
+class Logger final : public QDockWidget {
   Q_OBJECT
 
 public:
-  explicit Logger(QWidget *parent = nullptr);
+  explicit Logger(vgmtrans::ui::WorkspaceController& workspace,
+                  QWidget* parent = nullptr);
   static QString getLogText();
-  int level() const { return m_level; }
-  void installTitleBarControls(TitleBar *titleBar);
-
-  void push(const LogItem *item);
+  [[nodiscard]] int level() const noexcept { return m_level; }
+  void installTitleBarControls(TitleBar* titleBar);
 
 public slots:
   void exportLog();
@@ -33,23 +35,25 @@ public slots:
   void setLevel(int level);
 
 private:
-  void createElements();
-  void connectElements();
+  void syncDiagnostics();
+  void rebuildText();
   void flushPending();
   void refreshTitleBarControls();
 
   struct PendingMessage {
     QString text;
-    LogLevel level;
+    int level{};
   };
 
-  TitleBar *m_titleBar{};
-  QPlainTextEdit *logger_textarea;
-  QToolButton *m_filterButton{};
-  QToolButton *m_clearButton{};
-  QToolButton *m_exportButton{};
-
-  int m_level;
-  QTimer *m_flushTimer;
+  vgmtrans::ui::WorkspaceController& m_workspace;
+  TitleBar* m_titleBar{};
+  QPlainTextEdit* m_textArea{};
+  QToolButton* m_filterButton{};
+  QToolButton* m_clearButton{};
+  QToolButton* m_exportButton{};
+  qsizetype m_suppressedDiagnostics{};
+  qsizetype m_observedDiagnostics{};
+  int m_level = 2;
+  QTimer* m_flushTimer{};
   QVector<PendingMessage> m_pendingMessages;
 };

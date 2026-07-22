@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "base/Types.h"
+#include "value/base/Types.h"
 #include "value/base/Source.h"
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/scan/FormatDefinition.h"

@@ -6,18 +6,14 @@
 
 #pragma once
 
+#include "PlaybackPosition.h"
+
 #include <bass.h>
 #include <bassmidi.h>
 #include <QObject>
 #include <QTimer>
 
 class VGMColl;
-
-enum class PositionChangeOrigin {
-  Playback,
-  SeekBar,
-  HexView
-};
 
 class SequencePlayer : public QObject {
   Q_OBJECT

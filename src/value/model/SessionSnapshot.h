@@ -58,6 +58,7 @@ public:
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
   [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return diagnostics_; }
 
+  [[nodiscard]] const SourceFile* source(SourceId id) const;
   [[nodiscard]] const Asset* asset(AssetId id) const;
 
   template <typename T>
@@ -73,6 +74,7 @@ private:
 
   struct Index {
     // Store vector indexes rather than pointers so snapshots stay easy to copy/move.
+    std::unordered_map<u32, size_t> sourcesById;
     std::unordered_map<u32, size_t> assetsById;
     std::unordered_map<u32, size_t> collectionsById;
   };
@@ -80,7 +82,8 @@ private:
   SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets, std::vector<MatchFact> matchFacts,
                   std::vector<Collection> collections, SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
 
-  [[nodiscard]] static Index buildIndex(const std::vector<Asset>& assets, const std::vector<Collection>& collections);
+  [[nodiscard]] static Index buildIndex(const std::vector<SourceFile>& sources, const std::vector<Asset>& assets,
+                                        const std::vector<Collection>& collections);
 
   std::vector<SourceFile> sources_;
   std::vector<Asset> assets_;

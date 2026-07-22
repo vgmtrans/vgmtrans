@@ -6,11 +6,9 @@
 
 #include "ReportDialog.h"
 
-#include "RawFile.h"
-#include "Root.h"
-#include "util/Helpers.h"
+#include "application/WorkspaceController.h"
+#include "util/ExternalUrl.h"
 #include <version.h>
-#include "VGMFile.h"
 
 #include <QCryptographicHash>
 #include <QFrame>
@@ -30,7 +28,24 @@
 #include <QUrlQuery>
 #include <QVBoxLayout>
 
-ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
+namespace {
+QIcon iconForAsset(const vgmtrans::core::Asset& asset) {
+  if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/sequence.svg"));
+  }
+  if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/instrument-set.svg"));
+  }
+  if (std::holds_alternative<vgmtrans::core::SampleCollectionAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/sample-collection.svg"));
+  }
+  return QIcon(QStringLiteral(":/icons/binary.svg"));
+}
+}  // namespace
+
+ReportDialog::ReportDialog(vgmtrans::ui::WorkspaceController& workspace,
+                           QWidget* parent)
+    : QWidget(parent), m_workspace(workspace) {
   setWindowFlags(Qt::Window);
   setWindowTitle(tr("Report a Bug"));
 
@@ -130,11 +145,11 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   auto* raw_vbox = new QVBoxLayout(raw_group);
   m_raw_list = new QListWidget(raw_group);
   m_raw_list->setSelectionMode(QAbstractItemView::NoSelection);
-  for (const auto& raw_file : pRoot->rawFiles()) {
-    auto* item = new QListWidgetItem(QString::fromStdString(raw_file->name()), m_raw_list);
+  for (const auto& source : m_workspace.snapshot().sources()) {
+    auto* item = new QListWidgetItem(QString::fromStdString(source.name), m_raw_list);
     item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
     item->setCheckState(Qt::Unchecked);
-    item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(raw_file)));
+    item->setData(Qt::UserRole, source.id.value);
   }
   m_raw_list->setMinimumHeight(200);
   raw_vbox->addWidget(m_raw_list);
@@ -153,16 +168,15 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   m_vgm_tree->setColumnWidth(0, 250);
   m_vgm_tree->setSelectionMode(QAbstractItemView::NoSelection);
 
-  for (const auto& vgm_file_var : pRoot->vgmFiles()) {
-    if (auto* vgm_file = variantToVGMFile(vgm_file_var)) {
-      auto* item = new QTreeWidgetItem(m_vgm_tree);
-      item->setText(0, QString::fromStdString(vgm_file->name()));
-      item->setText(1, QString::fromStdString(vgm_file->formatName()));
-      item->setIcon(0, iconForFile(vgm_file_var));
-      item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-      item->setCheckState(0, Qt::Unchecked);
-      item->setData(0, Qt::UserRole, QVariant::fromValue(static_cast<void*>(vgm_file)));
-    }
+  for (const auto& asset : m_workspace.snapshot().assets()) {
+    const auto& metadata = vgmtrans::core::metadata(asset);
+    auto* item = new QTreeWidgetItem(m_vgm_tree);
+    item->setText(0, QString::fromStdString(metadata.name));
+    item->setText(1, QString::fromStdString(metadata.format));
+    item->setIcon(0, iconForAsset(asset));
+    item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+    item->setCheckState(0, Qt::Unchecked);
+    item->setData(0, Qt::UserRole, metadata.id.value);
   }
 
   connect(search_edit, &QLineEdit::textChanged, [this](const QString& text) {
@@ -255,14 +269,22 @@ QUrl ReportDialog::buildReportUrl() const {
   for (int i = 0; i < m_raw_list->count(); ++i) {
     if (auto* item = m_raw_list->item(i); item->checkState() == Qt::Checked) {
       QString sha = item->data(Qt::UserRole + 1).toString();
-      auto* raw_file = static_cast<RawFile*>(item->data(Qt::UserRole).value<void*>());
+      const auto sourceId = vgmtrans::core::SourceId{
+          item->data(Qt::UserRole).toUInt()};
+      const auto* source = m_workspace.snapshot().source(sourceId);
+      if (source == nullptr) {
+        continue;
+      }
 
       if (sha.isEmpty()) {
-        QByteArray data = QByteArray::fromRawData(raw_file->data(), static_cast<int>(raw_file->size()));
+        const std::span<const u8> bytes = m_workspace.sourceBytes(sourceId);
+        const QByteArray data = QByteArray::fromRawData(
+            reinterpret_cast<const char*>(bytes.data()),
+            static_cast<qsizetype>(bytes.size()));
         sha = QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
         item->setData(Qt::UserRole + 1, sha);
       }
-      assets << QString("%1 (%2)").arg(QString::fromStdString(raw_file->name()), sha);
+      assets << QString("%1 (%2)").arg(QString::fromStdString(source->name), sha);
     }
   }
 
@@ -293,6 +315,6 @@ void ReportDialog::updateUrlStatus() {
 }
 
 void ReportDialog::submitReport() {
-  qtOpenUrl(buildReportUrl());
+  openExternalUrl(buildReportUrl());
   m_feedback_label->setText(tr("GitHub opened in browser. You can now close this window."));
 }

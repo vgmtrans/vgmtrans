@@ -24,6 +24,13 @@ target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
 
+if(ENABLE_UI_QT)
+  add_executable(vgmtrans-value-ui-tests ui/ValueUiModelTests.cpp)
+  target_link_libraries(vgmtrans-value-ui-tests PRIVATE vgmtransqtvalue)
+  target_compile_features(vgmtrans-value-ui-tests PRIVATE cxx_std_20)
+  add_test(NAME vgmtrans-value-ui-tests COMMAND vgmtrans-value-ui-tests)
+endif()
+
 add_executable(vgmtrans-parity)
 target_sources(vgmtrans-parity
   PRIVATE

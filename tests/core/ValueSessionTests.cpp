@@ -22,6 +22,10 @@ void sessionScansValuesAndDerivedSources() {
 
   SessionSnapshot snapshot = session.scanPendingSources();
   expect(snapshot.sources().size() == 2, "scan should include extracted derived source");
+  expect(snapshot.source(sourceId) == &snapshot.sources()[0],
+         "session snapshot should find a source by stable id");
+  expect(snapshot.source(SourceId{99}) == nullptr,
+         "session snapshot should return null for a missing source id");
   expect(snapshot.sources()[1].derived(), "extracted source should be derived");
   expect(snapshot.sources()[1].origin.has_value() && snapshot.sources()[1].origin->source == sourceId &&
              snapshot.sources()[1].origin->offset == 0 && snapshot.sources()[1].origin->size == 1,
