@@ -21,9 +21,6 @@ struct PerformanceEventHeader {
   SourceAnnotationId sourceAnnotation;
   TrackId track;
   u64 tick = 0;
-  // Stable execution order disambiguates events that occur on the same tick
-  // and lets automation points be merged with ordinary events after rendering.
-  u64 sequence = 0;
 };
 
 struct NotePerformanceEvent {
@@ -219,69 +216,23 @@ struct MarkerPerformanceEvent {
 
 using PerformanceEvent =
     std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
-                 LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent, StereoBalancePerformanceEvent,
-                 MasterLevelPerformanceEvent, ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
+                 LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
+                 StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
+                 MonoModePerformanceEvent, TuningPerformanceEvent,
                  GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
                  PortamentoTimePerformanceEvent, PortamentoControlPerformanceEvent, PitchBendPerformanceEvent,
                  PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent,
                  LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
-
-// The source command's musical intent. Exact source-driver arithmetic remains
-// in the dialect; realized points below preserve its result without reducing a
-// fade, slide, or envelope to unrelated top-level performance events.
-enum class PerformanceAutomationTarget {
-  Tempo,
-  Level,
-  Expression,
-  Pan,
-  Pitch,
-  VibratoDepth,
-  TremoloDepth,
-};
-
-enum class PerformanceAutomationMotion {
-  TargetOverTicks,
-  TargetByStep,
-  Envelope,
-};
-
-struct PerformanceAutomationIntent {
-  PerformanceAutomationTarget target = PerformanceAutomationTarget::Level;
-  PerformanceAutomationMotion motion = PerformanceAutomationMotion::TargetOverTicks;
-  // Destination in the target's neutral domain: microseconds per quarter for
-  // tempo, linear gain for levels, stereo position for pan, semitones for
-  // pitch, and normalized amount for modulation depth.
-  std::optional<double> targetValue;
-  // TargetByStep is open-ended when durationTicks is zero. Its rate is carried
-  // by the exact points rather than a neutral step field: a constant source
-  // step can become nonlinear after conversion to tempo, gain, or pan.
-  u32 durationTicks = 0;
-  u32 delayTicks = 0;
-  // Some source envelopes are armed by one command and restarted for each
-  // subsequent note. Realized points preserve the exact restart behavior.
-  bool restartsOnNote = false;
-};
-
-struct PerformanceAutomation {
-  PerformanceEventHeader header;
-  PerformanceAutomationIntent intent;
-  // Exact neutral values observed while the source driver runs. Points carry
-  // the automation's source command but their own tick and execution order.
-  // A target may translate intent to a native effect or lower these points
-  // when no faithful native representation exists.
-  std::vector<PerformanceEvent> points;
-};
 
 struct PerformanceTrack {
   TrackId id;
   u32 sourceTrackNumber = 0;
   u64 endTick = 0;
   std::vector<PerformanceEvent> events;
-  std::vector<PerformanceAutomation> automations;
 };
 
-// Output from SequenceVm. Events and automations point back to their source
-// commands, while target-specific encoding happens later in the export layer.
+// Output from SequenceVm. Events point back to the source command that produced
+// them, but MIDI controller encoding happens later in the export layer.
 struct PerformanceSequence {
   Timebase timebase;
   std::vector<PerformanceTrack> tracks;
@@ -289,9 +240,6 @@ struct PerformanceSequence {
 };
 
 [[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event);
-// Returns ordinary events and exact automation points in stable execution
-// order. Use this when lowering to a target that cannot retain automation.
-[[nodiscard]] std::vector<const PerformanceEvent*> flattenedPerformanceEvents(const PerformanceTrack& track);
 [[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
 [[nodiscard]] const SourceCommand* sourceCommandForEvent(const SequenceProgram& program,
                                                          const PerformanceEventHeader& header);

@@ -124,8 +124,8 @@ struct Playback {
     return std::max<u32>(1, delta > 2 ? delta - 2 : 0);
   }
 
-  template <class Emit>
-  void controllerSlide(u16& previous, u16 target, u16 duration, Emit emit) {
+  template <class Quantize, class Emit>
+  void controllerSlide(u16& previous, u16 target, u16 duration, Quantize quantize, Emit emit) {
     if (duration == 0) {
       previous = target;
       return;
@@ -133,10 +133,16 @@ struct Playback {
     const u64 startTick = vm.tick();
     const double increment =
         static_cast<double>(static_cast<int>(target) - static_cast<int>(previous)) / static_cast<double>(duration);
+    int lastWritten = -1;
     for (u16 i = 0; i < duration; ++i) {
       const u8 value =
           static_cast<u8>(std::clamp(static_cast<int>(std::round(previous + increment * (i + 1))), 0, 127));
+      const int comparable = quantize(value);
+      if (comparable == lastWritten) {
+        continue;
+      }
       emit(startTick + i, value);
+      lastWritten = comparable;
     }
     previous = target;
   }
@@ -270,14 +276,12 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       const u32 micros = event.derived("target_microseconds_per_quarter", profile.tempoMicrosPerQuarter(raw));
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, double targetBpm, u32 targetMicros) {
-            const auto automation =
-                playback.out.fade(PerformanceAutomationTarget::Tempo, static_cast<double>(targetMicros), fadeTicks);
             const u64 startTick = playback.vm.tick();
             const double increment = (targetBpm - playback.track.tempoBpm) / fadeTicks;
             for (u16 i = 0; i < fadeTicks; ++i) {
               const double fadedBpm = playback.track.tempoBpm + increment * (i + 1);
               const u32 fadedMicros = static_cast<u32>(std::round(60000000.0 / std::max(1.0, fadedBpm)));
-              automation.at(playback.out, startTick + i).tempo(fadedMicros);
+              playback.out.at(startTick + i).tempo(fadedMicros);
             }
             playback.track.tempoBpm = targetBpm;
             playback.track.microsecondsPerQuarter = targetMicros;
@@ -337,11 +341,10 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       const u8 target = event.u8("target_volume", SemanticOperandRole::Level);
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, u8 targetVolume) {
-            const auto automation = playback.out.fade(PerformanceAutomationTarget::Level,
-                                                      akaoLinearControllerGain(targetVolume), fadeTicks);
-            playback.controllerSlide(playback.track.volume, targetVolume, fadeTicks, [&](u64 tick, u8 value) {
-              automation.at(playback.out, tick).level(akaoLinearControllerGain(value));
-            });
+            playback.controllerSlide(
+                playback.track.volume, targetVolume, fadeTicks,
+                [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
+                [&](u64 tick, u8 value) { playback.out.at(tick).level(akaoLinearControllerGain(value)); });
           },
           duration, target);
     }
@@ -485,11 +488,10 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       const u8 target = event.u8("target_expression", SemanticOperandRole::Level);
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, u8 targetExpression) {
-            const auto automation = playback.out.fade(PerformanceAutomationTarget::Expression,
-                                                      akaoLinearControllerGain(targetExpression), fadeTicks);
-            playback.controllerSlide(playback.track.expression, targetExpression, fadeTicks, [&](u64 tick, u8 value) {
-              automation.at(playback.out, tick).expression(akaoLinearControllerGain(value));
-            });
+            playback.controllerSlide(
+                playback.track.expression, targetExpression, fadeTicks,
+                [](u8 value) { return LevelScale::midi7FromLinear(akaoLinearControllerGain(value)); },
+                [&](u64 tick, u8 value) { playback.out.at(tick).expression(akaoLinearControllerGain(value)); });
           },
           duration, target);
     }
@@ -506,13 +508,12 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       const u8 target = event.u8("target_pan", SemanticOperandRole::Pan);
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, u8 targetPan) {
-            const double targetRightGain = rightGainFromLinearPan(targetPan);
-            const auto automation =
-                playback.out.fade(PerformanceAutomationTarget::Pan, (targetRightGain * 2.0) - 1.0, fadeTicks);
-            playback.controllerSlide(playback.track.pan, targetPan, fadeTicks, [&](u64 tick, u8 value) {
-              const double rightGain = rightGainFromLinearPan(value);
-              automation.at(playback.out, tick).stereoBalance(1.0 - rightGain, rightGain);
-            });
+            playback.controllerSlide(
+                playback.track.pan, targetPan, fadeTicks, [](u8 value) { return value; },
+                [&](u64 tick, u8 value) {
+                  const double rightGain = rightGainFromLinearPan(value);
+                  playback.out.at(tick).stereoBalance(1.0 - rightGain, rightGain);
+                });
           },
           duration, target);
     }

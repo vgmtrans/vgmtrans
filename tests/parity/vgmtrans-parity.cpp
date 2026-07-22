@@ -3460,8 +3460,8 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
   std::map<u32, InstrumentState> instruments;
   for (const auto& track : performance.tracks) {
     auto& instrument = instruments[track.id.value];
-    for (const auto* event : flattenedPerformanceEvents(track)) {
-      if (const auto* note = std::get_if<NotePerformanceEvent>(event)) {
+    for (const auto& event : track.events) {
+      if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
         ++stats.noteEvents;
         stats.lastNoteTick = std::max(stats.lastNoteTick, note->header.tick);
         if (instrument.bank == (0x7f << 7) && instrument.program == 0) {
@@ -3473,7 +3473,7 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
         } else {
           ++stats.melodicBankNoteEvents;
         }
-      } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(event)) {
+      } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
         const std::optional<InstrumentAddress> explicitAddress = instrumentEvent->sourceInstrument
                                                                      ? std::nullopt
                                                                      : std::optional{InstrumentAddress{
@@ -3488,7 +3488,7 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
         } else {
           ++stats.melodicInstrumentEvents;
         }
-      } else if (const auto* pitchBend = std::get_if<PitchBendPerformanceEvent>(event)) {
+      } else if (const auto* pitchBend = std::get_if<PitchBendPerformanceEvent>(&event)) {
         ++stats.sourcePitchBendEvents;
         const double semitones = std::abs(pitchBend->semitones);
         if (semitones > 0.0001) {
@@ -3498,13 +3498,13 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           stats.maxSourcePitchBendSemitones = semitones;
           stats.maxSourcePitchBendLocation = performanceEventLocation(program, pitchBend->header);
         }
-      } else if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(event)) {
+      } else if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
         ++stats.vibratoDelayEvents;
         stats.maxVibratoDelayTicks = std::max(stats.maxVibratoDelayTicks, delay->delayTicks);
         if (delay->delayTicks > 0) {
           ++stats.activeVibratoDelayEvents;
         }
-      } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(event)) {
+      } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
         if (modulation->target == ModulationPerformanceTarget::VibratoDepth) {
           ++stats.vibratoDepthEvents;
           if (modulation->amount > 0.0001) {

@@ -6,42 +6,23 @@
 
 #include "value/sequence/SequenceVm.h"
 
-#include <stdexcept>
+#include <iterator>
 #include <utility>
 
 namespace vgmtrans::core {
 
-namespace {
-
-PerformanceAutomationIntent automationIntent(PerformanceAutomationTarget target, PerformanceAutomationMotion motion,
-                                             double targetValue, u32 durationTicks, u32 delayTicks,
-                                             bool restartsOnNote = false) {
-  return PerformanceAutomationIntent{
-      .target = target,
-      .motion = motion,
-      .targetValue = targetValue,
-      .durationTicks = durationTicks,
-      .delayTicks = delayTicks,
-      .restartsOnNote = restartsOnNote,
-  };
-}
-
-}  // namespace
-
 PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand,
-                                       SourceAnnotationId sourceAnnotation, u64 tick, u64& nextSequence)
-    : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick),
-      nextSequence_(nextSequence) {
+                                       SourceAnnotationId sourceAnnotation, u64 tick)
+    : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick) {
 }
 
 PerformanceEmitter PerformanceEmitter::at(u64 tick) const {
-  auto output = PerformanceEmitter{track_, sourceCommand_, sourceAnnotation_, tick, nextSequence_};
-  output.automation_ = automation_;
-  return output;
+  return PerformanceEmitter{track_, sourceCommand_, sourceAnnotation_, tick};
 }
 
 void PerformanceEmitter::note(NotePerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious) {
@@ -54,7 +35,8 @@ void PerformanceEmitter::note(double key, double linearVelocity, u32 durationTic
 }
 
 void PerformanceEmitter::tempo(TempoPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::tempo(u32 microsecondsPerQuarter) {
@@ -64,7 +46,8 @@ void PerformanceEmitter::tempo(u32 microsecondsPerQuarter) {
 }
 
 void PerformanceEmitter::timeSignature(TimeSignaturePerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick) {
@@ -76,7 +59,8 @@ void PerformanceEmitter::timeSignature(u8 numerator, u8 denominator, u8 clocksPe
 }
 
 void PerformanceEmitter::instrument(InstrumentPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::instrument(InstrumentIdentity sourceInstrument) {
@@ -94,7 +78,8 @@ void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect)
 }
 
 void PerformanceEmitter::level(LevelPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::level(double linearGain, ValueQuantization sourceQuantization) {
@@ -112,7 +97,8 @@ void PerformanceEmitter::level(double linearGain, LevelPrecisionHint precisionHi
 }
 
 void PerformanceEmitter::expression(ExpressionPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::expression(double linearGain, ValueQuantization sourceQuantization) {
@@ -130,7 +116,8 @@ void PerformanceEmitter::expression(double linearGain, LevelPrecisionHint precis
 }
 
 void PerformanceEmitter::pan(PanPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::pan(double stereoPosition) {
@@ -148,7 +135,8 @@ void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
 }
 
 void PerformanceEmitter::stereoBalance(StereoBalancePerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::stereoBalance(double leftGain, double rightGain) {
@@ -159,7 +147,8 @@ void PerformanceEmitter::stereoBalance(double leftGain, double rightGain) {
 }
 
 void PerformanceEmitter::masterLevel(MasterLevelPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::masterLevel(double linearGain) {
@@ -169,7 +158,8 @@ void PerformanceEmitter::masterLevel(double linearGain) {
 }
 
 void PerformanceEmitter::reverb(ReverbPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::reverb(double send) {
@@ -179,7 +169,8 @@ void PerformanceEmitter::reverb(double send) {
 }
 
 void PerformanceEmitter::tuning(TuningPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::tuning(double cents) {
@@ -189,7 +180,8 @@ void PerformanceEmitter::tuning(double cents) {
 }
 
 void PerformanceEmitter::globalTranspose(GlobalTransposePerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::globalTranspose(s32 semitones) {
@@ -199,7 +191,8 @@ void PerformanceEmitter::globalTranspose(s32 semitones) {
 }
 
 void PerformanceEmitter::pitchBend(PitchBendPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::pitchBend(double semitones) {
@@ -209,7 +202,8 @@ void PerformanceEmitter::pitchBend(double semitones) {
 }
 
 void PerformanceEmitter::pitchBendRange(PitchBendRangePerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::pitchBendRange(u8 semitones) {
@@ -219,7 +213,8 @@ void PerformanceEmitter::pitchBendRange(u8 semitones) {
 }
 
 void PerformanceEmitter::vibratoDelay(VibratoDelayPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::vibratoDelay(u32 delayTicks, u8 midiValue) {
@@ -230,7 +225,8 @@ void PerformanceEmitter::vibratoDelay(u32 delayTicks, u8 midiValue) {
 }
 
 void PerformanceEmitter::tremoloDelay(TremoloDelayPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::tremoloDelay(u32 delayTicks, u8 midiValue) {
@@ -241,7 +237,8 @@ void PerformanceEmitter::tremoloDelay(u32 delayTicks, u8 midiValue) {
 }
 
 void PerformanceEmitter::portamento(PortamentoPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::portamento(double timeMilliseconds, double previousKey) {
@@ -252,7 +249,8 @@ void PerformanceEmitter::portamento(double timeMilliseconds, double previousKey)
 }
 
 void PerformanceEmitter::portamentoEnable(PortamentoEnablePerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::portamentoEnable(bool enabled) {
@@ -262,7 +260,8 @@ void PerformanceEmitter::portamentoEnable(bool enabled) {
 }
 
 void PerformanceEmitter::portamentoTime(PortamentoTimePerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::portamentoTime(double timeMilliseconds) {
@@ -272,7 +271,8 @@ void PerformanceEmitter::portamentoTime(double timeMilliseconds) {
 }
 
 void PerformanceEmitter::portamentoControl(PortamentoControlPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::portamentoControl(double previousKey) {
@@ -282,7 +282,8 @@ void PerformanceEmitter::portamentoControl(double previousKey) {
 }
 
 void PerformanceEmitter::legatoPedal(LegatoPedalPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::legatoPedal(bool enabled) {
@@ -292,7 +293,8 @@ void PerformanceEmitter::legatoPedal(bool enabled) {
 }
 
 void PerformanceEmitter::modulation(ModulationPerformanceEvent event) {
-  append(std::move(event));
+  event.header = header();
+  track_.events.emplace_back(std::move(event));
 }
 
 void PerformanceEmitter::modulation(ModulationPerformanceTarget target, double amount) {
@@ -303,89 +305,21 @@ void PerformanceEmitter::modulation(ModulationPerformanceTarget target, double a
 }
 
 void PerformanceEmitter::marker(MarkerPerformanceEvent event) {
-  append(std::move(event));
-}
-
-PerformanceAutomationBinding PerformanceEmitter::beginAutomation(PerformanceAutomationIntent intent) {
-  const auto index = static_cast<u32>(track_.automations.size());
-  track_.automations.push_back(PerformanceAutomation{
-      .header = header(),
-      .intent = std::move(intent),
-  });
-  return PerformanceAutomationBinding{track_, index};
-}
-
-PerformanceAutomationBinding PerformanceEmitter::fade(PerformanceAutomationTarget target, double targetValue,
-                                                      u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(
-      automationIntent(target, PerformanceAutomationMotion::TargetOverTicks, targetValue, durationTicks, delayTicks));
-}
-
-PerformanceAutomationBinding PerformanceEmitter::noteFade(PerformanceAutomationTarget target, double targetValue,
-                                                          u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(automationIntent(target, PerformanceAutomationMotion::TargetOverTicks, targetValue,
-                                          durationTicks, delayTicks, true));
-}
-
-PerformanceAutomationBinding PerformanceEmitter::step(PerformanceAutomationTarget target, double targetValue,
-                                                      u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(
-      automationIntent(target, PerformanceAutomationMotion::TargetByStep, targetValue, durationTicks, delayTicks));
-}
-
-PerformanceAutomationBinding PerformanceEmitter::noteEnvelope(PerformanceAutomationTarget target, double targetValue,
-                                                              u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(
-      automationIntent(target, PerformanceAutomationMotion::Envelope, targetValue, durationTicks, delayTicks, true));
-}
-
-PerformanceEmitter PerformanceEmitter::withAutomation(const PerformanceAutomationBinding& automation) const {
-  auto output = *this;
-  if (automation.owner_ == nullptr) {
-    output.automation_.reset();
-  } else if (automation.owner_ != &track_) {
-    throw std::logic_error("Performance automation binding belongs to another track");
-  } else {
-    output.automation_ = automation.automation_;
-  }
-  return output;
-}
-
-void PerformanceEmitter::append(PerformanceEvent event) {
-  if (automation_) {
-    automationPoint(*automation_, std::move(event));
-    return;
-  }
-  std::visit([&](auto& typedEvent) { typedEvent.header = header(); }, event);
+  event.header = header();
   track_.events.emplace_back(std::move(event));
 }
 
-void PerformanceEmitter::automationPoint(u32 automation, PerformanceEvent event) {
-  if (automation >= track_.automations.size()) {
-    throw std::logic_error("Performance automation binding was not valid for this track");
-  }
-  const auto& origin = track_.automations[automation].header;
-  std::visit(
-      [&](auto& typedEvent) {
-        typedEvent.header = PerformanceEventHeader{
-            .sourceCommand = origin.sourceCommand,
-            .sourceAnnotation = origin.sourceAnnotation,
-            .track = origin.track,
-            .tick = tick_,
-            .sequence = nextSequence_++,
-        };
-      },
-      event);
-  track_.automations[automation].points.emplace_back(std::move(event));
+void PerformanceEmitter::appendEvents(std::vector<PerformanceEvent> events) {
+  track_.events.insert(track_.events.end(), std::make_move_iterator(events.begin()),
+                       std::make_move_iterator(events.end()));
 }
 
-PerformanceEventHeader PerformanceEmitter::header() {
+PerformanceEventHeader PerformanceEmitter::header() const {
   return PerformanceEventHeader{
       .sourceCommand = sourceCommand_,
       .sourceAnnotation = sourceAnnotation_,
       .track = track_.id,
       .tick = tick_,
-      .sequence = nextSequence_++,
   };
 }
 
