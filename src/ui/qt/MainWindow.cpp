@@ -56,7 +56,6 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFont>
-#include <QHeaderView>
 #include <QHBoxLayout>
 #include <QItemSelectionModel>
 #include <QKeyEvent>
@@ -198,7 +197,6 @@ void configureTableView(TableView* view) {
   view->setIconSize(QSize(16, 16));
   view->setSelectionMode(QAbstractItemView::ExtendedSelection);
   view->setSelectionBehavior(QAbstractItemView::SelectRows);
-  view->horizontalHeader()->setStretchLastSection(true);
 }
 
 class CollectionTreeDelegate final : public FixedHeightListDelegate {
