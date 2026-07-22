@@ -901,7 +901,9 @@ void standaloneSequenceExportDoesNotRequireACollection() {
 
   SequenceDialectRegistry dialects;
   dialects.add(dialect);
-  const Artifact artifact = exportSequenceMidi(snapshot, AssetId{7}, SequenceExportRequest{}, dialects);
+  const SourceStore sources;
+  const Artifact artifact =
+      exportSequenceMidi(snapshot, sources, AssetId{7}, SequenceExportRequest{}, dialects);
 
   expect(artifact.filename == "Loose_Sequence.mid",
          "standalone sequence export should derive a safe filename from sequence metadata");

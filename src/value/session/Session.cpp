@@ -198,8 +198,8 @@ Artifact Session::exportSequenceMidi(AssetId id, const SequenceExportRequest& re
   return core::exportSequenceMidi(snapshot(), sources_, id, request, dialects_, &formats_);
 }
 
-Artifact Session::exportInstrumentSet(AssetId id, ExportKind kind, const ExportRequest& request) const {
-  return core::exportInstrumentSet(snapshot(), sources_, id, kind, request, dialects_, &formats_);
+Artifact Session::exportInstrumentSet(AssetId id, SynthExportFormat format, const ExportRequest& request) const {
+  return core::exportInstrumentSet(snapshot(), sources_, id, format, request, dialects_, &formats_);
 }
 
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {

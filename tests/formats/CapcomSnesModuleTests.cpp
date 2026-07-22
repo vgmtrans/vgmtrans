@@ -635,9 +635,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument set");
   const Artifact individualSf2 = session.exportInstrumentSet(
-      instruments->metadata.id, ExportKind::SoundFont2, ExportRequest{});
+      instruments->metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
   const Artifact individualDls = session.exportInstrumentSet(
-      instruments->metadata.id, ExportKind::Dls, ExportRequest{});
+      instruments->metadata.id, SynthExportFormat::Dls, ExportRequest{});
   expect(individualSf2.bytes == sf2Artifacts[0].bytes && individualDls.bytes == dlsArtifacts[0].bytes,
          "individual instrument export should use its first collection's complete synth context");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid instrument");

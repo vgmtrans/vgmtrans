@@ -267,9 +267,9 @@ void MenuBar::appendContextualCommands(Context context) {
     addAction(convert, tr("Stitch"), false, {});
   } else if (context == Context::InstrumentSet) {
     addAction(convert, tr("Save as SF2"), true, {},
-              [this] { emit exportSelectedInstrumentSet(0); });
+              [this] { emit exportSelectedInstrumentSetSf2(); });
     addAction(convert, tr("Save as DLS"), true, {},
-              [this] { emit exportSelectedInstrumentSet(1); });
+              [this] { emit exportSelectedInstrumentSetDls(); });
     addAction(convert, tr("Save as Original Format"), true, {},
               [this] { emit saveSelectedAssetOriginal(); });
   } else if (context == Context::SampleCollection) {
