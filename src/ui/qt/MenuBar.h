@@ -52,6 +52,8 @@ signals:
   void closeSelectedSources();
   void removeSelectedAssets();
   void openSelectedAsset();
+  void saveSelectedSourceOriginal();
+  void saveSelectedAssetOriginal();
   void exportSelectedSequenceMidi();
   void exportSelectedCollection(int choice);
   void increaseHexFontRequested();

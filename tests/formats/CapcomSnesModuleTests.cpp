@@ -369,6 +369,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->program.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
          "sequence should carry CapcomSnes default loop policy");
   expect(sequence->program.tracks.size() == 8, "sequence should decode all nonzero track pointers");
+  const auto sequenceInspection = session.inspect(sequence->metadata.id);
+  expect(sequenceInspection && sequenceInspection->range().offset == 0x2001 &&
+             sequenceInspection->bytes().size() == 0x1010,
+         "sequence inspection should cover its header and decoded tracks");
 
   const auto* dialect = session.dialects().find(sequence->program.dialect.value);
   expect(dialect != nullptr, "registered dialect should interpret the scanned sequence program");

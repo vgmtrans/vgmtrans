@@ -250,7 +250,8 @@ void MenuBar::appendContextualCommands(Context context) {
   const QStringList convert{tr("Convert")};
   const QStringList file{tr("File")};
   if (context == Context::Source) {
-    addAction(convert, tr("Save as Original Format"), false, {});
+    addAction(convert, tr("Save as Original Format"), true, {},
+              [this] { emit saveSelectedSourceOriginal(); });
     QAction* close = addAction(file, tr("Close"), true, {Qt::Key_Backspace, Qt::Key_Delete},
                                [this] { emit closeSelectedSources(); });
     close->setShortcutContext(Qt::WidgetShortcut);
@@ -260,18 +261,22 @@ void MenuBar::appendContextualCommands(Context context) {
   if (context == Context::Sequence) {
     addAction(convert, tr("Save as MIDI"), true, {},
               [this] { emit exportSelectedSequenceMidi(); });
-    addAction(convert, tr("Save as Original Format"), false, {});
+    addAction(convert, tr("Save as Original Format"), true, {},
+              [this] { emit saveSelectedAssetOriginal(); });
     addSeparator(convert);
     addAction(convert, tr("Stitch"), false, {});
   } else if (context == Context::InstrumentSet) {
     addAction(convert, tr("Save as SF2"), false, {});
     addAction(convert, tr("Save as DLS"), false, {});
-    addAction(convert, tr("Save as Original Format"), false, {});
+    addAction(convert, tr("Save as Original Format"), true, {},
+              [this] { emit saveSelectedAssetOriginal(); });
   } else if (context == Context::SampleCollection) {
     addAction(convert, tr("Save all samples as WAV"), false, {});
-    addAction(convert, tr("Save as Original Format"), false, {});
+    addAction(convert, tr("Save as Original Format"), true, {},
+              [this] { emit saveSelectedAssetOriginal(); });
   } else if (context == Context::Misc) {
-    addAction(convert, tr("Save as Original Format"), false, {});
+    addAction(convert, tr("Save as Original Format"), true, {},
+              [this] { emit saveSelectedAssetOriginal(); });
   } else if (context == Context::Collection) {
     addAction(convert, tr("Export as MIDI and SF2"), true, {},
               [this] { emit exportSelectedCollection(0); });

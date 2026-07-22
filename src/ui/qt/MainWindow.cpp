@@ -184,6 +184,16 @@ QString pathText(const std::filesystem::path& path) {
 #endif
 }
 
+std::filesystem::path safeFileName(QString name) {
+  const QString invalid = QStringLiteral("<>:\"/\\|?*");
+  for (qsizetype index = 0; index < name.size(); ++index) {
+    if (name[index].unicode() < 32 || invalid.contains(name[index])) {
+      name[index] = QLatin1Char('_');
+    }
+  }
+  return filePath(name.isEmpty() ? QStringLiteral("unnamed") : name);
+}
+
 void configureTableView(TableView* view) {
   view->setIconSize(QSize(16, 16));
   view->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -607,6 +617,59 @@ void MainWindow::removeSelectedAssets() {
   static_cast<void>(m_workspace.removeAssets(assets));
 }
 
+void MainWindow::saveOriginal(QAbstractItemView* view, OriginalItemKind kind) {
+  if (view == nullptr || view->selectionModel() == nullptr) {
+    return;
+  }
+  const QModelIndexList rows = view->selectionModel()->selectedRows();
+  if (rows.isEmpty()) {
+    return;
+  }
+
+  const bool single = rows.size() == 1;
+  const std::filesystem::path destination =
+      single ? openSaveFileDialog(safeFileName(rows.front().data(Qt::DisplayRole).toString()), "")
+             : openSaveDirDialog();
+  if (destination.empty()) {
+    return;
+  }
+
+  QStringList errors;
+  size_t written = 0;
+  for (const QModelIndex& row : rows) {
+    const u32 id = row.data(vgmtrans::ui::IdRole).toUInt();
+    const auto inspection = kind == OriginalItemKind::Asset
+                                ? m_workspace.inspect(vgmtrans::core::AssetId{id})
+                                : nullptr;
+    if (kind == OriginalItemKind::Asset && inspection == nullptr) {
+      errors.push_back(tr("%1 could not be inspected.").arg(row.data(Qt::DisplayRole).toString()));
+      continue;
+    }
+    const std::span<const u8> bytes = inspection != nullptr
+                                         ? inspection->bytes()
+                                         : m_workspace.sourceBytes(vgmtrans::core::SourceId{id});
+    const std::filesystem::path path =
+        single ? destination : destination / safeFileName(row.data(Qt::DisplayRole).toString());
+    QSaveFile file(pathText(path));
+    const auto size = static_cast<qsizetype>(bytes.size());
+    if (!file.open(QIODevice::WriteOnly) ||
+        (!bytes.empty() && file.write(reinterpret_cast<const char*>(bytes.data()), size) != size) ||
+        !file.commit()) {
+      errors.push_back(file.errorString());
+      continue;
+    }
+    ++written;
+  }
+
+  const QString title = rows.size() == 1
+                            ? rows.front().data(Qt::DisplayRole).toString()
+                            : tr("%1 items").arg(rows.size());
+  statusBarContent->setStatus(title, tr("Wrote %1 file(s)").arg(static_cast<qulonglong>(written)));
+  if (!errors.isEmpty()) {
+    showToast(errors.join(QLatin1Char('\n')), ToastType::Error, 15000);
+  }
+}
+
 void MainWindow::exportSequenceMidi(const QModelIndex& index) {
   if (!index.isValid()) {
     return;
@@ -804,6 +867,16 @@ void MainWindow::routeSignals() {
   const auto removeSelectedAssets = [this] { this->removeSelectedAssets(); };
   connect(m_menu_bar, &MenuBar::closeSelectedSources, this, closeSelectedSources);
   connect(m_menu_bar, &MenuBar::removeSelectedAssets, this, removeSelectedAssets);
+  connect(m_menu_bar, &MenuBar::saveSelectedSourceOriginal, this,
+          [this] { saveOriginal(m_rawfile_listview, OriginalItemKind::Source); });
+  connect(m_menu_bar, &MenuBar::saveSelectedAssetOriginal, this, [this] {
+    const QWidget* focused = QApplication::focusWidget();
+    const bool contentsFocused = focused != nullptr &&
+        (focused == m_coll_view || m_coll_view->isAncestorOf(focused));
+    saveOriginal(contentsFocused ? static_cast<QAbstractItemView*>(m_coll_view)
+                                 : static_cast<QAbstractItemView*>(m_vgmfile_listview),
+                 OriginalItemKind::Asset);
+  });
 
   const auto exportSelectedCollection = [this](int choice) {
     const QModelIndex current = m_coll_listview->currentIndex();
@@ -959,12 +1032,14 @@ void MainWindow::routeSignals() {
             }
             QMenu menu(m_rawfile_listview);
             QAction* saveOriginal = menu.addAction(tr("Save as Original Format"));
-            saveOriginal->setEnabled(false);
             menu.addSeparator();
             QAction* close = menu.addAction(tr("Close"));
             close->setShortcuts({Qt::Key_Backspace, Qt::Key_Delete});
             close->setShortcutVisibleInContextMenu(true);
-            if (menu.exec(m_rawfile_listview->viewport()->mapToGlobal(position)) == close) {
+            const QAction* chosen = menu.exec(m_rawfile_listview->viewport()->mapToGlobal(position));
+            if (chosen == saveOriginal) {
+              this->saveOriginal(m_rawfile_listview, OriginalItemKind::Source);
+            } else if (chosen == close) {
               closeSelectedSources();
             }
           });
@@ -987,20 +1062,21 @@ void MainWindow::routeSignals() {
     open->setShortcutVisibleInContextMenu(true);
     menu.addSeparator();
     QAction* saveMidi = nullptr;
+    QAction* saveOriginalAction = nullptr;
     if (context == MenuBar::Context::Sequence) {
       saveMidi = menu.addAction(tr("Save as MIDI"));
-      addDisabled(menu, tr("Save as Original Format"));
+      saveOriginalAction = menu.addAction(tr("Save as Original Format"));
       menu.addSeparator();
       addDisabled(menu, tr("Stitch"));
     } else if (context == MenuBar::Context::InstrumentSet) {
       addDisabled(menu, tr("Save as SF2"));
       addDisabled(menu, tr("Save as DLS"));
-      addDisabled(menu, tr("Save as Original Format"));
+      saveOriginalAction = menu.addAction(tr("Save as Original Format"));
     } else if (context == MenuBar::Context::SampleCollection) {
       addDisabled(menu, tr("Save all samples as WAV"));
-      addDisabled(menu, tr("Save as Original Format"));
+      saveOriginalAction = menu.addAction(tr("Save as Original Format"));
     } else {
-      addDisabled(menu, tr("Save as Original Format"));
+      saveOriginalAction = menu.addAction(tr("Save as Original Format"));
     }
     menu.addSeparator();
     QAction* remove = menu.addAction(tr("Remove"));
@@ -1013,6 +1089,8 @@ void MainWindow::routeSignals() {
           vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
     } else if (saveMidi != nullptr && chosen == saveMidi) {
       exportSequenceMidi(current);
+    } else if (chosen == saveOriginalAction) {
+      saveOriginal(view, OriginalItemKind::Asset);
     } else if (chosen == remove) {
       removeSelectedAssets();
     }
