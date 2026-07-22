@@ -63,7 +63,6 @@ private:
 // while the VM advances ticks, calls, repeats, and loop detection.
 struct VmTrackRuntime {
   u64 tick = 0;
-  u64 outputSequence = 0;
   std::vector<u32> callStack;
   RepeatState repeat;
   CommandId lastCommand;
@@ -208,14 +207,13 @@ private:
   std::map<VisitState, VisitRecord> visited_;
 };
 
-void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, u64& nextSequence, std::string text) {
+void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, std::string text) {
   track.events.emplace_back(MarkerPerformanceEvent{
       .header =
           PerformanceEventHeader{
               .sourceCommand = sourceCommand,
               .track = track.id,
               .tick = tick,
-              .sequence = nextSequence++,
           },
       .text = std::move(text),
   });
@@ -265,12 +263,6 @@ void endTrackAt(PerformanceTrack& track, u64 endTick) {
       note->durationTicks = static_cast<u32>(std::min<u64>(note->durationTicks, endTick - note->header.tick));
     }
   }
-  std::erase_if(track.automations,
-                [endTick](const PerformanceAutomation& automation) { return automation.header.tick >= endTick; });
-  for (auto& automation : track.automations) {
-    std::erase_if(automation.points,
-                  [endTick](const PerformanceEvent& event) { return performanceEventHeader(event).tick >= endTick; });
-  }
   track.endTick = endTick;
 }
 
@@ -285,8 +277,8 @@ class VmTrackExecutor {
 public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
-                  PerformanceSequence& targetSequence, std::optional<u64> stopTick, std::any* programState = nullptr,
-                  bool sequenceCoordinatesLoops = false)
+                  PerformanceSequence& targetSequence, std::optional<u64> stopTick,
+                  std::any* programState = nullptr, bool sequenceCoordinatesLoops = false)
       : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
         options_(options), targetSequence_(targetSequence), stopTick_(stopTick),
         performanceTrack_(PerformanceTrack{
@@ -297,9 +289,6 @@ public:
         programState_(programState), current_(destinationIndex(track, track.startAddress)),
         sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
     addInitialTrackEvents(performanceTrack_, behavior_);
-    for (auto& event : performanceTrack_.events) {
-      std::visit([&](auto& typedEvent) { typedEvent.header.sequence = runtime_.outputSequence++; }, event);
-    }
     if (!current_ && !track_.commands.empty()) {
       current_ = 0;
     }
@@ -343,7 +332,7 @@ public:
       }
     }
 
-    PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick, runtime_.outputSequence};
+    PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr || dialect_.execute == nullptr) {
       warn("Missing sequence dialect executor state", command.range);
@@ -376,8 +365,8 @@ private:
     }
 
     if (loopPolicy_ == LoopPolicy::Preserve) {
-      addLoopMarker(performanceTrack_, loop.start.command, loop.start.tick, runtime_.outputSequence, "Loop Start");
-      addLoopMarker(performanceTrack_, loop.endCommand, loop.endTick, runtime_.outputSequence, "Loop End");
+      addLoopMarker(performanceTrack_, loop.start.command, loop.start.tick, "Loop Start");
+      addLoopMarker(performanceTrack_, loop.endCommand, loop.endTick, "Loop End");
       current_ = std::nullopt;
       arrivedByControlFlow_ = false;
       return LoopAction{.kind = LoopActionKind::StopTrack};
@@ -470,7 +459,7 @@ private:
 
     for (u32 elapsed = 0; elapsed < ticks; ++elapsed) {
       ++runtime_.tick;
-      PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick, runtime_.outputSequence};
+      PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
       VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
       if (programState_ == nullptr) {
         warn("Missing sequence program state", command.range);
@@ -795,7 +784,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
         };
         VmTrackRuntime runtime;
         for (const SourceCommand& command : track.commands) {
-          PerformanceEmitter out{output, command.id, command.annotation, 0, runtime.outputSequence};
+          PerformanceEmitter out{output, command.id, command.annotation, 0};
           VmApi vm = detail::VmApiAccess::make(runtime, prepass, command);
           static_cast<void>(dialect.execute(command, programState, trackState, out, vm));
         }

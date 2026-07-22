@@ -431,80 +431,6 @@ void performanceMidiRendererHonorsMidiExportOptions() {
          "MIDI renderer should use all 16 channels per port when channel 10 is allowed");
 }
 
-void performanceMidiRendererLowersStructuredAutomationPoints() {
-  const PerformanceEventHeader origin{
-      .sourceCommand = CommandId{7},
-      .track = TrackId{0},
-      .tick = 0,
-      .sequence = 0,
-  };
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .endTick = 4,
-          .events = {NotePerformanceEvent{
-              .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 1, .sequence = 2},
-              .key = 60,
-              .durationTicks = 2,
-          }},
-          .automations = {PerformanceAutomation{
-              .header = origin,
-              .intent =
-                  PerformanceAutomationIntent{
-                      .target = PerformanceAutomationTarget::Level,
-                      .targetValue = 0.5,
-                      .durationTicks = 2,
-                  },
-              .points =
-                  {
-                      LevelPerformanceEvent{
-                          .header =
-                              PerformanceEventHeader{
-                                  .sourceCommand = CommandId{7}, .track = TrackId{0}, .tick = 0, .sequence = 1},
-                          .linearGain = 0.75,
-                      },
-                      LevelPerformanceEvent{
-                          .header =
-                              PerformanceEventHeader{
-                                  .sourceCommand = CommandId{7}, .track = TrackId{0}, .tick = 2, .sequence = 3},
-                          .linearGain = 0.5,
-                      },
-                  },
-          }},
-      }},
-  };
-
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
-  const auto& events = midi.tracks.front().events;
-  const auto firstVolume = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* volume = std::get_if<Volume>(&event);
-    return volume != nullptr && volume->tick == 0;
-  });
-  const auto finalVolume = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* volume = std::get_if<Volume>(&event);
-    return volume != nullptr && volume->tick == 2;
-  });
-  expect(firstVolume != events.end() && finalVolume != events.end(),
-         "MIDI renderer should expand exact realized automation points");
-  expect(std::ranges::any_of(events,
-                             [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 1;
-                             }),
-         "automation expansion should retain interleaved ordinary performance events");
-
-  PerformanceSequence flatPerformance = performance;
-  auto& flatTrack = flatPerformance.tracks.front();
-  flatTrack.events.insert(flatTrack.events.end(), flatTrack.automations.front().points.begin(),
-                          flatTrack.automations.front().points.end());
-  flatTrack.automations.clear();
-  const MidiSequence flatMidi = PerformanceMidiRenderer().render(flatPerformance);
-  expect(MidiExporter().exportMidi(midi) == MidiExporter().exportMidi(flatMidi),
-         "structured automation should lower identically to the same exact flat performance points");
-}
-
 void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -632,87 +558,6 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
   assertPitchBends(PerformanceMidiRenderer().render(performance, MidiExportOptions{},
                                                     ModulationConversionPolicy::SequenceEventSimulation),
                    "sequence-event MIDI lowering");
-}
-
-void performanceMidiRendererSkipsRedundantLoweredControllers() {
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .endTick = 4,
-          .automations =
-              {
-                  PerformanceAutomation{
-                      .intent = PerformanceAutomationIntent{.target = PerformanceAutomationTarget::Level},
-                      .points =
-                          {
-                              LevelPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 0},
-                                  .linearGain = 0.5,
-                              },
-                              LevelPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 1, .sequence = 1},
-                                  .linearGain = 0.5,
-                              },
-                          },
-                  },
-                  PerformanceAutomation{
-                      .intent = PerformanceAutomationIntent{.target = PerformanceAutomationTarget::Expression},
-                      .points =
-                          {
-                              ExpressionPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 2},
-                                  .linearGain = 0.75,
-                              },
-                              ExpressionPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 2, .sequence = 3},
-                                  .linearGain = 0.75,
-                              },
-                          },
-                  },
-                  PerformanceAutomation{
-                      .intent = PerformanceAutomationIntent{.target = PerformanceAutomationTarget::Pan},
-                      .points =
-                          {
-                              PanPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 4},
-                                  .stereoPosition = 0.0,
-                              },
-                              PanPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 3, .sequence = 5},
-                                  .stereoPosition = 0.0,
-                              },
-                          },
-                  },
-              },
-      }},
-  };
-
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
-  expect(std::ranges::count_if(midi.tracks[0].events,
-                               [](const MidiEvent& event) { return std::holds_alternative<Volume>(event); }) == 1 &&
-             std::ranges::count_if(midi.tracks[0].events,
-                                   [](const MidiEvent& event) { return std::holds_alternative<Expression>(event); }) ==
-                 1 &&
-             std::ranges::count_if(midi.tracks[0].events,
-                                   [](const MidiEvent& event) { return std::holds_alternative<Pan>(event); }) == 1,
-         "automation lowering should suppress repeated quantized volume, expression, and pan values");
-
-  PerformanceSequence flatPerformance = performance;
-  auto& flatTrack = flatPerformance.tracks.front();
-  for (const auto& automation : flatTrack.automations) {
-    flatTrack.events.insert(flatTrack.events.end(), automation.points.begin(), automation.points.end());
-  }
-  flatTrack.automations.clear();
-  const MidiSequence flatMidi = PerformanceMidiRenderer().render(flatPerformance);
-  expect(std::ranges::count_if(flatMidi.tracks[0].events,
-                               [](const MidiEvent& event) { return std::holds_alternative<Volume>(event); }) == 2 &&
-             std::ranges::count_if(flatMidi.tracks[0].events,
-                                   [](const MidiEvent& event) { return std::holds_alternative<Expression>(event); }) ==
-                 2 &&
-             std::ranges::count_if(flatMidi.tracks[0].events,
-                                   [](const MidiEvent& event) { return std::holds_alternative<Pan>(event); }) == 2,
-         "automation lowering should not remove repeated writes from ordinary performance events");
 }
 
 void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
@@ -1246,11 +1091,9 @@ void runValueMidiTests() {
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererCombinesExpressionWithPanGain();
   performanceMidiRendererHonorsMidiExportOptions();
-  performanceMidiRendererLowersStructuredAutomationPoints();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
   performanceMidiRendererSkipsRedundantPitchBends();
-  performanceMidiRendererSkipsRedundantLoweredControllers();
   performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape();
   performanceMidiRendererDoesNotDoubleDelayVibrato();
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
