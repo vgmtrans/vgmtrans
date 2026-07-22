@@ -52,12 +52,21 @@ SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, std::vector<As
                                  SourceMap sourceMap, std::vector<Diagnostic> diagnostics)
     : sources_(std::move(sources)), assets_(std::move(assets)), matchFacts_(std::move(matchFacts)),
       collections_(std::move(collections)), sourceMap_(std::move(sourceMap)), diagnostics_(std::move(diagnostics)),
-      index_(buildIndex(assets_, collections_)) {
+      index_(buildIndex(sources_, assets_, collections_)) {
 }
 
-SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<Asset>& assets,
+SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<SourceFile>& sources,
+                                                   const std::vector<Asset>& assets,
                                                    const std::vector<Collection>& collections) {
   Index index;
+  index.sourcesById.reserve(sources.size());
+  for (size_t i = 0; i < sources.size(); ++i) {
+    const SourceId id = sources[i].id;
+    if (id.valid()) {
+      index.sourcesById.emplace(id.value, i);
+    }
+  }
+
   index.assetsById.reserve(assets.size());
   for (size_t i = 0; i < assets.size(); ++i) {
     const AssetId id = metadata(assets[i]).id;
@@ -75,6 +84,14 @@ SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<Asset>& ass
   }
 
   return index;
+}
+
+const SourceFile* SessionSnapshot::source(SourceId id) const {
+  const auto found = index_.sourcesById.find(id.value);
+  if (found == index_.sourcesById.end() || found->second >= sources_.size()) {
+    return nullptr;
+  }
+  return &sources_[found->second];
 }
 
 const Asset* SessionSnapshot::asset(AssetId id) const {
@@ -98,8 +115,8 @@ SessionSnapshot SessionSnapshotBuilder::finish() {
   diagnostics.insert(diagnostics.end(), std::make_move_iterator(indexDiagnostics.begin()),
                      std::make_move_iterator(indexDiagnostics.end()));
   return SessionSnapshot{
-      std::move(sources),     std::move(assets),     std::move(matchFacts),
-      std::move(collections), std::move(sourceMap),  std::move(diagnostics),
+      std::move(sources),     std::move(assets),    std::move(matchFacts),
+      std::move(collections), std::move(sourceMap), std::move(diagnostics),
   };
 }
 

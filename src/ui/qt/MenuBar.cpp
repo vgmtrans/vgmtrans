@@ -1,357 +1,299 @@
 /*
- * VGMTrans (c) 2002-2025
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
 
 #include "MenuBar.h"
 
-#include "LogManager.h"
-#include "Options.h"
-#include "RawFile.h"
-#include "ReportDialog.h"
-#include "Root.h"
-#include "services/MenuManager.h"
-#include "services/NotificationCenter.h"
 #include "services/Settings.h"
-#include <version.h>
-#include "VGMColl.h"
-#include "VGMFile.h"
-#include "VGMItem.h"
-#include "workarea/MdiArea.h"
-#include "workarea/VGMFileView.h"
 
+#include <algorithm>
 #include <array>
+#include <functional>
+#include <utility>
 
-#include <QDesktopServices>
+#include <QActionGroup>
 #include <QDir>
 #include <QDockWidget>
 #include <QInputDialog>
+#include <QMenu>
 #include <QSignalBlocker>
-#include <QtGlobal>
-#include <QUrl>
-#include <QUrlQuery>
 
-MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
+MenuBar::MenuBar(QWidget* parent, const QList<QDockWidget*>& dockWidgets)
+    : QMenuBar(parent) {
   appendFileMenu();
   appendViewMenu(dockWidgets);
   appendOptionsMenu();
   appendInfoMenu();
-
-  connect(NotificationCenter::the(), &NotificationCenter::vgmFileContextCommandsChanged,
-          this, &MenuBar::handleVGMFileContextChange);
-  connect(NotificationCenter::the(), &NotificationCenter::vgmCollContextCommandsChanged,
-          this, &MenuBar::handleVGMCollContextChange);
-  connect(NotificationCenter::the(), &NotificationCenter::rawFileContextCommandsChanged,
-          this, &MenuBar::handleRawFileContextChange);
 }
 
-void MenuBar::setShortcutHost(QWidget *host) {
+void MenuBar::setShortcutHost(QWidget* host) {
   m_shortcutHost = host;
 }
 
 void MenuBar::appendFileMenu() {
-  m_fileMenu = addMenu("File");
-  m_topLevelMenus.insert("File", m_fileMenu);
+  m_fileMenu = addMenu(tr("File"));
+  m_topLevelMenus.insert(m_fileMenu->title(), m_fileMenu);
+  QAction* open = m_fileMenu->addAction(tr("Scan File"));
+  open->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
+  connect(open, &QAction::triggered, this, &MenuBar::openFile);
 
-  menu_open_file = m_fileMenu->addAction("Scan File");
-  menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
-  connect(menu_open_file, &QAction::triggered, this, &MenuBar::openFile);
-
-  menu_recent_files = m_fileMenu->addMenu("Scan Recent");
+  m_recentFilesMenu = m_fileMenu->addMenu(tr("Scan Recent"));
   updateRecentFilesMenu();
 
-  menu_exit_separator = m_fileMenu->addSeparator();
-
-  menu_app_exit = m_fileMenu->addAction("Exit");
-  menu_app_exit->setShortcut(QKeySequence(QStringLiteral("Alt+F4")));
-  menu_app_exit->setMenuRole(QAction::QuitRole);
-  connect(menu_app_exit, &QAction::triggered, this, &MenuBar::exit);
+  m_exitSeparator = m_fileMenu->addSeparator();
+  m_exitAction = m_fileMenu->addAction(tr("Exit"));
+  m_exitAction->setShortcut(QKeySequence(QStringLiteral("Alt+F4")));
+  m_exitAction->setMenuRole(QAction::QuitRole);
+  connect(m_exitAction, &QAction::triggered, this, &MenuBar::exit);
 }
 
-void MenuBar::ensureExitActionAtBottom() {
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-  return;
-#endif
-
-  if (!m_fileMenu || !menu_app_exit) {
-    return;
+void MenuBar::appendViewMenu(const QList<QDockWidget*>& dockWidgets) {
+  m_viewMenu = addMenu(tr("View"));
+  m_topLevelMenus.insert(m_viewMenu->title(), m_viewMenu);
+  for (QDockWidget* dock : dockWidgets) {
+    m_viewMenu->addAction(dock->toggleViewAction());
   }
-
-  if (menu_exit_separator) {
-    m_fileMenu->removeAction(menu_exit_separator);
-  }
-
-  m_fileMenu->removeAction(menu_app_exit);
-
-  if (!m_fileMenu->actions().isEmpty()) {
-    if (!menu_exit_separator) {
-      menu_exit_separator = new QAction(m_fileMenu);
-      menu_exit_separator->setSeparator(true);
-    }
-
-    m_fileMenu->addAction(menu_exit_separator);
-  }
-
-  m_fileMenu->addAction(menu_app_exit);
-}
-
-void MenuBar::appendViewMenu(const QList<QDockWidget *> &dockWidgets) {
-  m_viewMenu = addMenu("View");
-  m_topLevelMenus.insert("View", m_viewMenu);
-
-  for (auto &widget : dockWidgets) {
-    m_viewMenu->addAction(widget->toggleViewAction());
-  }
-
+  m_viewMenu->addSeparator();
+  QAction* reset = m_viewMenu->addAction(tr("Reset Dock Layout"));
+  connect(reset, &QAction::triggered, this, &MenuBar::resetDockLayout);
   m_viewMenu->addSeparator();
 
-  menu_reset_dock_layout = m_viewMenu->addAction(tr("Reset Dock Layout"));
-  connect(menu_reset_dock_layout, &QAction::triggered, this, &MenuBar::resetDockLayout);
+  m_increaseHexFont = m_viewMenu->addAction(tr("Increase Font Size in Hex View"));
+  m_increaseHexFont->setShortcut(QKeySequence::ZoomIn);
+  m_increaseHexFont->setShortcutContext(Qt::WidgetShortcut);
+  connect(m_increaseHexFont, &QAction::triggered, this,
+          &MenuBar::increaseHexFontRequested);
 
-  m_viewMenu->addSeparator();
+  m_decreaseHexFont = m_viewMenu->addAction(tr("Decrease Font Size in Hex View"));
+  m_decreaseHexFont->setShortcut(QKeySequence::ZoomOut);
+  m_decreaseHexFont->setShortcutContext(Qt::WidgetShortcut);
+  connect(m_decreaseHexFont, &QAction::triggered, this,
+          &MenuBar::decreaseHexFontRequested);
 
-  menu_increase_hex_font = m_viewMenu->addAction(tr("Increase Font Size in Hex View"));
-  menu_increase_hex_font->setShortcut(QKeySequence::ZoomIn);
-  menu_increase_hex_font->setShortcutContext(Qt::WidgetShortcut);
-  connect(menu_increase_hex_font, &QAction::triggered, this, [this]() {
-    if (auto *view = currentVGMFileView()) {
-      view->increaseHexViewFont();
-    }
-  });
-
-  menu_decrease_hex_font = m_viewMenu->addAction(tr("Decrease Font Size in Hex View"));
-  menu_decrease_hex_font->setShortcut(QKeySequence::ZoomOut);
-  menu_decrease_hex_font->setShortcutContext(Qt::WidgetShortcut);
-  connect(menu_decrease_hex_font, &QAction::triggered, this, [this]() {
-    if (auto *view = currentVGMFileView()) {
-      view->decreaseHexViewFont();
-    }
-  });
-
-  menu_reset_hex_font = m_viewMenu->addAction(tr("Reset Font Size in Hex View"));
-  menu_reset_hex_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
-  menu_reset_hex_font->setShortcutContext(Qt::WidgetShortcut);
-  connect(menu_reset_hex_font, &QAction::triggered, this, [this]() {
-    if (auto *view = currentVGMFileView()) {
-      view->resetHexViewFont();
-    }
-  });
-
+  m_resetHexFont = m_viewMenu->addAction(tr("Reset Font Size in Hex View"));
+  m_resetHexFont->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+  m_resetHexFont->setShortcutContext(Qt::WidgetShortcut);
+  connect(m_resetHexFont, &QAction::triggered, this,
+          &MenuBar::resetHexFontRequested);
+  setHexViewAvailable(false);
 #if defined(Q_OS_MACOS)
   // Add a separator between these actions and the automatically added "Enter Full Screen" action.
   m_viewMenu->addSeparator();
 #endif
-
-  connect(MdiArea::the(), &QMdiArea::subWindowActivated, this,
-          [this](QMdiSubWindow *) { updateHexFontActions(); });
-  updateHexFontActions();
 }
 
-VGMFileView* MenuBar::currentVGMFileView() const {
-  return qobject_cast<VGMFileView*>(MdiArea::the()->activeSubWindow());
-}
-
-void MenuBar::updateHexFontActions() {
-  const bool hasActiveView = currentVGMFileView() != nullptr;
-  menu_reset_hex_font->setEnabled(hasActiveView);
-  menu_increase_hex_font->setEnabled(hasActiveView);
-  menu_decrease_hex_font->setEnabled(hasActiveView);
-}
-
-void MenuBar::appendInfoMenu() {
-  m_helpMenu = addMenu("Help");
-  m_topLevelMenus.insert("Help", m_helpMenu);
-
-  auto* report_bug = m_helpMenu->addAction("Report a Bug");
-  connect(report_bug, &QAction::triggered, this, &MenuBar::reportBug);
-
-  m_helpMenu->addSeparator();
-
-  menu_about_dlg = m_helpMenu->addAction("About VGMTrans");
-  menu_about_dlg->setMenuRole(QAction::AboutRole);
-  connect(menu_about_dlg, &QAction::triggered, this, &MenuBar::showAbout);
-}
-
-void MenuBar::reportBug() {
-  auto *dialog = new ReportDialog(this);
-  dialog->setAttribute(Qt::WA_DeleteOnClose);
-  dialog->show();
+void MenuBar::setHexViewAvailable(bool available) {
+  m_increaseHexFont->setEnabled(available);
+  m_decreaseHexFont->setEnabled(available);
+  m_resetHexFont->setEnabled(available);
 }
 
 void MenuBar::appendOptionsMenu() {
-  m_optionsMenu = addMenu("Options");
-  m_topLevelMenus.insert("Options", m_optionsMenu);
-  auto bs = m_optionsMenu->addMenu("Bank Select Style");
-
-  auto bankSelectStyle = Settings::the()->conversion.bankSelectStyle();
-
-  QActionGroup *bs_grp = new QActionGroup(this);
-  auto act = bs->addAction("GS (Default)");
-  act->setCheckable(true);
-  act->setChecked(bankSelectStyle == BankSelectStyle::GS);
-  bs_grp->addAction(act);
-  act = bs->addAction("MMA");
-  act->setCheckable(true);
-  act->setChecked(bankSelectStyle == BankSelectStyle::MMA);
-  bs_grp->addAction(act);
-
-  connect(bs_grp, &QActionGroup::triggered, [](const QAction *bs_style) {
-    if (auto text = bs_style->text(); text == "GS (Default)") {
-      Settings::the()->conversion.setBankSelectStyle(BankSelectStyle::GS);
-    } else if (text == "MMA") {
-      Settings::the()->conversion.setBankSelectStyle(BankSelectStyle::MMA);
-      L_WARN("MMA style (CC0 * 128 + CC32) bank select was chosen and "
-             "it will be used for bank select events in generated MIDIs. This "
-             "will cause in-program playback to sound incorrect!");
+  m_optionsMenu = addMenu(tr("Options"));
+  m_topLevelMenus.insert(m_optionsMenu->title(), m_optionsMenu);
+  QMenu* bank = m_optionsMenu->addMenu(tr("Bank Select Style"));
+  auto* bankGroup = new QActionGroup(bank);
+  bankGroup->setExclusive(true);
+  const BankSelectStyle savedStyle = Settings::the()->conversion.bankSelectStyle();
+  for (const auto& option : std::array<std::pair<const char*, BankSelectStyle>, 2>{{
+           {"GS (Default)", BankSelectStyle::GS}, {"MMA", BankSelectStyle::MMA}}}) {
+    QAction* action = bank->addAction(tr(option.first));
+    action->setData(static_cast<int>(option.second));
+    action->setCheckable(true);
+    action->setChecked(option.second == savedStyle);
+    bankGroup->addAction(action);
+  }
+  connect(bankGroup, &QActionGroup::triggered, this, [](QAction* action) {
+    const auto style = static_cast<BankSelectStyle>(action->data().toInt());
+    Settings::the()->conversion.setBankSelectStyle(style);
+    if (style == BankSelectStyle::MMA) {
+      qWarning("MMA style (CC0 * 128 + CC32) bank select was chosen and "
+               "it will be used for bank select events in generated MIDIs. This "
+               "will cause in-program playback to sound incorrect!");
     }
   });
 
-  auto loopsMenu = m_optionsMenu->addMenu(tr("Sequence Loops"));
-
-  QActionGroup *loopsGroup = new QActionGroup(this);
+  QMenu* loops = m_optionsMenu->addMenu(tr("Sequence Loops"));
+  auto* loopsGroup = new QActionGroup(loops);
   loopsGroup->setExclusive(true);
-
-  auto addLoopOption = [loopsMenu, loopsGroup](const QString &label, int loops) {
-    QAction *action = loopsMenu->addAction(label);
+  const int savedLoops = Settings::the()->conversion.numSequenceLoops();
+  const std::array loopOptions{
+      std::pair{tr("0 Loops"), 0},
+      std::pair{tr("1 Loop"), 1},
+      std::pair{tr("2 Loops"), 2},
+  };
+  std::array<QAction*, 3> presetLoopActions{};
+  size_t loopIndex = 0;
+  for (const auto& [label, count] : loopOptions) {
+    QAction* action = loops->addAction(label);
+    action->setData(count);
     action->setCheckable(true);
-    action->setData(loops);
+    action->setChecked(savedLoops == count);
     loopsGroup->addAction(action);
-    return action;
-  };
+    presetLoopActions[loopIndex++] = action;
+  }
+  QAction* custom = loops->addAction(tr("Custom..."));
+  custom->setData(-1);
+  custom->setCheckable(true);
+  custom->setChecked(savedLoops > 2);
+  if (savedLoops > 2) {
+    custom->setText(tr("Custom (%1)").arg(savedLoops));
+  }
+  loopsGroup->addAction(custom);
 
-  std::array presetLoopActions = {
-      addLoopOption(tr("0 Loops"), 0),
-      addLoopOption(tr("1 Loop"), 1),
-      addLoopOption(tr("2 Loops"), 2),
-  };
-
-  QAction *customLoopsAction = addLoopOption(tr("Custom..."), -1);
-
-  auto updateLoopMenu = [presetLoopActions, customLoopsAction, loopsGroup]() mutable {
+  const auto updateLoopMenu = [presetLoopActions, custom, loopsGroup]() {
     const int currentLoops = Settings::the()->conversion.numSequenceLoops();
     QSignalBlocker blocker(loopsGroup);
-
     if (currentLoops >= 0 && currentLoops < static_cast<int>(presetLoopActions.size())) {
-      customLoopsAction->setText(tr("Custom..."));
-      presetLoopActions.at(static_cast<size_t>(currentLoops))->setChecked(true);
+      custom->setText(tr("Custom..."));
+      presetLoopActions[static_cast<size_t>(currentLoops)]->setChecked(true);
     } else {
-      customLoopsAction->setText(tr("Custom (%1)").arg(currentLoops));
-      customLoopsAction->setChecked(true);
+      custom->setText(tr("Custom (%1)").arg(currentLoops));
+      custom->setChecked(true);
     }
   };
 
-  connect(loopsGroup, &QActionGroup::triggered, this, [this, updateLoopMenu](QAction *action) mutable {
-    const int selectedLoops = action->data().toInt();
-    if (selectedLoops >= 0) {
-      if (selectedLoops != Settings::the()->conversion.numSequenceLoops()) {
-        Settings::the()->conversion.setNumSequenceLoops(selectedLoops);
+  connect(loopsGroup, &QActionGroup::triggered, this, [this, updateLoopMenu](QAction* action) {
+    int value = action->data().toInt();
+    if (value < 0) {
+      bool accepted = false;
+      value = QInputDialog::getInt(this, tr("Sequence loops"), tr("Number of loops"),
+                                   Settings::the()->conversion.numSequenceLoops(), 0,
+                                   Settings::ConversionSettings::kMaxSequenceLoops, 1, &accepted);
+      if (!accepted) {
+        updateLoopMenu();
+        return;
       }
-      updateLoopMenu();
-      return;
     }
-
-    bool ok = false;
-    const int currentLoops = Settings::the()->conversion.numSequenceLoops();
-    const int newLoops = QInputDialog::getInt(this, tr("Sequence loops"), tr("Number of loops"),
-      currentLoops, 0, ConversionOptions::kMaxSequenceLoops, 1, &ok);
-    if (ok) {
-      Settings::the()->conversion.setNumSequenceLoops(newLoops);
-    }
-
+    Settings::the()->conversion.setNumSequenceLoops(value);
     updateLoopMenu();
   });
-
-  connect(loopsMenu, &QMenu::aboutToShow, this, [updateLoopMenu]() mutable { updateLoopMenu(); });
+  connect(loops, &QMenu::aboutToShow, this, updateLoopMenu);
   updateLoopMenu();
 
-  act = m_optionsMenu->addAction("Skip MIDI channel 10");
-  act->setCheckable(true);
-  act->setChecked(Settings::the()->conversion.skipChannel10());
-  connect(act, &QAction::toggled, [](bool skip) {
-    if (!skip) {
-      pRoot->UI_toast("Tracks using MIDI channel 10 will be silent during in-app playback.", ToastType::Info);
+  QAction* skipChannel10 = m_optionsMenu->addAction(tr("Skip MIDI channel 10"));
+  skipChannel10->setCheckable(true);
+  skipChannel10->setChecked(Settings::the()->conversion.skipChannel10());
+  connect(skipChannel10, &QAction::toggled, this, [this](bool checked) {
+    Settings::the()->conversion.setSkipChannel10(checked);
+    if (!checked) {
+      qWarning("Tracks using MIDI channel 10 will be silent during in-app playback.");
+      emit showToastRequested(
+          tr("Tracks using MIDI channel 10 will be silent during in-app playback."),
+          ToastType::Info, 3000);
     }
-    Settings::the()->conversion.setSkipChannel10(skip);
   });
 }
 
-void MenuBar::handleVGMFileContextChange(const QList<VGMFile*>& files) {
-  m_selectedVGMFiles = files;
-  m_selectedVGMColls.clear();
-  m_selectedRawFiles.clear();
-  refreshContextualMenus();
+void MenuBar::appendInfoMenu() {
+  m_helpMenu = addMenu(tr("Help"));
+  m_topLevelMenus.insert(m_helpMenu->title(), m_helpMenu);
+  QAction* report = m_helpMenu->addAction(tr("Report a Bug"));
+  connect(report, &QAction::triggered, this, &MenuBar::reportBug);
+  m_helpMenu->addSeparator();
+  QAction* about = m_helpMenu->addAction(tr("About VGMTrans"));
+  about->setMenuRole(QAction::AboutRole);
+  connect(about, &QAction::triggered, this, &MenuBar::showAbout);
 }
 
-void MenuBar::handleVGMCollContextChange(const QList<VGMColl*>& colls) {
-  m_selectedVGMColls = colls;
-  m_selectedVGMFiles.clear();
-  m_selectedRawFiles.clear();
-  refreshContextualMenus();
+void MenuBar::reportBug() {
+  emit reportBugRequested();
 }
 
-void MenuBar::handleRawFileContextChange(const QList<RawFile*>& files) {
-  m_selectedRawFiles = files;
-  m_selectedVGMFiles.clear();
-  m_selectedVGMColls.clear();
-  refreshContextualMenus();
-}
-
-void MenuBar::refreshContextualMenus() {
+void MenuBar::setContext(Context context) {
   clearContextualMenus();
+  appendContextualCommands(context);
+}
 
-  if (!m_selectedRawFiles.isEmpty()) {
-    auto items = std::make_shared<std::vector<RawFile*>>();
-    items->reserve(m_selectedRawFiles.size());
-    for (auto* file : m_selectedRawFiles) {
-      if (file) {
-        items->push_back(file);
-      }
-    }
-    if (!items->empty()) {
-      auto commands = MenuManager::the()->commandsByMenuForItems<RawFile>(items);
-      appendContextualCommands<RawFile>(commands, items);
-    }
+void MenuBar::appendContextualCommands(Context context) {
+  if (context == Context::None) {
     return;
   }
 
-  if (!m_selectedVGMFiles.isEmpty()) {
-    auto items = std::make_shared<std::vector<VGMFile*>>();
-    items->reserve(m_selectedVGMFiles.size());
-    for (auto* file : m_selectedVGMFiles) {
-      if (file) {
-        items->push_back(file);
-      }
+  const auto addAction = [this](const QStringList& path, const QString& text,
+                                bool enabled, const QList<QKeySequence>& shortcuts,
+                                const std::function<void()>& invoke = {}) {
+    QMenu* target = ensureMenuForPath(path);
+    if (target == nullptr) {
+      return static_cast<QAction*>(nullptr);
     }
-    if (!items->empty()) {
-      auto commands = MenuManager::the()->commandsByMenuForItems<VGMItem>(items);
-      appendContextualCommands<VGMItem>(commands, items);
+    if (m_contextActions[target].empty() &&
+        std::find(m_dynamicTopLevelMenus.begin(), m_dynamicTopLevelMenus.end(), target) ==
+            m_dynamicTopLevelMenus.end()) {
+      QAction* separator = target->addSeparator();
+      m_contextSeparators[target] = separator;
     }
+    QAction* action = target->addAction(text);
+    action->setEnabled(enabled);
+    action->setShortcuts(shortcuts);
+    if (invoke) {
+      connect(action, &QAction::triggered, this, invoke);
+    }
+    if (m_shortcutHost != nullptr) {
+      m_shortcutHost->addAction(action);
+    }
+    m_contextActions[target].push_back(action);
+    if (target == m_fileMenu) {
+      ensureExitActionAtBottom();
+    }
+    return action;
+  };
+  const auto addSeparator = [this](const QStringList& path) {
+    if (QMenu* target = ensureMenuForPath(path)) {
+      QAction* separator = target->addSeparator();
+      m_contextActions[target].push_back(separator);
+    }
+  };
+
+  const QStringList convert{tr("Convert")};
+  const QStringList file{tr("File")};
+  if (context == Context::Source) {
+    addAction(convert, tr("Save as Original Format"), false, {});
+    addAction(file, tr("Close"), true, {Qt::Key_Backspace, Qt::Key_Delete},
+              [this] { emit closeSelectedSources(); });
     return;
   }
 
-  if (!m_selectedVGMColls.isEmpty()) {
-    auto items = std::make_shared<std::vector<VGMColl*>>();
-    items->reserve(m_selectedVGMColls.size());
-    for (auto* coll : m_selectedVGMColls) {
-      if (coll) {
-        items->push_back(coll);
-      }
-    }
-    if (!items->empty()) {
-      auto commands = MenuManager::the()->commandsByMenuForItems<VGMColl>(items);
-      appendContextualCommands<VGMColl>(commands, items);
-    }
+  if (context == Context::Sequence) {
+    addAction(convert, tr("Save as MIDI"), false, {});
+    addAction(convert, tr("Save as Original Format"), false, {});
+    addSeparator(convert);
+    addAction(convert, tr("Stitch"), false, {});
+  } else if (context == Context::InstrumentSet) {
+    addAction(convert, tr("Save as SF2"), false, {});
+    addAction(convert, tr("Save as DLS"), false, {});
+    addAction(convert, tr("Save as Original Format"), false, {});
+  } else if (context == Context::SampleCollection) {
+    addAction(convert, tr("Save all samples as WAV"), false, {});
+    addAction(convert, tr("Save as Original Format"), false, {});
+  } else if (context == Context::Misc) {
+    addAction(convert, tr("Save as Original Format"), false, {});
+  } else if (context == Context::Collection) {
+    addAction(convert, tr("Export as MIDI and SF2"), true, {},
+              [this] { emit exportSelectedCollection(0); });
+    addAction(convert, tr("Export as MIDI and DLS"), true, {},
+              [this] { emit exportSelectedCollection(1); });
+    addAction(convert, tr("Export as MIDI, SF2, and DLS"), true, {},
+              [this] { emit exportSelectedCollection(2); });
+    addSeparator(convert);
+    addAction(convert, tr("Stitch"), false, {});
+    return;
   }
+
+  addAction(file, tr("Open Analysis"), true, {Qt::Key_Return},
+            [this] { emit openSelectedAsset(); });
+  addAction(file, tr("Remove"), false, {Qt::Key_Backspace, Qt::Key_Delete});
 }
 
 void MenuBar::clearContextualMenus() {
   for (auto& [menu, actions] : m_contextActions) {
-    for (auto* action : actions) {
-      if (m_shortcutHost && action) {
+    for (QAction* action : actions) {
+      if (m_shortcutHost != nullptr && action != nullptr) {
         m_shortcutHost->removeAction(action);
       }
-      if (menu && action) {
+      if (menu != nullptr && action != nullptr) {
         menu->removeAction(action);
         action->deleteLater();
       }
@@ -360,30 +302,30 @@ void MenuBar::clearContextualMenus() {
   m_contextActions.clear();
 
   for (auto& [menu, separator] : m_contextSeparators) {
-    if (menu && separator) {
+    if (menu != nullptr && separator != nullptr) {
       menu->removeAction(separator);
       separator->deleteLater();
     }
   }
   m_contextSeparators.clear();
 
-  for (auto* submenu : m_dynamicSubmenus) {
-    if (!submenu) {
+  for (QMenu* submenu : m_dynamicSubmenus) {
+    if (submenu == nullptr) {
       continue;
     }
     QMenu* parentMenu = qobject_cast<QMenu*>(submenu->parentWidget());
-    if (!parentMenu) {
+    if (parentMenu == nullptr) {
       parentMenu = qobject_cast<QMenu*>(submenu->parent());
     }
-    if (parentMenu) {
+    if (parentMenu != nullptr) {
       parentMenu->removeAction(submenu->menuAction());
     }
     submenu->deleteLater();
   }
   m_dynamicSubmenus.clear();
 
-  for (auto* menu : m_dynamicTopLevelMenus) {
-    if (!menu) {
+  for (QMenu* menu : m_dynamicTopLevelMenus) {
+    if (menu == nullptr) {
       continue;
     }
     removeAction(menu->menuAction());
@@ -391,70 +333,80 @@ void MenuBar::clearContextualMenus() {
     menu->deleteLater();
   }
   m_dynamicTopLevelMenus.clear();
+  ensureExitActionAtBottom();
 }
 
-QMenu* MenuBar::ensureMenuForPath(const MenuManager::MenuPath& path) {
-  if (path.empty()) {
+QMenu* MenuBar::ensureMenuForPath(const QStringList& path) {
+  if (path.isEmpty()) {
     return nullptr;
   }
 
-  const QString topLevelName = QString::fromStdString(path.front());
-  QMenu* menu = nullptr;
-
-  if (m_topLevelMenus.contains(topLevelName)) {
-    menu = m_topLevelMenus.value(topLevelName);
-  } else {
-    menu = new QMenu(topLevelName, this);
-    if (m_helpMenu) {
-      insertMenu(m_helpMenu->menuAction(), menu);
-    } else if (m_optionsMenu) {
-      insertMenu(m_optionsMenu->menuAction(), menu);
-    } else {
-      addMenu(menu);
-    }
-    m_topLevelMenus.insert(topLevelName, menu);
-    m_dynamicTopLevelMenus.push_back(menu);
+  QMenu* current = m_topLevelMenus.value(path.front(), nullptr);
+  if (current == nullptr) {
+    current = new QMenu(path.front(), this);
+    insertMenu(m_optionsMenu->menuAction(), current);
+    m_topLevelMenus.insert(path.front(), current);
+    m_dynamicTopLevelMenus.push_back(current);
   }
 
-  QMenu* currentMenu = menu;
-  for (size_t i = 1; i < path.size(); ++i) {
-    const QString submenuTitle = QString::fromStdString(path[i]);
+  for (qsizetype index = 1; index < path.size(); ++index) {
     QMenu* submenu = nullptr;
-    const auto submenus = currentMenu->findChildren<QMenu*>(QString(), Qt::FindDirectChildrenOnly);
-    for (auto* candidate : submenus) {
-      if (candidate->title() == submenuTitle) {
+    const auto candidates = current->findChildren<QMenu*>(QString(), Qt::FindDirectChildrenOnly);
+    for (QMenu* candidate : candidates) {
+      if (candidate->title() == path[index]) {
         submenu = candidate;
         break;
       }
     }
-    if (!submenu) {
-      submenu = currentMenu->addMenu(submenuTitle);
+    if (submenu == nullptr) {
+      submenu = current->addMenu(path[index]);
       m_dynamicSubmenus.push_back(submenu);
     }
-    currentMenu = submenu;
+    current = submenu;
   }
+  return current;
+}
 
-  return currentMenu;
+void MenuBar::ensureExitActionAtBottom() {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+  return;
+#endif
+  if (m_fileMenu == nullptr || m_exitAction == nullptr) {
+    return;
+  }
+  if (m_exitSeparator != nullptr) {
+    m_fileMenu->removeAction(m_exitSeparator);
+  }
+  m_fileMenu->removeAction(m_exitAction);
+  if (!m_fileMenu->actions().isEmpty()) {
+    if (m_exitSeparator == nullptr) {
+      m_exitSeparator = new QAction(m_fileMenu);
+      m_exitSeparator->setSeparator(true);
+    }
+    m_fileMenu->addAction(m_exitSeparator);
+  }
+  m_fileMenu->addAction(m_exitAction);
 }
 
 void MenuBar::updateRecentFilesMenu() {
-  menu_recent_files->clear();
-  auto files = Settings::the()->recentFiles.list();
-  const QString homeDir = QDir::homePath();
-  for (const auto& file : files) {
+  m_recentFilesMenu->clear();
+  const QStringList files = Settings::the()->recentFiles.list();
+  const QString home = QDir::homePath();
+  for (const QString& file : files) {
     QString display = file;
-    if (display.startsWith(homeDir, Qt::CaseInsensitive)) {
-      display.replace(0, homeDir.length(), "~");
+    if (display.startsWith(home, Qt::CaseInsensitive)) {
+      display.replace(0, home.size(), QStringLiteral("~"));
     }
-    auto act = menu_recent_files->addAction(display);
-    connect(act, &QAction::triggered, this, [this, file]() { emit openRecentFile(file); });
+    QAction* action = m_recentFilesMenu->addAction(display);
+    connect(action, &QAction::triggered, this,
+            [this, file] { emit openRecentFile(file); });
   }
-  menu_recent_files->addSeparator();
-  auto clear_act = menu_recent_files->addAction("Clear Items");
-  connect(clear_act, &QAction::triggered, this, [this]() {
+  m_recentFilesMenu->addSeparator();
+  QAction* clear = m_recentFilesMenu->addAction(tr("Clear Items"));
+  clear->setEnabled(!files.isEmpty());
+  connect(clear, &QAction::triggered, this, [this] {
     Settings::the()->recentFiles.clear();
     updateRecentFilesMenu();
   });
-  clear_act->setEnabled(!files.isEmpty());
-  menu_recent_files->setEnabled(!files.isEmpty());
+  m_recentFilesMenu->setEnabled(!files.isEmpty());
 }

@@ -23,11 +23,6 @@ else()
   )
 endif()
 
-if(ENABLE_UI_QT)
-  message(STATUS "Using vendored BASS(MIDI) library")
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/bass ${CMAKE_CURRENT_BINARY_DIR}/lib/bass EXCLUDE_FROM_ALL SYSTEM)
-endif()
-
 if(USE_SYSTEM_FMT)
   find_package(fmt 12.1.1 REQUIRED)
 else()
@@ -162,6 +157,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/BytecodeDecode.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/Types.h
       ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
@@ -219,8 +215,7 @@ target_sources(vgmtransvaluecore
 target_include_directories(
   vgmtransvaluecore
   PUBLIC
-    ${PROJECT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR})
+    ${PROJECT_SOURCE_DIR}/src)
 target_compile_features(vgmtransvaluecore PUBLIC cxx_std_20)
 target_link_libraries(vgmtransvaluecore PRIVATE fmt::fmt)
 
@@ -476,6 +471,7 @@ target_sources(vgmtranscore
       Root.h
       base/Binary.h
       base/Types.h
+      base/ToastType.h
     FILE_SET headers_formats TYPE HEADERS BASE_DIRS formats
     FILES
       formats/Akao/AkaoFormat.h
@@ -733,7 +729,9 @@ target_sources(vgmtranscore
 )
 
 configure_file("version.h.in" "version.h")
-target_include_directories(vgmtranscore PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+add_library(vgmtransversion INTERFACE)
+target_include_directories(vgmtransversion INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(vgmtranscore PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(
   vgmtranscore
   PUBLIC vgmtransvalueformats vgmtransvaluecore spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json

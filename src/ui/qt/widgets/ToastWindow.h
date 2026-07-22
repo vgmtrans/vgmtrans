@@ -6,4 +6,6 @@
 
 #pragma once
 
-#include "value/base/Types.h"
+class QWidget;
+
+void setToastWindowChildOf(QWidget* child, QWidget* parent);

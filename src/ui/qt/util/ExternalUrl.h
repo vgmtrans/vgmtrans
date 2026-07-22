@@ -6,4 +6,6 @@
 
 #pragma once
 
-#include "value/base/Types.h"
+class QUrl;
+
+void openExternalUrl(const QUrl& url);

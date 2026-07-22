@@ -5,6 +5,8 @@
  */
 
 #pragma once
+
+#include "PlaybackPosition.h"
 #include "SeqEventTimeIndex.h"
 
 #include <memory>
@@ -25,7 +27,6 @@ class VGMItem;
 class SeqEvent;
 class SeqTrack;
 struct SeqTimedEvent;
-enum class PositionChangeOrigin;
 
 class VGMFileView final : public QMdiSubWindow {
   Q_OBJECT
