@@ -94,6 +94,7 @@ private:
   void openFileInternal(const QString& filename);
   void removeSelectedSources();
   void removeSelectedAssets();
+  void exportSequenceMidi(const QModelIndex& index);
   void togglePlayback();
   void updateSelectionStatus(const QModelIndex& index,
                              SelectionStatusKind kind);

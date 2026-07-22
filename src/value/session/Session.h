@@ -51,6 +51,7 @@ public:
   [[nodiscard]] std::shared_ptr<const SourceInspection> inspect(AssetId asset) const;
 
   [[nodiscard]] CollectionPlayback preparePlayback(CollectionId id, const PlaybackRequest& request) const;
+  [[nodiscard]] Artifact exportSequenceMidi(AssetId id, const SequenceExportRequest& request) const;
   [[nodiscard]] std::vector<Artifact> exportCollection(CollectionId id, const ExportRequest& request) const;
   [[nodiscard]] std::vector<CollectionExport> exportAllCollections(const ExportRequest& request) const;
 

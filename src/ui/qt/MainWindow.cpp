@@ -277,7 +277,8 @@ bool selectIdInView(QAbstractItemView* view, u32 id, bool assetOnly,
   return false;
 }
 
-QString playbackDiagnostics(const std::vector<vgmtrans::core::Diagnostic>& diagnostics) {
+QString diagnosticMessages(const std::vector<vgmtrans::core::Diagnostic>& diagnostics,
+                           const QString& fallback) {
   QStringList messages;
   for (const auto& diagnostic : diagnostics) {
     const QString message = QString::fromStdString(diagnostic.message);
@@ -285,9 +286,18 @@ QString playbackDiagnostics(const std::vector<vgmtrans::core::Diagnostic>& diagn
       messages.push_back(message);
     }
   }
-  return messages.isEmpty()
-             ? QObject::tr("The collection could not be prepared for playback.")
-             : messages.join(QLatin1Char('\n'));
+  return messages.isEmpty() ? fallback : messages.join(QLatin1Char('\n'));
+}
+
+template <typename Request>
+void applySequenceExportSettings(Request& request) {
+  request.sequenceLoops = static_cast<u32>(
+      Settings::the()->conversion.numSequenceLoops());
+  request.midi.skipChannel10 = Settings::the()->conversion.skipChannel10();
+  request.midi.bankSelectStyle =
+      Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
+          ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
+          : vgmtrans::core::MidiBankSelectStyle::MsbOnly;
 }
 }  // namespace
 
@@ -597,6 +607,49 @@ void MainWindow::removeSelectedAssets() {
   static_cast<void>(m_workspace.removeAssets(assets));
 }
 
+void MainWindow::exportSequenceMidi(const QModelIndex& index) {
+  if (!index.isValid()) {
+    return;
+  }
+
+  const QString title = index.data(Qt::DisplayRole).toString();
+  vgmtrans::core::SequenceExportRequest request;
+  applySequenceExportSettings(request);
+
+  try {
+    const auto artifact = m_workspace.exportSequenceMidi(
+        vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, request);
+    if (artifact.bytes.empty()) {
+      const QString message = diagnosticMessages(
+          artifact.diagnostics, tr("The sequence could not be exported as MIDI."));
+      statusBarContent->setStatus(title, message);
+      showToast(message, ToastType::Error, 15000);
+      return;
+    }
+
+    const std::filesystem::path path = openSaveFileDialog(artifact.filename, "mid");
+    if (path.empty()) {
+      return;
+    }
+
+    QSaveFile file(pathText(path));
+    const auto size = static_cast<qsizetype>(artifact.bytes.size());
+    if (!file.open(QIODevice::WriteOnly) ||
+        file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) != size ||
+        !file.commit()) {
+      const QString message = file.errorString();
+      statusBarContent->setStatus(title, message);
+      showToast(message, ToastType::Error, 15000);
+      return;
+    }
+    statusBarContent->setStatus(title, tr("Wrote %1").arg(pathText(path)));
+  } catch (const std::exception& error) {
+    const QString message = QString::fromUtf8(error.what());
+    statusBarContent->setStatus(title, message);
+    showToast(message, ToastType::Error, 15000);
+  }
+}
+
 void MainWindow::togglePlayback() {
   if (!m_playback_controls->hasPlayableTarget()) {
     m_playback_controls->showPlayInfo();
@@ -617,18 +670,13 @@ void MainWindow::togglePlayback() {
   }
 
   vgmtrans::core::PlaybackRequest request;
-  request.sequenceLoops = static_cast<u32>(
-      Settings::the()->conversion.numSequenceLoops());
-  request.midi.skipChannel10 = Settings::the()->conversion.skipChannel10();
-  request.midi.bankSelectStyle =
-      Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
-          ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
-          : vgmtrans::core::MidiBankSelectStyle::MsbOnly;
+  applySequenceExportSettings(request);
 
   try {
     auto playback = m_workspace.preparePlayback(collection, request);
     if (!playback.playable()) {
-      const QString message = playbackDiagnostics(playback.diagnostics);
+      const QString message = diagnosticMessages(
+          playback.diagnostics, tr("The collection could not be prepared for playback."));
       statusBarContent->setStatus(current.data(Qt::DisplayRole).toString(), message);
       showToast(message, ToastType::Error, 15000);
       return;
@@ -775,13 +823,7 @@ void MainWindow::routeSignals() {
     if (directory.empty()) {
       return;
     }
-    request.sequenceLoops = static_cast<u32>(
-        Settings::the()->conversion.numSequenceLoops());
-    request.midi.skipChannel10 = Settings::the()->conversion.skipChannel10();
-    request.midi.bankSelectStyle =
-        Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
-            ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
-            : vgmtrans::core::MidiBankSelectStyle::MsbOnly;
+    applySequenceExportSettings(request);
 
     const auto collection = vgmtrans::core::CollectionId{
         current.data(vgmtrans::ui::IdRole).toUInt()};
@@ -812,6 +854,13 @@ void MainWindow::routeSignals() {
   };
   connect(m_menu_bar, &MenuBar::exportSelectedCollection, this,
           exportSelectedCollection);
+  connect(m_menu_bar, &MenuBar::exportSelectedSequenceMidi, this, [this] {
+    const QWidget* focused = QApplication::focusWidget();
+    const bool contentsFocused = focused != nullptr &&
+        (focused == m_coll_view || m_coll_view->isAncestorOf(focused));
+    exportSequenceMidi(contentsFocused ? m_coll_view->currentIndex()
+                                       : m_vgmfile_listview->currentIndex());
+  });
   connect(m_menu_bar, &MenuBar::openSelectedAsset, this, [this] {
     const QWidget* focused = QApplication::focusWidget();
     const bool contentsFocused = focused != nullptr &&
@@ -930,8 +979,9 @@ void MainWindow::routeSignals() {
     open->setShortcut(Qt::Key_Return);
     open->setShortcutVisibleInContextMenu(true);
     menu.addSeparator();
+    QAction* saveMidi = nullptr;
     if (context == MenuBar::Context::Sequence) {
-      addDisabled(menu, tr("Save as MIDI"));
+      saveMidi = menu.addAction(tr("Save as MIDI"));
       addDisabled(menu, tr("Save as Original Format"));
       menu.addSeparator();
       addDisabled(menu, tr("Stitch"));
@@ -954,6 +1004,8 @@ void MainWindow::routeSignals() {
     if (chosen == open) {
       MdiArea::the()->newView(
           vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
+    } else if (saveMidi != nullptr && chosen == saveMidi) {
+      exportSequenceMidi(current);
     } else if (chosen == remove) {
       removeSelectedAssets();
     }

@@ -258,7 +258,8 @@ void MenuBar::appendContextualCommands(Context context) {
   }
 
   if (context == Context::Sequence) {
-    addAction(convert, tr("Save as MIDI"), false, {});
+    addAction(convert, tr("Save as MIDI"), true, {},
+              [this] { emit exportSelectedSequenceMidi(); });
     addAction(convert, tr("Save as Original Format"), false, {});
     addSeparator(convert);
     addAction(convert, tr("Stitch"), false, {});

@@ -55,6 +55,13 @@ namespace {
   return name;
 }
 
+[[nodiscard]] std::string artifactBaseName(const SequenceProgramAsset& sequence) {
+  if (!sequence.metadata.name.empty()) {
+    return filenamePart(sequence.metadata.name);
+  }
+  return "sequence-" + std::to_string(sequence.metadata.id.value);
+}
+
 [[nodiscard]] std::string sampleArtifactName(const std::string& baseName, const Sample& sample, u32 sampleIndex) {
   std::string sampleName = sample.name.empty() ? "sample-" + std::to_string(sampleIndex) : sample.name;
   return filenamePart(baseName) + "-" + std::to_string(sampleIndex) + "-" + filenamePart(std::move(sampleName)) +
@@ -127,9 +134,34 @@ struct MidiLoweringResult {
   return prepared;
 }
 
-[[nodiscard]] MidiLoweringResult lowerMidiSequence(const PreparedCollectionExport& prepared,
-                                                   const SequenceDialectRegistry& dialects,
-                                                   const ExportRequest& request) {
+[[nodiscard]] MidiLoweringResult lowerMidiSequence(const SequenceProgramAsset& sequence,
+                                                   std::span<const InstrumentSetAsset* const> instrumentSets,
+                                                   const SequenceDialectRegistry& dialects, LoopPolicy loopPolicy,
+                                                   u32 sequenceLoops, const MidiExportOptions& midiOptions,
+                                                   ModulationConversionPolicy modulationConversion) {
+  const auto* dialect = dialects.find(sequence.program.dialect.value);
+  if (dialect == nullptr) {
+    return MidiLoweringResult{
+        .diagnostics = {exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'",
+                                    validDiagnosticRange(sequence.metadata.range))},
+    };
+  }
+
+  auto performance = SequenceVm(SequenceVmOptions{
+                                    .loopPolicy = loopPolicy,
+                                    .sequenceLoops = sequenceLoops,
+                                })
+                         .render(sequence.program, *dialect);
+  auto midi = PerformanceMidiRenderer().render(performance, midiOptions, modulationConversion, instrumentSets);
+  return MidiLoweringResult{
+      .performance = std::move(performance),
+      .sequence = std::move(midi),
+  };
+}
+
+[[nodiscard]] MidiLoweringResult lowerCollectionMidiSequence(const PreparedCollectionExport& prepared,
+                                                             const SequenceDialectRegistry& dialects,
+                                                             const ExportRequest& request) {
   // Rendering the source sequence is needed for .mid output and for observed-range
   // modulation. Keep failures as diagnostics so other exports can still run.
   if (!prepared.assets.diagnostics.collection.empty()) {
@@ -147,26 +179,8 @@ struct MidiLoweringResult {
     };
   }
 
-  const auto& sequence = *prepared.assets.sequenceProgram;
-  const auto* dialect = dialects.find(sequence.program.dialect.value);
-  if (dialect == nullptr) {
-    return MidiLoweringResult{
-        .diagnostics = {exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'",
-                                    validDiagnosticRange(sequence.metadata.range))},
-    };
-  }
-
-  auto performance = SequenceVm(SequenceVmOptions{
-                                    .loopPolicy = request.loopPolicy,
-                                    .sequenceLoops = request.sequenceLoops,
-                                })
-                         .render(sequence.program, *dialect);
-  auto midi = PerformanceMidiRenderer().render(performance, request.midi, request.modulationConversion,
-                                               prepared.assets.instrumentSets);
-  return MidiLoweringResult{
-      .performance = std::move(performance),
-      .sequence = std::move(midi),
-  };
+  return lowerMidiSequence(*prepared.assets.sequenceProgram, prepared.assets.instrumentSets, dialects,
+                           request.loopPolicy, request.sequenceLoops, request.midi, request.modulationConversion);
 }
 
 [[nodiscard]] std::optional<MidiModulationUsage> midiModulationUsage(const MidiLoweringResult& lowering) {
@@ -183,31 +197,32 @@ struct MidiLoweringResult {
   return usage;
 }
 
-[[nodiscard]] Artifact exportMidi(const PreparedCollectionExport& prepared, const ExportRequest& request,
-                                  const MidiLoweringResult& lowering) {
+[[nodiscard]] Artifact exportMidi(std::string_view baseName, const MidiLoweringResult& lowering,
+                                  ModulationScalingPolicy modulationScaling,
+                                  ModulationConversionPolicy modulationConversion) {
   if (!lowering.sequence) {
     return Artifact{
-        .filename = prepared.baseName + ".mid",
+        .filename = std::string(baseName) + ".mid",
         .mediaType = "audio/midi",
         .diagnostics = lowering.diagnostics,
     };
   }
 
   auto midiSequence = *lowering.sequence;
-  if (request.modulationConversion == ModulationConversionPolicy::SynthModulators &&
-      request.modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
+  if (modulationConversion == ModulationConversionPolicy::SynthModulators &&
+      modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
     // Apply the same observed-range scaling to MIDI controller values and synth
     // modulators so they continue to match each other.
     const auto usage = lowering.performance ? analyzePerformanceModulationUsage(*lowering.performance)
                                             : analyzeMidiModulationUsage(midiSequence);
     if (hasMidiModulationUsage(usage)) {
-      applyMidiModulationScaling(midiSequence, usage, request.modulationScaling);
+      applyMidiModulationScaling(midiSequence, usage, modulationScaling);
     }
   }
   auto bytes = MidiExporter().exportMidi(midiSequence);
 
   return Artifact{
-      .filename = prepared.baseName + ".mid",
+      .filename = std::string(baseName) + ".mid",
       .mediaType = "audio/midi",
       .bytes = std::move(bytes),
       .diagnostics = std::move(midiSequence.diagnostics),
@@ -333,6 +348,30 @@ struct MidiLoweringResult {
 
 }  // namespace
 
+Artifact exportSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId, const SequenceExportRequest& request,
+                            const SequenceDialectRegistry& dialects) {
+  const auto* asset = snapshot.asset(sequenceId);
+  const auto* sequence = asset != nullptr ? std::get_if<SequenceProgramAsset>(asset) : nullptr;
+  if (sequence == nullptr) {
+    std::vector<Diagnostic> diagnostics;
+    if (asset == nullptr) {
+      diagnostics.push_back(exportError("Sequence asset was not found"));
+    } else {
+      diagnostics.push_back(exportError("Asset is not a sequence", validDiagnosticRange(metadata(*asset).range)));
+    }
+    return Artifact{
+        .filename = "sequence-" + std::to_string(sequenceId.value) + ".mid",
+        .mediaType = "audio/midi",
+        .diagnostics = std::move(diagnostics),
+    };
+  }
+
+  const auto lowering = lowerMidiSequence(*sequence, {}, dialects, request.loopPolicy, request.sequenceLoops,
+                                          request.midi, ModulationConversionPolicy::SequenceEventSimulation);
+  return exportMidi(artifactBaseName(*sequence), lowering, ModulationScalingPolicy::FullFormatRange,
+                    ModulationConversionPolicy::SequenceEventSimulation);
+}
+
 CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,
                                              CollectionId collection, const PlaybackRequest& request,
                                              const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {
@@ -368,8 +407,9 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
       .modulationScaling = ModulationScalingPolicy::FullFormatRange,
       .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
   };
-  auto lowering = lowerMidiSequence(prepared, dialects, exportRequest);
-  auto midi = exportMidi(prepared, exportRequest, lowering);
+  auto lowering = lowerCollectionMidiSequence(prepared, dialects, exportRequest);
+  auto midi =
+      exportMidi(prepared.baseName, lowering, exportRequest.modulationScaling, exportRequest.modulationConversion);
   auto soundFont = exportSoundFont2(prepared, sources, exportRequest, nullptr,
                                     lowering.sequence ? ModulationConversionPolicy::SequenceEventSimulation
                                                       : ModulationConversionPolicy::SynthModulators);
@@ -413,7 +453,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     // Several requested files can depend on the same rendered sequence. Render it
     // once so diagnostics and modulation analysis refer to the same playback data.
     if (!midiLowering) {
-      midiLowering = lowerMidiSequence(prepared, dialects, request);
+      midiLowering = lowerCollectionMidiSequence(prepared, dialects, request);
     }
     return *midiLowering;
   };
@@ -447,7 +487,8 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   for (const auto kind : kinds) {
     switch (kind) {
       case ExportKind::Midi:
-        artifacts.push_back(exportMidi(prepared, request, requireMidiLowering()));
+        artifacts.push_back(exportMidi(prepared.baseName, requireMidiLowering(), request.modulationScaling,
+                                       request.modulationConversion));
         break;
       case ExportKind::Wav: {
         auto wavArtifacts = exportWav(prepared, sources);
