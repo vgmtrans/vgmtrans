@@ -27,6 +27,15 @@ void DiagnosticStore::append(std::vector<Diagnostic> diagnostics) {
                       std::make_move_iterator(diagnostics.end()));
 }
 
+void DiagnosticStore::removeForAssetsAndAnnotations(const std::unordered_set<u32>& assetIds,
+                                                     const std::unordered_set<u32>& annotationIds) {
+  std::erase_if(diagnostics_, [&](const Diagnostic& diagnostic) {
+    return (diagnostic.object && diagnostic.object->asset.valid() &&
+            assetIds.contains(diagnostic.object->asset.value)) ||
+           (diagnostic.annotation && annotationIds.contains(diagnostic.annotation->value));
+  });
+}
+
 void DiagnosticStore::removeForSources(const std::vector<SourceId>& sources) {
   const auto sourceIds = makeSourceIdSet(sources);
   std::erase_if(diagnostics_, [&](const Diagnostic& diagnostic) {

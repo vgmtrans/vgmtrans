@@ -22,6 +22,7 @@
 
 #include <filesystem>
 #include <set>
+#include <span>
 #include <unordered_set>
 #include <vector>
 
@@ -40,6 +41,7 @@ public:
   SourceId addSource(SourceFile file, std::vector<u8> bytes);
   SourceId addSourceFromPath(std::filesystem::path path);
   [[nodiscard]] SessionSnapshot removeSource(SourceId id);
+  [[nodiscard]] SessionSnapshot removeAssets(std::span<const AssetId> assets);
 
   [[nodiscard]] SessionSnapshot scanSource(SourceId id);
   [[nodiscard]] SessionSnapshot scanPendingSources();

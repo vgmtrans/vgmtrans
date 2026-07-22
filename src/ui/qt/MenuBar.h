@@ -50,6 +50,7 @@ signals:
   void reportBugRequested();
   void resetDockLayout();
   void closeSelectedSources();
+  void removeSelectedAssets();
   void openSelectedAsset();
   void exportSelectedCollection(int choice);
   void increaseHexFontRequested();

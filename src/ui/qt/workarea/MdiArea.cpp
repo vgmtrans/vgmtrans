@@ -10,7 +10,7 @@
 #include "InstructionHintLayout.h"
 #include "Metrics.h"
 #include "UIHelpers.h"
-#include "widgets/EmptyStateWidget.h"
+#include "VGMFileView.h"
 
 #include <algorithm>
 #include <cmath>
@@ -270,28 +270,56 @@ void MdiArea::newView(vgmtrans::core::AssetId asset) {
     return;
   }
 
-  if (const auto it = assetToWindowMap.find(asset.value); it != assetToWindowMap.end()) {
-    setActiveSubWindow(it->second);
-    it->second->setFocus();
-    return;
+  if (auto it = assetToWindowMap.find(asset.value); it != assetToWindowMap.end()) {
+    const InspectorWindow existing = it->second;
+    if (existing.window && existing.content && subWindowList().contains(existing.window.data()) &&
+        existing.window->widget() == existing.content.data()) {
+      setActiveSubWindow(existing.window.data());
+      // Activation can synchronously deliver signals that close a pending tab,
+      // so re-check both guarded objects before moving keyboard focus.
+      if (existing.window && existing.content && existing.window->widget() == existing.content.data()) {
+        existing.content->setFocus();
+      }
+      return;
+    }
+    if (existing.window) {
+      windowToAssetMap.erase(existing.window.data());
+    }
+    assetToWindowMap.erase(it);
   }
 
-  const QString name = QString::fromStdString(vgmtrans::core::metadata(*value).name);
-  auto* placeholder = new EmptyStateWidget(
-      {QStringLiteral(":/icons/magnify.svg"), name, 2, 2.0, 0.4});
-  placeholder->setEmptyStateShown(true);
-  placeholder->setWindowTitle(name);
-  QMdiSubWindow* window = addSubWindow(placeholder, Qt::SubWindow);
-  assetToWindowMap.emplace(asset.value, window);
+  auto* inspector = new VGMFileView(*m_workspace, asset);
+  if (!inspector->valid()) {
+    inspector->deleteLater();
+    return;
+  }
+  inspector->setSeekModifierActive(m_seekModifierActive);
+  const QString name = inspector->windowTitle();
+  QMdiSubWindow* window = addSubWindow(inspector, Qt::SubWindow);
+  assetToWindowMap.emplace(asset.value, InspectorWindow{.window = window, .content = inspector});
   windowToAssetMap.emplace(window, asset.value);
+  connect(inspector, &VGMFileView::statusChanged, this,
+          &MdiArea::inspectorStatusChanged);
+  connect(inspector, &VGMFileView::playbackSeekRequested, this,
+          &MdiArea::playbackSeekRequested);
   connect(window, &QObject::destroyed, this, [this, assetValue = asset.value, window]() {
-    assetToWindowMap.erase(assetValue);
+    const auto found = assetToWindowMap.find(assetValue);
+    if (found != assetToWindowMap.end() &&
+        (found->second.window.isNull() || found->second.window.data() == window)) {
+      assetToWindowMap.erase(found);
+    }
     windowToAssetMap.erase(window);
   });
+  const QPointer<QMdiSubWindow> windowGuard(window);
+  const QPointer<VGMFileView> inspectorGuard(inspector);
   window->showMaximized();
-  window->setFocus();
+  if (windowGuard && inspectorGuard && windowGuard->widget() == inspectorGuard.data()) {
+    inspectorGuard->setFocus();
+  }
 #ifdef Q_OS_MAC
-  placeholder->setWindowTitle(QStringLiteral(" %1 ").arg(name));
+  if (inspectorGuard) {
+    inspectorGuard->setWindowTitle(QStringLiteral(" %1 ").arg(name));
+  }
 #endif
 }
 
@@ -302,18 +330,26 @@ void MdiArea::workspaceChanged() {
         ++it;
         continue;
       }
-      QMdiSubWindow* window = it->second;
-      windowToAssetMap.erase(window);
+      const QPointer<QMdiSubWindow> window = it->second.window;
+      if (window) {
+        windowToAssetMap.erase(window.data());
+      }
       it = assetToWindowMap.erase(it);
-      window->close();
+      if (window) {
+        window->close();
+      }
     }
   }
   viewport()->update();
 }
 
 void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
-  if (!window)
+  emit hexViewAvailableChanged(window != nullptr &&
+                               qobject_cast<VGMFileView*>(window->widget()) != nullptr);
+  if (!window) {
+    emit inspectorStatusChanged({}, {}, {}, -1, -1);
     return;
+  }
 
   // For some reason, if multiple documents are open, closing one document causes the others
   // to become windowed instead of maximized. This fixes the problem.
@@ -328,6 +364,40 @@ void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
   if (const auto it = windowToAssetMap.find(window); it != windowToAssetMap.end()) {
     emit assetSelected(vgmtrans::core::AssetId{it->second}, this);
   }
+  if (auto* view = activeFileView()) {
+    view->setSeekModifierActive(m_seekModifierActive);
+    view->refreshStatus();
+  }
+}
+
+VGMFileView* MdiArea::activeFileView() const {
+  QMdiSubWindow* window = activeSubWindow();
+  return window != nullptr ? qobject_cast<VGMFileView*>(window->widget()) : nullptr;
+}
+
+void MdiArea::increaseActiveHexFont() {
+  if (auto* view = activeFileView()) {
+    view->increaseHexViewFont();
+  }
+}
+
+void MdiArea::decreaseActiveHexFont() {
+  if (auto* view = activeFileView()) {
+    view->decreaseHexViewFont();
+  }
+}
+
+void MdiArea::resetActiveHexFont() {
+  if (auto* view = activeFileView()) {
+    view->resetHexViewFont();
+  }
+}
+
+void MdiArea::setSeekModifierActive(bool active) {
+  m_seekModifierActive = active;
+  if (auto* view = activeFileView()) {
+    view->setSeekModifierActive(active);
+  }
 }
 
 void MdiArea::selectAsset(vgmtrans::core::AssetId asset, QWidget* caller) {
@@ -335,15 +405,25 @@ void MdiArea::selectAsset(vgmtrans::core::AssetId asset, QWidget* caller) {
     return;
   }
 
-  const auto it = assetToWindowMap.find(asset.value);
+  auto it = assetToWindowMap.find(asset.value);
   if (it == assetToWindowMap.end()) {
+    return;
+  }
+  const InspectorWindow inspector = it->second;
+  const QPointer<QMdiSubWindow> window = inspector.window;
+  if (!window || !inspector.content || !subWindowList().contains(window.data()) ||
+      window->widget() != inspector.content.data()) {
+    if (window) {
+      windowToAssetMap.erase(window.data());
+    }
+    assetToWindowMap.erase(it);
     return;
   }
 
   QWidget* focusedWidget = QApplication::focusWidget();
   const bool callerHadFocus = caller != nullptr && focusedWidget != nullptr &&
       (focusedWidget == caller || caller->isAncestorOf(focusedWidget));
-  setActiveSubWindow(it->second);
+  setActiveSubWindow(window.data());
 
   // Selecting an item may activate its analysis tab, but keyboard focus stays
   // in the list that initiated the selection.

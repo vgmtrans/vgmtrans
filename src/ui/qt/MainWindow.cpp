@@ -559,7 +559,30 @@ void MainWindow::showEvent(QShowEvent* event) {
 #endif
 }
 
+void MainWindow::removeSelectedSources() {
+  const QModelIndexList rows = m_rawfile_listview->selectionModel()->selectedRows();
+  std::vector<vgmtrans::core::SourceId> sources;
+  sources.reserve(static_cast<size_t>(rows.size()));
+  for (const QModelIndex& row : rows) {
+    sources.push_back(vgmtrans::core::SourceId{
+        row.data(vgmtrans::ui::IdRole).toUInt()});
+  }
+  static_cast<void>(m_workspace.removeSources(sources));
+}
+
+void MainWindow::removeSelectedAssets() {
+  const QModelIndexList rows = m_vgmfile_listview->selectionModel()->selectedRows();
+  std::vector<vgmtrans::core::AssetId> assets;
+  assets.reserve(static_cast<size_t>(rows.size()));
+  for (const QModelIndex& row : rows) {
+    assets.push_back(vgmtrans::core::AssetId{
+        row.data(vgmtrans::ui::IdRole).toUInt()});
+  }
+  static_cast<void>(m_workspace.removeAssets(assets));
+}
+
 void MainWindow::routeSignals() {
+  auto* mdiArea = MdiArea::the();
   connect(m_menu_bar, &MenuBar::openFile, this, &MainWindow::openFile);
   connect(m_menu_bar, &MenuBar::openRecentFile, this, &MainWindow::openFileInternal);
   connect(m_menu_bar, &MenuBar::exit, this, &MainWindow::close);
@@ -575,6 +598,24 @@ void MainWindow::routeSignals() {
   connect(m_menu_bar, &MenuBar::showToastRequested, this,
           &MainWindow::showToast);
   connect(m_menu_bar, &MenuBar::resetDockLayout, m_dockLayout, &MainWindowDockLayout::resetToDefault);
+  connect(m_menu_bar, &MenuBar::increaseHexFontRequested, mdiArea,
+          &MdiArea::increaseActiveHexFont);
+  connect(m_menu_bar, &MenuBar::decreaseHexFontRequested, mdiArea,
+          &MdiArea::decreaseActiveHexFont);
+  connect(m_menu_bar, &MenuBar::resetHexFontRequested, mdiArea,
+          &MdiArea::resetActiveHexFont);
+  connect(mdiArea, &MdiArea::hexViewAvailableChanged, m_menu_bar,
+          &MenuBar::setHexViewAvailable);
+  connect(this, &MainWindow::seekModifierActiveChanged, mdiArea,
+          &MdiArea::setSeekModifierActive);
+  connect(mdiArea, &MdiArea::playbackSeekRequested, this,
+          &MainWindow::playbackSeekRequested);
+  connect(mdiArea, &MdiArea::inspectorStatusChanged, this,
+          [this](const QString& name, const QString& description, const QIcon& icon,
+                 int offset, int size) {
+            statusBarContent->setStatus(name, description, icon.isNull() ? nullptr : &icon,
+                                        offset, size);
+          });
 
   const auto synchronizeAssetSelection =
       [this](vgmtrans::core::AssetId assetId, QWidget* caller) {
@@ -631,17 +672,10 @@ void MainWindow::routeSignals() {
   connect(selectionStopShortcut, &QShortcut::activated, this,
           &MainWindow::playbackStopRequested);
 
-  const auto closeSelectedSources = [this] {
-    const QModelIndexList rows = m_rawfile_listview->selectionModel()->selectedRows();
-    std::vector<vgmtrans::core::SourceId> sources;
-    sources.reserve(static_cast<size_t>(rows.size()));
-    for (const QModelIndex& row : rows) {
-      sources.push_back(vgmtrans::core::SourceId{
-          row.data(vgmtrans::ui::IdRole).toUInt()});
-    }
-    static_cast<void>(m_workspace.removeSources(sources));
-  };
+  const auto closeSelectedSources = [this] { removeSelectedSources(); };
+  const auto removeSelectedAssets = [this] { this->removeSelectedAssets(); };
   connect(m_menu_bar, &MenuBar::closeSelectedSources, this, closeSelectedSources);
+  connect(m_menu_bar, &MenuBar::removeSelectedAssets, this, removeSelectedAssets);
 
   const auto exportSelectedCollection = [this](int choice) {
     const QModelIndex current = m_coll_listview->currentIndex();
@@ -806,9 +840,9 @@ void MainWindow::routeSignals() {
             }
           });
 
-  const auto showAssetContextMenu = [this](QAbstractItemView* view,
-                                           const QModelIndex& current,
-                                           const QPoint& position) {
+  const auto showAssetContextMenu = [this, removeSelectedAssets](QAbstractItemView* view,
+                                                                const QModelIndex& current,
+                                                                const QPoint& position) {
     const MenuBar::Context context = contextForAsset(m_workspace, current);
     if (context == MenuBar::Context::None) {
       return;
@@ -842,11 +876,13 @@ void MainWindow::routeSignals() {
     QAction* remove = menu.addAction(tr("Remove"));
     remove->setShortcuts({Qt::Key_Backspace, Qt::Key_Delete});
     remove->setShortcutVisibleInContextMenu(true);
-    remove->setEnabled(false);
 
-    if (menu.exec(view->viewport()->mapToGlobal(position)) == open) {
+    const QAction* chosen = menu.exec(view->viewport()->mapToGlobal(position));
+    if (chosen == open) {
       MdiArea::the()->newView(
           vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
+    } else if (chosen == remove) {
+      removeSelectedAssets();
     }
   };
 
@@ -943,6 +979,29 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
     auto *mouseEvent = static_cast<QMouseEvent *>(event);
     if (mouseEvent->button() == Qt::LeftButton) {
       m_dockLayout->endSeparatorDrag();
+    }
+  }
+
+  if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
+    auto* keyEvent = static_cast<QKeyEvent*>(event);
+    const bool removeKey = keyEvent->key() == Qt::Key_Backspace || keyEvent->key() == Qt::Key_Delete;
+    const auto commandModifiers = Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier;
+    auto* widget = qobject_cast<QWidget*>(obj);
+    const auto targets = [widget](const QWidget* view) {
+      return widget != nullptr && view != nullptr && (widget == view || view->isAncestorOf(widget));
+    };
+    const bool targetsSources = targets(m_rawfile_listview);
+    const bool targetsAssets = targets(m_vgmfile_listview);
+    if (removeKey && !(keyEvent->modifiers() & commandModifiers) && (targetsSources || targetsAssets)) {
+      event->accept();
+      if (event->type() == QEvent::KeyPress && !keyEvent->isAutoRepeat()) {
+        if (targetsSources) {
+          removeSelectedSources();
+        } else {
+          removeSelectedAssets();
+        }
+      }
+      return true;
     }
   }
 

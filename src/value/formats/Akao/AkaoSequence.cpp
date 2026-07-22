@@ -959,7 +959,6 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
       .bytecodeEnd = sequenceEnd,
       .maxCommands = kAkaoMaxTrackCommands,
       .sequenceAsset = id,
-      .parentAnnotation = headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt,
       .sourceMap = sourceMap,
   };
   for (u32 trackIndex = 0; trackIndex < layout->trackAddresses.size(); ++trackIndex) {

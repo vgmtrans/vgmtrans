@@ -1,31 +1,26 @@
 /*
- * VGMTrans (c) 2002-2021
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+
 #include "VGMFileTreeView.h"
 
 #include "ColorHelpers.h"
-#include "Helpers.h"
 #include "hexview/HexViewInput.h"
 #include "Metrics.h"
-#include "services/NotificationCenter.h"
+#include "models/SourceInspectorModel.h"
 #include "services/Settings.h"
-#include "VGMFileView.h"
+#include "workarea/SourceInspectorPresentation.h"
 
 #include <QAbstractTextDocumentLayout>
-#include <QAccessible>
 #include <QApplication>
 #include <QCheckBox>
 #include <QPainter>
 #include <QScrollBar>
 #include <QTextDocument>
 
-// ***********************************
-// VMGFileTreeHeaderView
-// ***********************************
-
-VMGFileTreeHeaderView::VMGFileTreeHeaderView(Qt::Orientation orientation, QWidget *parent, bool showDetails)
+VMGFileTreeHeaderView::VMGFileTreeHeaderView(Qt::Orientation orientation, QWidget* parent, bool showDetails)
     : QHeaderView(orientation, parent) {
   setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   setSectionResizeMode(QHeaderView::Fixed);
@@ -35,39 +30,29 @@ VMGFileTreeHeaderView::VMGFileTreeHeaderView(Qt::Orientation orientation, QWidge
   detailsCheckBox->setStyleSheet(
       QString("QCheckBox::indicator { width: %1px; height: %1px; }").arg(Size::HeaderCheckbox));
   detailsCheckBox->setChecked(showDetails);
-
   detailsCheckBox->show();
 
   connect(detailsCheckBox, &QCheckBox::clicked, this, &VMGFileTreeHeaderView::toggleShowDetails);
-  connect(NotificationCenter::the(), &NotificationCenter::vgmfiletree_showDetailsChanged,
-          this, &VMGFileTreeHeaderView::onShowDetailsChanged);
+  connect(Settings::the(), &Settings::vgmFileTreeShowDetailsChanged, this,
+          &VMGFileTreeHeaderView::onShowDetailsChanged);
 }
 
-// MacOS exhibits strange behavior around the QHeaderView font. The font is not correctly set when
-// accessed in the constructor, so we delay setting to showEvent. What's more, the font size will
-// still be incorrect until we set it with setPointSize. In our case, we're shrinking it anyway.
-void VMGFileTreeHeaderView::showEvent(QShowEvent *event) {
+void VMGFileTreeHeaderView::showEvent(QShowEvent* event) {
   QFont headerFont = font();
-  headerFont.setPointSize(headerFont.pointSize()-1);
+  headerFont.setPointSize(headerFont.pointSize() - 1);
 #ifdef Q_OS_MAC
-  // Hide the splitter that appears on the far right of the header. Oddly, setting border-right
-  // does not work, but setting border-top seems to reset the appearance altogether and remove the
-  // splitter. The margin and padding settings here get us back to the default appearance.
-  setStyleSheet("QHeaderView::section { border-top: 0px solid white; margin-left: 4px; padding-bottom: -1px; padding-top: -3px; }");
+  setStyleSheet("QHeaderView::section { border-top: 0px solid white; margin-left: 4px; "
+                "padding-bottom: -1px; padding-top: -3px; }");
   resizeSection(0, width());
 #endif
   detailsCheckBox->setFont(headerFont);
-
   QHeaderView::showEvent(event);
 }
 
-void VMGFileTreeHeaderView::resizeEvent(QResizeEvent *event) {
+void VMGFileTreeHeaderView::resizeEvent(QResizeEvent* event) {
   QHeaderView::resizeEvent(event);
-
-  // Resize the first and only section to 1 pixel beyond the width to hide the column splitter
   resizeSection(0, width());
-  detailsCheckBox->move(width() - detailsCheckBox->width() - 10,
-                    (height() - detailsCheckBox->height()) / 2);
+  detailsCheckBox->move(width() - detailsCheckBox->width() - 10, (height() - detailsCheckBox->height()) / 2);
 }
 
 void VMGFileTreeHeaderView::onShowDetailsChanged(bool showDetails) const {
@@ -78,144 +63,125 @@ void VMGFileTreeHeaderView::toggleShowDetails() const {
   Settings::the()->VGMFileTreeView.setShowDetails(detailsCheckBox->isChecked());
 }
 
-// ***********************************
-// VGMTreeDisplayItem
-// ***********************************
-
 namespace {
-QColor selectedTreeTextColor(const QStyleOptionViewItem &paintopt) {
-  const QPalette::ColorGroup colorGroup =
-      !paintopt.state.testFlag(QStyle::State_Enabled)
-          ? QPalette::Disabled
-          : paintopt.state.testFlag(QStyle::State_Active) ? QPalette::Normal
-                                                          : QPalette::Inactive;
-  const QColor selectionColor = itemSelectionFillColor(paintopt.palette, colorGroup);
-  return contrastingTextColor(selectionColor, paintopt.palette.color(colorGroup, QPalette::Window),
-                              paintopt.palette, colorGroup);
-}
+
+QColor selectedTreeTextColor(const QStyleOptionViewItem& option) {
+  const QPalette::ColorGroup colorGroup = !option.state.testFlag(QStyle::State_Enabled) ? QPalette::Disabled
+                                          : option.state.testFlag(QStyle::State_Active) ? QPalette::Normal
+                                                                                        : QPalette::Inactive;
+  const QColor selectionColor = itemSelectionFillColor(option.palette, colorGroup);
+  return contrastingTextColor(selectionColor, option.palette.color(colorGroup, QPalette::Window), option.palette,
+                              colorGroup);
 }
 
-void VGMTreeDisplayItem::paint(QPainter *painter, const QStyleOptionViewItem &option,
-                               const QModelIndex &index) const {
-  QStyleOptionViewItem paintopt = option;
-  initStyleOption(&paintopt, index);
+}  // namespace
 
-  QStyle *style = paintopt.widget ? paintopt.widget->style() : QApplication::style();
+void VGMTreeDisplayItem::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const {
+  QStyleOptionViewItem paintOption = option;
+  initStyleOption(&paintOption, index);
+  QStyle* style = paintOption.widget ? paintOption.widget->style() : QApplication::style();
 
-  QTextDocument backing_doc;
-  backing_doc.setHtml(paintopt.text);
+  QTextDocument document;
+  document.setHtml(paintOption.text);
   QAbstractTextDocumentLayout::PaintContext textContext;
-  textContext.palette = paintopt.palette;
-  if (paintopt.state.testFlag(QStyle::State_Selected)) {
-    const QColor textColor = selectedTreeTextColor(paintopt);
+  textContext.palette = paintOption.palette;
+  if (paintOption.state.testFlag(QStyle::State_Selected)) {
+    const QColor textColor = selectedTreeTextColor(paintOption);
     textContext.palette.setColor(QPalette::Text, textColor);
     textContext.palette.setColor(QPalette::WindowText, textColor);
     textContext.palette.setColor(QPalette::ButtonText, textColor);
     textContext.palette.setColor(QPalette::HighlightedText, textColor);
   }
 
-  // Paint the item's background
-  paintopt.text = QString{};
-  style->drawControl(QStyle::CE_ItemViewItem, &paintopt, painter, paintopt.widget);
-
-  QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &paintopt);
+  paintOption.text.clear();
+  style->drawControl(QStyle::CE_ItemViewItem, &paintOption, painter, paintOption.widget);
+  const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &paintOption);
   painter->save();
   painter->translate(textRect.topLeft());
   textContext.clip = textRect.translated(-textRect.topLeft());
-  backing_doc.documentLayout()->draw(painter, textContext);
-
+  document.documentLayout()->draw(painter, textContext);
   painter->restore();
 }
 
-QSize VGMTreeDisplayItem::sizeHint(const QStyleOptionViewItem &option,
-                                   const QModelIndex &index) const {
-  QStyleOptionViewItem style_opt = option;
-  initStyleOption(&style_opt, index);
-
-  QTextDocument backing_doc;
-  backing_doc.setHtml(style_opt.text);
-  backing_doc.setTextWidth(style_opt.rect.width());
-  return QSize(backing_doc.idealWidth(), backing_doc.size().height());
+QSize VGMTreeDisplayItem::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const {
+  QStyleOptionViewItem styleOption = option;
+  initStyleOption(&styleOption, index);
+  QTextDocument document;
+  document.setHtml(styleOption.text);
+  document.setTextWidth(styleOption.rect.width());
+  return QSize(document.idealWidth(), document.size().height());
 }
 
-
-// ***********************************
-// VGMFileTreeView
-// ***********************************
-
-/*
- * The following is not actually a proper view on the data,
- * but actually an entirely new tree.
- * As long as we need to support the legacy version, this is fine.
- */
-
-
-VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(parent) {
+VGMFileTreeView::VGMFileTreeView(const vgmtrans::ui::SourceInspectorModel& model, QWidget* parent)
+    : QTreeWidget(parent), model_(model) {
   setHeaderLabel("File structure");
-
-  // Load persistent settings
-  showDetails = Settings::the()->VGMFileTreeView.showDetails();
-
-  // Items to be added to the top level have their parent set at the vgmfile
-  m_items[file] = invisibleRootItem();
-  file->addToUI(nullptr, this);
+  showDetails_ = Settings::the()->VGMFileTreeView.showDetails();
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   horizontalScrollBar()->setEnabled(false);
-
-  VMGFileTreeHeaderView *headerView = new VMGFileTreeHeaderView(Qt::Horizontal, this, showDetails);
-  this->setHeader(headerView);
-
+  setHeader(new VMGFileTreeHeaderView(Qt::Horizontal, this, showDetails_));
   setItemDelegate(new VGMTreeDisplayItem(this));
-  QColor playbackColor = palette().color(QPalette::Accent);
-  m_playbackBrush = QBrush(playbackColor);
+  playbackBrush_ = QBrush(palette().color(QPalette::Accent));
 
-  connect(NotificationCenter::the(), &NotificationCenter::vgmfiletree_showDetailsChanged,
-          this, &VGMFileTreeView::onShowDetailsChanged);
+  appendChildren(invisibleRootItem(), model_.roots());
+  connect(Settings::the(), &Settings::vgmFileTreeShowDetailsChanged, this, &VGMFileTreeView::onShowDetailsChanged);
 }
 
-void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name) {
-  auto item_name = QString::fromStdString(name);
-  auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
-
-  setItemText(item, tree_item);
-
-  if (parent != parent_cached) {
-    parent_cached = parent;
-    parent_item_cached = m_items[parent];
+void VGMFileTreeView::appendChildren(QTreeWidgetItem* parent,
+                                     std::span<const vgmtrans::core::SourceAnnotationId> children) {
+  for (const auto id : children) {
+    const auto* annotation = model_.annotation(id);
+    if (annotation == nullptr) {
+      continue;
+    }
+    auto* item = new VGMTreeItem(id, annotation->range.offset);
+    setItemText(item);
+    item->setData(0, Qt::UserRole, id.value);
+    parent->addChild(item);
+    items_.emplace(id.value, item);
+    appendChildren(item, model_.children(id));
   }
-
-  int insertIndex = getSortedIndex(parent_item_cached, tree_item);
-  parent_item_cached->insertChild(insertIndex, tree_item);
-  m_items[item] = tree_item;
-  m_treeItemToVGMItem[tree_item] = item;
-  tree_item->setData(0, Qt::UserRole, QVariant::fromValue(static_cast<void*>(item)));
 }
 
-// Override the focusInEvent to prevent item selection upon focus
-void VGMFileTreeView::focusInEvent(QFocusEvent* event) {
-
+QTreeWidgetItem* VGMFileTreeView::treeItem(vgmtrans::core::SourceAnnotationId annotation) const {
+  const auto found = items_.find(annotation.value);
+  return found == items_.end() ? nullptr : found->second;
 }
 
-void VGMFileTreeView::currentChanged(const QModelIndex &current, const QModelIndex &previous) {
+vgmtrans::core::SourceAnnotationId VGMFileTreeView::annotationForItem(const QTreeWidgetItem* item) const {
+  if (item == nullptr || item->type() != VGMTreeItem::ItemType) {
+    return {};
+  }
+  return static_cast<const VGMTreeItem*>(item)->annotation();
+}
+
+void VGMFileTreeView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation) {
+  if (!annotation.valid()) {
+    setCurrentItem(nullptr);
+    clearSelection();
+    return;
+  }
+  setCurrentItem(treeItem(annotation));
+}
+
+void VGMFileTreeView::focusInEvent(QFocusEvent*) {
+  // Preserve the current selection when focus moves between the two inspector panes.
+}
+
+void VGMFileTreeView::currentChanged(const QModelIndex& current, const QModelIndex& previous) {
   QTreeView::currentChanged(current, previous);
-
   updateStatusBar();
   if (QApplication::keyboardModifiers().testFlag(HexViewInput::kModifier)) {
     seekToTreeItem(currentItem());
   }
 }
 
-void VGMFileTreeView::mousePressEvent(QMouseEvent *event) {
-  // Get the item at the current mouse position
-  QTreeWidgetItem *itemAtPoint = itemAt(event->pos());
-
+void VGMFileTreeView::mousePressEvent(QMouseEvent* event) {
+  QTreeWidgetItem* item = itemAt(event->pos());
   if (event->modifiers().testFlag(HexViewInput::kModifier)) {
-    seekToTreeItem(itemAtPoint, true);
+    seekToTreeItem(item, true);
     return;
   }
-
-  // If the item at the mouse position is already selected
-  if (itemAtPoint && itemAtPoint->isSelected()) {
+  if (item && item->isSelected()) {
     clearSelection();
     setCurrentItem(nullptr);
   } else {
@@ -223,36 +189,27 @@ void VGMFileTreeView::mousePressEvent(QMouseEvent *event) {
   }
 }
 
-void VGMFileTreeView::mouseDoubleClickEvent(QMouseEvent *event) {
-  QTreeWidgetItem *itemAtPoint = itemAt(event->pos());
-
-  // Check if the item is expandable/contractible
-  if (itemAtPoint && itemAtPoint->childCount() > 0) {
-    // If it's expandable, forward the event to the default behavior
+void VGMFileTreeView::mouseDoubleClickEvent(QMouseEvent* event) {
+  QTreeWidgetItem* item = itemAt(event->pos());
+  if (item && item->childCount() > 0) {
     QTreeWidget::mouseDoubleClickEvent(event);
   } else {
-    // If not, treat the second click like a normal mousePressEvent
     mousePressEvent(event);
   }
 }
 
-void VGMFileTreeView::keyPressEvent(QKeyEvent *event) {
+void VGMFileTreeView::keyPressEvent(QKeyEvent* event) {
   if (event->key() == Qt::Key_Left) {
-    QTreeWidgetItem *current = currentItem();
-
-    // If the item has a parent and is not expanded, move to the parent
+    QTreeWidgetItem* current = currentItem();
     if (current && current->parent() && !isExpanded(indexFromItem(current))) {
-      QTreeWidgetItem *parent = current->parent();
-      setCurrentItem(parent);
+      setCurrentItem(current->parent());
       return;
     }
   }
-
-  // Call base class keyPressEvent for other keys and unhandled cases
   QTreeWidget::keyPressEvent(event);
 }
 
-void VGMFileTreeView::mouseMoveEvent(QMouseEvent *event) {
+void VGMFileTreeView::mouseMoveEvent(QMouseEvent* event) {
   if ((event->buttons() & Qt::LeftButton) && event->modifiers().testFlag(HexViewInput::kModifier)) {
     seekToTreeItem(itemAt(event->pos()));
     return;
@@ -260,154 +217,70 @@ void VGMFileTreeView::mouseMoveEvent(QMouseEvent *event) {
   QTreeWidget::mouseMoveEvent(event);
 }
 
-// Update the status bar for the current selection
 void VGMFileTreeView::updateStatusBar() {
-  QTreeWidgetItem *treeItem = currentItem();
-  if (!treeItem) {
-    NotificationCenter::the()->updateStatusForItem(nullptr);
-    return;
-  }
-
-  VGMItem* vgmItem = m_treeItemToVGMItem[treeItem];
-  if (!vgmItem) {
-    NotificationCenter::the()->updateStatusForItem(nullptr);
-    return;
-  }
-
-  NotificationCenter::the()->updateStatusForItem(vgmItem);
+  emit statusAnnotationChanged(annotationForItem(currentItem()));
 }
 
-void VGMFileTreeView::setPlaybackItems(const std::vector<const VGMItem*>& items) {
+void VGMFileTreeView::setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations) {
   std::unordered_set<QTreeWidgetItem*> next;
-  next.reserve(items.size());
-  for (const auto* item : items) {
-    if (!item) {
-      continue;
-    }
-    auto it = m_items.find(item);
-    if (it == m_items.end()) {
-      continue;
-    }
-    if (it->second) {
-      next.insert(it->second);
+  next.reserve(annotations.size());
+  for (const auto id : annotations) {
+    if (auto* item = treeItem(id)) {
+      next.insert(item);
     }
   }
-
-  for (auto* treeItem : m_playbackTreeItems) {
-    if (!treeItem || next.find(treeItem) != next.end()) {
-      continue;
+  for (auto* item : playbackTreeItems_) {
+    if (item && !next.contains(item)) {
+      item->setBackground(0, QBrush());
     }
-    treeItem->setBackground(0, QBrush());
   }
-
-  for (auto* treeItem : next) {
-    if (!treeItem || m_playbackTreeItems.find(treeItem) != m_playbackTreeItems.end()) {
-      continue;
+  for (auto* item : next) {
+    if (item && !playbackTreeItems_.contains(item)) {
+      item->setBackground(0, playbackBrush_);
     }
-    treeItem->setBackground(0, m_playbackBrush);
   }
-
-  m_playbackTreeItems.swap(next);
+  playbackTreeItems_.swap(next);
 }
 
 void VGMFileTreeView::seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat) {
-  if (!item || (!allowRepeat && item == m_lastSeekItem)) {
+  if (item == nullptr || (!allowRepeat && item == lastSeekItem_)) {
     return;
   }
-  auto it = m_treeItemToVGMItem.find(item);
-  if (it == m_treeItemToVGMItem.end()) {
+  const auto annotation = annotationForItem(item);
+  if (!annotation.valid()) {
     return;
   }
-  QWidget* widget = parentWidget();
-  while (widget) {
-    if (auto* view = qobject_cast<VGMFileView*>(widget)) {
-      view->seekToEvent(it->second);
-      m_lastSeekItem = item;
-      return;
-    }
-    widget = widget->parentWidget();
-  }
+  emit seekToAnnotationRequested(annotation);
+  lastSeekItem_ = item;
 }
 
-// Find the index to insert a child item, sorted by offset, using binary search
-int VGMFileTreeView::getSortedIndex(const QTreeWidgetItem* parent, const VGMTreeItem* item) {
-  if (!parent || !item) {
-    return 0;
+void VGMFileTreeView::setItemText(VGMTreeItem* item) const {
+  const auto* annotation = model_.annotation(item->annotation());
+  if (annotation == nullptr) {
+    return;
   }
-
-  const auto newOffset = item->item_offset();
-  int left = 0;
-  int right = parent->childCount() - 1;
-
-  while (left <= right) {
-    int mid = left + (right - left) / 2;
-    const auto* child = parent->child(mid);
-    if (!child) {
-      return left;
-    }
-    const auto* childItem = static_cast<const VGMTreeItem*>(child);
-    const auto childOffset = childItem->item_offset();
-
-    if (childOffset == newOffset) {
-      return mid;
-    } else if (childOffset < newOffset) {
-      left = mid + 1;
-    } else {
-      right = mid - 1;
-    }
-  }
-  return left;
-}
-
-void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
-  auto name = QString::fromStdString(item->name());
-  if (showDetails) {
-    if (item->description().empty()) {
-      treeItem->setText(0, QString{"<b>%1</b><br>Offset: 0x%2 | Length: 0x%3"}
-                               .arg(name,
-                                    QString::number(item->offset(), 16),
-                                    QString::number(item->length(), 16)));
-    } else {
-      treeItem->setText(0, QString{"<b>%1</b><br>%2<br>Offset: 0x%3 | Length: 0x%4"}
-                               .arg(name,
-                                    QString::fromStdString(item->description()),
-                                    QString::number(item->offset(), 16),
-                                    QString::number(item->length(), 16)));
-    }
-  } else {
-    treeItem->setText(0, name);
-  }
-  treeItem->setIcon(0, iconForItemType(item->type));
-  treeItem->setToolTip(0, QString::fromStdString(item->description()));
+  item->setText(0, SourceInspectorPresentation::treeText(*annotation, showDetails_));
+  item->setIcon(0, SourceInspectorPresentation::icon(*annotation));
+  item->setToolTip(0, SourceInspectorPresentation::description(*annotation));
 }
 
 void VGMFileTreeView::onShowDetailsChanged(bool show) {
-  this->showDetails = show;
-
-  // We will update the text and icons of all items. We temporarily disable the model from emitting
-  // signals as this causes performance issues on MacOS and Windows due to unnecessary drawing
+  showDetails_ = show;
   model()->blockSignals(true);
   updateItemTextRecursively(invisibleRootItem());
   model()->blockSignals(false);
-
   doItemsLayout();
   scrollToItem(currentItem());
 }
 
 void VGMFileTreeView::updateItemTextRecursively(QTreeWidgetItem* item) {
-  if (!item) return;
-
-  // The invisibleRootItem() is a plain QTreeWidgetItem, not a VGMTreeItem.
-  if (item->type() == VGMTreeItem::ItemType) {
-    auto* vgmTreeItem = static_cast<VGMTreeItem*>(item);
-    auto it = m_treeItemToVGMItem.find(item);
-    if (it != m_treeItemToVGMItem.end() && it->second) {
-      setItemText(it->second, vgmTreeItem);
-    }
+  if (item == nullptr) {
+    return;
   }
-
-  // Recursively update children
-  for (int i = 0; i < item->childCount(); ++i) {
-    updateItemTextRecursively(item->child(i));
+  if (item->type() == VGMTreeItem::ItemType) {
+    setItemText(static_cast<VGMTreeItem*>(item));
+  }
+  for (int index = 0; index < item->childCount(); ++index) {
+    updateItemTextRecursively(item->child(index));
   }
 }

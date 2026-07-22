@@ -95,6 +95,8 @@ private:
 
   void openFile();
   void openFileInternal(const QString& filename);
+  void removeSelectedSources();
+  void removeSelectedAssets();
   void updateSelectionStatus(const QModelIndex& index,
                              SelectionStatusKind kind);
 

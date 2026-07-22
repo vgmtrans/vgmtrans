@@ -1,4 +1,6 @@
+set(QT_NO_PRIVATE_MODULE_WARNING ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
+find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
 message(STATUS "Using Qt: ${Qt6_VERSION}")
 
 if(NOT TARGET QWindowKit::Widgets)
@@ -33,11 +35,13 @@ vgmtrans_enable_project_warnings(vgmtransqtvalue)
 target_sources(vgmtransqtvalue
   PRIVATE
     application/WorkspaceController.cpp
+    models/SourceInspectorModel.cpp
     models/ValueModels.cpp
   PUBLIC
     FILE_SET HEADERS TYPE HEADERS
     FILES
       application/WorkspaceController.h
+      models/SourceInspectorModel.h
       models/ValueModels.h
 )
 set_target_properties(vgmtransqtvalue PROPERTIES AUTOMOC ON)
@@ -64,6 +68,7 @@ target_sources(vgmtrans
     util/UIHelpers.cpp
     widgets/EmptyStateWidget.cpp
     widgets/ItemViewDensity.cpp
+    widgets/SnappingSplitter.cpp
     widgets/SeekBar.cpp
     widgets/StatusBarContent.cpp
     widgets/TableView.cpp
@@ -75,6 +80,14 @@ target_sources(vgmtrans
     widgets/WindowBar.cpp
     workarea/CollectionListView.cpp
     workarea/MdiArea.cpp
+    workarea/SourceInspectorPresentation.cpp
+    workarea/VGMFileTreeView.cpp
+    workarea/VGMFileView.cpp
+    workarea/hexview/HexView.cpp
+    workarea/hexview/HexViewRhiHost.cpp
+    workarea/hexview/HexViewRhiRenderer.cpp
+    workarea/hexview/HexViewRhiWidget.cpp
+    workarea/hexview/HexViewRhiWindow.cpp
   PRIVATE
     FILE_SET HEADERS TYPE HEADERS
     FILES
@@ -91,12 +104,15 @@ target_sources(vgmtrans
       util/ExternalUrl.h
       util/Colors.h
       util/InstructionHintLayout.h
+      util/LambdaEventFilter.h
       util/Metrics.h
+      util/NonTransientScrollBarStyle.h
       util/TintableSvgIconEngine.h
       util/UIHelpers.h
       widgets/EmptyStateWidget.h
       widgets/FixedHeightListDelegate.h
       widgets/ItemViewDensity.h
+      widgets/SnappingSplitter.h
       widgets/SeekBar.h
       widgets/StatusBarContent.h
       widgets/TableView.h
@@ -108,6 +124,21 @@ target_sources(vgmtrans
       widgets/WindowBar.h
       workarea/CollectionListView.h
       workarea/MdiArea.h
+      workarea/SourceInspectorPresentation.h
+      workarea/SplitterSnapProvider.h
+      workarea/VGMFileTreeView.h
+      workarea/VGMFileView.h
+      workarea/hexview/HexView.h
+      workarea/hexview/HexViewFrameData.h
+      workarea/hexview/HexViewInput.h
+      workarea/hexview/HexViewRhiEventForwarder.h
+      workarea/hexview/HexViewRhiHost.h
+      workarea/hexview/HexViewRhiInputCoalescer.h
+      workarea/hexview/HexViewRhiRenderer.h
+      workarea/hexview/HexViewRhiWidget.h
+      workarea/hexview/HexViewRhiWindow.h
+      workarea/rhi/RhiWindowDragDropEvents.h
+      workarea/rhi/RhiWindowMainWindowLocator.h
 )
 target_compile_features(vgmtrans PRIVATE cxx_std_20)
 target_include_directories(vgmtrans PRIVATE
@@ -116,7 +147,7 @@ target_include_directories(vgmtrans PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/widgets
   ${CMAKE_CURRENT_LIST_DIR}/workarea)
 target_link_libraries(vgmtrans PRIVATE vgmtransqtvalue vgmtransversion
-                      QWindowKit::Widgets Qt6::Widgets Qt6::Svg)
+                      QWindowKit::Widgets Qt6::Widgets Qt6::GuiPrivate Qt6::Svg)
 set_target_properties(vgmtrans PROPERTIES AUTOMOC ON)
 
 if(APPLE)
@@ -152,23 +183,6 @@ set(VGMTRANS_UI_VALUE_PORT_REFERENCE_SOURCES
   workarea/VGMCollView.h
   workarea/VGMFileListView.cpp
   workarea/VGMFileListView.h
-  workarea/VGMFileTreeView.cpp
-  workarea/VGMFileTreeView.h
-  workarea/VGMFileView.cpp
-  workarea/VGMFileView.h
-  workarea/hexview/HexView.cpp
-  workarea/hexview/HexView.h
-  workarea/hexview/HexViewFrameData.h
-  workarea/hexview/HexViewRhiEventForwarder.h
-  workarea/hexview/HexViewRhiHost.cpp
-  workarea/hexview/HexViewRhiHost.h
-  workarea/hexview/HexViewRhiInputCoalescer.h
-  workarea/hexview/HexViewRhiRenderer.cpp
-  workarea/hexview/HexViewRhiRenderer.h
-  workarea/hexview/HexViewRhiWidget.cpp
-  workarea/hexview/HexViewRhiWidget.h
-  workarea/hexview/HexViewRhiWindow.cpp
-  workarea/hexview/HexViewRhiWindow.h
 )
 add_custom_target(vgmtrans-ui-value-port-reference
   SOURCES ${VGMTRANS_UI_VALUE_PORT_REFERENCE_SOURCES})
@@ -185,8 +199,8 @@ set(VGMTRANS_HEX_VIEW_SHADER_SOURCES
   workarea/hexview/shaders/hexedge_effect.frag
   workarea/hexview/shaders/hexcomposite.frag)
 
-# Call this when the value-native inspector target is ready. Keeping the shader
-# recipe here avoids having to reconstruct its resource paths during that port.
+# Keep the HexView shader bundle attached through one helper so other UI test or
+# preview targets can opt into the same renderer resources later.
 function(vgmtrans_add_hex_view_shaders target)
   find_package(Qt6 REQUIRED COMPONENTS ShaderTools)
   target_compile_definitions(${target} PRIVATE VGMTRANS_VALUE_HEX_VIEW)
@@ -196,6 +210,8 @@ function(vgmtrans_add_hex_view_shaders target)
     BASE "workarea/hexview/shaders"
     FILES ${VGMTRANS_HEX_VIEW_SHADER_SOURCES})
 endfunction()
+
+vgmtrans_add_hex_view_shaders(vgmtrans)
 
 if(Qt6DBus_FOUND)
   target_link_libraries(vgmtrans PRIVATE Qt6::DBus)

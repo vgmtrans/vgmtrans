@@ -437,15 +437,12 @@ SequenceProgram parseNdsSequenceProgram(ByteReader reader, AssetId id, NdsSequen
   const u32 sequenceOffset = range.offset;
   SequenceProgram program = dialect.makeProgram(Address{sequenceOffset + kSseqHeaderSize});
 
-  std::optional<SourceAnnotationId> headerAnnotation;
   if (sourceMap != nullptr && reader.has(sequenceOffset, kSseqHeaderSize)) {
-    headerAnnotation =
-        sourceMap->header("SSEQ Header", reader.range(sequenceOffset, kSseqHeaderSize))
-            .kind("sseq-header")
-            .owner(ObjectRefs::sequence(id))
-            .field("data_offset", reader.range(sequenceOffset + kSseqDataOffsetField, 4),
-                   sequenceOffset + reader.le32(sequenceOffset + kSseqDataOffsetField), SourceValueDisplay::Address)
-            .id();
+    sourceMap->header("SSEQ Header", reader.range(sequenceOffset, kSseqHeaderSize))
+        .kind("sseq-header")
+        .owner(ObjectRefs::sequence(id))
+        .field("data_offset", reader.range(sequenceOffset + kSseqDataOffsetField, 4),
+               sequenceOffset + reader.le32(sequenceOffset + kSseqDataOffsetField), SourceValueDisplay::Address);
   }
 
   const SequenceDecodeContext context{
@@ -455,7 +452,6 @@ SequenceProgram parseNdsSequenceProgram(ByteReader reader, AssetId id, NdsSequen
               .bytecodeEnd = range.sequenceEnd,
               .maxCommands = kMaxTrackCommands,
               .sequenceAsset = id,
-              .parentAnnotation = headerAnnotation,
               .sourceMap = sourceMap,
           },
       .range = range,

@@ -94,6 +94,27 @@ size_t WorkspaceController::removeSources(std::span<const core::SourceId> source
   return removed;
 }
 
+size_t WorkspaceController::removeAssets(std::span<const core::AssetId> assets) {
+  std::unordered_set<u32> selected;
+  selected.reserve(assets.size());
+  for (const auto id : assets) {
+    if (id.valid() && snapshot_.asset(id) != nullptr) {
+      selected.insert(id.value);
+    }
+  }
+  if (selected.empty()) {
+    return 0;
+  }
+
+  std::vector<core::AssetId> existing;
+  existing.reserve(selected.size());
+  for (const u32 value : selected) {
+    existing.push_back(core::AssetId{value});
+  }
+  publish(session_.removeAssets(existing));
+  return existing.size();
+}
+
 std::vector<core::Artifact> WorkspaceController::exportCollection(core::CollectionId id,
                                                                   const core::ExportRequest& request) const {
   return session_.exportCollection(id, request);
