@@ -307,7 +307,6 @@ void MdiArea::newView(vgmtrans::core::AssetId asset) {
     return;
   }
   auto* inspector = new VGMFileView(std::move(inspection));
-  inspector->setWindowIcon(assetIcon(*value));
   inspector->setSeekModifierActive(m_seekModifierActive);
   if (asset == m_playbackSequence) {
     inspector->setPlaybackTimeline(m_playbackSpans);
@@ -316,6 +315,7 @@ void MdiArea::newView(vgmtrans::core::AssetId asset) {
   }
   const QString name = inspector->windowTitle();
   QMdiSubWindow* window = addSubWindow(inspector, Qt::SubWindow);
+  window->setWindowIcon(assetIcon(*value));
   assetToWindowMap.emplace(asset.value, InspectorWindow{.window = window, .content = inspector});
   windowToAssetMap.emplace(window, asset.value);
   connect(inspector, &VGMFileView::statusChanged, this,
