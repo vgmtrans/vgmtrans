@@ -542,13 +542,15 @@ void akaoScanPreparesInstrumentSetWithoutProvisionalAsset() {
   const SourceAnnotation& sequenceHeader = project.sourceMap().get(*header);
   expect(sequenceHeader.owner == ObjectRefs::sequence(sequenceId),
          "Akao sequence header annotation should point at the semantic sequence asset");
-  const auto trackAnnotations = project.sourceMap().childrenOf(sequenceHeader.id);
-  expect(!trackAnnotations.empty(), "Akao sequence header should parent decoded track annotations");
+  const auto trackAnnotations = project.sourceMap().withRole(SourceId{0}, SourceRole::SequenceTrack);
+  expect(!trackAnnotations.empty(), "Akao source map should expose decoded track annotations");
   const auto trackAnnotation = std::ranges::find_if(trackAnnotations, [&](SourceAnnotationId id) {
     return project.sourceMap().get(id).owner == ObjectRefs::sequenceTrack(sequenceId, 0);
   });
   expect(trackAnnotation != trackAnnotations.end(),
          "Akao track annotation should point at the semantic sequence track");
+  expect(!project.sourceMap().get(*trackAnnotation).parent,
+         "Akao track annotation should be a sibling of the sequence header");
   const auto* instrumentLayout =
       annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::InstrumentSet, "akao-instrument-layout");
   expect(instrumentLayout != nullptr && instrumentLayout->range.offset == melodicRegionOffset &&

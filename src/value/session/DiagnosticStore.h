@@ -10,6 +10,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -23,6 +24,8 @@ public:
 
   void addError(std::string message, std::optional<SourceRange> range = std::nullopt);
   void append(std::vector<Diagnostic> diagnostics);
+  void removeForAssetsAndAnnotations(const std::unordered_set<u32>& assetIds,
+                                     const std::unordered_set<u32>& annotationIds);
   void removeForSources(const std::vector<SourceId>& sources);
 
 private:

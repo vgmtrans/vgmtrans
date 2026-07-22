@@ -10,6 +10,7 @@
 #include "value/scan/ScanTypes.h"
 
 #include <string>
+#include <span>
 #include <variant>
 #include <unordered_map>
 #include <unordered_set>
@@ -33,6 +34,7 @@ public:
   }
 
   void append(std::vector<Asset> assets, SourceId owner);
+  [[nodiscard]] std::unordered_set<u32> remove(std::span<const AssetId> assets);
   [[nodiscard]] std::unordered_set<u32> removeForSources(const std::vector<SourceId>& sources);
 
 private:

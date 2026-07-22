@@ -216,10 +216,10 @@ SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceDi
     return;
   }
 
-  tracks_.parentAnnotation = tracks_.sourceMap->header("Sequence Header", headerRange)
-                                 .kind(sourceKindPrefix_ + "-sequence-header")
-                                 .owner(ObjectRefs::sequence(sequenceAsset))
-                                 .id();
+  headerAnnotation_ = tracks_.sourceMap->header("Sequence Header", headerRange)
+                          .kind(sourceKindPrefix_ + "-sequence-header")
+                          .owner(ObjectRefs::sequence(sequenceAsset))
+                          .id();
 }
 
 void SequenceDecodeSession::annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset,
@@ -238,7 +238,9 @@ void SequenceDecodeSession::annotateTrackPointer(u32 trackIndex, SourceRange poi
   } else {
     pointer.field("destination", pointerRange, startOffset, SourceValueDisplay::Address);
   }
-  pointer.parent(*tracks_.parentAnnotation);
+  if (headerAnnotation_) {
+    pointer.parent(*headerAnnotation_);
+  }
 }
 
 }  // namespace vgmtrans::core

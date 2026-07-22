@@ -251,8 +251,9 @@ void MenuBar::appendContextualCommands(Context context) {
   const QStringList file{tr("File")};
   if (context == Context::Source) {
     addAction(convert, tr("Save as Original Format"), false, {});
-    addAction(file, tr("Close"), true, {Qt::Key_Backspace, Qt::Key_Delete},
-              [this] { emit closeSelectedSources(); });
+    QAction* close = addAction(file, tr("Close"), true, {Qt::Key_Backspace, Qt::Key_Delete},
+                               [this] { emit closeSelectedSources(); });
+    close->setShortcutContext(Qt::WidgetShortcut);
     return;
   }
 
@@ -284,7 +285,9 @@ void MenuBar::appendContextualCommands(Context context) {
 
   addAction(file, tr("Open Analysis"), true, {Qt::Key_Return},
             [this] { emit openSelectedAsset(); });
-  addAction(file, tr("Remove"), false, {Qt::Key_Backspace, Qt::Key_Delete});
+  QAction* remove = addAction(file, tr("Remove"), true, {Qt::Key_Backspace, Qt::Key_Delete},
+                              [this] { emit removeSelectedAssets(); });
+  remove->setShortcutContext(Qt::WidgetShortcut);
 }
 
 void MenuBar::clearContextualMenus() {

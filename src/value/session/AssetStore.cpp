@@ -56,6 +56,26 @@ void AssetStore::append(std::vector<Asset> assets, SourceId owner) {
   }
 }
 
+std::unordered_set<u32> AssetStore::remove(std::span<const AssetId> assets) {
+  std::unordered_set<u32> removedAssetIds;
+  removedAssetIds.reserve(assets.size());
+  for (const AssetId id : assets) {
+    if (contains(id)) {
+      removedAssetIds.insert(id.value);
+    }
+  }
+
+  std::erase_if(assets_, [&](const Asset& asset) {
+    const AssetId id = metadata(asset).id;
+    return id.valid() && removedAssetIds.contains(id.value);
+  });
+  for (const u32 id : removedAssetIds) {
+    sourceOwners_.erase(id);
+  }
+  rebuildIndex();
+  return removedAssetIds;
+}
+
 std::unordered_set<u32> AssetStore::removeForSources(const std::vector<SourceId>& sources) {
   const auto sourceIds = makeSourceIdSet(sources);
   std::unordered_set<u32> removedAssetIds;

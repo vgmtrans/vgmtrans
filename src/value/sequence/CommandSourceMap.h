@@ -93,9 +93,9 @@ struct TrackDecodeScope {
   }
 };
 
-// Owns the generic sequence -> track-pointer/track -> command annotation
-// lifecycle. Formats still read their own headers and pass each decoded track
-// start explicitly, so binary-layout rules remain visible in format code.
+// Owns the generic sequence-header/track-pointer and track -> command
+// annotation lifecycle. Headers and tracks are siblings; pointer fields remain
+// under the header that encodes them.
 class SequenceDecodeSession {
 public:
   // maxTrackCommands is a safety cap for damaged control flow. Formats with
@@ -118,7 +118,7 @@ public:
     program_.tracks.push_back(tracks_.reachable(trackIndex, startOffset, std::move(decodeCommand)));
   }
 
-  [[nodiscard]] std::optional<SourceAnnotationId> headerAnnotation() const noexcept { return tracks_.parentAnnotation; }
+  [[nodiscard]] std::optional<SourceAnnotationId> headerAnnotation() const noexcept { return headerAnnotation_; }
 
   [[nodiscard]] SequenceProgram finish() { return std::move(program_); }
 
@@ -127,6 +127,7 @@ private:
                             std::optional<u64> encodedStartOffset);
 
   TrackDecodeScope tracks_;
+  std::optional<SourceAnnotationId> headerAnnotation_;
   SequenceProgram program_;
   std::string sourceKindPrefix_;
 };

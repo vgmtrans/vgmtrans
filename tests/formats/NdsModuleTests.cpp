@@ -454,7 +454,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   const auto trackAnnotations = programAnnotations.withRole(SourceId{4}, SourceRole::SequenceTrack);
   expect(trackAnnotations.size() == 1, "NDS sequence parse should publish a track annotation");
   const SourceAnnotation& trackAnnotation = programAnnotations.get(trackAnnotations.front());
-  expect(trackAnnotation.parent == sseqHeader->id, "NDS track annotation should be parented under the SSEQ header");
+  expect(!trackAnnotation.parent, "NDS track annotation should be a sibling of the SSEQ header");
   expect(trackAnnotation.owner == ObjectRefs::sequenceTrack(AssetId{7}, 0),
          "NDS track annotation should point at the semantic sequence track");
   expect(trackAnnotation.range.offset == trackStart && trackAnnotation.range.size == 4,

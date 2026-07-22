@@ -6,15 +6,19 @@
 
 #pragma once
 
+#include "PlaybackPosition.h"
 #include "value/base/CoreTypes.h"
 
 #include <unordered_map>
 
 #include <QMdiArea>
 #include <QMdiSubWindow>
+#include <QIcon>
+#include <QPointer>
 
 class QEvent;
 class QPaintEvent;
+class VGMFileView;
 
 namespace vgmtrans::ui {
 class WorkspaceController;
@@ -42,19 +46,36 @@ public:
   void workspaceChanged();
   void selectAsset(vgmtrans::core::AssetId asset, QWidget* caller);
 
+public slots:
+  void increaseActiveHexFont();
+  void decreaseActiveHexFont();
+  void resetActiveHexFont();
+  void setSeekModifierActive(bool active);
+
 signals:
   void assetSelected(vgmtrans::core::AssetId asset, QWidget* caller);
+  void hexViewAvailableChanged(bool available);
+  void inspectorStatusChanged(const QString& name, const QString& description,
+                              const QIcon& icon, int offset, int size);
+  void playbackSeekRequested(int position, PositionChangeOrigin origin);
 
 protected:
   void changeEvent(QEvent *event) override;
   void paintEvent(QPaintEvent *event) override;
 
 private:
+  struct InspectorWindow {
+    QPointer<QMdiSubWindow> window;
+    QPointer<QWidget> content;
+  };
+
   MdiArea(QWidget *parent = nullptr);
   void updateBackgroundColor();
   void onSubWindowActivated(QMdiSubWindow *window);
+  [[nodiscard]] VGMFileView* activeFileView() const;
   static void ensureMaximizedSubWindow(QMdiSubWindow *window);
   vgmtrans::ui::WorkspaceController* m_workspace{};
-  std::unordered_map<u32, QMdiSubWindow *> assetToWindowMap;
+  bool m_seekModifierActive = false;
+  std::unordered_map<u32, InspectorWindow> assetToWindowMap;
   std::unordered_map<QMdiSubWindow *, u32> windowToAssetMap;
 };

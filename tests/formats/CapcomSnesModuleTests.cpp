@@ -455,8 +455,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       trackPointers, [&](SourceAnnotationId id) { return sourceMap.get(id).localKind == "capcom-snes-track-pointer"; });
   expect(trackPointer != nullptr && trackPointer->range.size == 2 && capcomTrackPointerCount == 8,
          "CapcomSnes scan should annotate track pointer fields");
-  expect(trackPointer->parent == sequenceHeader->id && firstTrackAnnotation.parent == sequenceHeader->id,
-         "track pointers and tracks should be siblings under the sequence header");
+  expect(trackPointer->parent == sequenceHeader->id && !firstTrackAnnotation.parent,
+         "track pointers should remain under the header while tracks are header siblings");
   expect(trackPointer->owner == firstTrackAnnotation.owner,
          "track pointer annotations should identify the semantic track they reference");
   const auto* instrumentTable =

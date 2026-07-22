@@ -6,13 +6,14 @@
 
 #pragma once
 
-#include "base/Types.h"
 #include "HexViewFrameData.h"
+#include "value/base/CoreTypes.h"
 #include "workarea/SplitterSnapProvider.h"
 
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -28,9 +29,13 @@
 
 class QParallelAnimationGroup;
 class QWidget;
-class VGMFile;
-class VGMItem;
 class HexViewRhiHost;
+namespace vgmtrans::ui {
+class SourceInspectorModel;
+}
+namespace vgmtrans::core {
+struct SourceAnnotation;
+}
 
 static constexpr int OUTLINE_FADE_DURATION_MS = 150;
 
@@ -42,15 +47,20 @@ class HexView final : public QAbstractScrollArea, public SplitterSnapProvider {
   Q_PROPERTY(qreal shadowStrength READ shadowStrength WRITE setShadowStrength)
 
 public:
-  explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
+  explicit HexView(const vgmtrans::ui::SourceInspectorModel& model,
+                   QWidget* parent = nullptr);
   ~HexView() override;
   [[nodiscard]] static QFont defaultViewFont();
-  void setSelectedItem(VGMItem* item);
-  void setSelectedItems(const std::vector<const VGMItem*>& items, const VGMItem* primaryItem = nullptr);
-  void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items,
-                                     const std::vector<QColor>& glowColors = {});
+  void setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation);
+  void setSelectedAnnotations(
+      const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
+      vgmtrans::core::SourceAnnotationId primaryAnnotation = {});
+  void setPlaybackSelectionsForAnnotations(
+      const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
+      const std::vector<QColor>& glowColors = {});
   void clearPlaybackSelections(bool fade = true);
   void setPlaybackActive(bool active);
+  void setSeekModifierActive(bool active);
   void requestPlaybackFrame();
   int scrollYForRender() const;
   void setFont(const QFont& font);
@@ -70,9 +80,10 @@ public:
   void handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods);
 
 signals:
-  void selectionChanged(VGMItem* item);
-  void seekToEventRequested(VGMItem* item);
-  void notePreviewRequested(VGMItem* item, bool includeActiveNotesAtTick);
+  void selectionChanged(vgmtrans::core::SourceAnnotationId annotation);
+  void seekToEventRequested(vgmtrans::core::SourceAnnotationId annotation);
+  void notePreviewRequested(vgmtrans::core::SourceAnnotationId annotation,
+                            bool includeActiveNotesAtTick);
   void notePreviewStopped();
 
 protected:
@@ -116,8 +127,8 @@ private:
   int getVirtualHeight() const;
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
-  void handleSelectionPress(int offset, VGMItem* item);
-  void handleSeekPress(VGMItem* item, const QPoint& pos);
+  void handleSelectionPress(int offset, vgmtrans::core::SourceAnnotationId annotation);
+  void handleSeekPress(vgmtrans::core::SourceAnnotationId annotation, const QPoint& pos);
   void handleSelectionDrag(int offset);
   void handleSeekScrubDrag(int offset);
   void requestRhiUpdate(bool markBaseDirty = false,
@@ -145,18 +156,23 @@ private:
   void ensurePlaybackFadeTimer();
   qint64 playbackNowMs();
   void updateHighlightState(bool animateSelection);
-  void showTooltip(VGMItem* item, const QPoint& pos);
+  void showTooltip(vgmtrans::core::SourceAnnotationId annotation, const QPoint& pos);
   void hideTooltip();
   void stopNotePreview();
+  [[nodiscard]] const vgmtrans::core::SourceAnnotation* annotation(
+      vgmtrans::core::SourceAnnotationId id) const;
+  [[nodiscard]] vgmtrans::core::SourceAnnotationId annotationAt(u32 offset) const;
+  [[nodiscard]] std::optional<SelectionRange> visibleRange(
+      const vgmtrans::core::SourceAnnotation& annotation) const;
 
-  VGMFile* m_vgmfile = nullptr;
+  const vgmtrans::ui::SourceInspectorModel* m_model = nullptr;
   // Interaction state.
-  VGMItem* m_selectedItem = nullptr;
+  vgmtrans::core::SourceAnnotationId m_selectedAnnotation;
   u32 m_selectedOffset = 0;
   bool m_isDragging = false;
   bool m_seekModifierActive = false;
-  VGMItem* m_tooltipItem = nullptr;
-  VGMItem* m_lastSeekItem = nullptr;
+  vgmtrans::core::SourceAnnotationId m_tooltipAnnotation;
+  vgmtrans::core::SourceAnnotationId m_lastSeekAnnotation;
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
   std::vector<PlaybackSelection> m_playbackSelections;
@@ -173,7 +189,8 @@ private:
   std::vector<Style> m_styles;
   // Style id for each byte in the current file data; each entry indexes into m_styles.
   std::vector<u16> m_styleIds;
-  std::unordered_map<int, u16> m_typeToStyleId;
+  std::vector<u16> m_itemIds;
+  std::unordered_map<int, u16> m_roleToStyleId;
 
   QParallelAnimationGroup* m_selectionAnimation = nullptr;
   qreal m_overlayOpacity = 0.0;

@@ -209,6 +209,32 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
   expect(project.sources()[0].id == replacement, "replacement user source should keep its new stable id");
 }
 
+void sessionRemovesIndividualAssetsWithoutClosingTheirSource() {
+  Session session;
+  session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
+
+  const SourceId source = session.addSource(SourceFile{.name = "remove-asset.probe"}, {0xab});
+  SessionSnapshot project = session.scanSource(source);
+  expect(project.assets().size() == 1 && project.collections().size() == 1,
+         "individual asset removal fixture should publish one asset and collection");
+  expect(!project.sourceMap().empty(), "individual asset removal fixture should publish source annotations");
+  const AssetId asset = metadata(project.assets().front()).id;
+
+  const std::array assets{asset};
+  project = session.removeAssets(assets);
+  expect(project.sources().size() == 1 && project.source(source) != nullptr,
+         "removing a detected asset should leave its scanned source loaded");
+  expect(project.assets().empty(), "removed detected asset should disappear from the snapshot");
+  expect(project.collections().empty(), "collections depending on a removed asset should be reconciled");
+  expect(project.sourceMap().empty(), "owned source annotations should be removed with their detected asset");
+
+  project = session.removeAssets(assets);
+  expect(project.sources().size() == 1 && project.assets().empty(),
+         "removing an already removed asset should leave the session unchanged");
+  project = session.scanPendingSources();
+  expect(project.assets().empty(), "a removed asset should stay removed while its source remains scanned");
+}
+
 void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   Session session;
   session.registerFormat(probeBankSequenceModule(), probeSequenceDialect());
@@ -1025,6 +1051,7 @@ void runValueSessionTests() {
   sessionKeepsScannerKnownCollectionsWithoutResolver();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
   sessionRemovesSourceFamilyAndDiscoveredData();
+  sessionRemovesIndividualAssetsWithoutClosingTheirSource();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();
   sessionResolverFailureDoesNotWipeExistingCollections();
   sessionMarksCollectionsStaleWhenRemovalCannotReconcile();

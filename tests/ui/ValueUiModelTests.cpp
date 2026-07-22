@@ -5,6 +5,7 @@
  */
 
 #include "application/WorkspaceController.h"
+#include "models/SourceInspectorModel.h"
 #include "models/ValueModels.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
@@ -35,8 +36,16 @@ ScanResult scanUiProbe(const ScanInput& input) {
     return result.finish();
   }
 
-  const SourceRange wholeSource = input.reader.range(0, input.reader.size());
-  const auto misc = result.misc("Probe asset", wholeSource).payload({0x01, 0x02});
+  // Like several sequence formats, metadata identifies only a header while the
+  // owned annotation graph describes the full decoded source extent.
+  const auto misc = result.misc("Probe asset", input.reader.range(0, 1)).payload({0x01, 0x02});
+  const auto section =
+      result.sourceMap().section("Probe section", input.reader.range(0, 1)).owner(ObjectRefs::asset(misc.id));
+  result.sourceMap()
+      .annotation(SourceRole::Field, "Magic", input.reader.range(0, 1))
+      .parent(section.id())
+      .field("value", input.reader.range(0, 1), 0x7f, SourceValueDisplay::Hex);
+  result.sourceMap().annotation(SourceRole::Payload, "Payload", input.reader.range(1, 2)).parent(section.id());
   result.sourceCollection("Probe collection").misc(misc);
   result.warning("Probe warning", input.reader.range(0, 1));
   return result.finish();
@@ -78,11 +87,9 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(assets.rowCount() == 1, "asset model should publish the scanned asset");
   expect(collections.rowCount() == 1, "collection model should publish the resolved collection");
   collectionFilter.setFilterFixedString(QStringLiteral("Probe collection"));
-  expect(collectionFilter.rowCount() == 1,
-         "collection filtering should retain matching collections");
+  expect(collectionFilter.rowCount() == 1, "collection filtering should retain matching collections");
   collectionFilter.setFilterFixedString(QStringLiteral("no such collection"));
-  expect(collectionFilter.rowCount() == 0,
-         "collection filtering should hide non-matching collections");
+  expect(collectionFilter.rowCount() == 0, "collection filtering should hide non-matching collections");
   collectionFilter.setFilterFixedString({});
   expect(diagnostics.rowCount() == 1, "diagnostic model should publish scan diagnostics");
   expect(sources.index(0, 0).data(IdRole).toUInt() == 0, "source model should expose its stable id");
@@ -91,15 +98,42 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
 
   const auto collectionId = CollectionId{collections.index(0, 0).data(IdRole).toUInt()};
   contents.setCollection(collectionId);
-  expect(contents.rowCount() == 2,
-         "collection contents should expose the collection root and resolve its member ids");
+  expect(contents.rowCount() == 2, "collection contents should expose the collection root and resolve its member ids");
   expect(workspace.sourceBytes(SourceId{0}).size() == 3, "workspace should expose source bytes for later inspectors");
+
+  const AssetId assetId{assets.index(0, 0).data(IdRole).toUInt()};
+  SourceInspectorModel inspector(workspace, assetId);
+  expect(inspector.valid(), "source inspector should resolve a value asset and its source bytes");
+  expect(inspector.bytes().size() == 3 && inspector.bytes()[0] == 0x7f,
+         "source inspector should expand a header-only asset range across its owned annotations");
+  expect(inspector.roots().size() == 1, "source inspector should preserve the source annotation hierarchy");
+  expect(inspector.children(inspector.roots().front()).size() == 2,
+         "source inspector should expose child annotations to both panes");
+  const auto magic = inspector.annotationAt(0);
+  const auto payload = inspector.annotationAt(1);
+  expect(magic && inspector.annotation(*magic)->label == "Magic",
+         "source inspector hit testing should prefer the most specific annotation");
+  expect(payload && inspector.annotation(*payload)->label == "Payload",
+         "source inspector hit testing should follow byte ranges");
+
+  const std::array assetIds{assetId};
+  expect(workspace.removeAssets(assetIds) == 1, "workspace should remove selected detected assets");
+  expect(sources.rowCount() == 1, "removing a detected asset should retain its scanned source");
+  expect(assets.rowCount() == 0 && collections.rowCount() == 0 && contents.rowCount() == 0,
+         "removing a detected asset should update asset and collection models together");
+  expect(workspace.snapshot().sourceMap().empty(),
+         "removing a detected asset should remove its owned source annotation tree");
+  expect(workspace.removeAssets(assetIds) == 0, "removing an already removed asset should be a no-op");
+  expect(inspector.bytes().size() == 3 && inspector.annotation(*magic) != nullptr,
+         "an open inspector projection should remain valid until its tab closes");
 
   const std::array sourceId{SourceId{0}};
   expect(workspace.removeSources(sourceId) == 1, "workspace should remove the selected source family");
   expect(sources.rowCount() == 0 && assets.rowCount() == 0 && collections.rowCount() == 0 &&
              diagnostics.rowCount() == 0 && contents.rowCount() == 0,
          "all models should reset to the new immutable snapshot after removal");
+  expect(inspector.bytes().size() == 3 && inspector.annotation(*magic) != nullptr,
+         "an open inspector projection should not retain pointers into a replaced snapshot");
 }
 
 }  // namespace

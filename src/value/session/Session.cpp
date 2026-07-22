@@ -109,6 +109,23 @@ SessionSnapshot Session::removeSource(SourceId id) {
   return snapshot();
 }
 
+SessionSnapshot Session::removeAssets(std::span<const AssetId> assets) {
+  sealRegistries();
+  const auto removedAssetIds = assets_.remove(assets);
+  if (removedAssetIds.empty()) {
+    return snapshot();
+  }
+
+  const std::vector<SourceId> noSources;
+  matchFacts_.removeForSourcesAndAssets(noSources, removedAssetIds);
+  explicitCollections_.removeForSourcesAndAssets(noSources, removedAssetIds);
+  const auto removedAnnotations = sourceMaps_.removeForAssets(removedAssetIds);
+  diagnostics_.removeForAssetsAndAnnotations(removedAssetIds, removedAnnotations);
+  collections_.markStaleForAssets(removedAssetIds);
+  rebuildCollections();
+  return snapshot();
+}
+
 // Scan this source if it has not been scanned yet. Any files extracted from it are
 // added as derived sources and scanned before this call returns.
 SessionSnapshot Session::scanSource(SourceId id) {

@@ -6,13 +6,11 @@
 
 #include "HexView.h"
 
-#include "base/Types.h"
-#include "Helpers.h"
 #include "HexViewInput.h"
 #include "HexViewRhiHost.h"
-#include "services/NotificationCenter.h"
+#include "models/SourceInspectorModel.h"
 #include "util/NonTransientScrollBarStyle.h"
-#include "VGMFile.h"
+#include "workarea/SourceInspectorPresentation.h"
 
 #include <algorithm>
 #include <cmath>
@@ -21,10 +19,8 @@
 #include <unordered_set>
 
 #include <QApplication>
-#include <QBuffer>
 #include <QCursor>
 #include <QFontMetricsF>
-#include <QHash>
 #include <QHelpEvent>
 #include <QImage>
 #include <QKeyEvent>
@@ -97,51 +93,6 @@ WidgetLayoutMetrics computeWidgetLayoutMetrics(const QWidget* widget, int charWi
       layout.hexEndPx + (HEX_TO_ASCII_SPACING_CHARS * layout.charWidthPx) + charHalfWidthPx;
   layout.asciiEndPx = layout.asciiStartPx + (BYTES_PER_LINE * layout.charWidthPx);
   return layout;
-}
-
-QString tooltipIconDataUrl(VGMItem::Type type) {
-  static QHash<int, QString> cache;
-  const int key = static_cast<int>(type);
-  auto it = cache.find(key);
-  if (it != cache.end()) {
-    return it.value();
-  }
-  const QIcon& icon = iconForItemType(type);
-  const QPixmap pixmap = icon.pixmap(QSize(16, 16));
-  if (pixmap.isNull()) {
-    cache.insert(key, QString());
-    return {};
-  }
-  QByteArray bytes;
-  QBuffer buffer(&bytes);
-  buffer.open(QIODevice::WriteOnly);
-  pixmap.toImage().save(&buffer, "PNG");
-  const QString dataUrl =
-      QString("data:image/png;base64,%1").arg(QString::fromLatin1(bytes.toBase64()));
-  cache.insert(key, dataUrl);
-  return dataUrl;
-}
-
-QString tooltipHtmlWithIcon(VGMItem* item) {
-  if (!item) {
-    return {};
-  }
-  const QString iconData = tooltipIconDataUrl(item->type);
-  const QString description = getFullDescriptionForTooltip(item);
-  QString content = description;
-  if (!iconData.isEmpty()) {
-    content = QString("<table cellspacing=\"0\" cellpadding=\"0\">"
-                      "<tr>"
-                      "<td style=\"padding-right:6px; vertical-align:top;\">"
-                      "<img src=\"%1\" width=\"16\" height=\"16\">"
-                      "</td>"
-                      "<td>%2</td>"
-                      "</tr>"
-                      "</table>")
-                  .arg(iconData, description);
-  }
-  return QString("<table cellspacing=\"0\" cellpadding=\"6\"><tr><td>%1</td></tr></table>")
-      .arg(content);
 }
 
 #ifdef Q_OS_WIN
@@ -350,8 +301,8 @@ QFont HexView::defaultViewFont() {
 }
 
 // Initialize HexView UI state, RHI host, typography, animations, and signal wiring.
-HexView::HexView(VGMFile* vgmfile, QWidget* parent)
-    : QAbstractScrollArea(parent), m_vgmfile(vgmfile) {
+HexView::HexView(const vgmtrans::ui::SourceInspectorModel& model, QWidget* parent)
+    : QAbstractScrollArea(parent), m_model(&model) {
   setFocusPolicy(Qt::StrongFocus);
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   viewport()->setAutoFillBackground(false);
@@ -392,38 +343,38 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
     m_pendingScrollY = verticalScrollBar()->value();
   });
 
-  connect(NotificationCenter::the(), &NotificationCenter::seekModifierChanged, this,
-          [this](bool active) {
-            if (m_seekModifierActive == active) {
-              return;
-            }
-            m_seekModifierActive = active;
-            if (!isVisible()) {
-              hideTooltip();
-              requestRhiUpdate();
-              return;
-            }
-            m_outlineFadeClock.restart();
-            if (!m_outlineFadeTimer.isActive()) {
-              m_outlineFadeTimer.start(16, this);
-            }
-            if (m_isDragging) {
-              hideTooltip();
-              requestRhiUpdate();
-              return;
-            }
-            if (active) {
-              const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
-              if (viewport()->rect().contains(vp)) {
-                handleTooltipHoverMove(vp, Qt::KeyboardModifiers(HexViewInput::kModifier));
-              } else {
-                hideTooltip();
-              }
-            } else {
-              hideTooltip();
-            }
-            requestRhiUpdate();
-          });
+}
+
+void HexView::setSeekModifierActive(bool active) {
+  if (m_seekModifierActive == active) {
+    return;
+  }
+  m_seekModifierActive = active;
+  if (!isVisible()) {
+    hideTooltip();
+    requestRhiUpdate();
+    return;
+  }
+  m_outlineFadeClock.restart();
+  if (!m_outlineFadeTimer.isActive()) {
+    m_outlineFadeTimer.start(16, this);
+  }
+  if (m_isDragging) {
+    hideTooltip();
+    requestRhiUpdate();
+    return;
+  }
+  if (active) {
+    const QPoint position = viewport()->mapFromGlobal(QCursor::pos());
+    if (viewport()->rect().contains(position)) {
+      handleTooltipHoverMove(position, Qt::KeyboardModifiers(HexViewInput::kModifier));
+    } else {
+      hideTooltip();
+    }
+  } else {
+    hideTooltip();
+  }
+  requestRhiUpdate();
 }
 
 // Apply a monospaced font, normalize glyph metrics, and invalidate layout/glyph cache.
@@ -577,10 +528,10 @@ void HexView::updateLayout() {
 
 // Return total line count required to display file bytes at 16 bytes per line.
 int HexView::getTotalLines() const {
-  if (!m_vgmfile) {
+  if (m_model == nullptr) {
     return 0;
   }
-  return static_cast<int>((m_vgmfile->length() + BYTES_PER_LINE - 1) / BYTES_PER_LINE);
+  return static_cast<int>((m_model->bytes().size() + BYTES_PER_LINE - 1) / BYTES_PER_LINE);
 }
 
 // Clear current manual selection, optionally preserving/animating fade semantics.
@@ -601,12 +552,17 @@ void HexView::clearCurrentSelection(bool animateSelection) {
 
 // Select the current item's byte range and refresh highlight visuals.
 void HexView::selectCurrentItem(bool animateSelection) {
-  if (!m_selectedItem) {
+  const auto* selected = annotation(m_selectedAnnotation);
+  if (selected == nullptr) {
     return;
   }
-  m_selectedOffset = m_selectedItem->offset();
+  const auto range = visibleRange(*selected);
+  if (!range) {
+    return;
+  }
+  m_selectedOffset = range->offset;
   m_selections.clear();
-  m_selections.push_back({m_selectedItem->offset(), m_selectedItem->length()});
+  m_selections.push_back(*range);
   m_fadeSelections.clear();
   updateHighlightState(animateSelection);
   requestRhiUpdate(false, true);
@@ -619,10 +575,12 @@ void HexView::refreshSelectionVisuals(bool animateSelection) {
 }
 
 // Set selected item, update selection, and scroll it into view when needed.
-void HexView::setSelectedItem(VGMItem* item) {
-  m_selectedItem = item;
+void HexView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotationId) {
+  m_selectedAnnotation = annotationId;
+  const auto* selected = annotation(m_selectedAnnotation);
 
-  if (!m_selectedItem) {
+  if (selected == nullptr) {
+    m_selectedAnnotation = {};
     clearCurrentSelection(true);
     return;
   }
@@ -633,9 +591,15 @@ void HexView::setSelectedItem(VGMItem* item) {
     return;
   }
 
-  const int itemBaseOffset = static_cast<int>(m_selectedItem->offset() - m_vgmfile->offset());
+  const auto selectedRange = visibleRange(*selected);
+  if (!selectedRange) {
+    return;
+  }
+  const int itemBaseOffset = static_cast<int>(
+      selectedRange->offset - static_cast<u32>(m_model->range().offset));
   const int line = itemBaseOffset / BYTES_PER_LINE;
-  const int endLine = (itemBaseOffset + static_cast<int>(m_selectedItem->length())) / BYTES_PER_LINE;
+  const int endLine = (itemBaseOffset + static_cast<int>(selectedRange->length)) /
+                      BYTES_PER_LINE;
 
   const int viewStartLine = verticalScrollBar()->value() / m_lineHeight;
   const int viewEndLine = viewStartLine + (viewport()->height() / m_lineHeight);
@@ -657,53 +621,60 @@ void HexView::setSelectedItem(VGMItem* item) {
 }
 
 // Select multiple items, using the primary item as the anchor for keyboard focus and scroll-to-visible behavior.
-void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
-                               const VGMItem* primaryItem) {
-  if (items.empty()) {
-    setSelectedItem(nullptr);
+void HexView::setSelectedAnnotations(
+    const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
+    vgmtrans::core::SourceAnnotationId primaryAnnotation) {
+  if (annotations.empty()) {
+    setSelectedAnnotation({});
     return;
   }
 
-  // If the caller did not provide an explicit primary item, fall back to the first non-null entry so we still have
-  // a stable anchor for the selection.
-  VGMItem* resolvedPrimary = const_cast<VGMItem*>(primaryItem);
-  if (!resolvedPrimary) {
-    for (const auto* item : items) {
-      if (item) {
-        resolvedPrimary = const_cast<VGMItem*>(item);
+  if (annotation(primaryAnnotation) == nullptr) {
+    for (const auto id : annotations) {
+      if (annotation(id) != nullptr) {
+        primaryAnnotation = id;
         break;
       }
     }
   }
 
-  if (!resolvedPrimary) {
-    setSelectedItem(nullptr);
+  const auto* primary = annotation(primaryAnnotation);
+  if (primary == nullptr) {
+    setSelectedAnnotation({});
+    return;
+  }
+  const auto primaryRange = visibleRange(*primary);
+  if (!primaryRange) {
+    setSelectedAnnotation({});
     return;
   }
 
-  m_selectedItem = resolvedPrimary;
-  m_selectedOffset = m_selectedItem->offset();
+  m_selectedAnnotation = primaryAnnotation;
+  m_selectedOffset = primaryRange->offset;
 
   std::vector<SelectionRange> selections;
-  selections.reserve(items.size());
+  selections.reserve(annotations.size());
   std::unordered_set<u64> keys;
-  keys.reserve(items.size() * 2 + 1);
+  keys.reserve(annotations.size() * 2 + 1);
 
-  for (const auto* item : items) {
-    if (!item) {
+  for (const auto id : annotations) {
+    const auto* item = annotation(id);
+    if (item == nullptr) {
       continue;
     }
     // Zero-length items still need a visible caret-width highlight in the hex view, so normalize them to a one-byte range.
-    const u32 length = item->length() > 0 ? item->length() : 1u;
-    const SelectionRange range{item->offset(), length};
+    const auto range = visibleRange(*item);
+    if (!range) {
+      continue;
+    }
     // Ignore duplicate ranges so the renderer and highlight animation only see one entry per distinct byte span.
-    if (keys.insert(selectionKey(range)).second) {
-      selections.push_back(range);
+    if (keys.insert(selectionKey(*range)).second) {
+      selections.push_back(*range);
     }
   }
 
   if (selections.empty()) {
-    setSelectedItem(nullptr);
+    setSelectedAnnotation({});
     return;
   }
 
@@ -725,9 +696,11 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
     return;
   }
 
-  const int itemBaseOffset = static_cast<int>(m_selectedItem->offset() - m_vgmfile->offset());
+  const int itemBaseOffset = static_cast<int>(
+      primaryRange->offset - static_cast<u32>(m_model->range().offset));
   const int line = itemBaseOffset / BYTES_PER_LINE;
-  const int endLine = (itemBaseOffset + static_cast<int>(m_selectedItem->length())) / BYTES_PER_LINE;
+  const int endLine = (itemBaseOffset + static_cast<int>(primaryRange->length)) /
+                      BYTES_PER_LINE;
 
   const int viewStartLine = verticalScrollBar()->value() / m_lineHeight;
   const int viewEndLine = viewStartLine + (viewport()->height() / m_lineHeight);
@@ -749,18 +722,22 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
 }
 
 // Update playback selections from active items and seed fade-out entries for removed ones.
-void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items,
-                                            const std::vector<QColor>& glowColors) {
+void HexView::setPlaybackSelectionsForAnnotations(
+    const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
+    const std::vector<QColor>& glowColors) {
   std::vector<PlaybackSelection> next;
-  next.reserve(items.size());
-  for (size_t i = 0; i < items.size(); ++i) {
-    const auto* item = items[i];
-    if (!item) {
+  next.reserve(annotations.size());
+  for (size_t i = 0; i < annotations.size(); ++i) {
+    const auto* item = annotation(annotations[i]);
+    if (item == nullptr) {
       continue;
     }
-    const u32 length = item->length() > 0 ? item->length() : 1u;
+    const auto range = visibleRange(*item);
+    if (!range) {
+      continue;
+    }
     const QColor glowColor = (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
-    next.push_back({item->offset(), length, glowColor});
+    next.push_back({range->offset, range->length, glowColor});
   }
 
   // Track incoming active playback ranges for fast membership checks below.
@@ -869,10 +846,10 @@ void HexView::requestPlaybackFrame() {
   requestRhiUpdate();
 }
 
-// Build byte-level style-id lookup from VGM leaf items for renderer consumption.
+// Build byte-level style and outline lookups from value source annotations.
 void HexView::rebuildStyleMap() {
   m_styles.clear();
-  m_typeToStyleId.clear();
+  m_roleToStyleId.clear();
 
   // Slot 0 is the fallback/default style used for unassigned bytes.
   Style defaultStyle;
@@ -880,63 +857,82 @@ void HexView::rebuildStyleMap() {
   defaultStyle.fg = palette().color(QPalette::WindowText);
   m_styles.push_back(defaultStyle);
 
-  if (!m_vgmfile) {
+  if (m_model == nullptr) {
     return;
   }
 
-  const u32 length = m_vgmfile->length();
+  const size_t length = m_model->bytes().size();
   // Start with "unassigned" markers so we can preserve first-write wins below.
   m_styleIds.assign(length, STYLE_UNASSIGNED);
+  m_itemIds.assign(length, 0);
 
-  // Deduplicate styles by item type and keep a compact style table for the renderer.
-  auto styleIdForType = [&](VGMItem::Type type) -> u16 {
-    const int key = static_cast<int>(type);
-    auto it = m_typeToStyleId.find(key);
-    if (it != m_typeToStyleId.end()) {
+  // Deduplicate styles by value role/semantic and keep a compact renderer table.
+  auto styleIdForAnnotation = [&](const vgmtrans::core::SourceAnnotation& annotation) -> u16 {
+    const int semantic = annotation.sequenceSemantic
+        ? static_cast<int>(*annotation.sequenceSemantic) + 1
+        : 0;
+    const int key = static_cast<int>(annotation.role) * 256 + semantic;
+    auto it = m_roleToStyleId.find(key);
+    if (it != m_roleToStyleId.end()) {
       return it->second;
     }
     Style style;
-    style.bg = colorForItemType(type);
-    style.fg = textColorForItemType(type);
-    u16 id = static_cast<u16>(m_styles.size());
+    style.bg = SourceInspectorPresentation::color(annotation);
+    style.fg = SourceInspectorPresentation::textColor(annotation);
+    const u16 id = static_cast<u16>(m_styles.size());
     m_styles.push_back(style);
-    m_typeToStyleId.emplace(key, id);
+    m_roleToStyleId.emplace(key, id);
     return id;
   };
 
-  // Flatten the item tree to leaf items; leaf ranges represent final semantic regions.
-  std::vector<VGMItem*> leaves;
-  std::function<void(VGMItem*)> walk = [&](VGMItem* item) {
-    auto children = item->children();
-    if (children.empty()) {
-      leaves.push_back(item);
-      return;
+  std::vector<const vgmtrans::core::SourceAnnotation*> styledAnnotations;
+  styledAnnotations.reserve(m_model->annotations().size());
+  for (const auto& item : m_model->annotations()) {
+    styledAnnotations.push_back(&item);
+  }
+  // Most-specific ranges paint first. Parent annotations then fill any bytes
+  // not covered by their children, which keeps headers useful when their
+  // fields are represented as SourceField values rather than child nodes.
+  std::ranges::sort(styledAnnotations, [](const auto* lhs, const auto* rhs) {
+    if (lhs->range.size != rhs->range.size) {
+      return lhs->range.size < rhs->range.size;
     }
-    for (auto* child : children) {
-      walk(child);
+    if (lhs->range.offset != rhs->range.offset) {
+      return lhs->range.offset < rhs->range.offset;
     }
-  };
-
-  walk(m_vgmfile);
+    return lhs->id.value < rhs->id.value;
+  });
 
   // Paint style ids into byte slots. First assignment wins to avoid later overlaps
   // from replacing an already chosen leaf style.
-  for (auto* item : leaves) {
-    if (!item || item->length() == 0) {
+  u16 nextItemId = 1;
+  for (const auto* item : styledAnnotations) {
+    if (item == nullptr || item->range.size == 0 ||
+        item->range.offset < m_model->range().offset) {
       continue;
     }
-    if (item->offset() < m_vgmfile->offset()) {
+    const u64 start64 = item->range.offset - m_model->range().offset;
+    if (start64 >= length) {
       continue;
     }
-    const u32 start = item->offset() - m_vgmfile->offset();
+    const size_t start = static_cast<size_t>(start64);
     if (start >= length) {
       continue;
     }
-    const u32 end = std::min<u32>(start + item->length(), length);
-    const u16 styleId = styleIdForType(item->type);
-    for (u32 i = start; i < end; ++i) {
+    const size_t end = static_cast<size_t>(
+        std::min<u64>(start64 + item->range.size, static_cast<u64>(length)));
+    const u16 styleId = styleIdForAnnotation(*item);
+    const u16 itemId = nextItemId;
+    ++nextItemId;
+    if (nextItemId == 0) {
+      nextItemId = 1;
+    }
+    for (size_t i = start; i < end; ++i) {
       if (m_styleIds[i] == STYLE_UNASSIGNED) {
         m_styleIds[i] = styleId;
+        if (item->outline != vgmtrans::core::SourceOutlinePolicy::Hide) {
+          m_itemIds[i] = itemId;
+        }
       }
     }
   }
@@ -1098,7 +1094,8 @@ bool HexView::viewportEvent(QEvent* event) {
       hideTooltip();
       return true;
     }
-    if (VGMItem* item = m_vgmfile->getItemAtOffset(offset, false)) {
+    const auto item = annotationAt(static_cast<u32>(offset));
+    if (item.valid()) {
       showTooltip(item, helpEvent->pos());
     } else {
       hideTooltip();
@@ -1136,7 +1133,11 @@ int HexView::scrollYForRender() const {
 // Capture immutable frame snapshot consumed by the RHI renderer this frame.
 HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   HexViewFrame::Data frame;
-  frame.vgmfile = m_vgmfile;
+  if (m_model != nullptr) {
+    frame.bytes = m_model->bytes();
+    frame.itemIds = m_itemIds;
+    frame.baseOffset = static_cast<u32>(m_model->range().offset);
+  }
   frame.viewportSize = viewport()->size();
   frame.dpr = dpr;
   frame.totalLines = getTotalLines();
@@ -1191,46 +1192,61 @@ void HexView::changeEvent(QEvent* event) {
 
 // Handle keyboard navigation between adjacent items.
 void HexView::keyPressEvent(QKeyEvent* event) {
-  if (!m_selectedItem) {
+  const auto* selected = annotation(m_selectedAnnotation);
+  if (selected == nullptr || m_model == nullptr) {
     QAbstractScrollArea::keyPressEvent(event);
     return;
   }
 
+  const u32 baseOffset = static_cast<u32>(m_model->range().offset);
+  const u32 endOffset = baseOffset + static_cast<u32>(m_model->bytes().size());
+  const auto selectedRange = visibleRange(*selected);
+  if (!selectedRange) {
+    QAbstractScrollArea::keyPressEvent(event);
+    return;
+  }
   u32 newOffset = 0;
   switch (event->key()) {
     case Qt::Key_Up:
+      if (m_selectedOffset < baseOffset + BYTES_PER_LINE) {
+        return;
+      }
       newOffset = m_selectedOffset - BYTES_PER_LINE;
       goto selectNewOffset;
 
     case Qt::Key_Down: {
-      const int selectedCol = (m_selectedOffset - m_vgmfile->offset()) % BYTES_PER_LINE;
-      const int endOffset = m_selectedItem->offset() - m_vgmfile->offset() + m_selectedItem->length();
-      const int itemEndCol = endOffset % BYTES_PER_LINE;
-      const int itemEndLine = endOffset / BYTES_PER_LINE;
-      newOffset = m_vgmfile->offset() +
+      const int selectedCol = (m_selectedOffset - baseOffset) % BYTES_PER_LINE;
+      const int selectedEndOffset = static_cast<int>(
+          selectedRange->offset - baseOffset + selectedRange->length);
+      const int itemEndCol = selectedEndOffset % BYTES_PER_LINE;
+      const int itemEndLine = selectedEndOffset / BYTES_PER_LINE;
+      newOffset = baseOffset +
                   ((itemEndLine + (selectedCol > itemEndCol ? 0 : 1)) * BYTES_PER_LINE) +
                   selectedCol;
       goto selectNewOffset;
     }
 
     case Qt::Key_Left:
-      newOffset = m_selectedItem->offset() - 1;
+      if (selectedRange->offset <= baseOffset) {
+        return;
+      }
+      newOffset = selectedRange->offset - 1;
       goto selectNewOffset;
 
     case Qt::Key_Right:
-      newOffset = m_selectedItem->offset() + m_selectedItem->length();
+      newOffset = selectedRange->offset + selectedRange->length;
       goto selectNewOffset;
 
     case Qt::Key_Escape:
-      selectionChanged(nullptr);
+      emit selectionChanged({});
       return;
 
     selectNewOffset:
-      if (newOffset >= m_vgmfile->offset() &&
-          newOffset < (m_vgmfile->offset() + m_vgmfile->length())) {
+      if (newOffset >= baseOffset && newOffset < endOffset) {
         m_selectedOffset = newOffset;
-        if (auto* item = m_vgmfile->getItemAtOffset(newOffset, false)) {
-          selectionChanged(item);
+        const auto item = annotationAt(newOffset);
+        if (item.valid()) {
+          emit selectionChanged(item);
         }
       }
       return;
@@ -1263,20 +1279,24 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
     return -1;
   }
 
-  const int offset = m_vgmfile->offset() + (line * BYTES_PER_LINE) + byteNum;
-  if (offset < static_cast<int>(m_vgmfile->offset()) ||
-      offset >= static_cast<int>(m_vgmfile->offset() + m_vgmfile->length())) {
+  if (m_model == nullptr) {
+    return -1;
+  }
+  const int baseOffset = static_cast<int>(m_model->range().offset);
+  const int offset = baseOffset + (line * BYTES_PER_LINE) + byteNum;
+  if (offset < baseOffset ||
+      offset >= baseOffset + static_cast<int>(m_model->bytes().size())) {
     return -1;
   }
   return offset;
 }
 
-void HexView::handleSeekPress(VGMItem* item, const QPoint& pos) {
-  if (item) {
-    if (item != m_lastSeekItem) {
-      m_lastSeekItem = item;
-      seekToEventRequested(item);
-      notePreviewRequested(item, true);
+void HexView::handleSeekPress(vgmtrans::core::SourceAnnotationId item, const QPoint& pos) {
+  if (item.valid()) {
+    if (item != m_lastSeekAnnotation) {
+      m_lastSeekAnnotation = item;
+      emit seekToEventRequested(item);
+      emit notePreviewRequested(item, true);
     }
     showTooltip(item, pos);
   } else {
@@ -1285,21 +1305,21 @@ void HexView::handleSeekPress(VGMItem* item, const QPoint& pos) {
   }
 }
 
-void HexView::handleSelectionPress(int offset, VGMItem* item) {
+void HexView::handleSelectionPress(int offset, vgmtrans::core::SourceAnnotationId item) {
   if (offset == -1) {
-    selectionChanged(nullptr);
+    emit selectionChanged({});
     stopNotePreview();
     return;
   }
 
   m_selectedOffset = offset;
-  if (item == m_selectedItem) {
-    selectionChanged(nullptr);
+  if (item == m_selectedAnnotation) {
+    emit selectionChanged({});
     stopNotePreview();
   } else {
-    selectionChanged(item);
-    if (item) {
-      notePreviewRequested(item, false);
+    emit selectionChanged(item);
+    if (item.valid()) {
+      emit notePreviewRequested(item, false);
     } else {
       stopNotePreview();
     }
@@ -1309,11 +1329,12 @@ void HexView::handleSelectionPress(int offset, VGMItem* item) {
 
 void HexView::handleSeekScrubDrag(int offset) {
   if (offset >= 0) {
-    if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
-      if (item != m_lastSeekItem) {
-        m_lastSeekItem = item;
-        seekToEventRequested(item);
-        notePreviewRequested(item, true);
+    const auto item = annotationAt(static_cast<u32>(offset));
+    if (item.valid()) {
+      if (item != m_lastSeekAnnotation) {
+        m_lastSeekAnnotation = item;
+        emit seekToEventRequested(item);
+        emit notePreviewRequested(item, true);
       }
     } else {
       stopNotePreview();
@@ -1326,24 +1347,25 @@ void HexView::handleSeekScrubDrag(int offset) {
 
 void HexView::handleSelectionDrag(int offset) {
   if (offset == -1) {
-    selectionChanged(nullptr);
+    emit selectionChanged({});
     stopNotePreview();
     hideTooltip();
     return;
   }
 
   m_selectedOffset = offset;
-  if (m_selectedItem && (m_selectedOffset >= m_selectedItem->offset()) &&
-      (m_selectedOffset < (m_selectedItem->offset() + m_selectedItem->length()))) {
+  const auto* selected = annotation(m_selectedAnnotation);
+  if (selected != nullptr && m_selectedOffset >= selected->range.offset &&
+      m_selectedOffset < selected->range.endOffset()) {
     hideTooltip();
     return;
   }
 
-  auto* item = m_vgmfile->getItemAtOffset(offset, false);
-  if (item != m_selectedItem) {
-    selectionChanged(item);
-    if (item) {
-      notePreviewRequested(item, false);
+  const auto item = annotationAt(static_cast<u32>(offset));
+  if (item != m_selectedAnnotation) {
+    emit selectionChanged(item);
+    if (item.valid()) {
+      emit notePreviewRequested(item, false);
     } else {
       stopNotePreview();
     }
@@ -1355,7 +1377,8 @@ void HexView::handleSelectionDrag(int offset) {
 void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const int offset = getOffsetFromPoint(event->pos());
-    auto* item = m_vgmfile->getItemAtOffset(offset, false);
+    const auto item = offset >= 0 ? annotationAt(static_cast<u32>(offset))
+                                  : vgmtrans::core::SourceAnnotationId{};
     const DragMode mode = dragModeForModifiers(event->modifiers());
     if (mode == DragMode::SeekScrub) {
       handleSeekPress(item, event->pos());
@@ -1378,7 +1401,7 @@ void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
     stopNotePreview();
-    m_lastSeekItem = nullptr;
+    m_lastSeekAnnotation = {};
     const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
     handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
   }
@@ -1415,7 +1438,8 @@ void HexView::handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mo
     hideTooltip();
     return;
   }
-  if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
+  const auto item = annotationAt(static_cast<u32>(offset));
+  if (item.valid()) {
     showTooltip(item, pos);
   } else {
     hideTooltip();
@@ -1691,32 +1715,65 @@ void HexView::updateHighlightState(bool animateSelection) {
 
 void HexView::stopNotePreview() {
   emit notePreviewStopped();
-  m_lastSeekItem = nullptr;
+  m_lastSeekAnnotation = {};
 }
 
 // Show rich HTML tooltip for a hovered item, avoiding redundant re-show for same item.
-void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
-  if (!item) {
+void HexView::showTooltip(vgmtrans::core::SourceAnnotationId item, const QPoint& pos) {
+  const auto* value = annotation(item);
+  if (value == nullptr) {
     hideTooltip();
     return;
   }
-  if (m_tooltipItem == item) {
+  if (m_tooltipAnnotation == item) {
     return;
   }
-  const QString description = tooltipHtmlWithIcon(item);
+  const QString description = SourceInspectorPresentation::tooltipHtml(*value);
   if (description.isEmpty()) {
     hideTooltip();
     return;
   }
   QToolTip::showText(viewport()->mapToGlobal(pos), description, this);
-  m_tooltipItem = item;
+  m_tooltipAnnotation = item;
 }
 
 // Hide active tooltip and clear tracked tooltip item.
 void HexView::hideTooltip() {
-  if (m_tooltipItem == nullptr) {
+  if (!m_tooltipAnnotation.valid()) {
     return;
   }
   QToolTip::hideText();
-  m_tooltipItem = nullptr;
+  m_tooltipAnnotation = {};
+}
+
+const vgmtrans::core::SourceAnnotation* HexView::annotation(
+    vgmtrans::core::SourceAnnotationId id) const {
+  return m_model != nullptr ? m_model->annotation(id) : nullptr;
+}
+
+std::optional<HexView::SelectionRange> HexView::visibleRange(
+    const vgmtrans::core::SourceAnnotation& annotation) const {
+  if (m_model == nullptr || m_model->bytes().empty()) {
+    return std::nullopt;
+  }
+  const u64 viewBegin = m_model->range().offset;
+  const u64 viewEnd = m_model->range().endOffset();
+  const u64 annotationEnd = annotation.range.endOffset();
+  u64 begin = std::max(annotation.range.offset, viewBegin);
+  u64 end = std::min(annotationEnd, viewEnd);
+  if (annotation.range.size == 0) {
+    begin = std::clamp(annotation.range.offset, viewBegin, viewEnd - 1);
+    end = begin + 1;
+  }
+  if (end <= begin) {
+    return std::nullopt;
+  }
+  return SelectionRange{static_cast<u32>(begin), static_cast<u32>(end - begin)};
+}
+
+vgmtrans::core::SourceAnnotationId HexView::annotationAt(u32 offset) const {
+  if (m_model == nullptr) {
+    return {};
+  }
+  return m_model->annotationAt(offset).value_or(vgmtrans::core::SourceAnnotationId{});
 }
