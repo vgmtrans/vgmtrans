@@ -9,6 +9,8 @@
 #include "value/sequence/PerformanceModel.h"
 #include "value/sequence/SequenceDialect.h"
 
+#include <utility>
+
 namespace vgmtrans::core {
 
 namespace detail {
@@ -21,6 +23,8 @@ struct BranchResult {
   bool taken = false;
   Effects effects;
 };
+
+class PerformanceAutomationBinding;
 
 class RepeatCounter {
 public:
@@ -44,7 +48,8 @@ private:
 // PerformanceEmitter fills in the current tick and source command automatically.
 class PerformanceEmitter {
 public:
-  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick);
+  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick,
+                     u64& nextSequence);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   void note(NotePerformanceEvent event);
@@ -96,15 +101,77 @@ public:
   void modulation(ModulationPerformanceEvent event);
   void modulation(ModulationPerformanceTarget target, double amount);
   void marker(MarkerPerformanceEvent event);
-  void appendEvents(std::vector<PerformanceEvent> events);
+
+  [[nodiscard]] PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue,
+                                                  u32 durationTicks, u32 delayTicks = 0);
+  [[nodiscard]] PerformanceAutomationBinding noteFade(PerformanceAutomationTarget target, double targetValue,
+                                                      u32 durationTicks, u32 delayTicks = 0);
+  [[nodiscard]] PerformanceAutomationBinding step(PerformanceAutomationTarget target, double targetValue,
+                                                  u32 durationTicks = 0, u32 delayTicks = 0);
+  [[nodiscard]] PerformanceAutomationBinding noteEnvelope(PerformanceAutomationTarget target, double targetValue,
+                                                          u32 durationTicks, u32 delayTicks = 0);
 
 private:
-  [[nodiscard]] PerformanceEventHeader header() const;
+  friend class PerformanceAutomationBinding;
+
+  [[nodiscard]] PerformanceAutomationBinding beginAutomation(PerformanceAutomationIntent intent);
+  [[nodiscard]] PerformanceEmitter withAutomation(const PerformanceAutomationBinding& automation) const;
+  [[nodiscard]] PerformanceEventHeader header();
+  void append(PerformanceEvent event);
+  void automationPoint(u32 automation, PerformanceEvent event);
 
   PerformanceTrack& track_;
   CommandId sourceCommand_;
   SourceAnnotationId sourceAnnotation_;
   u64 tick_ = 0;
+  u64& nextSequence_;
+  std::optional<u32> automation_;
+};
+
+// Opaque association between source-driver motion and its automation.
+// Formats can retain it as playback state, but cannot depend on IR storage.
+class PerformanceAutomationBinding {
+public:
+  PerformanceAutomationBinding() = default;
+
+  void clear() noexcept {
+    owner_ = nullptr;
+    automation_ = 0;
+  }
+  [[nodiscard]] PerformanceEmitter output(const PerformanceEmitter& out) const { return out.withAutomation(*this); }
+  [[nodiscard]] PerformanceEmitter at(const PerformanceEmitter& out, u64 tick) const {
+    return out.at(tick).withAutomation(*this);
+  }
+
+private:
+  friend class PerformanceEmitter;
+
+  PerformanceAutomationBinding(PerformanceTrack& owner, u32 automation) : owner_(&owner), automation_(automation) {}
+
+  PerformanceTrack* owner_ = nullptr;
+  u32 automation_ = 0;
+};
+
+// Adds an output binding to an existing sequence-motion type without coupling
+// the arithmetic type itself to PerformanceSequence.
+template <class Motion>
+class PerformanceBoundMotion : public Motion {
+public:
+  using Motion::begin;
+
+  void bind(PerformanceAutomationBinding binding) { binding_ = std::move(binding); }
+
+  template <class Plan>
+  decltype(auto) begin(PerformanceAutomationBinding binding, const Plan& plan) {
+    bind(std::move(binding));
+    return Motion::begin(plan);
+  }
+
+  void clearAutomation() noexcept { binding_.clear(); }
+  [[nodiscard]] PerformanceEmitter output(const PerformanceEmitter& out) const { return binding_.output(out); }
+
+private:
+  PerformanceAutomationBinding binding_;
 };
 
 // Commands use VmApi for playback flow that is shared across formats: next, end,

@@ -694,9 +694,14 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
                                                0xf3, 0x00, 0x02, 0x40, 0, 0, 0xff}});
   expect(tied.diagnostics.empty() && tied.tracks[0].endTick == 15,
          "compressed notes, ties, rests, and inline pitch slides should preserve their combined wait time");
+  const auto tiedEvents = flattenedPerformanceEvents(tied.tracks[0]);
   expect(std::ranges::any_of(
-             tied.tracks[0].events,
-             [](const PerformanceEvent& event) { return std::holds_alternative<PitchBendPerformanceEvent>(event); }),
+             tiedEvents,
+             [](const PerformanceEvent* event) { return std::holds_alternative<PitchBendPerformanceEvent>(*event); }) &&
+             std::ranges::any_of(tied.tracks[0].automations,
+                                 [](const PerformanceAutomation& automation) {
+                                   return automation.intent.target == PerformanceAutomationTarget::Pitch;
+                                 }),
          "inline pitch slide should tick through the typed automation callback");
 }
 
@@ -710,25 +715,26 @@ void konamiSnesCompiledAutomationTicksFades() {
                                                0xef, 0xc0, 0xfc,        // volume fade
                                                0xf8, 0x10, 0xff,        // pan fade
                                                0xe0, 0x08, 0xff}});
-  const auto& events = performance.tracks[0].events;
+  const auto events = flattenedPerformanceEvents(performance.tracks[0]);
   expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 8,
          "compiled Konami fades should advance only through the waiting command");
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
-                               return tempo != nullptr && tempo->header.tick > 0;
-                             }) &&
+  expect(performance.tracks[0].automations.size() >= 3 &&
              std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* level = std::get_if<LevelPerformanceEvent>(&event);
+                                 [](const PerformanceEvent* event) {
+                                   const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
+                                   return tempo != nullptr && tempo->header.tick > 0;
+                                 }) &&
+             std::ranges::any_of(events,
+                                 [](const PerformanceEvent* event) {
+                                   const auto* level = std::get_if<LevelPerformanceEvent>(event);
                                    return level != nullptr && level->header.tick > 0;
                                  }) &&
              std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* pan = std::get_if<PanPerformanceEvent>(&event);
+                                 [](const PerformanceEvent* event) {
+                                   const auto* pan = std::get_if<PanPerformanceEvent>(event);
                                    return pan != nullptr && pan->header.tick > 0;
                                  }),
-         "tempo, volume, and pan fades should emit from the typed per-tick callback");
+         "tempo, volume, and pan fades should retain structured intent and exact per-tick realizations");
 }
 
 void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion() {
