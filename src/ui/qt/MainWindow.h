@@ -16,6 +16,7 @@
 #include <span>
 
 class QWidget;
+class QAbstractItemView;
 class QDockWidget;
 class MenuBar;
 class MainWindowDockLayout;
@@ -84,6 +85,11 @@ private:
     CollectionContents,
   };
 
+  enum class OriginalItemKind {
+    Source,
+    Asset,
+  };
+
   void createElements();
   void configureWindowAgent();
   void createStatusBar();
@@ -95,6 +101,7 @@ private:
   void openFileInternal(const QString& filename);
   void removeSelectedSources();
   void removeSelectedAssets();
+  void saveOriginal(QAbstractItemView* view, OriginalItemKind kind);
   void exportSequenceMidi(const QModelIndex& index);
   void togglePlayback();
   void updateSelectionStatus(const QModelIndex& index,
