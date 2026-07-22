@@ -2,6 +2,11 @@
 # Dependencies
 # ~~~
 
+if(ENABLE_UI_QT)
+  message(STATUS "Using vendored BASS(MIDI) library")
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/bass ${CMAKE_CURRENT_BINARY_DIR}/lib/bass EXCLUDE_FROM_ALL SYSTEM)
+endif()
+
 # mio is a header-only library
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mio ${CMAKE_CURRENT_BINARY_DIR}/lib/mio EXCLUDE_FROM_ALL SYSTEM)
 

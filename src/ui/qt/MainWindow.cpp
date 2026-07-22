@@ -12,6 +12,7 @@
 #include "MenuBar.h"
 #include "PlaybackControls.h"
 #include "ReportDialog.h"
+#include "SequencePlayer.h"
 #include "application/WorkspaceController.h"
 #include "models/ValueModels.h"
 #include "services/Settings.h"
@@ -70,6 +71,7 @@
 #include <QSaveFile>
 #include <QSignalBlocker>
 #include <QShortcut>
+#include <QStringList>
 #include <QSortFilterProxyModel>
 #include <QStandardPaths>
 #include <QStyleOptionViewItem>
@@ -274,6 +276,19 @@ bool selectIdInView(QAbstractItemView* view, u32 id, bool assetOnly,
   }
   return false;
 }
+
+QString playbackDiagnostics(const std::vector<vgmtrans::core::Diagnostic>& diagnostics) {
+  QStringList messages;
+  for (const auto& diagnostic : diagnostics) {
+    const QString message = QString::fromStdString(diagnostic.message);
+    if (!message.isEmpty() && !messages.contains(message)) {
+      messages.push_back(message);
+    }
+  }
+  return messages.isEmpty()
+             ? QObject::tr("The collection could not be prepared for playback.")
+             : messages.join(QLatin1Char('\n'));
+}
 }  // namespace
 
 MainWindow::MainWindow(vgmtrans::ui::WorkspaceController& workspace)
@@ -373,6 +388,7 @@ void MainWindow::createElements() {
       ItemViewDensity::listItemHeight(m_coll_view) + ItemViewDensity::listSpacing(m_coll_view),
       m_coll_view));
   m_playback_controls = new PlaybackControls();
+  m_sequence_player = new SequencePlayer(this);
 
   auto *central_wrapper = new QWidget(this);
   auto *central_layout = new QVBoxLayout();
@@ -610,6 +626,69 @@ void MainWindow::routeSignals() {
           &MdiArea::setSeekModifierActive);
   connect(mdiArea, &MdiArea::playbackSeekRequested, this,
           &MainWindow::playbackSeekRequested);
+  connect(m_sequence_player, &SequencePlayer::stateChanged,
+          m_playback_controls, &PlaybackControls::setPlaybackState);
+  connect(m_sequence_player, &SequencePlayer::stateChanged,
+          mdiArea, &MdiArea::setPlaybackState);
+  connect(m_sequence_player, &SequencePlayer::positionChanged,
+          m_playback_controls, &PlaybackControls::setPlaybackPosition);
+  connect(m_sequence_player, &SequencePlayer::positionChanged,
+          mdiArea, &MdiArea::setPlaybackPosition);
+  connect(m_sequence_player, &SequencePlayer::errorOccurred, this,
+          [this](const QString& message) {
+            showToast(message, ToastType::Error, 15000);
+          });
+  connect(this, &MainWindow::playbackStopRequested,
+          m_sequence_player, &SequencePlayer::stop);
+  connect(this, &MainWindow::playbackSeekRequested,
+          m_sequence_player, &SequencePlayer::seek);
+  connect(this, &MainWindow::playbackToggleRequested, this,
+          [this, mdiArea] {
+            const QModelIndex current = m_coll_listview->currentIndex();
+            if (!current.isValid()) {
+              m_sequence_player->toggle();
+              return;
+            }
+
+            const auto collection = vgmtrans::core::CollectionId{
+                current.data(vgmtrans::ui::IdRole).toUInt()};
+            if (m_sequence_player->activeCollection() == collection) {
+              m_sequence_player->toggle();
+              return;
+            }
+
+            vgmtrans::core::PlaybackRequest request;
+            request.sequenceLoops = static_cast<u32>(
+                Settings::the()->conversion.numSequenceLoops());
+            request.midi.skipChannel10 =
+                Settings::the()->conversion.skipChannel10();
+            request.midi.bankSelectStyle =
+                Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
+                    ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
+                    : vgmtrans::core::MidiBankSelectStyle::MsbOnly;
+
+            try {
+              auto playback = m_workspace.preparePlayback(collection, request);
+              if (!playback.playable()) {
+                const QString message = playbackDiagnostics(playback.diagnostics);
+                statusBarContent->setStatus(
+                    current.data(Qt::DisplayRole).toString(), message);
+                showToast(message, ToastType::Error, 15000);
+                return;
+              }
+              if (m_sequence_player->load(std::move(playback))) {
+                if (const auto* performance = m_sequence_player->activePerformance()) {
+                  mdiArea->setPlaybackSequence(
+                      m_sequence_player->activeSequence(), *performance);
+                }
+              }
+            } catch (const std::exception& error) {
+              const QString message = QString::fromUtf8(error.what());
+              statusBarContent->setStatus(
+                  current.data(Qt::DisplayRole).toString(), message);
+              showToast(message, ToastType::Error, 15000);
+            }
+          });
   connect(mdiArea, &MdiArea::inspectorStatusChanged, this,
           [this](const QString& name, const QString& description, const QIcon& icon,
                  int offset, int size) {
@@ -895,7 +974,7 @@ void MainWindow::routeSignals() {
 
   m_coll_listview->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_coll_listview, &QWidget::customContextMenuRequested, this,
-          [this, exportSelectedCollection](const QPoint& position) {
+          [this, exportSelectedCollection, requestPlayback](const QPoint& position) {
             const QModelIndex current = m_coll_listview->currentIndex();
             if (!current.isValid()) {
               return;
@@ -905,7 +984,6 @@ void MainWindow::routeSignals() {
             QAction* play = menu.addAction(tr("Play / Pause"));
             play->setShortcut(Qt::Key_Return);
             play->setShortcutVisibleInContextMenu(true);
-            play->setEnabled(false);
             menu.addSeparator();
             QAction* midiSf2 = menu.addAction(tr("Export as MIDI and SF2"));
             QAction* midiDls = menu.addAction(tr("Export as MIDI and DLS"));
@@ -914,7 +992,9 @@ void MainWindow::routeSignals() {
             QAction* stitch = menu.addAction(tr("Stitch"));
             stitch->setEnabled(false);
             QAction* chosen = menu.exec(m_coll_listview->viewport()->mapToGlobal(position));
-            if (chosen == midiSf2) {
+            if (chosen == play) {
+              requestPlayback();
+            } else if (chosen == midiSf2) {
               exportSelectedCollection(0);
             } else if (chosen == midiDls) {
               exportSelectedCollection(1);
@@ -925,7 +1005,8 @@ void MainWindow::routeSignals() {
 
   m_coll_view->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_coll_view, &QWidget::customContextMenuRequested, this,
-          [this, exportSelectedCollection, showAssetContextMenu](const QPoint& position) {
+          [this, exportSelectedCollection, showAssetContextMenu,
+           requestPlayback](const QPoint& position) {
             const QModelIndex current = m_coll_view->currentIndex();
             if (!current.isValid()) {
               return;
@@ -939,7 +1020,6 @@ void MainWindow::routeSignals() {
             QAction* play = menu.addAction(tr("Play / Pause"));
             play->setShortcut(Qt::Key_Return);
             play->setShortcutVisibleInContextMenu(true);
-            play->setEnabled(false);
             menu.addSeparator();
             QAction* midiSf2 = menu.addAction(tr("Export as MIDI and SF2"));
             QAction* midiDls = menu.addAction(tr("Export as MIDI and DLS"));
@@ -948,7 +1028,9 @@ void MainWindow::routeSignals() {
             QAction* stitch = menu.addAction(tr("Stitch"));
             stitch->setEnabled(false);
             QAction* chosen = menu.exec(m_coll_view->viewport()->mapToGlobal(position));
-            if (chosen == midiSf2) {
+            if (chosen == play) {
+              requestPlayback();
+            } else if (chosen == midiSf2) {
               exportSelectedCollection(0);
             } else if (chosen == midiDls) {
               exportSelectedCollection(1);
@@ -959,6 +1041,31 @@ void MainWindow::routeSignals() {
 
   connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged,
           MdiArea::the(), &MdiArea::workspaceChanged);
+  connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged,
+          this, [this] {
+            if (!m_sequence_player->hasActiveCollection()) {
+              return;
+            }
+            const auto* collection = m_workspace.snapshot().collection(
+                m_sequence_player->activeCollection());
+            std::vector<vgmtrans::core::AssetId> assets;
+            if (collection != nullptr && collection->sequence) {
+              assets.push_back(*collection->sequence);
+              assets.insert(assets.end(), collection->instrumentSets.begin(),
+                            collection->instrumentSets.end());
+              assets.insert(assets.end(), collection->sampleCollections.begin(),
+                            collection->sampleCollections.end());
+            }
+            const auto activeAssets = m_sequence_player->activeAssets();
+            const bool assetsChanged =
+                !std::ranges::equal(assets, activeAssets) ||
+                std::ranges::any_of(activeAssets, [this](const auto asset) {
+                  return m_workspace.snapshot().asset(asset) == nullptr;
+                });
+            if (collection == nullptr || assetsChanged) {
+              m_sequence_player->stop();
+            }
+          });
   connect(MdiArea::the(), &MdiArea::assetSelected, this,
           [synchronizeAssetSelection](vgmtrans::core::AssetId asset, QWidget* caller) {
             synchronizeAssetSelection(asset, caller);

@@ -1,108 +1,83 @@
-/**
- * VGMTrans (c) - 2002-2021
- * Licensed under the zlib license
- * See the included LICENSE for more information
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
  */
 
 #include "SequencePlayer.h"
 
-#include "base/Types.h"
-#include "LogManager.h"
-#include "QtVGMRoot.h"
-#include "SF2Conversion.h"
-#include "SF2File.h"
-#include "VGMColl.h"
-#include "VGMSeq.h"
-
 #include <algorithm>
 #include <cstddef>
+#include <limits>
+#include <memory>
+#include <utility>
 
-#include "bass.h"
-#include "bassmidi.h"
+#include <QMetaObject>
+#include <QTimer>
 
-/**
- * @brief Routines to read file data from memory.
- */
-namespace MemFile {
-struct DataBlob {
-  QWORD index{};
-  std::vector<u8> data;
+namespace {
+
+struct MemoryFile {
+  QWORD position = 0;
+  std::vector<u8> bytes;
+
+  static DWORD read(void* destination, DWORD count, void* handle) {
+    auto* file = static_cast<MemoryFile*>(handle);
+    if (destination == nullptr || file == nullptr || file->position >= file->bytes.size()) {
+      return 0;
+    }
+    const auto begin = static_cast<size_t>(file->position);
+    const auto size = std::min<size_t>(count, file->bytes.size() - begin);
+    std::copy_n(file->bytes.data() + begin, size, static_cast<u8*>(destination));
+    file->position += size;
+    return static_cast<DWORD>(size);
+  }
+
+  static BOOL seek(QWORD offset, void* handle) {
+    auto* file = static_cast<MemoryFile*>(handle);
+    if (file == nullptr || offset > file->bytes.size()) {
+      return false;
+    }
+    file->position = offset;
+    return true;
+  }
+
+  static QWORD length(void* handle) {
+    const auto* file = static_cast<const MemoryFile*>(handle);
+    return file != nullptr ? file->bytes.size() : 0;
+  }
+
+  static void close(void* handle) { delete static_cast<MemoryFile*>(handle); }
 };
 
-static DWORD mem_read(void *buf, DWORD count, void *handle) {
-  auto blob = static_cast<DataBlob *>(handle);
-  if (!buf || !blob || blob->index >= blob->data.size()) {
+constexpr BASS_FILEPROCS kMemoryFileCallbacks{
+    MemoryFile::close,
+    MemoryFile::length,
+    MemoryFile::read,
+    MemoryFile::seek,
+};
+constexpr int kPositionPollIntervalMs = 1000 / 60;
+
+int tickValue(QWORD value) {
+  if (value == static_cast<QWORD>(-1)) {
     return 0;
   }
-
-  /* This function never fails: count is the *maximum* number of bytes the caller wants, not a
-   * precise number of bytes to fetch */
-  const auto start = static_cast<std::size_t>(blob->index);
-  const auto bytesToRead = std::min<std::size_t>(count, blob->data.size() - start);
-
-  auto position = blob->data.begin() + start;
-  std::copy(position, position + bytesToRead, static_cast<char *>(buf));
-
-  blob->index += bytesToRead;
-
-  return static_cast<DWORD>(bytesToRead);
+  return static_cast<int>(std::min<QWORD>(value, std::numeric_limits<int>::max()));
 }
 
-static BOOL mem_seek(QWORD offset, void *handle) {
-  auto blob = static_cast<DataBlob *>(handle);
-  if (!blob) {
-    return false;
-  }
+}  // namespace
 
-  blob->index = offset;
-
-  return true;
-}
-
-static QWORD mem_tell(void *handle) {
-  auto blob = static_cast<DataBlob *>(handle);
-  if (!blob) {
-    return 0;
-  }
-
-  return blob->data.size();
-}
-
-static void mem_close(void *handle) {
-  auto blob = static_cast<DataBlob *>(handle);
-  if (!blob) {
-    return;
-  }
-
-  delete blob;
-}
-};  // namespace MemFile
-
-static constexpr BASS_FILEPROCS memory_file_callbacks{MemFile::mem_close, MemFile::mem_tell,
-                                                      MemFile::mem_read, MemFile::mem_seek};
-/* How often (in ms) the current ticks are polled */
-static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
-
-SequencePlayer::SequencePlayer() {
-  /* Use the system default output device.
-   * The sample rate is actually only respected on Linux: on Windows and macOS, BASS will use the
-   * native sampling frequency. */
-  BASS_Init(-1, 44100, 0, nullptr, nullptr);
-  if (BASS_ErrorGetCode() != BASS_OK) {
-    L_ERROR("Failed to initialize audio device. Collection playback will not be available.");
-    return;
-  }
-
-  m_seekupdate_timer = new QTimer(this);
-  connect(m_seekupdate_timer, &QTimer::timeout, [this]() {
-    if (playing()) {
-      playbackPositionChanged(elapsedTicks(), totalTicks(), PositionChangeOrigin::Playback);
+SequencePlayer::SequencePlayer(QObject* parent) : QObject(parent), positionTimer_(new QTimer(this)) {
+  audioReady_ = BASS_Init(-1, 44100, 0, nullptr, nullptr) != 0;
+  positionTimer_->setInterval(kPositionPollIntervalMs);
+  connect(positionTimer_, &QTimer::timeout, this, [this] {
+    if (!activeStream_) {
+      return;
     }
-  });
-  m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
-
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl, this, [this](VGMColl* coll) {
-    if (m_active_vgmcoll == coll) {
+    const DWORD state = BASS_ChannelIsActive(activeStream_);
+    if (state == BASS_ACTIVE_PLAYING) {
+      emit positionChanged(elapsedTicks(), totalTicks(), PositionChangeOrigin::Playback);
+    } else if (state == BASS_ACTIVE_STOPPED) {
       stop();
     }
   });
@@ -110,167 +85,167 @@ SequencePlayer::SequencePlayer() {
 
 SequencePlayer::~SequencePlayer() {
   stop();
-  BASS_Free();
-}
-
-void SequencePlayer::toggle() {
-  if (playing()) {
-    BASS_ChannelPause(m_active_stream);
-    m_seekupdate_timer->stop();
-  } else {
-    BASS_ChannelPlay(m_active_stream, false);
-    m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
+  if (audioReady_) {
+    BASS_Free();
   }
-
-  bool status = playing();
-  statusChange(status);
 }
 
-void SequencePlayer::stop() {
-  /* Stop polling seekbar, reset it, propagate that we're done */
-  playbackPositionChanged(0, 1, PositionChangeOrigin::Playback);
-
-  /* Stop the audio output */
-  BASS_ChannelStop(m_active_stream);
-
-  /* Release resources */
-  BASS_MIDI_FontFree(m_loaded_sf);
-  m_loaded_sf = 0;
-  BASS_StreamFree(m_active_stream);
-  m_active_stream = 0;
-  m_active_vgmcoll = nullptr;
-
-  statusChange(false);
-}
-
-void SequencePlayer::seek(int position, PositionChangeOrigin origin) {
-  BASS_ChannelSetPosition(m_active_stream, position, BASS_POS_MIDI_TICK);
-  playbackPositionChanged(position, totalTicks(), origin);
-}
-
-bool SequencePlayer::playing() const {
-  return m_active_stream && BASS_ChannelIsActive(m_active_stream) == BASS_ACTIVE_PLAYING;
-}
-
-int SequencePlayer::elapsedTicks() const {
-  return BASS_ChannelGetPosition(m_active_stream, BASS_POS_MIDI_TICK);
-}
-
-int SequencePlayer::totalTicks() const {
-  return BASS_ChannelGetLength(m_active_stream, BASS_POS_MIDI_TICK);
-}
-
-QString SequencePlayer::songTitle() const {
-  return m_song_title;
-}
-
-bool SequencePlayer::playCollection(const VGMColl *coll) {
-  if (coll == m_active_vgmcoll) {
-    toggle();
+bool SequencePlayer::load(vgmtrans::core::CollectionPlayback playback) {
+  if (!playback.playable()) {
+    emit errorOccurred(tr("The collection did not produce playable MIDI and SoundFont data."));
+    return false;
+  }
+  if (!audioReady_) {
+    emit errorOccurred(bassError(tr("Could not initialize the audio device")));
     return false;
   }
 
-  return loadCollection(coll, true);
-}
+  auto soundFontFile = std::make_unique<MemoryFile>(MemoryFile{
+      .bytes = std::move(playback.soundFont),
+  });
+  const HSOUNDFONT soundFont =
+      BASS_MIDI_FontInitUser(&kMemoryFileCallbacks, soundFontFile.get(), BASS_MIDI_FONT_XGDRUMS);
+  if (!soundFont) {
+    emit errorOccurred(bassError(tr("Could not load the generated SoundFont")));
+    return false;
+  }
+  soundFontFile.release();
 
-bool SequencePlayer::setActiveCollection(const VGMColl *coll) {
-  if (coll == m_active_vgmcoll) {
+  const HSTREAM stream =
+      BASS_MIDI_StreamCreateFile(true, playback.midi.data(), 0, playback.midi.size(), BASS_MIDI_DECAYEND, 0);
+  if (!stream) {
+    const QString error = bassError(tr("Could not load the generated MIDI"));
+    BASS_MIDI_FontFree(soundFont);
+    emit errorOccurred(error);
     return false;
   }
 
-  const bool wasPlaying = playing();
-  return loadCollection(coll, wasPlaying);
-}
-
-bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
-
-  VGMSeq *seq = coll->seq();
-  if (!seq) {
-    L_ERROR("Failed to play collection as it lacks sequence data.");
-    return false;
-  }
-
-  auto sf2 = conversion::createSF2File(*coll);
-  if (!sf2) {
-    L_ERROR("Failed to play collection as a soundfont file could not be produced.");
-    return false;
-  }
-
-  auto rawSF2 = sf2->saveToMem();
-  /* Deleted by MemFile::mem_close */
-  auto sf2_data_blob = std::make_unique<MemFile::DataBlob>(MemFile::DataBlob{0, std::move(rawSF2)});
-
-  /* Init soundfont */
-  HSOUNDFONT sf2_handle =
-      BASS_MIDI_FontInitUser(&memory_file_callbacks, sf2_data_blob.get(), BASS_MIDI_FONT_XGDRUMS);
-  if (BASS_ErrorGetCode() != BASS_OK) {
-    L_ERROR("Could not load soundfont. Maybe the system is running out of "
-                                  "memory or the sountfont was too large?");
-    return false;
-  }
-  sf2_data_blob.release();
-
-  auto midi = seq->convertToMidi(coll);
-  if (!midi) {
-    BASS_MIDI_FontFree(sf2_handle);
-    L_ERROR("Failed to convert sequence to MIDI");
-    return false;
-  }
-  std::vector<u8> raw_midi;
-  midi->writeMidiToBuffer(raw_midi);
-  /* Set up the MIDI stream */
-  HSTREAM midi_stream =
-      BASS_MIDI_StreamCreateFile(true, raw_midi.data(), 0, raw_midi.size(), BASS_MIDI_DECAYEND, 0);
-  if (BASS_ErrorGetCode() != BASS_OK) {
-    BASS_MIDI_FontFree(sf2_handle);
-
-    L_ERROR("Failed to read MIDI data");
-    return false;
-  }
-
-  /* Tie the loaded soundfont to the new MIDI stream */
-  BASS_MIDI_FONT font;
-  font.font = sf2_handle;
-  font.preset = -1;
-  font.bank = 0;
-  BASS_MIDI_StreamSetFonts(midi_stream, &font, 1);
-  if (BASS_ErrorGetCode() != BASS_OK) {
-    BASS_MIDI_FontFree(sf2_handle);
-    BASS_StreamFree(midi_stream);
-
-    L_ERROR("Could not assign soundfont to MIDI data");
-    return false;
-  }
-
-  /* Use 128 MIDI channels */
-  BASS_ChannelSetAttribute(midi_stream, BASS_ATTRIB_MIDI_CHANS, 128);
-  /* Turn on FXs (reverb, chorus) */
-  BASS_ChannelFlags(midi_stream, 0, BASS_MIDI_NOFX);
-
-  /* Set callback used to signal that the playback is over */
-  static auto stop_callback = [](HSYNC, DWORD, DWORD, void *player) {
-    reinterpret_cast<SequencePlayer *>(player)->stop();
+  BASS_MIDI_FONT font{
+      .font = soundFont,
+      .preset = -1,
+      .bank = 0,
   };
-  BASS_ChannelSetSync(midi_stream, BASS_SYNC_END, 0, stop_callback, this);
-
-  /* Stop the current playback in order to start the new song */
-  stop();
-
-  /* Reassign tracking info and start playback */
-  m_active_vgmcoll = coll;
-  m_active_stream = midi_stream;
-  m_loaded_sf = sf2_handle;
-  m_song_title = QString::fromStdString(m_active_vgmcoll->name());
-  if (startPlaying) {
-    toggle();
-  } else {
-    BASS_ChannelPause(m_active_stream);
-    statusChange(false);
+  if (!BASS_MIDI_StreamSetFonts(stream, &font, 1)) {
+    const QString error = bassError(tr("Could not assign the generated SoundFont"));
+    BASS_StreamFree(stream);
+    BASS_MIDI_FontFree(soundFont);
+    emit errorOccurred(error);
+    return false;
   }
 
+  static_cast<void>(BASS_ChannelSetAttribute(stream, BASS_ATTRIB_MIDI_CHANS, 128));
+  static_cast<void>(BASS_ChannelFlags(stream, 0, BASS_MIDI_NOFX));
+  static_cast<void>(BASS_ChannelSetSync(stream, BASS_SYNC_END, 0, &SequencePlayer::playbackEnded, this));
+
+  stop();
+  activeStream_ = stream;
+  loadedSoundFont_ = soundFont;
+  activePlayback_ = std::move(playback);
+
+  if (!BASS_ChannelPlay(activeStream_, false)) {
+    const QString error = bassError(tr("Could not start playback"));
+    stop();
+    emit errorOccurred(error);
+    return false;
+  }
+  positionTimer_->start();
+  emit positionChanged(0, totalTicks(), PositionChangeOrigin::Playback);
+  emit stateChanged(true, true);
   return true;
 }
 
-const VGMColl* SequencePlayer::activeCollection() const {
-  return m_active_vgmcoll;
+void SequencePlayer::toggle() {
+  if (!activeStream_) {
+    return;
+  }
+  if (playing()) {
+    if (!BASS_ChannelPause(activeStream_)) {
+      emit errorOccurred(bassError(tr("Could not pause playback")));
+      return;
+    }
+    positionTimer_->stop();
+  } else if (BASS_ChannelPlay(activeStream_, false)) {
+    positionTimer_->start();
+  } else {
+    emit errorOccurred(bassError(tr("Could not resume playback")));
+  }
+  emit stateChanged(playing(), true);
+}
+
+void SequencePlayer::stop() {
+  positionTimer_->stop();
+  if (activeStream_) {
+    BASS_ChannelStop(activeStream_);
+    BASS_StreamFree(activeStream_);
+    activeStream_ = 0;
+  }
+  if (loadedSoundFont_) {
+    BASS_MIDI_FontFree(loadedSoundFont_);
+    loadedSoundFont_ = 0;
+  }
+  activePlayback_.reset();
+  emit positionChanged(0, 1, PositionChangeOrigin::Playback);
+  emit stateChanged(false, false);
+}
+
+void SequencePlayer::seek(int position, PositionChangeOrigin origin) {
+  if (!activeStream_) {
+    return;
+  }
+  const int maximum = totalTicks();
+  const int target = std::clamp(position, 0, maximum);
+  if (!BASS_ChannelSetPosition(activeStream_, static_cast<QWORD>(target), BASS_POS_MIDI_TICK)) {
+    emit errorOccurred(bassError(tr("Could not seek playback")));
+    return;
+  }
+  emit positionChanged(target, maximum, origin);
+}
+
+bool SequencePlayer::playing() const {
+  return activeStream_ && BASS_ChannelIsActive(activeStream_) == BASS_ACTIVE_PLAYING;
+}
+
+vgmtrans::core::CollectionId SequencePlayer::activeCollection() const noexcept {
+  return activePlayback_ ? activePlayback_->collection : vgmtrans::core::CollectionId{};
+}
+
+vgmtrans::core::AssetId SequencePlayer::activeSequence() const noexcept {
+  return activePlayback_ ? activePlayback_->sequence : vgmtrans::core::AssetId{};
+}
+
+std::span<const vgmtrans::core::AssetId> SequencePlayer::activeAssets() const noexcept {
+  return activePlayback_ ? std::span<const vgmtrans::core::AssetId>(activePlayback_->assetDependencies)
+                         : std::span<const vgmtrans::core::AssetId>{};
+}
+
+const vgmtrans::core::PerformanceSequence* SequencePlayer::activePerformance() const noexcept {
+  return activePlayback_ ? &activePlayback_->performance : nullptr;
+}
+
+int SequencePlayer::elapsedTicks() const {
+  return activeStream_ ? tickValue(BASS_ChannelGetPosition(activeStream_, BASS_POS_MIDI_TICK)) : 0;
+}
+
+int SequencePlayer::totalTicks() const {
+  return activeStream_ ? std::max(1, tickValue(BASS_ChannelGetLength(activeStream_, BASS_POS_MIDI_TICK))) : 1;
+}
+
+QString SequencePlayer::bassError(const QString& action) const {
+  return tr("%1 (BASS error %2).").arg(action).arg(BASS_ErrorGetCode());
+}
+
+void CALLBACK SequencePlayer::playbackEnded(HSYNC, DWORD channel, DWORD, void* user) {
+  auto* player = static_cast<SequencePlayer*>(user);
+  if (player == nullptr) {
+    return;
+  }
+  QMetaObject::invokeMethod(
+      player, [player, stream = static_cast<HSTREAM>(channel)] { player->handlePlaybackEnded(stream); },
+      Qt::QueuedConnection);
+}
+
+void SequencePlayer::handlePlaybackEnded(HSTREAM stream) {
+  if (stream == activeStream_) {
+    stop();
+  }
 }

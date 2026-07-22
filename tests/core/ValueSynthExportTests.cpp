@@ -631,6 +631,112 @@ void synthExportAssignsPresetAddressFromSourceInstrumentIdentity() {
          "synth lowering should assign preset addressing from the neutral source key");
 }
 
+void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "playback.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
+
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{.id = TrackId{0}, .sourceTrackNumber = 3, .startAddress = Address{0}};
+  TrackProgramBuilder trackBuilder(track);
+  const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  track.commands.back().annotation = SourceAnnotationId{40};
+  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  track.commands.back().annotation = SourceAnnotationId{41};
+
+  const SequenceProgramAsset sequence{
+      .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "Playback Sequence"},
+      .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+  };
+  const SampleCollectionAsset samples{
+      .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Playback Samples"},
+      .samples = SampleCollection{.samples = {Sample{
+                                      .name = "Zero",
+                                      .codec = AudioCodec::SnesBrr,
+                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                                      .sampleRate = 16000,
+                                  }}},
+  };
+  const InstrumentSetAsset instruments{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Playback Instruments"},
+      .instruments = {Instrument{
+          .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
+          .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
+      }},
+  };
+
+  SessionSnapshotBuilder builder;
+  builder.assets.emplace_back(sequence);
+  builder.assets.emplace_back(instruments);
+  builder.assets.emplace_back(samples);
+  builder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Playback",
+      .sequence = sequence.metadata.id,
+      .instrumentSets = {instruments.metadata.id},
+      .sampleCollections = {samples.metadata.id},
+  });
+  SequenceDialectRegistry dialects;
+  dialects.add(dialect);
+
+  const auto playback =
+      prepareCollectionPlayback(builder.finish(), sources, CollectionId{0}, PlaybackRequest{}, dialects);
+  expect(playback.playable() && playback.diagnostics.empty(),
+         "valid collection playback should prepare clean MIDI and SoundFont data");
+  expect(playback.collection == CollectionId{0} && playback.sequence == sequence.metadata.id &&
+             playback.title == "Playback",
+         "prepared playback should retain stable collection and sequence identity");
+  expect(playback.assetDependencies ==
+             std::vector<AssetId>{sequence.metadata.id, instruments.metadata.id, samples.metadata.id},
+         "prepared playback should identify the assets whose removal invalidates it");
+  expect(playback.midi.size() >= 4 && std::string(playback.midi.begin(), playback.midi.begin() + 4) == "MThd",
+         "prepared playback should contain a Standard MIDI File");
+  expect(playback.soundFont.size() >= 12 &&
+             std::string(playback.soundFont.begin() + 8, playback.soundFont.begin() + 12) == "sfbk",
+         "prepared playback should contain an SF2 RIFF file");
+  expect(playback.performance.sourceSpans ==
+             std::vector<SourcePlaybackSpan>{
+                 {.annotation = SourceAnnotationId{40}, .beginTick = 0, .endTick = 4},
+                 {.annotation = SourceAnnotationId{41}, .beginTick = 4, .endTick = 5},
+             },
+         "prepared playback should retain the VM source timeline used by inspectors");
+
+  SessionSnapshotBuilder sequenceOnlyBuilder;
+  sequenceOnlyBuilder.assets.emplace_back(sequence);
+  sequenceOnlyBuilder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Missing Synth",
+      .sequence = sequence.metadata.id,
+  });
+  const auto missingSynth =
+      prepareCollectionPlayback(sequenceOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, dialects);
+  expect(!missingSynth.playable() &&
+             std::ranges::any_of(missingSynth.diagnostics,
+                                 [](const Diagnostic& diagnostic) {
+                                   return diagnostic.message == "No decodable samples available for SoundFont2 export";
+                                 }),
+         "playback preparation should preserve a useful SoundFont failure diagnostic");
+
+  SessionSnapshotBuilder synthOnlyBuilder;
+  synthOnlyBuilder.assets.emplace_back(instruments);
+  synthOnlyBuilder.assets.emplace_back(samples);
+  synthOnlyBuilder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Missing Sequence",
+      .instrumentSets = {instruments.metadata.id},
+      .sampleCollections = {samples.metadata.id},
+  });
+  const auto missingSequence =
+      prepareCollectionPlayback(synthOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, dialects);
+  expect(!missingSequence.playable() &&
+             std::ranges::any_of(missingSequence.diagnostics,
+                                 [](const Diagnostic& diagnostic) {
+                                   return diagnostic.message == "Collection does not reference a sequence asset";
+                                 }),
+         "playback preparation should preserve a useful MIDI failure diagnostic");
+}
+
 }  // namespace
 
 void runValueSynthExportTests() {
@@ -645,4 +751,5 @@ void runValueSynthExportTests() {
   standaloneSynthExportsKeepNativeModulation();
   exportDiagnosticsPreserveSourceRanges();
   synthExportAssignsPresetAddressFromSourceInstrumentIdentity();
+  collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair();
 }

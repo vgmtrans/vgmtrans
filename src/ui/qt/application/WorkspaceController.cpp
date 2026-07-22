@@ -119,6 +119,11 @@ size_t WorkspaceController::removeAssets(std::span<const core::AssetId> assets) 
   return existing.size();
 }
 
+core::CollectionPlayback WorkspaceController::preparePlayback(core::CollectionId id,
+                                                              const core::PlaybackRequest& request) const {
+  return session_.preparePlayback(id, request);
+}
+
 std::vector<core::Artifact> WorkspaceController::exportCollection(core::CollectionId id,
                                                                   const core::ExportRequest& request) const {
   return session_.exportCollection(id, request);

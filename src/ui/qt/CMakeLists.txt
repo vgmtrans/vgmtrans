@@ -55,6 +55,7 @@ target_sources(vgmtrans
     Logger.cpp
     PlaybackControls.cpp
     ReportDialog.cpp
+    SequencePlayer.cpp
     MainWindow.cpp
     MainWindowDockLayout.cpp
     MenuBar.cpp
@@ -94,6 +95,7 @@ target_sources(vgmtrans
       PlaybackPosition.h
       PlaybackControls.h
       ReportDialog.h
+      SequencePlayer.h
       MainWindow.h
       MainWindowDockLayout.h
       MenuBar.h
@@ -144,7 +146,7 @@ target_include_directories(vgmtrans PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/util
   ${CMAKE_CURRENT_LIST_DIR}/widgets
   ${CMAKE_CURRENT_LIST_DIR}/workarea)
-target_link_libraries(vgmtrans PRIVATE vgmtransqtvalue vgmtransversion
+target_link_libraries(vgmtrans PRIVATE vgmtransqtvalue vgmtransversion BASS::MIDI
                       QWindowKit::Widgets Qt6::Widgets Qt6::GuiPrivate Qt6::Svg)
 set_target_properties(vgmtrans PROPERTIES AUTOMOC ON)
 
@@ -297,6 +299,11 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_source_files_properties(
     "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
     PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  set_target_properties(vgmtrans PROPERTIES
+      INSTALL_RPATH "@executable_path/../Frameworks"
+      INSTALL_RPATH_USE_LINK_PATH TRUE)
+  install(FILES $<TARGET_FILE:BASS::BASS> $<TARGET_FILE:BASS::MIDI>
+          DESTINATION "VGMTrans.app/Contents/Frameworks")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   target_sources(vgmtrans PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
   install(FILES $<TARGET_RUNTIME_DLLS:vgmtrans>
@@ -308,6 +315,11 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       --skip-plugin-types tls)
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
   set(APP_ID "io.github.vgmtrans.vgmtrans")
+
+  install(FILES $<TARGET_FILE:BASS::BASS> $<TARGET_FILE:BASS::MIDI>
+          DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+  set_target_properties(vgmtrans PROPERTIES
+      INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 
   install(FILES resources/vgmtrans.png
           DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps"

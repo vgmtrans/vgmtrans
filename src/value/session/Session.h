@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/export/ExportTypes.h"
+#include "value/export/Export.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/model/SourceInspection.h"
 #include "value/scan/FormatRegistry.h"
@@ -50,6 +50,7 @@ public:
   [[nodiscard]] SessionSnapshot snapshot() const;
   [[nodiscard]] std::shared_ptr<const SourceInspection> inspect(AssetId asset) const;
 
+  [[nodiscard]] CollectionPlayback preparePlayback(CollectionId id, const PlaybackRequest& request) const;
   [[nodiscard]] std::vector<Artifact> exportCollection(CollectionId id, const ExportRequest& request) const;
   [[nodiscard]] std::vector<CollectionExport> exportAllCollections(const ExportRequest& request) const;
 

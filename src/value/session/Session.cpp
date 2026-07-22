@@ -189,6 +189,11 @@ std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
   return SourceInspection::create(metadata(*value), sourceMaps_.all(), sources_.sharedBytes(source));
 }
 
+CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackRequest& request) const {
+  const auto current = snapshot();
+  return core::prepareCollectionPlayback(current, sources_, id, request, dialects_, &formats_);
+}
+
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
   const auto current = snapshot();
   return core::exportCollection(current, sources_, id, request, dialects_, &formats_);

@@ -22,10 +22,14 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
   const std::array<u8, 1> endBytes{0xff};
   addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  track.commands.back().annotation = SourceAnnotationId{10};
   const CommandId noteCommandId =
       addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes).id;
+  track.commands.back().annotation = SourceAnnotationId{11};
   addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+  track.commands.back().annotation = SourceAnnotationId{12};
   addProbeCommand<ProbeEndCommand>(builder, dialect, Address{8}, probeRange(8, endBytes.size()), endBytes);
+  track.commands.back().annotation = SourceAnnotationId{13};
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -73,6 +77,41 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   expect(sourceCommandForEvent(program, PerformanceEventHeader{.sourceCommand = CommandId{99}, .track = TrackId{2}}) ==
              nullptr,
          "performance source-link helper should return null for a missing command");
+
+  expect(performance.sourceSpans ==
+             std::vector<SourcePlaybackSpan>{
+                 {.annotation = SourceAnnotationId{10}, .beginTick = 0, .endTick = 1},
+                 {.annotation = SourceAnnotationId{11}, .beginTick = 0, .endTick = 12},
+             },
+         "source timeline should preserve point and note durations while trimming the final loop boundary");
+}
+
+void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
+  const SequenceDialect dialect{
+      .id = DialectId{.value = "source-timeline-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .execute = [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter&,
+                    VmApi& vm) { return command.address.value == 0 ? Effects::wait(7) : Effects{.step = vm.end()}; },
+  };
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder builder(track);
+  builder.addSemantic(Address{0}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
+  builder.addSemantic(Address{1}, 0, 1, {}, {}, DecodeFlow::terminalFlow(), SourceAnnotationId{21});
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.tracks[0].events.empty(),
+         "eventless source-timeline fixture should not invent musical performance events");
+  expect(performance.sourceSpans ==
+             std::vector<SourcePlaybackSpan>{
+                 {.annotation = SourceAnnotationId{20}, .beginTick = 0, .endTick = 7},
+                 {.annotation = SourceAnnotationId{21}, .beginTick = 7, .endTick = 8},
+             },
+         "source timeline should preserve waits and zero-time commands without musical events");
 }
 
 void sequenceVmReplaysInfiniteLoopsWhenRequested() {
@@ -969,6 +1008,7 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
 
 void runValueSequenceVmTests() {
   sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
+  sequenceVmTimesCommandsThatEmitNoPerformanceEvents();
   sequenceVmReplaysInfiniteLoopsWhenRequested();
   sequenceVmStopsDeclaredLoopBeforeTargetReplay();
   sequenceVmPreservesDeclaredLoopAsPerformanceMarkers();
