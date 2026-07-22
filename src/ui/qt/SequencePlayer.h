@@ -41,7 +41,7 @@ public:
   [[nodiscard]] vgmtrans::core::CollectionId activeCollection() const noexcept;
   [[nodiscard]] vgmtrans::core::AssetId activeSequence() const noexcept;
   [[nodiscard]] std::span<const vgmtrans::core::AssetId> activeAssets() const noexcept;
-  [[nodiscard]] const vgmtrans::core::PerformanceSequence* activePerformance() const noexcept;
+  [[nodiscard]] std::span<const vgmtrans::core::SourcePlaybackSpan> activeSourceSpans() const noexcept;
 
 signals:
   void stateChanged(bool playing, bool hasActiveCollection);
@@ -49,8 +49,6 @@ signals:
   void errorOccurred(const QString& message);
 
 private:
-  static void CALLBACK playbackEnded(HSYNC handle, DWORD channel, DWORD data, void* user);
-  void handlePlaybackEnded(HSTREAM stream);
   [[nodiscard]] int elapsedTicks() const;
   [[nodiscard]] int totalTicks() const;
   [[nodiscard]] QString bassError(const QString& action) const;

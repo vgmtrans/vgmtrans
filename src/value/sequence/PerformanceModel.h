@@ -233,7 +233,8 @@ struct PerformanceTrack {
 
 // Maps an executed source command to the half-open interval during which it is
 // active in the rendered sequence. This includes commands such as rests and
-// control flow that do not emit a PerformanceEvent.
+// control flow that do not emit a PerformanceEvent. Spans are kept in scheduled
+// execution order, with nondecreasing begin ticks.
 struct SourcePlaybackSpan {
   SourceAnnotationId annotation;
   u64 beginTick = 0;

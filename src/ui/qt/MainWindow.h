@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "PlaybackPosition.h"
 #include "main/base/ToastType.h"
 
 #include <QList>
@@ -65,9 +64,6 @@ public slots:
 signals:
   void manualCollectionRequested();
   void collectionStitchRequested();
-  void playbackToggleRequested();
-  void playbackStopRequested();
-  void playbackSeekRequested(int position, PositionChangeOrigin origin);
   void seekModifierActiveChanged(bool active);
 
 protected:
@@ -98,6 +94,7 @@ private:
   void openFileInternal(const QString& filename);
   void removeSelectedSources();
   void removeSelectedAssets();
+  void togglePlayback();
   void updateSelectionStatus(const QModelIndex& index,
                              SelectionStatusKind kind);
 

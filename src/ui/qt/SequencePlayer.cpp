@@ -12,7 +12,6 @@
 #include <memory>
 #include <utility>
 
-#include <QMetaObject>
 #include <QTimer>
 
 namespace {
@@ -135,7 +134,6 @@ bool SequencePlayer::load(vgmtrans::core::CollectionPlayback playback) {
 
   static_cast<void>(BASS_ChannelSetAttribute(stream, BASS_ATTRIB_MIDI_CHANS, 128));
   static_cast<void>(BASS_ChannelFlags(stream, 0, BASS_MIDI_NOFX));
-  static_cast<void>(BASS_ChannelSetSync(stream, BASS_SYNC_END, 0, &SequencePlayer::playbackEnded, this));
 
   stop();
   activeStream_ = stream;
@@ -218,8 +216,10 @@ std::span<const vgmtrans::core::AssetId> SequencePlayer::activeAssets() const no
                          : std::span<const vgmtrans::core::AssetId>{};
 }
 
-const vgmtrans::core::PerformanceSequence* SequencePlayer::activePerformance() const noexcept {
-  return activePlayback_ ? &activePlayback_->performance : nullptr;
+std::span<const vgmtrans::core::SourcePlaybackSpan> SequencePlayer::activeSourceSpans() const noexcept {
+  return activePlayback_
+             ? std::span<const vgmtrans::core::SourcePlaybackSpan>(activePlayback_->performance.sourceSpans)
+             : std::span<const vgmtrans::core::SourcePlaybackSpan>{};
 }
 
 int SequencePlayer::elapsedTicks() const {
@@ -232,20 +232,4 @@ int SequencePlayer::totalTicks() const {
 
 QString SequencePlayer::bassError(const QString& action) const {
   return tr("%1 (BASS error %2).").arg(action).arg(BASS_ErrorGetCode());
-}
-
-void CALLBACK SequencePlayer::playbackEnded(HSYNC, DWORD channel, DWORD, void* user) {
-  auto* player = static_cast<SequencePlayer*>(user);
-  if (player == nullptr) {
-    return;
-  }
-  QMetaObject::invokeMethod(
-      player, [player, stream = static_cast<HSTREAM>(channel)] { player->handlePlaybackEnded(stream); },
-      Qt::QueuedConnection);
-}
-
-void SequencePlayer::handlePlaybackEnded(HSTREAM stream) {
-  if (stream == activeStream_) {
-    stop();
-  }
 }

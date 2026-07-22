@@ -9,7 +9,6 @@
 #include <any>
 #include <algorithm>
 #include <fmt/format.h>
-#include <iterator>
 #include <limits>
 #include <map>
 #include <memory>
@@ -286,7 +285,6 @@ void endSourceSpansAt(std::vector<SourcePlaybackSpan>& spans, u64 endTick) {
 
 struct RenderedTrack {
   PerformanceTrack track;
-  std::vector<SourcePlaybackSpan> sourceSpans;
   std::optional<u64> loopStopTick;
 };
 
@@ -368,7 +366,7 @@ public:
       for (size_t i = firstEvent; i < performanceTrack_.events.size(); ++i) {
         endTick = std::max(endTick, eventEndTick(performanceTrack_.events[i]));
       }
-      sourceSpans_.push_back(SourcePlaybackSpan{
+      targetSequence_.sourceSpans.push_back(SourcePlaybackSpan{
           .annotation = command.annotation,
           .beginTick = beginTick,
           .endTick = endTick,
@@ -384,7 +382,6 @@ public:
     performanceTrack_.endTick = runtime_.tick;
     return RenderedTrack{
         .track = std::move(performanceTrack_),
-        .sourceSpans = std::move(sourceSpans_),
         .loopStopTick = loopStopTick_ ? loopStopTick_ : firstLoopTick_,
     };
   }
@@ -593,7 +590,6 @@ private:
   PerformanceSequence& targetSequence_;
   std::optional<u64> stopTick_;
   PerformanceTrack performanceTrack_;
-  std::vector<SourcePlaybackSpan> sourceSpans_;
   std::any trackState_;
   std::any* programState_ = nullptr;
   VmTrackRuntime runtime_;
@@ -790,25 +786,16 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
       std::vector<PerformanceTrack> tracks;
       tracks.reserve(executors.size());
+      if (sequenceEndTick) {
+        endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
+      }
       for (auto& executor : executors) {
         auto rendered = executor->finish();
         if (sequenceEndTick) {
           endTrackAt(rendered.track, *sequenceEndTick);
-          endSourceSpansAt(rendered.sourceSpans, *sequenceEndTick);
         }
-        target.sourceSpans.insert(target.sourceSpans.end(), std::make_move_iterator(rendered.sourceSpans.begin()),
-                                  std::make_move_iterator(rendered.sourceSpans.end()));
         tracks.push_back(std::move(rendered.track));
       }
-      std::ranges::sort(target.sourceSpans, [](const SourcePlaybackSpan& lhs, const SourcePlaybackSpan& rhs) {
-        if (lhs.beginTick != rhs.beginTick) {
-          return lhs.beginTick < rhs.beginTick;
-        }
-        if (lhs.endTick != rhs.endTick) {
-          return lhs.endTick < rhs.endTick;
-        }
-        return lhs.annotation.value < rhs.annotation.value;
-      });
       return tracks;
     };
 
