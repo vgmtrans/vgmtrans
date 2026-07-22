@@ -11,6 +11,7 @@
 
 #include <QCoreApplication>
 #include <QFile>
+#include <QIcon>
 #include <QTemporaryDir>
 
 #include <array>
@@ -96,6 +97,15 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
          "asset model should expose value metadata");
 
   const auto collectionId = CollectionId{collections.index(0, 0).data(IdRole).toUInt()};
+  const auto normalCollectionIcon = collections.index(0, 0).data(Qt::DecorationRole).value<QIcon>();
+  collections.setPlayingCollection(collectionId);
+  const auto playingCollectionIcon = collections.index(0, 0).data(Qt::DecorationRole).value<QIcon>();
+  expect(playingCollectionIcon.cacheKey() != normalCollectionIcon.cacheKey(),
+         "collection model should decorate the playing collection with a distinct icon");
+  collections.setPlayingCollection(std::nullopt);
+  expect(collections.index(0, 0).data(Qt::DecorationRole).value<QIcon>().cacheKey() ==
+             normalCollectionIcon.cacheKey(),
+         "collection model should restore the normal icon when playback stops");
   contents.setCollection(collectionId);
   expect(contents.rowCount() == 2, "collection contents should expose the collection root and resolve its member ids");
   expect(workspace.sourceBytes(SourceId{0}).size() == 3, "workspace should expose source bytes for later inspectors");

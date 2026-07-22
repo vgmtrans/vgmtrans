@@ -42,6 +42,7 @@ class WidgetWindowAgent;
 
 namespace vgmtrans::ui {
 class CollectionContentsModel;
+class CollectionTableModel;
 class WorkspaceController;
 }
 
@@ -105,6 +106,7 @@ private:
   CollectionListView* m_coll_listview{};
   QListView* m_coll_view{};
   QSortFilterProxyModel* m_collection_filter{};
+  vgmtrans::ui::CollectionTableModel* m_collection_model{};
   vgmtrans::ui::CollectionContentsModel* m_collection_contents_model{};
 
   QDockWidget *m_rawfile_dock{};
