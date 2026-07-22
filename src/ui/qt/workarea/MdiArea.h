@@ -10,6 +10,7 @@
 #include "value/base/CoreTypes.h"
 #include "value/sequence/PerformanceModel.h"
 
+#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -47,16 +48,16 @@ public:
   void newView(vgmtrans::core::AssetId asset);
   void workspaceChanged();
   void selectAsset(vgmtrans::core::AssetId asset, QWidget* caller);
+  void setPlaybackSequence(vgmtrans::core::AssetId sequence,
+                           std::span<const vgmtrans::core::SourcePlaybackSpan> timeline);
+  void clearPlayback();
 
 public slots:
   void increaseActiveHexFont();
   void decreaseActiveHexFont();
   void resetActiveHexFont();
   void setSeekModifierActive(bool active);
-  void setPlaybackSequence(vgmtrans::core::AssetId sequence,
-                           const vgmtrans::core::PerformanceSequence& performance);
   void setPlaybackPosition(int current, int maximum, PositionChangeOrigin origin);
-  void setPlaybackState(bool playing, bool hasActiveCollection);
 
 signals:
   void assetSelected(vgmtrans::core::AssetId asset, QWidget* caller);
@@ -82,8 +83,6 @@ private:
   static void ensureMaximizedSubWindow(QMdiSubWindow *window);
   vgmtrans::ui::WorkspaceController* m_workspace{};
   bool m_seekModifierActive = false;
-  bool m_playing = false;
-  bool m_hasActivePlayback = false;
   int m_playbackPosition = 0;
   int m_playbackMaximum = 1;
   vgmtrans::core::AssetId m_playbackSequence;

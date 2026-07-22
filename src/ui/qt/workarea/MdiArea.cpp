@@ -14,8 +14,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -46,52 +44,6 @@ QIcon assetIcon(const vgmtrans::core::Asset& asset) {
     return QIcon(QStringLiteral(":/icons/sample-collection.svg"));
   }
   return QIcon(QStringLiteral(":/icons/binary.svg"));
-}
-
-int playbackTick(u64 tick) {
-  return static_cast<int>(
-      std::min<u64>(tick, std::numeric_limits<int>::max()));
-}
-
-std::vector<VGMFileView::PlaybackAnnotationSpan> playbackTimeline(
-    const vgmtrans::ui::WorkspaceController* workspace,
-    vgmtrans::core::AssetId sequence,
-    const std::vector<vgmtrans::core::SourcePlaybackSpan>& sourceSpans) {
-  std::vector<VGMFileView::PlaybackAnnotationSpan> result;
-  if (workspace == nullptr) {
-    return result;
-  }
-
-  const auto* sequenceAsset =
-      workspace->snapshot().asset<vgmtrans::core::SequenceProgramAsset>(sequence);
-  if (sequenceAsset == nullptr) {
-    return result;
-  }
-
-  std::unordered_map<vgmtrans::core::SourceAnnotationId, u32> trackByAnnotation;
-  for (size_t trackIndex = 0;
-       trackIndex < sequenceAsset->program.tracks.size(); ++trackIndex) {
-    for (const auto& command : sequenceAsset->program.tracks[trackIndex].commands) {
-      if (command.annotation.valid()) {
-        trackByAnnotation.emplace(command.annotation,
-                                  static_cast<u32>(trackIndex));
-      }
-    }
-  }
-
-  result.reserve(sourceSpans.size());
-  for (const auto& span : sourceSpans) {
-    const auto track = trackByAnnotation.find(span.annotation);
-    const u64 endTick =
-        span.endTick > span.beginTick ? span.endTick - 1 : span.beginTick;
-    result.push_back({
-        .annotation = span.annotation,
-        .trackIndex = track != trackByAnnotation.end() ? track->second : 0,
-        .startTick = playbackTick(span.beginTick),
-        .endTick = playbackTick(endTick),
-    });
-  }
-  return result;
 }
 
 struct DetailedInstruction {
@@ -358,11 +310,9 @@ void MdiArea::newView(vgmtrans::core::AssetId asset) {
   inspector->setWindowIcon(assetIcon(*value));
   inspector->setSeekModifierActive(m_seekModifierActive);
   if (asset == m_playbackSequence) {
-    inspector->setPlaybackTimeline(
-        playbackTimeline(m_workspace, asset, m_playbackSpans));
+    inspector->setPlaybackTimeline(m_playbackSpans);
     inspector->onPlaybackPositionChanged(
         m_playbackPosition, m_playbackMaximum, PositionChangeOrigin::HexView);
-    inspector->onPlayerStatusChanged(m_playing, m_hasActivePlayback);
   }
   const QString name = inspector->windowTitle();
   QMdiSubWindow* window = addSubWindow(inspector, Qt::SubWindow);
@@ -472,7 +422,7 @@ void MdiArea::setSeekModifierActive(bool active) {
 
 void MdiArea::setPlaybackSequence(
     vgmtrans::core::AssetId sequence,
-    const vgmtrans::core::PerformanceSequence& performance) {
+    std::span<const vgmtrans::core::SourcePlaybackSpan> timeline) {
   if (m_playbackSequence.valid() && m_playbackSequence != sequence) {
     const auto previous = assetToWindowMap.find(m_playbackSequence.value);
     if (previous != assetToWindowMap.end()) {
@@ -484,16 +434,14 @@ void MdiArea::setPlaybackSequence(
   }
 
   m_playbackSequence = sequence;
-  m_playbackSpans = performance.sourceSpans;
+  m_playbackSpans.assign(timeline.begin(), timeline.end());
 
   const auto current = assetToWindowMap.find(sequence.value);
   if (current != assetToWindowMap.end()) {
     if (auto* view = qobject_cast<VGMFileView*>(current->second.content.data())) {
-      view->setPlaybackTimeline(
-          playbackTimeline(m_workspace, sequence, m_playbackSpans));
+      view->setPlaybackTimeline(m_playbackSpans);
       view->onPlaybackPositionChanged(
           m_playbackPosition, m_playbackMaximum, PositionChangeOrigin::HexView);
-      view->onPlayerStatusChanged(m_playing, m_hasActivePlayback);
     }
   }
 }
@@ -513,26 +461,19 @@ void MdiArea::setPlaybackPosition(int current, int maximum,
   }
 }
 
-void MdiArea::setPlaybackState(bool playing, bool hasActiveCollection) {
-  m_playing = playing;
-  m_hasActivePlayback = hasActiveCollection;
+void MdiArea::clearPlayback() {
   if (m_playbackSequence.valid()) {
     const auto found = assetToWindowMap.find(m_playbackSequence.value);
     if (found != assetToWindowMap.end()) {
       if (auto* view = qobject_cast<VGMFileView*>(found->second.content.data())) {
-        view->onPlayerStatusChanged(playing, hasActiveCollection);
-        if (!hasActiveCollection) {
-          view->setPlaybackTimeline({});
-        }
+        view->setPlaybackTimeline({});
       }
     }
   }
-  if (!hasActiveCollection) {
-    m_playbackSequence = {};
-    m_playbackSpans.clear();
-    m_playbackPosition = 0;
-    m_playbackMaximum = 1;
-  }
+  m_playbackSequence = {};
+  m_playbackSpans.clear();
+  m_playbackPosition = 0;
+  m_playbackMaximum = 1;
 }
 
 void MdiArea::selectAsset(vgmtrans::core::AssetId asset, QWidget* caller) {

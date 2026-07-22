@@ -26,7 +26,7 @@
 
 namespace {
 
-int statusValue(u64 value) {
+int boundedInt(u64 value) {
   return static_cast<int>(std::min<u64>(value, std::numeric_limits<int>::max()));
 }
 
@@ -149,9 +149,9 @@ void VGMFileView::seekToAnnotation(vgmtrans::core::SourceAnnotationId annotation
   }
   emit seekToAnnotationRequested(annotation);
   const auto found = std::ranges::find_if(
-      playbackTimeline_, [annotation](const PlaybackAnnotationSpan& span) { return span.annotation == annotation; });
+      playbackTimeline_, [annotation](const auto& span) { return span.annotation == annotation; });
   if (found != playbackTimeline_.end()) {
-    emit playbackSeekRequested(found->startTick, PositionChangeOrigin::HexView);
+    emit playbackSeekRequested(boundedInt(found->beginTick), PositionChangeOrigin::HexView);
   }
 }
 
@@ -166,25 +166,7 @@ void VGMFileView::setPlaybackAnnotations(const std::vector<vgmtrans::core::Sourc
   treeView_->setPlaybackAnnotations(annotations);
 }
 
-void VGMFileView::setPlaybackTimeline(std::vector<PlaybackAnnotationSpan> timeline) {
-  timeline.erase(std::remove_if(timeline.begin(), timeline.end(),
-                                [](PlaybackAnnotationSpan& span) {
-                                  if (!span.annotation.valid()) {
-                                    return true;
-                                  }
-                                  span.endTick = std::max(span.startTick, span.endTick);
-                                  return false;
-                                }),
-                 timeline.end());
-  std::ranges::sort(timeline, [](const PlaybackAnnotationSpan& lhs, const PlaybackAnnotationSpan& rhs) {
-    if (lhs.startTick != rhs.startTick) {
-      return lhs.startTick < rhs.startTick;
-    }
-    if (lhs.trackIndex != rhs.trackIndex) {
-      return lhs.trackIndex < rhs.trackIndex;
-    }
-    return lhs.annotation.value < rhs.annotation.value;
-  });
+void VGMFileView::setPlaybackTimeline(std::vector<vgmtrans::core::SourcePlaybackSpan> timeline) {
   playbackTimeline_ = std::move(timeline);
   lastPlaybackAnnotations_.clear();
   lastPlaybackColors_.clear();
@@ -198,10 +180,12 @@ void VGMFileView::onPlaybackPositionChanged(int current, int maximum, PositionCh
   }
 
   const int tickDifference = current - lastPlaybackPosition_;
-  std::vector<PlaybackAnnotationSpan> spans;
+  std::vector<vgmtrans::core::SourcePlaybackSpan> spans;
   switch (origin) {
     case PositionChangeOrigin::Playback:
-      spans = tickDifference <= 20 ? playbackSpansInRange(lastPlaybackPosition_, current) : playbackSpansAt(current);
+      spans = tickDifference >= 0 && tickDifference <= 20
+                  ? playbackSpansInRange(lastPlaybackPosition_, current)
+                  : playbackSpansInRange(current, current);
       break;
     case PositionChangeOrigin::SeekBar:
       if (tickDifference >= -500 && tickDifference <= 500) {
@@ -214,11 +198,11 @@ void VGMFileView::onPlaybackPositionChanged(int current, int maximum, PositionCh
           onPlaybackPositionChanged(current, maximum, PositionChangeOrigin::HexView);
         });
       } else {
-        spans = playbackSpansAt(current);
+        spans = playbackSpansInRange(current, current);
       }
       break;
     case PositionChangeOrigin::HexView:
-      spans = playbackSpansAt(current);
+      spans = playbackSpansInRange(current, current);
       break;
   }
   lastPlaybackPosition_ = current;
@@ -233,7 +217,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int maximum, PositionCh
       continue;
     }
     annotations.push_back(span.annotation);
-    colors.push_back(QColor::fromHsv(static_cast<int>((span.trackIndex * 43) % 360), 190, 235));
+    colors.push_back(
+        QColor::fromHsv(static_cast<int>((playbackTrackIndex(span.annotation) * 43) % 360), 190, 235));
   }
 
   if (annotations == lastPlaybackAnnotations_ && colors == lastPlaybackColors_) {
@@ -243,16 +228,6 @@ void VGMFileView::onPlaybackPositionChanged(int current, int maximum, PositionCh
   lastPlaybackAnnotations_ = annotations;
   lastPlaybackColors_ = colors;
   setPlaybackAnnotations(annotations, colors);
-}
-
-void VGMFileView::onPlayerStatusChanged(bool playing, bool hasActiveTarget) {
-  if (playing || hasActiveTarget) {
-    return;
-  }
-  lastPlaybackAnnotations_.clear();
-  lastPlaybackColors_.clear();
-  lastPlaybackPosition_ = 0;
-  clearPlaybackAnnotations(false);
 }
 
 void VGMFileView::clearPlaybackAnnotations(bool fade) {
@@ -265,29 +240,35 @@ void VGMFileView::refreshStatus() {
   treeView_->updateStatusBar();
 }
 
-std::vector<VGMFileView::PlaybackAnnotationSpan> VGMFileView::playbackSpansAt(int tick) const {
-  std::vector<PlaybackAnnotationSpan> result;
-  for (const auto& span : playbackTimeline_) {
-    if (span.startTick > tick) {
+u32 VGMFileView::playbackTrackIndex(
+    vgmtrans::core::SourceAnnotationId annotationId) const {
+  while (annotationId.valid()) {
+    const auto* annotation = inspection_->annotation(annotationId);
+    if (annotation == nullptr) {
       break;
     }
-    if (span.endTick >= tick) {
-      result.push_back(span);
+    if (annotation->owner &&
+        annotation->owner->kind == vgmtrans::core::ObjectKind::SequenceTrack) {
+      return annotation->owner->index0;
     }
+    annotationId = annotation->parent.value_or(vgmtrans::core::SourceAnnotationId{});
   }
-  return result;
+  return 0;
 }
 
-std::vector<VGMFileView::PlaybackAnnotationSpan> VGMFileView::playbackSpansInRange(int startTick, int endTick) const {
+std::vector<vgmtrans::core::SourcePlaybackSpan>
+VGMFileView::playbackSpansInRange(int startTick, int endTick) const {
   if (endTick < startTick) {
     std::swap(startTick, endTick);
   }
-  std::vector<PlaybackAnnotationSpan> result;
+  const u64 firstTick = static_cast<u64>(std::max(0, startTick));
+  const u64 lastTick = static_cast<u64>(std::max(0, endTick));
+  std::vector<vgmtrans::core::SourcePlaybackSpan> result;
   for (const auto& span : playbackTimeline_) {
-    if (span.startTick > endTick) {
+    if (span.beginTick > lastTick) {
       break;
     }
-    if (span.endTick >= startTick) {
+    if (span.endTick > firstTick) {
       result.push_back(span);
     }
   }
@@ -302,6 +283,6 @@ void VGMFileView::updateStatus(vgmtrans::core::SourceAnnotationId annotationId) 
   }
   emit statusChanged(QStringLiteral("<b>%1</b>").arg(QString::fromStdString(annotation->label)),
                      SourceInspectorPresentation::description(*annotation),
-                     SourceInspectorPresentation::icon(*annotation), statusValue(annotation->range.offset),
-                     statusValue(annotation->range.size));
+                     SourceInspectorPresentation::icon(*annotation), boundedInt(annotation->range.offset),
+                     boundedInt(annotation->range.size));
 }

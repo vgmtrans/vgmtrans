@@ -7,8 +7,8 @@
 #pragma once
 
 #include "PlaybackPosition.h"
-#include "value/base/CoreTypes.h"
 #include "value/model/SourceInspection.h"
+#include "value/sequence/PerformanceModel.h"
 
 #include <memory>
 #include <vector>
@@ -28,13 +28,6 @@ class VGMFileView final : public QWidget {
   Q_OBJECT
 
 public:
-  struct PlaybackAnnotationSpan {
-    vgmtrans::core::SourceAnnotationId annotation;
-    u32 trackIndex = 0;
-    int startTick = 0;
-    int endTick = 0;
-  };
-
   explicit VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
                        QWidget* parent = nullptr);
 
@@ -53,12 +46,8 @@ public slots:
   void onSelectionChange(vgmtrans::core::SourceAnnotationId annotation);
   void seekToAnnotation(vgmtrans::core::SourceAnnotationId annotation);
   void setSeekModifierActive(bool active);
-  void setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
-                              const std::vector<QColor>& colors = {});
-  void setPlaybackTimeline(std::vector<PlaybackAnnotationSpan> timeline);
+  void setPlaybackTimeline(std::vector<vgmtrans::core::SourcePlaybackSpan> timeline);
   void onPlaybackPositionChanged(int current, int maximum, PositionChangeOrigin origin);
-  void onPlayerStatusChanged(bool playing, bool hasActiveTarget);
-  void clearPlaybackAnnotations(bool fade = true);
   void refreshStatus();
   void resetHexViewFont();
   void increaseHexViewFont();
@@ -74,15 +63,19 @@ private:
   void updateHexViewFont(qreal sizeIncrement) const;
   void applyHexViewFont(QFont font) const;
   void updateStatus(vgmtrans::core::SourceAnnotationId annotation);
-  [[nodiscard]] std::vector<PlaybackAnnotationSpan> playbackSpansAt(int tick) const;
-  [[nodiscard]] std::vector<PlaybackAnnotationSpan> playbackSpansInRange(int startTick, int endTick) const;
+  void setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
+                              const std::vector<QColor>& colors = {});
+  void clearPlaybackAnnotations(bool fade = true);
+  [[nodiscard]] u32 playbackTrackIndex(vgmtrans::core::SourceAnnotationId annotation) const;
+  [[nodiscard]] std::vector<vgmtrans::core::SourcePlaybackSpan> playbackSpansInRange(int startTick,
+                                                                                    int endTick) const;
 
   std::shared_ptr<const vgmtrans::core::SourceInspection> inspection_;
   VGMFileTreeView* treeView_{};
   HexView* hexView_{};
   SnappingSplitter* splitter_{};
   QFont defaultHexFont_;
-  std::vector<PlaybackAnnotationSpan> playbackTimeline_;
+  std::vector<vgmtrans::core::SourcePlaybackSpan> playbackTimeline_;
   std::vector<vgmtrans::core::SourceAnnotationId> lastPlaybackAnnotations_;
   std::vector<QColor> lastPlaybackColors_;
   int lastPlaybackPosition_ = 0;
