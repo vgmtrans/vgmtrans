@@ -124,6 +124,11 @@ core::CollectionPlayback WorkspaceController::preparePlayback(core::CollectionId
   return session_.preparePlayback(id, request);
 }
 
+core::Artifact WorkspaceController::exportSequenceMidi(core::AssetId id,
+                                                       const core::SequenceExportRequest& request) const {
+  return session_.exportSequenceMidi(id, request);
+}
+
 std::vector<core::Artifact> WorkspaceController::exportCollection(core::CollectionId id,
                                                                   const core::ExportRequest& request) const {
   return session_.exportCollection(id, request);

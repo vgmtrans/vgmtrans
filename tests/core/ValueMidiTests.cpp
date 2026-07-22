@@ -868,6 +868,49 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   expect(noteOnCount == 3, "ExportRequest sequenceLoops should replay the loop before MIDI rendering");
 }
 
+void standaloneSequenceExportDoesNotRequireACollection() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{
+      .id = TrackId{0},
+      .startAddress = Address{0},
+  };
+  TrackProgramBuilder trackBuilder{track};
+
+  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+
+  SessionSnapshotBuilder snapshotBuilder;
+  snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{7},
+              .format = "Probe",
+              .name = "Loose/Sequence",
+          },
+      .program =
+          SequenceProgram{
+              .dialect = dialect.id,
+              .timebase = dialect.timebase,
+              .tracks = {track},
+          },
+  });
+  const SessionSnapshot snapshot = snapshotBuilder.finish();
+  expect(snapshot.collections().empty(), "standalone MIDI fixture should not contain a collection");
+
+  SequenceDialectRegistry dialects;
+  dialects.add(dialect);
+  const Artifact artifact = exportSequenceMidi(snapshot, AssetId{7}, SequenceExportRequest{}, dialects);
+
+  expect(artifact.filename == "Loose_Sequence.mid",
+         "standalone sequence export should derive a safe filename from sequence metadata");
+  expect(artifact.mediaType == "audio/midi", "standalone sequence export should identify Standard MIDI data");
+  expect(artifact.diagnostics.empty(), "standalone sequence export should not require collection diagnostics");
+  expect(artifact.bytes.size() > 14 && std::string(artifact.bytes.begin(), artifact.bytes.begin() + 4) == "MThd",
+         "standalone sequence export should produce a Standard MIDI file");
+}
+
 void modulationAnalysisReportsObservedMidiControllerRanges() {
   const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -1099,6 +1142,7 @@ void runValueMidiTests() {
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
   performanceMidiRendererSimulatesTremoloUsingGlobalTempo();
   exportRequestSequenceLoopsAffectMidiLowering();
+  standaloneSequenceExportDoesNotRequireACollection();
   modulationAnalysisReportsObservedMidiControllerRanges();
   modulationAnalysisReportsObservedPerformanceRanges();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();

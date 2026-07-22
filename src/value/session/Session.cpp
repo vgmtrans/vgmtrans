@@ -194,6 +194,10 @@ CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackReque
   return core::prepareCollectionPlayback(current, sources_, id, request, dialects_, &formats_);
 }
 
+Artifact Session::exportSequenceMidi(AssetId id, const SequenceExportRequest& request) const {
+  return core::exportSequenceMidi(snapshot(), id, request, dialects_);
+}
+
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
   const auto current = snapshot();
   return core::exportCollection(current, sources_, id, request, dialects_, &formats_);

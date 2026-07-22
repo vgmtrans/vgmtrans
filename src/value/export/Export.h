@@ -39,6 +39,10 @@ struct CollectionPlayback {
   }
 };
 
+[[nodiscard]] Artifact exportSequenceMidi(const SessionSnapshot& snapshot, AssetId sequence,
+                                          const SequenceExportRequest& request,
+                                          const SequenceDialectRegistry& dialects);
+
 [[nodiscard]] CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,
                                                            CollectionId collection, const PlaybackRequest& request,
                                                            const SequenceDialectRegistry& dialects,

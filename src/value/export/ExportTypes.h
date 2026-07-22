@@ -42,6 +42,15 @@ struct MidiExportOptions {
   MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
 };
 
+// Policy for exporting one sequence as a self-contained Standard MIDI file.
+// Synth modulation is rendered into MIDI events because there is no companion
+// instrument container in a standalone export.
+struct SequenceExportRequest {
+  LoopPolicy loopPolicy = LoopPolicy::Default;
+  u32 sequenceLoops = 1;
+  MidiExportOptions midi;
+};
+
 // ExportRequest is policy, not parsed data. Callers choose which files to write
 // and how to handle loops, MIDI channels, and modulation scaling.
 struct ExportRequest {
