@@ -824,15 +824,16 @@ SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
   });
 }
 
-TrackProgram decodeAkaoTrack(ByteReader reader, AkaoPs1Version version, TrackDecodeInput input) {
+TrackProgram decodeAkaoTrack(AkaoPs1Version version, const TrackDecodeScope& tracks, u32 trackIndex, u32 startOffset,
+                             std::vector<Diagnostic>* diagnostics) {
   RepeatStack repeats;
   const AkaoProfile profile{.version = version};
-  const u32 bytecodeEnd =
-      input.bytecodeEnd == std::numeric_limits<u32>::max() ? static_cast<u32>(reader.size()) : input.bytecodeEnd;
+  const u32 bytecodeEnd = tracks.bytecodeEnd == std::numeric_limits<u32>::max() ? static_cast<u32>(tracks.reader.size())
+                                                                                : tracks.bytecodeEnd;
   const auto command = [&](u32 offset) {
-    return decodeCommand(reader, offset, bytecodeEnd, profile, repeats, input.diagnostics);
+    return decodeCommand(tracks.reader, offset, bytecodeEnd, profile, repeats, diagnostics);
   };
-  return makeTrackDecodeScope(reader, input).reachable(input.trackIndex, input.startOffset, command);
+  return tracks.reachable(trackIndex, startOffset, command);
 }
 
 AkaoSequenceReferences akaoSequenceReferences(const TrackProgram& track) {
@@ -952,19 +953,17 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
     }
   }
 
+  const TrackDecodeScope tracks{
+      .reader = reader,
+      .bytecodeEnd = sequenceEnd,
+      .maxCommands = kAkaoMaxTrackCommands,
+      .sequenceAsset = id,
+      .parentAnnotation = headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt,
+      .sourceMap = sourceMap,
+  };
   for (u32 trackIndex = 0; trackIndex < layout->trackAddresses.size(); ++trackIndex) {
-    auto track = decodeAkaoTrack(
-        reader, analysis.header.version,
-        TrackDecodeInput{
-            .sequenceAsset = id,
-            .trackIndex = trackIndex,
-            .startOffset = layout->trackAddresses[trackIndex],
-            .bytecodeEnd = sequenceEnd,
-            .parentAnnotation = headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt,
-            .sourceMap = sourceMap,
-            .diagnostics = diagnostics,
-            .maxCommands = kAkaoMaxTrackCommands,
-        });
+    auto track =
+        decodeAkaoTrack(analysis.header.version, tracks, trackIndex, layout->trackAddresses[trackIndex], diagnostics);
     track.sourceTrackNumber = trackIndex;
     analysis.references.merge(akaoSequenceReferences(track));
     program.tracks.push_back(std::move(track));
@@ -989,14 +988,13 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
   };
 }
 
-void registerAkaoSequenceDialects(SequenceDialectRegistry& registry) {
-  registry.add(makeAkaoDialect(AkaoPs1Version::Version1_0));
-  registry.add(makeAkaoDialect(AkaoPs1Version::Version1_1));
-  registry.add(makeAkaoDialect(AkaoPs1Version::Version1_2));
-  registry.add(makeAkaoDialect(AkaoPs1Version::Version2));
-  registry.add(makeAkaoDialect(AkaoPs1Version::Version3_0));
-  registry.add(makeAkaoDialect(AkaoPs1Version::Version3_1));
-  registry.add(makeAkaoDialect(AkaoPs1Version::Version3_2));
+std::vector<SequenceDialect> akaoSequenceDialects() {
+  return {
+      makeAkaoDialect(AkaoPs1Version::Version1_0), makeAkaoDialect(AkaoPs1Version::Version1_1),
+      makeAkaoDialect(AkaoPs1Version::Version1_2), makeAkaoDialect(AkaoPs1Version::Version2),
+      makeAkaoDialect(AkaoPs1Version::Version3_0), makeAkaoDialect(AkaoPs1Version::Version3_1),
+      makeAkaoDialect(AkaoPs1Version::Version3_2),
+  };
 }
 
 }  // namespace vgmtrans::formats::akao

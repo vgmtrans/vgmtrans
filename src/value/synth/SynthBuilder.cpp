@@ -69,8 +69,9 @@ void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
     annotation.derived("sustain_level", *envelope.sustainAmplitude, SourceValueDisplay::Percent);
   }
   if (envelope.releaseSeconds) {
-    annotation.derived(std::isinf(*envelope.releaseSeconds) ? "release_infinite" : "release_seconds",
-                       std::isinf(*envelope.releaseSeconds) ? SourceValue{true} : SourceValue{*envelope.releaseSeconds});
+    annotation.derived(
+        std::isinf(*envelope.releaseSeconds) ? "release_infinite" : "release_seconds",
+        std::isinf(*envelope.releaseSeconds) ? SourceValue{true} : SourceValue{*envelope.releaseSeconds});
   }
 }
 
@@ -198,10 +199,6 @@ std::optional<SampleRef> SampleCollectionBuilder::find(u64 sourceKey) const {
   return SampleRef{.collection = asset_, .index = found->second};
 }
 
-SampleRefLookup SampleCollectionBuilder::refs() const {
-  return SampleRefLookup{asset_, indexes_};
-}
-
 AnnotationBuilder SampleCollectionBuilder::source(SourceRole role, std::string_view label, SourceRange range,
                                                   std::string_view kind) {
   recordRange(range, false);
@@ -240,7 +237,7 @@ void SampleCollectionBuilder::error(std::string message, SourceRange range) {
   report(Severity::Error, {}, std::move(message), range);
 }
 
-SampleCollection SampleCollectionBuilder::finish() && {
+BuiltSampleCollection SampleCollectionBuilder::finish() && {
   if (finished_) {
     throw std::logic_error("SampleCollectionBuilder was finished more than once");
   }
@@ -251,8 +248,14 @@ SampleCollection SampleCollectionBuilder::finish() && {
   }
   addFallbackSources();
   annotateValues();
+  const SourceRange finalRange = range();
   finished_ = true;
-  return SampleCollection{.samples = std::move(samples_)};
+  return BuiltSampleCollection{
+      .asset = asset_,
+      .value = SampleCollection{.samples = std::move(samples_)},
+      .refs = SampleRefLookup{asset_, std::move(indexes_)},
+      .range = finalRange,
+  };
 }
 
 SampleCollectionBuilder::Entry::Entry(SampleCollectionBuilder& builder, u32 index) : builder_(&builder), index_(index) {
@@ -432,7 +435,7 @@ void InstrumentSetBuilder::error(std::string message, SourceRange range) {
   report(Severity::Error, {}, std::move(message), range);
 }
 
-std::vector<Instrument> InstrumentSetBuilder::finish() && {
+BuiltInstrumentSet InstrumentSetBuilder::finish() && {
   if (finished_) {
     throw std::logic_error("InstrumentSetBuilder was finished more than once");
   }
@@ -447,8 +450,13 @@ std::vector<Instrument> InstrumentSetBuilder::finish() && {
   }
   addFallbackSources();
   annotateValues();
+  const SourceRange finalRange = range();
   finished_ = true;
-  return std::move(instruments_);
+  return BuiltInstrumentSet{
+      .asset = asset_,
+      .values = std::move(instruments_),
+      .range = finalRange,
+  };
 }
 
 InstrumentSetBuilder::Entry::Entry(InstrumentSetBuilder& builder, u32 index) : builder_(&builder), index_(index) {

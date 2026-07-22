@@ -152,15 +152,19 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
 
 }  // namespace
 
-void registerAkaoModule(FormatRegistry& registry) {
-  registry.add(FormatModule{
-      .name = std::string(kAkaoFormatName),
-      .canScan = canScanAkao,
-      .scan = scanAkao,
-      .collectionResolverId = std::string(kAkaoCollectionResolver),
-      .resolveCollections = resolveAkaoCollections,
-      .materializeCollection = materializeAkaoCollection,
-  });
+FormatDefinition akaoDefinition() {
+  return FormatDefinition{
+      .module =
+          {
+              .name = std::string(kAkaoFormatName),
+              .canScan = canScanAkao,
+              .scan = scanAkao,
+              .collectionResolverId = std::string(kAkaoCollectionResolver),
+              .resolveCollections = resolveAkaoCollections,
+              .prepareCollection = prepareAkaoCollection,
+          },
+      .sequenceDialects = akaoSequenceDialects(),
+  };
 }
 
 }  // namespace vgmtrans::formats::akao

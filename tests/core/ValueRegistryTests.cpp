@@ -65,7 +65,7 @@ void sessionRegistersOneFormatDefinitionAtTheAuthoringSurface() {
   Session session;
   session.registerFormat(FormatDefinition{
       .module = probeSequenceModule(),
-      .sequenceDialect = probeSequenceDialect(),
+      .sequenceDialects = {probeSequenceDialect()},
   });
 
   expect(session.formats().modules().size() == 1 && session.formats().modules()[0].name == "ProbeSequence",
@@ -214,15 +214,15 @@ void scanResultBuilderCursorReportsMalformedFields() {
   ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
 
   ScanResultBuilder out(input, "ProbeBuilder");
-  auto validCursor = out.cursor(input.reader.range(1, 2));
-  const auto value = validCursor.le16(0, "probe value");
+  RecordReader validCursor(input.reader, 1, 3, &out.diagnostics(), false);
+  const auto value = validCursor.u16leAt(0, "probe value");
   expect(value && *value == 0xccbb, "parse cursor should return parsed field values");
   expect(sameRange(value.range, SourceRange{.source = source, .offset = 1, .size = 2}),
          "parse cursor should return parsed field ranges");
   out.sourceMap().header("Probe Header", input.reader.range(1, 2)).field("probe_value", value);
 
-  auto cursor = out.cursor(input.reader.range(2, 1));
-  expect(!cursor.le32(0, "probe field"), "parse cursor should reject fields outside its range");
+  RecordReader cursor(input.reader, 2, 3, &out.diagnostics(), false);
+  expect(!cursor.u32leAt(0, "probe field"), "record reader should reject fields outside its range");
 
   const ScanResult result = out.finish();
   const auto headerIds = result.sourceMap.withRole(source, SourceRole::Header);
@@ -233,8 +233,8 @@ void scanResultBuilderCursorReportsMalformedFields() {
              sameRange(header.fields[0].range, SourceRange{.source = source, .offset = 1, .size = 2}),
          "annotation fields should use the parsed value range");
   expect(result.diagnostics.size() == 1, "parse cursor should report malformed fields as diagnostics");
-  expect(result.diagnostics[0].message == "Could not read probe field: field is outside the parser range",
-         "parse cursor diagnostic should name the failed field");
+  expect(result.diagnostics[0].message == "Truncated field 'probe field'",
+         "record reader diagnostic should name the failed field");
 }
 
 }  // namespace

@@ -188,7 +188,7 @@ SampleCollection buildSnesBrrSampleCollection(ByteReader reader, const SnesBrrCa
                                               std::string_view directoryEntryKind) {
   SampleCollectionBuilder samples{sampleCollectionId, &sourceMap};
   [[maybe_unused]] const auto refs = addSnesBrrSamples(samples, reader, catalog, directoryEntryKind);
-  return std::move(samples).finish();
+  return std::move(samples).finish().value;
 }
 
 }  // namespace vgmtrans::core

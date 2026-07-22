@@ -5,6 +5,7 @@
  */
 
 #include "value/export/midi/MidiExporter.h"
+#include "value/export/BinaryWriter.h"
 
 #include <algorithm>
 #include <array>
@@ -27,22 +28,6 @@ struct MidiMessage {
   size_t sequence = 0;
   std::vector<u8> bytes;
 };
-
-void writeAscii(std::vector<u8>& bytes, std::string_view text) {
-  bytes.insert(bytes.end(), text.begin(), text.end());
-}
-
-void writeBe16(std::vector<u8>& bytes, u16 value) {
-  bytes.push_back(static_cast<u8>((value >> 8) & 0xff));
-  bytes.push_back(static_cast<u8>(value & 0xff));
-}
-
-void writeBe32(std::vector<u8>& bytes, u32 value) {
-  bytes.push_back(static_cast<u8>((value >> 24) & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 16) & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 8) & 0xff));
-  bytes.push_back(static_cast<u8>(value & 0xff));
-}
 
 void writeVariableLength(std::vector<u8>& bytes, u64 value) {
   // Standard MIDI files encode delta times as big-endian base-128 variable-length values.

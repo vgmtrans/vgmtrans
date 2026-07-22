@@ -44,22 +44,23 @@ public:
   // Fixed layouts are often clearest when their documented offsets remain
   // visible in code. These reads use offsets from the record's beginning while
   // still extending its range and collecting exact source fields.
-  [[nodiscard]] RangedValue<::u8> u8At(u32 relativeOffset, std::string_view name,
+  [[nodiscard]] RangedValue<::u8> u8At(u64 relativeOffset, std::string_view name,
                                        SourceValueDisplay display = SourceValueDisplay::Default);
-  [[nodiscard]] RangedValue<::s8> s8At(u32 relativeOffset, std::string_view name,
+  [[nodiscard]] RangedValue<::s8> s8At(u64 relativeOffset, std::string_view name,
                                        SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
-  [[nodiscard]] RangedValue<u16> u16beAt(u32 relativeOffset, std::string_view name,
+  [[nodiscard]] RangedValue<u16> u16beAt(u64 relativeOffset, std::string_view name,
                                          SourceValueDisplay display = SourceValueDisplay::Default);
-  [[nodiscard]] RangedValue<u16> u16leAt(u32 relativeOffset, std::string_view name,
+  [[nodiscard]] RangedValue<u16> u16leAt(u64 relativeOffset, std::string_view name,
                                          SourceValueDisplay display = SourceValueDisplay::Default);
-  [[nodiscard]] RangedValue<s16> s16beAt(u32 relativeOffset, std::string_view name,
+  [[nodiscard]] RangedValue<s16> s16beAt(u64 relativeOffset, std::string_view name,
                                          SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
-  [[nodiscard]] RangedValue<s16> s16leAt(u32 relativeOffset, std::string_view name,
+  [[nodiscard]] RangedValue<s16> s16leAt(u64 relativeOffset, std::string_view name,
                                          SourceValueDisplay display = SourceValueDisplay::SignedDecimal);
-  [[nodiscard]] RangedValue<u32> u32beAt(u32 relativeOffset, std::string_view name,
+  [[nodiscard]] RangedValue<u32> u32beAt(u64 relativeOffset, std::string_view name,
                                          SourceValueDisplay display = SourceValueDisplay::Default);
-  [[nodiscard]] RangedValue<u32> u32leAt(u32 relativeOffset, std::string_view name,
+  [[nodiscard]] RangedValue<u32> u32leAt(u64 relativeOffset, std::string_view name,
                                          SourceValueDisplay display = SourceValueDisplay::Default);
+  [[nodiscard]] std::optional<SourceRange> rangeAt(u64 relativeOffset, u64 size, std::string_view name);
   [[nodiscard]] std::optional<::u8> peekU8() const;
 
   template <class T>
@@ -86,7 +87,7 @@ public:
 
 private:
   bool require(u32 size, std::string_view field);
-  [[nodiscard]] std::optional<u32> requireAt(u32 relativeOffset, u32 size, std::string_view field);
+  [[nodiscard]] std::optional<u32> requireAt(u64 relativeOffset, u64 size, std::string_view field);
   void field(std::string_view name, SourceRange range, SourceValue value, SourceValueDisplay display);
 
   ByteReader reader_;

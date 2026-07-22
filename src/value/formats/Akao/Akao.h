@@ -8,9 +8,9 @@
 
 #include "value/base/CoreTypes.h"
 #include "value/scan/FormatModule.h"
-#include "value/scan/FormatRegistry.h"
+#include "value/scan/FormatDefinition.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/SequenceDialect.h"
 #include "value/synth/SynthModel.h"
 
@@ -158,8 +158,9 @@ struct AkaoSplitSampleLocation {
 };
 
 [[nodiscard]] core::SequenceDialect makeAkaoDialect(AkaoPs1Version version);
-[[nodiscard]] core::TrackProgram decodeAkaoTrack(core::ByteReader reader, AkaoPs1Version version,
-                                                 core::TrackDecodeInput input);
+[[nodiscard]] core::TrackProgram decodeAkaoTrack(AkaoPs1Version version, const core::TrackDecodeScope& tracks,
+                                                 u32 trackIndex, u32 startOffset,
+                                                 std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] AkaoSequenceReferences akaoSequenceReferences(const core::TrackProgram& track);
 [[nodiscard]] std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(const core::ScanInput& input,
                                                                       const core::SequenceProgramAsset& sequence);
@@ -167,7 +168,7 @@ struct AkaoSplitSampleLocation {
                                                                  u32 offset,
                                                                  core::SourceMapBuilder* sourceMap = nullptr,
                                                                  std::vector<core::Diagnostic>* diagnostics = nullptr);
-void registerAkaoSequenceDialects(core::SequenceDialectRegistry& registry);
+[[nodiscard]] std::vector<core::SequenceDialect> akaoSequenceDialects();
 
 [[nodiscard]] std::optional<AkaoSplitSampleLocation> ff7HardcodedAkaoSampleLocation(core::ByteReader reader);
 [[nodiscard]] bool isPossibleAkaoSampleCollection(core::ByteReader reader, u32 offset);
@@ -195,8 +196,8 @@ void buildAkaoInstrumentSet(const core::ScanInput& input, const AkaoSequenceAnal
     std::optional<core::SourceAnnotationId> parent = std::nullopt);
 
 [[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(const core::MatchContext& context);
-[[nodiscard]] core::MaterializationResult materializeAkaoCollection(const core::MaterializationContext& context);
+[[nodiscard]] core::PreparedCollectionAssets prepareAkaoCollection(const core::CollectionPrepareContext& context);
 
-void registerAkaoModule(core::FormatRegistry& registry);
+[[nodiscard]] core::FormatDefinition akaoDefinition();
 
 }  // namespace vgmtrans::formats::akao

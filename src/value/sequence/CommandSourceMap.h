@@ -131,7 +131,4 @@ private:
   std::string sourceKindPrefix_;
 };
 
-// Temporary bridge for formats still exposing the old per-track parameter bag.
-[[nodiscard]] TrackDecodeScope makeTrackDecodeScope(ByteReader reader, const TrackDecodeInput& input);
-
 }  // namespace vgmtrans::core

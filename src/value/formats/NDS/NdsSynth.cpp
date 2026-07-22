@@ -190,7 +190,7 @@ struct ParsedNdsRegion {
 }
 
 // Reads one SWAV entry and adds it under the source index used by SBNK records.
-void addNdsWave(ScanResultBuilder& builder, ParseCursor& archive, SampleCollectionBuilder& samples, u32 relativeOffset,
+void addNdsWave(ScanResultBuilder& builder, RecordReader& archive, SampleCollectionBuilder& samples, u32 relativeOffset,
                 SourceRange headerRange, u32 sampleIndex, SourceAnnotationId parent) {
   if (headerRange.endOffset() > std::numeric_limits<u32>::max()) {
     return;
@@ -221,12 +221,12 @@ void addNdsWave(ScanResultBuilder& builder, ParseCursor& archive, SampleCollecti
 
   // ADPCM stores a four-byte predictor header between the common SWAV header and
   // encodedData. SampleDecoder reads that predictor immediately before encodedData.
-  if (adpcm && !archive.range(relativeOffset, 0x10, "SWAR ADPCM sample header")) {
+  if (adpcm && !archive.rangeAt(relativeOffset, 0x10, "SWAR ADPCM sample header")) {
     return;
   }
   const u32 dataLength = totalDataBytes - (adpcm ? 4 : 0);
   const u64 dataOffset = static_cast<u64>(relativeOffset) + (adpcm ? 0x10 : 0x0c);
-  const auto dataRange = archive.range(dataOffset, dataLength, "SWAR sample data");
+  const auto dataRange = archive.rangeAt(dataOffset, dataLength, "SWAR sample data");
   if (!dataRange) {
     return;
   }
@@ -304,16 +304,20 @@ std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& buil
   samples.include(range);
   const auto commit = [&]() { return builder.sampleCollection(std::string(name), std::move(samples)); };
 
-  auto archive = builder.cursor(range);
-  if (const auto header = archive.range(0, 0x3c, "SWAR header")) {
+  if (range.endOffset() > std::numeric_limits<u32>::max()) {
+    return std::nullopt;
+  }
+  RecordReader archive(reader, static_cast<u32>(range.offset), static_cast<u32>(range.endOffset()),
+                       &builder.diagnostics(), false);
+  if (const auto header = archive.rangeAt(0, 0x3c, "SWAR header")) {
     samples.source(SourceRole::Header, "SWAR Header", *header, "swar-header");
   }
 
-  const auto sampleCount = archive.le32(0x38, "SWAR sample count");
+  const auto sampleCount = archive.u32leAt(0x38, "SWAR sample count");
   if (!sampleCount) {
     return commit();
   }
-  const auto sampleTableRange = archive.range(0x3c, static_cast<u64>(*sampleCount) * 4, "SWAR sample offset table");
+  const auto sampleTableRange = archive.rangeAt(0x3c, static_cast<u64>(*sampleCount) * 4, "SWAR sample offset table");
   if (!sampleTableRange) {
     return commit();
   }
@@ -324,11 +328,11 @@ std::optional<ScanSampleCollectionRef> addNdsWaveArchive(ScanResultBuilder& buil
 
   for (u32 i = 0; i < *sampleCount; ++i) {
     const u64 entryOffset = 0x3c + static_cast<u64>(i) * 4;
-    const auto sampleRelativeOffset = archive.le32(entryOffset, "SWAR sample offset");
+    const auto sampleRelativeOffset = archive.u32leAt(entryOffset, "SWAR sample offset");
     if (!sampleRelativeOffset) {
       break;
     }
-    const auto sampleHeaderRange = archive.range(*sampleRelativeOffset, 0x0c, "SWAR sample header");
+    const auto sampleHeaderRange = archive.rangeAt(*sampleRelativeOffset, 0x0c, "SWAR sample header");
     if (!sampleHeaderRange) {
       continue;
     }
@@ -351,13 +355,17 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
     ScanResultBuilder& builder, SourceRange range, std::string_view name, ScanSampleCollectionRef psgCollection,
     const std::array<std::optional<ScanSampleCollectionRef>, 4>& waveCollections) {
   const ByteReader reader = builder.reader();
-  auto bank = builder.cursor(range);
-  const auto instrumentCount = bank.le32(0x38, "SBNK instrument count");
+  if (range.endOffset() > std::numeric_limits<u32>::max()) {
+    return std::nullopt;
+  }
+  RecordReader bank(reader, static_cast<u32>(range.offset), static_cast<u32>(range.endOffset()), &builder.diagnostics(),
+                    false);
+  const auto instrumentCount = bank.u32leAt(0x38, "SBNK instrument count");
   if (!instrumentCount) {
     return std::nullopt;
   }
   const auto pointerTableRange =
-      bank.range(0x38, 4 + static_cast<u64>(*instrumentCount) * 4, "SBNK instrument pointer table");
+      bank.rangeAt(0x38, 4 + static_cast<u64>(*instrumentCount) * 4, "SBNK instrument pointer table");
   if (!pointerTableRange) {
     return std::nullopt;
   }
@@ -370,7 +378,7 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
                           .field("instrument_count", instrumentCount);
 
   for (u32 i = 0; i < *instrumentCount; ++i) {
-    const auto pointer = bank.le32(0x3c + static_cast<u64>(i) * 4, "SBNK instrument pointer");
+    const auto pointer = bank.u32leAt(0x3c + static_cast<u64>(i) * 4, "SBNK instrument pointer");
     if (!pointer) {
       break;
     }
@@ -381,7 +389,7 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
     const u8 rawType = *pointer & 0xff;
     const auto type = static_cast<InstrumentType>(rawType);
     const u32 instrumentRelativeOffset = *pointer >> 8;
-    const auto instrumentStart = bank.range(instrumentRelativeOffset, 1, "SBNK instrument");
+    const auto instrumentStart = bank.rangeAt(instrumentRelativeOffset, 1, "SBNK instrument");
     if (!instrumentStart) {
       continue;
     }
@@ -410,7 +418,7 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
       case InstrumentType::Sample:
       case InstrumentType::PsgWave:
       case InstrumentType::PsgNoise: {
-        const auto recordRange = bank.range(instrumentRelativeOffset, 10, "SBNK single-region instrument");
+        const auto recordRange = bank.rangeAt(instrumentRelativeOffset, 10, "SBNK single-region instrument");
         if (!recordRange) {
           break;
         }
@@ -429,13 +437,14 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
       }
       case InstrumentType::Drumset: {
         // Drumsets encode one region per key in a contiguous key range.
-        if (!bank.range(instrumentRelativeOffset, 2, "SBNK drumset header")) {
+        if (!bank.rangeAt(instrumentRelativeOffset, 2, "SBNK drumset header")) {
           break;
         }
         const u8 lowKey = reader.u8At(instrumentOffset);
         const u8 highKey = reader.u8At(instrumentOffset + 1);
         const u32 regionCount = highKey >= lowKey ? (highKey - lowKey) + 1 : 0;
-        const auto instrumentRange = bank.range(instrumentRelativeOffset, 2 + regionCount * 12, "SBNK drumset regions");
+        const auto instrumentRange =
+            bank.rangeAt(instrumentRelativeOffset, 2 + regionCount * 12, "SBNK drumset regions");
         if (!instrumentRange) {
           break;
         }
@@ -451,7 +460,7 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
       }
       case InstrumentType::KeySplit: {
         // Multi-region instruments store high-key boundaries followed by region records.
-        if (!bank.range(instrumentRelativeOffset, 8, "SBNK key-split header")) {
+        if (!bank.rangeAt(instrumentRelativeOffset, 8, "SBNK key-split header")) {
           break;
         }
         std::array<u8, 8> keyRanges{};
@@ -464,7 +473,7 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
           ++regionCount;
         }
         const auto instrumentRange =
-            bank.range(instrumentRelativeOffset, 8 + regionCount * 12, "SBNK key-split regions");
+            bank.rangeAt(instrumentRelativeOffset, 8 + regionCount * 12, "SBNK key-split regions");
         if (!instrumentRange) {
           break;
         }

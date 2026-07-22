@@ -7,6 +7,7 @@
 #include "value/base/RecordReader.h"
 
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <utility>
 
@@ -167,7 +168,7 @@ RangedValue<s16> RecordReader::s16le(std::string_view name, SourceValueDisplay d
   return RangedValue<s16>{value, sourceRange};
 }
 
-RangedValue<::u8> RecordReader::u8At(u32 relativeOffset, std::string_view name, SourceValueDisplay display) {
+RangedValue<::u8> RecordReader::u8At(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
   const auto position = requireAt(relativeOffset, 1, name);
   if (!position) {
     return {};
@@ -178,7 +179,7 @@ RangedValue<::u8> RecordReader::u8At(u32 relativeOffset, std::string_view name, 
   return RangedValue<::u8>{value, sourceRange};
 }
 
-RangedValue<::s8> RecordReader::s8At(u32 relativeOffset, std::string_view name, SourceValueDisplay display) {
+RangedValue<::s8> RecordReader::s8At(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
   const auto position = requireAt(relativeOffset, 1, name);
   if (!position) {
     return {};
@@ -189,7 +190,7 @@ RangedValue<::s8> RecordReader::s8At(u32 relativeOffset, std::string_view name, 
   return RangedValue<::s8>{value, sourceRange};
 }
 
-RangedValue<u16> RecordReader::u16beAt(u32 relativeOffset, std::string_view name, SourceValueDisplay display) {
+RangedValue<u16> RecordReader::u16beAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
   const auto position = requireAt(relativeOffset, 2, name);
   if (!position) {
     return {};
@@ -200,7 +201,7 @@ RangedValue<u16> RecordReader::u16beAt(u32 relativeOffset, std::string_view name
   return RangedValue<u16>{value, sourceRange};
 }
 
-RangedValue<u16> RecordReader::u16leAt(u32 relativeOffset, std::string_view name, SourceValueDisplay display) {
+RangedValue<u16> RecordReader::u16leAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
   const auto position = requireAt(relativeOffset, 2, name);
   if (!position) {
     return {};
@@ -211,7 +212,7 @@ RangedValue<u16> RecordReader::u16leAt(u32 relativeOffset, std::string_view name
   return RangedValue<u16>{value, sourceRange};
 }
 
-RangedValue<s16> RecordReader::s16beAt(u32 relativeOffset, std::string_view name, SourceValueDisplay display) {
+RangedValue<s16> RecordReader::s16beAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
   const auto position = requireAt(relativeOffset, 2, name);
   if (!position) {
     return {};
@@ -222,7 +223,7 @@ RangedValue<s16> RecordReader::s16beAt(u32 relativeOffset, std::string_view name
   return RangedValue<s16>{value, sourceRange};
 }
 
-RangedValue<s16> RecordReader::s16leAt(u32 relativeOffset, std::string_view name, SourceValueDisplay display) {
+RangedValue<s16> RecordReader::s16leAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
   const auto position = requireAt(relativeOffset, 2, name);
   if (!position) {
     return {};
@@ -233,7 +234,7 @@ RangedValue<s16> RecordReader::s16leAt(u32 relativeOffset, std::string_view name
   return RangedValue<s16>{value, sourceRange};
 }
 
-RangedValue<u32> RecordReader::u32beAt(u32 relativeOffset, std::string_view name, SourceValueDisplay display) {
+RangedValue<u32> RecordReader::u32beAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
   const auto position = requireAt(relativeOffset, 4, name);
   if (!position) {
     return {};
@@ -244,7 +245,7 @@ RangedValue<u32> RecordReader::u32beAt(u32 relativeOffset, std::string_view name
   return RangedValue<u32>{value, sourceRange};
 }
 
-RangedValue<u32> RecordReader::u32leAt(u32 relativeOffset, std::string_view name, SourceValueDisplay display) {
+RangedValue<u32> RecordReader::u32leAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
   const auto position = requireAt(relativeOffset, 4, name);
   if (!position) {
     return {};
@@ -253,6 +254,11 @@ RangedValue<u32> RecordReader::u32leAt(u32 relativeOffset, std::string_view name
   const auto value = reader_.le32(*position);
   field(name, sourceRange, makeSourceValue(value), display);
   return RangedValue<u32>{value, sourceRange};
+}
+
+std::optional<SourceRange> RecordReader::rangeAt(u64 relativeOffset, u64 size, std::string_view name) {
+  const auto position = requireAt(relativeOffset, size, name);
+  return position ? std::optional<SourceRange>{reader_.range(*position, size)} : std::nullopt;
 }
 
 std::optional<::u8> RecordReader::peekU8() const {
@@ -290,19 +296,20 @@ bool RecordReader::require(u32 size, std::string_view fieldName) {
   return false;
 }
 
-std::optional<u32> RecordReader::requireAt(u32 relativeOffset, u32 size, std::string_view fieldName) {
-  const u64 absolute = static_cast<u64>(begin_) + relativeOffset;
-  if (!failed_ && absolute <= end_ && size <= end_ - absolute && reader_.has(absolute, size)) {
+std::optional<u32> RecordReader::requireAt(u64 relativeOffset, u64 size, std::string_view fieldName) {
+  const bool validOffset = relativeOffset <= std::numeric_limits<u64>::max() - begin_;
+  const u64 absolute = validOffset ? static_cast<u64>(begin_) + relativeOffset : std::numeric_limits<u64>::max();
+  if (absolute <= end_ && size <= end_ - absolute && reader_.has(absolute, size)) {
     const auto position = static_cast<u32>(absolute);
-    position_ = std::max(position_, position + size);
+    position_ = std::max(position_, static_cast<u32>(absolute + size));
     return position;
   }
 
   u32 fieldBegin = begin_;
   u32 available = 0;
-  if (!failed_ && absolute <= end_) {
+  if (absolute <= end_) {
     fieldBegin = static_cast<u32>(absolute);
-    available = std::min<u32>(size, end_ - fieldBegin);
+    available = static_cast<u32>(std::min<u64>(size, end_ - fieldBegin));
     position_ = std::max(position_, fieldBegin + available);
   }
   if (!failed_ && diagnostics_ != nullptr) {

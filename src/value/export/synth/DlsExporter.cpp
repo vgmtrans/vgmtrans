@@ -6,6 +6,7 @@
 
 #include "value/export/synth/DlsExporter.h"
 
+#include "value/export/BinaryWriter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
@@ -52,13 +53,7 @@ constexpr u16 kDlsConnDstEg1HoldTime = 0x020c;
 constexpr u16 kDlsConnTrnNone = 0;
 constexpr s32 kDlsSustainLevelFullScale = 0x03e80000;
 
-struct Chunk {
-  // RIFF chunk size excludes the optional pad byte; payload is stored padded for direct
-  // append into parent LIST/RIFF chunks.
-  std::string id;
-  u32 size = 0;
-  std::vector<u8> payload;
-};
+using Chunk = RiffChunk;
 
 using DecodedDlsSample = DecodedSynthSample;
 
@@ -71,93 +66,9 @@ struct DlsConnection {
   s32 scale = 0;
 };
 
-void writeAscii(std::vector<u8>& bytes, std::string_view text) {
-  bytes.insert(bytes.end(), text.begin(), text.end());
-}
-
-void writeLe16(std::vector<u8>& bytes, u16 value) {
-  bytes.push_back(static_cast<u8>(value & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 8) & 0xff));
-}
-
-void writeLeS16(std::vector<u8>& bytes, s16 value) {
-  writeLe16(bytes, static_cast<u16>(value));
-}
-
-void writeLe32(std::vector<u8>& bytes, u32 value) {
-  bytes.push_back(static_cast<u8>(value & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 8) & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 16) & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 24) & 0xff));
-}
-
-void writeLeS32(std::vector<u8>& bytes, s32 value) {
-  writeLe32(bytes, static_cast<u32>(value));
-}
-
 void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   writeAscii(bytes, text);
   bytes.push_back(0);
-}
-
-[[nodiscard]] std::vector<u8> withEvenPad(std::vector<u8> payload) {
-  if ((payload.size() & 1) != 0) {
-    payload.push_back(0);
-  }
-  return payload;
-}
-
-[[nodiscard]] Chunk makeChunk(std::string id, std::vector<u8> payload) {
-  if (payload.size() > std::numeric_limits<u32>::max()) {
-    throw std::overflow_error("DLS chunk is too large");
-  }
-  return Chunk{
-      .id = std::move(id),
-      .size = static_cast<u32>(payload.size()),
-      .payload = withEvenPad(std::move(payload)),
-  };
-}
-
-void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
-  writeAscii(bytes, chunk.id);
-  writeLe32(bytes, chunk.size);
-  bytes.insert(bytes.end(), chunk.payload.begin(), chunk.payload.end());
-}
-
-[[nodiscard]] u32 chunkStorageSize(const Chunk& chunk) {
-  if (chunk.payload.size() > std::numeric_limits<u32>::max() - 8) {
-    throw std::overflow_error("DLS chunk is too large");
-  }
-  return static_cast<u32>(8 + chunk.payload.size());
-}
-
-[[nodiscard]] Chunk makeListChunk(std::string type, std::vector<Chunk> children) {
-  // LIST chunks carry a four-byte type tag followed by child chunks. DLS uses this for
-  // instrument, region, wave, and metadata containers.
-  std::vector<u8> payload;
-  writeAscii(payload, type);
-  for (const auto& child : children) {
-    appendChunk(payload, child);
-  }
-  return makeChunk("LIST", std::move(payload));
-}
-
-[[nodiscard]] std::vector<u8> riffDls(std::vector<Chunk> children) {
-  std::vector<u8> payload;
-  writeAscii(payload, "DLS ");
-  for (const auto& child : children) {
-    appendChunk(payload, child);
-  }
-
-  if (payload.size() > std::numeric_limits<u32>::max()) {
-    throw std::overflow_error("DLS RIFF payload is too large");
-  }
-
-  std::vector<u8> bytes;
-  writeAscii(bytes, "RIFF");
-  writeLe32(bytes, static_cast<u32>(payload.size()));
-  bytes.insert(bytes.end(), payload.begin(), payload.end());
-  return bytes;
 }
 
 [[nodiscard]] std::string dlsName(std::string name, std::string_view fallback) {
@@ -627,13 +538,14 @@ DlsResult DlsExporter::exportDls(const DlsInput& input, const SourceStore& sourc
   }
 
   auto waves = waveChunks(samples);
-  result.bytes = riffDls({
-      colhChunk(instruments),
-      linsList(instruments, samples, input.midiModulationUsage, input.modulationScaling, input.modulationConversion),
-      ptblChunk(waves),
-      makeListChunk("wvpl", std::move(waves)),
-      infoList(dlsName(input.name, "DLS")),
-  });
+  result.bytes = makeRiff("DLS ", {
+                                      colhChunk(instruments),
+                                      linsList(instruments, samples, input.midiModulationUsage, input.modulationScaling,
+                                               input.modulationConversion),
+                                      ptblChunk(waves),
+                                      makeListChunk("wvpl", std::move(waves)),
+                                      infoList(dlsName(input.name, "DLS")),
+                                  });
   return result;
 }
 

@@ -19,21 +19,14 @@
 namespace vgmtrans::formats {
 
 void registerValueFormats(core::Session& session) {
-  snes_rsn::registerSnesRsnExtractor(session.formats());
-  snes_spc::registerSnesSpcExtractor(session.formats());
-  psf::registerPsfExtractor(session.formats());
-
-  // Semantic formats register scanning and execution as one definition. The
-  // remaining direct calls are migration adapters.
+  session.registerFormat(snes_rsn::snesRsnExtractorDefinition());
+  session.registerFormat(snes_spc::snesSpcExtractorDefinition());
+  session.registerFormat(psf::psfExtractorDefinition());
   session.registerFormat(capcom_snes::capcomSnesDefinition());
   session.registerFormat(nds::ndsDefinition());
   session.registerFormat(akao_snes::akaoSnesDefinition());
-
-  akao::registerAkaoModule(session.formats());
-  konami_snes::registerKonamiSnesModule(session.formats());
-
-  akao::registerAkaoSequenceDialects(session.dialects());
-  konami_snes::registerKonamiSnesSequenceDialects(session.dialects());
+  session.registerFormat(akao::akaoDefinition());
+  session.registerFormat(konami_snes::konamiSnesDefinition());
 }
 
 }  // namespace vgmtrans::formats

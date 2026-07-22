@@ -17,16 +17,17 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   const SourceRange headerRange{.source = source, .offset = 0, .size = 4};
   const SourceRange tableRange{.source = source, .offset = 8, .size = 8};
 
-  const auto header = builder.header("Probe Header", headerRange)
-                          .field("Magic", SourceRange{.source = source, .offset = 0, .size = 1}, u8{0xaa},
-                                 SourceValueDisplay::Hex)
-                          .derived("Decoded", "yes")
-                          .link(SourceLinkRole::PointsTo, tableRange, "Table");
+  const auto header =
+      builder.header("Probe Header", headerRange)
+          .field("Magic", SourceRange{.source = source, .offset = 0, .size = 1}, u8{0xaa}, SourceValueDisplay::Hex)
+          .derived("Decoded", "yes")
+          .link(SourceLinkRole::PointsTo, tableRange, "Table");
   const auto table = builder.table("Pointer Table", tableRange).parent(header.id());
-  const auto command = builder.command("Pitch Bend Range", SourceRange{.source = source, .offset = 10, .size = 2},
-                                       SequenceSemantic::Pitch)
-                            .field("bend", SourceRange{.source = source, .offset = 10, .size = 1}, s8{-2},
-                                   SourceValueDisplay::SignedDecimal);
+  const auto command =
+      builder
+          .command("Pitch Bend Range", SourceRange{.source = source, .offset = 10, .size = 2}, SequenceSemantic::Pitch)
+          .field("bend", SourceRange{.source = source, .offset = 10, .size = 1}, s8{-2},
+                 SourceValueDisplay::SignedDecimal);
 
   const SourceMap sourceMap = builder.finish();
   expect(sourceMap.annotations().size() == 3, "source map should contain all builder annotations");
@@ -35,8 +36,7 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   expect(headerAnnotation.role == SourceRole::Header, "header helper should create a header annotation");
   expect(headerAnnotation.localKind == "probe-header", "source map should slugify annotation labels");
   expect(headerAnnotation.fields.size() == 2, "source map should preserve direct and derived fields");
-  expect(std::get<u64>(headerAnnotation.fields[0].value) == 0xaa,
-         "source map should preserve field values");
+  expect(std::get<u64>(headerAnnotation.fields[0].value) == 0xaa, "source map should preserve field values");
   expect(headerAnnotation.fields[0].display == SourceValueDisplay::Hex,
          "source map should preserve field display hints");
   expect(headerAnnotation.links.size() == 1 && headerAnnotation.links[0].role == SourceLinkRole::PointsTo,
@@ -49,8 +49,7 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
          "command helper should preserve sequence semantic");
   expect(sourceMap.get(command.id()).localKind == "pitch-bend-range",
          "command helper should slugify multi-word labels");
-  expect(sourceMap.get(command.id()).fields.size() == 1 &&
-             sourceMap.get(command.id()).fields[0].name == "bend" &&
+  expect(sourceMap.get(command.id()).fields.size() == 1 && sourceMap.get(command.id()).fields[0].name == "bend" &&
              std::get<s64>(sourceMap.get(command.id()).fields[0].value) == -2 &&
              sourceMap.get(command.id()).fields[0].display == SourceValueDisplay::SignedDecimal,
          "command annotation should own decoded operand fields for inspectors and HexView");
@@ -69,9 +68,9 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
          "source map should find annotations containing a range");
   expect(sourceMap.withRole(source, SourceRole::Header) == std::vector<SourceAnnotationId>{header.id()},
          "source map should filter annotations by source role");
-  expect(sourceMap.withSequenceSemantic(source, SequenceSemantic::Pitch) ==
-             std::vector<SourceAnnotationId>{command.id()},
-         "source map should filter annotations by sequence semantic");
+  expect(
+      sourceMap.withSequenceSemantic(source, SequenceSemantic::Pitch) == std::vector<SourceAnnotationId>{command.id()},
+      "source map should filter annotations by sequence semantic");
 }
 
 void sourceAnnotationsCarryOutlinePolicyForTreeConsumers() {
@@ -86,10 +85,9 @@ void sourceAnnotationsCarryOutlinePolicyForTreeConsumers() {
       builder.annotation(SourceRole::Field, "ADSR/Gain", SourceRange{.source = source, .offset = 1, .size = 3})
           .parent(root.id())
           .outline(SourceOutlinePolicy::Show);
-  const auto hiddenHeader =
-      builder.header("Internal Header", SourceRange{.source = source, .offset = 2, .size = 1})
-          .parent(root.id())
-          .outline(SourceOutlinePolicy::Hide);
+  const auto hiddenHeader = builder.header("Internal Header", SourceRange{.source = source, .offset = 2, .size = 1})
+                                .parent(root.id())
+                                .outline(SourceOutlinePolicy::Hide);
 
   const SourceMap sourceMap = builder.finish();
   expect(sourceMap.get(root.id()).outline == SourceOutlinePolicy::Auto,
@@ -218,9 +216,9 @@ void scanValidationRejectsSourceAnnotationParentCycles() {
       }},
   };
   const ValidationReport report = validateScanCommit(commit, sources, AssetStore{});
-  expect(std::ranges::any_of(report.findings(), [](const ValidationFinding& finding) {
-           return finding.code == "scan.source-annotation.parent-cycle";
-         }),
+  expect(std::ranges::any_of(
+             report.findings(),
+             [](const ValidationFinding& finding) { return finding.code == "scan.source-annotation.parent-cycle"; }),
          "scan admission should reject cyclic annotation parents before a TreeView can recurse through them");
 }
 
@@ -254,14 +252,14 @@ void diagnosticsCanReferenceSourceAnnotationsAndObjects() {
 
   expect(sourceMap.find(*annotationDiagnostic.annotation) != nullptr,
          "diagnostics should be able to anchor to source annotations");
-  expect(objectDiagnostic.object && sourceMap.ownedBy(*objectDiagnostic.object) == std::vector<SourceAnnotationId>{header.id()},
+  expect(objectDiagnostic.object &&
+             sourceMap.ownedBy(*objectDiagnostic.object) == std::vector<SourceAnnotationId>{header.id()},
          "diagnostics should be able to anchor to semantic objects");
 }
 
 void sessionSnapshotCarriesScannerSourceMap() {
   Session session;
-  session.formats().add(probeExplicitCollectionModule());
-  session.dialects().add(probeSequenceDialect());
+  session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
 
   const auto source = session.addSource(SourceFile{.name = "annotated.probe"}, {0xab});
   SessionSnapshot snapshot = session.scanSource(source);

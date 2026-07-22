@@ -5,12 +5,10 @@
  */
 #pragma once
 
-namespace vgmtrans::core {
-class FormatRegistry;
-}
+#include "value/scan/FormatDefinition.h"
 
 namespace vgmtrans::formats::snes_spc {
 
-void registerSnesSpcExtractor(core::FormatRegistry& registry);
+[[nodiscard]] core::FormatDefinition snesSpcExtractorDefinition();
 
 }  // namespace vgmtrans::formats::snes_spc

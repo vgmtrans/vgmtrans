@@ -41,9 +41,17 @@ void addMissingSequenceDialectDiagnostics(SessionSnapshotBuilder& snapshot, cons
 
 void Session::registerFormat(FormatDefinition definition) {
   formats_.add(std::move(definition.module));
-  if (definition.sequenceDialect) {
-    dialects_.add(std::move(*definition.sequenceDialect));
+  for (auto& dialect : definition.sequenceDialects) {
+    dialects_.add(std::move(dialect));
   }
+}
+
+void Session::registerFormat(FormatModule module) {
+  registerFormat(FormatDefinition{.module = std::move(module)});
+}
+
+void Session::registerFormat(FormatModule module, SequenceDialect dialect) {
+  registerFormat(FormatDefinition{.module = std::move(module), .sequenceDialects = {std::move(dialect)}});
 }
 
 SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
@@ -154,12 +162,12 @@ SessionSnapshot Session::snapshot() const {
 
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
   const auto current = snapshot();
-  return core::exportCollection(current, sources_, id, request, dialects_);
+  return core::exportCollection(current, sources_, id, request, dialects_, &formats_);
 }
 
 std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest& request) const {
   const auto current = snapshot();
-  return core::exportAllCollections(current, sources_, request, dialects_);
+  return core::exportAllCollections(current, sources_, request, dialects_, &formats_);
 }
 
 void Session::sealRegistries() noexcept {
@@ -273,52 +281,6 @@ void Session::rebuildCollections() {
     auto& desiredCollections = desiredByResolver[resolverId];
     try {
       auto desired = module.resolveCollections(context);
-      if (module.materializeCollection != nullptr) {
-        // Materializers are format code and may fail on any collection. Apply
-        // the resolver's whole batch to copies first so one late failure cannot
-        // publish earlier derived assets, annotations, or diagnostics.
-        auto stagedAssets = assets_;
-        auto stagedSourceMaps = sourceMaps_;
-        std::vector<Diagnostic> stagedDiagnostics;
-        std::vector<DesiredCollection> materializedDesired;
-        std::set<std::string> activeMaterializedKeys;
-        for (auto& collection : desired) {
-          if (collection.key.resolver.empty()) {
-            collection.key.resolver = resolverId;
-          }
-          MaterializationContext materialization{
-              .sources = sources_,
-              .snapshot = current,
-              .collection = collection,
-              .ids = ids_,
-              .assetIdForSlot =
-                  [&](std::string_view slot) {
-                    return stagedAssets.materializedAssetId(resolverId, collection.key, slot, ids_);
-                  },
-          };
-          auto result = module.materializeCollection(materialization);
-          stagedDiagnostics.insert(stagedDiagnostics.end(), std::make_move_iterator(result.diagnostics.begin()),
-                                   std::make_move_iterator(result.diagnostics.end()));
-          std::vector<AssetId> materializedAssetIds;
-          materializedAssetIds.reserve(result.assets.size());
-          for (auto& asset : result.assets) {
-            materializedAssetIds.push_back(metadata(asset.asset).id);
-            activeMaterializedKeys.insert(
-                stagedAssets.upsertMaterializedAsset(resolverId, collection.key, asset.slot, std::move(asset.asset)));
-          }
-          // A rebuilt derived asset keeps its ID but may point at different
-          // source records, so its old annotations must not accumulate.
-          stagedSourceMaps.replaceForAssets(materializedAssetIds, std::move(result.sourceMap));
-          materializedDesired.push_back(std::move(result.collection));
-        }
-        const auto removedMaterializedAssets =
-            stagedAssets.removeStaleMaterializedAssets(resolverId, activeMaterializedKeys);
-        stagedSourceMaps.removeForAssets(removedMaterializedAssets);
-        assets_ = std::move(stagedAssets);
-        sourceMaps_ = std::move(stagedSourceMaps);
-        diagnostics_.append(std::move(stagedDiagnostics));
-        desired = std::move(materializedDesired);
-      }
       desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),
                                 std::make_move_iterator(desired.end()));
     } catch (const std::exception& ex) {

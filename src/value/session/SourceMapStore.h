@@ -8,7 +8,6 @@
 
 #include "value/model/SourceMap.h"
 
-#include <unordered_set>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -21,8 +20,6 @@ public:
   void validateAppend(const SourceMap& sourceMap) const;
   void append(SourceMap sourceMap);
   void removeForSources(const std::vector<SourceId>& sources);
-  void replaceForAssets(const std::vector<AssetId>& assets, SourceMap sourceMap);
-  void removeForAssets(const std::unordered_set<u32>& assets);
 
   [[nodiscard]] SourceMap all() const;
 

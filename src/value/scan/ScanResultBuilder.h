@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "value/scan/ParseCursor.h"
 #include "value/scan/ScanTypes.h"
 #include "value/model/SourceMap.h"
 #include "value/synth/SynthBuilder.h"
@@ -123,7 +122,6 @@ public:
   [[nodiscard]] ByteReader reader() const noexcept { return input_.reader; }
   [[nodiscard]] std::string_view format() const noexcept { return format_; }
   [[nodiscard]] std::string sourceDisplayName() const;
-  [[nodiscard]] ParseCursor cursor(SourceRange bounds);
   [[nodiscard]] SourceMapBuilder& sourceMap() noexcept { return sourceMap_; }
   [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }
 

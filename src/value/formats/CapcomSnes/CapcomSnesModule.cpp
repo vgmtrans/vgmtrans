@@ -57,7 +57,7 @@ namespace {
 FormatDefinition capcomSnesDefinition() {
   return FormatDefinition{
       .module = {.name = "CapcomSnes", .scan = scanCapcomSnes},
-      .sequenceDialect = capcomSnesSequenceDialect(),
+      .sequenceDialects = {capcomSnesSequenceDialect()},
   };
 }
 

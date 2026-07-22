@@ -6,6 +6,7 @@
 
 #include "value/export/synth/SoundFontExporter.h"
 
+#include "value/export/BinaryWriter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
@@ -67,13 +68,7 @@ constexpr u32 kPresetGeneratorsPerInstrument = 2;
 constexpr u32 kBaseInstrumentRegionGenerators = 9;
 constexpr u32 kEnvelopeInstrumentRegionGenerators = 5;
 
-struct Chunk {
-  // RIFF chunk size excludes the optional pad byte. payload is already padded so appending
-  // chunks can stay mechanical.
-  std::string id;
-  u32 size = 0;
-  std::vector<u8> payload;
-};
+using Chunk = RiffChunk;
 
 struct DecodedSfSample {
   AssetId collectionId;
@@ -108,55 +103,6 @@ struct SfModulatorRecord {
   s16 amount = 0;
 };
 
-void writeAscii(std::vector<u8>& bytes, std::string_view text) {
-  bytes.insert(bytes.end(), text.begin(), text.end());
-}
-
-void writeU8(std::vector<u8>& bytes, u8 value) {
-  bytes.push_back(value);
-}
-
-void writeLe16(std::vector<u8>& bytes, u16 value) {
-  bytes.push_back(static_cast<u8>(value & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 8) & 0xff));
-}
-
-void writeLeS16(std::vector<u8>& bytes, s16 value) {
-  writeLe16(bytes, static_cast<u16>(value));
-}
-
-void writeLe32(std::vector<u8>& bytes, u32 value) {
-  bytes.push_back(static_cast<u8>(value & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 8) & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 16) & 0xff));
-  bytes.push_back(static_cast<u8>((value >> 24) & 0xff));
-}
-
-void writeFixedString(std::vector<u8>& bytes, std::string_view text, size_t width) {
-  const auto copied = std::min(text.size(), width);
-  bytes.insert(bytes.end(), text.begin(), text.begin() + static_cast<std::ptrdiff_t>(copied));
-  bytes.insert(bytes.end(), width - copied, 0);
-}
-
-[[nodiscard]] std::vector<u8> withEvenPad(std::vector<u8> payload) {
-  if ((payload.size() & 1) != 0) {
-    payload.push_back(0);
-  }
-  return payload;
-}
-
-[[nodiscard]] Chunk makeChunk(std::string id, std::vector<u8> payload) {
-  if (payload.size() > std::numeric_limits<u32>::max()) {
-    throw std::overflow_error("SF2 chunk is too large");
-  }
-
-  return Chunk{
-      .id = std::move(id),
-      .size = static_cast<u32>(payload.size()),
-      .payload = withEvenPad(std::move(payload)),
-  };
-}
-
 [[nodiscard]] Chunk makeStringChunk(std::string id, std::string_view text) {
   std::vector<u8> payload;
   writeAscii(payload, text);
@@ -165,40 +111,6 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text, size_t widt
     payload.push_back(0);
   }
   return makeChunk(std::move(id), std::move(payload));
-}
-
-void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
-  writeAscii(bytes, chunk.id);
-  writeLe32(bytes, chunk.size);
-  bytes.insert(bytes.end(), chunk.payload.begin(), chunk.payload.end());
-}
-
-[[nodiscard]] Chunk makeListChunk(std::string type, std::vector<Chunk> children) {
-  // SF2 stores most tables inside RIFF LIST chunks whose first four payload bytes name
-  // the list type, such as INFO, sdta, or pdta.
-  std::vector<u8> payload;
-  writeAscii(payload, type);
-  for (const auto& child : children) {
-    appendChunk(payload, child);
-  }
-  return makeChunk("LIST", std::move(payload));
-}
-
-[[nodiscard]] std::vector<u8> riffSoundFont(std::vector<Chunk> children) {
-  std::vector<u8> payload;
-  writeAscii(payload, "sfbk");
-  for (const auto& child : children) {
-    appendChunk(payload, child);
-  }
-
-  std::vector<u8> bytes;
-  writeAscii(bytes, "RIFF");
-  if (payload.size() > std::numeric_limits<u32>::max()) {
-    throw std::overflow_error("SF2 RIFF payload is too large");
-  }
-  writeLe32(bytes, static_cast<u32>(payload.size()));
-  bytes.insert(bytes.end(), payload.begin(), payload.end());
-  return bytes;
 }
 
 [[nodiscard]] std::string sf2Name(std::string name, std::string_view fallback) {
@@ -400,8 +312,8 @@ void appendChunk(std::vector<u8>& bytes, const Chunk& chunk) {
   constexpr long maxSustainAttenuationCentibels = 1000;
   const double amplitude = std::clamp(envelope.sustainAmplitude.value_or(1.0), 0.0, 1.0);
   const double attenuationDb = amplitude == 0.0 ? 100.0 : std::min(-20.0 * std::log10(amplitude), 100.0);
-  return clampS16(static_cast<s32>(
-      std::clamp(attenuationDb * 10.0, 0.0, static_cast<double>(maxSustainAttenuationCentibels))));
+  return clampS16(
+      static_cast<s32>(std::clamp(attenuationDb * 10.0, 0.0, static_cast<double>(maxSustainAttenuationCentibels))));
 }
 
 [[nodiscard]] u32 instrumentRegionGeneratorCount(const Region& region) {
@@ -773,12 +685,13 @@ SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, 
     return result;
   }
 
-  result.bytes = riffSoundFont({
-      makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
-      makeListChunk("sdta", {smplChunk(samples)}),
-      makeListChunk("pdta", pdtaChunks(instruments, samples, input.midiModulationUsage, input.modulationScaling,
-                                       input.modulationConversion)),
-  });
+  result.bytes =
+      makeRiff("sfbk", {
+                           makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
+                           makeListChunk("sdta", {smplChunk(samples)}),
+                           makeListChunk("pdta", pdtaChunks(instruments, samples, input.midiModulationUsage,
+                                                            input.modulationScaling, input.modulationConversion)),
+                       });
   return result;
 }
 

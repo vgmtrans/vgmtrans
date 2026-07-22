@@ -68,7 +68,7 @@ using namespace core;
 FormatDefinition akaoSnesDefinition() {
   return FormatDefinition{
       .module = {.name = std::string(kAkaoSnesFormatName), .scan = scanAkaoSnes},
-      .sequenceDialect = akaoSnesSequenceDialect(),
+      .sequenceDialects = {akaoSnesSequenceDialect()},
   };
 }
 

@@ -1236,14 +1236,13 @@ const SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version) {
   return none;
 }
 
-void registerKonamiSnesSequenceDialects(SequenceDialectRegistry& registry) {
-  registry.add(konamiSnesSequenceDialect(KONAMISNES_NONE));
-  registry.add(konamiSnesSequenceDialect(KONAMISNES_V1));
-  registry.add(konamiSnesSequenceDialect(KONAMISNES_V2));
-  registry.add(konamiSnesSequenceDialect(KONAMISNES_V3));
-  registry.add(konamiSnesSequenceDialect(KONAMISNES_V4));
-  registry.add(konamiSnesSequenceDialect(KONAMISNES_V5));
-  registry.add(konamiSnesSequenceDialect(KONAMISNES_V6));
+std::vector<SequenceDialect> konamiSnesSequenceDialects() {
+  return {
+      konamiSnesSequenceDialect(KONAMISNES_NONE), konamiSnesSequenceDialect(KONAMISNES_V1),
+      konamiSnesSequenceDialect(KONAMISNES_V2),   konamiSnesSequenceDialect(KONAMISNES_V3),
+      konamiSnesSequenceDialect(KONAMISNES_V4),   konamiSnesSequenceDialect(KONAMISNES_V5),
+      konamiSnesSequenceDialect(KONAMISNES_V6),
+  };
 }
 
 TrackProgram decodeKonamiSnesSourceTrack(ByteReader reader, KonamiSnesVersion version, u32 sourceTrackNumber,

@@ -241,15 +241,4 @@ void SequenceDecodeSession::annotateTrackPointer(u32 trackIndex, SourceRange poi
   pointer.parent(*tracks_.parentAnnotation);
 }
 
-TrackDecodeScope makeTrackDecodeScope(ByteReader reader, const TrackDecodeInput& input) {
-  return TrackDecodeScope{
-      .reader = reader,
-      .bytecodeEnd = input.bytecodeEnd,
-      .maxCommands = input.maxCommands,
-      .sequenceAsset = input.sequenceAsset,
-      .parentAnnotation = input.parentAnnotation,
-      .sourceMap = input.sourceMap,
-  };
-}
-
 }  // namespace vgmtrans::core

@@ -6,12 +6,10 @@
 
 #pragma once
 
-namespace vgmtrans::core {
-class FormatRegistry;
-}
+#include "value/scan/FormatDefinition.h"
 
 namespace vgmtrans::formats::psf {
 
-void registerPsfExtractor(core::FormatRegistry& registry);
+[[nodiscard]] core::FormatDefinition psfExtractorDefinition();
 
 }  // namespace vgmtrans::formats::psf
