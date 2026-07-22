@@ -7,6 +7,7 @@
 #include "value/sequence/PerformanceModel.h"
 
 #include <algorithm>
+#include <tuple>
 
 namespace vgmtrans::core {
 
@@ -14,10 +15,32 @@ const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& eve
   return std::visit([](const auto& typedEvent) -> const PerformanceEventHeader& { return typedEvent.header; }, event);
 }
 
-const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id) {
-  const auto found = std::ranges::find_if(sequence.tracks, [id](const PerformanceTrack& track) {
-    return track.id == id;
+std::vector<const PerformanceEvent*> flattenedPerformanceEvents(const PerformanceTrack& track) {
+  std::vector<const PerformanceEvent*> events;
+  size_t eventCount = track.events.size();
+  for (const auto& automation : track.automations) {
+    eventCount += automation.points.size();
+  }
+  events.reserve(eventCount);
+  for (const auto& event : track.events) {
+    events.push_back(&event);
+  }
+  for (const auto& automation : track.automations) {
+    for (const auto& event : automation.points) {
+      events.push_back(&event);
+    }
+  }
+  std::ranges::stable_sort(events, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
+    const auto& lhsHeader = performanceEventHeader(*lhs);
+    const auto& rhsHeader = performanceEventHeader(*rhs);
+    return std::tie(lhsHeader.tick, lhsHeader.sequence) < std::tie(rhsHeader.tick, rhsHeader.sequence);
   });
+  return events;
+}
+
+const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id) {
+  const auto found =
+      std::ranges::find_if(sequence.tracks, [id](const PerformanceTrack& track) { return track.id == id; });
   if (found == sequence.tracks.end()) {
     return nullptr;
   }
@@ -34,11 +57,22 @@ const SourceCommand* sourceCommandForEvent(const SequenceProgram& program, const
 
 std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track, CommandId command) {
   std::vector<const PerformanceEvent*> events;
-  for (const auto& event : track.events) {
-    if (performanceEventHeader(event).sourceCommand == command) {
-      events.push_back(&event);
+  const auto appendMatching = [&](const auto& candidates) {
+    for (const auto& event : candidates) {
+      if (performanceEventHeader(event).sourceCommand == command) {
+        events.push_back(&event);
+      }
     }
+  };
+  appendMatching(track.events);
+  for (const auto& automation : track.automations) {
+    appendMatching(automation.points);
   }
+  std::ranges::stable_sort(events, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
+    const auto& lhsHeader = performanceEventHeader(*lhs);
+    const auto& rhsHeader = performanceEventHeader(*rhs);
+    return std::tie(lhsHeader.tick, lhsHeader.sequence) < std::tie(rhsHeader.tick, rhsHeader.sequence);
+  });
   return events;
 }
 

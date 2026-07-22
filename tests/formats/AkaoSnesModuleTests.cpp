@@ -76,8 +76,8 @@ PerformanceSequence renderTracks(AkaoSnesProfile profile, std::vector<TrackProgr
 template <class Event>
 std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
   std::vector<const Event*> events;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
+  for (const PerformanceEvent* event : flattenedPerformanceEvents(track)) {
+    if (const auto* typed = std::get_if<Event>(event)) {
       events.push_back(typed);
     }
   }
@@ -480,6 +480,22 @@ void akaoSnesCompiledAutomationTicksControllerAndTempoFades() {
 
   const PerformanceSequence performance = renderTracks(ff6, {decodeTrack(bytes, ff6, start, static_cast<u32>(offset))});
   expect(performance.diagnostics.empty(), "valid AkaoSnes fade fixtures should render without diagnostics");
+  expect(performance.tracks.front().automations.size() == 3,
+         "volume, pan, and tempo fades should remain three first-class automation operations");
+  expect(performance.tracks.front().automations[0].intent.target == PerformanceAutomationTarget::Level &&
+             performance.tracks.front().automations[1].intent.target == PerformanceAutomationTarget::Pan &&
+             performance.tracks.front().automations[2].intent.target == PerformanceAutomationTarget::Tempo,
+         "AkaoSnes fades should retain their neutral targets and source order");
+  expect(std::ranges::all_of(performance.tracks.front().automations,
+                             [](const PerformanceAutomation& automation) {
+                               return std::ranges::all_of(automation.points, [&](const PerformanceEvent& point) {
+                                 const auto& header = performanceEventHeader(point);
+                                 return header.sourceCommand == automation.header.sourceCommand &&
+                                        header.sourceAnnotation == automation.header.sourceAnnotation &&
+                                        header.track == automation.header.track;
+                               });
+                             }),
+         "automation points should retain the defining command's source provenance");
   const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks.front());
   const auto pans = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
   const auto tempos = eventsOfType<TempoPerformanceEvent>(performance.tracks.front());
