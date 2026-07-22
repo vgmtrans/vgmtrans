@@ -9,6 +9,7 @@
 #include "value/base/Source.h"
 #include "value/export/ExportTypes.h"
 #include "value/model/SessionSnapshot.h"
+#include "value/model/SourceInspection.h"
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/FormatDefinition.h"
 #include "value/scan/ScanTypes.h"
@@ -21,6 +22,7 @@
 #include "value/session/SourceMapStore.h"
 
 #include <filesystem>
+#include <memory>
 #include <set>
 #include <span>
 #include <unordered_set>
@@ -46,6 +48,7 @@ public:
   [[nodiscard]] SessionSnapshot scanSource(SourceId id);
   [[nodiscard]] SessionSnapshot scanPendingSources();
   [[nodiscard]] SessionSnapshot snapshot() const;
+  [[nodiscard]] std::shared_ptr<const SourceInspection> inspect(AssetId asset) const;
 
   [[nodiscard]] std::vector<Artifact> exportCollection(CollectionId id, const ExportRequest& request) const;
   [[nodiscard]] std::vector<CollectionExport> exportAllCollections(const ExportRequest& request) const;

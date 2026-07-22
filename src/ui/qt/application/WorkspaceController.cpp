@@ -28,6 +28,10 @@ std::span<const u8> WorkspaceController::sourceBytes(core::SourceId id) const {
   return session_.sources().bytes(id);
 }
 
+std::shared_ptr<const core::SourceInspection> WorkspaceController::inspect(core::AssetId asset) const {
+  return session_.inspect(asset);
+}
+
 OpenResult WorkspaceController::openPaths(std::span<const std::filesystem::path> paths) {
   OpenResult result;
   for (const auto& path : paths) {

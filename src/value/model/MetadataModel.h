@@ -14,7 +14,8 @@
 namespace vgmtrans::core {
 
 // Common metadata for sequences, instrument sets, sample collections, and misc
-// assets. Exporters use this for names and source ranges instead of rediscovering them.
+// assets. range identifies the asset's primary source structure; SourceInspection
+// expands it across the asset-owned annotation graph when presenting its bytes.
 struct AssetMetadata {
   AssetId id;
   std::string format;

@@ -12,6 +12,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -28,8 +29,8 @@ struct OpenResult {
   std::vector<OpenFailure> failures;
 };
 
-// The only mutable boundary between Qt and the value core. Views consume an
-// immutable snapshot and keep stable IDs; they never retain pointers into Session.
+// The only mutable boundary between Qt and the value core. Lists consume the
+// current snapshot; inspector tabs share immutable SourceInspection instances.
 class WorkspaceController final : public QObject {
   Q_OBJECT
 
@@ -41,6 +42,7 @@ public:
 
   [[nodiscard]] const core::SessionSnapshot& snapshot() const noexcept { return snapshot_; }
   [[nodiscard]] std::span<const u8> sourceBytes(core::SourceId id) const;
+  [[nodiscard]] std::shared_ptr<const core::SourceInspection> inspect(core::AssetId asset) const;
 
   [[nodiscard]] OpenResult openPaths(std::span<const std::filesystem::path> paths);
   [[nodiscard]] size_t removeSources(std::span<const core::SourceId> sources);

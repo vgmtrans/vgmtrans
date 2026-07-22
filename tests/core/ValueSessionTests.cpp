@@ -790,7 +790,10 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   expect(missingParentFailed, "derived source parent must already exist");
 
   const auto parent = store.add(SourceFile{.name = "parent"}, {0xaa});
+  const SharedSourceBytes retainedBytes = store.sharedBytes(parent);
   static_cast<void>(store.removeFamily(parent));
+  expect(retainedBytes && *retainedBytes == std::vector<u8>{0xaa},
+         "removing a source should preserve immutable bytes retained by an open inspection");
 
   bool removedParentFailed = false;
   try {

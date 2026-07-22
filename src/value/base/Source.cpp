@@ -83,7 +83,10 @@ SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
   if (file.name.empty() && !file.path.empty()) {
     file.name = file.path.filename().string();
   }
-  entries_.push_back(Entry{.file = std::move(file), .bytes = std::move(bytes)});
+  entries_.push_back(Entry{
+      .file = std::move(file),
+      .bytes = std::make_shared<const std::vector<u8>>(std::move(bytes)),
+  });
   return id;
 }
 
@@ -105,8 +108,7 @@ std::vector<SourceId> SourceStore::removeFamily(SourceId id) {
     auto& entry = entries_[source.value];
     entry.file.status = SourceStatus::Removed;
     entry.file.size = 0;
-    entry.bytes.clear();
-    entry.bytes.shrink_to_fit();
+    entry.bytes.reset();
   }
   return family;
 }
@@ -121,7 +123,11 @@ bool SourceStore::hasSlot(SourceId id) const noexcept {
 
 std::span<const u8> SourceStore::bytes(SourceId id) const {
   const auto& e = entry(id);
-  return e.bytes;
+  return *e.bytes;
+}
+
+SharedSourceBytes SourceStore::sharedBytes(SourceId id) const {
+  return entry(id).bytes;
 }
 
 ByteReader SourceStore::reader(SourceId id) const {

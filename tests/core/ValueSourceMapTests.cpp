@@ -222,6 +222,63 @@ void scanValidationRejectsSourceAnnotationParentCycles() {
          "scan admission should reject cyclic annotation parents before a TreeView can recurse through them");
 }
 
+void scanValidationRequiresAssetOwnedAnnotationGraphs() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "unowned.bin"}, {0});
+  const SourceRange range = sources.reader(source).range(0, 1);
+  ScanCommit commit{
+      .source = source,
+      .sourceSize = 1,
+      .assets = {MiscAsset{.metadata = AssetMetadata{.id = AssetId{1}, .name = "Unowned", .range = range}}},
+      .sourceMap = SourceMap{{SourceAnnotation{
+          .id = SourceAnnotationId{1},
+          .range = range,
+          .label = "Unowned",
+      }}},
+  };
+
+  const ValidationReport report = validateScanCommit(commit, sources, AssetStore{});
+  expect(std::ranges::any_of(report.findings(), [](const ValidationFinding& finding) {
+           return finding.code == "scan.asset.missing-source-annotations";
+         }),
+         "scan admission should require every asset to expose an explicitly owned annotation graph");
+}
+
+void scanValidationRejectsCrossAssetAnnotationParents() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "cross-owned.bin"}, {0, 0});
+  const SourceRange range = sources.reader(source).range(0, 2);
+  ScanCommit commit{
+      .source = source,
+      .sourceSize = 2,
+      .assets = {
+          MiscAsset{.metadata = AssetMetadata{.id = AssetId{1}, .name = "First", .range = range}},
+          MiscAsset{.metadata = AssetMetadata{.id = AssetId{2}, .name = "Second", .range = range}},
+      },
+      .sourceMap = SourceMap{{
+          SourceAnnotation{
+              .id = SourceAnnotationId{1},
+              .range = sources.reader(source).range(0, 1),
+              .label = "First",
+              .owner = ObjectRefs::misc(AssetId{1}),
+          },
+          SourceAnnotation{
+              .id = SourceAnnotationId{2},
+              .range = sources.reader(source).range(1, 1),
+              .label = "Second",
+              .owner = ObjectRefs::misc(AssetId{2}),
+              .parent = SourceAnnotationId{1},
+          },
+      }},
+  };
+
+  const ValidationReport report = validateScanCommit(commit, sources, AssetStore{});
+  expect(std::ranges::any_of(report.findings(), [](const ValidationFinding& finding) {
+           return finding.code == "scan.source-annotation.cross-asset-parent";
+         }),
+         "scan admission should reject annotation parents that cross asset boundaries");
+}
+
 void objectSelectorsHaveDistinctKinds() {
   expect(ObjectRefs::instrumentIndex(2) != ObjectRefs::instrumentProgram(2, 0),
          "an instrument table index should not collide with a bank/program selector");
@@ -261,7 +318,7 @@ void sessionSnapshotCarriesScannerSourceMap() {
   Session session;
   session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
 
-  const auto source = session.addSource(SourceFile{.name = "annotated.probe"}, {0xab});
+  const auto source = session.addSource(SourceFile{.name = "annotated.probe"}, {0xab, 0x01, 0x02});
   SessionSnapshot snapshot = session.scanSource(source);
 
   const auto headerIds = snapshot.sourceMap().withRole(source, SourceRole::Header);
@@ -274,8 +331,16 @@ void sessionSnapshotCarriesScannerSourceMap() {
   expect(header.fields.size() == 1 && std::get<u64>(header.fields[0].value) == 0xab,
          "session source map should preserve annotation fields");
 
+  const auto inspection = session.inspect(header.owner->asset);
+  expect(inspection && inspection->bytes().size() == 3 && inspection->bytes().front() == 0xab,
+         "source inspection should expand a primary header range across its explicitly owned graph");
+  expect(inspection->roots().size() == 2 && inspection->annotation(inspection->roots().front()) != nullptr,
+         "source inspection should preserve the asset-owned annotation graph");
+
   snapshot = session.removeSource(source);
   expect(snapshot.sourceMap().empty(), "removing a source should remove its source annotations");
+  expect(inspection->bytes().size() == 3 && inspection->bytes().front() == 0xab,
+         "an existing source inspection should survive source removal");
 }
 
 }  // namespace
@@ -287,6 +352,8 @@ void runValueSourceMapTests() {
   sourceMapStoreRejectsCrossScanAnnotationIdCollisions();
   scanCommitPreflightsSourceAnnotationIdCollisions();
   scanValidationRejectsSourceAnnotationParentCycles();
+  scanValidationRequiresAssetOwnedAnnotationGraphs();
+  scanValidationRejectsCrossAssetAnnotationParents();
   objectSelectorsHaveDistinctKinds();
   diagnosticsCanReferenceSourceAnnotationsAndObjects();
   sessionSnapshotCarriesScannerSourceMap();

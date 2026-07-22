@@ -177,6 +177,18 @@ SessionSnapshot Session::snapshot() const {
   return current.finish();
 }
 
+std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
+  const auto* value = assets_.find(asset);
+  if (value == nullptr) {
+    return {};
+  }
+  const SourceId source = metadata(*value).range.source;
+  if (!sources_.contains(source)) {
+    return {};
+  }
+  return SourceInspection::create(metadata(*value), sourceMaps_.all(), sources_.sharedBytes(source));
+}
+
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
   const auto current = snapshot();
   return core::exportCollection(current, sources_, id, request, dialects_, &formats_);

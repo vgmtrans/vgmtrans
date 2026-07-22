@@ -35,13 +35,11 @@ vgmtrans_enable_project_warnings(vgmtransqtvalue)
 target_sources(vgmtransqtvalue
   PRIVATE
     application/WorkspaceController.cpp
-    models/SourceInspectorModel.cpp
     models/ValueModels.cpp
   PUBLIC
     FILE_SET HEADERS TYPE HEADERS
     FILES
       application/WorkspaceController.h
-      models/SourceInspectorModel.h
       models/ValueModels.h
 )
 set_target_properties(vgmtransqtvalue PROPERTIES AUTOMOC ON)
