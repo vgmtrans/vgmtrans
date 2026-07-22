@@ -47,6 +47,11 @@ class CollectionTableModel;
 class WorkspaceController;
 }
 
+namespace vgmtrans::core {
+struct Artifact;
+enum class ExportKind;
+}
+
 class MainWindow final : public QMainWindow {
   Q_OBJECT
 
@@ -102,7 +107,10 @@ private:
   void removeSelectedSources();
   void removeSelectedAssets();
   void saveOriginal(QAbstractItemView* view, OriginalItemKind kind);
+  void saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact artifact,
+                    const QString& failureMessage, const char* extension);
   void exportSequenceMidi(const QModelIndex& index);
+  void exportInstrumentSet(const QModelIndex& index, vgmtrans::core::ExportKind kind);
   void togglePlayback();
   void updateSelectionStatus(const QModelIndex& index,
                              SelectionStatusKind kind);

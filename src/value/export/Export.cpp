@@ -62,6 +62,13 @@ namespace {
   return "sequence-" + std::to_string(sequence.metadata.id.value);
 }
 
+[[nodiscard]] std::string artifactBaseName(const InstrumentSetAsset& instrumentSet) {
+  if (!instrumentSet.metadata.name.empty()) {
+    return filenamePart(instrumentSet.metadata.name);
+  }
+  return "instrument-set-" + std::to_string(instrumentSet.metadata.id.value);
+}
+
 [[nodiscard]] std::string sampleArtifactName(const std::string& baseName, const Sample& sample, u32 sampleIndex) {
   std::string sampleName = sample.name.empty() ? "sample-" + std::to_string(sampleIndex) : sample.name;
   return filenamePart(baseName) + "-" + std::to_string(sampleIndex) + "-" + filenamePart(std::move(sampleName)) +
@@ -77,7 +84,7 @@ namespace {
   return {ExportKind::Midi};
 }
 
-struct PreparedCollectionExport {
+struct PreparedExport {
   std::string baseName;
   CollectionAssets assets;
   std::vector<InstrumentSetAsset> preparedInstrumentSets;
@@ -89,13 +96,12 @@ struct MidiLoweringResult {
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] PreparedCollectionExport prepareCollectionExport(CollectionAssets assets, const SessionSnapshot& snapshot,
-                                                               const SourceStore& sources,
-                                                               const FormatRegistry* formats) {
+[[nodiscard]] PreparedExport prepareCollectionExport(CollectionAssets assets, const SessionSnapshot& snapshot,
+                                                     const SourceStore& sources, const FormatRegistry* formats) {
   // Prepare once per collection so all requested artifacts share names, resolved assets,
   // and reference diagnostics.
   const std::string baseName = assets.collection != nullptr ? artifactBaseName(*assets.collection) : "collection";
-  PreparedCollectionExport prepared{
+  PreparedExport prepared{
       .baseName = baseName,
       .assets = std::move(assets),
   };
@@ -159,7 +165,7 @@ struct MidiLoweringResult {
   };
 }
 
-[[nodiscard]] MidiLoweringResult lowerCollectionMidiSequence(const PreparedCollectionExport& prepared,
+[[nodiscard]] MidiLoweringResult lowerCollectionMidiSequence(const PreparedExport& prepared,
                                                              const SequenceDialectRegistry& dialects,
                                                              const ExportRequest& request) {
   // Rendering the source sequence is needed for .mid output and for observed-range
@@ -229,7 +235,7 @@ struct MidiLoweringResult {
   };
 }
 
-[[nodiscard]] std::vector<Artifact> exportWav(const PreparedCollectionExport& prepared, const SourceStore& sources) {
+[[nodiscard]] std::vector<Artifact> exportWav(const PreparedExport& prepared, const SourceStore& sources) {
   if (prepared.assets.collection == nullptr || prepared.assets.collection->sampleCollections.empty()) {
     return {Artifact{
         .filename = filenamePart(prepared.baseName) + "-samples.wav",
@@ -288,7 +294,7 @@ struct MidiLoweringResult {
   return artifacts;
 }
 
-[[nodiscard]] Artifact exportSoundFont2(const PreparedCollectionExport& prepared, const SourceStore& sources,
+[[nodiscard]] Artifact exportSoundFont2(const PreparedExport& prepared, const SourceStore& sources,
                                         const ExportRequest& request, const MidiModulationUsage* midiModulation,
                                         ModulationConversionPolicy modulationConversion) {
   auto result = SoundFontExporter().exportSoundFont(
@@ -317,7 +323,7 @@ struct MidiLoweringResult {
   };
 }
 
-[[nodiscard]] Artifact exportDls(const PreparedCollectionExport& prepared, const SourceStore& sources,
+[[nodiscard]] Artifact exportDls(const PreparedExport& prepared, const SourceStore& sources,
                                  const ExportRequest& request, const MidiModulationUsage* midiModulation,
                                  ModulationConversionPolicy modulationConversion) {
   auto result = DlsExporter().exportDls(
@@ -370,6 +376,107 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId,
                                           request.midi, ModulationConversionPolicy::SequenceEventSimulation);
   return exportMidi(artifactBaseName(*sequence), lowering, ModulationScalingPolicy::FullFormatRange,
                     ModulationConversionPolicy::SequenceEventSimulation);
+}
+
+Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId sequenceId,
+                            const SequenceExportRequest& request, const SequenceDialectRegistry& dialects,
+                            const FormatRegistry* formats) {
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(sequenceId);
+  const auto* collection = snapshot.firstCollectionContaining(sequenceId);
+  if (sequence == nullptr || collection == nullptr) {
+    return exportSequenceMidi(snapshot, sequenceId, request, dialects);
+  }
+
+  auto artifacts = exportCollection(
+      snapshot, sources, collection->id,
+      ExportRequest{
+          .kinds = {ExportKind::Midi},
+          .loopPolicy = request.loopPolicy,
+          .sequenceLoops = request.sequenceLoops,
+          .midi = request.midi,
+          .modulationScaling = ModulationScalingPolicy::FullFormatRange,
+          .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+      },
+      dialects, formats);
+  if (artifacts.empty()) {
+    return Artifact{
+        .filename = artifactBaseName(*sequence) + ".mid",
+        .mediaType = "audio/midi",
+        .diagnostics = {exportError("Collection MIDI export produced no artifact")},
+    };
+  }
+  artifacts.front().filename = artifactBaseName(*sequence) + ".mid";
+  return std::move(artifacts.front());
+}
+
+Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId instrumentSetId,
+                             ExportKind kind, const ExportRequest& request,
+                             const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {
+  const bool soundFont = kind == ExportKind::SoundFont2;
+  const bool dls = kind == ExportKind::Dls;
+  if (!soundFont && !dls) {
+    return Artifact{
+        .filename = "instrument-set-" + std::to_string(instrumentSetId.value),
+        .mediaType = "application/octet-stream",
+        .diagnostics = {exportError("Unsupported instrument set export kind")},
+    };
+  }
+
+  const std::string extension = soundFont ? ".sf2" : ".dls";
+  const std::string mediaType = soundFont ? "audio/soundfont" : "audio/dls";
+  const auto* asset = snapshot.asset(instrumentSetId);
+  const auto* instrumentSet = asset != nullptr ? std::get_if<InstrumentSetAsset>(asset) : nullptr;
+  if (instrumentSet == nullptr) {
+    return Artifact{
+        .filename = "instrument-set-" + std::to_string(instrumentSetId.value) + extension,
+        .mediaType = mediaType,
+        .diagnostics = {exportError(asset == nullptr ? "Instrument set asset was not found"
+                                                     : "Asset is not an instrument set")},
+    };
+  }
+
+  const std::string baseName = artifactBaseName(*instrumentSet);
+  if (const auto* collection = snapshot.firstCollectionContaining(instrumentSetId)) {
+    auto collectionRequest = request;
+    collectionRequest.kinds = {kind};
+    auto artifacts = exportCollection(snapshot, sources, collection->id, collectionRequest, dialects, formats);
+    if (!artifacts.empty()) {
+      artifacts.front().filename = baseName + extension;
+      return std::move(artifacts.front());
+    }
+    return Artifact{
+        .filename = baseName + extension,
+        .mediaType = mediaType,
+        .diagnostics = {exportError("Collection instrument export produced no artifact")},
+    };
+  }
+
+  PreparedExport prepared{
+      .baseName = baseName,
+  };
+  prepared.assets.instrumentSets.push_back(instrumentSet);
+  std::vector<AssetId> sampleIds;
+  for (const auto& instrument : instrumentSet->instruments) {
+    for (const auto& region : instrument.regions) {
+      if (!region.sample.collection || !region.sample.collection->valid() ||
+          std::ranges::find(sampleIds, *region.sample.collection) != sampleIds.end()) {
+        continue;
+      }
+      const AssetId sampleId = *region.sample.collection;
+      sampleIds.push_back(sampleId);
+      if (const auto* samples = snapshot.asset<SampleCollectionAsset>(sampleId)) {
+        prepared.assets.sampleCollections.push_back(samples);
+      } else {
+        prepared.assets.diagnostics.sampleCollections.push_back(
+            exportError("Instrument set sample collection asset was not found"));
+      }
+    }
+  }
+
+  return soundFont ? exportSoundFont2(prepared, sources, request, nullptr,
+                                      ModulationConversionPolicy::SynthModulators)
+                   : exportDls(prepared, sources, request, nullptr,
+                               ModulationConversionPolicy::SynthModulators);
 }
 
 CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,

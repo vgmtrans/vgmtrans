@@ -670,45 +670,72 @@ void MainWindow::saveOriginal(QAbstractItemView* view, OriginalItemKind kind) {
   }
 }
 
+void MainWindow::saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact artifact,
+                              const QString& failureMessage, const char* extension) {
+  const QString title = index.data(Qt::DisplayRole).toString();
+  if (artifact.bytes.empty()) {
+    const QString message = diagnosticMessages(artifact.diagnostics, failureMessage);
+    statusBarContent->setStatus(title, message);
+    showToast(message, ToastType::Error, 15000);
+    return;
+  }
+
+  const std::filesystem::path path = openSaveFileDialog(artifact.filename, extension);
+  if (path.empty()) {
+    return;
+  }
+
+  QSaveFile file(pathText(path));
+  const auto size = static_cast<qsizetype>(artifact.bytes.size());
+  if (!file.open(QIODevice::WriteOnly) ||
+      file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) != size ||
+      !file.commit()) {
+    const QString message = file.errorString();
+    statusBarContent->setStatus(title, message);
+    showToast(message, ToastType::Error, 15000);
+    return;
+  }
+  statusBarContent->setStatus(title, tr("Wrote %1").arg(pathText(path)));
+}
+
 void MainWindow::exportSequenceMidi(const QModelIndex& index) {
   if (!index.isValid()) {
     return;
   }
 
-  const QString title = index.data(Qt::DisplayRole).toString();
   vgmtrans::core::SequenceExportRequest request;
   applySequenceExportSettings(request);
 
   try {
-    const auto artifact = m_workspace.exportSequenceMidi(
-        vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, request);
-    if (artifact.bytes.empty()) {
-      const QString message = diagnosticMessages(
-          artifact.diagnostics, tr("The sequence could not be exported as MIDI."));
-      statusBarContent->setStatus(title, message);
-      showToast(message, ToastType::Error, 15000);
-      return;
-    }
-
-    const std::filesystem::path path = openSaveFileDialog(artifact.filename, "mid");
-    if (path.empty()) {
-      return;
-    }
-
-    QSaveFile file(pathText(path));
-    const auto size = static_cast<qsizetype>(artifact.bytes.size());
-    if (!file.open(QIODevice::WriteOnly) ||
-        file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) != size ||
-        !file.commit()) {
-      const QString message = file.errorString();
-      statusBarContent->setStatus(title, message);
-      showToast(message, ToastType::Error, 15000);
-      return;
-    }
-    statusBarContent->setStatus(title, tr("Wrote %1").arg(pathText(path)));
+    saveArtifact(index,
+                 m_workspace.exportSequenceMidi(
+                     vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, request),
+                 tr("The sequence could not be exported as MIDI."), "mid");
   } catch (const std::exception& error) {
     const QString message = QString::fromUtf8(error.what());
-    statusBarContent->setStatus(title, message);
+    statusBarContent->setStatus(index.data(Qt::DisplayRole).toString(), message);
+    showToast(message, ToastType::Error, 15000);
+  }
+}
+
+void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::ExportKind kind) {
+  if (!index.isValid()) {
+    return;
+  }
+
+  vgmtrans::core::ExportRequest request;
+  applySequenceExportSettings(request);
+  const bool soundFont = kind == vgmtrans::core::ExportKind::SoundFont2;
+  try {
+    saveArtifact(index,
+                 m_workspace.exportInstrumentSet(
+                     vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, kind, request),
+                 soundFont ? tr("The instrument set could not be exported as SF2.")
+                           : tr("The instrument set could not be exported as DLS."),
+                 soundFont ? "sf2" : "dls");
+  } catch (const std::exception& error) {
+    const QString message = QString::fromUtf8(error.what());
+    statusBarContent->setStatus(index.data(Qt::DisplayRole).toString(), message);
     showToast(message, ToastType::Error, 15000);
   }
 }
@@ -941,6 +968,16 @@ void MainWindow::routeSignals() {
     exportSequenceMidi(contentsFocused ? m_coll_view->currentIndex()
                                        : m_vgmfile_listview->currentIndex());
   });
+  connect(m_menu_bar, &MenuBar::exportSelectedInstrumentSet, this, [this](int choice) {
+    const QWidget* focused = QApplication::focusWidget();
+    const bool contentsFocused = focused != nullptr &&
+        (focused == m_coll_view || m_coll_view->isAncestorOf(focused));
+    const auto kind = choice == 0 ? vgmtrans::core::ExportKind::SoundFont2
+                                  : vgmtrans::core::ExportKind::Dls;
+    exportInstrumentSet(contentsFocused ? m_coll_view->currentIndex()
+                                        : m_vgmfile_listview->currentIndex(),
+                        kind);
+  });
   connect(m_menu_bar, &MenuBar::openSelectedAsset, this, [this] {
     const QWidget* focused = QApplication::focusWidget();
     const bool contentsFocused = focused != nullptr &&
@@ -1062,6 +1099,8 @@ void MainWindow::routeSignals() {
     open->setShortcutVisibleInContextMenu(true);
     menu.addSeparator();
     QAction* saveMidi = nullptr;
+    QAction* saveSf2 = nullptr;
+    QAction* saveDls = nullptr;
     QAction* saveOriginalAction = nullptr;
     if (context == MenuBar::Context::Sequence) {
       saveMidi = menu.addAction(tr("Save as MIDI"));
@@ -1069,8 +1108,8 @@ void MainWindow::routeSignals() {
       menu.addSeparator();
       addDisabled(menu, tr("Stitch"));
     } else if (context == MenuBar::Context::InstrumentSet) {
-      addDisabled(menu, tr("Save as SF2"));
-      addDisabled(menu, tr("Save as DLS"));
+      saveSf2 = menu.addAction(tr("Save as SF2"));
+      saveDls = menu.addAction(tr("Save as DLS"));
       saveOriginalAction = menu.addAction(tr("Save as Original Format"));
     } else if (context == MenuBar::Context::SampleCollection) {
       addDisabled(menu, tr("Save all samples as WAV"));
@@ -1089,6 +1128,10 @@ void MainWindow::routeSignals() {
           vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
     } else if (saveMidi != nullptr && chosen == saveMidi) {
       exportSequenceMidi(current);
+    } else if (saveSf2 != nullptr && chosen == saveSf2) {
+      exportInstrumentSet(current, vgmtrans::core::ExportKind::SoundFont2);
+    } else if (saveDls != nullptr && chosen == saveDls) {
+      exportInstrumentSet(current, vgmtrans::core::ExportKind::Dls);
     } else if (chosen == saveOriginalAction) {
       saveOriginal(view, OriginalItemKind::Asset);
     } else if (chosen == remove) {

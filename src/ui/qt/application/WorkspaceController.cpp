@@ -129,6 +129,11 @@ core::Artifact WorkspaceController::exportSequenceMidi(core::AssetId id,
   return session_.exportSequenceMidi(id, request);
 }
 
+core::Artifact WorkspaceController::exportInstrumentSet(core::AssetId id, core::ExportKind kind,
+                                                        const core::ExportRequest& request) const {
+  return session_.exportInstrumentSet(id, kind, request);
+}
+
 std::vector<core::Artifact> WorkspaceController::exportCollection(core::CollectionId id,
                                                                   const core::ExportRequest& request) const {
   return session_.exportCollection(id, request);
