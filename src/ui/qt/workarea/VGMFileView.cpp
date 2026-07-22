@@ -6,9 +6,7 @@
 
 #include "VGMFileView.h"
 
-#include "application/WorkspaceController.h"
 #include "hexview/HexView.h"
-#include "models/SourceInspectorModel.h"
 #include "SnappingSplitter.h"
 #include "VGMFileTreeView.h"
 #include "workarea/SourceInspectorPresentation.h"
@@ -18,7 +16,6 @@
 #include <limits>
 #include <unordered_set>
 #include <utility>
-#include <variant>
 
 #include <QFocusEvent>
 #include <QFontMetricsF>
@@ -29,50 +26,32 @@
 
 namespace {
 
-QIcon assetIcon(const vgmtrans::core::Asset& asset) {
-  if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(asset)) {
-    return QIcon(QStringLiteral(":/icons/sequence.svg"));
-  }
-  if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(asset)) {
-    return QIcon(QStringLiteral(":/icons/instrument-set.svg"));
-  }
-  if (std::holds_alternative<vgmtrans::core::SampleCollectionAsset>(asset)) {
-    return QIcon(QStringLiteral(":/icons/sample-collection.svg"));
-  }
-  return QIcon(QStringLiteral(":/icons/binary.svg"));
-}
-
 int statusValue(u64 value) {
   return static_cast<int>(std::min<u64>(value, std::numeric_limits<int>::max()));
 }
 
 }  // namespace
 
-VGMFileView::VGMFileView(vgmtrans::ui::WorkspaceController& workspace, vgmtrans::core::AssetId asset, QWidget* parent)
-    : QWidget(parent), asset_(asset), model_(std::make_unique<vgmtrans::ui::SourceInspectorModel>(workspace, asset)) {
-  const auto* value = workspace.snapshot().asset(asset);
-  if (!model_->valid() || value == nullptr) {
-    return;
-  }
-
-  setWindowTitle(QString::fromStdString(model_->metadata().name));
-  setWindowIcon(assetIcon(*value));
+VGMFileView::VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection, QWidget* parent)
+    : QWidget(parent), inspection_(std::move(inspection)) {
+  Q_ASSERT(inspection_);
+  setWindowTitle(QString::fromStdString(inspection_->metadata().name));
   setAttribute(Qt::WA_DeleteOnClose);
   setCursor(Qt::ArrowCursor);
 
   splitter_ = new SnappingSplitter(Qt::Horizontal, this);
-  hexView_ = new HexView(*model_, splitter_);
-  treeView_ = new VGMFileTreeView(*model_, splitter_);
+  hexView_ = new HexView(inspection_, splitter_);
+  treeView_ = new VGMFileTreeView(inspection_, splitter_);
 
   hexView_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   splitter_->addWidget(hexView_);
   splitter_->addWidget(treeView_);
-  splitter_->setSizes(QList<int>{hexViewFullWidth(), treeViewMinimumWidth});
+  splitter_->setSizes(QList<int>{hexView_->getViewportFullWidth(), treeViewMinimumWidth});
   splitter_->setStretchFactor(0, 0);
   splitter_->setStretchFactor(1, 1);
   splitter_->persistState();
   resetSnapRanges();
-  hexView_->setMaximumWidth(hexViewFullWidth());
+  hexView_->setMaximumWidth(hexView_->getViewportFullWidth());
   treeView_->setMinimumWidth(treeViewMinimumWidth);
   defaultHexFont_ = hexView_->font();
 
@@ -98,35 +77,16 @@ VGMFileView::VGMFileView(vgmtrans::ui::WorkspaceController& workspace, vgmtrans:
           &VGMFileView::resetHexViewFont);
 }
 
-VGMFileView::~VGMFileView() = default;
-
-bool VGMFileView::valid() const {
-  return model_ != nullptr && model_->valid() && splitter_ != nullptr;
-}
-
 void VGMFileView::focusInEvent(QFocusEvent* event) {
   QWidget::focusInEvent(event);
-  if (treeView_ != nullptr) {
-    treeView_->updateStatusBar();
-  }
+  treeView_->updateStatusBar();
 }
 
 void VGMFileView::resetSnapRanges() const {
   splitter_->clearSnapRanges();
-  splitter_->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
-  splitter_->addSnapRange(0, hexViewWidthSansAscii(), hexViewFullWidth());
-}
-
-int VGMFileView::hexViewFullWidth() const {
-  return hexView_->getViewportFullWidth();
-}
-
-int VGMFileView::hexViewWidthSansAscii() const {
-  return hexView_->getViewportWidthSansAscii();
-}
-
-int VGMFileView::hexViewWidthSansAsciiAndAddress() const {
-  return hexView_->getViewportWidthSansAsciiAndAddress();
+  for (const auto range : hexView_->splitterSnapRanges()) {
+    splitter_->addSnapRange(0, range.lowerBound, range.upperBound);
+  }
 }
 
 void VGMFileView::updateHexViewFont(qreal sizeIncrement) const {
@@ -147,14 +107,15 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) const {
 
 void VGMFileView::applyHexViewFont(QFont font) const {
   const QList<int> splitterSizes = splitter_->sizes();
-  const int actualWidthBeforeResize = splitterSizes.isEmpty() ? hexViewFullWidth() : splitterSizes.first();
-  const int fullWidthBeforeResize = std::max(1, hexViewFullWidth());
+  const int actualWidthBeforeResize =
+      splitterSizes.isEmpty() ? hexView_->getViewportFullWidth() : splitterSizes.first();
+  const int fullWidthBeforeResize = std::max(1, hexView_->getViewportFullWidth());
 
   hexView_->setFont(font);
-  hexView_->setMaximumWidth(hexViewFullWidth());
+  hexView_->setMaximumWidth(hexView_->getViewportFullWidth());
 
   const float percentVisible = static_cast<float>(actualWidthBeforeResize) / static_cast<float>(fullWidthBeforeResize);
-  const int fullWidthAfterResize = std::max(1, hexViewFullWidth());
+  const int fullWidthAfterResize = std::max(1, hexView_->getViewportFullWidth());
   const int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
   const int scaledWidthChange = static_cast<int>(std::round(static_cast<float>(widthChange) * percentVisible));
   const int newWidth = std::max(1, actualWidthBeforeResize + scaledWidthChange);
@@ -164,27 +125,18 @@ void VGMFileView::applyHexViewFont(QFont font) const {
 }
 
 void VGMFileView::resetHexViewFont() {
-  if (hexView_ != nullptr) {
-    applyHexViewFont(defaultHexFont_);
-  }
+  applyHexViewFont(defaultHexFont_);
 }
 
 void VGMFileView::increaseHexViewFont() {
-  if (hexView_ != nullptr) {
-    updateHexViewFont(+0.5);
-  }
+  updateHexViewFont(+0.5);
 }
 
 void VGMFileView::decreaseHexViewFont() {
-  if (hexView_ != nullptr) {
-    updateHexViewFont(-0.5);
-  }
+  updateHexViewFont(-0.5);
 }
 
 void VGMFileView::onSelectionChange(vgmtrans::core::SourceAnnotationId annotation) {
-  if (hexView_ == nullptr || treeView_ == nullptr) {
-    return;
-  }
   hexView_->setSelectedAnnotation(annotation);
   const QSignalBlocker blocker(treeView_);
   treeView_->setSelectedAnnotation(annotation);
@@ -204,20 +156,14 @@ void VGMFileView::seekToAnnotation(vgmtrans::core::SourceAnnotationId annotation
 }
 
 void VGMFileView::setSeekModifierActive(bool active) {
-  if (hexView_ != nullptr) {
-    hexView_->setSeekModifierActive(active);
-  }
+  hexView_->setSeekModifierActive(active);
 }
 
 void VGMFileView::setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
                                          const std::vector<QColor>& colors) {
-  if (hexView_ != nullptr) {
-    hexView_->setPlaybackActive(!annotations.empty());
-    hexView_->setPlaybackSelectionsForAnnotations(annotations, colors);
-  }
-  if (treeView_ != nullptr) {
-    treeView_->setPlaybackAnnotations(annotations);
-  }
+  hexView_->setPlaybackActive(!annotations.empty());
+  hexView_->setPlaybackSelectionsForAnnotations(annotations, colors);
+  treeView_->setPlaybackAnnotations(annotations);
 }
 
 void VGMFileView::setPlaybackTimeline(std::vector<PlaybackAnnotationSpan> timeline) {
@@ -291,9 +237,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int maximum, PositionCh
   }
 
   if (annotations == lastPlaybackAnnotations_ && colors == lastPlaybackColors_) {
-    if (hexView_ != nullptr) {
-      hexView_->requestPlaybackFrame();
-    }
+    hexView_->requestPlaybackFrame();
     return;
   }
   lastPlaybackAnnotations_ = annotations;
@@ -312,19 +256,13 @@ void VGMFileView::onPlayerStatusChanged(bool playing, bool hasActiveTarget) {
 }
 
 void VGMFileView::clearPlaybackAnnotations(bool fade) {
-  if (hexView_ != nullptr) {
-    hexView_->clearPlaybackSelections(fade);
-    hexView_->setPlaybackActive(false);
-  }
-  if (treeView_ != nullptr) {
-    treeView_->setPlaybackAnnotations({});
-  }
+  hexView_->clearPlaybackSelections(fade);
+  hexView_->setPlaybackActive(false);
+  treeView_->setPlaybackAnnotations({});
 }
 
 void VGMFileView::refreshStatus() {
-  if (treeView_ != nullptr) {
-    treeView_->updateStatusBar();
-  }
+  treeView_->updateStatusBar();
 }
 
 std::vector<VGMFileView::PlaybackAnnotationSpan> VGMFileView::playbackSpansAt(int tick) const {
@@ -357,7 +295,7 @@ std::vector<VGMFileView::PlaybackAnnotationSpan> VGMFileView::playbackSpansInRan
 }
 
 void VGMFileView::updateStatus(vgmtrans::core::SourceAnnotationId annotationId) {
-  const auto* annotation = model_ != nullptr ? model_->annotation(annotationId) : nullptr;
+  const auto* annotation = inspection_->annotation(annotationId);
   if (annotation == nullptr) {
     emit statusChanged({}, {}, {}, -1, -1);
     return;

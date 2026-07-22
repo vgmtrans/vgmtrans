@@ -157,6 +157,22 @@ std::vector<SourceAnnotationId> SourceMap::ownedBy(ObjectRef object) const {
   });
 }
 
+std::optional<AssetId> SourceMap::assetOwner(SourceAnnotationId id) const {
+  const SourceAnnotation* annotation = find(id);
+  for (size_t depth = 0; annotation != nullptr && depth < annotations_.size(); ++depth) {
+    if (annotation->owner && annotation->owner->asset.valid()) {
+      return annotation->owner->asset;
+    }
+    annotation = annotation->parent ? find(*annotation->parent) : nullptr;
+  }
+  return std::nullopt;
+}
+
+std::vector<SourceAnnotationId> SourceMap::annotationsForAsset(AssetId asset) const {
+  return idsFromAnnotations(annotations_,
+                            [&](const SourceAnnotation& annotation) { return assetOwner(annotation.id) == asset; });
+}
+
 std::vector<SourceAnnotationId> SourceMap::childrenOf(SourceAnnotationId parent) const {
   const auto found = annotationsByParent_.find(parent.value);
   if (found == annotationsByParent_.end()) {

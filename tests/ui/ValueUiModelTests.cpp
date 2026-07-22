@@ -5,7 +5,6 @@
  */
 
 #include "application/WorkspaceController.h"
-#include "models/SourceInspectorModel.h"
 #include "models/ValueModels.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
@@ -102,18 +101,18 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(workspace.sourceBytes(SourceId{0}).size() == 3, "workspace should expose source bytes for later inspectors");
 
   const AssetId assetId{assets.index(0, 0).data(IdRole).toUInt()};
-  SourceInspectorModel inspector(workspace, assetId);
-  expect(inspector.valid(), "source inspector should resolve a value asset and its source bytes");
-  expect(inspector.bytes().size() == 3 && inspector.bytes()[0] == 0x7f,
+  auto inspector = workspace.inspect(assetId);
+  expect(inspector != nullptr, "source inspection should resolve a value asset and its source bytes");
+  expect(inspector->bytes().size() == 3 && inspector->bytes()[0] == 0x7f,
          "source inspector should expand a header-only asset range across its owned annotations");
-  expect(inspector.roots().size() == 1, "source inspector should preserve the source annotation hierarchy");
-  expect(inspector.children(inspector.roots().front()).size() == 2,
+  expect(inspector->roots().size() == 1, "source inspector should preserve the source annotation hierarchy");
+  expect(inspector->children(inspector->roots().front()).size() == 2,
          "source inspector should expose child annotations to both panes");
-  const auto magic = inspector.annotationAt(0);
-  const auto payload = inspector.annotationAt(1);
-  expect(magic && inspector.annotation(*magic)->label == "Magic",
+  const auto magic = inspector->annotationAt(0);
+  const auto payload = inspector->annotationAt(1);
+  expect(magic && inspector->annotation(*magic)->label == "Magic",
          "source inspector hit testing should prefer the most specific annotation");
-  expect(payload && inspector.annotation(*payload)->label == "Payload",
+  expect(payload && inspector->annotation(*payload)->label == "Payload",
          "source inspector hit testing should follow byte ranges");
 
   const std::array assetIds{assetId};
@@ -124,16 +123,16 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(workspace.snapshot().sourceMap().empty(),
          "removing a detected asset should remove its owned source annotation tree");
   expect(workspace.removeAssets(assetIds) == 0, "removing an already removed asset should be a no-op");
-  expect(inspector.bytes().size() == 3 && inspector.annotation(*magic) != nullptr,
-         "an open inspector projection should remain valid until its tab closes");
+  expect(inspector->bytes().size() == 3 && inspector->annotation(*magic) != nullptr,
+         "an open source inspection should remain valid until its tab closes");
 
   const std::array sourceId{SourceId{0}};
   expect(workspace.removeSources(sourceId) == 1, "workspace should remove the selected source family");
   expect(sources.rowCount() == 0 && assets.rowCount() == 0 && collections.rowCount() == 0 &&
              diagnostics.rowCount() == 0 && contents.rowCount() == 0,
          "all models should reset to the new immutable snapshot after removal");
-  expect(inspector.bytes().size() == 3 && inspector.annotation(*magic) != nullptr,
-         "an open inspector projection should not retain pointers into a replaced snapshot");
+  expect(inspector->bytes().size() == 3 && inspector->annotation(*magic) != nullptr,
+         "an open source inspection should retain its immutable source data after removal");
 }
 
 }  // namespace

@@ -296,17 +296,11 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 }
 
 [[nodiscard]] ScanResult scanProbeMisc(const ScanInput& input) {
-  return ScanResult{
-      .assets = {MiscAsset{
-          .metadata =
-              AssetMetadata{
-                  .format = "ProbeMisc",
-                  .name = input.source.name,
-                  .range = input.reader.range(0, input.reader.size()),
-              },
-          .payload = {input.reader.u8At(0), input.reader.u8At(1)},
-      }},
-  };
+  ScanResultBuilder out(input, "ProbeMisc");
+  const SourceRange range = input.reader.range(0, input.reader.size());
+  const auto asset = out.misc(input.source.name, range).payload({input.reader.u8At(0), input.reader.u8At(1)});
+  out.sourceMap().annotation(SourceRole::Payload, input.source.name, range).owner(ObjectRefs::misc(asset.id));
+  return out.finish();
 }
 
 [[nodiscard]] FormatModule probeMiscModule() {
@@ -323,7 +317,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
 [[nodiscard]] ScanResult scanProbeExplicitCollection(const ScanInput& input) {
   ScanResultBuilder out(input, "ProbeExplicit");
-  const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, input.reader.size()))
+  const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, 1))
                             .program(SequenceProgram{
                                 .dialect = DialectId{.value = "probe"},
                                 .timebase = Timebase{.ppqn = 48},
@@ -332,6 +326,11 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .header("Probe Header", input.reader.range(0, 1))
       .owner(ObjectRefs::sequence(sequence.id))
       .field("Magic", input.reader.range(0, 1), input.reader.u8At(0), SourceValueDisplay::Hex);
+  if (input.reader.size() > 1) {
+    out.sourceMap()
+        .annotation(SourceRole::Payload, "Probe Payload", input.reader.range(1, input.reader.size() - 1))
+        .owner(ObjectRefs::sequence(sequence.id));
+  }
   out.collection(input.source.name, CollectionKey{.resolver = "ProbeExplicit",
                                                   .value = "source:" + std::to_string(input.source.id.value)})
       .sequence(sequence);
@@ -383,6 +382,13 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
   ScanResult result;
   result.assets.emplace_back(std::move(sequence));
+  result.sourceMap = SourceMap{{SourceAnnotation{
+      .id = input.ids.nextSourceAnnotationId(),
+      .range = input.reader.range(0, input.reader.size()),
+      .role = SourceRole::Sequence,
+      .label = input.source.name,
+      .owner = ObjectRefs::sequence(assetId),
+  }}};
   result.matchFacts.push_back(probeBankFact(input, assetId, bank));
   return result;
 }
@@ -400,6 +406,13 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .range = input.reader.range(0, input.reader.size()),
           },
   });
+  result.sourceMap = SourceMap{{SourceAnnotation{
+      .id = input.ids.nextSourceAnnotationId(),
+      .range = input.reader.range(0, input.reader.size()),
+      .role = SourceRole::InstrumentSet,
+      .label = input.source.name,
+      .owner = ObjectRefs::asset(assetId),
+  }}};
   result.matchFacts.push_back(probeBankFact(input, assetId, bank));
   return result;
 }
@@ -516,6 +529,13 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .range = input.reader.range(0, input.reader.size()),
           },
   });
+  result.sourceMap = SourceMap{{SourceAnnotation{
+      .id = input.ids.nextSourceAnnotationId(),
+      .range = input.reader.range(0, input.reader.size()),
+      .role = SourceRole::Payload,
+      .label = "Rejected asset",
+      .owner = ObjectRefs::misc(assetId),
+  }}};
   result.extractedSources.push_back(ExtractedSource{
       .file = SourceFile{.name = "bad-parent.child"},
       .bytes = {0xbb},
@@ -571,6 +591,13 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
                   .range = input.reader.range(0, input.reader.size()),
               },
       }},
+      .sourceMap = SourceMap{{SourceAnnotation{
+          .id = input.ids.nextSourceAnnotationId(),
+          .range = input.reader.range(0, input.reader.size()),
+          .role = SourceRole::Payload,
+          .label = "Bad source fact",
+          .owner = ObjectRefs::misc(assetId),
+      }}},
       .matchFacts = {MatchFact{
           .asset = assetId,
           .format = "ProbeBadFact",

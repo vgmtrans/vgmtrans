@@ -9,35 +9,76 @@
 #include "ColorHelpers.h"
 #include "hexview/HexViewInput.h"
 #include "Metrics.h"
-#include "models/SourceInspectorModel.h"
 #include "services/Settings.h"
+#include "value/model/SourceInspection.h"
 #include "workarea/SourceInspectorPresentation.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QCheckBox>
+#include <QHeaderView>
 #include <QPainter>
 #include <QScrollBar>
+#include <QSignalBlocker>
+#include <QStyledItemDelegate>
 #include <QTextDocument>
 
-VMGFileTreeHeaderView::VMGFileTreeHeaderView(Qt::Orientation orientation, QWidget* parent, bool showDetails)
+#include <utility>
+
+namespace {
+
+class VGMFileTreeHeaderView final : public QHeaderView {
+public:
+  VGMFileTreeHeaderView(Qt::Orientation orientation, QWidget* parent, bool showDetails);
+
+private:
+  void resizeEvent(QResizeEvent* event) override;
+  void showEvent(QShowEvent* event) override;
+  void onShowDetailsChanged(bool showDetails) const;
+  void toggleShowDetails() const;
+
+  QCheckBox* detailsCheckBox_{};
+};
+
+class VGMTreeItem final : public QTreeWidgetItem {
+public:
+  static constexpr auto ItemType = QTreeWidgetItem::UserType + 1;
+
+  explicit VGMTreeItem(vgmtrans::core::SourceAnnotationId annotation)
+      : QTreeWidgetItem(ItemType), annotation_(annotation) {}
+
+  [[nodiscard]] vgmtrans::core::SourceAnnotationId annotation() const noexcept { return annotation_; }
+
+private:
+  vgmtrans::core::SourceAnnotationId annotation_;
+};
+
+class VGMTreeDisplayItem final : public QStyledItemDelegate {
+public:
+  using QStyledItemDelegate::QStyledItemDelegate;
+
+  void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+  QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+};
+
+VGMFileTreeHeaderView::VGMFileTreeHeaderView(Qt::Orientation orientation, QWidget* parent, bool showDetails)
     : QHeaderView(orientation, parent) {
   setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   setSectionResizeMode(QHeaderView::Fixed);
 
-  detailsCheckBox = new QCheckBox("Show Details", this);
-  detailsCheckBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-  detailsCheckBox->setStyleSheet(
+  detailsCheckBox_ = new QCheckBox("Show Details", this);
+  detailsCheckBox_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+  detailsCheckBox_->setStyleSheet(
       QString("QCheckBox::indicator { width: %1px; height: %1px; }").arg(Size::HeaderCheckbox));
-  detailsCheckBox->setChecked(showDetails);
-  detailsCheckBox->show();
+  detailsCheckBox_->setChecked(showDetails);
+  detailsCheckBox_->show();
 
-  connect(detailsCheckBox, &QCheckBox::clicked, this, &VMGFileTreeHeaderView::toggleShowDetails);
+  connect(detailsCheckBox_, &QCheckBox::clicked, this, &VGMFileTreeHeaderView::toggleShowDetails);
   connect(Settings::the(), &Settings::vgmFileTreeShowDetailsChanged, this,
-          &VMGFileTreeHeaderView::onShowDetailsChanged);
+          &VGMFileTreeHeaderView::onShowDetailsChanged);
 }
 
-void VMGFileTreeHeaderView::showEvent(QShowEvent* event) {
+void VGMFileTreeHeaderView::showEvent(QShowEvent* event) {
   QFont headerFont = font();
   headerFont.setPointSize(headerFont.pointSize() - 1);
 #ifdef Q_OS_MAC
@@ -45,25 +86,23 @@ void VMGFileTreeHeaderView::showEvent(QShowEvent* event) {
                 "padding-bottom: -1px; padding-top: -3px; }");
   resizeSection(0, width());
 #endif
-  detailsCheckBox->setFont(headerFont);
+  detailsCheckBox_->setFont(headerFont);
   QHeaderView::showEvent(event);
 }
 
-void VMGFileTreeHeaderView::resizeEvent(QResizeEvent* event) {
+void VGMFileTreeHeaderView::resizeEvent(QResizeEvent* event) {
   QHeaderView::resizeEvent(event);
   resizeSection(0, width());
-  detailsCheckBox->move(width() - detailsCheckBox->width() - 10, (height() - detailsCheckBox->height()) / 2);
+  detailsCheckBox_->move(width() - detailsCheckBox_->width() - 10, (height() - detailsCheckBox_->height()) / 2);
 }
 
-void VMGFileTreeHeaderView::onShowDetailsChanged(bool showDetails) const {
-  detailsCheckBox->setChecked(showDetails);
+void VGMFileTreeHeaderView::onShowDetailsChanged(bool showDetails) const {
+  detailsCheckBox_->setChecked(showDetails);
 }
 
-void VMGFileTreeHeaderView::toggleShowDetails() const {
-  Settings::the()->VGMFileTreeView.setShowDetails(detailsCheckBox->isChecked());
+void VGMFileTreeHeaderView::toggleShowDetails() const {
+  Settings::the()->VGMFileTreeView.setShowDetails(detailsCheckBox_->isChecked());
 }
-
-namespace {
 
 QColor selectedTreeTextColor(const QStyleOptionViewItem& option) {
   const QPalette::ColorGroup colorGroup = !option.state.testFlag(QStyle::State_Enabled) ? QPalette::Disabled
@@ -112,33 +151,34 @@ QSize VGMTreeDisplayItem::sizeHint(const QStyleOptionViewItem& option, const QMo
   return QSize(document.idealWidth(), document.size().height());
 }
 
-VGMFileTreeView::VGMFileTreeView(const vgmtrans::ui::SourceInspectorModel& model, QWidget* parent)
-    : QTreeWidget(parent), model_(model) {
+VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection, QWidget* parent)
+    : QTreeWidget(parent), inspection_(std::move(inspection)) {
+  Q_ASSERT(inspection_);
   setHeaderLabel("File structure");
   showDetails_ = Settings::the()->VGMFileTreeView.showDetails();
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   horizontalScrollBar()->setEnabled(false);
-  setHeader(new VMGFileTreeHeaderView(Qt::Horizontal, this, showDetails_));
+  setHeader(new VGMFileTreeHeaderView(Qt::Horizontal, this, showDetails_));
   setItemDelegate(new VGMTreeDisplayItem(this));
   playbackBrush_ = QBrush(palette().color(QPalette::Accent));
 
-  appendChildren(invisibleRootItem(), model_.roots());
+  appendChildren(invisibleRootItem(), inspection_->roots());
   connect(Settings::the(), &Settings::vgmFileTreeShowDetailsChanged, this, &VGMFileTreeView::onShowDetailsChanged);
 }
 
 void VGMFileTreeView::appendChildren(QTreeWidgetItem* parent,
                                      std::span<const vgmtrans::core::SourceAnnotationId> children) {
   for (const auto id : children) {
-    const auto* annotation = model_.annotation(id);
+    const auto* annotation = inspection_->annotation(id);
     if (annotation == nullptr) {
       continue;
     }
-    auto* item = new VGMTreeItem(id, annotation->range.offset);
+    auto* item = new VGMTreeItem(id);
     setItemText(item);
-    item->setData(0, Qt::UserRole, id.value);
     parent->addChild(item);
     items_.emplace(id.value, item);
-    appendChildren(item, model_.children(id));
+    const auto grandchildren = inspection_->children(id);
+    appendChildren(item, grandchildren);
   }
 }
 
@@ -254,8 +294,8 @@ void VGMFileTreeView::seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat) {
   lastSeekItem_ = item;
 }
 
-void VGMFileTreeView::setItemText(VGMTreeItem* item) const {
-  const auto* annotation = model_.annotation(item->annotation());
+void VGMFileTreeView::setItemText(QTreeWidgetItem* item) const {
+  const auto* annotation = inspection_->annotation(annotationForItem(item));
   if (annotation == nullptr) {
     return;
   }
@@ -266,9 +306,10 @@ void VGMFileTreeView::setItemText(VGMTreeItem* item) const {
 
 void VGMFileTreeView::onShowDetailsChanged(bool show) {
   showDetails_ = show;
-  model()->blockSignals(true);
-  updateItemTextRecursively(invisibleRootItem());
-  model()->blockSignals(false);
+  {
+    const QSignalBlocker blocker(model());
+    updateItemTextRecursively(invisibleRootItem());
+  }
   doItemsLayout();
   scrollToItem(currentItem());
 }
@@ -278,7 +319,7 @@ void VGMFileTreeView::updateItemTextRecursively(QTreeWidgetItem* item) {
     return;
   }
   if (item->type() == VGMTreeItem::ItemType) {
-    setItemText(static_cast<VGMTreeItem*>(item));
+    setItemText(item);
   }
   for (int index = 0; index < item->childCount(); ++index) {
     updateItemTextRecursively(item->child(index));

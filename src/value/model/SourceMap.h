@@ -198,6 +198,8 @@ struct SourceAnnotation {
   std::optional<CommandPlaybackStatus> playbackStatus;
   std::string localKind;
   std::string detailKind;
+  // Asset ownership is explicit at graph roots and inherited by structural
+  // descendants. Scan validation rejects parents that cross asset boundaries.
   std::optional<ObjectRef> owner;
   std::optional<SourceAnnotationId> parent;
   SourceOutlinePolicy outline = SourceOutlinePolicy::Auto;
@@ -220,6 +222,8 @@ public:
   [[nodiscard]] std::vector<SourceAnnotationId> containing(SourceRange range) const;
   [[nodiscard]] std::vector<SourceAnnotationId> at(SourceId source, u64 offset) const;
   [[nodiscard]] std::vector<SourceAnnotationId> ownedBy(ObjectRef object) const;
+  [[nodiscard]] std::optional<AssetId> assetOwner(SourceAnnotationId id) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> annotationsForAsset(AssetId asset) const;
   [[nodiscard]] std::vector<SourceAnnotationId> childrenOf(SourceAnnotationId parent) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withRole(SourceId source, SourceRole role) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withSequenceSemantic(SourceId source, SequenceSemantic semantic) const;

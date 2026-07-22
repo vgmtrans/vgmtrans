@@ -10,12 +10,15 @@
 #include "value/base/CoreTypes.h"
 
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <vector>
 
 namespace vgmtrans::core {
+
+using SharedSourceBytes = std::shared_ptr<const std::vector<u8>>;
 
 enum class SourceKind {
   UserLoaded,
@@ -93,6 +96,7 @@ public:
   [[nodiscard]] bool contains(SourceId id) const noexcept;
   [[nodiscard]] bool hasSlot(SourceId id) const noexcept;
   [[nodiscard]] std::span<const u8> bytes(SourceId id) const;
+  [[nodiscard]] SharedSourceBytes sharedBytes(SourceId id) const;
   [[nodiscard]] ByteReader reader(SourceId id) const;
   [[nodiscard]] const SourceFile& source(SourceId id) const;
   [[nodiscard]] const SourceFile& sourceAt(size_t index) const;
@@ -104,7 +108,7 @@ public:
 private:
   struct Entry {
     SourceFile file;
-    std::vector<u8> bytes;
+    SharedSourceBytes bytes;
   };
 
   [[nodiscard]] const Entry& entry(SourceId id) const;

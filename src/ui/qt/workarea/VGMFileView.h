@@ -8,6 +8,7 @@
 
 #include "PlaybackPosition.h"
 #include "value/base/CoreTypes.h"
+#include "value/model/SourceInspection.h"
 
 #include <memory>
 #include <vector>
@@ -20,10 +21,6 @@
 class HexView;
 class SnappingSplitter;
 class VGMFileTreeView;
-namespace vgmtrans::ui {
-class SourceInspectorModel;
-class WorkspaceController;
-}  // namespace vgmtrans::ui
 
 // The existing two-pane file inspector, reworked directly around immutable
 // value annotations instead of legacy VGMFile/VGMItem object graphs.
@@ -38,12 +35,10 @@ public:
     int endTick = 0;
   };
 
-  explicit VGMFileView(vgmtrans::ui::WorkspaceController& workspace, vgmtrans::core::AssetId asset,
+  explicit VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
                        QWidget* parent = nullptr);
-  ~VGMFileView() override;
 
-  [[nodiscard]] bool valid() const;
-  [[nodiscard]] vgmtrans::core::AssetId asset() const noexcept { return asset_; }
+  [[nodiscard]] vgmtrans::core::AssetId asset() const noexcept { return inspection_->asset(); }
 
 signals:
   void statusChanged(const QString& name, const QString& description, const QIcon& icon, int offset, int size);
@@ -76,17 +71,13 @@ private:
   static constexpr int treeViewMinimumWidth = 220;
 
   void resetSnapRanges() const;
-  int hexViewFullWidth() const;
-  int hexViewWidthSansAscii() const;
-  int hexViewWidthSansAsciiAndAddress() const;
   void updateHexViewFont(qreal sizeIncrement) const;
   void applyHexViewFont(QFont font) const;
   void updateStatus(vgmtrans::core::SourceAnnotationId annotation);
   [[nodiscard]] std::vector<PlaybackAnnotationSpan> playbackSpansAt(int tick) const;
   [[nodiscard]] std::vector<PlaybackAnnotationSpan> playbackSpansInRange(int startTick, int endTick) const;
 
-  vgmtrans::core::AssetId asset_;
-  std::unique_ptr<vgmtrans::ui::SourceInspectorModel> model_;
+  std::shared_ptr<const vgmtrans::core::SourceInspection> inspection_;
   VGMFileTreeView* treeView_{};
   HexView* hexView_{};
   SnappingSplitter* splitter_{};

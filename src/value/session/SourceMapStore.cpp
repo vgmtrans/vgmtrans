@@ -54,28 +54,11 @@ std::unordered_set<u32> SourceMapStore::removeForAssets(const std::unordered_set
     return removedAnnotations;
   }
 
+  const SourceMap current{annotations_};
   for (const auto& annotation : annotations_) {
-    if (annotation.owner && annotation.owner->asset.valid() && assetIds.contains(annotation.owner->asset.value)) {
+    const auto owner = current.assetOwner(annotation.id);
+    if (owner && assetIds.contains(owner->value)) {
       removedAnnotations.insert(annotation.id.value);
-    }
-  }
-
-  // Unowned structural children belong to their nearest owned ancestor. Keep
-  // an explicitly owned child from another asset and detach it instead.
-  bool foundDescendant = true;
-  while (foundDescendant) {
-    foundDescendant = false;
-    for (auto& annotation : annotations_) {
-      if (removedAnnotations.contains(annotation.id.value) || !annotation.parent ||
-          !removedAnnotations.contains(annotation.parent->value)) {
-        continue;
-      }
-      if (annotation.owner && annotation.owner->asset.valid() &&
-          !assetIds.contains(annotation.owner->asset.value)) {
-        annotation.parent.reset();
-        continue;
-      }
-      foundDescendant |= removedAnnotations.insert(annotation.id.value).second;
     }
   }
 

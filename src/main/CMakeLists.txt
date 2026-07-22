@@ -112,6 +112,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SourceInspection.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/AssetStore.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/CollectionStore.cpp
@@ -170,6 +171,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/model/InstrumentIdentity.h
       ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/SourceInspection.h
       ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
       ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h

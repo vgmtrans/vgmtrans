@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <QApplication>
@@ -31,6 +32,19 @@
 #include <QTabBar>
 
 namespace {
+
+QIcon assetIcon(const vgmtrans::core::Asset& asset) {
+  if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/sequence.svg"));
+  }
+  if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/instrument-set.svg"));
+  }
+  if (std::holds_alternative<vgmtrans::core::SampleCollectionAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/sample-collection.svg"));
+  }
+  return QIcon(QStringLiteral(":/icons/binary.svg"));
+}
 
 struct DetailedInstruction {
   QString iconPath;
@@ -288,11 +302,12 @@ void MdiArea::newView(vgmtrans::core::AssetId asset) {
     assetToWindowMap.erase(it);
   }
 
-  auto* inspector = new VGMFileView(*m_workspace, asset);
-  if (!inspector->valid()) {
-    inspector->deleteLater();
+  auto inspection = m_workspace->inspect(asset);
+  if (!inspection) {
     return;
   }
+  auto* inspector = new VGMFileView(std::move(inspection));
+  inspector->setWindowIcon(assetIcon(*value));
   inspector->setSeekModifierActive(m_seekModifierActive);
   const QString name = inspector->windowTitle();
   QMdiSubWindow* window = addSubWindow(inspector, Qt::SubWindow);

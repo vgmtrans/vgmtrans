@@ -223,6 +223,71 @@ void validateAssetIds(ValidationReport& report, const ScanCommit& commit, const 
   }
 }
 
+void validateSourceMapOwnership(ValidationReport& report, const ScanCommit& commit,
+                                const std::unordered_set<u32>& batchAssetIds) {
+  const SourceMap& sourceMap = commit.sourceMap;
+
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (!annotation.owner || !annotation.owner->asset.valid()) {
+      continue;
+    }
+    const AssetId owner = annotation.owner->asset;
+    if (!batchAssetIds.contains(owner.value)) {
+      report.error("scan.source-annotation.unknown-owner",
+                   "Scan result contained source annotation owned by asset id " + std::to_string(owner.value) +
+                       " that was not produced by the scan",
+                   annotation.range);
+    }
+    if (!annotation.parent) {
+      continue;
+    }
+    const auto parentOwner = sourceMap.assetOwner(*annotation.parent);
+    if (!parentOwner) {
+      report.error("scan.source-annotation.external-asset-parent",
+                   "Asset id " + std::to_string(owner.value) +
+                       " has a source annotation whose parent is outside its owned graph",
+                   annotation.range);
+    } else if (*parentOwner != owner) {
+      report.error("scan.source-annotation.cross-asset-parent",
+                   "Source annotation owned by asset id " + std::to_string(owner.value) +
+                       " is nested inside asset id " + std::to_string(parentOwner->value),
+                   annotation.range);
+    }
+  }
+
+  for (const auto& asset : commit.assets) {
+    const AssetMetadata& meta = metadata(asset);
+    if (!meta.range.valid()) {
+      report.error("scan.asset.missing-range",
+                   "Scan result contained asset id " + std::to_string(meta.id.value) +
+                       " without a primary source range");
+      continue;
+    }
+
+    const auto annotations = sourceMap.annotationsForAsset(meta.id);
+    if (annotations.empty()) {
+      report.error("scan.asset.missing-source-annotations",
+                   "Scan result contained asset id " + std::to_string(meta.id.value) +
+                       " without an explicitly owned source annotation",
+                   meta.range);
+      continue;
+    }
+
+    for (const SourceAnnotationId id : annotations) {
+      const auto* annotation = sourceMap.find(id);
+      if (annotation == nullptr) {
+        continue;
+      }
+      if (annotation->range.source != meta.range.source) {
+        report.error("scan.asset.multiple-sources",
+                     "Asset id " + std::to_string(meta.id.value) +
+                         " has source annotations in more than one source",
+                     annotation->range);
+      }
+    }
+  }
+}
+
 void validateMatchFacts(ValidationReport& report, const ScanCommit& commit, const SourceStore& sources,
                         const AssetStore& existingAssets, const std::unordered_set<u32>& batchAssetIds) {
   // Match facts may point at assets from this scan or assets already accepted
@@ -292,6 +357,7 @@ ValidationReport validateScanCommit(const ScanCommit& commit, const SourceStore&
 
   std::unordered_set<u32> batchAssetIds;
   validateAssetIds(report, commit, existingAssets, batchAssetIds);
+  validateSourceMapOwnership(report, commit, batchAssetIds);
   validateMatchFacts(report, commit, sources, existingAssets, batchAssetIds);
 
   return report;

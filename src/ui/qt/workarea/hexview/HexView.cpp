@@ -8,15 +8,17 @@
 
 #include "HexViewInput.h"
 #include "HexViewRhiHost.h"
-#include "models/SourceInspectorModel.h"
 #include "util/NonTransientScrollBarStyle.h"
+#include "value/model/SourceInspection.h"
 #include "workarea/SourceInspectorPresentation.h"
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #include <QApplication>
 #include <QCursor>
@@ -301,8 +303,9 @@ QFont HexView::defaultViewFont() {
 }
 
 // Initialize HexView UI state, RHI host, typography, animations, and signal wiring.
-HexView::HexView(const vgmtrans::ui::SourceInspectorModel& model, QWidget* parent)
-    : QAbstractScrollArea(parent), m_model(&model) {
+HexView::HexView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection, QWidget* parent)
+    : QAbstractScrollArea(parent), m_inspection(std::move(inspection)) {
+  Q_ASSERT(m_inspection);
   setFocusPolicy(Qt::StrongFocus);
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   viewport()->setAutoFillBackground(false);
@@ -394,9 +397,7 @@ void HexView::setFont(const QFont& font) {
 
   QAbstractScrollArea::setFont(adjustedFont);
 
-  if (m_glyphAtlas) {
-    m_glyphAtlas->dpr = 0.0;
-  }
+  m_glyphAtlas.dpr = 0.0;
 
   updateLayout();
   requestRhiUpdate(true, true, true);
@@ -528,10 +529,7 @@ void HexView::updateLayout() {
 
 // Return total line count required to display file bytes at 16 bytes per line.
 int HexView::getTotalLines() const {
-  if (m_model == nullptr) {
-    return 0;
-  }
-  return static_cast<int>((m_model->bytes().size() + BYTES_PER_LINE - 1) / BYTES_PER_LINE);
+  return static_cast<int>((m_inspection->bytes().size() + BYTES_PER_LINE - 1) / BYTES_PER_LINE);
 }
 
 // Clear current manual selection, optionally preserving/animating fade semantics.
@@ -568,12 +566,6 @@ void HexView::selectCurrentItem(bool animateSelection) {
   requestRhiUpdate(false, true);
 }
 
-// Refresh overlay/shadow animation state for current selection/playback state.
-void HexView::refreshSelectionVisuals(bool animateSelection) {
-  updateHighlightState(animateSelection);
-  requestRhiUpdate(false, true);
-}
-
 // Set selected item, update selection, and scroll it into view when needed.
 void HexView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotationId) {
   m_selectedAnnotation = annotationId;
@@ -586,20 +578,22 @@ void HexView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotatio
   }
 
   selectCurrentItem(true);
-
-  if (!m_lineHeight) {
-    return;
-  }
-
   const auto selectedRange = visibleRange(*selected);
   if (!selectedRange) {
     return;
   }
-  const int itemBaseOffset = static_cast<int>(
-      selectedRange->offset - static_cast<u32>(m_model->range().offset));
+  scrollRangeIntoView(*selectedRange);
+}
+
+void HexView::scrollRangeIntoView(SelectionRange range) {
+  if (!m_lineHeight) {
+    return;
+  }
+
+  const int itemBaseOffset =
+      static_cast<int>(range.offset - static_cast<u32>(m_inspection->range().offset));
   const int line = itemBaseOffset / BYTES_PER_LINE;
-  const int endLine = (itemBaseOffset + static_cast<int>(selectedRange->length)) /
-                      BYTES_PER_LINE;
+  const int endLine = (itemBaseOffset + static_cast<int>(range.length)) / BYTES_PER_LINE;
 
   const int viewStartLine = verticalScrollBar()->value() / m_lineHeight;
   const int viewEndLine = viewStartLine + (viewport()->height() / m_lineHeight);
@@ -690,35 +684,7 @@ void HexView::setSelectedAnnotations(
   m_fadeSelections.clear();
   updateHighlightState(true);
   requestRhiUpdate(false, true);
-
-  // Reuse the single-item visibility logic and anchor it to the primary item.
-  if (!m_lineHeight) {
-    return;
-  }
-
-  const int itemBaseOffset = static_cast<int>(
-      primaryRange->offset - static_cast<u32>(m_model->range().offset));
-  const int line = itemBaseOffset / BYTES_PER_LINE;
-  const int endLine = (itemBaseOffset + static_cast<int>(primaryRange->length)) /
-                      BYTES_PER_LINE;
-
-  const int viewStartLine = verticalScrollBar()->value() / m_lineHeight;
-  const int viewEndLine = viewStartLine + (viewport()->height() / m_lineHeight);
-
-  if (line <= viewEndLine && endLine > viewStartLine) {
-    return;
-  }
-
-  if (line < viewStartLine) {
-    verticalScrollBar()->setValue(line * m_lineHeight);
-  } else if (endLine > viewEndLine) {
-    if ((endLine - line) > (viewport()->height() / m_lineHeight)) {
-      verticalScrollBar()->setValue(line * m_lineHeight);
-    } else {
-      const int y = ((endLine + 1) * m_lineHeight) + 1 - viewport()->height();
-      verticalScrollBar()->setValue(y);
-    }
-  }
+  scrollRangeIntoView(*primaryRange);
 }
 
 // Update playback selections from active items and seed fade-out entries for removed ones.
@@ -849,7 +815,7 @@ void HexView::requestPlaybackFrame() {
 // Build byte-level style and outline lookups from value source annotations.
 void HexView::rebuildStyleMap() {
   m_styles.clear();
-  m_roleToStyleId.clear();
+  std::unordered_map<int, u16> roleToStyleId;
 
   // Slot 0 is the fallback/default style used for unassigned bytes.
   Style defaultStyle;
@@ -857,11 +823,7 @@ void HexView::rebuildStyleMap() {
   defaultStyle.fg = palette().color(QPalette::WindowText);
   m_styles.push_back(defaultStyle);
 
-  if (m_model == nullptr) {
-    return;
-  }
-
-  const size_t length = m_model->bytes().size();
+  const size_t length = m_inspection->bytes().size();
   // Start with "unassigned" markers so we can preserve first-write wins below.
   m_styleIds.assign(length, STYLE_UNASSIGNED);
   m_itemIds.assign(length, 0);
@@ -872,8 +834,8 @@ void HexView::rebuildStyleMap() {
         ? static_cast<int>(*annotation.sequenceSemantic) + 1
         : 0;
     const int key = static_cast<int>(annotation.role) * 256 + semantic;
-    auto it = m_roleToStyleId.find(key);
-    if (it != m_roleToStyleId.end()) {
+    auto it = roleToStyleId.find(key);
+    if (it != roleToStyleId.end()) {
       return it->second;
     }
     Style style;
@@ -881,13 +843,13 @@ void HexView::rebuildStyleMap() {
     style.fg = SourceInspectorPresentation::textColor(annotation);
     const u16 id = static_cast<u16>(m_styles.size());
     m_styles.push_back(style);
-    m_roleToStyleId.emplace(key, id);
+    roleToStyleId.emplace(key, id);
     return id;
   };
 
   std::vector<const vgmtrans::core::SourceAnnotation*> styledAnnotations;
-  styledAnnotations.reserve(m_model->annotations().size());
-  for (const auto& item : m_model->annotations()) {
+  styledAnnotations.reserve(m_inspection->annotations().size());
+  for (const auto& item : m_inspection->annotations()) {
     styledAnnotations.push_back(&item);
   }
   // Most-specific ranges paint first. Parent annotations then fill any bytes
@@ -908,10 +870,10 @@ void HexView::rebuildStyleMap() {
   u16 nextItemId = 1;
   for (const auto* item : styledAnnotations) {
     if (item == nullptr || item->range.size == 0 ||
-        item->range.offset < m_model->range().offset) {
+        item->range.offset < m_inspection->range().offset) {
       continue;
     }
-    const u64 start64 = item->range.offset - m_model->range().offset;
+    const u64 start64 = item->range.offset - m_inspection->range().offset;
     if (start64 >= length) {
       continue;
     }
@@ -952,15 +914,11 @@ void HexView::rebuildStyleMap() {
 
 // Lazily rebuild glyph atlas texture and UV table when DPR/font/metrics change.
 void HexView::ensureGlyphAtlas(qreal dpr) {
-  if (!m_glyphAtlas) {
-    m_glyphAtlas = std::make_unique<GlyphAtlas>();
-  }
-
   const bool needsRebuild =
-      m_glyphAtlas->dpr != dpr ||
-      m_glyphAtlas->glyphWidth != m_charWidth ||
-      m_glyphAtlas->glyphHeight != m_lineHeight ||
-      m_glyphAtlas->font != font();
+      m_glyphAtlas.dpr != dpr ||
+      m_glyphAtlas.glyphWidth != m_charWidth ||
+      m_glyphAtlas.glyphHeight != m_lineHeight ||
+      m_glyphAtlas.font != font();
 
   if (!needsRebuild) {
     return;
@@ -1016,7 +974,7 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   }
 #endif
 
-  m_glyphAtlas->uvTable.fill(QRectF());
+  m_glyphAtlas.uvTable.fill(QRectF());
 
   for (size_t i = 0; i < glyphs.size(); ++i) {
     const int col = static_cast<int>(i % columns);
@@ -1067,17 +1025,17 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     const qreal v1 = static_cast<qreal>(cellYPx + paddingPx + glyphHeightPx) / imageHeight;
 
     const ushort code = glyphs[i].unicode();
-    if (code < m_glyphAtlas->uvTable.size()) {
-      m_glyphAtlas->uvTable[code] = QRectF(u0, v0, u1 - u0, v1 - v0);
+    if (code < m_glyphAtlas.uvTable.size()) {
+      m_glyphAtlas.uvTable[code] = QRectF(u0, v0, u1 - u0, v1 - v0);
     }
   }
 
-  m_glyphAtlas->image = std::move(image);
-  m_glyphAtlas->dpr = dpr;
-  m_glyphAtlas->glyphWidth = m_charWidth;
-  m_glyphAtlas->glyphHeight = m_lineHeight;
-  m_glyphAtlas->font = font();
-  m_glyphAtlas->version++;
+  m_glyphAtlas.image = std::move(image);
+  m_glyphAtlas.dpr = dpr;
+  m_glyphAtlas.glyphWidth = m_charWidth;
+  m_glyphAtlas.glyphHeight = m_lineHeight;
+  m_glyphAtlas.font = font();
+  m_glyphAtlas.version++;
 
   if (m_rhiHost) {
     m_rhiHost->markBaseDirty();
@@ -1133,11 +1091,9 @@ int HexView::scrollYForRender() const {
 // Capture immutable frame snapshot consumed by the RHI renderer this frame.
 HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   HexViewFrame::Data frame;
-  if (m_model != nullptr) {
-    frame.bytes = m_model->bytes();
-    frame.itemIds = m_itemIds;
-    frame.baseOffset = static_cast<u32>(m_model->range().offset);
-  }
+  frame.bytes = m_inspection->bytes();
+  frame.itemIds = m_itemIds;
+  frame.baseOffset = static_cast<u32>(m_inspection->range().offset);
   frame.viewportSize = viewport()->size();
   frame.dpr = dpr;
   frame.totalLines = getTotalLines();
@@ -1169,11 +1125,9 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.fadePlaybackSelections = m_fadePlaybackSelections;
 
   ensureGlyphAtlas(dpr);
-  if (m_glyphAtlas) {
-    frame.glyphAtlas.image = &m_glyphAtlas->image;
-    frame.glyphAtlas.uvTable = &m_glyphAtlas->uvTable;
-    frame.glyphAtlas.version = m_glyphAtlas->version;
-  }
+  frame.glyphAtlas.image = &m_glyphAtlas.image;
+  frame.glyphAtlas.uvTable = &m_glyphAtlas.uvTable;
+  frame.glyphAtlas.version = m_glyphAtlas.version;
 
   return frame;
 }
@@ -1193,13 +1147,13 @@ void HexView::changeEvent(QEvent* event) {
 // Handle keyboard navigation between adjacent items.
 void HexView::keyPressEvent(QKeyEvent* event) {
   const auto* selected = annotation(m_selectedAnnotation);
-  if (selected == nullptr || m_model == nullptr) {
+  if (selected == nullptr) {
     QAbstractScrollArea::keyPressEvent(event);
     return;
   }
 
-  const u32 baseOffset = static_cast<u32>(m_model->range().offset);
-  const u32 endOffset = baseOffset + static_cast<u32>(m_model->bytes().size());
+  const u32 baseOffset = static_cast<u32>(m_inspection->range().offset);
+  const u32 endOffset = baseOffset + static_cast<u32>(m_inspection->bytes().size());
   const auto selectedRange = visibleRange(*selected);
   if (!selectedRange) {
     QAbstractScrollArea::keyPressEvent(event);
@@ -1279,13 +1233,10 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
     return -1;
   }
 
-  if (m_model == nullptr) {
-    return -1;
-  }
-  const int baseOffset = static_cast<int>(m_model->range().offset);
+  const int baseOffset = static_cast<int>(m_inspection->range().offset);
   const int offset = baseOffset + (line * BYTES_PER_LINE) + byteNum;
   if (offset < baseOffset ||
-      offset >= baseOffset + static_cast<int>(m_model->bytes().size())) {
+      offset >= baseOffset + static_cast<int>(m_inspection->bytes().size())) {
     return -1;
   }
   return offset;
@@ -1748,16 +1699,16 @@ void HexView::hideTooltip() {
 
 const vgmtrans::core::SourceAnnotation* HexView::annotation(
     vgmtrans::core::SourceAnnotationId id) const {
-  return m_model != nullptr ? m_model->annotation(id) : nullptr;
+  return m_inspection->annotation(id);
 }
 
 std::optional<HexView::SelectionRange> HexView::visibleRange(
     const vgmtrans::core::SourceAnnotation& annotation) const {
-  if (m_model == nullptr || m_model->bytes().empty()) {
+  if (m_inspection->bytes().empty()) {
     return std::nullopt;
   }
-  const u64 viewBegin = m_model->range().offset;
-  const u64 viewEnd = m_model->range().endOffset();
+  const u64 viewBegin = m_inspection->range().offset;
+  const u64 viewEnd = m_inspection->range().endOffset();
   const u64 annotationEnd = annotation.range.endOffset();
   u64 begin = std::max(annotation.range.offset, viewBegin);
   u64 end = std::min(annotationEnd, viewEnd);
@@ -1772,8 +1723,5 @@ std::optional<HexView::SelectionRange> HexView::visibleRange(
 }
 
 vgmtrans::core::SourceAnnotationId HexView::annotationAt(u32 offset) const {
-  if (m_model == nullptr) {
-    return {};
-  }
-  return m_model->annotationAt(offset).value_or(vgmtrans::core::SourceAnnotationId{});
+  return m_inspection->annotationAt(offset).value_or(vgmtrans::core::SourceAnnotationId{});
 }

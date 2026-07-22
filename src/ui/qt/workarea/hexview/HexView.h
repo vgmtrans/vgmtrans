@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <unordered_map>
 #include <vector>
 
 #include <QAbstractScrollArea>
@@ -30,10 +29,8 @@
 class QParallelAnimationGroup;
 class QWidget;
 class HexViewRhiHost;
-namespace vgmtrans::ui {
-class SourceInspectorModel;
-}
 namespace vgmtrans::core {
+class SourceInspection;
 struct SourceAnnotation;
 }
 
@@ -47,7 +44,7 @@ class HexView final : public QAbstractScrollArea, public SplitterSnapProvider {
   Q_PROPERTY(qreal shadowStrength READ shadowStrength WRITE setShadowStrength)
 
 public:
-  explicit HexView(const vgmtrans::ui::SourceInspectorModel& model,
+  explicit HexView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
                    QWidget* parent = nullptr);
   ~HexView() override;
   [[nodiscard]] static QFont defaultViewFont();
@@ -136,7 +133,7 @@ private:
                         bool markPlaybackDirty = false);
   void clearCurrentSelection(bool animateSelection);
   void selectCurrentItem(bool animateSelection);
-  void refreshSelectionVisuals(bool animateSelection);
+  void scrollRangeIntoView(SelectionRange range);
   void updateLayout();
   void updateScrollBars();
   void rebuildStyleMap();
@@ -165,7 +162,7 @@ private:
   [[nodiscard]] std::optional<SelectionRange> visibleRange(
       const vgmtrans::core::SourceAnnotation& annotation) const;
 
-  const vgmtrans::ui::SourceInspectorModel* m_model = nullptr;
+  std::shared_ptr<const vgmtrans::core::SourceInspection> m_inspection;
   // Interaction state.
   vgmtrans::core::SourceAnnotationId m_selectedAnnotation;
   u32 m_selectedOffset = 0;
@@ -190,7 +187,6 @@ private:
   // Style id for each byte in the current file data; each entry indexes into m_styles.
   std::vector<u16> m_styleIds;
   std::vector<u16> m_itemIds;
-  std::unordered_map<int, u16> m_roleToStyleId;
 
   QParallelAnimationGroup* m_selectionAnimation = nullptr;
   qreal m_overlayOpacity = 0.0;
@@ -209,5 +205,5 @@ private:
   int m_pendingScrollY = 0;
 
   HexViewRhiHost* m_rhiHost = nullptr;
-  std::unique_ptr<GlyphAtlas> m_glyphAtlas;
+  GlyphAtlas m_glyphAtlas;
 };
