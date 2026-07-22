@@ -379,10 +379,10 @@ void MainWindow::createElements() {
   installTitleBar(m_vgmfile_dock, "Detected Files", TitleBar::HideButton);
 
   m_coll_listview = new CollectionListView();
-  auto* collectionModel = new vgmtrans::ui::CollectionTableModel(m_workspace, m_coll_listview);
+  m_collection_model = new vgmtrans::ui::CollectionTableModel(m_workspace, m_coll_listview);
   m_collection_filter =
       new vgmtrans::ui::CollectionFilterProxyModel(m_workspace, m_coll_listview);
-  m_collection_filter->setSourceModel(collectionModel);
+  m_collection_filter->setSourceModel(m_collection_model);
   m_coll_listview->setModel(m_collection_filter);
 
   m_coll_view = new QListView();
@@ -723,6 +723,13 @@ void MainWindow::routeSignals() {
           m_sequence_player, &SequencePlayer::seek);
   connect(m_sequence_player, &SequencePlayer::stateChanged,
           m_playback_controls, &PlaybackControls::setPlaybackState);
+  connect(m_sequence_player, &SequencePlayer::stateChanged, m_collection_model,
+          [this](bool playing, bool hasActiveCollection) {
+            m_collection_model->setPlayingCollection(
+                playing && hasActiveCollection
+                    ? std::optional{m_sequence_player->activeCollection()}
+                    : std::nullopt);
+          });
   connect(m_sequence_player, &SequencePlayer::stateChanged, mdiArea,
           [mdiArea](bool, bool hasActiveCollection) {
             if (!hasActiveCollection) {

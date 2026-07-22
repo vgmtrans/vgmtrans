@@ -51,6 +51,7 @@ class CollectionTableModel final : public QAbstractTableModel {
 public:
   explicit CollectionTableModel(WorkspaceController& workspace, QObject* parent = nullptr);
 
+  void setPlayingCollection(std::optional<core::CollectionId> collection);
   [[nodiscard]] int rowCount(const QModelIndex& parent = {}) const override;
   [[nodiscard]] int columnCount(const QModelIndex& parent = {}) const override;
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
@@ -58,6 +59,7 @@ public:
 
 private:
   WorkspaceController& workspace_;
+  std::optional<core::CollectionId> playingCollection_;
 };
 
 class CollectionFilterProxyModel final : public QSortFilterProxyModel {

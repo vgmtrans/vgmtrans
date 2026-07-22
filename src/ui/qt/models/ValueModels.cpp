@@ -6,6 +6,9 @@
 
 #include "models/ValueModels.h"
 
+#include "util/Colors.h"
+#include "util/TintableSvgIconEngine.h"
+
 #include <QColor>
 #include <QIcon>
 #include <QVariant>
@@ -24,6 +27,12 @@ const QIcon& sourceIcon() {
 
 const QIcon& collectionIcon() {
   static const QIcon icon(QStringLiteral(":/icons/collection.svg"));
+  return icon;
+}
+
+const QIcon& playingCollectionIcon() {
+  static const QIcon icon(new TintableSvgIconEngine(
+      QStringLiteral(":/icons/play.svg"), UIColors::PlayingIconColor));
   return icon;
 }
 
@@ -218,6 +227,16 @@ CollectionTableModel::CollectionTableModel(WorkspaceController& workspace, QObje
   connect(&workspace_, &WorkspaceController::snapshotChanged, this, [this] { endResetModel(); });
 }
 
+void CollectionTableModel::setPlayingCollection(std::optional<core::CollectionId> collection) {
+  if (playingCollection_ == collection) {
+    return;
+  }
+  playingCollection_ = collection;
+  if (rowCount() != 0) {
+    emit dataChanged(index(0, 0), index(rowCount() - 1, 0), {Qt::DecorationRole});
+  }
+}
+
 int CollectionTableModel::rowCount(const QModelIndex& parent) const {
   return parent.isValid() ? 0 : static_cast<int>(workspace_.snapshot().collections().size());
 }
@@ -236,7 +255,8 @@ QVariant CollectionTableModel::data(const QModelIndex& index, int role) const {
     return collection.id.value;
   }
   if (role == Qt::DecorationRole) {
-    return collectionIcon();
+    return playingCollection_ == collection.id ? playingCollectionIcon()
+                                               : collectionIcon();
   }
   if (role == Qt::DisplayRole || role == Qt::EditRole) {
     return QString::fromStdString(collection.name);

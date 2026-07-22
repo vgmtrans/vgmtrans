@@ -45,7 +45,7 @@ target_sources(vgmtransqtvalue
 set_target_properties(vgmtransqtvalue PROPERTIES AUTOMOC ON)
 target_compile_features(vgmtransqtvalue PUBLIC cxx_std_20)
 target_include_directories(vgmtransqtvalue PUBLIC ${CMAKE_CURRENT_LIST_DIR})
-target_link_libraries(vgmtransqtvalue PUBLIC vgmtransvalueformats Qt6::Core Qt6::Gui)
+target_link_libraries(vgmtransqtvalue PUBLIC vgmtransvalueformats Qt6::Core Qt6::Gui Qt6::Svg)
 
 add_executable(vgmtrans ${GUI_TYPE})
 vgmtrans_enable_project_warnings(vgmtrans)
