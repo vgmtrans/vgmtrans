@@ -86,7 +86,7 @@ namespace {
 
 struct PreparedExport {
   std::string baseName;
-  CollectionAssets assets;
+  ResolvedAssets assets;
   std::vector<InstrumentSetAsset> preparedInstrumentSets;
 };
 
@@ -96,7 +96,7 @@ struct MidiLoweringResult {
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] PreparedExport prepareCollectionExport(CollectionAssets assets, const SessionSnapshot& snapshot,
+[[nodiscard]] PreparedExport prepareCollectionExport(ResolvedAssets assets, const SessionSnapshot& snapshot,
                                                      const SourceStore& sources, const FormatRegistry* formats) {
   // Prepare once per collection so all requested artifacts share names, resolved assets,
   // and reference diagnostics.
@@ -352,10 +352,9 @@ struct MidiLoweringResult {
   };
 }
 
-}  // namespace
-
-Artifact exportSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId, const SequenceExportRequest& request,
-                            const SequenceDialectRegistry& dialects) {
+Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId,
+                                      const SequenceExportRequest& request,
+                                      const SequenceDialectRegistry& dialects) {
   const auto* asset = snapshot.asset(sequenceId);
   const auto* sequence = asset != nullptr ? std::get_if<SequenceProgramAsset>(asset) : nullptr;
   if (sequence == nullptr) {
@@ -378,13 +377,15 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId,
                     ModulationConversionPolicy::SequenceEventSimulation);
 }
 
+}  // namespace
+
 Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId sequenceId,
                             const SequenceExportRequest& request, const SequenceDialectRegistry& dialects,
                             const FormatRegistry* formats) {
   const auto* sequence = snapshot.asset<SequenceProgramAsset>(sequenceId);
   const auto* collection = snapshot.firstCollectionContaining(sequenceId);
   if (sequence == nullptr || collection == nullptr) {
-    return exportSequenceMidi(snapshot, sequenceId, request, dialects);
+    return exportStandaloneSequenceMidi(snapshot, sequenceId, request, dialects);
   }
 
   auto artifacts = exportCollection(
@@ -410,18 +411,10 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& 
 }
 
 Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId instrumentSetId,
-                             ExportKind kind, const ExportRequest& request,
+                             SynthExportFormat format, const ExportRequest& request,
                              const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {
-  const bool soundFont = kind == ExportKind::SoundFont2;
-  const bool dls = kind == ExportKind::Dls;
-  if (!soundFont && !dls) {
-    return Artifact{
-        .filename = "instrument-set-" + std::to_string(instrumentSetId.value),
-        .mediaType = "application/octet-stream",
-        .diagnostics = {exportError("Unsupported instrument set export kind")},
-    };
-  }
-
+  const bool soundFont = format == SynthExportFormat::SoundFont2;
+  const ExportKind kind = soundFont ? ExportKind::SoundFont2 : ExportKind::Dls;
   const std::string extension = soundFont ? ".sf2" : ".dls";
   const std::string mediaType = soundFont ? "audio/soundfont" : "audio/dls";
   const auto* asset = snapshot.asset(instrumentSetId);

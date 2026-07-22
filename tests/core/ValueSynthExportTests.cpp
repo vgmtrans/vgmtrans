@@ -482,9 +482,9 @@ void standaloneSynthExportsKeepNativeModulation() {
   const SessionSnapshot snapshot = builder.finish();
   SequenceDialectRegistry dialects;
   const Artifact soundFont = exportInstrumentSet(snapshot, sources, instruments.metadata.id,
-                                                 ExportKind::SoundFont2, ExportRequest{}, dialects);
+                                                 SynthExportFormat::SoundFont2, ExportRequest{}, dialects);
   const Artifact dls = exportInstrumentSet(snapshot, sources, instruments.metadata.id,
-                                           ExportKind::Dls, ExportRequest{}, dialects);
+                                           SynthExportFormat::Dls, ExportRequest{}, dialects);
 
   expect(soundFontIgenContainsAmount(soundFont.bytes, 24, -8479),
          "standalone SoundFont export should retain native modulation when no MIDI replacement exists");

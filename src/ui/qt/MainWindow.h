@@ -49,7 +49,7 @@ class WorkspaceController;
 
 namespace vgmtrans::core {
 struct Artifact;
-enum class ExportKind;
+enum class SynthExportFormat;
 }
 
 class MainWindow final : public QMainWindow {
@@ -109,8 +109,9 @@ private:
   void saveOriginal(QAbstractItemView* view, OriginalItemKind kind);
   void saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact artifact,
                     const QString& failureMessage, const char* extension);
+  [[nodiscard]] QAbstractItemView* activeAssetView() const;
   void exportSequenceMidi(const QModelIndex& index);
-  void exportInstrumentSet(const QModelIndex& index, vgmtrans::core::ExportKind kind);
+  void exportInstrumentSet(const QModelIndex& index, vgmtrans::core::SynthExportFormat format);
   void togglePlayback();
   void updateSelectionStatus(const QModelIndex& index,
                              SelectionStatusKind kind);

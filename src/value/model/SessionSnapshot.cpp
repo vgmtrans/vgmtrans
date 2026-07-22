@@ -27,7 +27,7 @@ namespace {
 
 }  // namespace
 
-std::vector<Diagnostic> CollectionAssetDiagnostics::all() const {
+std::vector<Diagnostic> AssetResolutionDiagnostics::all() const {
   std::vector<Diagnostic> diagnostics;
   diagnostics.reserve(collection.size() + sequence.size() + instrumentSets.size() + sampleCollections.size() +
                       miscAssets.size());
@@ -140,20 +140,20 @@ const Collection* collectionById(const SessionSnapshot& snapshot, CollectionId i
   return snapshot.collection(id);
 }
 
-CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id) {
+ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id) {
   if (const auto* collection = collectionById(snapshot, id)) {
     return resolveCollectionAssets(snapshot, *collection);
   }
 
-  CollectionAssets resolved;
+  ResolvedAssets resolved;
   resolved.diagnostics.collection.push_back(snapshotError("CollectionId was not found in the SessionSnapshot"));
   return resolved;
 }
 
-CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, const Collection& collection) {
+ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, const Collection& collection) {
   // Resolve collection references once before export. The returned pointers are the usable
   // assets; diagnostics describe any missing or wrong-type references.
-  CollectionAssets resolved{
+  ResolvedAssets resolved{
       .collection = &collection,
   };
 

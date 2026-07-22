@@ -21,6 +21,11 @@ enum class ExportKind {
   Wav,
 };
 
+enum class SynthExportFormat {
+  SoundFont2,
+  Dls,
+};
+
 enum class MidiLevelResolution {
   Auto,
   SevenBit,

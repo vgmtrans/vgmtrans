@@ -107,7 +107,7 @@ public:
   [[nodiscard]] SessionSnapshot finish();
 };
 
-struct CollectionAssetDiagnostics {
+struct AssetResolutionDiagnostics {
   std::vector<Diagnostic> collection;
   std::vector<Diagnostic> sequence;
   std::vector<Diagnostic> instrumentSets;
@@ -117,15 +117,15 @@ struct CollectionAssetDiagnostics {
   [[nodiscard]] std::vector<Diagnostic> all() const;
 };
 
-struct CollectionAssets {
-  // Non-owning pointers to the assets in one Collection. Exporters use this
-  // instead of repeatedly resolving IDs.
+struct ResolvedAssets {
+  // Non-owning pointers to assets selected for one operation. A collection is
+  // present when the selection was resolved from one.
   const Collection* collection = nullptr;
   const SequenceProgramAsset* sequenceProgram = nullptr;
   std::vector<const InstrumentSetAsset*> instrumentSets;
   std::vector<const SampleCollectionAsset*> sampleCollections;
   std::vector<const MiscAsset*> miscAssets;
-  CollectionAssetDiagnostics diagnostics;
+  AssetResolutionDiagnostics diagnostics;
 };
 
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
@@ -138,7 +138,7 @@ template <typename T>
 }
 
 [[nodiscard]] const Collection* collectionById(const SessionSnapshot& snapshot, CollectionId id);
-[[nodiscard]] CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id);
-[[nodiscard]] CollectionAssets resolveCollectionAssets(const SessionSnapshot& snapshot, const Collection& collection);
+[[nodiscard]] ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id);
+[[nodiscard]] ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, const Collection& collection);
 
 }  // namespace vgmtrans::core

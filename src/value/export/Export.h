@@ -39,16 +39,13 @@ struct CollectionPlayback {
   }
 };
 
-[[nodiscard]] Artifact exportSequenceMidi(const SessionSnapshot& snapshot, AssetId sequence,
-                                          const SequenceExportRequest& request,
-                                          const SequenceDialectRegistry& dialects);
 [[nodiscard]] Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources,
                                           AssetId sequence, const SequenceExportRequest& request,
                                           const SequenceDialectRegistry& dialects,
                                           const FormatRegistry* formats = nullptr);
 
 [[nodiscard]] Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore& sources,
-                                           AssetId instrumentSet, ExportKind kind,
+                                           AssetId instrumentSet, SynthExportFormat format,
                                            const ExportRequest& request,
                                            const SequenceDialectRegistry& dialects,
                                            const FormatRegistry* formats = nullptr);

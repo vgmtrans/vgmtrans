@@ -55,7 +55,8 @@ signals:
   void saveSelectedSourceOriginal();
   void saveSelectedAssetOriginal();
   void exportSelectedSequenceMidi();
-  void exportSelectedInstrumentSet(int choice);
+  void exportSelectedInstrumentSetSf2();
+  void exportSelectedInstrumentSetDls();
   void exportSelectedCollection(int choice);
   void increaseHexFontRequested();
   void decreaseHexFontRequested();

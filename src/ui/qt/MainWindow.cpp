@@ -698,6 +698,13 @@ void MainWindow::saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact
   statusBarContent->setStatus(title, tr("Wrote %1").arg(pathText(path)));
 }
 
+QAbstractItemView* MainWindow::activeAssetView() const {
+  const QWidget* focused = QApplication::focusWidget();
+  return focused != nullptr && (focused == m_coll_view || m_coll_view->isAncestorOf(focused))
+             ? static_cast<QAbstractItemView*>(m_coll_view)
+             : static_cast<QAbstractItemView*>(m_vgmfile_listview);
+}
+
 void MainWindow::exportSequenceMidi(const QModelIndex& index) {
   if (!index.isValid()) {
     return;
@@ -718,18 +725,18 @@ void MainWindow::exportSequenceMidi(const QModelIndex& index) {
   }
 }
 
-void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::ExportKind kind) {
+void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::SynthExportFormat format) {
   if (!index.isValid()) {
     return;
   }
 
   vgmtrans::core::ExportRequest request;
   applySequenceExportSettings(request);
-  const bool soundFont = kind == vgmtrans::core::ExportKind::SoundFont2;
+  const bool soundFont = format == vgmtrans::core::SynthExportFormat::SoundFont2;
   try {
     saveArtifact(index,
                  m_workspace.exportInstrumentSet(
-                     vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, kind, request),
+                     vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, format, request),
                  soundFont ? tr("The instrument set could not be exported as SF2.")
                            : tr("The instrument set could not be exported as DLS."),
                  soundFont ? "sf2" : "dls");
@@ -897,12 +904,7 @@ void MainWindow::routeSignals() {
   connect(m_menu_bar, &MenuBar::saveSelectedSourceOriginal, this,
           [this] { saveOriginal(m_rawfile_listview, OriginalItemKind::Source); });
   connect(m_menu_bar, &MenuBar::saveSelectedAssetOriginal, this, [this] {
-    const QWidget* focused = QApplication::focusWidget();
-    const bool contentsFocused = focused != nullptr &&
-        (focused == m_coll_view || m_coll_view->isAncestorOf(focused));
-    saveOriginal(contentsFocused ? static_cast<QAbstractItemView*>(m_coll_view)
-                                 : static_cast<QAbstractItemView*>(m_vgmfile_listview),
-                 OriginalItemKind::Asset);
+    saveOriginal(activeAssetView(), OriginalItemKind::Asset);
   });
 
   const auto exportSelectedCollection = [this](int choice) {
@@ -962,28 +964,17 @@ void MainWindow::routeSignals() {
   connect(m_menu_bar, &MenuBar::exportSelectedCollection, this,
           exportSelectedCollection);
   connect(m_menu_bar, &MenuBar::exportSelectedSequenceMidi, this, [this] {
-    const QWidget* focused = QApplication::focusWidget();
-    const bool contentsFocused = focused != nullptr &&
-        (focused == m_coll_view || m_coll_view->isAncestorOf(focused));
-    exportSequenceMidi(contentsFocused ? m_coll_view->currentIndex()
-                                       : m_vgmfile_listview->currentIndex());
+    exportSequenceMidi(activeAssetView()->currentIndex());
   });
-  connect(m_menu_bar, &MenuBar::exportSelectedInstrumentSet, this, [this](int choice) {
-    const QWidget* focused = QApplication::focusWidget();
-    const bool contentsFocused = focused != nullptr &&
-        (focused == m_coll_view || m_coll_view->isAncestorOf(focused));
-    const auto kind = choice == 0 ? vgmtrans::core::ExportKind::SoundFont2
-                                  : vgmtrans::core::ExportKind::Dls;
-    exportInstrumentSet(contentsFocused ? m_coll_view->currentIndex()
-                                        : m_vgmfile_listview->currentIndex(),
-                        kind);
+  connect(m_menu_bar, &MenuBar::exportSelectedInstrumentSetSf2, this, [this] {
+    exportInstrumentSet(activeAssetView()->currentIndex(),
+                        vgmtrans::core::SynthExportFormat::SoundFont2);
+  });
+  connect(m_menu_bar, &MenuBar::exportSelectedInstrumentSetDls, this, [this] {
+    exportInstrumentSet(activeAssetView()->currentIndex(), vgmtrans::core::SynthExportFormat::Dls);
   });
   connect(m_menu_bar, &MenuBar::openSelectedAsset, this, [this] {
-    const QWidget* focused = QApplication::focusWidget();
-    const bool contentsFocused = focused != nullptr &&
-        (focused == m_coll_view || m_coll_view->isAncestorOf(focused));
-    const QModelIndex current = contentsFocused ? m_coll_view->currentIndex()
-                                                : m_vgmfile_listview->currentIndex();
+    const QModelIndex current = activeAssetView()->currentIndex();
     if (current.isValid() && !current.data(vgmtrans::ui::IsCollectionRole).toBool()) {
       MdiArea::the()->newView(
           vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
@@ -1129,9 +1120,9 @@ void MainWindow::routeSignals() {
     } else if (saveMidi != nullptr && chosen == saveMidi) {
       exportSequenceMidi(current);
     } else if (saveSf2 != nullptr && chosen == saveSf2) {
-      exportInstrumentSet(current, vgmtrans::core::ExportKind::SoundFont2);
+      exportInstrumentSet(current, vgmtrans::core::SynthExportFormat::SoundFont2);
     } else if (saveDls != nullptr && chosen == saveDls) {
-      exportInstrumentSet(current, vgmtrans::core::ExportKind::Dls);
+      exportInstrumentSet(current, vgmtrans::core::SynthExportFormat::Dls);
     } else if (chosen == saveOriginalAction) {
       saveOriginal(view, OriginalItemKind::Asset);
     } else if (chosen == remove) {
