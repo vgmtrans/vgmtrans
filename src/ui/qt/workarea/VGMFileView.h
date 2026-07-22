@@ -42,8 +42,8 @@ public:
 
 signals:
   void statusChanged(const QString& name, const QString& description, const QIcon& icon, int offset, int size);
-  // Playback wiring can consume these once the value player publishes an
-  // annotation-to-time index. Keeping IDs here avoids reintroducing adapters.
+  // Inspector interactions stay source-ID based; the playback timeline resolves
+  // seek requests to ticks without introducing a model adapter.
   void seekToAnnotationRequested(vgmtrans::core::SourceAnnotationId annotation);
   void notePreviewRequested(vgmtrans::core::SourceAnnotationId annotation, bool includeActiveNotesAtTick);
   void notePreviewStopped();

@@ -231,11 +231,24 @@ struct PerformanceTrack {
   std::vector<PerformanceEvent> events;
 };
 
+// Maps an executed source command to the half-open interval during which it is
+// active in the rendered sequence. This includes commands such as rests and
+// control flow that do not emit a PerformanceEvent.
+struct SourcePlaybackSpan {
+  SourceAnnotationId annotation;
+  u64 beginTick = 0;
+  u64 endTick = 0;
+
+  friend bool operator==(const SourcePlaybackSpan&, const SourcePlaybackSpan&) noexcept = default;
+};
+
 // Output from SequenceVm. Events point back to the source command that produced
-// them, but MIDI controller encoding happens later in the export layer.
+// them, while sourceSpans preserve runtime timing for every executed annotated
+// command. MIDI controller encoding happens later in the export layer.
 struct PerformanceSequence {
   Timebase timebase;
   std::vector<PerformanceTrack> tracks;
+  std::vector<SourcePlaybackSpan> sourceSpans;
   std::vector<Diagnostic> diagnostics;
 };
 

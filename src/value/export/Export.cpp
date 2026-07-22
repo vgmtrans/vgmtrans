@@ -333,6 +333,58 @@ struct MidiLoweringResult {
 
 }  // namespace
 
+CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,
+                                             CollectionId collection, const PlaybackRequest& request,
+                                             const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {
+  CollectionPlayback playback{
+      .collection = collection,
+  };
+  auto resolved = resolveCollectionAssets(snapshot, collection);
+  if (resolved.collection == nullptr) {
+    playback.diagnostics = std::move(resolved.diagnostics.collection);
+    if (playback.diagnostics.empty()) {
+      playback.diagnostics.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
+    }
+    return playback;
+  }
+
+  const auto prepared = prepareCollectionExport(std::move(resolved), snapshot, sources, formats);
+  playback.title = prepared.baseName;
+  if (prepared.assets.sequenceProgram != nullptr) {
+    playback.sequence = prepared.assets.sequenceProgram->metadata.id;
+    playback.assetDependencies.push_back(playback.sequence);
+  }
+  playback.assetDependencies.insert(playback.assetDependencies.end(),
+                                    prepared.assets.collection->instrumentSets.begin(),
+                                    prepared.assets.collection->instrumentSets.end());
+  playback.assetDependencies.insert(playback.assetDependencies.end(),
+                                    prepared.assets.collection->sampleCollections.begin(),
+                                    prepared.assets.collection->sampleCollections.end());
+
+  const ExportRequest exportRequest{
+      .loopPolicy = request.loopPolicy,
+      .sequenceLoops = request.sequenceLoops,
+      .midi = request.midi,
+      .modulationScaling = ModulationScalingPolicy::FullFormatRange,
+      .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+  };
+  auto lowering = lowerMidiSequence(prepared, dialects, exportRequest);
+  auto midi = exportMidi(prepared, exportRequest, lowering);
+  auto soundFont = exportSoundFont2(prepared, sources, exportRequest, nullptr,
+                                    lowering.sequence ? ModulationConversionPolicy::SequenceEventSimulation
+                                                      : ModulationConversionPolicy::SynthModulators);
+
+  playback.midi = std::move(midi.bytes);
+  playback.soundFont = std::move(soundFont.bytes);
+  playback.diagnostics = std::move(midi.diagnostics);
+  playback.diagnostics.insert(playback.diagnostics.end(), std::make_move_iterator(soundFont.diagnostics.begin()),
+                              std::make_move_iterator(soundFont.diagnostics.end()));
+  if (lowering.performance) {
+    playback.performance = std::move(*lowering.performance);
+  }
+  return playback;
+}
+
 std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
                                        CollectionId collection, const ExportRequest& request,
                                        const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {

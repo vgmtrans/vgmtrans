@@ -21,6 +21,7 @@ class QDockWidget;
 class MenuBar;
 class MainWindowDockLayout;
 class PlaybackControls;
+class SequencePlayer;
 class Logger;
 class QListView;
 class QSortFilterProxyModel;
@@ -114,6 +115,7 @@ private:
   QDockWidget *m_coll_view_dock{};
   MenuBar *m_menu_bar{};
   PlaybackControls *m_playback_controls{};
+  SequencePlayer *m_sequence_player{};
   StatusBarContent *statusBarContent{};
   Logger *m_logger{};
   QToolButton *m_stitchButton{};

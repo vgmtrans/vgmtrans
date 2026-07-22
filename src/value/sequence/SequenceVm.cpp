@@ -9,6 +9,7 @@
 #include <any>
 #include <algorithm>
 #include <fmt/format.h>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <memory>
@@ -266,8 +267,26 @@ void endTrackAt(PerformanceTrack& track, u64 endTick) {
   track.endTick = endTick;
 }
 
+void endSourceSpansAt(std::vector<SourcePlaybackSpan>& spans, u64 endTick) {
+  std::erase_if(spans, [endTick](const SourcePlaybackSpan& span) { return span.beginTick >= endTick; });
+  for (auto& span : spans) {
+    span.endTick = std::min(span.endTick, endTick);
+  }
+}
+
+[[nodiscard]] u64 eventEndTick(const PerformanceEvent& event) {
+  const auto& header = performanceEventHeader(event);
+  u64 duration = 1;
+  if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+    duration = std::max<u64>(1, note->durationTicks);
+  }
+  return header.tick > std::numeric_limits<u64>::max() - duration ? std::numeric_limits<u64>::max()
+                                                                  : header.tick + duration;
+}
+
 struct RenderedTrack {
   PerformanceTrack track;
+  std::vector<SourcePlaybackSpan> sourceSpans;
   std::optional<u64> loopStopTick;
 };
 
@@ -332,7 +351,9 @@ public:
       }
     }
 
-    PerformanceEmitter out{performanceTrack_, command.id, command.annotation, runtime_.tick};
+    const u64 beginTick = runtime_.tick;
+    const size_t firstEvent = performanceTrack_.events.size();
+    PerformanceEmitter out{performanceTrack_, command.id, command.annotation, beginTick};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr || dialect_.execute == nullptr) {
       warn("Missing sequence dialect executor state", command.range);
@@ -341,6 +362,18 @@ public:
     }
     const Effects effects = dialect_.execute(command, *programState_, trackState_, out, vm);
     advanceTicks(command, effects.advanceTicks);
+    if (command.annotation.valid()) {
+      u64 endTick = beginTick == std::numeric_limits<u64>::max() ? beginTick : beginTick + 1;
+      endTick = std::max(endTick, runtime_.tick);
+      for (size_t i = firstEvent; i < performanceTrack_.events.size(); ++i) {
+        endTick = std::max(endTick, eventEndTick(performanceTrack_.events[i]));
+      }
+      sourceSpans_.push_back(SourcePlaybackSpan{
+          .annotation = command.annotation,
+          .beginTick = beginTick,
+          .endTick = endTick,
+      });
+    }
     runtime_.lastCommand = command.id;
     applyStep(command, effects.step);
 
@@ -351,6 +384,7 @@ public:
     performanceTrack_.endTick = runtime_.tick;
     return RenderedTrack{
         .track = std::move(performanceTrack_),
+        .sourceSpans = std::move(sourceSpans_),
         .loopStopTick = loopStopTick_ ? loopStopTick_ : firstLoopTick_,
     };
   }
@@ -559,6 +593,7 @@ private:
   PerformanceSequence& targetSequence_;
   std::optional<u64> stopTick_;
   PerformanceTrack performanceTrack_;
+  std::vector<SourcePlaybackSpan> sourceSpans_;
   std::any trackState_;
   std::any* programState_ = nullptr;
   VmTrackRuntime runtime_;
@@ -759,9 +794,21 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
         auto rendered = executor->finish();
         if (sequenceEndTick) {
           endTrackAt(rendered.track, *sequenceEndTick);
+          endSourceSpansAt(rendered.sourceSpans, *sequenceEndTick);
         }
+        target.sourceSpans.insert(target.sourceSpans.end(), std::make_move_iterator(rendered.sourceSpans.begin()),
+                                  std::make_move_iterator(rendered.sourceSpans.end()));
         tracks.push_back(std::move(rendered.track));
       }
+      std::ranges::sort(target.sourceSpans, [](const SourcePlaybackSpan& lhs, const SourcePlaybackSpan& rhs) {
+        if (lhs.beginTick != rhs.beginTick) {
+          return lhs.beginTick < rhs.beginTick;
+        }
+        if (lhs.endTick != rhs.endTick) {
+          return lhs.endTick < rhs.endTick;
+        }
+        return lhs.annotation.value < rhs.annotation.value;
+      });
       return tracks;
     };
 
