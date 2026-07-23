@@ -124,6 +124,24 @@ QColor selectedTreeTextColor(const QStyleOptionViewItem& option) {
                               colorGroup);
 }
 
+int itemWidthForSizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) {
+  const auto* tree = qobject_cast<const QTreeView*>(option.widget);
+  if (tree == nullptr) {
+    if (option.rect.width() > 0) {
+      return option.rect.width();
+    }
+    return option.widget == nullptr ? 1 : option.widget->width();
+  }
+
+  int depth = tree->rootIsDecorated() ? 1 : 0;
+  for (QModelIndex parent = index.parent(); parent.isValid(); parent = parent.parent()) {
+    ++depth;
+  }
+  const int indentedWidth =
+      std::max(1, tree->viewport()->width() - (depth * tree->indentation()));
+  return option.rect.width() > 0 ? std::min(option.rect.width(), indentedWidth) : indentedWidth;
+}
+
 }  // namespace
 
 void VGMTreeDisplayItem::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const {
@@ -182,10 +200,7 @@ QSize VGMTreeDisplayItem::sizeHint(const QStyleOptionViewItem& option, const QMo
   const QSize baseSize = QStyledItemDelegate::sizeHint(styleOption, index);
   const bool showDetails = index.data(ShowDetailsRole).toBool();
   QStyle* style = styleOption.widget ? styleOption.widget->style() : QApplication::style();
-  int itemWidth = styleOption.rect.width();
-  if (itemWidth <= 0 && styleOption.widget != nullptr) {
-    itemWidth = styleOption.widget->width();
-  }
+  const int itemWidth = itemWidthForSizeHint(styleOption, index);
   styleOption.rect = QRect(0, 0, std::max(1, itemWidth), 1000);
   styleOption.text.clear();
   const int textWidth =
