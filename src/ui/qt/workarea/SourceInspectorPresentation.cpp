@@ -35,6 +35,20 @@ QString midiNoteText(qint64 value) {
   return QStringLiteral("%1%2 (%3)").arg(QLatin1String(noteNames[note])).arg(octave).arg(value);
 }
 
+QString tempoText(double beatsPerMinute) {
+  if (!std::isfinite(beatsPerMinute) || beatsPerMinute <= 0.0) {
+    return QStringLiteral("0 BPM");
+  }
+  QString bpm = QString::number(beatsPerMinute, 'f', 2);
+  while (bpm.endsWith(QLatin1Char('0'))) {
+    bpm.chop(1);
+  }
+  if (bpm.endsWith(QLatin1Char('.'))) {
+    bpm.chop(1);
+  }
+  return QStringLiteral("%1 BPM").arg(bpm);
+}
+
 QString valueText(const SourceField& field) {
   return std::visit(
       [&field](const auto& value) -> QString {
@@ -58,6 +72,8 @@ QString valueText(const SourceField& field) {
               return QStringLiteral("%1 dB").arg(number);
             case SourceValueDisplay::MidiNote:
               return std::isfinite(value) ? midiNoteText(static_cast<qint64>(std::llround(value))) : number;
+            case SourceValueDisplay::BeatsPerMinute:
+              return tempoText(value);
             default:
               return number;
           }
@@ -77,6 +93,8 @@ QString valueText(const SourceField& field) {
               return QStringLiteral("%1 dB").arg(static_cast<qlonglong>(value));
             case SourceValueDisplay::MidiNote:
               return midiNoteText(static_cast<qint64>(value));
+            case SourceValueDisplay::BeatsPerMinute:
+              return tempoText(static_cast<double>(value));
             case SourceValueDisplay::Ascii: {
               const auto character = static_cast<qulonglong>(value);
               if (character >= 0x20 && character <= 0x7e) {

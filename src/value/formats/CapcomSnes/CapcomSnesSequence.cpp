@@ -300,8 +300,10 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x05: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u32 tempo =
-          event.resolved("microseconds_per_quarter", event.rawU16be("raw"), math::tempoMicrosecondsPerQuarter);
+      const auto raw = event.rawU16be("raw");
+      const u32 tempo = raw.valid ? math::tempoMicrosecondsPerQuarter(raw.value) : 0;
+      static_cast<void>(event.resolvedValue("tempo", raw, tempoBeatsPerMinute(tempo),
+                                            SourceValueDisplay::BeatsPerMinute));
       return event.emitTempo(tempo);
     }
     case 0x06: {

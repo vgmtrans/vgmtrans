@@ -138,6 +138,13 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
   return static_cast<u32>(std::lround(kAkaoSnesPpqn * (125.0 * timer) * 256.0 / tempo));
 }
 
+[[nodiscard]] u8 normalizeTempoValue(AkaoSnesMinorVersion minorVersion, u8 rawTempo) {
+  if (minorVersion == AKAOSNES_V4_FM || minorVersion == AKAOSNES_V4_CT) {
+    rawTempo = static_cast<u8>(rawTempo + ((rawTempo * 0x14) >> 8));
+  }
+  return rawTempo;
+}
+
 [[nodiscard]] double levelFromLegacyMidiVolume(u8 volume) {
   return std::clamp(static_cast<double>(volume) / 127.0, 0.0, 1.0);
 }
@@ -1534,10 +1541,7 @@ struct Playback {
   }
 
   [[nodiscard]] u8 normalizedTempo(u8 rawTempo) const {
-    if (context.minorVersion == AKAOSNES_V4_FM || context.minorVersion == AKAOSNES_V4_CT) {
-      rawTempo = static_cast<u8>(rawTempo + ((rawTempo * 0x14) >> 8));
-    }
-    return rawTempo;
+    return normalizeTempoValue(context.minorVersion, rawTempo);
   }
 
   void applyTempo(u8 tempo) {
@@ -1932,12 +1936,24 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("End", SequenceSemantic::End).end();
     case EventType::Tempo: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      return event.invoke<&Playback::tempoChange>(event.u8("tempo"));
+      const u8 raw = event.u8("raw");
+      const u8 tempo = normalizeTempoValue(profile.minorVersion, raw);
+      event.derived(
+          "tempo",
+          tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, tempo)),
+          SourceValueDisplay::BeatsPerMinute);
+      return event.invoke<&Playback::tempoChange>(raw);
     }
     case EventType::TempoFade: {
       auto event = cursor.command("Tempo Fade", SequenceSemantic::Tempo);
       const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
-      const u8 target = event.u8("tempo");
+      const u8 target = event.u8("raw");
+      const u8 normalizedTarget = normalizeTempoValue(profile.minorVersion, target);
+      event.derived(
+          "target_tempo",
+          tempoBeatsPerMinute(
+              tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, normalizedTarget)),
+          SourceValueDisplay::BeatsPerMinute);
       return length == 0
                  ? event.invoke<&Playback::tempoChange>(target)
                  : event.invoke(

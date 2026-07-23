@@ -243,7 +243,7 @@ struct SequenceDecodeContext {
       return cursor.ignored("Modulation Delay", 2);
     case 0xe1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u16 bpm = event.u16le("bpm");
+      const u16 bpm = event.u16le("tempo", SourceValueDisplay::BeatsPerMinute);
       return bpm == 0 ? event.ignore() : event.emitTempo(static_cast<u32>(std::round(60000000.0 / bpm)));
     }
     case 0xe3:
