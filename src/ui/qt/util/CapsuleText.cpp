@@ -104,7 +104,7 @@ void paint(QPainter& painter, const QRect& rect, const CapsuleText& text,
   const int top = rect.top() + std::max(0, (rect.height() - contentHeight) / 2);
   const QColor base = palette.color(QPalette::Base);
   const QColor blue(63, 120, 181);
-  const QColor background = blendColors(blue, base, isDarkPalette(palette) ? 0.38 : 0.30);
+  const QColor background = blendColors(blue, base, isDarkPalette(palette) ? 0.58 : 0.30);
   const QColor capsuleText = contrastingTextColor(background, base, palette);
 
   painter.save();
