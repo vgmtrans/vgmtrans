@@ -19,6 +19,20 @@
 
 namespace vgmtrans::core {
 
+struct SynthExportInput {
+  std::string name;
+  std::span<const InstrumentSetAsset* const> instrumentSets;
+  std::span<const SampleCollectionAsset* const> sampleCollections;
+  const MidiModulationUsage* midiModulationUsage = nullptr;
+  ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
+  ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
+};
+
+struct SynthExportResult {
+  std::vector<u8> bytes;
+  std::vector<Diagnostic> diagnostics;
+};
+
 struct SynthSampleDecodeOptions {
   bool requireMono = false;
   std::string nonMonoWarning;

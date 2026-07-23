@@ -8,6 +8,7 @@
 
 #include "value/base/CoreTypes.h"
 
+#include <iterator>
 #include <optional>
 #include <span>
 #include <string>
@@ -23,8 +24,19 @@ public:
   [[nodiscard]] std::vector<Diagnostic> takeDiagnostics() noexcept { return std::move(diagnostics_); }
   [[nodiscard]] bool empty() const noexcept { return diagnostics_.empty(); }
 
-  void merge(ValidationReport report);
-  void error(std::string code, std::string message, std::optional<SourceRange> range = std::nullopt);
+  void merge(ValidationReport report) {
+    diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(report.diagnostics_.begin()),
+                        std::make_move_iterator(report.diagnostics_.end()));
+  }
+
+  void error(std::string code, std::string message, std::optional<SourceRange> range = std::nullopt) {
+    diagnostics_.push_back(Diagnostic{
+        .severity = Severity::Error,
+        .code = std::move(code),
+        .message = std::move(message),
+        .range = range,
+    });
+  }
 
 private:
   std::vector<Diagnostic> diagnostics_;

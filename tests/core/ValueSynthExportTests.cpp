@@ -228,7 +228,7 @@ void soundFontExporterWritesSfbkRiffFile() {
       .tremoloRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
   };
   const auto result = SoundFontExporter().exportSoundFont(
-      SoundFontInput{
+      SynthExportInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
@@ -297,7 +297,7 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write releaseVolEnv from Region envelope");
 
   const auto simulatedResult = SoundFontExporter().exportSoundFont(
-      SoundFontInput{
+      SynthExportInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
@@ -387,7 +387,7 @@ void dlsExporterWritesDlsRiffFile() {
       .tremoloRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
   };
   const auto result = DlsExporter().exportDls(
-      DlsInput{
+      SynthExportInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
@@ -441,7 +441,7 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should scale default tremolo-rate modulator from observed MIDI usage");
 
   const auto simulatedResult = DlsExporter().exportDls(
-      DlsInput{
+      SynthExportInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = samples,
@@ -534,7 +534,7 @@ void exportDiagnosticsPreserveSourceRanges() {
 
   const std::array<const SampleCollectionAsset*, 1> missingSamples{&missingSampleCollection};
   const auto sf2MissingSample = SoundFontExporter().exportSoundFont(
-      SoundFontInput{
+      SynthExportInput{
           .name = "Probe",
           .sampleCollections = missingSamples,
       },
@@ -542,7 +542,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   expectDiagnosticRange(sf2MissingSample.diagnostics, "Sample source was not found", missingSampleRange);
 
   const auto dlsMissingSample = DlsExporter().exportDls(
-      DlsInput{
+      SynthExportInput{
           .name = "Probe",
           .sampleCollections = missingSamples,
       },
@@ -588,7 +588,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{&badRegionSet};
   const std::array<const SampleCollectionAsset*, 1> validSamples{&validSampleCollection};
   const auto sf2BadRegion = SoundFontExporter().exportSoundFont(
-      SoundFontInput{
+      SynthExportInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = validSamples,
@@ -597,7 +597,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   expectDiagnosticRange(sf2BadRegion.diagnostics, "Region sample reference was not found", regionRange);
 
   const auto dlsBadRegion = DlsExporter().exportDls(
-      DlsInput{
+      SynthExportInput{
           .name = "Probe",
           .instrumentSets = instrumentSets,
           .sampleCollections = validSamples,
