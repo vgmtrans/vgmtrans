@@ -6,27 +6,29 @@
 
 #include "value/export/synth/SynthExportData.h"
 
-#include "value/export/synth/ModulationScaling.h"
-
-#include "value/synth/SampleDecoder.h"
 #include "value/export/ExportDiagnostics.h"
+#include "value/synth/SampleDecoder.h"
 
 #include <algorithm>
 #include <limits>
+#include <map>
+#include <optional>
+#include <utility>
 
 namespace vgmtrans::core {
 
 namespace {
 
+using SynthSampleIndexKey = std::pair<u32, u32>;
+using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
+
 [[nodiscard]] u16 clampU16(u32 value) {
   return static_cast<u16>(std::min<u32>(value, std::numeric_limits<u16>::max()));
 }
 
-}  // namespace
-
-std::vector<DecodedSynthSample> decodeSynthSamples(std::span<const SampleCollectionAsset* const> sampleCollections,
-                                                   const SourceStore& sources, std::vector<Diagnostic>& diagnostics,
-                                                   const SynthSampleDecodeOptions& options) {
+[[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(
+    std::span<const SampleCollectionAsset* const> sampleCollections, const SourceStore& sources,
+    std::vector<Diagnostic>& diagnostics, const SynthSampleDecodeOptions& options) {
   // Decode once into a flat vector. Container exporters then decide how to lay out that
   // PCM, but all of them share the same source-range diagnostics.
   std::vector<DecodedSynthSample> samples;
@@ -72,7 +74,7 @@ std::vector<DecodedSynthSample> decodeSynthSamples(std::span<const SampleCollect
   return samples;
 }
 
-SynthSampleIndexMap synthSampleIndexMap(std::span<const DecodedSynthSample> samples) {
+[[nodiscard]] SynthSampleIndexMap synthSampleIndexMap(std::span<const DecodedSynthSample> samples) {
   // Region references use collection-local sample indexes. Export containers need a flat
   // sample table, so keep a map from original reference identity to flat index.
   SynthSampleIndexMap indexes;
@@ -82,7 +84,8 @@ SynthSampleIndexMap synthSampleIndexMap(std::span<const DecodedSynthSample> samp
   return indexes;
 }
 
-std::optional<AssetId> firstSampleCollectionId(std::span<const SampleCollectionAsset* const> sampleCollections) {
+[[nodiscard]] std::optional<AssetId> firstSampleCollectionId(
+    std::span<const SampleCollectionAsset* const> sampleCollections) {
   for (const auto* collection : sampleCollections) {
     if (collection != nullptr) {
       return collection->metadata.id;
@@ -91,8 +94,10 @@ std::optional<AssetId> firstSampleCollectionId(std::span<const SampleCollectionA
   return std::nullopt;
 }
 
-std::optional<u16> resolveRegionSampleIndex(const Region& region, std::optional<AssetId> fallbackCollection,
-                                            const SynthSampleIndexMap& samples, std::vector<Diagnostic>& diagnostics) {
+[[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region,
+                                                          std::optional<AssetId> fallbackCollection,
+                                                          const SynthSampleIndexMap& samples,
+                                                          std::vector<Diagnostic>& diagnostics) {
   // Older formats often imply "the first sample collection in the collection" rather than
   // storing an explicit collection id on every region.
   const std::optional<AssetId> collectionId = region.sample.collection ? region.sample.collection : fallbackCollection;
@@ -111,17 +116,7 @@ std::optional<u16> resolveRegionSampleIndex(const Region& region, std::optional<
   return found->second;
 }
 
-Loop effectiveRegionLoop(const Region& region, const DecodedSynthSample& sample) {
-  Loop loop = region.loop.value_or(sample.decoded.loop);
-  if (loop.enabled && loop.length == 0) {
-    const auto channels = std::max<u16>(1, sample.decoded.channels);
-    const auto frameCount = static_cast<u32>(sample.decoded.pcm.size() / channels);
-    loop.length = loop.start < frameCount ? frameCount - loop.start : 0;
-  }
-  return loop;
-}
-
-std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
+[[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     std::span<const InstrumentSetAsset* const> instrumentSets,
     std::span<const SampleCollectionAsset* const> sampleCollections, const SynthSampleIndexMap& samples,
     std::vector<Diagnostic>& diagnostics) {
@@ -162,6 +157,18 @@ std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
   }
 
   return instruments;
+}
+
+}  // namespace
+
+PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
+                                   const SynthSampleDecodeOptions& options) {
+  PreparedSynthData prepared;
+  prepared.samples = decodeSynthSamples(input.sampleCollections, sources, prepared.diagnostics, options);
+  const auto samplesByReference = synthSampleIndexMap(prepared.samples);
+  prepared.instruments =
+      resolveSynthInstruments(input.instrumentSets, input.sampleCollections, samplesByReference, prepared.diagnostics);
+  return prepared;
 }
 
 }  // namespace vgmtrans::core

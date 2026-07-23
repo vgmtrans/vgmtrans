@@ -10,11 +10,8 @@
 #include "value/export/synth/ModulationScaling.h"
 #include "value/synth/SynthModel.h"
 
-#include <map>
-#include <optional>
 #include <span>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -65,30 +62,15 @@ struct ResolvedSynthInstrument {
   std::vector<SynthModulator> modulators;
 };
 
-using SynthSampleIndexKey = std::pair<u32, u32>;
-using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
+struct PreparedSynthData {
+  std::vector<DecodedSynthSample> samples;
+  std::vector<ResolvedSynthInstrument> instruments;
+  std::vector<Diagnostic> diagnostics;
+};
 
-// Decode all referenced sample collections once before writing a synth container.
-// The returned samples still remember the collection-local indexes used by regions.
-[[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(
-    std::span<const SampleCollectionAsset* const> sampleCollections, const SourceStore& sources,
-    std::vector<Diagnostic>& diagnostics, const SynthSampleDecodeOptions& options = {});
-
-[[nodiscard]] SynthSampleIndexMap synthSampleIndexMap(std::span<const DecodedSynthSample> samples);
-
-[[nodiscard]] std::optional<AssetId> firstSampleCollectionId(
-    std::span<const SampleCollectionAsset* const> sampleCollections);
-
-[[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region,
-                                                          std::optional<AssetId> fallbackCollection,
-                                                          const SynthSampleIndexMap& samples,
-                                                          std::vector<Diagnostic>& diagnostics);
-
-[[nodiscard]] Loop effectiveRegionLoop(const Region& region, const DecodedSynthSample& sample);
-
-[[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
-    std::span<const InstrumentSetAsset* const> instrumentSets,
-    std::span<const SampleCollectionAsset* const> sampleCollections, const SynthSampleIndexMap& samples,
-    std::vector<Diagnostic>& diagnostics);
+// Decode samples and resolve instrument references once before a format-specific
+// writer lays out its container.
+[[nodiscard]] PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
+                                                 const SynthSampleDecodeOptions& options = {});
 
 }  // namespace vgmtrans::core

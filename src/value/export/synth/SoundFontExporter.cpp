@@ -9,7 +9,6 @@
 #include "value/export/BinaryWriter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/synth/ModulationScaling.h"
-#include "value/export/synth/SynthExportData.h"
 
 #include <algorithm>
 #include <cmath>
@@ -666,33 +665,31 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 }  // namespace
 
 SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceStore& sources) {
-  SynthExportResult result;
-
   // SoundFont 2 sample data is mono PCM16. Shared decode/resolve helpers do the expensive
   // source work once before this file-specific table writer assembles RIFF chunks.
-  auto decodedSamples = decodeSynthSamples(input.sampleCollections, sources, result.diagnostics,
-                                           SynthSampleDecodeOptions{
-                                               .requireMono = true,
-                                               .nonMonoWarning = "Skipping non-mono sample for SoundFont2 export",
-                                           });
-  const auto samplesByReference = synthSampleIndexMap(decodedSamples);
+  auto [decodedSamples, instruments, diagnostics] =
+      prepareSynthData(input, sources,
+                       SynthSampleDecodeOptions{
+                           .requireMono = true,
+                           .nonMonoWarning = "Skipping non-mono sample for SoundFont2 export",
+                       });
   auto samples = sf2Samples(std::move(decodedSamples));
-  auto instruments =
-      resolveSynthInstruments(input.instrumentSets, input.sampleCollections, samplesByReference, result.diagnostics);
 
   if (samples.empty()) {
-    result.diagnostics.push_back(exportError("No decodable samples available for SoundFont2 export"));
-    return result;
+    diagnostics.push_back(exportError("No decodable samples available for SoundFont2 export"));
+    return SynthExportResult{.diagnostics = std::move(diagnostics)};
   }
 
-  result.bytes =
-      makeRiff("sfbk", {
-                           makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
-                           makeListChunk("sdta", {smplChunk(samples)}),
-                           makeListChunk("pdta", pdtaChunks(instruments, samples, input.midiModulationUsage,
-                                                            input.modulationScaling, input.modulationConversion)),
-                       });
-  return result;
+  return SynthExportResult{
+      .bytes = makeRiff("sfbk",
+                        {
+                            makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
+                            makeListChunk("sdta", {smplChunk(samples)}),
+                            makeListChunk("pdta", pdtaChunks(instruments, samples, input.midiModulationUsage,
+                                                             input.modulationScaling, input.modulationConversion)),
+                        }),
+      .diagnostics = std::move(diagnostics),
+  };
 }
 
 }  // namespace vgmtrans::core

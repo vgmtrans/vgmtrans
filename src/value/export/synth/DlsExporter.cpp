@@ -9,7 +9,6 @@
 #include "value/export/BinaryWriter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/synth/ModulationScaling.h"
-#include "value/export/synth/SynthExportData.h"
 
 #include <algorithm>
 #include <cmath>
@@ -56,6 +55,16 @@ constexpr s32 kDlsSustainLevelFullScale = 0x03e80000;
 using Chunk = RiffChunk;
 
 using DecodedDlsSample = DecodedSynthSample;
+
+[[nodiscard]] Loop effectiveRegionLoop(const Region& region, const DecodedDlsSample& sample) {
+  Loop loop = region.loop.value_or(sample.decoded.loop);
+  if (loop.enabled && loop.length == 0) {
+    const auto channels = std::max<u16>(1, sample.decoded.channels);
+    const auto frameCount = static_cast<u32>(sample.decoded.pcm.size() / channels);
+    loop.length = loop.start < frameCount ? frameCount - loop.start : 0;
+  }
+  return loop;
+}
 
 struct DlsConnection {
   // DLS articulation is a list of source/control/destination/scale connections. This is
@@ -520,33 +529,31 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }  // namespace
 
 SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sources) {
-  SynthExportResult result;
-
   // DLS accepts the decoded PCM view directly. After shared sample/instrument resolution,
   // this function is mostly RIFF table assembly.
-  auto samples = decodeSynthSamples(input.sampleCollections, sources, result.diagnostics);
+  auto [samples, instruments, diagnostics] = prepareSynthData(input, sources);
   for (auto& sample : samples) {
     sample.name = dlsName(std::move(sample.name), "Wave");
   }
-  const auto samplesByReference = synthSampleIndexMap(samples);
-  auto instruments =
-      resolveSynthInstruments(input.instrumentSets, input.sampleCollections, samplesByReference, result.diagnostics);
 
   if (samples.empty()) {
-    result.diagnostics.push_back(exportError("No decodable samples available for DLS export"));
-    return result;
+    diagnostics.push_back(exportError("No decodable samples available for DLS export"));
+    return SynthExportResult{.diagnostics = std::move(diagnostics)};
   }
 
   auto waves = waveChunks(samples);
-  result.bytes = makeRiff("DLS ", {
-                                      colhChunk(instruments),
-                                      linsList(instruments, samples, input.midiModulationUsage, input.modulationScaling,
-                                               input.modulationConversion),
-                                      ptblChunk(waves),
-                                      makeListChunk("wvpl", std::move(waves)),
-                                      infoList(dlsName(input.name, "DLS")),
-                                  });
-  return result;
+  return SynthExportResult{
+      .bytes = makeRiff("DLS ",
+                        {
+                            colhChunk(instruments),
+                            linsList(instruments, samples, input.midiModulationUsage, input.modulationScaling,
+                                     input.modulationConversion),
+                            ptblChunk(waves),
+                            makeListChunk("wvpl", std::move(waves)),
+                            infoList(dlsName(input.name, "DLS")),
+                        }),
+      .diagnostics = std::move(diagnostics),
+  };
 }
 
 }  // namespace vgmtrans::core

@@ -114,31 +114,6 @@ void physicalModulationLowersToLegacySynthControls() {
       "physical vibrato and no-boost tremolo should preserve the legacy synth modulator records");
 }
 
-void synthEffectiveLoopExpandsEnabledZeroLengthLoop() {
-  const DecodedSynthSample sample{
-      .collectionId = AssetId{1},
-      .decoded =
-          DecodedSample{
-              .channels = 1,
-              .pcm = std::vector<s16>(16),
-              .loop = Loop{.enabled = true, .start = 4, .length = 0},
-          },
-  };
-
-  const Loop sampleLoop = effectiveRegionLoop(Region{}, sample);
-  expect(sampleLoop.enabled, "enabled zero-length sample loop should remain enabled");
-  expect(sampleLoop.start == 4, "effective sample loop should preserve loop start");
-  expect(sampleLoop.length == 12, "effective sample loop should extend to sample end");
-
-  const Region region{
-      .loop = Loop{.enabled = true, .start = 2, .length = 0},
-  };
-  const Loop regionLoop = effectiveRegionLoop(region, sample);
-  expect(regionLoop.enabled, "enabled zero-length region loop should remain enabled");
-  expect(regionLoop.start == 2, "effective region loop should preserve loop start");
-  expect(regionLoop.length == 14, "effective region loop should extend to sample end");
-}
-
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -333,7 +308,7 @@ void dlsExporterWritesDlsRiffFile() {
                   .codec = AudioCodec::SnesBrr,
                   .encodedData = SourceRange{.source = sourceId, .offset = 0, .size = 9},
                   .sampleRate = 16000,
-                  .loop = Loop{.enabled = true, .start = 0, .length = 16},
+                  .loop = Loop{.enabled = true, .start = 0, .length = 0},
               }},
           },
   };
@@ -345,7 +320,7 @@ void dlsExporterWritesDlsRiffFile() {
               .name = "Probe Instruments",
           },
       .instruments = {Instrument{
-          .explicitAddress = InstrumentAddress{.bank = 1, .program = 5},
+          .identity = InstrumentIdentity{.domain = "probe.instrument", .key = 133},
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
@@ -417,6 +392,12 @@ void dlsExporterWritesDlsRiffFile() {
   expect(chunkSize(result.bytes, "colh") == 4, "DLS colh chunk should store one u32 count");
   expect(chunkSize(result.bytes, "ptbl") == 12, "DLS ptbl chunk should include one pool cue");
   expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
+  const size_t instrumentHeader = asciiOffset(result.bytes, "insh");
+  expect(readLe32(result.bytes, instrumentHeader + 12) == 0x100 && readLe32(result.bytes, instrumentHeader + 16) == 5,
+         "DLS export should assign preset addressing from the neutral source identity");
+  const size_t sampleMetadata = asciiOffset(result.bytes, "wsmp");
+  expect(readLe32(result.bytes, sampleMetadata + 40) == 16,
+         "DLS export should extend an enabled zero-length loop to the end of the sample");
   expect(chunkSize(result.bytes, "art2") == 188,
          "DLS art2 chunk should include pan, envelope, generator, and modulator connections");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0206, 0),
@@ -606,29 +587,6 @@ void exportDiagnosticsPreserveSourceRanges() {
   expectDiagnosticRange(dlsBadRegion.diagnostics, "Region sample reference was not found", regionRange);
 }
 
-void synthExportAssignsPresetAddressFromSourceInstrumentIdentity() {
-  const SampleCollectionAsset samples{
-      .metadata = AssetMetadata{.id = AssetId{7}},
-  };
-  const InstrumentSetAsset instruments{
-      .instruments = {Instrument{
-          .identity = InstrumentIdentity{.domain = "probe.instrument", .key = 133},
-          .regions = {Region{
-              .sample = SampleRef{.collection = samples.metadata.id, .index = 0},
-          }},
-      }},
-  };
-  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instruments};
-  const std::array<const SampleCollectionAsset*, 1> sampleCollections{&samples};
-  const SynthSampleIndexMap sampleIndexes{{{samples.metadata.id.value, 0}, 0}};
-  std::vector<Diagnostic> diagnostics;
-
-  const auto resolved = resolveSynthInstruments(instrumentSets, sampleCollections, sampleIndexes, diagnostics);
-  expect(diagnostics.empty() && resolved.size() == 1, "source instrument fixture should resolve for synth export");
-  expect(resolved[0].address == InstrumentAddress{.bank = 1, .program = 5},
-         "synth lowering should assign preset addressing from the neutral source key");
-}
-
 void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "playback.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
@@ -742,12 +700,10 @@ void runValueSynthExportTests() {
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   envelopePredicateDetectsCanonicalData();
   physicalModulationLowersToLegacySynthControls();
-  synthEffectiveLoopExpandsEnabledZeroLengthLoop();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
   exportDiagnosticsPreserveSourceRanges();
-  synthExportAssignsPresetAddressFromSourceInstrumentIdentity();
   collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair();
 }
