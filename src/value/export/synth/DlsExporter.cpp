@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/export/synth/DlsExporter.h"
+#include "value/export/synth/SynthExportData.h"
 
 #include "value/export/BinaryWriter.h"
 #include "value/export/ExportDiagnostics.h"
@@ -519,7 +519,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 
 }  // namespace
 
-SynthExportResult DlsExporter::exportDls(const SynthExportInput& input, const SourceStore& sources) const {
+SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sources) {
   SynthExportResult result;
 
   // DLS accepts the decoded PCM view directly. After shared sample/instrument resolution,

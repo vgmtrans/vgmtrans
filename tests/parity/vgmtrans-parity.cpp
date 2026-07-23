@@ -3989,7 +3989,7 @@ int selfTest() {
       }},
   };
 
-  const auto midi = MidiExporter().exportMidi(midiSequence);
+  const auto midi = encodeMidiFile(midiSequence);
   const auto normalized = normalizeMidi(midi);
 
   expect(std::ranges::any_of(
@@ -4014,7 +4014,7 @@ int selfTest() {
   longerSequence.tracks[0].events.insert(longerSequence.tracks[0].events.end() - 1,
                                          ProgramChange{.tick = 60, .channel = 2, .program = 13});
   std::get<EndOfTrack>(longerSequence.tracks[0].events.back()).tick = 72;
-  const auto longerMidi = MidiExporter().exportMidi(longerSequence);
+  const auto longerMidi = encodeMidiFile(longerSequence);
   std::ostringstream exactHorizonOutput;
   expect(!compareMidi(longerMidi, midi, exactHorizonOutput),
          "self-test should detect events beyond the shorter play-once endpoint without a horizon");

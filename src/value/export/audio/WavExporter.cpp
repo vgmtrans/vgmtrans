@@ -21,7 +21,7 @@ namespace {
 
 }  // namespace
 
-std::vector<u8> WavExporter::exportPcm16(const DecodedSample& sample) const {
+std::vector<u8> encodePcm16Wav(const DecodedSample& sample) {
   // WAV export is intentionally minimal: decoded samples are already interleaved PCM16,
   // so this only writes a canonical RIFF/WAVE header and the sample payload.
   constexpr u16 bitsPerSample = 16;

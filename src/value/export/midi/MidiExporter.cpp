@@ -310,7 +310,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
 
 }  // namespace
 
-std::vector<u8> MidiExporter::exportMidi(const MidiSequence& sequence) const {
+std::vector<u8> encodeMidiFile(const MidiSequence& sequence) {
   std::vector<u8> bytes;
   writeAscii(bytes, "MThd");
   writeBe32(bytes, 6);

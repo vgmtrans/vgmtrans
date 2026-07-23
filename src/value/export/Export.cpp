@@ -6,10 +6,10 @@
 
 #include "value/export/Export.h"
 
-#include "value/export/synth/DlsExporter.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
+#include "value/export/synth/SynthExportData.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/scan/FormatRegistry.h"
 #include "value/synth/SampleDecoder.h"
@@ -17,7 +17,6 @@
 #include "value/base/Source.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
-#include "value/export/synth/SoundFontExporter.h"
 #include "value/export/audio/WavExporter.h"
 
 #include <algorithm>
@@ -206,7 +205,7 @@ struct MidiLoweringResult {
                                     .sequenceLoops = sequenceLoops,
                                 })
                          .render(sequence.program, *dialect);
-  auto midi = PerformanceMidiRenderer().render(performance, midiOptions, modulationConversion, instrumentSets);
+  auto midi = renderMidiSequence(performance, midiOptions, modulationConversion, instrumentSets);
   return MidiLoweringResult{
       .performance = std::move(performance),
       .sequence = std::move(midi),
@@ -268,7 +267,7 @@ struct MidiLoweringResult {
       applyMidiModulationScaling(midiSequence, usage, modulationScaling);
     }
   }
-  auto bytes = MidiExporter().exportMidi(midiSequence);
+  auto bytes = encodeMidiFile(midiSequence);
 
   return Artifact{
       .filename = std::string(baseName) + ".mid",
@@ -289,7 +288,6 @@ struct MidiLoweringResult {
 
   std::vector<Artifact> artifacts;
   auto decoders = SampleDecoderRegistry::withDefaultDecoders();
-  const WavExporter exporter;
   u32 sampleIndex = 0;
 
   for (const auto& diagnostic : prepared.diagnostics.sampleCollections) {
@@ -313,7 +311,7 @@ struct MidiLoweringResult {
           artifact.diagnostics.push_back(
               exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
         } else if (auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source))) {
-          artifact.bytes = exporter.exportPcm16(*decoded);
+          artifact.bytes = encodePcm16Wav(*decoded);
         } else {
           artifact.diagnostics.push_back(
               exportError("No decoder registered for sample codec", validDiagnosticRange(sample.encodedData)));
@@ -370,19 +368,16 @@ struct MidiLoweringResult {
                                         const ExportRequest& request, const MidiModulationUsage* midiModulation,
                                         ModulationConversionPolicy modulationConversion) {
   return synthArtifact(
-      prepared,
-      SoundFontExporter().exportSoundFont(synthExportInput(prepared, request, midiModulation, modulationConversion),
-                                          sources),
+      prepared, buildSoundFont2(synthExportInput(prepared, request, midiModulation, modulationConversion), sources),
       ".sf2", "audio/soundfont");
 }
 
 [[nodiscard]] Artifact exportDls(const PreparedExport& prepared, const SourceStore& sources,
                                  const ExportRequest& request, const MidiModulationUsage* midiModulation,
                                  ModulationConversionPolicy modulationConversion) {
-  return synthArtifact(
-      prepared,
-      DlsExporter().exportDls(synthExportInput(prepared, request, midiModulation, modulationConversion), sources),
-      ".dls", "audio/dls");
+  return synthArtifact(prepared,
+                       buildDls(synthExportInput(prepared, request, midiModulation, modulationConversion), sources),
+                       ".dls", "audio/dls");
 }
 
 Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId,

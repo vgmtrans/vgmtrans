@@ -504,7 +504,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::get<LevelPerformanceEvent>(*levelEvent).sourceQuantization &&
              std::get<LevelPerformanceEvent>(*levelEvent).sourceQuantization->levels == 256,
          "CapcomSnes volume should retain neutral source quantization rather than a MIDI bit width");
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midiSequence = renderMidiSequence(performance);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
   expect(midiSequence.tracks[0].events.size() == 15,
@@ -556,8 +556,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::get<ModulationPerformanceEvent>(*vibratoRate).frequencyHz == 1.953125,
          "CapcomSnes vibrato rate should retain the driver's physical LFO frequency");
 
-  const MidiSequence simulatedMidi = PerformanceMidiRenderer().render(
-      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence simulatedMidi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   expect(std::ranges::any_of(simulatedMidi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* bend = std::get_if<PitchBend>(&event);
@@ -575,7 +575,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(artifacts[0].filename == "Mega Man X.mid", "MIDI artifact should use collection name");
   expect(artifacts[0].mediaType == "audio/midi", "MIDI artifact should use audio/midi media type");
   expect(artifacts[0].diagnostics.empty(), "MIDI artifact should not carry diagnostics for linear fixture");
-  expect(artifacts[0].bytes == MidiExporter().exportMidi(midiSequence),
+  expect(artifacts[0].bytes == encodeMidiFile(midiSequence),
          "Session MIDI export should match direct builder/exporter output");
 
   const Artifact individualMidi =
@@ -1006,7 +1006,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
          "note-attribute annotation should carry a readable name");
 
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midiSequence = renderMidiSequence(performance);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes note-state emission should not report diagnostics");
   expect(!midiSequence.tracks.empty(), "CapcomSnes note-state emission should preserve tracks");
 
@@ -1151,7 +1151,7 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   expect(performancePan != nullptr && performancePan->rightGain > performancePan->leftGain,
          "CapcomSnes pan performance should retain the source engine's stereo balance");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   expect(midi.tracks[0].events.size() == 6,
          "CapcomSnes compensated pan should render port, initial defaults, pan, expression, and end");
   expect(std::get<Pan>(midi.tracks[0].events[3]).value == 113,
@@ -1236,7 +1236,7 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
          "CapcomSnes source-only fixture should still reach the later note");
   expect(performance.tracks[0].endTick == 6, "CapcomSnes source-only fixture should advance through the later note");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   expect(std::holds_alternative<FineTune>(midi.tracks[0].events[3]),
          "CapcomSnes tuning performance should render as MIDI fine tuning");
   expect(std::holds_alternative<MasterVolume>(midi.tracks[0].events[4]),
@@ -1275,7 +1275,7 @@ void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey() {
   expect(portamento != nullptr && portamento->timeMilliseconds == 160.0 && portamento->previousKey == 0.0,
          "CapcomSnes portamento should use source-key distance and previous source key");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[3]),
          "CapcomSnes portamento fixture should render the first note");
   expect(std::get<PortamentoTime14>(midi.tracks[0].events[4]).value == 160,

@@ -417,7 +417,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 30,
          "NDS note-wait should make notes advance time before the rest command");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   expect(midi.tracks.size() == 1, "NDS SSEQ MIDI rendering should preserve one track");
   const auto& events = midi.tracks[0].events;
   expect(std::get<MidiPort>(events[0]).port == 0, "NDS SSEQ MIDI rendering should emit MIDI port metadata");
@@ -489,7 +489,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
       .tracks = {expressionTrack},
   };
   const MidiSequence expressionMidi =
-      PerformanceMidiRenderer().render(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram, dialect));
+      renderMidiSequence(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram, dialect));
   expect(std::holds_alternative<Expression>(expressionMidi.tracks[0].events[1]),
          "NDS expression opcode should render as MIDI expression");
 }

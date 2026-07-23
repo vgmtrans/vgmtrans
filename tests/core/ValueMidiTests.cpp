@@ -37,7 +37,7 @@ void midiExporterWritesStandardMidiFile() {
       0x3c, 0x64, 0x0c, 0xb0, 0x0a, 0x40, 0x0c, 0x80, 0x3c, 0x40, 0x00, 0xff, 0x2f, 0x00,
   };
 
-  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const auto exported = encodeMidiFile(midiSequence);
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
 }
 
@@ -54,7 +54,7 @@ void midiExporterKeeps14BitControllerPairsAdjacent() {
       }},
   };
 
-  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const auto exported = encodeMidiFile(midiSequence);
   const std::vector<u8> expectedOrder{
       0x00, 0xb0, 0x07, 0x24, 0x00, 0xb0, 0x27, 0x34, 0x00, 0xb0, 0x0a, 0x40,
   };
@@ -77,7 +77,7 @@ void midiExporterOrdersFineTuneBeforeSameTickProgramChange() {
       }},
   };
 
-  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const auto exported = encodeMidiFile(midiSequence);
   const std::vector<u8> expectedOrder{
       0x00, 0xb2, 0x65, 0x00, 0x00, 0xb2, 0x64, 0x01, 0x00, 0xb2, 0x06, 0x22,
       0x00, 0xb2, 0x26, 0x00, 0x00, 0xb2, 0x00, 0x00, 0x00, 0xc2, 0x09,
@@ -103,7 +103,7 @@ void midiExporterKeepsSameTickBankProgramPairsAdjacent() {
       }},
   };
 
-  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const auto exported = encodeMidiFile(midiSequence);
   const std::vector<u8> expectedOrder{
       0x00, 0xb0, 0x00, 0x00, 0x00, 0xc0, 0x0d, 0x00, 0xb0, 0x00, 0x7f, 0x00, 0xc0, 0x00, 0x00, 0x90, 0x3c, 0x64,
   };
@@ -129,7 +129,7 @@ void midiExporterWritesTimeSignatureMetaEvent() {
       'k', 0x00, 0x00, 0x00, 0x0c, 0x00, 0xff, 0x58, 0x04, 0x03, 0x02, 0x30, 0x08, 0x00, 0xff, 0x2f, 0x00,
   };
 
-  expect(MidiExporter().exportMidi(midiSequence) == expected, "MIDI exporter should write time-signature meta events");
+  expect(encodeMidiFile(midiSequence) == expected, "MIDI exporter should write time-signature meta events");
 }
 
 void midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn() {
@@ -145,7 +145,7 @@ void midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn() {
       }},
   };
 
-  const auto exported = MidiExporter().exportMidi(midiSequence);
+  const auto exported = encodeMidiFile(midiSequence);
   const std::vector<u8> expectedOrder{
       0x0a, 0x80, 0x3c, 0x40, 0x00, 0x90, 0x3c, 0x64,
   };
@@ -202,7 +202,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
       }},
   };
 
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midiSequence = renderMidiSequence(performance);
   expect(midiSequence.tracks.size() == 1, "performance renderer should preserve tracks");
   const auto& events = midiSequence.tracks[0].events;
   expect(std::holds_alternative<MidiPort>(events[0]), "performance renderer should mark each track's MIDI port");
@@ -254,7 +254,7 @@ void performanceMidiRendererWritesTimeSignaturesToFirstTrack() {
           },
   };
 
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midiSequence = renderMidiSequence(performance);
   expect(midiSequence.tracks.size() == 2, "performance renderer should preserve source track count");
 
   const auto& firstTrackEvents = midiSequence.tracks[0].events;
@@ -292,7 +292,7 @@ void performanceMidiRendererWritesPanGainResetWhenRequested() {
       }},
   };
 
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midiSequence = renderMidiSequence(performance);
   const auto& events = midiSequence.tracks[0].events;
   expect(std::get<Pan>(events[1]).value == 0 && std::holds_alternative<Expression>(events[2]),
          "pan gain compensation should emit expression with the pan event");
@@ -334,7 +334,7 @@ void performanceMidiRendererCombinesExpressionWithPanGain() {
   };
 
   const auto expressionValues = [&](ModulationConversionPolicy policy) {
-    const MidiSequence midi = PerformanceMidiRenderer().render(performance, MidiExportOptions{}, policy);
+    const MidiSequence midi = renderMidiSequence(performance, MidiExportOptions{}, policy);
     std::vector<u8> values;
     for (const MidiEvent& event : midi.tracks[0].events) {
       if (const auto* expression = std::get_if<Expression>(&event)) {
@@ -353,7 +353,7 @@ void performanceMidiRendererCombinesExpressionWithPanGain() {
   PerformanceSequence precisePerformance = performance;
   std::get<ExpressionPerformanceEvent>(precisePerformance.tracks[0].events[0]).precisionHint =
       LevelPrecisionHint::FourteenBit;
-  const MidiSequence preciseMidi = PerformanceMidiRenderer().render(precisePerformance);
+  const MidiSequence preciseMidi = renderMidiSequence(precisePerformance);
   expect(std::count_if(preciseMidi.tracks[0].events.begin(), preciseMidi.tracks[0].events.end(),
                        [](const MidiEvent& event) { return std::holds_alternative<Expression14>(event); }) == 4,
          "pan compensation should preserve the source expression's precision");
@@ -398,7 +398,7 @@ void performanceMidiRendererHonorsMidiExportOptions() {
     });
   }
 
-  const MidiSequence autoMidi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence autoMidi = renderMidiSequence(performance);
   expect(std::get<MidiPort>(autoMidi.tracks[0].events[0]).port == 0,
          "MIDI renderer should emit port zero for the first channel group");
   expect(std::get<BankSelect>(autoMidi.tracks[0].events[1]).writeLsb == false,
@@ -414,12 +414,12 @@ void performanceMidiRendererHonorsMidiExportOptions() {
          "MIDI renderer should move skipped-channel overflow to the next MIDI port");
 
   const MidiSequence forcedMidi =
-      PerformanceMidiRenderer().render(performance, MidiExportOptions{
-                                                        .volumeResolution = MidiLevelResolution::SevenBit,
-                                                        .expressionResolution = MidiLevelResolution::SevenBit,
-                                                        .skipChannel10 = false,
-                                                        .bankSelectStyle = MidiBankSelectStyle::MsbAndLsb,
-                                                    });
+      renderMidiSequence(performance, MidiExportOptions{
+                                          .volumeResolution = MidiLevelResolution::SevenBit,
+                                          .expressionResolution = MidiLevelResolution::SevenBit,
+                                          .skipChannel10 = false,
+                                          .bankSelectStyle = MidiBankSelectStyle::MsbAndLsb,
+                                      });
   expect(std::get<BankSelect>(forcedMidi.tracks[0].events[1]).writeLsb == true,
          "MIDI renderer should allow bank-select LSB output");
   expect(std::holds_alternative<Volume>(forcedMidi.tracks[0].events[3]),
@@ -453,7 +453,7 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
 
   const MidiSequence midi =
-      PerformanceMidiRenderer().render(performance, {}, ModulationConversionPolicy::SynthModulators, instrumentSets);
+      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, instrumentSets);
   expect(std::get<BankSelect>(midi.tracks[0].events[1]).bank == 3 &&
              std::get<ProgramChange>(midi.tracks[0].events[2]).program == 9,
          "MIDI lowering should resolve source instrument identities through collection instruments");
@@ -484,7 +484,7 @@ void performanceMidiRendererQuantizesPitchBendAndPortamento() {
       }},
   };
 
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midiSequence = renderMidiSequence(performance);
   const auto& events = midiSequence.tracks[0].events;
   expect(std::get<PitchBendRange>(events[1]).cents == 400,
          "MIDI renderer should emit the performance pitch-bend range");
@@ -556,10 +556,10 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
     expect(pitchBends == expectedPitchBends, std::string(label) + " should skip repeated pitch bend values");
   };
 
-  assertPitchBends(PerformanceMidiRenderer().render(performance), "synth-modulator MIDI lowering");
-  assertPitchBends(PerformanceMidiRenderer().render(performance, MidiExportOptions{},
-                                                    ModulationConversionPolicy::SequenceEventSimulation),
-                   "sequence-event MIDI lowering");
+  assertPitchBends(renderMidiSequence(performance), "synth-modulator MIDI lowering");
+  assertPitchBends(
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation),
+      "sequence-event MIDI lowering");
 }
 
 void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
@@ -595,8 +595,8 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
       }},
   };
 
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(
-      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence midiSequence =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto& events = midiSequence.tracks[0].events;
 
   bool hasPreDelayNonzero = false;
@@ -665,8 +665,8 @@ void performanceMidiRendererDoesNotDoubleDelayVibrato() {
       }},
   };
 
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(
-      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence midiSequence =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
 
   std::vector<std::pair<u64, s16>> pitchBends;
   for (const MidiEvent& event : midiSequence.tracks[0].events) {
@@ -727,8 +727,8 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
       }},
   };
 
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(
-      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence midiSequence =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
 
   std::vector<std::pair<u64, s16>> pitchBends;
   for (const MidiEvent& event : midiSequence.tracks[0].events) {
@@ -794,8 +794,8 @@ void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
           },
   };
 
-  const MidiSequence midiSequence = PerformanceMidiRenderer().render(
-      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence midiSequence =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
 
   std::vector<std::pair<u64, u8>> expressions;
   for (const MidiEvent& event : midiSequence.tracks[1].events) {

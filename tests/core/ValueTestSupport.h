@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "value/export/synth/DlsExporter.h"
 #include "value/export/Export.h"
 #include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatModule.h"
@@ -20,7 +19,7 @@
 #include "value/synth/SampleDecoder.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
-#include "value/export/synth/SoundFontExporter.h"
+#include "value/export/synth/SynthExportData.h"
 #include "value/export/audio/WavExporter.h"
 
 #include <algorithm>
