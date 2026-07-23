@@ -64,7 +64,7 @@ QString valueText(const SourceField& field) {
             case SourceValueDisplay::Hex:
               return QStringLiteral("0x%1").arg(static_cast<qulonglong>(value), 0, 16);
             case SourceValueDisplay::Address:
-              return QStringLiteral("0x%1").arg(static_cast<qulonglong>(value), 8, 16, QLatin1Char('0'));
+              return QStringLiteral("0x%1").arg(static_cast<qulonglong>(value), 0, 16, QLatin1Char('0'));
             case SourceValueDisplay::Boolean:
               return value != 0 ? QStringLiteral("true") : QStringLiteral("false");
             case SourceValueDisplay::Percent:
@@ -209,8 +209,8 @@ QString description(const SourceAnnotation& annotation) {
     for (const auto& field : annotation.fields) {
       fields.push_back(QStringLiteral("%1: %2").arg(QString::fromStdString(field.name), valueText(field)));
     }
-    const QString fieldText = fields.join(QStringLiteral(" | "));
-    text = text.isEmpty() ? fieldText : QStringLiteral("%1 | %2").arg(text, fieldText);
+    const QString fieldText = fields.join(QStringLiteral(", "));
+    text = text.isEmpty() ? fieldText : QStringLiteral("%1, %2").arg(text, fieldText);
   }
   return text;
 }
