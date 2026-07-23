@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "value/export/midi/MidiModel.h"
 #include "value/sequence/PerformanceModel.h"
 
 #include <optional>
@@ -49,6 +48,5 @@ struct MidiModulationUsage {
 [[nodiscard]] bool hasMidiModulationUsage(const MidiTrackModulationUsage& usage) noexcept;
 [[nodiscard]] bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept;
 [[nodiscard]] MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence& sequence);
-[[nodiscard]] MidiModulationUsage analyzeMidiModulationUsage(const MidiSequence& sequence);
 
 }  // namespace vgmtrans::core

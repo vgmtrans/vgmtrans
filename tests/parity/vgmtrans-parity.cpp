@@ -874,8 +874,6 @@ std::map<std::string, CapcomSnesSummary> legacyCapcomSnesRsnSummaries(const std:
 CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const SourceStore& sources,
                                          const Collection& collection,
                                          std::span<const InstrumentSetAsset> preparedInstrumentSets = {}) {
-  const auto decoders = SampleDecoderRegistry::withDefaultDecoders();
-
   CapcomSnesSummary summary;
   std::map<u32, const SampleCollectionAsset*> sampleCollectionsById;
   std::optional<AssetId> fallbackSampleCollection;
@@ -900,7 +898,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
     sampleCollectionsById[sampleCollection->metadata.id.value] = sampleCollection;
     for (u32 i = 0; i < sampleCollection->samples.samples.size(); ++i) {
       const auto& sample = sampleCollection->samples.samples[i];
-      const auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source));
+      const auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source));
       expect(decoded.has_value(), "value sample summary expected decodable sample");
       summary.samples.push_back(SampleSummary{
           .index = i,
@@ -1210,8 +1208,11 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
   const auto artifacts = session.exportCollection(
       project.collections().front().id, ExportRequest{
                                             .kinds = {ExportKind::Midi},
-                                            .loopPolicy = LoopPolicy::PlayOnce,
-                                            .sequenceLoops = 0,
+                                            .sequence =
+                                                {
+                                                    .loopPolicy = LoopPolicy::PlayOnce,
+                                                    .sequenceLoops = 0,
+                                                },
                                             .modulationConversion = ModulationConversionPolicy::SynthModulators,
                                         });
 
@@ -1231,8 +1232,11 @@ std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
   const auto artifacts =
       session.exportCollection(collection, ExportRequest{
                                                .kinds = {ExportKind::Midi},
-                                               .loopPolicy = LoopPolicy::PlayOnce,
-                                               .sequenceLoops = 0,
+                                               .sequence =
+                                                   {
+                                                       .loopPolicy = LoopPolicy::PlayOnce,
+                                                       .sequenceLoops = 0,
+                                                   },
                                                .modulationConversion = ModulationConversionPolicy::SynthModulators,
                                            });
 
@@ -1852,9 +1856,12 @@ std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u
                                     ModulationScalingPolicy modulationScaling) {
   const auto artifacts = session.exportCollection(collection, ExportRequest{
                                                                   .kinds = {ExportKind::Midi},
-                                                                  .loopPolicy = LoopPolicy::PlayOnce,
-                                                                  .sequenceLoops = sequenceLoops,
-                                                                  .midi = midiOptions,
+                                                                  .sequence =
+                                                                      {
+                                                                          .loopPolicy = LoopPolicy::PlayOnce,
+                                                                          .sequenceLoops = sequenceLoops,
+                                                                          .midi = midiOptions,
+                                                                      },
                                                                   .modulationScaling = modulationScaling,
                                                                   .modulationConversion = modulationConversion,
                                                               });
@@ -4259,7 +4266,10 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
 
   const auto collectionExports = session.exportAllCollections(ExportRequest{
       .kinds = {ExportKind::Midi, ExportKind::SoundFont2, ExportKind::Dls, ExportKind::Wav},
-      .loopPolicy = LoopPolicy::PlayOnce,
+      .sequence =
+          {
+              .loopPolicy = LoopPolicy::PlayOnce,
+          },
   });
   if (collectionExports.size() != project.collections().size()) {
     std::cout << "value all-collection export count differs: collections=" << project.collections().size()

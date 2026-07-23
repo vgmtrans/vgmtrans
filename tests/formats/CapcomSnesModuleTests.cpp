@@ -568,7 +568,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto artifacts = session.exportCollection(
       project.collections()[0].id, ExportRequest{
                                        .kinds = {ExportKind::Midi},
-                                       .loopPolicy = LoopPolicy::PlayOnce,
+                                       .sequence =
+                                           {
+                                               .loopPolicy = LoopPolicy::PlayOnce,
+                                           },
                                        .modulationConversion = ModulationConversionPolicy::SynthModulators,
                                    });
   expect(artifacts.size() == 1, "value export should produce one MIDI artifact");
@@ -583,7 +586,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto contextualMidi = session.exportCollection(
       project.collections()[0].id, ExportRequest{
                                        .kinds = {ExportKind::Midi},
-                                       .loopPolicy = LoopPolicy::PlayOnce,
+                                       .sequence =
+                                           {
+                                               .loopPolicy = LoopPolicy::PlayOnce,
+                                           },
                                        .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
                                    });
   expect(contextualMidi.size() == 1 && individualMidi.bytes == contextualMidi[0].bytes,

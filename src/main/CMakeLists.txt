@@ -129,6 +129,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/synth/PsxAdpcm.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/PsxSpu.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h
     ${PROJECT_SOURCE_DIR}/src/value/synth/SynthBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.cpp
@@ -193,7 +194,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceMotion.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h
-      ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SynthBuilder.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.h
       ${PROJECT_SOURCE_DIR}/src/value/base/Source.h

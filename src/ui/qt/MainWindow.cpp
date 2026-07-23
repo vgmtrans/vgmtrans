@@ -307,15 +307,12 @@ QString diagnosticMessages(const std::vector<vgmtrans::core::Diagnostic>& diagno
   return messages.isEmpty() ? fallback : messages.join(QLatin1Char('\n'));
 }
 
-template <typename Request>
-void applySequenceExportSettings(Request& request) {
-  request.sequenceLoops = static_cast<u32>(
-      Settings::the()->conversion.numSequenceLoops());
-  request.midi.skipChannel10 = Settings::the()->conversion.skipChannel10();
-  request.midi.bankSelectStyle =
-      Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
-          ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
-          : vgmtrans::core::MidiBankSelectStyle::MsbOnly;
+void applySequenceExportSettings(vgmtrans::core::SequenceRenderOptions& options) {
+  options.sequenceLoops = static_cast<u32>(Settings::the()->conversion.numSequenceLoops());
+  options.midi.skipChannel10 = Settings::the()->conversion.skipChannel10();
+  options.midi.bankSelectStyle = Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
+                                     ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
+                                     : vgmtrans::core::MidiBankSelectStyle::MsbOnly;
 }
 }  // namespace
 
@@ -739,7 +736,7 @@ void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::S
   }
 
   vgmtrans::core::ExportRequest request;
-  applySequenceExportSettings(request);
+  applySequenceExportSettings(request.sequence);
   const bool soundFont = format == vgmtrans::core::SynthExportFormat::SoundFont2;
   try {
     saveArtifact(index,
@@ -955,7 +952,7 @@ void MainWindow::routeSignals() {
     if (directory.empty()) {
       return;
     }
-    applySequenceExportSettings(request);
+    applySequenceExportSettings(request.sequence);
 
     const auto collection = vgmtrans::core::CollectionId{
         current.data(vgmtrans::ui::IdRole).toUInt()};

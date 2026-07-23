@@ -8,9 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <type_traits>
 #include <utility>
-#include <variant>
 
 namespace vgmtrans::core {
 
@@ -78,10 +76,6 @@ void observePerformanceModulation(MidiTrackModulationUsage& usage, const Modulat
   }
 }
 
-[[nodiscard]] double normalizedControllerAmount(u8 value, const std::optional<double>& normalizedAmount) {
-  return normalizedAmount.value_or(static_cast<double>(value) / 127.0);
-}
-
 void mergeTrackUsage(MidiModulationUsage& result, const MidiTrackModulationUsage& trackUsage) {
   merge(result.vibratoDepth, trackUsage.vibratoDepth);
   merge(result.vibratoRate, trackUsage.vibratoRate);
@@ -119,44 +113,6 @@ MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence&
       if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
         observePerformanceModulation(trackUsage, *modulation);
       }
-    }
-
-    mergeTrackUsage(result, trackUsage);
-    result.tracks.push_back(std::move(trackUsage));
-  }
-
-  return result;
-}
-
-MidiModulationUsage analyzeMidiModulationUsage(const MidiSequence& sequence) {
-  MidiModulationUsage result;
-  result.tracks.reserve(sequence.tracks.size());
-
-  for (u32 trackIndex = 0; trackIndex < sequence.tracks.size(); ++trackIndex) {
-    const auto& track = sequence.tracks[trackIndex];
-    MidiTrackModulationUsage trackUsage{
-        .trackIndex = trackIndex,
-    };
-
-    for (const auto& event : track.events) {
-      std::visit(
-          [&](const auto& typedEvent) {
-            using TypedEvent = std::decay_t<decltype(typedEvent)>;
-            if constexpr (std::is_same_v<TypedEvent, VibratoDepth>) {
-              const double normalized = normalizedControllerAmount(typedEvent.value, typedEvent.normalizedAmount);
-              observe(trackUsage.vibratoDepth, typedEvent.value, normalized, normalized, SourceRange{});
-            } else if constexpr (std::is_same_v<TypedEvent, VibratoFrequency>) {
-              const double normalized = normalizedControllerAmount(typedEvent.value, typedEvent.normalizedAmount);
-              observe(trackUsage.vibratoRate, typedEvent.value, normalized, normalized, SourceRange{});
-            } else if constexpr (std::is_same_v<TypedEvent, TremoloDepth>) {
-              const double normalized = normalizedControllerAmount(typedEvent.value, typedEvent.normalizedAmount);
-              observe(trackUsage.tremoloDepth, typedEvent.value, normalized, normalized, SourceRange{});
-            } else if constexpr (std::is_same_v<TypedEvent, TremoloFrequency>) {
-              const double normalized = normalizedControllerAmount(typedEvent.value, typedEvent.normalizedAmount);
-              observe(trackUsage.tremoloRate, typedEvent.value, normalized, normalized, SourceRange{});
-            }
-          },
-          event);
     }
 
     mergeTrackUsage(result, trackUsage);

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/export/midi/MidiModel.h"
 #include "value/export/midi/ModulationAnalysis.h"
 #include "value/synth/SynthModel.h"
 #include "value/export/ExportPolicy.h"

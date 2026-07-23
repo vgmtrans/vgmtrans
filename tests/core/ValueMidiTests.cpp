@@ -816,7 +816,8 @@ void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
 }
 
 void exportRequestSequenceLoopsAffectMidiLowering() {
-  expect(ExportRequest{}.sequenceLoops == 1, "the user-facing export request should default to one sequence loop");
+  expect(ExportRequest{}.sequence.sequenceLoops == 1,
+         "the user-facing export request should default to one sequence loop");
 
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -859,8 +860,11 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   const auto artifacts = exportCollection(project, sources, CollectionId{0},
                                           ExportRequest{
                                               .kinds = {ExportKind::Midi},
-                                              .loopPolicy = LoopPolicy::PlayOnce,
-                                              .sequenceLoops = 2,
+                                              .sequence =
+                                                  {
+                                                      .loopPolicy = LoopPolicy::PlayOnce,
+                                                      .sequenceLoops = 2,
+                                                  },
                                           },
                                           dialects);
 
@@ -915,53 +919,7 @@ void standaloneSequenceExportDoesNotRequireACollection() {
          "standalone sequence export should produce a Standard MIDI file");
 }
 
-void modulationAnalysisReportsObservedMidiControllerRanges() {
-  const MidiSequence midiSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks =
-          {
-              MidiTrack{
-                  .name = "Lead",
-                  .events =
-                      {
-                          VibratoDepth{.tick = 0, .channel = 0, .value = 0},
-                          VibratoDepth{.tick = 12, .channel = 0, .value = 82},
-                          VibratoFrequency{.tick = 12, .channel = 0, .value = 17},
-                          TremoloDepth{.tick = 24, .channel = 0, .value = 40},
-                          TremoloFrequency{.tick = 24, .channel = 0, .value = 5},
-                      },
-              },
-              MidiTrack{
-                  .name = "Pad",
-                  .events =
-                      {
-                          VibratoFrequency{.tick = 0, .channel = 1, .value = 29},
-                          TremoloFrequency{.tick = 0, .channel = 1, .value = 9},
-                      },
-              },
-          },
-  };
-
-  const auto usage = analyzeMidiModulationUsage(midiSequence);
-  expect(hasMidiModulationUsage(usage), "MIDI modulation analysis should report observed controller modulation");
-  expect(usage.tracks.size() == 2, "MIDI modulation analysis should preserve track-level results");
-  expect(usage.vibratoDepth.observed && usage.vibratoDepth.min == 0 && usage.vibratoDepth.max == 82,
-         "MIDI modulation analysis should report global vibrato depth controller range");
-  expect(usage.vibratoRate.observed && usage.vibratoRate.min == 17 && usage.vibratoRate.max == 29,
-         "MIDI modulation analysis should report global vibrato rate controller range");
-  expect(usage.tremoloDepth.observed && usage.tremoloDepth.min == 40 && usage.tremoloDepth.max == 40,
-         "MIDI modulation analysis should report global tremolo depth controller range");
-  expect(usage.tremoloRate.observed && usage.tremoloRate.min == 5 && usage.tremoloRate.max == 9,
-         "MIDI modulation analysis should report global tremolo rate controller range");
-  expect(usage.tracks[0].trackIndex == 0 && usage.tracks[0].vibratoDepth.max == 82 &&
-             usage.tracks[0].vibratoRate.max == 17,
-         "MIDI modulation analysis should keep first track modulation ranges separate");
-  expect(usage.tracks[1].trackIndex == 1 && !usage.tracks[1].vibratoDepth.observed &&
-             usage.tracks[1].vibratoRate.max == 29,
-         "MIDI modulation analysis should keep second track modulation ranges separate");
-}
-
-void modulationAnalysisReportsObservedPerformanceRanges() {
+PerformanceSequence observedModulationPerformance() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
       .tracks =
@@ -1017,8 +975,11 @@ void modulationAnalysisReportsObservedPerformanceRanges() {
               },
           },
   };
+  return performance;
+}
 
-  const auto usage = analyzePerformanceModulationUsage(performance);
+void modulationAnalysisReportsObservedPerformanceRanges() {
+  const auto usage = analyzePerformanceModulationUsage(observedModulationPerformance());
   expect(hasMidiModulationUsage(usage), "performance modulation analysis should report observed driver modulation");
   expect(usage.tracks.size() == 2, "performance modulation analysis should preserve track-level results");
   expect(usage.vibratoDepth.observed && usage.vibratoDepth.min == 0 && usage.vibratoDepth.max == 82,
@@ -1065,7 +1026,7 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
           },
   };
 
-  const auto usage = analyzeMidiModulationUsage(midiSequence);
+  const auto usage = analyzePerformanceModulationUsage(observedModulationPerformance());
   expect(scaledMidiModulationControllerValue(41, &usage.vibratoDepth, ModulationScalingPolicy::FullFormatRange) == 41,
          "full-range modulation scaling should leave MIDI controller values unchanged");
 
@@ -1103,6 +1064,23 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
 }
 
 void observedModulationScalingUsesPreciseNormalizedAmounts() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .events =
+              {
+                  ModulationPerformanceEvent{
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .amount = 0.006862745098,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 12},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .amount = 0.015686274510,
+                  },
+              },
+      }},
+  };
   MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {MidiTrack{
@@ -1114,7 +1092,7 @@ void observedModulationScalingUsesPreciseNormalizedAmounts() {
       }},
   };
 
-  const auto usage = analyzeMidiModulationUsage(midiSequence);
+  const auto usage = analyzePerformanceModulationUsage(performance);
   applyMidiModulationScaling(midiSequence, usage, ModulationScalingPolicy::ObservedSequenceRange);
 
   const auto& events = midiSequence.tracks[0].events;
@@ -1147,7 +1125,6 @@ void runValueMidiTests() {
   performanceMidiRendererSimulatesTremoloUsingGlobalTempo();
   exportRequestSequenceLoopsAffectMidiLowering();
   standaloneSequenceExportDoesNotRequireACollection();
-  modulationAnalysisReportsObservedMidiControllerRanges();
   modulationAnalysisReportsObservedPerformanceRanges();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
   observedModulationScalingUsesPreciseNormalizedAmounts();

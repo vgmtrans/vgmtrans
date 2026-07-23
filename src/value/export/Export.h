@@ -16,12 +16,6 @@ class FormatRegistry;
 class SessionSnapshot;
 class SourceStore;
 
-struct PlaybackRequest {
-  LoopPolicy loopPolicy = LoopPolicy::Default;
-  u32 sequenceLoops = 1;
-  MidiExportOptions midi;
-};
-
 // Standard MIDI and SoundFont data prepared from one rendered performance.
 // The retained performance supplies the source timeline used by inspectors.
 struct CollectionPlayback {
