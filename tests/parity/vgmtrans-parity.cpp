@@ -1520,7 +1520,7 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
       diagnostics << "value preparation diagnostic: " << diagnostic.message << "\n";
     }
     const auto detailed =
-        valueCapcomSnesSummary(project, session.sources(), collection, prepared.instrumentSets);
+        valueCapcomSnesSummary(project, session.sources(), collection, prepared.replacementInstrumentSets);
     shape.sampleCount = static_cast<u32>(detailed.samples.size());
     shape.samples = detailed.samples;
     for (auto& sample : shape.samples) {
