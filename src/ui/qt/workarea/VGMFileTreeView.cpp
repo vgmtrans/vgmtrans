@@ -6,6 +6,7 @@
 
 #include "VGMFileTreeView.h"
 
+#include "CapsuleText.h"
 #include "ColorHelpers.h"
 #include "hexview/HexViewInput.h"
 #include "Metrics.h"
@@ -13,19 +14,29 @@
 #include "value/model/SourceInspection.h"
 #include "workarea/SourceInspectorPresentation.h"
 
-#include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QCheckBox>
+#include <QFontMetrics>
 #include <QHeaderView>
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QScrollBar>
 #include <QSignalBlocker>
 #include <QStyledItemDelegate>
-#include <QTextDocument>
 
+#include <algorithm>
 #include <utility>
 
 namespace {
+
+enum ItemDataRole {
+  DescriptionRole = Qt::UserRole,
+  RangeRole,
+  ShowDetailsRole,
+};
+
+constexpr int treeTextMargin = 4;
 
 class VGMFileTreeHeaderView final : public QHeaderView {
 public:
@@ -118,37 +129,85 @@ QColor selectedTreeTextColor(const QStyleOptionViewItem& option) {
 void VGMTreeDisplayItem::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const {
   QStyleOptionViewItem paintOption = option;
   initStyleOption(&paintOption, index);
+  const bool showDetails = index.data(ShowDetailsRole).toBool();
   QStyle* style = paintOption.widget ? paintOption.widget->style() : QApplication::style();
-
-  QTextDocument document;
-  document.setHtml(paintOption.text);
-  QAbstractTextDocumentLayout::PaintContext textContext;
-  textContext.palette = paintOption.palette;
-  if (paintOption.state.testFlag(QStyle::State_Selected)) {
-    const QColor textColor = selectedTreeTextColor(paintOption);
-    textContext.palette.setColor(QPalette::Text, textColor);
-    textContext.palette.setColor(QPalette::WindowText, textColor);
-    textContext.palette.setColor(QPalette::ButtonText, textColor);
-    textContext.palette.setColor(QPalette::HighlightedText, textColor);
-  }
-
+  const QString label = paintOption.text;
   paintOption.text.clear();
   style->drawControl(QStyle::CE_ItemViewItem, &paintOption, painter, paintOption.widget);
   const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &paintOption);
+  const QRect contentRect = textRect.adjusted(treeTextMargin, treeTextMargin,
+                                              -treeTextMargin, -treeTextMargin);
+
+  const QColor textColor = paintOption.state.testFlag(QStyle::State_Selected)
+                               ? selectedTreeTextColor(paintOption)
+                               : paintOption.palette.color(QPalette::Text);
+  QFont labelFont = paintOption.font;
+  labelFont.setBold(showDetails);
+  const QFontMetrics labelMetrics(labelFont);
+
+  int y = contentRect.top();
   painter->save();
-  painter->translate(textRect.topLeft());
-  textContext.clip = textRect.translated(-textRect.topLeft());
-  document.documentLayout()->draw(painter, textContext);
+  painter->setClipRect(textRect);
+  painter->setPen(textColor);
+  painter->setFont(labelFont);
+  painter->drawText(QRect(contentRect.left(), y, contentRect.width(), labelMetrics.height()),
+                    Qt::AlignLeft | Qt::AlignVCenter, label);
+  if (!showDetails) {
+    painter->restore();
+    return;
+  }
+
+  const QFontMetrics detailMetrics(paintOption.font);
+  const CapsuleText description = index.data(DescriptionRole).value<CapsuleText>();
+  const int descriptionHeight = CapsuleTextLayout::heightForWidth(
+      description, paintOption.font, contentRect.width(), true);
+  y += labelMetrics.height();
+  if (descriptionHeight > 0) {
+    painter->setFont(paintOption.font);
+    CapsuleTextLayout::paint(
+        *painter, QRect(contentRect.left(), y + 1, contentRect.width(), descriptionHeight),
+        description, paintOption.palette, textColor, true);
+    y += descriptionHeight + 2;
+  }
+  painter->setFont(paintOption.font);
+  painter->setPen(textColor);
+  painter->drawText(QRect(contentRect.left(), y, contentRect.width(), detailMetrics.height()),
+                    Qt::AlignLeft | Qt::AlignVCenter, index.data(RangeRole).toString());
   painter->restore();
 }
 
 QSize VGMTreeDisplayItem::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const {
   QStyleOptionViewItem styleOption = option;
   initStyleOption(&styleOption, index);
-  QTextDocument document;
-  document.setHtml(styleOption.text);
-  document.setTextWidth(styleOption.rect.width());
-  return QSize(document.idealWidth(), document.size().height());
+  const QSize baseSize = QStyledItemDelegate::sizeHint(styleOption, index);
+  const bool showDetails = index.data(ShowDetailsRole).toBool();
+  QStyle* style = styleOption.widget ? styleOption.widget->style() : QApplication::style();
+  int itemWidth = styleOption.rect.width();
+  if (itemWidth <= 0 && styleOption.widget != nullptr) {
+    itemWidth = styleOption.widget->width();
+  }
+  styleOption.rect = QRect(0, 0, std::max(1, itemWidth), 1000);
+  styleOption.text.clear();
+  const int textWidth =
+      std::max(1, style->subElementRect(QStyle::SE_ItemViewItemText, &styleOption).width());
+  const int contentWidth = std::max(1, textWidth - (treeTextMargin * 2));
+
+  QFont labelFont = styleOption.font;
+  labelFont.setBold(showDetails);
+  const int labelHeight = QFontMetrics(labelFont).height();
+  if (!showDetails) {
+    return QSize(baseSize.width(),
+                 std::max(baseSize.height(), labelHeight + (treeTextMargin * 2)));
+  }
+
+  const QFontMetrics detailMetrics(styleOption.font);
+  const int descriptionHeight = CapsuleTextLayout::heightForWidth(
+      index.data(DescriptionRole).value<CapsuleText>(), styleOption.font, contentWidth, true);
+  const int spacing = descriptionHeight > 0 ? 2 : 0;
+  return QSize(baseSize.width(),
+               std::max(baseSize.height(),
+                        labelHeight + descriptionHeight + spacing + detailMetrics.height() +
+                            (treeTextMargin * 2)));
 }
 
 VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection, QWidget* parent)
@@ -299,10 +358,16 @@ void VGMFileTreeView::setItemText(QTreeWidgetItem* item) const {
   if (annotation == nullptr) {
     return;
   }
-  const QString description = SourceInspectorPresentation::description(*annotation);
-  item->setText(0, SourceInspectorPresentation::treeText(*annotation, showDetails_, description));
+  const CapsuleText description = SourceInspectorPresentation::description(*annotation);
+  item->setText(0, QString::fromStdString(annotation->label));
+  item->setData(0, DescriptionRole, QVariant::fromValue(description));
+  item->setData(0, RangeRole,
+                QStringLiteral("Offset: 0x%1 | Length: 0x%2")
+                    .arg(annotation->range.offset, 0, 16)
+                    .arg(annotation->range.size, 0, 16));
+  item->setData(0, ShowDetailsRole, showDetails_);
   item->setIcon(0, SourceInspectorPresentation::icon(*annotation));
-  item->setToolTip(0, description);
+  item->setToolTip(0, description.plainText());
 }
 
 void VGMFileTreeView::onShowDetailsChanged(bool show) {
@@ -320,7 +385,7 @@ void VGMFileTreeView::updateItemTextRecursively(QTreeWidgetItem* item) {
     return;
   }
   if (item->type() == VGMTreeItem::ItemType) {
-    setItemText(item);
+    item->setData(0, ShowDetailsRole, showDetails_);
   }
   for (int index = 0; index < item->childCount(); ++index) {
     updateItemTextRecursively(item->child(index));

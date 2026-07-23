@@ -7,6 +7,7 @@
 #pragma once
 
 #include "PlaybackPosition.h"
+#include "util/CapsuleText.h"
 #include "value/model/SourceInspection.h"
 #include "value/sequence/PerformanceModel.h"
 
@@ -34,7 +35,8 @@ public:
   [[nodiscard]] vgmtrans::core::AssetId asset() const noexcept { return inspection_->asset(); }
 
 signals:
-  void statusChanged(const QString& name, const QString& description, const QIcon& icon, int offset, int size);
+  void statusChanged(const QString& name, const CapsuleText& description, const QIcon& icon,
+                     int offset, int size);
   // Inspector interactions stay source-ID based; the playback timeline resolves
   // seek requests to ticks without introducing a model adapter.
   void seekToAnnotationRequested(vgmtrans::core::SourceAnnotationId annotation);

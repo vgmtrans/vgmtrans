@@ -61,6 +61,7 @@ target_sources(vgmtrans
     MenuBar.cpp
     main_ui.cpp
     services/Settings.cpp
+    util/CapsuleText.cpp
     util/ColorHelpers.cpp
     util/ExternalUrl.cpp
     util/InstructionHintLayout.cpp
@@ -100,6 +101,7 @@ target_sources(vgmtrans
       MainWindowDockLayout.h
       MenuBar.h
       services/Settings.h
+      util/CapsuleText.h
       util/ColorHelpers.h
       util/ExternalUrl.h
       util/Colors.h

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "util/CapsuleText.h"
 #include "value/model/SourceMap.h"
 
 #include <QColor>
@@ -17,9 +18,7 @@ namespace SourceInspectorPresentation {
 [[nodiscard]] QColor color(const vgmtrans::core::SourceAnnotation& annotation);
 [[nodiscard]] QColor textColor(const vgmtrans::core::SourceAnnotation& annotation);
 [[nodiscard]] QIcon icon(const vgmtrans::core::SourceAnnotation& annotation);
-[[nodiscard]] QString description(const vgmtrans::core::SourceAnnotation& annotation);
-[[nodiscard]] QString treeText(const vgmtrans::core::SourceAnnotation& annotation, bool showDetails,
-                               const QString& description);
+[[nodiscard]] CapsuleText description(const vgmtrans::core::SourceAnnotation& annotation);
 [[nodiscard]] QString tooltipHtml(const vgmtrans::core::SourceAnnotation& annotation);
 
 }  // namespace SourceInspectorPresentation
