@@ -6,8 +6,12 @@
 
 #pragma once
 
+#include "util/CapsuleText.h"
+
 #include <QLabel>
 #include <QWidget>
+
+class CapsuleTextLabel;
 
 class StatusBarContent : public QWidget {
   Q_OBJECT
@@ -17,11 +21,15 @@ public:
 
 public slots:
   void setStatus(const QString& name, const QString& description, const QIcon* icon = nullptr, int offset = -1, int size = -1) const;
+  void setInspectorStatus(const QString& name, const CapsuleText& description,
+                          const QIcon* icon = nullptr, int offset = -1, int size = -1) const;
 
 private:
+  void setCommonStatus(const QString& name, const QIcon* icon, int offset, int size) const;
+
   QLabel* iconLabel;
   QLabel* nameLabel;
-  QLabel* descriptionLabel;
+  CapsuleTextLabel* descriptionLabel;
   QLabel* offsetLabel;
   QLabel* sizeLabel;
 };

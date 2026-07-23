@@ -259,38 +259,19 @@ QIcon icon(const SourceAnnotation& annotation) {
   return QIcon(new TintableSvgIconEngine(iconPath(annotation), color(annotation)));
 }
 
-QString description(const SourceAnnotation& annotation) {
-  QString text = QString::fromStdString(annotation.description);
+CapsuleText description(const SourceAnnotation& annotation) {
+  CapsuleText text{.prefix = QString::fromStdString(annotation.description)};
   if (!annotation.fields.empty()) {
-    QStringList fields;
-    fields.reserve(static_cast<qsizetype>(annotation.fields.size()));
+    text.capsules.reserve(static_cast<qsizetype>(annotation.fields.size()));
     for (const auto& field : annotation.fields) {
       if (annotation.role == SourceRole::Command && field.name == "opcode") {
         continue;
       }
-      fields.push_back(QStringLiteral("%1: %2").arg(fieldName(field.name), valueText(field)));
-    }
-    if (!fields.empty()) {
-      const QString fieldText = fields.join(QStringLiteral(", "));
-      text = text.isEmpty() ? fieldText : QStringLiteral("%1, %2").arg(text, fieldText);
+      text.capsules.push_back(
+          QStringLiteral("%1: %2").arg(fieldName(field.name), valueText(field)));
     }
   }
   return text;
-}
-
-QString treeText(const SourceAnnotation& annotation, bool showDetails, const QString& description) {
-  const QString name = escaped(QString::fromStdString(annotation.label));
-  if (!showDetails) {
-    return name;
-  }
-  const QString detail = escaped(description);
-  const QString range = QStringLiteral("Offset: 0x%1 | Length: 0x%2")
-                            .arg(annotation.range.offset, 0, 16)
-                            .arg(annotation.range.size, 0, 16);
-  if (detail.isEmpty()) {
-    return QStringLiteral("<b>%1</b><br>%2").arg(name, range);
-  }
-  return QStringLiteral("<b>%1</b><br>%2<br>%3").arg(name, detail, range);
 }
 
 QString tooltipHtml(const SourceAnnotation& annotation) {
@@ -306,7 +287,7 @@ QString tooltipHtml(const SourceAnnotation& annotation) {
   }
 
   const QString name = escaped(QString::fromStdString(annotation.label));
-  const QString detail = escaped(description(annotation));
+  const QString detail = escaped(description(annotation).plainText());
   QString body = QStringLiteral("<nobr><h3>%1</h3>%2</nobr>").arg(name, detail);
   if (!iconData.isEmpty()) {
     body = QStringLiteral("<table cellspacing=\"0\" cellpadding=\"0\"><tr>"

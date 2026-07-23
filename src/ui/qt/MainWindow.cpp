@@ -850,10 +850,10 @@ void MainWindow::routeSignals() {
             showToast(message, ToastType::Error, 15000);
           });
   connect(mdiArea, &MdiArea::inspectorStatusChanged, this,
-          [this](const QString& name, const QString& description, const QIcon& icon,
+          [this](const QString& name, const CapsuleText& description, const QIcon& icon,
                  int offset, int size) {
-            statusBarContent->setStatus(name, description, icon.isNull() ? nullptr : &icon,
-                                        offset, size);
+            statusBarContent->setInspectorStatus(
+                name, description, icon.isNull() ? nullptr : &icon, offset, size);
           });
 
   const auto synchronizeAssetSelection =

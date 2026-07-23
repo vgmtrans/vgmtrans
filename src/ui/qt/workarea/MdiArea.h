@@ -7,6 +7,7 @@
 #pragma once
 
 #include "PlaybackPosition.h"
+#include "util/CapsuleText.h"
 #include "value/base/CoreTypes.h"
 #include "value/sequence/PerformanceModel.h"
 
@@ -62,7 +63,7 @@ public slots:
 signals:
   void assetSelected(vgmtrans::core::AssetId asset, QWidget* caller);
   void hexViewAvailableChanged(bool available);
-  void inspectorStatusChanged(const QString& name, const QString& description,
+  void inspectorStatusChanged(const QString& name, const CapsuleText& description,
                               const QIcon& icon, int offset, int size);
   void playbackSeekRequested(int position, PositionChangeOrigin origin);
 
