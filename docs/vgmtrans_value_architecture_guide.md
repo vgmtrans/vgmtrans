@@ -16,12 +16,12 @@ Old style, roughly:
 
 New style:
   scanners produce data records
-  stores own those records
+  SessionState owns those records
   snapshots expose read-only copies
   shared engines render/export those records
 ```
 
-A format scanner no longer needs to create a web of live objects that know about each other. It emits values: a sequence, an instrument set, a sample collection, source annotations, match facts, diagnostics, and extracted child sources. The session commits those values, then later decides which values belong together.
+A format scanner no longer needs to create a web of live objects that know about each other. It emits values: a sequence, an instrument set, a sample collection, source annotations, match facts, diagnostics, and extracted child sources. The session validates and accepts those values, then later decides which values belong together.
 
 ---
 
@@ -136,7 +136,7 @@ The `src/value` directory is organized around architectural layers:
 | `sequence` | Parsed sequence programs, command cursor, bytecode walkers, sequence dialects, VM, performance events. |
 | `synth` | Target-neutral instrument, region, sample, envelope, loop, codec, and sample decoding model. |
 | `export` | Collection export to MIDI, SF2, DLS, and WAV. |
-| `validation` | Checks that scanner output and snapshots are internally consistent. |
+| `validation` | Checks sequence, synth, and scanner output before durable admission. |
 | `formats` | Ported format modules: Akao, Akao SNES, Capcom SNES, Konami SNES, and Nintendo DS. |
 | `extractors` | Source extractors such as PSF, SPC, and RSN that create derived sources. |
 
@@ -400,7 +400,7 @@ A scan receives:
 - a `ByteReader` over the source bytes;
 - the session ID allocator.
 
-The scanner does not receive mutable session stores. It cannot directly append assets to the session. It can only return a result.
+The scanner does not receive mutable session state. It cannot directly append assets to the session. It can only return a result.
 
 ### 10.2 `ScanResult`
 
@@ -413,7 +413,7 @@ A scan result can contain:
 - diagnostics;
 - extracted sources.
 
-This is a useful boundary: scanners can produce partial results and warnings, but the session decides whether the result is valid enough to commit.
+This is a useful boundary: scanners can produce partial results and warnings, but the session decides whether the result is valid enough to accept.
 
 ### 10.3 `ScanResultBuilder`
 
@@ -540,6 +540,13 @@ This keeps cross-vector invariants visible in one place and removes store-to-sto
 - diagnostics.
 
 It also builds indexes for fast asset and collection lookup by ID.
+
+Snapshot creation is a projection, not another validation boundary. `SessionState`
+already owns the invariants for admitted assets, annotations, diagnostics, and
+collections, so rebuilding the same checks while copying state would create two
+sources of truth. The raw constructor remains private. Tests that need a small
+synthetic export input use a fixture builder under `tests/`; production callers
+can only obtain snapshots from `Session`.
 
 UI and tests read explicit snapshots rather than mutable state. Export operations create one stable snapshot for the duration of the export. Internal collection rebuilding instead borrows a lightweight `MatchContext`, and source inspection selects annotations directly, so neither path builds and discards a complete snapshot.
 
@@ -986,11 +993,16 @@ Validation is split by boundary and model:
 - scan validation checks a normalized `ScanResult` before it enters `SessionState`;
 - sequence validation checks `SequenceProgram` structure;
 - synth validation checks instrument and sample model structure;
-- snapshot validation checks whole-session consistency.
+- collection reconciliation checks collection references against admitted assets.
 
-The validation result is a `ValidationReport`, which can be converted to diagnostics or can throw on errors.
+`ValidationReport` is a small accumulator over ordinary `Diagnostic` values. It
+adds composition and the scan-admission throwing policy without introducing a
+parallel validation-only error model.
 
-This is an important part of the value-oriented design. Since values can be created in many places, the system needs clear gates that verify they make sense before other layers rely on them.
+Snapshots do not run a second whole-session audit. They are read-only copies of
+state that has already crossed those gates. This keeps invariant ownership at
+the mutation boundary and prevents test-only invalid-snapshot construction from
+becoming production API.
 
 ---
 
@@ -1149,7 +1161,7 @@ Use explicit collections when the scanner already knows the grouping.
 
 Use match facts and a resolver when relationships may be discovered across multiple files or depend on incomplete evidence.
 
-Prefer durable symbolic references and transient export preparation when an asset depends on collection membership. Prepared values should not be inserted into session stores.
+Prefer durable symbolic references and transient export preparation when an asset depends on collection membership. Prepared values should not be inserted into `SessionState`.
 
 ### Step 3: Parse source structure
 
@@ -1201,7 +1213,7 @@ The parity executable keeps format policy in small `ParitySuite` descriptors and
 
 `CoreTypes` provides IDs, source ranges, ranged values, object references, severity, and diagnostics.
 
-The important design point is that these types are small and copyable. They are the shared language between scanners, stores, snapshots, source maps, validators, and exporters.
+The important design point is that these types are small and copyable. They are the shared language between scanners, session state, snapshots, source maps, validators, and exporters.
 
 ### 21.2 `SourceStore`
 
@@ -1277,7 +1289,7 @@ This model is the main bridge to future non-MIDI sequence outputs.
 
 ### 21.14 `SynthModel`
 
-`SynthModel` contains the durable neutral values. `SampleCollectionBuilder` and `InstrumentSetBuilder` are temporary authoring helpers around those values; they do not add a draft model or a combined synth lifecycle. Exceptional collection-specific values may be prepared transiently for export, but never enter the asset store.
+`SynthModel` contains the durable neutral values. `SampleCollectionBuilder` and `InstrumentSetBuilder` are temporary authoring helpers around those values; they do not add a draft model or a combined synth lifecycle. Exceptional collection-specific values may be prepared transiently for export, but never enter `SessionState`.
 
 `SynthModel` is the neutral instrument/sample layer. It represents instruments, regions, samples, envelopes, loops, tuning, physical modulation, and decoded PCM. Export preparation lowers standard modulation to raw generator/modulator records; the model retains custom records only as an escape hatch. `resolveInstrumentAddress` provides the one export-address policy shared by MIDI, SF2, and DLS.
 
@@ -1291,7 +1303,7 @@ The export layer is careful to share work. For example, if both MIDI and observe
 
 ### 21.16 `Validation`
 
-Validation checks values at the boundaries. The most important boundary is scan commit. A scanner can be generous and return diagnostics, but invalid durable references should be rejected before entering session stores.
+Validation checks values at the boundaries. The most important boundary is scan admission. A scanner can be generous and return diagnostics, but invalid durable references should be rejected before entering `SessionState`.
 
 ---
 
@@ -1302,7 +1314,7 @@ Validation checks values at the boundaries. The most important boundary is scan 
 The architecture makes ownership easy to state:
 
 - `SourceStore` owns bytes.
-- session stores own durable values.
+- `SessionState` owns durable discovered values.
 - snapshots own read-only copies.
 - exporters own temporary output data.
 - format scanners own only temporary parse state.

@@ -828,7 +828,7 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeJumpCommand>(trackBuilder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
-  SessionSnapshotBuilder snapshotBuilder;
+  SessionSnapshotTestBuilder snapshotBuilder;
   snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
       .metadata =
           AssetMetadata{
@@ -881,7 +881,7 @@ void standaloneSequenceExportDoesNotRequireACollection() {
   addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
-  SessionSnapshotBuilder snapshotBuilder;
+  SessionSnapshotTestBuilder snapshotBuilder;
   snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
       .metadata =
           AssetMetadata{

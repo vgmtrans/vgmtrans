@@ -17,8 +17,8 @@
 
 namespace vgmtrans::core {
 
-// Hands out session-unique IDs while scanners build value
-// objects before commit. reserveAfter() keeps generated IDs ahead of explicit
+// Hands out session-unique IDs while scanners build values before admission.
+// reserveAfter() keeps generated IDs ahead of explicit
 // IDs that formats reserve for cross-references.
 class ScanIdAllocator {
 public:

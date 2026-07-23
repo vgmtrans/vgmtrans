@@ -20,8 +20,9 @@
 
 namespace vgmtrans::core {
 
-// Copyable view of the current Session state. UI, tests, and export read this
-// snapshot; Session owns the mutable stores.
+namespace detail {
+class SessionSnapshotAccess;
+}
 
 struct MiscAsset {
   AssetMetadata metadata;
@@ -45,10 +46,8 @@ struct Collection {
   std::vector<CollectionIssue> issues;
 };
 
-class SessionSnapshotBuilder;
-
 // Copyable read-only view of the current Session state. UI, tests, and export
-// read this snapshot; Session owns the mutable stores.
+// read this snapshot; SessionState owns the mutable discovered values.
 class SessionSnapshot {
 public:
   [[nodiscard]] const std::vector<SourceFile>& sources() const noexcept { return sources_; }
@@ -71,7 +70,7 @@ public:
   [[nodiscard]] const Collection* firstCollectionContaining(AssetId asset) const;
 
 private:
-  friend class SessionSnapshotBuilder;
+  friend class detail::SessionSnapshotAccess;
 
   struct Index {
     // Store vector indexes rather than pointers so snapshots stay easy to copy/move.
@@ -93,18 +92,6 @@ private:
   SourceMap sourceMap_;
   std::vector<Diagnostic> diagnostics_;
   Index index_;
-};
-
-class SessionSnapshotBuilder {
-public:
-  std::vector<SourceFile> sources;
-  std::vector<Asset> assets;
-  std::vector<MatchFact> matchFacts;
-  std::vector<Collection> collections;
-  SourceMap sourceMap;
-  std::vector<Diagnostic> diagnostics;
-
-  [[nodiscard]] SessionSnapshot finish();
 };
 
 struct AssetResolutionDiagnostics {

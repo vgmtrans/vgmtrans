@@ -104,7 +104,6 @@ class MatchFactIndex {
 public:
   explicit MatchFactIndex(const MatchContext& context);
 
-  [[nodiscard]] const MatchContext& context() const noexcept { return context_; }
   [[nodiscard]] const SourceFile* sourceFor(const MatchFact& fact) const;
   [[nodiscard]] const Asset* asset(AssetId id) const noexcept;
 

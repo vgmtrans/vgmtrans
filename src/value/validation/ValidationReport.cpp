@@ -14,47 +14,18 @@
 namespace vgmtrans::core {
 
 bool ValidationReport::hasErrors() const noexcept {
-  return std::ranges::any_of(findings_,
-                             [](const ValidationFinding& finding) { return finding.severity == Severity::Error; });
-}
-
-std::vector<Diagnostic> ValidationReport::diagnostics() const {
-  std::vector<Diagnostic> diagnostics;
-  diagnostics.reserve(findings_.size());
-  for (const auto& finding : findings_) {
-    diagnostics.push_back(Diagnostic{
-        .severity = finding.severity,
-        .code = finding.code,
-        .message = finding.message,
-        .range = finding.range,
-        .object = finding.asset ? std::optional<ObjectRef>{ObjectRef{.kind = ObjectKind::Asset, .asset = *finding.asset}}
-                                : std::nullopt,
-    });
-  }
-  return diagnostics;
-}
-
-void ValidationReport::add(ValidationFinding finding) {
-  findings_.push_back(std::move(finding));
+  return std::ranges::any_of(diagnostics_,
+                             [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; });
 }
 
 void ValidationReport::merge(ValidationReport report) {
-  auto findings = std::move(report.findings_);
-  findings_.insert(findings_.end(), std::make_move_iterator(findings.begin()), std::make_move_iterator(findings.end()));
+  diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(report.diagnostics_.begin()),
+                      std::make_move_iterator(report.diagnostics_.end()));
 }
 
 void ValidationReport::error(std::string code, std::string message, std::optional<SourceRange> range) {
-  add(ValidationFinding{
+  diagnostics_.push_back(Diagnostic{
       .severity = Severity::Error,
-      .code = std::move(code),
-      .message = std::move(message),
-      .range = range,
-  });
-}
-
-void ValidationReport::warning(std::string code, std::string message, std::optional<SourceRange> range) {
-  add(ValidationFinding{
-      .severity = Severity::Warning,
       .code = std::move(code),
       .message = std::move(message),
       .range = range,
@@ -63,8 +34,8 @@ void ValidationReport::warning(std::string code, std::string message, std::optio
 
 void ValidationReport::throwIfErrors(std::string_view prefix) const {
   const auto found = std::ranges::find_if(
-      findings_, [](const ValidationFinding& finding) { return finding.severity == Severity::Error; });
-  if (found == findings_.end()) {
+      diagnostics_, [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; });
+  if (found == diagnostics_.end()) {
     return;
   }
 

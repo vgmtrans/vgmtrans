@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "SessionSnapshotTestBuilder.h"
+
 #include "value/scan/CollectionResolver.h"
 
 #include <stdexcept>
@@ -26,7 +28,7 @@ void matchFactsAreJoinedOncePerAsset() {
   const AssetId sequenceId{10};
   const AssetId samplesId{11};
 
-  SessionSnapshotBuilder builder;
+  SessionSnapshotTestBuilder builder;
   builder.sources.push_back(sources.source(source));
   builder.assets.push_back(SequenceProgramAsset{
       .metadata =

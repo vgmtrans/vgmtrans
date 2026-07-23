@@ -16,33 +16,20 @@
 
 namespace vgmtrans::core {
 
-// One validation problem tied back to the value object that caused it when possible.
-// Validators use this richer shape; callers can still convert findings to plain diagnostics.
-struct ValidationFinding {
-  Severity severity = Severity::Info;
-  std::string code;
-  std::string message;
-  std::optional<SourceRange> range;
-  std::optional<SourceId> source;
-  std::optional<AssetId> asset;
-  std::optional<CollectionId> collection;
-};
-
+// Validators accumulate the same diagnostics consumed by Session and the UI.
+// The report adds only composition and the admission-time throwing policy.
 class ValidationReport {
 public:
-  [[nodiscard]] std::span<const ValidationFinding> findings() const noexcept { return findings_; }
-  [[nodiscard]] bool empty() const noexcept { return findings_.empty(); }
+  [[nodiscard]] std::span<const Diagnostic> diagnostics() const noexcept { return diagnostics_; }
+  [[nodiscard]] bool empty() const noexcept { return diagnostics_.empty(); }
   [[nodiscard]] bool hasErrors() const noexcept;
-  [[nodiscard]] std::vector<Diagnostic> diagnostics() const;
 
-  void add(ValidationFinding finding);
   void merge(ValidationReport report);
   void error(std::string code, std::string message, std::optional<SourceRange> range = std::nullopt);
-  void warning(std::string code, std::string message, std::optional<SourceRange> range = std::nullopt);
   void throwIfErrors(std::string_view prefix = {}) const;
 
 private:
-  std::vector<ValidationFinding> findings_;
+  std::vector<Diagnostic> diagnostics_;
 };
 
 }  // namespace vgmtrans::core

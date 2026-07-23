@@ -201,12 +201,8 @@ void validateAsset(ValidationReport& report, const SourceStore& sources, const A
   }
 }
 
-[[nodiscard]] bool containsAsset(std::span<const Asset> assets, AssetId id) {
-  return id.valid() && std::ranges::any_of(assets, [id](const Asset& asset) { return metadata(asset).id == id; });
-}
-
-void validateAssetIds(ValidationReport& report, const ScanResult& result, std::span<const Asset> existingAssets,
-                      std::unordered_set<u32>& batchAssetIds) {
+void validateAssetIds(ValidationReport& report, const ScanResult& result,
+                      const std::unordered_set<u32>& existingAssetIds, std::unordered_set<u32>& batchAssetIds) {
   // IDs are stable references used by match facts and collections, so a scan
   // result must be internally unique and must not reuse IDs already in Session.
   batchAssetIds.reserve(result.assets.size());
@@ -219,7 +215,7 @@ void validateAssetIds(ValidationReport& report, const ScanResult& result, std::s
     if (!batchAssetIds.insert(id.value).second) {
       report.error("scan.asset.duplicate-id", "Scan result contained duplicate asset id " + std::to_string(id.value));
     }
-    if (containsAsset(existingAssets, id)) {
+    if (existingAssetIds.contains(id.value)) {
       report.error("scan.asset.reused-id", "Scan result reused existing asset id " + std::to_string(id.value));
     }
   }
@@ -289,13 +285,13 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
 }
 
 void validateMatchFacts(ValidationReport& report, const ScanResult& result, const SourceStore& sources,
-                        std::span<const Asset> existingAssets, const std::unordered_set<u32>& batchAssetIds) {
+                        const std::unordered_set<u32>& existingAssetIds, const std::unordered_set<u32>& batchAssetIds) {
   // Match facts may point at assets from this scan or assets already accepted
   // from earlier source loads. They must never point at a missing source.
   for (const auto& fact : result.matchFacts) {
     if (!fact.asset.valid()) {
       report.error("scan.match-fact.missing-asset", "Scan result contained a match fact without an asset id");
-    } else if (!batchAssetIds.contains(fact.asset.value) && !containsAsset(existingAssets, fact.asset)) {
+    } else if (!batchAssetIds.contains(fact.asset.value) && !existingAssetIds.contains(fact.asset.value)) {
       report.error("scan.match-fact.unknown-asset",
                    "Scan result contained a match fact for missing asset id " + std::to_string(fact.asset.value));
     }
@@ -363,10 +359,21 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
   validateSourceMapParentCycles(report, result.sourceMap);
   validateDiagnosticAnnotationReferences(report, result.diagnostics, result.sourceMap);
 
+  std::unordered_set<u32> existingAssetIds;
+  if (!result.assets.empty() || !result.matchFacts.empty()) {
+    existingAssetIds.reserve(existingAssets.size());
+    for (const auto& asset : existingAssets) {
+      const AssetId id = metadata(asset).id;
+      if (id.valid()) {
+        existingAssetIds.insert(id.value);
+      }
+    }
+  }
+
   std::unordered_set<u32> batchAssetIds;
-  validateAssetIds(report, result, existingAssets, batchAssetIds);
+  validateAssetIds(report, result, existingAssetIds, batchAssetIds);
   validateSourceMapOwnership(report, result, batchAssetIds);
-  validateMatchFacts(report, result, sources, existingAssets, batchAssetIds);
+  validateMatchFacts(report, result, sources, existingAssetIds, batchAssetIds);
 
   return report;
 }

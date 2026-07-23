@@ -6,6 +6,7 @@ target_sources(vgmtrans-value-core-tests
     formats/AkaoSnesModuleTests.cpp
     formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
+    core/SessionSnapshotTestBuilder.h
     core/ValueCollectionResolverTests.cpp
     core/ValueCompilerCursorTests.cpp
     core/ValueMidiTests.cpp

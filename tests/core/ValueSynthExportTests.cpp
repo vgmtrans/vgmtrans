@@ -476,7 +476,7 @@ void standaloneSynthExportsKeepNativeModulation() {
       }},
   };
 
-  SessionSnapshotBuilder builder;
+  SessionSnapshotTestBuilder builder;
   builder.assets.emplace_back(instruments);
   builder.assets.emplace_back(samples);
   const SessionSnapshot snapshot = builder.finish();
@@ -514,7 +514,7 @@ void exportDiagnosticsPreserveSourceRanges() {
           },
   };
 
-  SessionSnapshotBuilder builder;
+  SessionSnapshotTestBuilder builder;
   builder.assets.push_back(missingSampleCollection);
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
@@ -661,7 +661,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       }},
   };
 
-  SessionSnapshotBuilder builder;
+  SessionSnapshotTestBuilder builder;
   builder.assets.emplace_back(sequence);
   builder.assets.emplace_back(instruments);
   builder.assets.emplace_back(samples);
@@ -697,7 +697,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
              },
          "prepared playback should retain the VM source timeline used by inspectors");
 
-  SessionSnapshotBuilder sequenceOnlyBuilder;
+  SessionSnapshotTestBuilder sequenceOnlyBuilder;
   sequenceOnlyBuilder.assets.emplace_back(sequence);
   sequenceOnlyBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
@@ -713,7 +713,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
                                  }),
          "playback preparation should preserve a useful SoundFont failure diagnostic");
 
-  SessionSnapshotBuilder synthOnlyBuilder;
+  SessionSnapshotTestBuilder synthOnlyBuilder;
   synthOnlyBuilder.assets.emplace_back(instruments);
   synthOnlyBuilder.assets.emplace_back(samples);
   synthOnlyBuilder.collections.push_back(Collection{
