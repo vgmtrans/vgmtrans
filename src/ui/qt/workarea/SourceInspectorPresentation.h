@@ -18,7 +18,8 @@ namespace SourceInspectorPresentation {
 [[nodiscard]] QColor textColor(const vgmtrans::core::SourceAnnotation& annotation);
 [[nodiscard]] QIcon icon(const vgmtrans::core::SourceAnnotation& annotation);
 [[nodiscard]] QString description(const vgmtrans::core::SourceAnnotation& annotation);
-[[nodiscard]] QString treeText(const vgmtrans::core::SourceAnnotation& annotation, bool showDetails);
+[[nodiscard]] QString treeText(const vgmtrans::core::SourceAnnotation& annotation, bool showDetails,
+                               const QString& description);
 [[nodiscard]] QString tooltipHtml(const vgmtrans::core::SourceAnnotation& annotation);
 
 }  // namespace SourceInspectorPresentation

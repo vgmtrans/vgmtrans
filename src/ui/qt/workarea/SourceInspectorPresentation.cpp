@@ -14,7 +14,9 @@
 
 #include <array>
 #include <cmath>
+#include <string_view>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 namespace SourceInspectorPresentation {
@@ -92,6 +94,62 @@ QString valueText(const SourceField& field) {
         }
       },
       field.value);
+}
+
+QString fieldName(std::string_view name) {
+  static constexpr std::array substitutions{
+      std::pair{std::string_view{"adsr"}, std::string_view{"ADSR"}},
+      std::pair{std::string_view{"adsr1"}, std::string_view{"ADSR1"}},
+      std::pair{std::string_view{"adsr2"}, std::string_view{"ADSR2"}},
+      std::pair{std::string_view{"apu"}, std::string_view{"APU"}},
+      std::pair{std::string_view{"bpm"}, std::string_view{"BPM"}},
+      std::pair{std::string_view{"brr"}, std::string_view{"BRR"}},
+      std::pair{std::string_view{"db"}, std::string_view{"dB"}},
+      std::pair{std::string_view{"dls"}, std::string_view{"DLS"}},
+      std::pair{std::string_view{"fat"}, std::string_view{"FAT"}},
+      std::pair{std::string_view{"hz"}, std::string_view{"Hz"}},
+      std::pair{std::string_view{"id"}, std::string_view{"ID"}},
+      std::pair{std::string_view{"info"}, std::string_view{"INFO"}},
+      std::pair{std::string_view{"lfo"}, std::string_view{"LFO"}},
+      std::pair{std::string_view{"lsb"}, std::string_view{"LSB"}},
+      std::pair{std::string_view{"midi"}, std::string_view{"MIDI"}},
+      std::pair{std::string_view{"msb"}, std::string_view{"MSB"}},
+      std::pair{std::string_view{"pcm"}, std::string_view{"PCM"}},
+      std::pair{std::string_view{"rom"}, std::string_view{"ROM"}},
+      std::pair{std::string_view{"sf2"}, std::string_view{"SF2"}},
+      std::pair{std::string_view{"snes"}, std::string_view{"SNES"}},
+      std::pair{std::string_view{"srcn"}, std::string_view{"SRCN"}},
+      std::pair{std::string_view{"symb"}, std::string_view{"SYMB"}},
+  };
+
+  QString result;
+  result.reserve(static_cast<qsizetype>(name.size()));
+  while (!name.empty()) {
+    const size_t separator = name.find('_');
+    const std::string_view word = name.substr(0, separator);
+    if (!word.empty()) {
+      if (!result.isEmpty()) {
+        result.append(QLatin1Char(' '));
+      }
+      bool substituted = false;
+      for (const auto& [source, display] : substitutions) {
+        if (word == source) {
+          result.append(QString::fromLatin1(display.data(), static_cast<qsizetype>(display.size())));
+          substituted = true;
+          break;
+        }
+      }
+      if (!substituted) {
+        result.append(QChar::fromLatin1(word.front()).toUpper());
+        result.append(QString::fromLatin1(word.data() + 1, static_cast<qsizetype>(word.size() - 1)));
+      }
+    }
+    if (separator == std::string_view::npos) {
+      break;
+    }
+    name.remove_prefix(separator + 1);
+  }
+  return result;
 }
 
 QString iconPath(const SourceAnnotation& annotation) {
@@ -207,20 +265,25 @@ QString description(const SourceAnnotation& annotation) {
     QStringList fields;
     fields.reserve(static_cast<qsizetype>(annotation.fields.size()));
     for (const auto& field : annotation.fields) {
-      fields.push_back(QStringLiteral("%1: %2").arg(QString::fromStdString(field.name), valueText(field)));
+      if (annotation.role == SourceRole::Command && field.name == "opcode") {
+        continue;
+      }
+      fields.push_back(QStringLiteral("%1: %2").arg(fieldName(field.name), valueText(field)));
     }
-    const QString fieldText = fields.join(QStringLiteral(", "));
-    text = text.isEmpty() ? fieldText : QStringLiteral("%1, %2").arg(text, fieldText);
+    if (!fields.empty()) {
+      const QString fieldText = fields.join(QStringLiteral(", "));
+      text = text.isEmpty() ? fieldText : QStringLiteral("%1, %2").arg(text, fieldText);
+    }
   }
   return text;
 }
 
-QString treeText(const SourceAnnotation& annotation, bool showDetails) {
+QString treeText(const SourceAnnotation& annotation, bool showDetails, const QString& description) {
   const QString name = escaped(QString::fromStdString(annotation.label));
   if (!showDetails) {
     return name;
   }
-  const QString detail = escaped(description(annotation));
+  const QString detail = escaped(description);
   const QString range = QStringLiteral("Offset: 0x%1 | Length: 0x%2")
                             .arg(annotation.range.offset, 0, 16)
                             .arg(annotation.range.size, 0, 16);
