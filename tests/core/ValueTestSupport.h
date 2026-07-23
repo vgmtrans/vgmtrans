@@ -227,9 +227,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   auto root = sourceMap.annotation(SourceRole::Sequence, input.source.name, assetRange)
                   .kind("probe-sequence")
                   .owner(ObjectRefs::sequence(assetId));
-  sourceMap.header("Header", input.reader.range(0, 1))
-      .kind("probe-header")
-      .parent(root.id());
+  sourceMap.header("Header", input.reader.range(0, 1)).kind("probe-header").parent(root.id());
 
   SequenceProgramAsset sequence{
       .metadata =
@@ -331,8 +329,8 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
         .annotation(SourceRole::Payload, "Probe Payload", input.reader.range(1, input.reader.size() - 1))
         .owner(ObjectRefs::sequence(sequence.id));
   }
-  out.collection(input.source.name, CollectionKey{.resolver = "ProbeExplicit",
-                                                  .value = "source:" + std::to_string(input.source.id.value)})
+  out.collection(input.source.name,
+                 CollectionKey{.resolver = "ProbeExplicit", .value = "source:" + std::to_string(input.source.id.value)})
       .sequence(sequence);
   return out.finish();
 }
@@ -418,8 +416,9 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 }
 
 [[nodiscard]] std::vector<DesiredCollection> resolveProbeBankCollections(const MatchContext& context) {
+  const MatchFactIndex index(context);
   std::vector<DesiredCollection> collections;
-  for (const auto& fact : context.snapshot.matchFacts()) {
+  for (const auto& fact : context.matchFacts()) {
     const auto* id = std::get_if<IdMatchFact>(&fact.payload);
     if (id == nullptr || fact.format != "ProbeBank" || id->domain != "probe.bank") {
       continue;
@@ -437,9 +436,9 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       found = std::prev(collections.end());
     }
 
-    if (assetById<SequenceProgramAsset>(context.snapshot, fact.asset) != nullptr) {
+    if (index.asset<SequenceProgramAsset>(fact.asset) != nullptr) {
       found->sequence = fact.asset;
-    } else if (assetById<InstrumentSetAsset>(context.snapshot, fact.asset) != nullptr) {
+    } else if (index.asset<InstrumentSetAsset>(fact.asset) != nullptr) {
       found->instrumentSets.push_back(fact.asset);
     }
 
@@ -624,7 +623,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 }
 
 [[nodiscard]] std::vector<DesiredCollection> fragileProbeSequenceResolver(const MatchContext& context) {
-  if (context.snapshot.assets().empty() || context.snapshot.assets().size() > 1) {
+  if (context.assets().empty() || context.assets().size() > 1) {
     throw std::runtime_error("resolver exploded");
   }
   return resolveCollectionMemberFacts(context, "ProbeSequence", "ProbeSequence");
@@ -662,7 +661,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
 [[nodiscard]] std::vector<DesiredCollection> wrongTypeCollectionResolver(const MatchContext& context) {
   std::optional<AssetId> sequence;
-  for (const auto& asset : context.snapshot.assets()) {
+  for (const auto& asset : context.assets()) {
     if (const auto* typed = std::get_if<SequenceProgramAsset>(&asset)) {
       sequence = typed->metadata.id;
       break;
@@ -812,8 +811,8 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
       return event.invoke<&ProbePlayback::note>(key, duration);
     }
     case 0xfe: {
-      auto event = cursor.command(ProbeJumpCommand::name, SequenceSemantic::Jump,
-                                  ProbeJumpCommand::playbackStatus, "jump");
+      auto event =
+          cursor.command(ProbeJumpCommand::name, SequenceSemantic::Jump, ProbeJumpCommand::playbackStatus, "jump");
       return event.jump(event.addressLe("destination"));
     }
     case 0xfb: {
@@ -827,17 +826,17 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
       return event.loopCandidate(event.addressLe("destination"));
     }
     case 0xc0: {
-      auto event = cursor.command(ProbeCallCommand::name, SequenceSemantic::Call,
-                                  ProbeCallCommand::playbackStatus, "call");
+      auto event =
+          cursor.command(ProbeCallCommand::name, SequenceSemantic::Call, ProbeCallCommand::playbackStatus, "call");
       return event.call(event.addressLe("destination"));
     }
     case 0xfd:
-      return cursor.command(ProbeReturnCommand::name, SequenceSemantic::Return,
-                            ProbeReturnCommand::playbackStatus, "return")
+      return cursor
+          .command(ProbeReturnCommand::name, SequenceSemantic::Return, ProbeReturnCommand::playbackStatus, "return")
           .return_();
     case 0xf0: {
-      auto event = cursor.command(ProbeRepeatCommand::name, SequenceSemantic::Loop,
-                                  ProbeRepeatCommand::playbackStatus, "repeat");
+      auto event = cursor.command(ProbeRepeatCommand::name, SequenceSemantic::Loop, ProbeRepeatCommand::playbackStatus,
+                                  "repeat");
       const u8 slot = event.u8("slot");
       const u8 count = event.u8("count");
       const Address destination = event.addressLe("destination");
@@ -851,9 +850,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
       return event.invoke<&ProbePlayback::repeatBreak>(slot, destination).mayBranchTo(destination);
     }
     case 0xff:
-      return cursor.command(ProbeEndCommand::name, SequenceSemantic::End,
-                            ProbeEndCommand::playbackStatus, "end")
-          .end();
+      return cursor.command(ProbeEndCommand::name, SequenceSemantic::End, ProbeEndCommand::playbackStatus, "end").end();
     default:
       return cursor.unsupported("Unsupported Opcode").stop();
   }

@@ -10,7 +10,7 @@
 
 namespace vgmtrans::core {
 
-std::shared_ptr<const SourceInspection> SourceInspection::create(AssetMetadata metadata, const SourceMap& sourceMap,
+std::shared_ptr<const SourceInspection> SourceInspection::create(AssetMetadata metadata, SourceMap sourceMap,
                                                                  SharedSourceBytes sourceBytes) {
   if (sourceBytes == nullptr) {
     return {};
@@ -21,31 +21,22 @@ std::shared_ptr<const SourceInspection> SourceInspection::create(AssetMetadata m
     return {};
   }
 
-  const auto selected = sourceMap.annotationsForAsset(metadata.id);
-  if (selected.empty()) {
+  SourceRange inspectionRange = metadata.range;
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (annotation.range.source != inspectionRange.source || annotation.range.offset > sourceBytes->size() ||
+        annotation.range.size > sourceBytes->size() - annotation.range.offset) {
+      return {};
+    }
+    const u64 begin = std::min(inspectionRange.offset, annotation.range.offset);
+    const u64 end = std::max(inspectionRange.endOffset(), annotation.range.endOffset());
+    inspectionRange = SourceRange{.source = inspectionRange.source, .offset = begin, .size = end - begin};
+  }
+  if (sourceMap.empty()) {
     return {};
   }
 
-  SourceRange inspectionRange = metadata.range;
-  std::vector<SourceAnnotation> annotations;
-  annotations.reserve(selected.size());
-  for (const SourceAnnotationId id : selected) {
-    const auto* annotation = sourceMap.find(id);
-    if (annotation == nullptr) {
-      continue;
-    }
-    if (annotation->range.source != inspectionRange.source || annotation->range.offset > sourceBytes->size() ||
-        annotation->range.size > sourceBytes->size() - annotation->range.offset) {
-      return {};
-    }
-    const u64 begin = std::min(inspectionRange.offset, annotation->range.offset);
-    const u64 end = std::max(inspectionRange.endOffset(), annotation->range.endOffset());
-    inspectionRange = SourceRange{.source = inspectionRange.source, .offset = begin, .size = end - begin};
-    annotations.push_back(*annotation);
-  }
-
-  return std::shared_ptr<const SourceInspection>(new SourceInspection(
-      std::move(metadata), inspectionRange, std::move(sourceBytes), SourceMap{std::move(annotations)}));
+  return std::shared_ptr<const SourceInspection>(
+      new SourceInspection(std::move(metadata), inspectionRange, std::move(sourceBytes), std::move(sourceMap)));
 }
 
 SourceInspection::SourceInspection(AssetMetadata metadata, SourceRange range, SharedSourceBytes sourceBytes,
@@ -65,7 +56,7 @@ std::span<const u8> SourceInspection::bytes() const noexcept {
     return {};
   }
   return std::span<const u8>{*sourceBytes_}.subspan(static_cast<size_t>(range_.offset),
-                                                   static_cast<size_t>(range_.size));
+                                                    static_cast<size_t>(range_.size));
 }
 
 const SourceAnnotation* SourceInspection::annotation(SourceAnnotationId id) const {

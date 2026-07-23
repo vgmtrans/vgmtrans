@@ -5,7 +5,7 @@
  */
 
 #include "ValueTestSupport.h"
-#include "value/session/ScanCommit.h"
+#include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
 
 namespace {
@@ -137,43 +137,44 @@ void sourceMapRejectsDuplicateAnnotationIds() {
   expect(builderThrew, "source map builder should reject duplicate annotation ids from its allocator");
 }
 
-void sourceMapStoreRejectsCrossScanAnnotationIdCollisions() {
-  SourceMapStore store;
-  store.append(SourceMap{{SourceAnnotation{
-      .id = SourceAnnotationId{7},
-      .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
-      .label = "First",
-  }}});
+void sessionStateRejectsCrossScanAnnotationIdCollisions() {
+  SessionState state;
+  state.appendScan(SourceId{1}, ScanResult{
+                                    .sourceMap = SourceMap{{SourceAnnotation{
+                                        .id = SourceAnnotationId{7},
+                                        .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
+                                        .label = "First",
+                                    }}},
+                                });
 
   bool threw = false;
   try {
-    store.append(SourceMap{{SourceAnnotation{
-        .id = SourceAnnotationId{7},
-        .range = SourceRange{.source = SourceId{2}, .offset = 0, .size = 1},
-        .label = "Second",
-    }}});
+    state.appendScan(SourceId{2}, ScanResult{
+                                      .sourceMap = SourceMap{{SourceAnnotation{
+                                          .id = SourceAnnotationId{7},
+                                          .range = SourceRange{.source = SourceId{2}, .offset = 0, .size = 1},
+                                          .label = "Second",
+                                      }}},
+                                  });
   } catch (const std::invalid_argument&) {
     threw = true;
   }
-  expect(threw, "source map store should reject annotation ids already owned by another scan");
-  expect(store.all().annotations().size() == 1,
-         "a rejected source map append should leave the existing annotations unchanged");
+  expect(threw, "session state should reject annotation ids already owned by another scan");
+  expect(state.sourceMap().annotations().size() == 1,
+         "a rejected scan append should leave the existing annotations unchanged");
 }
 
-void scanCommitPreflightsSourceAnnotationIdCollisions() {
-  AssetStore assets;
-  MatchFactStore matchFacts;
-  ExplicitCollectionStore explicitCollections;
-  SourceMapStore sourceMaps;
-  DiagnosticStore diagnostics;
-  sourceMaps.append(SourceMap{{SourceAnnotation{
-      .id = SourceAnnotationId{7},
-      .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
-      .label = "Existing",
-  }}});
+void sessionStatePreflightsSourceAnnotationIdCollisions() {
+  SessionState state;
+  state.appendScan(SourceId{1}, ScanResult{
+                                    .sourceMap = SourceMap{{SourceAnnotation{
+                                        .id = SourceAnnotationId{7},
+                                        .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
+                                        .label = "Existing",
+                                    }}},
+                                });
 
-  ScanCommit commit{
-      .source = SourceId{2},
+  ScanResult result{
       .assets = {MiscAsset{.metadata = AssetMetadata{.id = AssetId{3}, .name = "Uncommitted"}}},
       .sourceMap = SourceMap{{SourceAnnotation{
           .id = SourceAnnotationId{7},
@@ -184,22 +185,67 @@ void scanCommitPreflightsSourceAnnotationIdCollisions() {
 
   bool threw = false;
   try {
-    commit.commit(assets, matchFacts, explicitCollections, sourceMaps, diagnostics);
+    state.appendScan(SourceId{2}, std::move(result));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
-  expect(threw, "scan commit should reject source annotation ids owned by an earlier scan");
-  expect(assets.all().empty(), "source annotation collision should be rejected before scan assets are published");
-  expect(sourceMaps.all().annotations().size() == 1,
-         "source annotation collision should not mutate the existing source map store");
+  expect(threw, "session state should reject source annotation ids owned by an earlier scan");
+  expect(state.assets().empty(), "source annotation collision should be rejected before scan assets are published");
+  expect(state.sourceMap().annotations().size() == 1,
+         "source annotation collision should not mutate existing session state");
+}
+
+void sessionStateScrubsCrossSourceObjectLinks() {
+  SessionState state;
+  const SourceId firstSource{1};
+  const SourceId secondSource{2};
+  state.appendScan(firstSource,
+                   ScanResult{
+                       .assets = {MiscAsset{.metadata =
+                                                AssetMetadata{
+                                                    .id = AssetId{1},
+                                                    .range = SourceRange{.source = firstSource, .offset = 0, .size = 1},
+                                                }}},
+                       .sourceMap = SourceMap{{SourceAnnotation{
+                           .id = SourceAnnotationId{1},
+                           .range = SourceRange{.source = firstSource, .offset = 0, .size = 1},
+                           .owner = ObjectRefs::misc(AssetId{1}),
+                       }}},
+                   });
+  state.appendScan(
+      secondSource,
+      ScanResult{
+          .assets = {MiscAsset{.metadata =
+                                   AssetMetadata{
+                                       .id = AssetId{2},
+                                       .range = SourceRange{.source = secondSource, .offset = 0, .size = 1},
+                                   }}},
+          .sourceMap = SourceMap{{SourceAnnotation{
+              .id = SourceAnnotationId{2},
+              .range = SourceRange{.source = secondSource, .offset = 0, .size = 1},
+              .owner = ObjectRefs::misc(AssetId{2}),
+              .links = {SourceLink{
+                  .role = SourceLinkRole::Related,
+                  .target = ObjectRefs::misc(AssetId{1}),
+              }},
+          }}},
+      });
+
+  const std::array removedSources{firstSource};
+  state.removeSources(removedSources);
+
+  expect(!state.containsAsset(AssetId{1}) && state.containsAsset(AssetId{2}),
+         "source removal should retain assets owned by surviving sources");
+  const SourceMap remaining = state.sourceMap();
+  expect(remaining.annotations().size() == 1 && remaining.annotations().front().id == SourceAnnotationId{2} &&
+             remaining.annotations().front().links.empty(),
+         "source removal should scrub surviving links to removed assets");
 }
 
 void scanValidationRejectsSourceAnnotationParentCycles() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "cycle.bin"}, {0, 0});
-  ScanCommit commit{
-      .source = source,
-      .sourceSize = 2,
+  ScanResult result{
       .sourceMap = SourceMap{{
           SourceAnnotation{
               .id = SourceAnnotationId{1},
@@ -215,7 +261,7 @@ void scanValidationRejectsSourceAnnotationParentCycles() {
           },
       }},
   };
-  const ValidationReport report = validateScanCommit(commit, sources, AssetStore{});
+  const ValidationReport report = validateScanResult(source, result, sources, {});
   expect(std::ranges::any_of(
              report.findings(),
              [](const ValidationFinding& finding) { return finding.code == "scan.source-annotation.parent-cycle"; }),
@@ -226,9 +272,7 @@ void scanValidationRequiresAssetOwnedAnnotationGraphs() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "unowned.bin"}, {0});
   const SourceRange range = sources.reader(source).range(0, 1);
-  ScanCommit commit{
-      .source = source,
-      .sourceSize = 1,
+  ScanResult result{
       .assets = {MiscAsset{.metadata = AssetMetadata{.id = AssetId{1}, .name = "Unowned", .range = range}}},
       .sourceMap = SourceMap{{SourceAnnotation{
           .id = SourceAnnotationId{1},
@@ -237,10 +281,10 @@ void scanValidationRequiresAssetOwnedAnnotationGraphs() {
       }}},
   };
 
-  const ValidationReport report = validateScanCommit(commit, sources, AssetStore{});
-  expect(std::ranges::any_of(report.findings(), [](const ValidationFinding& finding) {
-           return finding.code == "scan.asset.missing-source-annotations";
-         }),
+  const ValidationReport report = validateScanResult(source, result, sources, {});
+  expect(std::ranges::any_of(
+             report.findings(),
+             [](const ValidationFinding& finding) { return finding.code == "scan.asset.missing-source-annotations"; }),
          "scan admission should require every asset to expose an explicitly owned annotation graph");
 }
 
@@ -248,13 +292,12 @@ void scanValidationRejectsCrossAssetAnnotationParents() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "cross-owned.bin"}, {0, 0});
   const SourceRange range = sources.reader(source).range(0, 2);
-  ScanCommit commit{
-      .source = source,
-      .sourceSize = 2,
-      .assets = {
-          MiscAsset{.metadata = AssetMetadata{.id = AssetId{1}, .name = "First", .range = range}},
-          MiscAsset{.metadata = AssetMetadata{.id = AssetId{2}, .name = "Second", .range = range}},
-      },
+  ScanResult result{
+      .assets =
+          {
+              MiscAsset{.metadata = AssetMetadata{.id = AssetId{1}, .name = "First", .range = range}},
+              MiscAsset{.metadata = AssetMetadata{.id = AssetId{2}, .name = "Second", .range = range}},
+          },
       .sourceMap = SourceMap{{
           SourceAnnotation{
               .id = SourceAnnotationId{1},
@@ -272,10 +315,11 @@ void scanValidationRejectsCrossAssetAnnotationParents() {
       }},
   };
 
-  const ValidationReport report = validateScanCommit(commit, sources, AssetStore{});
-  expect(std::ranges::any_of(report.findings(), [](const ValidationFinding& finding) {
-           return finding.code == "scan.source-annotation.cross-asset-parent";
-         }),
+  const ValidationReport report = validateScanResult(source, result, sources, {});
+  expect(std::ranges::any_of(report.findings(),
+                             [](const ValidationFinding& finding) {
+                               return finding.code == "scan.source-annotation.cross-asset-parent";
+                             }),
          "scan admission should reject annotation parents that cross asset boundaries");
 }
 
@@ -319,7 +363,8 @@ void sessionSnapshotCarriesScannerSourceMap() {
   session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
 
   const auto source = session.addSource(SourceFile{.name = "annotated.probe"}, {0xab, 0x01, 0x02});
-  SessionSnapshot snapshot = session.scanSource(source);
+  session.scanSource(source);
+  SessionSnapshot snapshot = session.snapshot();
 
   const auto headerIds = snapshot.sourceMap().withRole(source, SourceRole::Header);
   expect(headerIds.size() == 1, "session snapshot should publish scanner source annotations");
@@ -337,7 +382,9 @@ void sessionSnapshotCarriesScannerSourceMap() {
   expect(inspection->roots().size() == 2 && inspection->annotation(inspection->roots().front()) != nullptr,
          "source inspection should preserve the asset-owned annotation graph");
 
-  snapshot = session.removeSource(source);
+  session.removeSource(source);
+
+  snapshot = session.snapshot();
   expect(snapshot.sourceMap().empty(), "removing a source should remove its source annotations");
   expect(inspection->bytes().size() == 3 && inspection->bytes().front() == 0xab,
          "an existing source inspection should survive source removal");
@@ -349,8 +396,9 @@ void runValueSourceMapTests() {
   sourceMapBuilderRecordsAnnotationsFieldsAndLinks();
   sourceAnnotationsCarryOutlinePolicyForTreeConsumers();
   sourceMapRejectsDuplicateAnnotationIds();
-  sourceMapStoreRejectsCrossScanAnnotationIdCollisions();
-  scanCommitPreflightsSourceAnnotationIdCollisions();
+  sessionStateRejectsCrossScanAnnotationIdCollisions();
+  sessionStatePreflightsSourceAnnotationIdCollisions();
+  sessionStateScrubsCrossSourceObjectLinks();
   scanValidationRejectsSourceAnnotationParentCycles();
   scanValidationRequiresAssetOwnedAnnotationGraphs();
   scanValidationRejectsCrossAssetAnnotationParents();

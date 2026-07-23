@@ -107,15 +107,28 @@ FormatSpecificFact formatFact(std::string kind, std::initializer_list<MatchField
 }
 
 MatchFactIndex::MatchFactIndex(const MatchContext& context) : context_(context) {
+  assetsById_.reserve(context.assets().size());
+  for (const auto& asset : context.assets()) {
+    const AssetId id = metadata(asset).id;
+    if (id.valid()) {
+      assetsById_.emplace(id.value, &asset);
+    }
+  }
+}
+
+const Asset* MatchFactIndex::asset(AssetId id) const noexcept {
+  if (!id.valid()) {
+    return nullptr;
+  }
+  const auto found = assetsById_.find(id.value);
+  return found != assetsById_.end() ? found->second : nullptr;
 }
 
 const SourceFile* MatchFactIndex::sourceFor(const MatchFact& fact) const {
   if (!fact.scope.source) {
     return nullptr;
   }
-  const auto found = std::ranges::find_if(context_.snapshot.sources(),
-                                          [&](const SourceFile& source) { return source.id == *fact.scope.source; });
-  return found == context_.snapshot.sources().end() ? nullptr : &*found;
+  return context_.sources().contains(*fact.scope.source) ? &context_.sources().source(*fact.scope.source) : nullptr;
 }
 
 SampleCoverageSelection selectSampleCoverage(std::optional<u32> preferredGroup, std::span<const u32> required,
@@ -245,7 +258,7 @@ std::vector<DesiredCollection> resolveCollectionMemberFacts(const MatchContext& 
   // still complete the same collection.
   std::map<std::pair<std::string, std::string>, DesiredCollection> grouped;
 
-  for (const auto& fact : context.snapshot.matchFacts()) {
+  for (const auto& fact : context.matchFacts()) {
     if (!format.empty() && fact.format != format) {
       continue;
     }

@@ -258,7 +258,8 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "value format registration should include KonamiSnes sequence dialects");
 
   const SourceId source = session.addSource(SourceFile{.name = "Axelay.spc"}, makeKonamiSnesAram());
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.diagnostics().empty(), "KonamiSnes scan should not report diagnostics for the complete fixture");
   expect(project.collections().size() == 1, "KonamiSnes scan should produce one collection");
   expect(project.assets().size() == 3, "KonamiSnes scan should produce sequence, instrument set, and samples");
@@ -620,8 +621,8 @@ void konamiSnesSequenceSimulationPreservesDriverVibratoDepth() {
                                                0xe0, 0x04, 0xff}});
   expect(performance.diagnostics.empty(), "KonamiSnes vibrato fixture should render without diagnostics");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(
-      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence midi = PerformanceMidiRenderer().render(performance, MidiExportOptions{},
+                                                             ModulationConversionPolicy::SequenceEventSimulation);
   s16 maximumBend = 0;
   for (const MidiEvent& event : midi.tracks[0].events) {
     if (const auto* bend = std::get_if<PitchBend>(&event)) {
@@ -673,7 +674,7 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
                                                0x3d, 0x01, 0x64, 0x7f,  // first-ending note
                                                0xf7,                    // replay shared section
                                                0x3e, 0x01, 0x64, 0x7f,  // second-ending note
-                                               0xf7, 0xff}});            // replay shared section, then exit
+                                               0xf7, 0xff}});           // replay shared section, then exit
   std::vector<double> voltaKeys;
   for (const PerformanceEvent& event : volta.tracks[0].events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {

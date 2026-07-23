@@ -63,7 +63,7 @@ void matchFactsAreJoinedOncePerAsset() {
   addFact(samplesId, SampleCoverageFact{.domain = "articulation", .first = 5, .count = 4});
 
   const SessionSnapshot snapshot = builder.finish();
-  const MatchFactIndex index(MatchContext{.sources = sources, .snapshot = snapshot});
+  const MatchFactIndex index(MatchContext{sources, snapshot.assets(), snapshot.matchFacts()});
   const auto sequences = index.assets<SequenceProgramAsset>("Probe");
   expect(sequences.size() == 1 && sequences[0].asset().metadata.id == sequenceId && sequences[0].sourceId == source &&
              sequences[0].source != nullptr,

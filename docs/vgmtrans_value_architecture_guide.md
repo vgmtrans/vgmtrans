@@ -41,10 +41,10 @@ FormatRegistry
 FormatModule::scan
   produces ScanResult values
   ↓
-ScanCommit
-  validates the result before durable storage
+Normalization and validation
+  reject an invalid result before durable mutation
   ↓
-Session stores
+SessionState
   assets, match facts, explicit collections, source map, diagnostics
   ↓
 Collection resolution
@@ -115,7 +115,7 @@ The most important rules are:
 1. **Bytes live in one place.** `SourceStore` owns source bytes. Assets refer back to byte ranges using `SourceRange`.
 2. **Objects point to each other by IDs.** Assets, collections, commands, and source annotations use small ID values instead of pointers.
 3. **Scanning and exporting are separate.** Scanners discover and describe data. Exporters consume already-scanned values.
-4. **Mutable state is contained.** `Session` and its stores mutate. `SessionSnapshot` is read-only.
+4. **Mutable state is contained.** `SessionState` is the single owner of mutable discovered values. `SessionSnapshot` is read-only.
 5. **Format code describes local meaning.** Shared systems handle storage, matching, loop policy, export policy, validation, and diagnostics.
 
 This makes the new core much easier to test. A test can construct a small source, scan it, inspect the snapshot, and verify the resulting values without needing the old UI/root object graph.
@@ -132,7 +132,7 @@ The `src/value` directory is organized around architectural layers:
 | `platform` | Concrete shared platform structures, such as SNES sample-directory and BRR stream readers. |
 | `model` | Durable data model: assets, collections, match facts, snapshots, source map. |
 | `scan` | Format module API, scan result types, scan result builder, parse cursor, collection resolver helpers. |
-| `session` | Mutable stores and orchestration: add sources, scan, commit, resolve collections, export. |
+| `session` | Mutable session state and orchestration: add sources, scan, validate, resolve collections, export. |
 | `sequence` | Parsed sequence programs, command cursor, bytecode walkers, sequence dialects, VM, performance events. |
 | `synth` | Target-neutral instrument, region, sample, envelope, loop, codec, and sample decoding model. |
 | `export` | Collection export to MIDI, SF2, DLS, and WAV. |
@@ -460,14 +460,15 @@ The overloads that accept an existing handle remain available when another objec
 
 ---
 
-## 11. Commit and validation
+## 11. Admission and validation
 
-A scanner returns a `ScanResult`, but the session does not blindly trust it. It turns the result into a `ScanCommit`, normalizes IDs, validates it, and only then appends it to stores.
+A scanner returns a `ScanResult`, but the session does not blindly trust it. The session fills in default diagnostic ranges, validates the complete result against the source store and existing assets, and only then moves it into `SessionState`.
 
 The validation layer checks things such as:
 
 - asset IDs are present and unique;
 - asset IDs do not reuse existing IDs;
+- asset primary ranges belong to the source being scanned;
 - source ranges point at active source bytes and are in bounds;
 - source map annotations have valid ranges;
 - annotation parent and link IDs are valid;
@@ -476,23 +477,18 @@ The validation layer checks things such as:
 - extracted source origins are valid;
 - sequence, instrument, and sample data pass their own model checks.
 
-This makes `ScanCommit` the admission gate between “a format scanner tried to parse something” and “the session now owns this data.”
+`ScanResult` is both the scanner output and the staging value. There is no second commit-shaped copy of the same data. Validation is the admission gate between “a format scanner tried to parse something” and “the session now owns this data,” and all validation completes before durable vectors are changed.
 
 That boundary is healthy. It means individual format modules can stay focused on parsing rather than duplicating session bookkeeping rules.
 
 ---
 
-## 12. Session and stores
+## 12. Session and state
 
 `Session` is the mutable workspace. It owns:
 
 - `SourceStore`
-- `AssetStore`
-- `MatchFactStore`
-- `ExplicitCollectionStore`
-- `SourceMapStore`
-- `CollectionStore`
-- `DiagnosticStore`
+- one private `SessionState`
 - `FormatRegistry`
 - `SequenceDialectRegistry`
 - `ScanIdAllocator`
@@ -507,6 +503,8 @@ The public session API is small:
 - get a snapshot;
 - export a collection or all collections.
 
+Mutation calls return after changing the session. Callers request a snapshot explicitly when they need to publish or inspect the resulting state, which lets a batch of mutations produce one snapshot rather than one full copy per operation.
+
 ### 12.1 Registries are sealed before use
 
 The session seals the format and dialect registries before adding, scanning, removing, or exporting. This prevents the meaning of already-scanned assets from changing halfway through a session because a new format or dialect was added late.
@@ -517,24 +515,22 @@ When `Session::scanSource` scans a source, it also scans any derived sources cre
 
 This design lets extractors and normal format modules compose without special cases. A PSF extractor can produce executable bytes. Then the Akao scanner can scan those bytes as a normal source.
 
-### 12.3 Stores have narrow jobs
+### 12.3 One state owner, organized by value type
 
-Each store owns one kind of session data:
+`SessionState` stores flat vectors of assets, match facts, explicit collections, annotations, resolved collections, and diagnostics. It keeps only the indexes needed for identity checks and asset lookup.
 
-| Store | Job |
-|---|---|
-| `AssetStore` | Owns scanned assets, indexes by ID, and tracks source ownership. |
-| `MatchFactStore` | Stores match facts and removes them when related sources/assets are removed. |
-| `ExplicitCollectionStore` | Stores scanner-known collections and turns them into desired collections. |
-| `SourceMapStore` | Stores raw annotations and publishes a combined `SourceMap`. |
-| `DiagnosticStore` | Stores diagnostics and removes source-owned diagnostics. |
-| `CollectionStore` | Reconciles desired collections by stable key and marks stale collections when assets disappear. |
+The important boundary is not one class per vector. It is one private class per consistency domain. A scan admission, source removal, or asset removal can affect several value types at once, so `SessionState` owns those transitions:
 
-This is intentionally more structured than a single large root object. It makes ownership and removal rules easier to reason about.
+- `appendScan` publishes one already-validated result;
+- `removeSources` and `removeAssets` compute the affected IDs once;
+- dependent facts, explicit collections, annotations, links, and diagnostics are removed or scrubbed together;
+- collection reconciliation preserves stable identities and marks collections stale when referenced assets disappear.
+
+This keeps cross-vector invariants visible in one place and removes store-to-store coordination code without creating a public root-object API.
 
 ### 12.4 Snapshot creation
 
-`Session::snapshot()` gathers the current store contents into a `SessionSnapshot`. The snapshot is copyable and read-only. It contains:
+`Session::snapshot()` copies the current source and state contents into a `SessionSnapshot`. The snapshot is copyable and read-only. It contains:
 
 - sources;
 - assets;
@@ -545,7 +541,7 @@ This is intentionally more structured than a single large root object. It makes 
 
 It also builds indexes for fast asset and collection lookup by ID.
 
-UI, tests, and export should read snapshots rather than mutable stores. That keeps most consumers from accidentally changing session state.
+UI and tests read explicit snapshots rather than mutable state. Export operations create one stable snapshot for the duration of the export. Internal collection rebuilding instead borrows a lightweight `MatchContext`, and source inspection selects annotations directly, so neither path builds and discards a complete snapshot.
 
 ---
 
@@ -593,7 +589,7 @@ Facts are not collections. They are evidence used by a resolver.
 
 ### 13.3 Resolvers
 
-A resolver reads the current snapshot and returns the collections that should exist now. Resolvers are pure functions over the snapshot and source store. They do not receive mutable stores.
+A resolver reads a `MatchContext` and returns the collections that should exist now. The context is a lightweight borrowed view of the source store, assets, and match facts; it does not copy a public snapshot or expose mutable state.
 
 The helper `MatchFactIndex` makes resolver code easier by giving typed access to facts and assets. `CollectionAssembly` helps build collections while handling duplicate suppression and common missing-role issues.
 
@@ -605,13 +601,13 @@ Every resolved collection has a `CollectionKey`:
 resolver id + resolver-specific value
 ```
 
-The key is the durable identity of a collection. When more sources are loaded, the resolver may return a collection with the same key but more complete membership. `CollectionStore` uses the key to update the existing collection rather than creating a duplicate.
+The key is the durable identity of a collection. When more sources are loaded, the resolver may return a collection with the same key but more complete membership. `SessionState` uses the key to update the existing collection rather than creating a duplicate.
 
 ### 13.5 Collection-dependent preparation
 
 Akao sequences and sample collections are scanned separately. After the resolver chooses the sample collections, export may need a collection-specific instrument set whose regions point at those chosen samples.
 
-`FormatModule::prepareCollection` receives the source store, current snapshot, and resolved collection. It returns transient instrument sets and diagnostics. Exporters consume those values directly; they never enter `AssetStore`, receive persistent IDs, or participate in collection rebuilding and stale removal.
+`FormatModule::prepareCollection` receives the source store, current snapshot, and resolved collection. It returns transient instrument sets and diagnostics. Exporters consume those values directly; they never enter `SessionState`, receive persistent IDs, or participate in collection rebuilding and stale removal.
 
 The remaining Akao debt is source rereading during preparation. Durable symbolic articulation data would let preparation operate only on snapshot values, but that is independent of the removed second asset lifecycle.
 
@@ -987,7 +983,7 @@ SF2 and DLS export consume instrument sets and sample collections. They may also
 
 Validation is split by boundary and model:
 
-- scan validation checks a `ScanCommit` before it enters the session;
+- scan validation checks a normalized `ScanResult` before it enters `SessionState`;
 - sequence validation checks `SequenceProgram` structure;
 - synth validation checks instrument and sample model structure;
 - snapshot validation checks whole-session consistency.
@@ -1239,57 +1235,47 @@ Formats enter through `FormatDefinition` and `Session::registerFormat`, which re
 
 This is a major readability win for format code.
 
-### 21.7 `ScanCommit`
+### 21.7 `SessionState`
 
-`ScanCommit` is a staged scan result tied to one source. It fills in default diagnostic ranges, validates the result, and commits to stores.
+`SessionState` is the private consistency boundary for accepted scanner output. It owns flat vectors of discovered values, the small indexes required for identity and lookup, collection reconciliation, and coordinated source/asset removal.
 
-This is the line between temporary scanner output and durable session state.
+It is deliberately not part of the public session API. `Session` handles source bytes, registries, validation, and orchestration; `SessionState` handles durable discovered values as one atomic conceptual state.
 
-### 21.8 `AssetStore`
+### 21.8 `MatchContext` and resolver helpers
 
-`AssetStore` owns scanned assets and tracks which source produced them. Collection-specific prepared values remain outside the store.
-
-### 21.9 `CollectionStore`
-
-`CollectionStore` reconciles desired collections by stable key. It preserves collection identity across rescans and marks collections stale when referenced assets are removed.
-
-It also validates collection references and reports missing or wrong-type assets.
-
-### 21.10 `MatchFactStore` and resolver helpers
-
-`MatchFactStore` stores facts. Resolver helpers make those facts readable by format-specific collection resolvers.
+`MatchContext` gives collection resolvers a borrowed read-only view of sources, assets, and facts without materializing a `SessionSnapshot`. Resolver helpers make those facts readable by format-specific collection resolvers.
 
 `MatchFactIndex` is especially useful because it combines fact filtering, payload typing, asset lookup, and optional source lookup.
 
-### 21.11 `SequenceProgram`
+### 21.9 `SequenceProgram`
 
 `SequenceProgram` records decoded source commands, program profile/configuration, and playback defaults. It is the stable parsed form of a sequence.
 
 Each compiler-cursor command stores its opcode, named source operands, source provenance, decode flow, and ordered executable actions. Every action has an automatically assigned executor slot and positional arguments. The `AddressIndex` lets the VM resolve runtime control flow by source addresses instead of assuming vector order is execution order.
 
-### 21.12 `CompilerCursor` and `RecordReader`
+### 21.10 `CompilerCursor` and `RecordReader`
 
 `RecordReader` is the small imperative checked reader for one source record. It owns sequential cursor bounds, exact field ranges, captured field metadata, and truncation diagnostics without introducing a schema language. `CompilerCursor` adds command presentation, source operands, discovery flow, ordered executable actions, and generated typed executor selection. Its flow methods supply the corresponding control-flow presentation and target metadata. `CommandSourceMap` performs automatic projection.
 
 `SequenceDecodeSession` owns the repeated sequence-header, track-pointer, track, and command-annotation lifecycle for ordinary linear formats. A format still reads its pointer table explicitly and supplies the track number, pointer range, and decoded start address, keeping ordering, endianness, relocation, and null rules visible. `TrackDecodeScope` owns the corresponding single-track walk and command projection.
 
-### 21.13 `SequenceDialect`
+### 21.11 `SequenceDialect`
 
 A source-free dialect connects a `SequenceProgram` to executable driver behavior. It packages program/track state factories, a byte-free command executor, timebase, and default behavior. `CompiledCommandDialect` is the compiler-cursor adapter: it is the only layer that sees `std::any`, creates the concrete `Playback`, dispatches every action in order, and combines their `Effects` for the VM. Formats normally apply that adapter with `makeCompiledDialect`, rather than naming and assigning its two generic hooks themselves.
 
 The implementation uses `std::any` only to erase the concrete program and track runtime-state types. Program-specific version data is not stored in dialect context; it lives on the immutable program.
 
-### 21.14 `SequenceVm`
+### 21.12 `SequenceVm`
 
 `SequenceVm` is the shared interpreter for parsed sequences. Source-free dialects run through a global `(tick, stable track order)` scheduler with one program state and per-track runtimes. The VM handles command limits, loops, calls, returns, repeats, diagnostics, and event emission. Recurrence keys include command, call stack, and repeat-counter state; the command limit is only a contextual emergency guard.
 
-### 21.15 `PerformanceModel`
+### 21.13 `PerformanceModel`
 
 `PerformanceModel` is the neutral musical output from the VM. Its events keep source command and source annotation IDs, so output can be traced back to source bytes. `StereoBalancePerformanceEvent` stores source-engine left/right gains without MIDI quantization.
 
 This model is the main bridge to future non-MIDI sequence outputs.
 
-### 21.16 `SynthModel`
+### 21.14 `SynthModel`
 
 `SynthModel` contains the durable neutral values. `SampleCollectionBuilder` and `InstrumentSetBuilder` are temporary authoring helpers around those values; they do not add a draft model or a combined synth lifecycle. Exceptional collection-specific values may be prepared transiently for export, but never enter the asset store.
 
@@ -1297,13 +1283,13 @@ This model is the main bridge to future non-MIDI sequence outputs.
 
 It is designed for SF2/DLS/WAV export without making those formats leak into scanners.
 
-### 21.17 `Export`
+### 21.15 `Export`
 
 Export resolves a collection, renders the sequence only when needed, decodes samples only when needed, and produces artifacts with diagnostics.
 
 The export layer is careful to share work. For example, if both MIDI and observed-range modulation are requested, the sequence render result can be reused.
 
-### 21.18 `Validation`
+### 21.16 `Validation`
 
 Validation checks values at the boundaries. The most important boundary is scan commit. A scanner can be generous and return diagnostics, but invalid durable references should be rejected before entering session stores.
 
@@ -1451,8 +1437,8 @@ The new architecture is easiest to understand as a set of stages:
 ```text
 1. SourceStore owns bytes.
 2. Format modules scan bytes into plain assets, facts, annotations, diagnostics, and extracted sources.
-3. ScanCommit validates results before storing them.
-4. Session stores own the accepted values.
+3. The session normalizes and validates each ScanResult before durable mutation.
+4. SessionState owns accepted values and their cross-value consistency.
 5. Collection resolution groups assets into export units.
 6. Export preparation builds any transient collection-specific values.
 7. SessionSnapshot exposes a read-only view.

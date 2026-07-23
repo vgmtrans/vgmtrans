@@ -8,9 +8,11 @@
 
 #include "value/export/Export.h"
 #include "value/scan/FormatModule.h"
-#include "value/session/ScanCommit.h"
+#include "value/session/SessionState.h"
+#include "value/validation/ScanValidation.h"
 
 #include <algorithm>
+#include <array>
 #include <exception>
 #include <fstream>
 #include <iterator>
@@ -23,22 +25,34 @@ namespace vgmtrans::core {
 
 namespace {
 
-void addMissingSequenceDialectDiagnostics(SessionSnapshotBuilder& snapshot, const SequenceDialectRegistry& dialects) {
-  for (const auto& asset : snapshot.assets) {
+void prepareDiagnostics(ScanResult& result, const SourceFile& source, const SequenceDialectRegistry& dialects) {
+  for (const auto& asset : result.assets) {
     const auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
     if (sequence == nullptr || dialects.contains(sequence->program.dialect.value)) {
       continue;
     }
 
-    snapshot.diagnostics.push_back(Diagnostic{
+    result.diagnostics.push_back(Diagnostic{
         .severity = Severity::Error,
         .message = "No sequence dialect registered for '" + sequence->program.dialect.value + "'",
         .range = sequence->metadata.range.valid() ? std::optional<SourceRange>{sequence->metadata.range} : std::nullopt,
     });
   }
+  for (auto& diagnostic : result.diagnostics) {
+    if (!diagnostic.range) {
+      diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
+    }
+  }
 }
 
 }  // namespace
+
+Session::Session() : state_(std::make_unique<SessionState>()) {
+}
+
+Session::~Session() = default;
+Session::Session(Session&&) noexcept = default;
+Session& Session::operator=(Session&&) noexcept = default;
 
 void Session::registerFormat(FormatDefinition definition) {
   formats_.add(std::move(definition.module));
@@ -90,26 +104,38 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
       std::move(bytes));
 }
 
-SessionSnapshot Session::removeSource(SourceId id) {
-  sealRegistries();
-  if (!sources_.hasSlot(id)) {
-    throw std::out_of_range("Cannot remove a SourceId that is not present in the Session");
-  }
-
-  if (!sources_.contains(id)) {
-    return snapshot();
-  }
-
-  removeSourceFamily(id);
-  rebuildCollections();
-  return snapshot();
+void Session::removeSource(SourceId id) {
+  const std::array ids{id};
+  removeSources(ids);
 }
 
-SessionSnapshot Session::removeAssets(std::span<const AssetId> assets) {
+void Session::removeSources(std::span<const SourceId> ids) {
+  sealRegistries();
+  for (const SourceId id : ids) {
+    if (!sources_.hasSlot(id)) {
+      throw std::out_of_range("Cannot remove a SourceId that is not present in the Session");
+    }
+  }
+
+  std::vector<SourceId> removed;
+  for (const SourceId id : ids) {
+    if (sources_.contains(id)) {
+      removeSourceFamily(id, removed);
+    }
+  }
+  if (removed.empty()) {
+    return;
+  }
+
+  state_->removeSources(removed);
+  rebuildCollections();
+}
+
+void Session::removeAssets(std::span<const AssetId> assets) {
   sealRegistries();
   std::vector<SourceId> affectedRoots;
   for (const AssetId id : assets) {
-    const auto* asset = assets_.find(id);
+    const auto* asset = state_->asset(id);
     SourceId source = asset != nullptr ? metadata(*asset).range.source : SourceId{};
     if (!sources_.contains(source)) {
       continue;
@@ -122,53 +148,47 @@ SessionSnapshot Session::removeAssets(std::span<const AssetId> assets) {
     }
   }
 
-  const auto removedAssetIds = assets_.remove(assets);
-  if (removedAssetIds.empty()) {
-    return snapshot();
+  if (!state_->removeAssets(assets)) {
+    return;
   }
 
-  const std::vector<SourceId> noSources;
-  matchFacts_.removeForSourcesAndAssets(noSources, removedAssetIds);
-  explicitCollections_.removeForSourcesAndAssets(noSources, removedAssetIds);
-  const auto removedAnnotations = sourceMaps_.removeForAssets(removedAssetIds);
-  diagnostics_.removeForAssetsAndAnnotations(removedAssetIds, removedAnnotations);
-  collections_.markStaleForAssets(removedAssetIds);
-
+  std::vector<SourceId> removedSources;
   for (const SourceId root : affectedRoots) {
     const auto family = sources_.sourceFamily(root);
-    const bool hasAssets = std::ranges::any_of(assets_.all(), [&](const Asset& asset) {
+    const bool hasAssets = std::ranges::any_of(state_->assets(), [&](const Asset& asset) {
       return std::ranges::find(family, metadata(asset).range.source) != family.end();
     });
     if (hasAssets) {
       continue;
     }
-    removeSourceFamily(root);
+    removeSourceFamily(root, removedSources);
+  }
+  if (!removedSources.empty()) {
+    state_->removeSources(removedSources);
   }
 
   rebuildCollections();
-  return snapshot();
 }
 
 // Scan this source if it has not been scanned yet. Any files extracted from it are
 // added as derived sources and scanned before this call returns.
-SessionSnapshot Session::scanSource(SourceId id) {
+void Session::scanSource(SourceId id) {
   sealRegistries();
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
 
   if (scannedSources_.contains(id.value)) {
-    return snapshot();
+    return;
   }
 
   scanSourceAndDerived(id);
   rebuildCollections();
-  return snapshot();
 }
 
 // Scan every user-loaded source that is still pending. Derived sources are skipped
 // here because scanning their parent source already scans them.
-SessionSnapshot Session::scanPendingSources() {
+void Session::scanPendingSources() {
   sealRegistries();
   bool scannedAny = false;
   for (const SourceId source : sources_.activeUserSources()) {
@@ -183,25 +203,22 @@ SessionSnapshot Session::scanPendingSources() {
   if (scannedAny) {
     rebuildCollections();
   }
-
-  return snapshot();
 }
 
 SessionSnapshot Session::snapshot() const {
   SessionSnapshotBuilder current{
       .sources = sources_.sourceFiles(),
-      .assets = assets_.all(),
-      .matchFacts = matchFacts_.all(),
-      .collections = collections_.all(),
-      .sourceMap = sourceMaps_.all(),
-      .diagnostics = diagnostics_.all(),
+      .assets = state_->assets(),
+      .matchFacts = state_->matchFacts(),
+      .collections = state_->collections(),
+      .sourceMap = state_->sourceMap(),
+      .diagnostics = state_->diagnostics(),
   };
-  addMissingSequenceDialectDiagnostics(current, dialects_);
   return current.finish();
 }
 
 std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
-  const auto* value = assets_.find(asset);
+  const auto* value = state_->asset(asset);
   if (value == nullptr) {
     return {};
   }
@@ -209,7 +226,7 @@ std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
   if (!sources_.contains(source)) {
     return {};
   }
-  return SourceInspection::create(metadata(*value), sourceMaps_.all(), sources_.sharedBytes(source));
+  return SourceInspection::create(metadata(*value), state_->sourceMapForAsset(asset), sources_.sharedBytes(source));
 }
 
 CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackRequest& request) const {
@@ -273,8 +290,8 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
         // hide data another registered module can still parse.
         shouldScan = module.canScan(source, bytes);
       } catch (const std::exception& ex) {
-        diagnostics_.addError(std::string(module.name) + " canScan failed: " + ex.what(),
-                              SourceRange{.source = source.id, .offset = 0, .size = source.size});
+        state_->addError(std::string(module.name) + " canScan failed: " + ex.what(),
+                         SourceRange{.source = source.id, .offset = 0, .size = source.size});
       }
       if (!shouldScan) {
         continue;
@@ -288,13 +305,14 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           .ids = ids_,
       });
       normalizeScanResult(result, ids_);
-      ScanCommit commit = ScanCommit::fromScanResult(source, std::move(result));
-      commit.validate(sources_, assets_);
-      commit.commit(assets_, matchFacts_, explicitCollections_, sourceMaps_, diagnostics_);
-      addExtractedSources(std::move(commit.extractedSources), source.id, queue, queued);
+      prepareDiagnostics(result, source, dialects_);
+      validateScanResult(source.id, result, sources_, state_->assets()).throwIfErrors();
+      auto extractedSources = std::exchange(result.extractedSources, {});
+      state_->appendScan(source.id, std::move(result));
+      addExtractedSources(std::move(extractedSources), source.id, queue, queued);
     } catch (const std::exception& ex) {
-      diagnostics_.addError(std::string(module.name) + " scan failed: " + ex.what(),
-                            SourceRange{.source = source.id, .offset = 0, .size = source.size});
+      state_->addError(std::string(module.name) + " scan failed: " + ex.what(),
+                       SourceRange{.source = source.id, .offset = 0, .size = source.size});
     }
   }
 }
@@ -315,34 +333,20 @@ void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources,
   }
 }
 
-void Session::removeSourceFamily(SourceId source) {
-  const auto removedSources = sources_.removeFamily(source);
-  for (const SourceId removed : removedSources) {
+void Session::removeSourceFamily(SourceId source, std::vector<SourceId>& removedSources) {
+  auto family = sources_.removeFamily(source);
+  for (const SourceId removed : family) {
     scannedSources_.erase(removed.value);
   }
-  removeDiscoveredDataForSources(removedSources);
-}
-
-void Session::removeDiscoveredDataForSources(const std::vector<SourceId>& sources) {
-  const auto removedAssetIds = assets_.removeForSources(sources);
-  matchFacts_.removeForSourcesAndAssets(sources, removedAssetIds);
-  explicitCollections_.removeForSourcesAndAssets(sources, removedAssetIds);
-  sourceMaps_.removeForSources(sources);
-  diagnostics_.removeForSources(sources);
-  collections_.markStaleForAssets(removedAssetIds);
+  removedSources.insert(removedSources.end(), family.begin(), family.end());
 }
 
 // Ask registered formats which collections should exist for the current assets and
 // match facts, then merge those answers into the session.
 void Session::rebuildCollections() {
-  const auto current = snapshot();
+  const MatchContext context{sources_, state_->assets(), state_->matchFacts()};
 
-  MatchContext context{
-      .sources = sources_,
-      .snapshot = current,
-  };
-
-  std::map<std::string, std::vector<DesiredCollection>> desiredByResolver = explicitCollections_.desiredByResolver();
+  auto desiredByResolver = state_->desiredCollectionsByResolver();
   std::set<std::string> failedResolvers;
   for (const auto& module : formats_.modules()) {
     if (module.resolveCollections == nullptr) {
@@ -358,7 +362,7 @@ void Session::rebuildCollections() {
                                 std::make_move_iterator(desired.end()));
     } catch (const std::exception& ex) {
       failedResolvers.insert(resolverId);
-      diagnostics_.addError(std::string(module.name) + " resolveCollections failed: " + ex.what());
+      state_->addError(std::string(module.name) + " resolveCollections failed: " + ex.what());
     }
   }
 
@@ -366,7 +370,7 @@ void Session::rebuildCollections() {
     if (failedResolvers.contains(resolverId)) {
       continue;
     }
-    collections_.reconcile(resolverId, std::move(desiredCollections), assets_, diagnostics_, ids_);
+    state_->reconcileCollections(resolverId, std::move(desiredCollections), ids_);
   }
 }
 

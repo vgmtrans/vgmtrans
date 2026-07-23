@@ -505,7 +505,8 @@ void akaoScanPreparesInstrumentSetWithoutProvisionalAsset() {
   Session session;
   session.registerFormat(akaoDefinition());
   session.addSource(SourceFile{.name = "Chrono Cross synthetic.psf"}, bytes);
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
 
   u32 sequenceAssets = 0;
   u32 instrumentAssets = 0;
