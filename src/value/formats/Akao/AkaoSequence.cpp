@@ -202,9 +202,10 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
 }
 
 [[nodiscard]] DecodedBytecodeCommand tempo(AkaoEvent& event, const AkaoProfile& profile) {
-  const u16 raw = event.u16le("tempo");
-  const double bpm = event.derived("beats_per_minute", profile.tempoBpm(raw));
-  const u32 micros = event.derived("microseconds_per_quarter", profile.tempoMicrosPerQuarter(raw));
+  const u16 raw = event.u16le("raw");
+  const double bpm =
+      event.derived("tempo", profile.tempoBpm(raw), SourceValueDisplay::BeatsPerMinute);
+  const u32 micros = profile.tempoMicrosPerQuarter(raw);
   event.set<&TrackState::tempoBpm>(bpm).set<&TrackState::microsecondsPerQuarter>(micros);
   return event.emitTempo(micros);
 }
@@ -271,9 +272,10 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     case 0x01: {
       auto event = subCommand(cursor, "Tempo Fade", SequenceSemantic::Tempo);
       const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
-      const u16 raw = event.u16le("tempo");
-      const double bpm = event.derived("target_beats_per_minute", profile.tempoBpm(raw));
-      const u32 micros = event.derived("target_microseconds_per_quarter", profile.tempoMicrosPerQuarter(raw));
+      const u16 raw = event.u16le("raw");
+      const double bpm = event.derived("target_tempo", profile.tempoBpm(raw),
+                                       SourceValueDisplay::BeatsPerMinute);
+      const u32 micros = profile.tempoMicrosPerQuarter(raw);
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, double targetBpm, u32 targetMicros) {
             const u64 startTick = playback.vm.tick();

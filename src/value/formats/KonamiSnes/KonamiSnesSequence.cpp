@@ -981,8 +981,9 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xea: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u8 tempo = event.u8("tempo");
-      event.derived("microseconds_per_quarter", tempoMicrosecondsPerQuarter(version, tempo));
+      const u8 tempo = event.u8("raw");
+      event.derived("tempo", tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(version, tempo)),
+                    SourceValueDisplay::BeatsPerMinute);
       return event.invoke<&Playback::tempo>(tempo);
     }
     case 0xeb:

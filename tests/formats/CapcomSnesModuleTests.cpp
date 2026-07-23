@@ -389,11 +389,12 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   }
   expect(firstTrack.commands[0].opcode == 0x05,
          "CapcomSnes tempo should be a compiled command with source metadata");
-  const SemanticOperand* tempo = semanticOperand(firstTrack.commands[0], "microseconds_per_quarter");
-  expect(tempo != nullptr && std::get<u64>(tempo->value) == 42191 && tempo->encodedValue &&
+  const SemanticOperand* tempo = semanticOperand(firstTrack.commands[0], "tempo");
+  expect(tempo != nullptr && std::abs(std::get<double>(tempo->value) - 1422.10424024) < 0.000001 &&
+             tempo->display == SourceValueDisplay::BeatsPerMinute && tempo->encodedValue &&
              std::get<u64>(*tempo->encodedValue) == 0x1234,
-         "tempo command should retain resolved playback meaning and its encoded value");
-  expect(tempo->name == "microseconds_per_quarter" && tempo->encodedName == "raw",
+         "tempo command should retain readable BPM and its encoded value");
+  expect(tempo->name == "tempo" && tempo->encodedName == "raw",
          "semantic operands should retain generic SourceMap presentation metadata");
   expect(tempo->range.offset == 0x3001 && tempo->range.size == 2,
          "typed operands should retain their exact source range");
@@ -446,7 +447,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto hasTempoField = [&](std::string_view name) {
     return std::ranges::any_of(tempoAnnotation.fields, [&](const SourceField& field) { return field.name == name; });
   };
-  expect(hasTempoField("opcode") && hasTempoField("raw") && hasTempoField("microseconds_per_quarter"),
+  expect(hasTempoField("opcode") && hasTempoField("raw") && hasTempoField("tempo"),
          "CapcomSnes tempo annotation should record opcode, raw operand, and interpreted tempo");
   const auto* sequenceHeader = annotationWithKind(sourceMap, source, SourceRole::Header, "capcom-snes-sequence-header");
   expect(sequenceHeader != nullptr && sequenceHeader->range.offset == 0x2001 && sequenceHeader->range.size == 16,
@@ -741,7 +742,7 @@ void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{7}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   const std::string decoded = decodedTrackSnapshot(track);
-  constexpr std::string_view expectedDecoded = "3000:5:3,microseconds_per_quarter=42191<4660>,flow=0->3003|"
+  constexpr std::string_view expectedDecoded = "3000:5:3,tempo=1422.10424<4660>,flow=0->3003|"
                                                "3003:8:2,instrument=0,flow=0->3005|"
                                                "3005:7:2,linear_gain=0.403921569<64>,flow=0->3007|"
                                                "3007:24:2,left_gain=0.6328125<0>,right_gain=0.6328125,flow=0->3009|"

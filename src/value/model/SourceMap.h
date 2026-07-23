@@ -116,6 +116,7 @@ enum class SourceValueDisplay : u8 {
   Cents,
   Decibels,
   MidiNote,
+  BeatsPerMinute,
   Ascii,
   Enum,
 };

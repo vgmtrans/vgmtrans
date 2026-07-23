@@ -16,6 +16,10 @@
 
 namespace vgmtrans::core {
 
+[[nodiscard]] constexpr double tempoBeatsPerMinute(u32 microsecondsPerQuarter) noexcept {
+  return microsecondsPerQuarter == 0 ? 0.0 : 60000000.0 / microsecondsPerQuarter;
+}
+
 struct PerformanceEventHeader {
   CommandId sourceCommand;
   SourceAnnotationId sourceAnnotation;
