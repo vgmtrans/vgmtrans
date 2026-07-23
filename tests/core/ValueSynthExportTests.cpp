@@ -476,6 +476,74 @@ void standaloneSynthExportsKeepNativeModulation() {
          "standalone DLS export should retain native modulation when no MIDI replacement exists");
 }
 
+PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepareContext& context) {
+  const AssetId samples = context.collection.sampleCollections.front();
+  return PreparedCollectionAssets{
+      .instrumentSets = {InstrumentSetAsset{
+          .metadata = AssetMetadata{.format = "Prepared Probe", .name = "Prepared Bank"},
+          .instruments = {Instrument{
+              .name = "Prepared Instrument",
+              .regions = {Region{.sample = SampleRef{.collection = samples, .index = 0}}},
+          }},
+      }},
+  };
+}
+
+ScanResult scanNoSources(const ScanInput&) {
+  return {};
+}
+
+void collectionPreparationReplacesDurableInstrumentSets() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
+  const SampleCollectionAsset samples{
+      .metadata = AssetMetadata{.id = AssetId{2}, .format = "Prepared Probe", .name = "Samples"},
+      .samples = SampleCollection{.samples = {Sample{
+                                      .name = "Zero",
+                                      .codec = AudioCodec::SnesBrr,
+                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                                      .sampleRate = 16000,
+                                  }}},
+  };
+  const InstrumentSetAsset durable{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Prepared Probe", .name = "Durable Bank"},
+      .instruments = {Instrument{
+          .name = "Durable Instrument",
+          .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
+      }},
+  };
+
+  test::SessionSnapshotBuilder builder;
+  builder.assets.emplace_back(durable);
+  builder.assets.emplace_back(samples);
+  builder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .key = CollectionKey{.resolver = "Prepared Probe", .value = "one"},
+      .name = "Prepared Probe",
+      .instrumentSets = {durable.metadata.id},
+      .sampleCollections = {samples.metadata.id},
+  });
+
+  FormatRegistry formats;
+  formats.add(FormatModule{
+      .name = "Prepared Probe",
+      .scan = scanNoSources,
+      .prepareCollection = prepareReplacementInstrumentSet,
+  });
+  formats.seal();
+  SequenceDialectRegistry dialects;
+  const auto artifacts = exportCollection(builder.finish(), sources, CollectionId{0},
+                                          ExportRequest{.kinds = {ExportKind::Dls}}, dialects, &formats);
+
+  expect(artifacts.size() == 1 && !artifacts.front().bytes.empty(),
+         "collection preparation replacement fixture should export a DLS");
+  const auto& dls = artifacts.front().bytes;
+  expect(readLe32(dls, asciiOffset(dls, "colh") + 8) == 1,
+         "prepared instrument sets should replace durable sets instead of being appended");
+  expect(containsAscii(dls, "Prepared Instrument") && !containsAscii(dls, "Durable Instrument"),
+         "collection export should use only the preparer's authoritative instrument view");
+}
+
 void exportDiagnosticsPreserveSourceRanges() {
   SourceStore sources;
   const auto validSource = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
@@ -704,6 +772,7 @@ void runValueSynthExportTests() {
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
+  collectionPreparationReplacesDurableInstrumentSets();
   exportDiagnosticsPreserveSourceRanges();
   collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair();
 }

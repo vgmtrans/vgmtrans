@@ -39,6 +39,8 @@ struct CollectionPrepareContext {
 };
 
 struct PreparedCollectionAssets {
+  // When a format prepares a collection, these are the complete instrument
+  // sets to use for that collection, replacing its durable scanned sets.
   std::vector<InstrumentSetAsset> instrumentSets;
   std::vector<Diagnostic> diagnostics;
 };

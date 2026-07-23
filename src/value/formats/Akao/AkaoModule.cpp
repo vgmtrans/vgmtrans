@@ -6,6 +6,8 @@
 
 #include "value/formats/Akao/Akao.h"
 
+#include "value/scan/CollectionResolver.h"
+
 #include <string>
 #include <utility>
 #include <vector>
@@ -87,6 +89,15 @@ void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const
   }
 }
 
+void addInstrumentSetFacts(ScanResultBuilder& result, ScanInstrumentSetRef instruments, ScanSequenceRef sequence) {
+  const MatchField sequenceAsset{
+      .name = std::string(kAkaoSequenceAssetField),
+      .value = std::to_string(sequence.id.value),
+  };
+  result.sourceFact(instruments.id,
+                    formatFact(std::string(kAkaoInstrumentSetFact), {sequenceAsset}));
+}
+
 void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets) {
   const AkaoPs1Version sourceVersion = determineVersionFromSource(input.source);
 
@@ -124,8 +135,13 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
       continue;
     }
 
+    const auto instrumentSetRef = result.reserveInstrumentSet();
+    auto instruments = result.instruments(instrumentSetRef);
+    parsed->analysis.requiredArticulations = buildAkaoInstrumentSet(input, parsed->analysis, {}, instruments);
     addSequenceFacts(result, sequenceRef, parsed->analysis, parsed->analysis.requiredArticulations);
+    addInstrumentSetFacts(result, instrumentSetRef, sequenceRef);
     result.sequence(sequenceRef, [&](AssetId) { return std::move(parsed->asset); });
+    result.instrumentSet(akaoInstrumentSetName(parsed->analysis), std::move(instruments));
   }
 }
 

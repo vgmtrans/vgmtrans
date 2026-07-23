@@ -941,7 +941,6 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
   SequenceProgram program = dialect.makeProgram(Address{offset});
   program.config.profile = static_cast<u32>(analysis.header.version);
 
-  SourceAnnotationId headerAnnotation;
   if (sourceMap != nullptr) {
     auto header = sourceMap->header("AKAO Sequence Header", reader.range(offset, analysis.header.trackHeaderOffset))
                       .kind("akao-sequence-header")
@@ -950,7 +949,6 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
                       .field("size", reader.range(offset + 6, 2), analysis.header.length)
                       .field("track_bits", reader.range(offset + profile.trackAllocationBitsOffset(), 4),
                              analysis.header.trackBits, SourceValueDisplay::Hex);
-    headerAnnotation = header.id();
     if (analysis.header.sampleSetId) {
       header.field("sample_set_id", reader.range(offset + 0x14, 2), *analysis.header.sampleSetId);
     }
@@ -970,9 +968,6 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
     analysis.references.merge(akaoSequenceReferences(track));
     program.tracks.push_back(std::move(track));
   }
-
-  analysis.requiredArticulations = analyzeAkaoInstrumentStructures(
-      reader, analysis, sourceMap, headerAnnotation.valid() ? std::optional{headerAnnotation} : std::nullopt);
 
   return AkaoSequenceParse{
       .asset =
