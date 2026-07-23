@@ -33,6 +33,9 @@ struct SynthExportResult {
   std::vector<Diagnostic> diagnostics;
 };
 
+[[nodiscard]] SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sources);
+[[nodiscard]] SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceStore& sources);
+
 struct SynthSampleDecodeOptions {
   bool requireMono = false;
   std::string nonMonoWarning;

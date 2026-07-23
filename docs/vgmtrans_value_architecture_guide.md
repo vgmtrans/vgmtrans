@@ -642,11 +642,11 @@ global SequenceVm scheduler
   ↓
 PerformanceSequence
   ↓
-PerformanceMidiRenderer
+renderMidiSequence
   ↓
 MidiSequence
   ↓
-MidiExporter
+encodeMidiFile
 ```
 
 ### 14.1 `SequenceProgram`
@@ -817,7 +817,7 @@ This is what makes future non-MIDI sequence export more plausible. The VM output
 
 ### 14.7 MIDI rendering
 
-`PerformanceMidiRenderer` converts `PerformanceSequence` into `MidiSequence`. This is where target-specific choices happen:
+`renderMidiSequence` converts `PerformanceSequence` into `MidiSequence`. This is where target-specific choices happen:
 
 - channel assignment;
 - bank select style;
@@ -965,9 +965,9 @@ MIDI export needs a sequence and a registered dialect. It renders like this:
 SequenceProgram
   ↓ SequenceVm
 PerformanceSequence
-  ↓ PerformanceMidiRenderer
+  ↓ renderMidiSequence
 MidiSequence
-  ↓ MidiExporter
+  ↓ encodeMidiFile
 .mid bytes
 ```
 

@@ -725,7 +725,7 @@ void akaoSnesV4TieExtendsShortenedPreviousNote() {
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
   expect(performance.diagnostics.empty(), "AkaoSnes V4 tie fixture should render without diagnostics");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   const auto note = std::ranges::find_if(
       midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
   expect(note != midi.tracks[0].events.end(), "AkaoSnes V4 tie fixture should render a MIDI note");

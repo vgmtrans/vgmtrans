@@ -586,7 +586,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           }
         } else if constexpr (std::is_same_v<TypedEvent, TimeSignaturePerformanceEvent>) {
           // Standard MIDI treats time signatures as global metadata. They are collected
-          // once and written to the first MIDI track by PerformanceMidiRenderer::render.
+          // once and written to the first MIDI track by renderMidiSequence.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
           const auto selection = instrumentSelection(typedEvent, instrumentSets);
           if (selection.address.bank != 0 || selection.forceBankSelect) {
@@ -815,9 +815,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
 
 }  // namespace
 
-MidiSequence PerformanceMidiRenderer::render(const PerformanceSequence& performance, MidiExportOptions options,
-                                             ModulationConversionPolicy modulationConversion,
-                                             std::span<const InstrumentSetAsset* const> instrumentSets) const {
+MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExportOptions options,
+                                ModulationConversionPolicy modulationConversion,
+                                std::span<const InstrumentSetAsset* const> instrumentSets) {
   MidiSequence sequence{
       .timebase = performance.timebase,
       .diagnostics = performance.diagnostics,

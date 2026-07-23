@@ -371,7 +371,7 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   expect(loopEnd != nullptr && loopEnd->header.sourceCommand == jumpCommand,
          "preserve-loop VM should link loop-end marker to the command that jumped back");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   const auto countMidiMarkers = [&](std::string_view text, u64 tick) {
     return std::ranges::count_if(midi.tracks[0].events, [text, tick](const MidiEvent& event) {
       const auto* marker = std::get_if<Marker>(&event);
@@ -488,7 +488,7 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   expect(mono != nullptr && mono->channels == 0 && !mono->header.sourceCommand.valid(),
          "initial mono mode should preserve explicit zero and should not pretend to come from a source command");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   const auto* midiPort = std::get_if<MidiPort>(&midi.tracks[0].events[0]);
   expect(midiPort != nullptr && midiPort->port == 0, "performance renderer should emit MIDI port metadata");
   const auto* midiReverb = std::get_if<Reverb>(&midi.tracks[0].events[1]);

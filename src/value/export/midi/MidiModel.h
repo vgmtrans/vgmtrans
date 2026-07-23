@@ -38,7 +38,7 @@ struct NoteDuration {
   u8 channel = 0;
   u8 key = 0;
   u8 velocity = 0;
-  // The renderer keeps note duration as one event. MidiExporter expands it to
+  // The renderer keeps note duration as one event. encodeMidiFile expands it to
   // note-on/note-off messages when writing the file.
   u32 duration = 0;
 };

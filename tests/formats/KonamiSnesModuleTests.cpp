@@ -314,14 +314,14 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::get<VibratoDelayPerformanceEvent>(*vibratoDelay).delayTicks == 2,
          "KonamiSnes vibrato delay should be converted to rendered sequence ticks");
 
-  const MidiSequence synthModulationMidi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence synthModulationMidi = renderMidiSequence(performance);
   expect(hasMidiEvent<VibratoDepth>(synthModulationMidi.tracks[0]) &&
              hasMidiEvent<VibratoFrequency>(synthModulationMidi.tracks[0]) &&
              hasMidiEvent<VibratoDelay>(synthModulationMidi.tracks[0]),
          "default KonamiSnes MIDI rendering should preserve synth modulation controllers");
 
-  const MidiSequence simulatedMidi = PerformanceMidiRenderer().render(
-      performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence simulatedMidi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   expect(!hasMidiEvent<VibratoDepth>(simulatedMidi.tracks[0]) &&
              !hasMidiEvent<VibratoFrequency>(simulatedMidi.tracks[0]) &&
              !hasMidiEvent<VibratoDelay>(simulatedMidi.tracks[0]),
@@ -476,7 +476,7 @@ void konamiSnesProgramChangeReemitsCurrentFineTune() {
   };
 
   const PerformanceSequence performance = renderKonamiSnesTrack(bytes);
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   const auto& events = midi.tracks[0].events;
 
   const auto programChange = std::ranges::find_if(events, [](const MidiEvent& event) {
@@ -540,7 +540,7 @@ void konamiSnesPercussionUsesPackedGsDrumBank() {
   };
 
   const PerformanceSequence performance = renderKonamiSnesTrack(bytes);
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance);
+  const MidiSequence midi = renderMidiSequence(performance);
   const auto& events = midi.tracks[0].events;
 
   const auto drumBank = std::ranges::find_if(events, [](const MidiEvent& event) {
@@ -621,8 +621,8 @@ void konamiSnesSequenceSimulationPreservesDriverVibratoDepth() {
                                                0xe0, 0x04, 0xff}});
   expect(performance.diagnostics.empty(), "KonamiSnes vibrato fixture should render without diagnostics");
 
-  const MidiSequence midi = PerformanceMidiRenderer().render(performance, MidiExportOptions{},
-                                                             ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   s16 maximumBend = 0;
   for (const MidiEvent& event : midi.tracks[0].events) {
     if (const auto* bend = std::get_if<PitchBend>(&event)) {
@@ -754,7 +754,7 @@ void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion() {
                                      return std::holds_alternative<NotePerformanceEvent>(event);
                                    }) == 2,
          "requested Konami sequence loops should replay the declared loop through shared loop policy");
-  const MidiSequence repeatedMidi = PerformanceMidiRenderer().render(repeated);
+  const MidiSequence repeatedMidi = renderMidiSequence(repeated);
   expect(std::ranges::count_if(repeatedMidi.tracks[0].events,
                                [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); }) == 2,
          "requested Konami loop playback should remain visible in default MIDI output");

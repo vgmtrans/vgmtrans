@@ -143,7 +143,6 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/base/Source.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.h
     ${PROJECT_SOURCE_DIR}/src/value/export/Export.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.h
@@ -153,7 +152,6 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.h
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.h
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.h
     ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.cpp

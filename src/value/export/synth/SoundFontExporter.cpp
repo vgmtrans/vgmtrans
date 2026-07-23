@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/export/synth/SoundFontExporter.h"
+#include "value/export/synth/SynthExportData.h"
 
 #include "value/export/BinaryWriter.h"
 #include "value/export/ExportDiagnostics.h"
@@ -665,8 +665,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 
 }  // namespace
 
-SynthExportResult SoundFontExporter::exportSoundFont(const SynthExportInput& input,
-                                                     const SourceStore& sources) const {
+SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceStore& sources) {
   SynthExportResult result;
 
   // SoundFont 2 sample data is mono PCM16. Shared decode/resolve helpers do the expensive

@@ -14,9 +14,6 @@
 namespace vgmtrans::core {
 
 // Writes decoded PCM16 sample data as a minimal RIFF/WAVE file.
-class WavExporter {
-public:
-  [[nodiscard]] std::vector<u8> exportPcm16(const DecodedSample& sample) const;
-};
+[[nodiscard]] std::vector<u8> encodePcm16Wav(const DecodedSample& sample);
 
 }  // namespace vgmtrans::core
