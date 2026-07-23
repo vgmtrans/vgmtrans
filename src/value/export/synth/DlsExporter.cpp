@@ -519,8 +519,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 
 }  // namespace
 
-DlsResult DlsExporter::exportDls(const DlsInput& input, const SourceStore& sources) const {
-  DlsResult result;
+SynthExportResult DlsExporter::exportDls(const SynthExportInput& input, const SourceStore& sources) const {
+  SynthExportResult result;
 
   // DLS accepts the decoded PCM view directly. After shared sample/instrument resolution,
   // this function is mostly RIFF table assembly.

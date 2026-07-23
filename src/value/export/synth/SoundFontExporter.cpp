@@ -665,8 +665,9 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 
 }  // namespace
 
-SoundFontResult SoundFontExporter::exportSoundFont(const SoundFontInput& input, const SourceStore& sources) const {
-  SoundFontResult result;
+SynthExportResult SoundFontExporter::exportSoundFont(const SynthExportInput& input,
+                                                     const SourceStore& sources) const {
+  SynthExportResult result;
 
   // SoundFont 2 sample data is mono PCM16. Shared decode/resolve helpers do the expensive
   // source work once before this file-specific table writer assembles RIFF chunks.

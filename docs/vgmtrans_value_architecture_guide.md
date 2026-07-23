@@ -954,6 +954,8 @@ Export first resolves one collection into typed pointers:
 - diagnostics for missing or wrong-type references.
 
 Export resolves these references privately through the snapshot's typed asset lookup.
+SF2 and DLS then consume the same private synth-export input and result values;
+only their container writers differ.
 
 ### 16.2 MIDI export
 
