@@ -148,9 +148,13 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.h
     ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.h
     ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.h
     ${PROJECT_SOURCE_DIR}/src/value/validation/ValidationReport.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/ValidationReport.h
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
@@ -201,10 +205,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.h
       ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.h
       ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.h
-      ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.h
-      ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.h
-      ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.h
-      ${PROJECT_SOURCE_DIR}/src/value/validation/ValidationReport.h
 )
 target_include_directories(
   vgmtransvaluecore

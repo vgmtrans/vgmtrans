@@ -7,34 +7,10 @@
 #include "value/model/SessionSnapshot.h"
 
 #include <algorithm>
-#include <string>
 #include <utility>
 #include <variant>
 
 namespace vgmtrans::core {
-
-namespace {
-
-[[nodiscard]] Diagnostic snapshotError(std::string message) {
-  return Diagnostic{
-      .severity = Severity::Error,
-      .message = std::move(message),
-  };
-}
-
-}  // namespace
-
-std::vector<Diagnostic> AssetResolutionDiagnostics::all() const {
-  std::vector<Diagnostic> diagnostics;
-  diagnostics.reserve(collection.size() + sequence.size() + instrumentSets.size() + sampleCollections.size() +
-                      miscAssets.size());
-  diagnostics.insert(diagnostics.end(), collection.begin(), collection.end());
-  diagnostics.insert(diagnostics.end(), sequence.begin(), sequence.end());
-  diagnostics.insert(diagnostics.end(), instrumentSets.begin(), instrumentSets.end());
-  diagnostics.insert(diagnostics.end(), sampleCollections.begin(), sampleCollections.end());
-  diagnostics.insert(diagnostics.end(), miscAssets.begin(), miscAssets.end());
-  return diagnostics;
-}
 
 AssetMetadata& metadata(Asset& asset) {
   return std::visit([](auto& typedAsset) -> AssetMetadata& { return typedAsset.metadata; }, asset);
@@ -117,70 +93,6 @@ const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) cons
     }
   }
   return nullptr;
-}
-
-const Asset* assetById(const SessionSnapshot& snapshot, AssetId id) {
-  return snapshot.asset(id);
-}
-
-const Collection* collectionById(const SessionSnapshot& snapshot, CollectionId id) {
-  return snapshot.collection(id);
-}
-
-ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id) {
-  if (const auto* collection = collectionById(snapshot, id)) {
-    return resolveCollectionAssets(snapshot, *collection);
-  }
-
-  ResolvedAssets resolved;
-  resolved.diagnostics.collection.push_back(snapshotError("CollectionId was not found in the SessionSnapshot"));
-  return resolved;
-}
-
-ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, const Collection& collection) {
-  // Resolve collection references once before export. The returned pointers are the usable
-  // assets; diagnostics describe any missing or wrong-type references.
-  ResolvedAssets resolved{
-      .collection = &collection,
-  };
-
-  if (collection.sequence) {
-    if (const auto* sequenceProgram = assetById<SequenceProgramAsset>(snapshot, *collection.sequence)) {
-      resolved.sequenceProgram = sequenceProgram;
-    } else {
-      resolved.diagnostics.sequence.push_back(snapshotError("Collection sequence asset was not found"));
-    }
-  }
-
-  resolved.instrumentSets.reserve(collection.instrumentSets.size());
-  for (const auto id : collection.instrumentSets) {
-    if (const auto* instrumentSet = assetById<InstrumentSetAsset>(snapshot, id)) {
-      resolved.instrumentSets.push_back(instrumentSet);
-    } else {
-      resolved.diagnostics.instrumentSets.push_back(snapshotError("Collection instrument set asset was not found"));
-    }
-  }
-
-  resolved.sampleCollections.reserve(collection.sampleCollections.size());
-  for (const auto id : collection.sampleCollections) {
-    if (const auto* sampleCollection = assetById<SampleCollectionAsset>(snapshot, id)) {
-      resolved.sampleCollections.push_back(sampleCollection);
-    } else {
-      resolved.diagnostics.sampleCollections.push_back(
-          snapshotError("Collection sample collection asset was not found"));
-    }
-  }
-
-  resolved.miscAssets.reserve(collection.miscAssets.size());
-  for (const auto id : collection.miscAssets) {
-    if (const auto* misc = assetById<MiscAsset>(snapshot, id)) {
-      resolved.miscAssets.push_back(misc);
-    } else {
-      resolved.diagnostics.miscAssets.push_back(snapshotError("Collection misc asset was not found"));
-    }
-  }
-
-  return resolved;
 }
 
 }  // namespace vgmtrans::core

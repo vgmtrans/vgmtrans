@@ -300,7 +300,18 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
       });
       normalizeScanResult(result, ids_);
       prepareDiagnostics(result, source, dialects_);
-      validateScanResult(source.id, result, sources_, state_->assets()).throwIfErrors();
+      auto validation = validateScanResult(source.id, result, sources_, state_->assets());
+      if (!validation.empty()) {
+        auto diagnostics = validation.takeDiagnostics();
+        for (auto& diagnostic : diagnostics) {
+          diagnostic.message = std::string(module.name) + " scan failed: " + diagnostic.message;
+          if (!diagnostic.range || !sources_.contains(diagnostic.range->source)) {
+            diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
+          }
+        }
+        state_->addDiagnostics(std::move(diagnostics));
+        continue;
+      }
       auto extractedSources = std::exchange(result.extractedSources, {});
       state_->appendScan(source.id, std::move(result));
       addExtractedSources(std::move(extractedSources), source.id, queue, queued);

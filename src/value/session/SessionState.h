@@ -44,6 +44,7 @@ public:
   void removeSources(std::span<const SourceId> sources);
 
   void addError(std::string message, std::optional<SourceRange> range = std::nullopt);
+  void addDiagnostics(std::vector<Diagnostic> diagnostics);
 
   [[nodiscard]] SourceMap sourceMap() const;
   [[nodiscard]] SourceMap sourceMapForAsset(AssetId asset) const;

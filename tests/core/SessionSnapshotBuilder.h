@@ -10,12 +10,11 @@
 
 #include <utility>
 
-namespace vgmtrans::core {
+namespace vgmtrans::core::test {
 
-// Raw snapshot construction is useful for focused pure-consumer tests, but it
-// deliberately bypasses Session admission and is not part of the production
-// model. These fixtures do not define which states Session may publish.
-class SessionSnapshotTestBuilder {
+// Raw snapshot construction deliberately bypasses Session admission. Keep it
+// explicit in the few pure-consumer tests that need otherwise-unpublishable state.
+class SessionSnapshotBuilder {
 public:
   std::vector<SourceFile> sources;
   std::vector<Asset> assets;
@@ -30,4 +29,4 @@ public:
   }
 };
 
-}  // namespace vgmtrans::core
+}  // namespace vgmtrans::core::test

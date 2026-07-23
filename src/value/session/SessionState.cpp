@@ -156,6 +156,11 @@ void SessionState::addError(std::string message, std::optional<SourceRange> rang
   });
 }
 
+void SessionState::addDiagnostics(std::vector<Diagnostic> diagnostics) {
+  diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(diagnostics.begin()),
+                      std::make_move_iterator(diagnostics.end()));
+}
+
 SourceMap SessionState::sourceMap() const {
   return SourceMap{annotations_};
 }

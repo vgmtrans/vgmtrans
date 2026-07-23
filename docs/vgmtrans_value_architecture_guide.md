@@ -951,10 +951,9 @@ Export first resolves one collection into typed pointers:
 - sequence program;
 - instrument sets;
 - sample collections;
-- miscellaneous assets;
 - diagnostics for missing or wrong-type references.
 
-This is done by `resolveCollectionAssets` on the snapshot.
+Export resolves these references privately through the snapshot's typed asset lookup.
 
 ### 16.2 MIDI export
 
@@ -995,9 +994,10 @@ Validation is split by boundary and model:
 - synth validation checks instrument and sample model structure;
 - collection reconciliation checks collection references against admitted assets.
 
-`ValidationReport` is a small accumulator over ordinary `Diagnostic` values. It
-adds composition and the scan-admission throwing policy without introducing a
-parallel validation-only error model.
+`ValidationReport` only composes ordinary `Diagnostic` values. Admission
+failures are transferred directly into session diagnostics, preserving their
+codes and source ranges; exceptions are reserved for unexpected failures rather
+than validation control flow.
 
 Snapshots do not run a second whole-session audit. They are read-only copies of
 state that has already crossed those gates. This keeps invariant ownership at

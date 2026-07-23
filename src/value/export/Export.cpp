@@ -84,6 +84,60 @@ namespace {
   return {ExportKind::Midi};
 }
 
+struct AssetResolutionDiagnostics {
+  std::vector<Diagnostic> collection;
+  std::vector<Diagnostic> sequence;
+  std::vector<Diagnostic> instrumentSets;
+  std::vector<Diagnostic> sampleCollections;
+};
+
+struct ResolvedAssets {
+  const Collection* collection = nullptr;
+  const SequenceProgramAsset* sequenceProgram = nullptr;
+  std::vector<const InstrumentSetAsset*> instrumentSets;
+  std::vector<const SampleCollectionAsset*> sampleCollections;
+  AssetResolutionDiagnostics diagnostics;
+};
+
+[[nodiscard]] ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id) {
+  ResolvedAssets resolved;
+  resolved.collection = snapshot.collection(id);
+  if (resolved.collection == nullptr) {
+    resolved.diagnostics.collection.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
+    return resolved;
+  }
+  const Collection& collection = *resolved.collection;
+
+  if (collection.sequence) {
+    if (const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.sequence)) {
+      resolved.sequenceProgram = sequence;
+    } else {
+      resolved.diagnostics.sequence.push_back(exportError("Collection sequence asset was not found"));
+    }
+  }
+
+  resolved.instrumentSets.reserve(collection.instrumentSets.size());
+  for (const auto assetId : collection.instrumentSets) {
+    if (const auto* instrumentSet = snapshot.asset<InstrumentSetAsset>(assetId)) {
+      resolved.instrumentSets.push_back(instrumentSet);
+    } else {
+      resolved.diagnostics.instrumentSets.push_back(exportError("Collection instrument set asset was not found"));
+    }
+  }
+
+  resolved.sampleCollections.reserve(collection.sampleCollections.size());
+  for (const auto assetId : collection.sampleCollections) {
+    if (const auto* samples = snapshot.asset<SampleCollectionAsset>(assetId)) {
+      resolved.sampleCollections.push_back(samples);
+    } else {
+      resolved.diagnostics.sampleCollections.push_back(
+          exportError("Collection sample collection asset was not found"));
+    }
+  }
+
+  return resolved;
+}
+
 struct PreparedExport {
   std::string baseName;
   ResolvedAssets assets;

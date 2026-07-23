@@ -6,10 +6,16 @@
 
 #include "ValueTestSupport.h"
 
+#include "SessionSnapshotBuilder.h"
+
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
 
 namespace {
+
+[[nodiscard]] std::string firstValidationMessage(ValidationReport report) {
+  return report.empty() ? std::string{} : report.diagnostics().front().message;
+}
 
 void sessionScansValuesAndDerivedSources() {
   Session session;
@@ -36,14 +42,14 @@ void sessionScansValuesAndDerivedSources() {
   const auto* sequence = std::get_if<SequenceProgramAsset>(&snapshot.assets()[0]);
   expect(sequence != nullptr, "first asset should be a sequence");
   expect(sequence->metadata.id == AssetId{0}, "sequence should keep allocated asset id");
-  expect(assetById(snapshot, sequence->metadata.id) == &snapshot.assets()[0],
+  expect(snapshot.asset(sequence->metadata.id) == &snapshot.assets()[0],
          "session snapshot should find an asset by stable id");
-  expect(assetById<SequenceProgramAsset>(snapshot, sequence->metadata.id) == sequence,
+  expect(snapshot.asset<SequenceProgramAsset>(sequence->metadata.id) == sequence,
          "session snapshot should find a sequence program asset by stable id");
-  expect(assetById<MiscAsset>(snapshot, sequence->metadata.id) == nullptr,
+  expect(snapshot.asset<MiscAsset>(sequence->metadata.id) == nullptr,
          "session snapshot should reject asset id lookups with the wrong value type");
-  expect(assetById(snapshot, AssetId{99}) == nullptr, "session snapshot should return null for a missing asset id");
-  expect(assetById<SequenceProgramAsset>(snapshot, AssetId{99}) == nullptr,
+  expect(snapshot.asset(AssetId{99}) == nullptr, "session snapshot should return null for a missing asset id");
+  expect(snapshot.asset<SequenceProgramAsset>(AssetId{99}) == nullptr,
          "session snapshot should return null for a missing asset id");
   const SourceMap& sourceMap = snapshot.sourceMap();
   const auto sequenceAnnotations = sourceMap.withRole(sourceId, SourceRole::Sequence);
@@ -58,9 +64,9 @@ void sessionScansValuesAndDerivedSources() {
   expect(sourceMap.find(SourceAnnotationId{99}) == nullptr,
          "source map should return null for a missing annotation id");
   expect(snapshot.collections()[0].sequence == sequence->metadata.id, "collection should reference sequence asset");
-  expect(collectionById(snapshot, snapshot.collections()[0].id) == &snapshot.collections()[0],
+  expect(snapshot.collection(snapshot.collections()[0].id) == &snapshot.collections()[0],
          "session snapshot should find a collection by stable id");
-  expect(collectionById(snapshot, CollectionId{99}) == nullptr,
+  expect(snapshot.collection(CollectionId{99}) == nullptr,
          "session snapshot should return null for a missing collection id");
 
   const auto* misc = std::get_if<MiscAsset>(&snapshot.assets()[1]);
@@ -382,6 +388,10 @@ void sessionRejectsDuplicateAssetIdsAtAdmission() {
   const SessionSnapshot project = session.snapshot();
   expect(project.assets().empty(), "duplicate asset ids should reject the whole scan result before admission");
   expect(project.collections().empty(), "rejected duplicate asset scan should not create collections");
+  expect(diagnosticWithMessage(project.diagnostics(),
+                               "ProbeDuplicate scan failed: Scan result contained duplicate asset id 7")
+             .code == "scan.asset.duplicate-id",
+         "session admission should preserve structured validation diagnostics");
   expectDiagnosticRange(project.diagnostics(), "ProbeDuplicate scan failed: Scan result contained duplicate asset id 7",
                         SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
@@ -466,7 +476,7 @@ void scanValidationReportsMultipleAdmissionErrors() {
   };
 
   const auto report = validateScanResult(source, result, sources, {});
-  expect(report.hasErrors(), "scan validation should report admission errors");
+  expect(!report.empty(), "scan validation should report admission errors");
 
   bool sawDuplicateAsset = false;
   bool sawForeignSource = false;
@@ -620,12 +630,7 @@ void scanValidationRejectsOutOfBoundsScanResultRanges() {
     ScanResult result = badRangeScanResult(testCase.kind, ids.nextAssetId(), sources.reader(source).range(0, 2),
                                            sources.reader(source).range(3, 1));
     normalizeScanResult(result, ids);
-    std::string message;
-    try {
-      validateScanResult(source, result, sources, {}).throwIfErrors();
-    } catch (const std::invalid_argument& ex) {
-      message = ex.what();
-    }
+    const auto message = firstValidationMessage(validateScanResult(source, result, sources, {}));
     expect(message == testCase.message, "scan validation should reject out-of-bounds source ranges");
   }
 }
@@ -645,12 +650,7 @@ void scanValidationRejectsRangeLessSourceAnnotations() {
           },
       }},
   };
-  std::string message;
-  try {
-    validateScanResult(source, result, sources, {}).throwIfErrors();
-  } catch (const std::invalid_argument& ex) {
-    message = ex.what();
-  }
+  const auto message = firstValidationMessage(validateScanResult(source, result, sources, {}));
   expect(message == "Scan result contained source annotation without a primary source range",
          "scan validation should reject source annotations without primary ranges");
 }
@@ -661,13 +661,7 @@ void scanValidationRejectsDanglingSourceAnnotationReferences() {
   const SourceRange range = sources.reader(source).range(0, 1);
 
   const auto validate = [&](ScanResult result) {
-    std::string message;
-    try {
-      validateScanResult(source, result, sources, {}).throwIfErrors();
-    } catch (const std::invalid_argument& ex) {
-      message = ex.what();
-    }
-    return message;
+    return firstValidationMessage(validateScanResult(source, result, sources, {}));
   };
 
   expect(validate(ScanResult{
@@ -815,97 +809,6 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   expect(removedParentFailed, "derived source parent must still be active");
 }
 
-void sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs() {
-  SessionSnapshotTestBuilder builder;
-  builder.assets.emplace_back(SequenceProgramAsset{
-      .metadata =
-          AssetMetadata{
-              .id = AssetId{0},
-              .format = "Probe",
-              .name = "Sequence",
-          },
-      .program =
-          SequenceProgram{
-              .dialect = DialectId{.value = "probe"},
-              .timebase = Timebase{.ppqn = 48},
-          },
-  });
-  builder.assets.emplace_back(InstrumentSetAsset{
-      .metadata =
-          AssetMetadata{
-              .id = AssetId{1},
-              .format = "Probe",
-              .name = "Instruments",
-          },
-  });
-  builder.assets.emplace_back(SampleCollectionAsset{
-      .metadata =
-          AssetMetadata{
-              .id = AssetId{2},
-              .format = "Probe",
-              .name = "Samples",
-          },
-  });
-  builder.assets.emplace_back(MiscAsset{
-      .metadata =
-          AssetMetadata{
-              .id = AssetId{3},
-              .format = "Probe",
-              .name = "Misc",
-          },
-  });
-  builder.collections.push_back(Collection{
-      .id = CollectionId{0},
-      .name = "Full",
-      .sequence = AssetId{0},
-      .instrumentSets = {AssetId{1}, AssetId{41}},
-      .sampleCollections = {AssetId{2}, AssetId{42}},
-      .miscAssets = {AssetId{3}, AssetId{43}},
-  });
-  builder.collections.push_back(Collection{
-      .id = CollectionId{1},
-      .name = "Samples Only",
-      .sampleCollections = {AssetId{2}},
-  });
-
-  const SessionSnapshot project = builder.finish();
-
-  const auto full = resolveCollectionAssets(project, CollectionId{0});
-  expect(full.collection == &project.collections()[0], "collection asset resolver should preserve the collection");
-  expect(full.sequenceProgram == std::get_if<SequenceProgramAsset>(&project.assets()[0]),
-         "collection asset resolver should resolve the typed sequence program asset");
-  expect(full.instrumentSets.size() == 1 &&
-             full.instrumentSets[0] == std::get_if<InstrumentSetAsset>(&project.assets()[1]),
-         "collection asset resolver should resolve typed instrument set assets");
-  expect(full.sampleCollections.size() == 1 &&
-             full.sampleCollections[0] == std::get_if<SampleCollectionAsset>(&project.assets()[2]),
-         "collection asset resolver should resolve typed sample collection assets");
-  expect(full.miscAssets.size() == 1 && full.miscAssets[0] == std::get_if<MiscAsset>(&project.assets()[3]),
-         "collection asset resolver should resolve typed misc assets");
-  expect(full.diagnostics.sequence.empty(), "valid sequence references should not produce diagnostics");
-  expect(full.diagnostics.instrumentSets.size() == 1,
-         "collection asset resolver should report broken instrument references separately");
-  expect(full.diagnostics.sampleCollections.size() == 1,
-         "collection asset resolver should report broken sample references separately");
-  expect(full.diagnostics.miscAssets.size() == 1,
-         "collection asset resolver should report broken misc references separately");
-  expect(full.diagnostics.all().size() == 3, "collection asset resolver should aggregate reference diagnostics");
-
-  const auto samplesOnly = resolveCollectionAssets(project, CollectionId{1});
-  expect(samplesOnly.collection == &project.collections()[1],
-         "collection asset resolver should resolve sample-only collections");
-  expect(samplesOnly.sequenceProgram == nullptr, "sample-only collections should not report a sequence asset");
-  expect(samplesOnly.diagnostics.sequence.empty(),
-         "absent optional sequence references should not be treated as broken references");
-  expect(samplesOnly.sampleCollections.size() == 1,
-         "sample-only collections should still resolve their sample collections");
-
-  const auto missing = resolveCollectionAssets(project, CollectionId{99});
-  expect(missing.collection == nullptr, "missing collection resolver result should not expose a collection");
-  expect(missing.diagnostics.collection.size() == 1,
-         "missing collection resolver result should report a collection diagnostic");
-}
-
 void sessionStateRebuildsLookupIndexAfterRemoval() {
   SessionState state;
   std::vector<Asset> firstSourceAssets;
@@ -1036,7 +939,7 @@ void sessionExportsASequenceWithoutACollection() {
 }
 
 void snapshotFindsTheFirstCollectionContainingAnAsset() {
-  SessionSnapshotTestBuilder builder;
+  test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(MiscAsset{.metadata = AssetMetadata{.id = AssetId{4}, .name = "Shared"}});
   builder.collections = {
       Collection{.id = CollectionId{8}, .name = "First", .miscAssets = {AssetId{4}}},
@@ -1077,7 +980,6 @@ void runValueSessionTests() {
   sessionReportsDesiredCollectionWrongTypeReferences();
   sessionReportsDuplicateDesiredCollectionKeys();
   sourceStoreRejectsMissingOrRemovedDerivedParents();
-  sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs();
   sessionStateRebuildsLookupIndexAfterRemoval();
   sessionAddsSourceFromPath();
   sessionExportsAllCollections();
