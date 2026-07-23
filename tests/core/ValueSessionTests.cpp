@@ -209,30 +209,38 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
   expect(project.sources()[0].id == replacement, "replacement user source should keep its new stable id");
 }
 
-void sessionRemovesIndividualAssetsWithoutClosingTheirSource() {
+void sessionRemovesSourceFamilyWithItsLastAsset() {
   Session session;
-  session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(probeMiscModule());
 
-  const SourceId source = session.addSource(SourceFile{.name = "remove-asset.probe"}, {0xab});
+  const SourceId source = session.addSource(SourceFile{.name = "remove-assets.probe"}, {0xaa, 0x34});
   SessionSnapshot project = session.scanSource(source);
-  expect(project.assets().size() == 1 && project.collections().size() == 1,
-         "individual asset removal fixture should publish one asset and collection");
-  expect(!project.sourceMap().empty(), "individual asset removal fixture should publish source annotations");
-  const AssetId asset = metadata(project.assets().front()).id;
+  expect(project.sources().size() == 2 && project.assets().size() == 2,
+         "asset removal fixture should publish assets from a user and derived source");
+  const AssetId sequence = metadata(project.assets()[0]).id;
+  const AssetId misc = metadata(project.assets()[1]).id;
 
-  const std::array assets{asset};
-  project = session.removeAssets(assets);
-  expect(project.sources().size() == 1 && project.source(source) != nullptr,
-         "removing a detected asset should leave its scanned source loaded");
-  expect(project.assets().empty(), "removed detected asset should disappear from the snapshot");
-  expect(project.collections().empty(), "collections depending on a removed asset should be reconciled");
-  expect(project.sourceMap().empty(), "owned source annotations should be removed with their detected asset");
+  const std::array firstRemoval{sequence};
+  project = session.removeAssets(firstRemoval);
+  expect(project.sources().size() == 2 && project.source(source) != nullptr,
+         "a source family should remain while it still owns a detected asset");
+  expect(project.assets().size() == 1 && metadata(project.assets().front()).id == misc,
+         "removing one detected asset should preserve the other family asset");
 
-  project = session.removeAssets(assets);
-  expect(project.sources().size() == 1 && project.assets().empty(),
+  const std::array lastRemoval{misc};
+  project = session.removeAssets(lastRemoval);
+  expect(project.sources().empty() && project.assets().empty(),
+         "removing the last detected asset should close its entire source family");
+  expect(project.collections().empty() && project.sourceMap().empty(),
+         "closing the empty source family should remove its discovered data");
+
+  project = session.removeAssets(lastRemoval);
+  expect(project.sources().empty() && project.assets().empty(),
          "removing an already removed asset should leave the session unchanged");
   project = session.scanPendingSources();
-  expect(project.assets().empty(), "a removed asset should stay removed while its source remains scanned");
+  expect(project.sources().empty() && project.assets().empty(),
+         "a source closed with its last asset should not be rescanned");
 }
 
 void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
@@ -1090,7 +1098,7 @@ void runValueSessionTests() {
   sessionKeepsScannerKnownCollectionsWithoutResolver();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
   sessionRemovesSourceFamilyAndDiscoveredData();
-  sessionRemovesIndividualAssetsWithoutClosingTheirSource();
+  sessionRemovesSourceFamilyWithItsLastAsset();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();
   sessionResolverFailureDoesNotWipeExistingCollections();
   sessionMarksCollectionsStaleWhenRemovalCannotReconcile();

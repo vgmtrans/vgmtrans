@@ -127,7 +127,7 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
 
   const std::array assetIds{assetId};
   expect(workspace.removeAssets(assetIds) == 1, "workspace should remove selected detected assets");
-  expect(sources.rowCount() == 1, "removing a detected asset should retain its scanned source");
+  expect(sources.rowCount() == 0, "removing the last detected asset should close its scanned source");
   expect(assets.rowCount() == 0 && collections.rowCount() == 0 && contents.rowCount() == 0,
          "removing a detected asset should update asset and collection models together");
   expect(workspace.snapshot().sourceMap().empty(),
@@ -137,7 +137,7 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
          "an open source inspection should remain valid until its tab closes");
 
   const std::array sourceId{SourceId{0}};
-  expect(workspace.removeSources(sourceId) == 1, "workspace should remove the selected source family");
+  expect(workspace.removeSources(sourceId) == 0, "the automatically closed source should already be absent");
   expect(sources.rowCount() == 0 && assets.rowCount() == 0 && collections.rowCount() == 0 &&
              diagnostics.rowCount() == 0 && contents.rowCount() == 0,
          "all models should reset to the new immutable snapshot after removal");
