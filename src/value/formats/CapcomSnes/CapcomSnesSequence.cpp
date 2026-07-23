@@ -68,11 +68,11 @@ struct StereoBalance {
   return static_cast<double>(interpolate(kVolumeCurve, index, fraction)) / 255.0;
 }
 
-// Converts Capcom's portamento speed into the time needed for a small pitch step.
-[[nodiscard]] double portamentoMillisecondsPerCent(u8 rawTime) {
+// Converts Capcom's portamento speed into travel time for one semitone.
+[[nodiscard]] double portamentoMillisecondsPerSemitone(u8 rawTime) {
   const u8 step = static_cast<u8>((rawTime << 1) & 0xff);
   const double centsPerUpdate = step * (100.0 / 256.0);
-  return centsPerUpdate == 0.0 ? 0.0 : (0.016 / centsPerUpdate) * 1000.0;
+  return centsPerUpdate == 0.0 ? 0.0 : (16.0 * 100.0) / centsPerUpdate;
 }
 
 // Converts the duration bits packed into a note opcode into sequence ticks.
@@ -146,7 +146,7 @@ struct TrackState {
   double vibratoAmount = 0.0;
   double vibratoDepthSemitones = 0.0;
   double tremoloAmount = 0.0;
-  double portamentoMillisecondsPerCent = 0.0;
+  double portamentoMillisecondsPerSemitone = 0.0;
   u16 lastPortamentoMilliseconds = 0;
   std::optional<s32> lastSourceKey;
   bool lastNoteSlurred = false;
@@ -240,12 +240,13 @@ private:
 
   // Starts or updates the glide from the previous source note to this one.
   void emitPortamentoTo(s32 key) {
-    if (track.portamentoMillisecondsPerCent <= 0.0 || !track.lastSourceKey) {
+    if (track.portamentoMillisecondsPerSemitone <= 0.0 || !track.lastSourceKey) {
       return;
     }
 
     const auto distance = static_cast<u32>(std::abs(key - *track.lastSourceKey));
-    const auto portamentoTime = static_cast<u16>(distance * 100 * track.portamentoMillisecondsPerCent);
+    const auto portamentoTime =
+        static_cast<u16>(distance * track.portamentoMillisecondsPerSemitone);
     const double previousKey = static_cast<double>(*track.lastSourceKey + track.transposeSemitones);
     if (portamentoTime != track.lastPortamentoMilliseconds) {
       out.portamento(static_cast<double>(portamentoTime), previousKey);
@@ -342,9 +343,10 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x0d: {
       auto event = cursor.command("Portamento Time", SequenceSemantic::Portamento);
-      const double millisecondsPerCent =
-          event.resolved("milliseconds_per_cent", event.rawU8("time"), math::portamentoMillisecondsPerCent);
-      return event.set<&TrackState::portamentoMillisecondsPerCent>(millisecondsPerCent);
+      const double millisecondsPerSemitone =
+          event.resolved("milliseconds_per_semitone", event.rawU8("time"),
+                         math::portamentoMillisecondsPerSemitone);
+      return event.set<&TrackState::portamentoMillisecondsPerSemitone>(millisecondsPerSemitone);
     }
     case 0x0e:
     case 0x0f:
