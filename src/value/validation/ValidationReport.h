@@ -11,22 +11,20 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
 
 // Validators accumulate the same diagnostics consumed by Session and the UI.
-// The report adds only composition and the admission-time throwing policy.
 class ValidationReport {
 public:
   [[nodiscard]] std::span<const Diagnostic> diagnostics() const noexcept { return diagnostics_; }
+  [[nodiscard]] std::vector<Diagnostic> takeDiagnostics() noexcept { return std::move(diagnostics_); }
   [[nodiscard]] bool empty() const noexcept { return diagnostics_.empty(); }
-  [[nodiscard]] bool hasErrors() const noexcept;
 
   void merge(ValidationReport report);
   void error(std::string code, std::string message, std::optional<SourceRange> range = std::nullopt);
-  void throwIfErrors(std::string_view prefix = {}) const;
 
 private:
   std::vector<Diagnostic> diagnostics_;

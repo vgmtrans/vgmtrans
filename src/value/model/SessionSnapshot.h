@@ -94,38 +94,7 @@ private:
   Index index_;
 };
 
-struct AssetResolutionDiagnostics {
-  std::vector<Diagnostic> collection;
-  std::vector<Diagnostic> sequence;
-  std::vector<Diagnostic> instrumentSets;
-  std::vector<Diagnostic> sampleCollections;
-  std::vector<Diagnostic> miscAssets;
-
-  [[nodiscard]] std::vector<Diagnostic> all() const;
-};
-
-struct ResolvedAssets {
-  // Non-owning pointers to assets selected for one operation. A collection is
-  // present when the selection was resolved from one.
-  const Collection* collection = nullptr;
-  const SequenceProgramAsset* sequenceProgram = nullptr;
-  std::vector<const InstrumentSetAsset*> instrumentSets;
-  std::vector<const SampleCollectionAsset*> sampleCollections;
-  std::vector<const MiscAsset*> miscAssets;
-  AssetResolutionDiagnostics diagnostics;
-};
-
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);
 [[nodiscard]] const AssetMetadata& metadata(const Asset& asset);
-[[nodiscard]] const Asset* assetById(const SessionSnapshot& snapshot, AssetId id);
-
-template <typename T>
-[[nodiscard]] const T* assetById(const SessionSnapshot& snapshot, AssetId id) {
-  return snapshot.asset<T>(id);
-}
-
-[[nodiscard]] const Collection* collectionById(const SessionSnapshot& snapshot, CollectionId id);
-[[nodiscard]] ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, CollectionId id);
-[[nodiscard]] ResolvedAssets resolveCollectionAssets(const SessionSnapshot& snapshot, const Collection& collection);
 
 }  // namespace vgmtrans::core

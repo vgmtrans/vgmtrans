@@ -800,7 +800,7 @@ bool printValueNoCollections(const vgmtrans::core::SessionSnapshot& project) {
 
 void printValueCollectionAssetRef(const vgmtrans::core::SessionSnapshot& project, std::string_view label, size_t index,
                                   vgmtrans::core::AssetId id) {
-  const auto* asset = vgmtrans::core::assetById(project, id);
+  const auto* asset = project.asset(id);
   if (asset == nullptr) {
     fmt::println("  {} #{} id={} missing", label, index, id.value);
     return;
@@ -1038,7 +1038,7 @@ size_t exportValueCollectionsToDirectory(const vgmtrans::core::SessionSnapshot& 
   size_t written = 0;
   for (size_t i = 0; i < exports.size(); ++i) {
     const auto& collectionExport = exports[i];
-    const auto* collection = vgmtrans::core::collectionById(project, collectionExport.collection);
+    const auto* collection = project.collection(collectionExport.collection);
     if (collection == nullptr) {
       fmt::println("Export skipped missing collection id {}", collectionExport.collection.value);
       continue;

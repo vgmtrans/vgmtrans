@@ -6,6 +6,8 @@
 
 #include "ValueTestSupport.h"
 
+#include "SessionSnapshotBuilder.h"
+
 #include <array>
 
 namespace {
@@ -828,7 +830,7 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeJumpCommand>(trackBuilder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
-  SessionSnapshotTestBuilder snapshotBuilder;
+  test::SessionSnapshotBuilder snapshotBuilder;
   snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
       .metadata =
           AssetMetadata{
@@ -881,7 +883,7 @@ void standaloneSequenceExportDoesNotRequireACollection() {
   addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
-  SessionSnapshotTestBuilder snapshotBuilder;
+  test::SessionSnapshotBuilder snapshotBuilder;
   snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
       .metadata =
           AssetMetadata{

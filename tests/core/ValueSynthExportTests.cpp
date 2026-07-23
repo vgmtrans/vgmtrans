@@ -5,6 +5,9 @@
  */
 
 #include "ValueTestSupport.h"
+
+#include "SessionSnapshotBuilder.h"
+
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
 
@@ -476,7 +479,7 @@ void standaloneSynthExportsKeepNativeModulation() {
       }},
   };
 
-  SessionSnapshotTestBuilder builder;
+  test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(instruments);
   builder.assets.emplace_back(samples);
   const SessionSnapshot snapshot = builder.finish();
@@ -514,7 +517,7 @@ void exportDiagnosticsPreserveSourceRanges() {
           },
   };
 
-  SessionSnapshotTestBuilder builder;
+  test::SessionSnapshotBuilder builder;
   builder.assets.push_back(missingSampleCollection);
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
@@ -661,7 +664,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       }},
   };
 
-  SessionSnapshotTestBuilder builder;
+  test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(sequence);
   builder.assets.emplace_back(instruments);
   builder.assets.emplace_back(samples);
@@ -697,7 +700,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
              },
          "prepared playback should retain the VM source timeline used by inspectors");
 
-  SessionSnapshotTestBuilder sequenceOnlyBuilder;
+  test::SessionSnapshotBuilder sequenceOnlyBuilder;
   sequenceOnlyBuilder.assets.emplace_back(sequence);
   sequenceOnlyBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
@@ -713,7 +716,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
                                  }),
          "playback preparation should preserve a useful SoundFont failure diagnostic");
 
-  SessionSnapshotTestBuilder synthOnlyBuilder;
+  test::SessionSnapshotBuilder synthOnlyBuilder;
   synthOnlyBuilder.assets.emplace_back(instruments);
   synthOnlyBuilder.assets.emplace_back(samples);
   synthOnlyBuilder.collections.push_back(Collection{

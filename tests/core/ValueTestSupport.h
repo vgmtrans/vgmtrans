@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "SessionSnapshotTestBuilder.h"
-
 #include "value/export/synth/DlsExporter.h"
 #include "value/export/Export.h"
 #include "value/scan/CollectionResolver.h"
