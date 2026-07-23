@@ -13,7 +13,6 @@
 #include <iterator>
 #include <numeric>
 #include <optional>
-#include <stdexcept>
 
 namespace vgmtrans::core {
 
@@ -365,32 +364,25 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 
 }  // namespace
 
-SampleDecoderRegistry SampleDecoderRegistry::withDefaultDecoders() {
-  SampleDecoderRegistry registry;
-  registry.add(SampleDecoder{.codec = AudioCodec::PcmS8, .decode = decodePcmS8});
-  registry.add(SampleDecoder{.codec = AudioCodec::PcmS16, .decode = decodePcmS16});
-  registry.add(SampleDecoder{.codec = AudioCodec::SnesBrr, .decode = decodeSnesBrr});
-  registry.add(SampleDecoder{.codec = AudioCodec::NdsImaAdpcm, .decode = decodeNdsImaAdpcm});
-  registry.add(SampleDecoder{.codec = AudioCodec::NdsPsg, .decode = decodeNdsPsg});
-  registry.add(SampleDecoder{.codec = AudioCodec::PsxAdpcm, .decode = decodePsxAdpcm});
-  return registry;
-}
-
-void SampleDecoderRegistry::add(SampleDecoder decoder) {
-  if (decoder.codec == AudioCodec::Unknown || decoder.decode == nullptr) {
-    throw std::invalid_argument("Cannot register an incomplete SampleDecoder");
+std::optional<DecodedSample> decodeSample(const Sample& sample, std::span<const u8> sourceBytes) {
+  switch (sample.codec) {
+    case AudioCodec::PcmS8:
+      return decodePcmS8(sample, sourceBytes);
+    case AudioCodec::PcmS16:
+      return decodePcmS16(sample, sourceBytes);
+    case AudioCodec::SnesBrr:
+      return decodeSnesBrr(sample, sourceBytes);
+    case AudioCodec::NdsImaAdpcm:
+      return decodeNdsImaAdpcm(sample, sourceBytes);
+    case AudioCodec::NdsPsg:
+      return decodeNdsPsg(sample, sourceBytes);
+    case AudioCodec::PsxAdpcm:
+      return decodePsxAdpcm(sample, sourceBytes);
+    case AudioCodec::Unknown:
+    case AudioCodec::OkiAdpcm:
+      return std::nullopt;
   }
-  decoders_.push_back(decoder);
-}
-
-std::optional<DecodedSample> SampleDecoderRegistry::decode(const Sample& sample,
-                                                           std::span<const u8> sourceBytes) const {
-  const auto decoder =
-      std::ranges::find_if(decoders_, [&sample](const auto& candidate) { return candidate.codec == sample.codec; });
-  if (decoder == decoders_.end()) {
-    return std::nullopt;
-  }
-  return decoder->decode(sample, sourceBytes);
+  return std::nullopt;
 }
 
 }  // namespace vgmtrans::core

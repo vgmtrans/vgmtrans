@@ -231,8 +231,8 @@ struct MidiLoweringResult {
     };
   }
 
-  return lowerMidiSequence(*prepared.sequenceProgram, prepared.instrumentSets, dialects,
-                           request.loopPolicy, request.sequenceLoops, request.midi, request.modulationConversion);
+  return lowerMidiSequence(*prepared.sequenceProgram, prepared.instrumentSets, dialects, request.sequence.loopPolicy,
+                           request.sequence.sequenceLoops, request.sequence.midi, request.modulationConversion);
 }
 
 [[nodiscard]] std::optional<MidiModulationUsage> midiModulationUsage(const MidiLoweringResult& lowering) {
@@ -262,11 +262,10 @@ struct MidiLoweringResult {
 
   auto midiSequence = *lowering.sequence;
   if (modulationConversion == ModulationConversionPolicy::SynthModulators &&
-      modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
+      modulationScaling == ModulationScalingPolicy::ObservedSequenceRange && lowering.performance) {
     // Apply the same observed-range scaling to MIDI controller values and synth
     // modulators so they continue to match each other.
-    const auto usage = lowering.performance ? analyzePerformanceModulationUsage(*lowering.performance)
-                                            : analyzeMidiModulationUsage(midiSequence);
+    const auto usage = analyzePerformanceModulationUsage(*lowering.performance);
     if (hasMidiModulationUsage(usage)) {
       applyMidiModulationScaling(midiSequence, usage, modulationScaling);
     }
@@ -291,7 +290,6 @@ struct MidiLoweringResult {
   }
 
   std::vector<Artifact> artifacts;
-  auto decoders = SampleDecoderRegistry::withDefaultDecoders();
   u32 sampleIndex = 0;
 
   for (const auto& diagnostic : prepared.diagnostics.sampleCollections) {
@@ -314,11 +312,11 @@ struct MidiLoweringResult {
         if (!sources.contains(sample.encodedData.source)) {
           artifact.diagnostics.push_back(
               exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
-        } else if (auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source))) {
+        } else if (auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source))) {
           artifact.bytes = encodePcm16Wav(*decoded);
         } else {
           artifact.diagnostics.push_back(
-              exportError("No decoder registered for sample codec", validDiagnosticRange(sample.encodedData)));
+              exportError("Unsupported sample codec", validDiagnosticRange(sample.encodedData)));
         }
       } catch (const std::exception& ex) {
         artifact.diagnostics.push_back(exportError(ex.what(), validDiagnosticRange(sample.encodedData)));
@@ -420,17 +418,14 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& 
     return exportStandaloneSequenceMidi(snapshot, sequenceId, request, dialects);
   }
 
-  auto artifacts = exportCollection(
-      snapshot, sources, collection->id,
-      ExportRequest{
-          .kinds = {ExportKind::Midi},
-          .loopPolicy = request.loopPolicy,
-          .sequenceLoops = request.sequenceLoops,
-          .midi = request.midi,
-          .modulationScaling = ModulationScalingPolicy::FullFormatRange,
-          .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
-      },
-      dialects, formats);
+  auto artifacts = exportCollection(snapshot, sources, collection->id,
+                                    ExportRequest{
+                                        .kinds = {ExportKind::Midi},
+                                        .sequence = request,
+                                        .modulationScaling = ModulationScalingPolicy::FullFormatRange,
+                                        .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+                                    },
+                                    dialects, formats);
   if (artifacts.empty()) {
     return Artifact{
         .filename = artifactBaseName(*sequence) + ".mid",
@@ -528,9 +523,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
                                     prepared.collection->sampleCollections.end());
 
   const ExportRequest exportRequest{
-      .loopPolicy = request.loopPolicy,
-      .sequenceLoops = request.sequenceLoops,
-      .midi = request.midi,
+      .sequence = request,
       .modulationScaling = ModulationScalingPolicy::FullFormatRange,
       .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
   };

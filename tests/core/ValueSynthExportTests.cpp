@@ -22,9 +22,7 @@ void snesBrrDecoderProducesPcm() {
       .sampleRate = 32000,
   };
 
-  const auto registry = SampleDecoderRegistry::withDefaultDecoders();
-  const auto copy = registry;
-  const auto decoded = registry.decode(sample, sourceBytes);
+  const auto decoded = decodeSample(sample, sourceBytes);
   expect(decoded.has_value(), "BRR decoder should decode a valid sample");
   expect(decoded->sampleRate == 32000, "decoded sample should preserve sample rate");
   expect(decoded->pcm.size() == 16, "one BRR block should decode to 16 samples");
@@ -36,16 +34,7 @@ void snesBrrDecoderProducesPcm() {
       .codec = AudioCodec::SnesBrr,
       .encodedData = SourceRange{.source = SourceId{0}, .offset = 8, .size = 9},
   };
-  expect(!copy.decode(invalidRange, sourceBytes).has_value(), "BRR decoder should reject invalid source ranges");
-
-  bool threw = false;
-  try {
-    SampleDecoderRegistry custom;
-    custom.add(SampleDecoder{.codec = AudioCodec::SnesBrr});
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw, "sample decoder registry should reject incomplete decoder values");
+  expect(!decodeSample(invalidRange, sourceBytes).has_value(), "BRR decoder should reject invalid source ranges");
 }
 
 void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
@@ -56,14 +45,13 @@ void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
       .sampleRate = 32768,
   };
 
-  const auto registry = SampleDecoderRegistry::withDefaultDecoders();
   const std::vector<u8> validMaxIndex{0x00, 0x00, 0x58, 0x00, 0x00};
-  const auto decoded = registry.decode(sample, validMaxIndex);
+  const auto decoded = decodeSample(sample, validMaxIndex);
   expect(decoded.has_value() && decoded->pcm.size() == 3,
          "NDS IMA ADPCM decoder should accept initial predictor index 88");
 
   const std::vector<u8> invalidIndex{0x00, 0x00, 0x59, 0x00, 0x00};
-  expect(!registry.decode(sample, invalidIndex).has_value(),
+  expect(!decodeSample(sample, invalidIndex).has_value(),
          "NDS IMA ADPCM decoder should reject initial predictor indexes outside the step table");
 }
 

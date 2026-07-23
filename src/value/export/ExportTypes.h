@@ -47,24 +47,26 @@ struct MidiExportOptions {
   MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
 };
 
-// Policy for exporting one sequence as a self-contained Standard MIDI file.
-// Synth modulation is rendered into MIDI events because there is no companion
-// instrument container in a standalone export.
-struct SequenceExportRequest {
-  LoopPolicy loopPolicy = LoopPolicy::Default;
-  u32 sequenceLoops = 1;
-  MidiExportOptions midi;
-};
-
-// ExportRequest is policy, not parsed data. Callers choose which files to write
-// and how to handle loops, MIDI channels, and modulation scaling.
-struct ExportRequest {
-  std::vector<ExportKind> kinds;
+// Options shared by standalone sequence export, collection export, and
+// collection playback.
+struct SequenceRenderOptions {
   LoopPolicy loopPolicy = LoopPolicy::Default;
   // Extra repeats after the initial playthrough. This is the user-facing
   // "Sequence Loops" setting: 0 means stop at the first infinite-loop point.
   u32 sequenceLoops = 1;
   MidiExportOptions midi;
+};
+
+// Standalone sequence export simulates synth modulation in MIDI because there
+// is no companion instrument container.
+using SequenceExportRequest = SequenceRenderOptions;
+using PlaybackRequest = SequenceRenderOptions;
+
+// ExportRequest is policy, not parsed data. Callers choose which files to write
+// and how to handle loops, MIDI channels, and modulation scaling.
+struct ExportRequest {
+  std::vector<ExportKind> kinds;
+  SequenceRenderOptions sequence;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SequenceEventSimulation;
 };

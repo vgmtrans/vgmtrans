@@ -32,7 +32,6 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
   // Decode once into a flat vector. Container exporters then decide how to lay out that
   // PCM, but all of them share the same source-range diagnostics.
   std::vector<DecodedSynthSample> samples;
-  auto decoders = SampleDecoderRegistry::withDefaultDecoders();
 
   for (const auto* collection : sampleCollections) {
     if (collection == nullptr) {
@@ -46,10 +45,9 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
         continue;
       }
 
-      auto decoded = decoders.decode(sample, sources.bytes(sample.encodedData.source));
+      auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source));
       if (!decoded) {
-        diagnostics.push_back(
-            exportError("No decoder registered for sample codec", validDiagnosticRange(sample.encodedData)));
+        diagnostics.push_back(exportError("Unsupported sample codec", validDiagnosticRange(sample.encodedData)));
         continue;
       }
 

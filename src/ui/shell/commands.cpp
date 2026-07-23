@@ -672,7 +672,10 @@ std::optional<vgmtrans::core::ModulationScalingPolicy> valueModulationScalingPol
 std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const std::vector<std::string>& args,
                                                                         size_t kindArgIndex) {
   vgmtrans::core::ExportRequest request{
-      .loopPolicy = vgmtrans::core::LoopPolicy::PlayOnce,
+      .sequence =
+          {
+              .loopPolicy = vgmtrans::core::LoopPolicy::PlayOnce,
+          },
   };
 
   bool sawKind = false;
