@@ -258,11 +258,9 @@ MenuBar::Context contextForAsset(vgmtrans::ui::WorkspaceController& workspace,
   return MenuBar::Context::Misc;
 }
 
-bool selectIdInView(QAbstractItemView* view, u32 id, bool assetOnly,
-                    bool clearWhenMissing) {
-  if (view == nullptr || view->model() == nullptr ||
-      view->selectionModel() == nullptr) {
-    return false;
+QModelIndex indexForId(const QAbstractItemView* view, u32 id, bool assetOnly) {
+  if (view == nullptr || view->model() == nullptr) {
+    return {};
   }
   for (int row = 0; row < view->model()->rowCount(); ++row) {
     const QModelIndex index = view->model()->index(row, 0);
@@ -272,6 +270,18 @@ bool selectIdInView(QAbstractItemView* view, u32 id, bool assetOnly,
     if (index.data(vgmtrans::ui::IdRole).toUInt() != id) {
       continue;
     }
+    return index;
+  }
+  return {};
+}
+
+bool selectIdInView(QAbstractItemView* view, u32 id, bool assetOnly,
+                    bool clearWhenMissing) {
+  if (view == nullptr || view->selectionModel() == nullptr) {
+    return false;
+  }
+  const QModelIndex index = indexForId(view, id, assetOnly);
+  if (index.isValid()) {
     const QSignalBlocker blocker(view->selectionModel());
     view->selectionModel()->setCurrentIndex(
         index, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
@@ -848,9 +858,24 @@ void MainWindow::routeSignals() {
 
   const auto synchronizeAssetSelection =
       [this](vgmtrans::core::AssetId assetId, QWidget* caller) {
-    const auto* asset = m_workspace.snapshot().asset(assetId);
+    const auto& snapshot = m_workspace.snapshot();
+    const auto* asset = snapshot.asset(assetId);
     if (asset == nullptr) {
       return;
+    }
+
+    if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(*asset)) {
+      if (const auto* collection = snapshot.firstCollectionContaining(assetId)) {
+        const QModelIndex index = indexForId(m_coll_listview, collection->id.value, false);
+        if (index.isValid()) {
+          m_coll_listview->selectionModel()->setCurrentIndex(
+              index, QItemSelectionModel::ClearAndSelect);
+          m_coll_listview->scrollTo(index, QAbstractItemView::EnsureVisible);
+        } else {
+          m_coll_listview->selectionModel()->clearSelection();
+          m_coll_listview->selectionModel()->setCurrentIndex({}, QItemSelectionModel::NoUpdate);
+        }
+      }
     }
 
     if (caller != m_vgmfile_listview) {
@@ -861,7 +886,7 @@ void MainWindow::routeSignals() {
     }
 
     vgmtrans::core::SourceId source = vgmtrans::core::metadata(*asset).range.source;
-    while (const auto* value = m_workspace.snapshot().source(source)) {
+    while (const auto* value = snapshot.source(source)) {
       if (!value->parent) {
         break;
       }
