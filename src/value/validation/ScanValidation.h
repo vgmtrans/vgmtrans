@@ -6,17 +6,18 @@
 
 #pragma once
 
+#include "value/scan/ScanTypes.h"
 #include "value/validation/ValidationReport.h"
+
+#include <span>
 
 namespace vgmtrans::core {
 
-class AssetStore;
 class SourceStore;
-struct ScanCommit;
 
 // Admission check for one scanner result after IDs and item trees are normalized.
 // Session calls this before accepting assets, match facts, diagnostics, or derived sources.
-[[nodiscard]] ValidationReport validateScanCommit(const ScanCommit& commit, const SourceStore& sources,
-                                                  const AssetStore& existingAssets);
+[[nodiscard]] ValidationReport validateScanResult(SourceId source, const ScanResult& result, const SourceStore& sources,
+                                                  std::span<const Asset> existingAssets);
 
 }  // namespace vgmtrans::core

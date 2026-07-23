@@ -981,7 +981,9 @@ CapcomSnesSummary valueCapcomSnesSummary(std::vector<u8> aramBytes, const std::s
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "value ARAM summary expected one collection");
   return valueCapcomSnesSummary(project, session.sources(), project.collections().front());
 }
@@ -991,7 +993,9 @@ std::map<std::string, CapcomSnesSummary> valueCapcomSnesRsnSummaries(const std::
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -1181,7 +1185,9 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = name}, std::move(aramBytes));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover a collection";
@@ -1191,14 +1197,13 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
     throw std::runtime_error(message.str());
   }
 
-  const auto artifacts =
-      session.exportCollection(project.collections().front().id, ExportRequest{
-                                                                     .kinds = {ExportKind::Midi},
-                                                                     .loopPolicy = LoopPolicy::PlayOnce,
-                                                                     .sequenceLoops = 0,
-                                                                     .modulationConversion =
-                                                                         ModulationConversionPolicy::SynthModulators,
-                                                                 });
+  const auto artifacts = session.exportCollection(
+      project.collections().front().id, ExportRequest{
+                                            .kinds = {ExportKind::Midi},
+                                            .loopPolicy = LoopPolicy::PlayOnce,
+                                            .sequenceLoops = 0,
+                                            .modulationConversion = ModulationConversionPolicy::SynthModulators,
+                                        });
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1213,13 +1218,13 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
 }
 
 std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
-  const auto artifacts = session.exportCollection(collection, ExportRequest{
-                                                                  .kinds = {ExportKind::Midi},
-                                                                  .loopPolicy = LoopPolicy::PlayOnce,
-                                                                  .sequenceLoops = 0,
-                                                                  .modulationConversion =
-                                                                      ModulationConversionPolicy::SynthModulators,
-                                                              });
+  const auto artifacts =
+      session.exportCollection(collection, ExportRequest{
+                                               .kinds = {ExportKind::Midi},
+                                               .loopPolicy = LoopPolicy::PlayOnce,
+                                               .sequenceLoops = 0,
+                                               .modulationConversion = ModulationConversionPolicy::SynthModulators,
+                                           });
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1238,7 +1243,9 @@ std::map<std::string, std::vector<u8>> valueCapcomSnesRsnMidis(const std::filesy
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -1295,7 +1302,9 @@ std::map<std::string, SynthExportBytes> valueCapcomSnesRsnSynthExports(const std
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections from RSN";
@@ -1340,7 +1349,9 @@ std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::fil
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover collections";
@@ -1400,7 +1411,9 @@ std::map<std::string, CapcomSnesSummary> valueFormatCollectionSummaries(const st
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover " << label << " collections";
@@ -1466,7 +1479,9 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   for (const auto& diagnostic : project.diagnostics()) {
     diagnostics << "value diagnostic: " << diagnostic.message << "\n";
   }
@@ -1654,7 +1669,9 @@ std::map<std::string, std::vector<u8>> valueAkaoCollectionMidis(const std::files
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover Akao MIDI collections";
@@ -1718,7 +1735,9 @@ std::map<std::string, SynthExportBytes> valueAkaoCollectionSynthExports(const st
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover Akao synth collections";
@@ -1842,7 +1861,9 @@ std::map<std::string, std::vector<u8>> valueCollectionMidis(
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover MIDI collections";
@@ -1918,7 +1939,9 @@ std::map<std::string, std::vector<u8>> valueFormatCollectionMidis(
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover " << label << " MIDI collections";
@@ -2003,7 +2026,9 @@ std::map<std::string, SynthExportBytes> valueCollectionSynthExports(const std::f
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover synth collections";
@@ -2037,7 +2062,9 @@ std::map<std::string, SynthExportBytes> valueFormatCollectionSynthExports(const 
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover " << label << " synth collections";
@@ -3544,7 +3571,9 @@ std::map<std::string, PerformanceModulationStats> valueFormatPerformanceModulati
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   if (project.collections().empty()) {
     std::ostringstream message;
     message << "value scanner did not discover " << label << " performance collections";
@@ -4191,7 +4220,8 @@ int compareCapcomSnesRsnDirectExport(const std::filesystem::path& path) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
 
   if (project.collections().empty()) {
     std::ostringstream message;

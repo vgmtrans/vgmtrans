@@ -169,7 +169,7 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   const SourceId source = session.addSource(SourceFile{.name = "ff4-test.spc"}, makeAkaoSnesAram());
-  static_cast<void>(session.scanSource(source));
+  session.scanSource(source);
   const SessionSnapshot project = session.snapshot();
 
   expect(project.diagnostics().empty(), "AkaoSnes synthetic scan should not report diagnostics");

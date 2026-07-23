@@ -22,6 +22,8 @@
 
 namespace vgmtrans::core {
 
+class SessionState;
+
 enum class SourceRole : u8 {
   Unknown,
   Source,
@@ -232,6 +234,8 @@ public:
   [[nodiscard]] std::vector<SourceAnnotationId> linksTo(const SourceTarget& target) const;
 
 private:
+  friend class SessionState;
+
   void buildIndexes();
 
   std::vector<SourceAnnotation> annotations_;

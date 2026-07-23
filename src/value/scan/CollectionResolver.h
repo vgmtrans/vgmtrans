@@ -15,6 +15,8 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -104,15 +106,22 @@ public:
 
   [[nodiscard]] const MatchContext& context() const noexcept { return context_; }
   [[nodiscard]] const SourceFile* sourceFor(const MatchFact& fact) const;
+  [[nodiscard]] const Asset* asset(AssetId id) const noexcept;
+
+  template <class AssetT>
+  [[nodiscard]] const AssetT* asset(AssetId id) const noexcept {
+    const auto* found = asset(id);
+    return found != nullptr ? std::get_if<AssetT>(found) : nullptr;
+  }
 
   template <class AssetT>
   [[nodiscard]] std::vector<AssetFacts<AssetT>> assets(std::string_view format) const {
     std::vector<AssetFacts<AssetT>> matches;
-    for (const auto& fact : context_.snapshot.matchFacts()) {
+    for (const auto& fact : context_.matchFacts()) {
       if (!format.empty() && fact.format != format) {
         continue;
       }
-      const auto* asset = assetById<AssetT>(context_.snapshot, fact.asset);
+      const auto* asset = this->template asset<AssetT>(fact.asset);
       if (asset == nullptr) {
         continue;
       }
@@ -141,7 +150,7 @@ public:
   [[nodiscard]] std::vector<AssetMatchView<AssetT, PayloadT>> facts(std::string_view format,
                                                                     Predicate predicate) const {
     std::vector<AssetMatchView<AssetT, PayloadT>> matches;
-    for (const auto& fact : context_.snapshot.matchFacts()) {
+    for (const auto& fact : context_.matchFacts()) {
       if (!format.empty() && fact.format != format) {
         continue;
       }
@@ -149,7 +158,7 @@ public:
       if (payload == nullptr || !predicate(fact, *payload)) {
         continue;
       }
-      const auto* asset = assetById<AssetT>(context_.snapshot, fact.asset);
+      const auto* asset = this->template asset<AssetT>(fact.asset);
       if (asset == nullptr) {
         continue;
       }
@@ -164,19 +173,17 @@ public:
   }
 
   template <class AssetT>
-  [[nodiscard]] std::vector<AssetMatchView<AssetT, FormatSpecificFact>>
-  formatFacts(std::string_view format, std::string_view kind) const {
-    return facts<AssetT, FormatSpecificFact>(format, [kind](const MatchFact&, const FormatSpecificFact& payload) {
-      return payload.kind == kind;
-    });
+  [[nodiscard]] std::vector<AssetMatchView<AssetT, FormatSpecificFact>> formatFacts(std::string_view format,
+                                                                                    std::string_view kind) const {
+    return facts<AssetT, FormatSpecificFact>(
+        format, [kind](const MatchFact&, const FormatSpecificFact& payload) { return payload.kind == kind; });
   }
 
   template <class AssetT>
   [[nodiscard]] std::vector<AssetMatchView<AssetT, IdMatchFact>> idFacts(std::string_view format,
                                                                          std::string_view domain) const {
-    return facts<AssetT, IdMatchFact>(format, [domain](const MatchFact&, const IdMatchFact& payload) {
-      return payload.domain == domain;
-    });
+    return facts<AssetT, IdMatchFact>(
+        format, [domain](const MatchFact&, const IdMatchFact& payload) { return payload.domain == domain; });
   }
 
   template <class AssetT>
@@ -185,21 +192,17 @@ public:
   }
 
   template <class AssetT>
-  [[nodiscard]] std::vector<AssetMatchView<AssetT, SampleCoverageFact>>
-  sampleCoverageFacts(std::string_view format, std::string_view domain) const {
-    return facts<AssetT, SampleCoverageFact>(format,
-                                             [domain](const MatchFact&, const SampleCoverageFact& payload) {
-                                               return payload.domain == domain;
-                                             });
+  [[nodiscard]] std::vector<AssetMatchView<AssetT, SampleCoverageFact>> sampleCoverageFacts(
+      std::string_view format, std::string_view domain) const {
+    return facts<AssetT, SampleCoverageFact>(
+        format, [domain](const MatchFact&, const SampleCoverageFact& payload) { return payload.domain == domain; });
   }
 
   template <class AssetT>
-  [[nodiscard]] std::vector<AssetMatchView<AssetT, SampleRequirementFact>>
-  sampleRequirementFacts(std::string_view format, std::string_view domain) const {
-    return facts<AssetT, SampleRequirementFact>(format,
-                                                [domain](const MatchFact&, const SampleRequirementFact& payload) {
-                                                  return payload.domain == domain;
-                                                });
+  [[nodiscard]] std::vector<AssetMatchView<AssetT, SampleRequirementFact>> sampleRequirementFacts(
+      std::string_view format, std::string_view domain) const {
+    return facts<AssetT, SampleRequirementFact>(
+        format, [domain](const MatchFact&, const SampleRequirementFact& payload) { return payload.domain == domain; });
   }
 
 private:
@@ -207,6 +210,7 @@ private:
   // index constructed from a temporary MatchContext does not retain a dangling
   // reference to that wrapper.
   MatchContext context_;
+  std::unordered_map<u32, const Asset*> assetsById_;
 };
 
 struct SampleCoverageProvider {

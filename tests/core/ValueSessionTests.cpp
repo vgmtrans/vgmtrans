@@ -6,7 +6,7 @@
 
 #include "ValueTestSupport.h"
 
-#include "value/session/ScanCommit.h"
+#include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
 #include "value/validation/SnapshotValidation.h"
 
@@ -20,12 +20,12 @@ void sessionScansValuesAndDerivedSources() {
   const auto sourceId = session.addSource(SourceFile{.name = "probe.spc"}, {0xaa, 0x34, 0x12});
   expect(sourceId == SourceId{0}, "first source should get SourceId 0");
 
-  SessionSnapshot snapshot = session.scanPendingSources();
+  session.scanPendingSources();
+
+  SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.sources().size() == 2, "scan should include extracted derived source");
-  expect(snapshot.source(sourceId) == &snapshot.sources()[0],
-         "session snapshot should find a source by stable id");
-  expect(snapshot.source(SourceId{99}) == nullptr,
-         "session snapshot should return null for a missing source id");
+  expect(snapshot.source(sourceId) == &snapshot.sources()[0], "session snapshot should find a source by stable id");
+  expect(snapshot.source(SourceId{99}) == nullptr, "session snapshot should return null for a missing source id");
   expect(snapshot.sources()[1].derived(), "extracted source should be derived");
   expect(snapshot.sources()[1].origin.has_value() && snapshot.sources()[1].origin->source == sourceId &&
              snapshot.sources()[1].origin->offset == 0 && snapshot.sources()[1].origin->size == 1,
@@ -68,7 +68,9 @@ void sessionScansValuesAndDerivedSources() {
   expect(misc != nullptr, "second asset should be misc from derived source");
   expect(metadata(snapshot.assets()[1]).id == AssetId{1}, "missing asset id should be assigned");
 
-  snapshot = session.scanPendingSources();
+  session.scanPendingSources();
+
+  snapshot = session.snapshot();
   expect(snapshot.sources().size() == 2, "pending-source scan should not duplicate already-scanned derived sources");
   expect(snapshot.assets().size() == 2, "pending-source scan should not duplicate already-scanned assets");
   expect(snapshot.collections().size() == 1, "pending-source scan should not duplicate already-resolved collections");
@@ -79,7 +81,8 @@ void sessionReportsUnregisteredSequenceDialect() {
   session.registerFormat(probeSequenceModule());
 
   session.addSource(SourceFile{.name = "missing-dialect.probe"}, {0xaa});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "missing dialect fixture should still scan sequence collections");
   expect(project.diagnostics().size() == 2, "missing dialect fixture should keep scan and registration diagnostics");
 
@@ -103,21 +106,27 @@ void sessionScansIndividualSourcesWithoutDuplicating() {
   session.registerFormat(probeSequenceModule(), probeSequenceDialect());
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
-  SessionSnapshot project = session.scanSource(first);
+  session.scanSource(first);
+  SessionSnapshot project = session.snapshot();
   expect(project.assets().size() == 1, "source scan should add assets from the requested source");
   expect(project.collections().size() == 1, "source scan should resolve collections after the scan transaction");
 
-  project = session.scanSource(first);
+  session.scanSource(first);
+
+  project = session.snapshot();
   expect(project.assets().size() == 1, "repeat source scan should not duplicate already-scanned assets");
   expect(project.collections().size() == 1, "repeat source scan should not duplicate already-resolved collections");
 
   const auto second = session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
-  project = session.scanSource(second);
+  session.scanSource(second);
+  project = session.snapshot();
   expect(project.assets().size() == 2, "later source scan should preserve previous assets and add the new source");
   expect(project.collections().size() == 2,
          "later source scan should preserve previous collections and add the new one");
 
-  project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  project = session.snapshot();
   expect(project.assets().size() == 2, "pending-source scan should skip already-scanned user sources");
   expect(project.collections().size() == 2, "pending-source scan should leave existing collections unchanged");
 }
@@ -127,13 +136,16 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
   session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
 
   const auto source = session.addSource(SourceFile{.name = "explicit.probe"}, {0xab});
-  SessionSnapshot project = session.scanSource(source);
+  session.scanSource(source);
+  SessionSnapshot project = session.snapshot();
   expect(project.matchFacts().empty(), "explicit scanner-known collection should not need match facts");
   expect(project.collections().size() == 1, "explicit scanner-known collection should be published");
   expect(project.collections()[0].key.resolver == "ProbeExplicit",
          "explicit scanner-known collection should use its scanner resolver key");
 
-  project = session.removeSource(source);
+  session.removeSource(source);
+
+  project = session.snapshot();
   expect(project.collections().empty(), "explicit scanner-known collection should disappear with its source");
 }
 
@@ -143,7 +155,8 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   session.registerFormat(probeBankInstrumentModule());
 
   const auto instrument = session.addSource(SourceFile{.name = "bank-7.instr"}, {0xdd, 7});
-  SessionSnapshot project = session.scanSource(instrument);
+  session.scanSource(instrument);
+  SessionSnapshot project = session.snapshot();
   expect(project.assets().size() == 1, "instrument scan should add its asset immediately");
   expect(project.collections().size() == 1, "resolver should keep an incomplete collection for a partial match");
   expect(project.collections()[0].status == CollectionStatus::Incomplete,
@@ -153,7 +166,8 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   const CollectionId bankCollection = project.collections()[0].id;
 
   const auto sequence = session.addSource(SourceFile{.name = "bank-7.seq"}, {0xcc, 7});
-  project = session.scanSource(sequence);
+  session.scanSource(sequence);
+  project = session.snapshot();
   expect(project.assets().size() == 2, "second source scan should add the matching sequence asset");
   expect(project.collections().size() == 1, "matching facts should update the existing bank collection");
   expect(project.collections()[0].id == bankCollection, "resolver update should preserve the collection id");
@@ -170,14 +184,17 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
   session.registerFormat(probeMiscModule());
 
   const auto source = session.addSource(SourceFile{.name = "remove-me.probe"}, {0xaa, 0x34});
-  SessionSnapshot project = session.scanSource(source);
+  session.scanSource(source);
+  SessionSnapshot project = session.snapshot();
   expect(project.sources().size() == 2, "fixture should scan one user source and one derived source");
   expect(project.assets().size() == 2, "fixture should scan user and derived assets");
   expect(project.matchFacts().size() == 1, "fixture should publish a collection match fact");
   expect(project.collections().size() == 1, "fixture should publish one collection");
   expect(project.diagnostics().size() == 1, "fixture should publish one source-backed diagnostic");
 
-  project = session.removeSource(source);
+  session.removeSource(source);
+
+  project = session.snapshot();
   expect(project.sources().empty(), "removed source family should disappear from snapshots");
   expect(project.assets().empty(), "removed source family should remove discovered assets");
   expect(project.matchFacts().empty(), "removed source family should remove match facts");
@@ -196,7 +213,7 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
 
   bool scanRemovedSourceFailed = false;
   try {
-    static_cast<void>(session.scanSource(source));
+    session.scanSource(source);
   } catch (const std::out_of_range&) {
     scanRemovedSourceFailed = true;
   }
@@ -204,7 +221,8 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
 
   const auto replacement = session.addSource(SourceFile{.name = "replacement.probe"}, {0xaa});
   expect(replacement == SourceId{2}, "source ids should not be reused after removing a source family");
-  project = session.scanPendingSources();
+  session.scanPendingSources();
+  project = session.snapshot();
   expect(project.sources().size() == 2, "replacement scan should add a new derived source");
   expect(project.sources()[0].id == replacement, "replacement user source should keep its new stable id");
 }
@@ -215,30 +233,36 @@ void sessionRemovesSourceFamilyWithItsLastAsset() {
   session.registerFormat(probeMiscModule());
 
   const SourceId source = session.addSource(SourceFile{.name = "remove-assets.probe"}, {0xaa, 0x34});
-  SessionSnapshot project = session.scanSource(source);
+  session.scanSource(source);
+  SessionSnapshot project = session.snapshot();
   expect(project.sources().size() == 2 && project.assets().size() == 2,
          "asset removal fixture should publish assets from a user and derived source");
   const AssetId sequence = metadata(project.assets()[0]).id;
   const AssetId misc = metadata(project.assets()[1]).id;
 
   const std::array firstRemoval{sequence};
-  project = session.removeAssets(firstRemoval);
+  session.removeAssets(firstRemoval);
+  project = session.snapshot();
   expect(project.sources().size() == 2 && project.source(source) != nullptr,
          "a source family should remain while it still owns a detected asset");
   expect(project.assets().size() == 1 && metadata(project.assets().front()).id == misc,
          "removing one detected asset should preserve the other family asset");
 
   const std::array lastRemoval{misc};
-  project = session.removeAssets(lastRemoval);
+  session.removeAssets(lastRemoval);
+  project = session.snapshot();
   expect(project.sources().empty() && project.assets().empty(),
          "removing the last detected asset should close its entire source family");
   expect(project.collections().empty() && project.sourceMap().empty(),
          "closing the empty source family should remove its discovered data");
 
-  project = session.removeAssets(lastRemoval);
+  session.removeAssets(lastRemoval);
+
+  project = session.snapshot();
   expect(project.sources().empty() && project.assets().empty(),
          "removing an already removed asset should leave the session unchanged");
-  project = session.scanPendingSources();
+  session.scanPendingSources();
+  project = session.snapshot();
   expect(project.sources().empty() && project.assets().empty(),
          "a source closed with its last asset should not be rescanned");
 }
@@ -250,12 +274,15 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
 
   const auto instrument = session.addSource(SourceFile{.name = "bank-9.instr"}, {0xdd, 9});
   const auto sequence = session.addSource(SourceFile{.name = "bank-9.seq"}, {0xcc, 9});
-  SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "matching bank files should produce one collection");
   expect(project.collections()[0].status == CollectionStatus::Complete, "matched bank collection should be complete");
   const CollectionId collectionId = project.collections()[0].id;
 
-  project = session.removeSource(instrument);
+  session.removeSource(instrument);
+
+  project = session.snapshot();
   expect(project.sources().size() == 1, "removing one matched source should leave the other source active");
   expect(project.assets().size() == 1, "removing one matched source should leave the other asset active");
   expect(project.matchFacts().size() == 1, "removing one matched source should leave the other match fact active");
@@ -268,7 +295,9 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
          "removed instrument source should be removed from the collection");
   expect(!project.collections()[0].issues.empty(), "incomplete collection should explain what is missing");
 
-  project = session.removeSource(sequence);
+  session.removeSource(sequence);
+
+  project = session.snapshot();
   expect(project.sources().empty(), "removing the last matched source should leave no active sources");
   expect(project.assets().empty(), "removing the last matched source should leave no assets");
   expect(project.matchFacts().empty(), "removing the last matched source should leave no match facts");
@@ -280,12 +309,14 @@ void sessionResolverFailureDoesNotWipeExistingCollections() {
   session.registerFormat(fragileProbeSequenceModule(), probeSequenceDialect());
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
-  SessionSnapshot project = session.scanSource(first);
+  session.scanSource(first);
+  SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "initial scan should create a collection");
   const CollectionId originalCollection = project.collections()[0].id;
 
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
-  project = session.scanPendingSources();
+  session.scanPendingSources();
+  project = session.snapshot();
   expect(project.collections().size() == 1, "resolver failure should preserve previous collections");
   expect(project.collections()[0].id == originalCollection, "preserved collection should keep its id");
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
@@ -297,11 +328,14 @@ void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
   session.registerFormat(fragileProbeSequenceModule(), probeSequenceDialect());
 
   const auto source = session.addSource(SourceFile{.name = "stale-on-failure.probe"}, {0xaa});
-  SessionSnapshot project = session.scanSource(source);
+  session.scanSource(source);
+  SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "initial scan should create a collection");
   const CollectionId originalCollection = project.collections()[0].id;
 
-  project = session.removeSource(source);
+  session.removeSource(source);
+
+  project = session.snapshot();
   expect(project.sources().empty(), "failed reconcile after removal should still remove sources");
   expect(project.assets().empty(), "failed reconcile after removal should still remove assets");
   expect(project.matchFacts().empty(), "failed reconcile after removal should still remove match facts");
@@ -329,7 +363,7 @@ void sessionRejectsLateRegistryMutation() {
   expect(formatFailed, "format registry should be sealed after session mutation starts");
 
   Session scannedEmptySession;
-  static_cast<void>(scannedEmptySession.scanPendingSources());
+  scannedEmptySession.scanPendingSources();
 
   bool emptyScanSealed = false;
   try {
@@ -340,12 +374,13 @@ void sessionRejectsLateRegistryMutation() {
   expect(emptyScanSealed, "format registry should also be sealed by an explicit scan");
 }
 
-void sessionRejectsDuplicateAssetIdsAtScanCommit() {
+void sessionRejectsDuplicateAssetIdsAtAdmission() {
   Session session;
   session.registerFormat(probeDuplicateAssetModule());
 
   session.addSource(SourceFile{.name = "duplicate.probe"}, {0xee});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.assets().empty(), "duplicate asset ids should reject the whole scan result before commit");
   expect(project.collections().empty(), "rejected duplicate asset scan should not create collections");
   expectDiagnosticRange(project.diagnostics(), "ProbeDuplicate scan failed: Scan result contained duplicate asset id 7",
@@ -358,7 +393,8 @@ void sessionRejectsExtractedSourcesWithMissingParents() {
   session.registerFormat(probeMiscModule());
 
   session.addSource(SourceFile{.name = "bad-derived-parent.probe"}, {0xf1});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.sources().size() == 1, "bad extracted source should not be added to the session");
   expect(project.assets().empty(), "bad extracted source should reject staged scan assets before commit");
   expectDiagnosticRange(
@@ -372,7 +408,8 @@ void sessionRejectsMatchFactsForMissingAssets() {
   session.registerFormat(probeBadFactAssetModule());
 
   session.addSource(SourceFile{.name = "bad-fact-asset.probe"}, {0xf2});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.assets().empty(), "invalid match fact should reject the whole scan result before commit");
   expect(project.matchFacts().empty(), "invalid match fact should not be committed");
   expectDiagnosticRange(project.diagnostics(),
@@ -385,7 +422,8 @@ void sessionRejectsSourceScopedMatchFactsForMissingSources() {
   session.registerFormat(probeBadFactSourceModule());
 
   session.addSource(SourceFile{.name = "bad-fact-source.probe"}, {0xf3});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.assets().empty(), "source-scoped invalid fact should reject the whole scan result before commit");
   expect(project.matchFacts().empty(), "source-scoped invalid fact should not be committed");
   expectDiagnosticRange(project.diagnostics(),
@@ -396,11 +434,10 @@ void sessionRejectsSourceScopedMatchFactsForMissingSources() {
 void scanValidationReportsMultipleAdmissionErrors() {
   SourceStore sources;
   const auto source = sources.add(SourceFile{.name = "multi-error.probe"}, {0xaa});
+  const auto foreignSource = sources.add(SourceFile{.name = "foreign.probe"}, {0xbb});
   const auto goodRange = sources.reader(source).range(0, 1);
 
-  ScanCommit commit{
-      .source = source,
-      .sourceSize = 1,
+  ScanResult result{
       .assets =
           {
               MiscAsset{.metadata =
@@ -415,7 +452,7 @@ void scanValidationReportsMultipleAdmissionErrors() {
                                 .id = AssetId{7},
                                 .format = "ProbeValidation",
                                 .name = "Duplicate",
-                                .range = goodRange,
+                                .range = sources.reader(foreignSource).range(0, 1),
                             }},
           },
       .matchFacts =
@@ -429,21 +466,23 @@ void scanValidationReportsMultipleAdmissionErrors() {
           },
   };
 
-  AssetStore existingAssets;
-  const auto report = validateScanCommit(commit, sources, existingAssets);
+  const auto report = validateScanResult(source, result, sources, {});
   expect(report.hasErrors(), "scan validation should report admission errors");
 
   bool sawDuplicateAsset = false;
+  bool sawForeignSource = false;
   bool sawMissingFactAsset = false;
   bool sawMissingFactSource = false;
   for (const auto& finding : report.findings()) {
     sawDuplicateAsset = sawDuplicateAsset || finding.message == "Scan result contained duplicate asset id 7";
+    sawForeignSource = sawForeignSource || finding.code == "scan.asset.foreign-source";
     sawMissingFactAsset =
         sawMissingFactAsset || finding.message == "Scan result contained a match fact for missing asset id 99";
     sawMissingFactSource =
         sawMissingFactSource || finding.message == "Scan result contained a match fact for missing source id 99";
   }
   expect(sawDuplicateAsset, "scan validation should report duplicate asset ids");
+  expect(sawForeignSource, "scan validation should reject assets whose primary range belongs to another source");
   expect(sawMissingFactAsset, "scan validation should report match facts for missing assets");
   expect(sawMissingFactSource, "scan validation should report match facts for missing sources");
 }
@@ -535,7 +574,7 @@ void scanValidationReportsMultipleAdmissionErrors() {
   }
 }
 
-void scanCommitRejectsOutOfBoundsScanResultRanges() {
+void scanValidationRejectsOutOfBoundsScanResultRanges() {
   struct BadRangeCase {
     u8 kind = 0;
     std::string_view message;
@@ -582,20 +621,17 @@ void scanCommitRejectsOutOfBoundsScanResultRanges() {
     ScanResult result = badRangeScanResult(testCase.kind, ids.nextAssetId(), sources.reader(source).range(0, 2),
                                            sources.reader(source).range(3, 1));
     normalizeScanResult(result, ids);
-    const ScanCommit commit = ScanCommit::fromScanResult(sources.source(source), std::move(result));
-
     std::string message;
     try {
-      AssetStore assets;
-      commit.validate(sources, assets);
+      validateScanResult(source, result, sources, {}).throwIfErrors();
     } catch (const std::invalid_argument& ex) {
       message = ex.what();
     }
-    expect(message == testCase.message, "scan commit should reject out-of-bounds source ranges");
+    expect(message == testCase.message, "scan validation should reject out-of-bounds source ranges");
   }
 }
 
-void scanCommitRejectsRangeLessSourceAnnotations() {
+void scanValidationRejectsRangeLessSourceAnnotations() {
   SourceStore sources;
   const auto source = sources.add(SourceFile{.name = "range-less-annotation.probe"}, {0xaa});
   ScanResult result{
@@ -610,30 +646,25 @@ void scanCommitRejectsRangeLessSourceAnnotations() {
           },
       }},
   };
-  const ScanCommit commit = ScanCommit::fromScanResult(sources.source(source), std::move(result));
-
   std::string message;
   try {
-    AssetStore assets;
-    commit.validate(sources, assets);
+    validateScanResult(source, result, sources, {}).throwIfErrors();
   } catch (const std::invalid_argument& ex) {
     message = ex.what();
   }
   expect(message == "Scan result contained source annotation without a primary source range",
-         "scan commit should reject source annotations without primary ranges");
+         "scan validation should reject source annotations without primary ranges");
 }
 
-void scanCommitRejectsDanglingSourceAnnotationReferences() {
+void scanValidationRejectsDanglingSourceAnnotationReferences() {
   SourceStore sources;
   const auto source = sources.add(SourceFile{.name = "dangling-annotation-ref.probe"}, {0xaa});
   const SourceRange range = sources.reader(source).range(0, 1);
 
   const auto validate = [&](ScanResult result) {
-    const ScanCommit commit = ScanCommit::fromScanResult(sources.source(source), std::move(result));
     std::string message;
     try {
-      AssetStore assets;
-      commit.validate(sources, assets);
+      validateScanResult(source, result, sources, {}).throwIfErrors();
     } catch (const std::invalid_argument& ex) {
       message = ex.what();
     }
@@ -651,7 +682,7 @@ void scanCommitRejectsDanglingSourceAnnotationReferences() {
                  },
              }},
          }) == "Scan result contained source annotation with missing parent annotation id 99",
-         "scan commit should reject source annotations with dangling parents");
+         "scan validation should reject source annotations with dangling parents");
 
   expect(validate(ScanResult{
              .sourceMap = SourceMap{{
@@ -667,7 +698,7 @@ void scanCommitRejectsDanglingSourceAnnotationReferences() {
                  },
              }},
          }) == "Scan result contained source annotation link to missing annotation id 99",
-         "scan commit should reject source annotation links with dangling annotation targets");
+         "scan validation should reject source annotation links with dangling annotation targets");
 
   expect(validate(ScanResult{
              .sourceMap = SourceMap{{
@@ -685,7 +716,7 @@ void scanCommitRejectsDanglingSourceAnnotationReferences() {
                  .annotation = SourceAnnotationId{99},
              }},
          }) == "Scan result contained diagnostic for missing source annotation id 99",
-         "scan commit should reject diagnostics with dangling annotation anchors");
+         "scan validation should reject diagnostics with dangling annotation anchors");
 }
 
 void snapshotValidationReportsWrongTypeCollectionReferences() {
@@ -723,7 +754,8 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
   session.registerFormat(missingAssetCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "missing-refs.probe"}, {0x00});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "resolver should still publish the collection shell");
   expect(project.collections()[0].status == CollectionStatus::Incomplete,
          "collection with missing asset references should be incomplete");
@@ -751,7 +783,8 @@ void sessionReportsDesiredCollectionWrongTypeReferences() {
   session.registerFormat(wrongTypeCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "wrong-type.probe"}, {0xaa});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   const auto found = std::ranges::find_if(project.collections(), [](const Collection& collection) {
     return collection.key.resolver == "ProbeWrongTypeRefs";
   });
@@ -779,7 +812,8 @@ void sessionReportsDuplicateDesiredCollectionKeys() {
   session.registerFormat(duplicateKeyCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "duplicate-keys.probe"}, {0x00});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "duplicate resolver keys should keep the first collection only");
   expect(project.collections()[0].name == "First", "first duplicate-key collection should be preserved");
   static_cast<void>(diagnosticWithMessage(
@@ -953,8 +987,8 @@ void sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs() {
          "missing collection resolver result should report a collection diagnostic");
 }
 
-void assetStoreRebuildsLookupIndexAfterRemoval() {
-  AssetStore assets;
+void sessionStateRebuildsLookupIndexAfterRemoval() {
+  SessionState state;
   std::vector<Asset> firstSourceAssets;
   firstSourceAssets.emplace_back(SequenceProgramAsset{
       .metadata =
@@ -962,6 +996,7 @@ void assetStoreRebuildsLookupIndexAfterRemoval() {
               .id = AssetId{0},
               .format = "Probe",
               .name = "Sequence",
+              .range = SourceRange{.source = SourceId{0}, .offset = 0, .size = 1},
           },
   });
   firstSourceAssets.emplace_back(MiscAsset{
@@ -970,9 +1005,12 @@ void assetStoreRebuildsLookupIndexAfterRemoval() {
               .id = AssetId{1},
               .format = "Probe",
               .name = "Misc",
+              .range = SourceRange{.source = SourceId{0}, .offset = 1, .size = 1},
           },
   });
-  assets.append(std::move(firstSourceAssets), SourceId{0});
+  state.appendScan(SourceId{0}, ScanResult{
+                                    .assets = std::move(firstSourceAssets),
+                                });
 
   std::vector<Asset> secondSourceAssets;
   secondSourceAssets.emplace_back(SampleCollectionAsset{
@@ -981,21 +1019,23 @@ void assetStoreRebuildsLookupIndexAfterRemoval() {
               .id = AssetId{2},
               .format = "Probe",
               .name = "Samples",
+              .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
           },
   });
-  assets.append(std::move(secondSourceAssets), SourceId{1});
+  state.appendScan(SourceId{1}, ScanResult{
+                                    .assets = std::move(secondSourceAssets),
+                                });
 
-  expect(assets.findAs<SampleCollectionAsset>(AssetId{2}) == std::get_if<SampleCollectionAsset>(&assets.all()[2]),
-         "asset store should look up assets by id before removal");
+  expect(state.asset<SampleCollectionAsset>(AssetId{2}) == std::get_if<SampleCollectionAsset>(&state.assets()[2]),
+         "session state should look up assets by id before removal");
 
-  const auto removed = assets.removeForSources({SourceId{0}});
-  expect(removed.contains(0) && removed.contains(1) && removed.size() == 2,
-         "asset store removal should report assets owned by the removed source");
-  expect(!assets.contains(AssetId{0}) && !assets.contains(AssetId{1}),
-         "asset store should remove deleted asset ids from the lookup index");
-  expect(assets.all().size() == 1 &&
-             assets.findAs<SampleCollectionAsset>(AssetId{2}) == std::get_if<SampleCollectionAsset>(&assets.all()[0]),
-         "asset store lookup index should be rebuilt after removal compacts the asset vector");
+  const std::array removedSources{SourceId{0}};
+  state.removeSources(removedSources);
+  expect(!state.containsAsset(AssetId{0}) && !state.containsAsset(AssetId{1}),
+         "session state should remove deleted asset ids from the lookup index");
+  expect(state.assets().size() == 1 &&
+             state.asset<SampleCollectionAsset>(AssetId{2}) == std::get_if<SampleCollectionAsset>(&state.assets()[0]),
+         "session state lookup index should be rebuilt after removal compacts the asset vector");
 }
 
 void sessionAddsSourceFromPath() {
@@ -1020,7 +1060,9 @@ void sessionAddsSourceFromPath() {
   expect(std::ranges::equal(session.sources().bytes(sourceId), expectedBytes),
          "path source should preserve file bytes");
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "path source should scan through registered modules");
   expect(project.sources().front().path == path, "session snapshot should preserve path source metadata");
 
@@ -1033,7 +1075,8 @@ void sessionExportsAllCollections() {
 
   session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 2, "probe sources should produce two collections");
 
   const auto exports = session.exportAllCollections(ExportRequest{
@@ -1060,14 +1103,14 @@ void sessionExportsASequenceWithoutACollection() {
   session.registerFormat(std::move(format), probeSequenceDialect());
 
   session.addSource(SourceFile{.name = "loose.probe"}, {0xaa});
-  const SessionSnapshot snapshot = session.scanPendingSources();
+  session.scanPendingSources();
+  const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.assets().size() == 1 && snapshot.collections().empty(),
          "standalone sequence fixture should scan without creating a collection");
 
   const AssetId sequence = metadata(snapshot.assets().front()).id;
   const Artifact artifact = session.exportSequenceMidi(sequence, SequenceExportRequest{});
-  expect(artifact.filename == "loose.probe.mid",
-         "session sequence export should use the standalone asset name");
+  expect(artifact.filename == "loose.probe.mid", "session sequence export should use the standalone asset name");
   expect(artifact.diagnostics.empty() && artifact.bytes.size() >= 4 &&
              std::string(artifact.bytes.begin(), artifact.bytes.begin() + 4) == "MThd",
          "session should export an uncollected sequence as Standard MIDI");
@@ -1103,14 +1146,14 @@ void runValueSessionTests() {
   sessionResolverFailureDoesNotWipeExistingCollections();
   sessionMarksCollectionsStaleWhenRemovalCannotReconcile();
   sessionRejectsLateRegistryMutation();
-  sessionRejectsDuplicateAssetIdsAtScanCommit();
+  sessionRejectsDuplicateAssetIdsAtAdmission();
   sessionRejectsExtractedSourcesWithMissingParents();
   sessionRejectsMatchFactsForMissingAssets();
   sessionRejectsSourceScopedMatchFactsForMissingSources();
   scanValidationReportsMultipleAdmissionErrors();
-  scanCommitRejectsOutOfBoundsScanResultRanges();
-  scanCommitRejectsRangeLessSourceAnnotations();
-  scanCommitRejectsDanglingSourceAnnotationReferences();
+  scanValidationRejectsOutOfBoundsScanResultRanges();
+  scanValidationRejectsRangeLessSourceAnnotations();
+  scanValidationRejectsDanglingSourceAnnotationReferences();
   snapshotValidationReportsWrongTypeCollectionReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionReportsDesiredCollectionWrongTypeReferences();
@@ -1118,7 +1161,7 @@ void runValueSessionTests() {
   sourceStoreRejectsMissingOrRemovedDerivedParents();
   sessionSnapshotFinalizationReportsDuplicateIds();
   sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs();
-  assetStoreRebuildsLookupIndexAfterRemoval();
+  sessionStateRebuildsLookupIndexAfterRemoval();
   sessionAddsSourceFromPath();
   sessionExportsAllCollections();
   sessionExportsASequenceWithoutACollection();

@@ -47,7 +47,8 @@ OpenResult WorkspaceController::openPaths(std::span<const std::filesystem::path>
   }
 
   if (!result.opened.empty()) {
-    publish(session_.scanPendingSources());
+    session_.scanPendingSources();
+    publish(session_.snapshot());
   }
   return result;
 }
@@ -85,17 +86,11 @@ size_t WorkspaceController::removeSources(std::span<const core::SourceId> source
     }
   }
 
-  size_t removed = 0;
-  for (const auto id : roots) {
-    if (session_.sources().contains(id)) {
-      static_cast<void>(session_.removeSource(id));
-      ++removed;
-    }
-  }
-  if (removed != 0) {
+  if (!roots.empty()) {
+    session_.removeSources(roots);
     publish(session_.snapshot());
   }
-  return removed;
+  return roots.size();
 }
 
 size_t WorkspaceController::removeAssets(std::span<const core::AssetId> assets) {
@@ -115,7 +110,8 @@ size_t WorkspaceController::removeAssets(std::span<const core::AssetId> assets) 
   for (const u32 value : selected) {
     existing.push_back(core::AssetId{value});
   }
-  publish(session_.removeAssets(existing));
+  session_.removeAssets(existing);
+  publish(session_.snapshot());
   return existing.size();
 }
 

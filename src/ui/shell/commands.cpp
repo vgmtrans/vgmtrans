@@ -1602,14 +1602,16 @@ void value_scan(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   printValueSessionSummary(project);
 }
 
 void value_scan_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    const auto project = session.scanPendingSources();
+    session.scanPendingSources();
+    const auto project = session.snapshot();
     printValueSessionSummary(project);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-scan {}: {}", args[2], ex.what());
@@ -1623,14 +1625,16 @@ void value_sources(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   printValueSources(project);
 }
 
 void value_sources_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    const auto project = session.scanPendingSources();
+    session.scanPendingSources();
+    const auto project = session.snapshot();
     printValueSources(project);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-sources {}: {}", args[2], ex.what());
@@ -1644,14 +1648,14 @@ void value_read_source(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  static_cast<void>(session.scanPendingSources());
+  session.scanPendingSources();
   printValueSourceBytes(session.sources(), args, 3);
 }
 
 void value_read_source_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    static_cast<void>(session.scanPendingSources());
+    session.scanPendingSources();
     printValueSourceBytes(session.sources(), args, 3);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-read-source {}: {}", args[2], ex.what());
@@ -1665,14 +1669,16 @@ void value_tree(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   printValueAssetTree(project, args, 3);
 }
 
 void value_tree_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    const auto project = session.scanPendingSources();
+    session.scanPendingSources();
+    const auto project = session.snapshot();
     printValueAssetTree(project, args, 3);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-tree {}: {}", args[2], ex.what());
@@ -1686,14 +1692,16 @@ void value_events(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   printValueSequenceEvents(project, args, 3);
 }
 
 void value_events_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    const auto project = session.scanPendingSources();
+    session.scanPendingSources();
+    const auto project = session.snapshot();
     printValueSequenceEvents(project, args, 3);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-events {}: {}", args[2], ex.what());
@@ -1707,14 +1715,16 @@ void value_collections(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   printValueCollections(project, args, 3);
 }
 
 void value_collections_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    const auto project = session.scanPendingSources();
+    session.scanPendingSources();
+    const auto project = session.snapshot();
     printValueCollections(project, args, 3);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-collections {}: {}", args[2], ex.what());
@@ -1728,14 +1738,16 @@ void value_instruments(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   printValueInstruments(project, args, 3);
 }
 
 void value_instruments_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    const auto project = session.scanPendingSources();
+    session.scanPendingSources();
+    const auto project = session.snapshot();
     printValueInstruments(project, args, 3);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-instruments {}: {}", args[2], ex.what());
@@ -1749,14 +1761,16 @@ void value_samples(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   printValueSamples(project, args, 3);
 }
 
 void value_samples_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    const auto project = session.scanPendingSources();
+    session.scanPendingSources();
+    const auto project = session.snapshot();
     printValueSamples(project, args, 3);
   } catch (const std::exception& ex) {
     fmt::println("Failed to value-samples {}: {}", args[2], ex.what());
@@ -1770,7 +1784,8 @@ void value_export(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   if (printValueNoCollections(project)) {
     return;
   }
@@ -1809,7 +1824,8 @@ void value_export_all(const std::vector<std::string>& args) {
   }
 
   auto session = valueSessionForRawFile(*file);
-  const auto project = session.scanPendingSources();
+  session.scanPendingSources();
+  const auto project = session.snapshot();
   if (printValueNoCollections(project)) {
     return;
   }
@@ -1833,7 +1849,8 @@ void value_export_all(const std::vector<std::string>& args) {
 void value_export_path(const std::vector<std::string>& args) {
   try {
     auto session = valueSessionForPath(args[2]);
-    const auto project = session.scanPendingSources();
+    session.scanPendingSources();
+    const auto project = session.snapshot();
     if (printValueNoCollections(project)) {
       return;
     }

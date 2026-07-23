@@ -15,9 +15,21 @@
 
 namespace vgmtrans::core {
 
-struct MatchContext {
-  const SourceStore& sources;
-  const SessionSnapshot& snapshot;
+// Lightweight read-only view used while rebuilding collections. It borrows the
+// live Session state instead of materializing a public SessionSnapshot.
+class MatchContext {
+public:
+  MatchContext(const SourceStore& sources, std::span<const Asset> assets, std::span<const MatchFact> matchFacts)
+      : sources_(sources), assets_(assets), matchFacts_(matchFacts) {}
+
+  [[nodiscard]] const SourceStore& sources() const noexcept { return sources_; }
+  [[nodiscard]] std::span<const Asset> assets() const noexcept { return assets_; }
+  [[nodiscard]] std::span<const MatchFact> matchFacts() const noexcept { return matchFacts_; }
+
+private:
+  const SourceStore& sources_;
+  std::span<const Asset> assets_;
+  std::span<const MatchFact> matchFacts_;
 };
 
 struct CollectionPrepareContext {

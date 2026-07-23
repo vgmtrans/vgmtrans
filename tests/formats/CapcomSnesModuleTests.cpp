@@ -355,7 +355,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "CapcomSnes recognition should run once inside scan rather than through a duplicate probe");
   const SourceId source = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   expect(project.diagnostics().empty(), "CapcomSnes scan should not report diagnostics for complete fixture");
   expect(project.collections().size() == 1, "CapcomSnes scan should produce one collection");
   expect(project.assets().size() == 3, "CapcomSnes scan should produce sequence, instrument set, and samples");
@@ -387,8 +389,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
     expect(commandDetailKind(project.sourceMap(), firstTrack.commands[index]) == expectedCommandDetailKinds[index],
            "track should decode command " + std::to_string(index));
   }
-  expect(firstTrack.commands[0].opcode == 0x05,
-         "CapcomSnes tempo should be a compiled command with source metadata");
+  expect(firstTrack.commands[0].opcode == 0x05, "CapcomSnes tempo should be a compiled command with source metadata");
   const SemanticOperand* tempo = semanticOperand(firstTrack.commands[0], "tempo");
   expect(tempo != nullptr && std::abs(std::get<double>(tempo->value) - 1422.10424024) < 0.000001 &&
              tempo->display == SourceValueDisplay::BeatsPerMinute && tempo->encodedValue &&
@@ -564,12 +565,12 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
                              }),
          "CapcomSnes sequence-event modulation should render vibrato as nonzero pitch bends");
 
-  const auto artifacts = session.exportCollection(project.collections()[0].id, ExportRequest{
-                                                                                   .kinds = {ExportKind::Midi},
-                                                                                   .loopPolicy = LoopPolicy::PlayOnce,
-                                                                                   .modulationConversion =
-                                                                                       ModulationConversionPolicy::SynthModulators,
-                                                                               });
+  const auto artifacts = session.exportCollection(
+      project.collections()[0].id, ExportRequest{
+                                       .kinds = {ExportKind::Midi},
+                                       .loopPolicy = LoopPolicy::PlayOnce,
+                                       .modulationConversion = ModulationConversionPolicy::SynthModulators,
+                                   });
   expect(artifacts.size() == 1, "value export should produce one MIDI artifact");
   expect(artifacts[0].filename == "Mega Man X.mid", "MIDI artifact should use collection name");
   expect(artifacts[0].mediaType == "audio/midi", "MIDI artifact should use audio/midi media type");
@@ -577,15 +578,14 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(artifacts[0].bytes == MidiExporter().exportMidi(midiSequence),
          "Session MIDI export should match direct builder/exporter output");
 
-  const Artifact individualMidi = session.exportSequenceMidi(
-      sequence->metadata.id, SequenceExportRequest{.loopPolicy = LoopPolicy::PlayOnce});
+  const Artifact individualMidi =
+      session.exportSequenceMidi(sequence->metadata.id, SequenceExportRequest{.loopPolicy = LoopPolicy::PlayOnce});
   const auto contextualMidi = session.exportCollection(
-      project.collections()[0].id,
-      ExportRequest{
-          .kinds = {ExportKind::Midi},
-          .loopPolicy = LoopPolicy::PlayOnce,
-          .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
-      });
+      project.collections()[0].id, ExportRequest{
+                                       .kinds = {ExportKind::Midi},
+                                       .loopPolicy = LoopPolicy::PlayOnce,
+                                       .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+                                   });
   expect(contextualMidi.size() == 1 && individualMidi.bytes == contextualMidi[0].bytes,
          "individual sequence export should use its first collection's prepared MIDI context");
 
@@ -635,10 +635,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument set");
-  const Artifact individualSf2 = session.exportInstrumentSet(
-      instruments->metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
-  const Artifact individualDls = session.exportInstrumentSet(
-      instruments->metadata.id, SynthExportFormat::Dls, ExportRequest{});
+  const Artifact individualSf2 =
+      session.exportInstrumentSet(instruments->metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
+  const Artifact individualDls =
+      session.exportInstrumentSet(instruments->metadata.id, SynthExportFormat::Dls, ExportRequest{});
   expect(individualSf2.bytes == sf2Artifacts[0].bytes && individualDls.bytes == dlsArtifacts[0].bytes,
          "individual instrument export should use its first collection's complete synth context");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid instrument");
@@ -655,10 +655,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "instrument envelope should convert SNES attack to seconds");
   expect(envelope.decaySeconds && std::isinf(*envelope.decaySeconds),
          "instrument envelope should preserve infinite SNES sustain decay");
-  expect(envelope.sustainAmplitude == 1.0,
-         "instrument envelope should convert SNES sustain to linear amplitude");
-  expect(envelope.releaseSeconds == 0.0,
-         "instrument envelope should match Capcom legacy gain-based release handling");
+  expect(envelope.sustainAmplitude == 1.0, "instrument envelope should convert SNES sustain to linear amplitude");
+  expect(envelope.releaseSeconds == 0.0, "instrument envelope should match Capcom legacy gain-based release handling");
   expect(instrument.modulation.vibrato.has_value(), "instrument should describe Capcom vibrato");
   expect(instrument.modulation.vibrato->maxDepthCents == 1200.0 &&
              instrument.modulation.vibrato->rateHertz.minimum == kCapcomSnesLfoStepHertz &&
@@ -727,7 +725,9 @@ void capcomSnesModuleWarnsWhenDetectedSynthIsEmpty() {
   std::fill(bytes.begin() + 0x4000, bytes.begin() + 0x4006, 0);
   session.addSource(SourceFile{.name = "Empty Synth.spc"}, std::move(bytes));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   expect(project.assets().size() == 1, "empty synth fixture should still preserve its sequence");
   expect(project.diagnostics().size() == 1 &&
              project.diagnostics()[0].message ==
@@ -860,7 +860,9 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
   vgmtrans::formats::registerValueFormats(session);
   const auto sourceId = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesSpc());
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   expect(project.diagnostics().empty(), "SPC-backed CapcomSnes scan should not report diagnostics");
   expect(project.sources().size() == 2, "SPC scan should preserve original source plus extracted ARAM");
   expect(!project.sources()[0].derived(), "original SPC source should not be derived");
@@ -961,7 +963,9 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   vgmtrans::formats::registerValueFormats(session);
   session.addSource(SourceFile{.name = "Mega Man X.spc"}, std::move(bytes));
 
-  const SessionSnapshot project = session.scanPendingSources();
+  session.scanPendingSources();
+
+  const SessionSnapshot project = session.snapshot();
   expect(project.diagnostics().empty(), "CapcomSnes note-state scan should not report diagnostics");
   expect(!project.assets().empty(), "CapcomSnes note-state scan should produce assets");
 
