@@ -299,9 +299,10 @@ void VGMFileTreeView::setItemText(QTreeWidgetItem* item) const {
   if (annotation == nullptr) {
     return;
   }
-  item->setText(0, SourceInspectorPresentation::treeText(*annotation, showDetails_));
+  const QString description = SourceInspectorPresentation::description(*annotation);
+  item->setText(0, SourceInspectorPresentation::treeText(*annotation, showDetails_, description));
   item->setIcon(0, SourceInspectorPresentation::icon(*annotation));
-  item->setToolTip(0, SourceInspectorPresentation::description(*annotation));
+  item->setToolTip(0, description);
 }
 
 void VGMFileTreeView::onShowDetailsChanged(bool show) {
