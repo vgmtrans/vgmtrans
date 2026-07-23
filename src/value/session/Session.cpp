@@ -10,6 +10,7 @@
 #include "value/scan/FormatModule.h"
 #include "value/session/ScanCommit.h"
 
+#include <algorithm>
 #include <exception>
 #include <fstream>
 #include <iterator>
@@ -99,18 +100,28 @@ SessionSnapshot Session::removeSource(SourceId id) {
     return snapshot();
   }
 
-  const auto removedSources = sources_.removeFamily(id);
-  for (const SourceId source : removedSources) {
-    scannedSources_.erase(source.value);
-  }
-
-  removeDiscoveredDataForSources(removedSources);
+  removeSourceFamily(id);
   rebuildCollections();
   return snapshot();
 }
 
 SessionSnapshot Session::removeAssets(std::span<const AssetId> assets) {
   sealRegistries();
+  std::vector<SourceId> affectedRoots;
+  for (const AssetId id : assets) {
+    const auto* asset = assets_.find(id);
+    SourceId source = asset != nullptr ? metadata(*asset).range.source : SourceId{};
+    if (!sources_.contains(source)) {
+      continue;
+    }
+    while (const auto parent = sources_.source(source).parent) {
+      source = *parent;
+    }
+    if (std::ranges::find(affectedRoots, source) == affectedRoots.end()) {
+      affectedRoots.push_back(source);
+    }
+  }
+
   const auto removedAssetIds = assets_.remove(assets);
   if (removedAssetIds.empty()) {
     return snapshot();
@@ -122,6 +133,18 @@ SessionSnapshot Session::removeAssets(std::span<const AssetId> assets) {
   const auto removedAnnotations = sourceMaps_.removeForAssets(removedAssetIds);
   diagnostics_.removeForAssetsAndAnnotations(removedAssetIds, removedAnnotations);
   collections_.markStaleForAssets(removedAssetIds);
+
+  for (const SourceId root : affectedRoots) {
+    const auto family = sources_.sourceFamily(root);
+    const bool hasAssets = std::ranges::any_of(assets_.all(), [&](const Asset& asset) {
+      return std::ranges::find(family, metadata(asset).range.source) != family.end();
+    });
+    if (hasAssets) {
+      continue;
+    }
+    removeSourceFamily(root);
+  }
+
   rebuildCollections();
   return snapshot();
 }
@@ -290,6 +313,14 @@ void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources,
       queue.push_back(derived);
     }
   }
+}
+
+void Session::removeSourceFamily(SourceId source) {
+  const auto removedSources = sources_.removeFamily(source);
+  for (const SourceId removed : removedSources) {
+    scannedSources_.erase(removed.value);
+  }
+  removeDiscoveredDataForSources(removedSources);
 }
 
 void Session::removeDiscoveredDataForSources(const std::vector<SourceId>& sources) {

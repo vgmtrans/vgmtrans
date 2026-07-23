@@ -67,6 +67,7 @@ private:
   void scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued);
   void addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
                            std::vector<SourceId>& queue, std::set<u32>& queued);
+  void removeSourceFamily(SourceId source);
   void removeDiscoveredDataForSources(const std::vector<SourceId>& sources);
   void rebuildCollections();
 
