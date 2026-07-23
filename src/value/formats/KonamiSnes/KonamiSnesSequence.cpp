@@ -924,9 +924,9 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xe2: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
-      const u8 program = event.u8("program", SemanticOperandRole::Instrument);
+      const u8 program = event.u8("raw");
       event.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
-      event.derived("program_number", program & 0x7f, SemanticOperandRole::InstrumentProgram);
+      event.derived("program", program & 0x7f, SemanticOperandRole::InstrumentProgram);
       return event.invoke<&Playback::programChange>(program);
     }
     case 0xe3: {
@@ -1115,9 +1115,9 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       if (version >= KONAMISNES_V4) {
         auto event = cursor.command("Program And Volume", SequenceSemantic::Program);
         const u8 volume = event.u8("volume", SemanticOperandRole::Level);
-        const u8 program = event.u8("program", SemanticOperandRole::Instrument);
+        const u8 program = event.u8("raw");
         event.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
-        event.derived("program_number", program & 0x7f, SemanticOperandRole::InstrumentProgram);
+        event.derived("program", program & 0x7f, SemanticOperandRole::InstrumentProgram);
         return event.invoke<&Playback::programChangeAndVolume>(volume, program);
       }
       return unknownCommand(cursor, 2);
