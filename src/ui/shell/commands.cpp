@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -874,14 +875,19 @@ std::string valueEnvelopeName(const vgmtrans::core::Envelope& envelope) {
   if (!vgmtrans::core::hasExplicitEnvelope(envelope)) {
     return "none";
   }
-  const auto stage = [](u32 micros) {
-    if (micros == vgmtrans::core::kEnvelopeInfinite) {
+  const auto stage = [](std::optional<double> seconds) {
+    if (!seconds) {
+      return std::string("-");
+    }
+    if (std::isinf(*seconds)) {
       return std::string("inf");
     }
-    return fmt::format("{:.3f}s", micros / 1000000.0);
+    return fmt::format("{:.3f}s", *seconds);
   };
-  return fmt::format("A {} D {} S {:.1f}% R {}", stage(envelope.attack), stage(envelope.decay), envelope.sustain / 10.0,
-                     stage(envelope.release));
+  const std::string sustain =
+      envelope.sustainAmplitude ? fmt::format("{:.1f}%", *envelope.sustainAmplitude * 100.0) : "-";
+  return fmt::format("A {} H {} D {} S {} R {}", stage(envelope.attackSeconds), stage(envelope.holdSeconds),
+                     stage(envelope.decaySeconds), sustain, stage(envelope.releaseSeconds));
 }
 
 void printValueInstrument(const vgmtrans::core::Instrument& instrument, size_t index) {
@@ -893,10 +899,11 @@ void printValueInstrument(const vgmtrans::core::Instrument& instrument, size_t i
 
   for (size_t i = 0; i < instrument.regions.size(); ++i) {
     const auto& region = instrument.regions[i];
-    fmt::println("  region #{} range=0x{:x}:0x{:x} key={}-{} vel={}-{} {} tuning={}c pan={:.3f} atten={:.2f}dB", i,
-                 region.range.offset, region.range.size, region.keyRange.low, region.keyRange.high,
-                 region.velocityRange.low, region.velocityRange.high, valueSampleRefName(region.sample),
-                 region.tuning.cents, region.pan, region.attenuationDb);
+    fmt::println(
+        "  region #{} range=0x{:x}:0x{:x} key={}-{} vel={}-{} {} unity-key={:.3f} pan={:.3f} atten={:.2f}dB", i,
+        region.range.offset, region.range.size, region.keyRange.low, region.keyRange.high, region.velocityRange.low,
+        region.velocityRange.high, valueSampleRefName(region.sample), region.unityKey, region.pan,
+        region.attenuationDb);
     fmt::println("    envelope {}", valueEnvelopeName(region.envelope));
   }
 }

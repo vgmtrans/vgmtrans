@@ -112,8 +112,10 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.cpp
@@ -144,8 +146,12 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.h
     ${PROJECT_SOURCE_DIR}/src/value/export/Export.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.h
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.h
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.h
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.cpp
@@ -180,8 +186,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SourceInspection.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.h
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
@@ -198,12 +202,8 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/synth/SynthModel.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.h
       ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.h
 )
 target_include_directories(
   vgmtransvaluecore

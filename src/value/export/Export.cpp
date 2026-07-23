@@ -93,6 +93,14 @@ struct PreparedExportDiagnostics {
 };
 
 struct PreparedExport {
+  // instrumentSets may point into ownedInstrumentSets, so copying would leave
+  // pointers referring to the original object.
+  PreparedExport() = default;
+  PreparedExport(const PreparedExport&) = delete;
+  PreparedExport& operator=(const PreparedExport&) = delete;
+  PreparedExport(PreparedExport&&) = default;
+  PreparedExport& operator=(PreparedExport&&) = default;
+
   std::string baseName;
   const Collection* collection = nullptr;
   const SequenceProgramAsset* sequenceProgram = nullptr;
@@ -469,9 +477,8 @@ Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore&
     };
   }
 
-  PreparedExport prepared{
-      .baseName = baseName,
-  };
+  PreparedExport prepared;
+  prepared.baseName = baseName;
   prepared.instrumentSets.push_back(instrumentSet);
   std::vector<AssetId> sampleIds;
   for (const auto& instrument : instrumentSet->instruments) {
