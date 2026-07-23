@@ -366,7 +366,7 @@ PreparedCollectionAssets prepareAkaoCollection(const CollectionPrepareContext& c
   InstrumentSetBuilder instruments(AssetId{}, nullptr, &prepared.diagnostics);
   (void)buildAkaoInstrumentSet(*input, *analysis, articulations, instruments);
   auto built = std::move(instruments).finish();
-  prepared.instrumentSets.push_back(InstrumentSetAsset{
+  prepared.replacementInstrumentSets.push_back(InstrumentSetAsset{
       .metadata =
           AssetMetadata{
               .format = std::string(kAkaoFormatName),

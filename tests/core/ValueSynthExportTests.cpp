@@ -479,7 +479,7 @@ void standaloneSynthExportsKeepNativeModulation() {
 PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepareContext& context) {
   const AssetId samples = context.collection.sampleCollections.front();
   return PreparedCollectionAssets{
-      .instrumentSets = {InstrumentSetAsset{
+      .replacementInstrumentSets = {InstrumentSetAsset{
           .metadata = AssetMetadata{.format = "Prepared Probe", .name = "Prepared Bank"},
           .instruments = {Instrument{
               .name = "Prepared Instrument",

@@ -171,7 +171,7 @@ struct PreparedExport {
       prepared.diagnostics.instrumentSets.insert(prepared.diagnostics.instrumentSets.end(),
                                                  std::make_move_iterator(result.diagnostics.begin()),
                                                  std::make_move_iterator(result.diagnostics.end()));
-      prepared.ownedInstrumentSets = std::move(result.instrumentSets);
+      prepared.ownedInstrumentSets = std::move(result.replacementInstrumentSets);
       prepared.instrumentSets.reserve(prepared.ownedInstrumentSets.size());
       for (const auto& instrumentSet : prepared.ownedInstrumentSets) {
         prepared.instrumentSets.push_back(&instrumentSet);
