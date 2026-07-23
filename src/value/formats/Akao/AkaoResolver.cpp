@@ -43,6 +43,11 @@ struct SampleFactEntry {
   u32 sourceOffset = 0;
 };
 
+struct InstrumentSetFactEntry {
+  AssetId asset;
+  AssetId sequenceAsset;
+};
+
 [[nodiscard]] bool psfLike(const SourceFile* source) {
   if (source == nullptr) {
     return false;
@@ -110,6 +115,21 @@ struct SampleFactEntry {
     });
   }
   std::ranges::sort(entries, {}, &SampleFactEntry::sourceOffset);
+  return entries;
+}
+
+[[nodiscard]] std::vector<InstrumentSetFactEntry> instrumentSetFacts(const MatchFactIndex& index) {
+  std::vector<InstrumentSetFactEntry> entries;
+  for (const auto& facts : index.formatFacts<InstrumentSetAsset>(kAkaoFormatName, kAkaoInstrumentSetFact)) {
+    const auto sequenceAsset = fieldU32(facts.payload, kAkaoSequenceAssetField);
+    if (!sequenceAsset) {
+      continue;
+    }
+    entries.push_back(InstrumentSetFactEntry{
+        .asset = facts.asset.metadata.id,
+        .sequenceAsset = AssetId{*sequenceAsset},
+    });
+  }
   return entries;
 }
 
@@ -268,18 +288,31 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
 std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& context) {
   const MatchFactIndex index(context);
   const auto sequences = sequenceFacts(index);
+  const auto instrumentSets = instrumentSetFacts(index);
   const auto samples = sampleFacts(index);
 
   std::vector<DesiredCollection> collections;
   for (const auto& sequence : sequences) {
     CollectionAssembly collection(collectionKey(sequence), sequence.name.empty() ? "Akao Collection" : sequence.name);
     collection.sequence(sequence.asset);
+    const auto instrumentSet =
+        std::ranges::find(instrumentSets, sequence.asset, &InstrumentSetFactEntry::sequenceAsset);
+    if (instrumentSet != instrumentSets.end()) {
+      collection.instrumentSet(instrumentSet->asset);
+    } else {
+      collection.incomplete(CollectionIssue{
+          .severity = Severity::Warning,
+          .code = "missing-instrument-set",
+          .message = "Akao sequence has no detected instrument set",
+          .asset = sequence.asset,
+      });
+    }
 
     std::set<u32> remaining(sequence.requiredArticulations.begin(), sequence.requiredArticulations.end());
 
     const auto selected = chooseSamplesForSequence(sequence, samples, remaining, collection);
     attachSamplesAndReportGaps(collection, sequence, selected, remaining);
-    collection.requireSequence().requireSampleCollection();
+    collection.requireSequence().requireInstrumentSet().requireSampleCollection();
     collections.push_back(std::move(collection).finish());
   }
   return collections;
@@ -287,12 +320,15 @@ std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& contex
 
 PreparedCollectionAssets prepareAkaoCollection(const CollectionPrepareContext& context) {
   PreparedCollectionAssets prepared;
-  if (!context.collection.sequence || context.collection.sampleCollections.empty()) {
+  if (!context.collection.sequence || context.collection.instrumentSets.empty() ||
+      context.collection.sampleCollections.empty()) {
     return prepared;
   }
 
   const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*context.collection.sequence);
-  if (sequence == nullptr) {
+  const auto* detectedInstrumentSet =
+      context.snapshot.asset<InstrumentSetAsset>(context.collection.instrumentSets.front());
+  if (sequence == nullptr || detectedInstrumentSet == nullptr) {
     return prepared;
   }
 
@@ -317,10 +353,9 @@ PreparedCollectionAssets prepareAkaoCollection(const CollectionPrepareContext& c
     return prepared;
   }
 
-  // Akao instruments cannot be finalized during the initial scan: the chosen
-  // collection may combine several sample sets, and each articulation must
-  // point into the set that actually supplied it. Build that lookup only after
-  // collection matching has made the selection.
+  // The scanned bank owns the durable layout and source annotations. Rebuild
+  // the same values here only to bind their articulation ids to the sample
+  // collections selected for this particular collection.
   auto articulations = buildResolvedArticulations(context, ids, prepared.diagnostics);
   if (articulations.empty()) {
     prepared.diagnostics.push_back(
@@ -329,13 +364,13 @@ PreparedCollectionAssets prepareAkaoCollection(const CollectionPrepareContext& c
   }
 
   InstrumentSetBuilder instruments(AssetId{}, nullptr, &prepared.diagnostics);
-  buildAkaoInstrumentSet(*input, *analysis, articulations, instruments);
+  (void)buildAkaoInstrumentSet(*input, *analysis, articulations, instruments);
   auto built = std::move(instruments).finish();
   prepared.instrumentSets.push_back(InstrumentSetAsset{
       .metadata =
           AssetMetadata{
               .format = std::string(kAkaoFormatName),
-              .name = akaoInstrumentSetName(*analysis),
+              .name = detectedInstrumentSet->metadata.name,
               .range = built.range,
           },
       .instruments = std::move(built.values),

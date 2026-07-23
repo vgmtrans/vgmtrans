@@ -23,6 +23,7 @@
 #include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
+#include "value/formats/Akao/Akao.h"
 #include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/formats/ValueFormats.h"
 #include "io/RawFile.h"
@@ -871,7 +872,8 @@ std::map<std::string, CapcomSnesSummary> legacyCapcomSnesRsnSummaries(const std:
 }
 
 CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const SourceStore& sources,
-                                         const Collection& collection) {
+                                         const Collection& collection,
+                                         std::span<const InstrumentSetAsset> preparedInstrumentSets = {}) {
   const auto decoders = SampleDecoderRegistry::withDefaultDecoders();
 
   CapcomSnesSummary summary;
@@ -915,12 +917,20 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
     }
   }
 
-  for (const auto instrumentSetId : collection.instrumentSets) {
-    const auto* instrumentSet = project.asset<InstrumentSetAsset>(instrumentSetId);
-    if (instrumentSet == nullptr) {
-      continue;
+  std::vector<const InstrumentSetAsset*> instrumentSets;
+  if (preparedInstrumentSets.empty()) {
+    for (const auto instrumentSetId : collection.instrumentSets) {
+      if (const auto* instrumentSet = project.asset<InstrumentSetAsset>(instrumentSetId)) {
+        instrumentSets.push_back(instrumentSet);
+      }
     }
+  } else {
+    for (const auto& instrumentSet : preparedInstrumentSets) {
+      instrumentSets.push_back(&instrumentSet);
+    }
+  }
 
+  for (const auto* instrumentSet : instrumentSets) {
     ++summary.instrumentSetCount;
     for (const auto& instrument : instrumentSet->instruments) {
       const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
@@ -1501,7 +1511,16 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
         .instrumentSetCount = static_cast<u32>(collection.instrumentSets.size()),
         .sampleCollectionCount = static_cast<u32>(collection.sampleCollections.size()),
     };
-    const auto detailed = valueCapcomSnesSummary(project, session.sources(), collection);
+    const auto prepared = vgmtrans::formats::akao::prepareAkaoCollection(CollectionPrepareContext{
+        .sources = session.sources(),
+        .snapshot = project,
+        .collection = collection,
+    });
+    for (const auto& diagnostic : prepared.diagnostics) {
+      diagnostics << "value preparation diagnostic: " << diagnostic.message << "\n";
+    }
+    const auto detailed =
+        valueCapcomSnesSummary(project, session.sources(), collection, prepared.instrumentSets);
     shape.sampleCount = static_cast<u32>(detailed.samples.size());
     shape.samples = detailed.samples;
     for (auto& sample : shape.samples) {

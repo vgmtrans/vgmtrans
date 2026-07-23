@@ -158,6 +158,10 @@ struct PreparedExport {
       continue;
     }
 
+    // A preparer returns the collection's authoritative export-time view.
+    // Durable scanned banks remain available for inspection, but formats such
+    // as Akao may need to bind them to collection-selected samples here.
+    prepared.instrumentSets.clear();
     try {
       auto result = module.prepareCollection(CollectionPrepareContext{
           .sources = sources,
@@ -168,7 +172,7 @@ struct PreparedExport {
                                                  std::make_move_iterator(result.diagnostics.begin()),
                                                  std::make_move_iterator(result.diagnostics.end()));
       prepared.ownedInstrumentSets = std::move(result.instrumentSets);
-      prepared.instrumentSets.reserve(prepared.instrumentSets.size() + prepared.ownedInstrumentSets.size());
+      prepared.instrumentSets.reserve(prepared.ownedInstrumentSets.size());
       for (const auto& instrumentSet : prepared.ownedInstrumentSets) {
         prepared.instrumentSets.push_back(&instrumentSet);
       }

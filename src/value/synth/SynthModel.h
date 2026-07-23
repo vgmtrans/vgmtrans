@@ -32,9 +32,12 @@ struct VelocityRange {
 
 struct SampleRef {
   // index is local to collection. collection may be empty when a format implies
-  // "use the collection paired with this instrument set".
+  // "use the collection paired with this instrument set". An invalid index
+  // represents a structural region whose sample has not been bound yet.
   std::optional<AssetId> collection;
   u32 index = 0;
+
+  [[nodiscard]] bool valid() const noexcept { return index != invalidIdValue; }
 };
 
 struct Tuning {

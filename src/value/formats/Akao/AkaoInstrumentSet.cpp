@@ -82,7 +82,7 @@ void requireArticulation(std::set<u32>& required, u32 articulationId) {
     Region region{
         .keyRange = KeyRange{.low = reader.u8At(regionOffset + 1), .high = reader.u8At(regionOffset + 2)},
         .velocityRange = VelocityRange{.low = 0, .high = 127},
-        .sample = SampleRef{.index = 0},
+        .sample = SampleRef{.index = invalidIdValue},
         .range = reader.range(regionOffset, 8),
         .attenuationDb = linearAmplitudeToAttenuationDb(
             reader.u8At(regionOffset + 7) == 0 ? 1.0 : reader.u8At(regionOffset + 7) / 128.0),
@@ -157,7 +157,7 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
       Region region{
           .keyRange = KeyRange{.low = static_cast<u8>(key), .high = static_cast<u8>(key)},
           .velocityRange = VelocityRange{.low = 0, .high = 127},
-          .sample = SampleRef{.index = 0},
+          .sample = SampleRef{.index = invalidIdValue},
           .range = reader.range(regionOffset, 8),
           .pan = panPositionFrom7Bit(reader.u8At(regionOffset + 7) & 0x7f),
           .attenuationDb = linearAmplitudeToAttenuationDb(
@@ -183,7 +183,7 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
       Region region{
           .keyRange = KeyRange{.low = key, .high = key},
           .velocityRange = VelocityRange{.low = 0, .high = 127},
-          .sample = SampleRef{.index = 0},
+          .sample = SampleRef{.index = invalidIdValue},
           .range = reader.range(regionOffset, regionSize),
           .pan = panPositionFrom7Bit(reader.u8At(regionOffset + 4)),
           .attenuationDb = linearAmplitudeToAttenuationDb(reader.le16(regionOffset + 2) / (127.0 * 128.0)),
@@ -235,15 +235,19 @@ struct ParsedInstrumentSet {
 
   if (sequence.header.instrumentSetOffset) {
     const u32 instrSetOffset = *sequence.header.instrumentSetOffset;
-    for (u32 program = 0; program < 16 && reader.has(instrSetOffset + program * 2, 2); ++program) {
-      const u16 pointer = reader.le16(instrSetOffset + program * 2);
+    for (u32 program = 0; program < 16; ++program) {
+      const u64 pointerOffset = static_cast<u64>(instrSetOffset) + program * 2;
+      if (pointerOffset + 2 > sequenceEnd || !reader.has(pointerOffset, 2)) {
+        break;
+      }
+      const u16 pointer = reader.le16(pointerOffset);
       if (pointer == 0xffff || (pointer == 0 && program != 0)) {
         continue;
       }
-      const u32 instrOffset = instrSetOffset + 0x20 + pointer;
+      const u64 instrOffset = static_cast<u64>(instrSetOffset) + 0x20 + pointer;
       if (instrOffset < sequenceEnd && reader.has(instrOffset, 8)) {
-        addMelodicInstrument(parsed.instruments, reader, instrOffset, sequenceEnd, profile, articulations, required,
-                             program);
+        addMelodicInstrument(parsed.instruments, reader, static_cast<u32>(instrOffset), sequenceEnd, profile,
+                             articulations, required, program);
       }
     }
   } else {
@@ -277,31 +281,64 @@ struct ParsedInstrumentSet {
   return parsed;
 }
 
+void includeSpan(std::optional<SourceRange>& span, SourceRange range) {
+  if (!range.valid()) {
+    return;
+  }
+  if (!span) {
+    span = range;
+    return;
+  }
+  if (span->source != range.source) {
+    return;
+  }
+  const u64 start = std::min(span->offset, range.offset);
+  const u64 end = std::max(span->endOffset(), range.endOffset());
+  span->offset = start;
+  span->size = end - start;
+}
+
 [[nodiscard]] std::optional<SourceRange> instrumentSpan(const std::vector<Instrument>& instruments) {
   std::optional<SourceRange> span;
-  const auto include = [&span](SourceRange range) {
-    if (!range.valid()) {
-      return;
-    }
-    if (!span) {
-      span = range;
-      return;
-    }
-    if (span->source != range.source) {
-      return;
-    }
-    const u64 start = std::min(span->offset, range.offset);
-    const u64 end = std::max(span->endOffset(), range.endOffset());
-    span->offset = start;
-    span->size = end - start;
-  };
   for (const Instrument& instrument : instruments) {
-    include(instrument.range);
+    includeSpan(span, instrument.range);
     for (const Region& region : instrument.regions) {
-      include(region.range);
+      includeSpan(span, region.range);
     }
   }
   return span;
+}
+
+[[nodiscard]] SourceRange instrumentSetRange(ByteReader reader, const AkaoSequenceAnalysis& sequence,
+                                             const std::vector<Instrument>& instruments) {
+  std::optional<SourceRange> span = instrumentSpan(instruments);
+  const u64 sequenceEnd = static_cast<u64>(sequence.header.offset) + sequence.header.length;
+  const auto includeAnchor = [&](u32 offset) {
+    if (offset < sequenceEnd && reader.has(offset, 0)) {
+      includeSpan(span, reader.range(offset, 0));
+    }
+  };
+
+  if (sequence.header.instrumentSetOffset) {
+    const u32 offset = *sequence.header.instrumentSetOffset;
+    if (offset < sequenceEnd && reader.has(offset, 0)) {
+      includeSpan(span, reader.range(offset, std::min<u64>(0x20, sequenceEnd - offset)));
+    }
+  }
+  if (sequence.header.drumSetOffset) {
+    includeAnchor(*sequence.header.drumSetOffset);
+  }
+  for (const u32 offset : sequence.references.customInstrumentTableOffsets) {
+    includeAnchor(offset);
+  }
+  for (const u32 offset : sequence.references.drumInstrumentTableOffsets) {
+    includeAnchor(offset);
+  }
+
+  // Individual-articulation sequences have no local instrument table. They
+  // still need a durable, inspectable bank asset, anchored to the sequence that
+  // defines its programs.
+  return span.value_or(reader.range(sequence.header.offset, 0));
 }
 
 [[nodiscard]] std::string_view instrumentKind(const InstrumentAddress& address) {
@@ -324,32 +361,47 @@ void annotateArticulation(ByteReader reader, AnnotationBuilder& annotation, cons
   }
 }
 
-void annotateInstrumentLayout(ByteReader reader, SourceMapBuilder& sourceMap, SourceAnnotationId parent,
-                              const Instrument& instrument) {
-  const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
-  auto annotation = sourceMap.annotation(SourceRole::Instrument, instrument.name, instrument.range)
-                        .parent(parent)
-                        .owner(ObjectRefs::instrumentProgram(address.bank, address.program))
-                        .kind(instrumentKind(address));
-  annotateSynthValue(annotation, instrument);
-  for (const Region& region : instrument.regions) {
-    auto regionAnnotation =
-        sourceMap.annotation(SourceRole::Region, "Region", region.range).kind("akao-region").parent(annotation.id());
-    annotateSynthValue(regionAnnotation, region);
-    annotateArticulation(reader, regionAnnotation, region);
+void annotateInstrumentPointerTable(ByteReader reader, const AkaoSequenceAnalysis& sequence,
+                                    InstrumentSetBuilder& instruments, SourceAnnotationId parent) {
+  if (!sequence.header.instrumentSetOffset) {
+    return;
+  }
+  const u32 tableOffset = *sequence.header.instrumentSetOffset;
+  const u64 sequenceEnd = static_cast<u64>(sequence.header.offset) + sequence.header.length;
+  if (tableOffset >= sequenceEnd || !reader.has(tableOffset, 2)) {
+    return;
+  }
+
+  const u32 tableSize = static_cast<u32>(std::min<u64>(0x20, sequenceEnd - tableOffset));
+  auto table = instruments
+                   .source(SourceRole::Table, "Instrument Pointer Table", reader.range(tableOffset, tableSize),
+                           "akao-instrument-pointer-table")
+                   .parent(parent);
+  for (u32 program = 0; program < 16 && program * 2 + 2 <= tableSize; ++program) {
+    const u32 pointerOffset = tableOffset + program * 2;
+    const u16 pointer = reader.le16(pointerOffset);
+    auto entry = instruments
+                     .source(SourceRole::TableEntry, fmt::format("Instrument {} Pointer", program),
+                             reader.range(pointerOffset, 2), "akao-instrument-pointer")
+                     .parent(table.id())
+                     .derived("program", program)
+                     .field("relative", reader.range(pointerOffset, 2), pointer, SourceValueDisplay::Hex);
+    if (pointer == 0xffff || (pointer == 0 && program != 0)) {
+      continue;
+    }
+    const u64 target = static_cast<u64>(tableOffset) + 0x20 + pointer;
+    if (target < sequenceEnd && reader.has(target, 1)) {
+      entry.link(SourceLinkRole::PointsTo, reader.range(target, 0), "Instrument");
+    }
   }
 }
 
-void publishInstrument(ByteReader reader, InstrumentSetBuilder& out, Instrument instrument) {
-  // Parsing returns complete values because the same parser also describes the
-  // sequence's instrument layout during scanning. Passing those values through
-  // the builder here gives every prepared instrument and region a stable
-  // source owner and records which selected sample it uses.
+void publishInstrument(ByteReader reader, InstrumentSetBuilder& out, SourceAnnotationId parent, Instrument instrument) {
   const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
   const std::string name = instrument.name;
   const SourceRange range = instrument.range;
   auto entry = out.append(std::move(instrument));
-  entry.source(name, range, instrumentKind(address));
+  entry.source(name, range, instrumentKind(address)).parent(parent);
 
   for (u32 i = 0; i < entry.value().regions.size(); ++i) {
     const Region& region = entry.value().regions[i];
@@ -365,33 +417,25 @@ std::string akaoInstrumentSetName(const AkaoSequenceAnalysis& sequence) {
   return fmt::format("Akao Instr Set {:02X}", sequence.header.sequenceId);
 }
 
-void buildAkaoInstrumentSet(const ScanInput& input, const AkaoSequenceAnalysis& sequence,
-                            const AkaoArticulationMap& articulations, InstrumentSetBuilder& instruments) {
+std::vector<u32> buildAkaoInstrumentSet(const ScanInput& input, const AkaoSequenceAnalysis& sequence,
+                                        const AkaoArticulationMap& articulations, InstrumentSetBuilder& instruments) {
   auto parsed = parseInstrumentTables(input.reader, sequence, articulations);
+  const SourceRange range = instrumentSetRange(input.reader, sequence, parsed.instruments);
   if (sequence.references.usesIndividualArticulations) {
     addSyntheticArticulationInstruments(parsed.instruments, articulations);
   }
-  for (auto& instrument : parsed.instruments) {
-    publishInstrument(input.reader, instruments, std::move(instrument));
-  }
-}
 
-std::vector<u32> analyzeAkaoInstrumentStructures(ByteReader reader, const AkaoSequenceAnalysis& sequence,
-                                                 SourceMapBuilder* sourceMap,
-                                                 std::optional<SourceAnnotationId> parent) {
-  const ParsedInstrumentSet parsed = parseInstrumentTables(reader, sequence, {});
-  const std::optional<SourceRange> range = instrumentSpan(parsed.instruments);
-  if (sourceMap == nullptr || !range) {
-    return parsed.requiredArticulations;
-  }
-  auto root = sourceMap->annotation(SourceRole::InstrumentSet, "Akao Instrument Layout", *range)
-                  .kind("akao-instrument-layout")
-                  .derived("instrument_count", parsed.instruments.size());
-  if (parent) {
-    root.parent(*parent);
-  }
-  for (const Instrument& instrument : parsed.instruments) {
-    annotateInstrumentLayout(reader, *sourceMap, root.id(), instrument);
+  instruments.include(range);
+  auto root =
+      instruments.source(SourceRole::InstrumentSet, akaoInstrumentSetName(sequence), range, "akao-instrument-set")
+          .derived("instrument_count", parsed.instruments.size())
+          .derived("required_articulation_count", parsed.requiredArticulations.size())
+          .derived("uses_individual_articulations", sequence.references.usesIndividualArticulations,
+                   SourceValueDisplay::Boolean);
+  annotateInstrumentPointerTable(input.reader, sequence, instruments, root.id());
+
+  for (auto& instrument : parsed.instruments) {
+    publishInstrument(input.reader, instruments, root.id(), std::move(instrument));
   }
   return parsed.requiredArticulations;
 }

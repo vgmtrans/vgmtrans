@@ -30,6 +30,8 @@ inline constexpr std::string_view kAkaoCollectionResolver = "Akao";
 inline constexpr std::string_view kAkaoSequenceIdDomain = "akao.sequence-id";
 inline constexpr std::string_view kAkaoSampleSetDomain = "akao.sample-set";
 inline constexpr std::string_view kAkaoArticulationDomain = "akao.articulation";
+inline constexpr std::string_view kAkaoInstrumentSetFact = "akao.instrument-set";
+inline constexpr std::string_view kAkaoSequenceAssetField = "sequence_asset";
 
 inline constexpr u32 kAkaoSignature = 0x414B414F;
 inline constexpr u32 kAkaoPpqn = 0x30;
@@ -189,11 +191,13 @@ struct AkaoSplitSampleLocation {
                                                                                  AkaoSplitSampleLocation location);
 
 [[nodiscard]] std::string akaoInstrumentSetName(const AkaoSequenceAnalysis& sequence);
-void buildAkaoInstrumentSet(const core::ScanInput& input, const AkaoSequenceAnalysis& sequence,
-                            const AkaoArticulationMap& articulations, core::InstrumentSetBuilder& instruments);
-[[nodiscard]] std::vector<u32> analyzeAkaoInstrumentStructures(
-    core::ByteReader reader, const AkaoSequenceAnalysis& sequence, core::SourceMapBuilder* sourceMap = nullptr,
-    std::optional<core::SourceAnnotationId> parent = std::nullopt);
+// An empty articulation map publishes the source-stable structure used during
+// scanning. Selected articulations turn the same structure into a bound export
+// view. The return value is the set of articulation ids the structure requires.
+[[nodiscard]] std::vector<u32> buildAkaoInstrumentSet(const core::ScanInput& input,
+                                                      const AkaoSequenceAnalysis& sequence,
+                                                      const AkaoArticulationMap& articulations,
+                                                      core::InstrumentSetBuilder& instruments);
 
 [[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(const core::MatchContext& context);
 [[nodiscard]] core::PreparedCollectionAssets prepareAkaoCollection(const core::CollectionPrepareContext& context);

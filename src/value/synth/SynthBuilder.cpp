@@ -669,7 +669,7 @@ void InstrumentSetBuilder::linkInstrumentSamples(u32 instrumentIndex, SourceAnno
 }
 
 void InstrumentSetBuilder::linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label) {
-  if (sourceMap_ != nullptr && annotation.valid()) {
+  if (sourceMap_ != nullptr && annotation.valid() && sample.valid()) {
     AnnotationBuilder{*sourceMap_, annotation}.link(SourceLinkRole::UsesSample, sampleTarget(sample), label);
   }
 }
