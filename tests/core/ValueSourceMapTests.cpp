@@ -263,8 +263,8 @@ void scanValidationRejectsSourceAnnotationParentCycles() {
   };
   const ValidationReport report = validateScanResult(source, result, sources, {});
   expect(std::ranges::any_of(
-             report.findings(),
-             [](const ValidationFinding& finding) { return finding.code == "scan.source-annotation.parent-cycle"; }),
+             report.diagnostics(),
+             [](const Diagnostic& diagnostic) { return diagnostic.code == "scan.source-annotation.parent-cycle"; }),
          "scan admission should reject cyclic annotation parents before a TreeView can recurse through them");
 }
 
@@ -283,8 +283,8 @@ void scanValidationRequiresAssetOwnedAnnotationGraphs() {
 
   const ValidationReport report = validateScanResult(source, result, sources, {});
   expect(std::ranges::any_of(
-             report.findings(),
-             [](const ValidationFinding& finding) { return finding.code == "scan.asset.missing-source-annotations"; }),
+             report.diagnostics(),
+             [](const Diagnostic& diagnostic) { return diagnostic.code == "scan.asset.missing-source-annotations"; }),
          "scan admission should require every asset to expose an explicitly owned annotation graph");
 }
 
@@ -316,9 +316,9 @@ void scanValidationRejectsCrossAssetAnnotationParents() {
   };
 
   const ValidationReport report = validateScanResult(source, result, sources, {});
-  expect(std::ranges::any_of(report.findings(),
-                             [](const ValidationFinding& finding) {
-                               return finding.code == "scan.source-annotation.cross-asset-parent";
+  expect(std::ranges::any_of(report.diagnostics(),
+                             [](const Diagnostic& diagnostic) {
+                               return diagnostic.code == "scan.source-annotation.cross-asset-parent";
                              }),
          "scan admission should reject annotation parents that cross asset boundaries");
 }

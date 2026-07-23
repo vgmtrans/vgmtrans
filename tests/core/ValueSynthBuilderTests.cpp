@@ -6,7 +6,6 @@
 
 #include "value/base/RecordReader.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/validation/SnapshotValidation.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -384,86 +383,6 @@ void detachedBuildersUseTheSameAuthoringSurface() {
   expect(diagnostics.empty(), "valid detached construction should not report diagnostics");
 }
 
-void collectionValidationRejectsAmbiguousSynthBindings() {
-  const SourceId source{34};
-  SessionSnapshotBuilder snapshotBuilder;
-  snapshotBuilder.assets.push_back(SampleCollectionAsset{
-      .metadata = AssetMetadata{.id = AssetId{80}, .name = "Samples A"},
-      .samples = SampleCollection{.samples = {Sample{.name = "A"}}},
-  });
-  snapshotBuilder.assets.push_back(SampleCollectionAsset{
-      .metadata = AssetMetadata{.id = AssetId{81}, .name = "Samples B"},
-      .samples = SampleCollection{.samples = {Sample{.name = "B"}}},
-  });
-  snapshotBuilder.assets.push_back(InstrumentSetAsset{
-      .metadata = AssetMetadata{.id = AssetId{82}, .name = "Instruments A"},
-      .instruments = {Instrument{
-          .explicitAddress = InstrumentAddress{.bank = 0, .program = 5},
-          .identity = InstrumentIdentity{.domain = "probe", .key = 1},
-          .regions =
-              {
-                  Region{
-                      .sample = SampleRef{.collection = AssetId{99}, .index = 0},
-                      .range = SourceRange{.source = source, .offset = 10, .size = 1},
-                  },
-                  Region{
-                      .sample = SampleRef{.collection = AssetId{80}, .index = 9},
-                      .range = SourceRange{.source = source, .offset = 11, .size = 1},
-                  },
-                  Region{
-                      .sample = SampleRef{.index = 0},
-                      .range = SourceRange{.source = source, .offset = 12, .size = 1},
-                  },
-              },
-      }},
-  });
-  snapshotBuilder.assets.push_back(InstrumentSetAsset{
-      .metadata = AssetMetadata{.id = AssetId{83}, .name = "Instruments B"},
-      .instruments = {Instrument{
-          .explicitAddress = InstrumentAddress{.bank = 0, .program = 5},
-          .identity = InstrumentIdentity{.domain = "probe", .key = 1},
-      }},
-  });
-  snapshotBuilder.collections.push_back(Collection{
-      .id = CollectionId{84},
-      .name = "Ambiguous Synth",
-      .instrumentSets = {AssetId{82}, AssetId{83}},
-      .sampleCollections = {AssetId{80}, AssetId{81}},
-  });
-  const SessionSnapshot snapshot = snapshotBuilder.finish();
-  const ValidationReport report = validateSessionSnapshot(snapshot);
-  const auto hasCode = [&](std::string_view code) {
-    return std::ranges::any_of(report.findings(), [=](const ValidationFinding& finding) {
-      return finding.code == code && finding.collection == CollectionId{84};
-    });
-  };
-  expect(hasCode("snapshot.collection.duplicate-instrument-identity"),
-         "collection validation should reject cross-set identity ambiguity");
-  expect(hasCode("snapshot.collection.conflicting-instrument-address"),
-         "collection validation should report cross-set explicit address conflicts");
-  expect(hasCode("snapshot.collection.region-sample-collection-missing"),
-         "collection validation should reject region references to unattached sample sets");
-  expect(hasCode("snapshot.collection.region-sample-index-invalid"),
-         "collection validation should reject out-of-range concrete sample indexes");
-  expect(hasCode("snapshot.collection.region-sample-collection-ambiguous"),
-         "collection validation should reject implicit first-match behavior with several sample sets");
-
-  SessionSnapshotBuilder validBuilder;
-  validBuilder.assets = {snapshot.assets()[0], InstrumentSetAsset{
-                                                   .metadata = AssetMetadata{.id = AssetId{85}},
-                                                   .instruments = {Instrument{
-                                                       .regions = {Region{.sample = SampleRef{.index = 0}}},
-                                                   }},
-                                               }};
-  validBuilder.collections.push_back(Collection{
-      .id = CollectionId{86},
-      .instrumentSets = {AssetId{85}},
-      .sampleCollections = {AssetId{80}},
-  });
-  expect(validateSessionSnapshot(validBuilder.finish()).empty(),
-         "one attached sample collection should remain a valid implicit reference for legacy formats");
-}
-
 }  // namespace
 
 void runValueSynthBuilderTests() {
@@ -474,5 +393,4 @@ void runValueSynthBuilderTests() {
   scanResultBuilderRetainsSampleKeysAndExposesExistingRegions();
   valueEscapeHatchContributesFinalRanges();
   detachedBuildersUseTheSameAuthoringSurface();
-  collectionValidationRejectsAmbiguousSynthBindings();
 }

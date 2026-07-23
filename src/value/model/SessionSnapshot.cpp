@@ -6,10 +6,7 @@
 
 #include "value/model/SessionSnapshot.h"
 
-#include "value/validation/SnapshotValidation.h"
-
 #include <algorithm>
-#include <iterator>
 #include <string>
 #include <utility>
 #include <variant>
@@ -120,16 +117,6 @@ const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) cons
     }
   }
   return nullptr;
-}
-
-SessionSnapshot SessionSnapshotBuilder::finish() {
-  auto indexDiagnostics = validateSessionSnapshotState(assets, collections).diagnostics();
-  diagnostics.insert(diagnostics.end(), std::make_move_iterator(indexDiagnostics.begin()),
-                     std::make_move_iterator(indexDiagnostics.end()));
-  return SessionSnapshot{
-      std::move(sources),     std::move(assets),    std::move(matchFacts),
-      std::move(collections), std::move(sourceMap), std::move(diagnostics),
-  };
 }
 
 const Asset* assetById(const SessionSnapshot& snapshot, AssetId id) {

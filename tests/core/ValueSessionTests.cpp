@@ -8,7 +8,6 @@
 
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
-#include "value/validation/SnapshotValidation.h"
 
 namespace {
 
@@ -381,7 +380,7 @@ void sessionRejectsDuplicateAssetIdsAtAdmission() {
   session.addSource(SourceFile{.name = "duplicate.probe"}, {0xee});
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
-  expect(project.assets().empty(), "duplicate asset ids should reject the whole scan result before commit");
+  expect(project.assets().empty(), "duplicate asset ids should reject the whole scan result before admission");
   expect(project.collections().empty(), "rejected duplicate asset scan should not create collections");
   expectDiagnosticRange(project.diagnostics(), "ProbeDuplicate scan failed: Scan result contained duplicate asset id 7",
                         SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
@@ -396,7 +395,7 @@ void sessionRejectsExtractedSourcesWithMissingParents() {
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
   expect(project.sources().size() == 1, "bad extracted source should not be added to the session");
-  expect(project.assets().empty(), "bad extracted source should reject staged scan assets before commit");
+  expect(project.assets().empty(), "bad extracted source should reject staged scan assets before admission");
   expectDiagnosticRange(
       project.diagnostics(),
       "ProbeBadExtracted scan failed: Scan result contained extracted source with missing parent source 99",
@@ -410,7 +409,7 @@ void sessionRejectsMatchFactsForMissingAssets() {
   session.addSource(SourceFile{.name = "bad-fact-asset.probe"}, {0xf2});
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
-  expect(project.assets().empty(), "invalid match fact should reject the whole scan result before commit");
+  expect(project.assets().empty(), "invalid match fact should reject the whole scan result before admission");
   expect(project.matchFacts().empty(), "invalid match fact should not be committed");
   expectDiagnosticRange(project.diagnostics(),
                         "ProbeBadFactAsset scan failed: Scan result contained a match fact for missing asset id 99",
@@ -424,7 +423,7 @@ void sessionRejectsSourceScopedMatchFactsForMissingSources() {
   session.addSource(SourceFile{.name = "bad-fact-source.probe"}, {0xf3});
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
-  expect(project.assets().empty(), "source-scoped invalid fact should reject the whole scan result before commit");
+  expect(project.assets().empty(), "source-scoped invalid fact should reject the whole scan result before admission");
   expect(project.matchFacts().empty(), "source-scoped invalid fact should not be committed");
   expectDiagnosticRange(project.diagnostics(),
                         "ProbeBadFactSource scan failed: Scan result contained a match fact for missing source id 99",
@@ -473,13 +472,13 @@ void scanValidationReportsMultipleAdmissionErrors() {
   bool sawForeignSource = false;
   bool sawMissingFactAsset = false;
   bool sawMissingFactSource = false;
-  for (const auto& finding : report.findings()) {
-    sawDuplicateAsset = sawDuplicateAsset || finding.message == "Scan result contained duplicate asset id 7";
-    sawForeignSource = sawForeignSource || finding.code == "scan.asset.foreign-source";
+  for (const auto& diagnostic : report.diagnostics()) {
+    sawDuplicateAsset = sawDuplicateAsset || diagnostic.message == "Scan result contained duplicate asset id 7";
+    sawForeignSource = sawForeignSource || diagnostic.code == "scan.asset.foreign-source";
     sawMissingFactAsset =
-        sawMissingFactAsset || finding.message == "Scan result contained a match fact for missing asset id 99";
+        sawMissingFactAsset || diagnostic.message == "Scan result contained a match fact for missing asset id 99";
     sawMissingFactSource =
-        sawMissingFactSource || finding.message == "Scan result contained a match fact for missing source id 99";
+        sawMissingFactSource || diagnostic.message == "Scan result contained a match fact for missing source id 99";
   }
   expect(sawDuplicateAsset, "scan validation should report duplicate asset ids");
   expect(sawForeignSource, "scan validation should reject assets whose primary range belongs to another source");
@@ -719,36 +718,6 @@ void scanValidationRejectsDanglingSourceAnnotationReferences() {
          "scan validation should reject diagnostics with dangling annotation anchors");
 }
 
-void snapshotValidationReportsWrongTypeCollectionReferences() {
-  SessionSnapshotBuilder builder;
-  builder.assets.push_back(SequenceProgramAsset{
-      .metadata =
-          AssetMetadata{
-              .id = AssetId{0},
-              .format = "ProbeSnapshot",
-              .name = "Sequence",
-          },
-      .program =
-          SequenceProgram{
-              .dialect = DialectId{.value = "probe"},
-              .timebase = Timebase{.ppqn = 48},
-          },
-  });
-  builder.collections.push_back(Collection{
-      .id = CollectionId{0},
-      .name = "Wrong Type",
-      .key = CollectionKey{.resolver = "ProbeSnapshot", .value = "wrong-type"},
-      .instrumentSets = {AssetId{0}},
-  });
-
-  const auto snapshot = builder.finish();
-  const auto report = validateSessionSnapshot(snapshot);
-  expect(report.hasErrors(), "snapshot validation should report wrong-type collection references");
-  expect(report.findings().size() == 1, "snapshot validation should report the wrong reference once");
-  expect(report.findings()[0].message == "Collection referenced missing or wrong-type instrument-set asset id 0",
-         "snapshot validation should describe the wrong collection role");
-}
-
 void sessionReportsDesiredCollectionMissingAssetReferences() {
   Session session;
   session.registerFormat(missingAssetCollectionResolverModule());
@@ -846,58 +815,8 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   expect(removedParentFailed, "derived source parent must still be active");
 }
 
-void sessionSnapshotFinalizationReportsDuplicateIds() {
-  SessionSnapshotBuilder builder;
-  builder.assets.emplace_back(MiscAsset{
-      .metadata =
-          AssetMetadata{
-              .id = AssetId{7},
-              .format = "Probe",
-              .name = "First",
-              .range = probeRange(4, 1),
-          },
-  });
-  builder.assets.emplace_back(MiscAsset{
-      .metadata =
-          AssetMetadata{
-              .id = AssetId{7},
-              .format = "Probe",
-              .name = "Duplicate",
-              .range = probeRange(8, 1),
-          },
-  });
-  builder.collections.push_back(Collection{
-      .id = CollectionId{3},
-      .name = "First",
-      .miscAssets = {AssetId{7}},
-  });
-  builder.collections.push_back(Collection{
-      .id = CollectionId{3},
-      .name = "Duplicate",
-      .miscAssets = {AssetId{7}},
-  });
-
-  const SessionSnapshot project = builder.finish();
-
-  expect(assetById(project, AssetId{7}) == &project.assets()[0],
-         "duplicate asset id lookup should keep the first asset");
-  expect(collectionById(project, CollectionId{3}) == &project.collections()[0],
-         "duplicate collection id lookup should keep the first collection");
-  expect(project.diagnostics().size() == 2, "snapshot finalization should report duplicate ids");
-
-  const auto& assetDiagnostic = diagnosticWithMessage(project.diagnostics(), "Duplicate asset id 7 in SessionSnapshot");
-  expect(assetDiagnostic.severity == Severity::Error, "duplicate asset id should be reported as an error");
-  expect(assetDiagnostic.range && sameRange(*assetDiagnostic.range, probeRange(8, 1)),
-         "duplicate asset id diagnostic should point at the conflicting asset");
-
-  const auto& collectionDiagnostic =
-      diagnosticWithMessage(project.diagnostics(), "Duplicate collection id 3 in SessionSnapshot");
-  expect(collectionDiagnostic.severity == Severity::Error, "duplicate collection id should be reported as an error");
-  expect(!collectionDiagnostic.range.has_value(), "collection id diagnostics should not invent a source range");
-}
-
 void sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs() {
-  SessionSnapshotBuilder builder;
+  SessionSnapshotTestBuilder builder;
   builder.assets.emplace_back(SequenceProgramAsset{
       .metadata =
           AssetMetadata{
@@ -1117,7 +1036,7 @@ void sessionExportsASequenceWithoutACollection() {
 }
 
 void snapshotFindsTheFirstCollectionContainingAnAsset() {
-  SessionSnapshotBuilder builder;
+  SessionSnapshotTestBuilder builder;
   builder.assets.emplace_back(MiscAsset{.metadata = AssetMetadata{.id = AssetId{4}, .name = "Shared"}});
   builder.collections = {
       Collection{.id = CollectionId{8}, .name = "First", .miscAssets = {AssetId{4}}},
@@ -1154,12 +1073,10 @@ void runValueSessionTests() {
   scanValidationRejectsOutOfBoundsScanResultRanges();
   scanValidationRejectsRangeLessSourceAnnotations();
   scanValidationRejectsDanglingSourceAnnotationReferences();
-  snapshotValidationReportsWrongTypeCollectionReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionReportsDesiredCollectionWrongTypeReferences();
   sessionReportsDuplicateDesiredCollectionKeys();
   sourceStoreRejectsMissingOrRemovedDerivedParents();
-  sessionSnapshotFinalizationReportsDuplicateIds();
   sessionSnapshotCollectionAssetResolutionProvidesTypedExportInputs();
   sessionStateRebuildsLookupIndexAfterRemoval();
   sessionAddsSourceFromPath();

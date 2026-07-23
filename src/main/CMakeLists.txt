@@ -119,6 +119,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SourceInspection.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshotAccess.h
     ${PROJECT_SOURCE_DIR}/src/value/session/SessionState.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/SessionState.h
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
@@ -148,7 +149,6 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.cpp
     ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/validation/SnapshotValidation.cpp
     ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.cpp
     ${PROJECT_SOURCE_DIR}/src/value/validation/ValidationReport.cpp
   PUBLIC
@@ -203,7 +203,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.h
       ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.h
       ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.h
-      ${PROJECT_SOURCE_DIR}/src/value/validation/SnapshotValidation.h
       ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.h
       ${PROJECT_SOURCE_DIR}/src/value/validation/ValidationReport.h
 )

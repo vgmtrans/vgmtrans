@@ -7,6 +7,7 @@
 #include "value/session/Session.h"
 
 #include "value/export/Export.h"
+#include "value/model/SessionSnapshotAccess.h"
 #include "value/scan/FormatModule.h"
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
@@ -206,15 +207,8 @@ void Session::scanPendingSources() {
 }
 
 SessionSnapshot Session::snapshot() const {
-  SessionSnapshotBuilder current{
-      .sources = sources_.sourceFiles(),
-      .assets = state_->assets(),
-      .matchFacts = state_->matchFacts(),
-      .collections = state_->collections(),
-      .sourceMap = state_->sourceMap(),
-      .diagnostics = state_->diagnostics(),
-  };
-  return current.finish();
+  return detail::SessionSnapshotAccess::create(sources_.sourceFiles(), state_->assets(), state_->matchFacts(),
+                                               state_->collections(), state_->sourceMap(), state_->diagnostics());
 }
 
 std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
