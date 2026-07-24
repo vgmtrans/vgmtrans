@@ -89,6 +89,15 @@ SequencePlayer::~SequencePlayer() {
   }
 }
 
+vgmtrans::core::PlaybackRequest SequencePlayer::playbackRequest(
+    vgmtrans::core::SequenceRenderOptions options) const {
+  options.midi.pitchTransitions = vgmtrans::core::MidiPitchTransitionRendering::PitchBend;
+  return vgmtrans::core::PlaybackRequest{
+      .sequence = std::move(options),
+      .modulationConversion = vgmtrans::core::ModulationConversionPolicy::SequenceEventSimulation,
+  };
+}
+
 bool SequencePlayer::load(vgmtrans::core::CollectionPlayback playback) {
   if (!playback.playable()) {
     emit errorOccurred(tr("The collection did not produce playable MIDI and SoundFont data."));

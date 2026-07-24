@@ -31,6 +31,8 @@ public:
   SequencePlayer(const SequencePlayer&) = delete;
   SequencePlayer& operator=(const SequencePlayer&) = delete;
 
+  [[nodiscard]] vgmtrans::core::PlaybackRequest playbackRequest(
+      vgmtrans::core::SequenceRenderOptions options) const;
   [[nodiscard]] bool load(vgmtrans::core::CollectionPlayback playback);
   void toggle();
   void stop();

@@ -523,15 +523,15 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
                                     prepared.collection->sampleCollections.end());
 
   const ExportRequest exportRequest{
-      .sequence = request,
+      .sequence = request.sequence,
       .modulationScaling = ModulationScalingPolicy::FullFormatRange,
-      .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+      .modulationConversion = request.modulationConversion,
   };
   auto lowering = lowerCollectionMidiSequence(prepared, dialects, exportRequest);
   auto midi =
       exportMidi(prepared.baseName, lowering, exportRequest.modulationScaling, exportRequest.modulationConversion);
   auto soundFont = exportSoundFont2(prepared, sources, exportRequest, nullptr,
-                                    lowering.sequence ? ModulationConversionPolicy::SequenceEventSimulation
+                                    lowering.sequence ? request.modulationConversion
                                                       : ModulationConversionPolicy::SynthModulators);
 
   playback.midi = std::move(midi.bytes);
