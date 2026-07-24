@@ -10,7 +10,6 @@
 #include <cmath>
 #include <limits>
 #include <optional>
-#include <span>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -20,101 +19,19 @@ namespace vgmtrans::core {
 
 namespace {
 
-struct NoteSegment {
-  PerformanceEventHeader header;
-  PerformanceNoteId note;
-  PerformanceLaneId lane;
-  u64 startTick = 0;
-  u64 endTick = 0;
-  double key = 0.0;
-  double linearVelocity = 1.0;
-};
-
-struct NoteChain {
-  PerformanceNoteId note;
-  PerformanceLaneId lane;
+struct PortamentoSegment {
   PerformanceEventHeader header;
   u64 startTick = 0;
   u64 endTick = 0;
   double key = 0.0;
-  double linearVelocity = 1.0;
-  std::vector<NoteSegment> segments;
 };
 
-struct TempoChange {
-  u64 tick = 0;
-  u32 microsecondsPerQuarter = 500000;
-  size_t order = 0;
+struct NoteSpan {
+  NotePerformanceEvent source;
+  u64 endTick = 0;
+  // Empty unless native portamento must replace this source note.
+  std::vector<PortamentoSegment> portamentoSegments;
 };
-
-[[nodiscard]] std::vector<TempoChange> collectTempoChanges(const PerformanceSequence& performance) {
-  std::vector<TempoChange> changes;
-  for (const auto& track : performance.tracks) {
-    for (const auto* event : flattenedPerformanceEvents(track)) {
-      const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
-      if (tempo == nullptr) {
-        continue;
-      }
-      changes.push_back(TempoChange{
-          .tick = tempo->header.tick,
-          .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
-          .order = changes.size(),
-      });
-    }
-  }
-  std::ranges::stable_sort(changes, [](const TempoChange& lhs, const TempoChange& rhs) {
-    return std::tie(lhs.tick, lhs.order) < std::tie(rhs.tick, rhs.order);
-  });
-  return changes;
-}
-
-[[nodiscard]] double tempoRelativeDurationMilliseconds(const Timebase& timebase, std::span<const TempoChange> changes,
-                                                       u64 startTick, u32 durationTicks) {
-  if (durationTicks == 0) {
-    return 0.0;
-  }
-
-  const u64 endTick = startTick > std::numeric_limits<u64>::max() - durationTicks ? std::numeric_limits<u64>::max()
-                                                                                  : startTick + durationTicks;
-  const double ppqn = std::max(1u, timebase.ppqn);
-  u32 tempo = 500000;
-  u64 cursor = startTick;
-  double microseconds = 0.0;
-
-  for (const auto& change : changes) {
-    if (change.tick <= startTick) {
-      tempo = change.microsecondsPerQuarter;
-      continue;
-    }
-    if (change.tick >= endTick) {
-      break;
-    }
-    microseconds += static_cast<double>(change.tick - cursor) * tempo / ppqn;
-    cursor = change.tick;
-    tempo = change.microsecondsPerQuarter;
-  }
-  microseconds += static_cast<double>(endTick - cursor) * tempo / ppqn;
-  return microseconds / 1000.0;
-}
-
-[[nodiscard]] double physicalDurationMilliseconds(const PitchTransitionIntent& transition, const Timebase& timebase,
-                                                  std::span<const TempoChange> changes, u64 startTick) {
-  return std::visit(
-      [&](const auto& physical) {
-        using Physical = std::decay_t<decltype(physical)>;
-        if constexpr (std::is_same_v<Physical, TempoRelativePitchSlideTiming>) {
-          return tempoRelativeDurationMilliseconds(timebase, changes, startTick, transition.timing.timelineTicks);
-        } else if constexpr (std::is_same_v<Physical, FixedDurationPitchSlideTiming>) {
-          return std::max(0.0, physical.milliseconds);
-        } else {
-          if (physical.semitonesPerSecond <= 0.0) {
-            return 0.0;
-          }
-          return std::abs(transition.targetKey - transition.startKey) / physical.semitonesPerSecond * 1000.0;
-        }
-      },
-      transition.timing.physical);
-}
 
 [[nodiscard]] u64 noteEnd(const NotePerformanceEvent& note) {
   return note.header.tick > std::numeric_limits<u64>::max() - note.durationTicks
@@ -122,26 +39,37 @@ struct TempoChange {
              : note.header.tick + note.durationTicks;
 }
 
-[[nodiscard]] PitchTransitionRenderingHint resolvedRendering(PitchTransitionRenderingHint hint,
-                                                             const MidiExportOptions& options) {
-  switch (options.pitchTransitions) {
-    case MidiPitchTransitionRendering::PreserveFormat:
-      return hint;
-    case MidiPitchTransitionRendering::Portamento:
-      return PitchTransitionRenderingHint::Portamento;
-    case MidiPitchTransitionRendering::PitchBend:
-      return PitchTransitionRenderingHint::PitchBend;
+[[nodiscard]] NoteSpan* findNote(std::vector<NoteSpan>& notes, PerformanceNoteId id) {
+  const auto found = std::ranges::find_if(notes, [id](const NoteSpan& note) { return note.source.note == id; });
+  return found == notes.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] const NoteSpan* findNote(const std::vector<NoteSpan>& notes, PerformanceNoteId id) {
+  const auto found = std::ranges::find_if(notes, [id](const NoteSpan& note) { return note.source.note == id; });
+  return found == notes.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::vector<NoteSpan> collectNotes(const PerformanceTrack& track) {
+  std::vector<NoteSpan> notes;
+  for (const auto& event : track.events) {
+    const auto* source = std::get_if<NotePerformanceEvent>(&event);
+    if (source == nullptr || !source->note.valid()) {
+      continue;
+    }
+    if (auto* note = findNote(notes, source->note)) {
+      note->endTick = std::max(note->endTick, noteEnd(*source));
+    } else {
+      notes.push_back(NoteSpan{
+          .source = *source,
+          .endTick = noteEnd(*source),
+      });
+    }
   }
-  return hint;
-}
-
-[[nodiscard]] bool containsNote(const std::vector<PerformanceNoteId>& notes, PerformanceNoteId note) {
-  return std::ranges::find(notes, note) != notes.end();
-}
-
-[[nodiscard]] NoteChain* findChain(std::vector<NoteChain>& chains, PerformanceNoteId note) {
-  const auto found = std::ranges::find(chains, note, &NoteChain::note);
-  return found == chains.end() ? nullptr : &*found;
+  std::ranges::stable_sort(notes, [](const NoteSpan& lhs, const NoteSpan& rhs) {
+    return std::tie(lhs.source.header.tick, lhs.source.header.sequence) <
+           std::tie(rhs.source.header.tick, rhs.source.header.sequence);
+  });
+  return notes;
 }
 
 [[nodiscard]] PerformanceEventHeader atTick(const PerformanceEventHeader& origin, u64 tick, u64& nextSequence) {
@@ -161,341 +89,282 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   });
 }
 
-void splitForPortamento(NoteChain& chain, const PerformanceAutomation& automation,
-                        const PitchTransitionIntent& transition, u64 startTick, u32 overlapTicks) {
-  if (startTick <= chain.startTick) {
-    if (!chain.segments.empty()) {
-      chain.segments.front().key = transition.targetKey;
-    }
-    return;
-  }
-
-  const u64 clampedStart = std::min(startTick, chain.endTick);
-  std::vector<NoteSegment> before;
-  before.reserve(chain.segments.size() + 1);
-  for (auto segment : chain.segments) {
-    if (segment.startTick >= clampedStart) {
-      continue;
-    }
-    if (segment.endTick > clampedStart) {
-      segment.endTick = std::min(chain.endTick, clampedStart > std::numeric_limits<u64>::max() - overlapTicks
-                                                    ? std::numeric_limits<u64>::max()
-                                                    : clampedStart + overlapTicks);
-      segment.key = transition.startKey;
-    }
-    if (segment.endTick > segment.startTick) {
-      before.push_back(std::move(segment));
-    }
-  }
-
-  if (clampedStart < chain.endTick) {
-    before.push_back(NoteSegment{
-        .header = automation.header,
-        .note = chain.note,
-        .lane = chain.lane,
-        .startTick = clampedStart,
-        .endTick = chain.endTick,
-        .key = transition.targetKey,
-        .linearVelocity = chain.linearVelocity,
-    });
-  }
-  chain.segments = std::move(before);
+[[nodiscard]] double physicalDurationMilliseconds(const PitchTransitionIntent& transition,
+                                                  const PerformanceTempoMap& tempos, u64 startTick) {
+  return std::visit(
+      [&](const auto& physical) {
+        using Physical = std::decay_t<decltype(physical)>;
+        if constexpr (std::is_same_v<Physical, TempoRelativePitchSlideTiming>) {
+          return tempos.durationMilliseconds(startTick, transition.timing.timelineTicks);
+        } else if constexpr (std::is_same_v<Physical, FixedDurationPitchSlideTiming>) {
+          return std::max(0.0, physical.milliseconds);
+        } else {
+          if (physical.semitonesPerSecond <= 0.0) {
+            return 0.0;
+          }
+          return std::abs(transition.targetKey - transition.startKey) / physical.semitonesPerSecond * 1000.0;
+        }
+      },
+      transition.timing.physical);
 }
 
-[[nodiscard]] u16 pitchRangeCents(const PitchTransitionIntent& transition, const PerformanceAutomation& automation,
-                                  const NoteChain& chain) {
-  const u64 beginTick = std::max(chain.startTick, automation.realization.startTick);
-  const u64 endTick = std::min(chain.endTick, automation.realization.endTick);
+[[nodiscard]] bool affectsNote(const PerformanceAutomation& automation, const PitchTransitionIntent& transition,
+                               const NoteSpan& anchor, const NoteSpan& note) {
+  if (note.source.note == anchor.source.note) {
+    return true;
+  }
+  if (!transition.continuesAcrossNotes || note.source.lane != transition.lane ||
+      note.source.header.tick < anchor.source.header.tick) {
+    return false;
+  }
+  return note.endTick > automation.realization.startTick && note.source.header.tick <= automation.realization.endTick;
+}
+
+[[nodiscard]] u16 pitchRangeCents(const PerformanceAutomation& automation, const PitchTransitionIntent& transition,
+                                  const NoteSpan& note) {
+  const u64 beginTick = std::max(note.source.header.tick, automation.realization.startTick);
+  const u64 endTick = std::min(note.endTick, automation.realization.endTick);
   if (endTick < beginTick) {
     return 200;
   }
+
   const u32 beginElapsed =
       static_cast<u32>(std::min<u64>(beginTick - automation.realization.startTick, std::numeric_limits<u32>::max()));
   const u32 endElapsed =
       static_cast<u32>(std::min<u64>(endTick - automation.realization.startTick, std::numeric_limits<u32>::max()));
-  double maximum = std::max(std::abs(pitchTransitionValueAt(transition, beginElapsed) - chain.key),
-                            std::abs(pitchTransitionValueAt(transition, endElapsed) - chain.key));
-  if (beginTick > chain.startTick) {
-    maximum = std::max(maximum, std::abs(transition.startKey - chain.key));
+  double maximum = std::max(std::abs(pitchTransitionValueAt(transition, beginElapsed) - note.source.key),
+                            std::abs(pitchTransitionValueAt(transition, endElapsed) - note.source.key));
+  if (beginTick > note.source.header.tick) {
+    maximum = std::max(maximum, std::abs(transition.startKey - note.source.key));
   }
   if (const auto* sampled = std::get_if<SampledAutomationCurve>(&transition.curve)) {
     for (const auto& sample : sampled->samples) {
       if (sample.tickOffset >= beginElapsed && sample.tickOffset <= endElapsed) {
-        maximum = std::max(maximum, std::abs(sample.value - chain.key));
+        maximum = std::max(maximum, std::abs(sample.value - note.source.key));
       }
     }
   }
+
   const double cents = std::ceil(maximum * 100.0);
   // MIDI's RPN stores 0-127 semitones plus 0-99 fine cents.
   return static_cast<u16>(std::clamp<double>(std::max(200.0, cents), 200.0, 12'799.0));
 }
 
-[[nodiscard]] bool transitionAffectsChain(const NoteChain& chain, const NoteChain& anchor,
-                                          const PerformanceAutomation& automation,
-                                          const PitchTransitionIntent& transition) {
-  if (chain.note == anchor.note) {
-    return true;
-  }
-  if (transition.interruptions.newNote != AutomationNewNotePolicy::Continue || chain.lane != transition.lane ||
-      chain.startTick < anchor.startTick) {
-    return false;
-  }
-  const u64 activeBegin = std::min(automation.realization.requestedStartTick, automation.realization.startTick);
-  return chain.endTick > activeBegin && chain.startTick <= automation.realization.endTick;
-}
-
-[[nodiscard]] bool addPitchBendSegment(std::vector<PerformanceEvent>& events, const NoteChain& chain,
-                                       const PerformanceAutomation& automation, const PitchTransitionIntent& transition,
-                                       u64& nextSequence) {
-  const u64 startTick = std::max(chain.startTick, automation.realization.startTick);
-  const u64 endTick = std::min(chain.endTick, automation.realization.endTick);
-  if (startTick >= chain.endTick || endTick < startTick) {
+[[nodiscard]] bool appendPitchBends(std::vector<PerformanceEvent>& events, const PerformanceAutomation& automation,
+                                    const PitchTransitionIntent& transition, const NoteSpan& note, u64& nextSequence) {
+  const u64 startTick = std::max(note.source.header.tick, automation.realization.startTick);
+  const u64 endTick = std::min(note.endTick, automation.realization.endTick);
+  if (startTick >= note.endTick || endTick < startTick) {
     return false;
   }
 
-  // A delayed note-on envelope may begin away from the note's nominal key.
-  // Establish that starting pitch at note-on and hold it until the motion
-  // begins.
-  if (startTick > chain.startTick && std::abs(transition.startKey - chain.key) > 0.000001) {
+  // A delayed slide may begin away from the note's nominal key.
+  if (startTick > note.source.header.tick && std::abs(transition.startKey - note.source.key) > 0.000001) {
     events.emplace_back(PitchBendPerformanceEvent{
-        .header = atTick(automation.header, chain.startTick, nextSequence),
-        .semitones = transition.startKey - chain.key,
+        .header = atTick(automation.header, note.source.header.tick, nextSequence),
+        .semitones = transition.startKey - note.source.key,
     });
   }
 
-  const u64 changingTicks = endTick - startTick;
-  for (u64 elapsed = 0; elapsed <= changingTicks; ++elapsed) {
-    const u64 absoluteTick = startTick + elapsed;
-    const u64 automationElapsed = absoluteTick - automation.realization.startTick;
-    const u32 sourceElapsed = static_cast<u32>(std::min<u64>(automationElapsed, std::numeric_limits<u32>::max()));
+  for (u64 tick = startTick; tick <= endTick; ++tick) {
+    const u64 elapsed = tick - automation.realization.startTick;
     events.emplace_back(PitchBendPerformanceEvent{
-        .header = atTick(automation.header, absoluteTick, nextSequence),
-        .semitones = pitchTransitionValueAt(transition, sourceElapsed) - chain.key,
+        .header = atTick(automation.header, tick, nextSequence),
+        .semitones = pitchTransitionValueAt(transition,
+                                            static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()))) -
+                     note.source.key,
     });
   }
   return true;
 }
 
-void lowerTrackAutomations(PerformanceSequence& performance, PerformanceTrack& track,
-                           std::span<const TempoChange> tempoChanges, const MidiExportOptions& options) {
-  u64 nextSequence = 0;
-  for (const auto& event : track.events) {
-    nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
-  }
-  for (const auto& automation : track.automations) {
-    nextSequence = std::max(nextSequence, automation.header.sequence + 1);
-    for (const auto& point : automation.points) {
-      nextSequence = std::max(nextSequence, performanceEventHeader(point).sequence + 1);
-    }
-  }
-
-  std::vector<PerformanceNoteId> involvedNotes;
-  for (const auto& automation : track.automations) {
-    const auto* transition = pitchTransitionIntent(automation);
-    if (transition == nullptr) {
-      continue;
-    }
-    if (!containsNote(involvedNotes, transition->note)) {
-      involvedNotes.push_back(transition->note);
-    }
-    if (transition->previousNote && !containsNote(involvedNotes, *transition->previousNote)) {
-      involvedNotes.push_back(*transition->previousNote);
-    }
-  }
-
-  std::vector<NoteChain> chains;
-  for (const auto& event : track.events) {
-    const auto* note = std::get_if<NotePerformanceEvent>(&event);
-    if (note == nullptr || !note->note.valid()) {
-      continue;
-    }
-    NoteChain* chain = findChain(chains, note->note);
-    if (chain == nullptr) {
-      chains.push_back(NoteChain{
-          .note = note->note,
-          .lane = note->lane,
-          .header = note->header,
-          .startTick = note->header.tick,
-          .endTick = noteEnd(*note),
-          .key = note->key,
-          .linearVelocity = note->linearVelocity,
-      });
-      chain = &chains.back();
-    } else {
-      chain->startTick = std::min(chain->startTick, note->header.tick);
-      chain->endTick = std::max(chain->endTick, noteEnd(*note));
-    }
-  }
-  std::ranges::stable_sort(chains, [](const NoteChain& lhs, const NoteChain& rhs) {
-    return std::tie(lhs.startTick, lhs.header.sequence) < std::tie(rhs.startTick, rhs.header.sequence);
-  });
-  for (auto& chain : chains) {
-    chain.segments.push_back(NoteSegment{
-        .header = chain.header,
-        .note = chain.note,
-        .lane = chain.lane,
-        .startTick = chain.startTick,
-        .endTick = chain.endTick,
-        .key = chain.key,
-        .linearVelocity = chain.linearVelocity,
-    });
-  }
-
+[[nodiscard]] std::vector<PerformanceEvent> lowerPitchBends(
+    PerformanceSequence& performance, const PerformanceTrack& track, const std::vector<NoteSpan>& notes,
+    const std::vector<const PerformanceAutomation*>& transitions, u64& nextSequence) {
   std::vector<PerformanceEvent> events;
-  events.reserve(track.events.size() + track.automations.size() * 4);
-  for (auto event : track.events) {
-    if (const auto* note = std::get_if<NotePerformanceEvent>(&event);
-        note != nullptr && note->note.valid() && containsNote(involvedNotes, note->note)) {
-      continue;
-    }
-    if (const auto* settings = std::get_if<PitchTransitionSettingsPerformanceEvent>(&event)) {
-      if (resolvedRendering(settings->renderingHint, options) == PitchTransitionRenderingHint::Portamento) {
-        events.emplace_back(PortamentoPerformanceEvent{
-            .header = settings->header,
-            .timeMilliseconds = settings->timeMilliseconds,
-        });
-      }
-      continue;
-    }
-    events.push_back(std::move(event));
-  }
-
-  std::vector<const PerformanceAutomation*> pitchAutomations;
-  for (const auto& automation : track.automations) {
-    if (pitchTransitionIntent(automation) != nullptr) {
-      pitchAutomations.push_back(&automation);
+  events.reserve(track.events.size() + transitions.size() * 4);
+  for (const auto& event : track.events) {
+    if (!std::holds_alternative<PitchTransitionSettingsPerformanceEvent>(event)) {
+      events.push_back(event);
     }
   }
-  std::ranges::stable_sort(pitchAutomations, [](const auto* lhs, const auto* rhs) {
-    return std::tie(lhs->realization.startTick, lhs->header.sequence) <
-           std::tie(rhs->realization.startTick, rhs->header.sequence);
-  });
 
-  // Pitch-bend range is channel state. Choose one range large enough for every
-  // transition on a note chain so later chained transitions cannot narrow it
-  // before an earlier bend at the same note-on tick.
-  for (const auto& chain : chains) {
-    const PerformanceAutomation* rangeOrigin = nullptr;
+  // Bend range is channel state, so choose one range that covers every linked
+  // transition affecting a note.
+  for (const auto& note : notes) {
+    const PerformanceAutomation* origin = nullptr;
     u16 rangeCents = 200;
-    for (const auto* automation : pitchAutomations) {
+    for (const auto* automation : transitions) {
       const auto& transition = *pitchTransitionIntent(*automation);
-      const auto* anchor = findChain(chains, transition.note);
-      if (anchor == nullptr || !transitionAffectsChain(chain, *anchor, *automation, transition) ||
-          resolvedRendering(transition.renderingHint, options) != PitchTransitionRenderingHint::PitchBend) {
+      const auto* anchor = findNote(notes, transition.note);
+      if (anchor == nullptr || !affectsNote(*automation, transition, *anchor, note)) {
         continue;
       }
-      if (rangeOrigin == nullptr) {
-        rangeOrigin = automation;
-      }
-      rangeCents = std::max(rangeCents, pitchRangeCents(transition, *automation, chain));
+      origin = origin == nullptr ? automation : origin;
+      rangeCents = std::max(rangeCents, pitchRangeCents(*automation, transition, note));
     }
-    if (rangeOrigin != nullptr) {
+    if (origin != nullptr) {
       events.emplace_back(PitchBendRangePerformanceEvent{
-          .header = atTick(rangeOrigin->header, chain.startTick, nextSequence),
+          .header = atTick(origin->header, note.source.header.tick, nextSequence),
           .cents = rangeCents,
       });
     }
   }
 
-  for (const auto* automation : pitchAutomations) {
+  for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
-    NoteChain* chain = findChain(chains, transition.note);
-    if (chain == nullptr) {
+    const auto* anchor = findNote(notes, transition.note);
+    if (anchor == nullptr) {
       addWarning(performance, *automation, "Pitch transition did not reference a rendered note");
       continue;
     }
-    const auto rendering = resolvedRendering(transition.renderingHint, options);
-    if (rendering == PitchTransitionRenderingHint::PitchBend) {
-      std::optional<PitchTransitionRenderingHint> successorRendering;
-      const auto successor = std::ranges::find_if(pitchAutomations, [&](const auto* candidate) {
-        return candidate->realization.continuesFrom == automation->id;
-      });
-      if (successor != pitchAutomations.end()) {
-        successorRendering = resolvedRendering(pitchTransitionIntent(**successor)->renderingHint, options);
-      }
 
-      const NoteChain* terminalChain = nullptr;
-      for (const auto& candidate : chains) {
-        if (transitionAffectsChain(candidate, *chain, *automation, transition) &&
-            addPitchBendSegment(events, candidate, *automation, transition, nextSequence)) {
-          terminalChain = &candidate;
-        }
+    const NoteSpan* terminalNote = nullptr;
+    for (const auto& note : notes) {
+      if (affectsNote(*automation, transition, *anchor, note) &&
+          appendPitchBends(events, *automation, transition, note, nextSequence)) {
+        terminalNote = &note;
       }
-
-      // Completed transitions hold their target for the remainder of the last
-      // affected note. Explicit interruption resets at the transition
-      // boundary. Chained pitch bends remain continuous; a successor rendered
-      // another way needs a reset before taking over.
-      const bool continuesAsPitchBend = successorRendering == PitchTransitionRenderingHint::PitchBend;
-      const bool resetAtTransitionEnd =
-          automation->realization.endReason == PerformanceAutomationEndReason::NewNote ||
-          automation->realization.endReason == PerformanceAutomationEndReason::SourceStopped ||
-          (successorRendering && !continuesAsPitchBend) ||
-          (automation->realization.endReason == PerformanceAutomationEndReason::Replaced && !successorRendering);
-      if (terminalChain != nullptr && resetAtTransitionEnd) {
-        events.emplace_back(PitchBendPerformanceEvent{
-            .header = atTick(automation->header, automation->realization.endTick, nextSequence),
-            .semitones = 0.0,
-        });
-      } else if (terminalChain != nullptr && !successorRendering &&
-                 automation->realization.endReason != PerformanceAutomationEndReason::Replaced) {
-        events.emplace_back(PitchBendPerformanceEvent{
-            .header = atTick(automation->header, terminalChain->endTick, nextSequence),
-            .semitones = 0.0,
-        });
-      }
+    }
+    if (terminalNote == nullptr || automation->realization.endReason == PerformanceAutomationEndReason::Continued) {
       continue;
     }
 
-    const NativePortamentoHint native = transition.nativePortamento.value_or(NativePortamentoHint{});
+    const u64 resetTick = automation->realization.endReason == PerformanceAutomationEndReason::Interrupted
+                              ? automation->realization.endTick
+                              : terminalNote->endTick;
+    events.emplace_back(PitchBendPerformanceEvent{
+        .header = atTick(automation->header, resetTick, nextSequence),
+        .semitones = 0.0,
+    });
+  }
+  return events;
+}
+
+void beginPortamentoRewrite(NoteSpan& note) {
+  if (!note.portamentoSegments.empty()) {
+    return;
+  }
+  note.portamentoSegments.push_back(PortamentoSegment{
+      .header = note.source.header,
+      .startTick = note.source.header.tick,
+      .endTick = note.endTick,
+      .key = note.source.key,
+  });
+}
+
+void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
+                        const PitchTransitionIntent& transition) {
+  const u64 startTick = automation.realization.startTick;
+  if (startTick <= note.source.header.tick) {
+    note.portamentoSegments.front().key = transition.targetKey;
+    return;
+  }
+
+  const u64 clampedStart = std::min(startTick, note.endTick);
+  std::vector<PortamentoSegment> segments;
+  segments.reserve(note.portamentoSegments.size() + 1);
+  for (auto segment : note.portamentoSegments) {
+    if (segment.startTick >= clampedStart) {
+      continue;
+    }
+    if (segment.endTick > clampedStart) {
+      const u32 overlap = transition.nativePortamento.overlapTicks;
+      segment.endTick = std::min(note.endTick, clampedStart > std::numeric_limits<u64>::max() - overlap
+                                                   ? std::numeric_limits<u64>::max()
+                                                   : clampedStart + overlap);
+      segment.key = transition.startKey;
+    }
+    if (segment.endTick > segment.startTick) {
+      segments.push_back(std::move(segment));
+    }
+  }
+  if (clampedStart < note.endTick) {
+    segments.push_back(PortamentoSegment{
+        .header = automation.header,
+        .startTick = clampedStart,
+        .endTick = note.endTick,
+        .key = transition.targetKey,
+    });
+  }
+  note.portamentoSegments = std::move(segments);
+}
+
+[[nodiscard]] std::vector<PerformanceEvent> lowerPortamento(
+    PerformanceSequence& performance, const PerformanceTrack& track, std::vector<NoteSpan>& notes,
+    const std::vector<const PerformanceAutomation*>& transitions, const PerformanceTempoMap& tempos,
+    u64& nextSequence) {
+  std::vector<PerformanceEvent> events;
+  events.reserve(track.events.size() + transitions.size() * 3);
+
+  for (const auto* automation : transitions) {
+    const auto& transition = *pitchTransitionIntent(*automation);
+    auto* note = findNote(notes, transition.note);
+    if (note == nullptr) {
+      addWarning(performance, *automation, "Pitch transition did not reference a rendered note");
+      continue;
+    }
     if (std::holds_alternative<SampledAutomationCurve>(transition.curve)) {
       addWarning(performance, *automation,
                  "Native MIDI portamento cannot preserve the transition's exact sampled pitch curve");
     }
 
     const u64 startTick = automation->realization.startTick;
-    if (startTick >= chain->endTick) {
+    if (startTick >= note->endTick) {
       continue;
     }
-    if (startTick <= chain->startTick && transition.previousNote) {
-      if (auto* previous = findChain(chains, *transition.previousNote);
-          previous != nullptr && !previous->segments.empty()) {
-        auto& segment = previous->segments.back();
-        const u64 overlapEnd = startTick > std::numeric_limits<u64>::max() - native.overlapTicks
-                                   ? std::numeric_limits<u64>::max()
-                                   : startTick + native.overlapTicks;
+    beginPortamentoRewrite(*note);
+    if (startTick <= note->source.header.tick && transition.previousNote) {
+      if (auto* previous = findNote(notes, *transition.previousNote)) {
+        beginPortamentoRewrite(*previous);
+        auto& segment = previous->portamentoSegments.back();
+        const u32 overlap = transition.nativePortamento.overlapTicks;
+        const u64 overlapEnd = startTick > std::numeric_limits<u64>::max() - overlap ? std::numeric_limits<u64>::max()
+                                                                                     : startTick + overlap;
         segment.endTick = std::max(segment.endTick, overlapEnd);
       }
     }
-    splitForPortamento(*chain, *automation, transition, startTick, native.overlapTicks);
+    splitForPortamento(*note, *automation, transition);
 
-    if (native.emitTime) {
-      const double timeMilliseconds = physicalDurationMilliseconds(transition, performance.timebase, tempoChanges,
-                                                                   automation->realization.startTick);
-      events.emplace_back(PortamentoPerformanceEvent{
-          .header = atTick(automation->header, startTick, nextSequence),
-          .timeMilliseconds = timeMilliseconds,
-          .previousKey = transition.startKey,
-      });
-    } else {
+    if (transition.nativePortamento.useCurrentTiming) {
       events.emplace_back(PortamentoControlPerformanceEvent{
           .header = atTick(automation->header, startTick, nextSequence),
           .previousKey = transition.startKey,
       });
-    }
-    if (native.restoreTimeMilliseconds) {
+    } else {
       events.emplace_back(PortamentoPerformanceEvent{
-          .header = atTick(automation->header, chain->endTick, nextSequence),
-          .timeMilliseconds = *native.restoreTimeMilliseconds,
+          .header = atTick(automation->header, startTick, nextSequence),
+          .timeMilliseconds = physicalDurationMilliseconds(transition, tempos, startTick),
+          .previousKey = transition.startKey,
+      });
+    }
+    if (transition.nativePortamento.restoreTimeMilliseconds) {
+      events.emplace_back(PortamentoPerformanceEvent{
+          .header = atTick(automation->header, note->endTick, nextSequence),
+          .timeMilliseconds = *transition.nativePortamento.restoreTimeMilliseconds,
       });
     }
   }
 
-  for (const auto& chain : chains) {
-    if (!containsNote(involvedNotes, chain.note)) {
-      continue;
+  for (const auto& event : track.events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note != nullptr && note->note.valid()) {
+      const auto* span = findNote(notes, note->note);
+      if (span != nullptr && !span->portamentoSegments.empty()) {
+        continue;
+      }
     }
-    for (const auto& segment : chain.segments) {
+    if (const auto* settings = std::get_if<PitchTransitionSettingsPerformanceEvent>(&event)) {
+      events.emplace_back(PortamentoPerformanceEvent{
+          .header = settings->header,
+          .timeMilliseconds = settings->timeMilliseconds,
+      });
+    } else {
+      events.push_back(event);
+    }
+  }
+
+  for (const auto& note : notes) {
+    for (const auto& segment : note.portamentoSegments) {
       if (segment.endTick <= segment.startTick) {
         continue;
       }
@@ -505,33 +374,64 @@ void lowerTrackAutomations(PerformanceSequence& performance, PerformanceTrack& t
       events.emplace_back(NotePerformanceEvent{
           .header = header,
           .key = segment.key,
-          .linearVelocity = segment.linearVelocity,
+          .linearVelocity = note.source.linearVelocity,
           .durationTicks =
               static_cast<u32>(std::min<u64>(segment.endTick - segment.startTick, std::numeric_limits<u32>::max())),
-          .note = segment.note,
-          .lane = segment.lane,
+          .note = note.source.note,
+          .lane = note.source.lane,
       });
     }
   }
-
-  std::ranges::stable_sort(events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
-    const auto& left = performanceEventHeader(lhs);
-    const auto& right = performanceEventHeader(rhs);
-    return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
-  });
-  track.events = std::move(events);
-  std::erase_if(track.automations,
-                [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
+  return events;
 }
 
 }  // namespace
 
 PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
                                                    const MidiExportOptions& options) {
-  const std::vector<TempoChange> tempoChanges = collectTempoChanges(performance);
+  return lowerMidiPerformanceAutomation(performance, options, PerformanceTempoMap{performance});
+}
+
+PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
+                                                   const MidiExportOptions& options,
+                                                   const PerformanceTempoMap& tempos) {
   PerformanceSequence lowered = performance;
+  PitchTransitionRenderingHint rendering = performance.preferredPitchTransitionRendering;
+  if (options.pitchTransitions == MidiPitchTransitionRendering::Portamento) {
+    rendering = PitchTransitionRenderingHint::Portamento;
+  } else if (options.pitchTransitions == MidiPitchTransitionRendering::PitchBend) {
+    rendering = PitchTransitionRenderingHint::PitchBend;
+  }
+
   for (auto& track : lowered.tracks) {
-    lowerTrackAutomations(lowered, track, tempoChanges, options);
+    u64 nextSequence = 0;
+    std::vector<const PerformanceAutomation*> transitions;
+    for (const auto& event : track.events) {
+      nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
+    }
+    for (const auto& automation : track.automations) {
+      nextSequence = std::max(nextSequence, automation.header.sequence + 1);
+      if (pitchTransitionIntent(automation) != nullptr) {
+        transitions.push_back(&automation);
+      }
+    }
+    std::ranges::stable_sort(transitions, [](const auto* lhs, const auto* rhs) {
+      return std::tie(lhs->realization.startTick, lhs->header.sequence) <
+             std::tie(rhs->realization.startTick, rhs->header.sequence);
+    });
+
+    auto notes = collectNotes(track);
+    auto events = rendering == PitchTransitionRenderingHint::PitchBend
+                      ? lowerPitchBends(lowered, track, notes, transitions, nextSequence)
+                      : lowerPortamento(lowered, track, notes, transitions, tempos, nextSequence);
+    std::ranges::stable_sort(events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
+      const auto& left = performanceEventHeader(lhs);
+      const auto& right = performanceEventHeader(rhs);
+      return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
+    });
+    track.events = std::move(events);
+    std::erase_if(track.automations,
+                  [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
   }
   return lowered;
 }

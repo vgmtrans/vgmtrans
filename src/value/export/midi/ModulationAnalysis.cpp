@@ -109,8 +109,8 @@ MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence&
         .trackIndex = trackIndex,
     };
 
-    for (const auto* event : flattenedPerformanceEvents(track)) {
-      if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(event)) {
+    for (const auto& event : track.events) {
+      if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
         observePerformanceModulation(trackUsage, *modulation);
       }
     }

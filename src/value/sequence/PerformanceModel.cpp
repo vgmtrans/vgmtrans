@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <optional>
 #include <tuple>
 
 namespace vgmtrans::core {
@@ -39,12 +41,7 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
     }
 
     const auto& previous = *std::prev(upper);
-    if (sampled->interpolation == AutomationSampleInterpolation::Step || upper->tickOffset == previous.tickOffset) {
-      return previous.value;
-    }
-    const double position = static_cast<double>(clampedElapsed - previous.tickOffset) /
-                            static_cast<double>(upper->tickOffset - previous.tickOffset);
-    return previous.value + ((upper->value - previous.value) * position);
+    return previous.value;
   }
 
   if (duration == 0) {
@@ -54,27 +51,84 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
   return transition.startKey + ((transition.targetKey - transition.startKey) * position);
 }
 
-std::vector<const PerformanceEvent*> flattenedPerformanceEvents(const PerformanceTrack& track) {
-  std::vector<const PerformanceEvent*> events;
-  size_t eventCount = track.events.size();
-  for (const auto& automation : track.automations) {
-    eventCount += automation.points.size();
-  }
-  events.reserve(eventCount);
-  for (const auto& event : track.events) {
-    events.push_back(&event);
-  }
-  for (const auto& automation : track.automations) {
-    for (const auto& point : automation.points) {
-      events.push_back(&point);
+PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance) : timebase_(performance.timebase) {
+  for (const auto& track : performance.tracks) {
+    for (const auto& event : track.events) {
+      const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
+      if (tempo == nullptr) {
+        continue;
+      }
+      changes_.push_back(Change{
+          .tick = tempo->header.tick,
+          .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
+          .track = tempo->header.track,
+          .sequence = tempo->header.sequence,
+          .order = changes_.size(),
+      });
     }
   }
-  std::ranges::stable_sort(events, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
-    const auto& lhsHeader = performanceEventHeader(*lhs);
-    const auto& rhsHeader = performanceEventHeader(*rhs);
-    return std::tie(lhsHeader.tick, lhsHeader.sequence) < std::tie(rhsHeader.tick, rhsHeader.sequence);
+  std::ranges::stable_sort(changes_, [](const Change& lhs, const Change& rhs) {
+    return std::tie(lhs.tick, lhs.order) < std::tie(rhs.tick, rhs.order);
   });
-  return events;
+  std::optional<u32> currentTempo;
+  std::erase_if(changes_, [&](const Change& change) {
+    if (currentTempo && *currentTempo == change.microsecondsPerQuarter) {
+      return true;
+    }
+    currentTempo = change.microsecondsPerQuarter;
+    return false;
+  });
+}
+
+u32 PerformanceTempoMap::microsecondsPerQuarterAt(u64 tick) const {
+  u32 microsecondsPerQuarter = 500000;
+  for (const auto& change : changes_) {
+    if (change.tick > tick) {
+      break;
+    }
+    microsecondsPerQuarter = change.microsecondsPerQuarter;
+  }
+  return microsecondsPerQuarter;
+}
+
+double PerformanceTempoMap::tickSeconds(u64 tick) const {
+  return (static_cast<double>(microsecondsPerQuarterAt(tick)) / 1'000'000.0) /
+         static_cast<double>(std::max<u16>(timebase_.ppqn, 1));
+}
+
+double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTicks) const {
+  if (durationTicks == 0) {
+    return 0.0;
+  }
+
+  const u64 endTick = startTick > std::numeric_limits<u64>::max() - durationTicks ? std::numeric_limits<u64>::max()
+                                                                                  : startTick + durationTicks;
+  const double ppqn = std::max<u16>(timebase_.ppqn, 1);
+  u32 tempo = 500000;
+  u64 cursor = startTick;
+  double microseconds = 0.0;
+
+  for (const auto& change : changes_) {
+    if (change.tick <= startTick) {
+      tempo = change.microsecondsPerQuarter;
+      continue;
+    }
+    if (change.tick >= endTick) {
+      break;
+    }
+    microseconds += static_cast<double>(change.tick - cursor) * tempo / ppqn;
+    cursor = change.tick;
+    tempo = change.microsecondsPerQuarter;
+  }
+  microseconds += static_cast<double>(endTick - cursor) * tempo / ppqn;
+  return microseconds / 1000.0;
+}
+
+bool PerformanceTempoMap::contains(const TempoPerformanceEvent& event) const {
+  return std::ranges::any_of(changes_, [&](const Change& change) {
+    return change.tick == event.header.tick && change.track == event.header.track &&
+           change.sequence == event.header.sequence && change.microsecondsPerQuarter == event.microsecondsPerQuarter;
+  });
 }
 
 const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id) {
@@ -96,16 +150,10 @@ const SourceCommand* sourceCommandForEvent(const SequenceProgram& program, const
 
 std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track, CommandId command) {
   std::vector<const PerformanceEvent*> events;
-  const auto appendMatching = [&](const auto& candidates) {
-    for (const auto& event : candidates) {
-      if (performanceEventHeader(event).sourceCommand == command) {
-        events.push_back(&event);
-      }
+  for (const auto& event : track.events) {
+    if (performanceEventHeader(event).sourceCommand == command) {
+      events.push_back(&event);
     }
-  };
-  appendMatching(track.events);
-  for (const auto& automation : track.automations) {
-    appendMatching(automation.points);
   }
   std::ranges::stable_sort(events, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
     const auto& lhsHeader = performanceEventHeader(*lhs);

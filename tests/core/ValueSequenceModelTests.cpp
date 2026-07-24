@@ -107,19 +107,43 @@ void collectionIssueHelpersValidateStoredStatus() {
          "explicit non-complete status should remain stored instead of being derived from issues");
 }
 
-void performanceAutomationRetainsIntentAndFlattensExactPointsInExecutionOrder() {
+void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
   const PerformanceTrack track{
       .id = TrackId{3},
       .events =
           {
+              MarkerPerformanceEvent{
+                  .header = PerformanceEventHeader{.track = TrackId{3}, .tick = 0, .sequence = 0},
+                  .text = "start",
+              },
+              LevelPerformanceEvent{
+                  .header =
+                      PerformanceEventHeader{
+                          .sourceCommand = CommandId{9},
+                          .sourceAnnotation = SourceAnnotationId{11},
+                          .track = TrackId{3},
+                          .tick = 0,
+                          .sequence = 1,
+                          .automation = PerformanceAutomationId{0},
+                      },
+                  .linearGain = 0.75,
+              },
+              LevelPerformanceEvent{
+                  .header =
+                      PerformanceEventHeader{
+                          .sourceCommand = CommandId{9},
+                          .sourceAnnotation = SourceAnnotationId{11},
+                          .track = TrackId{3},
+                          .tick = 1,
+                          .sequence = 2,
+                          .automation = PerformanceAutomationId{0},
+                      },
+                  .linearGain = 0.5,
+              },
               NotePerformanceEvent{
                   .header = PerformanceEventHeader{.track = TrackId{3}, .tick = 2, .sequence = 3},
                   .key = 60,
                   .durationTicks = 1,
-              },
-              MarkerPerformanceEvent{
-                  .header = PerformanceEventHeader{.track = TrackId{3}, .tick = 0, .sequence = 0},
-                  .text = "start",
               },
           },
       .automations = {PerformanceAutomation{
@@ -137,39 +161,12 @@ void performanceAutomationRetainsIntentAndFlattensExactPointsInExecutionOrder() 
                   .targetValue = 0.5,
                   .durationTicks = 1,
               },
-          .points =
-              {
-                  LevelPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{
-                              .sourceCommand = CommandId{9},
-                              .sourceAnnotation = SourceAnnotationId{11},
-                              .track = TrackId{3},
-                              .tick = 1,
-                              .sequence = 2,
-                          },
-                      .linearGain = 0.5,
-                  },
-                  LevelPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{
-                              .sourceCommand = CommandId{9},
-                              .sourceAnnotation = SourceAnnotationId{11},
-                              .track = TrackId{3},
-                              .tick = 0,
-                              .sequence = 1,
-                          },
-                      .linearGain = 0.75,
-                  },
-              },
       }},
   };
 
-  const auto flattened = flattenedPerformanceEvents(track);
-  expect(flattened.size() == 4 && performanceEventHeader(*flattened[0]).sequence == 0 &&
-             performanceEventHeader(*flattened[1]).sequence == 1 &&
-             performanceEventHeader(*flattened[2]).sequence == 2 && performanceEventHeader(*flattened[3]).sequence == 3,
-         "flattened performance events should merge ordinary events and exact automation points by tick and order");
+  expect(track.events.size() == 4 && performanceEventHeader(track.events[1]).automation == PerformanceAutomationId{0} &&
+             performanceEventHeader(track.events[2]).automation == PerformanceAutomationId{0},
+         "realized automation events should remain in the track timeline with their source-intent association");
 
   const auto sourceEvents = performanceEventsForCommand(track, CommandId{9});
   expect(sourceEvents.size() == 2 && std::ranges::all_of(sourceEvents,
@@ -192,15 +189,18 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   fade.at(out, 2).pitchBend(2.0);
   out.note(60, 1.0, 3);
 
-  expect(track.automations.size() == 1 && track.automations[0].points.size() == 2 && track.events.size() == 1,
-         "bound output should route only its events into the automation");
+  expect(track.automations.size() == 1 && track.events.size() == 3 &&
+             performanceEventHeader(track.events[0]).automation == track.automations[0].id &&
+             performanceEventHeader(track.events[1]).automation == track.automations[0].id &&
+             !performanceEventHeader(track.events[2]).automation,
+         "bound output should tag its realized events without removing them from the track timeline");
   const auto& intent = std::get<ScalarPerformanceAutomationIntent>(track.automations[0].intent);
   expect(intent.target == PerformanceAutomationTarget::Pitch &&
              intent.motion == PerformanceAutomationMotion::TargetOverTicks && intent.targetValue == 2.0 &&
              intent.durationTicks == 2 && intent.delayTicks == 1 && intent.restartsOnNote,
          "emitter automation helpers should construct the declared source intent");
-  expect(performanceEventHeader(track.automations[0].points[0]).sourceCommand == CommandId{9} &&
-             performanceEventHeader(track.automations[0].points[0]).sourceAnnotation == SourceAnnotationId{11},
+  expect(performanceEventHeader(track.events[0]).sourceCommand == CommandId{9} &&
+             performanceEventHeader(track.events[0]).sourceAnnotation == SourceAnnotationId{11},
          "bound output should retain the automation command's provenance");
 
   PerformanceTrack otherTrack{.id = TrackId{4}};
@@ -218,7 +218,7 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   expect(rejectedOtherTrack, "an automation binding should not attach to another performance track");
 }
 
-void pitchTransitionApiPreservesSamplesAndResolvesLifecyclePolicies() {
+void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
   PerformanceTrack track{.id = TrackId{5}};
   u64 nextSequence = 0;
   u32 nextNote = 0;
@@ -227,81 +227,62 @@ void pitchTransitionApiPreservesSamplesAndResolvesLifecyclePolicies() {
 
   const PerformanceNoteId retargetNote = out.note(64, 1.0, 16);
   auto first = out.pitchSlide(retargetNote, 60, 64, 8);
-  first.preferPitchBend().onNewSlide(AutomationNewAutomationPolicy::Retarget);
   first.sample(out.at(3), 61.5);
-  const auto second = out.at(4).pitchSlide(retargetNote, 0, 67, 4);
+  out.at(4).pitchSlide(retargetNote, 61.5, 67, 4);
 
   const auto& firstAutomation = track.automations[0];
   const auto& firstIntent = std::get<PitchTransitionIntent>(firstAutomation.intent);
   const auto& firstSamples = std::get<SampledAutomationCurve>(firstIntent.curve).samples;
-  const auto& secondAutomation = track.automations[1];
-  const auto& secondIntent = std::get<PitchTransitionIntent>(secondAutomation.intent);
   expect(firstSamples.size() == 3 && firstSamples[0] == AutomationSample{.tickOffset = 0, .value = 60} &&
              firstSamples[1] == AutomationSample{.tickOffset = 3, .value = 61.5} &&
              firstSamples[2] == AutomationSample{.tickOffset = 8, .value = 64},
          "the compact sample API should retain implicit endpoints and exact source pitch values in tick order");
   expect(firstAutomation.realization.endTick == 4 &&
-             firstAutomation.realization.endReason == PerformanceAutomationEndReason::Replaced &&
-             secondAutomation.realization.continuesFrom == first.id() && secondIntent.startKey == 61.5,
-         "retargeting should clip the previous transition and begin from its realized source curve value");
+             firstAutomation.realization.endReason == PerformanceAutomationEndReason::Continued &&
+             std::get<PitchTransitionIntent>(track.automations[1].intent).startKey == 61.5,
+         "a realized replacement should clip the previous transition and retain the source driver's current pitch");
 
-  const PerformanceNoteId queuedNote = out.at(20).note(69, 1.0, 12);
-  auto queuedFirst = out.at(20).pitchSlide(queuedNote, 65, 67, 5);
-  queuedFirst.onNewSlide(AutomationNewAutomationPolicy::Queue);
-  const auto queuedSecond = out.at(22).pitchSlide(queuedNote, 0, 69, 3);
-  const auto& queuedRealization = track.automations[3].realization;
-  const auto& queuedIntent = std::get<PitchTransitionIntent>(track.automations[3].intent);
-  expect(queuedRealization.requestedStartTick == 22 && queuedRealization.startTick == 25 &&
-             queuedRealization.continuesFrom == queuedFirst.id() && queuedIntent.startKey == 67,
-         "queueing should delay the successor and chain it from the previous target without format bookkeeping");
-  expect(queuedSecond.id().valid(), "a queued transition should retain an opaque automation identity");
-  const auto adjacent = out.at(28).pitchSlide(queuedNote, 69, 71, 2);
-  expect(track.automations[4].realization.continuesFrom == queuedSecond.id() && adjacent.id().valid(),
-         "back-to-back transitions should remain linked even when neither one interrupts the other");
+  const PerformanceNoteId chainedNote = out.at(20).note(69, 1.0, 12);
+  out.at(20).pitchSlide(chainedNote, 65, 67, 5);
+  out.at(25).pitchSlide(chainedNote, 67, 69, 3);
+  out.at(28).pitchSlide(chainedNote, 69, 71, 2);
+  expect(track.automations[2].realization.endReason == PerformanceAutomationEndReason::Continued &&
+             track.automations[3].realization.endReason == PerformanceAutomationEndReason::Continued &&
+             track.automations[3].realization.startTick == 25,
+         "playback code should emit queued source motion at its realized tick and retain adjacent chaining");
 
   const PerformanceNoteId interruptedNote = out.at(40).note(72, 1.0, 10);
-  const auto interrupted = out.at(40).pitchSlide(interruptedNote, 70, 72, 8);
+  out.at(40).pitchSlide(interruptedNote, 70, 72, 8);
   const PerformanceNoteId extension = out.at(42).note(72, 1.0, 2, true);
   expect(extension == interruptedNote && track.automations[5].realization.endTick == 48,
          "a source tie should extend one stable note identity without interrupting its transition");
   out.at(43).note(74, 1.0, 2);
   expect(track.automations[5].realization.endTick == 43 &&
-             track.automations[5].realization.endReason == PerformanceAutomationEndReason::NewNote &&
-             interrupted.id().valid(),
-         "a genuinely new note should apply the transition's new-note interruption policy");
+             track.automations[5].realization.endReason == PerformanceAutomationEndReason::Interrupted,
+         "a genuinely new note should mark the transition interrupted at that tick");
 
-  const PerformanceNoteId guardedNote = out.at(50).note(76, 1.0, 10);
-  auto guarded = out.at(50).pitchSlide(guardedNote, 74, 76, 6);
-  guarded.onNewSlide(AutomationNewAutomationPolicy::Ignore);
-  const auto ignored = out.at(52).pitchSlide(guardedNote, 76, 79, 3);
-  expect(guarded.id().valid() && !ignored.id().valid() && track.automations[6].realization.endTick == 56,
-         "an ignore policy should reject a competing transition without mutating the active one");
+  const PerformanceNoteId replacedNote = out.at(50).note(76, 1.0, 10);
+  out.at(50).pitchSlide(replacedNote, 74, 76, 6);
+  out.at(52).pitchSlide(replacedNote, 75, 79, 3);
+  expect(track.automations[6].realization.endTick == 52 &&
+             track.automations[6].realization.endReason == PerformanceAutomationEndReason::Continued,
+         "a new realized transition should replace active motion without re-simulating the source driver");
 
   const PerformanceNoteId stoppedNote = out.at(60).note(81, 1.0, 10);
   const auto stopped = out.at(60).pitchSlide(stoppedNote, 79, 81, 6);
   stopped.stop(out.at(62));
-  expect(track.automations[7].realization.endTick == 62 &&
-             track.automations[7].realization.endReason == PerformanceAutomationEndReason::SourceStopped,
+  expect(track.automations[8].realization.endTick == 62 &&
+             track.automations[8].realization.endReason == PerformanceAutomationEndReason::Interrupted,
          "formats should be able to stop a transition explicitly through its opaque handle");
 
   auto configured = out.at(70).pitchSlide(stoppedNote, 81, 84, PitchSlideTiming::fixedDuration(4, 125.0));
-  configured.continueFrom(interruptedNote)
-      .onNewNote(AutomationNewNotePolicy::Continue)
-      .onNewSlide(AutomationNewAutomationPolicy::Queue)
-      .onNoteEnd(AutomationNoteEndPolicy::Continue)
-      .preferPitchBend()
-      .restorePortamentoTiming(250.0)
-      .portamentoOverlap(2);
-  const auto& configuredIntent = std::get<PitchTransitionIntent>(track.automations[8].intent);
-  expect(configuredIntent.previousNote == interruptedNote &&
-             configuredIntent.interruptions.newNote == AutomationNewNotePolicy::Continue &&
-             configuredIntent.interruptions.newAutomation == AutomationNewAutomationPolicy::Queue &&
-             configuredIntent.interruptions.noteEnd == AutomationNoteEndPolicy::Continue &&
-             configuredIntent.renderingHint == PitchTransitionRenderingHint::PitchBend &&
+  configured.continueFrom(interruptedNote).continueAcrossNotes().restorePortamentoTiming(250.0).portamentoOverlap(2);
+  const auto& configuredIntent = std::get<PitchTransitionIntent>(track.automations[9].intent);
+  expect(configuredIntent.previousNote == interruptedNote && configuredIntent.continuesAcrossNotes &&
              configuredIntent.timing.timelineTicks == 4 &&
              std::get<FixedDurationPitchSlideTiming>(configuredIntent.timing.physical).milliseconds == 125.0 &&
-             configuredIntent.nativePortamento && configuredIntent.nativePortamento->restoreTimeMilliseconds == 250.0 &&
-             configuredIntent.nativePortamento->overlapTicks == 2,
+             configuredIntent.nativePortamento.restoreTimeMilliseconds == 250.0 &&
+             configuredIntent.nativePortamento.overlapTicks == 2,
          "the pitch-slide handle should attach uncommon source behavior without exposing IR construction");
 }
 
@@ -313,7 +294,7 @@ void runValueSequenceModelTests() {
   sourceCommandsRetainOnlySemanticData();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
   collectionIssueHelpersValidateStoredStatus();
-  performanceAutomationRetainsIntentAndFlattensExactPointsInExecutionOrder();
+  performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
-  pitchTransitionApiPreservesSamplesAndResolvesLifecyclePolicies();
+  pitchTransitionApiPreservesSamplesAndRealizedLifecycle();
 }
