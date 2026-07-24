@@ -308,9 +308,14 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 24 && note->key == 66 && note->duration == 8;
-                             }),
-         "delayed slides should emit an overlapping target note at the driver-specified tick");
+                               return note != nullptr && note->tick == 22 && note->key == 68 && note->duration == 3;
+                             }) &&
+             std::ranges::any_of(midi.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* note = std::get_if<NoteDuration>(&event);
+                                   return note != nullptr && note->tick == 24 && note->key == 66 && note->duration == 8;
+                                 }),
+         "delayed slides should overlap the source and target notes by one tick");
 
   const MidiSequence pitchBendMidi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},

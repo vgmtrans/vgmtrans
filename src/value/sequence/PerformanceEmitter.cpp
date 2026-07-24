@@ -589,6 +589,20 @@ PitchSlideBinding& PitchSlideBinding::continueAcrossNotes(bool enabled) {
   return *this;
 }
 
+PitchSlideBinding& PitchSlideBinding::preferPortamento() {
+  if (auto* transition = intent()) {
+    transition->preferredRendering = PitchTransitionRenderingHint::Portamento;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::preferPitchBend() {
+  if (auto* transition = intent()) {
+    transition->preferredRendering = PitchTransitionRenderingHint::PitchBend;
+  }
+  return *this;
+}
+
 PitchSlideBinding& PitchSlideBinding::useCurrentPortamentoTiming() {
   if (auto* transition = intent()) {
     transition->nativePortamento.useCurrentTiming = true;

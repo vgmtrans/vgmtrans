@@ -743,6 +743,62 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
          "MIDI lowering should leave the caller's target-neutral performance intact");
 }
 
+void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 12,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId first = out.note(60, 1.0, 4);
+  const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
+  out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first).preferPortamento();
+  const PerformanceNoteId third = out.at(8).note(67, 1.0, 4);
+  out.at(8).pitchSlide(third, 64, 67, 4).continueFrom(second).preferPitchBend();
+
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {track},
+  };
+
+  const auto countPortamento = [](const MidiSequence& midi) {
+    return std::ranges::count_if(
+        midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); });
+  };
+  const auto countPitchBends = [](const MidiSequence& midi) {
+    return std::ranges::count_if(midi.tracks[0].events,
+                                 [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); });
+  };
+  const auto noteDuration = [](const MidiSequence& midi, u64 tick) -> std::optional<u32> {
+    const auto found = std::ranges::find_if(midi.tracks[0].events, [tick](const MidiEvent& event) {
+      const auto* note = std::get_if<NoteDuration>(&event);
+      return note != nullptr && note->tick == tick;
+    });
+    return found == midi.tracks[0].events.end() ? std::nullopt : std::optional{std::get<NoteDuration>(*found).duration};
+  };
+
+  const MidiSequence preserved = renderMidiSequence(performance);
+  expect(countPortamento(preserved) == 1 && countPitchBends(preserved) != 0,
+         "PreserveFormat should allow portamento and pitch bend transitions in one track");
+  expect(noteDuration(preserved, 0) == 5 && noteDuration(preserved, 4) == 4,
+         "only native-portamento transitions should add their requested note overlap");
+
+  const MidiSequence allPortamento =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(countPortamento(allPortamento) == 2 && countPitchBends(allPortamento) == 0 &&
+             noteDuration(allPortamento, 0) == 5 && noteDuration(allPortamento, 4) == 5,
+         "an explicit portamento request should override every transition preference");
+
+  const MidiSequence allPitchBend =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(countPortamento(allPitchBend) == 0 && countPitchBends(allPitchBend) != 0 &&
+             noteDuration(allPitchBend, 0) == 4 && noteDuration(allPitchBend, 4) == 4,
+         "an explicit pitch-bend request should override every transition without rewriting notes");
+}
+
 void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -1535,6 +1591,7 @@ void runValueMidiTests() {
   performanceMidiRendererLowersStructuredScalarAutomationPoints();
   performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates();
   performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering();
+  performanceMidiRendererAllowsMixedPitchTransitionRendering();
   performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();
   performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();

@@ -276,9 +276,14 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
          "formats should be able to stop a transition explicitly through its opaque handle");
 
   auto configured = out.at(70).pitchSlide(stoppedNote, 81, 84, PitchSlideTiming::fixedDuration(4, 125.0));
-  configured.continueFrom(interruptedNote).continueAcrossNotes().restorePortamentoTiming(250.0).portamentoOverlap(2);
+  configured.continueFrom(interruptedNote)
+      .continueAcrossNotes()
+      .preferPitchBend()
+      .restorePortamentoTiming(250.0)
+      .portamentoOverlap(2);
   const auto& configuredIntent = std::get<PitchTransitionIntent>(track.automations[9].intent);
   expect(configuredIntent.previousNote == interruptedNote && configuredIntent.continuesAcrossNotes &&
+             configuredIntent.preferredRendering == PitchTransitionRenderingHint::PitchBend &&
              configuredIntent.timing.timelineTicks == 4 &&
              std::get<FixedDurationPitchSlideTiming>(configuredIntent.timing.physical).milliseconds == 125.0 &&
              configuredIntent.nativePortamento.restoreTimeMilliseconds == 250.0 &&
