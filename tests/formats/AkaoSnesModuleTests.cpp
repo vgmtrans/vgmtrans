@@ -624,9 +624,48 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
   slideBytes[start + 3] = 0x08;
   slideBytes[start + 4] = 0xec;
   const PerformanceSequence slide = renderTracks(ff6, {decodeTrack(slideBytes, ff6, start, start + 5)});
-  expect(!eventsOfType<PitchBendRangePerformanceEvent>(slide.tracks.front()).empty() &&
-             eventsOfType<PitchBendPerformanceEvent>(slide.tracks.front()).size() >= 3,
-         "a pending AkaoSnes pitch slide should begin with the next sounding note and reach its target over ticks");
+  const auto slideNotes = eventsOfType<NotePerformanceEvent>(slide.tracks.front());
+  const auto slideAutomation = std::ranges::find_if(
+      slide.tracks.front().automations,
+      [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
+  const auto* slideIntent = slideAutomation == slide.tracks.front().automations.end()
+                                ? nullptr
+                                : pitchTransitionIntent(*slideAutomation);
+  const auto* slideCurve =
+      slideIntent == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&slideIntent->curve);
+  const bool retainsDriverCurve =
+      slideCurve != nullptr && slideCurve->samples.size() == 3 &&
+      std::abs((slideCurve->samples[1].value - slideCurve->samples[0].value) -
+               (slideCurve->samples[2].value - slideCurve->samples[1].value)) >
+          0.1;
+  expect(slideNotes.size() == 1 && slideIntent != nullptr && slideIntent->note == slideNotes.front()->note &&
+             slideIntent->preferredRendering == PitchTransitionRenderingHint::PitchBend &&
+             slideIntent->timing.timelineTicks == 2 && retainsDriverCurve &&
+             slideCurve->samples.front().tickOffset == 0 && slideCurve->samples.back().tickOffset == 2,
+         "a pending AkaoSnes pitch slide should attach its exact driver curve to the next sounding note");
+
+  const MidiSequence bendSlide = renderMidiSequence(slide);
+  expect(std::ranges::count_if(bendSlide.tracks.front().events, [](const MidiEvent& event) {
+           return std::holds_alternative<PitchBend>(event);
+         }) >= 3,
+         "preserve-format MIDI should lower an AkaoSnes pitch slide through its sampled pitch-bend curve");
+
+  MidiExportOptions portamentoOptions;
+  portamentoOptions.pitchTransitions = MidiPitchTransitionRendering::Portamento;
+  const MidiSequence portamentoSlide = renderMidiSequence(slide, portamentoOptions);
+  expect(
+      std::ranges::any_of(portamentoSlide.tracks.front().events, [](const MidiEvent& event) {
+        return std::holds_alternative<PortamentoControl>(event);
+      }) &&
+          std::ranges::none_of(portamentoSlide.tracks.front().events,
+                               [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+         "explicit portamento MIDI should lower the same AkaoSnes pitch-slide intent natively");
+
+  slideBytes[start + 1] = 0;
+  const PerformanceSequence immediateSlide = renderTracks(ff6, {decodeTrack(slideBytes, ff6, start, start + 5)});
+  expect(immediateSlide.tracks.front().automations.empty() &&
+             eventsOfType<PitchBendPerformanceEvent>(immediateSlide.tracks.front()).size() == 1,
+         "a one-step AkaoSnes pitch change should remain instantaneous instead of inventing a timed transition");
 
   const AkaoSnesProfile ff4{.version = AKAOSNES_V1, .minorVersion = AKAOSNES_V1_FF4};
   const auto envelopeBytes = [&](u8 commandAfterNote) {

@@ -1149,10 +1149,11 @@ struct TrackState {
   u16 pitchSlideStepsRemaining = 0;
   s32 pitchSlideStep = 0;
   s32 pitchSlideFinalPitch = kNominalDspPitch * kPitchFractionScale;
-  bool pitchSlideNoteValid = false;
   s16 pitchSlideBaseNote = 0;
   s16 pitchSlideCurrentNote = 0;
-  PerformanceAutomationBinding pitchSlideAutomation;
+  double pitchSlideBaseKey = 0.0;
+  PerformanceNoteId pitchSlideNote;
+  PitchSlideBinding pitchSlideAutomation;
   PerformanceAutomationBinding pitchEnvelopeAutomation;
   LfoState vibrato;
   LfoState tremolo;
@@ -1223,7 +1224,7 @@ struct Playback {
     track.pitchBaseValid = false;
     track.pitchSlideActive = false;
     track.pitchSlideStepsRemaining = 0;
-    track.pitchSlideNoteValid = false;
+    track.pitchSlideNote = {};
     if (track.pitchBendAtRest()) {
       return;
     }
@@ -1265,25 +1266,33 @@ struct Playback {
     track.pitchBaseValid = true;
     track.pitchSlideBaseNote = akaoSnesCorrectedNote(note, track.transpose);
     track.pitchSlideCurrentNote = track.pitchSlideBaseNote;
-    track.pitchSlideNoteValid = true;
+    track.pitchSlideBaseKey = static_cast<double>(note) + track.transpose;
     beginPitchEnvelopeForNote();
   }
 
-  void updatePitchSlide() {
+  [[nodiscard]] double pitchSlideKey(s32 pitch) const {
+    return track.pitchSlideBaseKey + (akaoSnesPitchCents(pitch, track.pitchBase) / 100.0);
+  }
+
+  void samplePitchSlide() {
+    track.pitchSlideAutomation.sample(out, pitchSlideKey(track.currentPitch));
+  }
+
+  [[nodiscard]] bool advancePitchSlide() {
     if (!track.pitchSlideActive || !track.pitchBaseValid) {
-      return;
+      return false;
     }
     if (track.pitchSlideStepsRemaining == 0) {
       track.pitchSlideActive = false;
-      return;
+      return false;
     }
     --track.pitchSlideStepsRemaining;
     track.currentPitch =
         track.pitchSlideStepsRemaining == 0 ? track.pitchSlideFinalPitch : track.currentPitch + track.pitchSlideStep;
-    emitPitchBendForCurrentPitch(track.pitchSlideAutomation.output(out));
     if (track.pitchSlideStepsRemaining == 0) {
       track.pitchSlideActive = false;
     }
+    return true;
   }
 
   void beginPendingPitchSlide() {
@@ -1294,20 +1303,33 @@ struct Playback {
     const u16 steps = track.pendingPitchSlideSteps;
     const s8 semitones = track.pendingPitchSlideSemitones;
     track.clearPendingPitchSlide();
-    if (!track.pitchBaseValid || !track.pitchSlideNoteValid) {
+    if (!track.pitchBaseValid || !track.pitchSlideNote.valid()) {
       return;
     }
     track.pitchSlideCurrentNote = static_cast<s16>(track.pitchSlideCurrentNote + semitones);
     const s32 targetPitch = akaoSnesPitchForSemitoneOffset(track.pitchSlideCurrentNote - track.pitchSlideBaseNote);
     track.pitchSlideStep = akaoSnesPitchSlideStep(context.version, track.currentPitch, targetPitch, steps);
     track.pitchSlideFinalPitch = track.currentPitch + (track.pitchSlideStep * static_cast<s32>(steps));
-    emitPitchBendRange(std::max(
-        akaoSnesPitchBendRangeCents(track.pitchBase, targetPitch, kDefaultPitchBendRangeCents),
-        akaoSnesPitchBendRangeCents(track.pitchBase, track.pitchSlideFinalPitch, kDefaultPitchBendRangeCents)));
-    emitPitchBendForCurrentPitch(track.pitchSlideAutomation.output(out));
     track.pitchSlideStepsRemaining = steps;
     track.pitchSlideActive = true;
-    updatePitchSlide();
+    if (!advancePitchSlide()) {
+      return;
+    }
+    // The first driver step is already audible at the note tick, leaving
+    // steps - 1 timeline ticks between that pitch and the destination.
+    if (steps == 1) {
+      track.pitchSlideAutomation.stop(out);
+      track.pitchSlideAutomation.clear();
+      emitPitchBendRange(
+          akaoSnesPitchBendRangeCents(track.pitchBase, track.currentPitch, kDefaultPitchBendRangeCents));
+      emitPitchBendForCurrentPitch(out);
+      return;
+    }
+    track.pitchSlideAutomation =
+        out.pitchSlide(track.pitchSlideNote, pitchSlideKey(track.currentPitch), pitchSlideKey(track.pitchSlideFinalPitch),
+                       steps - 1);
+    track.pitchSlideAutomation.preferPitchBend();
+    samplePitchSlide();
   }
 
   void setPitchWaitBoundary(Address fallthrough, u32 waitTicks) {
@@ -1341,7 +1363,6 @@ struct Playback {
       const double velocity = kNoteVelocity / 127.0;
       const u8 note = static_cast<u8>((track.octave * 12) + noteIndex);
       beginNotePitch(note, !track.percussion);
-      beginPendingPitchSlide();
       if (!track.slur && !track.legato) {
         beginVibratoForNote();
         beginTremoloForNote();
@@ -1349,18 +1370,21 @@ struct Playback {
       if (track.percussion) {
         out.note(kAkaoSnesDrumKeyBias + noteIndex - track.transpose, velocity, duration);
       } else {
-        out.note((track.octave * 12) + noteIndex + track.transpose, velocity, duration);
+        const PerformanceNoteId pitchNote =
+            out.note((track.octave * 12) + noteIndex + track.transpose, velocity, duration);
+        track.pitchSlideNote = pitchNote;
+        beginPendingPitchSlide();
       }
       track.lastTieableNoteTick = vm.tick() + length;
       return Effects::wait(length);
     }
 
     if (noteIndex == akaoSnesStatusNoteIndexTie(context.version)) {
-      beginPendingPitchSlide();
       if (track.lastTieableNoteTick && *track.lastTieableNoteTick >= vm.tick()) {
-        out.note(0.0, 1.0, duration, true);
+        track.pitchSlideNote = out.note(0.0, 1.0, duration, true);
         track.lastTieableNoteTick = vm.tick() + length;
       }
+      beginPendingPitchSlide();
       return Effects::wait(length);
     }
 
@@ -1647,8 +1671,13 @@ struct Playback {
     }
     updateVibratoFade();
     updateTremoloFade();
-    updatePitchSlide();
+    const bool pitchSlideAdvanced = advancePitchSlide();
     updatePitchEnvelope();
+    if (pitchSlideAdvanced) {
+      // The driver updates the envelope after the slide when both are active,
+      // so the retained sample must reflect that final pitch for this tick.
+      samplePitchSlide();
+    }
   }
 };
 
@@ -1791,10 +1820,6 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
             playback.track.pendingPitchSlideSemitones = pitch;
             if (pitch == 0) {
               playback.track.clearPendingPitchSlide();
-              playback.track.pitchSlideAutomation.clear();
-            } else {
-              playback.track.pitchSlideAutomation =
-                  playback.out.noteFade(PerformanceAutomationTarget::Pitch, static_cast<double>(pitch), duration);
             }
           },
           steps, event.s8("semitones"));
