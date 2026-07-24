@@ -51,6 +51,11 @@ struct RepeatStack {
   void finishFallthrough() { layer = static_cast<u8>((layer - 1) & 3); }
 };
 
+struct PendingPitchSlide {
+  u16 durationTicks = 0;
+  s8 semitones = 0;
+};
+
 // These are the registers whose values genuinely survive from one executed
 // command to the next. Source bounds, version rules, and analysis do not.
 struct TrackState {
@@ -59,7 +64,7 @@ struct TrackState {
   s8 tuning = 0;
   bool slur = false;
   bool legato = false;
-  bool portamento = false;
+  u16 portamentoTicks = 0;
   bool drum = false;
   bool useOneTimeDuration = false;
   u8 oneTimeDuration = 0;
@@ -70,9 +75,9 @@ struct TrackState {
   u16 pan = 64;
   RepeatStack repeats;
   double tempoBpm = 120.0;
-  u32 microsecondsPerQuarter = 500000;
   std::optional<u8> previousKey;
   std::optional<u8> tieKey;
+  std::optional<PendingPitchSlide> pendingPitchSlide;
 };
 
 [[nodiscard]] double rightGainFromLinearPan(u8 rawPan) {
@@ -122,6 +127,21 @@ struct Playback {
       return std::max<u32>(1, delta);
     }
     return std::max<u32>(1, delta > 2 ? delta - 2 : 0);
+  }
+
+  void queuePitchSlide(u16 durationTicks, s8 semitones) {
+    track.pendingPitchSlide = PendingPitchSlide{
+        .durationTicks = durationTicks,
+        .semitones = semitones,
+    };
+  }
+
+  void applyPendingPitchSlide(PerformanceNoteId note, double key) {
+    const auto slide = std::exchange(track.pendingPitchSlide, std::nullopt);
+    if (!slide || slide->durationTicks == 0 || slide->semitones == 0) {
+      return;
+    }
+    out.pitchSlide(note, key, key + slide->semitones, slide->durationTicks).preferPitchBend();
   }
 
   template <class Emit>
@@ -199,7 +219,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
   const u16 raw = event.u16le("raw");
   const double bpm = event.derived("tempo", profile.tempoBpm(raw), SourceValueDisplay::BeatsPerMinute);
   const u32 micros = profile.tempoMicrosPerQuarter(raw);
-  event.set<&TrackState::tempoBpm>(bpm).set<&TrackState::microsecondsPerQuarter>(micros);
+  event.set<&TrackState::tempoBpm>(bpm);
   return event.emitTempo(micros);
 }
 
@@ -280,7 +300,6 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
               automation.at(playback.out, startTick + i).tempo(fadedMicros);
             }
             playback.track.tempoBpm = targetBpm;
-            playback.track.microsecondsPerQuarter = targetMicros;
           },
           duration, bpm, micros);
     }
@@ -399,8 +418,10 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
           [](Playback& playback, u32 encodedDelta, u32 defaultDelta, bool modernDriver) -> Effects {
             const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
             if (playback.track.tieKey) {
-              playback.out.note(*playback.track.tieKey, LevelScale::linearFromMidi7(kNoteVelocity),
-                                playback.soundingTicks(duration, modernDriver), true);
+              const PerformanceNoteId note =
+                  playback.out.note(*playback.track.tieKey, LevelScale::linearFromMidi7(kNoteVelocity),
+                                    playback.soundingTicks(duration, modernDriver), true);
+              playback.applyPendingPitchSlide(note, *playback.track.tieKey);
             }
             return Effects::wait(duration);
           },
@@ -421,11 +442,12 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
                                    : static_cast<u8>(playback.track.octave * 12 + scaleStep);
           const u8 key =
               static_cast<u8>(std::clamp<int>(static_cast<int>(sourceKey) + playback.track.transpose, 0, 127));
-          if (playback.track.portamento && playback.track.previousKey) {
-            playback.out.portamentoControl(*playback.track.previousKey);
+          const PerformanceNoteId note = playback.out.note(key, LevelScale::linearFromMidi7(kNoteVelocity),
+                                                           playback.soundingTicks(duration, modernDriver));
+          if (playback.track.portamentoTicks != 0 && playback.track.previousKey && *playback.track.previousKey != key) {
+            playback.out.pitchSlide(note, *playback.track.previousKey, key, playback.track.portamentoTicks);
           }
-          playback.out.note(key, LevelScale::linearFromMidi7(kNoteVelocity),
-                            playback.soundingTicks(duration, modernDriver));
+          playback.applyPendingPitchSlide(note, key);
           playback.track.previousKey = key;
           playback.track.tieKey = key;
           return Effects::wait(duration);
@@ -458,6 +480,12 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       const u8 volume = event.u8("volume", SemanticOperandRole::Level);
       event.set<&TrackState::volume>(volume);
       return event.emitLevel(akaoLinearControllerGain(volume));
+    }
+    case 0xa4: {
+      auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
+      const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
+      const s8 semitones = event.s8("semitones", SemanticOperandRole::Pitch);
+      return event.invoke<&Playback::queuePitchSlide>(duration, semitones);
     }
     case 0xa5: {
       auto event = cursor.command("Octave", SequenceSemantic::State);
@@ -603,20 +631,11 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     case 0xda: {
       auto event = cursor.command("Portamento On", SequenceSemantic::Portamento);
       const u16 speed = event.resolved("ticks", event.rawU8("speed"), akaoZeroAs256);
-      return event.invoke(
-          [](Playback& playback, u16 ticks) {
-            const double millisecondsPerTick =
-                playback.track.microsecondsPerQuarter / 1000.0 / static_cast<double>(kAkaoPpqn);
-            playback.out.portamentoTime(millisecondsPerTick * ticks);
-            playback.out.portamentoEnable(true);
-            playback.track.portamento = true;
-          },
-          speed);
+      return event.set<&TrackState::portamentoTicks>(speed);
     }
     case 0xdb: {
       auto event = cursor.command("Portamento Off", SequenceSemantic::Portamento);
-      event.emitPortamentoEnable(false);
-      return event.set<&TrackState::portamento>(false);
+      return event.set<&TrackState::portamentoTicks>(0);
     }
     case 0xdc: {
       auto event = cursor.command("Fixed Note Length", SequenceSemantic::State);
