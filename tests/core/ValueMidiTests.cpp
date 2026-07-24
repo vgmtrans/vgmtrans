@@ -468,11 +468,36 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
           .id = TrackId{0},
           .sourceTrackNumber = 0,
           .endTick = 4,
-          .events = {NotePerformanceEvent{
-              .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 1, .sequence = 2},
-              .key = 60,
-              .durationTicks = 2,
-          }},
+          .events =
+              {
+                  LevelPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{
+                              .sourceCommand = CommandId{7},
+                              .track = TrackId{0},
+                              .tick = 0,
+                              .sequence = 1,
+                              .automation = PerformanceAutomationId{0},
+                          },
+                      .linearGain = 0.75,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 1, .sequence = 2},
+                      .key = 60,
+                      .durationTicks = 2,
+                  },
+                  LevelPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{
+                              .sourceCommand = CommandId{7},
+                              .track = TrackId{0},
+                              .tick = 2,
+                              .sequence = 3,
+                              .automation = PerformanceAutomationId{0},
+                          },
+                      .linearGain = 0.5,
+                  },
+              },
           .automations = {PerformanceAutomation{
               .id = PerformanceAutomationId{0},
               .header = origin,
@@ -481,29 +506,6 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
                       .target = PerformanceAutomationTarget::Level,
                       .targetValue = 0.5,
                       .durationTicks = 2,
-                  },
-              .points =
-                  {
-                      LevelPerformanceEvent{
-                          .header =
-                              PerformanceEventHeader{
-                                  .sourceCommand = CommandId{7},
-                                  .track = TrackId{0},
-                                  .tick = 0,
-                                  .sequence = 1,
-                              },
-                          .linearGain = 0.75,
-                      },
-                      LevelPerformanceEvent{
-                          .header =
-                              PerformanceEventHeader{
-                                  .sourceCommand = CommandId{7},
-                                  .track = TrackId{0},
-                                  .tick = 2,
-                                  .sequence = 3,
-                              },
-                          .linearGain = 0.5,
-                      },
                   },
           }},
       }},
@@ -530,8 +532,9 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
 
   PerformanceSequence flatPerformance = performance;
   auto& flatTrack = flatPerformance.tracks.front();
-  flatTrack.events.insert(flatTrack.events.end(), flatTrack.automations.front().points.begin(),
-                          flatTrack.automations.front().points.end());
+  for (auto& event : flatTrack.events) {
+    std::visit([](auto& typed) { typed.header.automation.reset(); }, event);
+  }
   flatTrack.automations.clear();
   const MidiSequence flatMidi = renderMidiSequence(flatPerformance);
   expect(encodeMidiFile(midi) == encodeMidiFile(flatMidi),
@@ -544,6 +547,39 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
       .tracks = {PerformanceTrack{
           .id = TrackId{0},
           .endTick = 4,
+          .events =
+              {
+                  LevelPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{.tick = 0, .sequence = 0, .automation = PerformanceAutomationId{0}},
+                      .linearGain = 0.5,
+                  },
+                  LevelPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{.tick = 1, .sequence = 1, .automation = PerformanceAutomationId{0}},
+                      .linearGain = 0.5,
+                  },
+                  ExpressionPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{.tick = 0, .sequence = 2, .automation = PerformanceAutomationId{1}},
+                      .linearGain = 0.75,
+                  },
+                  ExpressionPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{.tick = 2, .sequence = 3, .automation = PerformanceAutomationId{1}},
+                      .linearGain = 0.75,
+                  },
+                  PanPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{.tick = 0, .sequence = 4, .automation = PerformanceAutomationId{2}},
+                      .stereoPosition = 0.0,
+                  },
+                  PanPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{.tick = 3, .sequence = 5, .automation = PerformanceAutomationId{2}},
+                      .stereoPosition = 0.0,
+                  },
+              },
           .automations =
               {
                   PerformanceAutomation{
@@ -552,17 +588,6 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
                           ScalarPerformanceAutomationIntent{
                               .target = PerformanceAutomationTarget::Level,
                           },
-                      .points =
-                          {
-                              LevelPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 0},
-                                  .linearGain = 0.5,
-                              },
-                              LevelPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 1, .sequence = 1},
-                                  .linearGain = 0.5,
-                              },
-                          },
                   },
                   PerformanceAutomation{
                       .id = PerformanceAutomationId{1},
@@ -570,34 +595,12 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
                           ScalarPerformanceAutomationIntent{
                               .target = PerformanceAutomationTarget::Expression,
                           },
-                      .points =
-                          {
-                              ExpressionPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 2},
-                                  .linearGain = 0.75,
-                              },
-                              ExpressionPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 2, .sequence = 3},
-                                  .linearGain = 0.75,
-                              },
-                          },
                   },
                   PerformanceAutomation{
                       .id = PerformanceAutomationId{2},
                       .intent =
                           ScalarPerformanceAutomationIntent{
                               .target = PerformanceAutomationTarget::Pan,
-                          },
-                      .points =
-                          {
-                              PanPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 4},
-                                  .stereoPosition = 0.0,
-                              },
-                              PanPerformanceEvent{
-                                  .header = PerformanceEventHeader{.tick = 3, .sequence = 5},
-                                  .stereoPosition = 0.0,
-                              },
                           },
                   },
               },
@@ -616,8 +619,8 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
 
   PerformanceSequence flatPerformance = performance;
   auto& flatTrack = flatPerformance.tracks.front();
-  for (const auto& automation : flatTrack.automations) {
-    flatTrack.events.insert(flatTrack.events.end(), automation.points.begin(), automation.points.end());
+  for (auto& event : flatTrack.events) {
+    std::visit([](auto& typed) { typed.header.automation.reset(); }, event);
   }
   flatTrack.automations.clear();
   const MidiSequence flatMidi = renderMidiSequence(flatPerformance);
@@ -642,8 +645,13 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
   out.tempo(1'000'000);
-  const PerformanceNoteId note = out.note(64, 1.0, 8);
-  out.pitchSlide(note, 60, 64, 4);
+  const PerformanceNoteId note = out.note(NotePerformanceEvent{
+      .key = 64,
+      .linearVelocity = 0.375,
+      .durationTicks = 8,
+      .lane = PerformanceLaneId{3},
+  });
+  out.pitchSlide(note, 60, 64, 4, PerformanceLaneId{3});
   out.at(2).tempo(500'000);
 
   PerformanceTrack rateTrack{
@@ -697,6 +705,25 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
 
   const MidiSequence bent =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const PerformanceSequence bendLowering = lowerMidiPerformanceAutomation(
+      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const auto sourceNote = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  const auto loweredNote = std::ranges::find_if(bendLowering.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  const auto notesMatch = [](const NotePerformanceEvent& lhs, const NotePerformanceEvent& rhs) {
+    return lhs.header.sourceCommand == rhs.header.sourceCommand &&
+           lhs.header.sourceAnnotation == rhs.header.sourceAnnotation && lhs.header.track == rhs.header.track &&
+           lhs.header.tick == rhs.header.tick && lhs.header.sequence == rhs.header.sequence &&
+           lhs.header.automation == rhs.header.automation && lhs.key == rhs.key &&
+           lhs.linearVelocity == rhs.linearVelocity && lhs.durationTicks == rhs.durationTicks &&
+           lhs.extendsPrevious == rhs.extendsPrevious && lhs.note == rhs.note && lhs.lane == rhs.lane;
+  };
+  expect(sourceNote != performance.tracks[0].events.end() && loweredNote != bendLowering.tracks[0].events.end() &&
+             notesMatch(std::get<NotePerformanceEvent>(*sourceNote), std::get<NotePerformanceEvent>(*loweredNote)),
+         "pitch-bend lowering should preserve the source note event verbatim");
   const auto noteEvent = std::ranges::find_if(
       bent.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
   expect(
@@ -725,17 +752,16 @@ void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track,        CommandId{3}, SourceAnnotationId{4}, 0,
-                         nextSequence, nextNote,     nextAutomation,        PitchTransitionRenderingHint::PitchBend};
+  PerformanceEmitter out{track, CommandId{3}, SourceAnnotationId{4}, 0, nextSequence, nextNote, nextAutomation};
   const PerformanceNoteId note = out.note(64, 1.0, 8);
   auto first = out.pitchSlide(note, 60, 62, 2);
-  first.onNewSlide(AutomationNewAutomationPolicy::Queue);
   first.sample(out.at(1), 61.5);
-  const auto second = out.at(1).pitchSlide(note, 0, 64, 2);
+  const auto second = out.at(2).pitchSlide(note, 62, 64, 2);
   second.sample(out.at(3), 63.5);
 
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
   };
   const MidiSequence midi = renderMidiSequence(performance);
@@ -768,14 +794,14 @@ void performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track,        CommandId{5}, SourceAnnotationId{6}, 0,
-                         nextSequence, nextNote,     nextAutomation,        PitchTransitionRenderingHint::PitchBend};
+  PerformanceEmitter out{track, CommandId{5}, SourceAnnotationId{6}, 0, nextSequence, nextNote, nextAutomation};
   const PerformanceNoteId firstNote = out.note(64, 1.0, 8);
   out.pitchSlide(firstNote, 60, 64, 6);
   out.at(3).note(67, 1.0, 3);
 
   const MidiSequence midi = renderMidiSequence(PerformanceSequence{
       .timebase = Timebase{.ppqn = 48},
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
   });
   std::vector<std::pair<u64, s16>> bends;
@@ -797,16 +823,14 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track,        CommandId{7}, SourceAnnotationId{8}, 0,
-                         nextSequence, nextNote,     nextAutomation,        PitchTransitionRenderingHint::PitchBend};
+  PerformanceEmitter out{track, CommandId{7}, SourceAnnotationId{8}, 0, nextSequence, nextNote, nextAutomation};
   const PerformanceNoteId firstNote = out.note(64, 1.0, 4);
-  out.pitchSlide(firstNote, 60, 68, 8)
-      .onNewNote(AutomationNewNotePolicy::Continue)
-      .onNoteEnd(AutomationNoteEndPolicy::Continue);
+  out.pitchSlide(firstNote, 60, 68, 8).continueAcrossNotes();
   out.at(4).note(67, 1.0, 4);
 
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
   };
   const PerformanceSequence lowered = lowerMidiPerformanceAutomation(performance, {});

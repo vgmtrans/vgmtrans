@@ -271,11 +271,8 @@ void endTrackAt(PerformanceTrack& track, u64 endTick) {
     return automation.realization.startTick >= endTick;
   });
   for (auto& automation : track.automations) {
-    std::erase_if(automation.points,
-                  [endTick](const PerformanceEvent& event) { return performanceEventHeader(event).tick >= endTick; });
     if (automation.realization.endTick > endTick) {
       automation.realization.endTick = endTick;
-      automation.realization.endReason = PerformanceAutomationEndReason::TrackEnded;
     }
   }
   track.endTick = endTick;
@@ -299,7 +296,7 @@ void endTrackAt(PerformanceTrack& track, u64 endTick) {
 void finalizeAutomations(PerformanceTrack& track) {
   for (auto& automation : track.automations) {
     auto* pitch = pitchTransitionIntent(automation);
-    if (pitch == nullptr || pitch->interruptions.noteEnd != AutomationNoteEndPolicy::Stop) {
+    if (pitch == nullptr || pitch->continuesAcrossNotes) {
       continue;
     }
     const auto noteEnd = noteEndTick(track, pitch->note);
@@ -307,7 +304,6 @@ void finalizeAutomations(PerformanceTrack& track) {
       continue;
     }
     automation.realization.endTick = std::max(automation.realization.startTick, *noteEnd);
-    automation.realization.endReason = PerformanceAutomationEndReason::NoteEnded;
   }
 }
 
@@ -400,10 +396,8 @@ public:
     const u64 beginTick = runtime_.tick;
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
-    PerformanceEmitter out{performanceTrack_,       command.id,
-                           command.annotation,      beginTick,
-                           runtime_.outputSequence, runtime_.nextNote,
-                           runtime_.nextAutomation, dialect_.preferredPitchTransitionRendering};
+    PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,     beginTick,
+                           runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr || dialect_.execute == nullptr) {
       warn("Missing sequence dialect executor state", command.range);
@@ -421,9 +415,6 @@ public:
       for (size_t i = firstAutomation; i < performanceTrack_.automations.size(); ++i) {
         const auto& automation = performanceTrack_.automations[i];
         endTick = std::max(endTick, automation.realization.endTick);
-        for (const auto& point : automation.points) {
-          endTick = std::max(endTick, eventEndTick(point));
-        }
       }
       targetSequence_.sourceSpans.push_back(SourcePlaybackSpan{
           .annotation = command.annotation,
@@ -557,10 +548,8 @@ private:
 
     for (u32 elapsed = 0; elapsed < ticks; ++elapsed) {
       ++runtime_.tick;
-      PerformanceEmitter out{performanceTrack_,       command.id,
-                             command.annotation,      runtime_.tick,
-                             runtime_.outputSequence, runtime_.nextNote,
-                             runtime_.nextAutomation, dialect_.preferredPitchTransitionRendering};
+      PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,     runtime_.tick,
+                             runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation};
       VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
       if (programState_ == nullptr) {
         warn("Missing sequence program state", command.range);
@@ -803,6 +792,7 @@ SequenceVm::SequenceVm(SequenceVmOptions options) : options_(options) {
 PerformanceSequence SequenceVm::render(const SequenceProgram& program, const SequenceDialect& dialect) const {
   PerformanceSequence sequence{
       .timebase = program.timebase,
+      .preferredPitchTransitionRendering = dialect.preferredPitchTransitionRendering,
   };
 
   const SequenceProgramBehavior behavior = resolvedBehavior(program, dialect);
@@ -894,8 +884,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
                                  0,
                                  runtime.outputSequence,
                                  runtime.nextNote,
-                                 runtime.nextAutomation,
-                                 dialect.preferredPitchTransitionRendering};
+                                 runtime.nextAutomation};
           VmApi vm = detail::VmApiAccess::make(runtime, prepass, command);
           static_cast<void>(dialect.execute(command, programState, trackState, out, vm));
         }

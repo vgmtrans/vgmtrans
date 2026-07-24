@@ -739,23 +739,23 @@ void konamiSnesCompiledAutomationTicksFades() {
                                                0xef, 0xc0, 0xfc,        // volume fade
                                                0xf8, 0x10, 0xff,        // pan fade
                                                0xe0, 0x08, 0xff}});
-  const auto events = flattenedPerformanceEvents(performance.tracks[0]);
+  const auto& events = performance.tracks[0].events;
   expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 8,
          "compiled Konami fades should advance only through the waiting command");
   expect(performance.tracks[0].automations.size() >= 3 &&
              std::ranges::any_of(events,
-                                 [](const PerformanceEvent* event) {
-                                   const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
+                                 [](const PerformanceEvent& event) {
+                                   const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
                                    return tempo != nullptr && tempo->header.tick > 0;
                                  }) &&
              std::ranges::any_of(events,
-                                 [](const PerformanceEvent* event) {
-                                   const auto* level = std::get_if<LevelPerformanceEvent>(event);
+                                 [](const PerformanceEvent& event) {
+                                   const auto* level = std::get_if<LevelPerformanceEvent>(&event);
                                    return level != nullptr && level->header.tick > 0;
                                  }) &&
              std::ranges::any_of(events,
-                                 [](const PerformanceEvent* event) {
-                                   const auto* pan = std::get_if<PanPerformanceEvent>(event);
+                                 [](const PerformanceEvent& event) {
+                                   const auto* pan = std::get_if<PanPerformanceEvent>(&event);
                                    return pan != nullptr && pan->header.tick > 0;
                                  }),
          "tempo, volume, and pan fades should retain structured intent and exact per-tick realizations");

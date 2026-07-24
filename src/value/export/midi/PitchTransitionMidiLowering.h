@@ -16,5 +16,8 @@ namespace vgmtrans::core {
 // state; the caller's target-neutral PerformanceSequence remains unchanged.
 [[nodiscard]] PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
                                                                  const MidiExportOptions& options);
+[[nodiscard]] PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
+                                                                 const MidiExportOptions& options,
+                                                                 const PerformanceTempoMap& tempos);
 
 }  // namespace vgmtrans::core

@@ -365,8 +365,8 @@ void akaoTempoFadeEmitsDriverTickRamp() {
   expect(performance.diagnostics.empty(), "Akao tempo-fade fixture should render without diagnostics");
 
   std::vector<TempoPerformanceEvent> tempos;
-  for (const auto* event : flattenedPerformanceEvents(performance.tracks[0])) {
-    if (const auto* tempo = std::get_if<TempoPerformanceEvent>(event)) {
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* tempo = std::get_if<TempoPerformanceEvent>(&event)) {
       tempos.push_back(*tempo);
     }
   }
