@@ -363,14 +363,17 @@ struct NativePortamentoHint {
 
 struct PitchTransitionIntent {
   PerformanceNoteId note;
-  // When a transition begins exactly at a new note, native portamento extends
-  // this preceding note by overlapTicks. Delayed transitions split note.
+  // Native portamento extends this preceding note by overlapTicks. Delayed
+  // transitions split the attached note with the same overlap.
   std::optional<PerformanceNoteId> previousNote;
   PerformanceLaneId lane{0};
   double startKey = 0.0;
   double targetKey = 0.0;
   PitchSlideTiming timing;
   PerformanceAutomationCurve curve = LinearAutomationCurve{};
+  // Empty inherits the format default; explicit export policy can still
+  // override every transition.
+  std::optional<PitchTransitionRenderingHint> preferredRendering;
   // Source playback normally replaces a slide at a new note. Formats whose
   // driver carries one live motion across note boundaries opt in explicitly.
   bool continuesAcrossNotes = false;

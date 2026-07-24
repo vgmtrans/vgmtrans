@@ -178,17 +178,9 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   return true;
 }
 
-[[nodiscard]] std::vector<PerformanceEvent> lowerPitchBends(
-    PerformanceSequence& performance, const PerformanceTrack& track, const std::vector<NoteSpan>& notes,
-    const std::vector<const PerformanceAutomation*>& transitions, u64& nextSequence) {
-  std::vector<PerformanceEvent> events;
-  events.reserve(track.events.size() + transitions.size() * 4);
-  for (const auto& event : track.events) {
-    if (!std::holds_alternative<PitchTransitionSettingsPerformanceEvent>(event)) {
-      events.push_back(event);
-    }
-  }
-
+void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
+                     const std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
+                     u64& nextSequence) {
   // Bend range is channel state, so choose one range that covers every linked
   // transition affecting a note.
   for (const auto& note : notes) {
@@ -238,7 +230,6 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
         .semitones = 0.0,
     });
   }
-  return events;
 }
 
 void beginPortamentoRewrite(NoteSpan& note) {
@@ -290,13 +281,9 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
   note.portamentoSegments = std::move(segments);
 }
 
-[[nodiscard]] std::vector<PerformanceEvent> lowerPortamento(
-    PerformanceSequence& performance, const PerformanceTrack& track, std::vector<NoteSpan>& notes,
-    const std::vector<const PerformanceAutomation*>& transitions, const PerformanceTempoMap& tempos,
-    u64& nextSequence) {
-  std::vector<PerformanceEvent> events;
-  events.reserve(track.events.size() + transitions.size() * 3);
-
+void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
+                     std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
+                     const PerformanceTempoMap& tempos, u64& nextSequence) {
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
     auto* note = findNote(notes, transition.note);
@@ -345,7 +332,10 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
       });
     }
   }
+}
 
+void appendSourceEvents(std::vector<PerformanceEvent>& events, const PerformanceTrack& track,
+                        const std::vector<NoteSpan>& notes, bool renderPortamentoSettings, u64& nextSequence) {
   for (const auto& event : track.events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note != nullptr && note->note.valid()) {
       const auto* span = findNote(notes, note->note);
@@ -354,10 +344,12 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
       }
     }
     if (const auto* settings = std::get_if<PitchTransitionSettingsPerformanceEvent>(&event)) {
-      events.emplace_back(PortamentoPerformanceEvent{
-          .header = settings->header,
-          .timeMilliseconds = settings->timeMilliseconds,
-      });
+      if (renderPortamentoSettings) {
+        events.emplace_back(PortamentoPerformanceEvent{
+            .header = settings->header,
+            .timeMilliseconds = settings->timeMilliseconds,
+        });
+      }
     } else {
       events.push_back(event);
     }
@@ -382,7 +374,18 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
       });
     }
   }
-  return events;
+}
+
+[[nodiscard]] PitchTransitionRenderingHint effectiveRendering(const PerformanceSequence& performance,
+                                                              const MidiExportOptions& options,
+                                                              const PitchTransitionIntent& transition) {
+  if (options.pitchTransitions == MidiPitchTransitionRendering::Portamento) {
+    return PitchTransitionRenderingHint::Portamento;
+  }
+  if (options.pitchTransitions == MidiPitchTransitionRendering::PitchBend) {
+    return PitchTransitionRenderingHint::PitchBend;
+  }
+  return transition.preferredRendering.value_or(performance.preferredPitchTransitionRendering);
 }
 
 }  // namespace
@@ -396,34 +399,44 @@ PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& pe
                                                    const MidiExportOptions& options,
                                                    const PerformanceTempoMap& tempos) {
   PerformanceSequence lowered = performance;
-  PitchTransitionRenderingHint rendering = performance.preferredPitchTransitionRendering;
-  if (options.pitchTransitions == MidiPitchTransitionRendering::Portamento) {
-    rendering = PitchTransitionRenderingHint::Portamento;
-  } else if (options.pitchTransitions == MidiPitchTransitionRendering::PitchBend) {
-    rendering = PitchTransitionRenderingHint::PitchBend;
-  }
 
   for (auto& track : lowered.tracks) {
     u64 nextSequence = 0;
-    std::vector<const PerformanceAutomation*> transitions;
+    std::vector<const PerformanceAutomation*> portamentoTransitions;
+    std::vector<const PerformanceAutomation*> pitchBendTransitions;
     for (const auto& event : track.events) {
       nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
     }
     for (const auto& automation : track.automations) {
       nextSequence = std::max(nextSequence, automation.header.sequence + 1);
-      if (pitchTransitionIntent(automation) != nullptr) {
+      if (const auto* transition = pitchTransitionIntent(automation)) {
+        auto& transitions =
+            effectiveRendering(performance, options, *transition) == PitchTransitionRenderingHint::Portamento
+                ? portamentoTransitions
+                : pitchBendTransitions;
         transitions.push_back(&automation);
       }
     }
-    std::ranges::stable_sort(transitions, [](const auto* lhs, const auto* rhs) {
-      return std::tie(lhs->realization.startTick, lhs->header.sequence) <
-             std::tie(rhs->realization.startTick, rhs->header.sequence);
-    });
+    const auto sortTransitions = [](auto& transitions) {
+      std::ranges::stable_sort(transitions, [](const auto* lhs, const auto* rhs) {
+        return std::tie(lhs->realization.startTick, lhs->header.sequence) <
+               std::tie(rhs->realization.startTick, rhs->header.sequence);
+      });
+    };
+    sortTransitions(portamentoTransitions);
+    sortTransitions(pitchBendTransitions);
 
     auto notes = collectNotes(track);
-    auto events = rendering == PitchTransitionRenderingHint::PitchBend
-                      ? lowerPitchBends(lowered, track, notes, transitions, nextSequence)
-                      : lowerPortamento(lowered, track, notes, transitions, tempos, nextSequence);
+    std::vector<PerformanceEvent> events;
+    events.reserve(track.events.size() + (portamentoTransitions.size() + pitchBendTransitions.size()) * 4);
+    lowerPortamento(lowered, events, notes, portamentoTransitions, tempos, nextSequence);
+    const bool renderPortamentoSettings =
+        options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
+        (options.pitchTransitions == MidiPitchTransitionRendering::PreserveFormat &&
+         (performance.preferredPitchTransitionRendering == PitchTransitionRenderingHint::Portamento ||
+          !portamentoTransitions.empty()));
+    appendSourceEvents(events, track, notes, renderPortamentoSettings, nextSequence);
+    lowerPitchBends(lowered, events, notes, pitchBendTransitions, nextSequence);
     std::ranges::stable_sort(events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
       const auto& left = performanceEventHeader(lhs);
       const auto& right = performanceEventHeader(rhs);

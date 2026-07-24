@@ -184,6 +184,8 @@ public:
 
   PitchSlideBinding& continueFrom(PerformanceNoteId previousNote);
   PitchSlideBinding& continueAcrossNotes(bool enabled = true);
+  PitchSlideBinding& preferPortamento();
+  PitchSlideBinding& preferPitchBend();
 
   // Retains portamento time already established by an earlier driver command.
   PitchSlideBinding& useCurrentPortamentoTiming();
