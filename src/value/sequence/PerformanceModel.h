@@ -48,12 +48,13 @@ struct NotePerformanceEvent {
   // are applied only by MIDI-like renderers.
   double linearVelocity = 1.0;
   u32 durationTicks = 0;
-  // The source format already decided this note extends the previous emitted note.
-  // Renderers should not re-test pitch after target-specific transforms such as global transpose.
+  // Extend the previously emitted voice without another attack. Source ties
+  // set this directly; target-specific lowering can also use it when one
+  // logical note continues through a different representation.
   bool extendsPrevious = false;
-  // Extensions share the same identity as the note they extend. A stable
-  // identity lets later commands attach automation to a sounding note without
-  // rewriting that note into MIDI-specific fragments.
+  // Source-level extensions normally share one identity. A stable identity
+  // lets later commands attach automation to a sounding note without rewriting
+  // that note into MIDI-specific fragments.
   PerformanceNoteId note;
   // Most sequence tracks are one driver voice and therefore use lane zero.
   // The explicit lane leaves room for formats that multiplex voices in one
@@ -363,8 +364,9 @@ struct NativePortamentoHint {
 
 struct PitchTransitionIntent {
   PerformanceNoteId note;
-  // Native portamento extends this preceding note by overlapTicks. Delayed
-  // transitions split the attached note with the same overlap.
+  // This transition continues the preceding voice without a new attack.
+  // Native portamento realizes that as overlapping notes; pitch bend retains
+  // the already-sounding MIDI note.
   std::optional<PerformanceNoteId> previousNote;
   PerformanceLaneId lane{0};
   double startKey = 0.0;

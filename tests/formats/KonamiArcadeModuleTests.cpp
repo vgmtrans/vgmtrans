@@ -285,8 +285,9 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "KonamiArcade format code should not preselect a MIDI slide representation");
 
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{instruments};
-  const MidiSequence midi =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, instrumentSets);
+  const MidiSequence midi = renderMidiSequence(
+      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat},
+      ModulationConversionPolicy::SynthModulators, instrumentSets);
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* bank = std::get_if<BankSelect>(&event);
@@ -332,6 +333,12 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
                                    return bend != nullptr && bend->tick >= 14 && bend->value != 0;
                                  }),
          "the export request should be able to render KonamiArcade transitions as pitch bend");
+  expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                const auto* note = std::get_if<NoteDuration>(&event);
+                                return note != nullptr && note->tick == 14 && note->key == 64;
+                              }),
+         "continuous KonamiArcade pitch bend should not retrigger its destination note");
   expect(std::ranges::any_of(pitchBendMidi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* note = std::get_if<NoteDuration>(&event);
