@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/Akao/Akao.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/scan/CollectionResolver.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -383,6 +384,128 @@ void akaoTempoFadeEmitsDriverTickRamp() {
          "Akao tempo fade should schedule tempo changes on consecutive ticks");
   expect(tempos[3].microsecondsPerQuarter < tempos[1].microsecondsPerQuarter,
          "Akao tempo fade should move toward the target tempo");
+}
+
+void akaoPitchSlideAppliesOnceToTheNextNote() {
+  std::vector<u8> bytes(0x40, 0xa0);
+  constexpr u32 start = 0x20;
+  bytes[start] = 0xa5;
+  bytes[start + 1] = 5;
+  bytes[start + 2] = 0xa4;
+  bytes[start + 3] = 0x24;
+  bytes[start + 4] = 2;
+  bytes[start + 5] = 0x38;
+  bytes[start + 6] = 0x38;
+  bytes[start + 7] = 0xa0;
+
+  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version3_1);
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version3_1, start, 0x40)},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "Akao pitch-slide fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 2 && performance.tracks[0].automations.size() == 1,
+         "Akao A4 should apply once to the next note instead of remaining active");
+  const auto* transition = pitchTransitionIntent(performance.tracks[0].automations.front());
+  expect(transition != nullptr && transition->note == notes[0]->note && transition->startKey == 65.0 &&
+             transition->targetKey == 67.0 && transition->timing.timelineTicks == 0x24 &&
+             transition->preferredRendering == PitchTransitionRenderingHint::PitchBend,
+         "Akao A4 should retain its upward semitone depth, tick duration, and pitch-bend intent");
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  expect(
+      std::ranges::count_if(midi.tracks[0].events,
+                            [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); }) == 2 &&
+          std::ranges::any_of(midi.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                const auto* bend = std::get_if<PitchBend>(&event);
+                                return bend != nullptr && bend->tick <= 0x24 && bend->value > 0;
+                              }) &&
+          std::ranges::none_of(midi.tracks[0].events,
+                               [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }),
+      "Akao A4 should bend the original attack without creating a destination-note attack or portamento event");
+}
+
+void akaoPortamentoRetainsPitchTransitionIntent() {
+  std::vector<u8> bytes(0x40, 0xa0);
+  constexpr u32 start = 0x20;
+  bytes[start] = 0xda;
+  bytes[start + 1] = 4;
+  bytes[start + 2] = 0x08;
+  bytes[start + 3] = 0x13;
+  bytes[start + 4] = 0xdb;
+  bytes[start + 5] = 0x1e;
+  bytes[start + 6] = 0xa0;
+
+  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40)},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "Akao portamento fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 3, "Akao portamento should retain each source note");
+  expect(performance.tracks[0].automations.size() == 1,
+         "Akao portamento should create transitions only while the persistent setting is active");
+  const auto* transition = pitchTransitionIntent(performance.tracks[0].automations.front());
+  expect(transition != nullptr && transition->note == notes[1]->note && !transition->previousNote &&
+             transition->startKey == 48.0 && transition->targetKey == 49.0 && transition->timing.timelineTicks == 4 &&
+             std::holds_alternative<TempoRelativePitchSlideTiming>(transition->timing.physical),
+         "Akao portamento should retain its note anchor, keys, new attack, and tick-relative duration");
+  expect(std::ranges::none_of(performance.tracks[0].events,
+                              [](const PerformanceEvent& event) {
+                                return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
+                                       std::holds_alternative<PortamentoEnablePerformanceEvent>(event) ||
+                                       std::holds_alternative<PortamentoTimePerformanceEvent>(event) ||
+                                       std::holds_alternative<PortamentoControlPerformanceEvent>(event);
+                              }),
+         "Akao format code should not preselect a MIDI portamento representation");
+
+  const MidiSequence native = renderMidiSequence(
+      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
+  expect(std::ranges::any_of(native.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* control = std::get_if<PortamentoControl>(&event);
+                               return control != nullptr && control->tick == 16 && control->key == 48;
+                             }),
+         "preserve-format MIDI should lower Akao portamento with its explicit source key");
+
+  const MidiSequence pitchBend =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(std::ranges::none_of(pitchBend.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                return std::holds_alternative<PortamentoTime>(event) ||
+                                       std::holds_alternative<PortamentoTime14>(event) ||
+                                       std::holds_alternative<PortamentoControl>(event);
+                              }) &&
+             std::ranges::any_of(pitchBend.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* bend = std::get_if<PitchBend>(&event);
+                                   return bend != nullptr && bend->tick >= 16 && bend->value != 0;
+                                 }) &&
+             std::ranges::any_of(pitchBend.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* note = std::get_if<NoteDuration>(&event);
+                                   return note != nullptr && note->tick == 16 && note->key == 49;
+                                 }),
+         "pitch-bend lowering should preserve Akao's destination-note attack without native portamento events");
 }
 
 void akaoRequiredArticulationsComeFromInstrumentRows() {

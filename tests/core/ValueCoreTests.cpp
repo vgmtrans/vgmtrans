@@ -76,6 +76,8 @@ void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange();
 void akaoLoopBranchUsesCurrentRepeatPass();
 void akaoTieAfterRestDoesNotExtendPreviousNote();
 void akaoTempoFadeEmitsDriverTickRamp();
+void akaoPitchSlideAppliesOnceToTheNextNote();
+void akaoPortamentoRetainsPitchTransitionIntent();
 void akaoRequiredArticulationsComeFromInstrumentRows();
 void akaoMelodicRegionsDropAdvancingOverlaps();
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections();
@@ -171,6 +173,8 @@ int main() {
     akaoLoopBranchUsesCurrentRepeatPass();
     akaoTieAfterRestDoesNotExtendPreviousNote();
     akaoTempoFadeEmitsDriverTickRamp();
+    akaoPitchSlideAppliesOnceToTheNextNote();
+    akaoPortamentoRetainsPitchTransitionIntent();
     akaoRequiredArticulationsComeFromInstrumentRows();
     akaoMelodicRegionsDropAdvancingOverlaps();
     akaoSampleSelectionKeepsPreferredAndRequiredCollections();
