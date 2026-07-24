@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -132,6 +133,10 @@ struct StereoBalance {
 
 }  // namespace math
 
+struct ProgramState {
+  u32 tempoMicrosecondsPerQuarter = 500000;
+};
+
 // Only registers that persist from one executed command to the next belong in
 // track state. Source bounds and engine-version conversions are decode concerns.
 struct TrackState {
@@ -149,6 +154,7 @@ struct TrackState {
   double portamentoMillisecondsPerSemitone = 0.0;
   u16 lastPortamentoMilliseconds = 0;
   std::optional<s32> lastSourceKey;
+  PerformanceNoteId lastNote;
   bool lastNoteSlurred = false;
   bool didRest = false;
 };
@@ -159,6 +165,7 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
+  ProgramState& program;
 
   // Applies the packed note flags and emits a pedal change when slur mode changes.
   void applyAttributes(u8 attributes) {
@@ -191,6 +198,11 @@ struct Playback {
     return Effects::wait(length);
   }
 
+  void tempo(u32 microsecondsPerQuarter) {
+    program.tempoMicrosecondsPerQuarter = microsecondsPerQuarter;
+    out.tempo(microsecondsPerQuarter);
+  }
+
   // Calculates and emits one note, including slurs and portamento from the last note.
   [[nodiscard]] Effects note(u8 durationIndex, u8 keyIndex) {
     const u32 length = consumeNoteTicks(durationIndex);
@@ -202,10 +214,11 @@ struct Playback {
     // Consecutive slurred notes at the same source pitch extend the existing
     // note instead of retriggering it.
     if (track.lastNoteSlurred && track.lastSourceKey && key == *track.lastSourceKey && !track.didRest) {
-      out.note(outputKey, 1.0, duration, true);
+      track.lastNote = out.note(outputKey, 1.0, duration, true);
     } else {
-      emitPortamentoTo(key);
-      out.note(outputKey, 1.0, duration + (track.noteSlurred ? 1u : 0u));
+      const PerformanceNoteId note = out.note(outputKey, 1.0, duration + (track.noteSlurred ? 1u : 0u));
+      emitPitchSlideTo(note, key);
+      track.lastNote = note;
     }
 
     track.lastSourceKey = key;
@@ -238,21 +251,33 @@ private:
     return duration == 0 ? 1 : duration;
   }
 
-  // Starts or updates the glide from the previous source note to this one.
-  void emitPortamentoTo(s32 key) {
-    if (track.portamentoMillisecondsPerSemitone <= 0.0 || !track.lastSourceKey) {
+  [[nodiscard]] u32 pitchSlideTicks(double milliseconds) const {
+    const double ticks =
+        milliseconds * 1000.0 * kCapcomSnesPpqn / std::max<u32>(program.tempoMicrosecondsPerQuarter, 1);
+    return static_cast<u32>(
+        std::clamp<double>(std::ceil(ticks), 1.0, static_cast<double>(std::numeric_limits<u32>::max())));
+  }
+
+  // Declares the driver's fixed-time glide into this note. Slurred notes carry
+  // their prior voice across the boundary; CC 84 supplies the source key even
+  // when the previous note is no longer sounding.
+  void emitPitchSlideTo(PerformanceNoteId note, s32 key) {
+    if (track.portamentoMillisecondsPerSemitone <= 0.0 || !track.lastSourceKey || key == *track.lastSourceKey) {
       return;
     }
 
     const auto distance = static_cast<u32>(std::abs(key - *track.lastSourceKey));
-    const auto portamentoTime =
-        static_cast<u16>(distance * track.portamentoMillisecondsPerSemitone);
+    const auto portamentoTime = static_cast<u16>(distance * track.portamentoMillisecondsPerSemitone);
     const double previousKey = static_cast<double>(*track.lastSourceKey + track.transposeSemitones);
+    auto slide = out.pitchSlide(note, previousKey, static_cast<double>(key + track.transposeSemitones),
+                                PitchSlideTiming::fixedDuration(pitchSlideTicks(portamentoTime), portamentoTime));
+    if (track.lastNoteSlurred && !track.didRest && track.lastNote.valid()) {
+      slide.continueFrom(track.lastNote);
+    }
     if (portamentoTime != track.lastPortamentoMilliseconds) {
-      out.portamento(static_cast<double>(portamentoTime), previousKey);
       track.lastPortamentoMilliseconds = portamentoTime;
     } else {
-      out.portamentoControl(previousKey);
+      slide.useCurrentPortamentoTiming();
     }
   }
 };
@@ -303,9 +328,9 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const auto raw = event.rawU16be("raw");
       const u32 tempo = raw.valid ? math::tempoMicrosecondsPerQuarter(raw.value) : 0;
-      static_cast<void>(event.resolvedValue("tempo", raw, tempoBeatsPerMinute(tempo),
-                                            SourceValueDisplay::BeatsPerMinute));
-      return event.emitTempo(tempo);
+      static_cast<void>(
+          event.resolvedValue("tempo", raw, tempoBeatsPerMinute(tempo), SourceValueDisplay::BeatsPerMinute));
+      return event.invoke<&Playback::tempo>(tempo);
     }
     case 0x06: {
       auto event = cursor.command("Duration Rate", SequenceSemantic::State);
@@ -344,8 +369,7 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
     case 0x0d: {
       auto event = cursor.command("Portamento Time", SequenceSemantic::Portamento);
       const double millisecondsPerSemitone =
-          event.resolved("milliseconds_per_semitone", event.rawU8("time"),
-                         math::portamentoMillisecondsPerSemitone);
+          event.resolved("milliseconds_per_semitone", event.rawU8("time"), math::portamentoMillisecondsPerSemitone);
       return event.set<&TrackState::portamentoMillisecondsPerSemitone>(millisecondsPerSemitone);
     }
     case 0x0e:
@@ -488,7 +512,7 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& capcomSnesSequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback>(SequenceDialect{
+  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
       .id = DialectId{.value = "capcom-snes"},
       .commandDetailKindPrefix = "capcom-snes",
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},

@@ -1251,19 +1251,31 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
          "CapcomSnes reverb performance should preserve the legacy echo send");
 }
 
-void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey() {
+void capcomSnesDialectEmitsStructuredPitchSlides() {
   std::vector<u8> bytes(0x4000);
-  bytes[0x3000] = 0x0d;
-  bytes[0x3001] = 0x40;
-  bytes[0x3002] = 0x41;
-  bytes[0x3003] = 0x46;
-  bytes[0x3004] = 0x17;
+  bytes[0x3000] = 0x05;
+  bytes[0x3001] = 0x03;
+  bytes[0x3002] = 0x00;
+  bytes[0x3003] = 0x0d;
+  bytes[0x3004] = 0x40;
+  bytes[0x3005] = 0x1a;
+  bytes[0x3006] = 0x00;
+  bytes[0x3007] = 0x20;
+  bytes[0x3008] = 0x1a;
+  bytes[0x3009] = 0x02;
+  bytes[0x300a] = 0x40;
+  bytes[0x300b] = 0x01;
+  bytes[0x300c] = 0x41;
+  bytes[0x300d] = 0x46;
+  bytes[0x300e] = 0x4b;
+  bytes[0x300f] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
   const SequenceDialect& dialect = capcomSnesSequenceDialect();
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
-  expect(track.commands.size() == 4, "CapcomSnes portamento fixture should decode portamento, notes, and end");
+  expect(track.commands.size() == 9,
+         "CapcomSnes portamento fixture should decode tempo, portamento, vibrato, slur, notes, and end");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -1273,23 +1285,106 @@ void capcomSnesDialectEmitsPortamentoFromPreviousSourceKey() {
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "CapcomSnes portamento fixture should render without diagnostics");
-  expect(performance.tracks[0].events.size() == 5,
-         "CapcomSnes portamento fixture should emit initial defaults, two notes, and one portamento event");
-  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[2]),
-         "CapcomSnes portamento fixture should emit the first note before portamento");
-  const auto* portamento = std::get_if<PortamentoPerformanceEvent>(&performance.tracks[0].events[3]);
-  expect(portamento != nullptr && portamento->timeMilliseconds == 160.0 && portamento->previousKey == 0.0,
-         "CapcomSnes portamento should use source-key distance and previous source key");
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 3, "CapcomSnes portamento fixture should retain three neutral notes");
+  expect(performance.tracks[0].automations.size() == 2,
+         "CapcomSnes portamento should produce structured pitch transitions between notes");
+  const auto* transition = pitchTransitionIntent(performance.tracks[0].automations[0]);
+  expect(transition != nullptr && transition->startKey == 0.0 && transition->targetKey == 5.0 &&
+             transition->previousNote == notes[0]->note && transition->timing.timelineTicks == 30 &&
+             std::get<FixedDurationPitchSlideTiming>(transition->timing.physical).milliseconds == 160.0,
+         "CapcomSnes pitch intent should retain its source key, target, overlap voice, and physical timing");
+  const auto* repeatedTiming = pitchTransitionIntent(performance.tracks[0].automations[1]);
+  expect(repeatedTiming != nullptr && repeatedTiming->startKey == 5.0 && repeatedTiming->targetKey == 10.0 &&
+             repeatedTiming->previousNote == notes[1]->note && repeatedTiming->nativePortamento.useCurrentTiming,
+         "equal-distance CapcomSnes slides should reuse the native portamento timing already in effect");
+  expect(std::ranges::none_of(performance.tracks[0].events,
+                              [](const PerformanceEvent& event) {
+                                return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
+                                       std::holds_alternative<PortamentoControlPerformanceEvent>(event) ||
+                                       std::holds_alternative<PitchBendPerformanceEvent>(event);
+                              }),
+         "CapcomSnes format code should leave MIDI slide representation to export");
 
-  const MidiSequence midi = renderMidiSequence(performance);
-  expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[3]),
-         "CapcomSnes portamento fixture should render the first note");
-  expect(std::get<PortamentoTime14>(midi.tracks[0].events[4]).value == 160,
-         "CapcomSnes portamento performance should render as 14-bit MIDI portamento time");
-  expect(std::get<PortamentoControl>(midi.tracks[0].events[5]).key == 0,
-         "CapcomSnes portamento performance should render the previous-key controller");
-  expect(std::holds_alternative<NoteDuration>(midi.tracks[0].events[6]),
-         "CapcomSnes portamento fixture should render the second note after portamento controllers");
+  const MidiSequence midi = renderMidiSequence(
+      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
+  expect(std::ranges::any_of(midi.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* note = std::get_if<NoteDuration>(&event);
+                               return note != nullptr && note->tick == 0 && note->key == 0 && note->duration == 7;
+                             }) &&
+             std::ranges::any_of(midi.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* note = std::get_if<NoteDuration>(&event);
+                                   return note != nullptr && note->tick == 6 && note->key == 5 && note->duration == 7;
+                                 }) &&
+             std::ranges::any_of(midi.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* note = std::get_if<NoteDuration>(&event);
+                                   return note != nullptr && note->tick == 12 && note->key == 10 && note->duration == 7;
+                                 }),
+         "native CapcomSnes portamento should retain the slurred notes' one-tick overlap");
+  expect(std::ranges::any_of(midi.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* time = std::get_if<PortamentoTime14>(&event);
+                               return time != nullptr && time->tick == 6 && time->value == 160;
+                             }) &&
+             std::ranges::any_of(midi.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* control = std::get_if<PortamentoControl>(&event);
+                                   return control != nullptr && control->tick == 6 && control->key == 0;
+                                 }),
+         "native CapcomSnes portamento should lower to its physical time and CC 84 source key");
+  expect(std::ranges::count_if(
+             midi.tracks[0].events,
+             [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); }) == 1 &&
+             std::ranges::count_if(
+                 midi.tracks[0].events,
+                 [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 2,
+         "native CapcomSnes lowering should not repeat an unchanged portamento time");
+
+  const MidiSequence pitchBendMidi =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                return std::holds_alternative<PortamentoTime14>(event) ||
+                                       std::holds_alternative<PortamentoControl>(event);
+                              }) &&
+             std::ranges::any_of(pitchBendMidi.tracks[0].events,
+                                 [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+         "CapcomSnes pitch intent should support pitch-bend export without portamento controllers");
+  const auto pitchBendNotes = std::ranges::count_if(pitchBendMidi.tracks[0].events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event);
+  });
+  const auto heldNote = std::ranges::find_if(pitchBendMidi.tracks[0].events, [](const MidiEvent& event) {
+    const auto* note = std::get_if<NoteDuration>(&event);
+    return note != nullptr && note->tick == 0 && note->key == 0 && note->duration == 19;
+  });
+  expect(pitchBendNotes == 1 && heldNote != pitchBendMidi.tracks[0].events.end(),
+         "CapcomSnes pitch-bend export should carry one attack across the complete slurred note chain");
+
+  const MidiSequence simulatedPitchBendMidi =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},
+                         ModulationConversionPolicy::SequenceEventSimulation);
+  const auto lastPitchBendAt = [](const MidiSequence& sequence, u64 tick) -> std::optional<s16> {
+    std::optional<s16> result;
+    for (const auto& event : sequence.tracks[0].events) {
+      const auto* bend = std::get_if<PitchBend>(&event);
+      if (bend != nullptr && bend->tick == tick) {
+        result = bend->value;
+      }
+    }
+    return result;
+  };
+  const auto slideOnly = lastPitchBendAt(pitchBendMidi, 8);
+  const auto slideWithVibrato = lastPitchBendAt(simulatedPitchBendMidi, 8);
+  expect(slideOnly && slideWithVibrato && *slideOnly > 0 && *slideWithVibrato > 0 && *slideOnly != *slideWithVibrato,
+         "CapcomSnes simulated vibrato should oscillate around an active pitch-bend slide");
 }
 
 void capcomSnesDialectExecutesRepeatUntilCommand() {
