@@ -226,6 +226,26 @@ TrackProgram decodeTestTrack(ByteReader reader, u32 sequenceOffset, u32 sequence
   return *track;
 }
 
+PerformanceSequence renderTestPerformance(std::initializer_list<u8> commands) {
+  constexpr u32 sequenceOffset = 0x100;
+  constexpr u32 trackStart = sequenceOffset + 0x1c;
+  std::vector<u8> bytes(trackStart + commands.size());
+  std::ranges::copy(commands, bytes.begin() + trackStart);
+
+  const SequenceDialect& dialect = ndsSequenceDialect();
+  const TrackProgram track =
+      decodeTestTrack(ByteReader(SourceId{30}, bytes), sequenceOffset, static_cast<u32>(bytes.size()), trackStart, 0);
+  return SequenceVm(LoopPolicy::PlayOnce)
+      .render(
+          SequenceProgram{
+              .dialect = dialect.id,
+              .timebase = dialect.timebase,
+              .sourceBaseAddress = Address{trackStart},
+              .tracks = {track},
+          },
+          dialect);
+}
+
 }  // namespace
 
 void ndsLayoutResolvesNamesFilesAndDependencies() {
@@ -524,6 +544,118 @@ void ndsSequenceDialectComposesPitchBendRangeActions() {
          "NDS pitch bend should observe the range state set by the preceding explicit action");
 }
 
+void ndsSequenceDialectPreservesPortamentoTimingIntent() {
+  const PerformanceSequence performance = renderTestPerformance({
+      0xc7, 0x01,        // note wait
+      0xc9, 0x3c,        // portamento source C4 (and enable)
+      0xcf, 0x10,        // fixed-clock portamento time
+      0x40, 0x7f, 0x20,  // E4 for 32 ticks
+      0xcf, 0x00,        // note-relative portamento time
+      0x43, 0x7f, 0x06,  // G4 for 6 ticks
+      0xce, 0x00,        // portamento off
+      0x45, 0x7f, 0x04,  // A4, no transition
+      0xff,
+  });
+  expect(performance.diagnostics.empty(), "NDS portamento fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 3 && performance.tracks[0].automations.size() == 2,
+         "NDS should retain source notes while creating transitions only when portamento is enabled");
+
+  const auto* fixed = pitchTransitionIntent(performance.tracks[0].automations[0]);
+  const auto* relative = pitchTransitionIntent(performance.tracks[0].automations[1]);
+  expect(fixed != nullptr && fixed->note == notes[0]->note && !fixed->previousNote && fixed->startKey == 60.0 &&
+             fixed->targetKey == 64.0 && fixed->timing.timelineTicks == 16 &&
+             fixed->preferredRendering == PitchTransitionRenderingHint::Portamento &&
+             std::holds_alternative<FixedDurationPitchSlideTiming>(fixed->timing.physical) &&
+             std::abs(std::get<FixedDurationPitchSlideTiming>(fixed->timing.physical).milliseconds - (1000.0 / 6.0)) <
+                 0.000001,
+         "nonzero NDS portamento time should preserve its source key and 192 Hz distance-scaled duration");
+  expect(relative != nullptr && relative->note == notes[1]->note && relative->startKey == 64.0 &&
+             relative->targetKey == 67.0 && relative->timing.timelineTicks == 6 &&
+             std::holds_alternative<TempoRelativePitchSlideTiming>(relative->timing.physical),
+         "zero NDS portamento time should derive its transition duration from the note's sequence ticks");
+  expect(std::ranges::none_of(performance.tracks[0].events,
+                              [](const PerformanceEvent& event) {
+                                return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
+                                       std::holds_alternative<PortamentoEnablePerformanceEvent>(event) ||
+                                       std::holds_alternative<PortamentoTimePerformanceEvent>(event) ||
+                                       std::holds_alternative<PortamentoControlPerformanceEvent>(event);
+                              }),
+         "NDS format code should retain transition intent instead of emitting MIDI portamento controls");
+
+  const MidiSequence native = renderMidiSequence(performance);
+  expect(std::ranges::count_if(
+             native.tracks[0].events,
+             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 2,
+         "preserve-format MIDI should lower both NDS source portamento transitions natively");
+
+  const MidiSequence bent =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(std::ranges::none_of(bent.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                return std::holds_alternative<PortamentoTime>(event) ||
+                                       std::holds_alternative<PortamentoTime14>(event) ||
+                                       std::holds_alternative<PortamentoControl>(event);
+                              }) &&
+             std::ranges::any_of(bent.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* bend = std::get_if<PitchBend>(&event);
+                                   return bend != nullptr && bend->value != 0;
+                                 }),
+         "pitch-bend lowering should reproduce NDS portamento without native portamento events");
+}
+
+void ndsSequenceDialectPreservesTiedSweepVoices() {
+  const PerformanceSequence performance = renderTestPerformance({
+      0xc7, 0x01,        // note wait
+      0xc8, 0x01,        // tie on
+      0x3c, 0x7f, 0x04,  // first tied note starts the channel
+      0xe3, 0x80, 0xff,  // start subsequent notes two semitones low
+      0x40, 0x7f, 0x04,  // tied E4 sweeps up over four ticks
+      0xe3, 0x00, 0x00,  // clear sweep pitch
+      0x43, 0x7f, 0x04,  // tied G4 changes immediately
+      0xc8, 0x00,        // tie off
+      0xff,
+  });
+  expect(performance.diagnostics.empty(), "NDS tied-sweep fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 3 && !notes[0]->extendsPrevious && notes[1]->extendsPrevious && notes[2]->extendsPrevious &&
+             notes[0]->note == notes[1]->note && notes[1]->note == notes[2]->note,
+         "NDS tie should retain one voice identity after the first attack");
+  expect(performance.tracks[0].automations.size() == 2,
+         "NDS tie should retain both the timed sweep and the following instantaneous key change");
+
+  const auto* sweep = pitchTransitionIntent(performance.tracks[0].automations[0]);
+  const auto* jump = pitchTransitionIntent(performance.tracks[0].automations[1]);
+  expect(sweep != nullptr && sweep->note == notes[0]->note && sweep->startKey == 62.0 && sweep->targetKey == 64.0 &&
+             sweep->timing.timelineTicks == 4 && sweep->preferredRendering == PitchTransitionRenderingHint::PitchBend,
+         "NDS sweep pitch should use 1/64-semitone units and the zero-time note duration");
+  expect(jump != nullptr && jump->note == notes[0]->note && jump->startKey == 64.0 && jump->targetKey == 67.0 &&
+             jump->timing.timelineTicks == 0 && jump->preferredRendering == PitchTransitionRenderingHint::PitchBend,
+         "a tied NDS note without a sweep should preserve its immediate attack-free pitch change");
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  const auto noteCount = std::ranges::count_if(
+      midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  const auto note = std::ranges::find_if(
+      midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  expect(noteCount == 1 && note != midi.tracks[0].events.end() && std::get<NoteDuration>(*note).tick == 0 &&
+             std::get<NoteDuration>(*note).duration == 12,
+         "pitch-bend lowering should keep tied NDS key changes on one MIDI attack");
+}
+
 void ndsSequenceDialectExecutesCallAndReturn() {
   std::vector<u8> bytes(0x160);
   constexpr u32 sequenceOffset = 0x100;
@@ -775,8 +907,7 @@ void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {
   expect(track.commands.size() == 1, "NDS unterminated variable-length command should decode as one command");
   expect(commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS unterminated variable-length command should use the truncated-command fallback");
-  expect(track.commands[0].range.size == 2,
-         "NDS truncated command should preserve its available partial source range");
+  expect(track.commands[0].range.size == 2, "NDS truncated command should preserve its available partial source range");
 }
 
 void ndsSequenceDialectDoesNotLinkInvalidControlTargets() {
