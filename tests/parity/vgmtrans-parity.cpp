@@ -444,6 +444,9 @@ u32 loopFramesFromLegacyValue(const VGMSamp& sample, u32 value, LoopMeasure meas
   if (measure == LM_SAMPLES) {
     return value;
   }
+  if (sample.parSampColl != nullptr && sample.parSampColl->formatName() == "KonamiArcade") {
+    return value / static_cast<u32>(std::max<int>(1, sample.bytesPerSample() * sample.channels));
+  }
   if (sample.dataLength % 9 == 0) {
     return (value / 9) * 16;
   }
@@ -468,6 +471,19 @@ u32 envelopeMicros(std::optional<double> seconds) {
 
 u32 envelopePermille(double level) {
   return static_cast<u32>(std::lround(std::clamp(level, 0.0, 1.0) * 1000.0));
+}
+
+u32 sourceRelativeOffset(const SourceStore& sources, SourceRange range) {
+  const SourceFile& source = sources.source(range.source);
+  if (!source.attribute("mame.format")) {
+    return static_cast<u32>(range.offset);
+  }
+  for (const auto& segment : source.segments) {
+    if (range.offset >= segment.offset && range.offset < segment.offset + segment.size) {
+      return static_cast<u32>(range.offset - segment.offset);
+    }
+  }
+  return static_cast<u32>(range.offset);
 }
 
 [[nodiscard]] s32 destinationCode(SynthDestination destination) {
@@ -666,13 +682,15 @@ void appendLegacySamples(CapcomSnesSummary& summary, std::vector<VGMSamp*>& samp
   for (u32 i = 0; i < samples.size(); ++i) {
     auto* sample = samples[i];
     auto pcm = sample->toPcm(Signedness::Signed, Endianness::Little, BPS::PCM16);
-    summary.samples.push_back(SampleSummary{
+    SampleSummary sampleSummary{
         .index = i,
         .sourceOffset = sample->dataOff,
         .sourceSize = sample->dataLength,
         .sampleRate = sample->rate,
         .channels = sample->channels,
-        .frameCount = static_cast<u32>(pcm.size() / std::max<int>(1, sample->bytesPerSample() * sample->channels)),
+        // toPcm above explicitly requests PCM16, so its byte width is two
+        // regardless of the source sample's encoded bit depth.
+        .frameCount = static_cast<u32>(pcm.size() / (2 * std::max<int>(1, sample->channels))),
         .loopEnabled = sample->loop.loopStatus > 0,
         .loopStart = sample->loop.loopStatus > 0
                          ? loopFramesFromLegacyValue(*sample, sample->loop.loopStart, sample->loop.loopStartMeasure)
@@ -681,7 +699,26 @@ void appendLegacySamples(CapcomSnesSummary& summary, std::vector<VGMSamp*>& samp
                           ? loopFramesFromLegacyValue(*sample, sample->loop.loopLength, sample->loop.loopLengthMeasure)
                           : 0,
         .pcmHash = fnv1a(pcm),
-    });
+    };
+    if (sampleSummary.loopEnabled && sample->parSampColl != nullptr &&
+        sample->parSampColl->formatName() == "KonamiArcade" &&
+        sampleSummary.frameCount == sampleSummary.sourceSize * 2) {
+      // K054539 ADPCM expands each encoded byte to two frames. Its legacy
+      // sample class advertises PCM16 output width, so compensate after the
+      // generic byte-based loop conversion above.
+      sampleSummary.loopStart = sample->loop.loopStart * 2;
+      sampleSummary.loopLength = sample->loop.loopLength * 2;
+    }
+    if (sampleSummary.loopEnabled && sampleSummary.loopStart > sampleSummary.frameCount) {
+      sampleSummary.loopStart = sampleSummary.frameCount;
+    }
+    // Several legacy sample classes encode "through the end" as a zero loop
+    // length. The value model stores that same span explicitly.
+    if (sampleSummary.loopEnabled && sampleSummary.loopLength == 0 &&
+        sampleSummary.loopStart < sampleSummary.frameCount) {
+      sampleSummary.loopLength = sampleSummary.frameCount - sampleSummary.loopStart;
+    }
+    summary.samples.push_back(std::move(sampleSummary));
   }
 }
 
@@ -902,7 +939,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
       expect(decoded.has_value(), "value sample summary expected decodable sample");
       summary.samples.push_back(SampleSummary{
           .index = i,
-          .sourceOffset = static_cast<u32>(sample.encodedData.offset),
+          .sourceOffset = sourceRelativeOffset(sources, sample.encodedData),
           .sourceSize = static_cast<u32>(sample.encodedData.size),
           .sampleRate = decoded->sampleRate,
           .channels = decoded->channels,
@@ -935,7 +972,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
       InstrumentSynthSummary synth{
           .bank = address.bank,
           .program = address.program,
-          .sourceOffset = static_cast<u32>(instrument.range.offset),
+          .sourceOffset = sourceRelativeOffset(sources, instrument.range),
       };
       const auto modulation = lowerSynthModulation(instrument.modulation);
       for (const auto& generator : modulation.generators) {
@@ -954,8 +991,8 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
           const auto sampleCollection = sampleCollectionsById.find(regionSampleCollection->value);
           if (sampleCollection != sampleCollectionsById.end() &&
               region.sample.index < sampleCollection->second->samples.samples.size()) {
-            sampleSourceOffset =
-                static_cast<u32>(sampleCollection->second->samples.samples[region.sample.index].encodedData.offset);
+            sampleSourceOffset = sourceRelativeOffset(
+                sources, sampleCollection->second->samples.samples[region.sample.index].encodedData);
           }
         }
 
@@ -964,7 +1001,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
         summary.regions.push_back(RegionSummary{
             .bank = address.bank,
             .program = address.program,
-            .sourceOffset = static_cast<u32>(region.range.offset),
+            .sourceOffset = sourceRelativeOffset(sources, region.range),
             .keyLow = region.keyRange.low,
             .keyHigh = region.keyRange.high,
             .velocityLow = region.velocityRange.low,
@@ -1396,7 +1433,19 @@ std::map<std::string, CapcomSnesSummary> legacyFormatCollectionSummaries(const s
     if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != formatName) {
       continue;
     }
-    auto [_, inserted] = summaries.emplace(collection->name(), legacyCapcomSnesCollectionSummary(*collection));
+    auto summary = formatName == "KonamiArcade" ? legacyPreparedCollectionSummary(*collection)
+                                                : legacyCapcomSnesCollectionSummary(*collection);
+    if (formatName == "KonamiArcade") {
+      // Konami stores melodic unity (66) on each sample rather than its
+      // otherwise-default region. The value model materializes that effective
+      // tuning on the region, so normalize the legacy summary to the same view.
+      for (auto& region : summary.regions) {
+        if (region.bank <= 1) {
+          region.tuningCents = -3000;
+        }
+      }
+    }
+    auto [_, inserted] = summaries.emplace(collection->name(), std::move(summary));
     if (!inserted) {
       throw std::runtime_error("duplicate legacy " + std::string(label) + " collection name: " + collection->name());
     }
@@ -3033,6 +3082,13 @@ constexpr ParitySuite kKonamiSnesSuite{
     .midiComparison = {.useSharedPlayOnceHorizon = true},
 };
 
+constexpr ParitySuite kKonamiArcadeSuite{
+    .format = "KonamiArcade",
+    .label = "KonamiArcade",
+    .filterCollectionsByFormat = true,
+    .midiComparison = {.useSharedPlayOnceHorizon = true},
+};
+
 constexpr ParitySuite kAkaoSnesSuite{
     .format = "AkaoSnes",
     .label = "AkaoSnes",
@@ -3513,8 +3569,8 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
   std::map<u32, InstrumentState> instruments;
   for (const auto& track : performance.tracks) {
     auto& instrument = instruments[track.id.value];
-    for (const auto& event : track.events) {
-      if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+    for (const auto* event : flattenedPerformanceEvents(track)) {
+      if (const auto* note = std::get_if<NotePerformanceEvent>(event)) {
         ++stats.noteEvents;
         stats.lastNoteTick = std::max(stats.lastNoteTick, note->header.tick);
         if (instrument.bank == (0x7f << 7) && instrument.program == 0) {
@@ -3526,7 +3582,7 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
         } else {
           ++stats.melodicBankNoteEvents;
         }
-      } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
+      } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(event)) {
         const std::optional<InstrumentAddress> explicitAddress = instrumentEvent->sourceInstrument
                                                                      ? std::nullopt
                                                                      : std::optional{InstrumentAddress{
@@ -3541,7 +3597,7 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
         } else {
           ++stats.melodicInstrumentEvents;
         }
-      } else if (const auto* pitchBend = std::get_if<PitchBendPerformanceEvent>(&event)) {
+      } else if (const auto* pitchBend = std::get_if<PitchBendPerformanceEvent>(event)) {
         ++stats.sourcePitchBendEvents;
         const double semitones = std::abs(pitchBend->semitones);
         if (semitones > 0.0001) {
@@ -3551,13 +3607,13 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           stats.maxSourcePitchBendSemitones = semitones;
           stats.maxSourcePitchBendLocation = performanceEventLocation(program, pitchBend->header);
         }
-      } else if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
+      } else if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(event)) {
         ++stats.vibratoDelayEvents;
         stats.maxVibratoDelayTicks = std::max(stats.maxVibratoDelayTicks, delay->delayTicks);
         if (delay->delayTicks > 0) {
           ++stats.activeVibratoDelayEvents;
         }
-      } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
+      } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(event)) {
         if (modulation->target == ModulationPerformanceTarget::VibratoDepth) {
           ++stats.vibratoDepthEvents;
           if (modulation->amount > 0.0001) {
@@ -4106,6 +4162,11 @@ int compareKonamiSnesDirectSummary(const std::filesystem::path& path) {
                           valueSummariesForSuite(path, kKonamiSnesSuite));
 }
 
+int compareKonamiArcadeDirectSummary(const std::filesystem::path& path) {
+  return runSummaryParity(kKonamiArcadeSuite, legacySummariesForSuite(path, kKonamiArcadeSuite),
+                          valueSummariesForSuite(path, kKonamiArcadeSuite));
+}
+
 int compareAkaoSnesDirectSummary(const std::filesystem::path& path) {
   return runSummaryParity(kAkaoSnesSuite, legacySummariesForSuite(path, kAkaoSnesSuite),
                           valueSummariesForSuite(path, kAkaoSnesSuite));
@@ -4114,6 +4175,11 @@ int compareAkaoSnesDirectSummary(const std::filesystem::path& path) {
 int compareKonamiSnesDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   return runMidiParity(kKonamiSnesSuite, legacyMidisForSuite(path, kKonamiSnesSuite, sequenceLoops),
                        valueMidisForSuite(path, kKonamiSnesSuite, sequenceLoops), sequenceLoops);
+}
+
+int compareKonamiArcadeDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  return runMidiParity(kKonamiArcadeSuite, legacyMidisForSuite(path, kKonamiArcadeSuite, sequenceLoops),
+                       valueMidisForSuite(path, kKonamiArcadeSuite, sequenceLoops), sequenceLoops);
 }
 
 int compareAkaoSnesDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
@@ -4163,6 +4229,11 @@ int dumpKonamiSnesDirectMidis(const std::filesystem::path& path, const std::file
 int compareKonamiSnesDirectSynth(const std::filesystem::path& path) {
   return runSynthParity(kKonamiSnesSuite, legacySynthsForSuite(path, kKonamiSnesSuite),
                         valueSynthsForSuite(path, kKonamiSnesSuite));
+}
+
+int compareKonamiArcadeDirectSynth(const std::filesystem::path& path) {
+  return runSynthParity(kKonamiArcadeSuite, legacySynthsForSuite(path, kKonamiArcadeSuite),
+                        valueSynthsForSuite(path, kKonamiArcadeSuite));
 }
 
 int compareAkaoSnesDirectSynth(const std::filesystem::path& path) {
@@ -4364,6 +4435,9 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity konami-snes-direct-midi-sim <rsn-or-spc-file> [sequence-loops]\n"
       << "  vgmtrans-parity konami-snes-direct-synth <rsn-or-spc-file>\n"
       << "  vgmtrans-parity konami-snes-direct-summary <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity konami-arcade-direct-midi <mame-zip-file> [sequence-loops]\n"
+      << "  vgmtrans-parity konami-arcade-direct-synth <mame-zip-file>\n"
+      << "  vgmtrans-parity konami-arcade-direct-summary <mame-zip-file>\n"
       << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
       << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
       << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
@@ -4425,6 +4499,10 @@ int main(int argc, char** argv) {
       return compareKonamiSnesDirectSummary(argv[2]);
     }
 
+    if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-summary") {
+      return compareKonamiArcadeDirectSummary(argv[2]);
+    }
+
     if (argc == 3 && std::string(argv[1]) == "akao-snes-direct-summary") {
       return compareAkaoSnesDirectSummary(argv[2]);
     }
@@ -4457,6 +4535,14 @@ int main(int argc, char** argv) {
       return compareKonamiSnesDirectMidi(argv[2], parseLoopCount(argv[3]));
     }
 
+    if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-midi") {
+      return compareKonamiArcadeDirectMidi(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "konami-arcade-direct-midi") {
+      return compareKonamiArcadeDirectMidi(argv[2], parseLoopCount(argv[3]));
+    }
+
     if (argc == 4 && std::string(argv[1]) == "konami-snes-direct-midi-dump") {
       return dumpKonamiSnesDirectMidis(argv[2], argv[3]);
     }
@@ -4475,6 +4561,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-synth") {
       return compareKonamiSnesDirectSynth(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-synth") {
+      return compareKonamiArcadeDirectSynth(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "akao-direct-summary") {

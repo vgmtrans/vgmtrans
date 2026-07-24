@@ -7,6 +7,7 @@
 #include "ValueTestSupport.h"
 
 #include "SessionSnapshotBuilder.h"
+#include "value/export/midi/PitchTransitionMidiLowering.h"
 
 #include <array>
 
@@ -61,6 +62,27 @@ void midiExporterKeeps14BitControllerPairsAdjacent() {
 
   expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
          "MIDI exporter should keep 14-bit volume MSB/LSB controllers adjacent before same-tick pan");
+}
+
+void midiExporterPreservesLegacyPortamentoTimeByteOrder() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  PortamentoTime14{.tick = 0, .channel = 0, .value = 0x01d3},
+                  PortamentoControl{.tick = 0, .channel = 0, .key = 60},
+                  EndOfTrack{.tick = 0},
+              },
+      }},
+  };
+
+  const auto exported = encodeMidiFile(midiSequence);
+  const std::vector<u8> expectedOrder{
+      0x00, 0xb0, 0x25, 0x53, 0x00, 0xb0, 0x05, 0x03, 0x00, 0xb0, 0x54, 0x3c,
+  };
+  expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
+         "MIDI exporter should write fine then coarse portamento time before source-key control");
 }
 
 void midiExporterOrdersFineTuneBeforeSameTickProgramChange() {
@@ -433,6 +455,350 @@ void performanceMidiRendererHonorsMidiExportOptions() {
          "MIDI renderer should use all 16 channels per port when channel 10 is allowed");
 }
 
+void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
+  const PerformanceEventHeader origin{
+      .sourceCommand = CommandId{7},
+      .track = TrackId{0},
+      .tick = 0,
+      .sequence = 0,
+  };
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 4,
+          .events = {NotePerformanceEvent{
+              .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 1, .sequence = 2},
+              .key = 60,
+              .durationTicks = 2,
+          }},
+          .automations = {PerformanceAutomation{
+              .id = PerformanceAutomationId{0},
+              .header = origin,
+              .intent =
+                  ScalarPerformanceAutomationIntent{
+                      .target = PerformanceAutomationTarget::Level,
+                      .targetValue = 0.5,
+                      .durationTicks = 2,
+                  },
+              .points =
+                  {
+                      LevelPerformanceEvent{
+                          .header =
+                              PerformanceEventHeader{
+                                  .sourceCommand = CommandId{7},
+                                  .track = TrackId{0},
+                                  .tick = 0,
+                                  .sequence = 1,
+                              },
+                          .linearGain = 0.75,
+                      },
+                      LevelPerformanceEvent{
+                          .header =
+                              PerformanceEventHeader{
+                                  .sourceCommand = CommandId{7},
+                                  .track = TrackId{0},
+                                  .tick = 2,
+                                  .sequence = 3,
+                              },
+                          .linearGain = 0.5,
+                      },
+                  },
+          }},
+      }},
+  };
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  const auto& events = midi.tracks.front().events;
+  const auto firstVolume = std::ranges::find_if(events, [](const MidiEvent& event) {
+    const auto* volume = std::get_if<Volume>(&event);
+    return volume != nullptr && volume->tick == 0;
+  });
+  const auto finalVolume = std::ranges::find_if(events, [](const MidiEvent& event) {
+    const auto* volume = std::get_if<Volume>(&event);
+    return volume != nullptr && volume->tick == 2;
+  });
+  expect(firstVolume != events.end() && finalVolume != events.end(),
+         "MIDI lowering should expand exact realized scalar-automation points");
+  expect(std::ranges::any_of(events,
+                             [](const MidiEvent& event) {
+                               const auto* note = std::get_if<NoteDuration>(&event);
+                               return note != nullptr && note->tick == 1;
+                             }),
+         "scalar automation lowering should retain interleaved ordinary events");
+
+  PerformanceSequence flatPerformance = performance;
+  auto& flatTrack = flatPerformance.tracks.front();
+  flatTrack.events.insert(flatTrack.events.end(), flatTrack.automations.front().points.begin(),
+                          flatTrack.automations.front().points.end());
+  flatTrack.automations.clear();
+  const MidiSequence flatMidi = renderMidiSequence(flatPerformance);
+  expect(encodeMidiFile(midi) == encodeMidiFile(flatMidi),
+         "structured scalar automation should lower identically to the same exact flat performance points");
+}
+
+void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .endTick = 4,
+          .automations =
+              {
+                  PerformanceAutomation{
+                      .id = PerformanceAutomationId{0},
+                      .intent =
+                          ScalarPerformanceAutomationIntent{
+                              .target = PerformanceAutomationTarget::Level,
+                          },
+                      .points =
+                          {
+                              LevelPerformanceEvent{
+                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 0},
+                                  .linearGain = 0.5,
+                              },
+                              LevelPerformanceEvent{
+                                  .header = PerformanceEventHeader{.tick = 1, .sequence = 1},
+                                  .linearGain = 0.5,
+                              },
+                          },
+                  },
+                  PerformanceAutomation{
+                      .id = PerformanceAutomationId{1},
+                      .intent =
+                          ScalarPerformanceAutomationIntent{
+                              .target = PerformanceAutomationTarget::Expression,
+                          },
+                      .points =
+                          {
+                              ExpressionPerformanceEvent{
+                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 2},
+                                  .linearGain = 0.75,
+                              },
+                              ExpressionPerformanceEvent{
+                                  .header = PerformanceEventHeader{.tick = 2, .sequence = 3},
+                                  .linearGain = 0.75,
+                              },
+                          },
+                  },
+                  PerformanceAutomation{
+                      .id = PerformanceAutomationId{2},
+                      .intent =
+                          ScalarPerformanceAutomationIntent{
+                              .target = PerformanceAutomationTarget::Pan,
+                          },
+                      .points =
+                          {
+                              PanPerformanceEvent{
+                                  .header = PerformanceEventHeader{.tick = 0, .sequence = 4},
+                                  .stereoPosition = 0.0,
+                              },
+                              PanPerformanceEvent{
+                                  .header = PerformanceEventHeader{.tick = 3, .sequence = 5},
+                                  .stereoPosition = 0.0,
+                              },
+                          },
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  expect(std::ranges::count_if(midi.tracks[0].events,
+                               [](const MidiEvent& event) { return std::holds_alternative<Volume>(event); }) == 1 &&
+             std::ranges::count_if(midi.tracks[0].events,
+                                   [](const MidiEvent& event) { return std::holds_alternative<Expression>(event); }) ==
+                 1 &&
+             std::ranges::count_if(midi.tracks[0].events,
+                                   [](const MidiEvent& event) { return std::holds_alternative<Pan>(event); }) == 1,
+         "automation lowering should suppress repeated quantized volume, expression, and pan values");
+
+  PerformanceSequence flatPerformance = performance;
+  auto& flatTrack = flatPerformance.tracks.front();
+  for (const auto& automation : flatTrack.automations) {
+    flatTrack.events.insert(flatTrack.events.end(), automation.points.begin(), automation.points.end());
+  }
+  flatTrack.automations.clear();
+  const MidiSequence flatMidi = renderMidiSequence(flatPerformance);
+  expect(std::ranges::count_if(flatMidi.tracks[0].events,
+                               [](const MidiEvent& event) { return std::holds_alternative<Volume>(event); }) == 2 &&
+             std::ranges::count_if(flatMidi.tracks[0].events,
+                                   [](const MidiEvent& event) { return std::holds_alternative<Expression>(event); }) ==
+                 2 &&
+             std::ranges::count_if(flatMidi.tracks[0].events,
+                                   [](const MidiEvent& event) { return std::holds_alternative<Pan>(event); }) == 2,
+         "automation deduplication should not remove repeated writes from ordinary performance events");
+}
+
+void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 8,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+  out.pitchTransitionSettings(250.0);
+  const PerformanceNoteId note = out.note(64, 1.0, 8);
+  PitchSlideOptions slideOptions{
+      .renderingHint = PitchTransitionRenderingHint::Portamento,
+      .nativePortamento =
+          NativePortamentoHint{
+              .timeMilliseconds = 250.0,
+              .emitTime = false,
+          },
+  };
+  out.pitchSlide(note, 60, 64, 4, slideOptions);
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {track},
+  };
+
+  const MidiSequence native = renderMidiSequence(performance);
+  expect(std::ranges::any_of(native.tracks[0].events,
+                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); }) &&
+             std::ranges::any_of(
+                 native.tracks[0].events,
+                 [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
+             std::ranges::none_of(native.tracks[0].events,
+                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+         "preserve-format lowering should honor a format's native-portamento preference");
+
+  const MidiSequence bent =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const auto noteEvent = std::ranges::find_if(
+      bent.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  expect(
+      noteEvent != bent.tracks[0].events.end() && std::get<NoteDuration>(*noteEvent).key == 64 &&
+          std::ranges::any_of(bent.tracks[0].events,
+                              [](const MidiEvent& event) { return std::holds_alternative<PitchBendRange>(event); }) &&
+          std::ranges::any_of(bent.tracks[0].events,
+                              [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }) &&
+          std::ranges::none_of(bent.tracks[0].events,
+                               [](const MidiEvent& event) {
+                                 return std::holds_alternative<PortamentoTime14>(event) ||
+                                        std::holds_alternative<PortamentoControl>(event);
+                               }),
+      "one parsed transition should lower to pitch bend without leaking native-portamento settings");
+  expect(performance.tracks[0].automations.size() == 1 &&
+             pitchTransitionIntent(performance.tracks[0].automations[0]) != nullptr,
+         "MIDI lowering should leave the caller's target-neutral performance intact");
+}
+
+void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 8,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{3}, SourceAnnotationId{4}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId note = out.note(64, 1.0, 8);
+  PitchSlideOptions firstOptions;
+  firstOptions.renderingHint = PitchTransitionRenderingHint::PitchBend;
+  firstOptions.interruptions.newAutomation = AutomationNewAutomationPolicy::Queue;
+  const auto first = out.pitchSlide(note, 60, 62, 2, firstOptions);
+  first.sample(out.at(1), 61.5);
+  const auto second = out.at(1).pitchSlide(note, 0, 64, 2,
+                                           PitchSlideOptions{
+                                               .renderingHint = PitchTransitionRenderingHint::PitchBend,
+                                           });
+  second.sample(out.at(3), 63.5);
+
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {track},
+  };
+  const MidiSequence midi = renderMidiSequence(performance);
+
+  std::vector<std::pair<u64, u16>> ranges;
+  std::vector<std::pair<u64, s16>> bends;
+  for (const auto& event : midi.tracks[0].events) {
+    if (const auto* range = std::get_if<PitchBendRange>(&event)) {
+      ranges.emplace_back(range->tick, range->cents);
+    } else if (const auto* bend = std::get_if<PitchBend>(&event)) {
+      bends.emplace_back(bend->tick, bend->value);
+    }
+  }
+
+  expect(ranges == std::vector<std::pair<u64, u16>>{{0, 400}},
+         "chained pitch bends should choose one range large enough for the complete note");
+  expect(std::ranges::find(bends, std::pair<u64, s16>{1, -5120}) != bends.end() &&
+             std::ranges::find(bends, std::pair<u64, s16>{3, -1024}) != bends.end(),
+         "pitch-bend lowering should reproduce exact source samples rather than replacing them with a linear ramp");
+  expect(std::ranges::none_of(bends, [](const auto& bend) { return bend.first == 2 && bend.second == 0; }),
+         "queued pitch transitions should remain continuous at their shared boundary");
+}
+
+void performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 8,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{5}, SourceAnnotationId{6}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId firstNote = out.note(64, 1.0, 8);
+  out.pitchSlide(firstNote, 60, 64, 6, PitchSlideOptions{.renderingHint = PitchTransitionRenderingHint::PitchBend});
+  out.at(3).note(67, 1.0, 3);
+
+  const MidiSequence midi = renderMidiSequence(PerformanceSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {track},
+  });
+  std::vector<std::pair<u64, s16>> bends;
+  for (const auto& event : midi.tracks[0].events) {
+    if (const auto* bend = std::get_if<PitchBend>(&event)) {
+      bends.emplace_back(bend->tick, bend->value);
+    }
+  }
+  expect(!bends.empty() && bends.back() == std::pair<u64, s16>{3, 0},
+         "a new-note interruption should reset the channel bend at the interruption tick");
+}
+
+void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 8,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{7}, SourceAnnotationId{8}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId firstNote = out.note(64, 1.0, 4);
+  PitchSlideOptions options{
+      .interruptions =
+          PerformanceAutomationInterruptPolicy{
+              .newNote = AutomationNewNotePolicy::Continue,
+              .noteEnd = AutomationNoteEndPolicy::Continue,
+          },
+      .renderingHint = PitchTransitionRenderingHint::PitchBend,
+  };
+  out.pitchSlide(firstNote, 60, 68, 8, options);
+  out.at(4).note(67, 1.0, 4);
+
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {track},
+  };
+  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(performance, {});
+  const auto continuedBend = std::ranges::find_if(lowered.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+    return bend != nullptr && bend->header.tick == 4 && std::abs(bend->semitones - (-3.0)) < 0.000001;
+  });
+  expect(
+      performance.tracks[0].automations[0].realization.endTick == 8 && continuedBend != lowered.tracks[0].events.end(),
+      "a continuing transition should preserve its absolute curve and rebase it to the new note");
+}
+
 void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -454,9 +820,15 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
 
   const MidiSequence midi =
       renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, instrumentSets);
-  expect(std::get<BankSelect>(midi.tracks[0].events[1]).bank == 3 &&
+  expect(std::get<BankSelect>(midi.tracks[0].events[1]).bank == (3 << 7) &&
              std::get<ProgramChange>(midi.tracks[0].events[2]).program == 9,
-         "MIDI lowering should resolve source instrument identities through collection instruments");
+         "MSB-only MIDI lowering should resolve and pack logical collection instrument banks");
+
+  const MidiSequence mmaMidi =
+      renderMidiSequence(performance, MidiExportOptions{.bankSelectStyle = MidiBankSelectStyle::MsbAndLsb},
+                         ModulationConversionPolicy::SynthModulators, instrumentSets);
+  expect(std::get<BankSelect>(mmaMidi.tracks[0].events[1]).bank == 3,
+         "MSB/LSB MIDI lowering should retain the logical collection instrument bank");
 }
 
 void performanceMidiRendererQuantizesPitchBendAndPortamento() {
@@ -908,8 +1280,7 @@ void standaloneSequenceExportDoesNotRequireACollection() {
   SequenceDialectRegistry dialects;
   dialects.add(dialect);
   const SourceStore sources;
-  const Artifact artifact =
-      exportSequenceMidi(snapshot, sources, AssetId{7}, SequenceExportRequest{}, dialects);
+  const Artifact artifact = exportSequenceMidi(snapshot, sources, AssetId{7}, SequenceExportRequest{}, dialects);
 
   expect(artifact.filename == "Loose_Sequence.mid",
          "standalone sequence export should derive a safe filename from sequence metadata");
@@ -1107,6 +1478,7 @@ void observedModulationScalingUsesPreciseNormalizedAmounts() {
 void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
   midiExporterKeeps14BitControllerPairsAdjacent();
+  midiExporterPreservesLegacyPortamentoTimeByteOrder();
   midiExporterOrdersFineTuneBeforeSameTickProgramChange();
   midiExporterKeepsSameTickBankProgramPairsAdjacent();
   midiExporterWritesTimeSignatureMetaEvent();
@@ -1116,6 +1488,12 @@ void runValueMidiTests() {
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererCombinesExpressionWithPanGain();
   performanceMidiRendererHonorsMidiExportOptions();
+  performanceMidiRendererLowersStructuredScalarAutomationPoints();
+  performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates();
+  performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering();
+  performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();
+  performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote();
+  performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
   performanceMidiRendererSkipsRedundantPitchBends();

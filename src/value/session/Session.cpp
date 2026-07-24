@@ -277,7 +277,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
   const auto bytes = sources_.bytes(id);
 
   for (const auto& module : formats_.modules()) {
-    if (module.canScan != nullptr) {
+    if (module.canScan) {
       bool shouldScan = false;
       try {
         // Legacy probe failures become diagnostics so one broken module cannot
@@ -354,7 +354,7 @@ void Session::rebuildCollections() {
   auto desiredByResolver = state_->desiredCollectionsByResolver();
   std::set<std::string> failedResolvers;
   for (const auto& module : formats_.modules()) {
-    if (module.resolveCollections == nullptr) {
+    if (!module.resolveCollections) {
       continue;
     }
 

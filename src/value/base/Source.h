@@ -10,10 +10,12 @@
 #include "value/base/CoreTypes.h"
 
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -30,6 +32,18 @@ enum class SourceStatus {
   Removed,
 };
 
+// A named byte range inside a container-derived source. Extractors use segments
+// to preserve the layout of assembled inputs (for example, MAME ROM regions)
+// without inventing a format-specific wrapper file.
+struct SourceSegment {
+  std::string name;
+  u64 offset = 0;
+  u64 size = 0;
+  std::map<std::string, std::string, std::less<>> attributes;
+
+  [[nodiscard]] std::optional<std::string_view> attribute(std::string_view key) const noexcept;
+};
+
 struct SourceFile {
   SourceId id;
   SourceKind kind = SourceKind::UserLoaded;
@@ -42,9 +56,17 @@ struct SourceFile {
   // or PSF executable images. parent/origin record where they came from.
   std::optional<SourceId> parent;
   std::optional<SourceRange> origin;
+  // Extractor-defined metadata and named regions remain ordinary values owned by
+  // the source. Format modules can therefore consume container context without
+  // loader pointers or process-global side channels.
+  std::map<std::string, std::string, std::less<>> attributes;
+  std::vector<SourceSegment> segments;
 
   [[nodiscard]] bool derived() const noexcept { return kind == SourceKind::Derived; }
   [[nodiscard]] bool active() const noexcept { return status == SourceStatus::Active; }
+  [[nodiscard]] std::optional<std::string_view> attribute(std::string_view key) const noexcept;
+  [[nodiscard]] const SourceSegment* segment(std::string_view segmentName) const noexcept;
+  [[nodiscard]] std::optional<SourceRange> segmentRange(std::string_view segmentName) const noexcept;
 };
 
 class ByteReader {

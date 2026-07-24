@@ -695,10 +695,38 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
                                                0xf3, 0x00, 0x02, 0x40, 0, 0, 0xff}});
   expect(tied.diagnostics.empty() && tied.tracks[0].endTick == 15,
          "compressed notes, ties, rests, and inline pitch slides should preserve their combined wait time");
-  expect(std::ranges::any_of(
-             tied.tracks[0].events,
-             [](const PerformanceEvent& event) { return std::holds_alternative<PitchBendPerformanceEvent>(event); }),
-         "inline pitch slide should tick through the typed automation callback");
+  const auto transition = std::ranges::find_if(tied.tracks[0].automations, [](const PerformanceAutomation& automation) {
+    return pitchTransitionIntent(automation) != nullptr;
+  });
+  expect(transition != tied.tracks[0].automations.end() &&
+             std::holds_alternative<SampledAutomationCurve>(pitchTransitionIntent(*transition)->curve) &&
+             std::get<SampledAutomationCurve>(pitchTransitionIntent(*transition)->curve).samples.size() >= 3 &&
+             std::ranges::none_of(tied.tracks[0].events,
+                                  [](const PerformanceEvent& event) {
+                                    return std::holds_alternative<PitchBendPerformanceEvent>(event);
+                                  }),
+         "inline pitch slide should retain typed intent and its exact driver-tick curve");
+
+  const MidiSequence exactPitchMidi = renderMidiSequence(tied);
+  expect(std::ranges::any_of(exactPitchMidi.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* bend = std::get_if<PitchBend>(&event);
+                               return bend != nullptr && bend->value != 0;
+                             }),
+         "KonamiSnes should preserve its exact sampled curve as pitch bend by default");
+
+  const MidiSequence nativePitchMidi =
+      renderMidiSequence(tied, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::any_of(nativePitchMidi.tracks[0].events,
+                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
+             std::ranges::none_of(nativePitchMidi.tracks[0].events,
+                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }) &&
+             std::ranges::any_of(nativePitchMidi.diagnostics,
+                                 [](const Diagnostic& diagnostic) {
+                                   return diagnostic.severity == Severity::Warning &&
+                                          diagnostic.message.find("exact sampled pitch curve") != std::string::npos;
+                                 }),
+         "the same sampled transition should support a requested native-portamento approximation with a warning");
 }
 
 void konamiSnesCompiledAutomationTicksFades() {
@@ -711,25 +739,26 @@ void konamiSnesCompiledAutomationTicksFades() {
                                                0xef, 0xc0, 0xfc,        // volume fade
                                                0xf8, 0x10, 0xff,        // pan fade
                                                0xe0, 0x08, 0xff}});
-  const auto& events = performance.tracks[0].events;
+  const auto events = flattenedPerformanceEvents(performance.tracks[0]);
   expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 8,
          "compiled Konami fades should advance only through the waiting command");
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
-                               return tempo != nullptr && tempo->header.tick > 0;
-                             }) &&
+  expect(performance.tracks[0].automations.size() >= 3 &&
              std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* level = std::get_if<LevelPerformanceEvent>(&event);
+                                 [](const PerformanceEvent* event) {
+                                   const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
+                                   return tempo != nullptr && tempo->header.tick > 0;
+                                 }) &&
+             std::ranges::any_of(events,
+                                 [](const PerformanceEvent* event) {
+                                   const auto* level = std::get_if<LevelPerformanceEvent>(event);
                                    return level != nullptr && level->header.tick > 0;
                                  }) &&
              std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* pan = std::get_if<PanPerformanceEvent>(&event);
+                                 [](const PerformanceEvent* event) {
+                                   const auto* pan = std::get_if<PanPerformanceEvent>(event);
                                    return pan != nullptr && pan->header.tick > 0;
                                  }),
-         "tempo, volume, and pan fades should emit from the typed per-tick callback");
+         "tempo, volume, and pan fades should retain structured intent and exact per-tick realizations");
 }
 
 void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion() {

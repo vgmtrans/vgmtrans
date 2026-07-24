@@ -9,6 +9,8 @@
 #include "value/sequence/PerformanceModel.h"
 #include "value/sequence/SequenceDialect.h"
 
+#include <utility>
+
 namespace vgmtrans::core {
 
 namespace detail {
@@ -20,6 +22,17 @@ struct VmTrackRuntime;
 struct BranchResult {
   bool taken = false;
   Effects effects;
+};
+
+class PerformanceAutomationBinding;
+
+struct PitchSlideOptions {
+  std::optional<PerformanceNoteId> previousNote;
+  PerformanceLaneId lane{0};
+  PerformanceAutomationCurve curve = LinearAutomationCurve{};
+  PerformanceAutomationInterruptPolicy interruptions;
+  PitchTransitionRenderingHint renderingHint = PitchTransitionRenderingHint::Portamento;
+  std::optional<NativePortamentoHint> nativePortamento;
 };
 
 class RepeatCounter {
@@ -44,11 +57,15 @@ private:
 // PerformanceEmitter fills in the current tick and source command automatically.
 class PerformanceEmitter {
 public:
-  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick);
+  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick,
+                     u64& nextSequence, u32& nextNote, u32& nextAutomation);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
-  void note(NotePerformanceEvent event);
-  void note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
+  PerformanceNoteId note(NotePerformanceEvent event);
+  PerformanceNoteId note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
+  // Formats whose slide command follows its note can revise the most recently
+  // emitted note chain once the delayed transition point becomes known.
+  [[nodiscard]] bool setPreviousNoteEnd(u64 endTick);
   void tempo(TempoPerformanceEvent event);
   void tempo(u32 microsecondsPerQuarter);
   void timeSignature(TimeSignaturePerformanceEvent event);
@@ -91,6 +108,8 @@ public:
   void portamentoTime(double timeMilliseconds);
   void portamentoControl(PortamentoControlPerformanceEvent event);
   void portamentoControl(double previousKey);
+  void pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent event);
+  void pitchTransitionSettings(double timeMilliseconds);
   void legatoPedal(LegatoPedalPerformanceEvent event);
   void legatoPedal(bool enabled);
   void modulation(ModulationPerformanceEvent event);
@@ -98,13 +117,94 @@ public:
   void marker(MarkerPerformanceEvent event);
   void appendEvents(std::vector<PerformanceEvent> events);
 
+  // Declares one source-level pitch transition. The emitter resolves
+  // replacement, queuing, and retargeting against earlier transitions; MIDI
+  // representation remains an export decision.
+  PerformanceAutomationBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, u32 durationTicks,
+                                          PitchSlideOptions options = {});
+
+  [[nodiscard]] PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue,
+                                                  u32 durationTicks, u32 delayTicks = 0);
+  [[nodiscard]] PerformanceAutomationBinding noteFade(PerformanceAutomationTarget target, double targetValue,
+                                                      u32 durationTicks, u32 delayTicks = 0);
+  [[nodiscard]] PerformanceAutomationBinding step(PerformanceAutomationTarget target, double targetValue,
+                                                  u32 durationTicks = 0, u32 delayTicks = 0);
+  [[nodiscard]] PerformanceAutomationBinding noteEnvelope(PerformanceAutomationTarget target, double targetValue,
+                                                          u32 durationTicks, u32 delayTicks = 0);
+
 private:
-  [[nodiscard]] PerformanceEventHeader header() const;
+  friend class PerformanceAutomationBinding;
+
+  [[nodiscard]] PerformanceAutomationBinding beginAutomation(ScalarPerformanceAutomationIntent intent);
+  [[nodiscard]] PerformanceEmitter withAutomation(const PerformanceAutomationBinding& automation) const;
+  [[nodiscard]] PerformanceEventHeader header();
+  void append(PerformanceEvent event);
+  void automationPoint(u32 automation, PerformanceEvent event);
+  void automationSample(u32 automation, double value);
+  void stopAutomation(u32 automation);
+  void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
 
   PerformanceTrack& track_;
   CommandId sourceCommand_;
   SourceAnnotationId sourceAnnotation_;
   u64 tick_ = 0;
+  u64& nextSequence_;
+  u32& nextNote_;
+  u32& nextAutomation_;
+  std::optional<u32> automation_;
+};
+
+// Opaque association between a source motion object and its structured
+// performance automation. Formats retain this small handle, never an IR
+// container or pointer into one.
+class PerformanceAutomationBinding {
+public:
+  PerformanceAutomationBinding() = default;
+
+  void clear() noexcept {
+    owner_ = nullptr;
+    automation_ = 0;
+    id_ = {};
+  }
+  [[nodiscard]] PerformanceEmitter output(const PerformanceEmitter& out) const { return out.withAutomation(*this); }
+  [[nodiscard]] PerformanceEmitter at(const PerformanceEmitter& out, u64 tick) const {
+    return out.at(tick).withAutomation(*this);
+  }
+  void stop(const PerformanceEmitter& out) const;
+  void sample(const PerformanceEmitter& out, double value) const;
+  [[nodiscard]] PerformanceAutomationId id() const noexcept { return id_; }
+
+private:
+  friend class PerformanceEmitter;
+
+  PerformanceAutomationBinding(PerformanceTrack& owner, u32 automation, PerformanceAutomationId id)
+      : owner_(&owner), automation_(automation), id_(id) {}
+
+  PerformanceTrack* owner_ = nullptr;
+  u32 automation_ = 0;
+  PerformanceAutomationId id_;
+};
+
+// Adds an output binding to an existing sequence-motion type without coupling
+// the arithmetic type itself to PerformanceSequence.
+template <class Motion>
+class PerformanceBoundMotion : public Motion {
+public:
+  using Motion::begin;
+
+  void bind(PerformanceAutomationBinding binding) { binding_ = std::move(binding); }
+
+  template <class Plan>
+  decltype(auto) begin(PerformanceAutomationBinding binding, const Plan& plan) {
+    bind(std::move(binding));
+    return Motion::begin(plan);
+  }
+
+  void clearAutomation() noexcept { binding_.clear(); }
+  [[nodiscard]] PerformanceEmitter output(const PerformanceEmitter& out) const { return binding_.output(out); }
+
+private:
+  PerformanceAutomationBinding binding_;
 };
 
 // Commands use VmApi for playback flow that is shared across formats: next, end,

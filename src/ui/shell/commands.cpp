@@ -971,6 +971,8 @@ std::string_view valueAudioCodecName(vgmtrans::core::AudioCodec codec) {
       return "snes-brr";
     case vgmtrans::core::AudioCodec::PsxAdpcm:
       return "psx-adpcm";
+    case vgmtrans::core::AudioCodec::KonamiK054539Adpcm:
+      return "konami-k054539-adpcm";
     case vgmtrans::core::AudioCodec::OkiAdpcm:
       return "oki-adpcm";
     case vgmtrans::core::AudioCodec::NdsImaAdpcm:

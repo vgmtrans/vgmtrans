@@ -12,6 +12,29 @@
 
 namespace vgmtrans::core {
 
+std::optional<std::string_view> SourceSegment::attribute(std::string_view key) const noexcept {
+  const auto found = attributes.find(key);
+  return found != attributes.end() ? std::optional<std::string_view>{found->second} : std::nullopt;
+}
+
+std::optional<std::string_view> SourceFile::attribute(std::string_view key) const noexcept {
+  const auto found = attributes.find(key);
+  return found != attributes.end() ? std::optional<std::string_view>{found->second} : std::nullopt;
+}
+
+const SourceSegment* SourceFile::segment(std::string_view segmentName) const noexcept {
+  const auto found = std::ranges::find(segments, segmentName, &SourceSegment::name);
+  return found != segments.end() ? std::addressof(*found) : nullptr;
+}
+
+std::optional<SourceRange> SourceFile::segmentRange(std::string_view segmentName) const noexcept {
+  const auto* value = segment(segmentName);
+  if (value == nullptr || value->offset > size || value->size > size - value->offset) {
+    return std::nullopt;
+  }
+  return SourceRange{.source = id, .offset = value->offset, .size = value->size};
+}
+
 ByteReader::ByteReader(SourceId source, std::span<const u8> bytes) : source_(source), bytes_(bytes) {
 }
 

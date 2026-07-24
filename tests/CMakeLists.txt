@@ -2,6 +2,7 @@ add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
+    formats/KonamiArcadeModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
     formats/AkaoSnesModuleTests.cpp
     formats/AkaoFormatTests.cpp
@@ -49,6 +50,7 @@ set_tests_properties(vgmtrans-parity-self-test PROPERTIES LABELS "parity;self-te
 set(VGMTRANS_PARITY_CAPCOM_SNES_FILE "" CACHE FILEPATH "Capcom SNES RSN file used for original/value parity")
 set(VGMTRANS_PARITY_AKAO_SNES_FILE "" CACHE FILEPATH "Akao SNES RSN or SPC file used for original/value parity")
 set(VGMTRANS_PARITY_KONAMI_SNES_FILE "" CACHE FILEPATH "Konami SNES RSN or SPC file used for original/value parity")
+set(VGMTRANS_PARITY_KONAMI_ARCADE_FILE "" CACHE FILEPATH "Konami Arcade MAME ZIP file used for original/value parity")
 set(VGMTRANS_PARITY_AKAO_FILE "" CACHE FILEPATH "Akao PSF or raw file used for original/value parity")
 set(VGMTRANS_PARITY_NDS_FILE "" CACHE FILEPATH "NDS or 2SF file used for original/value parity")
 
@@ -92,6 +94,11 @@ if(VGMTRANS_PARITY_KONAMI_SNES_FILE)
     konami-snes-midi konami-snes konami-snes-direct-midi "${VGMTRANS_PARITY_KONAMI_SNES_FILE}")
   add_vgmtrans_parity_corpus_test(
     konami-snes-synth konami-snes konami-snes-direct-synth "${VGMTRANS_PARITY_KONAMI_SNES_FILE}")
+endif()
+
+if(VGMTRANS_PARITY_KONAMI_ARCADE_FILE)
+  add_vgmtrans_parity_corpus_test(
+    konami-arcade-summary konami-arcade konami-arcade-direct-summary "${VGMTRANS_PARITY_KONAMI_ARCADE_FILE}")
 endif()
 
 if(VGMTRANS_PARITY_AKAO_FILE)

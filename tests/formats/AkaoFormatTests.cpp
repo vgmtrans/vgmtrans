@@ -365,11 +365,18 @@ void akaoTempoFadeEmitsDriverTickRamp() {
   expect(performance.diagnostics.empty(), "Akao tempo-fade fixture should render without diagnostics");
 
   std::vector<TempoPerformanceEvent> tempos;
-  for (const auto& event : performance.tracks[0].events) {
-    if (const auto* tempo = std::get_if<TempoPerformanceEvent>(&event)) {
+  for (const auto* event : flattenedPerformanceEvents(performance.tracks[0])) {
+    if (const auto* tempo = std::get_if<TempoPerformanceEvent>(event)) {
       tempos.push_back(*tempo);
     }
   }
+
+  expect(
+      performance.tracks[0].automations.size() == 1 &&
+          std::get<ScalarPerformanceAutomationIntent>(performance.tracks[0].automations[0].intent).target ==
+              PerformanceAutomationTarget::Tempo &&
+          std::get<ScalarPerformanceAutomationIntent>(performance.tracks[0].automations[0].intent).durationTicks == 3,
+      "Akao tempo fade should retain one structured automation with source duration");
 
   expect(tempos.size() == 4, "Akao tempo fade should emit one tempo event per driver tick");
   expect(tempos[1].header.tick == 0 && tempos[2].header.tick == 1 && tempos[3].header.tick == 2,

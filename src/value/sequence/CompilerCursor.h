@@ -477,6 +477,26 @@ public:
       return cursor_.decoded(cursor_.record_.u24le(name, display), name, display, role);
     }
 
+    u32 u32be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+              SemanticOperandRole role = SemanticOperandRole::Value) {
+      return cursor_.decoded(cursor_.record_.u32be(name, display), name, display, role);
+    }
+
+    [[nodiscard]] EncodedSemanticField<u32> rawU32be(std::string_view name,
+                                                     SourceValueDisplay display = SourceValueDisplay::Default) {
+      return field(cursor_.record_.u32be(name, display), name, display);
+    }
+
+    u32 u32le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+              SemanticOperandRole role = SemanticOperandRole::Value) {
+      return cursor_.decoded(cursor_.record_.u32le(name, display), name, display, role);
+    }
+
+    [[nodiscard]] EncodedSemanticField<u32> rawU32le(std::string_view name,
+                                                     SourceValueDisplay display = SourceValueDisplay::Default) {
+      return field(cursor_.record_.u32le(name, display), name, display);
+    }
+
     u32 varLen(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
                SemanticOperandRole role = SemanticOperandRole::Value) {
       return cursor_.decoded(cursor_.record_.varLen(name, display), name, display, role);

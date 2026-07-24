@@ -161,6 +161,7 @@ enum class AudioCodec {
   NdsImaAdpcm,
   NdsPsg,
   PsxAdpcm,
+  KonamiK054539Adpcm,
   OkiAdpcm,
 };
 
@@ -173,6 +174,9 @@ struct Sample {
   u32 sampleRate = 0;
   u8 channels = 1;
   u16 bitsPerSample = 16;
+  // Some hardware walks encoded sample memory backwards. Keeping that direction
+  // explicit avoids copying or mutating source bytes during scanning.
+  bool reverse = false;
   Loop loop;
   Tuning pitch;
   u32 codecParameter = 0;

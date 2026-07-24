@@ -113,6 +113,8 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.h
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
     ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
@@ -214,6 +216,7 @@ add_library(vgmtransvalueformats STATIC)
 vgmtrans_enable_project_warnings(vgmtransvalueformats)
 target_sources(vgmtransvalueformats
   PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/MameRomSetExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
@@ -232,6 +235,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.cpp
@@ -244,12 +251,14 @@ target_sources(vgmtransvalueformats
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/MameRomSetExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/Akao.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
@@ -257,8 +266,9 @@ target_sources(vgmtransvalueformats
 target_link_libraries(
   vgmtransvalueformats
   PUBLIC vgmtransvaluecore unarr
-  PRIVATE fmt::fmt ZLIB::ZLIB)
+  PRIVATE fmt::fmt ZLIB::ZLIB minizip nlohmann_json::nlohmann_json)
 target_compile_features(vgmtransvalueformats PUBLIC cxx_std_20)
+target_compile_definitions(vgmtransvalueformats PRIVATE "DEV_ENV_BUILD_TREE=\"${CMAKE_CURRENT_BINARY_DIR}\"")
 
 add_library(vgmtranscore OBJECT)
 vgmtrans_enable_project_warnings(vgmtranscore)
@@ -751,4 +761,5 @@ if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
     endif()
   endif()
   target_compile_definitions(vgmtranscore PUBLIC "VGMTRANS_DATA_DIR=\"${VGMTRANS_DATA_DIR}\"")
+  target_compile_definitions(vgmtransvalueformats PRIVATE "VGMTRANS_DATA_DIR=\"${VGMTRANS_DATA_DIR}\"")
 endif()
