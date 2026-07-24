@@ -25,7 +25,19 @@ struct PerformanceEventHeader {
   SourceAnnotationId sourceAnnotation;
   TrackId track;
   u64 tick = 0;
+  // Stable execution order disambiguates events emitted at the same tick and
+  // lets structured automation points be merged with ordinary events later.
+  u64 sequence = 0;
 };
+
+struct PerformanceNoteIdTag;
+using PerformanceNoteId = Id<PerformanceNoteIdTag>;
+
+struct PerformanceAutomationIdTag;
+using PerformanceAutomationId = Id<PerformanceAutomationIdTag>;
+
+struct PerformanceLaneIdTag;
+using PerformanceLaneId = Id<PerformanceLaneIdTag>;
 
 struct NotePerformanceEvent {
   PerformanceEventHeader header;
@@ -37,6 +49,14 @@ struct NotePerformanceEvent {
   // The source format already decided this note extends the previous emitted note.
   // Renderers should not re-test pitch after target-specific transforms such as global transpose.
   bool extendsPrevious = false;
+  // Extensions share the same identity as the note they extend. A stable
+  // identity lets later commands attach automation to a sounding note without
+  // rewriting that note into MIDI-specific fragments.
+  PerformanceNoteId note;
+  // Most sequence tracks are one driver voice and therefore use lane zero.
+  // The explicit lane leaves room for formats that multiplex voices in one
+  // source track.
+  PerformanceLaneId lane{0};
 };
 
 struct TempoPerformanceEvent {
@@ -165,7 +185,10 @@ struct TremoloDelayPerformanceEvent {
 struct PortamentoPerformanceEvent {
   PerformanceEventHeader header;
   double timeMilliseconds = 0.0;
-  double previousKey = 0.0;
+  // A missing source key configures the glide time without triggering a
+  // transition. A present key also identifies the pitch the next note should
+  // glide from.
+  std::optional<double> previousKey;
 };
 
 struct PortamentoEnablePerformanceEvent {
@@ -182,6 +205,20 @@ struct PortamentoTimePerformanceEvent {
 struct PortamentoControlPerformanceEvent {
   PerformanceEventHeader header;
   double previousKey = 0.0;
+};
+
+enum class PitchTransitionRenderingHint {
+  Portamento,
+  PitchBend,
+};
+
+struct PitchTransitionSettingsPerformanceEvent {
+  PerformanceEventHeader header;
+  // Physical glide time retained independently of its eventual MIDI
+  // representation. Pitch-bend lowering consumes the setting without writing
+  // a portamento controller.
+  double timeMilliseconds = 0.0;
+  PitchTransitionRenderingHint renderingHint = PitchTransitionRenderingHint::Portamento;
 };
 
 struct LegatoPedalPerformanceEvent {
@@ -220,19 +257,155 @@ struct MarkerPerformanceEvent {
 
 using PerformanceEvent =
     std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
-                 LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
-                 StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
-                 MonoModePerformanceEvent, TuningPerformanceEvent,
+                 LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent, StereoBalancePerformanceEvent,
+                 MasterLevelPerformanceEvent, ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
                  GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
                  PortamentoTimePerformanceEvent, PortamentoControlPerformanceEvent, PitchBendPerformanceEvent,
                  PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent,
-                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
+                 PitchTransitionSettingsPerformanceEvent, LegatoPedalPerformanceEvent, ModulationPerformanceEvent,
+                 MarkerPerformanceEvent>;
+
+enum class PerformanceAutomationTarget {
+  Tempo,
+  Level,
+  Expression,
+  Pan,
+  Pitch,
+  VibratoDepth,
+  TremoloDepth,
+};
+
+enum class PerformanceAutomationMotion {
+  TargetOverTicks,
+  TargetByStep,
+  Envelope,
+};
+
+// Scalar automation retains the intent behind an exact series of realized
+// performance events. Constant source-space steps are not assumed to remain
+// linear after conversion to tempo, gain, or pan.
+struct ScalarPerformanceAutomationIntent {
+  PerformanceAutomationTarget target = PerformanceAutomationTarget::Level;
+  PerformanceAutomationMotion motion = PerformanceAutomationMotion::TargetOverTicks;
+  std::optional<double> targetValue;
+  u32 durationTicks = 0;
+  u32 delayTicks = 0;
+  bool restartsOnNote = false;
+};
+
+struct LinearAutomationCurve {};
+
+enum class AutomationSampleInterpolation {
+  Step,
+  Linear,
+};
+
+struct AutomationSample {
+  // Offset from the automation's realized start tick.
+  u32 tickOffset = 0;
+  // Pitch automation uses absolute key-space values. Other targets use the
+  // neutral domain documented by their corresponding performance event.
+  double value = 0.0;
+
+  friend constexpr bool operator==(const AutomationSample&, const AutomationSample&) noexcept = default;
+};
+
+struct SampledAutomationCurve {
+  std::vector<AutomationSample> samples;
+  AutomationSampleInterpolation interpolation = AutomationSampleInterpolation::Step;
+};
+
+using PerformanceAutomationCurve = std::variant<LinearAutomationCurve, SampledAutomationCurve>;
+
+enum class AutomationNewNotePolicy {
+  Stop,
+  Continue,
+};
+
+enum class AutomationNewAutomationPolicy {
+  Replace,
+  Queue,
+  Retarget,
+  Ignore,
+};
+
+enum class AutomationNoteEndPolicy {
+  Stop,
+  Continue,
+};
+
+struct PerformanceAutomationInterruptPolicy {
+  AutomationNewNotePolicy newNote = AutomationNewNotePolicy::Stop;
+  AutomationNewAutomationPolicy newAutomation = AutomationNewAutomationPolicy::Replace;
+  AutomationNoteEndPolicy noteEnd = AutomationNoteEndPolicy::Stop;
+};
+
+// Native portamento cannot reproduce an arbitrary pitch curve, but it is often
+// the most compatible rendering of a source driver's glide. These physical
+// timing hints preserve that option without turning the transition itself into
+// MIDI controller events.
+struct NativePortamentoHint {
+  double timeMilliseconds = 0.0;
+  bool emitTime = true;
+  u32 overlapTicks = 1;
+  std::optional<double> restoreTimeMilliseconds;
+};
+
+struct PitchTransitionIntent {
+  PerformanceNoteId note;
+  // When a transition begins exactly at a new note, native portamento extends
+  // this preceding note by overlapTicks. Delayed transitions split note.
+  std::optional<PerformanceNoteId> previousNote;
+  PerformanceLaneId lane{0};
+  double startKey = 0.0;
+  double targetKey = 0.0;
+  u32 durationTicks = 0;
+  PerformanceAutomationCurve curve = LinearAutomationCurve{};
+  PerformanceAutomationInterruptPolicy interruptions;
+  PitchTransitionRenderingHint renderingHint = PitchTransitionRenderingHint::Portamento;
+  std::optional<NativePortamentoHint> nativePortamento;
+};
+
+using PerformanceAutomationIntent = std::variant<ScalarPerformanceAutomationIntent, PitchTransitionIntent>;
+
+enum class PerformanceAutomationEndReason {
+  Completed,
+  Replaced,
+  NewNote,
+  SourceStopped,
+  NoteEnded,
+  TrackEnded,
+};
+
+struct PerformanceAutomationRealization {
+  // requestedStartTick remains useful when Queue delays a transition.
+  u64 requestedStartTick = 0;
+  u64 startTick = 0;
+  // The half-open end of the changing portion of the automation. The terminal
+  // value remains in force until another event or the attached note ends.
+  u64 endTick = 0;
+  PerformanceAutomationEndReason endReason = PerformanceAutomationEndReason::Completed;
+  // When present, this automation is the next link after the referenced
+  // predecessor (including adjacent, queued, replaced, and retargeted links).
+  std::optional<PerformanceAutomationId> continuesFrom;
+};
+
+struct PerformanceAutomation {
+  PerformanceAutomationId id;
+  PerformanceEventHeader header;
+  PerformanceAutomationIntent intent;
+  PerformanceAutomationRealization realization;
+  // Exact realized events for scalar automation. Pitch transitions instead
+  // carry typed absolute-key samples in SampledAutomationCurve.
+  std::vector<PerformanceEvent> points;
+};
 
 struct PerformanceTrack {
   TrackId id;
   u32 sourceTrackNumber = 0;
   u64 endTick = 0;
   std::vector<PerformanceEvent> events;
+  std::vector<PerformanceAutomation> automations;
 };
 
 // Maps an executed source command to the half-open interval during which it is
@@ -258,6 +431,12 @@ struct PerformanceSequence {
 };
 
 [[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event);
+[[nodiscard]] const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& automation);
+[[nodiscard]] PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation);
+[[nodiscard]] double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks);
+// Returns ordinary events and exact scalar-automation points in stable
+// execution order. Pitch-transition intent remains structured until lowering.
+[[nodiscard]] std::vector<const PerformanceEvent*> flattenedPerformanceEvents(const PerformanceTrack& track);
 [[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
 [[nodiscard]] const SourceCommand* sourceCommandForEvent(const SequenceProgram& program,
                                                          const PerformanceEventHeader& header);

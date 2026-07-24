@@ -15,7 +15,7 @@ void FormatRegistry::add(FormatModule module) {
   if (sealed_) {
     throw std::logic_error("Cannot register value formats after session mutation has started");
   }
-  if (module.name.empty() || module.scan == nullptr) {
+  if (module.name.empty() || !module.scan) {
     throw std::invalid_argument("Cannot register an incomplete FormatModule");
   }
   modules_.push_back(std::move(module));

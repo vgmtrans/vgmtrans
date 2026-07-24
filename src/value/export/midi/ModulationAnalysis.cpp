@@ -54,8 +54,8 @@ void merge(ObservedValueRange& destination, const ObservedValueRange& source) {
 }
 
 [[nodiscard]] u32 midiControllerValue(double normalized) {
-  return static_cast<u32>(std::clamp<int>(static_cast<int>(std::lround(std::clamp(normalized, 0.0, 1.0) * 127.0)), 0,
-                                          127));
+  return static_cast<u32>(
+      std::clamp<int>(static_cast<int>(std::lround(std::clamp(normalized, 0.0, 1.0) * 127.0)), 0, 127));
 }
 
 void observePerformanceModulation(MidiTrackModulationUsage& usage, const ModulationPerformanceEvent& event) {
@@ -90,13 +90,13 @@ bool hasObservedValue(const ObservedValueRange& range) noexcept {
 }
 
 bool hasMidiModulationUsage(const MidiTrackModulationUsage& usage) noexcept {
-  return usage.vibratoDepth.observed || usage.vibratoRate.observed ||
-         usage.tremoloDepth.observed || usage.tremoloRate.observed;
+  return usage.vibratoDepth.observed || usage.vibratoRate.observed || usage.tremoloDepth.observed ||
+         usage.tremoloRate.observed;
 }
 
 bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept {
-  return usage.vibratoDepth.observed || usage.vibratoRate.observed ||
-         usage.tremoloDepth.observed || usage.tremoloRate.observed;
+  return usage.vibratoDepth.observed || usage.vibratoRate.observed || usage.tremoloDepth.observed ||
+         usage.tremoloRate.observed;
 }
 
 MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence& sequence) {
@@ -109,8 +109,8 @@ MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence&
         .trackIndex = trackIndex,
     };
 
-    for (const auto& event : track.events) {
-      if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
+    for (const auto* event : flattenedPerformanceEvents(track)) {
+      if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(event)) {
         observePerformanceModulation(trackUsage, *modulation);
       }
     }

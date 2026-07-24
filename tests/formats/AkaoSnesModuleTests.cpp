@@ -76,8 +76,8 @@ PerformanceSequence renderTracks(AkaoSnesProfile profile, std::vector<TrackProgr
 template <class Event>
 std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
   std::vector<const Event*> events;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
+  for (const PerformanceEvent* event : flattenedPerformanceEvents(track)) {
+    if (const auto* typed = std::get_if<Event>(event)) {
       events.push_back(typed);
     }
   }

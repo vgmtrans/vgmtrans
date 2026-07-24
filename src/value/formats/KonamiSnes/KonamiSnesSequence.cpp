@@ -185,6 +185,7 @@ public:
     rate_ = rate;
     depth_ = depth;
     currentDepth_.setCurrent(static_cast<s32>(depth) << 8);
+    currentDepth_.clearAutomation();
     reusableFadeTicks_ = 0;
   }
 
@@ -210,12 +211,15 @@ public:
   [[nodiscard]] u16 currentDepth() const {
     return static_cast<u16>(std::clamp<s32>(currentDepth_.current(), 0, static_cast<s32>(depth_) << 8));
   }
+  void bind(PerformanceAutomationBinding binding) { currentDepth_.bind(std::move(binding)); }
+  void clearAutomation() { currentDepth_.clearAutomation(); }
+  [[nodiscard]] PerformanceEmitter output(const PerformanceEmitter& out) const { return currentDepth_.output(out); }
 
 private:
   u8 delay_ = 0;
   u8 rate_ = 0;
   u8 depth_ = 0;
-  SequenceAutomatedValue<s32> currentDepth_;
+  PerformanceBoundMotion<SequenceAutomatedValue<s32>> currentDepth_;
   u8 reusableFadeTicks_ = 0;
 };
 
@@ -354,15 +358,17 @@ struct TrackState {
 
   // Fades retain fractional progress between note ticks. Their raw values are
   // converted to exported tempo, gain, or pan only when a tick changes them.
-  SequenceFixedPointAutomation<s32> panFade;
-  SequenceFixedPointAutomation<s32> volumeFade;
-  SequenceFixedPointAutomation<s32> tempoFade;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   LfoState vibrato;
 
   // A slide is stored as an absolute note pitch, but exported pitch bends are
   // measured relative to the note that began the slide.
   std::optional<double> pitchBase;
   SequenceAutomatedValue<double> pitchSlide;
+  PerformanceNoteId pitchNote;
+  PerformanceAutomationBinding pitchTransition;
   double lastVibratoDepthAmount = -1.0;
   bool emittedInitialModulationCeiling = false;
 };
@@ -393,16 +399,16 @@ struct Playback {
     // extends that voice instead of retriggering its sample and envelope.
     const bool tied = track.previousNoteSlurred && track.previousNoteKey && key == *track.previousNoteKey;
     resetPitchForNote(key);
-    out.pitchBend(0.0);
     track.vibrato.beginReusableFade();
     if (track.vibrato.fadeActive()) {
-      emitVibratoDepth(true);
+      emitVibratoDepth(track.vibrato.output(out), true);
     }
     if (tied) {
-      out.note(track.noteSemitones(key, false), LevelScale::linearFromLinear(velocity / 127.0), duration, true);
+      track.pitchNote =
+          out.note(track.noteSemitones(key, false), LevelScale::linearFromLinear(velocity / 127.0), duration, true);
     } else {
-      out.note(track.percussion ? key : track.noteSemitones(key, false), LevelScale::linearFromLinear(velocity / 127.0),
-               duration);
+      track.pitchNote = out.note(track.percussion ? key : track.noteSemitones(key, false),
+                                 LevelScale::linearFromLinear(velocity / 127.0), duration);
       track.previousNoteKey = key;
     }
     track.previousNoteSlurred = track.noteDurationRate == noteDurationRateMax(track.version) && !track.percussion;
@@ -488,11 +494,19 @@ struct Playback {
       // In later versions a large first argument means "fade in over N ticks"
       // rather than "wait N ticks before starting."
       track.vibrato.setReusableFade(builtInFade);
+      beginVibratoFadeAutomation(builtInFade);
+    } else {
+      track.vibrato.clearAutomation();
     }
     program.observeVibrato(track.trackNumber, rate, depth, track.tempo);
     emitVibratoDelay();
-    emitVibratoDepth(true);
+    emitVibratoDepth(out, true);
     emitVibratoRate();
+  }
+
+  void setVibratoFade(u8 length) {
+    track.vibrato.setReusableFade(length);
+    beginVibratoFadeAutomation(length);
   }
 
   void beginPitchSlide(PitchSlideKind kind, u8 delay, u8 length, u8 targetNote) {
@@ -503,13 +517,21 @@ struct Playback {
       return;
     }
     const double target = track.noteSemitones(targetNote, kind == PitchSlideKind::V1);
-    const double startDeviation = std::abs(track.pitchSlide.current() - *track.pitchBase);
-    const double targetDeviation = std::abs(target - *track.pitchBase);
-    const auto range =
-        static_cast<u8>(std::max<int>(2, static_cast<int>(std::ceil(std::max(startDeviation, targetDeviation)))));
-    // MIDI must declare a range wide enough for both the current position and
-    // the target. Two semitones remains the minimum for ordinary notes.
-    out.pitchBendRange(range);
+    if (!track.pitchNote.valid()) {
+      return;
+    }
+
+    auto transitionOut = out.at(vm.tick() + delay);
+    track.pitchTransition = transitionOut.pitchSlide(
+        track.pitchNote, track.pitchSlide.current(), target, length,
+        PitchSlideOptions{
+            .renderingHint = PitchTransitionRenderingHint::PitchBend,
+            .nativePortamento =
+                NativePortamentoHint{
+                    .timeMilliseconds = length * sequenceTickSeconds(track.version, track.tempo) * 1000.0,
+                },
+        });
+    track.pitchTransition.sample(transitionOut, track.pitchSlide.current());
     static_cast<void>(track.pitchSlide.begin(SequenceMotionPlan<double>::targetOverTicksWithStep(
         target, (target - track.pitchSlide.current()) / length, length, delay)));
   }
@@ -522,17 +544,27 @@ struct Playback {
         stepBased
             ? SequenceFixedPointMotion<s32>::toRawTargetByFixedStep(clampedDestination, static_cast<s32>(step) * 16)
             : SequenceFixedPointMotion<s32>::toRawTarget(clampedDestination, ticks);
+    auto* fade = &track.tempoFade;
+    auto automationTarget = PerformanceAutomationTarget::Tempo;
+    double targetValue = 0.0;
     switch (target) {
       case FadeTarget::Tempo:
-        static_cast<void>(track.tempoFade.begin(motion));
+        targetValue = tempoMicrosecondsPerQuarter(track.version, clampedDestination);
         break;
       case FadeTarget::Volume:
-        static_cast<void>(track.volumeFade.begin(motion));
+        fade = &track.volumeFade;
+        automationTarget = PerformanceAutomationTarget::Level;
+        targetValue = linearGainFromRawVolume(clampedDestination);
         break;
       case FadeTarget::Pan:
-        static_cast<void>(track.panFade.begin(motion));
+        fade = &track.panFade;
+        automationTarget = PerformanceAutomationTarget::Pan;
+        targetValue = stereoPositionFromPan(track.version, clampedDestination);
         break;
     }
+    auto automation =
+        stepBased ? out.step(automationTarget, targetValue, ticks) : out.fade(automationTarget, targetValue, ticks);
+    static_cast<void>(fade->begin(std::move(automation), motion));
   }
 
   [[nodiscard]] Effects loopEnd(u8 slot, u8 times, s8 volumeDelta, s8 pitchDelta) {
@@ -612,7 +644,7 @@ struct Playback {
         return;
       }
       track.tempo = value;
-      out.tempo(tempoMicrosecondsPerQuarter(track.version, value));
+      track.tempoFade.output(out).tempo(tempoMicrosecondsPerQuarter(track.version, value));
       if (vibrato::usesLegacy(track.version)) {
         emitVibratoRate();
         emitVibratoDelay();
@@ -620,22 +652,23 @@ struct Playback {
     }));
     static_cast<void>(track.volumeFade.tickRaw([&](s32 rawVolume) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff));
-      out.level(LevelScale::linearFromLinear(linearGainFromRawVolume(value)), LevelPrecisionHint::FourteenBit);
+      track.volumeFade.output(out).level(LevelScale::linearFromLinear(linearGainFromRawVolume(value)),
+                                         LevelPrecisionHint::FourteenBit);
     }));
     static_cast<void>(track.panFade.tickRaw([&](s32 rawPan) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawPan, 0, 0xff));
-      out.pan(stereoPositionFromPan(track.version, value));
+      track.panFade.output(out).pan(stereoPositionFromPan(track.version, value));
     }));
     if (track.pitchBase && track.pitchSlide.active()) {
       const auto pitchTick = track.pitchSlide.tick();
       if (pitchTick.status != SequenceMotionStatus::Inactive && pitchTick.status != SequenceMotionStatus::Delayed) {
-        out.pitchBend(track.pitchSlide.current() - *track.pitchBase);
+        track.pitchTransition.sample(out, track.pitchSlide.current());
       }
     }
     if (track.vibrato.fadeActive()) {
       const auto fadeTick = track.vibrato.tickFade();
       if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
-        emitVibratoDepth();
+        emitVibratoDepth(track.vibrato.output(out));
       }
     }
   }
@@ -657,7 +690,10 @@ private:
   void resetPitchForNote(u8 key) {
     // A new note cancels any unfinished slide. Drum notes have no melodic base,
     // so later slide commands cannot bend them as pitched instruments.
+    track.pitchTransition.stop(out);
+    track.pitchTransition.clear();
     track.pitchSlide.clearMotion();
+    track.pitchNote = {};
     if (track.percussion) {
       track.pitchBase.reset();
       return;
@@ -703,7 +739,7 @@ private:
     });
   }
 
-  void emitVibratoDepth(bool force = false) {
+  void emitVibratoDepth(PerformanceEmitter output, bool force = false) {
     const bool active = vibrato::isActive(track.version, track.vibrato.rate(), track.vibrato.depth());
     double amount = 0.0;
     double depthSemitones = 0.0;
@@ -721,14 +757,27 @@ private:
     }
     amount = std::clamp(amount, 0.0, 1.0);
     if (force || std::abs(amount - track.lastVibratoDepthAmount) > 0.0001) {
-      out.modulation(ModulationPerformanceEvent{
+      ModulationPerformanceEvent event{
           .target = ModulationPerformanceTarget::VibratoDepth,
           .amount = amount,
           .pitchDepthSemitones = depthSemitones,
           .controllerRangeMaxAmount = rangeMaxAmount,
-      });
+      };
+      output.modulation(std::move(event));
       track.lastVibratoDepthAmount = amount;
     }
+  }
+
+  void beginVibratoFadeAutomation(u8 length) {
+    if (length == 0) {
+      track.vibrato.clearAutomation();
+      return;
+    }
+    const double fullRangeCents = vibrato::maxDepthCents(track.version, kDefaultVibratoMaxDepth);
+    const double targetCents = vibrato::maxDepthCents(track.version, track.vibrato.depth());
+    track.vibrato.bind(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
+                                        fullRangeCents <= 0.0 ? 0.0 : targetCents / fullRangeCents, length,
+                                        vibratoDelayTicks(track.version, track.vibrato.delay(), track.tempo)));
   }
 
   void emitVibratoRate() {
@@ -1077,8 +1126,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xf9: {
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
-      return event.invoke([](Playback& playback, u8 length) { playback.track.vibrato.setReusableFade(length); },
-                          event.u8("length", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::setVibratoFade>(event.u8("length", SemanticOperandRole::Duration));
     }
     case 0xfa:
       if (version >= KONAMISNES_V4) {

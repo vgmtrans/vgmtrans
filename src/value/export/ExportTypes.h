@@ -37,6 +37,13 @@ enum class MidiBankSelectStyle {
   MsbAndLsb,
 };
 
+enum class MidiPitchTransitionRendering {
+  // Use each transition's format-provided compatibility preference.
+  PreserveFormat,
+  Portamento,
+  PitchBend,
+};
+
 struct MidiExportOptions {
   // Auto follows neutral source quantization when available, then falls back
   // to the legacy precision hint used by unmigrated dialects.
@@ -45,6 +52,7 @@ struct MidiExportOptions {
   bool skipChannel10 = true;
   bool writePortMetaEvents = true;
   MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
+  MidiPitchTransitionRendering pitchTransitions = MidiPitchTransitionRendering::PreserveFormat;
 };
 
 // Options shared by standalone sequence export, collection export, and

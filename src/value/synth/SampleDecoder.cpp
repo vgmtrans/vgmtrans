@@ -233,8 +233,9 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
       .loop = sample.loop,
   };
   decoded.pcm.reserve(encoded.size());
-  for (const u8 value : encoded) {
-    decoded.pcm.push_back(static_cast<s16>(static_cast<s8>(value)) << 8);
+  for (size_t index = 0; index < encoded.size(); ++index) {
+    const size_t sourceIndex = sample.reverse ? encoded.size() - 1 - index : index;
+    decoded.pcm.push_back(static_cast<s16>(static_cast<s8>(encoded[sourceIndex])) << 8);
   }
   return decoded;
 }
@@ -251,8 +252,40 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
       .loop = sample.loop,
   };
   decoded.pcm.reserve(encoded.size() / 2);
-  for (size_t offset = 0; offset + 1 < encoded.size(); offset += 2) {
-    decoded.pcm.push_back(static_cast<s16>(le16(encoded, offset)));
+  const size_t sampleCount = encoded.size() / 2;
+  for (size_t index = 0; index < sampleCount; ++index) {
+    const size_t sourceIndex = sample.reverse ? sampleCount - 1 - index : index;
+    decoded.pcm.push_back(static_cast<s16>(le16(encoded, sourceIndex * 2)));
+  }
+  return decoded;
+}
+
+[[nodiscard]] std::optional<DecodedSample> decodeKonamiK054539Adpcm(const Sample& sample,
+                                                                    std::span<const u8> sourceBytes) {
+  if (!rangeIsValid(sample, sourceBytes)) {
+    return std::nullopt;
+  }
+  static constexpr std::array<s16, 16> deltas{
+      0, 256, 512, 1024, 2048, 4096, 8192, 16384, 0, -16384, -8192, -4096, -2048, -1024, -512, -256,
+  };
+
+  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  DecodedSample decoded{
+      .sampleRate = sample.sampleRate,
+      .channels = sample.channels,
+      .loop = sample.loop,
+  };
+  decoded.pcm.reserve(encoded.size() * 2);
+  s32 previous = 0;
+  auto emit = [&](u8 nibble) {
+    previous = std::clamp<s32>(previous + deltas[nibble & 0x0f], -32768, 32767);
+    decoded.pcm.push_back(static_cast<s16>(previous));
+  };
+  for (size_t index = 0; index < encoded.size(); ++index) {
+    const size_t sourceIndex = sample.reverse ? encoded.size() - 1 - index : index;
+    const u8 value = encoded[sourceIndex];
+    emit(value & 0x0f);
+    emit(value >> 4);
   }
   return decoded;
 }
@@ -378,6 +411,8 @@ std::optional<DecodedSample> decodeSample(const Sample& sample, std::span<const 
       return decodeNdsPsg(sample, sourceBytes);
     case AudioCodec::PsxAdpcm:
       return decodePsxAdpcm(sample, sourceBytes);
+    case AudioCodec::KonamiK054539Adpcm:
+      return decodeKonamiK054539Adpcm(sample, sourceBytes);
     case AudioCodec::Unknown:
     case AudioCodec::OkiAdpcm:
       return std::nullopt;

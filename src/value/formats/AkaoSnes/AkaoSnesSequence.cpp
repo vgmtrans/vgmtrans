@@ -861,6 +861,7 @@ struct LfoState {
   void clearFade() {
     reusableFade.reset();
     fade.clearMotion();
+    fade.clearAutomation();
   }
 
   void setFade(u32 ticks, s32 target, s32 step) {
@@ -897,7 +898,7 @@ struct LfoState {
   u8 rate = 0;
   u8 depth = 0;
   std::optional<SequenceMotionPlan<s32>> reusableFade;
-  SequenceAutomatedValue<s32> fade;
+  PerformanceBoundMotion<SequenceAutomatedValue<s32>> fade;
   std::optional<u8> lastMidiDepth;
 };
 
@@ -1131,9 +1132,9 @@ struct TrackState {
   u8 tempo = kDefaultTempo;
   bool pan8Bit = true;
   bool sharedTempoApplied = false;
-  SequenceFixedPointAutomation<s32> volumeFade;
-  SequenceFixedPointAutomation<s32> panFade;
-  SequenceFixedPointAutomation<s32> tempoFade;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   std::optional<u64> lastTieableNoteTick;
   std::optional<u64> pitchAutomationStopTick;
   PitchEnvelopeState pitchEnvelope;
@@ -1151,6 +1152,8 @@ struct TrackState {
   bool pitchSlideNoteValid = false;
   s16 pitchSlideBaseNote = 0;
   s16 pitchSlideCurrentNote = 0;
+  PerformanceAutomationBinding pitchSlideAutomation;
+  PerformanceAutomationBinding pitchEnvelopeAutomation;
   LfoState vibrato;
   LfoState tremolo;
 };
@@ -1171,22 +1174,22 @@ struct Playback {
     return track.pitchAutomationStopTick && vm.tick() == *track.pitchAutomationStopTick;
   }
 
-  void emitVolume(u8 volume) { out.level(channelLevel(volume)); }
+  void emitVolume(PerformanceEmitter output, u8 volume) { output.level(channelLevel(volume)); }
 
   void volume(u8 value) {
     track.volumeFade.setCurrentRaw(value);
-    emitVolume(value);
+    emitVolume(out, value);
   }
 
-  void emitPan(u8 panValue) {
+  void emitPan(PerformanceEmitter output, u8 panValue) {
     const double rightGain = rightGainFromPan(panValue);
-    out.stereoBalance(1.0 - rightGain, rightGain);
+    output.stereoBalance(1.0 - rightGain, rightGain);
   }
 
   void pan(u8 rawPan) {
     const u8 panValue = static_cast<u8>(rawPan << (track.pan8Bit ? 0 : 1));
     track.panFade.setCurrentRaw(panValue);
-    emitPan(panValue);
+    emitPan(out, panValue);
   }
 
   void emitPitchBendRange(u16 cents) {
@@ -1206,9 +1209,14 @@ struct Playback {
     track.currentPitchBendValue = midiBendValue;
   }
 
-  void emitPitchBendForCurrentPitch() {
+  void emitPitchBendForCurrentPitch(PerformanceEmitter output) {
     const s16 value = akaoSnesPitchBendValue(track.currentPitch, track.pitchBase, track.currentPitchBendRangeCents);
-    emitPitchBendSemitones(akaoSnesPitchCents(track.currentPitch, track.pitchBase) / 100.0, value);
+    const double semitones = akaoSnesPitchCents(track.currentPitch, track.pitchBase) / 100.0;
+    if (track.currentPitchBendValue == value) {
+      return;
+    }
+    output.pitchBend(semitones);
+    track.currentPitchBendValue = value;
   }
 
   void resetPitchBendForNewNote() {
@@ -1272,7 +1280,7 @@ struct Playback {
     --track.pitchSlideStepsRemaining;
     track.currentPitch =
         track.pitchSlideStepsRemaining == 0 ? track.pitchSlideFinalPitch : track.currentPitch + track.pitchSlideStep;
-    emitPitchBendForCurrentPitch();
+    emitPitchBendForCurrentPitch(track.pitchSlideAutomation.output(out));
     if (track.pitchSlideStepsRemaining == 0) {
       track.pitchSlideActive = false;
     }
@@ -1296,7 +1304,7 @@ struct Playback {
     emitPitchBendRange(std::max(
         akaoSnesPitchBendRangeCents(track.pitchBase, targetPitch, kDefaultPitchBendRangeCents),
         akaoSnesPitchBendRangeCents(track.pitchBase, track.pitchSlideFinalPitch, kDefaultPitchBendRangeCents)));
-    emitPitchBendForCurrentPitch();
+    emitPitchBendForCurrentPitch(track.pitchSlideAutomation.output(out));
     track.pitchSlideStepsRemaining = steps;
     track.pitchSlideActive = true;
     updatePitchSlide();
@@ -1317,7 +1325,7 @@ struct Playback {
       return;
     }
     track.currentPitch = track.pitchBase + currentOffset;
-    emitPitchBendForCurrentPitch();
+    emitPitchBendForCurrentPitch(track.pitchEnvelopeAutomation.output(out));
   }
 
   Effects note(u8 durationIndex, u8 noteIndex, Address fallthrough) {
@@ -1360,39 +1368,41 @@ struct Playback {
     return Effects::wait(length);
   }
 
-  void emitVibratoDepth(u8 midiDepth, bool force = false) {
+  void emitVibratoDepth(PerformanceEmitter output, u8 midiDepth, bool force = false) {
     track.vibrato.emitDepth(
         midiDepth,
         [&](u8 outputDepth) {
           const double amount = static_cast<double>(outputDepth) / 127.0;
-          out.modulation(ModulationPerformanceEvent{
+          ModulationPerformanceEvent event{
               .target = ModulationPerformanceTarget::VibratoDepth,
               .amount = amount,
               .pitchDepthSemitones = (amount * akaoSnesMaxVibratoDepthCents(context.version)) / 100.0,
               .controllerRangeMaxAmount = 1.0,
-          });
+          };
+          output.modulation(std::move(event));
         },
         force);
   }
 
-  void emitTremoloDepth(u8 midiDepth, bool force = false) {
+  void emitTremoloDepth(PerformanceEmitter output, u8 midiDepth, bool force = false) {
     track.tremolo.emitDepth(
         midiDepth,
         [&](u8 outputDepth) {
-          out.modulation(ModulationPerformanceEvent{
+          ModulationPerformanceEvent event{
               .target = ModulationPerformanceTarget::TremoloDepth,
               .amount = static_cast<double>(outputDepth) / 127.0,
               .controllerRangeMaxAmount = 1.0,
-          });
+          };
+          output.modulation(std::move(event));
         },
         force);
   }
 
-  void setLfoOutputDepth(LfoTarget target, u8 depth, bool force = false) {
+  void setLfoOutputDepth(PerformanceEmitter output, LfoTarget target, u8 depth, bool force = false) {
     if (target == LfoTarget::Vibrato) {
-      emitVibratoDepth(depth, force);
+      emitVibratoDepth(output, depth, force);
     } else {
-      emitTremoloDepth(depth, force);
+      emitTremoloDepth(output, depth, force);
     }
   }
 
@@ -1477,7 +1487,18 @@ struct Playback {
       track.vibrato.beginFade(delayTicks, initialDepth);
       midiDepth = delayTicks == 0 ? track.vibratoFadeDepthMidiValue(context.version, initialDepth) : 0;
     }
-    setLfoOutputDepth(target, midiDepth, true);
+    const auto& fade = isVibrato ? track.vibrato.reusableFade : track.tremolo.reusableFade;
+    if (active && fade) {
+      lfo.fade.bind(out.noteEnvelope(
+          isVibrato ? PerformanceAutomationTarget::VibratoDepth : PerformanceAutomationTarget::TremoloDepth,
+          static_cast<double>(isVibrato ? vibratoDepthMidiValue(context.version, rate, depth)
+                                        : tremoloDepthMidiValue(context.version, rate, depth, delay)) /
+              127.0,
+          fade->ticks, lfoDelayTicks(context.version, delay)));
+    } else {
+      lfo.fade.clearAutomation();
+    }
+    setLfoOutputDepth(lfo.fade.output(out), target, midiDepth, true);
     if (active) {
       syncLfoRateAndDelay(target);
       if (vm.tick() == 0 && initialTempo && beforeInitialTempoTrack && initialTempo->tempo != track.tempo) {
@@ -1494,7 +1515,7 @@ struct Playback {
     LfoState& lfo = target == LfoTarget::Vibrato ? track.vibrato : track.tremolo;
     lfo.depth = 0;
     lfo.clearFade();
-    setLfoOutputDepth(target, 0, true);
+    setLfoOutputDepth(lfo.fade.output(out), target, 0, true);
   }
 
   void beginVibratoForNote() {
@@ -1505,7 +1526,8 @@ struct Playback {
     const u32 delay = lfoDelayTicks(context.version, track.vibrato.delay);
     const s32 initialDepth = context.version == AKAOSNES_V4 ? track.vibrato.scaledDepth(8) / 4 : 0;
     track.vibrato.beginFade(delay, initialDepth);
-    emitVibratoDepth(delay == 0 ? track.vibratoFadeDepthMidiValue(context.version, initialDepth) : 0, true);
+    emitVibratoDepth(track.vibrato.fade.output(out),
+                     delay == 0 ? track.vibratoFadeDepthMidiValue(context.version, initialDepth) : 0, true);
   }
 
   void beginTremoloForNote() {
@@ -1513,7 +1535,7 @@ struct Playback {
       return;
     }
     track.tremolo.beginFade(track.tremolo.delay);
-    emitTremoloDepth(0, true);
+    emitTremoloDepth(track.tremolo.fade.output(out), 0, true);
   }
 
   void updateVibratoFade() {
@@ -1524,7 +1546,7 @@ struct Playback {
     if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
       const s32 current = std::min(track.vibrato.scaledDepth(8), fadeTick.current);
       track.vibrato.fade.setCurrentPreservingMotion(current);
-      emitVibratoDepth(track.vibratoFadeDepthMidiValue(context.version, current));
+      emitVibratoDepth(track.vibrato.fade.output(out), track.vibratoFadeDepthMidiValue(context.version, current));
     }
   }
 
@@ -1536,21 +1558,19 @@ struct Playback {
     if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
       const s32 current = std::min(track.tremolo.scaledDepth(8), fadeTick.current);
       track.tremolo.fade.setCurrentPreservingMotion(current);
-      emitTremoloDepth(track.tremoloFadeDepthMidiValue(context.version, current));
+      emitTremoloDepth(track.tremolo.fade.output(out), track.tremoloFadeDepthMidiValue(context.version, current));
     }
   }
 
-  [[nodiscard]] u8 normalizedTempo(u8 rawTempo) const {
-    return normalizeTempoValue(context.minorVersion, rawTempo);
-  }
+  [[nodiscard]] u8 normalizedTempo(u8 rawTempo) const { return normalizeTempoValue(context.minorVersion, rawTempo); }
 
-  void applyTempo(u8 tempo) {
+  void applyTempo(PerformanceEmitter output, u8 tempo) {
     track.tempo = tempo;
     program.observeTempo(track.trackNumber, vm.tick(), tempo);
     if (const auto initial = program.initialTempo(); initial && tempo == initial->tempo) {
       track.sharedTempoApplied = true;
     }
-    out.tempo(tempoMicrosecondsPerQuarter(context.version, context.minorVersion, tempo));
+    output.tempo(tempoMicrosecondsPerQuarter(context.version, context.minorVersion, tempo));
     syncLfoRateAndDelay(LfoTarget::Vibrato);
     syncLfoRateAndDelay(LfoTarget::Tremolo);
   }
@@ -1558,7 +1578,7 @@ struct Playback {
   void tempoChange(u8 rawTempo) {
     const u8 tempo = normalizedTempo(rawTempo);
     track.tempoFade.setCurrentRaw(tempo);
-    applyTempo(tempo);
+    applyTempo(out, tempo);
   }
 
   void syncSharedTempoAtTick() {
@@ -1616,9 +1636,12 @@ struct Playback {
 
   void tick() {
     syncSharedTempoAtTick();
-    static_cast<void>(track.volumeFade.tickRaw([&](s32 value) { emitVolume(static_cast<u8>(value)); }));
-    static_cast<void>(track.panFade.tickRaw([&](s32 value) { emitPan(static_cast<u8>(value)); }));
-    static_cast<void>(track.tempoFade.tickRaw([&](s32 value) { applyTempo(static_cast<u8>(value)); }));
+    static_cast<void>(
+        track.volumeFade.tickRaw([&](s32 value) { emitVolume(track.volumeFade.output(out), static_cast<u8>(value)); }));
+    static_cast<void>(
+        track.panFade.tickRaw([&](s32 value) { emitPan(track.panFade.output(out), static_cast<u8>(value)); }));
+    static_cast<void>(
+        track.tempoFade.tickRaw([&](s32 value) { applyTempo(track.tempoFade.output(out), static_cast<u8>(value)); }));
     if (terminalPitchWaitBoundary()) {
       return;
     }
@@ -1693,6 +1716,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
                          : event.invoke(
                                [](Playback& playback, u16 ticks, u8 volume) {
                                  static_cast<void>(playback.track.volumeFade.begin(
+                                     playback.out.fade(PerformanceAutomationTarget::Level, channelLevel(volume), ticks),
                                      SequenceFixedPointMotion<s32>::toRawTarget(volume, ticks)));
                                },
                                length, target);
@@ -1705,14 +1729,17 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
       const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
       const u8 target = event.u8("pan", SemanticOperandRole::Pan);
-      return length == 0 ? event.invoke<&Playback::pan>(target)
-                         : event.invoke(
-                               [](Playback& playback, u16 ticks, u8 rawPan) {
-                                 const u8 pan = static_cast<u8>(rawPan << (playback.track.pan8Bit ? 0 : 1));
-                                 static_cast<void>(playback.track.panFade.begin(
-                                     SequenceFixedPointMotion<s32>::toRawTarget(pan, ticks)));
-                               },
-                               length, target);
+      return length == 0
+                 ? event.invoke<&Playback::pan>(target)
+                 : event.invoke(
+                       [](Playback& playback, u16 ticks, u8 rawPan) {
+                         const u8 pan = static_cast<u8>(rawPan << (playback.track.pan8Bit ? 0 : 1));
+                         const double rightGain = rightGainFromPan(pan);
+                         static_cast<void>(playback.track.panFade.begin(
+                             playback.out.fade(PerformanceAutomationTarget::Pan, (rightGain * 2.0) - 1.0, ticks),
+                             SequenceFixedPointMotion<s32>::toRawTarget(pan, ticks)));
+                       },
+                       length, target);
     }
 
     case EventType::PitchEnvelopeOn: {
@@ -1733,6 +1760,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
           [](Playback& playback, s8 pitch, u8 wait, u8 duration) {
             if (pitch == 0 || duration == 0) {
               playback.track.pitchEnvelope = {};
+              playback.track.pitchEnvelopeAutomation.clear();
               return;
             }
             auto& envelope = playback.track.pitchEnvelope;
@@ -1741,13 +1769,18 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
             envelope.delay = wait;
             envelope.length = duration;
             envelope.progressStep = akaoSnesPitchEnvelopeProgressStep(playback.context.version, duration);
+            playback.track.pitchEnvelopeAutomation = playback.out.noteEnvelope(
+                PerformanceAutomationTarget::Pitch, static_cast<double>(pitch), duration, wait);
           },
           semitones, delay, length);
     }
     case EventType::PitchEnvelopeOff: {
       auto event = cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch);
       event.derived("pitch_envelope_off", true, SemanticOperandRole::State);
-      return event.invoke([](Playback& playback) { playback.track.pitchEnvelope = {}; });
+      return event.invoke([](Playback& playback) {
+        playback.track.pitchEnvelope = {};
+        playback.track.pitchEnvelopeAutomation.clear();
+      });
     }
     case EventType::PitchSlide: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
@@ -1758,6 +1791,10 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
             playback.track.pendingPitchSlideSemitones = pitch;
             if (pitch == 0) {
               playback.track.clearPendingPitchSlide();
+              playback.track.pitchSlideAutomation.clear();
+            } else {
+              playback.track.pitchSlideAutomation =
+                  playback.out.noteFade(PerformanceAutomationTarget::Pitch, static_cast<double>(pitch), duration);
             }
           },
           steps, event.s8("semitones"));
@@ -1938,10 +1975,9 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const u8 raw = event.u8("raw");
       const u8 tempo = normalizeTempoValue(profile.minorVersion, raw);
-      event.derived(
-          "tempo",
-          tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, tempo)),
-          SourceValueDisplay::BeatsPerMinute);
+      event.derived("tempo",
+                    tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, tempo)),
+                    SourceValueDisplay::BeatsPerMinute);
       return event.invoke<&Playback::tempoChange>(raw);
     }
     case EventType::TempoFade: {
@@ -1951,16 +1987,20 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       const u8 normalizedTarget = normalizeTempoValue(profile.minorVersion, target);
       event.derived(
           "target_tempo",
-          tempoBeatsPerMinute(
-              tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, normalizedTarget)),
+          tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, normalizedTarget)),
           SourceValueDisplay::BeatsPerMinute);
       return length == 0
                  ? event.invoke<&Playback::tempoChange>(target)
                  : event.invoke(
                        [](Playback& playback, u16 ticks, u8 rawTempo) {
                          playback.track.tempoFade.setCurrentRaw(playback.track.tempo);
+                         const u8 tempo = playback.normalizedTempo(rawTempo);
                          static_cast<void>(playback.track.tempoFade.begin(
-                             SequenceFixedPointMotion<s32>::toRawTarget(playback.normalizedTempo(rawTempo), ticks)));
+                             playback.out.fade(PerformanceAutomationTarget::Tempo,
+                                               static_cast<double>(tempoMicrosecondsPerQuarter(
+                                                   playback.context.version, playback.context.minorVersion, tempo)),
+                                               ticks),
+                             SequenceFixedPointMotion<s32>::toRawTarget(tempo, ticks)));
                        },
                        length, target);
     }

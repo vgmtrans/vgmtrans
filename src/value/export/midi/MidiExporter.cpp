@@ -244,10 +244,10 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           addController(messages, typedEvent.tick, typedEvent.channel, 5, typedEvent.value);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoTime14>) {
-          addController(messages, typedEvent.tick, typedEvent.channel, 5,
-                        static_cast<u8>((typedEvent.value >> 7) & 0x7f), 20);
           addController(messages, typedEvent.tick, typedEvent.channel, 37, static_cast<u8>(typedEvent.value & 0x7f),
                         20);
+          addController(messages, typedEvent.tick, typedEvent.channel, 5,
+                        static_cast<u8>((typedEvent.value >> 7) & 0x7f), 20);
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoControl>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 84, typedEvent.key);

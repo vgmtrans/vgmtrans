@@ -91,6 +91,8 @@ void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
       return "NDS PSG";
     case AudioCodec::PsxAdpcm:
       return "PSX ADPCM";
+    case AudioCodec::KonamiK054539Adpcm:
+      return "Konami K054539 ADPCM";
     case AudioCodec::OkiAdpcm:
       return "OKI ADPCM";
   }
@@ -105,6 +107,9 @@ void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample) {
       .derived("effective_sample_rate", sample.sampleRate)
       .derived("channels", sample.channels)
       .derived("bits_per_sample", sample.bitsPerSample);
+  if (sample.reverse) {
+    annotation.derived("reverse", true, SourceValueDisplay::Boolean);
+  }
   annotateLoop(annotation, sample.loop);
   if (sample.pitch.cents != 0) {
     annotation.derived("pitch_cents", sample.pitch.cents, SourceValueDisplay::Cents);
