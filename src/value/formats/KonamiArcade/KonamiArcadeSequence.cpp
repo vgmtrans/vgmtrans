@@ -119,6 +119,12 @@ struct Playback {
   VmApi& vm;
 
   [[nodiscard]] bool percussion() const { return track.percussionFlag1 || track.percussionFlag2; }
+  [[nodiscard]] double driverMilliseconds(u8 ticks) const {
+    return portamentoMilliseconds(ticks, track.nmiRateHertz, track.tempo);
+  }
+  [[nodiscard]] PitchSlideTiming slideTiming(u8 ticks) const {
+    return PitchSlideTiming::fixedDuration(ticks, driverMilliseconds(ticks));
+  }
 
   void setPercussion(u8 flag, bool enabled) {
     if (flag == 0) {
@@ -194,35 +200,19 @@ struct Playback {
     if (!isDrum && track.portamentoTime != 0 && track.previousKey && track.previousNote.valid() &&
         std::abs(*track.previousKey - key) >= 0.001) {
       note = out.note(key, noteGain, duration);
-      PitchSlideOptions slide{
-          .nativePortamento =
-              NativePortamentoHint{
-                  .timeMilliseconds = portamentoMilliseconds(track.portamentoTime, track.nmiRateHertz, track.tempo),
-                  // F0 already retained the source driver's persistent glide
-                  // setting at the command tick.
-                  .emitTime = false,
-              },
-      };
       if (track.previousNoteStart + track.previousNoteDuration == vm.tick()) {
-        slide.previousNote = track.previousNote;
-        static_cast<void>(out.pitchSlide(note, *track.previousKey, key, track.portamentoTime, std::move(slide)));
+        auto slide = out.pitchSlide(note, *track.previousKey, key, track.portamentoTime);
+        slide.continueFrom(track.previousNote).useCurrentPortamentoTiming();
       } else if (duration > 2) {
-        static_cast<void>(
-            out.at(vm.tick() + 1).pitchSlide(note, *track.previousKey, key, track.portamentoTime, std::move(slide)));
+        out.at(vm.tick() + 1)
+            .pitchSlide(note, *track.previousKey, key, track.portamentoTime)
+            .useCurrentPortamentoTiming();
       }
     } else if (track.slideDuration != 0 && track.slideDepth != 0 && !isDrum &&
                duration > static_cast<u32>(track.slideDelay + 1)) {
       const double slideStartKey = std::clamp(key - track.slideDepth, 0.0, 127.0);
       note = out.note(key, noteGain, duration);
-      static_cast<void>(out.at(vm.tick() + track.slideDelay)
-                            .pitchSlide(note, slideStartKey, key, track.slideDuration,
-                                        PitchSlideOptions{
-                                            .nativePortamento =
-                                                NativePortamentoHint{
-                                                    .timeMilliseconds = portamentoMilliseconds(
-                                                        track.slideDuration, track.nmiRateHertz, track.tempo),
-                                                },
-                                        }));
+      out.at(vm.tick() + track.slideDelay).pitchSlide(note, slideStartKey, key, slideTiming(track.slideDuration));
     } else {
       note = out.note(key, noteGain, duration, tied);
     }
@@ -288,7 +278,7 @@ struct Playback {
     track.slideDuration = 0;
     track.slideDelay = 0;
     if (raw != 0) {
-      out.pitchTransitionSettings(portamentoMilliseconds(raw, track.nmiRateHertz, track.tempo));
+      out.pitchTransitionSettings(driverMilliseconds(raw));
     }
   }
 
@@ -315,20 +305,11 @@ struct Playback {
     // loop transpose to this target.
     const double destination = target + 24.0;
     const u64 slideStart = track.previousNoteStart + delay;
-    static_cast<void>(
-        out.at(slideStart)
-            .pitchSlide(
-                track.previousNote, *track.previousKey, destination, duration,
-                PitchSlideOptions{
-                    .nativePortamento =
-                        NativePortamentoHint{
-                            .timeMilliseconds = portamentoMilliseconds(duration, track.nmiRateHertz, track.tempo),
-                            .restoreTimeMilliseconds =
-                                track.portamentoTime == 0 ? std::nullopt
-                                                          : std::optional<double>{portamentoMilliseconds(
-                                                                track.portamentoTime, track.nmiRateHertz, track.tempo)},
-                        },
-                }));
+    auto slide =
+        out.at(slideStart).pitchSlide(track.previousNote, *track.previousKey, destination, slideTiming(duration));
+    if (track.portamentoTime != 0) {
+      slide.restorePortamentoTiming(driverMilliseconds(track.portamentoTime));
+    }
   }
 
   [[nodiscard]] Effects loopEnd(u8 slot, u8 totalPlays, s8 attenuationDelta, s8 transposeDelta) {

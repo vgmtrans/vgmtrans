@@ -641,31 +641,59 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   u32 nextNote = 0;
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
-  out.pitchTransitionSettings(250.0);
+  out.tempo(1'000'000);
   const PerformanceNoteId note = out.note(64, 1.0, 8);
-  PitchSlideOptions slideOptions{
-      .renderingHint = PitchTransitionRenderingHint::Portamento,
-      .nativePortamento =
-          NativePortamentoHint{
-              .timeMilliseconds = 250.0,
-              .emitTime = false,
-          },
+  out.pitchSlide(note, 60, 64, 4);
+  out.at(2).tempo(500'000);
+
+  PerformanceTrack rateTrack{
+      .id = TrackId{1},
+      .sourceTrackNumber = 1,
+      .endTick = 8,
   };
-  out.pitchSlide(note, 60, 64, 4, slideOptions);
+  u64 rateSequence = 0;
+  u32 rateNote = 0;
+  u32 rateAutomation = 0;
+  PerformanceEmitter rateOut{rateTrack, CommandId{3}, SourceAnnotationId{4}, 0, rateSequence, rateNote, rateAutomation};
+  const PerformanceNoteId rateNoteId = rateOut.note(64, 1.0, 8);
+  rateOut.pitchSlide(rateNoteId, 60, 64, PitchSlideTiming::fixedRate(4, 2.0));
+
+  PerformanceTrack fixedTrack{
+      .id = TrackId{2},
+      .sourceTrackNumber = 2,
+      .endTick = 8,
+  };
+  u64 fixedSequence = 0;
+  u32 fixedNote = 0;
+  u32 fixedAutomation = 0;
+  PerformanceEmitter fixedOut{fixedTrack,    CommandId{5}, SourceAnnotationId{6}, 0,
+                              fixedSequence, fixedNote,    fixedAutomation};
+  const PerformanceNoteId fixedNoteId = fixedOut.note(64, 1.0, 8);
+  fixedOut.pitchSlide(fixedNoteId, 60, 64, PitchSlideTiming::fixedDuration(4, 125.0));
+
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
-      .tracks = {track},
+      .tracks = {track, rateTrack, fixedTrack},
   };
 
   const MidiSequence native = renderMidiSequence(performance);
-  expect(std::ranges::any_of(native.tracks[0].events,
-                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); }) &&
+  const auto portamentoTime = std::ranges::find_if(
+      native.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); });
+  expect(portamentoTime != native.tracks[0].events.end() && std::get<PortamentoTime14>(*portamentoTime).value == 63 &&
              std::ranges::any_of(
                  native.tracks[0].events,
                  [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
              std::ranges::none_of(native.tracks[0].events,
                                   [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
-         "preserve-format lowering should honor a format's native-portamento preference");
+         "portamento lowering should derive physical duration from sequence ticks and tempo");
+  const auto rateTime = std::ranges::find_if(
+      native.tracks[1].events, [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); });
+  expect(rateTime != native.tracks[1].events.end() && std::get<PortamentoTime14>(*rateTime).value == 2000,
+         "fixed-rate timing should derive portamento duration from pitch distance independently of tempo");
+  const auto fixedTime = std::ranges::find_if(
+      native.tracks[2].events, [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); });
+  expect(fixedTime != native.tracks[2].events.end() && std::get<PortamentoTime14>(*fixedTime).value == 125,
+         "fixed-duration timing should preserve source physical time independently of tempo");
 
   const MidiSequence bent =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
@@ -697,17 +725,13 @@ void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{3}, SourceAnnotationId{4}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,        CommandId{3}, SourceAnnotationId{4}, 0,
+                         nextSequence, nextNote,     nextAutomation,        PitchTransitionRenderingHint::PitchBend};
   const PerformanceNoteId note = out.note(64, 1.0, 8);
-  PitchSlideOptions firstOptions;
-  firstOptions.renderingHint = PitchTransitionRenderingHint::PitchBend;
-  firstOptions.interruptions.newAutomation = AutomationNewAutomationPolicy::Queue;
-  const auto first = out.pitchSlide(note, 60, 62, 2, firstOptions);
+  auto first = out.pitchSlide(note, 60, 62, 2);
+  first.onNewSlide(AutomationNewAutomationPolicy::Queue);
   first.sample(out.at(1), 61.5);
-  const auto second = out.at(1).pitchSlide(note, 0, 64, 2,
-                                           PitchSlideOptions{
-                                               .renderingHint = PitchTransitionRenderingHint::PitchBend,
-                                           });
+  const auto second = out.at(1).pitchSlide(note, 0, 64, 2);
   second.sample(out.at(3), 63.5);
 
   const PerformanceSequence performance{
@@ -744,9 +768,10 @@ void performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{5}, SourceAnnotationId{6}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,        CommandId{5}, SourceAnnotationId{6}, 0,
+                         nextSequence, nextNote,     nextAutomation,        PitchTransitionRenderingHint::PitchBend};
   const PerformanceNoteId firstNote = out.note(64, 1.0, 8);
-  out.pitchSlide(firstNote, 60, 64, 6, PitchSlideOptions{.renderingHint = PitchTransitionRenderingHint::PitchBend});
+  out.pitchSlide(firstNote, 60, 64, 6);
   out.at(3).note(67, 1.0, 3);
 
   const MidiSequence midi = renderMidiSequence(PerformanceSequence{
@@ -772,17 +797,12 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{7}, SourceAnnotationId{8}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,        CommandId{7}, SourceAnnotationId{8}, 0,
+                         nextSequence, nextNote,     nextAutomation,        PitchTransitionRenderingHint::PitchBend};
   const PerformanceNoteId firstNote = out.note(64, 1.0, 4);
-  PitchSlideOptions options{
-      .interruptions =
-          PerformanceAutomationInterruptPolicy{
-              .newNote = AutomationNewNotePolicy::Continue,
-              .noteEnd = AutomationNoteEndPolicy::Continue,
-          },
-      .renderingHint = PitchTransitionRenderingHint::PitchBend,
-  };
-  out.pitchSlide(firstNote, 60, 68, 8, options);
+  out.pitchSlide(firstNote, 60, 68, 8)
+      .onNewNote(AutomationNewNotePolicy::Continue)
+      .onNoteEnd(AutomationNoteEndPolicy::Continue);
   out.at(4).note(67, 1.0, 4);
 
   const PerformanceSequence performance{

@@ -90,6 +90,9 @@ struct SequenceDialect {
   std::string commandDetailKindPrefix;
   Timebase timebase;
   SequenceProgramBehavior defaultBehavior;
+  // PreserveFormat uses this preference; an export request may still override
+  // every transition with portamento or pitch bend.
+  PitchTransitionRenderingHint preferredPitchTransitionRendering = PitchTransitionRenderingHint::Portamento;
   CreateProgramState createProgramState = nullptr;
   CreateTrackState createTrackState = nullptr;
   ExecuteCommand execute = nullptr;

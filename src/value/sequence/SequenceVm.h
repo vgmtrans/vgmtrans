@@ -25,15 +25,7 @@ struct BranchResult {
 };
 
 class PerformanceAutomationBinding;
-
-struct PitchSlideOptions {
-  std::optional<PerformanceNoteId> previousNote;
-  PerformanceLaneId lane{0};
-  PerformanceAutomationCurve curve = LinearAutomationCurve{};
-  PerformanceAutomationInterruptPolicy interruptions;
-  PitchTransitionRenderingHint renderingHint = PitchTransitionRenderingHint::Portamento;
-  std::optional<NativePortamentoHint> nativePortamento;
-};
+class PitchSlideBinding;
 
 class RepeatCounter {
 public:
@@ -57,8 +49,10 @@ private:
 // PerformanceEmitter fills in the current tick and source command automatically.
 class PerformanceEmitter {
 public:
-  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick,
-                     u64& nextSequence, u32& nextNote, u32& nextAutomation);
+  PerformanceEmitter(
+      PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick,
+      u64& nextSequence, u32& nextNote, u32& nextAutomation,
+      PitchTransitionRenderingHint preferredPitchTransitionRendering = PitchTransitionRenderingHint::Portamento);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   PerformanceNoteId note(NotePerformanceEvent event);
@@ -120,8 +114,10 @@ public:
   // Declares one source-level pitch transition. The emitter resolves
   // replacement, queuing, and retargeting against earlier transitions; MIDI
   // representation remains an export decision.
-  PerformanceAutomationBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, u32 durationTicks,
-                                          PitchSlideOptions options = {});
+  PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, u32 durationTicks,
+                               PerformanceLaneId lane = PerformanceLaneId{0});
+  PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, PitchSlideTiming timing,
+                               PerformanceLaneId lane = PerformanceLaneId{0});
 
   [[nodiscard]] PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue,
                                                   u32 durationTicks, u32 delayTicks = 0);
@@ -151,6 +147,7 @@ private:
   u64& nextSequence_;
   u32& nextNote_;
   u32& nextAutomation_;
+  PitchTransitionRenderingHint preferredPitchTransitionRendering_;
   std::optional<u32> automation_;
 };
 
@@ -176,6 +173,7 @@ public:
 
 private:
   friend class PerformanceEmitter;
+  friend class PitchSlideBinding;
 
   PerformanceAutomationBinding(PerformanceTrack& owner, u32 automation, PerformanceAutomationId id)
       : owner_(&owner), automation_(automation), id_(id) {}
@@ -183,6 +181,37 @@ private:
   PerformanceTrack* owner_ = nullptr;
   u32 automation_ = 0;
   PerformanceAutomationId id_;
+};
+
+// The common pitchSlide() call declares only musical intent. This small handle
+// adds the source driver's unusual behavior without exposing the stored IR
+// representation to format code.
+class PitchSlideBinding : public PerformanceAutomationBinding {
+public:
+  PitchSlideBinding() = default;
+
+  PitchSlideBinding& continueFrom(PerformanceNoteId previousNote);
+  PitchSlideBinding& curve(PerformanceAutomationCurve curve);
+  PitchSlideBinding& onNewNote(AutomationNewNotePolicy policy);
+  PitchSlideBinding& onNewSlide(AutomationNewAutomationPolicy policy);
+  PitchSlideBinding& onNoteEnd(AutomationNoteEndPolicy policy);
+  PitchSlideBinding& preferPortamento();
+  PitchSlideBinding& preferPitchBend();
+
+  // Retains portamento time already established by an earlier driver command.
+  PitchSlideBinding& useCurrentPortamentoTiming();
+  // Reinstates a persistent driver setting after a temporary native slide.
+  PitchSlideBinding& restorePortamentoTiming(double timeMilliseconds);
+  PitchSlideBinding& portamentoOverlap(u32 ticks);
+
+private:
+  friend class PerformanceEmitter;
+
+  PitchSlideBinding(PerformanceTrack& owner, u32 automation, PerformanceAutomationId id)
+      : PerformanceAutomationBinding(owner, automation, id) {}
+
+  [[nodiscard]] PitchTransitionIntent* intent() const;
+  [[nodiscard]] NativePortamentoHint* nativePortamento() const;
 };
 
 // Adds an output binding to an existing sequence-motion type without coupling

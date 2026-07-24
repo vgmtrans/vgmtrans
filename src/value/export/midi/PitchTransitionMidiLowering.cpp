@@ -10,7 +10,9 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <span>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -38,6 +40,81 @@ struct NoteChain {
   double linearVelocity = 1.0;
   std::vector<NoteSegment> segments;
 };
+
+struct TempoChange {
+  u64 tick = 0;
+  u32 microsecondsPerQuarter = 500000;
+  size_t order = 0;
+};
+
+[[nodiscard]] std::vector<TempoChange> collectTempoChanges(const PerformanceSequence& performance) {
+  std::vector<TempoChange> changes;
+  for (const auto& track : performance.tracks) {
+    for (const auto* event : flattenedPerformanceEvents(track)) {
+      const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
+      if (tempo == nullptr) {
+        continue;
+      }
+      changes.push_back(TempoChange{
+          .tick = tempo->header.tick,
+          .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
+          .order = changes.size(),
+      });
+    }
+  }
+  std::ranges::stable_sort(changes, [](const TempoChange& lhs, const TempoChange& rhs) {
+    return std::tie(lhs.tick, lhs.order) < std::tie(rhs.tick, rhs.order);
+  });
+  return changes;
+}
+
+[[nodiscard]] double tempoRelativeDurationMilliseconds(const Timebase& timebase, std::span<const TempoChange> changes,
+                                                       u64 startTick, u32 durationTicks) {
+  if (durationTicks == 0) {
+    return 0.0;
+  }
+
+  const u64 endTick = startTick > std::numeric_limits<u64>::max() - durationTicks ? std::numeric_limits<u64>::max()
+                                                                                  : startTick + durationTicks;
+  const double ppqn = std::max(1u, timebase.ppqn);
+  u32 tempo = 500000;
+  u64 cursor = startTick;
+  double microseconds = 0.0;
+
+  for (const auto& change : changes) {
+    if (change.tick <= startTick) {
+      tempo = change.microsecondsPerQuarter;
+      continue;
+    }
+    if (change.tick >= endTick) {
+      break;
+    }
+    microseconds += static_cast<double>(change.tick - cursor) * tempo / ppqn;
+    cursor = change.tick;
+    tempo = change.microsecondsPerQuarter;
+  }
+  microseconds += static_cast<double>(endTick - cursor) * tempo / ppqn;
+  return microseconds / 1000.0;
+}
+
+[[nodiscard]] double physicalDurationMilliseconds(const PitchTransitionIntent& transition, const Timebase& timebase,
+                                                  std::span<const TempoChange> changes, u64 startTick) {
+  return std::visit(
+      [&](const auto& physical) {
+        using Physical = std::decay_t<decltype(physical)>;
+        if constexpr (std::is_same_v<Physical, TempoRelativePitchSlideTiming>) {
+          return tempoRelativeDurationMilliseconds(timebase, changes, startTick, transition.timing.timelineTicks);
+        } else if constexpr (std::is_same_v<Physical, FixedDurationPitchSlideTiming>) {
+          return std::max(0.0, physical.milliseconds);
+        } else {
+          if (physical.semitonesPerSecond <= 0.0) {
+            return 0.0;
+          }
+          return std::abs(transition.targetKey - transition.startKey) / physical.semitonesPerSecond * 1000.0;
+        }
+      },
+      transition.timing.physical);
+}
 
 [[nodiscard]] u64 noteEnd(const NotePerformanceEvent& note) {
   return note.header.tick > std::numeric_limits<u64>::max() - note.durationTicks
@@ -200,7 +277,7 @@ void splitForPortamento(NoteChain& chain, const PerformanceAutomation& automatio
 }
 
 void lowerTrackAutomations(PerformanceSequence& performance, PerformanceTrack& track,
-                           const MidiExportOptions& options) {
+                           std::span<const TempoChange> tempoChanges, const MidiExportOptions& options) {
   u64 nextSequence = 0;
   for (const auto& event : track.events) {
     nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
@@ -370,9 +447,7 @@ void lowerTrackAutomations(PerformanceSequence& performance, PerformanceTrack& t
       continue;
     }
 
-    const NativePortamentoHint native = transition.nativePortamento.value_or(NativePortamentoHint{
-        .timeMilliseconds = static_cast<double>(transition.durationTicks),
-    });
+    const NativePortamentoHint native = transition.nativePortamento.value_or(NativePortamentoHint{});
     if (std::holds_alternative<SampledAutomationCurve>(transition.curve)) {
       addWarning(performance, *automation,
                  "Native MIDI portamento cannot preserve the transition's exact sampled pitch curve");
@@ -395,9 +470,11 @@ void lowerTrackAutomations(PerformanceSequence& performance, PerformanceTrack& t
     splitForPortamento(*chain, *automation, transition, startTick, native.overlapTicks);
 
     if (native.emitTime) {
+      const double timeMilliseconds = physicalDurationMilliseconds(transition, performance.timebase, tempoChanges,
+                                                                   automation->realization.startTick);
       events.emplace_back(PortamentoPerformanceEvent{
           .header = atTick(automation->header, startTick, nextSequence),
-          .timeMilliseconds = native.timeMilliseconds,
+          .timeMilliseconds = timeMilliseconds,
           .previousKey = transition.startKey,
       });
     } else {
@@ -451,9 +528,10 @@ void lowerTrackAutomations(PerformanceSequence& performance, PerformanceTrack& t
 
 PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
                                                    const MidiExportOptions& options) {
+  const std::vector<TempoChange> tempoChanges = collectTempoChanges(performance);
   PerformanceSequence lowered = performance;
   for (auto& track : lowered.tracks) {
-    lowerTrackAutomations(lowered, track, options);
+    lowerTrackAutomations(lowered, track, tempoChanges, options);
   }
   return lowered;
 }

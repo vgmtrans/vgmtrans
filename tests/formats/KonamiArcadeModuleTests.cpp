@@ -272,8 +272,10 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     }
   }
   expect(transitions.size() == 2 && transitions[0]->startKey == 62.0 && transitions[0]->targetKey == 64.0 &&
-             transitions[0]->previousNote == notes[2]->note && transitions[1]->startKey == 68.0 &&
-             transitions[1]->targetKey == 66.0,
+             transitions[0]->previousNote == notes[2]->note && transitions[0]->nativePortamento &&
+             !transitions[0]->nativePortamento->emitTime && transitions[1]->startKey == 68.0 &&
+             transitions[1]->targetKey == 66.0 &&
+             std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
          "continuous and delayed slides should retain typed intent, including F3's absolute target");
   expect(std::ranges::none_of(performance.tracks[0].events,
                               [](const PerformanceEvent& event) {

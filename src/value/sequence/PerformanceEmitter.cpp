@@ -38,14 +38,17 @@ namespace {
 
 PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand,
                                        SourceAnnotationId sourceAnnotation, u64 tick, u64& nextSequence, u32& nextNote,
-                                       u32& nextAutomation)
+                                       u32& nextAutomation,
+                                       PitchTransitionRenderingHint preferredPitchTransitionRendering)
     : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick),
-      nextSequence_(nextSequence), nextNote_(nextNote), nextAutomation_(nextAutomation) {
+      nextSequence_(nextSequence), nextNote_(nextNote), nextAutomation_(nextAutomation),
+      preferredPitchTransitionRendering_(preferredPitchTransitionRendering) {
 }
 
 PerformanceEmitter PerformanceEmitter::at(u64 tick) const {
   auto output =
-      PerformanceEmitter{track_, sourceCommand_, sourceAnnotation_, tick, nextSequence_, nextNote_, nextAutomation_};
+      PerformanceEmitter{track_,        sourceCommand_, sourceAnnotation_, tick,
+                         nextSequence_, nextNote_,      nextAutomation_,   preferredPitchTransitionRendering_};
   output.automation_ = automation_;
   return output;
 }
@@ -333,6 +336,7 @@ void PerformanceEmitter::pitchTransitionSettings(PitchTransitionSettingsPerforma
 void PerformanceEmitter::pitchTransitionSettings(double timeMilliseconds) {
   pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent{
       .timeMilliseconds = timeMilliseconds,
+      .renderingHint = preferredPitchTransitionRendering_,
   });
 }
 
@@ -367,12 +371,18 @@ void PerformanceEmitter::appendEvents(std::vector<PerformanceEvent> events) {
   }
 }
 
-PerformanceAutomationBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double startKey, double targetKey,
-                                                            u32 durationTicks, PitchSlideOptions options) {
-  if (!note.valid() || durationTicks == 0) {
+PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double startKey, double targetKey,
+                                                 u32 durationTicks, PerformanceLaneId lane) {
+  return pitchSlide(note, startKey, targetKey, PitchSlideTiming::fromTicks(durationTicks), lane);
+}
+
+PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double startKey, double targetKey,
+                                                 PitchSlideTiming timing, PerformanceLaneId lane) {
+  if (!note.valid() || timing.timelineTicks == 0) {
     return {};
   }
 
+  const u32 durationTicks = timing.timelineTicks;
   const u64 requestedStart = tick_;
   u64 start = requestedStart;
   std::optional<PerformanceAutomationId> continuesFrom;
@@ -382,7 +392,7 @@ PerformanceAutomationBinding PerformanceEmitter::pitchSlide(PerformanceNoteId no
   // though no interruption is necessary.
   for (auto previous = track_.automations.rbegin(); previous != track_.automations.rend(); ++previous) {
     auto* previousPitch = pitchTransitionIntent(*previous);
-    if (previousPitch == nullptr || previousPitch->lane != options.lane || previous->realization.endTick < start) {
+    if (previousPitch == nullptr || previousPitch->lane != lane || previous->realization.endTick < start) {
       continue;
     }
     if (previous->realization.endTick == start) {
@@ -432,15 +442,11 @@ PerformanceAutomationBinding PerformanceEmitter::pitchSlide(PerformanceNoteId no
       .intent =
           PitchTransitionIntent{
               .note = note,
-              .previousNote = options.previousNote,
-              .lane = options.lane,
+              .lane = lane,
               .startKey = startKey,
               .targetKey = targetKey,
-              .durationTicks = durationTicks,
-              .curve = std::move(options.curve),
-              .interruptions = options.interruptions,
-              .renderingHint = options.renderingHint,
-              .nativePortamento = std::move(options.nativePortamento),
+              .timing = std::move(timing),
+              .renderingHint = preferredPitchTransitionRendering_,
           },
       .realization =
           PerformanceAutomationRealization{
@@ -450,7 +456,7 @@ PerformanceAutomationBinding PerformanceEmitter::pitchSlide(PerformanceNoteId no
               .continuesFrom = continuesFrom,
           },
   });
-  return PerformanceAutomationBinding{track_, static_cast<u32>(track_.automations.size() - 1), id};
+  return PitchSlideBinding{track_, static_cast<u32>(track_.automations.size() - 1), id};
 }
 
 PerformanceAutomationBinding PerformanceEmitter::beginAutomation(ScalarPerformanceAutomationIntent intent) {
@@ -554,9 +560,9 @@ void PerformanceEmitter::automationSample(u32 automation, double value) {
         .tickOffset = 0,
         .value = pitch->startKey,
     });
-    if (pitch->durationTicks != 0) {
+    if (pitch->timing.timelineTicks != 0) {
       sampled.samples.push_back(AutomationSample{
-          .tickOffset = pitch->durationTicks,
+          .tickOffset = pitch->timing.timelineTicks,
           .value = pitch->targetKey,
       });
     }
@@ -609,6 +615,101 @@ void PerformanceAutomationBinding::sample(const PerformanceEmitter& out, double 
   }
   auto output = out;
   output.automationSample(automation_, value);
+}
+
+PitchTransitionIntent* PitchSlideBinding::intent() const {
+  if (owner_ == nullptr) {
+    return nullptr;
+  }
+  if (automation_ >= owner_->automations.size()) {
+    throw std::logic_error("Pitch-slide binding did not reference a valid automation");
+  }
+  auto* transition = pitchTransitionIntent(owner_->automations[automation_]);
+  if (transition == nullptr) {
+    throw std::logic_error("Pitch-slide binding did not reference a pitch transition");
+  }
+  return transition;
+}
+
+NativePortamentoHint* PitchSlideBinding::nativePortamento() const {
+  auto* transition = intent();
+  if (transition == nullptr) {
+    return nullptr;
+  }
+  if (!transition->nativePortamento) {
+    transition->nativePortamento.emplace();
+  }
+  return &*transition->nativePortamento;
+}
+
+PitchSlideBinding& PitchSlideBinding::continueFrom(PerformanceNoteId previousNote) {
+  if (auto* transition = intent()) {
+    transition->previousNote = previousNote.valid() ? std::optional{previousNote} : std::nullopt;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::curve(PerformanceAutomationCurve curve) {
+  if (auto* transition = intent()) {
+    transition->curve = std::move(curve);
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::onNewNote(AutomationNewNotePolicy policy) {
+  if (auto* transition = intent()) {
+    transition->interruptions.newNote = policy;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::onNewSlide(AutomationNewAutomationPolicy policy) {
+  if (auto* transition = intent()) {
+    transition->interruptions.newAutomation = policy;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::onNoteEnd(AutomationNoteEndPolicy policy) {
+  if (auto* transition = intent()) {
+    transition->interruptions.noteEnd = policy;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::preferPortamento() {
+  if (auto* transition = intent()) {
+    transition->renderingHint = PitchTransitionRenderingHint::Portamento;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::preferPitchBend() {
+  if (auto* transition = intent()) {
+    transition->renderingHint = PitchTransitionRenderingHint::PitchBend;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::useCurrentPortamentoTiming() {
+  if (auto* native = nativePortamento()) {
+    native->emitTime = false;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::restorePortamentoTiming(double timeMilliseconds) {
+  if (auto* native = nativePortamento()) {
+    native->restoreTimeMilliseconds = timeMilliseconds;
+  }
+  return *this;
+}
+
+PitchSlideBinding& PitchSlideBinding::portamentoOverlap(u32 ticks) {
+  if (auto* native = nativePortamento()) {
+    native->overlapTicks = ticks;
+  }
+  return *this;
 }
 
 void PerformanceEmitter::interruptPitchSlidesForNewNote(PerformanceLaneId lane) {

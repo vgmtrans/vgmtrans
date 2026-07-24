@@ -226,10 +226,8 @@ void pitchTransitionApiPreservesSamplesAndResolvesLifecyclePolicies() {
   PerformanceEmitter out{track, CommandId{14}, SourceAnnotationId{16}, 0, nextSequence, nextNote, nextAutomation};
 
   const PerformanceNoteId retargetNote = out.note(64, 1.0, 16);
-  PitchSlideOptions retargetable;
-  retargetable.renderingHint = PitchTransitionRenderingHint::PitchBend;
-  retargetable.interruptions.newAutomation = AutomationNewAutomationPolicy::Retarget;
-  const auto first = out.pitchSlide(retargetNote, 60, 64, 8, retargetable);
+  auto first = out.pitchSlide(retargetNote, 60, 64, 8);
+  first.preferPitchBend().onNewSlide(AutomationNewAutomationPolicy::Retarget);
   first.sample(out.at(3), 61.5);
   const auto second = out.at(4).pitchSlide(retargetNote, 0, 67, 4);
 
@@ -248,9 +246,8 @@ void pitchTransitionApiPreservesSamplesAndResolvesLifecyclePolicies() {
          "retargeting should clip the previous transition and begin from its realized source curve value");
 
   const PerformanceNoteId queuedNote = out.at(20).note(69, 1.0, 12);
-  PitchSlideOptions queueable;
-  queueable.interruptions.newAutomation = AutomationNewAutomationPolicy::Queue;
-  const auto queuedFirst = out.at(20).pitchSlide(queuedNote, 65, 67, 5, queueable);
+  auto queuedFirst = out.at(20).pitchSlide(queuedNote, 65, 67, 5);
+  queuedFirst.onNewSlide(AutomationNewAutomationPolicy::Queue);
   const auto queuedSecond = out.at(22).pitchSlide(queuedNote, 0, 69, 3);
   const auto& queuedRealization = track.automations[3].realization;
   const auto& queuedIntent = std::get<PitchTransitionIntent>(track.automations[3].intent);
@@ -274,9 +271,8 @@ void pitchTransitionApiPreservesSamplesAndResolvesLifecyclePolicies() {
          "a genuinely new note should apply the transition's new-note interruption policy");
 
   const PerformanceNoteId guardedNote = out.at(50).note(76, 1.0, 10);
-  PitchSlideOptions guardedOptions;
-  guardedOptions.interruptions.newAutomation = AutomationNewAutomationPolicy::Ignore;
-  const auto guarded = out.at(50).pitchSlide(guardedNote, 74, 76, 6, guardedOptions);
+  auto guarded = out.at(50).pitchSlide(guardedNote, 74, 76, 6);
+  guarded.onNewSlide(AutomationNewAutomationPolicy::Ignore);
   const auto ignored = out.at(52).pitchSlide(guardedNote, 76, 79, 3);
   expect(guarded.id().valid() && !ignored.id().valid() && track.automations[6].realization.endTick == 56,
          "an ignore policy should reject a competing transition without mutating the active one");
@@ -287,6 +283,26 @@ void pitchTransitionApiPreservesSamplesAndResolvesLifecyclePolicies() {
   expect(track.automations[7].realization.endTick == 62 &&
              track.automations[7].realization.endReason == PerformanceAutomationEndReason::SourceStopped,
          "formats should be able to stop a transition explicitly through its opaque handle");
+
+  auto configured = out.at(70).pitchSlide(stoppedNote, 81, 84, PitchSlideTiming::fixedDuration(4, 125.0));
+  configured.continueFrom(interruptedNote)
+      .onNewNote(AutomationNewNotePolicy::Continue)
+      .onNewSlide(AutomationNewAutomationPolicy::Queue)
+      .onNoteEnd(AutomationNoteEndPolicy::Continue)
+      .preferPitchBend()
+      .restorePortamentoTiming(250.0)
+      .portamentoOverlap(2);
+  const auto& configuredIntent = std::get<PitchTransitionIntent>(track.automations[8].intent);
+  expect(configuredIntent.previousNote == interruptedNote &&
+             configuredIntent.interruptions.newNote == AutomationNewNotePolicy::Continue &&
+             configuredIntent.interruptions.newAutomation == AutomationNewAutomationPolicy::Queue &&
+             configuredIntent.interruptions.noteEnd == AutomationNoteEndPolicy::Continue &&
+             configuredIntent.renderingHint == PitchTransitionRenderingHint::PitchBend &&
+             configuredIntent.timing.timelineTicks == 4 &&
+             std::get<FixedDurationPitchSlideTiming>(configuredIntent.timing.physical).milliseconds == 125.0 &&
+             configuredIntent.nativePortamento && configuredIntent.nativePortamento->restoreTimeMilliseconds == 250.0 &&
+             configuredIntent.nativePortamento->overlapTicks == 2,
+         "the pitch-slide handle should attach uncommon source behavior without exposing IR construction");
 }
 
 }  // namespace

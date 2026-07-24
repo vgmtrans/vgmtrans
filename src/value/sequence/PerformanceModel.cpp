@@ -25,7 +25,7 @@ PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation) 
 }
 
 double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks) {
-  const u32 duration = transition.durationTicks;
+  const u32 duration = transition.timing.timelineTicks;
   const u32 clampedElapsed = std::min(elapsedTicks, duration);
 
   if (const auto* sampled = std::get_if<SampledAutomationCurve>(&transition.curve);
