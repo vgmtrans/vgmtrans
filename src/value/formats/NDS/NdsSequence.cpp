@@ -30,18 +30,32 @@ namespace {
 constexpr u32 kMaxTrackCommands = 262144;
 constexpr u32 kSseqDataOffsetField = 0x18;
 constexpr u32 kSseqHeaderSize = 0x1c;
+constexpr double kPitchUnitsPerSemitone = 64.0;
+constexpr double kDriverSweepsPerSecond = 192.0;
+constexpr double kDriverTempoBase = 240.0;
 
 struct PendingBlock {
   u32 offset = 0;
   bool callTarget = false;
 };
 
+struct ProgramState {
+  u16 tempoBpm = 120;
+};
+
 // Only registers that persist from one executed source command to the next
 // belong here. Source bounds and relative-address bases are decode concerns.
 struct TrackState {
   bool noteWait = false;
+  bool tie = false;
+  bool portamento = false;
+  bool tiedChannelAutoSweep = true;
   s32 transpose = 0;
   u8 pitchBendRangeSemitones = 2;
+  u8 portamentoKey = 60;
+  u8 portamentoTime = 0;
+  s16 sweepPitch = 0;
+  std::optional<PerformanceNoteId> tiedNote;
 };
 
 // Only driver behavior that depends on runtime track history needs a method.
@@ -50,10 +64,91 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
+  ProgramState& program;
+
+  void tie(bool enabled) {
+    track.tie = enabled;
+    track.tiedNote.reset();
+    track.tiedChannelAutoSweep = true;
+  }
+
+  void portamentoControl(u8 sourceKey) {
+    track.portamentoKey = static_cast<u8>(static_cast<s32>(sourceKey) + track.transpose);
+    track.portamento = true;
+  }
+
+  void tempo(u16 bpm) {
+    program.tempoBpm = bpm;
+    out.tempo(static_cast<u32>(std::round(60000000.0 / bpm)));
+  }
+
+  void emitPitchSlide(PerformanceNoteId note, double startKey, double targetKey, PitchSlideTiming timing) {
+    auto slide = out.pitchSlide(note, startKey, targetKey, timing);
+    if (track.portamento) {
+      slide.preferPortamento();
+    } else {
+      slide.preferPitchBend();
+    }
+  }
 
   [[nodiscard]] Effects note(u8 sourceKey, u8 velocity, u32 duration) {
     const s32 key = std::clamp<s32>(static_cast<s32>(sourceKey) + track.transpose, 0, 127);
-    out.note(static_cast<double>(key), LevelScale::linearFromMidi7(velocity), duration);
+    const bool continuesTiedVoice = track.tie && track.tiedNote.has_value();
+    const PerformanceNoteId note =
+        out.note(static_cast<double>(key), LevelScale::linearFromMidi7(velocity), duration, continuesTiedVoice);
+
+    s32 sweep = track.sweepPitch;
+    if (track.portamento) {
+      sweep += (static_cast<s32>(track.portamentoKey) - key) * static_cast<s32>(kPitchUnitsPerSemitone);
+    }
+    sweep &= 0xffff;
+    if (sweep >= 0x8000) {
+      sweep -= 0x10000;
+    }
+    const double startKey = static_cast<double>(key) + sweep / kPitchUnitsPerSemitone;
+
+    std::optional<PitchSlideTiming> timing;
+    if (sweep != 0) {
+      if (track.portamentoTime == 0) {
+        if (duration != 0) {
+          timing = PitchSlideTiming::fromTicks(duration);
+        }
+      } else {
+        // Nitro squares CF, scales it by pitch distance, and counts the
+        // resulting length on its 192 Hz sound-thread clock.
+        const u32 sweepLength = static_cast<u32>(
+            (static_cast<u64>(track.portamentoTime) * track.portamentoTime * std::abs(static_cast<s64>(sweep))) >> 11);
+        if (sweepLength != 0) {
+          // A reused tied channel retains note-tick timing after a zero CF;
+          // changing CF alone does not restore its automatic sweep clock.
+          if (continuesTiedVoice && !track.tiedChannelAutoSweep) {
+            timing = PitchSlideTiming::fromTicks(sweepLength);
+          } else {
+            const double timelineTicks = sweepLength * static_cast<double>(program.tempoBpm) / kDriverTempoBase;
+            timing = PitchSlideTiming::fixedDuration(std::max<u32>(1, static_cast<u32>(std::llround(timelineTicks))),
+                                                     sweepLength * 1000.0 / kDriverSweepsPerSecond);
+          }
+        }
+      }
+    }
+
+    if (timing) {
+      emitPitchSlide(note, startKey, static_cast<double>(key), *timing);
+    } else if (continuesTiedVoice && track.portamentoKey != key) {
+      emitPitchSlide(note, static_cast<double>(track.portamentoKey), static_cast<double>(key),
+                     PitchSlideTiming::fromTicks(0));
+    }
+
+    if (track.tie) {
+      track.tiedNote = note;
+      if (!continuesTiedVoice) {
+        track.tiedChannelAutoSweep = true;
+      }
+      if (track.portamentoTime == 0) {
+        track.tiedChannelAutoSweep = false;
+      }
+    }
+    track.portamentoKey = static_cast<u8>(key);
     return track.noteWait ? Effects::wait(duration) : Effects{};
   }
 };
@@ -200,10 +295,15 @@ struct SequenceDecodeContext {
       auto event = cursor.command("Note Wait", SequenceSemantic::State);
       return event.set<&TrackState::noteWait>(event.u8("enabled") != 0);
     }
-    case 0xc8:
-      return cursor.ignored("Tie", 1);
-    case 0xc9:
-      return cursor.ignored("Portamento Control", 1);
+    case 0xc8: {
+      auto event = cursor.command("Tie", SequenceSemantic::State);
+      return event.invoke<&Playback::tie>(event.u8("enabled") != 0);
+    }
+    case 0xc9: {
+      auto event = cursor.command("Portamento Control", SequenceSemantic::Portamento);
+      return event.invoke<&Playback::portamentoControl>(
+          event.u8("key", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey));
+    }
     case 0xca: {
       auto event = cursor.command("Modulation Depth", SequenceSemantic::Modulation);
       const double amount = std::clamp(event.u8("depth") / 127.0, 0.0, 1.0);
@@ -217,11 +317,11 @@ struct SequenceDecodeContext {
       return cursor.ignored("Modulation Range", 1);
     case 0xce: {
       auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
-      return event.emitPortamentoEnable(event.u8("enabled") != 0);
+      return event.set<&TrackState::portamento>(event.u8("enabled") != 0);
     }
     case 0xcf: {
       auto event = cursor.command("Portamento Time", SequenceSemantic::Portamento);
-      return event.emitPortamentoTime(event.u8("time"));
+      return event.set<&TrackState::portamentoTime>(event.u8("time"));
     }
     case 0xd0:
       return cursor.ignored("Attack Rate", 1);
@@ -244,10 +344,13 @@ struct SequenceDecodeContext {
     case 0xe1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const u16 bpm = event.u16le("tempo", SourceValueDisplay::BeatsPerMinute);
-      return bpm == 0 ? event.ignore() : event.emitTempo(static_cast<u32>(std::round(60000000.0 / bpm)));
+      return bpm == 0 ? event.ignore() : event.invoke<&Playback::tempo>(bpm);
     }
-    case 0xe3:
-      return cursor.ignored("Sweep Pitch", 2);
+    case 0xe3: {
+      auto event = cursor.command("Sweep Pitch", SequenceSemantic::Pitch);
+      return event.set<&TrackState::sweepPitch>(
+          event.s16le("pitch", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+    }
     case 0xfc:
       return cursor.ignored("Loop End", 0);
     case 0xfd:
@@ -416,7 +519,7 @@ struct SequenceDecodeContext {
 }  // namespace
 
 const SequenceDialect& ndsSequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback>(SequenceDialect{
+  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
       .id = DialectId{.value = std::string(kNdsSequenceDialectId)},
       .commandDetailKindPrefix = "nds",
       .timebase = Timebase{.ppqn = 0x30},

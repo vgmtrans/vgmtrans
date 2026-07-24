@@ -114,7 +114,8 @@ public:
   // represents a musical glide that may be lowered as pitch bend or native
   // portamento. The glide may occur within one note or cross a note boundary;
   // continueFrom(previousNote) means it continues the previous note without
-  // retriggering the instrument's attack.
+  // retriggering the instrument's attack. A zero duration is an immediate
+  // attack-free key change.
   PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, u32 durationTicks,
                                PerformanceLaneId lane = PerformanceLaneId{0});
   PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, PitchSlideTiming timing,

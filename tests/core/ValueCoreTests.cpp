@@ -88,6 +88,8 @@ void ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();
 void ndsModuleOnlyBuildsDependenciesOfReferencedBanks();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectComposesPitchBendRangeActions();
+void ndsSequenceDialectPreservesPortamentoTimingIntent();
+void ndsSequenceDialectPreservesTiedSweepVoices();
 void ndsSequenceDialectExecutesCallAndReturn();
 void ndsSequenceDialectDiscoversSecondaryTrackAddresses();
 void ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands();
@@ -185,6 +187,8 @@ int main() {
     ndsModuleOnlyBuildsDependenciesOfReferencedBanks();
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
     ndsSequenceDialectComposesPitchBendRangeActions();
+    ndsSequenceDialectPreservesPortamentoTimingIntent();
+    ndsSequenceDialectPreservesTiedSweepVoices();
     ndsSequenceDialectExecutesCallAndReturn();
     ndsSequenceDialectDiscoversSecondaryTrackAddresses();
     ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands();

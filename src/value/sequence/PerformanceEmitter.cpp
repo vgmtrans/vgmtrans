@@ -374,7 +374,7 @@ PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double 
 
 PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double startKey, double targetKey,
                                                  PitchSlideTiming timing, PerformanceLaneId lane) {
-  if (!note.valid() || timing.timelineTicks == 0) {
+  if (!note.valid()) {
     return {};
   }
 
