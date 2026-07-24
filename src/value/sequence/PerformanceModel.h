@@ -175,6 +175,9 @@ struct VibratoDelayPerformanceEvent {
   PerformanceEventHeader header;
   // Delay in rendered sequence ticks, used when vibrato is simulated as pitch bend.
   u32 delayTicks = 0;
+  // Some source LFOs run on a fixed driver clock rather than sequence time.
+  // When present, simulation uses this physical duration instead of delayTicks.
+  std::optional<double> milliseconds;
   // Controller value to write when exporting synth-style MIDI controls.
   u8 midiValue = 0;
 };
@@ -182,6 +185,7 @@ struct VibratoDelayPerformanceEvent {
 struct TremoloDelayPerformanceEvent {
   PerformanceEventHeader header;
   u32 delayTicks = 0;
+  std::optional<double> milliseconds;
   u8 midiValue = 0;
 };
 
@@ -228,11 +232,21 @@ struct LegatoPedalPerformanceEvent {
   bool enabled = false;
 };
 
+enum class LfoWaveform {
+  Sine,
+  Triangle,
+  Square,
+  SawtoothUp,
+  SawtoothDown,
+};
+
 enum class ModulationPerformanceTarget {
   VibratoDepth,
   VibratoRate,
   TremoloDepth,
   TremoloRate,
+  PanDepth,
+  PanRate,
 };
 
 struct ModulationPerformanceEvent {
@@ -243,7 +257,16 @@ struct ModulationPerformanceEvent {
   // Optional physical values used by sequence-event simulation when the source
   // scanner can provide them. Generic controller export continues to use amount.
   std::optional<double> pitchDepthSemitones;
+  std::optional<double> volumeDepthDecibels;
+  std::optional<double> panDepth;
   std::optional<double> frequencyHz;
+  std::optional<u32> delayTicks;
+  std::optional<double> delayMilliseconds;
+  // A missing waveform retains the renderer's legacy/default LFO shape.
+  std::optional<LfoWaveform> waveform;
+  // Some drivers keep advancing the oscillator while its depth is zero. This
+  // matters when a later command reveals an already-running LFO mid-note.
+  bool phaseRunsAtZeroDepth = false;
   // Optional controller scaling ceiling, normalized to the same full range as amount.
   // Formats with sequence-derived modulation ranges can use this so MIDI controller
   // scaling and synth modulator scaling share the same denominator even when the
