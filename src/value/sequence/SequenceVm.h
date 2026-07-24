@@ -109,9 +109,12 @@ public:
   void marker(MarkerPerformanceEvent event);
   void appendEvents(std::vector<PerformanceEvent> events);
 
-  // Declares one already-realized source-level pitch transition. Format
-  // playback supplies its actual start tick and pitch; MIDI representation
-  // remains an export decision.
+  // Declares a note-anchored transition between absolute keys, where 60.0 is
+  // middle C and 60.5 is halfway to C-sharp. Unlike fade(Pitch, ...), this
+  // represents a musical glide that may be lowered as pitch bend or native
+  // portamento. The glide may occur within one note or cross a note boundary;
+  // continueFrom(previousNote) means it continues the previous note without
+  // retriggering the instrument's attack.
   PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, u32 durationTicks,
                                PerformanceLaneId lane = PerformanceLaneId{0});
   PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, PitchSlideTiming timing,
