@@ -1101,6 +1101,99 @@ void performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote() {
          "a new-note interruption should reset the channel bend at the interruption tick");
 }
 
+void performanceMidiRendererDefersPitchResetUntilTheNextAttack() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 16,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{7}, SourceAnnotationId{8}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId slidingNote = out.note(60, 1.0, 8);
+  out.pitchSlide(slidingNote, 60, 64, 4);
+  out.at(12).note(67, 1.0, 4);
+
+  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
+      PerformanceSequence{
+          .timebase = Timebase{.ppqn = 48},
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+          .tracks = {track},
+      },
+      {});
+  std::vector<std::pair<u64, double>> bends;
+  for (const auto& event : lowered.tracks[0].events) {
+    if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
+      bends.emplace_back(bend->header.tick, bend->semitones);
+    }
+  }
+
+  expect(std::ranges::find(bends, std::pair<u64, double>{4, 4.0}) != bends.end() &&
+             std::ranges::none_of(bends, [](const auto& bend) { return bend.first == 8; }) &&
+             bends.back() == std::pair<u64, double>{12, 0.0},
+         "a terminal bend should survive note-off and reset only when the next note attacks");
+}
+
+void performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 12,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{9}, SourceAnnotationId{10}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId note = out.note(60, 1.0, 8);
+  out.pitchSlide(note, 60, 64, 4);
+
+  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
+      PerformanceSequence{
+          .timebase = Timebase{.ppqn = 48},
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+          .tracks = {track},
+      },
+      {});
+  const auto& events = lowered.tracks[0].events;
+  const auto lastBend = std::find_if(events.rbegin(), events.rend(), [](const PerformanceEvent& event) {
+    return std::holds_alternative<PitchBendPerformanceEvent>(event);
+  });
+  expect(lastBend != events.rend() && std::get<PitchBendPerformanceEvent>(*lastBend).header.tick == 4 &&
+             std::get<PitchBendPerformanceEvent>(*lastBend).semitones == 4.0,
+         "pitch-bend lowering should not reset a release tail merely because the track has no later attack");
+}
+
+void performanceMidiRendererYieldsDeferredResetToAnExplicitPitchBend() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 16,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{11}, SourceAnnotationId{12}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId slidingNote = out.note(60, 1.0, 8);
+  out.pitchSlide(slidingNote, 60, 64, 4);
+  out.at(10).pitchBend(-1.0);
+  out.at(12).note(67, 1.0, 4);
+
+  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
+      PerformanceSequence{
+          .timebase = Timebase{.ppqn = 48},
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+          .tracks = {track},
+      },
+      {});
+  const auto resetAtNextAttack = std::ranges::find_if(lowered.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+    return bend != nullptr && bend->header.tick == 12 && bend->semitones == 0.0;
+  });
+  expect(resetAtNextAttack == lowered.tracks[0].events.end(),
+         "a later explicit pitch bend should own the channel instead of being erased by a deferred slide reset");
+}
+
 void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -1831,6 +1924,9 @@ void runValueMidiTests() {
   performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary();
   performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();
   performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote();
+  performanceMidiRendererDefersPitchResetUntilTheNextAttack();
+  performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack();
+  performanceMidiRendererYieldsDeferredResetToAnExplicitPitchBend();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
