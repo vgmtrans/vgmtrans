@@ -99,6 +99,13 @@ struct NoteSpan {
   return header;
 }
 
+[[nodiscard]] PerformanceEventHeader atAutomationTick(const PerformanceAutomation& automation, u64 tick,
+                                                      u64& nextSequence) {
+  auto header = atTick(automation.header, tick, nextSequence);
+  header.automation = automation.id;
+  return header;
+}
+
 void addWarning(PerformanceSequence& performance, const PerformanceAutomation& automation, std::string message) {
   performance.diagnostics.push_back(Diagnostic{
       .severity = Severity::Warning,
@@ -177,7 +184,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   const double noteBaseKey = bendBaseKeyAt(note, note.source.header.tick);
   if (startTick > note.source.header.tick && std::abs(transition.startKey - noteBaseKey) > 0.000001) {
     events.emplace_back(PitchBendPerformanceEvent{
-        .header = atTick(automation.header, note.source.header.tick, nextSequence),
+        .header = atAutomationTick(automation, note.source.header.tick, nextSequence),
         .semitones = transition.startKey - noteBaseKey,
     });
   }
@@ -185,7 +192,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   for (u64 tick = startTick;; ++tick) {
     const u64 elapsed = tick - automation.realization.startTick;
     events.emplace_back(PitchBendPerformanceEvent{
-        .header = atTick(automation.header, tick, nextSequence),
+        .header = atAutomationTick(automation, tick, nextSequence),
         .semitones = pitchTransitionValueAt(transition,
                                             static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()))) -
                      bendBaseKeyAt(note, tick),
@@ -197,9 +204,46 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   return true;
 }
 
+[[nodiscard]] bool transitionOwnsAttackAtEnd(const PerformanceAutomation& automation,
+                                             const PitchTransitionIntent& transition, const NoteSpan& anchor,
+                                             const NotePerformanceEvent& attack, const std::vector<NoteSpan>& notes) {
+  if (automation.realization.endReason != PerformanceAutomationEndReason::Completed ||
+      !transition.continuesAcrossNotes || attack.header.tick != automation.realization.endTick) {
+    return false;
+  }
+  const auto* note = findNote(notes, attack.note);
+  return note != nullptr && affectsNote(automation, transition, anchor, *note);
+}
+
+[[nodiscard]] std::optional<u64> nextIndependentAttack(const std::vector<PerformanceEvent>& events,
+                                                       const std::vector<NoteSpan>& notes,
+                                                       const PerformanceAutomation& automation,
+                                                       const PitchTransitionIntent& transition,
+                                                       const NoteSpan& anchor) {
+  std::optional<u64> next;
+  for (const auto& event : events) {
+    const auto* note = std::get_if<NotePerformanceEvent>(&event);
+    if (note == nullptr || note->extendsPrevious || note->header.tick < automation.realization.endTick ||
+        transitionOwnsAttackAtEnd(automation, transition, anchor, *note, notes)) {
+      continue;
+    }
+    next = next ? std::min(*next, note->header.tick) : note->header.tick;
+  }
+  return next;
+}
+
+[[nodiscard]] bool pitchBendTakenOver(const std::vector<PerformanceEvent>& events,
+                                      const PerformanceAutomation& automation, u64 resetTick) {
+  return std::ranges::any_of(events, [&](const PerformanceEvent& event) {
+    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+    return bend != nullptr && bend->header.tick >= automation.realization.endTick && bend->header.tick <= resetTick &&
+           (!bend->header.automation || *bend->header.automation != automation.id);
+  });
+}
+
 void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
                      const std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
-                     const std::vector<const PerformanceAutomation*>& portamentoTransitions, u64& nextSequence) {
+                     u64& nextSequence) {
   // Bend range is channel state, so choose one range that covers every linked
   // transition affecting a note.
   for (const auto& note : notes) {
@@ -222,6 +266,9 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
     }
   }
 
+  // Emit every transition first so a later pitch-bend writer can take
+  // ownership without an intervening reset.
+  std::vector<const PerformanceAutomation*> renderedTransitions;
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
     const auto* anchor = findNote(notes, transition.note);
@@ -230,35 +277,33 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
       continue;
     }
 
-    const NoteSpan* terminalNote = nullptr;
+    bool rendered = false;
     for (const auto& note : notes) {
       if (affectsNote(*automation, transition, *anchor, note) &&
           appendPitchBends(events, *automation, transition, note, nextSequence)) {
-        terminalNote = &note;
+        rendered = true;
       }
     }
-    const bool nativePortamentoTakesOver =
-        automation->realization.endReason == PerformanceAutomationEndReason::Continued &&
-        std::ranges::any_of(portamentoTransitions, [&](const PerformanceAutomation* candidate) {
-          if (candidate->realization.startTick != automation->realization.endTick) {
-            return false;
-          }
-          const auto& successor = *pitchTransitionIntent(*candidate);
-          return successor.lane == transition.lane &&
-                 (successor.note == transition.note ||
-                  (successor.previousNote && *successor.previousNote == transition.note));
-        });
-    if (terminalNote == nullptr || (automation->realization.endReason == PerformanceAutomationEndReason::Continued &&
-                                    !nativePortamentoTakesOver)) {
+    if (rendered) {
+      renderedTransitions.push_back(automation);
+    }
+  }
+
+  // Retain the terminal bend through note-off and the synth's release phase.
+  // Recenter only for the next attack that would otherwise inherit it.
+  std::vector<std::pair<const PerformanceAutomation*, u64>> resets;
+  for (const auto* automation : renderedTransitions) {
+    const auto& transition = *pitchTransitionIntent(*automation);
+    const auto* anchor = findNote(notes, transition.note);
+    const auto resetTick = nextIndependentAttack(events, notes, *automation, transition, *anchor);
+    if (!resetTick || pitchBendTakenOver(events, *automation, *resetTick)) {
       continue;
     }
-
-    const u64 resetTick =
-        automation->realization.endReason == PerformanceAutomationEndReason::Interrupted || nativePortamentoTakesOver
-            ? automation->realization.endTick
-            : terminalNote->endTick;
+    resets.emplace_back(automation, *resetTick);
+  }
+  for (const auto& [automation, resetTick] : resets) {
     events.emplace_back(PitchBendPerformanceEvent{
-        .header = atTick(automation->header, resetTick, nextSequence),
+        .header = atAutomationTick(*automation, resetTick, nextSequence),
         .semitones = 0.0,
     });
   }
@@ -509,7 +554,7 @@ PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& pe
          (performance.preferredPitchTransitionRendering == PitchTransitionRenderingHint::Portamento ||
           !portamentoTransitions.empty()));
     appendSourceEvents(events, track, notes, renderPortamentoSettings, nextSequence);
-    lowerPitchBends(lowered, events, notes, pitchBendTransitions, portamentoTransitions, nextSequence);
+    lowerPitchBends(lowered, events, notes, pitchBendTransitions, nextSequence);
     std::ranges::stable_sort(events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
       const auto& left = performanceEventHeader(lhs);
       const auto& right = performanceEventHeader(rhs);
