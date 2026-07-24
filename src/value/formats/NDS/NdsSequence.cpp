@@ -33,6 +33,8 @@ constexpr u32 kSseqHeaderSize = 0x1c;
 constexpr double kPitchUnitsPerSemitone = 64.0;
 constexpr double kDriverSweepsPerSecond = 192.0;
 constexpr double kDriverTempoBase = 240.0;
+constexpr double kLfoPhaseStepsPerCycle = 512.0;
+constexpr double kNitroSinePeak = 127.0;
 
 struct PendingBlock {
   u32 offset = 0;
@@ -41,6 +43,15 @@ struct PendingBlock {
 
 struct ProgramState {
   u16 tempoBpm = 120;
+};
+
+struct LfoState {
+  u8 target = 0;
+  u8 speed = 16;
+  u8 depth = 0;
+  u8 range = 1;
+  u16 delay = 0;
+  bool emitted = false;
 };
 
 // Only registers that persist from one executed source command to the next
@@ -56,6 +67,7 @@ struct TrackState {
   u8 portamentoTime = 0;
   s16 sweepPitch = 0;
   std::optional<PerformanceNoteId> tiedNote;
+  LfoState lfo;
 };
 
 // Only driver behavior that depends on runtime track history needs a method.
@@ -91,7 +103,136 @@ struct Playback {
     }
   }
 
+  [[nodiscard]] double lfoFrequencyHz() const {
+    return track.lfo.speed * kDriverSweepsPerSecond / kLfoPhaseStepsPerCycle;
+  }
+
+  [[nodiscard]] u32 lfoDelayTicks() const {
+    return static_cast<u32>(std::llround(track.lfo.delay * static_cast<double>(program.tempoBpm) / kDriverTempoBase));
+  }
+
+  [[nodiscard]] double lfoDelayMilliseconds() const { return track.lfo.delay * 1000.0 / kDriverSweepsPerSecond; }
+
+  [[nodiscard]] ModulationPerformanceEvent lfoEvent(ModulationPerformanceTarget target, double amount) const {
+    return ModulationPerformanceEvent{
+        .target = target,
+        .amount = amount,
+        .frequencyHz = lfoFrequencyHz(),
+        .delayTicks = lfoDelayTicks(),
+        .delayMilliseconds = lfoDelayMilliseconds(),
+        .waveform = LfoWaveform::Sine,
+        .phaseRunsAtZeroDepth = true,
+    };
+  }
+
+  void emitLfoRate(ModulationPerformanceTarget target) {
+    out.modulation(lfoEvent(target, std::clamp(track.lfo.speed / 127.0, 0.0, 1.0)));
+  }
+
+  void emitLfoRates() {
+    emitLfoRate(ModulationPerformanceTarget::VibratoRate);
+    emitLfoRate(ModulationPerformanceTarget::TremoloRate);
+    emitLfoRate(ModulationPerformanceTarget::PanRate);
+  }
+
+  void emitLfoDelayControls() {
+    const u8 midiValue = static_cast<u8>(std::min<u16>(track.lfo.delay, 127));
+    out.vibratoDelay(VibratoDelayPerformanceEvent{
+        .delayTicks = lfoDelayTicks(),
+        .milliseconds = lfoDelayMilliseconds(),
+        .midiValue = midiValue,
+    });
+    out.tremoloDelay(TremoloDelayPerformanceEvent{
+        .delayTicks = lfoDelayTicks(),
+        .milliseconds = lfoDelayMilliseconds(),
+        .midiValue = midiValue,
+    });
+  }
+
+  void emitLfoDepth(u8 target, u8 depth) {
+    const double amount = std::clamp(depth / 127.0, 0.0, 1.0);
+    const double scaledDepth = static_cast<double>(depth) * track.lfo.range;
+    switch (target) {
+      case 0: {
+        auto event = lfoEvent(ModulationPerformanceTarget::VibratoDepth, amount);
+        event.pitchDepthSemitones = kNitroSinePeak * scaledDepth / 16384.0;
+        out.modulation(std::move(event));
+        break;
+      }
+      case 1: {
+        auto event = lfoEvent(ModulationPerformanceTarget::TremoloDepth, amount);
+        event.volumeDepthDecibels = kNitroSinePeak * scaledDepth * 60.0 / 163840.0;
+        out.modulation(std::move(event));
+        break;
+      }
+      case 2: {
+        auto event = lfoEvent(ModulationPerformanceTarget::PanDepth, amount);
+        event.panDepth = scaledDepth / 128.0;
+        out.modulation(std::move(event));
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  void emitAllLfoDepths() {
+    emitLfoDepth(0, track.lfo.target == 0 ? track.lfo.depth : 0);
+    emitLfoDepth(1, track.lfo.target == 1 ? track.lfo.depth : 0);
+    emitLfoDepth(2, track.lfo.target == 2 ? track.lfo.depth : 0);
+  }
+
+  bool initializeLfo() {
+    if (track.lfo.emitted) {
+      return false;
+    }
+    track.lfo.emitted = true;
+    emitLfoDelayControls();
+    emitLfoRates();
+    emitAllLfoDepths();
+    return true;
+  }
+
+  void modulationDepth(u8 depth) {
+    track.lfo.depth = depth;
+    if (!initializeLfo()) {
+      emitLfoDepth(track.lfo.target, depth);
+    }
+  }
+
+  void modulationSpeed(u8 speed) {
+    track.lfo.speed = speed;
+    if (!initializeLfo()) {
+      emitLfoRates();
+    }
+  }
+
+  void modulationTarget(u8 target) {
+    const u8 previous = track.lfo.target;
+    track.lfo.target = target;
+    if (!initializeLfo()) {
+      emitLfoDepth(previous, 0);
+      emitLfoDepth(target, track.lfo.depth);
+    }
+  }
+
+  void modulationRange(u8 range) {
+    track.lfo.range = range;
+    if (!initializeLfo()) {
+      emitLfoDepth(track.lfo.target, track.lfo.depth);
+    }
+  }
+
+  void modulationDelay(u16 delay) {
+    track.lfo.delay = delay;
+    if (!initializeLfo()) {
+      emitLfoDelayControls();
+      emitLfoRates();
+    }
+  }
+
   [[nodiscard]] Effects note(u8 sourceKey, u8 velocity, u32 duration) {
+    static_cast<void>(initializeLfo());
     const s32 key = std::clamp<s32>(static_cast<s32>(sourceKey) + track.transpose, 0, 127);
     const bool continuesTiedVoice = track.tie && track.tiedNote.has_value();
     const PerformanceNoteId note =
@@ -306,15 +447,20 @@ struct SequenceDecodeContext {
     }
     case 0xca: {
       auto event = cursor.command("Modulation Depth", SequenceSemantic::Modulation);
-      const double amount = std::clamp(event.u8("depth") / 127.0, 0.0, 1.0);
-      return event.emitModulation(ModulationPerformanceTarget::VibratoDepth, amount);
+      return event.invoke<&Playback::modulationDepth>(event.u8("depth"));
     }
-    case 0xcb:
-      return cursor.ignored("Modulation Speed", 1);
-    case 0xcc:
-      return cursor.ignored("Modulation Type", 1);
-    case 0xcd:
-      return cursor.ignored("Modulation Range", 1);
+    case 0xcb: {
+      auto event = cursor.command("Modulation Speed", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::modulationSpeed>(event.u8("speed"));
+    }
+    case 0xcc: {
+      auto event = cursor.command("Modulation Type", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::modulationTarget>(event.u8("type"));
+    }
+    case 0xcd: {
+      auto event = cursor.command("Modulation Range", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::modulationRange>(event.u8("range"));
+    }
     case 0xce: {
       auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
       return event.set<&TrackState::portamento>(event.u8("enabled") != 0);
@@ -339,8 +485,10 @@ struct SequenceDecodeContext {
     }
     case 0xd6:
       return cursor.ignored("Print Variable", 1);
-    case 0xe0:
-      return cursor.ignored("Modulation Delay", 2);
+    case 0xe0: {
+      auto event = cursor.command("Modulation Delay", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::modulationDelay>(event.u16le("delay"));
+    }
     case 0xe1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const u16 bpm = event.u16le("tempo", SourceValueDisplay::BeatsPerMinute);

@@ -3777,6 +3777,10 @@ int validateAkaoSnesDirectMidiSimulation(const std::filesystem::path& path, u32 
   return validateFormatDirectMidiSimulation(path, "AkaoSnes", "AkaoSnes", sequenceLoops);
 }
 
+int validateNdsDirectMidiSimulation(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  return validateFormatDirectMidiSimulation(path, "NDS", "NDS", sequenceLoops);
+}
+
 MidiCompareOptions sharedPlayOnceHorizonOptions() {
   return MidiCompareOptions{
       .useSharedPlayOnceHorizon = true,
@@ -4439,6 +4443,7 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity konami-arcade-direct-synth <mame-zip-file>\n"
       << "  vgmtrans-parity konami-arcade-direct-summary <mame-zip-file>\n"
       << "  vgmtrans-parity nds-direct-midi <nds-or-2sf-file> [sequence-loops]\n"
+      << "  vgmtrans-parity nds-direct-midi-sim <nds-or-2sf-file> [sequence-loops]\n"
       << "  vgmtrans-parity nds-direct-synth <nds-or-2sf-file>\n"
       << "  vgmtrans-parity nds-direct-summary <nds-or-2sf-file>\n";
 }
@@ -4589,6 +4594,14 @@ int main(int argc, char** argv) {
 
     if (argc == 4 && std::string(argv[1]) == "nds-direct-midi") {
       return compareNdsDirectMidi(argv[2], parseLoopCount(argv[3]));
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "nds-direct-midi-sim") {
+      return validateNdsDirectMidiSimulation(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "nds-direct-midi-sim") {
+      return validateNdsDirectMidiSimulation(argv[2], parseLoopCount(argv[3]));
     }
 
     if (argc == 3 && std::string(argv[1]) == "nds-direct-synth") {

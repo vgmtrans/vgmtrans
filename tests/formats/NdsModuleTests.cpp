@@ -440,10 +440,19 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   const MidiSequence midi = renderMidiSequence(performance);
   expect(midi.tracks.size() == 1, "NDS SSEQ MIDI rendering should preserve one track");
   const auto& events = midi.tracks[0].events;
-  expect(std::get<MidiPort>(events[0]).port == 0, "NDS SSEQ MIDI rendering should emit MIDI port metadata");
-  expect(std::get<NoteDuration>(events[1]).tick == 0 && std::get<NoteDuration>(events[1]).duration == 24,
-         "NDS SSEQ note should render at the current tick with its source duration");
-  expect(std::get<Tempo>(events[2]).tick == 24 && std::get<Tempo>(events[2]).microsecondsPerQuarter == 500000,
+  const auto port =
+      std::ranges::find_if(events, [](const MidiEvent& event) { return std::holds_alternative<MidiPort>(event); });
+  const auto note =
+      std::ranges::find_if(events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  const auto tempo =
+      std::ranges::find_if(events, [](const MidiEvent& event) { return std::holds_alternative<Tempo>(event); });
+  expect(port != events.end() && std::get<MidiPort>(*port).port == 0,
+         "NDS SSEQ MIDI rendering should emit MIDI port metadata");
+  expect(
+      note != events.end() && std::get<NoteDuration>(*note).tick == 0 && std::get<NoteDuration>(*note).duration == 24,
+      "NDS SSEQ note should render at the current tick with its source duration");
+  expect(tempo != events.end() && std::get<Tempo>(*tempo).tick == 24 &&
+             std::get<Tempo>(*tempo).microsecondsPerQuarter == 500000,
          "NDS SSEQ tempo should convert BPM to microseconds per quarter");
   expect(std::get<EndOfTrack>(events.back()).tick == 30, "NDS SSEQ MIDI rendering should preserve VM end tick");
 
@@ -542,6 +551,88 @@ void ndsSequenceDialectComposesPitchBendRangeActions() {
   expect(std::get<PitchBendRangePerformanceEvent>(performance.tracks[0].events[0]).cents == 1200 &&
              std::get<PitchBendPerformanceEvent>(performance.tracks[0].events[1]).semitones == 6.0,
          "NDS pitch bend should observe the range state set by the preceding explicit action");
+}
+
+void ndsSequenceDialectModelsNitroLfoRegisters() {
+  const PerformanceSequence performance = renderTestPerformance({
+      0xcb,
+      0x20,  // speed 32 -> 12 Hz
+      0xcd,
+      0x02,  // range 2
+      0xe0,
+      0x30,
+      0x00,  // 48 driver updates -> 250 ms
+      0xca,
+      0x40,  // depth 64
+      0xcc,
+      0x01,  // volume target
+      0xcc,
+      0x02,  // pan target
+      0xff,
+  });
+  expect(performance.diagnostics.empty(), "NDS LFO-register fixture should render without diagnostics");
+
+  const ModulationPerformanceEvent* pitch = nullptr;
+  const ModulationPerformanceEvent* volume = nullptr;
+  const ModulationPerformanceEvent* pan = nullptr;
+  const ModulationPerformanceEvent* rate = nullptr;
+  for (const auto& event : performance.tracks[0].events) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    if (modulation == nullptr) {
+      continue;
+    }
+    if (modulation->target == ModulationPerformanceTarget::VibratoDepth && modulation->amount > 0.0) {
+      pitch = modulation;
+    } else if (modulation->target == ModulationPerformanceTarget::TremoloDepth && modulation->amount > 0.0) {
+      volume = modulation;
+    } else if (modulation->target == ModulationPerformanceTarget::PanDepth && modulation->amount > 0.0) {
+      pan = modulation;
+    } else if (modulation->target == ModulationPerformanceTarget::VibratoRate &&
+               modulation->delayMilliseconds == 250.0) {
+      rate = modulation;
+    }
+  }
+
+  expect(rate != nullptr && rate->frequencyHz == 12.0 && rate->delayTicks == 24 &&
+             rate->waveform == LfoWaveform::Sine && rate->phaseRunsAtZeroDepth,
+         "NDS should retain Nitro's fixed-clock rate, delay, sine shape, and zero-depth phase behavior");
+  expect(pitch != nullptr && pitch->pitchDepthSemitones && std::abs(*pitch->pitchDepthSemitones - 0.9921875) < 0.000001,
+         "NDS pitch modulation should use Nitro's depth/range scaling");
+  expect(
+      volume != nullptr && volume->volumeDepthDecibels && std::abs(*volume->volumeDepthDecibels - 5.953125) < 0.000001,
+      "NDS volume modulation should preserve Nitro's decibel-domain LFO depth");
+  expect(pan != nullptr && pan->panDepth && std::abs(*pan->panDepth - 1.0) < 0.000001,
+         "NDS pan modulation should preserve Nitro's pan-domain LFO depth");
+}
+
+void ndsSequenceDialectRevealsRunningSineLfoAtDepthChange() {
+  const PerformanceSequence performance = renderTestPerformance({
+      0xc7,
+      0x00,  // notes do not advance the sequence clock
+      0x3f,
+      0x7f,
+      0x19,  // note for 25 ticks
+      0x80,
+      0x04,  // leave the default zero-depth LFO running
+      0xca,
+      0x30,  // reveal depth 48 four ticks into the note
+      0x80,
+      0x13,
+      0xca,
+      0x00,
+      0x80,
+      0x02,
+      0xff,
+  });
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+
+  const auto bend = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
+    const auto* pitch = std::get_if<PitchBend>(&event);
+    return pitch != nullptr && pitch->tick == 5;
+  });
+  expect(bend != midi.tracks[0].events.end() && std::get<PitchBend>(*bend).value == 1524,
+         "NDS CA should reveal the already-running default 6 Hz sine LFO instead of restarting it");
 }
 
 void ndsSequenceDialectPreservesPortamentoTimingIntent() {
@@ -821,7 +912,7 @@ void ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands() {
          "NDS malformed bootstrap command should be preserved as a truncated source command");
 }
 
-void ndsSequenceDialectAnnotatesIgnoredOperandBytes() {
+void ndsSequenceDialectAnnotatesModulationDelayOperands() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -835,25 +926,26 @@ void ndsSequenceDialectAnnotatesIgnoredOperandBytes() {
   const TrackProgram track =
       decodeTestTrack(ByteReader(SourceId{7}, bytes), sequenceOffset, trackStart + 4, trackStart, 0, false, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
-  expect(track.commands.size() == 2, "NDS ignored-command fixture should decode the ignored command and end command");
+  expect(track.commands.size() == 2,
+         "NDS modulation-delay fixture should decode the modulation command and end command");
 
-  const SourceCommand& ignored = track.commands[0];
-  expect(commandDetailKind(annotations, ignored) == "nds.modulation-delay",
-         "NDS ignored opcode should stay annotated as its source-driver command");
-  expect(ignored.encodedSize == 3 && !ignored.execution.valid(),
-         "NDS ignored command should keep its source operand without playback behavior");
-  const SemanticOperand* ignoredBytes = semanticOperand(ignored, "bytes");
-  expect(ignoredBytes != nullptr && std::get<std::string>(ignoredBytes->value) == "12 34",
-         "NDS ignored command should keep its raw operand as a named semantic value");
+  const SourceCommand& command = track.commands[0];
+  expect(commandDetailKind(annotations, command) == "nds.modulation-delay",
+         "NDS modulation delay should stay annotated as its source-driver command");
+  expect(command.encodedSize == 3 && command.execution.valid(),
+         "NDS modulation delay should retain executable playback behavior");
+  const SemanticOperand* delay = semanticOperand(command, "delay");
+  expect(delay != nullptr && std::get<u64>(delay->value) == 0x3412,
+         "NDS modulation delay should retain its little-endian operand");
 
-  const SourceField* bytesField = fieldWithName(commandAnnotation(annotations, ignored), "bytes");
-  expect(fieldEquals(bytesField, "12 34"),
-         "NDS ignored command should preserve ignored operand bytes as source annotation data");
-  expect(bytesField->range.offset == trackStart + 1 && bytesField->range.size == 2,
-         "NDS ignored command annotation bytes should preserve their source range");
+  const SourceField* delayField = fieldWithName(commandAnnotation(annotations, command), "delay");
+  expect(fieldEquals(delayField, u64{0x3412}),
+         "NDS modulation delay should preserve its operand as source annotation data");
+  expect(delayField->range.offset == trackStart + 1 && delayField->range.size == 2,
+         "NDS modulation-delay annotation should preserve its source range");
 }
 
-void ndsSequenceDialectAnnotatesPartialIgnoredOperandBytes() {
+void ndsSequenceDialectAnnotatesPartialModulationDelayOperands() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -866,19 +958,13 @@ void ndsSequenceDialectAnnotatesPartialIgnoredOperandBytes() {
   const TrackProgram track = decodeTestTrack(ByteReader(SourceId{15}, bytes), sequenceOffset, trackStart + 2,
                                              trackStart, 0, false, &sourceMap, &diagnostics);
   const SourceMap annotations = sourceMap.finish();
-  expect(track.commands.size() == 1, "NDS partial ignored-command fixture should decode one truncated command");
+  expect(track.commands.size() == 1, "NDS partial modulation-delay fixture should decode one truncated command");
   expect(commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
-         "NDS partial ignored command should use the truncated-command fallback");
+         "NDS partial modulation delay should use the truncated-command fallback");
   expect(track.commands[0].range.size == 2,
-         "NDS partial ignored command should preserve the opcode and available operand source range");
-
-  const SourceField* bytesField = fieldWithName(commandAnnotation(annotations, track.commands[0]), "bytes");
-  expect(fieldEquals(bytesField, "12"),
-         "NDS partial ignored command should preserve available ignored operand bytes as annotation data");
-  expect(bytesField->range.offset == trackStart + 1 && bytesField->range.size == 1,
-         "NDS partial ignored command annotation bytes should use the partial operand range");
-  expect(diagnostics.size() == 1 && diagnostics[0].message == "Truncated field 'bytes'",
-         "NDS partial ignored command should diagnose the missing operand byte");
+         "NDS partial modulation delay should preserve the opcode and available operand source range");
+  expect(diagnostics.size() == 1 && diagnostics[0].message == "Truncated field 'delay'",
+         "NDS partial modulation delay should diagnose the missing operand byte");
 }
 
 void ndsSequenceDialectKeepsEmptyPlaceholderTrack() {

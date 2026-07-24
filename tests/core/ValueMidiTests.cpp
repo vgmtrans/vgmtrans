@@ -1416,6 +1416,53 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
          "sequence-event vibrato simulation should emit a delayed triangle LFO bend shape");
 }
 
+void performanceMidiRendererHonorsSpecifiedLfoWaveform() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 4,
+          .events =
+              {
+                  TempoPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .microsecondsPerQuarter = 1'000'000,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .amount = 1.0,
+                      .frequencyHz = 12.5,
+                      .waveform = LfoWaveform::Sine,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .amount = 0.5,
+                      .pitchDepthSemitones = 1.0,
+                      .waveform = LfoWaveform::Sine,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .key = 60,
+                      .linearVelocity = 1.0,
+                      .durationTicks = 4,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto atTickTwo = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
+    const auto* bend = std::get_if<PitchBend>(&event);
+    return bend != nullptr && bend->tick == 2;
+  });
+  expect(atTickTwo != midi.tracks[0].events.end() && std::get<PitchBend>(*atTickTwo).value == 2896,
+         "sequence-event simulation should evaluate an explicitly requested sine LFO");
+}
+
 void performanceMidiRendererDoesNotDoubleDelayVibrato() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 100},
@@ -1936,6 +1983,7 @@ void runValueMidiTests() {
   performanceMidiRendererQuantizesPitchBendAndPortamento();
   performanceMidiRendererSkipsRedundantPitchBends();
   performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape();
+  performanceMidiRendererHonorsSpecifiedLfoWaveform();
   performanceMidiRendererDoesNotDoubleDelayVibrato();
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
   performanceMidiRendererSimulatesTremoloUsingGlobalTempo();

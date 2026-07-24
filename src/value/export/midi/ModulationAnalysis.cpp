@@ -73,6 +73,11 @@ void observePerformanceModulation(MidiTrackModulationUsage& usage, const Modulat
     case ModulationPerformanceTarget::TremoloRate:
       observe(usage.tremoloRate, midiControllerValue(event.amount), event.amount, ceiling, SourceRange{});
       break;
+    case ModulationPerformanceTarget::PanDepth:
+    case ModulationPerformanceTarget::PanRate:
+      // MIDI has no standard pan-LFO controller pair. These targets are
+      // retained for sequence-event simulation instead.
+      break;
   }
 }
 
