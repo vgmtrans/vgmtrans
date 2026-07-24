@@ -75,6 +75,53 @@ void Settings::ConversionSettings::setSkipChannel10(bool skip) const {
   emit owner->conversionOptionsChanged();
 }
 
+vgmtrans::core::MidiPitchTransitionRendering Settings::ConversionSettings::pitchTransitionRendering() const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  const int value =
+      settings.value(QStringLiteral("pitchTransitionRendering"),
+                     static_cast<int>(vgmtrans::core::MidiPitchTransitionRendering::PreserveFormat))
+          .toInt();
+  settings.endGroup();
+  switch (static_cast<vgmtrans::core::MidiPitchTransitionRendering>(value)) {
+    case vgmtrans::core::MidiPitchTransitionRendering::PreserveFormat:
+    case vgmtrans::core::MidiPitchTransitionRendering::Portamento:
+    case vgmtrans::core::MidiPitchTransitionRendering::PitchBend:
+      return static_cast<vgmtrans::core::MidiPitchTransitionRendering>(value);
+  }
+  return vgmtrans::core::MidiPitchTransitionRendering::PreserveFormat;
+}
+
+void Settings::ConversionSettings::setPitchTransitionRendering(
+    vgmtrans::core::MidiPitchTransitionRendering rendering) const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  settings.setValue(QStringLiteral("pitchTransitionRendering"), static_cast<int>(rendering));
+  settings.endGroup();
+  emit owner->conversionOptionsChanged();
+}
+
+vgmtrans::core::ModulationConversionPolicy Settings::ConversionSettings::modulationConversion() const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  const int value =
+      settings.value(QStringLiteral("modulationConversion"),
+                     static_cast<int>(vgmtrans::core::ModulationConversionPolicy::SynthModulators))
+          .toInt();
+  settings.endGroup();
+  switch (static_cast<vgmtrans::core::ModulationConversionPolicy>(value)) {
+    case vgmtrans::core::ModulationConversionPolicy::SynthModulators:
+    case vgmtrans::core::ModulationConversionPolicy::SequenceEventSimulation:
+      return static_cast<vgmtrans::core::ModulationConversionPolicy>(value);
+  }
+  return vgmtrans::core::ModulationConversionPolicy::SynthModulators;
+}
+
+void Settings::ConversionSettings::setModulationConversion(
+    vgmtrans::core::ModulationConversionPolicy policy) const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  settings.setValue(QStringLiteral("modulationConversion"), static_cast<int>(policy));
+  settings.endGroup();
+  emit owner->conversionOptionsChanged();
+}
+
 QStringList Settings::RecentFilesSettings::list() const {
   settings.beginGroup(QStringLiteral("RecentFiles"));
   const QStringList files = settings.value(QStringLiteral("files")).toStringList();

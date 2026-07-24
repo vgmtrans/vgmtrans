@@ -1614,6 +1614,10 @@ void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
 void exportRequestSequenceLoopsAffectMidiLowering() {
   expect(ExportRequest{}.sequence.sequenceLoops == 1,
          "the user-facing export request should default to one sequence loop");
+  expect(ExportRequest{}.modulationConversion == ModulationConversionPolicy::SynthModulators,
+         "collection export should default to native synth modulation");
+  expect(PlaybackRequest{}.modulationConversion == ModulationConversionPolicy::SynthModulators,
+         "backend-neutral playback requests should default to native synth modulation");
 
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{

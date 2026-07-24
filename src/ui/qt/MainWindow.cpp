@@ -307,12 +307,22 @@ QString diagnosticMessages(const std::vector<vgmtrans::core::Diagnostic>& diagno
   return messages.isEmpty() ? fallback : messages.join(QLatin1Char('\n'));
 }
 
-void applySequenceExportSettings(vgmtrans::core::SequenceRenderOptions& options) {
+void applySequenceRenderSettings(vgmtrans::core::SequenceRenderOptions& options) {
   options.sequenceLoops = static_cast<u32>(Settings::the()->conversion.numSequenceLoops());
   options.midi.skipChannel10 = Settings::the()->conversion.skipChannel10();
   options.midi.bankSelectStyle = Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
                                      ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
                                      : vgmtrans::core::MidiBankSelectStyle::MsbOnly;
+}
+
+void applyMidiExportSettings(vgmtrans::core::SequenceRenderOptions& options) {
+  applySequenceRenderSettings(options);
+  options.midi.pitchTransitions = Settings::the()->conversion.pitchTransitionRendering();
+}
+
+void applyCollectionExportSettings(vgmtrans::core::ExportRequest& request) {
+  applyMidiExportSettings(request.sequence);
+  request.modulationConversion = Settings::the()->conversion.modulationConversion();
 }
 }  // namespace
 
@@ -716,7 +726,7 @@ void MainWindow::exportSequenceMidi(const QModelIndex& index) {
   }
 
   vgmtrans::core::SequenceExportRequest request;
-  applySequenceExportSettings(request);
+  applyMidiExportSettings(request);
 
   try {
     saveArtifact(index,
@@ -736,7 +746,7 @@ void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::S
   }
 
   vgmtrans::core::ExportRequest request;
-  applySequenceExportSettings(request.sequence);
+  applySequenceRenderSettings(request.sequence);
   const bool soundFont = format == vgmtrans::core::SynthExportFormat::SoundFont2;
   try {
     saveArtifact(index,
@@ -771,8 +781,9 @@ void MainWindow::togglePlayback() {
     return;
   }
 
-  vgmtrans::core::PlaybackRequest request;
-  applySequenceExportSettings(request);
+  vgmtrans::core::SequenceRenderOptions options;
+  applySequenceRenderSettings(options);
+  const auto request = m_sequence_player->playbackRequest(std::move(options));
 
   try {
     auto playback = m_workspace.preparePlayback(collection, request);
@@ -952,7 +963,7 @@ void MainWindow::routeSignals() {
     if (directory.empty()) {
       return;
     }
-    applySequenceExportSettings(request.sequence);
+    applyCollectionExportSettings(request);
 
     const auto collection = vgmtrans::core::CollectionId{
         current.data(vgmtrans::ui::IdRole).toUInt()};

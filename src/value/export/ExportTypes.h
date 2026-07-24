@@ -68,7 +68,14 @@ struct SequenceRenderOptions {
 // Standalone sequence export simulates synth modulation in MIDI because there
 // is no companion instrument container.
 using SequenceExportRequest = SequenceRenderOptions;
-using PlaybackRequest = SequenceRenderOptions;
+
+// A playback backend selects how the rendered MIDI and companion synth divide
+// modulation work. The value core honors that policy without knowing which
+// backend will consume the prepared data.
+struct PlaybackRequest {
+  SequenceRenderOptions sequence;
+  ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
+};
 
 // ExportRequest is policy, not parsed data. Callers choose which files to write
 // and how to handle loops, MIDI channels, and modulation scaling.
@@ -76,7 +83,7 @@ struct ExportRequest {
   std::vector<ExportKind> kinds;
   SequenceRenderOptions sequence;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
-  ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SequenceEventSimulation;
+  ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
 };
 
 // Artifact carries diagnostics even when no bytes were produced, so UI/CLI

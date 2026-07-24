@@ -7,6 +7,7 @@
 #pragma once
 
 #include "main/ConversionTypes.h"
+#include "value/export/ExportTypes.h"
 
 #include <QByteArray>
 #include <QObject>
@@ -46,6 +47,10 @@ public:
     void setNumSequenceLoops(int loops) const;
     [[nodiscard]] bool skipChannel10() const;
     void setSkipChannel10(bool skip) const;
+    [[nodiscard]] vgmtrans::core::MidiPitchTransitionRendering pitchTransitionRendering() const;
+    void setPitchTransitionRendering(vgmtrans::core::MidiPitchTransitionRendering rendering) const;
+    [[nodiscard]] vgmtrans::core::ModulationConversionPolicy modulationConversion() const;
+    void setModulationConversion(vgmtrans::core::ModulationConversionPolicy policy) const;
   } conversion;
 
   struct RecentFilesSettings : SettingsGroup {

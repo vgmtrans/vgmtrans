@@ -20,6 +20,28 @@
 #include <QMenu>
 #include <QSignalBlocker>
 
+namespace {
+
+template <typename Enum, size_t Size, typename Setter>
+void appendEnumOptions(QMenu* parent, const QString& title, Enum selected,
+                       const std::array<std::pair<QString, Enum>, Size>& options, Setter setter) {
+  QMenu* menu = parent->addMenu(title);
+  auto* group = new QActionGroup(menu);
+  group->setExclusive(true);
+  for (const auto& [label, value] : options) {
+    QAction* action = menu->addAction(label);
+    action->setData(static_cast<int>(value));
+    action->setCheckable(true);
+    action->setChecked(value == selected);
+    group->addAction(action);
+  }
+  QObject::connect(group, &QActionGroup::triggered, menu, [setter = std::move(setter)](QAction* action) {
+    setter(static_cast<Enum>(action->data().toInt()));
+  });
+}
+
+}  // namespace
+
 MenuBar::MenuBar(QWidget* parent, const QList<QDockWidget*>& dockWidgets)
     : QMenuBar(parent) {
   appendFileMenu();
@@ -114,6 +136,31 @@ void MenuBar::appendOptionsMenu() {
                "will cause in-program playback to sound incorrect!");
     }
   });
+
+  using vgmtrans::core::MidiPitchTransitionRendering;
+  appendEnumOptions(
+      m_optionsMenu, tr("Pitch Transition Rendering"),
+      Settings::the()->conversion.pitchTransitionRendering(),
+      std::array{
+          std::pair{tr("Preserve Format (Default)"), MidiPitchTransitionRendering::PreserveFormat},
+          std::pair{tr("Portamento"), MidiPitchTransitionRendering::Portamento},
+          std::pair{tr("Pitch Bend"), MidiPitchTransitionRendering::PitchBend},
+      },
+      [](MidiPitchTransitionRendering rendering) {
+        Settings::the()->conversion.setPitchTransitionRendering(rendering);
+      });
+
+  using vgmtrans::core::ModulationConversionPolicy;
+  appendEnumOptions(
+      m_optionsMenu, tr("Modulation Conversion"),
+      Settings::the()->conversion.modulationConversion(),
+      std::array{
+          std::pair{tr("Synth Modulators (Default)"), ModulationConversionPolicy::SynthModulators},
+          std::pair{tr("Sequence Event Simulation"), ModulationConversionPolicy::SequenceEventSimulation},
+      },
+      [](ModulationConversionPolicy conversion) {
+        Settings::the()->conversion.setModulationConversion(conversion);
+      });
 
   QMenu* loops = m_optionsMenu->addMenu(tr("Sequence Loops"));
   auto* loopsGroup = new QActionGroup(loops);
