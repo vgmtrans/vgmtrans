@@ -522,15 +522,7 @@ struct Playback {
     }
 
     auto transitionOut = out.at(vm.tick() + delay);
-    track.pitchTransition = transitionOut.pitchSlide(
-        track.pitchNote, track.pitchSlide.current(), target, length,
-        PitchSlideOptions{
-            .renderingHint = PitchTransitionRenderingHint::PitchBend,
-            .nativePortamento =
-                NativePortamentoHint{
-                    .timeMilliseconds = length * sequenceTickSeconds(track.version, track.tempo) * 1000.0,
-                },
-        });
+    track.pitchTransition = transitionOut.pitchSlide(track.pitchNote, track.pitchSlide.current(), target, length);
     track.pitchTransition.sample(transitionOut, track.pitchSlide.current());
     static_cast<void>(track.pitchSlide.begin(SequenceMotionPlan<double>::targetOverTicksWithStep(
         target, (target - track.pitchSlide.current()) / length, length, delay)));
@@ -1209,6 +1201,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 2,
           },
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       // Early vibrato depends on the order in which tempo commands run across
       // all tracks, so collect its limits with normal playback scheduling.
       // Later vibrato is independent of tempo; visiting each decoded command

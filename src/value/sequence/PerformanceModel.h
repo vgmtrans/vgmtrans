@@ -317,6 +317,45 @@ struct SampledAutomationCurve {
 
 using PerformanceAutomationCurve = std::variant<LinearAutomationCurve, SampledAutomationCurve>;
 
+struct TempoRelativePitchSlideTiming {};
+
+struct FixedDurationPitchSlideTiming {
+  double milliseconds = 0.0;
+};
+
+struct FixedRatePitchSlideTiming {
+  double semitonesPerSecond = 0.0;
+};
+
+using PitchSlidePhysicalTiming =
+    std::variant<TempoRelativePitchSlideTiming, FixedDurationPitchSlideTiming, FixedRatePitchSlideTiming>;
+
+// Timeline ticks determine sequencing, interruption, and pitch-bend samples.
+// Physical timing preserves how the source driver controls an asynchronous
+// glide. Most formats are tempo-relative and need only fromTicks().
+struct PitchSlideTiming {
+  u32 timelineTicks = 0;
+  PitchSlidePhysicalTiming physical = TempoRelativePitchSlideTiming{};
+
+  [[nodiscard]] static constexpr PitchSlideTiming fromTicks(u32 ticks) noexcept {
+    return PitchSlideTiming{.timelineTicks = ticks};
+  }
+
+  [[nodiscard]] static constexpr PitchSlideTiming fixedDuration(u32 timelineTicks, double milliseconds) noexcept {
+    return PitchSlideTiming{
+        .timelineTicks = timelineTicks,
+        .physical = FixedDurationPitchSlideTiming{.milliseconds = milliseconds},
+    };
+  }
+
+  [[nodiscard]] static constexpr PitchSlideTiming fixedRate(u32 timelineTicks, double semitonesPerSecond) noexcept {
+    return PitchSlideTiming{
+        .timelineTicks = timelineTicks,
+        .physical = FixedRatePitchSlideTiming{.semitonesPerSecond = semitonesPerSecond},
+    };
+  }
+};
+
 enum class AutomationNewNotePolicy {
   Stop,
   Continue,
@@ -345,7 +384,6 @@ struct PerformanceAutomationInterruptPolicy {
 // timing hints preserve that option without turning the transition itself into
 // MIDI controller events.
 struct NativePortamentoHint {
-  double timeMilliseconds = 0.0;
   bool emitTime = true;
   u32 overlapTicks = 1;
   std::optional<double> restoreTimeMilliseconds;
@@ -359,7 +397,7 @@ struct PitchTransitionIntent {
   PerformanceLaneId lane{0};
   double startKey = 0.0;
   double targetKey = 0.0;
-  u32 durationTicks = 0;
+  PitchSlideTiming timing;
   PerformanceAutomationCurve curve = LinearAutomationCurve{};
   PerformanceAutomationInterruptPolicy interruptions;
   PitchTransitionRenderingHint renderingHint = PitchTransitionRenderingHint::Portamento;
