@@ -634,8 +634,7 @@ void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
   expect(performance.diagnostics.empty(), "reused repeat counters should terminate through normal loop detection");
   expect(performance.tracks[0].events.size() == 4,
          "the VM should preserve the first playthrough before stopping the reused-counter cycle");
-  expect(performance.tracks[0].endTick == 4,
-         "the VM should stop when command, stack, and repeat-counter state recur");
+  expect(performance.tracks[0].endTick == 4, "the VM should stop when command, stack, and repeat-counter state recur");
 }
 
 void sequenceVmExecutesNestedCallInsideRepeat() {
@@ -1017,8 +1016,8 @@ struct PlaylistProbePlayback {
   VmApi& vm;
 };
 
-Effects executePlaylistProbe(const SourceCommand& command, std::any&, std::any& trackState,
-                             PerformanceEmitter& out, VmApi& vm) {
+Effects executePlaylistProbe(const SourceCommand& command, std::any&, std::any& trackState, PerformanceEmitter& out,
+                             VmApi& vm) {
   auto& state = std::any_cast<PlaylistProbeTrackState&>(trackState);
   if ((command.address.value & 1) != 0) {
     return Effects{.step = vm.endSection()};
@@ -1033,8 +1032,7 @@ std::any createPlaylistProbeTrackState(const SequenceProgram&, const TrackProgra
   return PlaylistProbeTrackState{};
 }
 
-void beginPlaylistProbeSection(std::any& trackState,
-                               std::optional<u64>) {
+void beginPlaylistProbeSection(std::any& trackState) {
   std::any_cast<PlaylistProbeTrackState&>(trackState).beginSection();
 }
 
@@ -1097,15 +1095,13 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
 
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "parallel section fixture should render without diagnostics");
-  expect(performance.tracks.size() == 2 && performance.tracks[0].endTick == 12 &&
-             performance.tracks[1].endTick == 12,
+  expect(performance.tracks.size() == 2 && performance.tracks[0].endTick == 12 && performance.tracks[1].endTick == 12,
          "the earliest section end should restart every channel at one shared tick");
   const auto& firstLongNote = std::get<NotePerformanceEvent>(performance.tracks[1].events[0]);
   const auto& secondSectionNote = std::get<NotePerformanceEvent>(performance.tracks[1].events[1]);
   expect(firstLongNote.header.tick == 0 && firstLongNote.durationTicks == 8,
          "a section switch should trim a longer sibling channel at the boundary");
-  expect(secondSectionNote.header.tick == 8 && secondSectionNote.durationTicks == 4 &&
-             secondSectionNote.key == 22.0,
+  expect(secondSectionNote.header.tick == 8 && secondSectionNote.durationTicks == 4 && secondSectionNote.key == 22.0,
          "track state should persist while the section-begin hook resets transient state");
 }
 
@@ -1131,11 +1127,12 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
                         PlaylistCommand{
                             .address = Address{1002},
                             .fallthrough = Address{1004},
-                            .operation = PlaylistRepeat{
-                                .additionalPlays = infinite ? 0u : 1u,
-                                .destination = Address{1000},
-                                .infinite = infinite,
-                            },
+                            .operation =
+                                PlaylistRepeat{
+                                    .additionalPlays = infinite ? 0u : 1u,
+                                    .destination = Address{1000},
+                                    .infinite = infinite,
+                                },
                         },
                         PlaylistCommand{.address = Address{1004}, .operation = PlaylistEnd{}},
                     },

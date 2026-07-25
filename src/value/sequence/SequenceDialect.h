@@ -73,16 +73,9 @@ using ExecuteCommand = Effects (*)(const SourceCommand&, std::any& programState,
                                    PerformanceEmitter& out, VmApi& vm);
 using TickTrackState = void (*)(const SourceCommand&, std::any& programState, std::any& trackState,
                                 PerformanceEmitter& out, VmApi& vm);
-using EndTrackTick = void (*)(const SourceCommand&, std::any& programState, std::any& trackState,
-                              PerformanceEmitter& out, VmApi& vm, u64 tick);
-using FinishPrepass = void (*)(std::any& programState,
-                               const PerformanceSequence& performance);
-using BeginTrackSection = void (*)(std::any& trackState,
-                                   std::optional<u64> sourceStop);
-using TrackSectionSourceStop = std::optional<u64> (*)(const std::any& trackState);
+using FinishPrepass = void (*)(std::any& programState);
+using BeginTrackSection = void (*)(std::any& trackState);
 using FinalizePerformance = void (*)(std::any& programState, PerformanceSequence& performance);
-using ReconcileTrackAfterTrim = void (*)(std::any& trackState, const PerformanceTrack& performance,
-                                         u64 endTick);
 
 enum class SemanticPrepassMode {
   // Render immediately; the format does not need information from later
@@ -96,25 +89,6 @@ enum class SemanticPrepassMode {
   DecodedCommands,
 };
 
-// Most sectioned drivers key off every channel at the shared boundary. A few
-// tick schedulers stop source parsing there but let each channel's pending
-// duration note run to its already-scheduled wake-up.
-enum class SectionNoteEndPolicy {
-  Boundary,
-  ScheduledWake,
-};
-
-// Drivers disagree on how a parallel section reaches its boundary.
-enum class SectionEndPolicy {
-  FirstTrack,
-  // Some parsers first discover the source-address range visited by each
-  // channel, then replay the section with those ranges as exclusive stops.
-  // An End reached inside a discovered range still ends every channel.
-  DiscoveredSourceRange,
-};
-
-using IncludeSectionSourceCommand = bool (*)(const SourceCommand&);
-
 struct SequenceDialect {
   DialectId id;
   std::string commandDetailKindPrefix;
@@ -127,22 +101,10 @@ struct SequenceDialect {
   CreateTrackState createTrackState = nullptr;
   ExecuteCommand execute = nullptr;
   TickTrackState tick = nullptr;
-  // Called after every channel has processed a shared scheduler tick. This is
-  // the right home for driver work that happens once the channel loop ends,
-  // such as a sequence-global tempo fade.
-  EndTrackTick endTrackTick = nullptr;
   FinishPrepass finishPrepass = nullptr;
   BeginTrackSection beginTrackSection = nullptr;
-  TrackSectionSourceStop trackSectionSourceStop = nullptr;
   FinalizePerformance finalizePerformance = nullptr;
-  ReconcileTrackAfterTrim reconcileTrackAfterTrim = nullptr;
   SemanticPrepassMode prepass = SemanticPrepassMode::None;
-  SectionNoteEndPolicy sectionNoteEndPolicy = SectionNoteEndPolicy::Boundary;
-  SectionEndPolicy sectionEndPolicy = SectionEndPolicy::FirstTrack;
-  // DiscoveredSourceRange normally includes every executed command. Formats
-  // can exclude a source-only terminator. The VM still retains such a command
-  // when it returns from a called pattern, but not when it ends the section.
-  IncludeSectionSourceCommand includeSectionSourceCommand = nullptr;
 
   // Formats normally want a program with this dialect's identity, timebase,
   // and default VM behavior. Keep that mechanical wiring out of each parser.

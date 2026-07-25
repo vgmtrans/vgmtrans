@@ -52,21 +52,18 @@ constexpr std::array<u8, 40> kIntelliFe3CommandLengths{
 };
 
 constexpr std::array<u8, 36> kIntelliFe4CommandLengths{
-    0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03,
-    0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03,
-    0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03,
+    0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01,
 };
 
 constexpr std::array<u8, 36> kIntelliTaCommandLengths{
-    0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03,
-    0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03,
-    0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x02, 0x00, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03,
+    0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x02, 0x00, 0x01, 0x01, 0x01, 0x01,
 };
 
 template <size_t Size>
 [[nodiscard]] bool matchesTable(ByteReader reader, u16 address, const std::array<u8, Size>& table) {
-  return reader.has(address, table.size()) &&
-         std::ranges::equal(reader.slice(address, table.size()), table);
+  return reader.has(address, table.size()) && std::ranges::equal(reader.slice(address, table.size()), table);
 }
 
 [[nodiscard]] std::vector<u8> readTable(ByteReader reader, u16 address, u8 length) {
@@ -142,8 +139,7 @@ template <size_t Size>
       return std::nullopt;
     }
     return SongListInfo{
-        .address = static_cast<u32>(reader.u8At(*initializeOffset + 1) |
-                                    (reader.u8At(*initializeOffset + 4) << 8)),
+        .address = static_cast<u32>(reader.u8At(*initializeOffset + 1) | (reader.u8At(*initializeOffset + 4) << 8)),
     };
   }
   return std::nullopt;
@@ -177,16 +173,16 @@ template <size_t Size>
     return info;
   }
 
-  if (const auto branch = Patterns::ptnBranchForVcmdReadahead.find(reader)) {
-    info.first = reader.u8At(*branch + 5);
-  } else if (const auto branch = Patterns::ptnBranchForVcmd.find(reader)) {
+  if (const auto readaheadBranch = Patterns::ptnBranchForVcmdReadahead.find(reader)) {
+    info.first = reader.u8At(*readaheadBranch + 5);
+  } else if (const auto normalBranch = Patterns::ptnBranchForVcmd.find(reader)) {
     // This broad signature remains necessary for Human Entertainment drivers.
-    info.first = reader.u8At(*branch + 1);
+    info.first = reader.u8At(*normalBranch + 1);
   } else {
     return std::nullopt;
   }
 
-  if (const auto dispatch = Patterns::ptnJumpToVcmd.find(reader)) {
+  if (const auto standardDispatch = Patterns::ptnJumpToVcmd.find(reader)) {
     if (const auto human = Patterns::ptnJumpToVcmdCTOW.find(reader)) {
       info.signature = Signature::Human;
       info.profile = ProfileId::Human;
@@ -194,16 +190,16 @@ template <size_t Size>
       info.lengthTable = reader.le16(*human + 17);
     } else {
       info.profile = ProfileId::Standard;
-      info.addressTable = reader.le16(*dispatch + 7) + ((info.first * 2) & 0xff);
-      info.lengthTable = reader.le16(*dispatch + 14) + (info.first & 0x7f);
+      info.addressTable = reader.le16(*standardDispatch + 7) + ((info.first * 2) & 0xff);
+      info.lengthTable = reader.le16(*standardDispatch + 14) + (info.first & 0x7f);
     }
-  } else if (const auto dispatch = Patterns::ptnJumpToVcmdSMW.find(reader)) {
+  } else if (const auto earlierDispatch = Patterns::ptnJumpToVcmdSMW.find(reader)) {
     const auto lengths = Patterns::ptnReadVcmdLengthSMW.find(reader);
     if (!lengths) {
       return std::nullopt;
     }
     info.profile = ProfileId::Earlier;
-    info.addressTable = reader.le16(*dispatch + 5) + ((info.first * 2) & 0xff);
+    info.addressTable = reader.le16(*earlierDispatch + 5) + ((info.first * 2) & 0xff);
     info.lengthTable = reader.le16(*lengths + 9) + info.first;
   } else {
     return std::nullopt;
@@ -240,13 +236,11 @@ template <size_t Size>
   if (Patterns::ptnDispatchNoteLEM.find(reader)) {
     return commands.first == 0xe0 ? ProfileId::Lemmings : ProfileId::Unknown;
   }
-  if (commands.first != 0xe0 ||
-      !matchesTable(reader, commands.lengthTable, kStandardCommandLengths)) {
+  if (commands.first != 0xe0 || !matchesTable(reader, commands.lengthTable, kStandardCommandLengths)) {
     return classifyIntelligent(reader, commands);
   }
 
-  const bool canonical =
-      commands.addressTable + (kStandardCommandLengths.size() * 2) == commands.lengthTable;
+  const bool canonical = commands.addressTable + (kStandardCommandLengths.size() * 2) == commands.lengthTable;
   if (canonical) {
     if (Patterns::ptnWriteVolumeKSS.find(reader)) {
       return ProfileId::Hal;
@@ -263,8 +257,7 @@ template <size_t Size>
   }
 
   const bool quintetTail =
-      commands.count == 32 && reader.has(commands.lengthTable + 31, 1) &&
-      reader.u8At(commands.lengthTable + 31) == 1;
+      commands.count == 32 && reader.has(commands.lengthTable + 31, 1) && reader.u8At(commands.lengthTable + 31) == 1;
   if (Patterns::ptnRD1VCmd_FA_FE.find(reader)) {
     return ProfileId::Rd1;
   }
@@ -293,8 +286,7 @@ template <size_t Size>
   }
   if (const auto offset = Patterns::ptnSetDIRVS.find(reader)) {
     const u16 pointer = reader.le16(*offset + 1);
-    return reader.has(pointer, 1) ? std::optional<u16>{static_cast<u16>(reader.u8At(pointer) << 8)}
-                                  : std::nullopt;
+    return reader.has(pointer, 1) ? std::optional<u16>{static_cast<u16>(reader.u8At(pointer) << 8)} : std::nullopt;
   }
   if (const auto offset = Patterns::ptnSetDIRSMW.find(reader)) {
     return static_cast<u16>(reader.u8At(*offset + 9) << 8);
@@ -308,38 +300,37 @@ template <size_t Size>
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<InstrumentProbe> findInstrumentProbe(ByteReader reader,
-                                                                 const Profile& selected) {
+[[nodiscard]] std::optional<InstrumentProbe> findInstrumentProbe(ByteReader reader, const Profile& selected) {
   if (selected.id == ProfileId::Unknown) {
     return InstrumentProbe{};
   }
 
   InstrumentProbe probe;
-  if (const auto offset = Patterns::ptnLoadInstrTableAddress.find(reader)) {
-    probe.tableAddress = reader.u8At(*offset + 7) | (reader.u8At(*offset + 10) << 8);
+  if (const auto standardOffset = Patterns::ptnLoadInstrTableAddress.find(reader)) {
+    probe.tableAddress = reader.u8At(*standardOffset + 7) | (reader.u8At(*standardOffset + 10) << 8);
     if (reader.has(probe.tableAddress, 4)) {
       const u32 firstWord = reader.le32(probe.tableAddress);
       if (firstWord == 0 || firstWord == 0xffffffff) {
         probe.tableAddress += 4;
       }
     }
-  } else if (const auto offset = Patterns::ptnLoadInstrTableAddressSMW.find(reader)) {
-    probe.tableAddress = reader.u8At(*offset + 3) | (reader.u8At(*offset + 6) << 8);
+  } else if (const auto earlierOffset = Patterns::ptnLoadInstrTableAddressSMW.find(reader)) {
+    probe.tableAddress = reader.u8At(*earlierOffset + 3) | (reader.u8At(*earlierOffset + 6) << 8);
   } else if (selected.instrumentTable == InstrumentTableAddressModel::Human) {
-    if (const auto offset = Patterns::ptnLoadInstrTableAddressCTOW.find(reader)) {
-      probe.tableAddress = reader.u8At(*offset + 7) | (reader.u8At(*offset + 10) << 8);
-    } else if (const auto offset = Patterns::ptnLoadInstrTableAddressSOS.find(reader)) {
-      probe.tableAddress = reader.u8At(*offset + 1) | (reader.u8At(*offset + 4) << 8);
+    if (const auto clockTowerOffset = Patterns::ptnLoadInstrTableAddressCTOW.find(reader)) {
+      probe.tableAddress = reader.u8At(*clockTowerOffset + 7) | (reader.u8At(*clockTowerOffset + 10) << 8);
+    } else if (const auto sosOffset = Patterns::ptnLoadInstrTableAddressSOS.find(reader)) {
+      probe.tableAddress = reader.u8At(*sosOffset + 1) | (reader.u8At(*sosOffset + 4) << 8);
     } else {
       return std::nullopt;
     }
   } else if (selected.instrumentTable == InstrumentTableAddressModel::Tose) {
-    const auto offset = Patterns::ptnLoadInstrTableAddressYSFR.find(reader);
-    if (!offset) {
+    const auto toseOffset = Patterns::ptnLoadInstrTableAddressYSFR.find(reader);
+    if (!toseOffset) {
       return std::nullopt;
     }
-    probe.dirAddress = static_cast<u16>(reader.u8At(*offset + 3) << 8);
-    probe.tableAddress = reader.u8At(*offset + 10) | (reader.u8At(*offset + 13) << 8);
+    probe.dirAddress = static_cast<u16>(reader.u8At(*toseOffset + 3) << 8);
+    probe.tableAddress = reader.u8At(*toseOffset + 10) | (reader.u8At(*toseOffset + 13) << 8);
   } else {
     return std::nullopt;
   }
@@ -366,23 +357,23 @@ std::optional<Layout> findLayout(ByteReader reader) {
   std::optional<u16> konamiBase;
   std::optional<u16> falcomBaseAddress;
 
-  if (const auto offset = Patterns::ptnIncSectionPtr.find(reader)) {
+  if (const auto standardOffset = Patterns::ptnIncSectionPtr.find(reader)) {
     signature = Signature::Standard;
-    sectionPointer = reader.u8At(*offset + 3);
-  } else if (const auto offset = Patterns::ptnIncSectionPtrGD3.find(reader)) {
+    sectionPointer = reader.u8At(*standardOffset + 3);
+  } else if (const auto konamiOffset = Patterns::ptnIncSectionPtrGD3.find(reader)) {
     signature = Signature::Konami;
-    sectionPointer = reader.u8At(*offset + 3);
-    const u8 basePointer = reader.u8At(*offset + 16);
+    sectionPointer = reader.u8At(*konamiOffset + 3);
+    const u8 basePointer = reader.u8At(*konamiOffset + 16);
     if (!reader.has(basePointer, 2)) {
       return std::nullopt;
     }
     konamiBase = reader.le16(basePointer);
-  } else if (const auto offset = Patterns::ptnIncSectionPtrYSFR.find(reader)) {
+  } else if (const auto toseOffset = Patterns::ptnIncSectionPtrYSFR.find(reader)) {
     signature = Signature::Tose;
-    sectionPointer = reader.u8At(*offset + 3);
-  } else if (const auto offset = Patterns::ptnIncSectionPtrYs4.find(reader)) {
+    sectionPointer = reader.u8At(*toseOffset + 3);
+  } else if (const auto falcomOffset = Patterns::ptnIncSectionPtrYs4.find(reader)) {
     signature = Signature::FalcomYs4;
-    sectionPointer = reader.u8At(*offset + 3);
+    sectionPointer = reader.u8At(*falcomOffset + 3);
   } else {
     return std::nullopt;
   }
@@ -417,10 +408,8 @@ std::optional<Layout> findLayout(ByteReader reader) {
     return !durationRateTable.empty() && !volumeTable.empty();
   };
   const bool noteTablesFound =
-      loadNoteTables(Patterns::ptnDispatchNoteYI, 6, 16) ||
-      loadNoteTables(Patterns::ptnDispatchNoteGD3, 6, 16) ||
-      loadNoteTables(Patterns::ptnDispatchNoteYSFR, 16, 4) ||
-      loadNoteTables(Patterns::ptnDispatchNoteYs4, 6, 15);
+      loadNoteTables(Patterns::ptnDispatchNoteYI, 6, 16) || loadNoteTables(Patterns::ptnDispatchNoteGD3, 6, 16) ||
+      loadNoteTables(Patterns::ptnDispatchNoteYSFR, 16, 4) || loadNoteTables(Patterns::ptnDispatchNoteYs4, 6, 15);
   (void)noteTablesFound;
 
   u32 instrumentCommandOffset = 0;
@@ -528,18 +517,15 @@ std::optional<Layout> findLayout(ByteReader reader) {
     }
     const u16 firstSectionPointer = sectionListPointer(pointer);
     updateFalcomOffset(firstSectionPointer);
-    if (firstSectionPointer > currentSection ||
-        (currentSection % 2) != (firstSectionPointer % 2)) {
+    if (firstSectionPointer > currentSection || (currentSection % 2) != (firstSectionPointer % 2)) {
       continue;
     }
     u16 address = firstSectionPointer;
-    for (u8 section = 0; address >= 0x100 && address < 0xfff0 && section < 32;
-         ++section, address += 2) {
+    for (u8 section = 0; address >= 0x100 && address < 0xfff0 && section < 32; ++section, address += 2) {
       if (!reader.has(address, 2)) {
         break;
       }
-      const u16 sectionAddress =
-          readAddress(selected, reader, address, konamiBase.value_or(0), falcomOffset);
+      const u16 sectionAddress = readAddress(selected, reader, address, konamiBase.value_or(0), falcomOffset);
       if (address == currentSection) {
         currentSong = song;
         break;

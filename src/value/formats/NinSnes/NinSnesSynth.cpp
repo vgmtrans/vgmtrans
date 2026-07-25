@@ -78,10 +78,8 @@ struct InstrumentRegion {
   if (info.srcn >= 0x80 || (info.adsr1 == 0 && info.gain == 0)) {
     return false;
   }
-  const auto directory =
-      readSnesSampleDirectoryEntry(reader, directoryAddress + info.srcn * 4, inspectSample);
-  if (!directory || directory->startAddress > directory->loopAddress ||
-      !directory->loopAddressIsBlockAligned()) {
+  const auto directory = readSnesSampleDirectoryEntry(reader, directoryAddress + info.srcn * 4, inspectSample);
+  if (!directory || directory->startAddress > directory->loopAddress || !directory->loopAddressIsBlockAligned()) {
     return false;
   }
   if (inspectSample && !directory->stream) {
@@ -90,8 +88,7 @@ struct InstrumentRegion {
   return true;
 }
 
-[[nodiscard]] InstrumentInfo readInstrument(ByteReader reader, const Profile& selected, u32 program,
-                                            u32 address) {
+[[nodiscard]] InstrumentInfo readInstrument(ByteReader reader, const Profile& selected, u32 program, u32 address) {
   const bool earlier = selected.instruments == InstrumentLayout::Earlier5Byte;
   RecordReader record(reader, address, address + instrumentHeaderSize(selected));
   const u8 srcn = *record.u8("srcn", SourceValueDisplay::Hex);
@@ -112,8 +109,7 @@ struct InstrumentRegion {
   };
 }
 
-[[nodiscard]] std::vector<InstrumentInfo> collectBaseInstruments(ByteReader reader,
-                                                                 const Layout& layout) {
+[[nodiscard]] std::vector<InstrumentInfo> collectBaseInstruments(ByteReader reader, const Layout& layout) {
   std::vector<InstrumentInfo> infos;
   if (!layout.instrumentTableAddress || !layout.spcDirAddress) {
     return infos;
@@ -198,12 +194,10 @@ struct InstrumentRegion {
     return 96.0;
   }
   if (((static_cast<u32>(0x0217) * pitchScale) >> 8) > 0x3fff) {
-    pitchScale = static_cast<u16>(
-        (((static_cast<u32>(0x0217) * pitchScale) >> 8) & 0x3fff) * 256.0 / 0x0217);
+    pitchScale = static_cast<u16>((((static_cast<u32>(0x0217) * pitchScale) >> 8) & 0x3fff) * 256.0 / 0x0217);
   }
   double coarse = 0.0;
-  double fine = std::modf(std::log2(pitchScale * (4286.0 / 4096.0) / 256.0) * 12.0,
-                          &coarse);
+  double fine = std::modf(std::log2(pitchScale * (4286.0 / 4096.0) / 256.0) * 12.0, &coarse);
   if (fine >= 0.5) {
     coarse += 1.0;
     fine -= 1.0;
@@ -211,21 +205,12 @@ struct InstrumentRegion {
     coarse -= 1.0;
     fine += 1.0;
   }
-  const auto fineCents = static_cast<s16>(fine * 100.0);
-  // VGMRgn historically stores unity key in a signed byte. Extremely low
-  // pitch scales therefore overflow into its "unspecified key" representation,
-  // leaving only fine tuning in the exported region. Reproduce the effective
-  // tuning, not the accidental signed-byte storage detail.
-  const auto legacyUnityKey =
-      static_cast<s8>(96 - static_cast<int>(coarse));
-  return legacyUnityKey < 0 ? 96.0 + fineCents / 100.0
-                            : legacyUnityKey - fineCents / 100.0;
+  return 96.0 - coarse - fine;
 }
 
 [[nodiscard]] double unityKey(ByteReader reader, const Layout& layout, const InstrumentInfo& info) {
   const Profile& selected = profile(layout.profile);
-  if (selected.instruments == InstrumentLayout::KonamiTuningTable &&
-      layout.konamiTuningTableAddress != 0) {
+  if (selected.instruments == InstrumentLayout::KonamiTuningTable && layout.konamiTuningTableAddress != 0) {
     s8 coarse = 0;
     u8 fine = 0;
     if (info.srcn < layout.konamiTuningTableSize &&
@@ -241,11 +226,9 @@ struct InstrumentRegion {
 }
 
 [[nodiscard]] InstrumentModulation modulation(const SequenceRecipes& recipes) {
-  const double maximumDepth =
-      recipes.maxVibratoDepthCents > 0.0 ? recipes.maxVibratoDepthCents : 1494.140625;
+  const double maximumDepth = recipes.maxVibratoDepthCents > 0.0 ? recipes.maxVibratoDepthCents : 1494.140625;
   const double maximumRate =
-      recipes.maxVibratoRateHertz > 0.0 ? recipes.maxVibratoRateHertz
-                                        : (kTimerHertz * 0xff * 0xff) / 65536.0;
+      recipes.maxVibratoRateHertz > 0.0 ? recipes.maxVibratoRateHertz : (kTimerHertz * 0xff * 0xff) / 65536.0;
   return InstrumentModulation{
       .vibrato =
           VibratoSpec{
@@ -263,62 +246,35 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
   const InstrumentModulation instrumentModulation = modulation(recipes);
   for (const InstrumentInfo& info : infos) {
     auto sample = samples.findSrcn(info.srcn);
-    const u32 directoryEntry = *layout.spcDirAddress + info.srcn * 4;
-    if (reader.has(directoryEntry, 2)) {
-      const u16 start = reader.le16(directoryEntry);
-      // NinSnes historically stores the BRR address relative to DIR on each
-      // region, while its sample collection is not attached directly to the
-      // instrument set. If that relative address itself names another BRR
-      // stream, legacy exports choose the alias before falling back to SRCN.
-      // A handful of Ys IV instruments make this quirk observable.
-      if (start >= *layout.spcDirAddress) {
-        if (const auto alias = samples.firstStartingAt(start - *layout.spcDirAddress)) {
-          sample = alias;
-        }
-      } else {
-        // The signed relative offset is negative but not the -1 sentinel.
-        // Legacy therefore attempts an offset lookup, fails it, and falls
-        // back to the first exported sample. FE4 places DIR near the top of
-        // ARAM and makes this otherwise accidental behavior audible.
-        sample = samples.atDenseIndex(0).value_or(
-            SampleRef{.index = invalidIdValue});
-      }
-    }
     if (!sample) {
-      builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn),
-                      info.source);
+      builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn), info.source);
       continue;
     }
-    const std::string name =
-        info.override ? fmt::format("Instrument {} (Overwrite)", info.program)
-                      : fmt::format("Instrument {}", info.program);
-    auto instrument =
-        builder.add(info.program, Instrument{
-                                      .explicitAddress =
-                                          InstrumentAddress{
-                                              .bank = info.program >> 7,
-                                              .program = info.program & 0x7f,
-                                          },
-                                      .identity =
-                                          InstrumentIdentity{
-                                              .domain = std::string(kInstrumentDomain),
-                                              .key = info.program,
-                                          },
-                                      .name = name,
-                                      .modulation = instrumentModulation,
-                                  });
+    const std::string name = info.override ? fmt::format("Instrument {} (Overwrite)", info.program)
+                                           : fmt::format("Instrument {}", info.program);
+    auto instrument = builder.add(info.program, Instrument{
+                                                    .explicitAddress =
+                                                        InstrumentAddress{
+                                                            .bank = info.program >> 7,
+                                                            .program = info.program & 0x7f,
+                                                        },
+                                                    .identity =
+                                                        InstrumentIdentity{
+                                                            .domain = std::string(kInstrumentDomain),
+                                                            .key = info.program,
+                                                        },
+                                                    .name = name,
+                                                    .modulation = instrumentModulation,
+                                                });
     if (info.source.valid()) {
-      instrument.source(name, info.source,
-                        info.override ? "nin-snes-instrument-override" : "nin-snes-instrument");
+      instrument.source(name, info.source, info.override ? "nin-snes-instrument-override" : "nin-snes-instrument");
     }
     Region region{
         .unityKey = unityKey(reader, layout, info),
         // The legacy NinSnes exporter never implemented direct GAIN-mode
         // envelopes. Preserve that established export contract instead of
         // inventing a decay for instrument slots whose ADSR enable bit is off.
-        .envelope = (info.adsr1 & 0x80) != 0
-                        ? snesDspEnvelope(info.adsr1, info.adsr2, info.gain)
-                        : Envelope{},
+        .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, info.gain) : Envelope{},
     };
     instrument.region(*sample, region)
         .source("Region", info.source, "nin-snes-region")
@@ -333,8 +289,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
   for (const DrumKit& kit : recipes.drumKits) {
     std::vector<std::pair<const DrumSlot*, const InstrumentRegion*>> resolvedSlots;
     for (const DrumSlot& slot : kit.slots) {
-      if (const auto source = regionsByProgram.find(slot.sourceProgram);
-          source != regionsByProgram.end()) {
+      if (const auto source = regionsByProgram.find(slot.sourceProgram); source != regionsByProgram.end()) {
         resolvedSlots.emplace_back(&slot, &source->second);
       }
     }
@@ -344,17 +299,16 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     }
 
     const u32 key = (0x7fu << 7) | kit.program;
-    auto drum =
-        builder.add(key, Instrument{
-                             .explicitAddress = InstrumentAddress{.bank = 0x7f, .program = kit.program},
-                             .identity =
-                                 InstrumentIdentity{
-                                     .domain = std::string(kInstrumentDomain),
-                                     .key = key,
-                                 },
-                             .name = fmt::format("Drum Kit {}", kit.program),
-                             .modulation = instrumentModulation,
-                         });
+    auto drum = builder.add(key, Instrument{
+                                     .explicitAddress = InstrumentAddress{.bank = 0x7f, .program = kit.program},
+                                     .identity =
+                                         InstrumentIdentity{
+                                             .domain = std::string(kInstrumentDomain),
+                                             .key = key,
+                                         },
+                                     .name = fmt::format("Drum Kit {}", kit.program),
+                                     .modulation = instrumentModulation,
+                                 });
     for (const auto& [slot, source] : resolvedSlots) {
       Region region = source->region;
       region.keyRange = KeyRange{.low = slot->key, .high = slot->key};
@@ -365,17 +319,15 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
         region.unityKey += static_cast<int>(slot->key) - 0x3c - slot->globalTranspose;
       }
       drum.region(source->sample, std::move(region))
-          .source(fmt::format("Drum {}", slot->key), source->source,
-                  "nin-snes-drum-region");
+          .source(fmt::format("Drum {}", slot->key), source->source, "nin-snes-drum-region");
     }
   }
 }
 
 }  // namespace
 
-bool addSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
-              ScanSampleCollectionRef sampleCollection, const Layout& layout,
-              const SequenceRecipes& recipes, std::string_view displayName) {
+bool addSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet, ScanSampleCollectionRef sampleCollection,
+              const Layout& layout, const SequenceRecipes& recipes, std::string_view displayName) {
   if (!layout.instrumentTableAddress || !layout.spcDirAddress) {
     return false;
   }

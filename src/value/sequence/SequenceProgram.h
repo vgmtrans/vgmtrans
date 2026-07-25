@@ -211,7 +211,6 @@ struct PlaylistCommand {
   Address address;
   Address fallthrough;
   SourceRange range;
-  SourceAnnotationId annotation;
   PlaylistOperation operation;
 };
 

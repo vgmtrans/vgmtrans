@@ -258,60 +258,27 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
   }
 }
 
-void endTrackAt(PerformanceTrack& track, u64 endTick, u64 noteEndTick,
-                bool retainBoundaryEvents,
-                bool retainBoundaryAutomations = false) {
-  // Same-tick scheduling can emit another channel before the final loop
-  // boundary is known, so trim the completed performance rather than relying
-  // only on EndOfTrack metadata.
-  const auto continuesAfterBoundary = [](const PerformanceAutomation& automation) {
-    const auto* scalar = std::get_if<ScalarPerformanceAutomationIntent>(&automation.intent);
-    // Ordinary fades are scheduled controller state and remain committed once
-    // their command executes. Note envelopes and pitch transitions are driven
-    // by the track tick and stop when the section deactivates that track.
-    return scalar != nullptr && scalar->motion != PerformanceAutomationMotion::Envelope;
-  };
-  const auto committedScheduledAutomation = [&](const PerformanceEventHeader& header) {
-    if (!header.automation) {
-      return false;
-    }
-    const auto found = std::ranges::find(track.automations, *header.automation,
-                                         &PerformanceAutomation::id);
-    return found != track.automations.end() && continuesAfterBoundary(*found) &&
-           (found->header.tick < endTick ||
-            (retainBoundaryAutomations && found->header.tick == endTick));
-  };
+void endTrackAt(PerformanceTrack& track, u64 endTick, bool retainBoundaryEvents = false) {
   std::erase_if(track.events, [&](const PerformanceEvent& event) {
-    const PerformanceEventHeader& header = performanceEventHeader(event);
-    const bool outside = retainBoundaryEvents ? header.tick > endTick
-                                              : header.tick >= endTick;
-    return outside && !committedScheduledAutomation(header);
+    const u64 tick = performanceEventHeader(event).tick;
+    if (tick > endTick || (!retainBoundaryEvents && tick == endTick)) {
+      return true;
+    }
+    // Notes beginning exactly at a section boundary have no audible extent.
+    return tick == endTick && std::holds_alternative<NotePerformanceEvent>(event);
   });
   for (PerformanceEvent& event : track.events) {
     if (auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-      note->durationTicks =
-          static_cast<u32>(std::min<u64>(note->durationTicks, noteEndTick - note->header.tick));
+      note->durationTicks = static_cast<u32>(std::min<u64>(note->durationTicks, endTick - note->header.tick));
     }
   }
-  std::erase_if(track.automations, [=](PerformanceAutomation& automation) {
-    // Judge commitment by the source command, not by the delayed realization.
-    // A command reached at the boundary is real, but its tick-driven motion
-    // cannot continue after the section scheduler deactivates the track.
-    const bool speculative = retainBoundaryAutomations
-                                 ? automation.header.tick > endTick
-                                 : automation.header.tick >= endTick;
-    if (speculative) {
-      return true;
-    }
-    if (continuesAfterBoundary(automation)) {
-      return false;
-    }
-    automation.realization.startTick =
-        std::min(automation.realization.startTick, endTick);
-    automation.realization.endTick =
-        std::min(automation.realization.endTick, endTick);
-    return false;
+  std::erase_if(track.automations, [=](const PerformanceAutomation& automation) {
+    return retainBoundaryEvents ? automation.header.tick > endTick : automation.header.tick >= endTick;
   });
+  for (auto& automation : track.automations) {
+    automation.realization.startTick = std::min(automation.realization.startTick, endTick);
+    automation.realization.endTick = std::min(automation.realization.endTick, endTick);
+  }
   track.endTick = endTick;
 }
 
@@ -364,7 +331,6 @@ void endSourceSpansAt(std::vector<SourcePlaybackSpan>& spans, u64 endTick) {
 struct RenderedTrack {
   PerformanceTrack track;
   std::optional<u64> loopStopTick;
-  u64 scheduledWakeTick = 0;
 };
 
 struct PlaylistVisitState {
@@ -372,8 +338,7 @@ struct PlaylistVisitState {
   std::map<u32, u32> repeatRemaining;
 
   friend bool operator<(const PlaylistVisitState& lhs, const PlaylistVisitState& rhs) {
-    return std::tie(lhs.commandIndex, lhs.repeatRemaining) <
-           std::tie(rhs.commandIndex, rhs.repeatRemaining);
+    return std::tie(lhs.commandIndex, lhs.repeatRemaining) < std::tie(rhs.commandIndex, rhs.repeatRemaining);
   }
 };
 
@@ -389,10 +354,9 @@ struct PlaylistAdvance {
 // end operations; synchronized scheduling remains a generic VM concern.
 class SectionPlaylistRunner {
 public:
-  SectionPlaylistRunner(const SectionPlaylist& playlist, LoopPolicy loopPolicy,
-                        const SequenceVmOptions& options)
-      : playlist_(playlist), loopPolicy_(loopPolicy), options_(options),
-        current_(commandIndex(playlist.startAddress)) {}
+  SectionPlaylistRunner(const SectionPlaylist& playlist, LoopPolicy loopPolicy, const SequenceVmOptions& options)
+      : playlist_(playlist), loopPolicy_(loopPolicy), options_(options), current_(commandIndex(playlist.startAddress)) {
+  }
 
   [[nodiscard]] PlaylistAdvance advance(u64 tick) {
     constexpr u32 kPlaylistCommandLimit = 100000;
@@ -432,8 +396,7 @@ public:
           continue;
         }
 
-        const auto [counter, _] =
-            repeatRemaining_.try_emplace(*current_, repeat->additionalPlays);
+        const auto [counter, _] = repeatRemaining_.try_emplace(*current_, repeat->additionalPlays);
         if (counter->second != 0) {
           --counter->second;
           current_ = commandIndex(repeat->destination);
@@ -451,8 +414,9 @@ public:
 
 private:
   [[nodiscard]] std::optional<u32> commandIndex(Address address) const {
-    const auto found = std::ranges::find_if(
-        playlist_.commands, [address](const PlaylistCommand& command) { return command.address.value == address.value; });
+    const auto found = std::ranges::find_if(playlist_.commands, [address](const PlaylistCommand& command) {
+      return command.address.value == address.value;
+    });
     if (found == playlist_.commands.end()) {
       return std::nullopt;
     }
@@ -460,8 +424,9 @@ private:
   }
 
   [[nodiscard]] const SequenceSection* sectionByAddress(Address address) const {
-    const auto found = std::ranges::find_if(
-        playlist_.sections, [address](const SequenceSection& section) { return section.address.value == address.value; });
+    const auto found = std::ranges::find_if(playlist_.sections, [address](const SequenceSection& section) {
+      return section.address.value == address.value;
+    });
     return found == playlist_.sections.end() ? nullptr : &*found;
   }
 
@@ -481,8 +446,7 @@ public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
                   PerformanceSequence& targetSequence, std::optional<u64> stopTick, std::any* programState = nullptr,
-                  bool sequenceCoordinatesLoops = false, bool startsActive = true,
-                  bool discoverSectionSourceRange = false)
+                  bool sequenceCoordinatesLoops = false, bool startsActive = true)
       : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
         options_(options), targetSequence_(targetSequence), stopTick_(stopTick),
         performanceTrack_(PerformanceTrack{
@@ -492,9 +456,7 @@ public:
         trackState_(dialect.createTrackState != nullptr ? dialect.createTrackState(program, track) : std::any{}),
         programState_(programState),
         current_(startsActive ? destinationIndex(track, track.startAddress) : std::optional<u32>{}),
-        sectionTickPending_(startsActive),
-        sequenceCoordinatesLoops_(sequenceCoordinatesLoops),
-        discoverSectionSourceRange_(discoverSectionSourceRange) {
+        sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
     addInitialTrackEvents(performanceTrack_, behavior_);
     for (auto& event : performanceTrack_.events) {
       std::visit([&](auto& typedEvent) { typedEvent.header.sequence = runtime_.outputSequence++; }, event);
@@ -512,17 +474,13 @@ public:
     return finish();
   }
 
-  [[nodiscard]] bool active() const noexcept {
-    return current_.has_value() || pendingTicks_ != 0;
-  }
+  [[nodiscard]] bool active() const noexcept { return current_.has_value() || pendingTicks_ != 0; }
   [[nodiscard]] u64 tick() const noexcept { return runtime_.tick; }
   [[nodiscard]] u64 nextActionTick() const noexcept {
-    if (sectionTickPending_ || pendingTicks_ == 0) {
+    if (pendingTicks_ == 0) {
       return runtime_.tick;
     }
-    return runtime_.tick == std::numeric_limits<u64>::max()
-               ? runtime_.tick
-               : runtime_.tick + 1;
+    return runtime_.tick == std::numeric_limits<u64>::max() ? runtime_.tick : runtime_.tick + 1;
   }
   [[nodiscard]] std::optional<u64> loopStopTick() const noexcept { return loopStopTick_; }
 
@@ -530,10 +488,7 @@ public:
     if (!current_ && pendingTicks_ == 0) {
       return false;
     }
-    if (sectionTickPending_) {
-      sectionTickPending_ = false;
-      tickDialect(track_.commands.at(*current_));
-    } else if (pendingTicks_ != 0) {
+    if (pendingTicks_ != 0) {
       if (runtime_.tick != std::numeric_limits<u64>::max()) {
         ++runtime_.tick;
       }
@@ -548,17 +503,6 @@ public:
     // wait. Keep consuming zero-time commands here; yielding between them
     // would let a later channel run too early at the same tick.
     while (current_ && pendingTicks_ == 0) {
-      // A discovered source range is an exclusive parser boundary, checked
-      // only when the channel wakes to read another command. Per-tick motion
-      // for the wait which reached this address has already run above.
-      if (sectionSourceStop_) {
-        const SourceCommand& candidate = track_.commands.at(*current_);
-        if (candidate.address.value >= *sectionSourceStop_) {
-          current_.reset();
-          retiredAtSourceStop_ = true;
-          break;
-        }
-      }
       const bool hadLoopStop = loopStopTick_.has_value();
       if (executeCommand()) {
         return true;
@@ -574,75 +518,27 @@ public:
 
   // A section switch preserves the format's typed channel state, but resets
   // source control flow and timing to the shared boundary tick.
-  void beginSection(std::optional<Address> start, u64 tick,
-                    std::optional<u64> sourceStop = std::nullopt) {
+  void beginSection(std::optional<Address> start, u64 tick) {
     runtime_.tick = tick;
     runtime_.callStack.clear();
     runtime_.repeat.clear();
     runtime_.lastCommand = {};
     pendingTicks_ = 0;
     current_ = start ? destinationIndex(track_, *start) : std::optional<u32>{};
-    sectionTickPending_ = current_.has_value();
     arrivedByControlFlow_ = true;
     loopDetector_.clear();
     firstLoopTick_.reset();
     loopStopTick_.reset();
     loopRepeats_ = 0;
-    sectionSourceStop_ = sourceStop;
-    discoveredSectionSourceStop_.reset();
-    retiredAtSourceStop_ = false;
     if (dialect_.beginTrackSection != nullptr) {
-      dialect_.beginTrackSection(trackState_, sourceStop);
+      dialect_.beginTrackSection(trackState_);
     }
     if (start && !current_) {
       warn(fmt::format("Sequence section target ${:04X} was not decoded", start->value), {});
     }
   }
 
-  void trimAt(u64 tick, bool retainBoundaryEvents) {
-    // Legacy's tick scheduler stops reading every channel at the shared
-    // section boundary, but duration notes are capped at that channel's next
-    // scheduled wake-up. Those can differ when one channel ends the section
-    // while another is still waiting on a longer note.
-    const u64 noteEndTick =
-        dialect_.sectionNoteEndPolicy == SectionNoteEndPolicy::ScheduledWake
-            ? std::max(tick, scheduledWakeTick())
-            : tick;
-    endTrackAt(performanceTrack_, tick, noteEndTick, retainBoundaryEvents,
-               retainBoundaryEvents);
-    if (dialect_.reconcileTrackAfterTrim != nullptr) {
-      dialect_.reconcileTrackAfterTrim(trackState_, performanceTrack_, tick);
-    }
-  }
-
-  [[nodiscard]] std::optional<u64> discoveredSectionSourceStop() const noexcept {
-    return discoveredSectionSourceStop_;
-  }
-
-  void advanceRetiredMotionTo(u64 tick) {
-    if (!retiredAtSourceStop_ || !lastCommandIndex_) {
-      return;
-    }
-    while (runtime_.tick < tick) {
-      ++runtime_.tick;
-      tickDialect(track_.commands.at(*lastCommandIndex_));
-    }
-  }
-
-  void endTrackTick(u64 tick) {
-    if (dialect_.endTrackTick == nullptr || !lastCommandIndex_) {
-      return;
-    }
-    const SourceCommand& command = track_.commands.at(*lastCommandIndex_);
-    PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,      tick,
-                           runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
-    VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-    if (programState_ == nullptr) {
-      warn("Missing sequence program state", command.range);
-      return;
-    }
-    dialect_.endTrackTick(command, *programState_, trackState_, out, vm, tick);
-  }
+  void trimAt(u64 tick, bool retainBoundaryEvents) { endTrackAt(performanceTrack_, tick, retainBoundaryEvents); }
 
   void preservePlaylistLoop(u64 startTick, u64 endTick) {
     addLoopMarker(performanceTrack_, {}, startTick, runtime_.outputSequence, "Loop Start");
@@ -662,18 +558,10 @@ public:
     return RenderedTrack{
         .track = std::move(performanceTrack_),
         .loopStopTick = loopStopTick_ ? loopStopTick_ : firstLoopTick_,
-        .scheduledWakeTick = scheduledWakeTick(),
     };
   }
 
 private:
-  [[nodiscard]] u64 scheduledWakeTick() const noexcept {
-    if (runtime_.tick > std::numeric_limits<u64>::max() - pendingTicks_) {
-      return std::numeric_limits<u64>::max();
-    }
-    return runtime_.tick + pendingTicks_;
-  }
-
   void tickDialect(const SourceCommand& command) {
     if (dialect_.tick == nullptr) {
       return;
@@ -686,7 +574,6 @@ private:
       return;
     }
     dialect_.tick(command, *programState_, trackState_, out, vm);
-    discoverDialectSourceStop(false);
   }
 
   [[nodiscard]] bool executeCommand() {
@@ -709,9 +596,6 @@ private:
     const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
     if (const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_)) {
       if (handleLoop(*loop, commandIndex, visitState).kind == LoopActionKind::StopTrack) {
-        if (sectionSourceStop_) {
-          retiredAtSourceStop_ = true;
-        }
         return false;
       }
     }
@@ -729,12 +613,6 @@ private:
     }
     const Effects effects = dialect_.execute(command, *programState_, trackState_, out, vm);
     scheduleTicks(commandIndex, effects.advanceTicks);
-    discoverSectionCommand(command, effects.step);
-    const bool sourceOnlyTerminator =
-        dialect_.includeSectionSourceCommand != nullptr &&
-        !dialect_.includeSectionSourceCommand(command) &&
-        command.flow.kind == DecodeFlow::Kind::Return;
-    discoverDialectSourceStop(!sourceOnlyTerminator);
     if (command.annotation.valid()) {
       u64 endTick = beginTick == std::numeric_limits<u64>::max() ? beginTick : beginTick + 1;
       if (beginTick <= std::numeric_limits<u64>::max() - effects.advanceTicks) {
@@ -756,7 +634,6 @@ private:
       });
     }
     runtime_.lastCommand = command.id;
-    lastCommandIndex_ = commandIndex;
     const bool endedSection = effects.step.kind == StepKind::EndSection;
     applyStep(command, effects.step);
 
@@ -866,61 +743,6 @@ private:
     pendingTickCommand_ = commandIndex;
   }
 
-  void discoverSectionCommand(const SourceCommand& command,
-                              const Step& step) {
-    if (!discoverSectionSourceRange_) {
-      return;
-    }
-    const auto included = [&](const SourceCommand& candidate) {
-      return dialect_.includeSectionSourceCommand == nullptr ||
-             dialect_.includeSectionSourceCommand(candidate);
-    };
-    // A source-only terminator is still part of the replay range when it
-    // returns from a called pattern. The same byte at the outermost level is
-    // deliberately excluded, allowing replay to stop before a section End
-    // that discovery reached only through control flow.
-    if (!included(command) && step.kind != StepKind::Return) {
-      return;
-    }
-
-    rememberDiscoveredSourceStop(
-        command.address.value + command.encodedSize,
-        included(command));
-  }
-
-  void discoverDialectSourceStop(bool includeAdjacentTerminator) {
-    if (!discoverSectionSourceRange_ ||
-        dialect_.trackSectionSourceStop == nullptr) {
-      return;
-    }
-    const auto stop = dialect_.trackSectionSourceStop(trackState_);
-    if (stop) {
-      rememberDiscoveredSourceStop(*stop, includeAdjacentTerminator);
-    }
-  }
-
-  void rememberDiscoveredSourceStop(u64 stop,
-                                    bool includeAdjacentTerminator) {
-    discoveredSectionSourceStop_ =
-        std::max(discoveredSectionSourceStop_.value_or(0), stop);
-    if (!includeAdjacentTerminator ||
-        dialect_.includeSectionSourceCommand == nullptr) {
-      return;
-    }
-
-    const auto adjacent = track_.addressIndex.find(Address{stop});
-    if (!adjacent) {
-      return;
-    }
-    const SourceCommand& command = track_.commands.at(*adjacent);
-    if (!dialect_.includeSectionSourceCommand(command) &&
-        command.flow.kind == DecodeFlow::Kind::Return) {
-      discoveredSectionSourceStop_ =
-          std::max(*discoveredSectionSourceStop_,
-                   command.address.value + command.encodedSize);
-    }
-  }
-
   void applyJump(const SourceCommand& command, Address destinationAddress, JumpSemantics semantics) {
     switch (semantics) {
       case JumpSemantics::Normal:
@@ -1016,7 +838,6 @@ private:
   VmTrackRuntime runtime_;
   LoopDetector loopDetector_;
   std::optional<u32> current_;
-  std::optional<u32> lastCommandIndex_;
   u32 pendingTicks_ = 0;
   u32 pendingTickCommand_ = 0;
   u32 executedCommands_ = 0;
@@ -1024,12 +845,7 @@ private:
   std::optional<u64> loopStopTick_;
   u32 loopRepeats_ = 0;
   bool arrivedByControlFlow_ = true;
-  bool sectionTickPending_ = false;
   bool sequenceCoordinatesLoops_ = false;
-  bool discoverSectionSourceRange_ = false;
-  std::optional<u64> sectionSourceStop_;
-  std::optional<u64> discoveredSectionSourceStop_;
-  bool retiredAtSourceStop_ = false;
 };
 
 }  // namespace
@@ -1164,8 +980,7 @@ SequenceVm::SequenceVm(SequenceVmOptions options) : options_(options) {
 }
 
 PerformanceSequence SequenceVm::render(const SequenceProgram& program, const SequenceDialect& dialect,
-                                       detail::ProgramStateInspector inspector,
-                                       void* inspectionDestination) const {
+                                       ProgramStateObserver observeProgramState) const {
   PerformanceSequence sequence{
       .timebase = program.timebase,
       .preferredPitchTransitionRendering = dialect.preferredPitchTransitionRendering,
@@ -1179,61 +994,25 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     // exported. Keep one song-wide state object across an optional silent pass
     // and the real render so collected information is retained.
     std::any programState = dialect.createProgramState != nullptr ? dialect.createProgramState(program) : std::any{};
-    using SectionSourceStops =
-        std::map<u64, std::vector<std::optional<u64>>>;
-    SectionSourceStops discoveredSectionStops;
-    const auto renderSemanticPass =
-        [&](PerformanceSequence& target, std::any& passProgramState,
-            bool discoverSectionStops,
-            const SectionSourceStops* replaySectionStops) {
+    const auto renderSemanticPass = [&](PerformanceSequence& target, std::any& passProgramState) {
       std::vector<std::unique_ptr<VmTrackExecutor>> executors;
       executors.reserve(program.tracks.size());
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (const TrackProgram& track : program.tracks) {
         executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, target,
                                                               std::nullopt, &passProgramState,
-                                                              loopPolicy == LoopPolicy::PlayOnce,
-                                                              !hasSectionPlaylist,
-                                                              discoverSectionStops));
+                                                              loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
       }
 
       std::optional<SectionPlaylistRunner> playlist;
-      const SequenceSection* currentSection = nullptr;
-      const auto sourceStop = [&](const SequenceSection* section,
-                                  size_t track) -> std::optional<u64> {
-        if (section == nullptr || replaySectionStops == nullptr) {
-          return std::nullopt;
-        }
-        const auto found = replaySectionStops->find(section->address.value);
-        if (found == replaySectionStops->end() ||
-            track >= found->second.size()) {
-          return std::nullopt;
-        }
-        return found->second[track];
-      };
-      const auto rememberDiscoveredStops = [&] {
-        if (!discoverSectionStops || currentSection == nullptr) {
-          return;
-        }
-        auto& stops = discoveredSectionStops[currentSection->address.value];
-        stops.resize(executors.size());
-        for (size_t i = 0; i < executors.size(); ++i) {
-          const auto discovered = executors[i]->discoveredSectionSourceStop();
-          if (discovered) {
-            stops[i] = std::max(stops[i].value_or(0), *discovered);
-          }
-        }
-      };
       if (program.sectionPlaylist) {
         playlist.emplace(*program.sectionPlaylist, loopPolicy, options_);
         const PlaylistAdvance first = playlist->advance(0);
         if (first.section != nullptr) {
-          currentSection = first.section;
           for (size_t i = 0; i < executors.size(); ++i) {
             const std::optional<Address> start =
                 i < first.section->trackStarts.size() ? first.section->trackStarts[i] : std::nullopt;
-            executors[i]->beginSection(start, 0,
-                                       sourceStop(first.section, i));
+            executors[i]->beginSection(start, 0);
           }
         }
       }
@@ -1248,8 +1027,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
           if (!executors[i]->active()) {
             continue;
           }
-          if (selected == executors.size() ||
-              executors[i]->nextActionTick() < executors[selected]->nextActionTick()) {
+          if (selected == executors.size() || executors[i]->nextActionTick() < executors[selected]->nextActionTick()) {
             selected = i;
           }
         }
@@ -1258,42 +1036,12 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
         }
 
         const bool endedSection = executors[selected]->executeNext();
-        const bool allSectionTracksEnded =
-            std::ranges::none_of(executors, [](const auto& executor) {
-              return executor->active();
-            });
-        const bool reachedDiscoveredStops =
-            replaySectionStops != nullptr && allSectionTracksEnded;
-        const bool advancesPlaylist =
-            endedSection || reachedDiscoveredStops;
-        if (advancesPlaylist && playlist) {
-          // Reaching parser stop ranges exits after the ordinary scheduler
-          // increment. An explicit End suppresses that increment and switches
-          // sections at the tick which read the command.
-          const u64 processedTick = executors[selected]->tick();
-          const u64 boundary =
-              reachedDiscoveredStops && !endedSection &&
-                      processedTick != std::numeric_limits<u64>::max()
-                  ? processedTick + 1
-                  : processedTick;
-          if (reachedDiscoveredStops) {
-            for (auto& executor : executors) {
-              // Source-inactive channels no longer receive track callbacks,
-              // but sliders they already created remain sequence-level work.
-              // The compiled dialect models those sliders through its tick
-              // hook, so realize their tail through the last processed tick.
-              executor->advanceRetiredMotionTo(processedTick);
-            }
-          }
-          rememberDiscoveredStops();
+        if (endedSection && playlist) {
+          const u64 boundary = executors[selected]->tick();
           for (size_t i = 0; i < executors.size(); ++i) {
-            // The legacy driver processes channels in source order. Channels
-            // through the one that reads End have already handled this tick;
-            // later channels are deactivated before their tick callback runs.
-            // If every channel instead reached its own discovered source stop,
-            // all callbacks at this boundary were processed.
-            executors[i]->trimAt(boundary,
-                                 reachedDiscoveredStops || i <= selected);
+            // Tracks are ordered exactly as the driver visits them. Retain
+            // same-tick work from channels already processed before End.
+            executors[i]->trimAt(boundary, i <= selected);
           }
           endSourceSpansAt(target.sourceSpans, boundary);
 
@@ -1307,12 +1055,10 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
             sequenceEndTick = boundary;
             break;
           }
-          currentSection = next.section;
           for (size_t i = 0; i < executors.size(); ++i) {
             const std::optional<Address> start =
                 i < next.section->trackStarts.size() ? next.section->trackStarts[i] : std::nullopt;
-            executors[i]->beginSection(start, boundary,
-                                       sourceStop(next.section, i));
+            executors[i]->beginSection(start, boundary);
           }
           continue;
         }
@@ -1328,27 +1074,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
           }
           break;
         }
-
-        const u64 processedTick = executors[selected]->tick();
-        const bool hasActiveTrack =
-            std::ranges::any_of(executors, [](const auto& executor) {
-              return executor->active();
-            });
-        const bool sharedTickComplete =
-            std::ranges::all_of(executors, [processedTick](const auto& executor) {
-              return !executor->active() ||
-                     executor->nextActionTick() > processedTick;
-            });
-        if (hasActiveTrack && sharedTickComplete) {
-          for (auto& executor : executors) {
-            executor->advanceRetiredMotionTo(processedTick);
-          }
-          for (auto& executor : executors) {
-            executor->endTrackTick(processedTick);
-          }
-        }
       }
-      rememberDiscoveredStops();
 
       std::vector<PerformanceTrack> tracks;
       tracks.reserve(executors.size());
@@ -1358,16 +1084,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
       for (auto& executor : executors) {
         auto rendered = executor->finish();
         if (sequenceEndTick) {
-          const bool scheduledWake =
-              playlist && dialect.sectionNoteEndPolicy == SectionNoteEndPolicy::ScheduledWake;
-          const u64 noteEndTick = scheduledWake
-                                      ? std::max(*sequenceEndTick, rendered.scheduledWakeTick)
-                                      : *sequenceEndTick;
-          // Reaching the playlist end is a half-open stop, unlike an
-          // intermediate section switch where commands already executed at
-          // the shared tick remain committed.
-          endTrackAt(rendered.track, *sequenceEndTick, noteEndTick, false,
-                     playlist.has_value());
+          endTrackAt(rendered.track, *sequenceEndTick);
         }
         tracks.push_back(std::move(rendered.track));
       }
@@ -1378,11 +1095,7 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
     if (dialect.prepass == SemanticPrepassMode::ScheduledPlayback) {
       // Run commands in normal time order but discard every emitted event. This
       // preserves song-wide interactions between tracks during collection.
-      prepass.tracks = renderSemanticPass(
-          prepass, programState,
-          dialect.sectionEndPolicy ==
-              SectionEndPolicy::DiscoveredSourceRange,
-          nullptr);
+      prepass.tracks = renderSemanticPass(prepass, programState);
     } else if (dialect.prepass == SemanticPrepassMode::DecodedCommands) {
       // Some limits must include every valid source block, even when a jump
       // skips that block during normal playback. Run each already-decoded
@@ -1409,37 +1122,19 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
         }
       }
     }
-    if (dialect.sectionEndPolicy ==
-            SectionEndPolicy::DiscoveredSourceRange &&
-        dialect.prepass != SemanticPrepassMode::ScheduledPlayback) {
-      // Range discovery is structural, so formats without a semantic prepass
-      // use an isolated state object and leave their real render state pristine.
-      std::any discoveryState =
-          dialect.createProgramState != nullptr
-              ? dialect.createProgramState(program)
-              : std::any{};
-      PerformanceSequence discovery{.timebase = program.timebase};
-      discovery.tracks =
-          renderSemanticPass(discovery, discoveryState, true, nullptr);
-    }
     if (dialect.prepass != SemanticPrepassMode::None) {
       if (dialect.finishPrepass != nullptr) {
         // Tell the format that collection is complete before fresh track state
         // is created for the real render.
-        dialect.finishPrepass(programState, prepass);
+        dialect.finishPrepass(programState);
       }
     }
-    sequence.tracks = renderSemanticPass(
-        sequence, programState, false,
-        dialect.sectionEndPolicy ==
-                SectionEndPolicy::DiscoveredSourceRange
-            ? &discoveredSectionStops
-            : nullptr);
+    sequence.tracks = renderSemanticPass(sequence, programState);
     if (dialect.finalizePerformance != nullptr) {
       dialect.finalizePerformance(programState, sequence);
     }
-    if (inspector != nullptr) {
-      inspector(&programState, inspectionDestination);
+    if (observeProgramState) {
+      observeProgramState(programState);
     }
     return sequence;
   }

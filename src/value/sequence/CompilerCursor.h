@@ -700,13 +700,13 @@ public:
     }
 
     Event& emitVibratoRate(auto amount, auto hertz) {
-      return append<&detail::emitModulationRate<Playback>>(ModulationPerformanceTarget::VibratoRate,
-                                                           std::move(amount), std::move(hertz));
+      return append<&detail::emitModulationRate<Playback>>(ModulationPerformanceTarget::VibratoRate, std::move(amount),
+                                                           std::move(hertz));
     }
 
     Event& emitTremoloRate(auto amount, auto hertz) {
-      return append<&detail::emitModulationRate<Playback>>(ModulationPerformanceTarget::TremoloRate,
-                                                           std::move(amount), std::move(hertz));
+      return append<&detail::emitModulationRate<Playback>>(ModulationPerformanceTarget::TremoloRate, std::move(amount),
+                                                           std::move(hertz));
     }
 
     Event& emitPortamentoEnable(auto enabled) {
@@ -895,7 +895,8 @@ public:
 
   CompilerCursor(ByteReader reader, u32 begin, u32 end, std::string_view detailKindPrefix,
                  std::vector<Diagnostic>* diagnostics = nullptr)
-      : record_(reader, begin, end, diagnostics, false), detailKindPrefix_(detailKindPrefix), diagnostics_(diagnostics) {
+      : record_(reader, begin, end, diagnostics, false), detailKindPrefix_(detailKindPrefix),
+        diagnostics_(diagnostics) {
     const auto opcode = record_.u8("opcode", SourceValueDisplay::Hex);
     if (opcode) {
       opcode_ = *opcode;
@@ -1114,63 +1115,26 @@ struct CompiledCommandDialect {
     }));
   }
 
-  static void endTrackTick(const SourceCommand&, std::any& programState,
-                           std::any& trackState, PerformanceEmitter& out,
-                           VmApi& vm, u64 tick) {
-    static_cast<void>(withPlayback(programState, trackState, out, vm,
-                                  [tick](Playback& playback) {
-      if constexpr (requires { playback.endTick(tick); }) {
-        playback.endTick(tick);
-      }
-      return Effects{};
-    }));
-  }
-
-  static void finishPrepass(std::any& programState,
-                            const PerformanceSequence& performance) {
+  static void finishPrepass(std::any& programState) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     // Give the format one clear boundary between silent collection and the
     // real render. Collected results remain in the same typed object.
-    if constexpr (requires { typedProgramState.finishPrepass(performance); }) {
-      typedProgramState.finishPrepass(performance);
-    } else if constexpr (requires { typedProgramState.finishPrepass(); }) {
+    if constexpr (requires { typedProgramState.finishPrepass(); }) {
       typedProgramState.finishPrepass();
     }
   }
 
-  static void beginTrackSection(std::any& trackState,
-                                std::optional<u64> sourceStop) {
+  static void beginTrackSection(std::any& trackState) {
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    if constexpr (requires {
-                    typedTrackState.beginSection(sourceStop);
-                  }) {
-      typedTrackState.beginSection(sourceStop);
-    } else if constexpr (requires { typedTrackState.beginSection(); }) {
+    if constexpr (requires { typedTrackState.beginSection(); }) {
       typedTrackState.beginSection();
     }
-  }
-
-  static std::optional<u64> trackSectionSourceStop(
-      const std::any& trackState) {
-    const auto& typedTrackState = std::any_cast<const TrackState&>(trackState);
-    if constexpr (requires { typedTrackState.sectionSourceStop(); }) {
-      return typedTrackState.sectionSourceStop();
-    }
-    return std::nullopt;
   }
 
   static void finalizePerformance(std::any& programState, PerformanceSequence& performance) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     if constexpr (requires { typedProgramState.finalizePerformance(performance); }) {
       typedProgramState.finalizePerformance(performance);
-    }
-  }
-
-  static void reconcileTrackAfterTrim(std::any& trackState,
-                                      const PerformanceTrack& performance, u64 endTick) {
-    auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    if constexpr (requires { typedTrackState.reconcileAfterTrim(performance, endTick); }) {
-      typedTrackState.reconcileAfterTrim(performance, endTick);
     }
   }
 };
@@ -1186,39 +1150,16 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
   if constexpr (requires(Playback& playback) { playback.tick(); }) {
     dialect.tick = Compiled::tick;
   }
-  if constexpr (requires(Playback& playback, u64 tick) {
-                  playback.endTick(tick);
-                }) {
-    dialect.endTrackTick = Compiled::endTrackTick;
-  }
-  if constexpr (requires(ProgramState& state, const PerformanceSequence& performance) {
-                  state.finishPrepass(performance);
-                } ||
-                requires(ProgramState& state) { state.finishPrepass(); }) {
+  if constexpr (requires(ProgramState& state) { state.finishPrepass(); }) {
     dialect.finishPrepass = Compiled::finishPrepass;
   }
-  if constexpr (requires(TrackState& state,
-                         std::optional<u64> sourceStop) {
-                  state.beginSection(sourceStop);
-                } ||
-                requires(TrackState& state) { state.beginSection(); }) {
+  if constexpr (requires(TrackState& state) { state.beginSection(); }) {
     dialect.beginTrackSection = Compiled::beginTrackSection;
-  }
-  if constexpr (requires(const TrackState& state) {
-                  state.sectionSourceStop();
-                }) {
-    dialect.trackSectionSourceStop = Compiled::trackSectionSourceStop;
   }
   if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
                   state.finalizePerformance(performance);
                 }) {
     dialect.finalizePerformance = Compiled::finalizePerformance;
-  }
-  if constexpr (requires(TrackState& state, const PerformanceTrack& performance,
-                         u64 endTick) {
-                  state.reconcileAfterTrim(performance, endTick);
-                }) {
-    dialect.reconcileTrackAfterTrim = Compiled::reconcileTrackAfterTrim;
   }
   return dialect;
 }
@@ -1229,21 +1170,10 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
 // format-facing projector remains fully typed; only this adapter touches any.
 template <class ProgramState, class Result>
 [[nodiscard]] Result analyzeCompiledProgram(const SequenceProgram& program, const SequenceDialect& dialect,
-                                            Result (*project)(const ProgramState&),
-                                            SequenceVmOptions options = {}) {
-  struct Inspection {
-    Result* result = nullptr;
-    Result (*project)(const ProgramState&) = nullptr;
-  };
-
+                                            Result (*project)(const ProgramState&), SequenceVmOptions options = {}) {
   Result result;
-  Inspection inspection{.result = &result, .project = project};
-  const auto inspect = [](const void* erasedState, void* erasedInspection) {
-    const auto& state = *static_cast<const std::any*>(erasedState);
-    auto& destination = *static_cast<Inspection*>(erasedInspection);
-    *destination.result = destination.project(std::any_cast<const ProgramState&>(state));
-  };
-  static_cast<void>(SequenceVm(options).render(program, dialect, inspect, &inspection));
+  const auto observe = [&](const std::any& state) { result = project(std::any_cast<const ProgramState&>(state)); };
+  static_cast<void>(SequenceVm(options).render(program, dialect, observe));
   return result;
 }
 

@@ -126,11 +126,6 @@ std::optional<SampleRef> SnesBrrSampleRefs::firstStartingAt(u32 address) const {
   return found == entries_.end() ? std::nullopt : std::optional<SampleRef>{found->sample};
 }
 
-std::optional<SampleRef> SnesBrrSampleRefs::atDenseIndex(u32 index) const {
-  return index < entries_.size() ? std::optional<SampleRef>{entries_[index].sample}
-                                 : std::nullopt;
-}
-
 SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
                                     std::string_view directoryEntryKind) {
   samples.include(catalog.directoryRange);
@@ -145,15 +140,7 @@ SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader
     const u32 lastBlockAddress = encodedLength >= 9 ? info.startAddress + encodedLength - 9 : info.startAddress;
     const bool loopEnabled =
         info.stream.loops && info.loopAddress >= info.startAddress && info.loopAddress <= lastBlockAddress;
-    const u32 loopByteOffset = loopEnabled ? info.loopAddress - info.startAddress : 0;
-    const u32 loopStart = (loopByteOffset * 16) / 9;
-    // Some SPC directories point a byte or two into a BRR block. Legacy
-    // quantizes both the start and the remaining span independently, so
-    // subtracting an already-quantized start from the decoded length can add
-    // one spurious 16-frame block.
-    const u32 loopLength = loopEnabled && encodedLength >= loopByteOffset
-                               ? ((encodedLength - loopByteOffset) * 16) / 9
-                               : 0;
+    const u32 loopStart = loopEnabled ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
     auto sample = samples.add(
         info.srcn, Sample{
                        .name = fmt::format("Sample {}", static_cast<unsigned>(info.srcn)),
@@ -166,7 +153,7 @@ SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader
                            Loop{
                                .enabled = loopEnabled,
                                .start = loopStart,
-                               .length = loopLength,
+                               .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
                            },
                    });
 
