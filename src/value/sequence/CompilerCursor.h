@@ -1171,10 +1171,8 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
 template <class ProgramState, class Result>
 [[nodiscard]] Result analyzeCompiledProgram(const SequenceProgram& program, const SequenceDialect& dialect,
                                             Result (*project)(const ProgramState&), SequenceVmOptions options = {}) {
-  Result result;
-  const auto observe = [&](const std::any& state) { result = project(std::any_cast<const ProgramState&>(state)); };
-  static_cast<void>(SequenceVm(options).render(program, dialect, observe));
-  return result;
+  const std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program, dialect);
+  return project(std::any_cast<const ProgramState&>(state));
 }
 
 }  // namespace vgmtrans::core

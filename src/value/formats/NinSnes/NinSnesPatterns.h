@@ -28,7 +28,7 @@ private:
 };
 
 // The legacy and value scanners intentionally share the signature definitions
-// from NinSnesScannerPatterns.inc. Keeping one catalog prevents the two
+// from the shared NinSnesScannerPatterns.inc. Keeping one catalog prevents the two
 // architectures from silently recognizing different engine permutations.
 struct Patterns {
   static Pattern makeInitSectionPtrPattern(u8 sectionPointer);

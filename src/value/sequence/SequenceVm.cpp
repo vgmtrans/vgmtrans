@@ -344,9 +344,7 @@ struct PlaylistVisitState {
 
 struct PlaylistAdvance {
   const SequenceSection* section = nullptr;
-  bool ended = false;
-  bool preservedLoop = false;
-  u64 loopStartTick = 0;
+  std::optional<u64> preservedLoopStart;
 };
 
 // Interprets the small, source-independent control graph between parallel
@@ -372,9 +370,8 @@ public:
           visited_.emplace(state, tick);
         } else {
           return PlaylistAdvance{
-              .ended = true,
-              .preservedLoop = loopPolicy_ == LoopPolicy::Preserve,
-              .loopStartTick = previous->second,
+              .preservedLoopStart =
+                  loopPolicy_ == LoopPolicy::Preserve ? std::optional<u64>{previous->second} : std::nullopt,
           };
         }
       } else {
@@ -387,7 +384,6 @@ public:
         const auto section = sectionByAddress(play->section);
         return PlaylistAdvance{
             .section = section,
-            .ended = section == nullptr,
         };
       }
       if (const auto* repeat = std::get_if<PlaylistRepeat>(&command.operation)) {
@@ -407,9 +403,9 @@ public:
         continue;
       }
 
-      return PlaylistAdvance{.ended = true};
+      return {};
     }
-    return PlaylistAdvance{.ended = true};
+    return {};
   }
 
 private:
@@ -979,8 +975,12 @@ SequenceVm::SequenceVm(LoopPolicy loopPolicy) : options_(SequenceVmOptions{.loop
 SequenceVm::SequenceVm(SequenceVmOptions options) : options_(options) {
 }
 
-PerformanceSequence SequenceVm::render(const SequenceProgram& program, const SequenceDialect& dialect,
-                                       ProgramStateObserver observeProgramState) const {
+PerformanceSequence SequenceVm::render(const SequenceProgram& program, const SequenceDialect& dialect) const {
+  return renderImpl(program, dialect, nullptr);
+}
+
+PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const SequenceDialect& dialect,
+                                           std::any* analyzedProgramState) const {
   PerformanceSequence sequence{
       .timebase = program.timebase,
       .preferredPitchTransitionRendering = dialect.preferredPitchTransitionRendering,
@@ -1046,12 +1046,12 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
           endSourceSpansAt(target.sourceSpans, boundary);
 
           const PlaylistAdvance next = playlist->advance(boundary);
-          if (next.preservedLoop) {
+          if (next.preservedLoopStart) {
             for (auto& executor : executors) {
-              executor->preservePlaylistLoop(next.loopStartTick, boundary);
+              executor->preservePlaylistLoop(*next.preservedLoopStart, boundary);
             }
           }
-          if (next.ended || next.section == nullptr) {
+          if (next.section == nullptr) {
             sequenceEndTick = boundary;
             break;
           }
@@ -1129,18 +1129,33 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
         dialect.finishPrepass(programState);
       }
     }
+    if (analyzedProgramState != nullptr) {
+      // Analysis needs the same control-flow semantics as rendering, but a
+      // format with a prepass has already executed everything required to
+      // collect its durable result. Do not perform the discarded output pass.
+      if (dialect.prepass == SemanticPrepassMode::None) {
+        PerformanceSequence analysis{.timebase = program.timebase};
+        analysis.tracks = renderSemanticPass(analysis, programState);
+      }
+      *analyzedProgramState = std::move(programState);
+      return sequence;
+    }
     sequence.tracks = renderSemanticPass(sequence, programState);
     if (dialect.finalizePerformance != nullptr) {
       dialect.finalizePerformance(programState, sequence);
-    }
-    if (observeProgramState) {
-      observeProgramState(programState);
     }
     return sequence;
   }
 
   sequence.diagnostics.push_back(vmWarning("Sequence dialect has no executor", {}));
   return sequence;
+}
+
+std::any detail::analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
+                                        const SequenceDialect& dialect) {
+  std::any state;
+  static_cast<void>(vm.renderImpl(program, dialect, &state));
+  return state;
 }
 
 SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& program,

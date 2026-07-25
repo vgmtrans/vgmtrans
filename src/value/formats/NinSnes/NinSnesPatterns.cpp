@@ -14,8 +14,7 @@
 namespace vgmtrans::formats::nin_snes {
 
 Pattern::Pattern(const char* bytes, const char* mask, size_t size)
-    : bytes_(reinterpret_cast<const u8*>(bytes), reinterpret_cast<const u8*>(bytes) + size),
-      mask_(mask, size) {
+    : bytes_(reinterpret_cast<const u8*>(bytes), reinterpret_cast<const u8*>(bytes) + size), mask_(mask, size) {
 }
 
 std::optional<u32> Pattern::find(core::ByteReader reader) const {
@@ -24,7 +23,7 @@ std::optional<u32> Pattern::find(core::ByteReader reader) const {
 
 #define NINSNES_BYTE_PATTERN Pattern
 #define NINSNES_PATTERN_OWNER Patterns
-#include "../../../main/formats/NinSnes/NinSnesScannerPatterns.inc"
+#include "../../../shared/NinSnesScannerPatterns.inc"
 #undef NINSNES_PATTERN_OWNER
 #undef NINSNES_BYTE_PATTERN
 

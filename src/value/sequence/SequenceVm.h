@@ -10,18 +10,19 @@
 #include "value/sequence/SequenceDialect.h"
 
 #include <any>
-#include <functional>
 #include <utility>
 
 namespace vgmtrans::core {
+
+class SequenceVm;
 
 namespace detail {
 class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
+[[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
+                                              const SequenceDialect& dialect);
 }  // namespace detail
-
-using ProgramStateObserver = std::function<void(const std::any&)>;
 
 struct BranchResult {
   bool taken = false;
@@ -286,10 +287,13 @@ public:
   explicit SequenceVm(LoopPolicy loopPolicy);
   explicit SequenceVm(SequenceVmOptions options);
 
-  [[nodiscard]] PerformanceSequence render(const SequenceProgram& program, const SequenceDialect& dialect,
-                                           ProgramStateObserver observeProgramState = {}) const;
+  [[nodiscard]] PerformanceSequence render(const SequenceProgram& program, const SequenceDialect& dialect) const;
 
 private:
+  friend std::any detail::analyzeSequenceProgram(const SequenceVm&, const SequenceProgram&, const SequenceDialect&);
+
+  [[nodiscard]] PerformanceSequence renderImpl(const SequenceProgram& program, const SequenceDialect& dialect,
+                                               std::any* analyzedProgramState) const;
   [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program,
                                                          const SequenceDialect& dialect) const;
 

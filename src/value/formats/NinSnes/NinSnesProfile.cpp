@@ -12,72 +12,57 @@ namespace vgmtrans::formats::nin_snes {
 
 namespace {
 
-constexpr Profile kUnknown{};
+constexpr Profile kUnknown{
+    .base = BaseProfile::Unknown,
+    .playlist = PlaylistModel::Unknown,
+    .programs = ProgramResolver::Direct,
+};
 
 constexpr std::array<Profile, 17> kProfiles{{
-    {ProfileId::Earlier, "Earlier", BaseProfile::Earlier, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::StandardPercussion,
-     PanModel::StandardTable, InstrumentLayout::Earlier5Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::None},
-    {ProfileId::Standard, "Standard", BaseProfile::Standard, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::StandardPercussion,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::None},
-    {ProfileId::Rd1, "RD1", BaseProfile::Standard, AddressModel::Direct, PlaylistModel::Standard,
-     NoteParameterModel::Standard, ProgramResolver::StandardPercussion, PanModel::StandardTable,
-     InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard, IntelliMode::None},
-    {ProfileId::Rd2, "RD2", BaseProfile::Standard, AddressModel::Direct, PlaylistModel::Standard,
-     NoteParameterModel::Standard, ProgramResolver::StandardPercussion, PanModel::StandardTable,
-     InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard, IntelliMode::None},
-    {ProfileId::Hal, "HAL", BaseProfile::Standard, AddressModel::Direct, PlaylistModel::Standard,
-     NoteParameterModel::Standard, ProgramResolver::StandardPercussion, PanModel::HalTable,
-     InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard, IntelliMode::None},
-    {ProfileId::Konami, "Konami", BaseProfile::Standard, AddressModel::KonamiBase,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::StandardPercussion,
-     PanModel::StandardTable, InstrumentLayout::KonamiTuningTable,
-     InstrumentTableAddressModel::Standard, IntelliMode::None},
-    {ProfileId::Lemmings, "Lemmings", BaseProfile::Standard, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::Lemmings, ProgramResolver::StandardPercussion,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::None},
-    {ProfileId::IntelliFe3, "Intelligent Systems FE3", BaseProfile::Intelli, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::IntelliTable, ProgramResolver::Direct,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::Fe3},
-    {ProfileId::IntelliTa, "Intelligent Systems TA", BaseProfile::Intelli, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::IntelliTaOverride,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::Ta},
-    {ProfileId::IntelliFe4, "Intelligent Systems FE4", BaseProfile::Intelli, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::IntelliTable, ProgramResolver::Direct,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::Fe4},
-    {ProfileId::Human, "Human", BaseProfile::Standard, AddressModel::Direct, PlaylistModel::Standard,
-     NoteParameterModel::Standard, ProgramResolver::Direct, PanModel::StandardTable,
-     InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Human, IntelliMode::None},
-    {ProfileId::Tose, "TOSE", BaseProfile::Standard, AddressModel::Direct, PlaylistModel::Tose,
-     NoteParameterModel::Standard, ProgramResolver::StandardPercussion, PanModel::ToseLinear,
-     InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Tose, IntelliMode::None},
-    {ProfileId::QuintetActR, "Quintet ActRaiser", BaseProfile::Standard, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::QuintetActRBase,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::None},
-    {ProfileId::QuintetActR2, "Quintet ActRaiser 2", BaseProfile::Standard, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::QuintetLookup,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::None},
-    {ProfileId::QuintetIog, "Quintet Illusion of Gaia", BaseProfile::Standard, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::QuintetLookup,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::None},
-    {ProfileId::QuintetTs, "Quintet Terranigma", BaseProfile::Standard, AddressModel::Direct,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::QuintetLookup,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::None},
-    {ProfileId::FalcomYs4, "Falcom Ys IV", BaseProfile::Standard, AddressModel::FalcomBaseOffset,
-     PlaylistModel::Standard, NoteParameterModel::Standard, ProgramResolver::StandardPercussion,
-     PanModel::StandardTable, InstrumentLayout::Standard6Byte, InstrumentTableAddressModel::Standard,
-     IntelliMode::None},
+    {.id = ProfileId::Earlier,
+     .name = "Earlier",
+     .base = BaseProfile::Earlier,
+     .instruments = InstrumentLayout::Earlier5Byte},
+    {.id = ProfileId::Standard, .name = "Standard"},
+    {.id = ProfileId::Rd1, .name = "RD1"},
+    {.id = ProfileId::Rd2, .name = "RD2"},
+    {.id = ProfileId::Hal, .name = "HAL", .pan = PanModel::HalTable},
+    {.id = ProfileId::Konami,
+     .name = "Konami",
+     .addresses = AddressModel::KonamiBase,
+     .instruments = InstrumentLayout::KonamiTuningTable},
+    {.id = ProfileId::Lemmings, .name = "Lemmings", .noteParameters = NoteParameterModel::Lemmings},
+    {.id = ProfileId::IntelliFe3,
+     .name = "Intelligent Systems FE3",
+     .base = BaseProfile::Intelli,
+     .noteParameters = NoteParameterModel::IntelliTable,
+     .programs = ProgramResolver::Direct,
+     .intelli = IntelliMode::Fe3},
+    {.id = ProfileId::IntelliTa,
+     .name = "Intelligent Systems TA",
+     .base = BaseProfile::Intelli,
+     .programs = ProgramResolver::IntelliTaOverride,
+     .intelli = IntelliMode::Ta},
+    {.id = ProfileId::IntelliFe4,
+     .name = "Intelligent Systems FE4",
+     .base = BaseProfile::Intelli,
+     .noteParameters = NoteParameterModel::IntelliTable,
+     .programs = ProgramResolver::Direct,
+     .intelli = IntelliMode::Fe4},
+    {.id = ProfileId::Human,
+     .name = "Human",
+     .programs = ProgramResolver::Direct,
+     .instrumentTable = InstrumentTableAddressModel::Human},
+    {.id = ProfileId::Tose,
+     .name = "TOSE",
+     .playlist = PlaylistModel::Tose,
+     .pan = PanModel::ToseLinear,
+     .instrumentTable = InstrumentTableAddressModel::Tose},
+    {.id = ProfileId::QuintetActR, .name = "Quintet ActRaiser", .programs = ProgramResolver::QuintetActRBase},
+    {.id = ProfileId::QuintetActR2, .name = "Quintet ActRaiser 2", .programs = ProgramResolver::QuintetLookup},
+    {.id = ProfileId::QuintetIog, .name = "Quintet Illusion of Gaia", .programs = ProgramResolver::QuintetLookup},
+    {.id = ProfileId::QuintetTs, .name = "Quintet Terranigma", .programs = ProgramResolver::QuintetLookup},
+    {.id = ProfileId::FalcomYs4, .name = "Falcom Ys IV", .addresses = AddressModel::FalcomBaseOffset},
 }};
 
 }  // namespace
@@ -91,8 +76,8 @@ const Profile& profile(ProfileId id) {
   return kUnknown;
 }
 
-u16 convertAddress(const Profile& selected, u16 rawAddress, u16 konamiBaseAddress,
-                   u16 falcomBaseOffset) {
+u16 Layout::resolveAddress(u16 rawAddress) const {
+  const Profile& selected = nin_snes::profile(profile);
   switch (selected.addresses) {
     case AddressModel::KonamiBase:
       return static_cast<u16>(konamiBaseAddress + rawAddress);
@@ -102,11 +87,6 @@ u16 convertAddress(const Profile& selected, u16 rawAddress, u16 konamiBaseAddres
     default:
       return rawAddress;
   }
-}
-
-u16 readAddress(const Profile& selected, core::ByteReader reader, u32 offset,
-                u16 konamiBaseAddress, u16 falcomBaseOffset) {
-  return convertAddress(selected, reader.le16(offset), konamiBaseAddress, falcomBaseOffset);
 }
 
 u32 instrumentHeaderSize(const Profile& selected) {

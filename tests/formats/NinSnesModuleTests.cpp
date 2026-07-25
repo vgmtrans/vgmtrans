@@ -71,13 +71,128 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
   expect(profile(ProfileId::Unknown).id == ProfileId::Unknown,
          "the unknown profile should remain an explicit safe fallback");
 
-  expect(convertAddress(profile(ProfileId::Konami), 0x20, 0x3000, 0) == 0x3020,
+  expect(profile(ProfileId::Earlier).base == BaseProfile::Earlier &&
+             profile(ProfileId::Earlier).instruments == InstrumentLayout::Earlier5Byte,
+         "the early driver should retain its original note and instrument layout");
+  expect(profile(ProfileId::Hal).pan == PanModel::HalTable, "HAL should select its reversed pan table");
+  expect(profile(ProfileId::Konami).addresses == AddressModel::KonamiBase &&
+             profile(ProfileId::Konami).instruments == InstrumentLayout::KonamiTuningTable,
+         "Konami should declare both of its independent driver deviations");
+  expect(profile(ProfileId::Lemmings).noteParameters == NoteParameterModel::Lemmings,
+         "Lemmings should select its packed note-parameter model");
+  expect(profile(ProfileId::IntelliFe3).base == BaseProfile::Intelli &&
+             profile(ProfileId::IntelliFe3).noteParameters == NoteParameterModel::IntelliTable &&
+             profile(ProfileId::IntelliFe3).intelli == IntelliMode::Fe3,
+         "FE3 should select its Intelligent Systems command and note tables");
+  expect(profile(ProfileId::IntelliTa).programs == ProgramResolver::IntelliTaOverride &&
+             profile(ProfileId::IntelliTa).intelli == IntelliMode::Ta,
+         "TA should select dynamic instrument overrides");
+  expect(profile(ProfileId::IntelliFe4).noteParameters == NoteParameterModel::IntelliTable &&
+             profile(ProfileId::IntelliFe4).intelli == IntelliMode::Fe4,
+         "FE4 should select its Intelligent Systems note table");
+  expect(profile(ProfileId::Human).programs == ProgramResolver::Direct &&
+             profile(ProfileId::Human).instrumentTable == InstrumentTableAddressModel::Human,
+         "Human Entertainment should use direct programs and its table locator");
+  expect(profile(ProfileId::Tose).playlist == PlaylistModel::Tose &&
+             profile(ProfileId::Tose).pan == PanModel::ToseLinear &&
+             profile(ProfileId::Tose).instrumentTable == InstrumentTableAddressModel::Tose,
+         "TOSE should declare its playlist, pan, and instrument-table variants");
+  expect(profile(ProfileId::QuintetActR).programs == ProgramResolver::QuintetActRBase &&
+             profile(ProfileId::QuintetActR2).programs == ProgramResolver::QuintetLookup &&
+             profile(ProfileId::QuintetIog).programs == ProgramResolver::QuintetLookup &&
+             profile(ProfileId::QuintetTs).programs == ProgramResolver::QuintetLookup,
+         "the four Quintet profiles should retain their two program-resolution models");
+  expect(profile(ProfileId::FalcomYs4).addresses == AddressModel::FalcomBaseOffset,
+         "Ys IV should select relocated Falcom addresses");
+
+  expect(Layout{.profile = ProfileId::Konami, .konamiBaseAddress = 0x3000}.resolveAddress(0x20) == 0x3020,
          "Konami profile addresses should be relative to the detected driver base");
-  expect(convertAddress(profile(ProfileId::FalcomYs4), 0x20, 0, 0x4000) == 0x4020,
+  expect(Layout{.profile = ProfileId::FalcomYs4, .falcomBaseOffset = 0x4000}.resolveAddress(0x20) == 0x4020,
          "Falcom profile addresses should include the relocated sequence offset");
   expect(
       instrumentHeaderSize(profile(ProfileId::Earlier)) == 5 && instrumentHeaderSize(profile(ProfileId::Standard)) == 6,
       "early and standard drivers should retain their distinct instrument layouts");
+}
+
+void ninSnesIntelligentVoiceTablesUseTypedPlaybackState() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  bytes[0x300] = 0xfa;  // define one inline voice record
+  bytes[0x301] = 1;
+  bytes[0x302] = 5;
+  bytes[0x303] = 0x80;
+  bytes[0x304] = 10;
+  bytes[0x305] = 0;
+  bytes[0x306] = 0xfb;  // load that record
+  bytes[0x307] = 0;
+  bytes[0x308] = 3;
+  bytes[0x309] = 0xc9;
+  bytes[0x30a] = 0;
+
+  Layout layout = standardLayout();
+  layout.signature = Signature::Intelligent;
+  layout.profile = ProfileId::IntelliFe3;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  const auto& events = performance.tracks[0].events;
+
+  const auto instrument = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* change = std::get_if<InstrumentPerformanceEvent>(&event);
+    return change != nullptr && change->sourceInstrument && change->sourceInstrument->key == 5;
+  });
+  const auto level = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto* change = std::get_if<LevelPerformanceEvent>(&event);
+    return change != nullptr && std::abs(change->linearGain - (128.0 / 255.0)) < 0.0001;
+  });
+  const auto balance = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<StereoBalancePerformanceEvent>(event);
+  });
+  expect(instrument != events.end() && level != events.end() && balance != events.end(),
+         "an inline Intelligent Systems voice record should execute from typed command state");
+}
+
+void ninSnesControllerFadesRemainInTheSourceDomain() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  bytes[0x300] = 0xe1;  // pan hard right
+  bytes[0x301] = 0;
+  bytes[0x302] = 0xe2;  // fade through center to hard left
+  bytes[0x303] = 2;
+  bytes[0x304] = 20;
+  bytes[0x305] = 0xed;  // half channel level
+  bytes[0x306] = 0x80;
+  bytes[0x307] = 0xee;  // fade to full channel level
+  bytes[0x308] = 2;
+  bytes[0x309] = 0xff;
+  bytes[0x30a] = 3;
+  bytes[0x30b] = 0xc9;  // wait while both fades advance
+  bytes[0x30c] = 0;
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  const auto& events = performance.tracks[0].events;
+  std::vector<const StereoBalancePerformanceEvent*> balances;
+  std::vector<const LevelPerformanceEvent*> levels;
+  for (const PerformanceEvent& event : events) {
+    if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+      balances.push_back(balance);
+    }
+    if (const auto* level = std::get_if<LevelPerformanceEvent>(&event)) {
+      levels.push_back(level);
+    }
+  }
+
+  expect(balances.size() >= 3 && balances[0]->header.tick == 0 && balances[0]->leftGain == 0.0 &&
+             balances[1]->header.tick == 1 && balances[1]->leftGain > 0.0 && balances[1]->rightGain > 0.0 &&
+             balances[2]->header.tick == 2 && balances[2]->rightGain == 0.0,
+         "pan fades should interpolate the N-SPC pan value and emit its actual left/right gains");
+  expect(levels.size() >= 3 && std::abs(levels[0]->linearGain - (128.0 / 255.0)) < 0.0001 &&
+             levels[1]->linearGain > levels[0]->linearGain && std::abs(levels[2]->linearGain - 1.0) < 0.0001,
+         "volume fades should interpolate the driver's eight-bit level instead of MIDI controller values");
 }
 
 void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
@@ -88,19 +203,25 @@ void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
   writeSection(bytes, 0x200, {{0, 0x300}});
   writeSection(bytes, 0x220, {{0, 0x320}});
 
-  // Standard note parameters: duration 24, full quantize, then note C.
-  bytes[0x300] = 24;
-  bytes[0x301] = 0x7f;
-  bytes[0x302] = 0x80;
-  bytes[0x303] = 0;
+  // Establish channel state, then play standard note C for 24 ticks.
+  bytes[0x300] = 0xed;
+  bytes[0x301] = 0x80;
+  bytes[0x302] = 24;
+  bytes[0x303] = 0x7f;
+  bytes[0x304] = 0x80;
+  bytes[0x305] = 0;
 
   // Section changes reset per-section control flow, but the driver's musical
-  // state persists. A leading tie therefore extends the preceding note.
-  bytes[0x320] = 12;
-  bytes[0x321] = 0x7f;
-  bytes[0x322] = 0xc8;
-  bytes[0x323] = 0xc9;
-  bytes[0x324] = 0;
+  // state persists. The fade continues from half volume, and a leading tie
+  // extends the preceding note.
+  bytes[0x320] = 0xee;
+  bytes[0x321] = 2;
+  bytes[0x322] = 0xff;
+  bytes[0x323] = 12;
+  bytes[0x324] = 0x7f;
+  bytes[0x325] = 0xc8;
+  bytes[0x326] = 0xc9;
+  bytes[0x327] = 0;
 
   const PerformanceSequence performance = render(std::move(bytes));
   expect(performance.diagnostics.empty(), "cross-section tie fixture should render without diagnostics");
@@ -110,6 +231,13 @@ void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
   expect(note != midi.tracks[0].events.end() && std::get<NoteDuration>(*note).tick == 0 &&
              std::get<NoteDuration>(*note).duration == 34,
          "a leading tie in the next section should extend the previous duration note");
+  expect(std::ranges::any_of(performance.tracks[0].events,
+                             [](const PerformanceEvent& event) {
+                               const auto* level = std::get_if<LevelPerformanceEvent>(&event);
+                               return level != nullptr && level->header.tick == 25 &&
+                                      level->linearGain > (128.0 / 255.0) && level->linearGain < 1.0;
+                             }),
+         "a fade in the next section should continue from the preceding channel level");
 }
 
 void ninSnesPercussionStartsPerNoteVibratoFade() {
@@ -178,9 +306,9 @@ void ninSnesGainModeInstrumentsUseDspEnvelope() {
          "NinSnes synth builder should accept a direct-GAIN instrument");
   const ScanResult scan = result.finish();
   const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
-  expect(instruments != nullptr && instruments->instruments.size() == 1 &&
-             instruments->instruments[0].regions.size() == 1,
-         "direct-GAIN fixture should produce one instrument region");
+  expect(
+      instruments != nullptr && instruments->instruments.size() == 1 && instruments->instruments[0].regions.size() == 1,
+      "direct-GAIN fixture should produce one instrument region");
   const Envelope& envelope = instruments->instruments[0].regions[0].envelope;
   expect(envelope.sustainAmplitude && *envelope.sustainAmplitude > 0.99 && *envelope.sustainAmplitude < 1.0,
          "direct GAIN should become the DSP's fixed sustain level instead of an unspecified envelope");

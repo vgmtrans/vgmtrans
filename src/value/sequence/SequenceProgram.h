@@ -253,15 +253,6 @@ struct SequenceProgramConfig {
   u32 profile = 0;
 };
 
-// Some bytecode commands select records indirectly from source memory at
-// runtime. Preserve only the bounded source blocks they may address so the
-// semantic VM remains deterministic and source-free without retaining an
-// entire ROM/ARAM image.
-struct SequenceDataBlock {
-  Address address;
-  std::vector<u8> bytes;
-};
-
 struct SequenceProgram {
   DialectId dialect;
   Timebase timebase;
@@ -272,7 +263,6 @@ struct SequenceProgram {
   // selecting an instrument. Decode that table once so runtime behavior stays
   // source-free while still emitting stable source-domain identities.
   std::vector<InstrumentIdentity> sourceProgramMap;
-  std::vector<SequenceDataBlock> dataBlocks;
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;
 };

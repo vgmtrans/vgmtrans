@@ -12,6 +12,6 @@
 
 #define NINSNES_BYTE_PATTERN BytePattern
 #define NINSNES_PATTERN_OWNER NinSnesScanner
-#include "NinSnesScannerPatterns.inc"
+#include "../../../shared/NinSnesScannerPatterns.inc"
 #undef NINSNES_PATTERN_OWNER
 #undef NINSNES_BYTE_PATTERN

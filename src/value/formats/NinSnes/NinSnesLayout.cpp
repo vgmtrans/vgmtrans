@@ -407,10 +407,9 @@ std::optional<Layout> findLayout(ByteReader reader) {
     volumeTable = readTable(reader, reader.le16(*offset + volumeOffset), 16);
     return !durationRateTable.empty() && !volumeTable.empty();
   };
-  const bool noteTablesFound =
+  static_cast<void>(
       loadNoteTables(Patterns::ptnDispatchNoteYI, 6, 16) || loadNoteTables(Patterns::ptnDispatchNoteGD3, 6, 16) ||
-      loadNoteTables(Patterns::ptnDispatchNoteYSFR, 16, 4) || loadNoteTables(Patterns::ptnDispatchNoteYs4, 6, 15);
-  (void)noteTablesFound;
+      loadNoteTables(Patterns::ptnDispatchNoteYSFR, 16, 4) || loadNoteTables(Patterns::ptnDispatchNoteYs4, 6, 15));
 
   u32 instrumentCommandOffset = 0;
   if (profileId == ProfileId::Standard) {
@@ -437,10 +436,21 @@ std::optional<Layout> findLayout(ByteReader reader) {
   }
 
   u16 falcomOffset = 0;
+  const auto resolveAddress = [&](u16 raw) {
+    switch (selected.addresses) {
+      case AddressModel::KonamiBase:
+        return static_cast<u16>(konamiBase.value_or(0) + raw);
+      case AddressModel::FalcomBaseOffset:
+        return static_cast<u16>(falcomOffset + raw);
+      case AddressModel::Direct:
+      default:
+        return raw;
+    }
+  };
   const auto sectionListPointer = [&](u32 songPointer) {
     u16 address = reader.le16(songPointer);
     if (selected.addresses == AddressModel::KonamiBase) {
-      address = convertAddress(selected, address, konamiBase.value_or(0), falcomOffset);
+      address = resolveAddress(address);
     }
     return address;
   };
@@ -461,7 +471,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
       if (raw == 0xffff) {
         return true;
       }
-      const u16 address = convertAddress(selected, raw, konamiBase.value_or(0), falcomOffset);
+      const u16 address = resolveAddress(raw);
       if ((address & 0xff00) == 0 || address == 0xffff) {
         return true;
       }
@@ -494,7 +504,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
       continue;
     }
     updateFalcomOffset(firstSectionPointer);
-    firstSection = convertAddress(selected, firstSection, konamiBase.value_or(0), falcomOffset);
+    firstSection = resolveAddress(firstSection);
     if (illegalTrackPointers(firstSection)) {
       break;
     }
@@ -525,7 +535,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
       if (!reader.has(address, 2)) {
         break;
       }
-      const u16 sectionAddress = readAddress(selected, reader, address, konamiBase.value_or(0), falcomOffset);
+      const u16 sectionAddress = resolveAddress(reader.le16(address));
       if (address == currentSection) {
         currentSong = song;
         break;
@@ -541,7 +551,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
 
   u16 playlistAddress = reader.le16(songList->address + *currentSong * 2);
   if (selected.addresses == AddressModel::KonamiBase) {
-    playlistAddress = convertAddress(selected, playlistAddress, konamiBase.value_or(0), falcomOffset);
+    playlistAddress = resolveAddress(playlistAddress);
   }
 
   Layout layout{

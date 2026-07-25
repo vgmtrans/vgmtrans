@@ -156,12 +156,12 @@ struct InstrumentRegion {
   for (const auto& definition : recipes.overrides) {
     infos.push_back(InstrumentInfo{
         .program = definition.program,
-        .srcn = definition.regionData[0],
-        .adsr1 = definition.regionData[1],
-        .adsr2 = definition.regionData[2],
-        .gain = definition.regionData[3],
-        .pitchHigh = definition.regionData[4],
-        .pitchLow = definition.regionData[5],
+        .srcn = definition.srcn,
+        .adsr1 = definition.adsr1,
+        .adsr2 = definition.adsr2,
+        .gain = definition.gain,
+        .pitchHigh = definition.pitchHigh,
+        .pitchLow = definition.pitchLow,
         .source = definition.source,
         .override = true,
     });
