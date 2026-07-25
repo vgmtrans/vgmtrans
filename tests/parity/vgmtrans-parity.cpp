@@ -17,7 +17,6 @@
 #include "conversion/SF2Conversion.h"
 #include "conversion/SF2File.h"
 #include "formats/NDS/NDSInstrSet.h"
-#include "formats/NinSnes/NinSnesSeq.h"
 #include "value/export/ExportTypes.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/synth/ModulationScaling.h"
@@ -26,7 +25,6 @@
 #include "value/synth/SampleDecoder.h"
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/CapcomSnes/CapcomSnes.h"
-#include "value/formats/NinSnes/NinSnes.h"
 #include "value/formats/ValueFormats.h"
 #include "io/RawFile.h"
 
@@ -450,7 +448,7 @@ u32 loopFramesFromLegacyValue(const VGMSamp& sample, u32 value, LoopMeasure meas
     return value / static_cast<u32>(std::max<int>(1, sample.bytesPerSample() * sample.channels));
   }
   if (sample.dataLength % 9 == 0) {
-    return (value * 16) / 9;
+    return (value / 9) * 16;
   }
   const auto bytesPerFrame = std::max<int>(1, sample.bytesPerSample() * sample.channels);
   return value / static_cast<u32>(bytesPerFrame);
@@ -626,14 +624,7 @@ u32 sourceRelativeOffset(const SourceStore& sources, SourceRange range) {
 }
 
 std::optional<u32> legacyRegionSampleOffset(const VGMRgn& region, std::span<VGMSamp* const> samples) {
-  if (region.sampOffset != -1) {
-    if (region.sampOffset < 0) {
-      // Conversion treats every value except -1 as an explicit offset. A
-      // negative lookup cannot match and consequently selects sample zero.
-      return samples.empty() || samples.front() == nullptr
-                 ? std::nullopt
-                 : std::optional<u32>{samples.front()->dataOff};
-    }
+  if (region.sampOffset >= 0) {
     const auto baseOffset = region.sampCollPtr ? region.sampCollPtr->offset()
                             : region.parInstr->parInstrSet->sampColl()
                                 ? region.parInstr->parInstrSet->sampColl()->offset()
@@ -4209,241 +4200,6 @@ int compareNinSnesDirectSummary(const std::filesystem::path& path) {
                           valueSummariesForSuite(path, kNinSnesSuite));
 }
 
-int identifyNinSnesProfiles(const std::filesystem::path& path) {
-  std::vector<NamedBytes> arams;
-  const std::vector<u8> input = readFile(path);
-  if (input.size() == 0x10000) {
-    arams.push_back(NamedBytes{.name = path.filename().string(), .bytes = input});
-  } else if (input.size() >= 0x10100 &&
-             std::string_view(reinterpret_cast<const char*>(input.data()),
-                              std::min<size_t>(input.size(), 27))
-                 .starts_with("SNES-SPC700 Sound File Data")) {
-    arams.push_back(NamedBytes{
-        .name = path.filename().string(),
-        .bytes = std::vector<u8>(input.begin() + 0x100, input.begin() + 0x10100),
-    });
-  } else {
-    arams = legacyExtractedArams(path);
-  }
-  if (arams.empty()) {
-    throw std::runtime_error("loader did not extract any 64 KiB ARAM files from: " + path.string());
-  }
-
-  std::map<vgmtrans::formats::nin_snes::ProfileId, std::string> examples;
-  for (const auto& aram : arams) {
-    const auto layout =
-        vgmtrans::formats::nin_snes::findLayout(ByteReader(SourceId{}, aram.bytes));
-    if (layout) {
-      examples.try_emplace(layout->profile, aram.name);
-    }
-  }
-  if (examples.empty()) {
-    std::cout << "no NinSnes profile\n";
-    return 1;
-  }
-  for (const auto& [id, example] : examples) {
-    std::cout << vgmtrans::formats::nin_snes::profile(id).name << '\t' << example << '\n';
-  }
-  return 0;
-}
-
-int inspectNinSnesSequence(const std::filesystem::path& path) {
-  const std::vector<u8> input = readFile(path);
-  std::span<const u8> aram = input;
-  if (input.size() >= 0x10100 &&
-      std::string_view(reinterpret_cast<const char*>(input.data()), 27)
-          .starts_with("SNES-SPC700 Sound File Data")) {
-    aram = std::span<const u8>(input).subspan(0x100, 0x10000);
-  }
-  const auto layout =
-      vgmtrans::formats::nin_snes::findLayout(ByteReader(SourceId{}, aram));
-  if (!layout) {
-    throw std::runtime_error("no NinSnes layout");
-  }
-  const auto parsed = vgmtrans::formats::nin_snes::decodeSequence(
-      ByteReader(SourceId{}, aram), *layout, AssetId{1});
-  std::cout << vgmtrans::formats::nin_snes::profile(layout->profile).name
-            << " playlist=0x" << std::hex << layout->playlistAddress
-            << " instruments=0x" << layout->instrumentTableAddress.value_or(0)
-            << " dir=0x" << layout->spcDirAddress.value_or(0) << std::dec
-            << " overrides=" << parsed.recipes.overrides.size()
-            << " drum_kits=" << parsed.recipes.drumKits.size()
-            << " vibrato_depth_cents=" << parsed.recipes.maxVibratoDepthCents
-            << " vibrato_rate_hz=" << parsed.recipes.maxVibratoRateHertz << '\n';
-  for (const auto& kit : parsed.recipes.drumKits) {
-    std::cout << "kit " << static_cast<unsigned>(kit.program) << ':';
-    for (const auto& slot : kit.slots) {
-      std::cout << " key=" << static_cast<unsigned>(slot.key)
-                << "/source=" << slot.sourceProgram;
-    }
-    std::cout << '\n';
-  }
-  if (parsed.program.sectionPlaylist) {
-    NinSnesSeq* legacySequence = nullptr;
-    const auto legacyRoot = scanLegacyFile(path);
-    for (const auto& file : legacyRoot->vgmFiles()) {
-      const auto* sequence = std::get_if<VGMSeq*>(&file);
-      if (sequence != nullptr) {
-        legacySequence = dynamic_cast<NinSnesSeq*>(*sequence);
-      }
-      if (legacySequence != nullptr) {
-        break;
-      }
-    }
-    for (const auto& section : parsed.program.sectionPlaylist->sections) {
-      std::cout << "section 0x" << std::hex << section.address.value << ':';
-      for (const auto& start : section.trackStarts) {
-        if (start) {
-          std::cout << " 0x" << start->value;
-        } else {
-          std::cout << " --";
-        }
-      }
-      std::cout << std::dec << '\n';
-      std::cout << "  static stops:";
-      for (size_t trackNumber = 0;
-           trackNumber < section.trackStarts.size(); ++trackNumber) {
-        if (!section.trackStarts[trackNumber]) {
-          std::cout << " --";
-          continue;
-        }
-        const TrackProgram& sourceTrack = parsed.program.tracks.at(trackNumber);
-        std::vector<Address> pending{*section.trackStarts[trackNumber]};
-        std::set<u64> visited;
-        u64 stop = section.trackStarts[trackNumber]->value;
-        while (!pending.empty()) {
-          const Address address = pending.back();
-          pending.pop_back();
-          if (!visited.insert(address.value).second) {
-            continue;
-          }
-          const auto index = sourceTrack.addressIndex.find(address);
-          if (!index) {
-            continue;
-          }
-          const SourceCommand& command = sourceTrack.commands.at(*index);
-          if (!command.flow.terminal) {
-            stop = std::max(stop, command.address.value + command.encodedSize);
-          }
-          if (command.flow.fallthrough) {
-            pending.push_back(*command.flow.fallthrough);
-          }
-          pending.insert(pending.end(), command.flow.staticTargets.begin(),
-                         command.flow.staticTargets.end());
-        }
-        std::cout << " 0x" << std::hex << stop;
-      }
-      std::cout << std::dec << '\n';
-      if (legacySequence != nullptr) {
-        const NinSnesSection* legacySection = nullptr;
-        for (const VGMItem* child : legacySequence->children()) {
-          const auto* candidate = dynamic_cast<const NinSnesSection*>(child);
-          if (candidate != nullptr &&
-              candidate->offset() == section.address.value) {
-            legacySection = candidate;
-            break;
-          }
-        }
-        if (legacySection != nullptr) {
-          std::cout << "  legacy ranges:";
-          for (size_t track = 0; track < section.trackStarts.size(); ++track) {
-            const auto& segment = legacySection->trackSegment(track);
-            if (segment.active) {
-              std::cout << " [0x" << std::hex << segment.rangeOffset
-                        << ",0x" << segment.stopOffset() << ')';
-            } else {
-              std::cout << " --";
-            }
-          }
-          std::cout << std::dec << '\n';
-        }
-      }
-    }
-  }
-  return 0;
-}
-
-int inspectNinSnesPerformance(const std::filesystem::path& path, u32 trackNumber,
-                              u64 tick) {
-  const std::vector<u8> input = readFile(path);
-  std::span<const u8> aram = input;
-  if (input.size() >= 0x10100 &&
-      std::string_view(reinterpret_cast<const char*>(input.data()), 27)
-          .starts_with("SNES-SPC700 Sound File Data")) {
-    aram = std::span<const u8>(input).subspan(0x100, 0x10000);
-  }
-  const auto layout =
-      vgmtrans::formats::nin_snes::findLayout(ByteReader(SourceId{}, aram));
-  if (!layout) {
-    throw std::runtime_error("no NinSnes layout");
-  }
-  const auto parsed = vgmtrans::formats::nin_snes::decodeSequence(
-      ByteReader(SourceId{}, aram), *layout, AssetId{1});
-  const PerformanceSequence performance =
-      SequenceVm(LoopPolicy::PlayOnce)
-          .render(parsed.program,
-                  vgmtrans::formats::nin_snes::sequenceDialect());
-  const auto track = std::ranges::find(
-      performance.tracks, trackNumber, &PerformanceTrack::sourceTrackNumber);
-  if (track == performance.tracks.end()) {
-    throw std::runtime_error("NinSnes performance track does not exist");
-  }
-  for (const PerformanceEvent& event : track->events) {
-    const PerformanceEventHeader& header = performanceEventHeader(event);
-    if (header.tick != tick) {
-      continue;
-    }
-    std::optional<Address> address;
-    for (const TrackProgram& sourceTrack : parsed.program.tracks) {
-      if (sourceTrack.sourceTrackNumber != trackNumber) {
-        continue;
-      }
-      const auto command =
-          std::ranges::find(sourceTrack.commands, header.sourceCommand,
-                            &SourceCommand::id);
-      if (command != sourceTrack.commands.end()) {
-        address = command->address;
-        break;
-      }
-    }
-    std::cout << "event=" << event.index() << " sequence=" << header.sequence
-              << " command=" << header.sourceCommand.value << " address=";
-    if (address) {
-      std::cout << "0x" << std::hex << address->value << std::dec;
-    } else {
-      std::cout << "--";
-    }
-    if (header.automation) {
-      std::cout << " automation=" << header.automation->value;
-      const auto automation =
-          std::ranges::find(track->automations, *header.automation,
-                            &PerformanceAutomation::id);
-      if (automation != track->automations.end()) {
-        std::cout << " automation_command="
-                  << automation->header.sourceCommand.value
-                  << " automation_start=" << automation->header.tick
-                  << " automation_end=" << automation->realization.endTick;
-        for (const TrackProgram& sourceTrack : parsed.program.tracks) {
-          if (sourceTrack.sourceTrackNumber != trackNumber) {
-            continue;
-          }
-          const auto command =
-              std::ranges::find(sourceTrack.commands,
-                                automation->header.sourceCommand,
-                                &SourceCommand::id);
-          if (command != sourceTrack.commands.end()) {
-            std::cout << " automation_address=0x" << std::hex
-                      << command->address.value << std::dec;
-            break;
-          }
-        }
-      }
-    }
-    std::cout << '\n';
-  }
-  return 0;
-}
-
 int compareKonamiArcadeDirectSummary(const std::filesystem::path& path) {
   return runSummaryParity(kKonamiArcadeSuite, legacySummariesForSuite(path, kKonamiArcadeSuite),
                           valueSummariesForSuite(path, kKonamiArcadeSuite));
@@ -4730,9 +4486,6 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity nin-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
       << "  vgmtrans-parity nin-snes-direct-synth <rsn-or-spc-file>\n"
       << "  vgmtrans-parity nin-snes-direct-summary <rsn-or-spc-file>\n"
-      << "  vgmtrans-parity nin-snes-identify <rsn-or-spc-file>\n"
-      << "  vgmtrans-parity nin-snes-inspect <spc-or-raw-aram-file>\n"
-      << "  vgmtrans-parity nin-snes-inspect-performance <spc-file> <track> <tick>\n"
       << "  vgmtrans-parity konami-arcade-direct-midi <mame-zip-file> [sequence-loops]\n"
       << "  vgmtrans-parity konami-arcade-direct-synth <mame-zip-file>\n"
       << "  vgmtrans-parity konami-arcade-direct-summary <mame-zip-file>\n"
@@ -4800,20 +4553,6 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "nin-snes-direct-summary") {
       return compareNinSnesDirectSummary(argv[2]);
-    }
-
-    if (argc == 3 && std::string(argv[1]) == "nin-snes-identify") {
-      return identifyNinSnesProfiles(argv[2]);
-    }
-
-    if (argc == 3 && std::string(argv[1]) == "nin-snes-inspect") {
-      return inspectNinSnesSequence(argv[2]);
-    }
-    if (argc == 5 &&
-        std::string(argv[1]) == "nin-snes-inspect-performance") {
-      return inspectNinSnesPerformance(
-          argv[2], static_cast<u32>(std::stoul(argv[3])),
-          static_cast<u64>(std::stoull(argv[4])));
     }
 
     if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-summary") {

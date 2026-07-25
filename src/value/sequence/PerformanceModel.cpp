@@ -64,7 +64,6 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
           .track = tempo->header.track,
           .sequence = tempo->header.sequence,
           .order = changes_.size(),
-          .force = tempo->force,
       });
     }
   }
@@ -73,7 +72,7 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
   });
   std::optional<u32> currentTempo;
   std::erase_if(changes_, [&](const Change& change) {
-    if (!change.force && currentTempo && *currentTempo == change.microsecondsPerQuarter) {
+    if (currentTempo && *currentTempo == change.microsecondsPerQuarter) {
       return true;
     }
     currentTempo = change.microsecondsPerQuarter;

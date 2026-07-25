@@ -9,6 +9,8 @@
 #include "value/sequence/PerformanceModel.h"
 #include "value/sequence/SequenceDialect.h"
 
+#include <any>
+#include <functional>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -17,8 +19,9 @@ namespace detail {
 class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
-using ProgramStateInspector = void (*)(const void* erasedState, void* destination);
 }  // namespace detail
+
+using ProgramStateObserver = std::function<void(const std::any&)>;
 
 struct BranchResult {
   bool taken = false;
@@ -283,9 +286,8 @@ public:
   explicit SequenceVm(LoopPolicy loopPolicy);
   explicit SequenceVm(SequenceVmOptions options);
 
-  [[nodiscard]] PerformanceSequence render(
-      const SequenceProgram& program, const SequenceDialect& dialect,
-      detail::ProgramStateInspector inspector = nullptr, void* inspectionDestination = nullptr) const;
+  [[nodiscard]] PerformanceSequence render(const SequenceProgram& program, const SequenceDialect& dialect,
+                                           ProgramStateObserver observeProgramState = {}) const;
 
 private:
   [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program,

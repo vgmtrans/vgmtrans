@@ -49,18 +49,15 @@ constexpr double kMaximumVibratoDelaySeconds = (256.0 * 0xff) / kTimerHertz;
 namespace math {
 
 constexpr std::array<u8, 16> kVolumeEarlier{
-    0x08, 0x12, 0x1b, 0x24, 0x2c, 0x35, 0x3e, 0x47,
-    0x51, 0x5a, 0x62, 0x6b, 0x7d, 0x8f, 0xa1, 0xb3,
+    0x08, 0x12, 0x1b, 0x24, 0x2c, 0x35, 0x3e, 0x47, 0x51, 0x5a, 0x62, 0x6b, 0x7d, 0x8f, 0xa1, 0xb3,
 };
 constexpr std::array<u8, 8> kDurationEarlier{0x33, 0x66, 0x80, 0x99, 0xb3, 0xcc, 0xe6, 0xff};
 constexpr std::array<u8, 16> kVolumeStandard{
-    0x19, 0x33, 0x4c, 0x66, 0x72, 0x7f, 0x8c, 0x99,
-    0xa5, 0xb2, 0xbf, 0xcc, 0xd8, 0xe5, 0xf2, 0xfc,
+    0x19, 0x33, 0x4c, 0x66, 0x72, 0x7f, 0x8c, 0x99, 0xa5, 0xb2, 0xbf, 0xcc, 0xd8, 0xe5, 0xf2, 0xfc,
 };
 constexpr std::array<u8, 8> kDurationStandard{0x33, 0x66, 0x7f, 0x99, 0xb2, 0xcc, 0xe5, 0xfc};
 constexpr std::array<u8, 16> kVolumeIntelli{
-    0x19, 0x32, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98,
-    0xa5, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
+    0x19, 0x32, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98, 0xa5, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
 };
 constexpr std::array<u8, 8> kDurationIntelli{0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xfc};
 constexpr std::array<u8, 21> kPan{
@@ -68,18 +65,16 @@ constexpr std::array<u8, 21> kPan{
     0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
 };
 constexpr std::array<u8, 64> kIntelliFe3{
-    0x00, 0x0c, 0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x72, 0x75, 0x77, 0x70,
-    0x7c, 0x7f, 0x82, 0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b,
-    0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa, 0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc,
-    0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3, 0xd6, 0xd8, 0xdb, 0xdd,
-    0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
+    0x00, 0x0c, 0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x72, 0x75, 0x77, 0x70, 0x7c, 0x7f, 0x82,
+    0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b, 0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa,
+    0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc, 0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3,
+    0xd6, 0xd8, 0xdb, 0xdd, 0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
 };
 constexpr std::array<u8, 64> kIntelliFe4{
-    0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x6d, 0x70, 0x72, 0x75, 0x77, 0x70,
-    0x7c, 0x7f, 0x82, 0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b,
-    0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa, 0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc,
-    0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3, 0xd6, 0xd8, 0xdb, 0xdd,
-    0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
+    0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x6d, 0x70, 0x72, 0x75, 0x77, 0x70, 0x7c, 0x7f, 0x82,
+    0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b, 0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa,
+    0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc, 0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3,
+    0xd6, 0xd8, 0xdb, 0xdd, 0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
 };
 
 [[nodiscard]] constexpr double vibratoDepthCents(u8 depth) {
@@ -98,8 +93,7 @@ constexpr std::array<u8, 64> kIntelliFe4{
 }
 
 [[nodiscard]] constexpr u32 tempoMicrosecondsPerQuarter(u8 tempo) {
-  return tempo == 0 ? 60'000'000
-                    : static_cast<u32>(std::lround(24'576'000.0 / tempo));
+  return tempo == 0 ? 60'000'000 : static_cast<u32>(std::lround(24'576'000.0 / tempo));
 }
 
 [[nodiscard]] double legacyMidiGain(u8 raw) {
@@ -119,8 +113,7 @@ constexpr std::array<u8, 64> kIntelliFe4{
   if (range == 0) {
     return 0;
   }
-  const int value =
-      static_cast<int>(std::lround(128.0 * (current - minimum) / static_cast<double>(range)));
+  const int value = static_cast<int>(std::lround(128.0 * (current - minimum) / static_cast<double>(range)));
   return static_cast<u8>(std::clamp(value, 0, 127));
 }
 
@@ -128,8 +121,7 @@ constexpr std::array<u8, 64> kIntelliFe4{
   if (cents <= 0.0 || maximumCents <= 0.0) {
     return 0;
   }
-  return static_cast<u8>(
-      std::clamp<int>(static_cast<int>(std::lround(128.0 * cents / maximumCents)), 0, 127));
+  return static_cast<u8>(std::clamp<int>(static_cast<int>(std::lround(128.0 * cents / maximumCents)), 0, 127));
 }
 
 [[nodiscard]] u8 vibratoRateMidi(double hertz, double maximumHertz) {
@@ -143,9 +135,8 @@ constexpr std::array<u8, 64> kIntelliFe4{
 
 [[nodiscard]] u8 vibratoDelayMidi(double seconds) {
   const s32 minimum = synthAmountFromSeconds(synthSecondsRangeMinimum(0.0));
-  return midiAmountInRange(
-      synthAmountFromSeconds(synthSecondsRangeMinimum(seconds)), minimum,
-      synthAmountFromSecondsRange(0.0, kMaximumVibratoDelaySeconds));
+  return midiAmountInRange(synthAmountFromSeconds(synthSecondsRangeMinimum(seconds)), minimum,
+                           synthAmountFromSecondsRange(0.0, kMaximumVibratoDelaySeconds));
 }
 
 struct PanGains {
@@ -292,15 +283,33 @@ void useDefault(std::vector<u8>& destination, const std::array<u8, Size>& source
 
 void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
   constexpr std::array<EventType, 27> commands{
-      EventType::Program,          EventType::Pan,             EventType::PanFade,
-      EventType::VibratoOn,       EventType::VibratoOff,      EventType::MasterVolume,
-      EventType::MasterVolumeFade, EventType::Tempo,           EventType::TempoFade,
-      EventType::GlobalTranspose, EventType::Transpose,       EventType::TremoloOn,
-      EventType::TremoloOff,      EventType::Volume,          EventType::VolumeFade,
-      EventType::Call,            EventType::VibratoFade,     EventType::PitchEnvelopeTo,
-      EventType::PitchEnvelopeFrom, EventType::PitchEnvelopeOff, EventType::Tuning,
-      EventType::EchoOn,          EventType::EchoOff,         EventType::EchoParameter,
-      EventType::EchoVolumeFade,  EventType::PitchSlide,      EventType::PercussionBase,
+      EventType::Program,
+      EventType::Pan,
+      EventType::PanFade,
+      EventType::VibratoOn,
+      EventType::VibratoOff,
+      EventType::MasterVolume,
+      EventType::MasterVolumeFade,
+      EventType::Tempo,
+      EventType::TempoFade,
+      EventType::GlobalTranspose,
+      EventType::Transpose,
+      EventType::TremoloOn,
+      EventType::TremoloOff,
+      EventType::Volume,
+      EventType::VolumeFade,
+      EventType::Call,
+      EventType::VibratoFade,
+      EventType::PitchEnvelopeTo,
+      EventType::PitchEnvelopeFrom,
+      EventType::PitchEnvelopeOff,
+      EventType::Tuning,
+      EventType::EchoOn,
+      EventType::EchoOff,
+      EventType::EchoParameter,
+      EventType::EchoVolumeFade,
+      EventType::PitchSlide,
+      EventType::PercussionBase,
   };
   for (u8 index = 0; index < commands.size(); ++index) {
     events[static_cast<u8>(first + index)] = commands[index];
@@ -315,8 +324,7 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
   definition.duration = layout.durationRateTable;
 
   if (selected.base == BaseProfile::Earlier) {
-    definition.status = Status{.noteMin = 0x80, .noteMax = 0xc5, .percussionMin = 0xd0,
-                               .percussionMax = 0xd9};
+    definition.status = Status{.noteMin = 0x80, .noteMax = 0xc5, .percussionMin = 0xd0, .percussionMax = 0xd9};
   }
   definition.events[0] = EventType::End;
   for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
@@ -333,14 +341,30 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
 
   if (selected.base == BaseProfile::Earlier) {
     constexpr std::array<EventType, 25> earlier{
-        EventType::Program,          EventType::Pan,             EventType::PanFade,
-        EventType::PitchSlide,       EventType::VibratoOn,       EventType::VibratoOff,
-        EventType::MasterVolume,     EventType::MasterVolumeFade, EventType::Tempo,
-        EventType::TempoFade,        EventType::GlobalTranspose, EventType::TremoloOn,
-        EventType::TremoloOff,       EventType::Volume,          EventType::VolumeFade,
-        EventType::Call,             EventType::VibratoFade,     EventType::PitchEnvelopeTo,
-        EventType::PitchEnvelopeFrom, EventType::Unknown0,       EventType::Tuning,
-        EventType::EchoOn,           EventType::EchoOff,         EventType::EchoParameter,
+        EventType::Program,
+        EventType::Pan,
+        EventType::PanFade,
+        EventType::PitchSlide,
+        EventType::VibratoOn,
+        EventType::VibratoOff,
+        EventType::MasterVolume,
+        EventType::MasterVolumeFade,
+        EventType::Tempo,
+        EventType::TempoFade,
+        EventType::GlobalTranspose,
+        EventType::TremoloOn,
+        EventType::TremoloOff,
+        EventType::Volume,
+        EventType::VolumeFade,
+        EventType::Call,
+        EventType::VibratoFade,
+        EventType::PitchEnvelopeTo,
+        EventType::PitchEnvelopeFrom,
+        EventType::Unknown0,
+        EventType::Tuning,
+        EventType::EchoOn,
+        EventType::EchoOff,
+        EventType::EchoParameter,
         EventType::EchoVolumeFade,
     };
     for (u8 index = 0; index < earlier.size(); ++index) {
@@ -380,8 +404,7 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     loadStandardCommands(definition.events, 0xda);
     definition.events[0xf5] = EventType::IntelliEchoOn;
     definition.events[0xf6] = EventType::IntelliEchoOff;
-    definition.events[0xf7] =
-        selected.intelli == IntelliMode::Ta ? EventType::IntelliAdsr : EventType::IntelliGain;
+    definition.events[0xf7] = selected.intelli == IntelliMode::Ta ? EventType::IntelliAdsr : EventType::IntelliGain;
     definition.events[0xf8] =
         selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDurationRate : EventType::IntelliGain;
     definition.events[0xf9] =
@@ -546,8 +569,7 @@ struct ProgramState {
             .tempo = tempo,
         });
         recipes.maxVibratoRateHertz =
-            std::max(recipes.maxVibratoRateHertz,
-                     math::vibratoRateHertz(vibrato.rate, tempo));
+            std::max(recipes.maxVibratoRateHertz, math::vibratoRateHertz(vibrato.rate, tempo));
       }
     }
   }
@@ -572,26 +594,21 @@ struct ProgramState {
                     .tick = change.tick,
                     .sequence = nextSequence++,
                 },
-            .send =
-                (change.mask & (1u << track.sourceTrackNumber)) != 0 ? 40.0 / 127.0 : 0.0,
+            .send = (change.mask & (1u << track.sourceTrackNumber)) != 0 ? 40.0 / 127.0 : 0.0,
         });
       }
     }
 
     for (const TempoVibratoSync& sync : tempoVibratoSyncs) {
-      const auto found = std::ranges::find(
-          performance.tracks, sync.trackNumber, &PerformanceTrack::sourceTrackNumber);
+      const auto found = std::ranges::find(performance.tracks, sync.trackNumber, &PerformanceTrack::sourceTrackNumber);
       if (found == performance.tracks.end()) {
         continue;
       }
       const double rate = math::vibratoRateHertz(sync.vibrato.rate, sync.tempo);
-      const u8 midiRate =
-          math::vibratoRateMidi(rate, recipes.maxVibratoRateHertz);
-      const double delaySeconds =
-          math::vibratoDelaySeconds(sync.vibrato.delay, sync.tempo);
+      const u8 midiRate = math::vibratoRateMidi(rate, recipes.maxVibratoRateHertz);
+      const double delaySeconds = math::vibratoDelaySeconds(sync.vibrato.delay, sync.tempo);
       const u32 delayTicks = static_cast<u32>(
-          std::lround(delaySeconds * 1'000'000.0 * kPpqn /
-                      math::tempoMicrosecondsPerQuarter(sync.tempo)));
+          std::lround(delaySeconds * 1'000'000.0 * kPpqn / math::tempoMicrosecondsPerQuarter(sync.tempo)));
       const u8 midiDelay = math::vibratoDelayMidi(delaySeconds);
 
       found->events.emplace_back(ModulationPerformanceEvent{
@@ -628,10 +645,10 @@ struct ProgramState {
       // number. Keep that distinction from the encoded table index: percussion
       // key assignment depends on the resolved logical number, while the
       // program map still needs the encoded index.
-      *logical = (selected.programs == ProgramResolver::QuintetActRBase ||
-                  selected.programs == ProgramResolver::QuintetLookup)
-                     ? static_cast<u8>(basePrograms[index])
-                     : index;
+      *logical =
+          (selected.programs == ProgramResolver::QuintetActRBase || selected.programs == ProgramResolver::QuintetLookup)
+              ? static_cast<u8>(basePrograms[index])
+              : index;
     }
     return programs[index];
   }
@@ -644,10 +661,8 @@ struct ProgramState {
     if (!collecting || !vibrato.active()) {
       return;
     }
-    recipes.maxVibratoDepthCents =
-        std::max(recipes.maxVibratoDepthCents, math::vibratoDepthCents(vibrato.depth));
-    recipes.maxVibratoRateHertz =
-        std::max(recipes.maxVibratoRateHertz, math::vibratoRateHertz(vibrato.rate, tempo));
+    recipes.maxVibratoDepthCents = std::max(recipes.maxVibratoDepthCents, math::vibratoDepthCents(vibrato.depth));
+    recipes.maxVibratoRateHertz = std::max(recipes.maxVibratoRateHertz, math::vibratoRateHertz(vibrato.rate, tempo));
   }
 
   [[nodiscard]] u32 registerOverride(u8 logical, const std::array<u8, 6>& data, Address sourceAddress) {
@@ -714,7 +729,7 @@ struct ProgramState {
     return recipes.drumKits.back().program;
   }
 
-  void finishPrepass(const PerformanceSequence& performance) {
+  void finishPrepass() {
     if (!standardDrums.empty()) {
       DrumKit kit{
           .program = 0,
@@ -725,22 +740,8 @@ struct ProgramState {
       }
       recipes.drumKits.push_back(std::move(kit));
     }
-    recipes.maxVibratoDepthCents = kMinimumVibratoDepthCents;
-    for (const PerformanceTrack& track : performance.tracks) {
-      for (const PerformanceEvent& event : track.events) {
-        const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-        if (modulation == nullptr ||
-            modulation->target != ModulationPerformanceTarget::VibratoDepth ||
-            !modulation->pitchDepthSemitones) {
-          continue;
-        }
-        recipes.maxVibratoDepthCents =
-            std::max(recipes.maxVibratoDepthCents,
-                     std::abs(*modulation->pitchDepthSemitones) * 100.0);
-      }
-    }
-    recipes.maxVibratoRateHertz =
-        std::max(recipes.maxVibratoRateHertz, kMinimumVibratoRateHertz);
+    recipes.maxVibratoDepthCents = std::max(recipes.maxVibratoDepthCents, kMinimumVibratoDepthCents);
+    recipes.maxVibratoRateHertz = std::max(recipes.maxVibratoRateHertz, kMinimumVibratoRateHertz);
     collecting = false;
     resetRuntime();
   }
@@ -801,25 +802,16 @@ struct QueuedPitchSlide {
   u8 delay = 0;
   u8 length = 0;
   u8 target = 0;
-  u64 sourceBegin = 0;
-  u64 sourceEnd = 0;
 };
 
 struct TrackState {
-  struct BoundaryState {
-    PitchState pitch;
-    VibratoConfig vibrato;
-    PerformanceBoundMotion<SequenceAutomatedValue<s32>> vibratoDepth;
-    u8 lastVibratoDepthMidi = 0;
-  };
-
   TrackState(const SequenceProgram&, const TrackProgram& track) : trackNumber(track.sourceTrackNumber) {
     resetSectionControllers();
     vibratoDepth.reset(0);
     pitch.reset();
   }
 
-  void beginSection(std::optional<u64> sourceStop = std::nullopt) {
+  void beginSection() {
     inPattern = false;
     patternRemaining = 0;
     lastWasPercussion = false;
@@ -828,70 +820,11 @@ struct TrackState {
     legato = false;
     queuedPitchSlides.clear();
     waitTicksRemaining = 0;
-    sectionSourceLimit = sourceStop;
-    discoveredSourceStop.reset();
-    boundaryHistory.clear();
-    // Legacy rebuilds its source-track parser for each section, but its MIDI
-    // track deliberately retains the most recent duration note. A tie at the
-    // start of the next section can therefore extend that note.
+    // Track state survives section changes, while parser-local state does not.
     resetSectionControllers();
   }
 
-  void observeSourceEnd(u64 end) {
-    discoveredSourceStop = std::max(discoveredSourceStop.value_or(0), end);
-  }
-
-  [[nodiscard]] bool sourceAllowed(u64 begin) const {
-    return !sectionSourceLimit || begin < *sectionSourceLimit;
-  }
-
-  [[nodiscard]] std::optional<u64> sectionSourceStop() const {
-    return discoveredSourceStop;
-  }
-
-  void reconcileAfterTrim(const PerformanceTrack& performance, u64 endTick) {
-    // The generic VM may realize a whole wait before another channel exposes
-    // an earlier shared section boundary. Events are trimmed by the VM; restore
-    // the persistent DSP pitch state to the same boundary so the next section
-    // does not inherit motion from ticks the source driver never processed.
-    const auto stateAtBoundary = boundaryHistory.upper_bound(endTick);
-    if (stateAtBoundary != boundaryHistory.begin()) {
-      const BoundaryState& state = std::prev(stateAtBoundary)->second;
-      pitch = state.pitch;
-      vibrato = state.vibrato;
-      vibratoDepth = state.vibratoDepth;
-      lastVibratoDepthMidi = state.lastVibratoDepthMidi;
-    }
-    boundaryHistory.erase(boundaryHistory.upper_bound(endTick),
-                          boundaryHistory.end());
-
-    u64 latestTick = 0;
-    u64 latestSequence = 0;
-    u8 depth = 0;
-    bool found = false;
-    for (const PerformanceEvent& event : performance.events) {
-      const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-      if (modulation == nullptr ||
-          modulation->target != ModulationPerformanceTarget::VibratoDepth ||
-          modulation->header.tick > endTick) {
-        continue;
-      }
-      if (!found || std::tie(modulation->header.tick, modulation->header.sequence) >
-                        std::tie(latestTick, latestSequence)) {
-        found = true;
-        latestTick = modulation->header.tick;
-        latestSequence = modulation->header.sequence;
-        depth = static_cast<u8>(std::clamp<int>(
-            static_cast<int>(std::lround(modulation->amount * 127.0)), 0, 127));
-      }
-    }
-    lastVibratoDepthMidi = depth;
-  }
-
   void resetSectionControllers() {
-    // Legacy conversion creates a fresh SeqTrack view for every section. The
-    // musical driver state below persists, but slide interpolation starts from
-    // the MIDI defaults unless that section has already set the controller.
     midiVolume = 100;
     midiPan = 64;
     midiMasterVolume = 127;
@@ -910,11 +843,8 @@ struct TrackState {
   VibratoConfig vibrato;
   PitchEnvelope pitchEnvelope;
   PitchState pitch;
-  std::map<u64, BoundaryState> boundaryHistory;
   std::deque<QueuedPitchSlide> queuedPitchSlides;
   u8 waitTicksRemaining = 0;
-  std::optional<u64> sectionSourceLimit;
-  std::optional<u64> discoveredSourceStop;
   u32 melodicProgram = 0;
   std::optional<u8> currentLogicalProgram;
   bool lastWasPercussion = false;
@@ -933,8 +863,6 @@ struct Slide {
   u8 delay = 0;
   u8 length = 0;
   u8 target = 0;
-  u64 sourceBegin = 0;
-  u64 sourceEnd = 0;
 };
 
 struct Playback {
@@ -960,8 +888,7 @@ struct Playback {
     }
   }
 
-  void lemmingsParameters(u8 duration, bool hasDuration, u8 durationValue, bool hasVelocity,
-                          u8 velocityValue) {
+  void lemmingsParameters(u8 duration, bool hasDuration, u8 durationValue, bool hasVelocity, u8 velocityValue) {
     track.noteLength = duration;
     if (hasDuration) {
       track.durationRate = durationValue;
@@ -1032,19 +959,16 @@ struct Playback {
       return;
     }
     track.pitch.bend = bend;
-    out.pitchBend((static_cast<double>(bend) / 8192.0) *
-                  (track.pitch.rangeCents / 100.0));
+    out.pitchBend((static_cast<double>(bend) / 8192.0) * (track.pitch.rangeCents / 100.0));
   }
 
   [[nodiscard]] s16 currentPitchBend() const {
     if (!track.pitch.baseValid) {
       return 0;
     }
-    const double cents =
-        (track.pitch.motion.current() - track.pitch.base) * (100.0 / 256.0);
-    return static_cast<s16>(std::clamp<s32>(
-        static_cast<s32>(std::lround((cents / track.pitch.rangeCents) * 8192.0)),
-        -8192, 8191));
+    const double cents = (track.pitch.motion.current() - track.pitch.base) * (100.0 / 256.0);
+    return static_cast<s16>(
+        std::clamp<s32>(static_cast<s32>(std::lround((cents / track.pitch.rangeCents) * 8192.0)), -8192, 8191));
   }
 
   void applyCurrentPitchBend() { emitPitchBend(currentPitchBend()); }
@@ -1063,12 +987,10 @@ struct Playback {
   void resetPitchForNote() {
     track.pitch.motion.clear();
     track.pitch.baseValid = false;
-    if (track.pitch.rangeCents == PitchState::kDefaultRangeCents &&
-        track.pitch.bend == 0) {
+    if (track.pitch.rangeCents == PitchState::kDefaultRangeCents && track.pitch.bend == 0) {
       return;
     }
-    if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None &&
-        track.pitchEnvelope.length != 0) {
+    if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None && track.pitchEnvelope.length != 0) {
       emitPitchBend(0);
       return;
     }
@@ -1080,31 +1002,17 @@ struct Playback {
     track.pitch.motion.clear();
     if (!track.pitch.baseValid || length == 0) {
       setPitchBendRange(PitchState::kDefaultRangeCents);
-      rememberBoundaryState();
       return;
     }
 
     const s32 current = track.pitch.motion.current();
-    const double largestDeviation =
-        std::max(std::abs(static_cast<double>(current - track.pitch.base)),
-                 std::abs(static_cast<double>(target - track.pitch.base)));
-    const u16 range = std::max<u16>(
-        PitchState::kDefaultRangeCents,
-        static_cast<u16>(std::ceil(largestDeviation * (100.0 / 256.0))));
+    const double largestDeviation = std::max(std::abs(static_cast<double>(current - track.pitch.base)),
+                                             std::abs(static_cast<double>(target - track.pitch.base)));
+    const u16 range =
+        std::max<u16>(PitchState::kDefaultRangeCents, static_cast<u16>(std::ceil(largestDeviation * (100.0 / 256.0))));
     setPitchBendRange(range);
-    static_cast<void>(track.pitch.motion.begin(
-        SequenceMotionPlan<s32>::targetOverTicks(target, length, delay)));
+    static_cast<void>(track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay)));
     applyCurrentPitchBend();
-    rememberBoundaryState();
-  }
-
-  void rememberBoundaryState() {
-    track.boundaryHistory[vm.tick()] = TrackState::BoundaryState{
-        .pitch = track.pitch,
-        .vibrato = track.vibrato,
-        .vibratoDepth = track.vibratoDepth,
-        .lastVibratoDepthMidi = track.lastVibratoDepthMidi,
-    };
   }
 
   void beginNotePitch(u8 rawNote) {
@@ -1113,27 +1021,24 @@ struct Playback {
     track.pitch.base = static_cast<s32>(rawNote & 0x7f) << 8;
     track.pitch.motion.setCurrent(track.pitch.base);
 
-    if (track.pitchEnvelope.mode == PitchEnvelope::Mode::None ||
-        track.pitchEnvelope.length == 0) {
-      rememberBoundaryState();
-      return;
+    if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None && track.pitchEnvelope.length != 0) {
+      const s32 offset = static_cast<s32>(track.pitchEnvelope.semitones) << 8;
+      s32 target = track.pitch.base;
+      if (track.pitchEnvelope.mode == PitchEnvelope::Mode::To) {
+        target += offset;
+      } else {
+        track.pitch.motion.setCurrent(track.pitch.base - offset);
+      }
+      activatePitchMotion(track.pitchEnvelope.delay, track.pitchEnvelope.length, target);
     }
-    const s32 offset = static_cast<s32>(track.pitchEnvelope.semitones) << 8;
-    s32 target = track.pitch.base;
-    if (track.pitchEnvelope.mode == PitchEnvelope::Mode::To) {
-      target += offset;
-    } else {
-      track.pitch.motion.setCurrent(track.pitch.base - offset);
-    }
-    activatePitchMotion(track.pitchEnvelope.delay, track.pitchEnvelope.length, target);
+    beginNoteVibrato();
   }
 
   void beginPitchSlide(const Slide& slide) {
     if (!slide.present) {
       return;
     }
-    activatePitchMotion(slide.delay, slide.length,
-                        static_cast<s32>(slide.target & 0x7f) << 8);
+    activatePitchMotion(slide.delay, slide.length, static_cast<s32>(slide.target & 0x7f) << 8);
   }
 
   void beginOrQueuePitchSlide(const Slide& slide) {
@@ -1141,7 +1046,6 @@ struct Playback {
       return;
     }
     if (!track.pitch.motion.active()) {
-      track.observeSourceEnd(slide.sourceEnd);
       beginPitchSlide(slide);
       return;
     }
@@ -1152,19 +1056,14 @@ struct Playback {
         .delay = slide.delay,
         .length = slide.length,
         .target = slide.target,
-        .sourceBegin = slide.sourceBegin,
-        .sourceEnd = slide.sourceEnd,
     });
   }
 
-  void queuePitchSlide(u8 delay, u8 length, u8 target, u64 sourceBegin,
-                       u64 sourceEnd) {
+  void queuePitchSlide(u8 delay, u8 length, u8 target) {
     track.queuedPitchSlides.push_back(QueuedPitchSlide{
         .delay = delay,
         .length = length,
         .target = target,
-        .sourceBegin = sourceBegin,
-        .sourceEnd = sourceEnd,
     });
   }
 
@@ -1172,18 +1071,13 @@ struct Playback {
 
   void advancePitchMotion() {
     const auto tick = track.pitch.motion.tick();
-    if (tick.status != SequenceMotionStatus::Inactive &&
-        tick.status != SequenceMotionStatus::Delayed) {
+    if (tick.status != SequenceMotionStatus::Inactive && tick.status != SequenceMotionStatus::Delayed) {
       applyCurrentPitchBend();
     }
   }
 
-  [[nodiscard]] Effects note(u8 noteIndex, u64 sourceEnd, bool hasSlide,
-                             u8 slideDelay, u8 slideLength, u8 slideTarget,
-                             u64 slideSourceBegin, u64 slideSourceEnd) {
-    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget,
-                      slideSourceBegin, slideSourceEnd};
-    track.observeSourceEnd(sourceEnd);
+  [[nodiscard]] Effects note(u8 noteIndex, bool hasSlide, u8 slideDelay, u8 slideLength, u8 slideTarget) {
+    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
     switchToMelodicProgram();
     const double key = kMelodicKeyCorrection + noteIndex + track.transpose;
     beginNotePitch(noteIndex);
@@ -1193,7 +1087,6 @@ struct Playback {
     // F1/F2 envelope starts at note-on first, so F9 must wait in source order
     // until that envelope finishes; otherwise it starts immediately.
     beginOrQueuePitchSlide(slide);
-    beginNoteVibrato();
     track.lastNote = note;
     track.lastKey = key;
     track.lastWasPercussion = false;
@@ -1201,19 +1094,14 @@ struct Playback {
     return Effects::wait(track.noteLength);
   }
 
-  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli,
-                                   u64 sourceEnd, bool hasSlide, u8 slideDelay,
-                                   u8 slideLength, u8 slideTarget,
-                                   u64 slideSourceBegin, u64 slideSourceEnd) {
-    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget,
-                      slideSourceBegin, slideSourceEnd};
-    track.observeSourceEnd(sourceEnd);
+  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli, bool hasSlide, u8 slideDelay,
+                                   u8 slideLength, u8 slideTarget) {
+    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
     const u8 duration = soundingDuration();
     if (intelli) {
       const bool custom = (program.intelliFlags & 0x40) != 0;
       const PercussionEntry entry = program.percussionTable[slot];
-      const u8 patch = custom ? static_cast<u8>(entry.patch & 0xbf)
-                              : static_cast<u8>(percussionMinimum + slot);
+      const u8 patch = custom ? static_cast<u8>(entry.patch & 0xbf) : static_cast<u8>(percussionMinimum + slot);
       if (custom && entry.pan < 0x80) {
         const auto gains = math::panGains(program.selected, panTable, entry.pan);
         out.stereoBalance(gains.left, gains.right);
@@ -1246,12 +1134,8 @@ struct Playback {
     return Effects::wait(track.noteLength);
   }
 
-  [[nodiscard]] Effects tie(u64 sourceEnd, bool hasSlide, u8 slideDelay,
-                            u8 slideLength, u8 slideTarget,
-                            u64 slideSourceBegin, u64 slideSourceEnd) {
-    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget,
-                      slideSourceBegin, slideSourceEnd};
-    track.observeSourceEnd(sourceEnd);
+  [[nodiscard]] Effects tie(bool hasSlide, u8 slideDelay, u8 slideLength, u8 slideTarget) {
+    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
     if (track.lastKey) {
       track.lastNote = out.note(*track.lastKey, math::legacyMidiGain(track.velocity), soundingDuration(), true);
     }
@@ -1260,12 +1144,8 @@ struct Playback {
     return Effects::wait(track.noteLength);
   }
 
-  [[nodiscard]] Effects rest(u64 sourceEnd, bool hasSlide, u8 slideDelay,
-                             u8 slideLength, u8 slideTarget,
-                             u64 slideSourceBegin, u64 slideSourceEnd) {
-    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget,
-                      slideSourceBegin, slideSourceEnd};
-    track.observeSourceEnd(sourceEnd);
+  [[nodiscard]] Effects rest(bool hasSlide, u8 slideDelay, u8 slideLength, u8 slideTarget) {
+    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
     beginOrQueuePitchSlide(slide);
     // A rest purges the legacy track's pending duration notes. A later tie
     // must not reach backward across that silence.
@@ -1311,8 +1191,7 @@ struct Playback {
     }
     constexpr double kPiOverTwo = 1.57079632679489661923;
     u8 result = static_cast<u8>(std::clamp<int>(
-        static_cast<int>(std::lround((std::atan2(gains.right, gains.left) / kPiOverTwo) * 126.0)),
-        0, 126));
+        static_cast<int>(std::lround((std::atan2(gains.right, gains.left) / kPiOverTwo) * 126.0)), 0, 126));
     if (result != 0) {
       ++result;
     }
@@ -1334,14 +1213,14 @@ struct Playback {
       return;
     }
     const u8 target = midiPan(value);
-    const auto automation =
-        out.fade(PerformanceAutomationTarget::Pan, (target / 63.5) - 1.0, length);
+    const auto automation = out.fade(PerformanceAutomationTarget::Pan, (target / 63.5) - 1.0, length);
     scheduleControllerFade(track.midiPan, target, length, [&](u64 tick, u8 sample) {
-      automation.output(out.at(tick)).pan(PanPerformanceEvent{
-          .stereoPosition = (sample / 63.5) - 1.0,
-          .law = PanLaw::EqualPower,
-          .preserveLinearGain = true,
-      });
+      automation.output(out.at(tick))
+          .pan(PanPerformanceEvent{
+              .stereoPosition = (sample / 63.5) - 1.0,
+              .law = PanLaw::EqualPower,
+              .preserveLinearGain = true,
+          });
     });
     track.midiPan = target;
   }
@@ -1352,7 +1231,6 @@ struct Playback {
     track.vibratoDepth.clearAutomation();
     program.observeVibrato(track.trackNumber, track.vibrato);
     emitConfiguredVibrato();
-    rememberBoundaryState();
   }
 
   void vibratoOff() {
@@ -1361,13 +1239,9 @@ struct Playback {
     track.vibratoDepth.clearAutomation();
     program.observeVibrato(track.trackNumber, track.vibrato);
     emitConfiguredVibrato();
-    rememberBoundaryState();
   }
 
-  void vibratoFade(u8 length) {
-    track.vibrato.fade = length;
-    rememberBoundaryState();
-  }
+  void vibratoFade(u8 length) { track.vibrato.fade = length; }
 
   void emitVibratoDepth(u8 rawDepth, PerformanceEmitter output) {
     const double depth = math::vibratoDepthCents(rawDepth);
@@ -1393,12 +1267,10 @@ struct Playback {
         .amount = midiRate / 127.0,
         .frequencyHz = rate,
     });
-    const double delaySeconds =
-        active ? math::vibratoDelaySeconds(track.vibrato.delay, program.tempo) : 0.0;
-    const u32 delayTicks = active
-                               ? static_cast<u32>(std::lround(delaySeconds * 1'000'000.0 * kPpqn /
-                                                             math::tempoMicrosecondsPerQuarter(program.tempo)))
-                               : 0;
+    const double delaySeconds = active ? math::vibratoDelaySeconds(track.vibrato.delay, program.tempo) : 0.0;
+    const u32 delayTicks = active ? static_cast<u32>(std::lround(delaySeconds * 1'000'000.0 * kPpqn /
+                                                                 math::tempoMicrosecondsPerQuarter(program.tempo)))
+                                  : 0;
     out.vibratoDelay(delayTicks, active ? math::vibratoDelayMidi(delaySeconds) : 0);
   }
 
@@ -1414,13 +1286,10 @@ struct Playback {
     track.vibratoDepth.setCurrent(0);
     const s32 target = track.vibrato.depth;
     track.vibratoDepth.begin(
-        out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, 1.0, track.vibrato.fade,
-                         track.vibrato.delay),
-        SequenceMotionPlan<s32>::targetOverTicksWithStep(
-            target, target / static_cast<s32>(track.vibrato.fade), track.vibrato.fade,
-            track.vibrato.delay));
+        out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, 1.0, track.vibrato.fade, track.vibrato.delay),
+        SequenceMotionPlan<s32>::targetOverTicksWithStep(target, target / static_cast<s32>(track.vibrato.fade),
+                                                         track.vibrato.fade, track.vibrato.delay));
     emitVibratoDepth(0, track.vibratoDepth.output(out));
-    rememberBoundaryState();
   }
 
   void tempo(u8 value) {
@@ -1428,10 +1297,7 @@ struct Playback {
     program.tempoFade.clearAutomation();
     program.tempoFadeTrack.reset();
     program.setTempo(vm.tick(), value);
-    out.tempo(TempoPerformanceEvent{
-        .microsecondsPerQuarter = math::tempoMicrosecondsPerQuarter(value),
-        .force = true,
-    });
+    out.tempo(math::tempoMicrosecondsPerQuarter(value));
   }
 
   void tempoFade(u8 length, u8 value) {
@@ -1440,11 +1306,11 @@ struct Playback {
       return;
     }
     program.tempoFade.setCurrentRaw(program.tempo);
-    program.tempoFade.begin(
-        out.fade(PerformanceAutomationTarget::Tempo,
-                 static_cast<double>(math::tempoMicrosecondsPerQuarter(value)), length),
-        SequenceFixedPointMotion<s32>::toRawTarget(value, length));
+    program.tempoFade.begin(out.fade(PerformanceAutomationTarget::Tempo,
+                                     static_cast<double>(math::tempoMicrosecondsPerQuarter(value)), length),
+                            SequenceFixedPointMotion<s32>::toRawTarget(value, length));
     program.tempoFadeTrack = track.trackNumber;
+    advanceTempoFade(vm.tick());
   }
 
   void volume(u8 value) {
@@ -1459,8 +1325,7 @@ struct Playback {
       return;
     }
     const u8 target = static_cast<u8>(value / 2);
-    const auto automation =
-        out.fade(PerformanceAutomationTarget::Level, LevelScale::linearFromMidi7(target), length);
+    const auto automation = out.fade(PerformanceAutomationTarget::Level, LevelScale::linearFromMidi7(target), length);
     scheduleControllerFade(track.midiVolume, target, length, [&](u64 tick, u8 sample) {
       automation.output(out.at(tick)).level(LevelScale::linearFromMidi7(sample));
     });
@@ -1479,12 +1344,10 @@ struct Playback {
       return;
     }
     const u8 target = static_cast<u8>(value / 2);
-    const auto automation =
-        out.fade(PerformanceAutomationTarget::MasterLevel,
-                 LevelScale::linearFromMidi14(static_cast<u16>(target) << 7), length);
+    const auto automation = out.fade(PerformanceAutomationTarget::MasterLevel,
+                                     LevelScale::linearFromMidi14(static_cast<u16>(target) << 7), length);
     scheduleControllerFade(track.midiMasterVolume, target, length, [&](u64 tick, u8 sample) {
-      automation.output(out.at(tick)).masterLevel(
-          LevelScale::linearFromMidi14(static_cast<u16>(sample) << 7));
+      automation.output(out.at(tick)).masterLevel(LevelScale::linearFromMidi14(static_cast<u16>(sample) << 7));
     });
     track.midiMasterVolume = target;
   }
@@ -1495,12 +1358,10 @@ struct Playback {
     // each sample is rounded from the original endpoints (not accumulated),
     // the first sample occurs on the command tick, and duplicate rounded
     // samples after the first are suppressed.
-    const double increment =
-        static_cast<double>(static_cast<int>(target) - static_cast<int>(start)) / length;
+    const double increment = static_cast<double>(static_cast<int>(target) - static_cast<int>(start)) / length;
     int previous = -1;
     for (u32 index = 0; index < length; ++index) {
-      const int sample = std::clamp<int>(
-          static_cast<int>(std::round(start + increment * (index + 1))), 0, 127);
+      const int sample = std::clamp<int>(static_cast<int>(std::round(start + increment * (index + 1))), 0, 127);
       if (sample != previous) {
         std::forward<Emit>(emit)(vm.tick() + index, static_cast<u8>(sample));
         previous = sample;
@@ -1524,8 +1385,7 @@ struct Playback {
     if (!tick.shouldApply()) {
       return;
     }
-    const u8 value =
-        static_cast<u8>(std::clamp<s32>(tick.current, 0, track.vibrato.depth));
+    const u8 value = static_cast<u8>(std::clamp<s32>(tick.current, 0, track.vibrato.depth));
     track.vibratoDepth.setCurrentPreservingMotion(value);
     emitVibratoDepth(value, track.vibratoDepth.output(out));
   }
@@ -1533,43 +1393,25 @@ struct Playback {
   void tick() {
     advanceVibratoFade();
     advancePitchMotion();
-    if (!track.queuedPitchSlides.empty() && !track.pitch.motion.active() &&
-        track.waitTicksRemaining > 1) {
+    if (program.tempoFadeTrack == track.trackNumber) {
+      advanceTempoFade(vm.tick());
+    }
+    if (!track.queuedPitchSlides.empty() && !track.pitch.motion.active() && track.waitTicksRemaining > 1) {
       const QueuedPitchSlide queued = track.queuedPitchSlides.front();
       track.queuedPitchSlides.pop_front();
-      track.observeSourceEnd(queued.sourceEnd);
-      activatePitchMotion(queued.delay, queued.length,
-                          static_cast<s32>(queued.target & 0x7f) << 8);
+      activatePitchMotion(queued.delay, queued.length, static_cast<s32>(queued.target & 0x7f) << 8);
     }
     if (track.waitTicksRemaining <= 1) {
-      // Once the wait expires the parser reaches every still-queued F9 at the
-      // same source tick. Unlike the tick-begin shortcut above, normal parser
-      // execution honors the section's learned source boundary. Each allowed
-      // F9 replaces the previous motion, so the last one is the state carried
-      // into the next tick.
+      // Once the wait expires, every adjacent F9 executes at the same source
+      // tick; each replaces the previous motion.
       while (!track.queuedPitchSlides.empty()) {
         const QueuedPitchSlide queued = track.queuedPitchSlides.front();
         track.queuedPitchSlides.pop_front();
-        if (!track.sourceAllowed(queued.sourceBegin)) {
-          continue;
-        }
-        track.observeSourceEnd(queued.sourceEnd);
-        activatePitchMotion(queued.delay, queued.length,
-                            static_cast<s32>(queued.target & 0x7f) << 8);
+        activatePitchMotion(queued.delay, queued.length, static_cast<s32>(queued.target & 0x7f) << 8);
       }
     }
     if (track.waitTicksRemaining != 0) {
       --track.waitTicksRemaining;
-    }
-    rememberBoundaryState();
-  }
-
-  void endTick(u64 tick) {
-    // Tempo fades are advanced by the SPC driver's sequence-level tick-end
-    // hook, after every active voice has run. If a voice ends the section,
-    // that hook is skipped and the fade resumes at the next section's tick.
-    if (program.tempoFadeTrack == track.trackNumber) {
-      advanceTempoFade(tick);
     }
   }
 
@@ -1578,9 +1420,7 @@ struct Playback {
     out.globalTranspose(semitones);
   }
 
-  void echo(u8 channels) {
-    program.setEcho(vm.tick(), channels);
-  }
+  void echo(u8 channels) { program.setEcho(vm.tick(), channels); }
 
   void percussionBase(u8 base) {
     program.percussionBase = base;
@@ -1605,8 +1445,8 @@ struct Playback {
     program.voiceTableDefined = true;
   }
 
-  void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchLow,
-                           u8 pitchHigh, Address sourceAddress) {
+  void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchLow, u8 pitchHigh,
+                           Address sourceAddress) {
     const u32 newProgram = program.registerOverride(
         logical, std::array<u8, 6>{srcn, adsr1, adsr2, gain, pitchLow, pitchHigh}, sourceAddress);
     if (track.currentLogicalProgram == logical) {
@@ -1723,31 +1563,25 @@ struct DecodeContext {
   }
 };
 
-[[nodiscard]] Slide readSlide(Cursor::Event& event, u64 sourceBegin,
-                              std::string_view prefix = {}) {
-  Slide slide{
+[[nodiscard]] Slide readSlide(Cursor::Event& event, std::string_view prefix = {}) {
+  return Slide{
       .present = true,
       .delay = event.u8(fmt::format("{}delay", prefix), SemanticOperandRole::Duration),
       .length = event.u8(fmt::format("{}length", prefix), SemanticOperandRole::Duration),
-      .target = event.u8(fmt::format("{}target_note", prefix), SourceValueDisplay::MidiNote,
-                         SemanticOperandRole::NoteKey),
-      .sourceBegin = sourceBegin,
+      .target =
+          event.u8(fmt::format("{}target_note", prefix), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey),
   };
-  slide.sourceEnd = event.nextAddress().value;
-  return slide;
 }
 
-[[nodiscard]] std::vector<Slide> readInlineSlides(Cursor::Event& event,
-                                                  const Definition& definition) {
+[[nodiscard]] std::vector<Slide> readInlineSlides(Cursor::Event& event, const Definition& definition) {
   std::vector<Slide> slides;
   while (const auto opcode = event.peekU8()) {
     if (definition.events[*opcode] != EventType::PitchSlide) {
       break;
     }
     const std::string prefix = fmt::format("pitch_slide_{}_", slides.size() + 1);
-    const u64 sourceBegin = event.nextAddress().value;
     event.u8(fmt::format("{}opcode", prefix), SourceValueDisplay::Hex);
-    slides.push_back(readSlide(event, sourceBegin, prefix));
+    slides.push_back(readSlide(event, prefix));
   }
   return slides;
 }
@@ -1755,9 +1589,7 @@ struct DecodeContext {
 void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) {
   for (size_t index = 1; index < slides.size(); ++index) {
     const Slide& slide = slides[index];
-    event.invoke<&Playback::queuePitchSlide>(
-        slide.delay, slide.length, slide.target, slide.sourceBegin,
-        slide.sourceEnd);
+    event.invoke<&Playback::queuePitchSlide>(slide.delay, slide.length, slide.target);
   }
 }
 
@@ -1769,8 +1601,8 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
   return event.ignore();
 }
 
-[[nodiscard]] DecodedBytecodeCommand decodeNoteParameters(Cursor& cursor, const DecodeContext& context,
-                                                          EventType type, u32 begin) {
+[[nodiscard]] DecodedBytecodeCommand decodeNoteParameters(Cursor& cursor, const DecodeContext& context, EventType type,
+                                                          u32 begin) {
   auto event = cursor.command("Note Parameters", SequenceSemantic::State);
   const u8 duration =
       event.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal, SemanticOperandRole::Duration);
@@ -1791,8 +1623,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
         event.derived("resolved_velocity", velocity, SemanticOperandRole::Level);
       }
     }
-    return event.invoke<&Playback::lemmingsParameters>(duration, hasDuration, durationRate, hasVelocity,
-                                                       velocity);
+    return event.invoke<&Playback::lemmingsParameters>(duration, hasDuration, durationRate, hasVelocity, velocity);
   }
 
   if (type == EventType::NoteParameter) {
@@ -1871,9 +1702,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
                                        SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
       const std::vector<Slide> slides = readInlineSlides(event, context.definition);
       const Slide first = slides.empty() ? Slide{} : slides.front();
-      event.invoke<&Playback::note>(
-          key, static_cast<u64>(begin + 1), first.present, first.delay,
-          first.length, first.target, first.sourceBegin, first.sourceEnd);
+      event.invoke<&Playback::note>(key, first.present, first.delay, first.length, first.target);
       appendQueuedSlides(event, slides);
       return event;
     }
@@ -1881,9 +1710,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       auto event = cursor.command("Tie", SequenceSemantic::Note);
       const std::vector<Slide> slides = readInlineSlides(event, context.definition);
       const Slide first = slides.empty() ? Slide{} : slides.front();
-      event.invoke<&Playback::tie>(
-          static_cast<u64>(begin + 1), first.present, first.delay,
-          first.length, first.target, first.sourceBegin, first.sourceEnd);
+      event.invoke<&Playback::tie>(first.present, first.delay, first.length, first.target);
       appendQueuedSlides(event, slides);
       return event;
     }
@@ -1891,33 +1718,28 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
       const std::vector<Slide> slides = readInlineSlides(event, context.definition);
       const Slide first = slides.empty() ? Slide{} : slides.front();
-      event.invoke<&Playback::rest>(
-          static_cast<u64>(begin + 1), first.present, first.delay,
-          first.length, first.target, first.sourceBegin, first.sourceEnd);
+      event.invoke<&Playback::rest>(first.present, first.delay, first.length, first.target);
       appendQueuedSlides(event, slides);
       return event;
     }
     case EventType::Percussion: {
       auto event = cursor.command("Percussion Note", SequenceSemantic::Note);
-      const u8 slot =
-          event.opcodeValue("slot", static_cast<u8>(opcode - context.definition.status.percussionMin),
-                            SourceValueDisplay::Decimal, SemanticOperandRole::NoteKey);
-      const bool intelli = (context.selected.intelli == IntelliMode::Ta ||
-                            context.selected.intelli == IntelliMode::Fe4) &&
-                           slot < kIntelliDrumSlots;
+      const u8 slot = event.opcodeValue("slot", static_cast<u8>(opcode - context.definition.status.percussionMin),
+                                        SourceValueDisplay::Decimal, SemanticOperandRole::NoteKey);
+      const bool intelli =
+          (context.selected.intelli == IntelliMode::Ta || context.selected.intelli == IntelliMode::Fe4) &&
+          slot < kIntelliDrumSlots;
       const std::vector<Slide> slides = readInlineSlides(event, context.definition);
       const Slide first = slides.empty() ? Slide{} : slides.front();
-      event.invoke<&Playback::percussion>(
-          slot, context.definition.status.percussionMin, intelli,
-          static_cast<u64>(begin + 1), first.present, first.delay,
-          first.length, first.target, first.sourceBegin, first.sourceEnd);
+      event.invoke<&Playback::percussion>(slot, context.definition.status.percussionMin, intelli, first.present,
+                                          first.delay, first.length, first.target);
       appendQueuedSlides(event, slides);
       return event;
     }
     case EventType::Program:
     case EventType::Rd2ProgramAndAdsr: {
-      auto event = cursor.command(type == EventType::Program ? "Program" : "Program And ADSR",
-                                  SequenceSemantic::Program);
+      auto event =
+          cursor.command(type == EventType::Program ? "Program" : "Program And ADSR", SequenceSemantic::Program);
       const u8 program = event.u8("program", SemanticOperandRole::Instrument);
       if (type == EventType::Rd2ProgramAndAdsr) {
         event.u8("adsr1", SourceValueDisplay::Hex);
@@ -1955,8 +1777,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibratoOff>();
     case EventType::MasterVolume: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterVolume>(
-          event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::masterVolume>(event.u8("volume", SemanticOperandRole::Level));
     }
     case EventType::MasterVolumeFade: {
       auto event = cursor.command("Master Volume Fade", SequenceSemantic::Level);
@@ -1990,8 +1811,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       return cursor.sourceOnly("Tremolo Off").ignore();
     case EventType::Volume: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(
-          event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
     }
     case EventType::VolumeFade: {
       auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
@@ -2001,25 +1821,21 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
     }
     case EventType::VibratoFade: {
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::vibratoFade>(
-          event.u8("length", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::vibratoFade>(event.u8("length", SemanticOperandRole::Duration));
     }
     case EventType::PitchEnvelopeTo:
     case EventType::PitchEnvelopeFrom: {
-      auto event = cursor.command(type == EventType::PitchEnvelopeTo ? "Pitch Envelope To"
-                                                                     : "Pitch Envelope From",
+      auto event = cursor.command(type == EventType::PitchEnvelopeTo ? "Pitch Envelope To" : "Pitch Envelope From",
                                   SequenceSemantic::Pitch);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 length = event.u8("length", SemanticOperandRole::Duration);
-      const s8 semitones =
-          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const s8 semitones = event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
       return event.invoke<&Playback::pitchEnvelope>(
-          type == EventType::PitchEnvelopeTo ? PitchEnvelope::Mode::To : PitchEnvelope::Mode::From,
-          delay, length, semitones);
+          type == EventType::PitchEnvelopeTo ? PitchEnvelope::Mode::To : PitchEnvelope::Mode::From, delay, length,
+          semitones);
     }
     case EventType::PitchEnvelopeOff:
-      return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch)
-          .invoke<&Playback::pitchEnvelopeOff>();
+      return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch).invoke<&Playback::pitchEnvelopeOff>();
     case EventType::Tuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
       const u8 tuning = event.u8("tuning", SemanticOperandRole::Pitch);
@@ -2036,8 +1852,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       return cursor.sourceOnly("Echo Off").ignore();
     case EventType::EchoParameter:
     case EventType::EchoVolumeFade: {
-      auto event = cursor.sourceOnly(type == EventType::EchoParameter ? "Echo Parameters"
-                                                                      : "Echo Volume Fade");
+      auto event = cursor.sourceOnly(type == EventType::EchoParameter ? "Echo Parameters" : "Echo Volume Fade");
       event.u8(type == EventType::EchoParameter ? "delay" : "length");
       event.u8(type == EventType::EchoParameter ? "feedback" : "volume_left");
       event.u8(type == EventType::EchoParameter ? "fir" : "volume_right");
@@ -2045,19 +1860,17 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
     }
     case EventType::PitchSlide: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
-      const Slide slide = readSlide(event, begin);
+      const Slide slide = readSlide(event);
       return event.invoke<&Playback::pitchSlide>(slide.delay, slide.length, slide.target);
     }
     case EventType::PercussionBase: {
       auto event = cursor.command("Percussion Base", SequenceSemantic::State);
-      return event.invoke<&Playback::percussionBase>(
-          event.u8("program", SemanticOperandRole::InstrumentProgram));
+      return event.invoke<&Playback::percussionBase>(event.u8("program", SemanticOperandRole::InstrumentProgram));
     }
     case EventType::KonamiLoopStart: {
       auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
-      return event.set<&TrackState::konamiLoopStart>(
-          event.derived("destination", event.nextAddress(), SourceValueDisplay::Address,
-                        SemanticOperandRole::LoopTarget));
+      return event.set<&TrackState::konamiLoopStart>(event.derived(
+          "destination", event.nextAddress(), SourceValueDisplay::Address, SemanticOperandRole::LoopTarget));
     }
     case EventType::KonamiLoopEnd: {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
@@ -2091,22 +1904,18 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
     case EventType::IntelliEchoOff:
       return cursor.command("Echo Off", SequenceSemantic::State).emitReverb(0.0);
     case EventType::IntelliLegatoOn:
-      return cursor.command("Legato On", SequenceSemantic::State)
-          .set<&TrackState::legato>(true)
-          .emitLegatoPedal(true);
+      return cursor.command("Legato On", SequenceSemantic::State).set<&TrackState::legato>(true).emitLegatoPedal(true);
     case EventType::IntelliLegatoOff:
       return cursor.command("Legato Off", SequenceSemantic::State)
           .set<&TrackState::legato>(false)
           .emitLegatoPedal(false);
     case EventType::IntelliConditionalJump:
     case EventType::IntelliJump: {
-      auto event = cursor.command(type == EventType::IntelliJump ? "Short Jump"
-                                                                 : "Conditional Short Jump",
+      auto event = cursor.command(type == EventType::IntelliJump ? "Short Jump" : "Conditional Short Jump",
                                   SequenceSemantic::Jump);
       const u8 distance = event.u8("distance");
       const Address destination{event.nextAddress().value + distance};
-      event.derived("destination", destination, SourceValueDisplay::Address,
-                    SemanticOperandRole::JumpTarget);
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       // The driver's "conditional" form tests a state that legacy conversion
       // has always treated as taken; retain that established interpretation.
       return event.jump(destination);
@@ -2139,11 +1948,9 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
               return block.address.value == tableAddress.value;
             })) {
           constexpr u64 kMaximumVoiceTableBytes = 256 * 4;
-          const u64 bytes = std::min<u64>(
-              kMaximumVoiceTableBytes,
-              context.reader.size() > tableAddress.value
-                  ? context.reader.size() - tableAddress.value
-                  : 0);
+          const u64 bytes = std::min<u64>(kMaximumVoiceTableBytes, context.reader.size() > tableAddress.value
+                                                                       ? context.reader.size() - tableAddress.value
+                                                                       : 0);
           const auto source = context.reader.slice(tableAddress.value, bytes);
           context.dataBlocks->push_back(SequenceDataBlock{
               .address = tableAddress,
@@ -2158,8 +1965,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
         }
         return event;
       }
-      if (context.selected.intelli != IntelliMode::Fe3 &&
-          context.selected.intelli != IntelliMode::Ta) {
+      if (context.selected.intelli != IntelliMode::Fe3 && context.selected.intelli != IntelliMode::Ta) {
         return event.ignore();
       }
       const u8 logical = static_cast<u8>(parameter) & 0x3f;
@@ -2170,8 +1976,8 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       const u8 pitchHigh = event.u8("pitch_high", SourceValueDisplay::Hex);
       const u8 pitchLow = event.u8("pitch_low", SourceValueDisplay::Hex);
       if (context.selected.intelli == IntelliMode::Ta) {
-        return event.invoke<&Playback::overwriteInstrument>(
-            logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, Address{begin});
+        return event.invoke<&Playback::overwriteInstrument>(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow,
+                                                            Address{begin});
       }
       return event.ignore();
     }
@@ -2179,7 +1985,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       auto event = cursor.command("Load Voice Parameters", SequenceSemantic::Program);
       const u8 index = event.u8("index");
       return event.invoke<&Playback::loadVoice>(index, context.definition.status.percussionMin,
-                                                 context.selected.intelli);
+                                                context.selected.intelli);
     }
     case EventType::IntelliAdsr: {
       auto event = cursor.sourceOnly("ADSR");
@@ -2199,8 +2005,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
     case EventType::IntelliGainDuration: {
       auto event = cursor.command("GAIN Duration", SequenceSemantic::State);
       const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
-      return context.selected.intelli == IntelliMode::Ta ? event.set<&TrackState::durationRate>(rate)
-                                                         : event.ignore();
+      return context.selected.intelli == IntelliMode::Ta ? event.set<&TrackState::durationRate>(rate) : event.ignore();
     }
     case EventType::IntelliGain: {
       auto event = cursor.sourceOnly("GAIN");
@@ -2214,13 +2019,11 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       event.derived("count", count, SemanticOperandRole::Count);
       event.invoke<&Playback::clearPercussionTable>();
       for (u8 slot = 0; slot < count; ++slot) {
-        const u8 patch = event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex,
-                                  SemanticOperandRole::Instrument);
+        const u8 patch =
+            event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex, SemanticOperandRole::Instrument);
         const u8 note =
-            event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote,
-                     SemanticOperandRole::NoteKey);
-        const u8 pan =
-            event.u8(fmt::format("pan_{}", slot), SemanticOperandRole::Pan);
+            event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+        const u8 pan = event.u8(fmt::format("pan_{}", slot), SemanticOperandRole::Pan);
         if (slot < kIntelliDrumSlots) {
           event.invoke<&Playback::percussionEntry>(slot, patch, note, pan);
         }
@@ -2278,8 +2081,7 @@ struct PlaylistDecode {
 };
 
 [[nodiscard]] PlaylistDecode decodePlaylist(ByteReader reader, const Layout& layout, AssetId sequenceId,
-                                            SourceMapBuilder* sourceMap,
-                                            std::vector<Diagnostic>* diagnostics) {
+                                            SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const Profile& selected = profile(layout.profile);
   std::map<u32, PlaylistCommand> commands;
   std::map<u32, SequenceSection> sections;
@@ -2295,8 +2097,7 @@ struct PlaylistDecode {
     }
   };
   const auto queue = [&](u32 address) {
-    if (reader.has(address, 2) && !commands.contains(address) &&
-        std::ranges::find(pending, address) == pending.end()) {
+    if (reader.has(address, 2) && !commands.contains(address) && std::ranges::find(pending, address) == pending.end()) {
       pending.push_back(address);
     }
   };
@@ -2316,8 +2117,7 @@ struct PlaylistDecode {
       if ((raw & 0xff00) == 0) {
         continue;
       }
-      const u16 start =
-          convertAddress(selected, raw, layout.konamiBaseAddress, layout.falcomBaseOffset);
+      const u16 start = convertAddress(selected, raw, layout.konamiBaseAddress, layout.falcomBaseOffset);
       if (!reader.has(start, 1)) {
         warn(fmt::format("NinSnes track pointer ${:04X} was outside ARAM", start),
              reader.range(address + track * 2, 2));
@@ -2356,15 +2156,13 @@ struct PlaylistDecode {
         command.operation = PlaylistRepeat{
             .additionalPlays = value,
             .destination = Address{destination},
-            .infinite = selected.playlist == PlaylistModel::Tose ? (value == 0 || value == 0xff)
-                                                                 : value > 0x80,
+            .infinite = selected.playlist == PlaylistModel::Tose ? (value == 0 || value == 0xff) : value > 0x80,
         };
         queue(destination);
         queue(address + 4);
       }
     } else {
-      const u16 sectionAddress =
-          convertAddress(selected, value, layout.konamiBaseAddress, layout.falcomBaseOffset);
+      const u16 sectionAddress = convertAddress(selected, value, layout.konamiBaseAddress, layout.falcomBaseOffset);
       command.operation = PlaylistPlaySection{.section = Address{sectionAddress}};
       if (!sections.contains(sectionAddress)) {
         if (auto section = decodeSection(sectionAddress)) {
@@ -2397,70 +2195,67 @@ struct PlaylistDecode {
   for (const auto& command : decoded.playlist.commands) {
     last = std::max(last, command.range.endOffset());
   }
-  decoded.annotation =
-      sourceMap->header("Section Playlist", SourceRange{
-                                                .source = reader.source(),
-                                                .offset = first,
-                                                .size = static_cast<u32>(last - first),
-                                            })
-          .kind("nin-snes-playlist")
-          .owner(ObjectRefs::sequence(sequenceId))
-          .id();
+  decoded.annotation = sourceMap
+                           ->header("Section Playlist",
+                                    SourceRange{
+                                        .source = reader.source(),
+                                        .offset = first,
+                                        .size = static_cast<u32>(last - first),
+                                    })
+                           .kind("nin-snes-playlist")
+                           .owner(ObjectRefs::sequence(sequenceId))
+                           .id();
 
   for (auto& command : decoded.playlist.commands) {
-    auto annotation =
-        sourceMap
-            ->command(std::holds_alternative<PlaylistPlaySection>(command.operation)
-                          ? "Play Section"
-                          : (std::holds_alternative<PlaylistRepeat>(command.operation) ? "Repeat Playlist"
-                                                                                     : "Playlist End"),
-                      command.range, std::holds_alternative<PlaylistRepeat>(command.operation)
-                                         ? SequenceSemantic::Repeat
-                                         : SequenceSemantic::Meta)
-            .kind("nin-snes-playlist-command")
-            .parent(*decoded.annotation)
-            .field("value", reader.range(command.range.offset, 2), reader.le16(command.range.offset),
-                   SourceValueDisplay::Hex);
+    auto annotation = sourceMap
+                          ->command(std::holds_alternative<PlaylistPlaySection>(command.operation)
+                                        ? "Play Section"
+                                        : (std::holds_alternative<PlaylistRepeat>(command.operation) ? "Repeat Playlist"
+                                                                                                     : "Playlist End"),
+                                    command.range,
+                                    std::holds_alternative<PlaylistRepeat>(command.operation) ? SequenceSemantic::Repeat
+                                                                                              : SequenceSemantic::Meta)
+                          .kind("nin-snes-playlist-command")
+                          .parent(*decoded.annotation)
+                          .field("value", reader.range(command.range.offset, 2), reader.le16(command.range.offset),
+                                 SourceValueDisplay::Hex);
     if (const auto* play = std::get_if<PlaylistPlaySection>(&command.operation)) {
       annotation.derived("section", play->section.value, SourceValueDisplay::Address)
-          .link(SourceLinkRole::PointsTo,
-                SourceTarget{reader.range(play->section.value, kTrackCount * 2)});
+          .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(play->section.value, kTrackCount * 2)});
     } else if (const auto* repeat = std::get_if<PlaylistRepeat>(&command.operation)) {
-      annotation.field("destination", reader.range(command.range.offset + 2, 2),
-                       repeat->destination.value, SourceValueDisplay::Address)
+      annotation
+          .field("destination", reader.range(command.range.offset + 2, 2), repeat->destination.value,
+                 SourceValueDisplay::Address)
           .derived("additional_plays", repeat->additionalPlays)
           .derived("infinite", repeat->infinite)
           .link(SourceLinkRole::RepeatTarget, SourceTarget{reader.range(repeat->destination.value, 2)});
     }
-    command.annotation = annotation.id();
+    static_cast<void>(annotation.id());
   }
 
   for (const auto& section : decoded.playlist.sections) {
-    auto annotation =
-        sourceMap->header("Section", reader.range(section.address.value, kTrackCount * 2))
-            .kind("nin-snes-section")
-            .parent(*decoded.annotation)
-            .owner(ObjectRefs::sequence(sequenceId));
+    auto annotation = sourceMap->header("Section", reader.range(section.address.value, kTrackCount * 2))
+                          .kind("nin-snes-section")
+                          .parent(*decoded.annotation)
+                          .owner(ObjectRefs::sequence(sequenceId));
     for (u8 track = 0; track < section.trackStarts.size(); ++track) {
       const SourceRange range = reader.range(section.address.value + track * 2, 2);
       if (section.trackStarts[track]) {
-        annotation.field(fmt::format("track_{}", track + 1), range,
-                         section.trackStarts[track]->value, SourceValueDisplay::Address)
+        annotation
+            .field(fmt::format("track_{}", track + 1), range, section.trackStarts[track]->value,
+                   SourceValueDisplay::Address)
             .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(section.trackStarts[track]->value, 1)});
       } else {
-        annotation.field(fmt::format("track_{}", track + 1), range, 0,
-                         SourceValueDisplay::Address);
+        annotation.field(fmt::format("track_{}", track + 1), range, 0, SourceValueDisplay::Address);
       }
     }
   }
   return decoded;
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, u32 trackNumber,
-                                       const std::vector<Address>& starts,
+[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, u32 trackNumber, const std::vector<Address>& starts,
                                        const DecodeContext& context, AssetId sequenceId,
-                                       std::optional<SourceAnnotationId> parent,
-                                       SourceMapBuilder* sourceMap) {
+                                       std::optional<SourceAnnotationId> parent, SourceMapBuilder* sourceMap) {
   if (starts.empty()) {
     return TrackProgram{
         .id = TrackId{trackNumber},
@@ -2479,8 +2274,7 @@ struct PlaylistDecode {
   while (!pending.empty() && commands.size() < kMaxTrackCommands) {
     u32 address = pending.back();
     pending.pop_back();
-    while (reader.has(address, 1) && !commands.contains(address) &&
-           commands.size() < kMaxTrackCommands) {
+    while (reader.has(address, 1) && !commands.contains(address) && commands.size() < kMaxTrackCommands) {
       DecodedBytecodeCommand command = decodeCommand(context, address);
       for (const Address target : command.flow.staticTargets) {
         if (reader.has(target.value, 1) && !commands.contains(static_cast<u32>(target.value))) {
@@ -2510,8 +2304,7 @@ struct PlaylistDecode {
   return session.finish();
 }
 
-[[nodiscard]] std::vector<InstrumentIdentity> buildProgramMap(ByteReader reader,
-                                                              const Layout& layout) {
+[[nodiscard]] std::vector<InstrumentIdentity> buildProgramMap(ByteReader reader, const Layout& layout) {
   const Profile& selected = profile(layout.profile);
   std::vector<InstrumentIdentity> map(256);
   for (u16 sourceProgram = 0; sourceProgram < map.size(); ++sourceProgram) {
@@ -2550,24 +2343,6 @@ struct PlaylistDecode {
           },
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .prepass = SemanticPrepassMode::ScheduledPlayback,
-      .sectionNoteEndPolicy = SectionNoteEndPolicy::ScheduledWake,
-      .sectionEndPolicy = SectionEndPolicy::DiscoveredSourceRange,
-      // 00 is a source-only pattern/section terminator in the classic event
-      // tree. Pattern returns must remain replayable, while an outermost 00
-      // reached only through control flow is the exclusive section boundary.
-      .includeSectionSourceCommand =
-          [](const SourceCommand& command) {
-            if (command.opcode == 0) {
-              return false;
-            }
-            // Inline F9 records are decoded with their note for musical
-            // clarity, but the source parser consumes them incrementally while
-            // that note waits. TrackState reports the precise consumed end.
-            return std::ranges::none_of(
-                command.operands, [](const SemanticOperand& operand) {
-                  return operand.name.starts_with("pitch_slide_");
-                });
-          },
   });
 }
 
@@ -2578,8 +2353,8 @@ const SequenceDialect& sequenceDialect() {
   return dialect;
 }
 
-SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId,
-                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
+                             std::vector<Diagnostic>* diagnostics) {
   const Profile& selected = profile(layout.profile);
   const Definition definition = makeDefinition(layout);
   PlaylistDecode playlist = decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
@@ -2601,15 +2376,13 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   for (u8 track = 0; track < kTrackCount; ++track) {
     std::vector<Address> starts;
     for (const SequenceSection& section : program.sectionPlaylist->sections) {
-      if (section.trackStarts[track] &&
-          std::ranges::find_if(starts, [&](Address address) {
-            return address.value == section.trackStarts[track]->value;
-          }) == starts.end()) {
+      if (section.trackStarts[track] && std::ranges::find_if(starts, [&](Address address) {
+                                          return address.value == section.trackStarts[track]->value;
+                                        }) == starts.end()) {
         starts.push_back(*section.trackStarts[track]);
       }
     }
-    program.tracks.push_back(
-        decodeTrack(reader, track, starts, context, sequenceId, playlist.annotation, sourceMap));
+    program.tracks.push_back(decodeTrack(reader, track, starts, context, sequenceId, playlist.annotation, sourceMap));
   }
 
   SequenceRecipes recipes =

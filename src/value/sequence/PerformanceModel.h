@@ -65,9 +65,6 @@ struct NotePerformanceEvent {
 struct TempoPerformanceEvent {
   PerformanceEventHeader header;
   u32 microsecondsPerQuarter = 500000;
-  // Preserve an intentional rewrite even when it does not alter the global
-  // time map. A few hardware drivers use such writes as synchronization.
-  bool force = false;
 };
 
 struct TimeSignaturePerformanceEvent {
@@ -497,7 +494,6 @@ private:
     TrackId track;
     u64 sequence = 0;
     size_t order = 0;
-    bool force = false;
   };
 
   Timebase timebase_;

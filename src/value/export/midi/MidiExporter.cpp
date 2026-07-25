@@ -124,14 +124,8 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
               {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), typedEvent.velocity});
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, NoteDuration>) {
-          // A source driver can end a section on the same tick that a note is
-          // read, producing a meaningful zero-duration note. Put that note-on
-          // just before same-tick note-offs; otherwise the generic "offs before
-          // ons" ordering leaves its note-on dangling and pairs the note-off
-          // with a later note of the same key.
-          const int noteOnPriority = typedEvent.duration == 0 ? 39 : 50;
           addMessage(
-              messages, typedEvent.tick, noteOnPriority,
+              messages, typedEvent.tick, 50,
               {static_cast<u8>(0x90 | channel4(typedEvent.channel)), data7(typedEvent.key), typedEvent.velocity});
           addMessage(messages, typedEvent.tick + typedEvent.duration, 40,
                      {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), 64});
