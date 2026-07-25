@@ -243,6 +243,12 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesPatterns.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesProfile.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.cpp
@@ -260,6 +266,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )

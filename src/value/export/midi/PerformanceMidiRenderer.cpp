@@ -731,12 +731,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .duration = typedEvent.durationTicks,
           });
         } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
-          if (globalTempos.contains(typedEvent)) {
-            track.events.push_back(Tempo{
-                .tick = typedEvent.header.tick,
-                .microsecondsPerQuarter = typedEvent.microsecondsPerQuarter,
-            });
-          }
+          // Tempo is song-wide. Effective changes are written once on the
+          // first MIDI track after all source tracks have been lowered.
         } else if constexpr (std::is_same_v<TypedEvent, TimeSignaturePerformanceEvent>) {
           // Standard MIDI treats time signatures as global metadata. They are collected
           // once and written to the first MIDI track by renderMidiSequence.
@@ -768,11 +764,14 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           const LoweredStereoBalance lowered = lowerPositionalPan(typedEvent.law, typedEvent.stereoPosition);
           state.sourcePanPosition = (static_cast<double>(lowered.pan) / 63.5) - 1.0;
           addCombinedPan(track, state, typedEvent.header.tick, channel, automationState, automationState == nullptr);
-          const double previousPanExpressionGain = state.panExpressionGain;
-          state.panExpressionGain = lowered.expressionGain * (typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0);
-          if (state.panExpressionGain != previousPanExpressionGain) {
-            addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
-                                  automationState);
+          if (!typedEvent.preserveLinearGain) {
+            const double previousPanExpressionGain = state.panExpressionGain;
+            state.panExpressionGain =
+                lowered.expressionGain * (typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0);
+            if (state.panExpressionGain != previousPanExpressionGain) {
+              addCombinedExpression(track, state, typedEvent.header.tick, channel, options,
+                                    modulationConversion, automationState);
+            }
           }
         } else if constexpr (std::is_same_v<TypedEvent, StereoBalancePerformanceEvent>) {
           const LoweredStereoBalance lowered = lowerStereoBalance(typedEvent.leftGain, typedEvent.rightGain);
@@ -987,6 +986,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
                                 ModulationConversionPolicy modulationConversion,
                                 std::span<const InstrumentSetAsset* const> instrumentSets) {
   const PerformanceTempoMap globalTempos{performance};
+  const std::vector<PerformanceTempoMap::Point> globalTempoPoints = globalTempos.points();
+  std::vector<bool> renderedTempoPoints(globalTempoPoints.size(), false);
   const PerformanceSequence loweredPerformance = lowerMidiPerformanceAutomation(performance, options, globalTempos);
   MidiSequence sequence{
       .timebase = loweredPerformance.timebase,
@@ -1033,6 +1034,25 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
       }
       flushSimulatedPan(midiTrack, renderState, flushTick, assignment.channel, globalTempos);
       const auto& header = performanceEventHeader(*event);
+      if (trackIndex == 0) {
+        if (const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
+            tempo != nullptr && globalTempos.contains(*tempo)) {
+          midiTrack.events.push_back(Tempo{
+              .tick = tempo->header.tick,
+              .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
+          });
+          for (size_t index = 0; index < globalTempoPoints.size(); ++index) {
+            if (!renderedTempoPoints[index] &&
+                globalTempoPoints[index].tick == tempo->header.tick &&
+                globalTempoPoints[index].microsecondsPerQuarter ==
+                    tempo->microsecondsPerQuarter) {
+              renderedTempoPoints[index] = true;
+              break;
+            }
+          }
+          continue;
+        }
+      }
       MidiControllerState* automationState =
           header.automation ? &automationControllerStates[*header.automation] : nullptr;
       addMidiEvent(midiTrack, renderState, *event, assignment.channel, globalTransposes, globalTempos, options,
@@ -1046,6 +1066,17 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     }
     flushSimulatedPan(midiTrack, renderState, endTick, assignment.channel, globalTempos);
     if (trackIndex == 0) {
+      for (size_t index = 0; index < globalTempoPoints.size(); ++index) {
+        if (renderedTempoPoints[index]) {
+          continue;
+        }
+        const auto& tempo = globalTempoPoints[index];
+        midiTrack.events.push_back(Tempo{
+            .tick = tempo.tick,
+            .microsecondsPerQuarter = tempo.microsecondsPerQuarter,
+        });
+        endTick = std::max(endTick, tempo.tick);
+      }
       midiTrack.events.insert(midiTrack.events.end(), globalTimeSignatures.begin(), globalTimeSignatures.end());
       for (const auto& timeSignature : globalTimeSignatures) {
         endTick = std::max(endTick, timeSignature.tick);

@@ -82,6 +82,7 @@ class SnesBrrSampleRefs {
 public:
   [[nodiscard]] std::optional<SampleRef> findSrcn(u8 srcn) const;
   [[nodiscard]] std::optional<SampleRef> firstStartingAt(u32 address) const;
+  [[nodiscard]] std::optional<SampleRef> atDenseIndex(u32 index) const;
 
 private:
   friend SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder&, ByteReader, const SnesBrrCatalog&,

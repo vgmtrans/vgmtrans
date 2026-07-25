@@ -17,6 +17,7 @@ namespace detail {
 class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
+using ProgramStateInspector = void (*)(const void* erasedState, void* destination);
 }  // namespace detail
 
 struct BranchResult {
@@ -234,6 +235,7 @@ class VmApi {
 public:
   [[nodiscard]] Step next() const noexcept;
   [[nodiscard]] Step end() const noexcept;
+  [[nodiscard]] Step endSection() const noexcept;
   [[nodiscard]] Step jump(Address destination) const noexcept;
   [[nodiscard]] Step finiteBranch(Address destination) const noexcept;
   [[nodiscard]] Step loopCandidate(Address destination) const noexcept;
@@ -281,7 +283,9 @@ public:
   explicit SequenceVm(LoopPolicy loopPolicy);
   explicit SequenceVm(SequenceVmOptions options);
 
-  [[nodiscard]] PerformanceSequence render(const SequenceProgram& program, const SequenceDialect& dialect) const;
+  [[nodiscard]] PerformanceSequence render(
+      const SequenceProgram& program, const SequenceDialect& dialect,
+      detail::ProgramStateInspector inspector = nullptr, void* inspectionDestination = nullptr) const;
 
 private:
   [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program,

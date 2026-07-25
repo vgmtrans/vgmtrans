@@ -175,6 +175,29 @@ void midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn() {
          "MIDI exporter should write generated note-off before same-tick note-on");
 }
 
+void midiExporterKeepsZeroDurationNotePairedAtSameTick() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  NoteDuration{.tick = 10, .channel = 0, .key = 60, .velocity = 90, .duration = 0},
+                  NoteDuration{.tick = 10, .channel = 0, .key = 60, .velocity = 100, .duration = 5},
+                  EndOfTrack{.tick = 15},
+              },
+      }},
+  };
+
+  const auto exported = encodeMidiFile(midiSequence);
+  const std::vector<u8> expectedOrder{
+      0x0a, 0x90, 0x3c, 0x5a,  // zero-duration attack
+      0x00, 0x80, 0x3c, 0x40,  // its same-tick release
+      0x00, 0x90, 0x3c, 0x64,  // following attack of the same key
+  };
+  expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
+         "zero-duration notes should close before a following same-key attack");
+}
+
 void performanceMidiRendererTrustsSourceNoteExtensions() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -2000,6 +2023,7 @@ void runValueMidiTests() {
   midiExporterKeepsSameTickBankProgramPairsAdjacent();
   midiExporterWritesTimeSignatureMetaEvent();
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
+  midiExporterKeepsZeroDurationNotePairedAtSameTick();
   performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererWritesPanGainResetWhenRequested();

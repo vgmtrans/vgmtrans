@@ -1,0 +1,2623 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/formats/NinSnes/NinSnes.h"
+
+#include "value/base/LevelScale.h"
+#include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/CommandSourceMap.h"
+#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/SequenceMotion.h"
+#include "value/synth/SynthMath.h"
+
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <deque>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace vgmtrans::formats::nin_snes {
+
+using namespace core;
+
+namespace {
+
+constexpr u32 kMaxTrackCommands = 32768;
+constexpr u8 kMelodicKeyCorrection = 24;
+constexpr u8 kIntelliDrumSlots = 16;
+constexpr u8 kDefaultTempo = 0x20;
+constexpr double kTimerHertz = 500.0;
+constexpr double kMinimumVibratoDepthCents = (0xff * 0x80 >> 8) * (100.0 / 256.0);
+constexpr double kMinimumVibratoRateHertz = (kTimerHertz * kDefaultTempo * 0x20) / 65536.0;
+constexpr double kAbsoluteMinimumVibratoRateHertz = kTimerHertz / 65536.0;
+constexpr double kMaximumVibratoDelaySeconds = (256.0 * 0xff) / kTimerHertz;
+
+[[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
+  return (0x7fu << 7) | program;
+}
+
+namespace math {
+
+constexpr std::array<u8, 16> kVolumeEarlier{
+    0x08, 0x12, 0x1b, 0x24, 0x2c, 0x35, 0x3e, 0x47,
+    0x51, 0x5a, 0x62, 0x6b, 0x7d, 0x8f, 0xa1, 0xb3,
+};
+constexpr std::array<u8, 8> kDurationEarlier{0x33, 0x66, 0x80, 0x99, 0xb3, 0xcc, 0xe6, 0xff};
+constexpr std::array<u8, 16> kVolumeStandard{
+    0x19, 0x33, 0x4c, 0x66, 0x72, 0x7f, 0x8c, 0x99,
+    0xa5, 0xb2, 0xbf, 0xcc, 0xd8, 0xe5, 0xf2, 0xfc,
+};
+constexpr std::array<u8, 8> kDurationStandard{0x33, 0x66, 0x7f, 0x99, 0xb2, 0xcc, 0xe5, 0xfc};
+constexpr std::array<u8, 16> kVolumeIntelli{
+    0x19, 0x32, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98,
+    0xa5, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
+};
+constexpr std::array<u8, 8> kDurationIntelli{0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xfc};
+constexpr std::array<u8, 21> kPan{
+    0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29, 0x34, 0x42, 0x51,
+    0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
+};
+constexpr std::array<u8, 64> kIntelliFe3{
+    0x00, 0x0c, 0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x72, 0x75, 0x77, 0x70,
+    0x7c, 0x7f, 0x82, 0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b,
+    0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa, 0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc,
+    0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3, 0xd6, 0xd8, 0xdb, 0xdd,
+    0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
+};
+constexpr std::array<u8, 64> kIntelliFe4{
+    0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x6d, 0x70, 0x72, 0x75, 0x77, 0x70,
+    0x7c, 0x7f, 0x82, 0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b,
+    0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa, 0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc,
+    0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3, 0xd6, 0xd8, 0xdb, 0xdd,
+    0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
+};
+
+[[nodiscard]] constexpr double vibratoDepthCents(u8 depth) {
+  if (depth <= 0xf0) {
+    return ((0xffu * depth) >> 8) * (100.0 / 256.0);
+  }
+  return (0xffu * (depth & 0x0fu)) * (100.0 / 256.0);
+}
+
+[[nodiscard]] constexpr double vibratoRateHertz(u8 rate, u8 tempo) {
+  return (kTimerHertz * std::max<u8>(tempo, 1) * rate) / 65536.0;
+}
+
+[[nodiscard]] constexpr double vibratoDelaySeconds(u8 delay, u8 tempo) {
+  return (256.0 * delay) / (kTimerHertz * std::max<u8>(tempo, 1));
+}
+
+[[nodiscard]] constexpr u32 tempoMicrosecondsPerQuarter(u8 tempo) {
+  return tempo == 0 ? 60'000'000
+                    : static_cast<u32>(std::lround(24'576'000.0 / tempo));
+}
+
+[[nodiscard]] double legacyMidiGain(u8 raw) {
+  // The old exporter intentionally treated the driver's 0..255 byte as a
+  // seven-bit MIDI value by truncating it in half. Preserve that destination
+  // quantization while keeping the performance model in linear-gain space.
+  return LevelScale::linearFromMidi7(static_cast<u8>(raw / 2));
+}
+
+[[nodiscard]] double legacyMasterGain(u8 raw) {
+  // MIDI master volume is fourteen-bit, but the legacy path wrote a seven-bit
+  // value into its high byte. Encode that exact grid in the semantic gain.
+  return LevelScale::linearFromMidi14(static_cast<u16>(raw / 2) << 7);
+}
+
+[[nodiscard]] u8 midiAmountInRange(s32 current, s32 minimum, s32 range) {
+  if (range == 0) {
+    return 0;
+  }
+  const int value =
+      static_cast<int>(std::lround(128.0 * (current - minimum) / static_cast<double>(range)));
+  return static_cast<u8>(std::clamp(value, 0, 127));
+}
+
+[[nodiscard]] u8 vibratoDepthMidi(double cents, double maximumCents) {
+  if (cents <= 0.0 || maximumCents <= 0.0) {
+    return 0;
+  }
+  return static_cast<u8>(
+      std::clamp<int>(static_cast<int>(std::lround(128.0 * cents / maximumCents)), 0, 127));
+}
+
+[[nodiscard]] u8 vibratoRateMidi(double hertz, double maximumHertz) {
+  if (hertz <= 0.0 || maximumHertz <= 0.0) {
+    return 0;
+  }
+  const s32 minimum = synthAmountFromHertz(kAbsoluteMinimumVibratoRateHertz);
+  return midiAmountInRange(synthAmountFromHertz(hertz), minimum,
+                           synthAmountFromHertzRange(kAbsoluteMinimumVibratoRateHertz, maximumHertz));
+}
+
+[[nodiscard]] u8 vibratoDelayMidi(double seconds) {
+  const s32 minimum = synthAmountFromSeconds(synthSecondsRangeMinimum(0.0));
+  return midiAmountInRange(
+      synthAmountFromSeconds(synthSecondsRangeMinimum(seconds)), minimum,
+      synthAmountFromSecondsRange(0.0, kMaximumVibratoDelaySeconds));
+}
+
+struct PanGains {
+  double left = 1.0;
+  double right = 1.0;
+};
+
+[[nodiscard]] u8 panTableValue(const std::vector<u8>& table, u16 pan) {
+  if (table.empty()) {
+    return 0;
+  }
+  u8 index = static_cast<u8>(pan >> 8);
+  u8 fraction = static_cast<u8>(pan);
+  const u8 maximum = static_cast<u8>(table.size() - 1);
+  if (index > maximum) {
+    index = maximum;
+    fraction = 0;
+  }
+  const u8 current = table[index];
+  const u8 next = index < maximum ? table[index + 1] : current;
+  return static_cast<u8>(current + (((next - current) * fraction) >> 8));
+}
+
+[[nodiscard]] PanGains panGains(const Profile& selected, const std::vector<u8>& table, u8 rawPan) {
+  if (selected.pan == PanModel::ToseLinear) {
+    if (rawPan <= 10) {
+      return PanGains{
+          .left = (255 - 25 * (10 - rawPan)) / 256.0,
+          .right = 1.0,
+      };
+    }
+    return PanGains{
+        .left = 1.0,
+        .right = (255 - 25 * (rawPan - 10)) / 256.0,
+    };
+  }
+
+  const u8 index = std::min<u8>(rawPan & 0x1f, static_cast<u8>(table.size() - 1));
+  const u16 pan = static_cast<u16>(index) << 8;
+  const u16 maximum = static_cast<u16>(table.size() - 1) << 8;
+  PanGains gains{
+      .left = panTableValue(table, pan) / 128.0,
+      .right = panTableValue(table, maximum - pan) / 128.0,
+  };
+  if (selected.pan == PanModel::HalTable) {
+    std::swap(gains.left, gains.right);
+  }
+  return gains;
+}
+
+}  // namespace math
+
+enum class EventType : u8 {
+  Unknown0,
+  Unknown1,
+  Unknown2,
+  Unknown3,
+  Unknown4,
+  Nop,
+  Nop1,
+  End,
+  NoteParameter,
+  LemmingsNoteParameter,
+  IntelliNoteParameter,
+  Note,
+  Tie,
+  Rest,
+  Percussion,
+  Program,
+  Call,
+  Pan,
+  PanFade,
+  VibratoOn,
+  VibratoOff,
+  MasterVolume,
+  MasterVolumeFade,
+  Tempo,
+  TempoFade,
+  GlobalTranspose,
+  Transpose,
+  TremoloOn,
+  TremoloOff,
+  Volume,
+  VolumeFade,
+  VibratoFade,
+  PitchEnvelopeTo,
+  PitchEnvelopeFrom,
+  PitchEnvelopeOff,
+  Tuning,
+  EchoOn,
+  EchoOff,
+  EchoParameter,
+  EchoVolumeFade,
+  PitchSlide,
+  PercussionBase,
+  Rd2ProgramAndAdsr,
+  KonamiLoopStart,
+  KonamiLoopEnd,
+  KonamiAdsrGain,
+  QuintetTuning,
+  QuintetAdsr,
+  IntelliEchoOn,
+  IntelliEchoOff,
+  IntelliLegatoOn,
+  IntelliLegatoOff,
+  IntelliConditionalJump,
+  IntelliJump,
+  IntelliFe3F5,
+  IntelliWritePort,
+  IntelliFe3F9,
+  IntelliDefineVoice,
+  IntelliLoadVoice,
+  IntelliAdsr,
+  IntelliGainDurationRate,
+  IntelliGainDuration,
+  IntelliGain,
+  IntelliCustomPercussion,
+  IntelliTaSubevent,
+  IntelliFe4Subevent,
+};
+
+struct Status {
+  u8 noteMin = 0x80;
+  u8 noteMax = 0xc7;
+  u8 percussionMin = 0xca;
+  u8 percussionMax = 0xdf;
+};
+
+struct Definition {
+  Status status;
+  std::array<EventType, 256> events{};
+  std::vector<u8> volume;
+  std::vector<u8> duration;
+  std::vector<u8> pan;
+  std::vector<u8> intelliDurationVolume;
+};
+
+template <size_t Size>
+void useDefault(std::vector<u8>& destination, const std::array<u8, Size>& source) {
+  if (destination.empty()) {
+    destination.assign(source.begin(), source.end());
+  }
+}
+
+void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
+  constexpr std::array<EventType, 27> commands{
+      EventType::Program,          EventType::Pan,             EventType::PanFade,
+      EventType::VibratoOn,       EventType::VibratoOff,      EventType::MasterVolume,
+      EventType::MasterVolumeFade, EventType::Tempo,           EventType::TempoFade,
+      EventType::GlobalTranspose, EventType::Transpose,       EventType::TremoloOn,
+      EventType::TremoloOff,      EventType::Volume,          EventType::VolumeFade,
+      EventType::Call,            EventType::VibratoFade,     EventType::PitchEnvelopeTo,
+      EventType::PitchEnvelopeFrom, EventType::PitchEnvelopeOff, EventType::Tuning,
+      EventType::EchoOn,          EventType::EchoOff,         EventType::EchoParameter,
+      EventType::EchoVolumeFade,  EventType::PitchSlide,      EventType::PercussionBase,
+  };
+  for (u8 index = 0; index < commands.size(); ++index) {
+    events[static_cast<u8>(first + index)] = commands[index];
+  }
+}
+
+[[nodiscard]] Definition makeDefinition(const Layout& layout) {
+  const Profile& selected = profile(layout.profile);
+  Definition definition;
+  definition.events.fill(EventType::Unknown0);
+  definition.volume = layout.volumeTable;
+  definition.duration = layout.durationRateTable;
+
+  if (selected.base == BaseProfile::Earlier) {
+    definition.status = Status{.noteMin = 0x80, .noteMax = 0xc5, .percussionMin = 0xd0,
+                               .percussionMax = 0xd9};
+  }
+  definition.events[0] = EventType::End;
+  for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
+    definition.events[opcode] = EventType::NoteParameter;
+  }
+  for (u16 opcode = definition.status.noteMin; opcode <= definition.status.noteMax; ++opcode) {
+    definition.events[opcode] = EventType::Note;
+  }
+  definition.events[definition.status.noteMax + 1] = EventType::Tie;
+  definition.events[definition.status.noteMax + 2] = EventType::Rest;
+  for (u16 opcode = definition.status.percussionMin; opcode <= definition.status.percussionMax; ++opcode) {
+    definition.events[opcode] = EventType::Percussion;
+  }
+
+  if (selected.base == BaseProfile::Earlier) {
+    constexpr std::array<EventType, 25> earlier{
+        EventType::Program,          EventType::Pan,             EventType::PanFade,
+        EventType::PitchSlide,       EventType::VibratoOn,       EventType::VibratoOff,
+        EventType::MasterVolume,     EventType::MasterVolumeFade, EventType::Tempo,
+        EventType::TempoFade,        EventType::GlobalTranspose, EventType::TremoloOn,
+        EventType::TremoloOff,       EventType::Volume,          EventType::VolumeFade,
+        EventType::Call,             EventType::VibratoFade,     EventType::PitchEnvelopeTo,
+        EventType::PitchEnvelopeFrom, EventType::Unknown0,       EventType::Tuning,
+        EventType::EchoOn,           EventType::EchoOff,         EventType::EchoParameter,
+        EventType::EchoVolumeFade,
+    };
+    for (u8 index = 0; index < earlier.size(); ++index) {
+      definition.events[0xda + index] = earlier[index];
+    }
+    useDefault(definition.volume, math::kVolumeEarlier);
+    useDefault(definition.duration, math::kDurationEarlier);
+    useDefault(definition.pan, math::kPan);
+  } else if (selected.intelli == IntelliMode::Fe3) {
+    for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
+      definition.events[opcode] = EventType::IntelliNoteParameter;
+    }
+    loadStandardCommands(definition.events, 0xd6);
+    definition.events[0xf1] = EventType::IntelliEchoOn;
+    definition.events[0xf2] = EventType::IntelliEchoOff;
+    definition.events[0xf3] = EventType::IntelliLegatoOn;
+    definition.events[0xf4] = EventType::IntelliLegatoOff;
+    definition.events[0xf5] = EventType::IntelliFe3F5;
+    definition.events[0xf6] = EventType::IntelliWritePort;
+    definition.events[0xf7] = EventType::IntelliConditionalJump;
+    definition.events[0xf8] = EventType::IntelliJump;
+    definition.events[0xf9] = EventType::IntelliFe3F9;
+    definition.events[0xfa] = EventType::IntelliDefineVoice;
+    definition.events[0xfb] = EventType::IntelliLoadVoice;
+    definition.events[0xfc] = EventType::IntelliAdsr;
+    definition.events[0xfd] = EventType::IntelliGainDurationRate;
+    useDefault(definition.volume, math::kVolumeIntelli);
+    useDefault(definition.duration, math::kDurationIntelli);
+    useDefault(definition.intelliDurationVolume, math::kIntelliFe3);
+    useDefault(definition.pan, math::kPan);
+  } else if (selected.intelli == IntelliMode::Ta || selected.intelli == IntelliMode::Fe4) {
+    if (selected.intelli == IntelliMode::Fe4) {
+      for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
+        definition.events[opcode] = EventType::IntelliNoteParameter;
+      }
+    }
+    loadStandardCommands(definition.events, 0xda);
+    definition.events[0xf5] = EventType::IntelliEchoOn;
+    definition.events[0xf6] = EventType::IntelliEchoOff;
+    definition.events[0xf7] =
+        selected.intelli == IntelliMode::Ta ? EventType::IntelliAdsr : EventType::IntelliGain;
+    definition.events[0xf8] =
+        selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDurationRate : EventType::IntelliGain;
+    definition.events[0xf9] =
+        selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDuration : EventType::Unknown0;
+    definition.events[0xfa] = EventType::IntelliDefineVoice;
+    definition.events[0xfb] = EventType::IntelliLoadVoice;
+    definition.events[0xfc] = EventType::IntelliCustomPercussion;
+    definition.events[0xfd] =
+        selected.intelli == IntelliMode::Ta ? EventType::IntelliTaSubevent : EventType::IntelliFe4Subevent;
+    if (selected.intelli == IntelliMode::Ta) {
+      useDefault(definition.volume, math::kVolumeIntelli);
+      useDefault(definition.duration, math::kDurationIntelli);
+    } else {
+      useDefault(definition.intelliDurationVolume, math::kIntelliFe4);
+    }
+    useDefault(definition.pan, math::kPan);
+  } else {
+    loadStandardCommands(definition.events, 0xe0);
+    useDefault(definition.volume, math::kVolumeStandard);
+    useDefault(definition.duration, math::kDurationStandard);
+    useDefault(definition.pan, math::kPan);
+  }
+
+  switch (selected.id) {
+    case ProfileId::Rd1:
+      definition.events[0xfb] = EventType::Unknown2;
+      definition.events[0xfc] = EventType::Unknown0;
+      definition.events[0xfd] = EventType::Unknown0;
+      definition.events[0xfe] = EventType::Unknown0;
+      break;
+    case ProfileId::Rd2:
+      definition.events[0xfb] = EventType::Rd2ProgramAndAdsr;
+      definition.events[0xfd] = EventType::Program;
+      break;
+    case ProfileId::Konami:
+      definition.events[0xe4] = EventType::Unknown2;
+      definition.events[0xe5] = EventType::KonamiLoopStart;
+      definition.events[0xe6] = EventType::KonamiLoopEnd;
+      definition.events[0xe8] = EventType::Nop;
+      definition.events[0xe9] = EventType::Nop;
+      definition.events[0xf5] = EventType::Unknown0;
+      definition.events[0xf6] = EventType::Unknown0;
+      definition.events[0xf7] = EventType::Unknown0;
+      definition.events[0xf8] = EventType::Unknown0;
+      definition.events[0xfb] = EventType::KonamiAdsrGain;
+      definition.events[0xfc] = EventType::Nop;
+      definition.events[0xfd] = EventType::Nop;
+      definition.events[0xfe] = EventType::Nop;
+      break;
+    case ProfileId::Lemmings:
+      for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
+        definition.events[opcode] = EventType::LemmingsNoteParameter;
+      }
+      definition.events[0xe5] = EventType::Unknown1;
+      definition.events[0xe6] = EventType::Unknown2;
+      definition.events[0xfb] = EventType::Nop1;
+      definition.events[0xfc] = EventType::Unknown0;
+      definition.events[0xfd] = EventType::Unknown0;
+      definition.events[0xfe] = EventType::Unknown0;
+      break;
+    case ProfileId::QuintetIog:
+    case ProfileId::QuintetTs:
+      definition.events[0xf4] = EventType::QuintetTuning;
+      definition.events[0xff] = EventType::QuintetAdsr;
+      break;
+    default:
+      break;
+  }
+  return definition;
+}
+
+struct VoiceRecord {
+  u8 instrument = 0;
+  u8 volume = 0;
+  u8 pan = 0;
+  u8 tuningTranspose = 0;
+};
+
+struct PercussionEntry {
+  u8 patch = 0;
+  u8 note = 0;
+  u8 pan = 0;
+};
+
+struct VibratoConfig {
+  u8 delay = 0;
+  u8 rate = 0;
+  u8 depth = 0;
+  u8 fade = 0;
+
+  [[nodiscard]] bool active() const { return rate != 0 && depth != 0; }
+};
+
+struct ProgramState {
+  struct EchoChange {
+    u64 tick = 0;
+    u8 mask = 0;
+  };
+
+  struct TempoVibratoSync {
+    u64 tick = 0;
+    u32 trackNumber = 0;
+    VibratoConfig vibrato;
+    u8 tempo = kDefaultTempo;
+  };
+
+  explicit ProgramState(const SequenceProgram& program)
+      : selected(profile(static_cast<ProfileId>(program.config.profile))) {
+    for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
+      basePrograms[encoded] =
+          encoded < program.sourceProgramMap.size() ? program.sourceProgramMap[encoded].key : encoded;
+    }
+    for (const auto& track : program.tracks) {
+      for (const auto& command : track.commands) {
+        sourceRanges.emplace(command.address.value, command.range);
+      }
+    }
+    for (const SequenceDataBlock& block : program.dataBlocks) {
+      dataBlocks.emplace(block.address.value, block.bytes);
+    }
+    activeVibrato.resize(program.tracks.size());
+    resetRuntime();
+  }
+
+  void resetRuntime() {
+    tempo = kDefaultTempo;
+    globalTranspose = 0;
+    percussionBase = 0;
+    customNoteParameters = false;
+    customPercussion = false;
+    intelliFlags = 0;
+    voiceTableAddress.reset();
+    voiceTableSize = 0;
+    voiceTableDefined = false;
+    percussionTable = {};
+    programs = basePrograms;
+    nextOverrideProgram = 0x80;
+    std::ranges::fill(activeVibrato, VibratoConfig{});
+    tempoFade.reset(kDefaultTempo);
+    tempoFade.clearAutomation();
+    tempoFadeTrack.reset();
+  }
+
+  void setEcho(u64 tick, u8 mask) {
+    if (collecting) {
+      echoChanges.push_back(EchoChange{.tick = tick, .mask = mask});
+    }
+  }
+
+  void setTempo(u64 tick, u8 value) {
+    tempo = value;
+    for (u32 trackNumber = 0; trackNumber < activeVibrato.size(); ++trackNumber) {
+      const VibratoConfig& vibrato = activeVibrato[trackNumber];
+      if (!vibrato.active()) {
+        continue;
+      }
+      if (collecting) {
+        tempoVibratoSyncs.push_back(TempoVibratoSync{
+            .tick = tick,
+            .trackNumber = trackNumber,
+            .vibrato = vibrato,
+            .tempo = tempo,
+        });
+        recipes.maxVibratoRateHertz =
+            std::max(recipes.maxVibratoRateHertz,
+                     math::vibratoRateHertz(vibrato.rate, tempo));
+      }
+    }
+  }
+
+  void finalizePerformance(PerformanceSequence& performance) const {
+    u64 nextSequence = 0;
+    for (const PerformanceTrack& track : performance.tracks) {
+      for (const PerformanceEvent& event : track.events) {
+        nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
+      }
+    }
+
+    // EON is one DSP register write whose mask affects every voice. Materialize
+    // its eight channel results after independent track execution, including
+    // channels that were inactive when the source command ran.
+    for (PerformanceTrack& track : performance.tracks) {
+      for (const EchoChange& change : echoChanges) {
+        track.events.emplace_back(ReverbPerformanceEvent{
+            .header =
+                PerformanceEventHeader{
+                    .track = track.id,
+                    .tick = change.tick,
+                    .sequence = nextSequence++,
+                },
+            .send =
+                (change.mask & (1u << track.sourceTrackNumber)) != 0 ? 40.0 / 127.0 : 0.0,
+        });
+      }
+    }
+
+    for (const TempoVibratoSync& sync : tempoVibratoSyncs) {
+      const auto found = std::ranges::find(
+          performance.tracks, sync.trackNumber, &PerformanceTrack::sourceTrackNumber);
+      if (found == performance.tracks.end()) {
+        continue;
+      }
+      const double rate = math::vibratoRateHertz(sync.vibrato.rate, sync.tempo);
+      const u8 midiRate =
+          math::vibratoRateMidi(rate, recipes.maxVibratoRateHertz);
+      const double delaySeconds =
+          math::vibratoDelaySeconds(sync.vibrato.delay, sync.tempo);
+      const u32 delayTicks = static_cast<u32>(
+          std::lround(delaySeconds * 1'000'000.0 * kPpqn /
+                      math::tempoMicrosecondsPerQuarter(sync.tempo)));
+      const u8 midiDelay = math::vibratoDelayMidi(delaySeconds);
+
+      found->events.emplace_back(ModulationPerformanceEvent{
+          .header =
+              PerformanceEventHeader{
+                  .track = found->id,
+                  .tick = sync.tick,
+                  .sequence = nextSequence++,
+              },
+          .target = ModulationPerformanceTarget::VibratoRate,
+          .amount = midiRate / 127.0,
+          .frequencyHz = rate,
+      });
+      found->events.emplace_back(VibratoDelayPerformanceEvent{
+          .header =
+              PerformanceEventHeader{
+                  .track = found->id,
+                  .tick = sync.tick,
+                  .sequence = nextSequence++,
+              },
+          .delayTicks = delayTicks,
+          .midiValue = midiDelay,
+      });
+    }
+  }
+
+  [[nodiscard]] u32 resolveProgram(u8 encoded, u8 percussionMinimum, u8* logical = nullptr) const {
+    u8 index = encoded;
+    if (selected.programs != ProgramResolver::Direct && encoded >= 0x80) {
+      index = static_cast<u8>((encoded - percussionMinimum) + percussionBase);
+    }
+    if (logical != nullptr) {
+      // Quintet applies its base/lookup before exposing the logical instrument
+      // number. Keep that distinction from the encoded table index: percussion
+      // key assignment depends on the resolved logical number, while the
+      // program map still needs the encoded index.
+      *logical = (selected.programs == ProgramResolver::QuintetActRBase ||
+                  selected.programs == ProgramResolver::QuintetLookup)
+                     ? static_cast<u8>(basePrograms[index])
+                     : index;
+    }
+    return programs[index];
+  }
+
+  void observeVibrato(u32 trackNumber, VibratoConfig vibrato) {
+    if (trackNumber >= activeVibrato.size()) {
+      activeVibrato.resize(trackNumber + 1);
+    }
+    activeVibrato[trackNumber] = vibrato;
+    if (!collecting || !vibrato.active()) {
+      return;
+    }
+    recipes.maxVibratoDepthCents =
+        std::max(recipes.maxVibratoDepthCents, math::vibratoDepthCents(vibrato.depth));
+    recipes.maxVibratoRateHertz =
+        std::max(recipes.maxVibratoRateHertz, math::vibratoRateHertz(vibrato.rate, tempo));
+  }
+
+  [[nodiscard]] u32 registerOverride(u8 logical, const std::array<u8, 6>& data, Address sourceAddress) {
+    const u32 program = nextOverrideProgram++;
+    programs[logical] = program;
+    if (collecting) {
+      recipes.overrides.push_back(InstrumentOverride{
+          .logicalProgram = logical,
+          .program = program,
+          .regionData = data,
+          .source = sourceRanges.contains(sourceAddress.value) ? sourceRanges.at(sourceAddress.value) : SourceRange{},
+      });
+    }
+    return program;
+  }
+
+  void rememberStandardDrum(u8 logicalProgram, u32 sourceProgram, u8 key, s8 transpose) {
+    if (!collecting) {
+      return;
+    }
+    standardDrums[logicalProgram] = DrumSlot{
+        .key = key,
+        .sourceProgram = sourceProgram,
+        .sourceNote = 0x3c,
+        .globalTranspose = transpose,
+    };
+  }
+
+  [[nodiscard]] DrumKit currentIntelliDrumKit(u8 percussionMinimum) const {
+    DrumKit kit{
+        .pitchModel = DrumPitchModel::IntelliPlayedNote,
+    };
+    kit.slots.reserve(kIntelliDrumSlots);
+    const bool useCustom = (intelliFlags & 0x40) != 0;
+    for (u8 slot = 0; slot < kIntelliDrumSlots; ++slot) {
+      u8 patch = static_cast<u8>(percussionMinimum + slot);
+      u8 note = 0xa4;
+      if (useCustom) {
+        patch = percussionTable[slot].patch & 0xbf;
+        note = percussionTable[slot].note;
+      }
+      kit.slots.push_back(DrumSlot{
+          .key = static_cast<u8>(0x24 + slot),
+          .sourceProgram = resolveProgram(patch, percussionMinimum),
+          .sourceNote = note,
+      });
+    }
+    return kit;
+  }
+
+  [[nodiscard]] u8 ensureIntelliDrumKit(u8 percussionMinimum) {
+    DrumKit candidate = currentIntelliDrumKit(percussionMinimum);
+    const auto found = std::ranges::find_if(recipes.drumKits, [&](const DrumKit& kit) {
+      return kit.pitchModel == candidate.pitchModel && kit.slots == candidate.slots;
+    });
+    if (found != recipes.drumKits.end()) {
+      return found->program;
+    }
+    if (!collecting || recipes.drumKits.size() >= 0x80) {
+      return recipes.drumKits.empty() ? 0 : recipes.drumKits.back().program;
+    }
+    candidate.program = static_cast<u8>(recipes.drumKits.size());
+    recipes.drumKits.push_back(std::move(candidate));
+    return recipes.drumKits.back().program;
+  }
+
+  void finishPrepass(const PerformanceSequence& performance) {
+    if (!standardDrums.empty()) {
+      DrumKit kit{
+          .program = 0,
+          .pitchModel = DrumPitchModel::StandardMapping,
+      };
+      for (const auto& [_, slot] : standardDrums) {
+        kit.slots.push_back(slot);
+      }
+      recipes.drumKits.push_back(std::move(kit));
+    }
+    recipes.maxVibratoDepthCents = kMinimumVibratoDepthCents;
+    for (const PerformanceTrack& track : performance.tracks) {
+      for (const PerformanceEvent& event : track.events) {
+        const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+        if (modulation == nullptr ||
+            modulation->target != ModulationPerformanceTarget::VibratoDepth ||
+            !modulation->pitchDepthSemitones) {
+          continue;
+        }
+        recipes.maxVibratoDepthCents =
+            std::max(recipes.maxVibratoDepthCents,
+                     std::abs(*modulation->pitchDepthSemitones) * 100.0);
+      }
+    }
+    recipes.maxVibratoRateHertz =
+        std::max(recipes.maxVibratoRateHertz, kMinimumVibratoRateHertz);
+    collecting = false;
+    resetRuntime();
+  }
+
+  const Profile& selected;
+  std::array<u32, 256> basePrograms{};
+  std::array<u32, 256> programs{};
+  std::map<u64, SourceRange> sourceRanges;
+  std::map<u64, std::vector<u8>> dataBlocks;
+  u8 tempo = kDefaultTempo;
+  s8 globalTranspose = 0;
+  u8 percussionBase = 0;
+  bool customNoteParameters = false;
+  bool customPercussion = false;
+  u8 intelliFlags = 0;
+  bool voiceTableDefined = false;
+  std::optional<Address> voiceTableAddress;
+  u8 voiceTableSize = 0;
+  std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
+  u32 nextOverrideProgram = 0x80;
+  std::vector<EchoChange> echoChanges;
+  std::vector<TempoVibratoSync> tempoVibratoSyncs;
+  std::vector<VibratoConfig> activeVibrato;
+  std::map<u8, DrumSlot> standardDrums;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
+  std::optional<u32> tempoFadeTrack;
+  SequenceRecipes recipes;
+  bool collecting = true;
+};
+
+struct PitchEnvelope {
+  enum class Mode : u8 { None, To, From };
+  Mode mode = Mode::None;
+  u8 delay = 0;
+  u8 length = 0;
+  s8 semitones = 0;
+};
+
+struct PitchState {
+  static constexpr u16 kDefaultRangeCents = 200;
+
+  void reset() {
+    baseValid = false;
+    base = 0;
+    motion.reset();
+    rangeCents = kDefaultRangeCents;
+    bend = 0;
+  }
+
+  bool baseValid = false;
+  s32 base = 0;
+  SequenceLinearMotion<s32> motion;
+  u16 rangeCents = kDefaultRangeCents;
+  s16 bend = 0;
+};
+
+struct QueuedPitchSlide {
+  u8 delay = 0;
+  u8 length = 0;
+  u8 target = 0;
+  u64 sourceBegin = 0;
+  u64 sourceEnd = 0;
+};
+
+struct TrackState {
+  struct BoundaryState {
+    PitchState pitch;
+    VibratoConfig vibrato;
+    PerformanceBoundMotion<SequenceAutomatedValue<s32>> vibratoDepth;
+    u8 lastVibratoDepthMidi = 0;
+  };
+
+  TrackState(const SequenceProgram&, const TrackProgram& track) : trackNumber(track.sourceTrackNumber) {
+    resetSectionControllers();
+    vibratoDepth.reset(0);
+    pitch.reset();
+  }
+
+  void beginSection(std::optional<u64> sourceStop = std::nullopt) {
+    inPattern = false;
+    patternRemaining = 0;
+    lastWasPercussion = false;
+    melodicProgram = 0;
+    currentLogicalProgram.reset();
+    legato = false;
+    queuedPitchSlides.clear();
+    waitTicksRemaining = 0;
+    sectionSourceLimit = sourceStop;
+    discoveredSourceStop.reset();
+    boundaryHistory.clear();
+    // Legacy rebuilds its source-track parser for each section, but its MIDI
+    // track deliberately retains the most recent duration note. A tie at the
+    // start of the next section can therefore extend that note.
+    resetSectionControllers();
+  }
+
+  void observeSourceEnd(u64 end) {
+    discoveredSourceStop = std::max(discoveredSourceStop.value_or(0), end);
+  }
+
+  [[nodiscard]] bool sourceAllowed(u64 begin) const {
+    return !sectionSourceLimit || begin < *sectionSourceLimit;
+  }
+
+  [[nodiscard]] std::optional<u64> sectionSourceStop() const {
+    return discoveredSourceStop;
+  }
+
+  void reconcileAfterTrim(const PerformanceTrack& performance, u64 endTick) {
+    // The generic VM may realize a whole wait before another channel exposes
+    // an earlier shared section boundary. Events are trimmed by the VM; restore
+    // the persistent DSP pitch state to the same boundary so the next section
+    // does not inherit motion from ticks the source driver never processed.
+    const auto stateAtBoundary = boundaryHistory.upper_bound(endTick);
+    if (stateAtBoundary != boundaryHistory.begin()) {
+      const BoundaryState& state = std::prev(stateAtBoundary)->second;
+      pitch = state.pitch;
+      vibrato = state.vibrato;
+      vibratoDepth = state.vibratoDepth;
+      lastVibratoDepthMidi = state.lastVibratoDepthMidi;
+    }
+    boundaryHistory.erase(boundaryHistory.upper_bound(endTick),
+                          boundaryHistory.end());
+
+    u64 latestTick = 0;
+    u64 latestSequence = 0;
+    u8 depth = 0;
+    bool found = false;
+    for (const PerformanceEvent& event : performance.events) {
+      const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+      if (modulation == nullptr ||
+          modulation->target != ModulationPerformanceTarget::VibratoDepth ||
+          modulation->header.tick > endTick) {
+        continue;
+      }
+      if (!found || std::tie(modulation->header.tick, modulation->header.sequence) >
+                        std::tie(latestTick, latestSequence)) {
+        found = true;
+        latestTick = modulation->header.tick;
+        latestSequence = modulation->header.sequence;
+        depth = static_cast<u8>(std::clamp<int>(
+            static_cast<int>(std::lround(modulation->amount * 127.0)), 0, 127));
+      }
+    }
+    lastVibratoDepthMidi = depth;
+  }
+
+  void resetSectionControllers() {
+    // Legacy conversion creates a fresh SeqTrack view for every section. The
+    // musical driver state below persists, but slide interpolation starts from
+    // the MIDI defaults unless that section has already set the controller.
+    midiVolume = 100;
+    midiPan = 64;
+    midiMasterVolume = 127;
+  }
+
+  u32 trackNumber = 0;
+  u8 noteLength = 1;
+  u8 durationRate = 0xfc;
+  u8 velocity = 0xfc;
+  s8 transpose = 0;
+  bool legato = false;
+  bool inPattern = false;
+  u8 patternRemaining = 0;
+  Address patternStart;
+  Address konamiLoopStart;
+  VibratoConfig vibrato;
+  PitchEnvelope pitchEnvelope;
+  PitchState pitch;
+  std::map<u64, BoundaryState> boundaryHistory;
+  std::deque<QueuedPitchSlide> queuedPitchSlides;
+  u8 waitTicksRemaining = 0;
+  std::optional<u64> sectionSourceLimit;
+  std::optional<u64> discoveredSourceStop;
+  u32 melodicProgram = 0;
+  std::optional<u8> currentLogicalProgram;
+  bool lastWasPercussion = false;
+  u8 percussionProgram = 0;
+  PerformanceNoteId lastNote;
+  std::optional<double> lastKey;
+  u8 midiVolume = 100;
+  u8 midiPan = 64;
+  u8 midiMasterVolume = 127;
+  PerformanceBoundMotion<SequenceAutomatedValue<s32>> vibratoDepth;
+  u8 lastVibratoDepthMidi = 0;
+};
+
+struct Slide {
+  bool present = false;
+  u8 delay = 0;
+  u8 length = 0;
+  u8 target = 0;
+  u64 sourceBegin = 0;
+  u64 sourceEnd = 0;
+};
+
+struct Playback {
+  TrackState& track;
+  PerformanceEmitter& out;
+  VmApi& vm;
+  ProgramState& program;
+
+  [[nodiscard]] u8 soundingDuration() const {
+    if (track.legato) {
+      return track.noteLength;
+    }
+    const u8 scaled = static_cast<u8>((track.noteLength * track.durationRate) >> 8);
+    const u8 maximum = static_cast<u8>(track.noteLength - 2);
+    return std::min(std::max<u8>(scaled, 1), maximum);
+  }
+
+  void standardParameters(u8 duration, bool hasPacked, u8 durationValue, u8 velocityValue) {
+    track.noteLength = duration;
+    if (hasPacked) {
+      track.durationRate = durationValue;
+      track.velocity = velocityValue;
+    }
+  }
+
+  void lemmingsParameters(u8 duration, bool hasDuration, u8 durationValue, bool hasVelocity,
+                          u8 velocityValue) {
+    track.noteLength = duration;
+    if (hasDuration) {
+      track.durationRate = durationValue;
+    }
+    if (hasVelocity) {
+      track.velocity = velocityValue;
+    }
+  }
+
+  void beginIntelliParameters(u8 duration) { track.noteLength = duration; }
+
+  void intelliParameter(u8 raw, u8 resolved) {
+    if (raw < 0x40) {
+      track.durationRate = resolved;
+    } else {
+      track.velocity = resolved;
+    }
+  }
+
+  void fe3CustomParameter(u8 raw, u8 resolved) {
+    if (program.customNoteParameters) {
+      intelliParameter(raw, resolved);
+    }
+  }
+
+  void fe3StandardParameter(bool present, u8 durationRate, u8 velocity) {
+    if (!program.customNoteParameters || !present) {
+      if (present) {
+        track.durationRate = durationRate;
+        track.velocity = velocity;
+      }
+    }
+  }
+
+  [[nodiscard]] Effects fe3ParameterFlow(Address standardDestination, Address customDestination) {
+    return Effects{.step = vm.jump(program.customNoteParameters ? customDestination : standardDestination)};
+  }
+
+  void switchToMelodicProgram() {
+    if (track.lastWasPercussion) {
+      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.melodicProgram});
+      track.lastWasPercussion = false;
+    }
+  }
+
+  void melodicProgram(u8 encoded, u8 percussionMinimum) {
+    u8 logical = 0;
+    track.melodicProgram = program.resolveProgram(encoded, percussionMinimum, &logical);
+    track.currentLogicalProgram = logical;
+    if (!track.lastWasPercussion) {
+      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.melodicProgram});
+    }
+  }
+
+  void switchToDrumProgram(u8 drumProgram) {
+    if (!track.lastWasPercussion || track.percussionProgram != drumProgram) {
+      out.instrument(InstrumentIdentity{
+          .domain = std::string(kInstrumentDomain),
+          .key = drumInstrumentKey(drumProgram),
+      });
+      track.percussionProgram = drumProgram;
+    }
+    track.lastWasPercussion = true;
+  }
+
+  void emitPitchBend(s16 bend) {
+    if (track.pitch.bend == bend) {
+      return;
+    }
+    track.pitch.bend = bend;
+    out.pitchBend((static_cast<double>(bend) / 8192.0) *
+                  (track.pitch.rangeCents / 100.0));
+  }
+
+  [[nodiscard]] s16 currentPitchBend() const {
+    if (!track.pitch.baseValid) {
+      return 0;
+    }
+    const double cents =
+        (track.pitch.motion.current() - track.pitch.base) * (100.0 / 256.0);
+    return static_cast<s16>(std::clamp<s32>(
+        static_cast<s32>(std::lround((cents / track.pitch.rangeCents) * 8192.0)),
+        -8192, 8191));
+  }
+
+  void applyCurrentPitchBend() { emitPitchBend(currentPitchBend()); }
+
+  void setPitchBendRange(u16 cents) {
+    if (cents == 0 || cents == track.pitch.rangeCents) {
+      return;
+    }
+    track.pitch.rangeCents = cents;
+    out.pitchBendRange(PitchBendRangePerformanceEvent{.cents = cents});
+    if (track.pitch.baseValid) {
+      applyCurrentPitchBend();
+    }
+  }
+
+  void resetPitchForNote() {
+    track.pitch.motion.clear();
+    track.pitch.baseValid = false;
+    if (track.pitch.rangeCents == PitchState::kDefaultRangeCents &&
+        track.pitch.bend == 0) {
+      return;
+    }
+    if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None &&
+        track.pitchEnvelope.length != 0) {
+      emitPitchBend(0);
+      return;
+    }
+    setPitchBendRange(PitchState::kDefaultRangeCents);
+    emitPitchBend(0);
+  }
+
+  void activatePitchMotion(u8 delay, u8 length, s32 target) {
+    track.pitch.motion.clear();
+    if (!track.pitch.baseValid || length == 0) {
+      setPitchBendRange(PitchState::kDefaultRangeCents);
+      rememberBoundaryState();
+      return;
+    }
+
+    const s32 current = track.pitch.motion.current();
+    const double largestDeviation =
+        std::max(std::abs(static_cast<double>(current - track.pitch.base)),
+                 std::abs(static_cast<double>(target - track.pitch.base)));
+    const u16 range = std::max<u16>(
+        PitchState::kDefaultRangeCents,
+        static_cast<u16>(std::ceil(largestDeviation * (100.0 / 256.0))));
+    setPitchBendRange(range);
+    static_cast<void>(track.pitch.motion.begin(
+        SequenceMotionPlan<s32>::targetOverTicks(target, length, delay)));
+    applyCurrentPitchBend();
+    rememberBoundaryState();
+  }
+
+  void rememberBoundaryState() {
+    track.boundaryHistory[vm.tick()] = TrackState::BoundaryState{
+        .pitch = track.pitch,
+        .vibrato = track.vibrato,
+        .vibratoDepth = track.vibratoDepth,
+        .lastVibratoDepthMidi = track.lastVibratoDepthMidi,
+    };
+  }
+
+  void beginNotePitch(u8 rawNote) {
+    resetPitchForNote();
+    track.pitch.baseValid = true;
+    track.pitch.base = static_cast<s32>(rawNote & 0x7f) << 8;
+    track.pitch.motion.setCurrent(track.pitch.base);
+
+    if (track.pitchEnvelope.mode == PitchEnvelope::Mode::None ||
+        track.pitchEnvelope.length == 0) {
+      rememberBoundaryState();
+      return;
+    }
+    const s32 offset = static_cast<s32>(track.pitchEnvelope.semitones) << 8;
+    s32 target = track.pitch.base;
+    if (track.pitchEnvelope.mode == PitchEnvelope::Mode::To) {
+      target += offset;
+    } else {
+      track.pitch.motion.setCurrent(track.pitch.base - offset);
+    }
+    activatePitchMotion(track.pitchEnvelope.delay, track.pitchEnvelope.length, target);
+  }
+
+  void beginPitchSlide(const Slide& slide) {
+    if (!slide.present) {
+      return;
+    }
+    activatePitchMotion(slide.delay, slide.length,
+                        static_cast<s32>(slide.target & 0x7f) << 8);
+  }
+
+  void beginOrQueuePitchSlide(const Slide& slide) {
+    if (!slide.present) {
+      return;
+    }
+    if (!track.pitch.motion.active()) {
+      track.observeSourceEnd(slide.sourceEnd);
+      beginPitchSlide(slide);
+      return;
+    }
+    // F9 is stored immediately after a tie/rest. The SPC driver consumes it
+    // during that wait only after the preceding pitch motion finishes; if the
+    // wait expires first, F9 executes normally and replaces the old motion.
+    track.queuedPitchSlides.push_back(QueuedPitchSlide{
+        .delay = slide.delay,
+        .length = slide.length,
+        .target = slide.target,
+        .sourceBegin = slide.sourceBegin,
+        .sourceEnd = slide.sourceEnd,
+    });
+  }
+
+  void queuePitchSlide(u8 delay, u8 length, u8 target, u64 sourceBegin,
+                       u64 sourceEnd) {
+    track.queuedPitchSlides.push_back(QueuedPitchSlide{
+        .delay = delay,
+        .length = length,
+        .target = target,
+        .sourceBegin = sourceBegin,
+        .sourceEnd = sourceEnd,
+    });
+  }
+
+  void beginWait(u8 ticks) { track.waitTicksRemaining = ticks; }
+
+  void advancePitchMotion() {
+    const auto tick = track.pitch.motion.tick();
+    if (tick.status != SequenceMotionStatus::Inactive &&
+        tick.status != SequenceMotionStatus::Delayed) {
+      applyCurrentPitchBend();
+    }
+  }
+
+  [[nodiscard]] Effects note(u8 noteIndex, u64 sourceEnd, bool hasSlide,
+                             u8 slideDelay, u8 slideLength, u8 slideTarget,
+                             u64 slideSourceBegin, u64 slideSourceEnd) {
+    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget,
+                      slideSourceBegin, slideSourceEnd};
+    track.observeSourceEnd(sourceEnd);
+    switchToMelodicProgram();
+    const double key = kMelodicKeyCorrection + noteIndex + track.transpose;
+    beginNotePitch(noteIndex);
+    const auto note =
+        out.note(key, math::legacyMidiGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
+    // An inline F9 is only consumed while no pitch motion is active. A stored
+    // F1/F2 envelope starts at note-on first, so F9 must wait in source order
+    // until that envelope finishes; otherwise it starts immediately.
+    beginOrQueuePitchSlide(slide);
+    beginNoteVibrato();
+    track.lastNote = note;
+    track.lastKey = key;
+    track.lastWasPercussion = false;
+    beginWait(track.noteLength);
+    return Effects::wait(track.noteLength);
+  }
+
+  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli,
+                                   u64 sourceEnd, bool hasSlide, u8 slideDelay,
+                                   u8 slideLength, u8 slideTarget,
+                                   u64 slideSourceBegin, u64 slideSourceEnd) {
+    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget,
+                      slideSourceBegin, slideSourceEnd};
+    track.observeSourceEnd(sourceEnd);
+    const u8 duration = soundingDuration();
+    if (intelli) {
+      const bool custom = (program.intelliFlags & 0x40) != 0;
+      const PercussionEntry entry = program.percussionTable[slot];
+      const u8 patch = custom ? static_cast<u8>(entry.patch & 0xbf)
+                              : static_cast<u8>(percussionMinimum + slot);
+      if (custom && entry.pan < 0x80) {
+        const auto gains = math::panGains(program.selected, panTable, entry.pan);
+        out.stereoBalance(gains.left, gains.right);
+      }
+      if (custom) {
+        out.reverb((entry.patch & 0x40) != 0 ? 40.0 / 127.0 : 0.0);
+      }
+      static_cast<void>(program.resolveProgram(patch, percussionMinimum));
+      const u8 kit = program.ensureIntelliDrumKit(percussionMinimum);
+      switchToDrumProgram(kit);
+      const double key = 0x24 + slot - program.globalTranspose;
+      beginNotePitch(static_cast<u8>(0x24 + slot - program.globalTranspose));
+      track.lastNote = out.note(key, math::legacyMidiGain(track.velocity), duration);
+      track.lastKey = key;
+    } else {
+      u8 logical = 0;
+      const u32 sourceProgram =
+          program.resolveProgram(static_cast<u8>(slot + program.percussionBase), percussionMinimum, &logical);
+      const u8 key = static_cast<u8>(0x24 + logical - program.percussionBase);
+      program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose);
+      switchToDrumProgram(0);
+      const double outputKey = key - program.globalTranspose;
+      beginNotePitch(static_cast<u8>(key - program.globalTranspose));
+      track.lastNote = out.note(outputKey, math::legacyMidiGain(track.velocity), duration);
+      track.lastKey = outputKey;
+    }
+    beginOrQueuePitchSlide(slide);
+    track.lastWasPercussion = true;
+    beginWait(track.noteLength);
+    return Effects::wait(track.noteLength);
+  }
+
+  [[nodiscard]] Effects tie(u64 sourceEnd, bool hasSlide, u8 slideDelay,
+                            u8 slideLength, u8 slideTarget,
+                            u64 slideSourceBegin, u64 slideSourceEnd) {
+    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget,
+                      slideSourceBegin, slideSourceEnd};
+    track.observeSourceEnd(sourceEnd);
+    if (track.lastKey) {
+      track.lastNote = out.note(*track.lastKey, math::legacyMidiGain(track.velocity), soundingDuration(), true);
+    }
+    beginOrQueuePitchSlide(slide);
+    beginWait(track.noteLength);
+    return Effects::wait(track.noteLength);
+  }
+
+  [[nodiscard]] Effects rest(u64 sourceEnd, bool hasSlide, u8 slideDelay,
+                             u8 slideLength, u8 slideTarget,
+                             u64 slideSourceBegin, u64 slideSourceEnd) {
+    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget,
+                      slideSourceBegin, slideSourceEnd};
+    track.observeSourceEnd(sourceEnd);
+    beginOrQueuePitchSlide(slide);
+    // A rest purges the legacy track's pending duration notes. A later tie
+    // must not reach backward across that silence.
+    track.lastNote = {};
+    track.lastKey.reset();
+    beginWait(track.noteLength);
+    return Effects::wait(track.noteLength);
+  }
+
+  void pitchSlide(u8 delay, u8 length, u8 target) {
+    beginPitchSlide(Slide{.present = true, .delay = delay, .length = length, .target = target});
+  }
+
+  void beginPattern(u8 times, Address destination) {
+    track.inPattern = true;
+    track.patternRemaining = times;
+    track.patternStart = destination;
+  }
+
+  [[nodiscard]] Effects endOrReturn() {
+    if (!track.inPattern) {
+      return Effects{.step = vm.endSection()};
+    }
+    if (track.patternRemaining > 1) {
+      --track.patternRemaining;
+      return Effects{.step = vm.jump(track.patternStart)};
+    }
+    track.inPattern = false;
+    track.patternRemaining = 0;
+    return Effects{.step = vm.return_()};
+  }
+
+  [[nodiscard]] u8 midiPan(u8 value) const {
+    const auto gains = math::panGains(program.selected, panTable, value);
+    if (gains.right == 0.0) {
+      return 0;
+    }
+    if (gains.left == gains.right) {
+      return 64;
+    }
+    if (gains.left == 0.0) {
+      return 127;
+    }
+    constexpr double kPiOverTwo = 1.57079632679489661923;
+    u8 result = static_cast<u8>(std::clamp<int>(
+        static_cast<int>(std::lround((std::atan2(gains.right, gains.left) / kPiOverTwo) * 126.0)),
+        0, 126));
+    if (result != 0) {
+      ++result;
+    }
+    return result;
+  }
+
+  void pan(u8 value) {
+    track.midiPan = midiPan(value);
+    const auto gains = math::panGains(program.selected, panTable, value);
+    out.stereoBalance(gains.left, gains.right);
+  }
+
+  void panFade(u8 length, u8 value) {
+    if (length == 0) {
+      // SeqTrack's historical controller-slide helper updates its cached
+      // endpoint but emits no sample for a zero-length slide. Preserve that
+      // established conversion behavior (tempo fades intentionally differ).
+      track.midiPan = midiPan(value);
+      return;
+    }
+    const u8 target = midiPan(value);
+    const auto automation =
+        out.fade(PerformanceAutomationTarget::Pan, (target / 63.5) - 1.0, length);
+    scheduleControllerFade(track.midiPan, target, length, [&](u64 tick, u8 sample) {
+      automation.output(out.at(tick)).pan(PanPerformanceEvent{
+          .stereoPosition = (sample / 63.5) - 1.0,
+          .law = PanLaw::EqualPower,
+          .preserveLinearGain = true,
+      });
+    });
+    track.midiPan = target;
+  }
+
+  void vibratoOn(u8 delay, u8 rate, u8 depth) {
+    track.vibrato = VibratoConfig{.delay = delay, .rate = rate, .depth = depth};
+    track.vibratoDepth.setCurrent(depth);
+    track.vibratoDepth.clearAutomation();
+    program.observeVibrato(track.trackNumber, track.vibrato);
+    emitConfiguredVibrato();
+    rememberBoundaryState();
+  }
+
+  void vibratoOff() {
+    track.vibrato = {};
+    track.vibratoDepth.setCurrent(0);
+    track.vibratoDepth.clearAutomation();
+    program.observeVibrato(track.trackNumber, track.vibrato);
+    emitConfiguredVibrato();
+    rememberBoundaryState();
+  }
+
+  void vibratoFade(u8 length) {
+    track.vibrato.fade = length;
+    rememberBoundaryState();
+  }
+
+  void emitVibratoDepth(u8 rawDepth, PerformanceEmitter output) {
+    const double depth = math::vibratoDepthCents(rawDepth);
+    const u8 midiDepth = math::vibratoDepthMidi(depth, program.recipes.maxVibratoDepthCents);
+    if (midiDepth == track.lastVibratoDepthMidi) {
+      return;
+    }
+    track.lastVibratoDepthMidi = midiDepth;
+    output.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoDepth,
+        .amount = midiDepth / 127.0,
+        .pitchDepthSemitones = depth / 100.0,
+        .controllerRangeMaxAmount = 1.0,
+    });
+  }
+
+  void emitVibratoRateAndDelay() {
+    const bool active = track.vibrato.active();
+    const double rate = active ? math::vibratoRateHertz(track.vibrato.rate, program.tempo) : 0.0;
+    const u8 midiRate = active ? math::vibratoRateMidi(rate, program.recipes.maxVibratoRateHertz) : 0;
+    out.modulation(ModulationPerformanceEvent{
+        .target = ModulationPerformanceTarget::VibratoRate,
+        .amount = midiRate / 127.0,
+        .frequencyHz = rate,
+    });
+    const double delaySeconds =
+        active ? math::vibratoDelaySeconds(track.vibrato.delay, program.tempo) : 0.0;
+    const u32 delayTicks = active
+                               ? static_cast<u32>(std::lround(delaySeconds * 1'000'000.0 * kPpqn /
+                                                             math::tempoMicrosecondsPerQuarter(program.tempo)))
+                               : 0;
+    out.vibratoDelay(delayTicks, active ? math::vibratoDelayMidi(delaySeconds) : 0);
+  }
+
+  void emitConfiguredVibrato() {
+    emitVibratoDepth(track.vibrato.active() ? track.vibrato.depth : 0, out);
+    emitVibratoRateAndDelay();
+  }
+
+  void beginNoteVibrato() {
+    if (!track.vibrato.active() || track.vibrato.fade == 0) {
+      return;
+    }
+    track.vibratoDepth.setCurrent(0);
+    const s32 target = track.vibrato.depth;
+    track.vibratoDepth.begin(
+        out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, 1.0, track.vibrato.fade,
+                         track.vibrato.delay),
+        SequenceMotionPlan<s32>::targetOverTicksWithStep(
+            target, target / static_cast<s32>(track.vibrato.fade), track.vibrato.fade,
+            track.vibrato.delay));
+    emitVibratoDepth(0, track.vibratoDepth.output(out));
+    rememberBoundaryState();
+  }
+
+  void tempo(u8 value) {
+    program.tempoFade.setCurrentRaw(value);
+    program.tempoFade.clearAutomation();
+    program.tempoFadeTrack.reset();
+    program.setTempo(vm.tick(), value);
+    out.tempo(TempoPerformanceEvent{
+        .microsecondsPerQuarter = math::tempoMicrosecondsPerQuarter(value),
+        .force = true,
+    });
+  }
+
+  void tempoFade(u8 length, u8 value) {
+    if (length == 0) {
+      tempo(value);
+      return;
+    }
+    program.tempoFade.setCurrentRaw(program.tempo);
+    program.tempoFade.begin(
+        out.fade(PerformanceAutomationTarget::Tempo,
+                 static_cast<double>(math::tempoMicrosecondsPerQuarter(value)), length),
+        SequenceFixedPointMotion<s32>::toRawTarget(value, length));
+    program.tempoFadeTrack = track.trackNumber;
+  }
+
+  void volume(u8 value) {
+    const u8 midi = static_cast<u8>(value / 2);
+    track.midiVolume = midi;
+    out.level(LevelScale::linearFromMidi7(midi));
+  }
+
+  void volumeFade(u8 length, u8 value) {
+    if (length == 0) {
+      track.midiVolume = static_cast<u8>(value / 2);
+      return;
+    }
+    const u8 target = static_cast<u8>(value / 2);
+    const auto automation =
+        out.fade(PerformanceAutomationTarget::Level, LevelScale::linearFromMidi7(target), length);
+    scheduleControllerFade(track.midiVolume, target, length, [&](u64 tick, u8 sample) {
+      automation.output(out.at(tick)).level(LevelScale::linearFromMidi7(sample));
+    });
+    track.midiVolume = target;
+  }
+
+  void masterVolume(u8 value) {
+    const u8 midi = static_cast<u8>(value / 2);
+    track.midiMasterVolume = midi;
+    out.masterLevel(math::legacyMasterGain(value));
+  }
+
+  void masterVolumeFade(u8 length, u8 value) {
+    if (length == 0) {
+      track.midiMasterVolume = static_cast<u8>(value / 2);
+      return;
+    }
+    const u8 target = static_cast<u8>(value / 2);
+    const auto automation =
+        out.fade(PerformanceAutomationTarget::MasterLevel,
+                 LevelScale::linearFromMidi14(static_cast<u16>(target) << 7), length);
+    scheduleControllerFade(track.midiMasterVolume, target, length, [&](u64 tick, u8 sample) {
+      automation.output(out.at(tick)).masterLevel(
+          LevelScale::linearFromMidi14(static_cast<u16>(sample) << 7));
+    });
+    track.midiMasterVolume = target;
+  }
+
+  template <typename Emit>
+  void scheduleControllerFade(u8 start, u8 target, u8 length, Emit&& emit) {
+    // SeqTrack's historical MIDI slide is part of the compatibility contract:
+    // each sample is rounded from the original endpoints (not accumulated),
+    // the first sample occurs on the command tick, and duplicate rounded
+    // samples after the first are suppressed.
+    const double increment =
+        static_cast<double>(static_cast<int>(target) - static_cast<int>(start)) / length;
+    int previous = -1;
+    for (u32 index = 0; index < length; ++index) {
+      const int sample = std::clamp<int>(
+          static_cast<int>(std::round(start + increment * (index + 1))), 0, 127);
+      if (sample != previous) {
+        std::forward<Emit>(emit)(vm.tick() + index, static_cast<u8>(sample));
+        previous = sample;
+      }
+    }
+  }
+
+  void advanceTempoFade(u64 tick) {
+    static_cast<void>(program.tempoFade.tickRaw([&](s32 raw) {
+      const u8 value = static_cast<u8>(std::clamp<s32>(raw, 0, 0xff));
+      program.setTempo(tick, value);
+      program.tempoFade.output(out).tempo(math::tempoMicrosecondsPerQuarter(value));
+    }));
+    if (!program.tempoFade.active()) {
+      program.tempoFadeTrack.reset();
+    }
+  }
+
+  void advanceVibratoFade() {
+    const auto tick = track.vibratoDepth.tick();
+    if (!tick.shouldApply()) {
+      return;
+    }
+    const u8 value =
+        static_cast<u8>(std::clamp<s32>(tick.current, 0, track.vibrato.depth));
+    track.vibratoDepth.setCurrentPreservingMotion(value);
+    emitVibratoDepth(value, track.vibratoDepth.output(out));
+  }
+
+  void tick() {
+    advanceVibratoFade();
+    advancePitchMotion();
+    if (!track.queuedPitchSlides.empty() && !track.pitch.motion.active() &&
+        track.waitTicksRemaining > 1) {
+      const QueuedPitchSlide queued = track.queuedPitchSlides.front();
+      track.queuedPitchSlides.pop_front();
+      track.observeSourceEnd(queued.sourceEnd);
+      activatePitchMotion(queued.delay, queued.length,
+                          static_cast<s32>(queued.target & 0x7f) << 8);
+    }
+    if (track.waitTicksRemaining <= 1) {
+      // Once the wait expires the parser reaches every still-queued F9 at the
+      // same source tick. Unlike the tick-begin shortcut above, normal parser
+      // execution honors the section's learned source boundary. Each allowed
+      // F9 replaces the previous motion, so the last one is the state carried
+      // into the next tick.
+      while (!track.queuedPitchSlides.empty()) {
+        const QueuedPitchSlide queued = track.queuedPitchSlides.front();
+        track.queuedPitchSlides.pop_front();
+        if (!track.sourceAllowed(queued.sourceBegin)) {
+          continue;
+        }
+        track.observeSourceEnd(queued.sourceEnd);
+        activatePitchMotion(queued.delay, queued.length,
+                            static_cast<s32>(queued.target & 0x7f) << 8);
+      }
+    }
+    if (track.waitTicksRemaining != 0) {
+      --track.waitTicksRemaining;
+    }
+    rememberBoundaryState();
+  }
+
+  void endTick(u64 tick) {
+    // Tempo fades are advanced by the SPC driver's sequence-level tick-end
+    // hook, after every active voice has run. If a voice ends the section,
+    // that hook is skipped and the fade resumes at the next section's tick.
+    if (program.tempoFadeTrack == track.trackNumber) {
+      advanceTempoFade(tick);
+    }
+  }
+
+  void globalTranspose(s8 semitones) {
+    program.globalTranspose = semitones;
+    out.globalTranspose(semitones);
+  }
+
+  void echo(u8 channels) {
+    program.setEcho(vm.tick(), channels);
+  }
+
+  void percussionBase(u8 base) {
+    program.percussionBase = base;
+    if (program.selected.intelli == IntelliMode::Ta) {
+      program.intelliFlags &= static_cast<u8>(~0x40);
+    }
+  }
+
+  void pitchEnvelope(PitchEnvelope::Mode mode, u8 delay, u8 length, s8 semitones) {
+    track.pitchEnvelope = PitchEnvelope{mode, delay, length, semitones};
+  }
+
+  void pitchEnvelopeOff() { track.pitchEnvelope = {}; }
+
+  [[nodiscard]] Effects konamiLoop(u8 times, Address destination) {
+    return vm.countedRepeatUntil(0, times == 0 ? 256 : times, destination);
+  }
+
+  void defineVoiceTable(Address address, u8 size) {
+    program.voiceTableAddress = address;
+    program.voiceTableSize = size;
+    program.voiceTableDefined = true;
+  }
+
+  void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchLow,
+                           u8 pitchHigh, Address sourceAddress) {
+    const u32 newProgram = program.registerOverride(
+        logical, std::array<u8, 6>{srcn, adsr1, adsr2, gain, pitchLow, pitchHigh}, sourceAddress);
+    if (track.currentLogicalProgram == logical) {
+      track.melodicProgram = newProgram;
+      if (!track.lastWasPercussion) {
+        out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = newProgram});
+      }
+    }
+  }
+
+  void loadVoice(u8 index, u8 percussionMinimum, IntelliMode mode) {
+    if (!program.voiceTableDefined || !program.voiceTableAddress ||
+        (mode == IntelliMode::Fe3 && index >= program.voiceTableSize)) {
+      return;
+    }
+    const auto block = program.dataBlocks.find(program.voiceTableAddress->value);
+    const size_t offset = static_cast<size_t>(index) * 4;
+    if (block == program.dataBlocks.end() || offset + 4 > block->second.size()) {
+      return;
+    }
+    const VoiceRecord record{
+        .instrument = block->second[offset],
+        .volume = block->second[offset + 1],
+        .pan = block->second[offset + 2],
+        .tuningTranspose = block->second[offset + 3],
+    };
+    const u8 midiVolume = static_cast<u8>(record.volume / 2);
+    track.midiVolume = midiVolume;
+    out.level(LevelScale::linearFromMidi7(midiVolume));
+    const u8 pan = mode == IntelliMode::Fe3 ? record.pan : record.pan & 0x1f;
+    const auto gains = math::panGains(program.selected, panTable, pan);
+    track.midiPan = midiPan(pan);
+    out.stereoBalance(gains.left, gains.right);
+
+    double tuningCents = 0.0;
+    s8 transpose = track.transpose;
+    if (mode == IntelliMode::Fe3) {
+      constexpr std::array<s8, 7> transposes{-24, -12, -1, 0, 1, 12, 24};
+      const u8 tuning = record.tuningTranspose & 0x0f;
+      const u8 transposeIndex = (record.tuningTranspose >> 4) & 7;
+      if (tuning != 0) {
+        tuningCents = ((tuning - 1) * 5 / 256.0) * 100.0;
+      }
+      if (transposeIndex != 0) {
+        transpose = transposes[transposeIndex - 1];
+      }
+    } else {
+      tuningCents = (((record.pan >> 5) & 7) * 5 / 256.0) * 100.0;
+      transpose = static_cast<s8>(record.tuningTranspose);
+    }
+    track.transpose = transpose;
+    out.tuning(tuningCents);
+    melodicProgram(record.instrument, percussionMinimum);
+  }
+
+  void clearPercussionTable() { program.percussionTable = {}; }
+
+  void percussionEntry(u8 slot, u8 patch, u8 note, u8 pan) {
+    if (slot < program.percussionTable.size()) {
+      program.percussionTable[slot] = PercussionEntry{patch, note, pan};
+    }
+  }
+
+  void enableCustomPercussion() {
+    program.intelliFlags |= 0x40;
+    program.customPercussion = true;
+  }
+
+  void intelliFlags(u8 mask, bool enabled) {
+    if (enabled) {
+      program.intelliFlags |= mask;
+    } else {
+      program.intelliFlags &= static_cast<u8>(~mask);
+    }
+  }
+
+  void fe3Flags(u8 param) {
+    if (param < 0xf0) {
+      return;
+    }
+    const bool enabled = (param & 8) == 0;
+    switch (param & 7) {
+      case 0:
+        program.customPercussion = enabled;
+        break;
+      case 7:
+        program.customNoteParameters = enabled;
+        break;
+      default:
+        break;
+    }
+  }
+
+  const std::vector<u8>& panTable = defaultPanTable();
+
+  [[nodiscard]] static const std::vector<u8>& defaultPanTable() {
+    static const std::vector<u8> table(math::kPan.begin(), math::kPan.end());
+    return table;
+  }
+};
+
+using Cursor = CompilerCursor<TrackState, Playback>;
+
+struct DecodeContext {
+  ByteReader reader;
+  const Layout& layout;
+  const Profile& selected;
+  const Definition& definition;
+  std::vector<SequenceDataBlock>* dataBlocks = nullptr;
+  std::vector<Diagnostic>* diagnostics = nullptr;
+
+  [[nodiscard]] Address address(u16 raw) const {
+    return Address{convertAddress(selected, raw, layout.konamiBaseAddress, layout.falcomBaseOffset)};
+  }
+};
+
+[[nodiscard]] Slide readSlide(Cursor::Event& event, u64 sourceBegin,
+                              std::string_view prefix = {}) {
+  Slide slide{
+      .present = true,
+      .delay = event.u8(fmt::format("{}delay", prefix), SemanticOperandRole::Duration),
+      .length = event.u8(fmt::format("{}length", prefix), SemanticOperandRole::Duration),
+      .target = event.u8(fmt::format("{}target_note", prefix), SourceValueDisplay::MidiNote,
+                         SemanticOperandRole::NoteKey),
+      .sourceBegin = sourceBegin,
+  };
+  slide.sourceEnd = event.nextAddress().value;
+  return slide;
+}
+
+[[nodiscard]] std::vector<Slide> readInlineSlides(Cursor::Event& event,
+                                                  const Definition& definition) {
+  std::vector<Slide> slides;
+  while (const auto opcode = event.peekU8()) {
+    if (definition.events[*opcode] != EventType::PitchSlide) {
+      break;
+    }
+    const std::string prefix = fmt::format("pitch_slide_{}_", slides.size() + 1);
+    const u64 sourceBegin = event.nextAddress().value;
+    event.u8(fmt::format("{}opcode", prefix), SourceValueDisplay::Hex);
+    slides.push_back(readSlide(event, sourceBegin, prefix));
+  }
+  return slides;
+}
+
+void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) {
+  for (size_t index = 1; index < slides.size(); ++index) {
+    const Slide& slide = slides[index];
+    event.invoke<&Playback::queuePitchSlide>(
+        slide.delay, slide.length, slide.target, slide.sourceBegin,
+        slide.sourceEnd);
+  }
+}
+
+[[nodiscard]] DecodedBytecodeCommand unknownCommand(Cursor& cursor, u8 arguments) {
+  auto event = cursor.sourceOnly("Unknown Event", "unknown");
+  for (u8 index = 0; index < arguments; ++index) {
+    event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex);
+  }
+  return event.ignore();
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeNoteParameters(Cursor& cursor, const DecodeContext& context,
+                                                          EventType type, u32 begin) {
+  auto event = cursor.command("Note Parameters", SequenceSemantic::State);
+  const u8 duration =
+      event.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal, SemanticOperandRole::Duration);
+
+  if (type == EventType::LemmingsNoteParameter) {
+    bool hasDuration = false;
+    bool hasVelocity = false;
+    u8 durationRate = 0;
+    u8 velocity = 0;
+    if (event.peekU8() <= 0x7f) {
+      hasDuration = true;
+      const u8 raw = event.u8("duration_rate", SemanticOperandRole::Duration);
+      durationRate = static_cast<u8>((raw << 1) + (raw >> 1) + (raw & 1));
+      event.derived("resolved_duration_rate", durationRate, SemanticOperandRole::Duration);
+      if (event.peekU8() <= 0x7f) {
+        hasVelocity = true;
+        velocity = static_cast<u8>(event.u8("velocity", SemanticOperandRole::Level) << 1);
+        event.derived("resolved_velocity", velocity, SemanticOperandRole::Level);
+      }
+    }
+    return event.invoke<&Playback::lemmingsParameters>(duration, hasDuration, durationRate, hasVelocity,
+                                                       velocity);
+  }
+
+  if (type == EventType::NoteParameter) {
+    bool present = false;
+    u8 packed = 0;
+    u8 durationRate = 0;
+    u8 velocity = 0;
+    if (event.peekU8() <= 0x7f) {
+      present = true;
+      packed = event.u8("quantize_velocity", SourceValueDisplay::Hex);
+      durationRate = context.definition.duration[(packed >> 4) & 7];
+      velocity = context.definition.volume[packed & 15];
+      event.derived("duration_rate", durationRate, SemanticOperandRole::Duration);
+      event.derived("velocity", velocity, SemanticOperandRole::Level);
+    }
+    return event.invoke<&Playback::standardParameters>(duration, present, durationRate, velocity);
+  }
+
+  event.invoke<&Playback::beginIntelliParameters>(duration);
+  std::vector<std::pair<u8, u8>> parameters;
+  while (event.peekU8() <= 0x7f && parameters.size() < 0x80) {
+    const u8 raw = event.u8(fmt::format("parameter_{}", parameters.size() + 1), SourceValueDisplay::Hex);
+    const u8 resolved = context.definition.intelliDurationVolume[raw & 0x3f];
+    event.derived(fmt::format("resolved_{}", parameters.size() + 1), resolved,
+                  raw < 0x40 ? SemanticOperandRole::Duration : SemanticOperandRole::Level);
+    parameters.emplace_back(raw, resolved);
+  }
+
+  if (context.selected.intelli != IntelliMode::Fe3) {
+    for (const auto& [raw, resolved] : parameters) {
+      event.invoke<&Playback::intelliParameter>(raw, resolved);
+    }
+    return event;
+  }
+
+  // FE3 can switch between the ordinary packed byte and its variable-length
+  // parameter stream at runtime. Decode both exits and let the semantic action
+  // choose one; this is the only overlapping command shape in the driver.
+  const bool hasPacked = !parameters.empty();
+  const u8 packed = hasPacked ? parameters.front().first : 0;
+  const u8 standardDuration = hasPacked ? context.definition.duration[(packed >> 4) & 7] : 0;
+  const u8 standardVelocity = hasPacked ? context.definition.volume[packed & 15] : 0;
+  event.invoke<&Playback::fe3StandardParameter>(hasPacked, standardDuration, standardVelocity);
+  for (const auto& [raw, resolved] : parameters) {
+    event.invoke<&Playback::fe3CustomParameter>(raw, resolved);
+  }
+  const Address standardDestination{begin + 1 + (hasPacked ? 1u : 0u)};
+  const Address customDestination = event.nextAddress();
+  event.invoke<&Playback::fe3ParameterFlow>(standardDestination, customDestination);
+  event.mayBranchTo(standardDestination, SemanticOperandRole::JumpTarget);
+  return event.runtimeControlFlow();
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(const DecodeContext& context, u32 begin) {
+  Cursor cursor(context.reader, begin, "nin-snes", context.diagnostics);
+  if (!cursor.hasOpcode()) {
+    return cursor.truncated();
+  }
+
+  const u8 opcode = cursor.opcode();
+  const EventType type = context.definition.events[opcode];
+  if (type == EventType::NoteParameter || type == EventType::LemmingsNoteParameter ||
+      type == EventType::IntelliNoteParameter) {
+    return decodeNoteParameters(cursor, context, type, begin);
+  }
+
+  switch (type) {
+    case EventType::End: {
+      auto event = cursor.command("Section End / Pattern Return", SequenceSemantic::End);
+      event.invoke<&Playback::endOrReturn>();
+      return event.discoverReturn();
+    }
+    case EventType::Note: {
+      auto event = cursor.command("Note", SequenceSemantic::Note);
+      const u8 key = event.opcodeValue("key", static_cast<u8>(opcode - context.definition.status.noteMin),
+                                       SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+      const std::vector<Slide> slides = readInlineSlides(event, context.definition);
+      const Slide first = slides.empty() ? Slide{} : slides.front();
+      event.invoke<&Playback::note>(
+          key, static_cast<u64>(begin + 1), first.present, first.delay,
+          first.length, first.target, first.sourceBegin, first.sourceEnd);
+      appendQueuedSlides(event, slides);
+      return event;
+    }
+    case EventType::Tie: {
+      auto event = cursor.command("Tie", SequenceSemantic::Note);
+      const std::vector<Slide> slides = readInlineSlides(event, context.definition);
+      const Slide first = slides.empty() ? Slide{} : slides.front();
+      event.invoke<&Playback::tie>(
+          static_cast<u64>(begin + 1), first.present, first.delay,
+          first.length, first.target, first.sourceBegin, first.sourceEnd);
+      appendQueuedSlides(event, slides);
+      return event;
+    }
+    case EventType::Rest: {
+      auto event = cursor.command("Rest", SequenceSemantic::Rest);
+      const std::vector<Slide> slides = readInlineSlides(event, context.definition);
+      const Slide first = slides.empty() ? Slide{} : slides.front();
+      event.invoke<&Playback::rest>(
+          static_cast<u64>(begin + 1), first.present, first.delay,
+          first.length, first.target, first.sourceBegin, first.sourceEnd);
+      appendQueuedSlides(event, slides);
+      return event;
+    }
+    case EventType::Percussion: {
+      auto event = cursor.command("Percussion Note", SequenceSemantic::Note);
+      const u8 slot =
+          event.opcodeValue("slot", static_cast<u8>(opcode - context.definition.status.percussionMin),
+                            SourceValueDisplay::Decimal, SemanticOperandRole::NoteKey);
+      const bool intelli = (context.selected.intelli == IntelliMode::Ta ||
+                            context.selected.intelli == IntelliMode::Fe4) &&
+                           slot < kIntelliDrumSlots;
+      const std::vector<Slide> slides = readInlineSlides(event, context.definition);
+      const Slide first = slides.empty() ? Slide{} : slides.front();
+      event.invoke<&Playback::percussion>(
+          slot, context.definition.status.percussionMin, intelli,
+          static_cast<u64>(begin + 1), first.present, first.delay,
+          first.length, first.target, first.sourceBegin, first.sourceEnd);
+      appendQueuedSlides(event, slides);
+      return event;
+    }
+    case EventType::Program:
+    case EventType::Rd2ProgramAndAdsr: {
+      auto event = cursor.command(type == EventType::Program ? "Program" : "Program And ADSR",
+                                  SequenceSemantic::Program);
+      const u8 program = event.u8("program", SemanticOperandRole::Instrument);
+      if (type == EventType::Rd2ProgramAndAdsr) {
+        event.u8("adsr1", SourceValueDisplay::Hex);
+        event.u8("adsr2", SourceValueDisplay::Hex);
+      }
+      return event.invoke<&Playback::melodicProgram>(program, context.definition.status.percussionMin);
+    }
+    case EventType::Call: {
+      auto event = cursor.command("Pattern Play", SequenceSemantic::Call);
+      const u16 stored = event.u16le("stored_destination", SourceValueDisplay::Address);
+      const Address destination = context.address(stored);
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
+      const u8 times = event.u8("times", SemanticOperandRole::Count);
+      event.invoke<&Playback::beginPattern>(times, destination);
+      return event.call(destination);
+    }
+    case EventType::Pan: {
+      auto event = cursor.command("Pan", SequenceSemantic::Pan);
+      return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
+    }
+    case EventType::PanFade: {
+      auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
+      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
+      return event.invoke<&Playback::panFade>(length, pan);
+    }
+    case EventType::VibratoOn: {
+      auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Modulation);
+      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      return event.invoke<&Playback::vibratoOn>(delay, rate, depth);
+    }
+    case EventType::VibratoOff:
+      return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibratoOff>();
+    case EventType::MasterVolume: {
+      auto event = cursor.command("Master Volume", SequenceSemantic::Level);
+      return event.invoke<&Playback::masterVolume>(
+          event.u8("volume", SemanticOperandRole::Level));
+    }
+    case EventType::MasterVolumeFade: {
+      auto event = cursor.command("Master Volume Fade", SequenceSemantic::Level);
+      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+      return event.invoke<&Playback::masterVolumeFade>(length, volume);
+    }
+    case EventType::Tempo: {
+      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
+      return event.invoke<&Playback::tempo>(event.u8("tempo"));
+    }
+    case EventType::TempoFade: {
+      auto event = cursor.command("Tempo Fade", SequenceSemantic::Tempo);
+      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const u8 tempo = event.u8("tempo");
+      return event.invoke<&Playback::tempoFade>(length, tempo);
+    }
+    case EventType::GlobalTranspose: {
+      auto event = cursor.command("Global Transpose", SequenceSemantic::Pitch);
+      return event.invoke<&Playback::globalTranspose>(
+          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+    }
+    case EventType::Transpose: {
+      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
+      return event.set<&TrackState::transpose>(
+          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+    }
+    case EventType::TremoloOn:
+      return unknownCommand(cursor, 3);
+    case EventType::TremoloOff:
+      return cursor.sourceOnly("Tremolo Off").ignore();
+    case EventType::Volume: {
+      auto event = cursor.command("Volume", SequenceSemantic::Level);
+      return event.invoke<&Playback::volume>(
+          event.u8("volume", SemanticOperandRole::Level));
+    }
+    case EventType::VolumeFade: {
+      auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
+      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+      return event.invoke<&Playback::volumeFade>(length, volume);
+    }
+    case EventType::VibratoFade: {
+      auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::vibratoFade>(
+          event.u8("length", SemanticOperandRole::Duration));
+    }
+    case EventType::PitchEnvelopeTo:
+    case EventType::PitchEnvelopeFrom: {
+      auto event = cursor.command(type == EventType::PitchEnvelopeTo ? "Pitch Envelope To"
+                                                                     : "Pitch Envelope From",
+                                  SequenceSemantic::Pitch);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const s8 semitones =
+          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      return event.invoke<&Playback::pitchEnvelope>(
+          type == EventType::PitchEnvelopeTo ? PitchEnvelope::Mode::To : PitchEnvelope::Mode::From,
+          delay, length, semitones);
+    }
+    case EventType::PitchEnvelopeOff:
+      return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch)
+          .invoke<&Playback::pitchEnvelopeOff>();
+    case EventType::Tuning: {
+      auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
+      const u8 tuning = event.u8("tuning", SemanticOperandRole::Pitch);
+      return event.emitTuning((tuning / 256.0) * 100.0);
+    }
+    case EventType::EchoOn: {
+      auto event = cursor.command("Echo", SequenceSemantic::State);
+      const u8 channels = event.u8("channels", SourceValueDisplay::Hex);
+      event.u8("volume_left");
+      event.u8("volume_right");
+      return event.invoke<&Playback::echo>(channels);
+    }
+    case EventType::EchoOff:
+      return cursor.sourceOnly("Echo Off").ignore();
+    case EventType::EchoParameter:
+    case EventType::EchoVolumeFade: {
+      auto event = cursor.sourceOnly(type == EventType::EchoParameter ? "Echo Parameters"
+                                                                      : "Echo Volume Fade");
+      event.u8(type == EventType::EchoParameter ? "delay" : "length");
+      event.u8(type == EventType::EchoParameter ? "feedback" : "volume_left");
+      event.u8(type == EventType::EchoParameter ? "fir" : "volume_right");
+      return event.ignore();
+    }
+    case EventType::PitchSlide: {
+      auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
+      const Slide slide = readSlide(event, begin);
+      return event.invoke<&Playback::pitchSlide>(slide.delay, slide.length, slide.target);
+    }
+    case EventType::PercussionBase: {
+      auto event = cursor.command("Percussion Base", SequenceSemantic::State);
+      return event.invoke<&Playback::percussionBase>(
+          event.u8("program", SemanticOperandRole::InstrumentProgram));
+    }
+    case EventType::KonamiLoopStart: {
+      auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
+      return event.set<&TrackState::konamiLoopStart>(
+          event.derived("destination", event.nextAddress(), SourceValueDisplay::Address,
+                        SemanticOperandRole::LoopTarget));
+    }
+    case EventType::KonamiLoopEnd: {
+      auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
+      const u8 times = event.u8("times", SemanticOperandRole::Count);
+      event.s8("volume_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      event.s8("pitch_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      event.invoke<&Playback::konamiLoop>(times, event.state<&TrackState::konamiLoopStart>());
+      return event.runtimeControlFlow();
+    }
+    case EventType::KonamiAdsrGain: {
+      auto event = cursor.sourceOnly("ADSR / GAIN");
+      event.u8("adsr1", SourceValueDisplay::Hex);
+      event.u8("adsr2", SourceValueDisplay::Hex);
+      event.u8("gain", SourceValueDisplay::Hex);
+      return event.ignore();
+    }
+    case EventType::QuintetTuning: {
+      auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
+      const u8 tuning = event.u8("tuning", SemanticOperandRole::Pitch);
+      return event.emitTuning((tuning / 256.0) * 61.8);
+    }
+    case EventType::QuintetAdsr: {
+      auto event = cursor.sourceOnly("ADSR");
+      event.u8("adsr1", SourceValueDisplay::Hex);
+      event.u8("sustain_rate");
+      event.u8("sustain_level");
+      return event.ignore();
+    }
+    case EventType::IntelliEchoOn:
+      return cursor.command("Echo On", SequenceSemantic::State).emitReverb(40.0 / 127.0);
+    case EventType::IntelliEchoOff:
+      return cursor.command("Echo Off", SequenceSemantic::State).emitReverb(0.0);
+    case EventType::IntelliLegatoOn:
+      return cursor.command("Legato On", SequenceSemantic::State)
+          .set<&TrackState::legato>(true)
+          .emitLegatoPedal(true);
+    case EventType::IntelliLegatoOff:
+      return cursor.command("Legato Off", SequenceSemantic::State)
+          .set<&TrackState::legato>(false)
+          .emitLegatoPedal(false);
+    case EventType::IntelliConditionalJump:
+    case EventType::IntelliJump: {
+      auto event = cursor.command(type == EventType::IntelliJump ? "Short Jump"
+                                                                 : "Conditional Short Jump",
+                                  SequenceSemantic::Jump);
+      const u8 distance = event.u8("distance");
+      const Address destination{event.nextAddress().value + distance};
+      event.derived("destination", destination, SourceValueDisplay::Address,
+                    SemanticOperandRole::JumpTarget);
+      // The driver's "conditional" form tests a state that legacy conversion
+      // has always treated as taken; retain that established interpretation.
+      return event.jump(destination);
+    }
+    case EventType::IntelliFe3F5: {
+      auto event = cursor.command("FE3 Flags / Port Wait", SequenceSemantic::State);
+      return event.invoke<&Playback::fe3Flags>(event.u8("parameter", SourceValueDisplay::Hex));
+    }
+    case EventType::IntelliWritePort: {
+      auto event = cursor.sourceOnly("Write APU Port");
+      event.u8("value");
+      return event.ignore();
+    }
+    case EventType::IntelliFe3F9: {
+      auto event = cursor.sourceOnly("Unknown FE3 Table", "unknown");
+      for (u8 index = 0; index < 36; ++index) {
+        event.u8(fmt::format("byte_{}", index + 1), SourceValueDisplay::Hex);
+      }
+      return event.ignore();
+    }
+    case EventType::IntelliDefineVoice: {
+      auto event = cursor.command("Voice Parameter Definition", SequenceSemantic::Program);
+      const s8 parameter = event.s8("count_or_instrument", SourceValueDisplay::SignedDecimal);
+      if (parameter >= 0) {
+        const Address tableAddress = event.nextAddress();
+        const u8 count = static_cast<u8>(parameter);
+        event.invoke<&Playback::defineVoiceTable>(tableAddress, count);
+        if (context.dataBlocks != nullptr &&
+            std::ranges::none_of(*context.dataBlocks, [tableAddress](const SequenceDataBlock& block) {
+              return block.address.value == tableAddress.value;
+            })) {
+          constexpr u64 kMaximumVoiceTableBytes = 256 * 4;
+          const u64 bytes = std::min<u64>(
+              kMaximumVoiceTableBytes,
+              context.reader.size() > tableAddress.value
+                  ? context.reader.size() - tableAddress.value
+                  : 0);
+          const auto source = context.reader.slice(tableAddress.value, bytes);
+          context.dataBlocks->push_back(SequenceDataBlock{
+              .address = tableAddress,
+              .bytes = std::vector<u8>(source.begin(), source.end()),
+          });
+        }
+        for (u8 index = 0; index < static_cast<u8>(parameter); ++index) {
+          event.u8(fmt::format("instrument_{}", index), SemanticOperandRole::Instrument);
+          event.u8(fmt::format("volume_{}", index), SemanticOperandRole::Level);
+          event.u8(fmt::format("pan_{}", index), SemanticOperandRole::Pan);
+          event.u8(fmt::format("tuning_transpose_{}", index), SemanticOperandRole::Pitch);
+        }
+        return event;
+      }
+      if (context.selected.intelli != IntelliMode::Fe3 &&
+          context.selected.intelli != IntelliMode::Ta) {
+        return event.ignore();
+      }
+      const u8 logical = static_cast<u8>(parameter) & 0x3f;
+      const u8 srcn = event.u8("srcn", SourceValueDisplay::Hex);
+      const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
+      const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
+      const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
+      const u8 pitchHigh = event.u8("pitch_high", SourceValueDisplay::Hex);
+      const u8 pitchLow = event.u8("pitch_low", SourceValueDisplay::Hex);
+      if (context.selected.intelli == IntelliMode::Ta) {
+        return event.invoke<&Playback::overwriteInstrument>(
+            logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, Address{begin});
+      }
+      return event.ignore();
+    }
+    case EventType::IntelliLoadVoice: {
+      auto event = cursor.command("Load Voice Parameters", SequenceSemantic::Program);
+      const u8 index = event.u8("index");
+      return event.invoke<&Playback::loadVoice>(index, context.definition.status.percussionMin,
+                                                 context.selected.intelli);
+    }
+    case EventType::IntelliAdsr: {
+      auto event = cursor.sourceOnly("ADSR");
+      event.u8("adsr1", SourceValueDisplay::Hex);
+      event.u8("adsr2", SourceValueDisplay::Hex);
+      return event.ignore();
+    }
+    case EventType::IntelliGainDurationRate: {
+      auto event = cursor.command("GAIN Duration Rate", SequenceSemantic::State);
+      const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
+      event.u8("gain", SourceValueDisplay::Hex);
+      if (context.selected.intelli == IntelliMode::Ta) {
+        return event.set<&TrackState::durationRate>(rate);
+      }
+      return event.ignore();
+    }
+    case EventType::IntelliGainDuration: {
+      auto event = cursor.command("GAIN Duration", SequenceSemantic::State);
+      const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
+      return context.selected.intelli == IntelliMode::Ta ? event.set<&TrackState::durationRate>(rate)
+                                                         : event.ignore();
+    }
+    case EventType::IntelliGain: {
+      auto event = cursor.sourceOnly("GAIN");
+      event.u8("gain", SourceValueDisplay::Hex);
+      return event.ignore();
+    }
+    case EventType::IntelliCustomPercussion: {
+      auto event = cursor.command("Custom Percussion Table", SequenceSemantic::State);
+      const u8 packedCount = event.u8("packed_count", SourceValueDisplay::Hex);
+      const u8 count = static_cast<u8>((packedCount & 0x0f) + 1);
+      event.derived("count", count, SemanticOperandRole::Count);
+      event.invoke<&Playback::clearPercussionTable>();
+      for (u8 slot = 0; slot < count; ++slot) {
+        const u8 patch = event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex,
+                                  SemanticOperandRole::Instrument);
+        const u8 note =
+            event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote,
+                     SemanticOperandRole::NoteKey);
+        const u8 pan =
+            event.u8(fmt::format("pan_{}", slot), SemanticOperandRole::Pan);
+        if (slot < kIntelliDrumSlots) {
+          event.invoke<&Playback::percussionEntry>(slot, patch, note, pan);
+        }
+      }
+      return event.invoke<&Playback::enableCustomPercussion>();
+    }
+    case EventType::IntelliTaSubevent:
+    case EventType::IntelliFe4Subevent: {
+      auto event = cursor.command("Intelligent Systems Subevent", SequenceSemantic::State);
+      const u8 subtype = event.u8("subtype", SourceValueDisplay::Hex);
+      if (type == EventType::IntelliTaSubevent && subtype == 0) {
+        event.u16le("request_value", SourceValueDisplay::Hex);
+        event.u8("request_type", SourceValueDisplay::Hex);
+        return event.ignore();
+      }
+      if (subtype == 1 || subtype == 2) {
+        const u8 mask = event.u8("mask", SourceValueDisplay::Hex);
+        return event.invoke<&Playback::intelliFlags>(mask, subtype == 1);
+      }
+      if (type == EventType::IntelliTaSubevent && subtype == 3) {
+        return event.set<&TrackState::legato>(true).emitLegatoPedal(true);
+      }
+      if (type == EventType::IntelliTaSubevent && subtype == 4) {
+        return event.set<&TrackState::legato>(false).emitLegatoPedal(false);
+      }
+      if (type == EventType::IntelliTaSubevent && subtype == 5) {
+        event.u8("global_byte", SourceValueDisplay::Hex);
+      }
+      return event.ignore();
+    }
+    case EventType::Nop:
+      return cursor.sourceOnly("NOP").ignore();
+    case EventType::Nop1: {
+      auto event = cursor.sourceOnly("NOP");
+      event.u8("argument", SourceValueDisplay::Hex);
+      return event.ignore();
+    }
+    case EventType::Unknown1:
+      return unknownCommand(cursor, 1);
+    case EventType::Unknown2:
+      return unknownCommand(cursor, 2);
+    case EventType::Unknown3:
+      return unknownCommand(cursor, 3);
+    case EventType::Unknown4:
+      return unknownCommand(cursor, 4);
+    case EventType::Unknown0:
+    default:
+      return unknownCommand(cursor, 0);
+  }
+}
+
+struct PlaylistDecode {
+  SectionPlaylist playlist;
+  std::optional<SourceAnnotationId> annotation;
+};
+
+[[nodiscard]] PlaylistDecode decodePlaylist(ByteReader reader, const Layout& layout, AssetId sequenceId,
+                                            SourceMapBuilder* sourceMap,
+                                            std::vector<Diagnostic>* diagnostics) {
+  const Profile& selected = profile(layout.profile);
+  std::map<u32, PlaylistCommand> commands;
+  std::map<u32, SequenceSection> sections;
+  std::vector<u32> pending{layout.playlistAddress};
+
+  const auto warn = [&](std::string message, SourceRange range) {
+    if (diagnostics != nullptr) {
+      diagnostics->push_back(Diagnostic{
+          .severity = Severity::Warning,
+          .message = std::move(message),
+          .range = range.valid() ? std::optional<SourceRange>{range} : std::nullopt,
+      });
+    }
+  };
+  const auto queue = [&](u32 address) {
+    if (reader.has(address, 2) && !commands.contains(address) &&
+        std::ranges::find(pending, address) == pending.end()) {
+      pending.push_back(address);
+    }
+  };
+  const auto decodeSection = [&](u16 address) -> std::optional<SequenceSection> {
+    if (!reader.has(address, kTrackCount * 2)) {
+      warn(fmt::format("NinSnes section ${:04X} did not contain eight track pointers", address),
+           reader.range(address, reader.has(address, 1) ? 1 : 0));
+      return std::nullopt;
+    }
+    SequenceSection section{
+        .address = Address{address},
+        .trackStarts = std::vector<std::optional<Address>>(kTrackCount),
+    };
+    bool active = false;
+    for (u8 track = 0; track < kTrackCount; ++track) {
+      const u16 raw = reader.le16(address + track * 2);
+      if ((raw & 0xff00) == 0) {
+        continue;
+      }
+      const u16 start =
+          convertAddress(selected, raw, layout.konamiBaseAddress, layout.falcomBaseOffset);
+      if (!reader.has(start, 1)) {
+        warn(fmt::format("NinSnes track pointer ${:04X} was outside ARAM", start),
+             reader.range(address + track * 2, 2));
+        continue;
+      }
+      section.trackStarts[track] = Address{start};
+      active = true;
+    }
+    return active ? std::optional<SequenceSection>{std::move(section)} : std::nullopt;
+  };
+
+  while (!pending.empty() && commands.size() < 4096) {
+    const u32 address = pending.back();
+    pending.pop_back();
+    if (commands.contains(address) || !reader.has(address, 2)) {
+      continue;
+    }
+    const u16 value = reader.le16(address);
+    PlaylistCommand command{
+        .address = Address{address},
+        .fallthrough = Address{address + 2},
+        .range = reader.range(address, 2),
+    };
+    if (value == 0) {
+      command.operation = PlaylistEnd{};
+    } else if (value <= 0xff) {
+      if (!reader.has(address, 4)) {
+        warn("NinSnes playlist repeat was truncated", reader.range(address, 2));
+        command.operation = PlaylistEnd{};
+      } else {
+        const u16 storedDestination = reader.le16(address + 2);
+        const u16 destination =
+            convertAddress(selected, storedDestination, layout.konamiBaseAddress, layout.falcomBaseOffset);
+        command.fallthrough = Address{address + 4};
+        command.range = reader.range(address, 4);
+        command.operation = PlaylistRepeat{
+            .additionalPlays = value,
+            .destination = Address{destination},
+            .infinite = selected.playlist == PlaylistModel::Tose ? (value == 0 || value == 0xff)
+                                                                 : value > 0x80,
+        };
+        queue(destination);
+        queue(address + 4);
+      }
+    } else {
+      const u16 sectionAddress =
+          convertAddress(selected, value, layout.konamiBaseAddress, layout.falcomBaseOffset);
+      command.operation = PlaylistPlaySection{.section = Address{sectionAddress}};
+      if (!sections.contains(sectionAddress)) {
+        if (auto section = decodeSection(sectionAddress)) {
+          sections.emplace(sectionAddress, std::move(*section));
+        }
+      }
+      queue(address + 2);
+    }
+    commands.emplace(address, std::move(command));
+  }
+
+  PlaylistDecode decoded{
+      .playlist =
+          SectionPlaylist{
+              .startAddress = Address{layout.playlistAddress},
+          },
+  };
+  for (auto& [_, section] : sections) {
+    decoded.playlist.sections.push_back(std::move(section));
+  }
+  for (auto& [_, command] : commands) {
+    decoded.playlist.commands.push_back(std::move(command));
+  }
+
+  if (sourceMap == nullptr || decoded.playlist.commands.empty()) {
+    return decoded;
+  }
+  const u64 first = decoded.playlist.commands.front().range.offset;
+  u64 last = first;
+  for (const auto& command : decoded.playlist.commands) {
+    last = std::max(last, command.range.endOffset());
+  }
+  decoded.annotation =
+      sourceMap->header("Section Playlist", SourceRange{
+                                                .source = reader.source(),
+                                                .offset = first,
+                                                .size = static_cast<u32>(last - first),
+                                            })
+          .kind("nin-snes-playlist")
+          .owner(ObjectRefs::sequence(sequenceId))
+          .id();
+
+  for (auto& command : decoded.playlist.commands) {
+    auto annotation =
+        sourceMap
+            ->command(std::holds_alternative<PlaylistPlaySection>(command.operation)
+                          ? "Play Section"
+                          : (std::holds_alternative<PlaylistRepeat>(command.operation) ? "Repeat Playlist"
+                                                                                     : "Playlist End"),
+                      command.range, std::holds_alternative<PlaylistRepeat>(command.operation)
+                                         ? SequenceSemantic::Repeat
+                                         : SequenceSemantic::Meta)
+            .kind("nin-snes-playlist-command")
+            .parent(*decoded.annotation)
+            .field("value", reader.range(command.range.offset, 2), reader.le16(command.range.offset),
+                   SourceValueDisplay::Hex);
+    if (const auto* play = std::get_if<PlaylistPlaySection>(&command.operation)) {
+      annotation.derived("section", play->section.value, SourceValueDisplay::Address)
+          .link(SourceLinkRole::PointsTo,
+                SourceTarget{reader.range(play->section.value, kTrackCount * 2)});
+    } else if (const auto* repeat = std::get_if<PlaylistRepeat>(&command.operation)) {
+      annotation.field("destination", reader.range(command.range.offset + 2, 2),
+                       repeat->destination.value, SourceValueDisplay::Address)
+          .derived("additional_plays", repeat->additionalPlays)
+          .derived("infinite", repeat->infinite)
+          .link(SourceLinkRole::RepeatTarget, SourceTarget{reader.range(repeat->destination.value, 2)});
+    }
+    command.annotation = annotation.id();
+  }
+
+  for (const auto& section : decoded.playlist.sections) {
+    auto annotation =
+        sourceMap->header("Section", reader.range(section.address.value, kTrackCount * 2))
+            .kind("nin-snes-section")
+            .parent(*decoded.annotation)
+            .owner(ObjectRefs::sequence(sequenceId));
+    for (u8 track = 0; track < section.trackStarts.size(); ++track) {
+      const SourceRange range = reader.range(section.address.value + track * 2, 2);
+      if (section.trackStarts[track]) {
+        annotation.field(fmt::format("track_{}", track + 1), range,
+                         section.trackStarts[track]->value, SourceValueDisplay::Address)
+            .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(section.trackStarts[track]->value, 1)});
+      } else {
+        annotation.field(fmt::format("track_{}", track + 1), range, 0,
+                         SourceValueDisplay::Address);
+      }
+    }
+  }
+  return decoded;
+}
+
+[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, u32 trackNumber,
+                                       const std::vector<Address>& starts,
+                                       const DecodeContext& context, AssetId sequenceId,
+                                       std::optional<SourceAnnotationId> parent,
+                                       SourceMapBuilder* sourceMap) {
+  if (starts.empty()) {
+    return TrackProgram{
+        .id = TrackId{trackNumber},
+        .sourceTrackNumber = trackNumber,
+    };
+  }
+
+  // A channel can begin at a different address in every section. Discover all
+  // roots into one immutable program, then the playlist selects the right root
+  // each time that section starts.
+  std::map<u32, DecodedBytecodeCommand> commands;
+  std::vector<u32> pending;
+  for (const Address start : starts) {
+    pending.push_back(static_cast<u32>(start.value));
+  }
+  while (!pending.empty() && commands.size() < kMaxTrackCommands) {
+    u32 address = pending.back();
+    pending.pop_back();
+    while (reader.has(address, 1) && !commands.contains(address) &&
+           commands.size() < kMaxTrackCommands) {
+      DecodedBytecodeCommand command = decodeCommand(context, address);
+      for (const Address target : command.flow.staticTargets) {
+        if (reader.has(target.value, 1) && !commands.contains(static_cast<u32>(target.value))) {
+          pending.push_back(static_cast<u32>(target.value));
+        }
+      }
+      const auto fallthrough = command.flow.fallthrough;
+      commands.emplace(address, std::move(command));
+      if (!fallthrough) {
+        break;
+      }
+      address = static_cast<u32>(fallthrough->value);
+    }
+  }
+
+  const TrackDecodeScope scope{
+      .reader = reader,
+      .maxCommands = kMaxTrackCommands,
+      .sequenceAsset = sequenceId,
+      .parentAnnotation = parent,
+      .sourceMap = sourceMap,
+  };
+  auto session = scope.begin(trackNumber, static_cast<u32>(starts.front().value));
+  for (auto& [address, command] : commands) {
+    session.append(std::move(command), address);
+  }
+  return session.finish();
+}
+
+[[nodiscard]] std::vector<InstrumentIdentity> buildProgramMap(ByteReader reader,
+                                                              const Layout& layout) {
+  const Profile& selected = profile(layout.profile);
+  std::vector<InstrumentIdentity> map(256);
+  for (u16 sourceProgram = 0; sourceProgram < map.size(); ++sourceProgram) {
+    u8 resolved = static_cast<u8>(sourceProgram);
+    if (selected.programs == ProgramResolver::QuintetActRBase) {
+      resolved = static_cast<u8>(resolved + layout.quintetBgmInstrumentBase);
+    } else if (selected.programs == ProgramResolver::QuintetLookup) {
+      const u32 address = layout.quintetInstrumentLookupAddress + resolved;
+      if (reader.has(address, 1)) {
+        resolved = reader.u8At(address);
+      }
+    }
+    map[sourceProgram] = InstrumentIdentity{
+        .domain = std::string(kInstrumentDomain),
+        .key = resolved,
+    };
+  }
+  return map;
+}
+
+[[nodiscard]] SequenceRecipes projectRecipes(const ProgramState& state) {
+  return state.recipes;
+}
+
+[[nodiscard]] SequenceDialect makeDialect() {
+  return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+      .id = DialectId{.value = "nin-snes"},
+      .commandDetailKindPrefix = "nin-snes",
+      .timebase = Timebase{.ppqn = kPpqn},
+      .defaultBehavior =
+          SequenceProgramBehavior{
+              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .panLaw = PanLaw::ConstantSum,
+              .initialReverbSend = 0.0,
+              .initialPitchBendRangeSemitones = 2,
+          },
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      .prepass = SemanticPrepassMode::ScheduledPlayback,
+      .sectionNoteEndPolicy = SectionNoteEndPolicy::ScheduledWake,
+      .sectionEndPolicy = SectionEndPolicy::DiscoveredSourceRange,
+      // 00 is a source-only pattern/section terminator in the classic event
+      // tree. Pattern returns must remain replayable, while an outermost 00
+      // reached only through control flow is the exclusive section boundary.
+      .includeSectionSourceCommand =
+          [](const SourceCommand& command) {
+            if (command.opcode == 0) {
+              return false;
+            }
+            // Inline F9 records are decoded with their note for musical
+            // clarity, but the source parser consumes them incrementally while
+            // that note waits. TrackState reports the precise consumed end.
+            return std::ranges::none_of(
+                command.operands, [](const SemanticOperand& operand) {
+                  return operand.name.starts_with("pitch_slide_");
+                });
+          },
+  });
+}
+
+}  // namespace
+
+const SequenceDialect& sequenceDialect() {
+  static const SequenceDialect dialect = makeDialect();
+  return dialect;
+}
+
+SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId,
+                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+  const Profile& selected = profile(layout.profile);
+  const Definition definition = makeDefinition(layout);
+  PlaylistDecode playlist = decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
+
+  SequenceProgram program = sequenceDialect().makeProgram(Address{layout.playlistAddress});
+  program.config.profile = static_cast<u32>(layout.profile);
+  program.sourceProgramMap = buildProgramMap(reader, layout);
+  program.sectionPlaylist = std::move(playlist.playlist);
+  DecodeContext context{
+      .reader = reader,
+      .layout = layout,
+      .selected = selected,
+      .definition = definition,
+      .dataBlocks = &program.dataBlocks,
+      .diagnostics = diagnostics,
+  };
+
+  program.tracks.reserve(kTrackCount);
+  for (u8 track = 0; track < kTrackCount; ++track) {
+    std::vector<Address> starts;
+    for (const SequenceSection& section : program.sectionPlaylist->sections) {
+      if (section.trackStarts[track] &&
+          std::ranges::find_if(starts, [&](Address address) {
+            return address.value == section.trackStarts[track]->value;
+          }) == starts.end()) {
+        starts.push_back(*section.trackStarts[track]);
+      }
+    }
+    program.tracks.push_back(
+        decodeTrack(reader, track, starts, context, sequenceId, playlist.annotation, sourceMap));
+  }
+
+  SequenceRecipes recipes =
+      analyzeCompiledProgram<ProgramState, SequenceRecipes>(program, sequenceDialect(), projectRecipes);
+  return SequenceParse{
+      .program = std::move(program),
+      .recipes = std::move(recipes),
+  };
+}
+
+}  // namespace vgmtrans::formats::nin_snes
