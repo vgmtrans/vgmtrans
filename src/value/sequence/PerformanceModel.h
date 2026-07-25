@@ -65,6 +65,9 @@ struct NotePerformanceEvent {
 struct TempoPerformanceEvent {
   PerformanceEventHeader header;
   u32 microsecondsPerQuarter = 500000;
+  // Preserve an intentional rewrite even when it does not alter the global
+  // time map. A few hardware drivers use such writes as synchronization.
+  bool force = false;
 };
 
 struct TimeSignaturePerformanceEvent {
@@ -128,6 +131,9 @@ struct PanPerformanceEvent {
   // True means the source pan law intentionally supplied linearGain, even when it
   // is 1.0 and should reset a previous expression compensation.
   bool hasLinearGain = false;
+  // Controller-only pan motion leaves an independently established loudness
+  // compensation untouched.
+  bool preserveLinearGain = false;
 };
 
 struct StereoBalancePerformanceEvent {
@@ -296,6 +302,7 @@ using PerformanceEvent =
 enum class PerformanceAutomationTarget {
   Tempo,
   Level,
+  MasterLevel,
   Expression,
   Pan,
   Pitch,
@@ -470,12 +477,18 @@ struct PerformanceSequence {
 // after a PerformanceSequence is copied for lowering.
 class PerformanceTempoMap {
 public:
+  struct Point {
+    u64 tick = 0;
+    u32 microsecondsPerQuarter = 500000;
+  };
+
   explicit PerformanceTempoMap(const PerformanceSequence& performance);
 
   [[nodiscard]] u32 microsecondsPerQuarterAt(u64 tick) const;
   [[nodiscard]] double tickSeconds(u64 tick) const;
   [[nodiscard]] double durationMilliseconds(u64 startTick, u32 durationTicks) const;
   [[nodiscard]] bool contains(const TempoPerformanceEvent& event) const;
+  [[nodiscard]] std::vector<Point> points() const;
 
 private:
   struct Change {
@@ -484,6 +497,7 @@ private:
     TrackId track;
     u64 sequence = 0;
     size_t order = 0;
+    bool force = false;
   };
 
   Timebase timebase_;

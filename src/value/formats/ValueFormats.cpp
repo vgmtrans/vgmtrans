@@ -15,6 +15,7 @@
 #include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/formats/KonamiSnes/KonamiSnes.h"
+#include "value/formats/NinSnes/NinSnes.h"
 #include "value/formats/NDS/Nds.h"
 #include "value/session/Session.h"
 
@@ -81,6 +82,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(akao::akaoDefinition());
   session.registerFormat(konami_arcade::konamiArcadeDefinition());
   session.registerFormat(konami_snes::konamiSnesDefinition());
+  session.registerFormat(nin_snes::definition());
 }
 
 }  // namespace vgmtrans::formats

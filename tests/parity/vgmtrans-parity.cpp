@@ -17,6 +17,7 @@
 #include "conversion/SF2Conversion.h"
 #include "conversion/SF2File.h"
 #include "formats/NDS/NDSInstrSet.h"
+#include "formats/NinSnes/NinSnesSeq.h"
 #include "value/export/ExportTypes.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/synth/ModulationScaling.h"
@@ -25,6 +26,7 @@
 #include "value/synth/SampleDecoder.h"
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/CapcomSnes/CapcomSnes.h"
+#include "value/formats/NinSnes/NinSnes.h"
 #include "value/formats/ValueFormats.h"
 #include "io/RawFile.h"
 
@@ -448,7 +450,7 @@ u32 loopFramesFromLegacyValue(const VGMSamp& sample, u32 value, LoopMeasure meas
     return value / static_cast<u32>(std::max<int>(1, sample.bytesPerSample() * sample.channels));
   }
   if (sample.dataLength % 9 == 0) {
-    return (value / 9) * 16;
+    return (value * 16) / 9;
   }
   const auto bytesPerFrame = std::max<int>(1, sample.bytesPerSample() * sample.channels);
   return value / static_cast<u32>(bytesPerFrame);
@@ -474,6 +476,11 @@ u32 envelopePermille(double level) {
 }
 
 u32 sourceRelativeOffset(const SourceStore& sources, SourceRange range) {
+  // Derived objects such as sequence-built drum kits do not necessarily have
+  // a single source range. Legacy represents their synthetic offset as zero.
+  if (!range.valid()) {
+    return 0;
+  }
   const SourceFile& source = sources.source(range.source);
   if (!source.attribute("mame.format")) {
     return static_cast<u32>(range.offset);
@@ -619,7 +626,14 @@ u32 sourceRelativeOffset(const SourceStore& sources, SourceRange range) {
 }
 
 std::optional<u32> legacyRegionSampleOffset(const VGMRgn& region, std::span<VGMSamp* const> samples) {
-  if (region.sampOffset >= 0) {
+  if (region.sampOffset != -1) {
+    if (region.sampOffset < 0) {
+      // Conversion treats every value except -1 as an explicit offset. A
+      // negative lookup cannot match and consequently selects sample zero.
+      return samples.empty() || samples.front() == nullptr
+                 ? std::nullopt
+                 : std::optional<u32>{samples.front()->dataOff};
+    }
     const auto baseOffset = region.sampCollPtr ? region.sampCollPtr->offset()
                             : region.parInstr->parInstrSet->sampColl()
                                 ? region.parInstr->parInstrSet->sampColl()->offset()
@@ -1375,6 +1389,19 @@ std::map<std::string, SynthExportBytes> valueCapcomSnesRsnSynthExports(const std
   return exports;
 }
 
+template <typename Value>
+std::string uniqueCollectionKey(const std::map<std::string, Value>& values, std::string base) {
+  if (!values.contains(base)) {
+    return base;
+  }
+  for (u32 occurrence = 2;; ++occurrence) {
+    std::string candidate = base + " [" + std::to_string(occurrence) + "]";
+    if (!values.contains(candidate)) {
+      return candidate;
+    }
+  }
+}
+
 std::map<std::string, CapcomSnesSummary> legacyCollectionSummaries(const std::filesystem::path& path) {
   const auto root = scanLegacyFile(path);
   std::map<std::string, CapcomSnesSummary> summaries;
@@ -1383,10 +1410,8 @@ std::map<std::string, CapcomSnesSummary> legacyCollectionSummaries(const std::fi
     if (collection == nullptr || collection->seq() == nullptr) {
       continue;
     }
-    auto [_, inserted] = summaries.emplace(collection->name(), legacyCapcomSnesCollectionSummary(*collection));
-    if (!inserted) {
-      throw std::runtime_error("duplicate legacy collection name: " + collection->name());
-    }
+    summaries.emplace(uniqueCollectionKey(summaries, collection->name()),
+                      legacyCapcomSnesCollectionSummary(*collection));
   }
 
   if (summaries.empty()) {
@@ -1414,11 +1439,8 @@ std::map<std::string, CapcomSnesSummary> valueCollectionSummaries(const std::fil
 
   std::map<std::string, CapcomSnesSummary> summaries;
   for (const auto& collection : project.collections()) {
-    auto [_, inserted] =
-        summaries.emplace(collection.name, valueCapcomSnesSummary(project, session.sources(), collection));
-    if (!inserted) {
-      throw std::runtime_error("duplicate value collection name: " + collection.name);
-    }
+    summaries.emplace(uniqueCollectionKey(summaries, collection.name),
+                      valueCapcomSnesSummary(project, session.sources(), collection));
   }
   return summaries;
 }
@@ -1433,8 +1455,12 @@ std::map<std::string, CapcomSnesSummary> legacyFormatCollectionSummaries(const s
     if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != formatName) {
       continue;
     }
-    auto summary = formatName == "KonamiArcade" ? legacyPreparedCollectionSummary(*collection)
-                                                : legacyCapcomSnesCollectionSummary(*collection);
+    // Both formats derive collection-local instruments from sequence data.
+    // Summarizing the raw instrument set would compare the value model against
+    // legacy's unused, full-range fallback modulation and omit dynamic drums.
+    const bool hasCollectionLocalSynth = formatName == "KonamiArcade" || formatName == "NinSnes";
+    auto summary = hasCollectionLocalSynth ? legacyPreparedCollectionSummary(*collection)
+                                           : legacyCapcomSnesCollectionSummary(*collection);
     if (formatName == "KonamiArcade") {
       // Konami stores melodic unity (66) on each sample rather than its
       // otherwise-default region. The value model materializes that effective
@@ -1445,10 +1471,7 @@ std::map<std::string, CapcomSnesSummary> legacyFormatCollectionSummaries(const s
         }
       }
     }
-    auto [_, inserted] = summaries.emplace(collection->name(), std::move(summary));
-    if (!inserted) {
-      throw std::runtime_error("duplicate legacy " + std::string(label) + " collection name: " + collection->name());
-    }
+    summaries.emplace(uniqueCollectionKey(summaries, collection->name()), std::move(summary));
   }
 
   if (summaries.empty()) {
@@ -1491,11 +1514,8 @@ std::map<std::string, CapcomSnesSummary> valueFormatCollectionSummaries(const st
     if (!valueCollectionHasSequenceFormat(project, collection, formatName)) {
       continue;
     }
-    auto [_, inserted] =
-        summaries.emplace(collection.name, valueCapcomSnesSummary(project, session.sources(), collection));
-    if (!inserted) {
-      throw std::runtime_error("duplicate value " + std::string(label) + " collection name: " + collection.name);
-    }
+    summaries.emplace(uniqueCollectionKey(summaries, collection.name),
+                      valueCapcomSnesSummary(project, session.sources(), collection));
   }
 
   if (summaries.empty()) {
@@ -1991,11 +2011,8 @@ std::map<std::string, std::vector<u8>> legacyFormatCollectionMidis(const std::fi
     }
     std::vector<u8> bytes;
     midi->writeMidiToBuffer(bytes);
-    const std::string key = legacyMidiCollectionKey(*collection);
-    auto [_, inserted] = midis.emplace(key, std::move(bytes));
-    if (!inserted) {
-      throw std::runtime_error("duplicate legacy " + std::string(label) + " MIDI collection key: " + key);
-    }
+    const std::string key = uniqueCollectionKey(midis, legacyMidiCollectionKey(*collection));
+    midis.emplace(key, std::move(bytes));
   }
 
   if (midis.empty()) {
@@ -2039,11 +2056,8 @@ std::map<std::string, std::vector<u8>> valueFormatCollectionMidis(
       throw std::runtime_error("value " + std::string(label) + " MIDI export failed for collection '" +
                                collection.name + "': " + ex.what());
     }
-    const std::string key = valueMidiCollectionKey(project, collection);
-    auto [_, inserted] = midis.emplace(key, std::move(midi));
-    if (!inserted) {
-      throw std::runtime_error("duplicate value " + std::string(label) + " MIDI collection key: " + key);
-    }
+    const std::string key = uniqueCollectionKey(midis, valueMidiCollectionKey(project, collection));
+    midis.emplace(key, std::move(midi));
   }
   if (midis.empty()) {
     throw std::runtime_error("value scanner did not discover " + std::string(label) + " MIDI collections");
@@ -2082,11 +2096,8 @@ std::map<std::string, SynthExportBytes> legacyFormatCollectionSynthExports(const
         collection->instrSets().empty() || collection->sampColls().empty()) {
       continue;
     }
-    const std::string key = legacyMidiCollectionKey(*collection);
-    auto [_, inserted] = exports.emplace(key, legacyCollectionSynthExports(*collection));
-    if (!inserted) {
-      throw std::runtime_error("duplicate legacy " + std::string(label) + " synth collection key: " + key);
-    }
+    const std::string key = uniqueCollectionKey(exports, legacyMidiCollectionKey(*collection));
+    exports.emplace(key, legacyCollectionSynthExports(*collection));
   }
 
   if (exports.empty()) {
@@ -2155,11 +2166,8 @@ std::map<std::string, SynthExportBytes> valueFormatCollectionSynthExports(const 
         collection.sampleCollections.empty()) {
       continue;
     }
-    const std::string key = valueMidiCollectionKey(project, collection);
-    auto [_, inserted] = exports.emplace(key, valueCapcomSnesSynthExports(session, collection.id));
-    if (!inserted) {
-      throw std::runtime_error("duplicate value " + std::string(label) + " synth collection key: " + key);
-    }
+    const std::string key = uniqueCollectionKey(exports, valueMidiCollectionKey(project, collection));
+    exports.emplace(key, valueCapcomSnesSynthExports(session, collection.id));
   }
 
   if (exports.empty()) {
@@ -3082,6 +3090,13 @@ constexpr ParitySuite kKonamiSnesSuite{
     .midiComparison = {.useSharedPlayOnceHorizon = true},
 };
 
+constexpr ParitySuite kNinSnesSuite{
+    .format = "NinSnes",
+    .label = "NinSnes",
+    .filterCollectionsByFormat = true,
+    .midiComparison = {.useSharedPlayOnceHorizon = true},
+};
+
 constexpr ParitySuite kKonamiArcadeSuite{
     .format = "KonamiArcade",
     .label = "KonamiArcade",
@@ -3842,6 +3857,28 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
   out << "MIDI parity mismatch\n";
   out << "legacy events: " << legacy.size() << "\n";
   out << "value events: " << value.size() << "\n";
+  out << "legacy end ticks: ";
+  for (const u64 tick : legacyMidi.endOfTrackTicks) {
+    out << tick << ' ';
+  }
+  out << "\nvalue end ticks:  ";
+  for (const u64 tick : valueMidi.endOfTrackTicks) {
+    out << tick << ' ';
+  }
+  auto describeCounts = [&](std::span<const NormalizedMidiEvent> events) {
+    std::map<std::pair<u32, std::string>, size_t> counts;
+    for (const auto& event : events) {
+      ++counts[{event.track, event.kind}];
+    }
+    for (const auto& [key, count] : counts) {
+      out << " t" << key.first << ':' << key.second << '=' << count;
+    }
+  };
+  out << "\nlegacy event counts:";
+  describeCounts(legacy);
+  out << "\nvalue event counts: ";
+  describeCounts(value);
+  out << "\n";
 
   const size_t shared = std::min(legacy.size(), value.size());
   for (size_t i = 0; i < shared; ++i) {
@@ -3849,9 +3886,10 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
       out << "first mismatch at normalized event " << i << "\n";
       out << "legacy: " << describeEvent(legacy[i]) << "\n";
       out << "value:  " << describeEvent(value[i]) << "\n";
-      const size_t begin = i > 3 ? i - 3 : 0;
-      const size_t legacyEnd = std::min(legacy.size(), i + 4);
-      const size_t valueEnd = std::min(value.size(), i + 4);
+      constexpr size_t kContextRadius = 10;
+      const size_t begin = i > kContextRadius ? i - kContextRadius : 0;
+      const size_t legacyEnd = std::min(legacy.size(), i + kContextRadius + 1);
+      const size_t valueEnd = std::min(value.size(), i + kContextRadius + 1);
       out << "legacy context:\n";
       for (size_t context = begin; context < legacyEnd; ++context) {
         out << "  [" << context << "] " << describeEvent(legacy[context]) << "\n";
@@ -4166,6 +4204,246 @@ int compareKonamiSnesDirectSummary(const std::filesystem::path& path) {
                           valueSummariesForSuite(path, kKonamiSnesSuite));
 }
 
+int compareNinSnesDirectSummary(const std::filesystem::path& path) {
+  return runSummaryParity(kNinSnesSuite, legacySummariesForSuite(path, kNinSnesSuite),
+                          valueSummariesForSuite(path, kNinSnesSuite));
+}
+
+int identifyNinSnesProfiles(const std::filesystem::path& path) {
+  std::vector<NamedBytes> arams;
+  const std::vector<u8> input = readFile(path);
+  if (input.size() == 0x10000) {
+    arams.push_back(NamedBytes{.name = path.filename().string(), .bytes = input});
+  } else if (input.size() >= 0x10100 &&
+             std::string_view(reinterpret_cast<const char*>(input.data()),
+                              std::min<size_t>(input.size(), 27))
+                 .starts_with("SNES-SPC700 Sound File Data")) {
+    arams.push_back(NamedBytes{
+        .name = path.filename().string(),
+        .bytes = std::vector<u8>(input.begin() + 0x100, input.begin() + 0x10100),
+    });
+  } else {
+    arams = legacyExtractedArams(path);
+  }
+  if (arams.empty()) {
+    throw std::runtime_error("loader did not extract any 64 KiB ARAM files from: " + path.string());
+  }
+
+  std::map<vgmtrans::formats::nin_snes::ProfileId, std::string> examples;
+  for (const auto& aram : arams) {
+    const auto layout =
+        vgmtrans::formats::nin_snes::findLayout(ByteReader(SourceId{}, aram.bytes));
+    if (layout) {
+      examples.try_emplace(layout->profile, aram.name);
+    }
+  }
+  if (examples.empty()) {
+    std::cout << "no NinSnes profile\n";
+    return 1;
+  }
+  for (const auto& [id, example] : examples) {
+    std::cout << vgmtrans::formats::nin_snes::profile(id).name << '\t' << example << '\n';
+  }
+  return 0;
+}
+
+int inspectNinSnesSequence(const std::filesystem::path& path) {
+  const std::vector<u8> input = readFile(path);
+  std::span<const u8> aram = input;
+  if (input.size() >= 0x10100 &&
+      std::string_view(reinterpret_cast<const char*>(input.data()), 27)
+          .starts_with("SNES-SPC700 Sound File Data")) {
+    aram = std::span<const u8>(input).subspan(0x100, 0x10000);
+  }
+  const auto layout =
+      vgmtrans::formats::nin_snes::findLayout(ByteReader(SourceId{}, aram));
+  if (!layout) {
+    throw std::runtime_error("no NinSnes layout");
+  }
+  const auto parsed = vgmtrans::formats::nin_snes::decodeSequence(
+      ByteReader(SourceId{}, aram), *layout, AssetId{1});
+  std::cout << vgmtrans::formats::nin_snes::profile(layout->profile).name
+            << " playlist=0x" << std::hex << layout->playlistAddress
+            << " instruments=0x" << layout->instrumentTableAddress.value_or(0)
+            << " dir=0x" << layout->spcDirAddress.value_or(0) << std::dec
+            << " overrides=" << parsed.recipes.overrides.size()
+            << " drum_kits=" << parsed.recipes.drumKits.size()
+            << " vibrato_depth_cents=" << parsed.recipes.maxVibratoDepthCents
+            << " vibrato_rate_hz=" << parsed.recipes.maxVibratoRateHertz << '\n';
+  for (const auto& kit : parsed.recipes.drumKits) {
+    std::cout << "kit " << static_cast<unsigned>(kit.program) << ':';
+    for (const auto& slot : kit.slots) {
+      std::cout << " key=" << static_cast<unsigned>(slot.key)
+                << "/source=" << slot.sourceProgram;
+    }
+    std::cout << '\n';
+  }
+  if (parsed.program.sectionPlaylist) {
+    NinSnesSeq* legacySequence = nullptr;
+    const auto legacyRoot = scanLegacyFile(path);
+    for (const auto& file : legacyRoot->vgmFiles()) {
+      const auto* sequence = std::get_if<VGMSeq*>(&file);
+      if (sequence != nullptr) {
+        legacySequence = dynamic_cast<NinSnesSeq*>(*sequence);
+      }
+      if (legacySequence != nullptr) {
+        break;
+      }
+    }
+    for (const auto& section : parsed.program.sectionPlaylist->sections) {
+      std::cout << "section 0x" << std::hex << section.address.value << ':';
+      for (const auto& start : section.trackStarts) {
+        if (start) {
+          std::cout << " 0x" << start->value;
+        } else {
+          std::cout << " --";
+        }
+      }
+      std::cout << std::dec << '\n';
+      std::cout << "  static stops:";
+      for (size_t trackNumber = 0;
+           trackNumber < section.trackStarts.size(); ++trackNumber) {
+        if (!section.trackStarts[trackNumber]) {
+          std::cout << " --";
+          continue;
+        }
+        const TrackProgram& sourceTrack = parsed.program.tracks.at(trackNumber);
+        std::vector<Address> pending{*section.trackStarts[trackNumber]};
+        std::set<u64> visited;
+        u64 stop = section.trackStarts[trackNumber]->value;
+        while (!pending.empty()) {
+          const Address address = pending.back();
+          pending.pop_back();
+          if (!visited.insert(address.value).second) {
+            continue;
+          }
+          const auto index = sourceTrack.addressIndex.find(address);
+          if (!index) {
+            continue;
+          }
+          const SourceCommand& command = sourceTrack.commands.at(*index);
+          if (!command.flow.terminal) {
+            stop = std::max(stop, command.address.value + command.encodedSize);
+          }
+          if (command.flow.fallthrough) {
+            pending.push_back(*command.flow.fallthrough);
+          }
+          pending.insert(pending.end(), command.flow.staticTargets.begin(),
+                         command.flow.staticTargets.end());
+        }
+        std::cout << " 0x" << std::hex << stop;
+      }
+      std::cout << std::dec << '\n';
+      if (legacySequence != nullptr) {
+        const NinSnesSection* legacySection = nullptr;
+        for (const VGMItem* child : legacySequence->children()) {
+          const auto* candidate = dynamic_cast<const NinSnesSection*>(child);
+          if (candidate != nullptr &&
+              candidate->offset() == section.address.value) {
+            legacySection = candidate;
+            break;
+          }
+        }
+        if (legacySection != nullptr) {
+          std::cout << "  legacy ranges:";
+          for (size_t track = 0; track < section.trackStarts.size(); ++track) {
+            const auto& segment = legacySection->trackSegment(track);
+            if (segment.active) {
+              std::cout << " [0x" << std::hex << segment.rangeOffset
+                        << ",0x" << segment.stopOffset() << ')';
+            } else {
+              std::cout << " --";
+            }
+          }
+          std::cout << std::dec << '\n';
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+int inspectNinSnesPerformance(const std::filesystem::path& path, u32 trackNumber,
+                              u64 tick) {
+  const std::vector<u8> input = readFile(path);
+  std::span<const u8> aram = input;
+  if (input.size() >= 0x10100 &&
+      std::string_view(reinterpret_cast<const char*>(input.data()), 27)
+          .starts_with("SNES-SPC700 Sound File Data")) {
+    aram = std::span<const u8>(input).subspan(0x100, 0x10000);
+  }
+  const auto layout =
+      vgmtrans::formats::nin_snes::findLayout(ByteReader(SourceId{}, aram));
+  if (!layout) {
+    throw std::runtime_error("no NinSnes layout");
+  }
+  const auto parsed = vgmtrans::formats::nin_snes::decodeSequence(
+      ByteReader(SourceId{}, aram), *layout, AssetId{1});
+  const PerformanceSequence performance =
+      SequenceVm(LoopPolicy::PlayOnce)
+          .render(parsed.program,
+                  vgmtrans::formats::nin_snes::sequenceDialect());
+  const auto track = std::ranges::find(
+      performance.tracks, trackNumber, &PerformanceTrack::sourceTrackNumber);
+  if (track == performance.tracks.end()) {
+    throw std::runtime_error("NinSnes performance track does not exist");
+  }
+  for (const PerformanceEvent& event : track->events) {
+    const PerformanceEventHeader& header = performanceEventHeader(event);
+    if (header.tick != tick) {
+      continue;
+    }
+    std::optional<Address> address;
+    for (const TrackProgram& sourceTrack : parsed.program.tracks) {
+      if (sourceTrack.sourceTrackNumber != trackNumber) {
+        continue;
+      }
+      const auto command =
+          std::ranges::find(sourceTrack.commands, header.sourceCommand,
+                            &SourceCommand::id);
+      if (command != sourceTrack.commands.end()) {
+        address = command->address;
+        break;
+      }
+    }
+    std::cout << "event=" << event.index() << " sequence=" << header.sequence
+              << " command=" << header.sourceCommand.value << " address=";
+    if (address) {
+      std::cout << "0x" << std::hex << address->value << std::dec;
+    } else {
+      std::cout << "--";
+    }
+    if (header.automation) {
+      std::cout << " automation=" << header.automation->value;
+      const auto automation =
+          std::ranges::find(track->automations, *header.automation,
+                            &PerformanceAutomation::id);
+      if (automation != track->automations.end()) {
+        std::cout << " automation_command="
+                  << automation->header.sourceCommand.value
+                  << " automation_start=" << automation->header.tick
+                  << " automation_end=" << automation->realization.endTick;
+        for (const TrackProgram& sourceTrack : parsed.program.tracks) {
+          if (sourceTrack.sourceTrackNumber != trackNumber) {
+            continue;
+          }
+          const auto command =
+              std::ranges::find(sourceTrack.commands,
+                                automation->header.sourceCommand,
+                                &SourceCommand::id);
+          if (command != sourceTrack.commands.end()) {
+            std::cout << " automation_address=0x" << std::hex
+                      << command->address.value << std::dec;
+            break;
+          }
+        }
+      }
+    }
+    std::cout << '\n';
+  }
+  return 0;
+}
+
 int compareKonamiArcadeDirectSummary(const std::filesystem::path& path) {
   return runSummaryParity(kKonamiArcadeSuite, legacySummariesForSuite(path, kKonamiArcadeSuite),
                           valueSummariesForSuite(path, kKonamiArcadeSuite));
@@ -4179,6 +4457,11 @@ int compareAkaoSnesDirectSummary(const std::filesystem::path& path) {
 int compareKonamiSnesDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   return runMidiParity(kKonamiSnesSuite, legacyMidisForSuite(path, kKonamiSnesSuite, sequenceLoops),
                        valueMidisForSuite(path, kKonamiSnesSuite, sequenceLoops), sequenceLoops);
+}
+
+int compareNinSnesDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  return runMidiParity(kNinSnesSuite, legacyMidisForSuite(path, kNinSnesSuite, sequenceLoops),
+                       valueMidisForSuite(path, kNinSnesSuite, sequenceLoops), sequenceLoops);
 }
 
 int compareKonamiArcadeDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
@@ -4233,6 +4516,11 @@ int dumpKonamiSnesDirectMidis(const std::filesystem::path& path, const std::file
 int compareKonamiSnesDirectSynth(const std::filesystem::path& path) {
   return runSynthParity(kKonamiSnesSuite, legacySynthsForSuite(path, kKonamiSnesSuite),
                         valueSynthsForSuite(path, kKonamiSnesSuite));
+}
+
+int compareNinSnesDirectSynth(const std::filesystem::path& path) {
+  return runSynthParity(kNinSnesSuite, legacySynthsForSuite(path, kNinSnesSuite),
+                        valueSynthsForSuite(path, kNinSnesSuite));
 }
 
 int compareKonamiArcadeDirectSynth(const std::filesystem::path& path) {
@@ -4439,6 +4727,12 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity konami-snes-direct-midi-sim <rsn-or-spc-file> [sequence-loops]\n"
       << "  vgmtrans-parity konami-snes-direct-synth <rsn-or-spc-file>\n"
       << "  vgmtrans-parity konami-snes-direct-summary <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity nin-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
+      << "  vgmtrans-parity nin-snes-direct-synth <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity nin-snes-direct-summary <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity nin-snes-identify <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity nin-snes-inspect <spc-or-raw-aram-file>\n"
+      << "  vgmtrans-parity nin-snes-inspect-performance <spc-file> <track> <tick>\n"
       << "  vgmtrans-parity konami-arcade-direct-midi <mame-zip-file> [sequence-loops]\n"
       << "  vgmtrans-parity konami-arcade-direct-synth <mame-zip-file>\n"
       << "  vgmtrans-parity konami-arcade-direct-summary <mame-zip-file>\n"
@@ -4504,6 +4798,24 @@ int main(int argc, char** argv) {
       return compareKonamiSnesDirectSummary(argv[2]);
     }
 
+    if (argc == 3 && std::string(argv[1]) == "nin-snes-direct-summary") {
+      return compareNinSnesDirectSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "nin-snes-identify") {
+      return identifyNinSnesProfiles(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "nin-snes-inspect") {
+      return inspectNinSnesSequence(argv[2]);
+    }
+    if (argc == 5 &&
+        std::string(argv[1]) == "nin-snes-inspect-performance") {
+      return inspectNinSnesPerformance(
+          argv[2], static_cast<u32>(std::stoul(argv[3])),
+          static_cast<u64>(std::stoull(argv[4])));
+    }
+
     if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-summary") {
       return compareKonamiArcadeDirectSummary(argv[2]);
     }
@@ -4540,6 +4852,14 @@ int main(int argc, char** argv) {
       return compareKonamiSnesDirectMidi(argv[2], parseLoopCount(argv[3]));
     }
 
+    if (argc == 3 && std::string(argv[1]) == "nin-snes-direct-midi") {
+      return compareNinSnesDirectMidi(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "nin-snes-direct-midi") {
+      return compareNinSnesDirectMidi(argv[2], parseLoopCount(argv[3]));
+    }
+
     if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-midi") {
       return compareKonamiArcadeDirectMidi(argv[2]);
     }
@@ -4566,6 +4886,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "konami-snes-direct-synth") {
       return compareKonamiSnesDirectSynth(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "nin-snes-direct-synth") {
+      return compareNinSnesDirectSynth(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-synth") {

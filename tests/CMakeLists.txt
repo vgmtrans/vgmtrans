@@ -4,6 +4,7 @@ target_sources(vgmtrans-value-core-tests
     formats/CapcomSnesModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
+    formats/NinSnesModuleTests.cpp
     formats/AkaoSnesModuleTests.cpp
     formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
@@ -50,6 +51,8 @@ set_tests_properties(vgmtrans-parity-self-test PROPERTIES LABELS "parity;self-te
 set(VGMTRANS_PARITY_CAPCOM_SNES_FILE "" CACHE FILEPATH "Capcom SNES RSN file used for original/value parity")
 set(VGMTRANS_PARITY_AKAO_SNES_FILE "" CACHE FILEPATH "Akao SNES RSN or SPC file used for original/value parity")
 set(VGMTRANS_PARITY_KONAMI_SNES_FILE "" CACHE FILEPATH "Konami SNES RSN or SPC file used for original/value parity")
+set(VGMTRANS_PARITY_NIN_SNES_FILES "" CACHE STRING
+    "Semicolon-separated NinSnes RSN or SPC files used for original/value parity")
 set(VGMTRANS_PARITY_KONAMI_ARCADE_FILE "" CACHE FILEPATH "Konami Arcade MAME ZIP file used for original/value parity")
 set(VGMTRANS_PARITY_AKAO_FILE "" CACHE FILEPATH "Akao PSF or raw file used for original/value parity")
 set(VGMTRANS_PARITY_NDS_FILE "" CACHE FILEPATH "NDS or 2SF file used for original/value parity")
@@ -95,6 +98,17 @@ if(VGMTRANS_PARITY_KONAMI_SNES_FILE)
   add_vgmtrans_parity_corpus_test(
     konami-snes-synth konami-snes konami-snes-direct-synth "${VGMTRANS_PARITY_KONAMI_SNES_FILE}")
 endif()
+
+set(nin_snes_parity_index 0)
+foreach(nin_snes_file IN LISTS VGMTRANS_PARITY_NIN_SNES_FILES)
+  math(EXPR nin_snes_parity_index "${nin_snes_parity_index} + 1")
+  add_vgmtrans_parity_corpus_test(
+    "nin-snes-${nin_snes_parity_index}-summary" nin-snes nin-snes-direct-summary "${nin_snes_file}")
+  add_vgmtrans_parity_corpus_test(
+    "nin-snes-${nin_snes_parity_index}-midi" nin-snes nin-snes-direct-midi "${nin_snes_file}")
+  add_vgmtrans_parity_corpus_test(
+    "nin-snes-${nin_snes_parity_index}-synth" nin-snes nin-snes-direct-synth "${nin_snes_file}")
+endforeach()
 
 if(VGMTRANS_PARITY_KONAMI_ARCADE_FILE)
   add_vgmtrans_parity_corpus_test(

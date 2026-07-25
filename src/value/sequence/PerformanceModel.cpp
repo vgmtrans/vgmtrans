@@ -64,6 +64,7 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
           .track = tempo->header.track,
           .sequence = tempo->header.sequence,
           .order = changes_.size(),
+          .force = tempo->force,
       });
     }
   }
@@ -72,7 +73,7 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
   });
   std::optional<u32> currentTempo;
   std::erase_if(changes_, [&](const Change& change) {
-    if (currentTempo && *currentTempo == change.microsecondsPerQuarter) {
+    if (!change.force && currentTempo && *currentTempo == change.microsecondsPerQuarter) {
       return true;
     }
     currentTempo = change.microsecondsPerQuarter;
@@ -129,6 +130,18 @@ bool PerformanceTempoMap::contains(const TempoPerformanceEvent& event) const {
     return change.tick == event.header.tick && change.track == event.header.track &&
            change.sequence == event.header.sequence && change.microsecondsPerQuarter == event.microsecondsPerQuarter;
   });
+}
+
+std::vector<PerformanceTempoMap::Point> PerformanceTempoMap::points() const {
+  std::vector<Point> result;
+  result.reserve(changes_.size());
+  for (const Change& change : changes_) {
+    result.push_back(Point{
+        .tick = change.tick,
+        .microsecondsPerQuarter = change.microsecondsPerQuarter,
+    });
+  }
+  return result;
 }
 
 const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id) {

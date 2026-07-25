@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
 #include "value/model/SourceMap.h"
 
@@ -180,6 +181,46 @@ struct TrackProgram {
   AddressIndex addressIndex;
 };
 
+// Some drivers arrange a song as a playlist of parallel track sections. A
+// section starts every listed channel at once, and the first EndSection command
+// advances the whole playlist. Track state survives that boundary; call stacks
+// and other control-flow state do not.
+struct SequenceSection {
+  Address address;
+  // Entries align with SequenceProgram::tracks. nullopt means that channel is
+  // inactive for this section.
+  std::vector<std::optional<Address>> trackStarts;
+};
+
+struct PlaylistPlaySection {
+  Address section;
+};
+
+struct PlaylistRepeat {
+  // Number of additional jumps after the first pass through the destination.
+  u32 additionalPlays = 0;
+  Address destination;
+  bool infinite = false;
+};
+
+struct PlaylistEnd {};
+
+using PlaylistOperation = std::variant<PlaylistPlaySection, PlaylistRepeat, PlaylistEnd>;
+
+struct PlaylistCommand {
+  Address address;
+  Address fallthrough;
+  SourceRange range;
+  SourceAnnotationId annotation;
+  PlaylistOperation operation;
+};
+
+struct SectionPlaylist {
+  Address startAddress;
+  std::vector<SequenceSection> sections;
+  std::vector<PlaylistCommand> commands;
+};
+
 // Positional pan needs a source-domain law to define its channel gains.
 // Unspecified is an internal sentinel used while program and dialect behavior
 // are being resolved; emitting positional pan with it is an error.
@@ -213,13 +254,28 @@ struct SequenceProgramConfig {
   u32 profile = 0;
 };
 
+// Some bytecode commands select records indirectly from source memory at
+// runtime. Preserve only the bounded source blocks they may address so the
+// semantic VM remains deterministic and source-free without retaining an
+// entire ROM/ARAM image.
+struct SequenceDataBlock {
+  Address address;
+  std::vector<u8> bytes;
+};
+
 struct SequenceProgram {
   DialectId dialect;
   Timebase timebase;
   Address sourceBaseAddress;
   SequenceProgramConfig config;
   SequenceProgramBehavior behavior;
+  // Some drivers translate their encoded program byte through a table before
+  // selecting an instrument. Decode that table once so runtime behavior stays
+  // source-free while still emitting stable source-domain identities.
+  std::vector<InstrumentIdentity> sourceProgramMap;
+  std::vector<SequenceDataBlock> dataBlocks;
   std::vector<TrackProgram> tracks;
+  std::optional<SectionPlaylist> sectionPlaylist;
 };
 
 [[nodiscard]] const TrackProgram* trackById(const SequenceProgram& program, TrackId id);

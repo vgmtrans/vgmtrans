@@ -1004,6 +1004,160 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
          "one requested semantic loop should replay every track together");
 }
 
+struct PlaylistProbeTrackState {
+  u32 sectionsStarted = 0;
+  u32 persistentValue = 0;
+
+  void beginSection() { ++sectionsStarted; }
+};
+
+struct PlaylistProbePlayback {
+  PlaylistProbeTrackState& track;
+  PerformanceEmitter& out;
+  VmApi& vm;
+};
+
+Effects executePlaylistProbe(const SourceCommand& command, std::any&, std::any& trackState,
+                             PerformanceEmitter& out, VmApi& vm) {
+  auto& state = std::any_cast<PlaylistProbeTrackState&>(trackState);
+  if ((command.address.value & 1) != 0) {
+    return Effects{.step = vm.endSection()};
+  }
+
+  ++state.persistentValue;
+  out.note(state.sectionsStarted * 10 + state.persistentValue, 1.0, command.opcode);
+  return Effects::wait(command.opcode);
+}
+
+std::any createPlaylistProbeTrackState(const SequenceProgram&, const TrackProgram&) {
+  return PlaylistProbeTrackState{};
+}
+
+void beginPlaylistProbeSection(std::any& trackState,
+                               std::optional<u64>) {
+  std::any_cast<PlaylistProbeTrackState&>(trackState).beginSection();
+}
+
+TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32, u8>> sections) {
+  TrackProgram track{
+      .id = TrackId{trackId},
+      .sourceTrackNumber = trackId,
+      .startAddress = Address{sections.begin()->first},
+  };
+  TrackProgramBuilder builder(track);
+  for (const auto [address, duration] : sections) {
+    builder.addSemantic(Address{address}, duration, 1, {}, {}, DecodeFlow::fallthroughTo(Address{address + 1}));
+    builder.addSemantic(Address{address + 1}, 0, 1, {}, {}, DecodeFlow::terminalFlow());
+  }
+  return track;
+}
+
+SequenceDialect playlistProbeDialect() {
+  return SequenceDialect{
+      .id = DialectId{.value = "section-playlist-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .createTrackState = createPlaylistProbeTrackState,
+      .execute = executePlaylistProbe,
+      .beginTrackSection = beginPlaylistProbeSection,
+  };
+}
+
+void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
+  const SequenceDialect dialect = playlistProbeDialect();
+  const TrackProgram track0 = playlistProbeTrack(0, {{0, 8}});
+  const TrackProgram track1 = playlistProbeTrack(1, {{100, 12}, {110, 4}});
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track0, track1},
+      .sectionPlaylist =
+          SectionPlaylist{
+              .startAddress = Address{1000},
+              .sections =
+                  {
+                      SequenceSection{.address = Address{500}, .trackStarts = {Address{0}, Address{100}}},
+                      SequenceSection{.address = Address{600}, .trackStarts = {std::nullopt, Address{110}}},
+                  },
+              .commands =
+                  {
+                      PlaylistCommand{
+                          .address = Address{1000},
+                          .fallthrough = Address{1002},
+                          .operation = PlaylistPlaySection{.section = Address{500}},
+                      },
+                      PlaylistCommand{
+                          .address = Address{1002},
+                          .fallthrough = Address{1004},
+                          .operation = PlaylistPlaySection{.section = Address{600}},
+                      },
+                      PlaylistCommand{.address = Address{1004}, .operation = PlaylistEnd{}},
+                  },
+          },
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty(), "parallel section fixture should render without diagnostics");
+  expect(performance.tracks.size() == 2 && performance.tracks[0].endTick == 12 &&
+             performance.tracks[1].endTick == 12,
+         "the earliest section end should restart every channel at one shared tick");
+  const auto& firstLongNote = std::get<NotePerformanceEvent>(performance.tracks[1].events[0]);
+  const auto& secondSectionNote = std::get<NotePerformanceEvent>(performance.tracks[1].events[1]);
+  expect(firstLongNote.header.tick == 0 && firstLongNote.durationTicks == 8,
+         "a section switch should trim a longer sibling channel at the boundary");
+  expect(secondSectionNote.header.tick == 8 && secondSectionNote.durationTicks == 4 &&
+             secondSectionNote.key == 22.0,
+         "track state should persist while the section-begin hook resets transient state");
+}
+
+void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
+  const SequenceDialect dialect = playlistProbeDialect();
+  const TrackProgram track = playlistProbeTrack(0, {{0, 4}});
+  const auto makeProgram = [&](bool infinite) {
+    return SequenceProgram{
+        .dialect = dialect.id,
+        .timebase = dialect.timebase,
+        .tracks = {track},
+        .sectionPlaylist =
+            SectionPlaylist{
+                .startAddress = Address{1000},
+                .sections = {SequenceSection{.address = Address{500}, .trackStarts = {Address{0}}}},
+                .commands =
+                    {
+                        PlaylistCommand{
+                            .address = Address{1000},
+                            .fallthrough = Address{1002},
+                            .operation = PlaylistPlaySection{.section = Address{500}},
+                        },
+                        PlaylistCommand{
+                            .address = Address{1002},
+                            .fallthrough = Address{1004},
+                            .operation = PlaylistRepeat{
+                                .additionalPlays = infinite ? 0u : 1u,
+                                .destination = Address{1000},
+                                .infinite = infinite,
+                            },
+                        },
+                        PlaylistCommand{.address = Address{1004}, .operation = PlaylistEnd{}},
+                    },
+            },
+    };
+  };
+
+  const PerformanceSequence finite = SequenceVm().render(makeProgram(false), dialect);
+  expect(finite.tracks[0].endTick == 8 && finite.tracks[0].events.size() == 2,
+         "a finite playlist repeat should play its destination the requested additional time");
+
+  const PerformanceSequence playOnce = SequenceVm().render(makeProgram(true), dialect);
+  expect(playOnce.tracks[0].endTick == 4 && playOnce.tracks[0].events.size() == 1,
+         "an infinite playlist repeat should stop at its first loop boundary by default");
+
+  const PerformanceSequence oneRepeat =
+      SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1})
+          .render(makeProgram(true), dialect);
+  expect(oneRepeat.tracks[0].endTick == 8 && oneRepeat.tracks[0].events.size() == 2,
+         "a requested playlist loop should replay every section once more");
+}
+
 }  // namespace
 
 void runValueSequenceVmTests() {
@@ -1032,4 +1186,6 @@ void runValueSequenceVmTests() {
   sequenceVmReportsMissingJumpTargetAfterEmittedEvents();
   sequenceVmSchedulesSemanticTracksAgainstOneProgramState();
   sequenceVmCoordinatesSemanticLoopsAtSequenceScope();
+  sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd();
+  sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats();
 }
