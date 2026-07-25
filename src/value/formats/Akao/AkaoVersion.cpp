@@ -24,6 +24,21 @@ namespace {
   return std::ranges::any_of(needles, [text](std::string_view needle) { return text.find(needle) != text.npos; });
 }
 
+[[nodiscard]] std::string normalizedSourceText(const SourceFile& source) {
+  std::string haystack = source.name;
+  if (source.title) {
+    haystack += " ";
+    haystack += *source.title;
+  }
+  if (!source.path.empty()) {
+    haystack += " ";
+    haystack += source.path.string();
+  }
+  std::ranges::transform(haystack, haystack.begin(),
+                         [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  return haystack;
+}
+
 }  // namespace
 
 std::string versionName(AkaoPs1Version version) {
@@ -53,17 +68,7 @@ std::string dialectId(AkaoPs1Version version) {
 }
 
 AkaoPs1Version determineVersionFromSource(const SourceFile& source) {
-  std::string haystack = source.name;
-  if (source.title) {
-    haystack += " ";
-    haystack += *source.title;
-  }
-  if (!source.path.empty()) {
-    haystack += " ";
-    haystack += source.path.string();
-  }
-  std::ranges::transform(haystack, haystack.begin(),
-                         [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  const std::string haystack = normalizedSourceText(source);
 
   if (containsAny(haystack, {"chocobo dungeon 2", "final fantasy viii", "final fantasy 8", "chocobo racing",
                              "saga frontier 2", "racing lagoon"})) {
@@ -89,6 +94,21 @@ AkaoPs1Version determineVersionFromSource(const SourceFile& source) {
     return AkaoPs1Version::Version3_0;
   }
   return AkaoPs1Version::Unknown;
+}
+
+PanLaw defaultPanLaw(AkaoPs1Version version) {
+  // The original v1.0 driver uses a linear, constant-sum table. Later known
+  // drivers use the equal-power family unless a game-specific profile below
+  // identifies an early v1.2 exception.
+  return version == AkaoPs1Version::Version1_0 ? PanLaw::ConstantSum : PanLaw::EqualPower;
+}
+
+PanLaw determinePanLawFromSource(const SourceFile& source, AkaoPs1Version version) {
+  const std::string haystack = normalizedSourceText(source);
+  if (containsAny(haystack, {"final fantasy vii", "final fantasy 7", "front mission 2"})) {
+    return PanLaw::ConstantSum;
+  }
+  return defaultPanLaw(version);
 }
 
 AkaoPs1Version guessSequenceVersion(ByteReader reader, u32 offset) {

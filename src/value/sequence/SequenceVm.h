@@ -50,7 +50,7 @@ private:
 class PerformanceEmitter {
 public:
   PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick,
-                     u64& nextSequence, u32& nextNote, u32& nextAutomation);
+                     u64& nextSequence, u32& nextNote, u32& nextAutomation, PanLaw panLaw = PanLaw::Unspecified);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   PerformanceNoteId note(NotePerformanceEvent event);
@@ -148,6 +148,7 @@ private:
   u64& nextSequence_;
   u32& nextNote_;
   u32& nextAutomation_;
+  PanLaw panLaw_ = PanLaw::Unspecified;
   std::optional<u32> automation_;
 };
 

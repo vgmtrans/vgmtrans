@@ -13,6 +13,7 @@
 #include <cmath>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -121,6 +122,24 @@ struct LoweredStereoBalance {
       .pan = pan,
       .expressionGain = midiGain == 0.0 ? 0.0 : (sourceLeft + sourceRight) / midiGain,
   };
+}
+
+[[nodiscard]] LoweredStereoBalance lowerPositionalPan(PanLaw law, double stereoPosition) {
+  const double position = std::clamp(stereoPosition, -1.0, 1.0);
+  switch (law) {
+    case PanLaw::ConstantSum: {
+      const double rightGain = (position + 1.0) / 2.0;
+      return lowerStereoBalance(1.0 - rightGain, rightGain);
+    }
+    case PanLaw::EqualPower:
+      return LoweredStereoBalance{
+          .pan = midiPan(position),
+          .expressionGain = 1.0,
+      };
+    case PanLaw::Unspecified:
+      throw std::logic_error("Cannot render positional pan without a declared pan law");
+  }
+  throw std::logic_error("Unknown positional pan law");
 }
 
 [[nodiscard]] u8 midiNormalized7(double amount) {
@@ -746,10 +765,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
                                 automationState);
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
-          state.sourcePanPosition = typedEvent.stereoPosition;
+          const LoweredStereoBalance lowered = lowerPositionalPan(typedEvent.law, typedEvent.stereoPosition);
+          state.sourcePanPosition = (static_cast<double>(lowered.pan) / 63.5) - 1.0;
           addCombinedPan(track, state, typedEvent.header.tick, channel, automationState, automationState == nullptr);
-          if (typedEvent.hasLinearGain) {
-            state.panExpressionGain = typedEvent.linearGain;
+          const double previousPanExpressionGain = state.panExpressionGain;
+          state.panExpressionGain = lowered.expressionGain * (typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0);
+          if (state.panExpressionGain != previousPanExpressionGain) {
             addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
                                   automationState);
           }

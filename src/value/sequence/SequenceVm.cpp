@@ -396,8 +396,8 @@ public:
     const u64 beginTick = runtime_.tick;
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
-    PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,     beginTick,
-                           runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation};
+    PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,      beginTick,
+                           runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr || dialect_.execute == nullptr) {
       warn("Missing sequence dialect executor state", command.range);
@@ -548,8 +548,8 @@ private:
 
     for (u32 elapsed = 0; elapsed < ticks; ++elapsed) {
       ++runtime_.tick;
-      PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,     runtime_.tick,
-                             runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation};
+      PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,      runtime_.tick,
+                             runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
       VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
       if (programState_ == nullptr) {
         warn("Missing sequence program state", command.range);
@@ -884,7 +884,8 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
                                  0,
                                  runtime.outputSequence,
                                  runtime.nextNote,
-                                 runtime.nextAutomation};
+                                 runtime.nextAutomation,
+                                 behavior.panLaw};
           VmApi vm = detail::VmApiAccess::make(runtime, prepass, command);
           static_cast<void>(dialect.execute(command, programState, trackState, out, vm));
         }
@@ -925,6 +926,12 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
     behavior.commandLimit = program.behavior.commandLimit;
   } else if (dialect.defaultBehavior.commandLimit != 0) {
     behavior.commandLimit = dialect.defaultBehavior.commandLimit;
+  }
+
+  if (program.behavior.panLaw != PanLaw::Unspecified) {
+    behavior.panLaw = program.behavior.panLaw;
+  } else if (dialect.defaultBehavior.panLaw != PanLaw::Unspecified) {
+    behavior.panLaw = dialect.defaultBehavior.panLaw;
   }
 
   if (program.behavior.initialReverbSend) {

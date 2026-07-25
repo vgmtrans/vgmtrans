@@ -675,6 +675,7 @@ const SequenceDialect& ndsSequenceDialect() {
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
+              .panLaw = PanLaw::EqualPower,
           },
   });
   return dialect;

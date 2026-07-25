@@ -178,7 +178,15 @@ struct TrackProgram {
   Address startAddress;
   std::vector<SourceCommand> commands;
   AddressIndex addressIndex;
+};
 
+// Positional pan needs a source-domain law to define its channel gains.
+// Unspecified is an internal sentinel used while program and dialect behavior
+// are being resolved; emitting positional pan with it is an error.
+enum class PanLaw {
+  Unspecified,
+  ConstantSum,
+  EqualPower,
 };
 
 // Driver settings that affect playback but are not individual source commands,
@@ -187,6 +195,9 @@ struct SequenceProgramBehavior {
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
   // Zero means "use the next default": program -> dialect -> VM fallback.
   u32 commandLimit = 0;
+  // Formats that emit a normalized pan position declare its law once here.
+  // Formats with exact left/right gains should emit StereoBalance instead.
+  PanLaw panLaw = PanLaw::Unspecified;
   // Some drivers rely on channel defaults that are not source opcodes. Keep
   // them in behavior so formats opt in explicitly and exporters can emit stable
   // initialization without attaching it to a fake source command.

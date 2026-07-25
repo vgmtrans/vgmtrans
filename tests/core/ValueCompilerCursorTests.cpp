@@ -141,6 +141,10 @@ SequenceDialect compilerProbeDialect() {
   return makeCompiledDialect<CompilerProbeState, CompilerProbePlayback>(SequenceDialect{
       .id = DialectId{.value = "compiler-probe"},
       .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior =
+          SequenceProgramBehavior{
+              .panLaw = PanLaw::EqualPower,
+          },
   });
 }
 

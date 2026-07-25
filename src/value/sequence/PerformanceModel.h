@@ -119,6 +119,9 @@ struct PanPerformanceEvent {
   PerformanceEventHeader header;
   // -1.0 is hard left, 0.0 is center, and 1.0 is hard right.
   double stereoPosition = 0.0;
+  // Resolved from the source program's driver behavior when emitted. Keeping
+  // it on the event makes the performance IR self-contained.
+  PanLaw law = PanLaw::Unspecified;
   // Some source pan laws also change loudness. Keep that as neutral gain here;
   // MIDI-specific expression compensation belongs to the renderer.
   double linearGain = 1.0;
