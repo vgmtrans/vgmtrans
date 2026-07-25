@@ -269,12 +269,12 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     if (info.source.valid()) {
       instrument.source(name, info.source, info.override ? "nin-snes-instrument-override" : "nin-snes-instrument");
     }
+    const bool rateBasedGain = (info.adsr1 & 0x80) == 0 && (info.gain & 0x80) != 0;
     Region region{
         .unityKey = unityKey(reader, layout, info),
-        // The legacy NinSnes exporter never implemented direct GAIN-mode
-        // envelopes. Preserve that established export contract instead of
-        // inventing a decay for instrument slots whose ADSR enable bit is off.
-        .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, info.gain) : Envelope{},
+        // Direct GAIN is fully described by the header. Rate-based GAIN starts
+        // from the DSP's live envelope, so a static region cannot infer it.
+        .envelope = rateBasedGain ? Envelope{} : snesDspEnvelope(info.adsr1, info.adsr2, info.gain),
     };
     instrument.region(*sample, region)
         .source("Region", info.source, "nin-snes-region")

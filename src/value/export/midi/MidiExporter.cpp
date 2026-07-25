@@ -124,8 +124,12 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
               {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), typedEvent.velocity});
           endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, NoteDuration>) {
+          // Keep a zero-length note's on/off pair in source order. Sorting its
+          // off before its on would leave the attack hanging until some later
+          // note of the same key releases it.
+          const int noteOnPriority = typedEvent.duration == 0 ? 40 : 50;
           addMessage(
-              messages, typedEvent.tick, 50,
+              messages, typedEvent.tick, noteOnPriority,
               {static_cast<u8>(0x90 | channel4(typedEvent.channel)), data7(typedEvent.key), typedEvent.velocity});
           addMessage(messages, typedEvent.tick + typedEvent.duration, 40,
                      {static_cast<u8>(0x80 | channel4(typedEvent.channel)), data7(typedEvent.key), 64});

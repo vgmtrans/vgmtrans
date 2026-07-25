@@ -57,6 +57,7 @@ void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
 void ninSnesProfilesDescribeEverySupportedDriverFamily();
 void ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
 void ninSnesPercussionStartsPerNoteVibratoFade();
+void ninSnesGainModeInstrumentsUseDspEnvelope();
 void mameRomDatabaseAndGroupAssemblyAreValueOriented();
 void konamiArcadeModuleBuildsSequencesSynthAndCollections();
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
@@ -162,6 +163,7 @@ int main() {
     ninSnesProfilesDescribeEverySupportedDriverFamily();
     ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
     ninSnesPercussionStartsPerNoteVibratoFade();
+    ninSnesGainModeInstrumentsUseDspEnvelope();
     mameRomDatabaseAndGroupAssemblyAreValueOriented();
     konamiArcadeModuleBuildsSequencesSynthAndCollections();
     konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();

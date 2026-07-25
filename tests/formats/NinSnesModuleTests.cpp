@@ -141,3 +141,47 @@ void ninSnesPercussionStartsPerNoteVibratoFade() {
       });
   expect(vibratoFadeSamples != 0, "percussion notes should advance a configured per-note vibrato fade");
 }
+
+void ninSnesGainModeInstrumentsUseDspEnvelope() {
+  std::vector<u8> bytes(kAramSize);
+
+  // One direct-GAIN instrument followed by a structurally invalid header that
+  // terminates the table. Its sample is a single non-looping BRR block.
+  bytes[0x4000] = 0;
+  bytes[0x4001] = 0;
+  bytes[0x4002] = 0;
+  bytes[0x4003] = 0x7f;
+  bytes[0x4004] = 1;
+  bytes[0x4005] = 0;
+  bytes[0x4006] = 0x80;
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  bytes[0x6000] = 0x01;
+
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "gain-mode.spc"}, std::move(bytes));
+  ScanIdAllocator ids;
+  ScanResultBuilder result(
+      ScanInput{
+          .source = sources.source(source),
+          .reader = sources.reader(source),
+          .ids = ids,
+      },
+      "NinSnes");
+  const auto instrumentSet = result.reserveInstrumentSet();
+  const auto sampleCollection = result.reserveSampleCollection();
+  Layout layout = standardLayout();
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x5000;
+
+  expect(addSynth(result, instrumentSet, sampleCollection, layout, {}, "GAIN"),
+         "NinSnes synth builder should accept a direct-GAIN instrument");
+  const ScanResult scan = result.finish();
+  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  expect(instruments != nullptr && instruments->instruments.size() == 1 &&
+             instruments->instruments[0].regions.size() == 1,
+         "direct-GAIN fixture should produce one instrument region");
+  const Envelope& envelope = instruments->instruments[0].regions[0].envelope;
+  expect(envelope.sustainAmplitude && *envelope.sustainAmplitude > 0.99 && *envelope.sustainAmplitude < 1.0,
+         "direct GAIN should become the DSP's fixed sustain level instead of an unspecified envelope");
+}
