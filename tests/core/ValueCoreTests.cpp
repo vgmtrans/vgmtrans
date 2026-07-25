@@ -73,6 +73,7 @@ void akaoTablePointersUseNonControlSourceLinks();
 void akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks();
 void akaoRepeatSourceLinksUseSpecificRolesOnly();
 void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange();
+void akaoPanLawFollowsDriverProfile();
 void akaoLoopBranchUsesCurrentRepeatPass();
 void akaoTieAfterRestDoesNotExtendPreviousNote();
 void akaoTempoFadeEmitsDriverTickRamp();
@@ -174,6 +175,7 @@ int main() {
     akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks();
     akaoRepeatSourceLinksUseSpecificRolesOnly();
     akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange();
+    akaoPanLawFollowsDriverProfile();
     akaoLoopBranchUsesCurrentRepeatPass();
     akaoTieAfterRestDoesNotExtendPreviousNote();
     akaoTempoFadeEmitsDriverTickRamp();

@@ -157,8 +157,14 @@ struct ModulationRanges {
   return std::min(pan, version <= KONAMISNES_V2 ? u8{20} : u8{40});
 }
 
-// Converts the driver's version-specific pan table into the shared -1..1 scale.
-[[nodiscard]] double stereoPositionFromPan(KonamiSnesVersion version, u8 rawPan) {
+struct PanGains {
+  double left = 0.0;
+  double right = 0.0;
+};
+
+// Preserve the driver's version-specific table as exact channel gains. The
+// normalized position below is only metadata for the automation intent.
+[[nodiscard]] PanGains panGains(KonamiSnesVersion version, u8 rawPan) {
   const u8 pan = clampPan(version, rawPan);
   u8 left = 0;
   u8 right = 0;
@@ -172,8 +178,17 @@ struct ModulationRanges {
     left = kPanTable[40 - pan];
     right = kPanTable[pan];
   }
-  const double total = static_cast<double>(left) + right;
-  return total == 0.0 ? 0.0 : std::clamp((right / total) * 2.0 - 1.0, -1.0, 1.0);
+  const double fullScale = version == KONAMISNES_V1 ? 127.0 : 254.0;
+  return PanGains{
+      .left = left / fullScale,
+      .right = right / fullScale,
+  };
+}
+
+[[nodiscard]] double stereoPositionFromPan(KonamiSnesVersion version, u8 rawPan) {
+  const PanGains gains = panGains(version, rawPan);
+  const double total = gains.left + gains.right;
+  return total == 0.0 ? 0.0 : std::clamp((gains.right / total) * 2.0 - 1.0, -1.0, 1.0);
 }
 
 // Holds one track's vibrato settings and its optional depth fade. The fade is
@@ -467,7 +482,8 @@ struct Playback {
   void pan(u8 rawPan) {
     const u8 value = clampPan(track.version, rawPan);
     track.panFade.setCurrentRaw(value);
-    out.pan(stereoPositionFromPan(track.version, value));
+    const PanGains gains = panGains(track.version, value);
+    out.stereoBalance(gains.left, gains.right);
   }
 
   void tuning(s8 value) {
@@ -649,7 +665,8 @@ struct Playback {
     }));
     static_cast<void>(track.panFade.tickRaw([&](s32 rawPan) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawPan, 0, 0xff));
-      track.panFade.output(out).pan(stereoPositionFromPan(track.version, value));
+      const PanGains gains = panGains(track.version, value);
+      track.panFade.output(out).stereoBalance(gains.left, gains.right);
     }));
     if (track.pitchBase && track.pitchSlide.active()) {
       const auto pitchTick = track.pitchSlide.tick();

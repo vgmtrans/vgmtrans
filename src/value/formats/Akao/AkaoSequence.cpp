@@ -80,8 +80,9 @@ struct TrackState {
   std::optional<PendingPitchSlide> pendingPitchSlide;
 };
 
-[[nodiscard]] double rightGainFromLinearPan(u8 rawPan) {
-  return rawPan == 127 ? 1.0 : rawPan / 128.0;
+[[nodiscard]] double stereoPositionFromPan(u8 rawPan) {
+  const double rightGain = rawPan == 127 ? 1.0 : rawPan / 128.0;
+  return (rightGain * 2.0) - 1.0;
 }
 
 [[nodiscard]] u16 akaoZeroAs256(u8 rawValue) {
@@ -524,9 +525,8 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     case 0xaa: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
-      const double rightGain = rightGainFromLinearPan(pan);
       event.set<&TrackState::pan>(pan);
-      return event.emitStereoBalance(1.0 - rightGain, rightGain);
+      return event.emitPan(stereoPositionFromPan(pan));
     }
     case 0xab: {
       auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
@@ -534,12 +534,10 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       const u8 target = event.u8("target_pan", SemanticOperandRole::Pan);
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, u8 targetPan) {
-            const double targetRightGain = rightGainFromLinearPan(targetPan);
-            const auto automation =
-                playback.out.fade(PerformanceAutomationTarget::Pan, (targetRightGain * 2.0) - 1.0, fadeTicks);
+            const double targetPosition = stereoPositionFromPan(targetPan);
+            const auto automation = playback.out.fade(PerformanceAutomationTarget::Pan, targetPosition, fadeTicks);
             playback.controllerSlide(playback.track.pan, targetPan, fadeTicks, [&](u64 tick, u8 value) {
-              const double rightGain = rightGainFromLinearPan(value);
-              automation.at(playback.out, tick).stereoBalance(1.0 - rightGain, rightGain);
+              automation.at(playback.out, tick).pan(stereoPositionFromPan(value));
             });
           },
           duration, target);
@@ -837,6 +835,7 @@ SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::Default,
               .commandLimit = kAkaoMaxTrackCommands,
+              .panLaw = defaultPanLaw(version),
               .initialLevel = 1.0,
               .initialPitchBendRangeSemitones = 12,
           },
@@ -956,6 +955,7 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
   const std::string name = fmt::format("Akao Seq {:02X}", analysis.header.sequenceId);
   SequenceProgram program = dialect.makeProgram(Address{offset});
   program.config.profile = static_cast<u32>(analysis.header.version);
+  program.behavior.panLaw = determinePanLawFromSource(input.source, analysis.header.version);
 
   if (sourceMap != nullptr) {
     auto header = sourceMap->header("AKAO Sequence Header", reader.range(offset, analysis.header.trackHeaderOffset))

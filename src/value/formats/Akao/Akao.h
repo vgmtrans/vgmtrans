@@ -79,6 +79,8 @@ struct AkaoProfile {
 [[nodiscard]] std::string versionName(AkaoPs1Version version);
 [[nodiscard]] std::string dialectId(AkaoPs1Version version);
 [[nodiscard]] AkaoPs1Version determineVersionFromSource(const core::SourceFile& source);
+[[nodiscard]] core::PanLaw defaultPanLaw(AkaoPs1Version version);
+[[nodiscard]] core::PanLaw determinePanLawFromSource(const core::SourceFile& source, AkaoPs1Version version);
 [[nodiscard]] AkaoPs1Version guessSequenceVersion(core::ByteReader reader, u32 offset);
 [[nodiscard]] AkaoPs1Version guessSampleVersion(core::ByteReader reader, u32 offset);
 

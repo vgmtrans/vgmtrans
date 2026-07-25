@@ -38,14 +38,14 @@ namespace {
 
 PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand,
                                        SourceAnnotationId sourceAnnotation, u64 tick, u64& nextSequence, u32& nextNote,
-                                       u32& nextAutomation)
+                                       u32& nextAutomation, PanLaw panLaw)
     : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick),
-      nextSequence_(nextSequence), nextNote_(nextNote), nextAutomation_(nextAutomation) {
+      nextSequence_(nextSequence), nextNote_(nextNote), nextAutomation_(nextAutomation), panLaw_(panLaw) {
 }
 
 PerformanceEmitter PerformanceEmitter::at(u64 tick) const {
-  auto output =
-      PerformanceEmitter{track_, sourceCommand_, sourceAnnotation_, tick, nextSequence_, nextNote_, nextAutomation_};
+  auto output = PerformanceEmitter{track_,        sourceCommand_, sourceAnnotation_, tick,
+                                   nextSequence_, nextNote_,      nextAutomation_,   panLaw_};
   output.automation_ = automation_;
   return output;
 }
@@ -175,6 +175,12 @@ void PerformanceEmitter::expression(double linearGain, LevelPrecisionHint precis
 }
 
 void PerformanceEmitter::pan(PanPerformanceEvent event) {
+  if (event.law == PanLaw::Unspecified) {
+    event.law = panLaw_;
+  }
+  if (event.law == PanLaw::Unspecified) {
+    throw std::logic_error("Positional pan requires a declared pan law");
+  }
   append(std::move(event));
 }
 

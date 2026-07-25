@@ -218,6 +218,30 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   expect(rejectedOtherTrack, "an automation binding should not attach to another performance track");
 }
 
+void performanceEmitterResolvesDeclaredPanLawIntoEvents() {
+  PerformanceTrack track{.id = TrackId{3}};
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track,        CommandId{9}, SourceAnnotationId{11}, 0,
+                         nextSequence, nextNote,     nextAutomation,         PanLaw::ConstantSum};
+
+  out.pan(0.0);
+  expect(std::get<PanPerformanceEvent>(track.events.front()).law == PanLaw::ConstantSum,
+         "positional pan events should retain the program's resolved pan law");
+
+  PerformanceTrack undeclaredTrack{.id = TrackId{4}};
+  PerformanceEmitter undeclared{undeclaredTrack, CommandId{10}, SourceAnnotationId{12}, 0,
+                                nextSequence,    nextNote,      nextAutomation};
+  bool rejectedUndeclaredPan = false;
+  try {
+    undeclared.pan(0.0);
+  } catch (const std::logic_error&) {
+    rejectedUndeclaredPan = true;
+  }
+  expect(rejectedUndeclaredPan, "positional pan should reject a format that did not declare its pan law");
+}
+
 void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
   PerformanceTrack track{.id = TrackId{5}};
   u64 nextSequence = 0;
@@ -301,5 +325,6 @@ void runValueSequenceModelTests() {
   collectionIssueHelpersValidateStoredStatus();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
+  performanceEmitterResolvesDeclaredPanLawIntoEvents();
   pitchTransitionApiPreservesSamplesAndRealizedLifecycle();
 }

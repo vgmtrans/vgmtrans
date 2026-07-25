@@ -348,6 +348,7 @@ void performanceMidiRendererCombinesExpressionWithPanGain() {
                   PanPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 36},
                       .stereoPosition = 0.0,
+                      .law = PanLaw::EqualPower,
                       .linearGain = 0.25,
                       .hasLinearGain = true,
                   },
@@ -379,6 +380,45 @@ void performanceMidiRendererCombinesExpressionWithPanGain() {
   expect(std::count_if(preciseMidi.tracks[0].events.begin(), preciseMidi.tracks[0].events.end(),
                        [](const MidiEvent& event) { return std::holds_alternative<Expression14>(event); }) == 4,
          "pan compensation should preserve the source expression's precision");
+}
+
+void performanceMidiRendererLowersDeclaredPanLaws() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks =
+          {
+              PerformanceTrack{
+                  .id = TrackId{0},
+                  .events =
+                      {
+                          PanPerformanceEvent{
+                              .stereoPosition = 0.0,
+                              .law = PanLaw::EqualPower,
+                          },
+                      },
+              },
+              PerformanceTrack{
+                  .id = TrackId{1},
+                  .events =
+                      {
+                          PanPerformanceEvent{
+                              .stereoPosition = 0.0,
+                              .law = PanLaw::ConstantSum,
+                          },
+                      },
+              },
+          },
+  };
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  expect(std::ranges::none_of(midi.tracks[0].events,
+                              [](const MidiEvent& event) { return std::holds_alternative<Expression>(event); }),
+         "equal-power positional pan should not add loudness compensation");
+  const auto constantSumExpression = std::ranges::find_if(
+      midi.tracks[1].events, [](const MidiEvent& event) { return std::holds_alternative<Expression>(event); });
+  expect(
+      constantSumExpression != midi.tracks[1].events.end() && std::get<Expression>(*constantSumExpression).value == 107,
+      "constant-sum center pan should retain its lower combined gain when lowered to MIDI equal-power pan");
 }
 
 void performanceMidiRendererHonorsMidiExportOptions() {
@@ -573,11 +613,13 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
                       .header =
                           PerformanceEventHeader{.tick = 0, .sequence = 4, .automation = PerformanceAutomationId{2}},
                       .stereoPosition = 0.0,
+                      .law = PanLaw::EqualPower,
                   },
                   PanPerformanceEvent{
                       .header =
                           PerformanceEventHeader{.tick = 3, .sequence = 5, .automation = PerformanceAutomationId{2}},
                       .stereoPosition = 0.0,
+                      .law = PanLaw::EqualPower,
                   },
               },
           .automations =
@@ -1962,6 +2004,7 @@ void runValueMidiTests() {
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererCombinesExpressionWithPanGain();
+  performanceMidiRendererLowersDeclaredPanLaws();
   performanceMidiRendererHonorsMidiExportOptions();
   performanceMidiRendererLowersStructuredScalarAutomationPoints();
   performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates();

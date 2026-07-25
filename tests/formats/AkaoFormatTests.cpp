@@ -276,6 +276,39 @@ void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange() {
   expect(instrument != performance.tracks[0].events.end(), "Akao v1.0 overlay voice should emit a program change");
 }
 
+void akaoPanLawFollowsDriverProfile() {
+  const SourceFile racingLagoon{
+      .name = "114 Body Shop.psf",
+      .title = "Racing Lagoon",
+  };
+  const SourceFile frontMission2{
+      .name = "Front Mission 2.psf",
+  };
+  expect(determinePanLawFromSource(racingLagoon, AkaoPs1Version::Version3_1) == PanLaw::EqualPower,
+         "Racing Lagoon should use its late Akao driver's equal-power pan law");
+  expect(determinePanLawFromSource(frontMission2, AkaoPs1Version::Version1_2) == PanLaw::ConstantSum,
+         "Front Mission 2 should retain its early Akao driver's constant-sum pan law");
+
+  std::vector<u8> bytes(0x40, 0xa0);
+  constexpr u32 start = 0x20;
+  bytes[start] = 0xaa;
+  bytes[start + 1] = 64;
+  bytes[start + 2] = 0xa0;
+
+  const SequenceDialect lateDialect = makeAkaoDialect(AkaoPs1Version::Version3_1);
+  const SequenceProgram lateProgram{
+      .dialect = lateDialect.id,
+      .timebase = lateDialect.timebase,
+      .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version3_1, start, 0x40)},
+  };
+  const PerformanceSequence performance = SequenceVm().render(lateProgram, lateDialect);
+  const auto pan = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<PanPerformanceEvent>(event);
+  });
+  expect(pan != performance.tracks[0].events.end() && std::get<PanPerformanceEvent>(*pan).law == PanLaw::EqualPower,
+         "Akao positional pan should carry the resolved profile law in the performance IR");
+}
+
 void akaoLoopBranchUsesCurrentRepeatPass() {
   std::vector<u8> bytes(0x40, 0xa0);
   constexpr u32 start = 0x20;

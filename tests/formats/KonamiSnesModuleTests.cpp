@@ -755,7 +755,7 @@ void konamiSnesCompiledAutomationTicksFades() {
                                  }) &&
              std::ranges::any_of(events,
                                  [](const PerformanceEvent& event) {
-                                   const auto* pan = std::get_if<PanPerformanceEvent>(&event);
+                                   const auto* pan = std::get_if<StereoBalancePerformanceEvent>(&event);
                                    return pan != nullptr && pan->header.tick > 0;
                                  }),
          "tempo, volume, and pan fades should retain structured intent and exact per-tick realizations");
