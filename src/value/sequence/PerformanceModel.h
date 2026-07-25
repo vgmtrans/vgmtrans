@@ -128,9 +128,6 @@ struct PanPerformanceEvent {
   // True means the source pan law intentionally supplied linearGain, even when it
   // is 1.0 and should reset a previous expression compensation.
   bool hasLinearGain = false;
-  // Controller-only pan motion leaves an independently established loudness
-  // compensation untouched.
-  bool preserveLinearGain = false;
 };
 
 struct StereoBalancePerformanceEvent {

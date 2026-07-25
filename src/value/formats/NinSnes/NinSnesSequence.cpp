@@ -6,7 +6,6 @@
 
 #include "value/formats/NinSnes/NinSnes.h"
 
-#include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
@@ -22,6 +21,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -96,17 +96,14 @@ constexpr std::array<u8, 64> kIntelliFe4{
   return tempo == 0 ? 60'000'000 : static_cast<u32>(std::lround(24'576'000.0 / tempo));
 }
 
-[[nodiscard]] double legacyMidiGain(u8 raw) {
-  // The old exporter intentionally treated the driver's 0..255 byte as a
-  // seven-bit MIDI value by truncating it in half. Preserve that destination
-  // quantization while keeping the performance model in linear-gain space.
-  return LevelScale::linearFromMidi7(static_cast<u8>(raw / 2));
+// N-SPC levels are linear 8-bit source values. Destination-specific curves and
+// quantization belong in the renderer, not in sequence playback.
+[[nodiscard]] constexpr double channelGain(u8 raw) {
+  return raw / 255.0;
 }
 
-[[nodiscard]] double legacyMasterGain(u8 raw) {
-  // MIDI master volume is fourteen-bit, but the legacy path wrote a seven-bit
-  // value into its high byte. Encode that exact grid in the semantic gain.
-  return LevelScale::linearFromMidi14(static_cast<u16>(raw / 2) << 7);
+[[nodiscard]] constexpr double masterGain(u8 raw) {
+  return raw / 255.0;
 }
 
 [[nodiscard]] u8 midiAmountInRange(s32 current, s32 minimum, s32 range) {
@@ -144,7 +141,7 @@ struct PanGains {
   double right = 1.0;
 };
 
-[[nodiscard]] u8 panTableValue(const std::vector<u8>& table, u16 pan) {
+[[nodiscard]] u8 panTableValue(std::span<const u8> table, u16 pan) {
   if (table.empty()) {
     return 0;
   }
@@ -160,7 +157,7 @@ struct PanGains {
   return static_cast<u8>(current + (((next - current) * fraction) >> 8));
 }
 
-[[nodiscard]] PanGains panGains(const Profile& selected, const std::vector<u8>& table, u8 rawPan) {
+[[nodiscard]] PanGains panGains(const Profile& selected, std::span<const u8> table, u8 rawPan) {
   if (selected.pan == PanModel::ToseLinear) {
     if (rawPan <= 10) {
       return PanGains{
@@ -185,6 +182,14 @@ struct PanGains {
     std::swap(gains.left, gains.right);
   }
   return gains;
+}
+
+[[nodiscard]] double stereoPosition(PanGains gains) {
+  if (gains.left == 0.0 && gains.right == 0.0) {
+    return 0.0;
+  }
+  constexpr double kPiOverTwo = 1.57079632679489661923;
+  return std::clamp((std::atan2(gains.right, gains.left) / kPiOverTwo) * 2.0 - 1.0, -1.0, 1.0);
 }
 
 }  // namespace math
@@ -270,7 +275,6 @@ struct Definition {
   std::array<EventType, 256> events{};
   std::vector<u8> volume;
   std::vector<u8> duration;
-  std::vector<u8> pan;
   std::vector<u8> intelliDurationVolume;
 };
 
@@ -372,7 +376,6 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     }
     useDefault(definition.volume, math::kVolumeEarlier);
     useDefault(definition.duration, math::kDurationEarlier);
-    useDefault(definition.pan, math::kPan);
   } else if (selected.intelli == IntelliMode::Fe3) {
     for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
       definition.events[opcode] = EventType::IntelliNoteParameter;
@@ -394,7 +397,6 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     useDefault(definition.volume, math::kVolumeIntelli);
     useDefault(definition.duration, math::kDurationIntelli);
     useDefault(definition.intelliDurationVolume, math::kIntelliFe3);
-    useDefault(definition.pan, math::kPan);
   } else if (selected.intelli == IntelliMode::Ta || selected.intelli == IntelliMode::Fe4) {
     if (selected.intelli == IntelliMode::Fe4) {
       for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
@@ -420,12 +422,10 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     } else {
       useDefault(definition.intelliDurationVolume, math::kIntelliFe4);
     }
-    useDefault(definition.pan, math::kPan);
   } else {
     loadStandardCommands(definition.events, 0xe0);
     useDefault(definition.volume, math::kVolumeStandard);
     useDefault(definition.duration, math::kDurationStandard);
-    useDefault(definition.pan, math::kPan);
   }
 
   switch (selected.id) {
@@ -522,9 +522,6 @@ struct ProgramState {
         sourceRanges.emplace(command.address.value, command.range);
       }
     }
-    for (const SequenceDataBlock& block : program.dataBlocks) {
-      dataBlocks.emplace(block.address.value, block.bytes);
-    }
     activeVibrato.resize(program.tracks.size());
     resetRuntime();
   }
@@ -534,11 +531,8 @@ struct ProgramState {
     globalTranspose = 0;
     percussionBase = 0;
     customNoteParameters = false;
-    customPercussion = false;
     intelliFlags = 0;
-    voiceTableAddress.reset();
-    voiceTableSize = 0;
-    voiceTableDefined = false;
+    voiceTable.clear();
     percussionTable = {};
     programs = basePrograms;
     nextOverrideProgram = 0x80;
@@ -546,6 +540,9 @@ struct ProgramState {
     tempoFade.reset(kDefaultTempo);
     tempoFade.clearAutomation();
     tempoFadeTrack.reset();
+    masterVolume = 0xff;
+    masterFade.reset(masterVolume);
+    masterFadeTrack.reset();
   }
 
   void setEcho(u64 tick, u8 mask) {
@@ -665,14 +662,19 @@ struct ProgramState {
     recipes.maxVibratoRateHertz = std::max(recipes.maxVibratoRateHertz, math::vibratoRateHertz(vibrato.rate, tempo));
   }
 
-  [[nodiscard]] u32 registerOverride(u8 logical, const std::array<u8, 6>& data, Address sourceAddress) {
+  [[nodiscard]] u32 registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
+                                     Address sourceAddress) {
     const u32 program = nextOverrideProgram++;
     programs[logical] = program;
     if (collecting) {
       recipes.overrides.push_back(InstrumentOverride{
-          .logicalProgram = logical,
           .program = program,
-          .regionData = data,
+          .srcn = srcn,
+          .adsr1 = adsr1,
+          .adsr2 = adsr2,
+          .gain = gain,
+          .pitchHigh = pitchHigh,
+          .pitchLow = pitchLow,
           .source = sourceRanges.contains(sourceAddress.value) ? sourceRanges.at(sourceAddress.value) : SourceRange{},
       });
     }
@@ -750,16 +752,12 @@ struct ProgramState {
   std::array<u32, 256> basePrograms{};
   std::array<u32, 256> programs{};
   std::map<u64, SourceRange> sourceRanges;
-  std::map<u64, std::vector<u8>> dataBlocks;
   u8 tempo = kDefaultTempo;
   s8 globalTranspose = 0;
   u8 percussionBase = 0;
   bool customNoteParameters = false;
-  bool customPercussion = false;
   u8 intelliFlags = 0;
-  bool voiceTableDefined = false;
-  std::optional<Address> voiceTableAddress;
-  u8 voiceTableSize = 0;
+  std::vector<VoiceRecord> voiceTable;
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
   u32 nextOverrideProgram = 0x80;
   std::vector<EchoChange> echoChanges;
@@ -768,6 +766,9 @@ struct ProgramState {
   std::map<u8, DrumSlot> standardDrums;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   std::optional<u32> tempoFadeTrack;
+  u8 masterVolume = 0xff;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> masterFade;
+  std::optional<u32> masterFadeTrack;
   SequenceRecipes recipes;
   bool collecting = true;
 };
@@ -806,7 +807,8 @@ struct QueuedPitchSlide {
 
 struct TrackState {
   TrackState(const SequenceProgram&, const TrackProgram& track) : trackNumber(track.sourceTrackNumber) {
-    resetSectionControllers();
+    volumeFade.reset(0xff);
+    panFade.reset(10);
     vibratoDepth.reset(0);
     pitch.reset();
   }
@@ -821,13 +823,6 @@ struct TrackState {
     queuedPitchSlides.clear();
     waitTicksRemaining = 0;
     // Track state survives section changes, while parser-local state does not.
-    resetSectionControllers();
-  }
-
-  void resetSectionControllers() {
-    midiVolume = 100;
-    midiPan = 64;
-    midiMasterVolume = 127;
   }
 
   u32 trackNumber = 0;
@@ -851,9 +846,8 @@ struct TrackState {
   u8 percussionProgram = 0;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
-  u8 midiVolume = 100;
-  u8 midiPan = 64;
-  u8 midiMasterVolume = 127;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
+  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
   PerformanceBoundMotion<SequenceAutomatedValue<s32>> vibratoDepth;
   u8 lastVibratoDepthMidi = 0;
 };
@@ -1081,8 +1075,7 @@ struct Playback {
     switchToMelodicProgram();
     const double key = kMelodicKeyCorrection + noteIndex + track.transpose;
     beginNotePitch(noteIndex);
-    const auto note =
-        out.note(key, math::legacyMidiGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
+    const auto note = out.note(key, math::channelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
     // An inline F9 is only consumed while no pitch motion is active. A stored
     // F1/F2 envelope starts at note-on first, so F9 must wait in source order
     // until that envelope finishes; otherwise it starts immediately.
@@ -1114,7 +1107,7 @@ struct Playback {
       switchToDrumProgram(kit);
       const double key = 0x24 + slot - program.globalTranspose;
       beginNotePitch(static_cast<u8>(0x24 + slot - program.globalTranspose));
-      track.lastNote = out.note(key, math::legacyMidiGain(track.velocity), duration);
+      track.lastNote = out.note(key, math::channelGain(track.velocity), duration);
       track.lastKey = key;
     } else {
       u8 logical = 0;
@@ -1125,7 +1118,7 @@ struct Playback {
       switchToDrumProgram(0);
       const double outputKey = key - program.globalTranspose;
       beginNotePitch(static_cast<u8>(key - program.globalTranspose));
-      track.lastNote = out.note(outputKey, math::legacyMidiGain(track.velocity), duration);
+      track.lastNote = out.note(outputKey, math::channelGain(track.velocity), duration);
       track.lastKey = outputKey;
     }
     beginOrQueuePitchSlide(slide);
@@ -1137,7 +1130,7 @@ struct Playback {
   [[nodiscard]] Effects tie(bool hasSlide, u8 slideDelay, u8 slideLength, u8 slideTarget) {
     const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
     if (track.lastKey) {
-      track.lastNote = out.note(*track.lastKey, math::legacyMidiGain(track.velocity), soundingDuration(), true);
+      track.lastNote = out.note(*track.lastKey, math::channelGain(track.velocity), soundingDuration(), true);
     }
     beginOrQueuePitchSlide(slide);
     beginWait(track.noteLength);
@@ -1178,51 +1171,26 @@ struct Playback {
     return Effects{.step = vm.return_()};
   }
 
-  [[nodiscard]] u8 midiPan(u8 value) const {
+  void emitPan(PerformanceEmitter output, u8 value) const {
     const auto gains = math::panGains(program.selected, panTable, value);
-    if (gains.right == 0.0) {
-      return 0;
-    }
-    if (gains.left == gains.right) {
-      return 64;
-    }
-    if (gains.left == 0.0) {
-      return 127;
-    }
-    constexpr double kPiOverTwo = 1.57079632679489661923;
-    u8 result = static_cast<u8>(std::clamp<int>(
-        static_cast<int>(std::lround((std::atan2(gains.right, gains.left) / kPiOverTwo) * 126.0)), 0, 126));
-    if (result != 0) {
-      ++result;
-    }
-    return result;
+    output.stereoBalance(gains.left, gains.right);
   }
 
   void pan(u8 value) {
-    track.midiPan = midiPan(value);
-    const auto gains = math::panGains(program.selected, panTable, value);
-    out.stereoBalance(gains.left, gains.right);
+    track.panFade.setCurrentRaw(value);
+    emitPan(out, value);
   }
 
   void panFade(u8 length, u8 value) {
     if (length == 0) {
-      // SeqTrack's historical controller-slide helper updates its cached
-      // endpoint but emits no sample for a zero-length slide. Preserve that
-      // established conversion behavior (tempo fades intentionally differ).
-      track.midiPan = midiPan(value);
+      pan(value);
       return;
     }
-    const u8 target = midiPan(value);
-    const auto automation = out.fade(PerformanceAutomationTarget::Pan, (target / 63.5) - 1.0, length);
-    scheduleControllerFade(track.midiPan, target, length, [&](u64 tick, u8 sample) {
-      automation.output(out.at(tick))
-          .pan(PanPerformanceEvent{
-              .stereoPosition = (sample / 63.5) - 1.0,
-              .law = PanLaw::EqualPower,
-              .preserveLinearGain = true,
-          });
-    });
-    track.midiPan = target;
+    // Interpolate the source pan index before applying its non-linear table.
+    const auto gains = math::panGains(program.selected, panTable, value);
+    static_cast<void>(
+        track.panFade.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
+                            SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
   }
 
   void vibratoOn(u8 delay, u8 rate, u8 depth) {
@@ -1314,59 +1282,37 @@ struct Playback {
   }
 
   void volume(u8 value) {
-    const u8 midi = static_cast<u8>(value / 2);
-    track.midiVolume = midi;
-    out.level(LevelScale::linearFromMidi7(midi));
+    track.volumeFade.setCurrentRaw(value);
+    out.level(math::channelGain(value), ValueQuantization{.levels = 256});
   }
 
   void volumeFade(u8 length, u8 value) {
     if (length == 0) {
-      track.midiVolume = static_cast<u8>(value / 2);
+      volume(value);
       return;
     }
-    const u8 target = static_cast<u8>(value / 2);
-    const auto automation = out.fade(PerformanceAutomationTarget::Level, LevelScale::linearFromMidi7(target), length);
-    scheduleControllerFade(track.midiVolume, target, length, [&](u64 tick, u8 sample) {
-      automation.output(out.at(tick)).level(LevelScale::linearFromMidi7(sample));
-    });
-    track.midiVolume = target;
+    static_cast<void>(
+        track.volumeFade.begin(out.fade(PerformanceAutomationTarget::Level, math::channelGain(value), length),
+                               SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
   }
 
   void masterVolume(u8 value) {
-    const u8 midi = static_cast<u8>(value / 2);
-    track.midiMasterVolume = midi;
-    out.masterLevel(math::legacyMasterGain(value));
+    program.masterVolume = value;
+    program.masterFade.setCurrentRaw(value);
+    program.masterFadeTrack.reset();
+    out.masterLevel(math::masterGain(value));
   }
 
   void masterVolumeFade(u8 length, u8 value) {
     if (length == 0) {
-      track.midiMasterVolume = static_cast<u8>(value / 2);
+      masterVolume(value);
       return;
     }
-    const u8 target = static_cast<u8>(value / 2);
-    const auto automation = out.fade(PerformanceAutomationTarget::MasterLevel,
-                                     LevelScale::linearFromMidi14(static_cast<u16>(target) << 7), length);
-    scheduleControllerFade(track.midiMasterVolume, target, length, [&](u64 tick, u8 sample) {
-      automation.output(out.at(tick)).masterLevel(LevelScale::linearFromMidi14(static_cast<u16>(sample) << 7));
-    });
-    track.midiMasterVolume = target;
-  }
-
-  template <typename Emit>
-  void scheduleControllerFade(u8 start, u8 target, u8 length, Emit&& emit) {
-    // SeqTrack's historical MIDI slide is part of the compatibility contract:
-    // each sample is rounded from the original endpoints (not accumulated),
-    // the first sample occurs on the command tick, and duplicate rounded
-    // samples after the first are suppressed.
-    const double increment = static_cast<double>(static_cast<int>(target) - static_cast<int>(start)) / length;
-    int previous = -1;
-    for (u32 index = 0; index < length; ++index) {
-      const int sample = std::clamp<int>(static_cast<int>(std::round(start + increment * (index + 1))), 0, 127);
-      if (sample != previous) {
-        std::forward<Emit>(emit)(vm.tick() + index, static_cast<u8>(sample));
-        previous = sample;
-      }
-    }
+    program.masterFade.setCurrentRaw(program.masterVolume);
+    static_cast<void>(
+        program.masterFade.begin(out.fade(PerformanceAutomationTarget::MasterLevel, math::masterGain(value), length),
+                                 SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
+    program.masterFadeTrack = track.trackNumber;
   }
 
   void advanceTempoFade(u64 tick) {
@@ -1390,11 +1336,38 @@ struct Playback {
     emitVibratoDepth(value, track.vibratoDepth.output(out));
   }
 
+  void advancePanFade() {
+    static_cast<void>(track.panFade.tickRaw(
+        [&](s32 value) { emitPan(track.panFade.output(out), static_cast<u8>(std::clamp<s32>(value, 0, 0xff))); }));
+  }
+
+  void advanceVolumeFade() {
+    static_cast<void>(track.volumeFade.tickRaw([&](s32 value) {
+      track.volumeFade.output(out).level(math::channelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
+                                         ValueQuantization{.levels = 256});
+    }));
+  }
+
+  void advanceMasterFade() {
+    static_cast<void>(program.masterFade.tickRaw([&](s32 value) {
+      program.masterVolume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
+      program.masterFade.output(out).masterLevel(math::masterGain(program.masterVolume));
+    }));
+    if (!program.masterFade.active()) {
+      program.masterFadeTrack.reset();
+    }
+  }
+
   void tick() {
+    advanceVolumeFade();
+    advancePanFade();
     advanceVibratoFade();
     advancePitchMotion();
     if (program.tempoFadeTrack == track.trackNumber) {
       advanceTempoFade(vm.tick());
+    }
+    if (program.masterFadeTrack == track.trackNumber) {
+      advanceMasterFade();
     }
     if (!track.queuedPitchSlides.empty() && !track.pitch.motion.active() && track.waitTicksRemaining > 1) {
       const QueuedPitchSlide queued = track.queuedPitchSlides.front();
@@ -1439,16 +1412,23 @@ struct Playback {
     return vm.countedRepeatUntil(0, times == 0 ? 256 : times, destination);
   }
 
-  void defineVoiceTable(Address address, u8 size) {
-    program.voiceTableAddress = address;
-    program.voiceTableSize = size;
-    program.voiceTableDefined = true;
+  void defineVoiceTable(u8 size) { program.voiceTable.assign(size, VoiceRecord{}); }
+
+  void defineVoice(u8 index, u8 instrument, u8 volume, u8 pan, u8 tuningTranspose) {
+    if (index < program.voiceTable.size()) {
+      program.voiceTable[index] = VoiceRecord{
+          .instrument = instrument,
+          .volume = volume,
+          .pan = pan,
+          .tuningTranspose = tuningTranspose,
+      };
+    }
   }
 
-  void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchLow, u8 pitchHigh,
+  void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
                            Address sourceAddress) {
-    const u32 newProgram = program.registerOverride(
-        logical, std::array<u8, 6>{srcn, adsr1, adsr2, gain, pitchLow, pitchHigh}, sourceAddress);
+    const u32 newProgram =
+        program.registerOverride(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, sourceAddress);
     if (track.currentLogicalProgram == logical) {
       track.melodicProgram = newProgram;
       if (!track.lastWasPercussion) {
@@ -1458,27 +1438,17 @@ struct Playback {
   }
 
   void loadVoice(u8 index, u8 percussionMinimum, IntelliMode mode) {
-    if (!program.voiceTableDefined || !program.voiceTableAddress ||
-        (mode == IntelliMode::Fe3 && index >= program.voiceTableSize)) {
+    // The declared table is the only typed data boundary; bytes belonging to
+    // following commands are not silently reinterpreted as voice records.
+    if (index >= program.voiceTable.size()) {
       return;
     }
-    const auto block = program.dataBlocks.find(program.voiceTableAddress->value);
-    const size_t offset = static_cast<size_t>(index) * 4;
-    if (block == program.dataBlocks.end() || offset + 4 > block->second.size()) {
-      return;
-    }
-    const VoiceRecord record{
-        .instrument = block->second[offset],
-        .volume = block->second[offset + 1],
-        .pan = block->second[offset + 2],
-        .tuningTranspose = block->second[offset + 3],
-    };
-    const u8 midiVolume = static_cast<u8>(record.volume / 2);
-    track.midiVolume = midiVolume;
-    out.level(LevelScale::linearFromMidi7(midiVolume));
+    const VoiceRecord& record = program.voiceTable[index];
+    track.volumeFade.setCurrentRaw(record.volume);
+    out.level(math::channelGain(record.volume), ValueQuantization{.levels = 256});
     const u8 pan = mode == IntelliMode::Fe3 ? record.pan : record.pan & 0x1f;
     const auto gains = math::panGains(program.selected, panTable, pan);
-    track.midiPan = midiPan(pan);
+    track.panFade.setCurrentRaw(pan);
     out.stereoBalance(gains.left, gains.right);
 
     double tuningCents = 0.0;
@@ -1510,10 +1480,7 @@ struct Playback {
     }
   }
 
-  void enableCustomPercussion() {
-    program.intelliFlags |= 0x40;
-    program.customPercussion = true;
-  }
+  void enableCustomPercussion() { program.intelliFlags |= 0x40; }
 
   void intelliFlags(u8 mask, bool enabled) {
     if (enabled) {
@@ -1530,7 +1497,7 @@ struct Playback {
     const bool enabled = (param & 8) == 0;
     switch (param & 7) {
       case 0:
-        program.customPercussion = enabled;
+        intelliFlags(0x40, enabled);
         break;
       case 7:
         program.customNoteParameters = enabled;
@@ -1540,12 +1507,7 @@ struct Playback {
     }
   }
 
-  const std::vector<u8>& panTable = defaultPanTable();
-
-  [[nodiscard]] static const std::vector<u8>& defaultPanTable() {
-    static const std::vector<u8> table(math::kPan.begin(), math::kPan.end());
-    return table;
-  }
+  std::span<const u8> panTable = math::kPan;
 };
 
 using Cursor = CompilerCursor<TrackState, Playback>;
@@ -1555,12 +1517,9 @@ struct DecodeContext {
   const Layout& layout;
   const Profile& selected;
   const Definition& definition;
-  std::vector<SequenceDataBlock>* dataBlocks = nullptr;
   std::vector<Diagnostic>* diagnostics = nullptr;
 
-  [[nodiscard]] Address address(u16 raw) const {
-    return Address{convertAddress(selected, raw, layout.konamiBaseAddress, layout.falcomBaseOffset)};
-  }
+  [[nodiscard]] Address address(u16 raw) const { return Address{layout.resolveAddress(raw)}; }
 };
 
 [[nodiscard]] Slide readSlide(Cursor::Event& event, std::string_view prefix = {}) {
@@ -1940,28 +1899,14 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       auto event = cursor.command("Voice Parameter Definition", SequenceSemantic::Program);
       const s8 parameter = event.s8("count_or_instrument", SourceValueDisplay::SignedDecimal);
       if (parameter >= 0) {
-        const Address tableAddress = event.nextAddress();
         const u8 count = static_cast<u8>(parameter);
-        event.invoke<&Playback::defineVoiceTable>(tableAddress, count);
-        if (context.dataBlocks != nullptr &&
-            std::ranges::none_of(*context.dataBlocks, [tableAddress](const SequenceDataBlock& block) {
-              return block.address.value == tableAddress.value;
-            })) {
-          constexpr u64 kMaximumVoiceTableBytes = 256 * 4;
-          const u64 bytes = std::min<u64>(kMaximumVoiceTableBytes, context.reader.size() > tableAddress.value
-                                                                       ? context.reader.size() - tableAddress.value
-                                                                       : 0);
-          const auto source = context.reader.slice(tableAddress.value, bytes);
-          context.dataBlocks->push_back(SequenceDataBlock{
-              .address = tableAddress,
-              .bytes = std::vector<u8>(source.begin(), source.end()),
-          });
-        }
-        for (u8 index = 0; index < static_cast<u8>(parameter); ++index) {
-          event.u8(fmt::format("instrument_{}", index), SemanticOperandRole::Instrument);
-          event.u8(fmt::format("volume_{}", index), SemanticOperandRole::Level);
-          event.u8(fmt::format("pan_{}", index), SemanticOperandRole::Pan);
-          event.u8(fmt::format("tuning_transpose_{}", index), SemanticOperandRole::Pitch);
+        event.invoke<&Playback::defineVoiceTable>(count);
+        for (u8 index = 0; index < count; ++index) {
+          const u8 instrument = event.u8(fmt::format("instrument_{}", index), SemanticOperandRole::Instrument);
+          const u8 volume = event.u8(fmt::format("volume_{}", index), SemanticOperandRole::Level);
+          const u8 pan = event.u8(fmt::format("pan_{}", index), SemanticOperandRole::Pan);
+          const u8 tuningTranspose = event.u8(fmt::format("tuning_transpose_{}", index), SemanticOperandRole::Pitch);
+          event.invoke<&Playback::defineVoice>(index, instrument, volume, pan, tuningTranspose);
         }
         return event;
       }
@@ -2117,7 +2062,7 @@ struct PlaylistDecode {
       if ((raw & 0xff00) == 0) {
         continue;
       }
-      const u16 start = convertAddress(selected, raw, layout.konamiBaseAddress, layout.falcomBaseOffset);
+      const u16 start = layout.resolveAddress(raw);
       if (!reader.has(start, 1)) {
         warn(fmt::format("NinSnes track pointer ${:04X} was outside ARAM", start),
              reader.range(address + track * 2, 2));
@@ -2149,8 +2094,7 @@ struct PlaylistDecode {
         command.operation = PlaylistEnd{};
       } else {
         const u16 storedDestination = reader.le16(address + 2);
-        const u16 destination =
-            convertAddress(selected, storedDestination, layout.konamiBaseAddress, layout.falcomBaseOffset);
+        const u16 destination = layout.resolveAddress(storedDestination);
         command.fallthrough = Address{address + 4};
         command.range = reader.range(address, 4);
         command.operation = PlaylistRepeat{
@@ -2162,7 +2106,7 @@ struct PlaylistDecode {
         queue(address + 4);
       }
     } else {
-      const u16 sectionAddress = convertAddress(selected, value, layout.konamiBaseAddress, layout.falcomBaseOffset);
+      const u16 sectionAddress = layout.resolveAddress(value);
       command.operation = PlaylistPlaySection{.section = Address{sectionAddress}};
       if (!sections.contains(sectionAddress)) {
         if (auto section = decodeSection(sectionAddress)) {
@@ -2368,7 +2312,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .layout = layout,
       .selected = selected,
       .definition = definition,
-      .dataBlocks = &program.dataBlocks,
       .diagnostics = diagnostics,
   };
 

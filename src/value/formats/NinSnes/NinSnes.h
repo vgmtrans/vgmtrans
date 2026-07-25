@@ -11,7 +11,6 @@
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
-#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -118,11 +117,14 @@ enum class IntelliMode : u8 {
 struct Profile {
   ProfileId id = ProfileId::Unknown;
   std::string_view name = "Unknown";
-  BaseProfile base = BaseProfile::Unknown;
+  // Most variants are small deviations from the standard N-SPC driver.
+  // Keeping those defaults here makes each profile declaration describe only
+  // what that variant actually changes.
+  BaseProfile base = BaseProfile::Standard;
   AddressModel addresses = AddressModel::Direct;
-  PlaylistModel playlist = PlaylistModel::Unknown;
+  PlaylistModel playlist = PlaylistModel::Standard;
   NoteParameterModel noteParameters = NoteParameterModel::Standard;
-  ProgramResolver programs = ProgramResolver::Direct;
+  ProgramResolver programs = ProgramResolver::StandardPercussion;
   PanModel pan = PanModel::StandardTable;
   InstrumentLayout instruments = InstrumentLayout::Standard6Byte;
   InstrumentTableAddressModel instrumentTable = InstrumentTableAddressModel::Standard;
@@ -148,12 +150,18 @@ struct Layout {
 
   std::vector<u8> volumeTable;
   std::vector<u8> durationRateTable;
+
+  [[nodiscard]] u16 resolveAddress(u16 rawAddress) const;
 };
 
 struct InstrumentOverride {
-  u8 logicalProgram = 0;
   u32 program = 0;
-  std::array<u8, 6> regionData{};
+  u8 srcn = 0;
+  u8 adsr1 = 0;
+  u8 adsr2 = 0;
+  u8 gain = 0;
+  u8 pitchHigh = 0;
+  u8 pitchLow = 0;
   core::SourceRange source;
 };
 
@@ -192,17 +200,12 @@ struct SequenceParse {
 };
 
 [[nodiscard]] const Profile& profile(ProfileId id);
-[[nodiscard]] u16 convertAddress(const Profile& profile, u16 rawAddress, u16 konamiBaseAddress,
-                                 u16 falcomBaseOffset);
-[[nodiscard]] u16 readAddress(const Profile& profile, core::ByteReader reader, u32 offset,
-                              u16 konamiBaseAddress, u16 falcomBaseOffset);
 [[nodiscard]] u32 instrumentHeaderSize(const Profile& profile);
 [[nodiscard]] u16 instrumentSlotCount(const Profile& profile);
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
 [[nodiscard]] const core::SequenceDialect& sequenceDialect();
-[[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout,
-                                           core::AssetId sequenceId,
+[[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] bool addSynth(core::ScanResultBuilder& builder, core::ScanInstrumentSetRef instrumentSet,

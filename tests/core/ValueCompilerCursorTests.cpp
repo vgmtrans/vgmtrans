@@ -17,10 +17,19 @@ struct CompilerProbeState {
   u8 pitchBendRange = 2;
 };
 
+struct CompilerProbeProgramState {
+  u32 executedCommands = 0;
+
+  void finishPrepass() {}
+};
+
 struct CompilerProbePlayback {
   CompilerProbeState& track;
   PerformanceEmitter& out;
   VmApi& vm;
+  CompilerProbeProgramState& program;
+
+  void beforeCommand() { ++program.executedCommands; }
 
   Effects note(u8 key, u32 duration) {
     out.note(static_cast<double>(key + track.transpose), track.enabled ? 1.0 : 0.5, duration);
@@ -138,7 +147,7 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
 }
 
 SequenceDialect compilerProbeDialect() {
-  return makeCompiledDialect<CompilerProbeState, CompilerProbePlayback>(SequenceDialect{
+  return makeCompiledDialect<CompilerProbeState, CompilerProbePlayback, CompilerProbeProgramState>(SequenceDialect{
       .id = DialectId{.value = "compiler-probe"},
       .timebase = Timebase{.ppqn = 48},
       .defaultBehavior =
@@ -146,6 +155,10 @@ SequenceDialect compilerProbeDialect() {
               .panLaw = PanLaw::EqualPower,
           },
   });
+}
+
+u32 projectExecutedCommands(const CompilerProbeProgramState& state) {
+  return state.executedCommands;
 }
 
 TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sourceMap = nullptr,
@@ -370,6 +383,22 @@ void compilerCursorRejectsConflictingComposedFlow() {
   expect(rejected, "one compiled source command should not produce multiple control-flow results");
 }
 
+void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
+  const std::vector<u8> bytes{0x21, 0xff};
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{15}, bytes), static_cast<u32>(bytes.size()));
+  SequenceDialect dialect = compilerProbeDialect();
+  dialect.prepass = SemanticPrepassMode::ScheduledPlayback;
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+
+  const u32 executed =
+      analyzeCompiledProgram<CompilerProbeProgramState, u32>(program, dialect, projectExecutedCommands);
+  expect(executed == 2, "compiled analysis should not execute a discarded output pass after its scheduled prepass");
+}
+
 }  // namespace
 
 void runValueCompilerCursorTests() {
@@ -380,4 +409,5 @@ void runValueCompilerCursorTests() {
   compilerCursorEvaluatesDeferredStateInActionOrder();
   compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
   compilerCursorRejectsConflictingComposedFlow();
+  compilerCursorAnalysisStopsAfterItsScheduledPrepass();
 }

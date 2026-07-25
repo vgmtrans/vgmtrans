@@ -1,3 +1,4 @@
+// Scanner signatures shared by the legacy and value implementations.
 namespace {
 
 template <size_t N>

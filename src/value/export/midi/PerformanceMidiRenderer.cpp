@@ -764,14 +764,11 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           const LoweredStereoBalance lowered = lowerPositionalPan(typedEvent.law, typedEvent.stereoPosition);
           state.sourcePanPosition = (static_cast<double>(lowered.pan) / 63.5) - 1.0;
           addCombinedPan(track, state, typedEvent.header.tick, channel, automationState, automationState == nullptr);
-          if (!typedEvent.preserveLinearGain) {
-            const double previousPanExpressionGain = state.panExpressionGain;
-            state.panExpressionGain =
-                lowered.expressionGain * (typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0);
-            if (state.panExpressionGain != previousPanExpressionGain) {
-              addCombinedExpression(track, state, typedEvent.header.tick, channel, options,
-                                    modulationConversion, automationState);
-            }
+          const double previousPanExpressionGain = state.panExpressionGain;
+          state.panExpressionGain = lowered.expressionGain * (typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0);
+          if (state.panExpressionGain != previousPanExpressionGain) {
+            addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
+                                  automationState);
           }
         } else if constexpr (std::is_same_v<TypedEvent, StereoBalancePerformanceEvent>) {
           const LoweredStereoBalance lowered = lowerStereoBalance(typedEvent.leftGain, typedEvent.rightGain);
@@ -1042,10 +1039,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
               .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
           });
           for (size_t index = 0; index < globalTempoPoints.size(); ++index) {
-            if (!renderedTempoPoints[index] &&
-                globalTempoPoints[index].tick == tempo->header.tick &&
-                globalTempoPoints[index].microsecondsPerQuarter ==
-                    tempo->microsecondsPerQuarter) {
+            if (!renderedTempoPoints[index] && globalTempoPoints[index].tick == tempo->header.tick &&
+                globalTempoPoints[index].microsecondsPerQuarter == tempo->microsecondsPerQuarter) {
               renderedTempoPoints[index] = true;
               break;
             }
