@@ -18,7 +18,6 @@
 #include <cmath>
 #include <map>
 #include <optional>
-#include <set>
 #include <span>
 #include <string>
 #include <utility>
@@ -494,8 +493,6 @@ struct ProgramState {
     }
   }
 
-  void setTempo(u8 value) { tempo = value; }
-
   void finalizePerformance(PerformanceSequence& performance) const {
     u64 nextSequence = 0;
     for (const PerformanceTrack& track : performance.tracks) {
@@ -663,7 +660,7 @@ struct PitchState {
     base = 0;
     motion.reset();
     transition.clear();
-    transitionBaseKey = 0.0;
+    transitionNoteKey = 0.0;
     rangeCents = kDefaultRangeCents;
     bend = 0;
   }
@@ -672,7 +669,7 @@ struct PitchState {
   s32 base = 0;
   SequenceLinearMotion<s32> motion;
   PitchSlideBinding transition;
-  double transitionBaseKey = 0.0;
+  double transitionNoteKey = 0.0;
   u16 rangeCents = kDefaultRangeCents;
   std::optional<s16> bend = 0;
 };
@@ -692,7 +689,7 @@ struct TrackState {
     melodicProgram = 0;
     currentLogicalProgram.reset();
     legato = false;
-    // Track state survives section changes, while parser-local state does not.
+    // Volume, pan, pitch, and modulation state carry across section boundaries.
   }
 
   u32 trackNumber = 0;
@@ -753,8 +750,6 @@ struct Playback {
     }
   }
 
-  void beginIntelliParameters(u8 duration) { track.noteLength = duration; }
-
   void intelliParameter(u8 raw, u8 resolved) {
     if (raw < 0x40) {
       track.durationRate = resolved;
@@ -770,11 +765,9 @@ struct Playback {
   }
 
   void fe3StandardParameter(bool present, u8 durationRate, u8 velocity) {
-    if (!program.customNoteParameters || !present) {
-      if (present) {
-        track.durationRate = durationRate;
-        track.velocity = velocity;
-      }
+    if (present && !program.customNoteParameters) {
+      track.durationRate = durationRate;
+      track.velocity = velocity;
     }
   }
 
@@ -830,8 +823,8 @@ struct Playback {
 
   // Pitch values use 256 units per semitone. Apply their offset from the
   // original note to the emitted key, which already includes mapping and transpose.
-  [[nodiscard]] double pitchKey(s32 sourcePitch, double noteKey) const {
-    return noteKey + static_cast<double>(sourcePitch - track.pitch.base) / 256.0;
+  [[nodiscard]] double pitchKey(s32 pitch, double noteKey) const {
+    return noteKey + static_cast<double>(pitch - track.pitch.base) / 256.0;
   }
 
   void setPitchBendRange(u16 cents) {
@@ -880,7 +873,9 @@ struct Playback {
     applyCurrentPitchBend();
   }
 
-  void activatePitchSlide(u8 delay, u8 length, s32 target) {
+  void pitchSlide(u8 delay, u8 length, u8 targetNote) {
+    const s32 target = static_cast<s32>(targetNote & 0x7f) * 256;
+
     // A new F9 stops any F9 slide still in progress.
     track.pitch.transition.interrupt(out);
 
@@ -896,9 +891,9 @@ struct Playback {
     const s32 current = track.pitch.motion.current();
     static_cast<void>(track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay)));
 
-    // Calculate intermediate pitches with N-SPC integer math;
-    // advancePitchMotion() records them on the slide created below every tick.
-    track.pitch.transitionBaseKey = *track.lastKey;
+    // Calculate intermediate pitches with N-SPC integer math.
+    // advancePitchMotion() records each value on the slide created below.
+    track.pitch.transitionNoteKey = *track.lastKey;
     track.pitch.transition =
         out.at(vm.tick() + delay)
             .pitchSlide(track.lastNote, pitchKey(current, *track.lastKey), pitchKey(target, *track.lastKey), length);
@@ -907,11 +902,11 @@ struct Playback {
   void beginNotePitch(u8 rawNote) {
     resetPitchForNote();
     track.pitch.baseValid = true;
-    track.pitch.base = static_cast<s32>(rawNote & 0x7f) << 8;
+    track.pitch.base = static_cast<s32>(rawNote & 0x7f) * 256;
     track.pitch.motion.setCurrent(track.pitch.base);
 
     if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None && track.pitchEnvelope.length != 0) {
-      const s32 offset = static_cast<s32>(track.pitchEnvelope.semitones) << 8;
+      const s32 offset = static_cast<s32>(track.pitchEnvelope.semitones) * 256;
       s32 target = track.pitch.base;
       if (track.pitchEnvelope.mode == PitchEnvelope::Mode::To) {
         target += offset;
@@ -931,7 +926,7 @@ struct Playback {
       return;
     }
     if (track.pitch.transition.valid()) {
-      track.pitch.transition.sample(out, pitchKey(tick.current, track.pitch.transitionBaseKey));
+      track.pitch.transition.sample(out, pitchKey(tick.current, track.pitch.transitionNoteKey));
       track.pitch.bend.reset();
       if (tick.status == SequenceMotionStatus::Finished) {
         track.pitch.transition.clear();
@@ -947,7 +942,6 @@ struct Playback {
     beginNotePitch(noteIndex);
     track.lastNote = out.note(key, math::levelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
     track.lastKey = key;
-    track.lastWasPercussion = false;
     return Effects::wait(track.noteLength);
   }
 
@@ -983,7 +977,6 @@ struct Playback {
       track.lastNote = out.note(outputKey, math::levelGain(track.velocity), duration);
       track.lastKey = outputKey;
     }
-    track.lastWasPercussion = true;
     return Effects::wait(track.noteLength);
   }
 
@@ -995,15 +988,11 @@ struct Playback {
   }
 
   [[nodiscard]] Effects rest() {
-    // A rest purges the legacy track's pending duration notes. A later tie
-    // must not reach backward across that silence.
+    // A rest ends the preceding note chain; a later tie cannot reach back
+    // across that silence.
     track.lastNote = {};
     track.lastKey.reset();
     return Effects::wait(track.noteLength);
-  }
-
-  void pitchSlide(u8 delay, u8 length, u8 target) {
-    activatePitchSlide(delay, length, static_cast<s32>(target & 0x7f) << 8);
   }
 
   void beginPattern(u8 times, Address destination) {
@@ -1107,7 +1096,7 @@ struct Playback {
     program.tempoFade.setCurrentRaw(value);
     program.tempoFade.clearAutomation();
     program.tempoFadeTrack.reset();
-    program.setTempo(value);
+    program.tempo = value;
     out.tempo(math::tempoMicrosecondsPerQuarter(value));
   }
 
@@ -1161,7 +1150,7 @@ struct Playback {
   void advanceTempoFade() {
     static_cast<void>(program.tempoFade.tickRaw([&](s32 raw) {
       const u8 value = static_cast<u8>(std::clamp<s32>(raw, 0, 0xff));
-      program.setTempo(value);
+      program.tempo = value;
       program.tempoFade.output(out).tempo(math::tempoMicrosecondsPerQuarter(value));
     }));
     if (!program.tempoFade.active()) {
@@ -1270,12 +1259,9 @@ struct Playback {
       return;
     }
     const VoiceRecord& record = program.voiceTable[index];
-    track.volumeFade.setCurrentRaw(record.volume);
-    out.level(math::levelGain(record.volume), ValueQuantization{.levels = 256});
-    const u8 pan = mode == IntelliMode::Fe3 ? record.pan : record.pan & 0x1f;
-    const auto gains = math::panGains(program.selected, panTable, pan);
-    track.panFade.setCurrentRaw(pan);
-    out.stereoBalance(gains.left, gains.right);
+    volume(record.volume);
+    const u8 panValue = mode == IntelliMode::Fe3 ? record.pan : record.pan & 0x1f;
+    pan(panValue);
 
     double tuningCents = 0.0;
     s8 transpose = track.transpose;
@@ -1383,12 +1369,11 @@ struct DecodeContext {
 
   if (type == EventType::NoteParameter) {
     bool present = false;
-    u8 packed = 0;
     u8 durationRate = 0;
     u8 velocity = 0;
     if (event.peekU8() <= 0x7f) {
       present = true;
-      packed = event.u8("quantize_velocity", SourceValueDisplay::Hex);
+      const u8 packed = event.u8("quantize_velocity", SourceValueDisplay::Hex);
       durationRate = context.definition.duration[(packed >> 4) & 7];
       velocity = context.definition.volume[packed & 15];
       event.derived("duration_rate", durationRate, SemanticOperandRole::Duration);
@@ -1397,7 +1382,7 @@ struct DecodeContext {
     return event.invoke<&Playback::standardParameters>(duration, present, durationRate, velocity);
   }
 
-  event.invoke<&Playback::beginIntelliParameters>(duration);
+  event.set<&TrackState::noteLength>(duration);
   std::vector<std::pair<u8, u8>> parameters;
   while (event.peekU8() <= 0x7f && parameters.size() < 0x80) {
     const u8 raw = event.u8(fmt::format("parameter_{}", parameters.size() + 1), SourceValueDisplay::Hex);
