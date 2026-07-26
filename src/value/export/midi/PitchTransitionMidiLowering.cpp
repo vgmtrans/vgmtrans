@@ -92,6 +92,34 @@ struct NoteSpan {
   return key;
 }
 
+[[nodiscard]] std::optional<double> pitchBendAt(const std::vector<PerformanceEvent>& events, u64 beginTick,
+                                                u64 endTick) {
+  const PitchBendPerformanceEvent* latest = nullptr;
+  for (const auto& event : events) {
+    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+    if (bend == nullptr || bend->header.tick < beginTick || bend->header.tick > endTick) {
+      continue;
+    }
+    if (latest == nullptr ||
+        std::tie(latest->header.tick, latest->header.sequence) < std::tie(bend->header.tick, bend->header.sequence)) {
+      latest = bend;
+    }
+  }
+  return latest == nullptr ? std::nullopt : std::optional{latest->semitones};
+}
+
+[[nodiscard]] std::optional<double> establishedPitchBend(const std::vector<PerformanceEvent>& events,
+                                                         const NoteSpan& note, const PitchTransitionIntent& transition,
+                                                         u64 startTick) {
+  const auto bend = pitchBendAt(events, note.source.header.tick, startTick);
+  // Pitch bends may already have passed through the source's finite bend
+  // register, so allow a small quantization difference from the exact key.
+  if (!bend || std::abs(bendBaseKeyAt(note, startTick) + *bend - transition.startKey) >= 0.02) {
+    return std::nullopt;
+  }
+  return bend;
+}
+
 [[nodiscard]] PerformanceEventHeader atTick(const PerformanceEventHeader& origin, u64 tick, u64& nextSequence) {
   auto header = origin;
   header.tick = tick;
@@ -182,7 +210,8 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 
   // A delayed slide may begin away from the note's nominal key.
   const double noteBaseKey = bendBaseKeyAt(note, note.source.header.tick);
-  if (startTick > note.source.header.tick && std::abs(transition.startKey - noteBaseKey) > 0.000001) {
+  if (startTick > note.source.header.tick && std::abs(transition.startKey - noteBaseKey) > 0.000001 &&
+      !establishedPitchBend(events, note, transition, startTick)) {
     events.emplace_back(PitchBendPerformanceEvent{
         .header = atAutomationTick(automation, note.source.header.tick, nextSequence),
         .semitones = transition.startKey - noteBaseKey,
@@ -323,7 +352,7 @@ void beginPortamentoRewrite(NoteSpan& note) {
 }
 
 void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
-                        const PitchTransitionIntent& transition) {
+                        const PitchTransitionIntent& transition, bool sourceEstablishesStart) {
   const u64 startTick = automation.realization.startTick;
   if (startTick <= note.source.header.tick) {
     note.portamentoSegments.front().key = transition.targetKey;
@@ -344,8 +373,10 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
       segment.endTick = std::min(note.endTick, clampedStart > std::numeric_limits<u64>::max() - overlap
                                                    ? std::numeric_limits<u64>::max()
                                                    : clampedStart + overlap);
-      segment.key = transition.startKey;
-      segment.bendBaseKey = transition.startKey;
+      if (!sourceEstablishesStart) {
+        segment.key = transition.startKey;
+        segment.bendBaseKey = transition.startKey;
+      }
     }
     if (segment.endTick > segment.startTick) {
       segments.push_back(std::move(segment));
@@ -392,8 +423,9 @@ void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const P
 }
 
 void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
-                     std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
-                     const PerformanceTempoMap& tempos, u64& nextSequence) {
+                     const std::vector<PerformanceEvent>& sourceEvents, std::vector<NoteSpan>& notes,
+                     const std::vector<const PerformanceAutomation*>& transitions, const PerformanceTempoMap& tempos,
+                     u64& nextSequence) {
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
     auto* note = findNote(notes, transition.note);
@@ -410,6 +442,7 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
     if (startTick >= note->endTick) {
       continue;
     }
+    const auto sourceBend = establishedPitchBend(sourceEvents, *note, transition, startTick);
     beginPortamentoRewrite(*note);
     if (startTick <= note->source.header.tick && transition.previousNote) {
       if (auto* previous = findNote(notes, *transition.previousNote)) {
@@ -421,7 +454,14 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
         segment.endTick = std::max(segment.endTick, overlapEnd);
       }
     }
-    splitForPortamento(*note, *automation, transition);
+    splitForPortamento(*note, *automation, transition, sourceBend.has_value());
+
+    if (sourceBend && std::abs(*sourceBend) > 0.000001) {
+      events.emplace_back(PitchBendPerformanceEvent{
+          .header = atTick(automation->header, startTick, nextSequence),
+          .semitones = 0.0,
+      });
+    }
 
     if (transition.nativePortamento.useCurrentTiming) {
       events.emplace_back(PortamentoControlPerformanceEvent{
@@ -527,6 +567,10 @@ PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& pe
     for (const auto& automation : track.automations) {
       nextSequence = std::max(nextSequence, automation.header.sequence + 1);
       if (const auto* transition = pitchTransitionIntent(automation)) {
+        if (automation.realization.endReason != PerformanceAutomationEndReason::Completed &&
+            automation.realization.endTick <= automation.realization.startTick) {
+          continue;
+        }
         auto& transitions =
             effectiveRendering(performance, options, *transition) == PitchTransitionRenderingHint::Portamento
                 ? portamentoTransitions
@@ -546,7 +590,7 @@ PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& pe
     auto notes = collectNotes(track);
     std::vector<PerformanceEvent> events;
     events.reserve(track.events.size() + (portamentoTransitions.size() + pitchBendTransitions.size()) * 4);
-    lowerPortamento(lowered, events, notes, portamentoTransitions, tempos, nextSequence);
+    lowerPortamento(lowered, events, track.events, notes, portamentoTransitions, tempos, nextSequence);
     linkPitchBendVoices(notes, pitchBendTransitions);
     const bool renderPortamentoSettings =
         options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||

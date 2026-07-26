@@ -61,6 +61,7 @@ void ninSnesNoteVelocityPreservesLegacyCurve();
 void ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
 void ninSnesControllerFadesRemainInTheSourceDomain();
 void ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
+void ninSnesF9UsesSharedPitchTransitions();
 void ninSnesPercussionStartsPerNoteVibratoFade();
 void ninSnesGainModeInstrumentsUseDspEnvelope();
 void mameRomDatabaseAndGroupAssemblyAreValueOriented();
@@ -173,6 +174,7 @@ int main() {
     ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
     ninSnesControllerFadesRemainInTheSourceDomain();
     ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
+    ninSnesF9UsesSharedPitchTransitions();
     ninSnesPercussionStartsPerNoteVibratoFade();
     ninSnesGainModeInstrumentsUseDspEnvelope();
     mameRomDatabaseAndGroupAssemblyAreValueOriented();
