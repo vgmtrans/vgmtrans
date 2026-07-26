@@ -500,19 +500,19 @@ void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u
   return 0.0;
 }
 
-// Normalized tremolo events do not carry physical phase metadata, but their
-// subtractive triangle begins at maximum attenuation. Physical events can
-// provide initialPhaseCycles and bypass this renderer fallback entirely.
+// Normalized tremolo events do not carry physical phase metadata. Preserve
+// their established unipolar triangle start at nominal gain; physical events
+// can provide initialPhaseCycles and bypass this renderer fallback entirely.
 enum class LfoInitialPhaseFallback {
   Zero,
-  TremoloTrough,
+  UnipolarTremoloNominalGain,
 };
 
 [[nodiscard]] double initialLfoPhase(const SimulatedLfoState& lfo, LfoInitialPhaseFallback fallback) {
   if (lfo.initialPhaseCycles) {
     return *lfo.initialPhaseCycles - std::floor(*lfo.initialPhaseCycles);
   }
-  return fallback == LfoInitialPhaseFallback::TremoloTrough ? 0.75 : 0.0;
+  return fallback == LfoInitialPhaseFallback::UnipolarTremoloNominalGain ? 0.75 : 0.0;
 }
 
 void restartLfo(SimulatedLfoState& lfo, u64 tick, LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
@@ -592,8 +592,7 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
       }
     }
 
-    if (lfo.cyclesPerTick.value_or(lfo.frequencyHz) <= 0.0 ||
-        (lfo.depth <= 0.0 && !lfo.phaseRunsAtZeroDepth)) {
+    if (lfo.cyclesPerTick.value_or(lfo.frequencyHz) <= 0.0 || (lfo.depth <= 0.0 && !lfo.phaseRunsAtZeroDepth)) {
       continue;
     }
 
@@ -702,7 +701,7 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
   }
 
   const auto fallback = !state.tremolo.waveform && !state.tremoloDepthIsDecibels
-                            ? LfoInitialPhaseFallback::TremoloTrough
+                            ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
                             : LfoInitialPhaseFallback::Zero;
   restartLfo(state.tremolo, tick, fallback);
   const double gain = tremoloGainAtCurrentPhase(state);
@@ -887,8 +886,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             });
           }
         } else if constexpr (std::is_same_v<TypedEvent, TremoloDelayPerformanceEvent>) {
-          const auto fallback =
-              typedEvent.milliseconds ? LfoInitialPhaseFallback::Zero : LfoInitialPhaseFallback::TremoloTrough;
+          const auto fallback = typedEvent.milliseconds ? LfoInitialPhaseFallback::Zero
+                                                        : LfoInitialPhaseFallback::UnipolarTremoloNominalGain;
           setLfoDelay(state.tremolo, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
                       typedEvent.tempoRelative, fallback);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
@@ -953,8 +952,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               }
               case ModulationPerformanceTarget::TremoloDepth: {
                 const bool physicalDecibels = typedEvent.volumeDepthDecibels.has_value();
-                const auto fallback = !typedEvent.waveform && !physicalDecibels ? LfoInitialPhaseFallback::TremoloTrough
-                                                                                : LfoInitialPhaseFallback::Zero;
+                const auto fallback = !typedEvent.waveform && !physicalDecibels
+                                          ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
+                                          : LfoInitialPhaseFallback::Zero;
                 configureLfo(state.tremolo, typedEvent.header.tick, typedEvent, fallback);
                 setSimulatedTremoloDepth(
                     track, state, typedEvent.header.tick, channel,
@@ -966,9 +966,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 configureLfo(state.vibrato, typedEvent.header.tick, typedEvent);
                 break;
               case ModulationPerformanceTarget::TremoloRate:
-                configureLfo(
-                    state.tremolo, typedEvent.header.tick, typedEvent,
-                    typedEvent.waveform ? LfoInitialPhaseFallback::Zero : LfoInitialPhaseFallback::TremoloTrough);
+                configureLfo(state.tremolo, typedEvent.header.tick, typedEvent,
+                             typedEvent.waveform ? LfoInitialPhaseFallback::Zero
+                                                 : LfoInitialPhaseFallback::UnipolarTremoloNominalGain);
                 break;
               case ModulationPerformanceTarget::PanDepth:
                 configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);

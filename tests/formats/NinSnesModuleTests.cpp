@@ -72,6 +72,8 @@ struct LevelOpcodes {
 
 struct ModulationOpcodes {
   u8 vibrato;
+  u8 tremolo;
+  u8 tremoloOff;
   u8 tempo;
   u8 rest;
 };
@@ -92,15 +94,15 @@ LevelOpcodes levelOpcodes(const Profile& driver) {
 
 ModulationOpcodes modulationOpcodes(const Profile& driver) {
   if (driver.base == BaseProfile::Earlier) {
-    return {.vibrato = 0xde, .tempo = 0xe2, .rest = 0xc7};
+    return {.vibrato = 0xde, .tremolo = 0xe5, .tremoloOff = 0xe6, .tempo = 0xe2, .rest = 0xc7};
   }
   if (driver.intelli == IntelliMode::Fe3) {
-    return {.vibrato = 0xd9, .tempo = 0xdd, .rest = 0xc9};
+    return {.vibrato = 0xd9, .tremolo = 0xe1, .tremoloOff = 0xe2, .tempo = 0xdd, .rest = 0xc9};
   }
   if (driver.intelli == IntelliMode::Ta || driver.intelli == IntelliMode::Fe4) {
-    return {.vibrato = 0xdd, .tempo = 0xe1, .rest = 0xc9};
+    return {.vibrato = 0xdd, .tremolo = 0xe5, .tremoloOff = 0xe6, .tempo = 0xe1, .rest = 0xc9};
   }
-  return {.vibrato = 0xe3, .tempo = 0xe7, .rest = 0xc9};
+  return {.vibrato = 0xe3, .tremolo = 0xeb, .tremoloOff = 0xec, .tempo = 0xe7, .rest = 0xc9};
 }
 
 u8 pitchSlideOpcode(const Profile& driver) {
@@ -290,6 +292,73 @@ void ninSnesProfilesShareTempoRelativeVibratoClock() {
                std::abs(*rates[1]->cyclesPerTick - 0.125) < 0.0001 &&
                std::abs(*rates[0]->frequencyHz - 7.8125) < 0.0001 && std::abs(*rates[1]->frequencyHz - 15.625) < 0.0001,
            label + " should share the sequence-clocked N-SPC vibrato behavior");
+  }
+}
+
+void ninSnesProfilesEmitSubtractiveTremolo() {
+  constexpr u8 kDelay = 3;
+  constexpr u8 kRate = 0x20;
+  constexpr u8 kDepth = 0x40;
+
+  for (const ProfileId id : kProfileIds) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+
+    const Profile& driver = profile(id);
+    const ModulationOpcodes opcodes = modulationOpcodes(driver);
+    size_t cursor = 0x300;
+    bytes[cursor++] = opcodes.tremolo;
+    bytes[cursor++] = kDelay;
+    bytes[cursor++] = kRate;
+    bytes[cursor++] = kDepth;
+    bytes[cursor++] = opcodes.tremoloOff;
+    bytes[cursor++] = 4;
+    bytes[cursor++] = opcodes.rest;
+    bytes[cursor] = 0;
+
+    Layout layout = standardLayout();
+    layout.profile = id;
+    if (driver.base == BaseProfile::Intelli) {
+      layout.signature = Signature::Intelligent;
+    } else if (driver.base == BaseProfile::Earlier) {
+      layout.signature = Signature::Earlier;
+    }
+
+    const PerformanceSequence performance = render(std::move(bytes), layout);
+    std::vector<const ModulationPerformanceEvent*> depths;
+    const ModulationPerformanceEvent* rate = nullptr;
+    const TremoloDelayPerformanceEvent* delay = nullptr;
+    for (const PerformanceEvent& event : performance.tracks[0].events) {
+      if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
+        if (modulation->target == ModulationPerformanceTarget::TremoloDepth) {
+          depths.push_back(modulation);
+        } else if (modulation->target == ModulationPerformanceTarget::TremoloRate) {
+          rate = modulation;
+        }
+      } else if (const auto* tremoloDelay = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
+        delay = tremoloDelay;
+      }
+    }
+
+    const int trough = driver.base == BaseProfile::Earlier ? 255 - ((255 * ((255 * kDepth) >> 8)) >> 8) : 255 - kDepth;
+    const double expectedDepth = 20.0 * std::log10(255.0 / trough);
+    const std::string label(driver.name);
+    expect(depths.size() == 2, label + " should emit tremolo-on and tremolo-off depth events");
+    expect(depths[0]->volumeDepthDecibels && std::abs(*depths[0]->volumeDepthDecibels - expectedDepth) < 0.0001,
+           label + " should convert N-SPC tremolo depth to physical decibels");
+    expect(depths[0]->waveform == LfoWaveform::Triangle && depths[0]->initialPhaseCycles == 0.25 &&
+               !depths[0]->phaseRunsAtZeroDepth && depths[0]->tremoloGainMode == TremoloGainMode::NoBoost,
+           label + " should emit a subtractive triangle beginning at nominal gain");
+    expect(depths[1]->volumeDepthDecibels == 0.0, label + " should disable tremolo by clearing its depth");
+    expect(rate != nullptr && rate->cyclesPerTick && rate->frequencyHz &&
+               std::abs(*rate->cyclesPerTick - 0.125) < 0.0001 && std::abs(*rate->frequencyHz - 7.8125) < 0.0001 &&
+               rate->initialPhaseCycles == 0.25,
+           label + " should use the sequence-clocked N-SPC tremolo rate");
+    expect(delay != nullptr && delay->delayTicks == kDelay && delay->milliseconds &&
+               std::abs(*delay->milliseconds - 48.0) < 0.0001 && delay->tempoRelative,
+           label + " should resolve the N-SPC tremolo delay against tempo");
   }
 }
 
