@@ -46,6 +46,30 @@ constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0
 constexpr std::array<std::string_view, 8> kDutyNames = {"12.5%", "25%", "37.5%", "50%", "62.5%", "75%", "87.5%", "0%"};
 constexpr std::array<AudioCodec, 3> kWaveCodecs = {AudioCodec::PcmS8, AudioCodec::PcmS16, AudioCodec::NdsImaAdpcm};
 
+[[nodiscard]] InstrumentModulation ndsInstrumentModulation(const NdsLfoRanges& ranges) {
+  InstrumentModulation modulation;
+  const bool hasRate = ranges.minRateHertz > 0.0 && ranges.maxRateHertz >= ranges.minRateHertz;
+  const auto delay = ranges.maxDelaySeconds > 0.0
+                         ? std::optional{ModulationRange{.minimum = 0.0, .maximum = ranges.maxDelaySeconds}}
+                         : std::nullopt;
+  if (hasRate && ranges.maxVibratoDepthCents > 0.0) {
+    modulation.vibrato = VibratoSpec{
+        .maxDepthCents = ranges.maxVibratoDepthCents,
+        .rateHertz = {.minimum = ranges.minRateHertz, .maximum = ranges.maxRateHertz},
+        .delaySeconds = delay,
+    };
+  }
+  if (hasRate && ranges.maxTremoloDepthDb > 0.0) {
+    modulation.tremolo = TremoloSpec{
+        .maxDepthDb = ranges.maxTremoloDepthDb,
+        .rateHertz = {.minimum = ranges.minRateHertz, .maximum = ranges.maxRateHertz},
+        .gainMode = TremoloGainMode::BipolarAroundNominal,
+        .delaySeconds = delay,
+    };
+  }
+  return modulation;
+}
+
 enum class WaveType : u8 {
   Pcm8,
   Pcm16,
@@ -504,6 +528,13 @@ std::optional<ScanInstrumentSetRef> addNdsInstrumentSet(
   }
 
   return builder.instrumentSet(std::string(name), std::move(instruments));
+}
+
+void applyNdsLfoRanges(InstrumentSetAsset& instrumentSet, const NdsLfoRanges& ranges) {
+  const InstrumentModulation modulation = ndsInstrumentModulation(ranges);
+  for (auto& instrument : instrumentSet.instruments) {
+    instrument.modulation = modulation;
+  }
 }
 
 }  // namespace vgmtrans::formats::nds
