@@ -96,14 +96,11 @@ constexpr std::array<u8, 64> kIntelliFe4{
   return tempo == 0 ? 60'000'000 : static_cast<u32>(std::lround(24'576'000.0 / tempo));
 }
 
-// N-SPC levels are linear 8-bit source values. Destination-specific curves and
-// quantization belong in the renderer, not in sequence playback.
-[[nodiscard]] constexpr double channelGain(u8 raw) {
-  return raw / 255.0;
-}
-
-[[nodiscard]] constexpr double masterGain(u8 raw) {
-  return raw / 255.0;
+// Convert the driver's 8-bit level control to linear gain using its square law.
+// Renderers handle destination encoding and quantization.
+[[nodiscard]] constexpr double levelGain(u8 raw) {
+  const double normalized = raw / 255.0;
+  return normalized * normalized;
 }
 
 [[nodiscard]] u8 midiAmountInRange(s32 current, s32 minimum, s32 range) {
@@ -1075,7 +1072,7 @@ struct Playback {
     switchToMelodicProgram();
     const double key = kMelodicKeyCorrection + noteIndex + track.transpose;
     beginNotePitch(noteIndex);
-    const auto note = out.note(key, math::channelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
+    const auto note = out.note(key, math::levelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
     // An inline F9 is only consumed while no pitch motion is active. A stored
     // F1/F2 envelope starts at note-on first, so F9 must wait in source order
     // until that envelope finishes; otherwise it starts immediately.
@@ -1107,7 +1104,7 @@ struct Playback {
       switchToDrumProgram(kit);
       const double key = 0x24 + slot - program.globalTranspose;
       beginNotePitch(static_cast<u8>(0x24 + slot - program.globalTranspose));
-      track.lastNote = out.note(key, math::channelGain(track.velocity), duration);
+      track.lastNote = out.note(key, math::levelGain(track.velocity), duration);
       track.lastKey = key;
     } else {
       u8 logical = 0;
@@ -1118,7 +1115,7 @@ struct Playback {
       switchToDrumProgram(0);
       const double outputKey = key - program.globalTranspose;
       beginNotePitch(static_cast<u8>(key - program.globalTranspose));
-      track.lastNote = out.note(outputKey, math::channelGain(track.velocity), duration);
+      track.lastNote = out.note(outputKey, math::levelGain(track.velocity), duration);
       track.lastKey = outputKey;
     }
     beginOrQueuePitchSlide(slide);
@@ -1130,7 +1127,7 @@ struct Playback {
   [[nodiscard]] Effects tie(bool hasSlide, u8 slideDelay, u8 slideLength, u8 slideTarget) {
     const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
     if (track.lastKey) {
-      track.lastNote = out.note(*track.lastKey, math::channelGain(track.velocity), soundingDuration(), true);
+      track.lastNote = out.note(*track.lastKey, math::levelGain(track.velocity), soundingDuration(), true);
     }
     beginOrQueuePitchSlide(slide);
     beginWait(track.noteLength);
@@ -1283,7 +1280,7 @@ struct Playback {
 
   void volume(u8 value) {
     track.volumeFade.setCurrentRaw(value);
-    out.level(math::channelGain(value), ValueQuantization{.levels = 256});
+    out.level(math::levelGain(value), ValueQuantization{.levels = 256});
   }
 
   void volumeFade(u8 length, u8 value) {
@@ -1292,7 +1289,7 @@ struct Playback {
       return;
     }
     static_cast<void>(
-        track.volumeFade.begin(out.fade(PerformanceAutomationTarget::Level, math::channelGain(value), length),
+        track.volumeFade.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
                                SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
   }
 
@@ -1300,7 +1297,7 @@ struct Playback {
     program.masterVolume = value;
     program.masterFade.setCurrentRaw(value);
     program.masterFadeTrack.reset();
-    out.masterLevel(math::masterGain(value));
+    out.masterLevel(math::levelGain(value));
   }
 
   void masterVolumeFade(u8 length, u8 value) {
@@ -1310,7 +1307,7 @@ struct Playback {
     }
     program.masterFade.setCurrentRaw(program.masterVolume);
     static_cast<void>(
-        program.masterFade.begin(out.fade(PerformanceAutomationTarget::MasterLevel, math::masterGain(value), length),
+        program.masterFade.begin(out.fade(PerformanceAutomationTarget::MasterLevel, math::levelGain(value), length),
                                  SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
     program.masterFadeTrack = track.trackNumber;
   }
@@ -1343,7 +1340,7 @@ struct Playback {
 
   void advanceVolumeFade() {
     static_cast<void>(track.volumeFade.tickRaw([&](s32 value) {
-      track.volumeFade.output(out).level(math::channelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
+      track.volumeFade.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
                                          ValueQuantization{.levels = 256});
     }));
   }
@@ -1351,7 +1348,7 @@ struct Playback {
   void advanceMasterFade() {
     static_cast<void>(program.masterFade.tickRaw([&](s32 value) {
       program.masterVolume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
-      program.masterFade.output(out).masterLevel(math::masterGain(program.masterVolume));
+      program.masterFade.output(out).masterLevel(math::levelGain(program.masterVolume));
     }));
     if (!program.masterFade.active()) {
       program.masterFadeTrack.reset();
@@ -1445,7 +1442,7 @@ struct Playback {
     }
     const VoiceRecord& record = program.voiceTable[index];
     track.volumeFade.setCurrentRaw(record.volume);
-    out.level(math::channelGain(record.volume), ValueQuantization{.levels = 256});
+    out.level(math::levelGain(record.volume), ValueQuantization{.levels = 256});
     const u8 pan = mode == IntelliMode::Fe3 ? record.pan : record.pan & 0x1f;
     const auto gains = math::panGains(program.selected, panTable, pan);
     track.panFade.setCurrentRaw(pan);
