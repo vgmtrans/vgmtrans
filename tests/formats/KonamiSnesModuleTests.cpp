@@ -531,6 +531,42 @@ void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
              std::abs(profile.instruments.vibrato->rateHertz.minimum - baseHz * (0x2d * 0x37)) < 0.0001 &&
              std::abs(profile.instruments.vibrato->rateHertz.maximum - baseHz * (0x2d * 0x78)) < 0.0001,
          "shared planning should include sequence-global tempo changes in legacy KonamiSnes vibrato");
+
+  const PerformanceSequence ordered =
+      renderKonamiSnesProgram(KONAMISNES_V2, {
+                                                 {
+                                                     0xe0,
+                                                     0x04,  // wait
+                                                     0xea,
+                                                     0x78,  // global tempo change at tick four
+                                                     0xff,
+                                                 },
+                                                 {
+                                                     0xe4,
+                                                     0x00,
+                                                     0x20,
+                                                     0x40,  // initial vibrato
+                                                     0xe0,
+                                                     0x04,
+                                                     0xe4,
+                                                     0x00,
+                                                     0x10,
+                                                     0x40,  // later same-tick replacement
+                                                     0xff,
+                                                 },
+                                             });
+  std::vector<const ModulationPerformanceEvent*> sameTickRates;
+  for (const PerformanceEvent& event : ordered.tracks[1].events) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    if (modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoRate &&
+        modulation->header.tick == 4) {
+      sameTickRates.push_back(modulation);
+    }
+  }
+  expect(sameTickRates.size() == 2 && sameTickRates[0]->cyclesPerTick && sameTickRates[1]->cyclesPerTick &&
+             *sameTickRates[0]->cyclesPerTick > *sameTickRates[1]->cyclesPerTick &&
+             sameTickRates[0]->header.sequence < sameTickRates[1]->header.sequence,
+         "global tempo invalidation should precede a later same-tick KonamiSnes vibrato replacement");
 }
 
 void konamiSnesPercussionUsesPackedGsDrumBank() {

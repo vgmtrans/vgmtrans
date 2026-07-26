@@ -360,15 +360,6 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
   return delay;
 }
 
-[[nodiscard]] double delaySeconds(AkaoSnesVersion version, u8 delay, u8 tempo, u8 timer0Frequency) {
-  const u8 ticks = lfoDelayTicks(version, delay);
-  if (ticks == 0) {
-    return 0.0;
-  }
-  const u8 safeTempo = tempo == 0 ? 1 : tempo;
-  return ticks * (256.0 / (akaoSnesFrameRateHz(timer0Frequency) * safeTempo));
-}
-
 [[nodiscard]] u32 driverFramesToTicks(double frames, u8 tempo) {
   const u8 safeTempo = tempo == 0 ? 1 : tempo;
   return std::max<u32>(1, static_cast<u32>(std::lround(frames * safeTempo / 256.0)));
@@ -1381,13 +1372,13 @@ struct Playback {
     }
     const u8 timer = akaoSnesTimer0Frequency(context.version, context.minorVersion);
     const double rateHertz = lfoRateHz(context.version, lfo.rate, lfo.depth, timer);
-    const double physicalDelaySeconds = delaySeconds(context.version, lfo.delay, track.tempo, timer);
+    const u32 delayTicks = lfoDelayTicks(context.version, lfo.delay);
     if (isVibrato) {
       out.vibratoRate(rateHertz);
-      out.vibratoDelayPhysical(lfoDelayTicks(context.version, lfo.delay), physicalDelaySeconds * 1000.0);
+      out.vibratoDelayTicks(delayTicks);
     } else {
       out.tremoloRate(rateHertz);
-      out.tremoloDelayPhysical(lfoDelayTicks(context.version, lfo.delay), physicalDelaySeconds * 1000.0);
+      out.tremoloDelayTicks(delayTicks);
     }
   }
 
@@ -1436,7 +1427,11 @@ struct Playback {
       if (vm.tick() == 0 && initialTempo && beforeInitialTempoTrack && initialTempo->tempo != track.tempo) {
         track.tempo = initialTempo->tempo;
         track.sharedTempoApplied = true;
-        syncLfoRateAndDelay(target);
+        if (isVibrato) {
+          track.configureVibratoFade(context.version);
+        } else {
+          track.configureTremoloFade(context.version);
+        }
       }
     } else {
       clearLfoRateAndDelay(target);
@@ -1503,8 +1498,8 @@ struct Playback {
       track.sharedTempoApplied = true;
     }
     output.tempo(tempoMicrosecondsPerQuarter(context.version, context.minorVersion, tempo));
-    syncLfoRateAndDelay(LfoTarget::Vibrato);
-    syncLfoRateAndDelay(LfoTarget::Tremolo);
+    track.configureVibratoFade(context.version);
+    track.configureTremoloFade(context.version);
   }
 
   void tempoChange(u8 rawTempo) {
@@ -1520,8 +1515,8 @@ struct Playback {
     }
     track.tempo = *sharedTempo;
     track.sharedTempoApplied = true;
-    syncLfoRateAndDelay(LfoTarget::Vibrato);
-    syncLfoRateAndDelay(LfoTarget::Tremolo);
+    track.configureVibratoFade(context.version);
+    track.configureTremoloFade(context.version);
   }
 
   Effects loopEnd() {
@@ -2164,6 +2159,8 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
   SequenceProgram program = session.finish();
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   program.config.profile = encodeAkaoSnesProfile(profile);
+  program.behavior.initialTempoMicrosecondsPerQuarter =
+      tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, kDefaultTempo);
 
   return program;
 }

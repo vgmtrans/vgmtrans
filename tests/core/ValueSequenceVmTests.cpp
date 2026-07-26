@@ -416,6 +416,47 @@ void sequenceVmUsesDialectCommandLimitDefault() {
   expect(performance.tracks[0].endTick == 12, "command-limit stop should preserve ticks from commands already run");
 }
 
+void sequenceVmResolvesInitialTempoAndGlobalEventOrder() {
+  const SequenceDialect tempoDialect = probeSequenceDialect(SequenceProgramBehavior{
+      .initialTempoMicrosecondsPerQuarter = 750'000,
+  });
+  const SequenceProgram defaultTempoProgram{
+      .dialect = tempoDialect.id,
+      .timebase = tempoDialect.timebase,
+  };
+  expect(SequenceVm().render(defaultTempoProgram, tempoDialect).initialTempoMicrosecondsPerQuarter == 750'000,
+         "sequence VM should retain a dialect's source initial tempo");
+
+  SequenceProgram overriddenTempoProgram = defaultTempoProgram;
+  overriddenTempoProgram.behavior.initialTempoMicrosecondsPerQuarter = 600'000;
+  expect(SequenceVm().render(overriddenTempoProgram, tempoDialect).initialTempoMicrosecondsPerQuarter == 600'000,
+         "a parsed program should be able to override its dialect's initial tempo");
+
+  const SequenceDialect orderDialect = probeSequenceDialect();
+  const auto makeTrack = [&](u32 trackNumber, u32 address, u8 program) {
+    TrackProgram track{
+        .id = TrackId{trackNumber},
+        .sourceTrackNumber = trackNumber,
+        .startAddress = Address{address},
+    };
+    TrackProgramBuilder builder{track};
+    const std::array<u8, 2> bytes{0x80, program};
+    addProbeCommand<ProbeProgramCommand>(builder, orderDialect, Address{address}, probeRange(address, bytes.size()),
+                                         bytes);
+    return track;
+  };
+  const SequenceProgram orderedProgram{
+      .dialect = orderDialect.id,
+      .timebase = orderDialect.timebase,
+      .tracks = {makeTrack(0, 0, 1), makeTrack(1, 16, 2)},
+  };
+  const PerformanceSequence ordered = SequenceVm().render(orderedProgram, orderDialect);
+  const auto& first = std::get<InstrumentPerformanceEvent>(ordered.tracks[0].events.front());
+  const auto& second = std::get<InstrumentPerformanceEvent>(ordered.tracks[1].events.front());
+  expect(first.header.sequence < second.header.sequence,
+         "sequence VM event order should be song-wide so same-tick global state changes order across channels");
+}
+
 void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -1168,6 +1209,7 @@ void runValueSequenceVmTests() {
   sequenceVmPreservesLoopCandidateAsPerformanceMarkers();
   sequenceVmPreservesLoopsAsPerformanceMarkers();
   sequenceVmUsesDialectCommandLimitDefault();
+  sequenceVmResolvesInitialTempoAndGlobalEventOrder();
   sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
   sequenceVmEmitsDialectInitialChannelDefaults();
   sequenceVmAllowsRepeatedCallsToSameSubroutine();

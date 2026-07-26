@@ -8,6 +8,7 @@
 
 #include "SessionSnapshotBuilder.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
+#include "value/sequence/TempoRelativeModulation.h"
 
 #include <array>
 
@@ -2016,6 +2017,140 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
          "physical modulation analysis should return immediately for tracks that did not opt in");
 }
 
+void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
+  PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .initialTempoMicrosecondsPerQuarter = 1'000'000,
+      .tracks =
+          {
+              PerformanceTrack{
+                  .id = TrackId{0},
+                  .sourceTrackNumber = 0,
+                  .endTick = 40,
+                  .hasPhysicalModulation = true,
+                  .events =
+                      {
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 0},
+                              .target = ModulationPerformanceTarget::VibratoRate,
+                              .cyclesPerTick = 0.25,
+                          },
+                          VibratoDelayPerformanceEvent{
+                              .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 1},
+                              .delayTicks = 10,
+                              .tempoRelative = true,
+                          },
+                          ModulationPerformanceEvent{
+                              .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 20, .sequence = 4},
+                              .target = ModulationPerformanceTarget::VibratoRate,
+                              .frequencyHz = 7.0,
+                          },
+                      },
+              },
+              PerformanceTrack{
+                  .id = TrackId{1},
+                  .sourceTrackNumber = 1,
+                  .endTick = 40,
+                  .events =
+                      {
+                          TempoPerformanceEvent{
+                              .header = PerformanceEventHeader{.track = TrackId{1}, .tick = 10, .sequence = 2},
+                              .microsecondsPerQuarter = 500'000,
+                          },
+                          TempoPerformanceEvent{
+                              .header = PerformanceEventHeader{.track = TrackId{1}, .tick = 30, .sequence = 5},
+                              .microsecondsPerQuarter = 250'000,
+                          },
+                      },
+              },
+          },
+  };
+
+  resolveTempoRelativeModulation(performance);
+  std::vector<const ModulationPerformanceEvent*> rates;
+  std::vector<const VibratoDelayPerformanceEvent*> delays;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* rate = std::get_if<ModulationPerformanceEvent>(&event)) {
+      rates.push_back(rate);
+    }
+    if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
+      delays.push_back(delay);
+    }
+  }
+
+  expect(rates.size() == 3 && rates[0]->header.tick == 0 && rates[0]->frequencyHz &&
+             std::abs(*rates[0]->frequencyHz - 25.0) < 0.0001 && rates[1]->header.tick == 10 &&
+             rates[1]->frequencyHz && std::abs(*rates[1]->frequencyHz - 50.0) < 0.0001 &&
+             rates[1]->header.sequence == 2 && rates[2]->header.tick == 20 && rates[2]->frequencyHz &&
+             std::abs(*rates[2]->frequencyHz - 7.0) < 0.0001,
+         "tempo-relative LFO rates should follow cross-track tempo changes in global execution order");
+  expect(delays.size() == 3 && delays[0]->milliseconds &&
+             std::abs(*delays[0]->milliseconds - 100.0) < 0.0001 && delays[1]->header.tick == 10 &&
+             delays[1]->milliseconds && std::abs(*delays[1]->milliseconds - 50.0) < 0.0001 &&
+             delays[2]->header.tick == 30 && delays[2]->milliseconds &&
+             std::abs(*delays[2]->milliseconds - 25.0) < 0.0001 &&
+             std::ranges::all_of(delays, [](const auto* delay) { return delay->tempoRelative; }),
+         "tempo-relative LFO delays should retain ticks while exposing physical synth delay values");
+
+  const auto simulatedPitchBends = [](bool changeTempo) {
+    PerformanceSequence simulation{
+        .timebase = Timebase{.ppqn = 100},
+        .initialTempoMicrosecondsPerQuarter = 1'000'000,
+        .tracks =
+            {
+                PerformanceTrack{
+                    .id = TrackId{0},
+                    .sourceTrackNumber = 0,
+                    .endTick = 8,
+                    .hasPhysicalModulation = true,
+                    .events =
+                        {
+                            ModulationPerformanceEvent{
+                                .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 0},
+                                .target = ModulationPerformanceTarget::VibratoRate,
+                                .cyclesPerTick = 0.125,
+                            },
+                            ModulationPerformanceEvent{
+                                .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 1},
+                                .target = ModulationPerformanceTarget::VibratoDepth,
+                                .pitchDepthSemitones = 1.0,
+                            },
+                            NotePerformanceEvent{
+                                .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 2},
+                                .key = 60.0,
+                                .linearVelocity = 1.0,
+                                .durationTicks = 8,
+                            },
+                        },
+                },
+                PerformanceTrack{
+                    .id = TrackId{1},
+                    .sourceTrackNumber = 1,
+                    .endTick = 8,
+                },
+            },
+    };
+    if (changeTempo) {
+      simulation.tracks[1].events.emplace_back(TempoPerformanceEvent{
+          .header = PerformanceEventHeader{.track = TrackId{1}, .tick = 4, .sequence = 3},
+          .microsecondsPerQuarter = 500'000,
+      });
+    }
+    resolveTempoRelativeModulation(simulation);
+    const MidiSequence midi =
+        renderMidiSequence(simulation, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+    std::vector<std::pair<u64, s16>> result;
+    for (const MidiEvent& event : midi.tracks[0].events) {
+      if (const auto* bend = std::get_if<PitchBend>(&event)) {
+        result.emplace_back(bend->tick, bend->value);
+      }
+    }
+    return result;
+  };
+  expect(simulatedPitchBends(true) == simulatedPitchBends(false),
+         "sequence-event simulation should preserve a sequence-clocked LFO's exact phase across tempo changes");
+}
+
 void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators() {
   MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -2165,6 +2300,7 @@ void runValueMidiTests() {
   standaloneSequenceExportDoesNotRequireACollection();
   modulationAnalysisReportsObservedPerformanceRanges();
   physicalModulationProfileDrivesMidiAndSynthFromOnePlan();
+  tempoRelativeModulationFollowsTheGlobalTempoTimeline();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
   observedModulationScalingUsesPreciseNormalizedAmounts();
 }

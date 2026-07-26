@@ -300,8 +300,10 @@ struct MidiInstrumentSelection {
 struct SimulatedLfoState {
   double depth = 0.0;
   double frequencyHz = 0.0;
+  std::optional<double> cyclesPerTick;
   u32 delayTicks = 0;
   std::optional<double> delayMilliseconds;
+  bool delayIsTempoRelative = false;
   u32 delayCounterTicks = 0;
   double delayCounterMilliseconds = 0.0;
   u64 cursorTick = 0;
@@ -510,6 +512,11 @@ void restartLfo(SimulatedLfoState& lfo, u64 tick, bool legacyUnipolarTremolo = f
 
 void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceEvent& event,
                   bool legacyUnipolarTremolo = false) {
+  if (event.cyclesPerTick) {
+    lfo.cyclesPerTick = std::max(0.0, *event.cyclesPerTick);
+  } else if (event.frequencyHz) {
+    lfo.cyclesPerTick.reset();
+  }
   if (event.frequencyHz) {
     lfo.frequencyHz = std::max(0.0, *event.frequencyHz);
   }
@@ -522,6 +529,9 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   if (event.delayMilliseconds) {
     lfo.delayMilliseconds = std::max(0.0, *event.delayMilliseconds);
   }
+  if (event.delayTicks || event.delayMilliseconds) {
+    lfo.delayIsTempoRelative = event.delayIsTempoRelative;
+  }
   lfo.phaseRunsAtZeroDepth = event.phaseRunsAtZeroDepth;
   lfo.configured = true;
   if (!lfo.started) {
@@ -530,9 +540,10 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
 }
 
 void setLfoDelay(SimulatedLfoState& lfo, u64 tick, u32 delayTicks, std::optional<double> delayMilliseconds,
-                 bool legacyUnipolarTremolo = false) {
+                 bool tempoRelative, bool legacyUnipolarTremolo = false) {
   lfo.delayTicks = delayTicks;
   lfo.delayMilliseconds = delayMilliseconds;
+  lfo.delayIsTempoRelative = tempoRelative;
   lfo.configured = true;
   if (!lfo.started) {
     restartLfo(lfo, tick, legacyUnipolarTremolo);
@@ -547,8 +558,10 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
 
   while (lfo.cursorTick < upToTick) {
     ++lfo.cursorTick;
-    const double tickMilliseconds = tempos.tickSeconds(lfo.cursorTick) * 1000.0;
-    if (lfo.delayMilliseconds) {
+    const u64 intervalTick = lfo.cursorTick == 0 ? 0 : lfo.cursorTick - 1;
+    const double tickSeconds = tempos.tickSeconds(intervalTick);
+    const double tickMilliseconds = tickSeconds * 1000.0;
+    if (!lfo.delayIsTempoRelative && lfo.delayMilliseconds) {
       if (lfo.delayCounterMilliseconds < *lfo.delayMilliseconds) {
         lfo.delayCounterMilliseconds =
             std::min(*lfo.delayMilliseconds, lfo.delayCounterMilliseconds + tickMilliseconds);
@@ -563,7 +576,8 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
       }
     }
 
-    if (lfo.frequencyHz <= 0.0 || (lfo.depth <= 0.0 && !lfo.phaseRunsAtZeroDepth)) {
+    if (lfo.cyclesPerTick.value_or(lfo.frequencyHz) <= 0.0 ||
+        (lfo.depth <= 0.0 && !lfo.phaseRunsAtZeroDepth)) {
       continue;
     }
 
@@ -571,7 +585,8 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
     if (lfo.depth > 0.0) {
       apply(lfo.cursorTick, value);
     }
-    lfo.phaseCycles = std::fmod(lfo.phaseCycles + lfo.frequencyHz * tempos.tickSeconds(lfo.cursorTick), 1.0);
+    const double phaseStep = lfo.cyclesPerTick.value_or(lfo.frequencyHz * tickSeconds);
+    lfo.phaseCycles = std::fmod(lfo.phaseCycles + phaseStep, 1.0);
   }
 }
 
@@ -822,7 +837,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             ensurePitchBendRange(track, state, typedEvent.header.tick, channel, typedEvent.cents);
           }
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
-          setLfoDelay(state.vibrato, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds);
+          setLfoDelay(state.vibrato, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
+                      typedEvent.tempoRelative);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
             track.events.push_back(VibratoDelay{
                 .tick = typedEvent.header.tick,
@@ -832,7 +848,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           }
         } else if constexpr (std::is_same_v<TypedEvent, TremoloDelayPerformanceEvent>) {
           setLfoDelay(state.tremolo, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
-                      !typedEvent.milliseconds);
+                      typedEvent.tempoRelative, !typedEvent.milliseconds);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
             track.events.push_back(TremoloDelay{
                 .tick = typedEvent.header.tick,

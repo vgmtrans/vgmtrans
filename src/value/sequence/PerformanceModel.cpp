@@ -51,7 +51,9 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
   return transition.startKey + ((transition.targetKey - transition.startKey) * position);
 }
 
-PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance) : timebase_(performance.timebase) {
+PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
+    : timebase_(performance.timebase),
+      initialTempoMicrosecondsPerQuarter_(performance.initialTempoMicrosecondsPerQuarter) {
   for (const auto& track : performance.tracks) {
     for (const auto& event : track.events) {
       const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
@@ -68,7 +70,7 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
     }
   }
   std::ranges::stable_sort(changes_, [](const Change& lhs, const Change& rhs) {
-    return std::tie(lhs.tick, lhs.order) < std::tie(rhs.tick, rhs.order);
+    return std::tie(lhs.tick, lhs.sequence, lhs.order) < std::tie(rhs.tick, rhs.sequence, rhs.order);
   });
   std::optional<u32> currentTempo;
   std::erase_if(changes_, [&](const Change& change) {
@@ -81,7 +83,7 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
 }
 
 u32 PerformanceTempoMap::microsecondsPerQuarterAt(u64 tick) const {
-  u32 microsecondsPerQuarter = 500000;
+  u32 microsecondsPerQuarter = initialTempoMicrosecondsPerQuarter_;
   for (const auto& change : changes_) {
     if (change.tick > tick) {
       break;
@@ -104,7 +106,7 @@ double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTick
   const u64 endTick = startTick > std::numeric_limits<u64>::max() - durationTicks ? std::numeric_limits<u64>::max()
                                                                                   : startTick + durationTicks;
   const double ppqn = std::max<u16>(timebase_.ppqn, 1);
-  u32 tempo = 500000;
+  u32 tempo = initialTempoMicrosecondsPerQuarter_;
   u64 cursor = startTick;
   double microseconds = 0.0;
 
@@ -133,7 +135,13 @@ bool PerformanceTempoMap::contains(const TempoPerformanceEvent& event) const {
 
 std::vector<PerformanceTempoMap::Point> PerformanceTempoMap::points() const {
   std::vector<Point> result;
-  result.reserve(changes_.size());
+  result.reserve(changes_.size() + 1);
+  if (initialTempoMicrosecondsPerQuarter_ != 500000 && (changes_.empty() || changes_.front().tick != 0)) {
+    result.push_back(Point{
+        .tick = 0,
+        .microsecondsPerQuarter = initialTempoMicrosecondsPerQuarter_,
+    });
+  }
   for (const Change& change : changes_) {
     result.push_back(Point{
         .tick = change.tick,

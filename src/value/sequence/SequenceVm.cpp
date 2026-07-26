@@ -5,6 +5,7 @@
  */
 
 #include "value/sequence/SequenceVm.h"
+#include "value/sequence/TempoRelativeModulation.h"
 
 #include <any>
 #include <algorithm>
@@ -65,7 +66,6 @@ private:
 // while the VM advances ticks, calls, repeats, and loop detection.
 struct VmTrackRuntime {
   u64 tick = 0;
-  u64 outputSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
   std::vector<u32> callStack;
@@ -441,10 +441,10 @@ class VmTrackExecutor {
 public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
-                  PerformanceSequence& targetSequence, std::optional<u64> stopTick, std::any* programState = nullptr,
-                  bool sequenceCoordinatesLoops = false, bool startsActive = true)
+                  PerformanceSequence& targetSequence, u64& outputSequence, std::optional<u64> stopTick,
+                  std::any* programState = nullptr, bool sequenceCoordinatesLoops = false, bool startsActive = true)
       : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
-        options_(options), targetSequence_(targetSequence), stopTick_(stopTick),
+        options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence), stopTick_(stopTick),
         performanceTrack_(PerformanceTrack{
             .id = track.id,
             .sourceTrackNumber = track.sourceTrackNumber,
@@ -455,7 +455,7 @@ public:
         sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
     addInitialTrackEvents(performanceTrack_, behavior_);
     for (auto& event : performanceTrack_.events) {
-      std::visit([&](auto& typedEvent) { typedEvent.header.sequence = runtime_.outputSequence++; }, event);
+      std::visit([&](auto& typedEvent) { typedEvent.header.sequence = outputSequence_++; }, event);
     }
     if (startsActive && !current_ && !track_.commands.empty()) {
       current_ = 0;
@@ -537,8 +537,8 @@ public:
   void trimAt(u64 tick, bool retainBoundaryEvents) { endTrackAt(performanceTrack_, tick, retainBoundaryEvents); }
 
   void preservePlaylistLoop(u64 startTick, u64 endTick) {
-    addLoopMarker(performanceTrack_, {}, startTick, runtime_.outputSequence, "Loop Start");
-    addLoopMarker(performanceTrack_, runtime_.lastCommand, endTick, runtime_.outputSequence, "Loop End");
+    addLoopMarker(performanceTrack_, {}, startTick, outputSequence_, "Loop Start");
+    addLoopMarker(performanceTrack_, runtime_.lastCommand, endTick, outputSequence_, "Loop End");
   }
 
   [[nodiscard]] RenderedTrack finish() {
@@ -563,7 +563,7 @@ private:
       return;
     }
     PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,      runtime_.tick,
-                           runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
+                           outputSequence_, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr) {
       warn("Missing sequence program state", command.range);
@@ -600,7 +600,7 @@ private:
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
     PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,      beginTick,
-                           runtime_.outputSequence, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
+                           outputSequence_, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr || dialect_.execute == nullptr) {
       warn("Missing sequence dialect executor state", command.range);
@@ -646,8 +646,8 @@ private:
     }
 
     if (loopPolicy_ == LoopPolicy::Preserve) {
-      addLoopMarker(performanceTrack_, loop.start.command, loop.start.tick, runtime_.outputSequence, "Loop Start");
-      addLoopMarker(performanceTrack_, loop.endCommand, loop.endTick, runtime_.outputSequence, "Loop End");
+      addLoopMarker(performanceTrack_, loop.start.command, loop.start.tick, outputSequence_, "Loop Start");
+      addLoopMarker(performanceTrack_, loop.endCommand, loop.endTick, outputSequence_, "Loop End");
       current_ = std::nullopt;
       arrivedByControlFlow_ = false;
       return LoopAction{.kind = LoopActionKind::StopTrack};
@@ -827,6 +827,7 @@ private:
   LoopPolicy loopPolicy_;
   const SequenceVmOptions& options_;
   PerformanceSequence& targetSequence_;
+  u64& outputSequence_;
   std::optional<u64> stopTick_;
   PerformanceTrack performanceTrack_;
   std::any trackState_;
@@ -981,12 +982,13 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program, const Seq
 
 PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const SequenceDialect& dialect,
                                            std::any* analyzedProgramState) const {
+  const SequenceProgramBehavior behavior = resolvedBehavior(program, dialect);
   PerformanceSequence sequence{
       .timebase = program.timebase,
+      .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
       .preferredPitchTransitionRendering = dialect.preferredPitchTransitionRendering,
   };
 
-  const SequenceProgramBehavior behavior = resolvedBehavior(program, dialect);
   const LoopPolicy loopPolicy = behavior.defaultLoopPolicy;
 
   if (dialect.execute != nullptr) {
@@ -995,12 +997,13 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
     // and the real render so collected information is retained.
     std::any programState = dialect.createProgramState != nullptr ? dialect.createProgramState(program) : std::any{};
     const auto renderSemanticPass = [&](PerformanceSequence& target, std::any& passProgramState) {
+      u64 outputSequence = 0;
       std::vector<std::unique_ptr<VmTrackExecutor>> executors;
       executors.reserve(program.tracks.size());
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (const TrackProgram& track : program.tracks) {
         executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, target,
-                                                              std::nullopt, &passProgramState,
+                                                              outputSequence, std::nullopt, &passProgramState,
                                                               loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
       }
 
@@ -1091,7 +1094,10 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       return tracks;
     };
 
-    PerformanceSequence prepass{.timebase = program.timebase};
+    PerformanceSequence prepass{
+        .timebase = program.timebase,
+        .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
+    };
     if (dialect.prepass == SemanticPrepassMode::ScheduledPlayback) {
       // Run commands in normal time order but discard every emitted event. This
       // preserves song-wide interactions between tracks during collection.
@@ -1100,6 +1106,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       // Some limits must include every valid source block, even when a jump
       // skips that block during normal playback. Run each already-decoded
       // command once in stable order and discard its events, timing, and jumps.
+      u64 outputSequence = 0;
       for (const TrackProgram& track : program.tracks) {
         std::any trackState =
             dialect.createTrackState != nullptr ? dialect.createTrackState(program, track) : std::any{};
@@ -1113,7 +1120,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
                                  command.id,
                                  command.annotation,
                                  0,
-                                 runtime.outputSequence,
+                                 outputSequence,
                                  runtime.nextNote,
                                  runtime.nextAutomation,
                                  behavior.panLaw};
@@ -1134,7 +1141,10 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       // format with a prepass has already executed everything required to
       // collect its durable result. Do not perform the discarded output pass.
       if (dialect.prepass == SemanticPrepassMode::None) {
-        PerformanceSequence analysis{.timebase = program.timebase};
+        PerformanceSequence analysis{
+            .timebase = program.timebase,
+            .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
+        };
         analysis.tracks = renderSemanticPass(analysis, programState);
       }
       *analyzedProgramState = std::move(programState);
@@ -1144,6 +1154,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
     if (dialect.finalizePerformance != nullptr) {
       dialect.finalizePerformance(programState, sequence);
     }
+    resolveTempoRelativeModulation(sequence);
     return sequence;
   }
 
@@ -1163,6 +1174,7 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
   SequenceProgramBehavior behavior{
       .defaultLoopPolicy = LoopPolicy::PlayOnce,
       .commandLimit = kFallbackCommandLimit,
+      .initialTempoMicrosecondsPerQuarter = 500000,
   };
 
   if (program.behavior.defaultLoopPolicy != LoopPolicy::Default) {
@@ -1208,6 +1220,12 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
     behavior.initialPitchBendRangeSemitones = program.behavior.initialPitchBendRangeSemitones;
   } else if (dialect.defaultBehavior.initialPitchBendRangeSemitones) {
     behavior.initialPitchBendRangeSemitones = dialect.defaultBehavior.initialPitchBendRangeSemitones;
+  }
+
+  if (program.behavior.initialTempoMicrosecondsPerQuarter != 0) {
+    behavior.initialTempoMicrosecondsPerQuarter = program.behavior.initialTempoMicrosecondsPerQuarter;
+  } else if (dialect.defaultBehavior.initialTempoMicrosecondsPerQuarter != 0) {
+    behavior.initialTempoMicrosecondsPerQuarter = dialect.defaultBehavior.initialTempoMicrosecondsPerQuarter;
   }
 
   return behavior;

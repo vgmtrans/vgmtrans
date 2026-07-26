@@ -56,6 +56,7 @@ void konamiSnesCompiledAutomationTicksFades();
 void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
 void ninSnesProfilesDescribeEverySupportedDriverFamily();
 void ninSnesProfilesShareSquaredLevelCurve();
+void ninSnesProfilesShareTempoRelativeVibratoClock();
 void ninSnesNoteVelocityPreservesLegacyCurve();
 void ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
 void ninSnesControllerFadesRemainInTheSourceDomain();
@@ -167,6 +168,7 @@ int main() {
     konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
     ninSnesProfilesDescribeEverySupportedDriverFamily();
     ninSnesProfilesShareSquaredLevelCurve();
+    ninSnesProfilesShareTempoRelativeVibratoClock();
     ninSnesNoteVelocityPreservesLegacyCurve();
     ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
     ninSnesControllerFadesRemainInTheSourceDomain();

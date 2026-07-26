@@ -182,6 +182,9 @@ struct VibratoDelayPerformanceEvent {
   // Some source LFOs run on a fixed driver clock rather than sequence time.
   // When present, simulation uses this physical duration instead of delayTicks.
   std::optional<double> milliseconds;
+  // Sequence-relative delays remain exact in event simulation. The shared
+  // resolver also supplies milliseconds for synth-modulator lowering.
+  bool tempoRelative = false;
   // Legacy controller fallback for formats that do not provide milliseconds.
   u8 midiValue = 0;
 };
@@ -190,6 +193,7 @@ struct TremoloDelayPerformanceEvent {
   PerformanceEventHeader header;
   u32 delayTicks = 0;
   std::optional<double> milliseconds;
+  bool tempoRelative = false;
   u8 midiValue = 0;
 };
 
@@ -259,8 +263,12 @@ enum class ModulationPerformanceTarget {
 // conversion.
 struct LfoPerformanceContext {
   std::optional<double> frequencyHz;
+  // Oscillator cycles advanced by one sequence tick. The shared resolver
+  // derives frequencyHz from the global tempo timeline.
+  std::optional<double> cyclesPerTick;
   std::optional<u32> delayTicks;
   std::optional<double> delayMilliseconds;
+  bool delayIsTempoRelative = false;
   std::optional<LfoWaveform> waveform;
   bool phaseRunsAtZeroDepth = false;
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
@@ -277,8 +285,10 @@ struct ModulationPerformanceEvent {
   std::optional<double> volumeDepthDecibels;
   std::optional<double> panDepth;
   std::optional<double> frequencyHz;
+  std::optional<double> cyclesPerTick;
   std::optional<u32> delayTicks;
   std::optional<double> delayMilliseconds;
+  bool delayIsTempoRelative = false;
   // A missing waveform retains the renderer's legacy/default LFO shape.
   std::optional<LfoWaveform> waveform;
   // Some drivers keep advancing the oscillator while its depth is zero. This
@@ -473,6 +483,7 @@ struct SourcePlaybackSpan {
 // command. MIDI controller encoding happens later in the export layer.
 struct PerformanceSequence {
   Timebase timebase;
+  u32 initialTempoMicrosecondsPerQuarter = 500000;
   PitchTransitionRenderingHint preferredPitchTransitionRendering = PitchTransitionRenderingHint::Portamento;
   std::vector<PerformanceTrack> tracks;
   std::vector<SourcePlaybackSpan> sourceSpans;
@@ -507,6 +518,7 @@ private:
   };
 
   Timebase timebase_;
+  u32 initialTempoMicrosecondsPerQuarter_ = 500000;
   std::vector<Change> changes_;
 };
 
