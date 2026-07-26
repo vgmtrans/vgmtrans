@@ -15,11 +15,14 @@
 
 namespace vgmtrans::core {
 
+struct SequenceModulationProfile;
+
 // Converts SequenceVm output into MIDI events. This is where parsed performance
 // values become MIDI channels, ports, controller numbers, and quantized controller values.
 [[nodiscard]] MidiSequence renderMidiSequence(
     const PerformanceSequence& performance, MidiExportOptions options = {},
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
-    std::span<const InstrumentSetAsset* const> instrumentSets = {});
+    std::span<const InstrumentSetAsset* const> instrumentSets = {},
+    const SequenceModulationProfile* modulationProfile = nullptr);
 
 }  // namespace vgmtrans::core

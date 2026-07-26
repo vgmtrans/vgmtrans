@@ -50,26 +50,6 @@ struct InstrumentReadResult {
   std::optional<AkaoSnesInstrumentInfo> info;
 };
 
-[[nodiscard]] InstrumentModulation akaoInstrumentModulation(AkaoSnesVersion version) {
-  const AkaoSnesLfoRateRange rate = akaoSnesLfoRateRange(version);
-  InstrumentModulation modulation{
-      .vibrato =
-          VibratoSpec{
-              .maxDepthCents = akaoSnesMaxVibratoDepthCents(version),
-              .rateHertz = {rate.minimum, rate.maximum},
-              .delaySeconds = ModulationRange{0.0, akaoSnesMaxLfoDelaySeconds(version)},
-          },
-  };
-  if (akaoSnesExportsTremolo(version)) {
-    modulation.tremolo = TremoloSpec{
-        .maxDepthDb = akaoSnesMaxTremoloDepthDb(version),
-        .rateHertz = {rate.minimum, rate.maximum},
-        .delaySeconds = ModulationRange{0.0, akaoSnesMaxLfoDelaySeconds(version)},
-    };
-  }
-  return modulation;
-}
-
 [[nodiscard]] InstrumentReadResult readMelodicInstrument(ByteReader reader, const AkaoSnesLayout& layout, u8 srcn,
                                                          std::vector<Diagnostic>* diagnostics) {
   if (!layout.spcDirAddress || !layout.tuningTableAddress) {
@@ -289,7 +269,6 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
         .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
         .name = info.percussion ? "Drum Kit" : fmt::format("Instrument {}", static_cast<unsigned>(info.srcn)),
         .range = info.tuning.range,
-        .modulation = akaoInstrumentModulation(layout.version),
     };
     auto instrument = info.percussion ? instruments.getOrAdd(programKey, std::move(model))
                                       : instruments.add(programKey, std::move(model));

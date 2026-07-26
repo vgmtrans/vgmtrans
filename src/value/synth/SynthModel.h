@@ -8,6 +8,7 @@
 
 #include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
+#include "value/model/ModulationModel.h"
 
 #include <optional>
 #include <string>
@@ -58,38 +59,6 @@ struct Envelope {
   return envelope.attackSeconds.has_value() || envelope.holdSeconds.has_value() || envelope.decaySeconds.has_value() ||
          envelope.releaseSeconds.has_value() || envelope.sustainAmplitude.has_value();
 }
-
-struct ModulationRange {
-  double minimum = 0.0;
-  double maximum = 0.0;
-};
-
-struct VibratoSpec {
-  double maxDepthCents = 0.0;
-  ModulationRange rateHertz;
-  std::optional<ModulationRange> delaySeconds;
-};
-
-enum class TremoloGainMode {
-  // The synth LFO is centered around nominal gain and may boost above it.
-  BipolarAroundNominal,
-  // Matching attenuation keeps the loudest point at nominal gain.
-  NoBoost,
-};
-
-struct TremoloSpec {
-  double maxDepthDb = 0.0;
-  ModulationRange rateHertz;
-  TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
-  std::optional<ModulationRange> delaySeconds;
-};
-
-// Formats describe vibrato and tremolo in physical units. Exporters lower
-// those values to their target-specific generator/modulator encodings.
-struct InstrumentModulation {
-  std::optional<VibratoSpec> vibrato;
-  std::optional<TremoloSpec> tremolo;
-};
 
 struct Loop {
   bool enabled = false;

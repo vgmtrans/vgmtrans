@@ -583,11 +583,14 @@ void ndsSequenceDialectModelsNitroLfoRegisters() {
     if (modulation == nullptr) {
       continue;
     }
-    if (modulation->target == ModulationPerformanceTarget::VibratoDepth && modulation->amount > 0.0) {
+    if (modulation->target == ModulationPerformanceTarget::VibratoDepth && modulation->pitchDepthSemitones &&
+        *modulation->pitchDepthSemitones > 0.0) {
       pitch = modulation;
-    } else if (modulation->target == ModulationPerformanceTarget::TremoloDepth && modulation->amount > 0.0) {
+    } else if (modulation->target == ModulationPerformanceTarget::TremoloDepth &&
+               modulation->volumeDepthDecibels && *modulation->volumeDepthDecibels > 0.0) {
       volume = modulation;
-    } else if (modulation->target == ModulationPerformanceTarget::PanDepth && modulation->amount > 0.0) {
+    } else if (modulation->target == ModulationPerformanceTarget::PanDepth && modulation->panDepth &&
+               *modulation->panDepth > 0.0) {
       pan = modulation;
     } else if (modulation->target == ModulationPerformanceTarget::VibratoRate &&
                modulation->delayMilliseconds == 250.0) {
@@ -608,8 +611,8 @@ void ndsSequenceDialectModelsNitroLfoRegisters() {
 }
 
 void ndsSynthModulatorsUseSequenceLfoRanges() {
-  expect(static_cast<bool>(ndsDefinition().module.prepareCollection),
-         "NDS should apply sequence-defined LFO ranges when preparing collection instruments");
+  expect(!ndsDefinition().module.prepareCollection,
+         "NDS modulation should not require a format-specific collection preparer");
   const SequenceProgram program = decodeTestSequenceProgram({
       0xcb,
       0x20,  // speed 32 -> 12 Hz
@@ -628,17 +631,22 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
       0x10,  // speed 16 -> 6 Hz
       0xff,
   });
-  const NdsLfoRanges ranges = analyzeNdsLfoRanges(program);
-  expect(std::abs(ranges.maxVibratoDepthCents - 99.21875) < 0.000001 &&
-             std::abs(ranges.maxTremoloDepthDb - 5.953125) < 0.000001 && std::abs(ranges.maxPanDepth - 1.0) < 0.000001,
-         "NDS LFO analysis should retain each target's sequence-wide physical depth");
-  expect(
-      ranges.minRateHertz == 6.0 && ranges.maxRateHertz == 12.0 && std::abs(ranges.maxDelaySeconds - 0.25) < 0.000001,
-      "NDS LFO analysis should retain the sequence-wide physical rate and delay");
-
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, ndsSequenceDialect());
-  const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SynthModulators);
+  const SequenceModulationProfile profile = analyzeSequenceModulation(performance);
+  expect(profile.instruments.vibrato && profile.instruments.tremolo &&
+             std::abs(profile.instruments.vibrato->maxDepthCents - 99.21875) < 0.000001 &&
+             std::abs(profile.instruments.tremolo->maxDepthDb - 5.953125) < 0.000001 &&
+             std::abs(profile.maxPanDepth - 1.0) < 0.000001,
+         "shared LFO analysis should retain each NDS target's sequence-wide physical depth");
+  expect(profile.instruments.vibrato->rateHertz.minimum == 6.0 &&
+             profile.instruments.vibrato->rateHertz.maximum == 12.0 &&
+             profile.instruments.vibrato->delaySeconds &&
+             profile.instruments.vibrato->delaySeconds->minimum == 0.0 &&
+             std::abs(profile.instruments.vibrato->delaySeconds->maximum - 0.25) < 0.000001,
+         "shared LFO analysis should retain the NDS sequence's physical rate and delay range");
+
+  const MidiSequence midi = renderMidiSequence(performance, MidiExportOptions{},
+                                               ModulationConversionPolicy::SynthModulators, {}, &profile);
   u8 maxVibratoDepth = 0;
   u8 maxTremoloDepth = 0;
   u8 maxVibratoFrequency = 0;
@@ -655,7 +663,7 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
     }
   }
   expect(maxVibratoDepth == 127 && maxTremoloDepth == 127 && maxVibratoFrequency == 127 && maxVibratoDelay == 127,
-         "NDS synth-modulator MIDI should use the full controller span for each observed LFO range");
+         "NDS synth-modulator MIDI should span each changing physical LFO range");
 
   std::vector<u8> bytes(0x80);
   writeLe32(bytes, 0x38, 1);
@@ -685,9 +693,9 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
   const ScanResult result = out.finish();
   const auto* bank = assetWithId<InstrumentSetAsset>(result, bankRef->id);
   expect(bank != nullptr && bank->instruments.size() == 1,
-         "NDS should retain every parsed instrument for collection preparation");
+         "NDS should retain every parsed instrument for shared collection preparation");
   InstrumentSetAsset preparedBank = *bank;
-  applyNdsLfoRanges(preparedBank, ranges);
+  applySequenceModulation(preparedBank, profile);
   const InstrumentModulation& modulation = preparedBank.instruments[0].modulation;
   expect(modulation.vibrato && modulation.tremolo,
          "NDS instruments should describe both Nitro pitch and volume LFO targets");

@@ -22,20 +22,6 @@ using namespace core;
 
 namespace {
 
-const InstrumentModulation kCapcomModulation{
-    .vibrato =
-        VibratoSpec{
-            .maxDepthCents = 1200.0,
-            .rateHertz = {kCapcomSnesLfoStepHertz, 255.0 * kCapcomSnesLfoStepHertz},
-        },
-    .tremolo =
-        TremoloSpec{
-            .maxDepthDb = kCapcomSnesTremoloHalfDepthCentibels / 10.0,
-            .rateHertz = {2.0 * kCapcomSnesLfoStepHertz, 510.0 * kCapcomSnesLfoStepHertz},
-            .gainMode = TremoloGainMode::NoBoost,
-        },
-};
-
 // Converts Capcom's pitch scale into an exact sample unity key.
 [[nodiscard]] double capcomInstrumentUnityKey(s16 pitchScale) {
   constexpr int baseUnityKey = 96;
@@ -160,7 +146,6 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
                                                               .key = info.index,
                                                           },
                                                       .name = name,
-                                                      .modulation = kCapcomModulation,
                                                   });
     auto annotation =
         instrument.source(name, info.source, "capcom-snes-instrument").derived("instrument", info.index).parent(root);

@@ -10,7 +10,6 @@
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
-#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -37,10 +36,6 @@ constexpr u8 kMelodicKeyCorrection = 24;
 constexpr u8 kIntelliDrumSlots = 16;
 constexpr u8 kDefaultTempo = 0x20;
 constexpr double kTimerHertz = 500.0;
-constexpr double kMinimumVibratoDepthCents = (0xff * 0x80 >> 8) * (100.0 / 256.0);
-constexpr double kMinimumVibratoRateHertz = (kTimerHertz * kDefaultTempo * 0x20) / 65536.0;
-constexpr double kAbsoluteMinimumVibratoRateHertz = kTimerHertz / 65536.0;
-constexpr double kMaximumVibratoDelaySeconds = (256.0 * 0xff) / kTimerHertz;
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
   return (0x7fu << 7) | program;
@@ -101,36 +96,6 @@ constexpr std::array<u8, 64> kIntelliFe4{
 [[nodiscard]] constexpr double levelGain(u8 raw) {
   const double normalized = raw / 255.0;
   return normalized * normalized;
-}
-
-[[nodiscard]] u8 midiAmountInRange(s32 current, s32 minimum, s32 range) {
-  if (range == 0) {
-    return 0;
-  }
-  const int value = static_cast<int>(std::lround(128.0 * (current - minimum) / static_cast<double>(range)));
-  return static_cast<u8>(std::clamp(value, 0, 127));
-}
-
-[[nodiscard]] u8 vibratoDepthMidi(double cents, double maximumCents) {
-  if (cents <= 0.0 || maximumCents <= 0.0) {
-    return 0;
-  }
-  return static_cast<u8>(std::clamp<int>(static_cast<int>(std::lround(128.0 * cents / maximumCents)), 0, 127));
-}
-
-[[nodiscard]] u8 vibratoRateMidi(double hertz, double maximumHertz) {
-  if (hertz <= 0.0 || maximumHertz <= 0.0) {
-    return 0;
-  }
-  const s32 minimum = synthAmountFromHertz(kAbsoluteMinimumVibratoRateHertz);
-  return midiAmountInRange(synthAmountFromHertz(hertz), minimum,
-                           synthAmountFromHertzRange(kAbsoluteMinimumVibratoRateHertz, maximumHertz));
-}
-
-[[nodiscard]] u8 vibratoDelayMidi(double seconds) {
-  const s32 minimum = synthAmountFromSeconds(synthSecondsRangeMinimum(0.0));
-  return midiAmountInRange(synthAmountFromSeconds(synthSecondsRangeMinimum(seconds)), minimum,
-                           synthAmountFromSecondsRange(0.0, kMaximumVibratoDelaySeconds));
 }
 
 struct PanGains {
@@ -562,8 +527,6 @@ struct ProgramState {
             .vibrato = vibrato,
             .tempo = tempo,
         });
-        recipes.maxVibratoRateHertz =
-            std::max(recipes.maxVibratoRateHertz, math::vibratoRateHertz(vibrato.rate, tempo));
       }
     }
   }
@@ -599,12 +562,9 @@ struct ProgramState {
         continue;
       }
       const double rate = math::vibratoRateHertz(sync.vibrato.rate, sync.tempo);
-      const u8 midiRate = math::vibratoRateMidi(rate, recipes.maxVibratoRateHertz);
       const double delaySeconds = math::vibratoDelaySeconds(sync.vibrato.delay, sync.tempo);
       const u32 delayTicks = static_cast<u32>(
           std::lround(delaySeconds * 1'000'000.0 * kPpqn / math::tempoMicrosecondsPerQuarter(sync.tempo)));
-      const u8 midiDelay = math::vibratoDelayMidi(delaySeconds);
-
       found->events.emplace_back(ModulationPerformanceEvent{
           .header =
               PerformanceEventHeader{
@@ -613,7 +573,7 @@ struct ProgramState {
                   .sequence = nextSequence++,
               },
           .target = ModulationPerformanceTarget::VibratoRate,
-          .amount = midiRate / 127.0,
+          .amount = 0.0,
           .frequencyHz = rate,
       });
       found->events.emplace_back(VibratoDelayPerformanceEvent{
@@ -624,8 +584,9 @@ struct ProgramState {
                   .sequence = nextSequence++,
               },
           .delayTicks = delayTicks,
-          .midiValue = midiDelay,
+          .milliseconds = delaySeconds * 1000.0,
       });
+      found->hasPhysicalModulation = true;
     }
   }
 
@@ -652,11 +613,6 @@ struct ProgramState {
       activeVibrato.resize(trackNumber + 1);
     }
     activeVibrato[trackNumber] = vibrato;
-    if (!collecting || !vibrato.active()) {
-      return;
-    }
-    recipes.maxVibratoDepthCents = std::max(recipes.maxVibratoDepthCents, math::vibratoDepthCents(vibrato.depth));
-    recipes.maxVibratoRateHertz = std::max(recipes.maxVibratoRateHertz, math::vibratoRateHertz(vibrato.rate, tempo));
   }
 
   [[nodiscard]] u32 registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
@@ -739,8 +695,6 @@ struct ProgramState {
       }
       recipes.drumKits.push_back(std::move(kit));
     }
-    recipes.maxVibratoDepthCents = std::max(recipes.maxVibratoDepthCents, kMinimumVibratoDepthCents);
-    recipes.maxVibratoRateHertz = std::max(recipes.maxVibratoRateHertz, kMinimumVibratoRateHertz);
     collecting = false;
     resetRuntime();
   }
@@ -846,7 +800,7 @@ struct TrackState {
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
   PerformanceBoundMotion<SequenceAutomatedValue<s32>> vibratoDepth;
-  u8 lastVibratoDepthMidi = 0;
+  double lastVibratoDepthSemitones = 0.0;
 };
 
 struct Slide {
@@ -1209,34 +1163,27 @@ struct Playback {
   void vibratoFade(u8 length) { track.vibrato.fade = length; }
 
   void emitVibratoDepth(u8 rawDepth, PerformanceEmitter output) {
-    const double depth = math::vibratoDepthCents(rawDepth);
-    const u8 midiDepth = math::vibratoDepthMidi(depth, program.recipes.maxVibratoDepthCents);
-    if (midiDepth == track.lastVibratoDepthMidi) {
+    const double depthSemitones = math::vibratoDepthCents(rawDepth) / 100.0;
+    if (std::abs(depthSemitones - track.lastVibratoDepthSemitones) < 0.000001) {
       return;
     }
-    track.lastVibratoDepthMidi = midiDepth;
-    output.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoDepth,
-        .amount = midiDepth / 127.0,
-        .pitchDepthSemitones = depth / 100.0,
-        .controllerRangeMaxAmount = 1.0,
-    });
+    track.lastVibratoDepthSemitones = depthSemitones;
+    output.vibratoDepth(depthSemitones);
   }
 
   void emitVibratoRateAndDelay() {
     const bool active = track.vibrato.active();
     const double rate = active ? math::vibratoRateHertz(track.vibrato.rate, program.tempo) : 0.0;
-    const u8 midiRate = active ? math::vibratoRateMidi(rate, program.recipes.maxVibratoRateHertz) : 0;
-    out.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoRate,
-        .amount = midiRate / 127.0,
-        .frequencyHz = rate,
-    });
+    out.vibratoRate(rate);
     const double delaySeconds = active ? math::vibratoDelaySeconds(track.vibrato.delay, program.tempo) : 0.0;
     const u32 delayTicks = active ? static_cast<u32>(std::lround(delaySeconds * 1'000'000.0 * kPpqn /
                                                                  math::tempoMicrosecondsPerQuarter(program.tempo)))
                                   : 0;
-    out.vibratoDelay(delayTicks, active ? math::vibratoDelayMidi(delaySeconds) : 0);
+    if (active) {
+      out.vibratoDelayPhysical(delayTicks, delaySeconds * 1000.0);
+    } else {
+      out.vibratoDelay(0, 0);
+    }
   }
 
   void emitConfiguredVibrato() {
@@ -1251,7 +1198,9 @@ struct Playback {
     track.vibratoDepth.setCurrent(0);
     const s32 target = track.vibrato.depth;
     track.vibratoDepth.begin(
-        out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, 1.0, track.vibrato.fade, track.vibrato.delay),
+        out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
+                         math::vibratoDepthCents(track.vibrato.depth) / 100.0, track.vibrato.fade,
+                         track.vibrato.delay),
         SequenceMotionPlan<s32>::targetOverTicksWithStep(target, target / static_cast<s32>(track.vibrato.fade),
                                                          track.vibrato.fade, track.vibrato.delay));
     emitVibratoDepth(0, track.vibratoDepth.output(out));

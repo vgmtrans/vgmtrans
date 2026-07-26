@@ -83,15 +83,22 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
         .destination = SynthDestination::VibratoDepth,
         .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
     });
-    lowered.modulators.push_back(SynthModulator{
-        .destination = SynthDestination::VibratoRate,
-        .amount = synthAmountFromHertzRange(vibrato.rateHertz.minimum, vibrato.rateHertz.maximum),
-    });
-    if (vibrato.delaySeconds) {
+    const s32 rateAmount = synthAmountFromHertzRange(vibrato.rateHertz.minimum, vibrato.rateHertz.maximum);
+    if (rateAmount != 0) {
       lowered.modulators.push_back(SynthModulator{
-          .destination = SynthDestination::VibratoDelay,
-          .amount = synthAmountFromSecondsRange(vibrato.delaySeconds->minimum, vibrato.delaySeconds->maximum),
+          .destination = SynthDestination::VibratoRate,
+          .amount = rateAmount,
       });
+    }
+    if (vibrato.delaySeconds) {
+      const s32 delayAmount =
+          synthAmountFromSecondsRange(vibrato.delaySeconds->minimum, vibrato.delaySeconds->maximum);
+      if (delayAmount != 0) {
+        lowered.modulators.push_back(SynthModulator{
+            .destination = SynthDestination::VibratoDelay,
+            .amount = delayAmount,
+        });
+      }
     }
   }
 
@@ -108,15 +115,22 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
       });
     }
 
-    lowered.modulators.push_back(SynthModulator{
-        .destination = SynthDestination::TremoloRate,
-        .amount = synthAmountFromHertzRange(tremolo.rateHertz.minimum, tremolo.rateHertz.maximum),
-    });
-    if (tremolo.delaySeconds) {
+    const s32 rateAmount = synthAmountFromHertzRange(tremolo.rateHertz.minimum, tremolo.rateHertz.maximum);
+    if (rateAmount != 0) {
       lowered.modulators.push_back(SynthModulator{
-          .destination = SynthDestination::TremoloDelay,
-          .amount = synthAmountFromSecondsRange(tremolo.delaySeconds->minimum, tremolo.delaySeconds->maximum),
+          .destination = SynthDestination::TremoloRate,
+          .amount = rateAmount,
       });
+    }
+    if (tremolo.delaySeconds) {
+      const s32 delayAmount =
+          synthAmountFromSecondsRange(tremolo.delaySeconds->minimum, tremolo.delaySeconds->maximum);
+      if (delayAmount != 0) {
+        lowered.modulators.push_back(SynthModulator{
+            .destination = SynthDestination::TremoloDelay,
+            .amount = delayAmount,
+        });
+      }
     }
     lowered.modulators.push_back(SynthModulator{
         .destination = SynthDestination::TremoloDepth,

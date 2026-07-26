@@ -25,10 +25,7 @@ using namespace core;
 
 namespace {
 
-constexpr double kTimerHertz = 500.0;
 constexpr u8 kMelodicKeyCorrection = 24;
-constexpr double kMinimumVibratoRateHertz = (kTimerHertz * 1.0) / 65536.0;
-constexpr double kMaximumVibratoDelaySeconds = (256.0 * 0xff) / kTimerHertz;
 
 struct InstrumentInfo {
   u32 program = 0;
@@ -225,25 +222,10 @@ struct InstrumentRegion {
   return standardUnityKey(selected, info.pitchHigh, info.pitchLow);
 }
 
-[[nodiscard]] InstrumentModulation modulation(const SequenceRecipes& recipes) {
-  const double maximumDepth = recipes.maxVibratoDepthCents > 0.0 ? recipes.maxVibratoDepthCents : 1494.140625;
-  const double maximumRate =
-      recipes.maxVibratoRateHertz > 0.0 ? recipes.maxVibratoRateHertz : (kTimerHertz * 0xff * 0xff) / 65536.0;
-  return InstrumentModulation{
-      .vibrato =
-          VibratoSpec{
-              .maxDepthCents = maximumDepth,
-              .rateHertz = ModulationRange{kMinimumVibratoRateHertz, maximumRate},
-              .delaySeconds = ModulationRange{0.0, kMaximumVibratoDelaySeconds},
-          },
-  };
-}
-
 void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layout& layout,
                     const SequenceRecipes& recipes, const std::vector<InstrumentInfo>& infos,
                     const SnesBrrSampleRefs& samples) {
   std::map<u32, InstrumentRegion> regionsByProgram;
-  const InstrumentModulation instrumentModulation = modulation(recipes);
   for (const InstrumentInfo& info : infos) {
     auto sample = samples.findSrcn(info.srcn);
     if (!sample) {
@@ -264,7 +246,6 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
                                                             .key = info.program,
                                                         },
                                                     .name = name,
-                                                    .modulation = instrumentModulation,
                                                 });
     if (info.source.valid()) {
       instrument.source(name, info.source, info.override ? "nin-snes-instrument-override" : "nin-snes-instrument");
@@ -307,7 +288,6 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
                                              .key = key,
                                          },
                                      .name = fmt::format("Drum Kit {}", kit.program),
-                                     .modulation = instrumentModulation,
                                  });
     for (const auto& [slot, source] : resolvedSlots) {
       Region region = source->region;

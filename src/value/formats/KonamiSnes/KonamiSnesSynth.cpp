@@ -130,20 +130,6 @@ constexpr u32 kDrumKitProgram = 0x00;
   return infos;
 }
 
-[[nodiscard]] InstrumentModulation konamiInstrumentModulation(KonamiSnesVersion version) {
-  // Instrument exports describe the widest values the driver can produce.
-  // Song-specific controller limits are added later by sequence playback.
-  const auto spec = vibrato::modulationSpec(version);
-  return InstrumentModulation{
-      .vibrato =
-          VibratoSpec{
-              .maxDepthCents = spec.maxDepthCents,
-              .rateHertz = {spec.minHertz, spec.maxHertz},
-              .delaySeconds = ModulationRange{spec.minDelaySeconds, spec.maxDelaySeconds},
-          },
-  };
-}
-
 [[nodiscard]] double konamiUnityKey(const KonamiSnesInstrumentInfo& info) {
   // The key byte is the whole-number part of pitch and tuning is its fractional
   // part. Join them before doing arithmetic so negative fractions keep their
@@ -306,7 +292,6 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
         instruments.getOrAdd(programKey, Instrument{
                                              .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
                                              .name = info.percussion ? "Percussion" : entryName,
-                                             .modulation = konamiInstrumentModulation(version),
                                          });
     instrument
         .source(entryName, info.source,

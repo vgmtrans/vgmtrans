@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/model/InstrumentIdentity.h"
+#include "value/model/ModulationModel.h"
 #include "value/sequence/SequenceProgram.h"
 
 #include <optional>
@@ -181,7 +182,7 @@ struct VibratoDelayPerformanceEvent {
   // Some source LFOs run on a fixed driver clock rather than sequence time.
   // When present, simulation uses this physical duration instead of delayTicks.
   std::optional<double> milliseconds;
-  // Controller value to write when exporting synth-style MIDI controls.
+  // Legacy controller fallback for formats that do not provide milliseconds.
   u8 midiValue = 0;
 };
 
@@ -252,13 +253,26 @@ enum class ModulationPerformanceTarget {
   PanRate,
 };
 
+// Optional source-oscillator behavior shared by the physical LFO helpers.
+// Most formats need none of it; drivers with a continuously running or
+// non-default oscillator can describe that behavior without doing controller
+// conversion.
+struct LfoPerformanceContext {
+  std::optional<double> frequencyHz;
+  std::optional<u32> delayTicks;
+  std::optional<double> delayMilliseconds;
+  std::optional<LfoWaveform> waveform;
+  bool phaseRunsAtZeroDepth = false;
+  TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
+};
+
 struct ModulationPerformanceEvent {
   PerformanceEventHeader header;
   ModulationPerformanceTarget target = ModulationPerformanceTarget::VibratoDepth;
-  // Normalized driver amount. MIDI and synth exporters decide how to quantize it.
+  // Legacy normalized fallback for formats that do not provide a physical value.
   double amount = 0.0;
-  // Optional physical values used by sequence-event simulation when the source
-  // scanner can provide them. Generic controller export continues to use amount.
+  // The shared modulation planner derives both MIDI controls and synth
+  // modulation from these physical values.
   std::optional<double> pitchDepthSemitones;
   std::optional<double> volumeDepthDecibels;
   std::optional<double> panDepth;
@@ -270,12 +284,9 @@ struct ModulationPerformanceEvent {
   // Some drivers keep advancing the oscillator while its depth is zero. This
   // matters when a later command reveals an already-running LFO mid-note.
   bool phaseRunsAtZeroDepth = false;
-  // Optional controller scaling ceiling, normalized to the same full range as amount.
-  // Formats with sequence-derived modulation ranges can use this so MIDI controller
-  // scaling and synth modulator scaling share the same denominator even when the
-  // rendered event stream does not hit the maximum.
-  std::optional<double> controllerRangeMaxAmount;
-  bool controllerRangeOnly = false;
+  // Tremolo depth is physical, but source engines differ in whether the
+  // oscillator may rise above nominal gain.
+  TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
 };
 
 struct MarkerPerformanceEvent {
@@ -439,6 +450,8 @@ struct PerformanceTrack {
   TrackId id;
   u32 sourceTrackNumber = 0;
   u64 endTick = 0;
+  // Lets physical modulation analysis return immediately for ordinary tracks.
+  bool hasPhysicalModulation = false;
   std::vector<PerformanceEvent> events;
   std::vector<PerformanceAutomation> automations;
 };

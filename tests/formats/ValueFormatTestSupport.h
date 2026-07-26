@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "value/export/SequenceModulationProfile.h"
+
 #include "value/model/SourceMap.h"
 #include "value/sequence/SequenceProgram.h"
 

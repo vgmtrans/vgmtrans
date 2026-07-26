@@ -10,7 +10,6 @@
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
-#include "value/synth/SynthMath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -37,103 +36,13 @@ constexpr double kDriverTempoBase = 240.0;
 constexpr double kLfoPhaseStepsPerCycle = 512.0;
 constexpr double kNitroSinePeak = 127.0;
 
-[[nodiscard]] u8 midiValueForLinearRange(double value, double maximum) {
-  if (value <= 0.0 || maximum <= 0.0) {
-    return 0;
-  }
-  return static_cast<u8>(std::clamp<s32>(static_cast<s32>(std::lround(128.0 * value / maximum)), 0, 127));
-}
-
-[[nodiscard]] u8 midiValueForSynthRange(s32 value, s32 minimum, s32 range) {
-  if (range <= 0) {
-    return 0;
-  }
-  return static_cast<u8>(
-      std::clamp<s32>(static_cast<s32>(std::lround(128.0 * (value - minimum) / static_cast<double>(range))), 0, 127));
-}
-
 struct PendingBlock {
   u32 offset = 0;
   bool callTarget = false;
 };
 
 struct ProgramState {
-  void observeRate(double hertz) {
-    if (!collecting || hertz <= 0.0) {
-      return;
-    }
-    if (lfoRanges.minRateHertz <= 0.0) {
-      lfoRanges.minRateHertz = hertz;
-    } else {
-      lfoRanges.minRateHertz = std::min(lfoRanges.minRateHertz, hertz);
-    }
-    lfoRanges.maxRateHertz = std::max(lfoRanges.maxRateHertz, hertz);
-  }
-
-  void observeDelay(double seconds) {
-    if (collecting) {
-      lfoRanges.maxDelaySeconds = std::max(lfoRanges.maxDelaySeconds, seconds);
-    }
-  }
-
-  void observeDepth(u8 target, double physicalDepth) {
-    if (!collecting) {
-      return;
-    }
-    switch (target) {
-      case 0:
-        lfoRanges.maxVibratoDepthCents = std::max(lfoRanges.maxVibratoDepthCents, physicalDepth * 100.0);
-        break;
-      case 1:
-        lfoRanges.maxTremoloDepthDb = std::max(lfoRanges.maxTremoloDepthDb, physicalDepth);
-        break;
-      case 2:
-        lfoRanges.maxPanDepth = std::max(lfoRanges.maxPanDepth, physicalDepth);
-        break;
-      default:
-        break;
-    }
-  }
-
-  [[nodiscard]] u8 depthMidiValue(u8 target, double physicalDepth) const {
-    switch (target) {
-      case 0:
-        return midiValueForLinearRange(physicalDepth * 100.0, lfoRanges.maxVibratoDepthCents);
-      case 1:
-        return midiValueForLinearRange(physicalDepth, lfoRanges.maxTremoloDepthDb);
-      case 2:
-        return midiValueForLinearRange(physicalDepth, lfoRanges.maxPanDepth);
-      default:
-        return 0;
-    }
-  }
-
-  [[nodiscard]] u8 rateMidiValue(double hertz) const {
-    if (hertz <= 0.0 || lfoRanges.minRateHertz <= 0.0 || lfoRanges.maxRateHertz <= 0.0) {
-      return 0;
-    }
-    const s32 minimum = synthAmountFromHertz(lfoRanges.minRateHertz);
-    const s32 range = synthAmountFromHertzRange(lfoRanges.minRateHertz, lfoRanges.maxRateHertz);
-    return midiValueForSynthRange(synthAmountFromHertz(hertz), minimum, range);
-  }
-
-  [[nodiscard]] u8 delayMidiValue(double seconds) const {
-    if (lfoRanges.maxDelaySeconds <= 0.0) {
-      return 0;
-    }
-    const s32 minimum = synthAmountFromSeconds(synthSecondsRangeMinimum(0.0));
-    const s32 range = synthAmountFromSecondsRange(0.0, lfoRanges.maxDelaySeconds);
-    return midiValueForSynthRange(synthAmountFromSeconds(synthSecondsRangeMinimum(seconds)), minimum, range);
-  }
-
-  void finishPrepass() {
-    collecting = false;
-    tempoBpm = 120;
-  }
-
   u16 tempoBpm = 120;
-  NdsLfoRanges lfoRanges;
-  bool collecting = true;
 };
 
 struct LfoState {
@@ -148,6 +57,10 @@ struct LfoState {
 // Only registers that persist from one executed source command to the next
 // belong here. Source bounds and relative-address bases are decode concerns.
 struct TrackState {
+  explicit TrackState(const TrackProgram& program)
+      : usesModulation(trackUsesSemantic(program, SequenceSemantic::Modulation)) {}
+
+  bool usesModulation = false;
   bool noteWait = false;
   bool tie = false;
   bool portamento = false;
@@ -204,10 +117,8 @@ struct Playback {
 
   [[nodiscard]] double lfoDelayMilliseconds() const { return track.lfo.delay * 1000.0 / kDriverSweepsPerSecond; }
 
-  [[nodiscard]] ModulationPerformanceEvent lfoEvent(ModulationPerformanceTarget target, double amount) const {
-    return ModulationPerformanceEvent{
-        .target = target,
-        .amount = amount,
+  [[nodiscard]] LfoPerformanceContext lfoContext() const {
+    return LfoPerformanceContext{
         .frequencyHz = lfoFrequencyHz(),
         .delayTicks = lfoDelayTicks(),
         .delayMilliseconds = lfoDelayMilliseconds(),
@@ -218,8 +129,22 @@ struct Playback {
 
   void emitLfoRate(ModulationPerformanceTarget target) {
     const double hertz = lfoFrequencyHz();
-    program.observeRate(hertz);
-    out.modulation(lfoEvent(target, program.rateMidiValue(hertz) / 127.0));
+    auto context = lfoContext();
+    switch (target) {
+      case ModulationPerformanceTarget::VibratoRate:
+        out.vibratoRate(hertz, std::move(context));
+        break;
+      case ModulationPerformanceTarget::TremoloRate:
+        out.tremoloRate(hertz, std::move(context));
+        break;
+      case ModulationPerformanceTarget::PanRate:
+        out.panLfoRate(hertz, std::move(context));
+        break;
+      case ModulationPerformanceTarget::VibratoDepth:
+      case ModulationPerformanceTarget::TremoloDepth:
+      case ModulationPerformanceTarget::PanDepth:
+        break;
+    }
   }
 
   void emitLfoRates() {
@@ -230,18 +155,8 @@ struct Playback {
 
   void emitLfoDelayControls() {
     const double seconds = track.lfo.delay / kDriverSweepsPerSecond;
-    program.observeDelay(seconds);
-    const u8 midiValue = program.delayMidiValue(seconds);
-    out.vibratoDelay(VibratoDelayPerformanceEvent{
-        .delayTicks = lfoDelayTicks(),
-        .milliseconds = seconds * 1000.0,
-        .midiValue = midiValue,
-    });
-    out.tremoloDelay(TremoloDelayPerformanceEvent{
-        .delayTicks = lfoDelayTicks(),
-        .milliseconds = seconds * 1000.0,
-        .midiValue = midiValue,
-    });
+    out.vibratoDelayPhysical(lfoDelayTicks(), seconds * 1000.0);
+    out.tremoloDelayPhysical(lfoDelayTicks(), seconds * 1000.0);
   }
 
   void emitLfoDepth(u8 target, u8 depth) {
@@ -249,29 +164,17 @@ struct Playback {
     switch (target) {
       case 0: {
         const double physicalDepth = kNitroSinePeak * scaledDepth / 16384.0;
-        program.observeDepth(target, physicalDepth);
-        auto event = lfoEvent(ModulationPerformanceTarget::VibratoDepth, 0.0);
-        event.amount = program.depthMidiValue(target, physicalDepth) / 127.0;
-        event.pitchDepthSemitones = physicalDepth;
-        out.modulation(std::move(event));
+        out.vibratoDepth(physicalDepth, lfoContext());
         break;
       }
       case 1: {
         const double physicalDepth = kNitroSinePeak * scaledDepth * 60.0 / 163840.0;
-        program.observeDepth(target, physicalDepth);
-        auto event = lfoEvent(ModulationPerformanceTarget::TremoloDepth, 0.0);
-        event.amount = program.depthMidiValue(target, physicalDepth) / 127.0;
-        event.volumeDepthDecibels = physicalDepth;
-        out.modulation(std::move(event));
+        out.tremoloDepth(physicalDepth, lfoContext());
         break;
       }
       case 2: {
         const double physicalDepth = scaledDepth / 128.0;
-        program.observeDepth(target, physicalDepth);
-        auto event = lfoEvent(ModulationPerformanceTarget::PanDepth, 0.0);
-        event.amount = program.depthMidiValue(target, physicalDepth) / 127.0;
-        event.panDepth = physicalDepth;
-        out.modulation(std::move(event));
+        out.panLfoDepth(physicalDepth, lfoContext());
         break;
       }
       default:
@@ -286,6 +189,9 @@ struct Playback {
   }
 
   bool initializeLfo() {
+    if (!track.usesModulation) {
+      return false;
+    }
     if (track.lfo.emitted) {
       return false;
     }
@@ -767,10 +673,6 @@ struct SequenceDecodeContext {
   return tracks;
 }
 
-[[nodiscard]] NdsLfoRanges projectLfoRanges(const ProgramState& state) {
-  return state.lfoRanges;
-}
-
 }  // namespace
 
 const SequenceDialect& ndsSequenceDialect() {
@@ -784,13 +686,8 @@ const SequenceDialect& ndsSequenceDialect() {
               .commandLimit = kMaxTrackCommands,
               .panLaw = PanLaw::EqualPower,
           },
-      .prepass = SemanticPrepassMode::ScheduledPlayback,
   });
   return dialect;
-}
-
-NdsLfoRanges analyzeNdsLfoRanges(const SequenceProgram& program) {
-  return analyzeCompiledProgram<ProgramState, NdsLfoRanges>(program, ndsSequenceDialect(), projectLfoRanges);
 }
 
 // Creates the sequence program, describes its header, and decodes all tracks

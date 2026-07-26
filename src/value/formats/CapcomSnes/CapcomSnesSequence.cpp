@@ -101,8 +101,7 @@ struct StereoBalance {
   return StereoBalance{.leftGain = left, .rightGain = right};
 }
 
-// Converts Capcom's tremolo depth into the normalized amount used by playback.
-[[nodiscard]] double tremoloDepth(CapcomSnesEngineVersion version, u8 rawDepth) {
+[[nodiscard]] double tremoloDepthDecibels(CapcomSnesEngineVersion version, u8 rawDepth) {
   int trough = 0;
   int peak = 250;
   if (version == CapcomSnesEngineVersion::v1BgmInList) {
@@ -124,11 +123,9 @@ struct StereoBalance {
     depthCentibels =
         std::clamp(200.0 * std::log10(peak / static_cast<double>(trough)), 0.0, kTremoloMuteFloorCentibels);
   }
-  // The driver rounds against 128 steps before clamping to a 7-bit controller.
-  // Preserve that quantization so the neutral amount lowers back to the same value.
-  const int midiValue =
-      static_cast<int>(std::floor(depthCentibels * 128.0 / (2.0 * kCapcomSnesTremoloHalfDepthCentibels) + 0.5));
-  return std::clamp(midiValue, 0, 127) / 127.0;
+  // The gain LFO is centered, so synth depth is half this peak-to-trough
+  // attenuation.
+  return depthCentibels / 20.0;
 }
 
 }  // namespace math
@@ -148,9 +145,8 @@ struct TrackState {
   bool noteSlurred = false;
   bool noteOctaveUp = false;
   bool modulationEnabled = false;
-  double vibratoAmount = 0.0;
   double vibratoDepthSemitones = 0.0;
-  double tremoloAmount = 0.0;
+  double tremoloDepthDecibels = 0.0;
   double portamentoMillisecondsPerSemitone = 0.0;
   u16 lastPortamentoMilliseconds = 0;
   std::optional<s32> lastSourceKey;
@@ -423,31 +419,25 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
         case LfoParameter::VibratoDepth: {
           const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
           const u8 depth = raw.value & 0x7f;
-          const double amount = event.resolvedValue("amount", raw, static_cast<double>(depth) / 127.0);
           // The driver applies 128 depth steps across a +/- one-octave pitch range.
-          const double semitones = event.derived("pitch_depth_semitones", depth * (12.0 / 128.0));
+          const double semitones = event.resolvedValue("pitch_depth_semitones", raw, depth * (12.0 / 128.0));
           const auto modulationEnabled = event.state<&TrackState::modulationEnabled>();
-          event.set<&TrackState::vibratoAmount>(amount);
           event.set<&TrackState::vibratoDepthSemitones>(semitones);
-          return event.emitModulation(ModulationPerformanceTarget::VibratoDepth,
-                                      event.select(modulationEnabled, amount, 0.0),
-                                      event.select(modulationEnabled, semitones, 0.0));
+          return event.emitVibratoDepth(event.select(modulationEnabled, semitones, 0.0));
         }
         case LfoParameter::TremoloDepth: {
           const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
-          const double amount = event.resolvedValue("amount", raw, math::tremoloDepth(version, raw.value));
+          const double decibels =
+              event.resolvedValue("depth_decibels", raw, math::tremoloDepthDecibels(version, raw.value));
           const auto modulationEnabled = event.state<&TrackState::modulationEnabled>();
-          event.set<&TrackState::tremoloAmount>(amount);
-          return event.emitModulation(ModulationPerformanceTarget::TremoloDepth,
-                                      event.select(modulationEnabled, amount, 0.0));
+          event.set<&TrackState::tremoloDepthDecibels>(decibels);
+          return event.emitTremoloDepth(event.select(modulationEnabled, decibels, 0.0), TremoloGainMode::NoBoost);
         }
         case LfoParameter::Rate: {
           const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
           const bool enabled = event.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
-          // Express rates 1-255 as logarithmic pitch-space positions.
-          const double normalizedRate = raw.value == 0 ? 0.0 : std::log2(raw.value) / std::log2(255.0);
-          const double amount = event.derived("amount", normalizedRate);
           const double hertz = event.derived("frequency_hz", raw.value * kCapcomSnesLfoStepHertz);
+          const double tremoloHertz = event.derived("tremolo_frequency_hz", 2.0 * hertz);
 
           // Zero disables both remembered depths without forgetting them.
           event.invoke(
@@ -458,22 +448,19 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
                 }
 
                 track.modulationEnabled = enabled;
-                if (track.vibratoAmount != 0.0 || track.vibratoDepthSemitones != 0.0) {
-                  playback.out.modulation(ModulationPerformanceEvent{
-                      .target = ModulationPerformanceTarget::VibratoDepth,
-                      .amount = enabled ? track.vibratoAmount : 0.0,
-                      .pitchDepthSemitones = enabled ? track.vibratoDepthSemitones : 0.0,
-                  });
+                if (track.vibratoDepthSemitones != 0.0) {
+                  playback.out.vibratoDepth(enabled ? track.vibratoDepthSemitones : 0.0);
                 }
-                if (track.tremoloAmount != 0.0) {
-                  playback.out.modulation(ModulationPerformanceTarget::TremoloDepth,
-                                          enabled ? track.tremoloAmount : 0.0);
+                if (track.tremoloDepthDecibels != 0.0) {
+                  playback.out.tremoloDepth(
+                      enabled ? track.tremoloDepthDecibels : 0.0,
+                      LfoPerformanceContext{.tremoloGainMode = TremoloGainMode::NoBoost});
                 }
               },
               enabled);
 
-          event.emitVibratoRate(amount, hertz);
-          return event.emitTremoloRate(amount, hertz);
+          event.emitVibratoRate(hertz);
+          return event.emitTremoloRate(tremoloHertz);
         }
         default:
           event.u8("value", SourceValueDisplay::Hex);

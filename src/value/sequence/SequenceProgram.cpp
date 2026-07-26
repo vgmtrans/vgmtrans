@@ -59,6 +59,16 @@ const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) 
   return &*found;
 }
 
+bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic) {
+  return std::ranges::any_of(
+      track.commands, [semantic](const SourceCommand& command) { return command.semantic == semantic; });
+}
+
+bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic semantic) {
+  return std::ranges::any_of(program.tracks,
+                             [semantic](const TrackProgram& track) { return trackUsesSemantic(track, semantic); });
+}
+
 const SemanticOperand* semanticOperand(const SourceCommand& command, std::string_view name) {
   const auto found =
       std::ranges::find_if(command.operands, [name](const SemanticOperand& operand) { return operand.name == name; });
@@ -83,7 +93,8 @@ TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
 
 const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
                                                       std::vector<SemanticOperand> operands, DecodeFlow flow,
-                                                      SourceAnnotationId annotation, CommandExecution execution) {
+                                                      SourceAnnotationId annotation, CommandExecution execution,
+                                                      SequenceSemantic semantic) {
   if (encodedSize == 0) {
     throw std::invalid_argument("Semantic sequence commands must include an opcode byte");
   }
@@ -99,6 +110,7 @@ const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode
       .encodedSize = encodedSize,
       .range = range,
       .annotation = annotation,
+      .semantic = semantic,
       .operands = std::move(operands),
       .flow = std::move(flow),
       .execution = std::move(execution),

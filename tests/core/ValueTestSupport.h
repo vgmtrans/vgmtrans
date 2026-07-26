@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/export/Export.h"
+#include "value/export/SequenceModulationProfile.h"
 #include "value/scan/CollectionResolver.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"

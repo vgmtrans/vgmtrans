@@ -293,16 +293,14 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto vibratoDepth = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
     return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoDepth &&
-           modulation->amount > 0.0;
+           modulation->pitchDepthSemitones && *modulation->pitchDepthSemitones > 0.0;
   });
   expect(vibratoDepth != performance.tracks[0].events.end(),
          "KonamiSnes vibrato command should emit target-neutral depth");
   const auto& vibratoDepthEvent = std::get<ModulationPerformanceEvent>(*vibratoDepth);
   const double expectedDepthCents = vibrato::currentDepthCents(KONAMISNES_V6, 0x10, 0x10 << 8);
-  const double expectedDepthAmount =
-      expectedDepthCents / vibrato::maxDepthCents(KONAMISNES_V6, kDefaultVibratoMaxDepth);
-  expect(std::abs(vibratoDepthEvent.amount - expectedDepthAmount) < 0.0001,
-         "KonamiSnes vibrato depth should be normalized against the full synth range");
+  expect(vibratoDepthEvent.amount == 0.0,
+         "KonamiSnes vibrato depth should not contain destination controller scaling");
   expect(vibratoDepthEvent.pitchDepthSemitones &&
              std::abs(*vibratoDepthEvent.pitchDepthSemitones - (expectedDepthCents / 100.0)) < 0.0001,
          "KonamiSnes vibrato depth should retain peak pitch swing for sequence-event simulation");
@@ -314,7 +312,9 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(std::get<VibratoDelayPerformanceEvent>(*vibratoDelay).delayTicks == 2,
          "KonamiSnes vibrato delay should be converted to rendered sequence ticks");
 
-  const MidiSequence synthModulationMidi = renderMidiSequence(performance);
+  const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
+  const MidiSequence synthModulationMidi = renderMidiSequence(
+      performance, {}, ModulationConversionPolicy::SynthModulators, {}, &modulationProfile);
   expect(hasMidiEvent<VibratoDepth>(synthModulationMidi.tracks[0]) &&
              hasMidiEvent<VibratoFrequency>(synthModulationMidi.tracks[0]) &&
              hasMidiEvent<VibratoDelay>(synthModulationMidi.tracks[0]),
@@ -340,11 +340,14 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instrument.range.offset == 0x4000 && instrument.range.size == 7,
          "instrument should preserve its source header range");
   expect(instrument.regions.size() == 1, "instrument should contain one sample-backed region");
-  expect(instrument.modulation.vibrato.has_value(), "KonamiSnes instruments should describe vibrato");
-  expect(instrument.modulation.vibrato->maxDepthCents > 0.0,
-         "KonamiSnes instruments should describe a positive vibrato depth range");
-  expect(instrument.modulation.vibrato->delaySeconds.has_value(),
-         "KonamiSnes instruments should describe the vibrato delay range");
+  expect(!instrument.modulation.vibrato,
+         "scanned KonamiSnes instruments should not carry sequence-independent modulation guesses");
+  InstrumentSetAsset preparedInstruments = *instruments;
+  applySequenceModulation(preparedInstruments, modulationProfile);
+  expect(preparedInstruments.instruments.front().modulation.vibrato &&
+             preparedInstruments.instruments.front().modulation.vibrato->maxDepthCents > 0.0 &&
+             preparedInstruments.instruments.front().modulation.vibrato->delaySeconds,
+         "shared collection planning should add the sequence's physical vibrato range");
 
   const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
   expect(samples != nullptr, "third KonamiSnes asset should be a sample collection");
@@ -517,20 +520,17 @@ void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
   const auto vibratoRate = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
     return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoRate &&
-           modulation->amount > 0.0;
+           modulation->frequencyHz && *modulation->frequencyHz > 0.0;
   });
   expect(vibratoRate != performance.tracks[0].events.end(),
          "KonamiSnes legacy vibrato should emit a rate modulation event");
 
-  const auto& rate = std::get<ModulationPerformanceEvent>(*vibratoRate);
   const double baseHz = vibrato::baseHz(KONAMISNES_V2);
-  const double fullRange = synthAmountFromHertzRange(baseHz, baseHz * vibrato::defaultMaxRateFactor(KONAMISNES_V2));
-  const double expectedCurrent = synthAmountFromHertzRange(baseHz, baseHz * (0x2d * 0x37)) / fullRange;
-  const double expectedCeiling = synthAmountFromHertzRange(baseHz, baseHz * (0x2d * 0x78)) / fullRange;
-  expect(std::abs(rate.amount - expectedCurrent) < 0.0001,
-         "KonamiSnes legacy vibrato rate should keep the current track-tempo amount");
-  expect(rate.controllerRangeMaxAmount && std::abs(*rate.controllerRangeMaxAmount - expectedCeiling) < 0.0001,
-         "KonamiSnes legacy vibrato rate ceiling should include the sequence-global tempo range");
+  const SequenceModulationProfile profile = analyzeSequenceModulation(performance);
+  expect(profile.instruments.vibrato &&
+             std::abs(profile.instruments.vibrato->rateHertz.minimum - baseHz * (0x2d * 0x37)) < 0.0001 &&
+             std::abs(profile.instruments.vibrato->rateHertz.maximum - baseHz * (0x2d * 0x78)) < 0.0001,
+         "shared planning should include sequence-global tempo changes in legacy KonamiSnes vibrato");
 }
 
 void konamiSnesPercussionUsesPackedGsDrumBank() {

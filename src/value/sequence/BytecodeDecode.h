@@ -66,7 +66,7 @@ struct EncodedSemanticField {
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
                                          u32 offset) {
   builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.operands,
-                      decoded.flow, decoded.annotation, decoded.execution);
+                      decoded.flow, decoded.annotation, decoded.execution, decoded.presentation.semantic);
 }
 
 // Shared limits for walking source bytecode. Formats still decide what each opcode means.

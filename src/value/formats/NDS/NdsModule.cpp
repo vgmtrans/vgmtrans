@@ -122,31 +122,9 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
 
 }  // namespace
 
-PreparedCollectionAssets prepareNdsCollection(const CollectionPrepareContext& context) {
-  PreparedCollectionAssets prepared;
-  for (const AssetId instrumentSetId : context.collection.instrumentSets) {
-    if (const auto* instrumentSet = context.snapshot.asset<InstrumentSetAsset>(instrumentSetId)) {
-      prepared.replacementInstrumentSets.push_back(*instrumentSet);
-    }
-  }
-  if (!context.collection.sequence || prepared.replacementInstrumentSets.empty()) {
-    return prepared;
-  }
-
-  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*context.collection.sequence);
-  if (sequence == nullptr) {
-    return prepared;
-  }
-  const NdsLfoRanges ranges = analyzeNdsLfoRanges(sequence->program);
-  for (auto& instrumentSet : prepared.replacementInstrumentSets) {
-    applyNdsLfoRanges(instrumentSet, ranges);
-  }
-  return prepared;
-}
-
 FormatDefinition ndsDefinition() {
   return FormatDefinition{
-      .module = {.name = std::string(kNdsFormatName), .scan = scanNds, .prepareCollection = prepareNdsCollection},
+      .module = {.name = std::string(kNdsFormatName), .scan = scanNds},
       .sequenceDialects = {ndsSequenceDialect()},
   };
 }

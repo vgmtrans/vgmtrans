@@ -1909,6 +1909,113 @@ void modulationAnalysisReportsObservedPerformanceRanges() {
          "performance modulation analysis should keep second track modulation ranges separate");
 }
 
+void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 24,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{0}, SourceAnnotationId{0}, 0, nextSequence, nextNote, nextAutomation};
+
+  out.vibratoRate(2.0);
+  out.vibratoDepth(0.5);
+  out.vibratoDelayPhysical(0, 0.0);
+  out.tremoloRate(4.0);
+  out.tremoloDepth(3.0, LfoPerformanceContext{.tremoloGainMode = TremoloGainMode::NoBoost});
+  out.tremoloDelayPhysical(10, 200.0);
+  out.at(12).vibratoRate(8.0);
+  out.at(12).vibratoDepth(2.0);
+  out.at(12).vibratoDelayPhysical(20, 400.0);
+  out.at(12).tremoloRate(16.0);
+  out.at(12).tremoloDepth(12.0, LfoPerformanceContext{.tremoloGainMode = TremoloGainMode::NoBoost});
+  out.at(12).tremoloDelayPhysical(40, 800.0);
+
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {track},
+  };
+  const SequenceModulationProfile profile = analyzeSequenceModulation(performance);
+
+  expect(track.hasPhysicalModulation && profile.instruments.vibrato && profile.instruments.tremolo,
+         "physical LFO authoring should opt the track into one shared sequence plan");
+  expect(profile.instruments.vibrato->maxDepthCents == 200.0 &&
+             profile.instruments.vibrato->rateHertz.minimum == 2.0 &&
+             profile.instruments.vibrato->rateHertz.maximum == 8.0 &&
+             profile.instruments.vibrato->delaySeconds &&
+             profile.instruments.vibrato->delaySeconds->minimum == 0.0 &&
+             profile.instruments.vibrato->delaySeconds->maximum == 0.4,
+         "the shared plan should preserve physical vibrato depth, rate, and delay");
+  expect(profile.instruments.tremolo->maxDepthDb == 12.0 &&
+             profile.instruments.tremolo->rateHertz.minimum == 4.0 &&
+             profile.instruments.tremolo->rateHertz.maximum == 16.0 &&
+             profile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
+         "the shared plan should preserve physical tremolo behavior");
+
+  const MidiSequence midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  u8 firstVibratoDepth = 255;
+  u8 lastVibratoDepth = 0;
+  u8 firstVibratoRate = 255;
+  u8 lastVibratoRate = 0;
+  u32 firstVibratoDelay = 255;
+  u32 lastVibratoDelay = 0;
+  for (const auto& event : midi.tracks[0].events) {
+    if (const auto* depth = std::get_if<VibratoDepth>(&event)) {
+      if (depth->tick == 0) {
+        firstVibratoDepth = depth->value;
+      } else if (depth->tick == 12) {
+        lastVibratoDepth = depth->value;
+      }
+    } else if (const auto* rate = std::get_if<VibratoFrequency>(&event)) {
+      if (rate->tick == 0) {
+        firstVibratoRate = rate->value;
+      } else if (rate->tick == 12) {
+        lastVibratoRate = rate->value;
+      }
+    } else if (const auto* delay = std::get_if<VibratoDelay>(&event)) {
+      if (delay->tick == 0) {
+        firstVibratoDelay = delay->ticks;
+      } else if (delay->tick == 12) {
+        lastVibratoDelay = delay->ticks;
+      }
+    }
+  }
+  expect(firstVibratoDepth == 32 && lastVibratoDepth == 127 && firstVibratoRate == 0 &&
+             lastVibratoRate == 127 && firstVibratoDelay == 0 && lastVibratoDelay == 127,
+         "MIDI controls should normalize the sequence plan while retaining its full useful resolution");
+
+  InstrumentSetAsset instrumentSet{
+      .instruments = {Instrument{}},
+  };
+  applySequenceModulation(instrumentSet, profile);
+  const auto& appliedModulation = instrumentSet.instruments[0].modulation;
+  expect(appliedModulation.vibrato && appliedModulation.tremolo &&
+             appliedModulation.vibrato->maxDepthCents == profile.instruments.vibrato->maxDepthCents &&
+             appliedModulation.vibrato->rateHertz.minimum == profile.instruments.vibrato->rateHertz.minimum &&
+             appliedModulation.tremolo->maxDepthDb == profile.instruments.tremolo->maxDepthDb &&
+             appliedModulation.tremolo->gainMode == profile.instruments.tremolo->gainMode,
+         "synth preparation should apply the exact same physical plan used by MIDI");
+  const LoweredSynthModulation lowered = lowerSynthModulation(appliedModulation);
+  expect(std::ranges::any_of(lowered.modulators, [](const SynthModulator& modulator) {
+           return modulator.destination == SynthDestination::VibratoDepth && modulator.amount == 200;
+         }) &&
+             std::ranges::any_of(lowered.modulators, [](const SynthModulator& modulator) {
+               return modulator.destination == SynthDestination::TremoloDepth && modulator.amount == 120;
+             }),
+         "synth lowering should retain the physical depths chosen by the shared plan");
+
+  PerformanceTrack ordinaryTrack{
+      .events = {ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoDepth,
+          .pitchDepthSemitones = 9.0,
+      }},
+  };
+  expect(analyzeSequenceModulation(PerformanceSequence{.tracks = {ordinaryTrack}}).empty(),
+         "physical modulation analysis should return immediately for tracks that did not opt in");
+}
+
 void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators() {
   MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -2057,6 +2164,7 @@ void runValueMidiTests() {
   exportRequestSequenceLoopsAffectMidiLowering();
   standaloneSequenceExportDoesNotRequireACollection();
   modulationAnalysisReportsObservedPerformanceRanges();
+  physicalModulationProfileDrivesMidiAndSynthFromOnePlan();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
   observedModulationScalingUsesPreciseNormalizedAmounts();
 }
