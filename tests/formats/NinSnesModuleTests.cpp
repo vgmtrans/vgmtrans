@@ -70,6 +70,12 @@ struct LevelOpcodes {
   u8 rest;
 };
 
+struct ModulationOpcodes {
+  u8 vibrato;
+  u8 tempo;
+  u8 rest;
+};
+
 LevelOpcodes levelOpcodes(const Profile& driver) {
   if (driver.base == BaseProfile::Earlier) {
     return {.master = 0xe0, .channel = 0xe7, .rest = 0xc7};
@@ -82,6 +88,19 @@ LevelOpcodes levelOpcodes(const Profile& driver) {
   }
   const bool hasMasterVolume = driver.id != ProfileId::Konami && driver.id != ProfileId::Lemmings;
   return {.master = static_cast<u8>(hasMasterVolume ? 0xe5 : 0), .channel = 0xed, .rest = 0xc9};
+}
+
+ModulationOpcodes modulationOpcodes(const Profile& driver) {
+  if (driver.base == BaseProfile::Earlier) {
+    return {.vibrato = 0xde, .tempo = 0xe2, .rest = 0xc7};
+  }
+  if (driver.intelli == IntelliMode::Fe3) {
+    return {.vibrato = 0xd9, .tempo = 0xdd, .rest = 0xc9};
+  }
+  if (driver.intelli == IntelliMode::Ta || driver.intelli == IntelliMode::Fe4) {
+    return {.vibrato = 0xdd, .tempo = 0xe1, .rest = 0xc9};
+  }
+  return {.vibrato = 0xe3, .tempo = 0xe7, .rest = 0xc9};
 }
 
 }  // namespace
@@ -204,6 +223,62 @@ void ninSnesProfilesShareSquaredLevelCurve() {
                  (std::get<MasterVolume>(*masterVolume).value >> 7) == static_cast<u16>(kMasterLevel / 2),
              label + " should retain the legacy master-volume MSB");
     }
+  }
+}
+
+void ninSnesProfilesShareTempoRelativeVibratoClock() {
+  for (const ProfileId id : kProfileIds) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x320}});
+
+    const Profile& driver = profile(id);
+    const ModulationOpcodes opcodes = modulationOpcodes(driver);
+    size_t first = 0x300;
+    bytes[first++] = opcodes.vibrato;
+    bytes[first++] = 3;
+    bytes[first++] = 0x20;
+    bytes[first++] = 0x40;
+    bytes[first++] = 4;
+    bytes[first++] = opcodes.rest;
+    bytes[first++] = 4;
+    bytes[first++] = opcodes.rest;
+    bytes[first] = 0;
+
+    size_t second = 0x320;
+    bytes[second++] = 4;
+    bytes[second++] = opcodes.rest;
+    bytes[second++] = opcodes.tempo;
+    bytes[second++] = 0x40;
+    bytes[second++] = 4;
+    bytes[second++] = opcodes.rest;
+    bytes[second] = 0;
+
+    Layout layout = standardLayout();
+    layout.profile = id;
+    if (driver.base == BaseProfile::Intelli) {
+      layout.signature = Signature::Intelligent;
+    } else if (driver.base == BaseProfile::Earlier) {
+      layout.signature = Signature::Earlier;
+    }
+
+    const PerformanceSequence performance = render(std::move(bytes), layout);
+    std::vector<const ModulationPerformanceEvent*> rates;
+    for (const PerformanceEvent& event : performance.tracks[0].events) {
+      const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+      if (modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoRate) {
+        rates.push_back(modulation);
+      }
+    }
+    const std::string label(driver.name);
+    expect(rates.size() == 2 && rates[0]->cyclesPerTick && rates[1]->cyclesPerTick &&
+               rates[0]->frequencyHz && rates[1]->frequencyHz &&
+               std::abs(*rates[0]->cyclesPerTick - 0.125) < 0.0001 &&
+               std::abs(*rates[1]->cyclesPerTick - 0.125) < 0.0001 &&
+               std::abs(*rates[0]->frequencyHz - 7.8125) < 0.0001 &&
+               std::abs(*rates[1]->frequencyHz - 15.625) < 0.0001,
+           label + " should share the sequence-clocked N-SPC vibrato behavior");
   }
 }
 

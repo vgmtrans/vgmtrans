@@ -140,6 +140,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/TempoRelativeModulation.cpp
     ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.cpp
     ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.cpp

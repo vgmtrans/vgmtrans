@@ -95,9 +95,11 @@ public:
   void pitchBendRange(u8 semitones);
   void vibratoDelay(VibratoDelayPerformanceEvent event);
   void vibratoDelay(u32 delayTicks, u8 midiValue);
+  void vibratoDelayTicks(u32 delayTicks);
   void vibratoDelayPhysical(u32 delayTicks, double milliseconds);
   void tremoloDelay(TremoloDelayPerformanceEvent event);
   void tremoloDelay(u32 delayTicks, u8 midiValue);
+  void tremoloDelayTicks(u32 delayTicks);
   void tremoloDelayPhysical(u32 delayTicks, double milliseconds);
   void portamento(PortamentoPerformanceEvent event);
   void portamento(double timeMilliseconds, double previousKey);
@@ -115,10 +117,13 @@ public:
   void modulation(ModulationPerformanceTarget target, double amount);
   void vibratoDepth(double semitones, LfoPerformanceContext context = {});
   void vibratoRate(double hertz, LfoPerformanceContext context = {});
+  void vibratoRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
   void tremoloDepth(double decibels, LfoPerformanceContext context = {});
   void tremoloRate(double hertz, LfoPerformanceContext context = {});
+  void tremoloRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
   void panLfoDepth(double depth, LfoPerformanceContext context = {});
   void panLfoRate(double hertz, LfoPerformanceContext context = {});
+  void panLfoRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
   void marker(MarkerPerformanceEvent event);
   void appendEvents(std::vector<PerformanceEvent> events);
 

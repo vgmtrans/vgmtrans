@@ -246,6 +246,10 @@ struct SequenceProgramBehavior {
   std::optional<double> initialReverbSend;
   std::optional<u8> initialMonoModeChannels;
   std::optional<u8> initialPitchBendRangeSemitones;
+  // Zero means "use the next default": program -> dialect -> MIDI's 120 BPM.
+  // The resolved source tempo also governs tempo-relative effects before the
+  // first explicit tempo command.
+  u32 initialTempoMicrosecondsPerQuarter = 0;
 };
 
 // Driver/profile selection belongs to the parsed program, not the registered

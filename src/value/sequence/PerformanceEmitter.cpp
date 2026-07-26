@@ -281,6 +281,13 @@ void PerformanceEmitter::vibratoDelay(u32 delayTicks, u8 midiValue) {
   });
 }
 
+void PerformanceEmitter::vibratoDelayTicks(u32 delayTicks) {
+  vibratoDelay(VibratoDelayPerformanceEvent{
+      .delayTicks = delayTicks,
+      .tempoRelative = true,
+  });
+}
+
 void PerformanceEmitter::vibratoDelayPhysical(u32 delayTicks, double milliseconds) {
   vibratoDelay(VibratoDelayPerformanceEvent{
       .delayTicks = delayTicks,
@@ -296,6 +303,13 @@ void PerformanceEmitter::tremoloDelay(u32 delayTicks, u8 midiValue) {
   tremoloDelay(TremoloDelayPerformanceEvent{
       .delayTicks = delayTicks,
       .midiValue = midiValue,
+  });
+}
+
+void PerformanceEmitter::tremoloDelayTicks(u32 delayTicks) {
+  tremoloDelay(TremoloDelayPerformanceEvent{
+      .delayTicks = delayTicks,
+      .tempoRelative = true,
   });
 }
 
@@ -386,8 +400,10 @@ namespace {
       .target = target,
       .amount = 0.0,
       .frequencyHz = context.frequencyHz,
+      .cyclesPerTick = context.cyclesPerTick,
       .delayTicks = context.delayTicks,
       .delayMilliseconds = context.delayMilliseconds,
+      .delayIsTempoRelative = context.delayIsTempoRelative,
       .waveform = context.waveform,
       .phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth,
       .tremoloGainMode = context.tremoloGainMode,
@@ -404,6 +420,13 @@ void PerformanceEmitter::vibratoDepth(double semitones, LfoPerformanceContext co
 
 void PerformanceEmitter::vibratoRate(double hertz, LfoPerformanceContext context) {
   context.frequencyHz = hertz;
+  context.cyclesPerTick.reset();
+  modulation(physicalLfoEvent(ModulationPerformanceTarget::VibratoRate, std::move(context)));
+}
+
+void PerformanceEmitter::vibratoRateCyclesPerTick(double cycles, LfoPerformanceContext context) {
+  context.frequencyHz.reset();
+  context.cyclesPerTick = cycles;
   modulation(physicalLfoEvent(ModulationPerformanceTarget::VibratoRate, std::move(context)));
 }
 
@@ -415,6 +438,13 @@ void PerformanceEmitter::tremoloDepth(double decibels, LfoPerformanceContext con
 
 void PerformanceEmitter::tremoloRate(double hertz, LfoPerformanceContext context) {
   context.frequencyHz = hertz;
+  context.cyclesPerTick.reset();
+  modulation(physicalLfoEvent(ModulationPerformanceTarget::TremoloRate, std::move(context)));
+}
+
+void PerformanceEmitter::tremoloRateCyclesPerTick(double cycles, LfoPerformanceContext context) {
+  context.frequencyHz.reset();
+  context.cyclesPerTick = cycles;
   modulation(physicalLfoEvent(ModulationPerformanceTarget::TremoloRate, std::move(context)));
 }
 
@@ -426,6 +456,13 @@ void PerformanceEmitter::panLfoDepth(double depth, LfoPerformanceContext context
 
 void PerformanceEmitter::panLfoRate(double hertz, LfoPerformanceContext context) {
   context.frequencyHz = hertz;
+  context.cyclesPerTick.reset();
+  modulation(physicalLfoEvent(ModulationPerformanceTarget::PanRate, std::move(context)));
+}
+
+void PerformanceEmitter::panLfoRateCyclesPerTick(double cycles, LfoPerformanceContext context) {
+  context.frequencyHz.reset();
+  context.cyclesPerTick = cycles;
   modulation(physicalLfoEvent(ModulationPerformanceTarget::PanRate, std::move(context)));
 }
 
@@ -564,10 +601,11 @@ void PerformanceEmitter::append(PerformanceEvent event) {
             using T = std::decay_t<decltype(typedEvent)>;
             if constexpr (std::is_same_v<T, ModulationPerformanceEvent>) {
               return typedEvent.pitchDepthSemitones.has_value() || typedEvent.volumeDepthDecibels.has_value() ||
-                     typedEvent.panDepth.has_value() || typedEvent.frequencyHz.has_value();
+                     typedEvent.panDepth.has_value() || typedEvent.frequencyHz.has_value() ||
+                     typedEvent.cyclesPerTick.has_value();
             } else if constexpr (std::is_same_v<T, VibratoDelayPerformanceEvent> ||
                                  std::is_same_v<T, TremoloDelayPerformanceEvent>) {
-              return typedEvent.milliseconds.has_value();
+              return typedEvent.milliseconds.has_value() || typedEvent.tempoRelative;
             }
             return false;
           },

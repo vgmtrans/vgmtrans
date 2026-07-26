@@ -119,6 +119,13 @@ struct DecodedPitchSlide {
   return static_cast<u32>(std::min<double>(std::lround(ticks), std::numeric_limits<u32>::max()));
 }
 
+[[nodiscard]] double vibratoCyclesPerTick(KonamiSnesVersion version, u8 rate) {
+  const u16 factor = vibrato::rateFactor(version, rate, kKonamiSnesDefaultTempo);
+  return factor == 0 ? 0.0
+                     : vibrato::baseHz(version) * factor *
+                           sequenceTickSeconds(version, kKonamiSnesDefaultTempo);
+}
+
 [[nodiscard]] double tuningCents(s8 tuning) {
   return tuning * (400.0 / 256.0);
 }
@@ -217,107 +224,10 @@ private:
   u8 reusableFadeTicks_ = 0;
 };
 
-struct ProgramState {
-  struct ActiveVibrato {
-    u8 rate = 0;
-    u8 depth = 0;
-    u8 delay = 0;
-  };
-
-  struct TempoSync {
-    u64 tick = 0;
-    u32 trackNumber = 0;
-    ActiveVibrato vibrato;
-    u8 tempo = kKonamiSnesDefaultTempo;
-  };
-
-  explicit ProgramState(const SequenceProgram& program)
-      : version(static_cast<KonamiSnesVersion>(program.config.profile)), activeVibrato(program.tracks.size()) {}
-
-  [[nodiscard]] u8 effectiveTempo(u8 trackTempo) const {
-    return vibrato::usesLegacy(version) ? globalTempo : trackTempo;
-  }
-
-  void observeVibrato(u32 trackNumber, u8 delay, u8 rate, u8 depth) {
-    if (trackNumber >= activeVibrato.size()) {
-      activeVibrato.resize(trackNumber + 1);
-    }
-    activeVibrato[trackNumber] = ActiveVibrato{
-        .rate = rate,
-        .depth = depth,
-        .delay = delay,
-    };
-  }
-
-  void observeTempo(u64 tick, u32 sourceTrackNumber, u8 tempo) {
-    if (!vibrato::usesLegacy(version)) {
-      return;
-    }
-    globalTempo = tempo;
-    for (u32 trackNumber = 0; trackNumber < activeVibrato.size(); ++trackNumber) {
-      const ActiveVibrato& active = activeVibrato[trackNumber];
-      if (trackNumber == sourceTrackNumber || !vibrato::isActive(version, active.rate, active.depth)) {
-        continue;
-      }
-      tempoSyncs.push_back(TempoSync{
-          .tick = tick,
-          .trackNumber = trackNumber,
-          .vibrato = active,
-          .tempo = tempo,
-      });
-    }
-  }
-
-  void finalizePerformance(PerformanceSequence& performance) const {
-    u64 nextSequence = 0;
-    for (const auto& track : performance.tracks) {
-      for (const auto& event : track.events) {
-        nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
-      }
-    }
-
-    for (const TempoSync& sync : tempoSyncs) {
-      const auto found = std::ranges::find(performance.tracks, sync.trackNumber, &PerformanceTrack::sourceTrackNumber);
-      if (found == performance.tracks.end()) {
-        continue;
-      }
-      const u16 factor = vibrato::rateFactor(version, sync.vibrato.rate, sync.tempo);
-      const double delaySeconds = vibrato::delaySeconds(version, sync.vibrato.delay, sync.tempo);
-      found->events.emplace_back(ModulationPerformanceEvent{
-          .header =
-              PerformanceEventHeader{
-                  .track = found->id,
-                  .tick = sync.tick,
-                  .sequence = nextSequence++,
-              },
-          .target = ModulationPerformanceTarget::VibratoRate,
-          .amount = 0.0,
-          .frequencyHz = factor == 0 ? 0.0 : vibrato::baseHz(version) * factor,
-      });
-      found->events.emplace_back(VibratoDelayPerformanceEvent{
-          .header =
-              PerformanceEventHeader{
-                  .track = found->id,
-                  .tick = sync.tick,
-                  .sequence = nextSequence++,
-              },
-          .delayTicks = vibratoDelayTicks(version, sync.vibrato.delay, sync.tempo),
-          .milliseconds = delaySeconds * 1000.0,
-      });
-      found->hasPhysicalModulation = true;
-    }
-  }
-
-  KonamiSnesVersion version = KONAMISNES_NONE;
-  u8 globalTempo = kKonamiSnesDefaultTempo;
-  std::vector<ActiveVibrato> activeVibrato;
-  std::vector<TempoSync> tempoSyncs;
-};
-
 // Only values that persist from one executed command to the next live here.
 struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
-      : version(static_cast<KonamiSnesVersion>(program.config.profile)), trackNumber(track.sourceTrackNumber) {
+      : version(static_cast<KonamiSnesVersion>(program.config.profile)) {
     panFade.reset(version <= KONAMISNES_V2 ? 10 : 20);
     volumeFade.reset(0xff);
     tempoFade.reset(kKonamiSnesDefaultTempo);
@@ -351,7 +261,6 @@ struct TrackState {
   }
 
   KonamiSnesVersion version = KONAMISNES_NONE;
-  u32 trackNumber = 0;
 
   // Note bytes can omit length or duration rate and reuse these values.
   u8 noteLength = 0;
@@ -407,7 +316,6 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
-  ProgramState& program;
 
   void note(u8 key, u8 sourceVelocity) {
     // Counted loops alter velocity before the later engines pass it through
@@ -504,14 +412,7 @@ struct Playback {
   void tempo(u8 value) {
     track.tempo = value;
     track.tempoFade.setCurrentRaw(value);
-    program.observeTempo(vm.tick(), track.trackNumber, value);
     out.tempo(tempoMicrosecondsPerQuarter(track.version, value));
-    // Only early vibrato depends on tempo, so an active effect needs new rate
-    // and delay controller values when tempo changes.
-    if (vibrato::usesLegacy(track.version)) {
-      emitVibratoRate();
-      emitVibratoDelay();
-    }
   }
 
   void configureVibrato(u8 delay, u8 rate, u8 depth, u8 builtInFade) {
@@ -524,7 +425,6 @@ struct Playback {
     } else {
       track.vibrato.clearAutomation();
     }
-    program.observeVibrato(track.trackNumber, delay, rate, depth);
     emitVibratoDelay();
     emitVibratoDepth(out, true);
     emitVibratoRate();
@@ -662,12 +562,7 @@ struct Playback {
         return;
       }
       track.tempo = value;
-      program.observeTempo(vm.tick(), track.trackNumber, value);
       track.tempoFade.output(out).tempo(tempoMicrosecondsPerQuarter(track.version, value));
-      if (vibrato::usesLegacy(track.version)) {
-        emitVibratoRate();
-        emitVibratoDelay();
-      }
     }));
     static_cast<void>(track.volumeFade.tickRaw([&](s32 rawVolume) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff));
@@ -749,10 +644,12 @@ private:
   }
 
   void emitVibratoRate() {
-    const u8 tempo = program.effectiveTempo(track.tempo);
-    const u16 factor = vibrato::rateFactor(track.version, track.vibrato.rate(), tempo);
-    const double minHertz = vibrato::baseHz(track.version);
-    out.vibratoRate(factor == 0 ? 0.0 : minHertz * factor);
+    if (vibrato::usesLegacy(track.version)) {
+      out.vibratoRateCyclesPerTick(vibratoCyclesPerTick(track.version, track.vibrato.rate()));
+      return;
+    }
+    const u16 factor = vibrato::rateFactor(track.version, track.vibrato.rate(), track.tempo);
+    out.vibratoRate(factor == 0 ? 0.0 : vibrato::baseHz(track.version) * factor);
   }
 
   void emitVibratoDelay() {
@@ -762,9 +659,13 @@ private:
       out.vibratoDelay(0, 0);
       return;
     }
-    const u8 tempo = program.effectiveTempo(track.tempo);
-    out.vibratoDelayPhysical(vibratoDelayTicks(track.version, track.vibrato.delay(), tempo),
-                             vibrato::delaySeconds(track.version, track.vibrato.delay(), tempo) * 1000.0);
+    if (vibrato::usesLegacy(track.version)) {
+      out.vibratoDelayTicks(
+          vibratoDelayTicks(track.version, track.vibrato.delay(), kKonamiSnesDefaultTempo));
+      return;
+    }
+    out.vibratoDelayPhysical(vibratoDelayTicks(track.version, track.vibrato.delay(), track.tempo),
+                             vibrato::delaySeconds(track.version, track.vibrato.delay(), track.tempo) * 1000.0);
   }
 };
 
@@ -1151,7 +1052,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 }
 
 [[nodiscard]] SequenceDialect makeDialect(KonamiSnesVersion version) {
-  return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  return makeCompiledDialect<TrackState, Playback>(SequenceDialect{
       .id = DialectId{.value = dialectId(version)},
       .commandDetailKindPrefix = "konami-snes",
       .timebase = Timebase{.ppqn = kKonamiSnesPpqn},
@@ -1161,6 +1062,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
               .initialLevel = 1.0,
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 2,
+              .initialTempoMicrosecondsPerQuarter =
+                  tempoMicrosecondsPerQuarter(version, kKonamiSnesDefaultTempo),
           },
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
   });

@@ -35,7 +35,6 @@ constexpr u32 kMaxTrackCommands = 32768;
 constexpr u8 kMelodicKeyCorrection = 24;
 constexpr u8 kIntelliDrumSlots = 16;
 constexpr u8 kDefaultTempo = 0x20;
-constexpr double kTimerHertz = 500.0;
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
   return (0x7fu << 7) | program;
@@ -77,14 +76,6 @@ constexpr std::array<u8, 64> kIntelliFe4{
     return ((0xffu * depth) >> 8) * (100.0 / 256.0);
   }
   return (0xffu * (depth & 0x0fu)) * (100.0 / 256.0);
-}
-
-[[nodiscard]] constexpr double vibratoRateHertz(u8 rate, u8 tempo) {
-  return (kTimerHertz * std::max<u8>(tempo, 1) * rate) / 65536.0;
-}
-
-[[nodiscard]] constexpr double vibratoDelaySeconds(u8 delay, u8 tempo) {
-  return (256.0 * delay) / (kTimerHertz * std::max<u8>(tempo, 1));
 }
 
 [[nodiscard]] constexpr u32 tempoMicrosecondsPerQuarter(u8 tempo) {
@@ -466,13 +457,6 @@ struct ProgramState {
     u8 mask = 0;
   };
 
-  struct TempoVibratoSync {
-    u64 tick = 0;
-    u32 trackNumber = 0;
-    VibratoConfig vibrato;
-    u8 tempo = kDefaultTempo;
-  };
-
   explicit ProgramState(const SequenceProgram& program)
       : selected(profile(static_cast<ProfileId>(program.config.profile))) {
     for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
@@ -484,7 +468,6 @@ struct ProgramState {
         sourceRanges.emplace(command.address.value, command.range);
       }
     }
-    activeVibrato.resize(program.tracks.size());
     resetRuntime();
   }
 
@@ -498,7 +481,6 @@ struct ProgramState {
     percussionTable = {};
     programs = basePrograms;
     nextOverrideProgram = 0x80;
-    std::ranges::fill(activeVibrato, VibratoConfig{});
     tempoFade.reset(kDefaultTempo);
     tempoFade.clearAutomation();
     tempoFadeTrack.reset();
@@ -513,23 +495,7 @@ struct ProgramState {
     }
   }
 
-  void setTempo(u64 tick, u8 value) {
-    tempo = value;
-    for (u32 trackNumber = 0; trackNumber < activeVibrato.size(); ++trackNumber) {
-      const VibratoConfig& vibrato = activeVibrato[trackNumber];
-      if (!vibrato.active()) {
-        continue;
-      }
-      if (collecting) {
-        tempoVibratoSyncs.push_back(TempoVibratoSync{
-            .tick = tick,
-            .trackNumber = trackNumber,
-            .vibrato = vibrato,
-            .tempo = tempo,
-        });
-      }
-    }
-  }
+  void setTempo(u8 value) { tempo = value; }
 
   void finalizePerformance(PerformanceSequence& performance) const {
     u64 nextSequence = 0;
@@ -555,39 +521,6 @@ struct ProgramState {
         });
       }
     }
-
-    for (const TempoVibratoSync& sync : tempoVibratoSyncs) {
-      const auto found = std::ranges::find(performance.tracks, sync.trackNumber, &PerformanceTrack::sourceTrackNumber);
-      if (found == performance.tracks.end()) {
-        continue;
-      }
-      const double rate = math::vibratoRateHertz(sync.vibrato.rate, sync.tempo);
-      const double delaySeconds = math::vibratoDelaySeconds(sync.vibrato.delay, sync.tempo);
-      const u32 delayTicks = static_cast<u32>(
-          std::lround(delaySeconds * 1'000'000.0 * kPpqn / math::tempoMicrosecondsPerQuarter(sync.tempo)));
-      found->events.emplace_back(ModulationPerformanceEvent{
-          .header =
-              PerformanceEventHeader{
-                  .track = found->id,
-                  .tick = sync.tick,
-                  .sequence = nextSequence++,
-              },
-          .target = ModulationPerformanceTarget::VibratoRate,
-          .amount = 0.0,
-          .frequencyHz = rate,
-      });
-      found->events.emplace_back(VibratoDelayPerformanceEvent{
-          .header =
-              PerformanceEventHeader{
-                  .track = found->id,
-                  .tick = sync.tick,
-                  .sequence = nextSequence++,
-              },
-          .delayTicks = delayTicks,
-          .milliseconds = delaySeconds * 1000.0,
-      });
-      found->hasPhysicalModulation = true;
-    }
   }
 
   [[nodiscard]] u32 resolveProgram(u8 encoded, u8 percussionMinimum, u8* logical = nullptr) const {
@@ -606,13 +539,6 @@ struct ProgramState {
               : index;
     }
     return programs[index];
-  }
-
-  void observeVibrato(u32 trackNumber, VibratoConfig vibrato) {
-    if (trackNumber >= activeVibrato.size()) {
-      activeVibrato.resize(trackNumber + 1);
-    }
-    activeVibrato[trackNumber] = vibrato;
   }
 
   [[nodiscard]] u32 registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
@@ -712,8 +638,6 @@ struct ProgramState {
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
   u32 nextOverrideProgram = 0x80;
   std::vector<EchoChange> echoChanges;
-  std::vector<TempoVibratoSync> tempoVibratoSyncs;
-  std::vector<VibratoConfig> activeVibrato;
   std::map<u8, DrumSlot> standardDrums;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   std::optional<u32> tempoFadeTrack;
@@ -1148,7 +1072,6 @@ struct Playback {
     track.vibrato = VibratoConfig{.delay = delay, .rate = rate, .depth = depth};
     track.vibratoDepth.setCurrent(depth);
     track.vibratoDepth.clearAutomation();
-    program.observeVibrato(track.trackNumber, track.vibrato);
     emitConfiguredVibrato();
   }
 
@@ -1156,7 +1079,6 @@ struct Playback {
     track.vibrato = {};
     track.vibratoDepth.setCurrent(0);
     track.vibratoDepth.clearAutomation();
-    program.observeVibrato(track.trackNumber, track.vibrato);
     emitConfiguredVibrato();
   }
 
@@ -1173,15 +1095,11 @@ struct Playback {
 
   void emitVibratoRateAndDelay() {
     const bool active = track.vibrato.active();
-    const double rate = active ? math::vibratoRateHertz(track.vibrato.rate, program.tempo) : 0.0;
-    out.vibratoRate(rate);
-    const double delaySeconds = active ? math::vibratoDelaySeconds(track.vibrato.delay, program.tempo) : 0.0;
-    const u32 delayTicks = active ? static_cast<u32>(std::lround(delaySeconds * 1'000'000.0 * kPpqn /
-                                                                 math::tempoMicrosecondsPerQuarter(program.tempo)))
-                                  : 0;
     if (active) {
-      out.vibratoDelayPhysical(delayTicks, delaySeconds * 1000.0);
+      out.vibratoRateCyclesPerTick(static_cast<double>(track.vibrato.rate) / 256.0);
+      out.vibratoDelayTicks(track.vibrato.delay);
     } else {
+      out.vibratoRate(0.0);
       out.vibratoDelay(0, 0);
     }
   }
@@ -1210,7 +1128,7 @@ struct Playback {
     program.tempoFade.setCurrentRaw(value);
     program.tempoFade.clearAutomation();
     program.tempoFadeTrack.reset();
-    program.setTempo(vm.tick(), value);
+    program.setTempo(value);
     out.tempo(math::tempoMicrosecondsPerQuarter(value));
   }
 
@@ -1224,7 +1142,7 @@ struct Playback {
                                      static_cast<double>(math::tempoMicrosecondsPerQuarter(value)), length),
                             SequenceFixedPointMotion<s32>::toRawTarget(value, length));
     program.tempoFadeTrack = track.trackNumber;
-    advanceTempoFade(vm.tick());
+    advanceTempoFade();
   }
 
   void volume(u8 value) {
@@ -1261,10 +1179,10 @@ struct Playback {
     program.masterFadeTrack = track.trackNumber;
   }
 
-  void advanceTempoFade(u64 tick) {
+  void advanceTempoFade() {
     static_cast<void>(program.tempoFade.tickRaw([&](s32 raw) {
       const u8 value = static_cast<u8>(std::clamp<s32>(raw, 0, 0xff));
-      program.setTempo(tick, value);
+      program.setTempo(value);
       program.tempoFade.output(out).tempo(math::tempoMicrosecondsPerQuarter(value));
     }));
     if (!program.tempoFade.active()) {
@@ -1310,7 +1228,7 @@ struct Playback {
     advanceVibratoFade();
     advancePitchMotion();
     if (program.tempoFadeTrack == track.trackNumber) {
-      advanceTempoFade(vm.tick());
+      advanceTempoFade();
     }
     if (program.masterFadeTrack == track.trackNumber) {
       advanceMasterFade();
@@ -2230,6 +2148,7 @@ struct PlaylistDecode {
               .panLaw = PanLaw::ConstantSum,
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 2,
+              .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(kDefaultTempo),
           },
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .prepass = SemanticPrepassMode::ScheduledPlayback,
