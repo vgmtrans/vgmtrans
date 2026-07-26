@@ -9,7 +9,6 @@
 #include "value/sequence/PerformanceModel.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <iterator>
 #include <optional>
@@ -27,7 +26,9 @@ struct EventRef {
 };
 
 struct TrackModulationState {
-  std::array<std::optional<ModulationPerformanceEvent>, 3> rates;
+  std::optional<ModulationPerformanceEvent> vibratoRate;
+  std::optional<ModulationPerformanceEvent> tremoloRate;
+  std::optional<ModulationPerformanceEvent> panRate;
   std::optional<u32> vibratoDelayTicks;
   std::optional<u32> tremoloDelayTicks;
 };
@@ -52,15 +53,16 @@ struct TrackModulationState {
   return static_cast<double>(ticks) * secondsPerTick * 1000.0;
 }
 
-[[nodiscard]] std::optional<ModulationPerformanceEvent>* relativeRate(TrackModulationState& state,
-                                                                      ModulationPerformanceTarget target) {
+[[nodiscard]] std::optional<ModulationPerformanceEvent>* relativeRate(
+    TrackModulationState& state,
+    ModulationPerformanceTarget target) {
   switch (target) {
     case ModulationPerformanceTarget::VibratoRate:
-      return &state.rates[0];
+      return &state.vibratoRate;
     case ModulationPerformanceTarget::TremoloRate:
-      return &state.rates[1];
+      return &state.tremoloRate;
     case ModulationPerformanceTarget::PanRate:
-      return &state.rates[2];
+      return &state.panRate;
     case ModulationPerformanceTarget::VibratoDepth:
     case ModulationPerformanceTarget::TremoloDepth:
     case ModulationPerformanceTarget::PanDepth:
@@ -173,9 +175,9 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
           resolveContext(update, secondsPerTick);
           derived[trackIndex].emplace_back(std::move(update));
         };
-        for (const auto& rate : trackState.rates) {
-          appendRate(rate);
-        }
+        appendRate(trackState.vibratoRate);
+        appendRate(trackState.tremoloRate);
+        appendRate(trackState.panRate);
 
         if (trackState.vibratoDelayTicks) {
           derived[trackIndex].emplace_back(VibratoDelayPerformanceEvent{
