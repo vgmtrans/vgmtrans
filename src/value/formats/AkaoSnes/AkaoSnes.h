@@ -118,25 +118,6 @@ inline constexpr u32 kAkaoSnesDrumKitProgram = 0;
   return 8000.0 / timer0Frequency;
 }
 
-struct AkaoSnesLfoRateRange {
-  double minimum = 1.0 / 16.0;
-  double maximum = 0.0;
-};
-
-[[nodiscard]] constexpr AkaoSnesLfoRateRange akaoSnesLfoRateRange(AkaoSnesVersion version) {
-  constexpr u8 minimumTimerFrequency = 0x24;
-  return AkaoSnesLfoRateRange{
-      .maximum = akaoSnesFrameRateHz(minimumTimerFrequency) / (version == AKAOSNES_V1 ? 4.0 : 2.0),
-  };
-}
-
-[[nodiscard]] constexpr double akaoSnesMaxLfoDelaySeconds(AkaoSnesVersion version) {
-  constexpr double v1 = 254.0 * 256.0 / (8000.0 / 0x24);
-  constexpr double v4 = 254.0 * 256.0 / (8000.0 / 0x2a);
-  constexpr double other = 255.0 * 256.0 / (8000.0 / 0x2a);
-  return version == AKAOSNES_V1 ? v1 : (version == AKAOSNES_V4 ? v4 : other);
-}
-
 [[nodiscard]] inline double akaoSnesVibratoDepthCentsForAmplitude(double amplitude) {
   if (amplitude <= 0.0) {
     return 0.0;
@@ -149,20 +130,6 @@ struct AkaoSnesLfoRateRange {
   return amplitude == 0 ? 0.0 : 1200.0 * std::log2(1.0 + (static_cast<double>(amplitude) / 3072.0));
 }
 
-[[nodiscard]] inline double akaoSnesMaxVibratoDepthCents(AkaoSnesVersion version) {
-  switch (version) {
-    case AKAOSNES_V1:
-      return akaoSnesV1VibratoDepthCents(255);
-    case AKAOSNES_V2:
-      return 1200.0 * std::log2(1.0 + (15.0 * 127.0 / 32768.0));
-    case AKAOSNES_V3:
-      return akaoSnesVibratoDepthCentsForAmplitude(127.0);
-    case AKAOSNES_V4:
-    default:
-      return akaoSnesVibratoDepthCentsForAmplitude(64.0);
-  }
-}
-
 [[nodiscard]] inline double akaoSnesTremoloDepthDbForAmplitude(double amplitude) {
   if (amplitude <= 0.0) {
     return 0.0;
@@ -172,12 +139,6 @@ struct AkaoSnesLfoRateRange {
 
 [[nodiscard]] constexpr bool akaoSnesExportsTremolo(AkaoSnesVersion version) {
   return version == AKAOSNES_V3 || version == AKAOSNES_V4;
-}
-
-[[nodiscard]] inline double akaoSnesMaxTremoloDepthDb(AkaoSnesVersion version) {
-  return version == AKAOSNES_V3   ? akaoSnesTremoloDepthDbForAmplitude(127.0)
-         : version == AKAOSNES_V4 ? akaoSnesTremoloDepthDbForAmplitude(64.0)
-                                  : 0.0;
 }
 
 [[nodiscard]] constexpr u32 akaoSnesSequenceHeaderSize(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion) {

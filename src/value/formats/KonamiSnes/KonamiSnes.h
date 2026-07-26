@@ -36,10 +36,6 @@ inline constexpr u16 kKonamiSnesPpqn = 48;
 inline constexpr u16 kKonamiSnesDefaultPitchBendRangeCents = 200;
 inline constexpr u8 kKonamiSnesDefaultTempo = 0xff;
 inline constexpr double kKonamiSnesTimerHz = 250.0;
-inline constexpr u8 kDefaultVibratoMaxDepth = 0xff;
-inline constexpr u8 kDefaultLegacyVibratoMaxRateStep = 0x7f;
-inline constexpr u8 kMinVibratoMaxDepth = 0x10;
-inline constexpr u8 kMinVibratoMaxRateStep = 0x09;
 inline constexpr u8 kLateEraVibratoFadeThreshold = 0xc8;
 
 // Versions 1-3 store an extra GAIN byte in each instrument entry. Later
@@ -61,14 +57,6 @@ inline constexpr u8 kLateEraVibratoFadeThreshold = 0xc8;
 [[nodiscard]] constexpr u8 timerFrequency(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 ? 0x20 : 0x40;
 }
-
-struct KonamiVibratoSpec {
-  double maxDepthCents = 0.0;
-  double minHertz = 0.0;
-  double maxHertz = 0.0;
-  double minDelaySeconds = 0.0;
-  double maxDelaySeconds = 0.0;
-};
 
 namespace vibrato {
 
@@ -113,15 +101,6 @@ namespace vibrato {
                                  : ((currentDepth - (126.0 * 256.0)) * (50.0 / 256.0));
 }
 
-[[nodiscard]] constexpr u16 defaultMaxRateFactor(KonamiSnesVersion version) {
-  return usesLegacy(version) ? static_cast<u16>(kDefaultLegacyVibratoMaxRateStep * 0xff)
-                             : static_cast<u16>(0xff * lateEraRateStep(0xff));
-}
-
-[[nodiscard]] constexpr u16 minMaxRateFactor(KonamiSnesVersion version) {
-  return usesLegacy(version) ? static_cast<u16>(kMinVibratoMaxRateStep * 0xff) : kMinVibratoMaxRateStep;
-}
-
 [[nodiscard]] inline double baseHz(KonamiSnesVersion version) {
   return usesLegacy(version) ? (kKonamiSnesTimerHz / 65536.0) : (kKonamiSnesTimerHz / 16384.0);
 }
@@ -144,14 +123,6 @@ namespace vibrato {
   return (delay + 1.0) / kKonamiSnesTimerHz;
 }
 
-[[nodiscard]] inline double minDelaySeconds(KonamiSnesVersion version) {
-  return usesLegacy(version) ? delaySeconds(version, 0, 0xff) : delaySeconds(version, 0, 0);
-}
-
-[[nodiscard]] inline double maxDelaySeconds(KonamiSnesVersion version) {
-  return usesLegacy(version) ? delaySeconds(version, 0xff, 1) : delaySeconds(version, 0xc7, 0);
-}
-
 [[nodiscard]] constexpr u8 delayFromArg1(KonamiSnesVersion version, u8 arg1) {
   // Later engines overload values 0xc8-0xff: they request a depth fade instead
   // of a start delay. In that form vibrato begins immediately.
@@ -162,23 +133,6 @@ namespace vibrato {
   return (!usesLegacy(version) && arg1 >= kLateEraVibratoFadeThreshold)
              ? static_cast<u8>(arg1 - (kLateEraVibratoFadeThreshold - 1))
              : 0;
-}
-
-[[nodiscard]] inline KonamiVibratoSpec modulationSpec(KonamiSnesVersion version, u8 maxDepth = kDefaultVibratoMaxDepth,
-                                                      u16 maxRateFactor = 0) {
-  // Exporters need stable controller ranges before playback begins. Clamp very
-  // small songs to a useful minimum so those ranges never collapse to zero.
-  const u8 clampedMaxDepth = std::max(maxDepth, kMinVibratoMaxDepth);
-  const u16 effectiveMaxRateFactor = maxRateFactor != 0 ? maxRateFactor : defaultMaxRateFactor(version);
-  const u16 clampedMaxRateFactor = std::max(effectiveMaxRateFactor, minMaxRateFactor(version));
-  const double minHertz = baseHz(version);
-  return KonamiVibratoSpec{
-      .maxDepthCents = maxDepthCents(version, clampedMaxDepth),
-      .minHertz = minHertz,
-      .maxHertz = minHertz * clampedMaxRateFactor,
-      .minDelaySeconds = minDelaySeconds(version),
-      .maxDelaySeconds = maxDelaySeconds(version),
-  };
 }
 
 }  // namespace vibrato

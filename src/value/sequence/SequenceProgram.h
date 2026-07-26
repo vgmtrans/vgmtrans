@@ -155,6 +155,7 @@ struct SourceCommand {
   u32 encodedSize = 0;
   SourceRange range;
   SourceAnnotationId annotation;
+  SequenceSemantic semantic = SequenceSemantic::Unknown;
   std::vector<SemanticOperand> operands;
   DecodeFlow flow;
   CommandExecution execution;
@@ -269,6 +270,8 @@ struct SequenceProgram {
 
 [[nodiscard]] const TrackProgram* trackById(const SequenceProgram& program, TrackId id);
 [[nodiscard]] const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id);
+[[nodiscard]] bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic);
+[[nodiscard]] bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic semantic);
 
 struct SequenceProgramAsset {
   AssetMetadata metadata;
@@ -281,7 +284,8 @@ public:
 
   const SourceCommand& addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
                                    std::vector<SemanticOperand> operands, DecodeFlow flow,
-                                   SourceAnnotationId annotation = {}, CommandExecution execution = {});
+                                   SourceAnnotationId annotation = {}, CommandExecution execution = {},
+                                   SequenceSemantic semantic = SequenceSemantic::Unknown);
 
 private:
   TrackProgram& track_;

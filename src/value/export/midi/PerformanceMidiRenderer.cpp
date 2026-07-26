@@ -7,6 +7,7 @@
 #include "value/export/midi/PerformanceMidiRenderer.h"
 
 #include "value/base/LevelScale.h"
+#include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
 
 #include <algorithm>
@@ -707,7 +708,8 @@ bool shouldRestartSimulatedPanForNote(const PerformanceEvent& event, const Rende
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
                   std::span<const GlobalTransposeChange> globalTransposes, const PerformanceTempoMap& globalTempos,
                   const MidiExportOptions& options, ModulationConversionPolicy modulationConversion,
-                  std::span<const InstrumentSetAsset* const> instrumentSets, MidiControllerState* automationState) {
+                  std::span<const InstrumentSetAsset* const> instrumentSets,
+                  const SequenceModulationProfile* modulationProfile, MidiControllerState* automationState) {
   std::visit(
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
@@ -825,7 +827,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             track.events.push_back(VibratoDelay{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
-                .ticks = typedEvent.midiValue,
+                .ticks = vibratoDelayControllerValue(typedEvent, modulationProfile),
             });
           }
         } else if constexpr (std::is_same_v<TypedEvent, TremoloDelayPerformanceEvent>) {
@@ -835,7 +837,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             track.events.push_back(TremoloDelay{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
-                .ticks = typedEvent.midiValue,
+                .ticks = tremoloDelayControllerValue(typedEvent, modulationProfile),
             });
           }
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
@@ -880,10 +882,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .enabled = typedEvent.enabled,
           });
         } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
-          if (typedEvent.controllerRangeOnly) {
-            return;
-          }
-          const double normalizedAmount = std::clamp(typedEvent.amount, 0.0, 1.0);
+          const double normalizedAmount = modulationControllerAmount(typedEvent, modulationProfile);
           const u8 value = midiNormalized7(normalizedAmount);
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             switch (typedEvent.target) {
@@ -981,7 +980,15 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
 
 MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExportOptions options,
                                 ModulationConversionPolicy modulationConversion,
-                                std::span<const InstrumentSetAsset* const> instrumentSets) {
+                                std::span<const InstrumentSetAsset* const> instrumentSets,
+                                const SequenceModulationProfile* modulationProfile) {
+  std::optional<SequenceModulationProfile> derivedModulationProfile;
+  if (modulationProfile == nullptr &&
+      std::ranges::any_of(performance.tracks, &PerformanceTrack::hasPhysicalModulation)) {
+    derivedModulationProfile = analyzeSequenceModulation(performance);
+    modulationProfile = &*derivedModulationProfile;
+  }
+
   const PerformanceTempoMap globalTempos{performance};
   const std::vector<PerformanceTempoMap::Point> globalTempoPoints = globalTempos.points();
   std::vector<bool> renderedTempoPoints(globalTempoPoints.size(), false);
@@ -1051,7 +1058,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
       MidiControllerState* automationState =
           header.automation ? &automationControllerStates[*header.automation] : nullptr;
       addMidiEvent(midiTrack, renderState, *event, assignment.channel, globalTransposes, globalTempos, options,
-                   modulationConversion, instrumentSets, automationState);
+                   modulationConversion, instrumentSets, modulationProfile, automationState);
     }
     u64 endTick = performanceTrack.endTick;
     if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {

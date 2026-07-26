@@ -18,6 +18,7 @@
 #include "conversion/SF2File.h"
 #include "formats/NDS/NDSInstrSet.h"
 #include "value/export/ExportTypes.h"
+#include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/session/Session.h"
@@ -3418,9 +3419,7 @@ struct PerformanceModulationStats {
   size_t nonZeroSourcePitchBendEvents = 0;
   double maxVibratoPitchDepthSemitones = 0.0;
   double maxVibratoNormalizedAmount = 0.0;
-  double maxVibratoObservedRangeAmount = 0.0;
   double maxVibratoRateNormalizedAmount = 0.0;
-  double maxVibratoRateObservedRangeAmount = 0.0;
   double maxVibratoRateHz = 0.0;
   double maxSourcePitchBendSemitones = 0.0;
   u32 maxVibratoDelayTicks = 0;
@@ -3566,6 +3565,7 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
   if (!performance.diagnostics.empty()) {
     throw std::runtime_error("performance render reported: " + performance.diagnostics.front().message);
   }
+  const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
 
   PerformanceModulationStats stats;
   struct InstrumentState {
@@ -3616,20 +3616,17 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
       } else if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
         ++stats.vibratoDelayEvents;
         stats.maxVibratoDelayTicks = std::max(stats.maxVibratoDelayTicks, delay->delayTicks);
-        if (delay->delayTicks > 0) {
+        if (delay->delayTicks > 0 || delay->milliseconds.value_or(0.0) > 0.0) {
           ++stats.activeVibratoDelayEvents;
         }
       } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
         if (modulation->target == ModulationPerformanceTarget::VibratoDepth) {
           ++stats.vibratoDepthEvents;
-          if (modulation->amount > 0.0001) {
+          const double amount = modulationControllerAmount(*modulation, &modulationProfile);
+          if (amount > 0.0001) {
             ++stats.activeVibratoDepthEvents;
           }
-          stats.maxVibratoNormalizedAmount = std::max(stats.maxVibratoNormalizedAmount, modulation->amount);
-          if (modulation->controllerRangeMaxAmount) {
-            stats.maxVibratoObservedRangeAmount =
-                std::max(stats.maxVibratoObservedRangeAmount, *modulation->controllerRangeMaxAmount);
-          }
+          stats.maxVibratoNormalizedAmount = std::max(stats.maxVibratoNormalizedAmount, amount);
           const double semitones = modulation->pitchDepthSemitones.value_or(0.0);
           if (semitones > stats.maxVibratoPitchDepthSemitones) {
             stats.maxVibratoPitchDepthSemitones = semitones;
@@ -3637,11 +3634,9 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           }
         } else if (modulation->target == ModulationPerformanceTarget::VibratoRate) {
           ++stats.vibratoRateEvents;
-          stats.maxVibratoRateNormalizedAmount = std::max(stats.maxVibratoRateNormalizedAmount, modulation->amount);
-          if (modulation->controllerRangeMaxAmount) {
-            stats.maxVibratoRateObservedRangeAmount =
-                std::max(stats.maxVibratoRateObservedRangeAmount, *modulation->controllerRangeMaxAmount);
-          }
+          stats.maxVibratoRateNormalizedAmount =
+              std::max(stats.maxVibratoRateNormalizedAmount,
+                       modulationControllerAmount(*modulation, &modulationProfile));
           if (modulation->frequencyHz) {
             stats.maxVibratoRateHz = std::max(stats.maxVibratoRateHz, *modulation->frequencyHz);
           }
@@ -3726,10 +3721,8 @@ int validateFormatDirectMidiSimulation(const std::filesystem::path& path, std::s
               << " maxDepthSemi=" << performance.maxVibratoPitchDepthSemitones
               << " maxDepthCents=" << (performance.maxVibratoPitchDepthSemitones * 100.0)
               << " maxAmount=" << performance.maxVibratoNormalizedAmount
-              << " observedRangeAmount=" << performance.maxVibratoObservedRangeAmount
               << " rateEvents=" << performance.vibratoRateEvents << " maxRateHz=" << performance.maxVibratoRateHz
               << " maxRateAmount=" << performance.maxVibratoRateNormalizedAmount
-              << " observedRateRangeAmount=" << performance.maxVibratoRateObservedRangeAmount
               << " delayEvents=" << performance.vibratoDelayEvents
               << " activeDelays=" << performance.activeVibratoDelayEvents
               << " maxDelayTicks=" << performance.maxVibratoDelayTicks
@@ -4139,8 +4132,13 @@ int selfTest() {
 
   const auto aramBytes = makeCapcomSnesAram();
   std::ostringstream summaryOutput;
-  expect(compareCapcomSnesSummary(aramBytes, "synthetic.spc", summaryOutput),
-         "self-test should compare CapcomSnes summary parity: " + summaryOutput.str());
+  const auto legacySummary = legacyCapcomSnesSummary(aramBytes, "synthetic.spc");
+  expect(compareSummary(legacySummary, legacySummary, summaryOutput),
+         "self-test should compare identical CapcomSnes summaries: " + summaryOutput.str());
+  std::ostringstream modulationDifference;
+  expect(!compareCapcomSnesSummary(aramBytes, "synthetic.spc", modulationDifference) &&
+             modulationDifference.str().find("instrument synth mismatch") != std::string::npos,
+         "self-test should detect sequence-derived modulation differences in scanned instruments");
   legacyLevelReapplicationKeepsPreCurvePrecision();
 
   std::cout << "vgmtrans-parity self-test ok\n";

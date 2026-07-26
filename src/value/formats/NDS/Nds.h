@@ -54,15 +54,6 @@ struct NdsLayout {
   std::vector<NdsWaveArchiveInfo> waveArchives;
 };
 
-struct NdsLfoRanges {
-  double maxVibratoDepthCents = 0.0;
-  double maxTremoloDepthDb = 0.0;
-  double maxPanDepth = 0.0;
-  double minRateHertz = 0.0;
-  double maxRateHertz = 0.0;
-  double maxDelaySeconds = 0.0;
-};
-
 // SDAT discovery and layout parsing.
 [[nodiscard]] std::vector<u32> findNdsSdatOffsets(core::ByteReader reader);
 [[nodiscard]] std::optional<NdsLayout> parseNdsLayout(core::ScanResultBuilder& builder, u32 baseOffset);
@@ -74,7 +65,6 @@ struct NdsLfoRanges {
                                                             NdsSequenceRange range,
                                                             core::SourceMapBuilder* sourceMap = nullptr,
                                                             std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] NdsLfoRanges analyzeNdsLfoRanges(const core::SequenceProgram& program);
 
 // SBNK instruments and SWAR/PSG samples. These functions add complete synth
 // assets directly to the scan result and return the handles used by collections.
@@ -86,9 +76,6 @@ struct NdsLfoRanges {
     core::ScanResultBuilder& builder, core::SourceRange range, std::string_view name,
     core::ScanSampleCollectionRef psgCollection,
     const std::array<std::optional<core::ScanSampleCollectionRef>, 4>& waveCollections);
-void applyNdsLfoRanges(core::InstrumentSetAsset& instrumentSet, const NdsLfoRanges& ranges);
-[[nodiscard]] core::PreparedCollectionAssets prepareNdsCollection(const core::CollectionPrepareContext& context);
-
 [[nodiscard]] core::FormatDefinition ndsDefinition();
 
 }  // namespace vgmtrans::formats::nds

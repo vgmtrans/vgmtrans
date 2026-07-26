@@ -10,6 +10,7 @@
 #include <iterator>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -280,6 +281,13 @@ void PerformanceEmitter::vibratoDelay(u32 delayTicks, u8 midiValue) {
   });
 }
 
+void PerformanceEmitter::vibratoDelayPhysical(u32 delayTicks, double milliseconds) {
+  vibratoDelay(VibratoDelayPerformanceEvent{
+      .delayTicks = delayTicks,
+      .milliseconds = milliseconds,
+  });
+}
+
 void PerformanceEmitter::tremoloDelay(TremoloDelayPerformanceEvent event) {
   append(std::move(event));
 }
@@ -288,6 +296,13 @@ void PerformanceEmitter::tremoloDelay(u32 delayTicks, u8 midiValue) {
   tremoloDelay(TremoloDelayPerformanceEvent{
       .delayTicks = delayTicks,
       .midiValue = midiValue,
+  });
+}
+
+void PerformanceEmitter::tremoloDelayPhysical(u32 delayTicks, double milliseconds) {
+  tremoloDelay(TremoloDelayPerformanceEvent{
+      .delayTicks = delayTicks,
+      .milliseconds = milliseconds,
   });
 }
 
@@ -361,6 +376,57 @@ void PerformanceEmitter::modulation(ModulationPerformanceTarget target, double a
       .target = target,
       .amount = amount,
   });
+}
+
+namespace {
+
+[[nodiscard]] ModulationPerformanceEvent physicalLfoEvent(ModulationPerformanceTarget target,
+                                                          LfoPerformanceContext context) {
+  return ModulationPerformanceEvent{
+      .target = target,
+      .amount = 0.0,
+      .frequencyHz = context.frequencyHz,
+      .delayTicks = context.delayTicks,
+      .delayMilliseconds = context.delayMilliseconds,
+      .waveform = context.waveform,
+      .phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth,
+      .tremoloGainMode = context.tremoloGainMode,
+  };
+}
+
+}  // namespace
+
+void PerformanceEmitter::vibratoDepth(double semitones, LfoPerformanceContext context) {
+  auto event = physicalLfoEvent(ModulationPerformanceTarget::VibratoDepth, std::move(context));
+  event.pitchDepthSemitones = semitones;
+  modulation(std::move(event));
+}
+
+void PerformanceEmitter::vibratoRate(double hertz, LfoPerformanceContext context) {
+  context.frequencyHz = hertz;
+  modulation(physicalLfoEvent(ModulationPerformanceTarget::VibratoRate, std::move(context)));
+}
+
+void PerformanceEmitter::tremoloDepth(double decibels, LfoPerformanceContext context) {
+  auto event = physicalLfoEvent(ModulationPerformanceTarget::TremoloDepth, std::move(context));
+  event.volumeDepthDecibels = decibels;
+  modulation(std::move(event));
+}
+
+void PerformanceEmitter::tremoloRate(double hertz, LfoPerformanceContext context) {
+  context.frequencyHz = hertz;
+  modulation(physicalLfoEvent(ModulationPerformanceTarget::TremoloRate, std::move(context)));
+}
+
+void PerformanceEmitter::panLfoDepth(double depth, LfoPerformanceContext context) {
+  auto event = physicalLfoEvent(ModulationPerformanceTarget::PanDepth, std::move(context));
+  event.panDepth = depth;
+  modulation(std::move(event));
+}
+
+void PerformanceEmitter::panLfoRate(double hertz, LfoPerformanceContext context) {
+  context.frequencyHz = hertz;
+  modulation(physicalLfoEvent(ModulationPerformanceTarget::PanRate, std::move(context)));
 }
 
 void PerformanceEmitter::marker(MarkerPerformanceEvent event) {
@@ -492,6 +558,21 @@ void PerformanceEmitter::append(PerformanceEvent event) {
     auto& automation = track_.automations[*automation_];
     automation.realization.endTick = std::max(automation.realization.endTick, tick_);
   }
+  const bool physicalModulation =
+      std::visit(
+          [](const auto& typedEvent) {
+            using T = std::decay_t<decltype(typedEvent)>;
+            if constexpr (std::is_same_v<T, ModulationPerformanceEvent>) {
+              return typedEvent.pitchDepthSemitones.has_value() || typedEvent.volumeDepthDecibels.has_value() ||
+                     typedEvent.panDepth.has_value() || typedEvent.frequencyHz.has_value();
+            } else if constexpr (std::is_same_v<T, VibratoDelayPerformanceEvent> ||
+                                 std::is_same_v<T, TremoloDelayPerformanceEvent>) {
+              return typedEvent.milliseconds.has_value();
+            }
+            return false;
+          },
+          event);
+  track_.hasPhysicalModulation |= physicalModulation;
   std::visit([&](auto& typedEvent) { typedEvent.header = header(); }, event);
   track_.events.emplace_back(std::move(event));
 }

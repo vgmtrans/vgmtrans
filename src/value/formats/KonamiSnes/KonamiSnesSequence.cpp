@@ -11,7 +11,6 @@
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
-#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -79,11 +78,6 @@ struct DecodedPitchSlide {
   u8 targetNote = 0;
 };
 
-struct ModulationRanges {
-  u8 maxDepth = kMinVibratoMaxDepth;
-  u16 maxRateFactor = 0;
-};
-
 [[nodiscard]] constexpr bool isLateVersion(KonamiSnesVersion version) {
   return version == KONAMISNES_V5 || version == KONAMISNES_V6;
 }
@@ -123,21 +117,6 @@ struct ModulationRanges {
     return 0;
   }
   return static_cast<u32>(std::min<double>(std::lround(ticks), std::numeric_limits<u32>::max()));
-}
-
-[[nodiscard]] u8 vibratoDelayMidiValue(KonamiSnesVersion version, u8 delay, u8 tempo) {
-  // The synth model stores delay on a normalized controller. Convert seconds
-  // through the same logarithmic range used by the synth exporter.
-  const s32 minAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato::minDelaySeconds(version)));
-  const s32 rangeAmount =
-      synthAmountFromSecondsRange(vibrato::minDelaySeconds(version), vibrato::maxDelaySeconds(version));
-  if (rangeAmount == 0) {
-    return 0;
-  }
-  const s32 currentAmount =
-      synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato::delaySeconds(version, delay, tempo)));
-  return static_cast<u8>(std::clamp<s32>(
-      static_cast<s32>(std::lround(128.0 * (currentAmount - minAmount) / static_cast<double>(rangeAmount))), 0, 127));
 }
 
 [[nodiscard]] double tuningCents(s8 tuning) {
@@ -238,65 +217,101 @@ private:
   u8 reusableFadeTicks_ = 0;
 };
 
-// Before producing output, the shared VM silently runs the same decoded
-// commands once to find the song's widest vibrato settings. No source bytes are
-// reopened, and calls, loops, timing, and opcode meaning stay in one place.
 struct ProgramState {
   struct ActiveVibrato {
     u8 rate = 0;
     u8 depth = 0;
+    u8 delay = 0;
+  };
+
+  struct TempoSync {
+    u64 tick = 0;
+    u32 trackNumber = 0;
+    ActiveVibrato vibrato;
+    u8 tempo = kKonamiSnesDefaultTempo;
   };
 
   explicit ProgramState(const SequenceProgram& program)
-      : version(static_cast<KonamiSnesVersion>(program.config.profile)),
-        ranges{.maxDepth = kMinVibratoMaxDepth, .maxRateFactor = vibrato::minMaxRateFactor(version)},
-        activeVibrato(program.tracks.size()) {}
+      : version(static_cast<KonamiSnesVersion>(program.config.profile)), activeVibrato(program.tracks.size()) {}
 
-  void observeVibrato(u32 trackNumber, u8 rate, u8 depth, u8 trackTempo) {
-    if (!collecting) {
-      return;
-    }
+  [[nodiscard]] u8 effectiveTempo(u8 trackTempo) const {
+    return vibrato::usesLegacy(version) ? globalTempo : trackTempo;
+  }
+
+  void observeVibrato(u32 trackNumber, u8 delay, u8 rate, u8 depth) {
     if (trackNumber >= activeVibrato.size()) {
       activeVibrato.resize(trackNumber + 1);
     }
-    activeVibrato[trackNumber] = ActiveVibrato{.rate = rate, .depth = depth};
-    if (!vibrato::isActive(version, rate, depth)) {
-      return;
-    }
-    ranges.maxDepth = std::max(ranges.maxDepth, depth);
-    // Early drivers share one song tempo across all channels. Later drivers do
-    // not tie vibrato speed to tempo, so the track value is enough there.
-    const u8 tempo = vibrato::usesLegacy(version) ? globalTempo : trackTempo;
-    ranges.maxRateFactor = std::max(ranges.maxRateFactor, vibrato::rateFactor(version, rate, tempo));
+    activeVibrato[trackNumber] = ActiveVibrato{
+        .rate = rate,
+        .depth = depth,
+        .delay = delay,
+    };
   }
 
-  void observeTempo(u8 tempo) {
-    if (!collecting || !vibrato::usesLegacy(version)) {
+  void observeTempo(u64 tick, u32 sourceTrackNumber, u8 tempo) {
+    if (!vibrato::usesLegacy(version)) {
       return;
     }
     globalTempo = tempo;
-    // A tempo command can raise the speed of vibrato already running on any
-    // early-engine track. Recheck those tracks instead of only future commands.
-    for (const auto& active : activeVibrato) {
-      if (vibrato::isActive(version, active.rate, active.depth)) {
-        ranges.maxRateFactor = std::max(ranges.maxRateFactor, vibrato::rateFactor(version, active.rate, globalTempo));
+    for (u32 trackNumber = 0; trackNumber < activeVibrato.size(); ++trackNumber) {
+      const ActiveVibrato& active = activeVibrato[trackNumber];
+      if (trackNumber == sourceTrackNumber || !vibrato::isActive(version, active.rate, active.depth)) {
+        continue;
       }
+      tempoSyncs.push_back(TempoSync{
+          .tick = tick,
+          .trackNumber = trackNumber,
+          .vibrato = active,
+          .tempo = tempo,
+      });
     }
   }
 
-  void finishPrepass() {
-    // Playback reuses the collected limits but must not keep changing them.
-    // Reset temporary song-wide state so the real render starts cleanly.
-    collecting = false;
-    globalTempo = kKonamiSnesDefaultTempo;
-    activeVibrato.clear();
+  void finalizePerformance(PerformanceSequence& performance) const {
+    u64 nextSequence = 0;
+    for (const auto& track : performance.tracks) {
+      for (const auto& event : track.events) {
+        nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
+      }
+    }
+
+    for (const TempoSync& sync : tempoSyncs) {
+      const auto found = std::ranges::find(performance.tracks, sync.trackNumber, &PerformanceTrack::sourceTrackNumber);
+      if (found == performance.tracks.end()) {
+        continue;
+      }
+      const u16 factor = vibrato::rateFactor(version, sync.vibrato.rate, sync.tempo);
+      const double delaySeconds = vibrato::delaySeconds(version, sync.vibrato.delay, sync.tempo);
+      found->events.emplace_back(ModulationPerformanceEvent{
+          .header =
+              PerformanceEventHeader{
+                  .track = found->id,
+                  .tick = sync.tick,
+                  .sequence = nextSequence++,
+              },
+          .target = ModulationPerformanceTarget::VibratoRate,
+          .amount = 0.0,
+          .frequencyHz = factor == 0 ? 0.0 : vibrato::baseHz(version) * factor,
+      });
+      found->events.emplace_back(VibratoDelayPerformanceEvent{
+          .header =
+              PerformanceEventHeader{
+                  .track = found->id,
+                  .tick = sync.tick,
+                  .sequence = nextSequence++,
+              },
+          .delayTicks = vibratoDelayTicks(version, sync.vibrato.delay, sync.tempo),
+          .milliseconds = delaySeconds * 1000.0,
+      });
+      found->hasPhysicalModulation = true;
+    }
   }
 
   KonamiSnesVersion version = KONAMISNES_NONE;
-  ModulationRanges ranges;
-  std::vector<ActiveVibrato> activeVibrato;
   u8 globalTempo = kKonamiSnesDefaultTempo;
-  bool collecting = true;
+  std::vector<ActiveVibrato> activeVibrato;
+  std::vector<TempoSync> tempoSyncs;
 };
 
 // Only values that persist from one executed command to the next live here.
@@ -384,8 +399,7 @@ struct TrackState {
   SequenceAutomatedValue<double> pitchSlide;
   PerformanceNoteId pitchNote;
   PerformanceAutomationBinding pitchTransition;
-  double lastVibratoDepthAmount = -1.0;
-  bool emittedInitialModulationCeiling = false;
+  double lastVibratoDepthSemitones = -1.0;
 };
 
 // History-dependent driver behavior stays close to the opcode switch below.
@@ -394,10 +408,6 @@ struct Playback {
   PerformanceEmitter& out;
   VmApi& vm;
   ProgramState& program;
-
-  // Controller limits must precede the first musical event, regardless of
-  // which opcode appears first on this track.
-  void beforeCommand() { emitInitialModulationCeiling(); }
 
   void note(u8 key, u8 sourceVelocity) {
     // Counted loops alter velocity before the later engines pass it through
@@ -494,7 +504,7 @@ struct Playback {
   void tempo(u8 value) {
     track.tempo = value;
     track.tempoFade.setCurrentRaw(value);
-    program.observeTempo(value);
+    program.observeTempo(vm.tick(), track.trackNumber, value);
     out.tempo(tempoMicrosecondsPerQuarter(track.version, value));
     // Only early vibrato depends on tempo, so an active effect needs new rate
     // and delay controller values when tempo changes.
@@ -514,7 +524,7 @@ struct Playback {
     } else {
       track.vibrato.clearAutomation();
     }
-    program.observeVibrato(track.trackNumber, rate, depth, track.tempo);
+    program.observeVibrato(track.trackNumber, delay, rate, depth);
     emitVibratoDelay();
     emitVibratoDepth(out, true);
     emitVibratoRate();
@@ -652,6 +662,7 @@ struct Playback {
         return;
       }
       track.tempo = value;
+      program.observeTempo(vm.tick(), track.trackNumber, value);
       track.tempoFade.output(out).tempo(tempoMicrosecondsPerQuarter(track.version, value));
       if (vibrato::usesLegacy(track.version)) {
         emitVibratoRate();
@@ -711,69 +722,19 @@ private:
     track.pitchSlide.setCurrent(*track.pitchBase);
   }
 
-  void emitInitialModulationCeiling() {
-    if (track.emittedInitialModulationCeiling) {
-      return;
-    }
-    track.emittedInitialModulationCeiling = true;
-
-    // MIDI synth controls need their maximum before the first live value. The
-    // silent first pass found the largest depth and speed used in this song.
-    const double fullRangeCents = vibrato::maxDepthCents(track.version, kDefaultVibratoMaxDepth);
-    const double maxCents = vibrato::maxDepthCents(track.version, program.ranges.maxDepth);
-    out.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoDepth,
-        .amount = 0.0,
-        .pitchDepthSemitones = 0.0,
-        .controllerRangeMaxAmount =
-            fullRangeCents <= 0.0 ? std::nullopt : std::optional<double>{maxCents / fullRangeCents},
-        .controllerRangeOnly = true,
-    });
-    track.lastVibratoDepthAmount = 0.0;
-
-    const double minHertz = vibrato::baseHz(track.version);
-    const s32 fullRangeAmount =
-        synthAmountFromHertzRange(minHertz, minHertz * vibrato::defaultMaxRateFactor(track.version));
-    const s32 maxRangeAmount = program.ranges.maxRateFactor == 0
-                                   ? 0
-                                   : synthAmountFromHertzRange(minHertz, minHertz * program.ranges.maxRateFactor);
-    out.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoRate,
-        .amount = 0.0,
-        .frequencyHz = 0.0,
-        .controllerRangeMaxAmount = fullRangeAmount <= 0 || maxRangeAmount <= 0
-                                        ? std::nullopt
-                                        : std::optional<double>{static_cast<double>(maxRangeAmount) / fullRangeAmount},
-        .controllerRangeOnly = true,
-    });
-  }
-
   void emitVibratoDepth(PerformanceEmitter output, bool force = false) {
     const bool active = vibrato::isActive(track.version, track.vibrato.rate(), track.vibrato.depth());
-    double amount = 0.0;
     double depthSemitones = 0.0;
-    std::optional<double> rangeMaxAmount;
     if (active) {
       const double currentCents =
           vibrato::currentDepthCents(track.version, track.vibrato.depth(), track.vibrato.currentDepth());
-      const double fullRangeCents = vibrato::maxDepthCents(track.version, kDefaultVibratoMaxDepth);
-      amount = fullRangeCents <= 0.0 ? 0.0 : currentCents / fullRangeCents;
-      const double maxCents = vibrato::maxDepthCents(track.version, program.ranges.maxDepth);
-      rangeMaxAmount = fullRangeCents <= 0.0 ? 0.0 : maxCents / fullRangeCents;
       // The driver value is already the farthest pitch moves from the note.
       // Convert cents to semitones without reducing that distance again.
       depthSemitones = currentCents / 100.0;
     }
-    amount = std::clamp(amount, 0.0, 1.0);
-    if (force || std::abs(amount - track.lastVibratoDepthAmount) > 0.0001) {
-      ModulationPerformanceEvent event{
-          .target = ModulationPerformanceTarget::VibratoDepth,
-          .amount = amount,
-          .pitchDepthSemitones = depthSemitones,
-          .controllerRangeMaxAmount = rangeMaxAmount,
-      };
-      output.modulation(std::move(event));
-      track.lastVibratoDepthAmount = amount;
+    if (force || std::abs(depthSemitones - track.lastVibratoDepthSemitones) > 0.0001) {
+      output.vibratoDepth(depthSemitones);
+      track.lastVibratoDepthSemitones = depthSemitones;
     }
   }
 
@@ -782,34 +743,16 @@ private:
       track.vibrato.clearAutomation();
       return;
     }
-    const double fullRangeCents = vibrato::maxDepthCents(track.version, kDefaultVibratoMaxDepth);
     const double targetCents = vibrato::maxDepthCents(track.version, track.vibrato.depth());
-    track.vibrato.bind(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
-                                        fullRangeCents <= 0.0 ? 0.0 : targetCents / fullRangeCents, length,
+    track.vibrato.bind(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, targetCents / 100.0, length,
                                         vibratoDelayTicks(track.version, track.vibrato.delay(), track.tempo)));
   }
 
   void emitVibratoRate() {
-    const u16 factor = vibrato::rateFactor(track.version, track.vibrato.rate(), track.tempo);
+    const u8 tempo = program.effectiveTempo(track.tempo);
+    const u16 factor = vibrato::rateFactor(track.version, track.vibrato.rate(), tempo);
     const double minHertz = vibrato::baseHz(track.version);
-    // MIDI's controller is normalized, while the synth model's frequency
-    // range is logarithmic. Convert current, song maximum, and engine maximum
-    // through the same scale before comparing them.
-    const s32 fullRangeAmount =
-        synthAmountFromHertzRange(minHertz, minHertz * vibrato::defaultMaxRateFactor(track.version));
-    const s32 currentAmount = factor == 0 ? 0 : synthAmountFromHertzRange(minHertz, minHertz * factor);
-    const s32 maxAmount = program.ranges.maxRateFactor == 0
-                              ? 0
-                              : synthAmountFromHertzRange(minHertz, minHertz * program.ranges.maxRateFactor);
-    out.modulation(ModulationPerformanceEvent{
-        .target = ModulationPerformanceTarget::VibratoRate,
-        .amount =
-            fullRangeAmount <= 0 ? 0.0 : std::clamp(static_cast<double>(currentAmount) / fullRangeAmount, 0.0, 1.0),
-        .frequencyHz = minHertz * factor,
-        .controllerRangeMaxAmount = fullRangeAmount <= 0 || maxAmount <= 0
-                                        ? std::nullopt
-                                        : std::optional<double>{static_cast<double>(maxAmount) / fullRangeAmount},
-    });
+    out.vibratoRate(factor == 0 ? 0.0 : minHertz * factor);
   }
 
   void emitVibratoDelay() {
@@ -819,8 +762,9 @@ private:
       out.vibratoDelay(0, 0);
       return;
     }
-    out.vibratoDelay(vibratoDelayTicks(track.version, track.vibrato.delay(), track.tempo),
-                     vibratoDelayMidiValue(track.version, track.vibrato.delay(), track.tempo));
+    const u8 tempo = program.effectiveTempo(track.tempo);
+    out.vibratoDelayPhysical(vibratoDelayTicks(track.version, track.vibrato.delay(), tempo),
+                             vibrato::delaySeconds(track.version, track.vibrato.delay(), tempo) * 1000.0);
   }
 };
 
@@ -1219,12 +1163,6 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
               .initialPitchBendRangeSemitones = 2,
           },
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-      // Early vibrato depends on the order in which tempo commands run across
-      // all tracks, so collect its limits with normal playback scheduling.
-      // Later vibrato is independent of tempo; visiting each decoded command
-      // once also includes valid blocks that a particular playthrough skips.
-      .prepass =
-          vibrato::usesLegacy(version) ? SemanticPrepassMode::ScheduledPlayback : SemanticPrepassMode::DecodedCommands,
   });
 }
 

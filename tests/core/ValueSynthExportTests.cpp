@@ -102,6 +102,22 @@ void physicalModulationLowersToLegacySynthControls() {
       "physical vibrato and no-boost tremolo should preserve the legacy synth modulator records");
 }
 
+void fixedPhysicalLfoValuesNeedNoZeroRangeModulators() {
+  const auto lowered = lowerSynthModulation(InstrumentModulation{
+      .vibrato =
+          VibratoSpec{
+              .maxDepthCents = 100.0,
+              .rateHertz = {6.0, 6.0},
+              .delaySeconds = ModulationRange{0.25, 0.25},
+          },
+  });
+  expect(std::ranges::none_of(lowered.modulators, [](const SynthModulator& modulator) {
+           return modulator.destination == SynthDestination::VibratoRate ||
+                  modulator.destination == SynthDestination::VibratoDelay;
+         }),
+         "fixed physical rate and delay should live entirely in synth base generators");
+}
+
 void wavExporterWritesPcm16RiffFile() {
   const DecodedSample sample{
       .sampleRate = 8000,
@@ -532,6 +548,77 @@ void collectionPreparationReplacesDurableInstrumentSets() {
          "collection export should use only the preparer's authoritative instrument view");
 }
 
+u32 synthOnlySequenceExecutions = 0;
+
+Effects countSynthOnlySequenceExecution(const SourceCommand& command, std::any& programState, std::any& trackState,
+                                        PerformanceEmitter& out, VmApi& vm) {
+  ++synthOnlySequenceExecutions;
+  static const ExecuteCommand execute = probeSequenceDialect().execute;
+  return execute(command, programState, trackState, out, vm);
+}
+
+void synthOnlyExportSkipsSequencesWithoutModulation() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "no-modulation.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
+
+  SequenceDialect dialect = probeSequenceDialect();
+  dialect.id = DialectId{.value = "probe-no-modulation"};
+  dialect.execute = countSynthOnlySequenceExecution;
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder trackBuilder(track);
+  const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+
+  const SequenceProgramAsset sequence{
+      .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "No Modulation"},
+      .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+  };
+  const SampleCollectionAsset samples{
+      .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Samples"},
+      .samples = SampleCollection{.samples = {Sample{
+                                      .codec = AudioCodec::SnesBrr,
+                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                                      .sampleRate = 16000,
+                                  }}},
+  };
+  const InstrumentSetAsset instruments{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
+      .instruments = {Instrument{
+          .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
+      }},
+  };
+
+  test::SessionSnapshotBuilder builder;
+  builder.assets.emplace_back(sequence);
+  builder.assets.emplace_back(instruments);
+  builder.assets.emplace_back(samples);
+  builder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "No Modulation",
+      .sequence = sequence.metadata.id,
+      .instrumentSets = {instruments.metadata.id},
+      .sampleCollections = {samples.metadata.id},
+  });
+  SequenceDialectRegistry dialects;
+  dialects.add(dialect);
+
+  synthOnlySequenceExecutions = 0;
+  const auto artifacts = exportCollection(
+      builder.finish(), sources, CollectionId{0},
+      ExportRequest{
+          .kinds = {ExportKind::Dls},
+          .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
+          .modulationConversion = ModulationConversionPolicy::SynthModulators,
+      },
+      dialects);
+  expect(artifacts.size() == 1 && !artifacts[0].bytes.empty(),
+         "synth-only export should still write an instrument artifact without sequence modulation");
+  expect(synthOnlySequenceExecutions == 0,
+         "synth-only export should not render a sequence that has no modulation commands");
+}
+
 void exportDiagnosticsPreserveSourceRanges() {
   SourceStore sources;
   const auto validSource = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
@@ -756,11 +843,13 @@ void runValueSynthExportTests() {
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   envelopePredicateDetectsCanonicalData();
   physicalModulationLowersToLegacySynthControls();
+  fixedPhysicalLfoValuesNeedNoZeroRangeModulators();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
   collectionPreparationReplacesDurableInstrumentSets();
+  synthOnlyExportSkipsSequencesWithoutModulation();
   exportDiagnosticsPreserveSourceRanges();
   collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair();
 }

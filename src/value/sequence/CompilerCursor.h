@@ -341,27 +341,23 @@ void emitPitchBendRange(Playback& playback, u8 semitones) {
 }
 
 template <class Playback>
-void emitModulation(Playback& playback, ModulationPerformanceTarget target, double amount) {
-  playback.out.modulation(target, amount);
+void emitVibratoDepth(Playback& playback, double semitones) {
+  playback.out.vibratoDepth(semitones);
 }
 
 template <class Playback>
-void emitPitchDepthModulation(Playback& playback, ModulationPerformanceTarget target, double amount,
-                              double pitchDepthSemitones) {
-  playback.out.modulation(ModulationPerformanceEvent{
-      .target = target,
-      .amount = amount,
-      .pitchDepthSemitones = pitchDepthSemitones,
-  });
+void emitTremoloDepth(Playback& playback, double decibels, TremoloGainMode gainMode) {
+  playback.out.tremoloDepth(decibels, LfoPerformanceContext{.tremoloGainMode = gainMode});
 }
 
 template <class Playback>
-void emitModulationRate(Playback& playback, ModulationPerformanceTarget target, double amount, double hertz) {
-  playback.out.modulation(ModulationPerformanceEvent{
-      .target = target,
-      .amount = amount,
-      .frequencyHz = hertz,
-  });
+void emitVibratoRate(Playback& playback, double hertz) {
+  playback.out.vibratoRate(hertz);
+}
+
+template <class Playback>
+void emitTremoloRate(Playback& playback, double hertz) {
+  playback.out.tremoloRate(hertz);
 }
 
 template <class Playback>
@@ -690,23 +686,20 @@ public:
       return append<&detail::emitPitchBendRange<Playback>>(std::move(semitones));
     }
 
-    Event& emitModulation(ModulationPerformanceTarget target, auto amount) {
-      return append<&detail::emitModulation<Playback>>(target, std::move(amount));
+    Event& emitVibratoDepth(auto semitones) {
+      return append<&detail::emitVibratoDepth<Playback>>(std::move(semitones));
     }
 
-    Event& emitModulation(ModulationPerformanceTarget target, auto amount, auto pitchDepthSemitones) {
-      return append<&detail::emitPitchDepthModulation<Playback>>(target, std::move(amount),
-                                                                 std::move(pitchDepthSemitones));
+    Event& emitTremoloDepth(auto decibels, TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal) {
+      return append<&detail::emitTremoloDepth<Playback>>(std::move(decibels), gainMode);
     }
 
-    Event& emitVibratoRate(auto amount, auto hertz) {
-      return append<&detail::emitModulationRate<Playback>>(ModulationPerformanceTarget::VibratoRate, std::move(amount),
-                                                           std::move(hertz));
+    Event& emitVibratoRate(auto hertz) {
+      return append<&detail::emitVibratoRate<Playback>>(std::move(hertz));
     }
 
-    Event& emitTremoloRate(auto amount, auto hertz) {
-      return append<&detail::emitModulationRate<Playback>>(ModulationPerformanceTarget::TremoloRate, std::move(amount),
-                                                           std::move(hertz));
+    Event& emitTremoloRate(auto hertz) {
+      return append<&detail::emitTremoloRate<Playback>>(std::move(hertz));
     }
 
     Event& emitPortamentoEnable(auto enabled) {

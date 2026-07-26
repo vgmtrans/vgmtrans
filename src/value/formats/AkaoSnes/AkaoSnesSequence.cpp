@@ -11,7 +11,6 @@
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
-#include "value/synth/SynthMath.h"
 
 #include <algorithm>
 #include <array>
@@ -375,44 +374,6 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
   return std::max<u32>(1, static_cast<u32>(std::lround(frames * safeTempo / 256.0)));
 }
 
-[[nodiscard]] u8 midiValueForAmountInRange(s32 currentAmount, s32 minAmount, s32 maxAmount) {
-  if (minAmount == maxAmount) {
-    return 0;
-  }
-  const int midiValue =
-      static_cast<int>(std::round(128.0 * (currentAmount - minAmount) / static_cast<double>(maxAmount - minAmount)));
-  return static_cast<u8>(std::clamp(midiValue, 0, 127));
-}
-
-[[nodiscard]] u8 midiValueForHertzInRange(double hertz, double minHertz, double maxHertz) {
-  if (hertz <= 0.0 || minHertz <= 0.0 || maxHertz <= 0.0 || !std::isfinite(hertz) || !std::isfinite(minHertz) ||
-      !std::isfinite(maxHertz)) {
-    return 0;
-  }
-  const s32 minAmount = synthAmountFromHertz(minHertz);
-  const s32 rangeAmount = synthAmountFromHertzRange(minHertz, maxHertz);
-  const s32 currentAmount = synthAmountFromHertz(hertz);
-  return rangeAmount == 0 ? 0 : midiValueForAmountInRange(currentAmount, minAmount, minAmount + rangeAmount);
-}
-
-[[nodiscard]] u8 midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds) {
-  if (maxSeconds <= 0.0 || !std::isfinite(seconds) || !std::isfinite(minSeconds) || !std::isfinite(maxSeconds)) {
-    return 0;
-  }
-  const s32 minAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(minSeconds));
-  const s32 rangeAmount = synthAmountFromSecondsRange(minSeconds, maxSeconds);
-  const s32 currentAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(seconds));
-  return rangeAmount == 0 ? 0 : midiValueForAmountInRange(currentAmount, minAmount, minAmount + rangeAmount);
-}
-
-[[nodiscard]] u8 midiValueForDepthRange(double value, double maxValue) {
-  if (maxValue <= 0.0) {
-    return 0;
-  }
-  const int midiValue = static_cast<int>(std::lround(128.0 * value / maxValue));
-  return static_cast<u8>(std::clamp(midiValue, 0, 127));
-}
-
 [[nodiscard]] bool isLfoActive(AkaoSnesVersion version, u8 rate, u8 depth) {
   if (version == AKAOSNES_V2) {
     return v2RateCounter(rate) != 0;
@@ -423,39 +384,24 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
   return version != AKAOSNES_V1 || v1RateCounter(rate) != 0;
 }
 
-[[nodiscard]] u8 vibratoDepthMidiValue(AkaoSnesVersion version, u8 rate, u8 depth) {
+[[nodiscard]] double vibratoDepthSemitones(AkaoSnesVersion version, u8 rate, u8 depth) {
   if (!isLfoActive(version, rate, depth)) {
-    return 0;
+    return 0.0;
   }
-  const int midiValue = static_cast<int>(
-      std::lround(128.0 * vibratoDepthCents(version, rate, depth) / akaoSnesMaxVibratoDepthCents(version)));
-  return static_cast<u8>(std::clamp(midiValue, version == AKAOSNES_V3 ? 1 : 0, 127));
+  return vibratoDepthCents(version, rate, depth) / 100.0;
 }
 
-[[nodiscard]] u8 tremoloDepthMidiValue(AkaoSnesVersion version, u8 rate, u8 depth, u8 delay = 0) {
+[[nodiscard]] double tremoloDepthDecibels(AkaoSnesVersion version, u8 rate, u8 depth, u8 delay = 0) {
   if (!akaoSnesExportsTremolo(version) || !isLfoActive(version, rate, depth)) {
-    return 0;
+    return 0.0;
   }
-  double depthDb = 0.0;
   if (version == AKAOSNES_V3) {
     constexpr double kV3SteppedTremoloSmoothLfoCompensation = 2.0;
-    depthDb = kV3SteppedTremoloSmoothLfoCompensation * v3TremoloPeakToTroughDb(depth);
-  } else if (delay != 0) {
-    depthDb = akaoSnesTremoloDepthDbForAmplitude(v4PhaseHighByteAmplitude(rate, depth) / 4.0);
-  } else {
-    depthDb = akaoSnesTremoloDepthDbForAmplitude(v4PhaseHighByteAmplitude(rate, depth));
+    return kV3SteppedTremoloSmoothLfoCompensation * v3TremoloPeakToTroughDb(depth);
   }
-  return midiValueForDepthRange(depthDb, akaoSnesMaxTremoloDepthDb(version));
-}
-
-[[nodiscard]] u8 rateMidiValue(AkaoSnesVersion version, u8 rate, u8 depth, u8 timer0Frequency) {
-  const AkaoSnesLfoRateRange range = akaoSnesLfoRateRange(version);
-  return midiValueForHertzInRange(lfoRateHz(version, rate, depth, timer0Frequency), range.minimum, range.maximum);
-}
-
-[[nodiscard]] u8 delayMidiValue(AkaoSnesVersion version, u8 delay, u8 tempo, u8 timer0Frequency) {
-  return midiValueForSecondsInRange(delaySeconds(version, delay, tempo, timer0Frequency), 0.0,
-                                    akaoSnesMaxLfoDelaySeconds(version));
+  const double amplitude =
+      delay != 0 ? v4PhaseHighByteAmplitude(rate, depth) / 4.0 : v4PhaseHighByteAmplitude(rate, depth);
+  return akaoSnesTremoloDepthDbForAmplitude(amplitude);
 }
 
 [[nodiscard]] u32 v1VibratoRampTicks(u8 rate, u8 tempo) {
@@ -886,12 +832,12 @@ struct LfoState {
   }
 
   template <typename EmitDepth>
-  void emitDepth(u8 value, EmitDepth&& emit, bool force = false) {
-    if (!force && lastMidiDepth && *lastMidiDepth == value) {
+  void emitDepth(double value, EmitDepth&& emit, bool force = false) {
+    if (!force && lastPhysicalDepth && std::abs(*lastPhysicalDepth - value) < 0.000001) {
       return;
     }
     std::forward<EmitDepth>(emit)(value);
-    lastMidiDepth = value;
+    lastPhysicalDepth = value;
   }
 
   u8 delay = 0;
@@ -899,7 +845,7 @@ struct LfoState {
   u8 depth = 0;
   std::optional<SequenceMotionPlan<s32>> reusableFade;
   PerformanceBoundMotion<SequenceAutomatedValue<s32>> fade;
-  std::optional<u8> lastMidiDepth;
+  std::optional<double> lastPhysicalDepth;
 };
 
 struct SharedTempoChange {
@@ -1101,22 +1047,22 @@ struct TrackState {
     tremolo.setFadeToDepth(v3LfoRampTicks(tremolo.rate, tempo), 8);
   }
 
-  [[nodiscard]] u8 vibratoFadeDepthMidiValue(AkaoSnesVersion version, s32 depth) const {
+  [[nodiscard]] double vibratoFadeDepthSemitones(AkaoSnesVersion version, s32 depth) const {
     const s32 targetDepth = vibrato.scaledDepth(8);
     if (targetDepth <= 0) {
-      return 0;
+      return 0.0;
     }
-    const int fullDepth = vibratoDepthMidiValue(version, vibrato.rate, vibrato.depth);
-    return static_cast<u8>(std::clamp<int>((fullDepth * depth + (targetDepth / 2)) / targetDepth, 0, 127));
+    return vibratoDepthSemitones(version, vibrato.rate, vibrato.depth) *
+           std::clamp(static_cast<double>(depth) / targetDepth, 0.0, 1.0);
   }
 
-  [[nodiscard]] u8 tremoloFadeDepthMidiValue(AkaoSnesVersion version, s32 depth) const {
+  [[nodiscard]] double tremoloFadeDepthDecibels(AkaoSnesVersion version, s32 depth) const {
     const s32 targetDepth = tremolo.scaledDepth(8);
     if (targetDepth <= 0) {
-      return 0;
+      return 0.0;
     }
-    const int fullDepth = tremoloDepthMidiValue(version, tremolo.rate, tremolo.depth);
-    return static_cast<u8>(std::clamp<int>((fullDepth * depth + (targetDepth / 2)) / targetDepth, 0, 127));
+    return tremoloDepthDecibels(version, tremolo.rate, tremolo.depth) *
+           std::clamp(static_cast<double>(depth) / targetDepth, 0.0, 1.0);
   }
 
   u32 trackNumber = 0;
@@ -1392,37 +1338,19 @@ struct Playback {
     return Effects::wait(length);
   }
 
-  void emitVibratoDepth(PerformanceEmitter output, u8 midiDepth, bool force = false) {
+  void emitVibratoDepth(PerformanceEmitter output, double semitones, bool force = false) {
     track.vibrato.emitDepth(
-        midiDepth,
-        [&](u8 outputDepth) {
-          const double amount = static_cast<double>(outputDepth) / 127.0;
-          ModulationPerformanceEvent event{
-              .target = ModulationPerformanceTarget::VibratoDepth,
-              .amount = amount,
-              .pitchDepthSemitones = (amount * akaoSnesMaxVibratoDepthCents(context.version)) / 100.0,
-              .controllerRangeMaxAmount = 1.0,
-          };
-          output.modulation(std::move(event));
-        },
+        semitones, [&](double value) { output.vibratoDepth(value); },
         force);
   }
 
-  void emitTremoloDepth(PerformanceEmitter output, u8 midiDepth, bool force = false) {
+  void emitTremoloDepth(PerformanceEmitter output, double decibels, bool force = false) {
     track.tremolo.emitDepth(
-        midiDepth,
-        [&](u8 outputDepth) {
-          ModulationPerformanceEvent event{
-              .target = ModulationPerformanceTarget::TremoloDepth,
-              .amount = static_cast<double>(outputDepth) / 127.0,
-              .controllerRangeMaxAmount = 1.0,
-          };
-          output.modulation(std::move(event));
-        },
+        decibels, [&](double value) { output.tremoloDepth(value); },
         force);
   }
 
-  void setLfoOutputDepth(PerformanceEmitter output, LfoTarget target, u8 depth, bool force = false) {
+  void setLfoOutputDepth(PerformanceEmitter output, LfoTarget target, double depth, bool force = false) {
     if (target == LfoTarget::Vibrato) {
       emitVibratoDepth(output, depth, force);
     } else {
@@ -1432,18 +1360,10 @@ struct Playback {
 
   void clearLfoRateAndDelay(LfoTarget target) {
     if (target == LfoTarget::Vibrato) {
-      out.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::VibratoRate,
-          .amount = 0.0,
-          .controllerRangeMaxAmount = 1.0,
-      });
+      out.vibratoRate(0.0);
       out.vibratoDelay(0, 0);
     } else {
-      out.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::TremoloRate,
-          .amount = 0.0,
-          .controllerRangeMaxAmount = 1.0,
-      });
+      out.tremoloRate(0.0);
       out.tremoloDelay(0, 0);
     }
   }
@@ -1460,25 +1380,14 @@ struct Playback {
       track.configureTremoloFade(context.version);
     }
     const u8 timer = akaoSnesTimer0Frequency(context.version, context.minorVersion);
-    const u8 rateValue = rateMidiValue(context.version, lfo.rate, lfo.depth, timer);
+    const double rateHertz = lfoRateHz(context.version, lfo.rate, lfo.depth, timer);
+    const double physicalDelaySeconds = delaySeconds(context.version, lfo.delay, track.tempo, timer);
     if (isVibrato) {
-      out.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::VibratoRate,
-          .amount = static_cast<double>(rateValue) / 127.0,
-          .frequencyHz = lfoRateHz(context.version, lfo.rate, lfo.depth, timer),
-          .controllerRangeMaxAmount = 1.0,
-      });
-      out.vibratoDelay(lfoDelayTicks(context.version, lfo.delay),
-                       delayMidiValue(context.version, lfo.delay, track.tempo, timer));
+      out.vibratoRate(rateHertz);
+      out.vibratoDelayPhysical(lfoDelayTicks(context.version, lfo.delay), physicalDelaySeconds * 1000.0);
     } else {
-      out.modulation(ModulationPerformanceEvent{
-          .target = ModulationPerformanceTarget::TremoloRate,
-          .amount = static_cast<double>(rateValue) / 127.0,
-          .frequencyHz = lfoRateHz(context.version, lfo.rate, lfo.depth, timer),
-          .controllerRangeMaxAmount = 1.0,
-      });
-      out.tremoloDelay(lfoDelayTicks(context.version, lfo.delay),
-                       delayMidiValue(context.version, lfo.delay, track.tempo, timer));
+      out.tremoloRate(rateHertz);
+      out.tremoloDelayPhysical(lfoDelayTicks(context.version, lfo.delay), physicalDelaySeconds * 1000.0);
     }
   }
 
@@ -1500,29 +1409,28 @@ struct Playback {
     } else {
       track.configureTremoloFade(context.version);
     }
-    u8 midiDepth = 0;
+    double physicalDepth = 0.0;
     if (active) {
-      midiDepth = isVibrato ? vibratoDepthMidiValue(context.version, rate, depth)
-                            : tremoloDepthMidiValue(context.version, rate, depth, delay);
+      physicalDepth = isVibrato ? vibratoDepthSemitones(context.version, rate, depth)
+                                : tremoloDepthDecibels(context.version, rate, depth, delay);
     }
     if (isVibrato && context.version == AKAOSNES_V4 && active && track.vibrato.reusableFade) {
       const u32 delayTicks = lfoDelayTicks(context.version, track.vibrato.delay);
       const s32 initialDepth = track.vibrato.scaledDepth(8) / 4;
       track.vibrato.beginFade(delayTicks, initialDepth);
-      midiDepth = delayTicks == 0 ? track.vibratoFadeDepthMidiValue(context.version, initialDepth) : 0;
+      physicalDepth = delayTicks == 0 ? track.vibratoFadeDepthSemitones(context.version, initialDepth) : 0.0;
     }
     const auto& fade = isVibrato ? track.vibrato.reusableFade : track.tremolo.reusableFade;
     if (active && fade) {
       lfo.fade.bind(out.noteEnvelope(
           isVibrato ? PerformanceAutomationTarget::VibratoDepth : PerformanceAutomationTarget::TremoloDepth,
-          static_cast<double>(isVibrato ? vibratoDepthMidiValue(context.version, rate, depth)
-                                        : tremoloDepthMidiValue(context.version, rate, depth, delay)) /
-              127.0,
+          isVibrato ? vibratoDepthSemitones(context.version, rate, depth)
+                    : tremoloDepthDecibels(context.version, rate, depth, delay),
           fade->ticks, lfoDelayTicks(context.version, delay)));
     } else {
       lfo.fade.clearAutomation();
     }
-    setLfoOutputDepth(lfo.fade.output(out), target, midiDepth, true);
+    setLfoOutputDepth(lfo.fade.output(out), target, physicalDepth, true);
     if (active) {
       syncLfoRateAndDelay(target);
       if (vm.tick() == 0 && initialTempo && beforeInitialTempoTrack && initialTempo->tempo != track.tempo) {
@@ -1551,7 +1459,7 @@ struct Playback {
     const s32 initialDepth = context.version == AKAOSNES_V4 ? track.vibrato.scaledDepth(8) / 4 : 0;
     track.vibrato.beginFade(delay, initialDepth);
     emitVibratoDepth(track.vibrato.fade.output(out),
-                     delay == 0 ? track.vibratoFadeDepthMidiValue(context.version, initialDepth) : 0, true);
+                     delay == 0 ? track.vibratoFadeDepthSemitones(context.version, initialDepth) : 0.0, true);
   }
 
   void beginTremoloForNote() {
@@ -1570,7 +1478,7 @@ struct Playback {
     if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
       const s32 current = std::min(track.vibrato.scaledDepth(8), fadeTick.current);
       track.vibrato.fade.setCurrentPreservingMotion(current);
-      emitVibratoDepth(track.vibrato.fade.output(out), track.vibratoFadeDepthMidiValue(context.version, current));
+      emitVibratoDepth(track.vibrato.fade.output(out), track.vibratoFadeDepthSemitones(context.version, current));
     }
   }
 
@@ -1582,7 +1490,7 @@ struct Playback {
     if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
       const s32 current = std::min(track.tremolo.scaledDepth(8), fadeTick.current);
       track.tremolo.fade.setCurrentPreservingMotion(current);
-      emitTremoloDepth(track.tremolo.fade.output(out), track.tremoloFadeDepthMidiValue(context.version, current));
+      emitTremoloDepth(track.tremolo.fade.output(out), track.tremoloFadeDepthDecibels(context.version, current));
     }
   }
 

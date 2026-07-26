@@ -190,8 +190,6 @@ struct DrumKit {
 struct SequenceRecipes {
   std::vector<InstrumentOverride> overrides;
   std::vector<DrumKit> drumKits;
-  double maxVibratoDepthCents = 0.0;
-  double maxVibratoRateHertz = 0.0;
 };
 
 struct SequenceParse {

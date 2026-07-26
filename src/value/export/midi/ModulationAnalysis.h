@@ -13,6 +13,8 @@
 
 namespace vgmtrans::core {
 
+struct SequenceModulationProfile;
+
 struct ObservedValueRange {
   // Min/max controller values that actually occur in the rendered sequence,
   // plus the normalized source amounts that produced them. MIDI controller
@@ -47,6 +49,7 @@ struct MidiModulationUsage {
 [[nodiscard]] bool hasObservedValue(const ObservedValueRange& range) noexcept;
 [[nodiscard]] bool hasMidiModulationUsage(const MidiTrackModulationUsage& usage) noexcept;
 [[nodiscard]] bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept;
-[[nodiscard]] MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence& sequence);
+[[nodiscard]] MidiModulationUsage analyzePerformanceModulationUsage(
+    const PerformanceSequence& sequence, const SequenceModulationProfile* modulationProfile = nullptr);
 
 }  // namespace vgmtrans::core
