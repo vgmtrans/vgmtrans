@@ -15,6 +15,7 @@ struct CompilerProbeState {
   s8 transpose = 0;
   bool enabled = false;
   u8 pitchBendRange = 2;
+  u8 readyDuringWaitAtTick = 0;
 };
 
 struct CompilerProbeProgramState {
@@ -35,6 +36,12 @@ struct CompilerProbePlayback {
     out.note(static_cast<double>(key + track.transpose), track.enabled ? 1.0 : 0.5, duration);
     return Effects::wait(duration);
   }
+
+  [[nodiscard]] bool readyDuringWait() const { return vm.tick() >= track.readyDuringWaitAtTick; }
+
+  void deferredExpression(u8 value) { out.expression(value / 127.0); }
+
+  [[nodiscard]] Effects deferredWait() { return Effects::wait(1); }
 };
 
 using ProbeCursor = CompilerCursor<CompilerProbeState, CompilerProbePlayback>;
@@ -96,6 +103,19 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       event.set<&CompilerProbeState::enabled>(false);
       return event.ignore();
     }
+    case 0x2a: {
+      auto event = cursor.command("Wait Readiness", SequenceSemantic::State);
+      return event.set<&CompilerProbeState::readyDuringWaitAtTick>(event.u8("tick"));
+    }
+    case 0x2b: {
+      auto event = cursor.command("During-Wait Expression", SequenceSemantic::State);
+      return event.invoke<&CompilerProbePlayback::deferredExpression>(event.u8("value"))
+          .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
+    }
+    case 0x2c:
+      return cursor.command("Invalid During-Wait Wait", SequenceSemantic::State)
+          .invoke<&CompilerProbePlayback::deferredWait>()
+          .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
     case 0x40:
     case 0x41:
     case 0x42:
@@ -351,6 +371,46 @@ void compilerCursorEvaluatesDeferredStateInActionOrder() {
          "select() should evaluate both true and false branches from runtime state");
 }
 
+void compilerCursorExecutesEligibleCommandsDuringWaits() {
+  const auto render = [](std::initializer_list<u8> bytes) {
+    const std::vector<u8> source(bytes);
+    const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, source), static_cast<u32>(source.size()));
+    const SequenceDialect dialect = compilerProbeDialect();
+    const SequenceProgram program{
+        .dialect = dialect.id,
+        .timebase = dialect.timebase,
+        .tracks = {track},
+    };
+    return std::pair{track, SequenceVm().render(program, dialect)};
+  };
+
+  const auto [gatedTrack, gated] = render({0x2a, 0x02, 0x50, 0x04, 0x2b, 0x20, 0x2b, 0x40, 0xff});
+  expect(gatedTrack.commands.size() == 5 && gatedTrack.commands[2].execution.duringWait.valid() &&
+             gatedTrack.commands[3].execution.duringWait.valid(),
+         "during-wait eligibility should remain attached to each independently decoded command");
+  const auto& gatedEvents = gated.tracks[0].events;
+  expect(gated.tracks[0].endTick == 4 && gatedEvents.size() == 2 &&
+             std::get<ExpressionPerformanceEvent>(gatedEvents[0]).header.tick == 2 &&
+             std::get<ExpressionPerformanceEvent>(gatedEvents[1]).header.tick == 3,
+         "the VM should retain a gated command and execute at most one eligible command per wait tick");
+
+  const auto [boundaryTrack, boundary] = render({0x2a, 0x00, 0x50, 0x02, 0x2b, 0x10, 0x2b, 0x20, 0x2b, 0x30, 0xff});
+  const auto& boundaryEvents = boundary.tracks[0].events;
+  expect(boundaryTrack.commands.size() == 6 && boundary.tracks[0].endTick == 2 && boundaryEvents.size() == 3 &&
+             std::get<ExpressionPerformanceEvent>(boundaryEvents[0]).header.tick == 0 &&
+             std::get<ExpressionPerformanceEvent>(boundaryEvents[1]).header.tick == 1 &&
+             std::get<ExpressionPerformanceEvent>(boundaryEvents[2]).header.tick == 2,
+         "the VM should poll once when a wait begins and resume ordinary command execution at its final boundary");
+
+  bool rejectedWait = false;
+  try {
+    static_cast<void>(render({0x2a, 0x00, 0x50, 0x02, 0x2c, 0xff}));
+  } catch (const std::logic_error&) {
+    rejectedWait = true;
+  }
+  expect(rejectedWait, "a command executed during another command's wait must remain a zero-time operation");
+}
+
 void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
   const std::vector<u8> bytes{0x10};
   std::vector<Diagnostic> diagnostics;
@@ -407,6 +467,7 @@ void runValueCompilerCursorTests() {
   compilerCursorCompilesRepeatsAndConditionalFields();
   compilerCursorComposesChainedAndSeparateActions();
   compilerCursorEvaluatesDeferredStateInActionOrder();
+  compilerCursorExecutesEligibleCommandsDuringWaits();
   compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
   compilerCursorRejectsConflictingComposedFlow();
   compilerCursorAnalysisStopsAfterItsScheduledPrepass();

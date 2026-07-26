@@ -1255,8 +1255,7 @@ struct Playback {
     // The first driver step is already audible at the note tick, leaving
     // steps - 1 timeline ticks between that pitch and the destination.
     if (steps == 1) {
-      track.pitchSlideAutomation.stop(out);
-      track.pitchSlideAutomation.clear();
+      track.pitchSlideAutomation.interrupt(out);
       emitPitchBendRange(
           akaoSnesPitchBendRangeCents(track.pitchBase, track.currentPitch, kDefaultPitchBendRangeCents));
       emitPitchBendForCurrentPitch(out);
