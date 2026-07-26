@@ -34,6 +34,7 @@ enum class LfoParameter : u8 {
   VibratoDepth = 0,
   TremoloDepth = 1,
   Rate = 2,
+  ResetPhaseOnNote = 3,
 };
 
 namespace math {
@@ -123,12 +124,32 @@ struct StereoBalance {
     depthCentibels =
         std::clamp(200.0 * std::log10(peak / static_cast<double>(trough)), 0.0, kTremoloMuteFloorCentibels);
   }
-  // The gain LFO is centered, so synth depth is half this peak-to-trough
-  // attenuation.
+  // Shared synth and event-simulation LFOs are bipolar. NoBoost contributes
+  // matching center attenuation, so their physical depth is half the driver's
+  // peak-to-trough attenuation.
   return depthCentibels / 20.0;
 }
 
 }  // namespace math
+
+[[nodiscard]] LfoPerformanceContext vibratoLfoContext() {
+  return LfoPerformanceContext{
+      .waveform = LfoWaveform::Triangle,
+      .initialPhaseCycles = 0.0,
+      .phaseRunsAtZeroDepth = true,
+  };
+}
+
+[[nodiscard]] LfoPerformanceContext tremoloLfoContext() {
+  return LfoPerformanceContext{
+      .waveform = LfoWaveform::Triangle,
+      // Capcom folds the shared phase so tremolo starts at its deepest
+      // attenuation and then rises toward nominal gain.
+      .initialPhaseCycles = 0.75,
+      .phaseRunsAtZeroDepth = true,
+      .tremoloGainMode = TremoloGainMode::NoBoost,
+  };
+}
 
 struct ProgramState {
   u32 tempoMicrosecondsPerQuarter = 500000;
@@ -137,6 +158,12 @@ struct ProgramState {
 // Only registers that persist from one executed command to the next belong in
 // track state. Source bounds and engine-version conversions are decode concerns.
 struct TrackState {
+  TrackState() = default;
+
+  explicit TrackState(const SequenceProgram& program)
+      : resetLfoPhaseOnNote(static_cast<CapcomSnesEngineVersion>(program.config.profile) !=
+                            CapcomSnesEngineVersion::v1BgmInList) {}
+
   u8 durationRate256ths = 0;
   s8 transposeSemitones = 0;
   u8 noteOctave = 0;
@@ -144,9 +171,7 @@ struct TrackState {
   bool noteTriplet = false;
   bool noteSlurred = false;
   bool noteOctaveUp = false;
-  bool modulationEnabled = false;
-  double vibratoDepthSemitones = 0.0;
-  double tremoloDepthDecibels = 0.0;
+  bool resetLfoPhaseOnNote = true;
   double portamentoMillisecondsPerSemitone = 0.0;
   u16 lastPortamentoMilliseconds = 0;
   std::optional<s32> lastSourceKey;
@@ -199,6 +224,15 @@ struct Playback {
     out.tempo(microsecondsPerQuarter);
   }
 
+  void vibratoDepth(double semitones) { out.vibratoDepth(semitones, vibratoLfoContext()); }
+
+  void tremoloDepth(double decibels) { out.tremoloDepth(decibels, tremoloLfoContext()); }
+
+  void lfoRates(double vibratoHertz, double tremoloHertz) {
+    out.vibratoRate(vibratoHertz, vibratoLfoContext());
+    out.tremoloRate(tremoloHertz, tremoloLfoContext());
+  }
+
   // Calculates and emits one note, including slurs and portamento from the last note.
   [[nodiscard]] Effects note(u8 durationIndex, u8 keyIndex) {
     const u32 length = consumeNoteTicks(durationIndex);
@@ -210,9 +244,20 @@ struct Playback {
     // Consecutive slurred notes at the same source pitch extend the existing
     // note instead of retriggering it.
     if (track.lastNoteSlurred && track.lastSourceKey && key == *track.lastSourceKey && !track.didRest) {
-      track.lastNote = out.note(outputKey, 1.0, duration, true);
+      track.lastNote = out.note(NotePerformanceEvent{
+          .key = outputKey,
+          .linearVelocity = 1.0,
+          .durationTicks = duration,
+          .extendsPrevious = true,
+          .restartsLfoPhase = false,
+      });
     } else {
-      const PerformanceNoteId note = out.note(outputKey, 1.0, duration + (track.noteSlurred ? 1u : 0u));
+      const PerformanceNoteId note = out.note(NotePerformanceEvent{
+          .key = outputKey,
+          .linearVelocity = 1.0,
+          .durationTicks = duration + (track.noteSlurred ? 1u : 0u),
+          .restartsLfoPhase = track.resetLfoPhaseOnNote && !track.noteSlurred,
+      });
       emitPitchSlideTo(note, key);
       track.lastNote = note;
     }
@@ -421,46 +466,30 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
           const u8 depth = raw.value & 0x7f;
           // The driver applies 128 depth steps across a +/- one-octave pitch range.
           const double semitones = event.resolvedValue("pitch_depth_semitones", raw, depth * (12.0 / 128.0));
-          const auto modulationEnabled = event.state<&TrackState::modulationEnabled>();
-          event.set<&TrackState::vibratoDepthSemitones>(semitones);
-          return event.emitVibratoDepth(event.select(modulationEnabled, semitones, 0.0));
+          return event.invoke<&Playback::vibratoDepth>(semitones);
         }
         case LfoParameter::TremoloDepth: {
           const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
           const double decibels =
               event.resolvedValue("depth_decibels", raw, math::tremoloDepthDecibels(version, raw.value));
-          const auto modulationEnabled = event.state<&TrackState::modulationEnabled>();
-          event.set<&TrackState::tremoloDepthDecibels>(decibels);
-          return event.emitTremoloDepth(event.select(modulationEnabled, decibels, 0.0), TremoloGainMode::NoBoost);
+          return event.invoke<&Playback::tremoloDepth>(decibels);
         }
         case LfoParameter::Rate: {
           const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
-          const bool enabled = event.resolvedValue("enabled", raw, raw.value != 0, SourceValueDisplay::Boolean);
+          [[maybe_unused]] const bool phaseAdvancing =
+              event.resolvedValue("phase_advancing", raw, raw.value != 0, SourceValueDisplay::Boolean);
           const double hertz = event.derived("frequency_hz", raw.value * kCapcomSnesLfoStepHertz);
           const double tremoloHertz = event.derived("tremolo_frequency_hz", 2.0 * hertz);
 
-          // Zero disables both remembered depths without forgetting them.
-          event.invoke(
-              [](Playback& playback, bool enabled) {
-                auto& track = playback.track;
-                if (track.modulationEnabled == enabled) {
-                  return;
-                }
-
-                track.modulationEnabled = enabled;
-                if (track.vibratoDepthSemitones != 0.0) {
-                  playback.out.vibratoDepth(enabled ? track.vibratoDepthSemitones : 0.0);
-                }
-                if (track.tremoloDepthDecibels != 0.0) {
-                  playback.out.tremoloDepth(
-                      enabled ? track.tremoloDepthDecibels : 0.0,
-                      LfoPerformanceContext{.tremoloGainMode = TremoloGainMode::NoBoost});
-                }
-              },
-              enabled);
-
-          event.emitVibratoRate(hertz);
-          return event.emitTremoloRate(tremoloHertz);
+          // A zero speed freezes the shared oscillator at its current phase;
+          // it does not disable either depth.
+          return event.invoke<&Playback::lfoRates>(hertz, tremoloHertz);
+        }
+        case LfoParameter::ResetPhaseOnNote: {
+          const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
+          const bool enabled =
+              event.resolvedValue("reset_phase_on_note", raw, (raw.value & 1) != 0, SourceValueDisplay::Boolean);
+          return event.set<&TrackState::resetLfoPhaseOnNote>(enabled);
         }
         default:
           event.u8("value", SourceValueDisplay::Hex);
@@ -545,7 +574,9 @@ SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayo
 
     sequence.addLinearTrack(sourceTrackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
   }
-  return sequence.finish();
+  SequenceProgram program = sequence.finish();
+  program.config.profile = static_cast<u32>(layout.version);
+  return program;
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

@@ -53,6 +53,9 @@ struct NotePerformanceEvent {
   // set this directly; target-specific lowering can also use it when one
   // logical note continues through a different representation.
   bool extendsPrevious = false;
+  // Source voices normally restart their LFOs on a fresh attack, but some
+  // drivers can disable that reset or suppress it for legato notes.
+  bool restartsLfoPhase = true;
   // Source-level extensions normally share one identity. A stable identity
   // lets later commands attach automation to a sounding note without rewriting
   // that note into MIDI-specific fragments.
@@ -270,6 +273,9 @@ struct LfoPerformanceContext {
   std::optional<double> delayMilliseconds;
   bool delayIsTempoRelative = false;
   std::optional<LfoWaveform> waveform;
+  // Oscillator position, in cycles, used when playback starts or a note resets
+  // the phase. Zero is the bipolar triangle's center/rising point.
+  std::optional<double> initialPhaseCycles;
   bool phaseRunsAtZeroDepth = false;
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
 };
@@ -291,6 +297,7 @@ struct ModulationPerformanceEvent {
   bool delayIsTempoRelative = false;
   // A missing waveform retains the renderer's legacy/default LFO shape.
   std::optional<LfoWaveform> waveform;
+  std::optional<double> initialPhaseCycles;
   // Some drivers keep advancing the oscillator while its depth is zero. This
   // matters when a later command reveals an already-running LFO mid-note.
   bool phaseRunsAtZeroDepth = false;

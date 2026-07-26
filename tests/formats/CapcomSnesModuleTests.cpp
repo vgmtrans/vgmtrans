@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <iomanip>
 #include <sstream>
@@ -509,7 +510,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, {}, &modulationProfile);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
-  expect(midiSequence.tracks[0].events.size() == 15,
+  expect(midiSequence.tracks[0].events.size() == 14,
          "built track should include port, initial, command, and end events");
   expect(std::get<MidiPort>(midiSequence.tracks[0].events[0]).port == 0,
          "CapcomSnes should emit the legacy MIDI port metadata");
@@ -529,17 +530,15 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "CapcomSnes center pan should map to MIDI center pan");
   expect(std::holds_alternative<Expression>(midiSequence.tracks[0].events[8]),
          "CapcomSnes pan should emit expression compensation for the source pan law");
-  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[9]).value == 0,
-         "CapcomSnes vibrato depth should stay silent until the LFO rate enables output");
-  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[10]).value == 127,
-         "CapcomSnes LFO rate should enable the sequence-normalized vibrato depth");
-  expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[11]),
+  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[9]).value == 127,
+         "CapcomSnes vibrato depth should be independent of whether the oscillator is advancing");
+  expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[10]),
          "CapcomSnes LFO rate should emit vibrato frequency");
-  expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[12]),
+  expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[11]),
          "CapcomSnes LFO rate should emit tremolo frequency");
-  expect(std::get<NoteDuration>(midiSequence.tracks[0].events[13]).duration == 6,
+  expect(std::get<NoteDuration>(midiSequence.tracks[0].events[12]).duration == 6,
          "CapcomSnes note length index should map to ticks");
-  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[14]).tick == 6,
+  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[13]).tick == 6,
          "builder should advance time before end of track");
 
   const auto vibratoDepth = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
@@ -753,7 +752,7 @@ void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {
                                                "3005:7:2,linear_gain=0.403921569<64>,flow=0->3007|"
                                                "3007:24:2,left_gain=0.6328125<0>,right_gain=0.6328125,flow=0->3009|"
                                                "3009:26:3,type=0,pitch_depth_semitones=3<32>,flow=0->300C|"
-                                               "300C:26:3,type=2,enabled=true<32>,frequency_hz=1.953125,"
+                                               "300C:26:3,type=2,phase_advancing=true<32>,frequency_hz=1.953125,"
                                                "tremolo_frequency_hz=3.90625,flow=0->300F|"
                                                "300F:65:1,duration_index=2,key_index=1,flow=0->3010|"
                                                "3010:23:1,flow=4";
@@ -769,8 +768,8 @@ void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {
   const std::string performance = performanceTrackSnapshot(SequenceVm().render(program, dialect).tracks[0]);
   constexpr std::string_view expectedPerformance =
       "reverb@0=0|mono@0=0|tempo@0=42191|instrument@0=capcom-snes.instrument:0|"
-      "level@0=0.403921569/q256|balance@0=0.6328125,0.6328125|mod@0:0=0|mod@0:0=0|"
-      "mod@0:1=0|mod@0:3=0|note@0=0/6";
+      "level@0=0.403921569/q256|balance@0=0.6328125,0.6328125|mod@0:0=0|mod@0:1=0|"
+      "mod@0:3=0|note@0=0/6";
   expect(performance == expectedPerformance, "CapcomSnes neutral-performance golden changed:\n" + performance);
 }
 
@@ -781,16 +780,20 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
   bytes[0x3002] = 0xa0;
   bytes[0x3003] = 0x1a;
   bytes[0x3004] = 0x01;
-  bytes[0x3005] = 0x40;
+  bytes[0x3005] = 0x3c;
   bytes[0x3006] = 0x1a;
   bytes[0x3007] = 0x02;
   bytes[0x3008] = 0x20;
-  bytes[0x3009] = 0x17;
+  bytes[0x3009] = 0x1a;
+  bytes[0x300a] = 0x03;
+  bytes[0x300b] = 0x00;
+  bytes[0x300c] = 0x41;
+  bytes[0x300d] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
-  expect(track.commands.size() == 4, "CapcomSnes LFO fixture should decode three parameters and end");
+  expect(track.commands.size() == 6, "CapcomSnes LFO fixture should decode four parameters, a note, and end");
 
   const SemanticOperand* vibratoDepth = semanticOperand(track.commands[0], "pitch_depth_semitones");
   expect(vibratoDepth != nullptr && std::get<double>(vibratoDepth->value) == 3.0 &&
@@ -799,10 +802,12 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
          "CapcomSnes vibrato decode should retain raw depth and resolve its physical pitch range");
 
   const SemanticOperand* tremoloDepth = semanticOperand(track.commands[1], "depth_decibels");
-  expect(tremoloDepth != nullptr && std::get<double>(tremoloDepth->value) > 0.0 &&
+  const double expectedHalfDepthDecibels = 10.0 * std::log10(250.0 / 106.0);
+  expect(tremoloDepth != nullptr &&
+             std::abs(std::get<double>(tremoloDepth->value) - expectedHalfDepthDecibels) < 0.000001 &&
              tremoloDepth->encodedName == "value" && tremoloDepth->encodedValue &&
-             std::get<u64>(*tremoloDepth->encodedValue) == 0x40,
-         "CapcomSnes tremolo decode should resolve its physical depth before execution");
+             std::get<u64>(*tremoloDepth->encodedValue) == 0x3c,
+         "CapcomSnes tremolo decode should retain half the driver's peak-to-trough attenuation for a bipolar LFO");
 
   const TrackProgram version1Track =
       decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), CapcomSnesEngineVersion::v1BgmInList,
@@ -812,14 +817,17 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
              std::get<double>(version1TremoloDepth->value) != std::get<double>(tremoloDepth->value),
          "CapcomSnes tremolo should resolve version-dependent driver math during decode");
 
-  const SemanticOperand* enabled = semanticOperand(track.commands[2], "enabled");
+  const SemanticOperand* phaseAdvancing = semanticOperand(track.commands[2], "phase_advancing");
   const SemanticOperand* frequency = semanticOperand(track.commands[2], "frequency_hz");
   const SemanticOperand* tremoloFrequency = semanticOperand(track.commands[2], "tremolo_frequency_hz");
-  expect(enabled != nullptr && std::get<bool>(enabled->value) && enabled->encodedName == "value" &&
-             enabled->encodedValue && std::get<u64>(*enabled->encodedValue) == 0x20 && frequency != nullptr &&
-             std::get<double>(frequency->value) == 1.953125 && tremoloFrequency != nullptr &&
+  expect(phaseAdvancing != nullptr && std::get<bool>(phaseAdvancing->value) && phaseAdvancing->encodedName == "value" &&
+             phaseAdvancing->encodedValue && std::get<u64>(*phaseAdvancing->encodedValue) == 0x20 &&
+             frequency != nullptr && std::get<double>(frequency->value) == 1.953125 && tremoloFrequency != nullptr &&
              std::get<double>(tremoloFrequency->value) == 3.90625,
-         "CapcomSnes LFO rate decode should resolve enable state and physical target frequencies");
+         "CapcomSnes LFO rate decode should resolve phase motion and physical target frequencies");
+  const SemanticOperand* resetPhase = semanticOperand(track.commands[3], "reset_phase_on_note");
+  expect(resetPhase != nullptr && !std::get<bool>(resetPhase->value),
+         "CapcomSnes selector 3 should decode the per-note phase-reset flag");
 
   const SequenceDialect& dialect = capcomSnesSequenceDialect();
   const SequenceProgram program{
@@ -838,11 +846,75 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
              std::get<ModulationPerformanceEvent>(*emittedTremolo).volumeDepthDecibels ==
                  std::get<double>(tremoloDepth->value),
          "CapcomSnes playback should emit the physical tremolo depth resolved by decode");
+  const auto& tremoloEvent = std::get<ModulationPerformanceEvent>(*emittedTremolo);
+  expect(tremoloEvent.waveform == LfoWaveform::Triangle && tremoloEvent.initialPhaseCycles == 0.75 &&
+             tremoloEvent.phaseRunsAtZeroDepth && tremoloEvent.tremoloGainMode == TremoloGainMode::NoBoost,
+         "CapcomSnes playback should preserve its trough-first subtractive folded-triangle behavior");
+  const auto emittedNote = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  expect(emittedNote != performance.tracks[0].events.end() &&
+             !std::get<NotePerformanceEvent>(*emittedNote).restartsLfoPhase,
+         "CapcomSnes selector 3 value 0 should keep the oscillator continuous across normal notes");
   const SequenceModulationProfile profile = analyzeSequenceModulation(performance);
-  expect(profile.instruments.tremolo &&
-             profile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost &&
+  expect(profile.instruments.tremolo && profile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost &&
              profile.instruments.tremolo->rateHertz.minimum == 3.90625,
          "shared planning should retain Capcom's no-boost tremolo behavior and target frequency");
+
+  std::vector<u8> noteBytes(0x4000);
+  noteBytes[0x3000] = 0x41;
+  noteBytes[0x3001] = 0x04;
+  noteBytes[0x3002] = 0x40;
+  noteBytes[0x3003] = 0x42;
+  noteBytes[0x3004] = 0x17;
+  const auto noteResetFlags = [&](CapcomSnesEngineVersion noteVersion) {
+    const TrackProgram noteTrack = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, noteBytes), noteVersion,
+                                                               CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
+    const SequenceProgram noteProgram{
+        .dialect = dialect.id,
+        .timebase = dialect.timebase,
+        .config = SequenceProgramConfig{.profile = static_cast<u32>(noteVersion)},
+        .tracks = {noteTrack},
+    };
+    const PerformanceSequence notePerformance = SequenceVm().render(noteProgram, dialect);
+    std::vector<bool> flags;
+    for (const auto& event : notePerformance.tracks[0].events) {
+      if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        flags.push_back(note->restartsLfoPhase);
+      }
+    }
+    return flags;
+  };
+  expect(noteResetFlags(CapcomSnesEngineVersion::v3BgmFixedLocation) == std::vector<bool>{true, false},
+         "CapcomSnes V2+ should reset a normal note by default but preserve phase through a slur");
+  expect(noteResetFlags(CapcomSnesEngineVersion::v1BgmInList) == std::vector<bool>{false, false},
+         "CapcomSnes V1 should preserve its disabled-by-default phase reset");
+
+  std::vector<u8> frozenBytes(0x4000);
+  frozenBytes[0x3000] = 0x1a;
+  frozenBytes[0x3001] = 0x01;
+  frozenBytes[0x3002] = 0x3c;
+  frozenBytes[0x3003] = 0x1a;
+  frozenBytes[0x3004] = 0x02;
+  frozenBytes[0x3005] = 0x00;
+  frozenBytes[0x3006] = 0x17;
+  const TrackProgram frozenTrack = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, frozenBytes), version,
+                                                               CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
+  const SequenceProgram frozenProgram{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .tracks = {frozenTrack},
+  };
+  const PerformanceSequence frozenPerformance = SequenceVm().render(frozenProgram, dialect);
+  const auto activeFrozenTremolo =
+      std::ranges::find_if(frozenPerformance.tracks[0].events, [](const PerformanceEvent& event) {
+        const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+        return modulation != nullptr && modulation->target == ModulationPerformanceTarget::TremoloDepth &&
+               modulation->volumeDepthDecibels && *modulation->volumeDepthDecibels > 0.0;
+      });
+  expect(activeFrozenTremolo != frozenPerformance.tracks[0].events.end(),
+         "CapcomSnes speed zero should freeze the LFO without muting its tremolo depth");
 }
 
 void capcomSnesCompiledCommandsDoNotNeedEngineProfile() {

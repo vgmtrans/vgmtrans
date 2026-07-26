@@ -786,7 +786,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
            lhs.header.tick == rhs.header.tick && lhs.header.sequence == rhs.header.sequence &&
            lhs.header.automation == rhs.header.automation && lhs.key == rhs.key &&
            lhs.linearVelocity == rhs.linearVelocity && lhs.durationTicks == rhs.durationTicks &&
-           lhs.extendsPrevious == rhs.extendsPrevious && lhs.note == rhs.note && lhs.lane == rhs.lane;
+           lhs.extendsPrevious == rhs.extendsPrevious && lhs.restartsLfoPhase == rhs.restartsLfoPhase &&
+           lhs.note == rhs.note && lhs.lane == rhs.lane;
   };
   expect(sourceNote != performance.tracks[0].events.end() && loweredNote != bendLowering.tracks[0].events.end() &&
              notesMatch(std::get<NotePerformanceEvent>(*sourceNote), std::get<NotePerformanceEvent>(*loweredNote)),
@@ -1724,6 +1725,74 @@ void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
          "global tempo output should be written once on the first MIDI track");
 }
 
+void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 5,
+          .events =
+              {
+                  TempoPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .microsecondsPerQuarter = 1'000'000,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::TremoloRate,
+                      .frequencyHz = 25.0,
+                      .waveform = LfoWaveform::Triangle,
+                      .initialPhaseCycles = 0.75,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::TremoloDepth,
+                      .volumeDepthDecibels = 3.0,
+                      .waveform = LfoWaveform::Triangle,
+                      .initialPhaseCycles = 0.75,
+                      .tremoloGainMode = TremoloGainMode::NoBoost,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .key = 60,
+                      .durationTicks = 2,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 2},
+                      .key = 62,
+                      .durationTicks = 2,
+                      .restartsLfoPhase = false,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 4},
+                      .key = 64,
+                      .durationTicks = 1,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  std::vector<std::pair<u64, u8>> expressions;
+  for (const MidiEvent& event : midi.tracks[0].events) {
+    if (const auto* expression = std::get_if<Expression>(&event)) {
+      expressions.emplace_back(expression->tick, expression->value);
+    }
+  }
+
+  expect(!expressions.empty() && expressions.front() == std::pair<u64, u8>{0, 90},
+         "no-boost tremolo should begin at its six-decibel trough without exceeding nominal gain");
+  expect(std::ranges::find(expressions, std::pair<u64, u8>{2, 107}) != expressions.end() &&
+             std::ranges::find(expressions, std::pair<u64, u8>{2, 90}) == expressions.end(),
+         "a note that preserves LFO phase should continue the existing tremolo curve");
+  expect(std::ranges::find(expressions, std::pair<u64, u8>{4, 90}) != expressions.end(),
+         "a note that resets LFO phase should return no-boost tremolo to its trough");
+  expect(std::ranges::all_of(expressions, [](const auto& expression) { return expression.second <= 127; }),
+         "no-boost tremolo should never emit expression above nominal gain");
+}
+
 void exportRequestSequenceLoopsAffectMidiLowering() {
   expect(ExportRequest{}.sequence.sequenceLoops == 1,
          "the user-facing export request should default to one sequence loop");
@@ -2296,6 +2365,7 @@ void runValueMidiTests() {
   performanceMidiRendererDoesNotDoubleDelayVibrato();
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
   performanceMidiRendererSimulatesTremoloUsingGlobalTempo();
+  performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy();
   exportRequestSequenceLoopsAffectMidiLowering();
   standaloneSequenceExportDoesNotRequireACollection();
   modulationAnalysisReportsObservedPerformanceRanges();

@@ -405,6 +405,7 @@ namespace {
       .delayMilliseconds = context.delayMilliseconds,
       .delayIsTempoRelative = context.delayIsTempoRelative,
       .waveform = context.waveform,
+      .initialPhaseCycles = context.initialPhaseCycles,
       .phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth,
       .tremoloGainMode = context.tremoloGainMode,
   };
