@@ -76,6 +76,24 @@ constexpr std::array<u8, 64> kIntelliFe4{
   return (0xffu * (depth & 0x0fu)) * (100.0 / 256.0);
 }
 
+[[nodiscard]] double tremoloDepthDecibels(BaseProfile base, u8 depth) {
+  int trough = 255;
+  if (base == BaseProfile::Earlier) {
+    // The earlier driver applies two rounded 8-bit multiplies before
+    // subtracting the tremolo attenuation from the per-note velocity.
+    const int attenuation = (255 * depth) >> 8;
+    trough -= (255 * attenuation) >> 8;
+  } else {
+    // Later N-SPC drivers compensate the falling half of the triangle so its
+    // deepest point subtracts the raw depth directly.
+    trough = std::max(1, 255 - static_cast<int>(depth));
+  }
+
+  // N-SPC squares the combined volume after tremolo. A subtractive bipolar
+  // output spans 2D dB, so D is 20*log10(peak/trough).
+  return 20.0 * std::log10(255.0 / trough);
+}
+
 [[nodiscard]] constexpr u32 tempoMicrosecondsPerQuarter(u8 tempo) {
   return tempo == 0 ? 60'000'000 : static_cast<u32>(std::lround(24'576'000.0 / tempo));
 }
@@ -448,6 +466,15 @@ struct VibratoConfig {
 
   [[nodiscard]] bool active() const { return rate != 0 && depth != 0; }
 };
+
+[[nodiscard]] LfoPerformanceContext tremoloLfoContext() {
+  return LfoPerformanceContext{
+      .waveform = LfoWaveform::Triangle,
+      // N-SPC starts at nominal gain and initially moves toward attenuation.
+      .initialPhaseCycles = 0.25,
+      .tremoloGainMode = TremoloGainMode::NoBoost,
+  };
+}
 
 struct ProgramState {
   struct EchoChange {
@@ -1085,12 +1112,20 @@ struct Playback {
     const s32 target = track.vibrato.depth;
     track.vibratoDepth.begin(
         out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
-                         math::vibratoDepthCents(track.vibrato.depth) / 100.0, track.vibrato.fade,
-                         track.vibrato.delay),
+                         math::vibratoDepthCents(track.vibrato.depth) / 100.0, track.vibrato.fade, track.vibrato.delay),
         SequenceMotionPlan<s32>::targetOverTicksWithStep(target, target / static_cast<s32>(track.vibrato.fade),
                                                          track.vibrato.fade, track.vibrato.delay));
     emitVibratoDepth(0, track.vibratoDepth.output(out));
   }
+
+  void tremoloOn(u8 delay, u8 rate, u8 depth) {
+    const LfoPerformanceContext context = tremoloLfoContext();
+    out.tremoloDepth(math::tremoloDepthDecibels(program.selected.base, depth), context);
+    out.tremoloRateCyclesPerTick(static_cast<double>(rate) / 256.0, context);
+    out.tremoloDelayTicks(delay);
+  }
+
+  void tremoloOff() { out.tremoloDepth(0.0, tremoloLfoContext()); }
 
   void tempo(u8 value) {
     program.tempoFade.setCurrentRaw(value);
@@ -1524,10 +1559,15 @@ struct DecodeContext {
       return event.set<&TrackState::transpose>(
           event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
     }
-    case EventType::TremoloOn:
-      return unknownCommand(cursor, 3);
+    case EventType::TremoloOn: {
+      auto event = cursor.command("Tremolo On", SequenceSemantic::Modulation);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      return event.invoke<&Playback::tremoloOn>(delay, rate, depth);
+    }
     case EventType::TremoloOff:
-      return cursor.sourceOnly("Tremolo Off").ignore();
+      return cursor.command("Tremolo Off", SequenceSemantic::Modulation).invoke<&Playback::tremoloOff>();
     case EventType::Volume: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
       return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
