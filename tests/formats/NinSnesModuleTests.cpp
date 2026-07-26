@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -20,6 +21,13 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::nin_snes;
 
 namespace {
+
+constexpr std::array kProfileIds{
+    ProfileId::Earlier,   ProfileId::Standard,  ProfileId::Rd1,         ProfileId::Rd2,          ProfileId::Hal,
+    ProfileId::Konami,    ProfileId::Lemmings,  ProfileId::IntelliFe3,  ProfileId::IntelliTa,    ProfileId::IntelliFe4,
+    ProfileId::Human,     ProfileId::Tose,      ProfileId::QuintetActR, ProfileId::QuintetActR2, ProfileId::QuintetIog,
+    ProfileId::QuintetTs, ProfileId::FalcomYs4,
+};
 
 void expect(bool condition, const std::string& message) {
   if (!condition) {
@@ -51,18 +59,36 @@ PerformanceSequence render(std::vector<u8> bytes, const Layout& layout = standar
   return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
 }
 
+double ninSnesLevelGain(u8 raw) {
+  const double normalized = raw / 255.0;
+  return normalized * normalized;
+}
+
+struct LevelOpcodes {
+  u8 master;
+  u8 channel;
+  u8 rest;
+};
+
+LevelOpcodes levelOpcodes(const Profile& driver) {
+  if (driver.base == BaseProfile::Earlier) {
+    return {.master = 0xe0, .channel = 0xe7, .rest = 0xc7};
+  }
+  if (driver.intelli == IntelliMode::Fe3) {
+    return {.master = 0xdb, .channel = 0xe3, .rest = 0xc9};
+  }
+  if (driver.intelli == IntelliMode::Ta || driver.intelli == IntelliMode::Fe4) {
+    return {.master = 0xdf, .channel = 0xe7, .rest = 0xc9};
+  }
+  const bool hasMasterVolume = driver.id != ProfileId::Konami && driver.id != ProfileId::Lemmings;
+  return {.master = static_cast<u8>(hasMasterVolume ? 0xe5 : 0), .channel = 0xed, .rest = 0xc9};
+}
+
 }  // namespace
 
 void ninSnesProfilesDescribeEverySupportedDriverFamily() {
-  constexpr std::array ids{
-      ProfileId::Earlier,     ProfileId::Standard,     ProfileId::Rd1,        ProfileId::Rd2,
-      ProfileId::Hal,         ProfileId::Konami,       ProfileId::Lemmings,   ProfileId::IntelliFe3,
-      ProfileId::IntelliTa,   ProfileId::IntelliFe4,   ProfileId::Human,      ProfileId::Tose,
-      ProfileId::QuintetActR, ProfileId::QuintetActR2, ProfileId::QuintetIog, ProfileId::QuintetTs,
-      ProfileId::FalcomYs4,
-  };
   std::set<std::string_view> names;
-  for (const ProfileId id : ids) {
+  for (const ProfileId id : kProfileIds) {
     const Profile& driver = profile(id);
     expect(driver.id == id && driver.base != BaseProfile::Unknown,
            "every public NinSnes profile should resolve to a complete driver description");
@@ -114,6 +140,104 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
       "early and standard drivers should retain their distinct instrument layouts");
 }
 
+void ninSnesProfilesShareSquaredLevelCurve() {
+  constexpr u8 kMasterLevel = 120;
+  constexpr u8 kChannelLevel = 140;
+
+  for (const ProfileId id : kProfileIds) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+
+    const Profile& driver = profile(id);
+    const LevelOpcodes opcodes = levelOpcodes(driver);
+    size_t offset = 0x300;
+    if (opcodes.master != 0) {
+      bytes[offset++] = opcodes.master;
+      bytes[offset++] = kMasterLevel;
+    }
+    bytes[offset++] = opcodes.channel;
+    bytes[offset++] = kChannelLevel;
+    bytes[offset++] = 1;
+    bytes[offset++] = opcodes.rest;
+    bytes[offset] = 0;
+
+    Layout layout = standardLayout();
+    layout.profile = id;
+    if (driver.base == BaseProfile::Intelli) {
+      layout.signature = Signature::Intelligent;
+    } else if (driver.base == BaseProfile::Earlier) {
+      layout.signature = Signature::Earlier;
+    }
+
+    const PerformanceSequence performance = render(std::move(bytes), layout);
+    const auto& events = performance.tracks[0].events;
+    const auto level = std::ranges::find_if(
+        events, [](const PerformanceEvent& event) { return std::holds_alternative<LevelPerformanceEvent>(event); });
+    const auto master = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+      return std::holds_alternative<MasterLevelPerformanceEvent>(event);
+    });
+    const std::string label(driver.name);
+    expect(level != events.end(), label + " should emit channel gain");
+    expect(std::abs(std::get<LevelPerformanceEvent>(*level).linearGain - ninSnesLevelGain(kChannelLevel)) < 0.0001,
+           label + " should expose squared channel gain, got " +
+               std::to_string(std::get<LevelPerformanceEvent>(*level).linearGain));
+    if (opcodes.master != 0) {
+      expect(master != events.end(), label + " should emit master gain");
+      expect(
+          std::abs(std::get<MasterLevelPerformanceEvent>(*master).linearGain - ninSnesLevelGain(kMasterLevel)) < 0.0001,
+          label + " should expose squared master gain, got " +
+              std::to_string(std::get<MasterLevelPerformanceEvent>(*master).linearGain));
+    }
+
+    const MidiSequence midi = renderMidiSequence(performance);
+    const auto volume = std::ranges::find_if(
+        midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<Volume14>(event); });
+    const auto masterVolume = std::ranges::find_if(
+        midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<MasterVolume>(event); });
+    expect(volume != midi.tracks[0].events.end() &&
+               (std::get<Volume14>(*volume).value >> 7) == static_cast<u16>(kChannelLevel / 2),
+           label + " should retain the legacy channel-controller MSB");
+    if (opcodes.master != 0) {
+      expect(masterVolume != midi.tracks[0].events.end() &&
+                 (std::get<MasterVolume>(*masterVolume).value >> 7) == static_cast<u16>(kMasterLevel / 2),
+             label + " should retain the legacy master-volume MSB");
+    }
+  }
+}
+
+void ninSnesNoteVelocityPreservesLegacyCurve() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  bytes[0x300] = 3;
+  bytes[0x301] = 0x7f;
+  bytes[0x302] = 0x80;
+  bytes[0x303] = 3;
+  bytes[0x304] = 0x77;
+  bytes[0x305] = 0x80;
+  bytes[0x306] = 0;
+
+  Layout layout = standardLayout();
+  layout.volumeTable.assign(16, 0);
+  layout.volumeTable[7] = 152;
+  layout.volumeTable[15] = 252;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  const MidiSequence midi = renderMidiSequence(performance);
+  std::vector<u8> velocities;
+  for (const MidiEvent& event : midi.tracks[0].events) {
+    if (const auto* note = std::get_if<NoteDuration>(&event)) {
+      velocities.push_back(note->velocity);
+    }
+  }
+
+  expect(velocities == std::vector<u8>{126, 76},
+         "NinSnes note velocity should preserve the legacy full/echo pair instead of compressing it to 126/98");
+}
+
 void ninSnesIntelligentVoiceTablesUseTypedPlaybackState() {
   std::vector<u8> bytes(kAramSize);
   writeLe16(bytes, 0x100, 0x200);
@@ -144,7 +268,7 @@ void ninSnesIntelligentVoiceTablesUseTypedPlaybackState() {
   });
   const auto level = std::ranges::find_if(events, [](const PerformanceEvent& event) {
     const auto* change = std::get_if<LevelPerformanceEvent>(&event);
-    return change != nullptr && std::abs(change->linearGain - (128.0 / 255.0)) < 0.0001;
+    return change != nullptr && std::abs(change->linearGain - ninSnesLevelGain(128)) < 0.0001;
   });
   const auto balance = std::ranges::find_if(events, [](const PerformanceEvent& event) {
     return std::holds_alternative<StereoBalancePerformanceEvent>(event);
@@ -190,7 +314,7 @@ void ninSnesControllerFadesRemainInTheSourceDomain() {
              balances[1]->header.tick == 1 && balances[1]->leftGain > 0.0 && balances[1]->rightGain > 0.0 &&
              balances[2]->header.tick == 2 && balances[2]->rightGain == 0.0,
          "pan fades should interpolate the N-SPC pan value and emit its actual left/right gains");
-  expect(levels.size() >= 3 && std::abs(levels[0]->linearGain - (128.0 / 255.0)) < 0.0001 &&
+  expect(levels.size() >= 3 && std::abs(levels[0]->linearGain - ninSnesLevelGain(128)) < 0.0001 &&
              levels[1]->linearGain > levels[0]->linearGain && std::abs(levels[2]->linearGain - 1.0) < 0.0001,
          "volume fades should interpolate the driver's eight-bit level instead of MIDI controller values");
 }
@@ -235,7 +359,7 @@ void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
                              [](const PerformanceEvent& event) {
                                const auto* level = std::get_if<LevelPerformanceEvent>(&event);
                                return level != nullptr && level->header.tick == 25 &&
-                                      level->linearGain > (128.0 / 255.0) && level->linearGain < 1.0;
+                                      level->linearGain > ninSnesLevelGain(128) && level->linearGain < 1.0;
                              }),
          "a fade in the next section should continue from the preceding channel level");
 }
