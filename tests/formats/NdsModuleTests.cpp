@@ -5,10 +5,11 @@
  */
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/export/synth/ModulationScaling.h"
+#include "value/formats/NDS/Nds.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceVm.h"
-#include "value/formats/NDS/Nds.h"
 #include "value/validation/SynthValidation.h"
 
 #include "ValueFormatTestSupport.h"
@@ -226,7 +227,7 @@ TrackProgram decodeTestTrack(ByteReader reader, u32 sequenceOffset, u32 sequence
   return *track;
 }
 
-PerformanceSequence renderTestPerformance(std::initializer_list<u8> commands) {
+SequenceProgram decodeTestSequenceProgram(std::initializer_list<u8> commands) {
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
   std::vector<u8> bytes(trackStart + commands.size());
@@ -235,15 +236,16 @@ PerformanceSequence renderTestPerformance(std::initializer_list<u8> commands) {
   const SequenceDialect& dialect = ndsSequenceDialect();
   const TrackProgram track =
       decodeTestTrack(ByteReader(SourceId{30}, bytes), sequenceOffset, static_cast<u32>(bytes.size()), trackStart, 0);
-  return SequenceVm(LoopPolicy::PlayOnce)
-      .render(
-          SequenceProgram{
-              .dialect = dialect.id,
-              .timebase = dialect.timebase,
-              .sourceBaseAddress = Address{trackStart},
-              .tracks = {track},
-          },
-          dialect);
+  return SequenceProgram{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .sourceBaseAddress = Address{trackStart},
+      .tracks = {track},
+  };
+}
+
+PerformanceSequence renderTestPerformance(std::initializer_list<u8> commands) {
+  return SequenceVm(LoopPolicy::PlayOnce).render(decodeTestSequenceProgram(commands), ndsSequenceDialect());
 }
 
 }  // namespace
@@ -603,6 +605,113 @@ void ndsSequenceDialectModelsNitroLfoRegisters() {
       "NDS volume modulation should preserve Nitro's decibel-domain LFO depth");
   expect(pan != nullptr && pan->panDepth && std::abs(*pan->panDepth - 1.0) < 0.000001,
          "NDS pan modulation should preserve Nitro's pan-domain LFO depth");
+}
+
+void ndsSynthModulatorsUseSequenceLfoRanges() {
+  expect(static_cast<bool>(ndsDefinition().module.prepareCollection),
+         "NDS should apply sequence-defined LFO ranges when preparing collection instruments");
+  const SequenceProgram program = decodeTestSequenceProgram({
+      0xcb,
+      0x20,  // speed 32 -> 12 Hz
+      0xcd,
+      0x02,  // range 2
+      0xe0,
+      0x30,
+      0x00,  // 48 driver updates -> 250 ms
+      0xca,
+      0x40,  // depth 64
+      0xcc,
+      0x01,  // volume target
+      0xcc,
+      0x02,  // pan target
+      0xcb,
+      0x10,  // speed 16 -> 6 Hz
+      0xff,
+  });
+  const NdsLfoRanges ranges = analyzeNdsLfoRanges(program);
+  expect(std::abs(ranges.maxVibratoDepthCents - 99.21875) < 0.000001 &&
+             std::abs(ranges.maxTremoloDepthDb - 5.953125) < 0.000001 && std::abs(ranges.maxPanDepth - 1.0) < 0.000001,
+         "NDS LFO analysis should retain each target's sequence-wide physical depth");
+  expect(
+      ranges.minRateHertz == 6.0 && ranges.maxRateHertz == 12.0 && std::abs(ranges.maxDelaySeconds - 0.25) < 0.000001,
+      "NDS LFO analysis should retain the sequence-wide physical rate and delay");
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, ndsSequenceDialect());
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SynthModulators);
+  u8 maxVibratoDepth = 0;
+  u8 maxTremoloDepth = 0;
+  u8 maxVibratoFrequency = 0;
+  u32 maxVibratoDelay = 0;
+  for (const MidiEvent& event : midi.tracks[0].events) {
+    if (const auto* depth = std::get_if<VibratoDepth>(&event)) {
+      maxVibratoDepth = std::max(maxVibratoDepth, depth->value);
+    } else if (const auto* depth = std::get_if<TremoloDepth>(&event)) {
+      maxTremoloDepth = std::max(maxTremoloDepth, depth->value);
+    } else if (const auto* rate = std::get_if<VibratoFrequency>(&event)) {
+      maxVibratoFrequency = std::max(maxVibratoFrequency, rate->value);
+    } else if (const auto* delay = std::get_if<VibratoDelay>(&event)) {
+      maxVibratoDelay = std::max(maxVibratoDelay, delay->ticks);
+    }
+  }
+  expect(maxVibratoDepth == 127 && maxTremoloDepth == 127 && maxVibratoFrequency == 127 && maxVibratoDelay == 127,
+         "NDS synth-modulator MIDI should use the full controller span for each observed LFO range");
+
+  std::vector<u8> bytes(0x80);
+  writeLe32(bytes, 0x38, 1);
+  writeLe32(bytes, 0x3c, (0x40u << 8) | 0x01);
+  writeLe16(bytes, 0x40, 0);
+  writeLe16(bytes, 0x42, 0);
+  bytes[0x44] = 60;
+  bytes[0x45] = 0x6d;
+  bytes[0x46] = 0x20;
+  bytes[0x47] = 0x7f;
+  bytes[0x48] = 0x7f;
+  bytes[0x49] = 64;
+
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = SourceFile{.id = SourceId{31}, .name = "modulation-bank.sbnk", .size = bytes.size()},
+      .reader = ByteReader(SourceId{31}, bytes),
+      .ids = ids,
+  };
+  ScanResultBuilder out(input, "NDS");
+  const auto psg = addNdsPsgSamples(out);
+  std::array<std::optional<ScanSampleCollectionRef>, 4> waves{};
+  waves[0] = psg;
+  const auto bankRef = addNdsInstrumentSet(out, input.reader.range(0, bytes.size()), "Bank", psg, waves);
+  expect(bankRef.has_value(), "NDS should build a bank for sequence-derived LFO metadata");
+
+  const ScanResult result = out.finish();
+  const auto* bank = assetWithId<InstrumentSetAsset>(result, bankRef->id);
+  expect(bank != nullptr && bank->instruments.size() == 1,
+         "NDS should retain every parsed instrument for collection preparation");
+  InstrumentSetAsset preparedBank = *bank;
+  applyNdsLfoRanges(preparedBank, ranges);
+  const InstrumentModulation& modulation = preparedBank.instruments[0].modulation;
+  expect(modulation.vibrato && modulation.tremolo,
+         "NDS instruments should describe both Nitro pitch and volume LFO targets");
+  expect(std::abs(modulation.vibrato->maxDepthCents - 99.21875) < 0.000001 &&
+             modulation.vibrato->rateHertz.minimum == 6.0 && modulation.vibrato->rateHertz.maximum == 12.0 &&
+             modulation.vibrato->delaySeconds && std::abs(modulation.vibrato->delaySeconds->maximum - 0.25) < 0.000001,
+         "NDS vibrato metadata should use the same physical range as its MIDI controllers");
+  expect(std::abs(modulation.tremolo->maxDepthDb - 5.953125) < 0.000001 &&
+             modulation.tremolo->gainMode == TremoloGainMode::BipolarAroundNominal,
+         "NDS tremolo metadata should preserve Nitro's bipolar decibel swing");
+
+  const LoweredSynthModulation lowered = lowerSynthModulation(modulation);
+  expect(std::ranges::any_of(lowered.modulators,
+                             [](const SynthModulator& modulator) {
+                               return !modulator.source && modulator.destination == SynthDestination::VibratoDepth &&
+                                      modulator.amount == 99;
+                             }),
+         "NDS vibrato metadata should lower to an explicit synth depth modulator");
+  expect(std::ranges::any_of(lowered.modulators,
+                             [](const SynthModulator& modulator) {
+                               return !modulator.source && modulator.destination == SynthDestination::TremoloDepth &&
+                                      modulator.amount == 60;
+                             }),
+         "NDS tremolo metadata should lower to an explicit synth depth modulator");
 }
 
 void ndsSequenceDialectRevealsRunningSineLfoAtDepthChange() {

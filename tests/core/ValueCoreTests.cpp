@@ -98,6 +98,7 @@ void ndsModuleOnlyBuildsDependenciesOfReferencedBanks();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectComposesPitchBendRangeActions();
 void ndsSequenceDialectModelsNitroLfoRegisters();
+void ndsSynthModulatorsUseSequenceLfoRanges();
 void ndsSequenceDialectRevealsRunningSineLfoAtDepthChange();
 void ndsSequenceDialectPreservesPortamentoTimingIntent();
 void ndsSequenceDialectPreservesTiedSweepVoices();
@@ -208,6 +209,7 @@ int main() {
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
     ndsSequenceDialectComposesPitchBendRangeActions();
     ndsSequenceDialectModelsNitroLfoRegisters();
+    ndsSynthModulatorsUseSequenceLfoRanges();
     ndsSequenceDialectRevealsRunningSineLfoAtDepthChange();
     ndsSequenceDialectPreservesPortamentoTimingIntent();
     ndsSequenceDialectPreservesTiedSweepVoices();
