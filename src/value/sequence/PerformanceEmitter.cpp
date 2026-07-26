@@ -675,6 +675,11 @@ void PerformanceAutomationBinding::stop(const PerformanceEmitter& out) const {
   output.stopAutomation(automation_);
 }
 
+void PerformanceAutomationBinding::interrupt(const PerformanceEmitter& out) {
+  stop(out);
+  clear();
+}
+
 void PerformanceAutomationBinding::sample(const PerformanceEmitter& out, double value) const {
   if (owner_ == nullptr) {
     return;

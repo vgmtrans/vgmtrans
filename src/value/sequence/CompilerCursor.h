@@ -154,6 +154,9 @@ struct SelectedValue {
 template <class Playback>
 using CompiledExecutor = Effects (*)(std::span<const SemanticOperandValue>, Playback&);
 
+template <class Playback>
+using CompiledPredicate = bool (*)(Playback&);
+
 template <class Playback, auto Operation, class... Values>
 [[nodiscard]] Effects executeOperation(std::span<const SemanticOperandValue> arguments, Playback& playback) {
   size_t next = 0;
@@ -180,39 +183,51 @@ template <class Playback, auto Operation, class... Values>
 
 // Commands retain a small slot rather than a callback. The dialect-owned
 // registry stores one generated thunk for each operation used by the format.
-template <class Playback>
-class CompiledExecutorRegistry {
+template <class Callback>
+class CompiledCallbackRegistry {
 public:
-  [[nodiscard]] u32 add(CompiledExecutor<Playback> executor) {
+  [[nodiscard]] u32 add(Callback callback) {
     std::scoped_lock lock(mutex_);
-    const auto found = std::ranges::find(executors_, executor);
-    if (found != executors_.end()) {
-      return static_cast<u32>(std::distance(executors_.begin(), found));
+    const auto found = std::ranges::find(callbacks_, callback);
+    if (found != callbacks_.end()) {
+      return static_cast<u32>(std::distance(callbacks_.begin(), found));
     }
-    executors_.push_back(executor);
-    return static_cast<u32>(executors_.size() - 1);
+    callbacks_.push_back(callback);
+    return static_cast<u32>(callbacks_.size() - 1);
   }
 
-  [[nodiscard]] Effects execute(u32 slot, std::span<const SemanticOperandValue> arguments, Playback& playback) {
-    CompiledExecutor<Playback> executor = nullptr;
+  template <class... Arguments>
+  [[nodiscard]] decltype(auto) execute(u32 slot, Arguments&&... arguments) {
+    Callback callback = nullptr;
     {
       std::scoped_lock lock(mutex_);
-      if (slot >= executors_.size()) {
-        throw std::logic_error("Compiled sequence command referenced an unknown executor slot");
+      if (slot >= callbacks_.size()) {
+        throw std::logic_error("Compiled sequence command referenced an unknown callback slot");
       }
-      executor = executors_[slot];
+      callback = callbacks_[slot];
     }
-    return executor(arguments, playback);
+    return std::invoke(callback, std::forward<Arguments>(arguments)...);
   }
 
 private:
   std::mutex mutex_;
-  std::vector<CompiledExecutor<Playback>> executors_;
+  std::vector<Callback> callbacks_;
 };
 
 template <class Playback>
-[[nodiscard]] CompiledExecutorRegistry<Playback>& compiledExecutors() {
-  static CompiledExecutorRegistry<Playback> registry;
+[[nodiscard]] CompiledCallbackRegistry<CompiledExecutor<Playback>>& compiledExecutors() {
+  static CompiledCallbackRegistry<CompiledExecutor<Playback>> registry;
+  return registry;
+}
+
+template <class Playback, auto Predicate>
+[[nodiscard]] bool invokePredicate(Playback& playback) {
+  return std::invoke(Predicate, playback);
+}
+
+template <class Playback>
+[[nodiscard]] CompiledCallbackRegistry<CompiledPredicate<Playback>>& compiledPredicates() {
+  static CompiledCallbackRegistry<CompiledPredicate<Playback>> registry;
   return registry;
 }
 
@@ -742,6 +757,21 @@ public:
           std::move(arguments)...);
     }
 
+    // The VM may execute this command while the preceding command's wait is
+    // still active. It polls at most once when the wait begins and once per
+    // nonfinal wait tick, and executes the command only when Predicate is true.
+    template <auto Predicate>
+    Event& duringWaitWhen() {
+      static_assert(std::is_same_v<std::invoke_result_t<decltype(Predicate), Playback&>, bool>,
+                    "A during-wait predicate must return bool");
+      if (execution_.duringWait.valid()) {
+        throw std::logic_error("Compiled sequence command declared more than one during-wait predicate");
+      }
+      execution_.duringWait.evaluator =
+          detail::compiledPredicates<Playback>().add(&detail::invokePredicate<Playback, Predicate>);
+      return *this;
+    }
+
     Event& jump(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       targetRole(destination, SemanticOperandRole::JumpTarget);
@@ -1048,8 +1078,8 @@ struct CompiledCommandDialect {
   }
 
   template <class Execute>
-  [[nodiscard]] static Effects withPlayback(std::any& programState, std::any& trackState, PerformanceEmitter& out,
-                                            VmApi& vm, Execute execute) {
+  [[nodiscard]] static decltype(auto) withPlayback(std::any& programState, std::any& trackState,
+                                                   PerformanceEmitter& out, VmApi& vm, Execute execute) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
     // Playback may ask for song-wide state as a fourth reference. Simpler
@@ -1093,6 +1123,16 @@ struct CompiledCommandDialect {
         combined.step = vm.end();
       }
       return combined;
+    });
+  }
+
+  [[nodiscard]] static bool readyDuringWait(const SourceCommand& command, std::any& programState, std::any& trackState,
+                                            PerformanceEmitter& out, VmApi& vm) {
+    if (!command.execution.duringWait.valid()) {
+      return false;
+    }
+    return withPlayback(programState, trackState, out, vm, [&](Playback& playback) {
+      return detail::compiledPredicates<Playback>().execute(command.execution.duringWait.evaluator, playback);
     });
   }
 
@@ -1140,6 +1180,7 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
   dialect.createProgramState = Compiled::createProgramState;
   dialect.createTrackState = Compiled::createTrackState;
   dialect.execute = Compiled::execute;
+  dialect.readyDuringWait = Compiled::readyDuringWait;
   if constexpr (requires(Playback& playback) { playback.tick(); }) {
     dialect.tick = Compiled::tick;
   }

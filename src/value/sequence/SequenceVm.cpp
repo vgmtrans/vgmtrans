@@ -489,6 +489,9 @@ public:
         ++runtime_.tick;
       }
       tickDialect(track_.commands.at(pendingTickCommand_));
+      if (pendingTicks_ > 1) {
+        executeReadyCommandDuringWait();
+      }
       --pendingTicks_;
       if (pendingTicks_ != 0) {
         return false;
@@ -507,6 +510,9 @@ public:
         // Let the sequence coordinator observe the newly discovered common
         // loop boundary before this zero-time loop can execute again.
         return false;
+      }
+      if (pendingTicks_ != 0) {
+        executeReadyCommandDuringWait();
       }
     }
     return false;
@@ -572,7 +578,29 @@ private:
     dialect_.tick(command, *programState_, trackState_, out, vm);
   }
 
-  [[nodiscard]] bool executeCommand() {
+  void executeReadyCommandDuringWait() {
+    if (pendingTicks_ == 0 || !current_ || dialect_.readyDuringWait == nullptr) {
+      return;
+    }
+    const SourceCommand& command = track_.commands.at(*current_);
+    if (!command.execution.duringWait.valid()) {
+      return;
+    }
+    if (programState_ == nullptr) {
+      warn("Missing sequence program state", command.range);
+      return;
+    }
+
+    PerformanceEmitter out{performanceTrack_, command.id,        command.annotation,      runtime_.tick,
+                           outputSequence_,   runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
+    VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
+    if (!dialect_.readyDuringWait(command, *programState_, trackState_, out, vm)) {
+      return;
+    }
+    static_cast<void>(executeCommand(true));
+  }
+
+  [[nodiscard]] bool executeCommand(bool duringWait = false) {
     if (executedCommands_ >= behavior_.commandLimit) {
       const SourceCommand& command = track_.commands.at(*current_);
       warn(fmt::format("Sequence VM command limit reached: track={}, address=${:04X}, tick={}, executed={}, limit={}",
@@ -608,7 +636,13 @@ private:
       return false;
     }
     const Effects effects = dialect_.execute(command, *programState_, trackState_, out, vm);
-    scheduleTicks(commandIndex, effects.advanceTicks);
+    if (duringWait) {
+      if (effects.advanceTicks != 0 || effects.step.kind != StepKind::Next) {
+        throw std::logic_error("A command executed during a wait must not advance time or alter control flow");
+      }
+    } else {
+      scheduleTicks(commandIndex, effects.advanceTicks);
+    }
     if (command.annotation.valid()) {
       u64 endTick = beginTick == std::numeric_limits<u64>::max() ? beginTick : beginTick + 1;
       if (beginTick <= std::numeric_limits<u64>::max() - effects.advanceTicks) {

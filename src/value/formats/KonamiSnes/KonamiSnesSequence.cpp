@@ -605,8 +605,7 @@ private:
   void resetPitchForNote(u8 key) {
     // A new note cancels any unfinished slide. Drum notes have no melodic base,
     // so later slide commands cannot bend them as pitched instruments.
-    track.pitchTransition.stop(out);
-    track.pitchTransition.clear();
+    track.pitchTransition.interrupt(out);
     track.pitchSlide.clearMotion();
     track.pitchNote = {};
     if (track.percussion) {

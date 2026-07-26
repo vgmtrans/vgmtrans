@@ -71,6 +71,8 @@ using CreateProgramState = std::any (*)(const SequenceProgram&);
 using CreateTrackState = std::any (*)(const SequenceProgram&, const TrackProgram&);
 using ExecuteCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
                                    PerformanceEmitter& out, VmApi& vm);
+using CommandReadyDuringWait = bool (*)(const SourceCommand&, std::any& programState, std::any& trackState,
+                                        PerformanceEmitter& out, VmApi& vm);
 using TickTrackState = void (*)(const SourceCommand&, std::any& programState, std::any& trackState,
                                 PerformanceEmitter& out, VmApi& vm);
 using FinishPrepass = void (*)(std::any& programState);
@@ -100,6 +102,7 @@ struct SequenceDialect {
   CreateProgramState createProgramState = nullptr;
   CreateTrackState createTrackState = nullptr;
   ExecuteCommand execute = nullptr;
+  CommandReadyDuringWait readyDuringWait = nullptr;
   TickTrackState tick = nullptr;
   FinishPrepass finishPrepass = nullptr;
   BeginTrackSection beginTrackSection = nullptr;

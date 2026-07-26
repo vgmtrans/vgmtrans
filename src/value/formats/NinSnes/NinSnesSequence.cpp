@@ -16,7 +16,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <deque>
 #include <map>
 #include <optional>
 #include <set>
@@ -656,11 +655,6 @@ struct PitchEnvelope {
   s8 semitones = 0;
 };
 
-struct ActivePitchTransition {
-  PitchSlideBinding binding;
-  double baseKey = 0.0;
-};
-
 struct PitchState {
   static constexpr u16 kDefaultRangeCents = 200;
 
@@ -668,7 +662,8 @@ struct PitchState {
     baseValid = false;
     base = 0;
     motion.reset();
-    transition.reset();
+    transition.clear();
+    transitionBaseKey = 0.0;
     rangeCents = kDefaultRangeCents;
     bend = 0;
   }
@@ -676,15 +671,10 @@ struct PitchState {
   bool baseValid = false;
   s32 base = 0;
   SequenceLinearMotion<s32> motion;
-  std::optional<ActivePitchTransition> transition;
+  PitchSlideBinding transition;
+  double transitionBaseKey = 0.0;
   u16 rangeCents = kDefaultRangeCents;
   std::optional<s16> bend = 0;
-};
-
-struct QueuedPitchSlide {
-  u8 delay = 0;
-  u8 length = 0;
-  u8 target = 0;
 };
 
 struct TrackState {
@@ -702,8 +692,6 @@ struct TrackState {
     melodicProgram = 0;
     currentLogicalProgram.reset();
     legato = false;
-    queuedPitchSlides.clear();
-    waitTicksRemaining = 0;
     // Track state survives section changes, while parser-local state does not.
   }
 
@@ -720,8 +708,6 @@ struct TrackState {
   VibratoConfig vibrato;
   PitchEnvelope pitchEnvelope;
   PitchState pitch;
-  std::deque<QueuedPitchSlide> queuedPitchSlides;
-  u8 waitTicksRemaining = 0;
   u32 melodicProgram = 0;
   std::optional<u8> currentLogicalProgram;
   bool lastWasPercussion = false;
@@ -732,13 +718,6 @@ struct TrackState {
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
   PerformanceBoundMotion<SequenceAutomatedValue<s32>> vibratoDepth;
   double lastVibratoDepthSemitones = 0.0;
-};
-
-struct Slide {
-  bool present = false;
-  u8 delay = 0;
-  u8 length = 0;
-  u8 target = 0;
 };
 
 struct Playback {
@@ -865,10 +844,7 @@ struct Playback {
   }
 
   void resetPitchForNote() {
-    if (track.pitch.transition) {
-      track.pitch.transition->binding.stop(out);
-      track.pitch.transition.reset();
-    }
+    track.pitch.transition.interrupt(out);
     track.pitch.motion.clear();
     track.pitch.baseValid = false;
     if (track.pitch.rangeCents == PitchState::kDefaultRangeCents && track.pitch.bend == 0) {
@@ -900,10 +876,7 @@ struct Playback {
   }
 
   void activatePitchSlide(u8 delay, u8 length, s32 target) {
-    if (track.pitch.transition) {
-      track.pitch.transition->binding.stop(out);
-      track.pitch.transition.reset();
-    }
+    track.pitch.transition.interrupt(out);
     if (!track.pitch.baseValid || length == 0 || !track.lastNote.valid() || !track.lastKey) {
       activatePitchMotion(delay, length, target);
       return;
@@ -912,12 +885,10 @@ struct Playback {
     track.pitch.motion.clear();
     const s32 current = track.pitch.motion.current();
     static_cast<void>(track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay)));
-    track.pitch.transition = ActivePitchTransition{
-        .binding = out.at(vm.tick() + delay)
-                       .pitchSlide(track.lastNote, pitchKey(current, *track.lastKey), pitchKey(target, *track.lastKey),
-                                   length),
-        .baseKey = *track.lastKey,
-    };
+    track.pitch.transitionBaseKey = *track.lastKey;
+    track.pitch.transition =
+        out.at(vm.tick() + delay)
+            .pitchSlide(track.lastNote, pitchKey(current, *track.lastKey), pitchKey(target, *track.lastKey), length);
   }
 
   void beginNotePitch(u8 rawNote) {
@@ -939,76 +910,35 @@ struct Playback {
     beginNoteVibrato();
   }
 
-  void beginPitchSlide(const Slide& slide) {
-    if (!slide.present) {
-      return;
-    }
-    activatePitchSlide(slide.delay, slide.length, static_cast<s32>(slide.target & 0x7f) << 8);
-  }
-
-  void beginOrQueuePitchSlide(const Slide& slide) {
-    if (!slide.present) {
-      return;
-    }
-    if (!track.pitch.motion.active()) {
-      beginPitchSlide(slide);
-      return;
-    }
-    // F9 is stored immediately after a tie/rest. The SPC driver consumes it
-    // during that wait only after the preceding pitch motion finishes; if the
-    // wait expires first, F9 executes normally and replaces the old motion.
-    track.queuedPitchSlides.push_back(QueuedPitchSlide{
-        .delay = slide.delay,
-        .length = slide.length,
-        .target = slide.target,
-    });
-  }
-
-  void queuePitchSlide(u8 delay, u8 length, u8 target) {
-    track.queuedPitchSlides.push_back(QueuedPitchSlide{
-        .delay = delay,
-        .length = length,
-        .target = target,
-    });
-  }
-
-  void beginWait(u8 ticks) { track.waitTicksRemaining = ticks; }
+  [[nodiscard]] bool pitchMotionIdle() const { return !track.pitch.motion.active(); }
 
   void advancePitchMotion() {
     const auto tick = track.pitch.motion.tick();
     if (tick.status == SequenceMotionStatus::Inactive || tick.status == SequenceMotionStatus::Delayed) {
       return;
     }
-    if (track.pitch.transition) {
-      track.pitch.transition->binding.sample(out, pitchKey(tick.current, track.pitch.transition->baseKey));
+    if (track.pitch.transition.valid()) {
+      track.pitch.transition.sample(out, pitchKey(tick.current, track.pitch.transitionBaseKey));
       track.pitch.bend.reset();
       if (tick.status == SequenceMotionStatus::Finished) {
-        track.pitch.transition.reset();
+        track.pitch.transition.clear();
       }
     } else {
       applyCurrentPitchBend();
     }
   }
 
-  [[nodiscard]] Effects note(u8 noteIndex, bool hasSlide, u8 slideDelay, u8 slideLength, u8 slideTarget) {
-    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
+  [[nodiscard]] Effects note(u8 noteIndex) {
     switchToMelodicProgram();
     const double key = kMelodicKeyCorrection + noteIndex + track.transpose;
     beginNotePitch(noteIndex);
     track.lastNote = out.note(key, math::levelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
     track.lastKey = key;
-    // An inline F9 is only consumed while no pitch motion is active. A stored
-    // F1/F2 envelope starts at note-on first, so F9 must wait in source order
-    // until that envelope finishes; otherwise it starts immediately.
-    beginOrQueuePitchSlide(slide);
     track.lastWasPercussion = false;
-    beginWait(track.noteLength);
     return Effects::wait(track.noteLength);
   }
 
-  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli, bool hasSlide, u8 slideDelay,
-                                   u8 slideLength, u8 slideTarget) {
-    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
+  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli) {
     const u8 duration = soundingDuration();
     if (intelli) {
       const bool custom = (program.intelliFlags & 0x40) != 0;
@@ -1040,35 +970,27 @@ struct Playback {
       track.lastNote = out.note(outputKey, math::levelGain(track.velocity), duration);
       track.lastKey = outputKey;
     }
-    beginOrQueuePitchSlide(slide);
     track.lastWasPercussion = true;
-    beginWait(track.noteLength);
     return Effects::wait(track.noteLength);
   }
 
-  [[nodiscard]] Effects tie(bool hasSlide, u8 slideDelay, u8 slideLength, u8 slideTarget) {
-    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
+  [[nodiscard]] Effects tie() {
     if (track.lastKey) {
       track.lastNote = out.note(*track.lastKey, math::levelGain(track.velocity), soundingDuration(), true);
     }
-    beginOrQueuePitchSlide(slide);
-    beginWait(track.noteLength);
     return Effects::wait(track.noteLength);
   }
 
-  [[nodiscard]] Effects rest(bool hasSlide, u8 slideDelay, u8 slideLength, u8 slideTarget) {
-    const Slide slide{hasSlide, slideDelay, slideLength, slideTarget};
-    beginOrQueuePitchSlide(slide);
+  [[nodiscard]] Effects rest() {
     // A rest purges the legacy track's pending duration notes. A later tie
     // must not reach backward across that silence.
     track.lastNote = {};
     track.lastKey.reset();
-    beginWait(track.noteLength);
     return Effects::wait(track.noteLength);
   }
 
   void pitchSlide(u8 delay, u8 length, u8 target) {
-    beginPitchSlide(Slide{.present = true, .delay = delay, .length = length, .target = target});
+    activatePitchSlide(delay, length, static_cast<s32>(target & 0x7f) << 8);
   }
 
   void beginPattern(u8 times, Address destination) {
@@ -1277,23 +1199,6 @@ struct Playback {
     if (program.masterFadeTrack == track.trackNumber) {
       advanceMasterFade();
     }
-    if (!track.queuedPitchSlides.empty() && !track.pitch.motion.active() && track.waitTicksRemaining > 1) {
-      const QueuedPitchSlide queued = track.queuedPitchSlides.front();
-      track.queuedPitchSlides.pop_front();
-      activatePitchSlide(queued.delay, queued.length, static_cast<s32>(queued.target & 0x7f) << 8);
-    }
-    if (track.waitTicksRemaining <= 1) {
-      // Once the wait expires, every adjacent F9 executes at the same source
-      // tick; each replaces the previous motion.
-      while (!track.queuedPitchSlides.empty()) {
-        const QueuedPitchSlide queued = track.queuedPitchSlides.front();
-        track.queuedPitchSlides.pop_front();
-        activatePitchSlide(queued.delay, queued.length, static_cast<s32>(queued.target & 0x7f) << 8);
-      }
-    }
-    if (track.waitTicksRemaining != 0) {
-      --track.waitTicksRemaining;
-    }
   }
 
   void globalTranspose(s8 semitones) {
@@ -1430,36 +1335,6 @@ struct DecodeContext {
   [[nodiscard]] Address address(u16 raw) const { return Address{layout.resolveAddress(raw)}; }
 };
 
-[[nodiscard]] Slide readSlide(Cursor::Event& event, std::string_view prefix = {}) {
-  return Slide{
-      .present = true,
-      .delay = event.u8(fmt::format("{}delay", prefix), SemanticOperandRole::Duration),
-      .length = event.u8(fmt::format("{}length", prefix), SemanticOperandRole::Duration),
-      .target =
-          event.u8(fmt::format("{}target_note", prefix), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey),
-  };
-}
-
-[[nodiscard]] std::vector<Slide> readInlineSlides(Cursor::Event& event, const Definition& definition) {
-  std::vector<Slide> slides;
-  while (const auto opcode = event.peekU8()) {
-    if (definition.events[*opcode] != EventType::PitchSlide) {
-      break;
-    }
-    const std::string prefix = fmt::format("pitch_slide_{}_", slides.size() + 1);
-    event.u8(fmt::format("{}opcode", prefix), SourceValueDisplay::Hex);
-    slides.push_back(readSlide(event, prefix));
-  }
-  return slides;
-}
-
-void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) {
-  for (size_t index = 1; index < slides.size(); ++index) {
-    const Slide& slide = slides[index];
-    event.invoke<&Playback::queuePitchSlide>(slide.delay, slide.length, slide.target);
-  }
-}
-
 [[nodiscard]] DecodedBytecodeCommand unknownCommand(Cursor& cursor, u8 arguments) {
   auto event = cursor.sourceOnly("Unknown Event", "unknown");
   for (u8 index = 0; index < arguments; ++index) {
@@ -1567,28 +1442,12 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       auto event = cursor.command("Note", SequenceSemantic::Note);
       const u8 key = event.opcodeValue("key", static_cast<u8>(opcode - context.definition.status.noteMin),
                                        SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-      const std::vector<Slide> slides = readInlineSlides(event, context.definition);
-      const Slide first = slides.empty() ? Slide{} : slides.front();
-      event.invoke<&Playback::note>(key, first.present, first.delay, first.length, first.target);
-      appendQueuedSlides(event, slides);
-      return event;
+      return event.invoke<&Playback::note>(key);
     }
-    case EventType::Tie: {
-      auto event = cursor.command("Tie", SequenceSemantic::Note);
-      const std::vector<Slide> slides = readInlineSlides(event, context.definition);
-      const Slide first = slides.empty() ? Slide{} : slides.front();
-      event.invoke<&Playback::tie>(first.present, first.delay, first.length, first.target);
-      appendQueuedSlides(event, slides);
-      return event;
-    }
-    case EventType::Rest: {
-      auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      const std::vector<Slide> slides = readInlineSlides(event, context.definition);
-      const Slide first = slides.empty() ? Slide{} : slides.front();
-      event.invoke<&Playback::rest>(first.present, first.delay, first.length, first.target);
-      appendQueuedSlides(event, slides);
-      return event;
-    }
+    case EventType::Tie:
+      return cursor.command("Tie", SequenceSemantic::Note).invoke<&Playback::tie>();
+    case EventType::Rest:
+      return cursor.command("Rest", SequenceSemantic::Rest).invoke<&Playback::rest>();
     case EventType::Percussion: {
       auto event = cursor.command("Percussion Note", SequenceSemantic::Note);
       const u8 slot = event.opcodeValue("slot", static_cast<u8>(opcode - context.definition.status.percussionMin),
@@ -1596,12 +1455,7 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
       const bool intelli =
           (context.selected.intelli == IntelliMode::Ta || context.selected.intelli == IntelliMode::Fe4) &&
           slot < kIntelliDrumSlots;
-      const std::vector<Slide> slides = readInlineSlides(event, context.definition);
-      const Slide first = slides.empty() ? Slide{} : slides.front();
-      event.invoke<&Playback::percussion>(slot, context.definition.status.percussionMin, intelli, first.present,
-                                          first.delay, first.length, first.target);
-      appendQueuedSlides(event, slides);
-      return event;
+      return event.invoke<&Playback::percussion>(slot, context.definition.status.percussionMin, intelli);
     }
     case EventType::Program:
     case EventType::Rd2ProgramAndAdsr: {
@@ -1727,8 +1581,10 @@ void appendQueuedSlides(Cursor::Event& event, const std::vector<Slide>& slides) 
     }
     case EventType::PitchSlide: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
-      const Slide slide = readSlide(event);
-      return event.invoke<&Playback::pitchSlide>(slide.delay, slide.length, slide.target);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+      return event.invoke<&Playback::pitchSlide>(delay, length, target).duringWaitWhen<&Playback::pitchMotionIdle>();
     }
     case EventType::PercussionBase: {
       auto event = cursor.command("Percussion Base", SequenceSemantic::State);

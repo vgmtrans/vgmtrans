@@ -177,6 +177,7 @@ class PerformanceAutomationBinding {
 public:
   PerformanceAutomationBinding() = default;
 
+  [[nodiscard]] bool valid() const noexcept { return owner_ != nullptr; }
   void clear() noexcept {
     owner_ = nullptr;
     automation_ = 0;
@@ -186,6 +187,7 @@ public:
     return out.at(tick).withAutomation(*this);
   }
   void stop(const PerformanceEmitter& out) const;
+  void interrupt(const PerformanceEmitter& out);
   void sample(const PerformanceEmitter& out, double value) const;
 
 private:

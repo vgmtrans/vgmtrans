@@ -451,14 +451,15 @@ void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
 }
 
 void ninSnesF9UsesSharedPitchTransitions() {
-  const auto renderCommands = [](std::initializer_list<u8> commands) {
+  const auto commandBytes = [](std::initializer_list<u8> commands) {
     std::vector<u8> bytes(kAramSize);
     writeLe16(bytes, 0x100, 0x200);
     writeLe16(bytes, 0x102, 0);
     writeSection(bytes, 0x200, {{0, 0x300}});
     std::ranges::copy(commands, bytes.begin() + 0x300);
-    return render(std::move(bytes));
+    return bytes;
   };
+  const auto renderCommands = [&](std::initializer_list<u8> commands) { return render(commandBytes(commands)); };
 
   // C glides to C-sharp after a two-tick delay. Three source steps divide one
   // semitone as 85/256, 85/256, and the exact final target.
@@ -470,6 +471,13 @@ void ninSnesF9UsesSharedPitchTransitions() {
   expect(transition != nullptr && automation.realization.startTick == 2 && automation.realization.endTick == 5 &&
              transition->startKey == 24.0 && transition->targetKey == 25.0 && transition->timing.timelineTicks == 3,
          "F9 should retain its note anchor, delay, duration, and destination");
+  const SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, commandBytes({12, 0x7f, 0x80, 0xf9, 2, 3, 1, 0})),
+                                              standardLayout(), AssetId{1});
+  const auto& commands = parsed.program.tracks[0].commands;
+  const auto decodedSlide = std::ranges::find(commands, u8{0xf9}, &SourceCommand::opcode);
+  expect(decodedSlide != commands.end() && decodedSlide->encodedSize == 4 && decodedSlide->address.value == 0x303 &&
+             decodedSlide->execution.duringWait.valid(),
+         "F9 should remain an independent source command with generic during-wait eligibility");
   const auto* sampled = transition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&transition->curve);
   expect(sampled != nullptr && sampled->samples.size() == 4 && sampled->samples[0].tickOffset == 0 &&
              sampled->samples[0].value == 24.0 && sampled->samples[1].tickOffset == 1 &&

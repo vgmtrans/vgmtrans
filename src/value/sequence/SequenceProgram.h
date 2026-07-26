@@ -95,11 +95,20 @@ struct CommandAction {
   [[nodiscard]] bool valid() const noexcept { return executor != kInvalidExecutor; }
 };
 
+struct CommandPredicate {
+  u32 evaluator = CommandAction::kInvalidExecutor;
+
+  [[nodiscard]] bool valid() const noexcept { return evaluator != CommandAction::kInvalidExecutor; }
+};
+
 struct CommandExecution {
   // One source command may perform several small actions. Keeping them ordered
   // lets format code state each effect honestly (for example, set state and
   // then emit a controller) without inventing a hidden compound operation.
   std::vector<CommandAction> actions;
+  // Some drivers poll the next command while the current wait is still active.
+  // The predicate is format-owned; SequenceVm only provides the polling timing.
+  CommandPredicate duringWait;
 
   [[nodiscard]] bool valid() const noexcept { return !actions.empty(); }
 };
