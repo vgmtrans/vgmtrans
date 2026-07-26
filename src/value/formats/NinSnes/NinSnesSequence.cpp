@@ -828,8 +828,10 @@ struct Playback {
 
   void applyCurrentPitchBend() { emitPitchBend(currentPitchBend()); }
 
-  [[nodiscard]] double pitchKey(s32 pitch, double baseKey) const {
-    return baseKey + static_cast<double>(pitch - track.pitch.base) / 256.0;
+  // Pitch values use 256 units per semitone. Apply their offset from the
+  // original note to the emitted key, which already includes mapping and transpose.
+  [[nodiscard]] double pitchKey(s32 sourcePitch, double noteKey) const {
+    return noteKey + static_cast<double>(sourcePitch - track.pitch.base) / 256.0;
   }
 
   void setPitchBendRange(u16 cents) {
@@ -858,7 +860,10 @@ struct Playback {
     emitPitchBend(0);
   }
 
-  void activatePitchMotion(u8 delay, u8 length, s32 target) {
+  // Start a delayed pitch change for direct channel-pitch-bend output. It moves
+  // from the current pitch to the target over the requested length, expanding
+  // the bend range when necessary to avoid clipping.
+  void beginPitchBendMotion(u8 delay, u8 length, s32 target) {
     track.pitch.motion.clear();
     if (!track.pitch.baseValid || length == 0) {
       setPitchBendRange(PitchState::kDefaultRangeCents);
@@ -876,15 +881,23 @@ struct Playback {
   }
 
   void activatePitchSlide(u8 delay, u8 length, s32 target) {
+    // A new F9 stops any F9 slide still in progress.
     track.pitch.transition.interrupt(out);
+
+    // Portamento needs a nonzero length and a note to slide. Use pitch bends otherwise.
     if (!track.pitch.baseValid || length == 0 || !track.lastNote.valid() || !track.lastKey) {
-      activatePitchMotion(delay, length, target);
+      beginPitchBendMotion(delay, length, target);
       return;
     }
 
+    // Stop the previous calculation without resetting its current pitch, so
+    // the replacement starts from the value already reached.
     track.pitch.motion.clear();
     const s32 current = track.pitch.motion.current();
     static_cast<void>(track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay)));
+
+    // Calculate intermediate pitches with N-SPC integer math;
+    // advancePitchMotion() records them on the slide created below every tick.
     track.pitch.transitionBaseKey = *track.lastKey;
     track.pitch.transition =
         out.at(vm.tick() + delay)
@@ -905,7 +918,7 @@ struct Playback {
       } else {
         track.pitch.motion.setCurrent(track.pitch.base - offset);
       }
-      activatePitchMotion(track.pitchEnvelope.delay, track.pitchEnvelope.length, target);
+      beginPitchBendMotion(track.pitchEnvelope.delay, track.pitchEnvelope.length, target);
     }
     beginNoteVibrato();
   }
@@ -1584,6 +1597,7 @@ struct DecodeContext {
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 length = event.u8("length", SemanticOperandRole::Duration);
       const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+      // During a preceding wait, execute F9 early only after the current pitch change ends.
       return event.invoke<&Playback::pitchSlide>(delay, length, target).duringWaitWhen<&Playback::pitchMotionIdle>();
     }
     case EventType::PercussionBase: {
