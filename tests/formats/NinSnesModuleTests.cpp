@@ -103,6 +103,19 @@ ModulationOpcodes modulationOpcodes(const Profile& driver) {
   return {.vibrato = 0xe3, .tempo = 0xe7, .rest = 0xc9};
 }
 
+u8 pitchSlideOpcode(const Profile& driver) {
+  if (driver.base == BaseProfile::Earlier) {
+    return 0xdd;
+  }
+  if (driver.intelli == IntelliMode::Fe3) {
+    return 0xef;
+  }
+  if (driver.intelli == IntelliMode::Ta || driver.intelli == IntelliMode::Fe4) {
+    return 0xf3;
+  }
+  return 0xf9;
+}
+
 }  // namespace
 
 void ninSnesProfilesDescribeEverySupportedDriverFamily() {
@@ -272,12 +285,10 @@ void ninSnesProfilesShareTempoRelativeVibratoClock() {
       }
     }
     const std::string label(driver.name);
-    expect(rates.size() == 2 && rates[0]->cyclesPerTick && rates[1]->cyclesPerTick &&
-               rates[0]->frequencyHz && rates[1]->frequencyHz &&
-               std::abs(*rates[0]->cyclesPerTick - 0.125) < 0.0001 &&
+    expect(rates.size() == 2 && rates[0]->cyclesPerTick && rates[1]->cyclesPerTick && rates[0]->frequencyHz &&
+               rates[1]->frequencyHz && std::abs(*rates[0]->cyclesPerTick - 0.125) < 0.0001 &&
                std::abs(*rates[1]->cyclesPerTick - 0.125) < 0.0001 &&
-               std::abs(*rates[0]->frequencyHz - 7.8125) < 0.0001 &&
-               std::abs(*rates[1]->frequencyHz - 15.625) < 0.0001,
+               std::abs(*rates[0]->frequencyHz - 7.8125) < 0.0001 && std::abs(*rates[1]->frequencyHz - 15.625) < 0.0001,
            label + " should share the sequence-clocked N-SPC vibrato behavior");
   }
 }
@@ -437,6 +448,145 @@ void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
                                       level->linearGain > ninSnesLevelGain(128) && level->linearGain < 1.0;
                              }),
          "a fade in the next section should continue from the preceding channel level");
+}
+
+void ninSnesF9UsesSharedPitchTransitions() {
+  const auto renderCommands = [](std::initializer_list<u8> commands) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+    std::ranges::copy(commands, bytes.begin() + 0x300);
+    return render(std::move(bytes));
+  };
+
+  // C glides to C-sharp after a two-tick delay. Three source steps divide one
+  // semitone as 85/256, 85/256, and the exact final target.
+  const PerformanceSequence performance = renderCommands({12, 0x7f, 0x80, 0xf9, 2, 3, 1, 0});
+  expect(performance.diagnostics.empty() && performance.tracks[0].automations.size() == 1,
+         "NinSnes F9 should produce one shared pitch transition");
+  const PerformanceAutomation& automation = performance.tracks[0].automations.front();
+  const auto* transition = pitchTransitionIntent(automation);
+  expect(transition != nullptr && automation.realization.startTick == 2 && automation.realization.endTick == 5 &&
+             transition->startKey == 24.0 && transition->targetKey == 25.0 && transition->timing.timelineTicks == 3,
+         "F9 should retain its note anchor, delay, duration, and destination");
+  const auto* sampled = transition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&transition->curve);
+  expect(sampled != nullptr && sampled->samples.size() == 4 && sampled->samples[0].tickOffset == 0 &&
+             sampled->samples[0].value == 24.0 && sampled->samples[1].tickOffset == 1 &&
+             std::abs(sampled->samples[1].value - (24.0 + 85.0 / 256.0)) < 0.000001 &&
+             sampled->samples[2].tickOffset == 2 &&
+             std::abs(sampled->samples[2].value - (24.0 + 170.0 / 256.0)) < 0.000001 &&
+             sampled->samples[3].tickOffset == 3 && sampled->samples[3].value == 25.0,
+         "F9 should retain the driver's exact fixed-point pitch staircase");
+  expect(std::ranges::none_of(
+             performance.tracks[0].events,
+             [](const PerformanceEvent& event) { return std::holds_alternative<PitchBendPerformanceEvent>(event); }),
+         "F9 format playback should not choose a MIDI pitch representation");
+
+  const MidiSequence pitchBend = renderMidiSequence(performance);
+  expect(
+      std::ranges::any_of(pitchBend.tracks[0].events,
+                          [](const MidiEvent& event) {
+                            const auto* bend = std::get_if<PitchBend>(&event);
+                            return bend != nullptr && bend->value != 0;
+                          }) &&
+          std::ranges::none_of(pitchBend.tracks[0].events,
+                               [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }),
+      "NinSnes should retain exact F9 pitch bends by default");
+
+  const MidiSequence portamento =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::any_of(portamento.tracks[0].events,
+                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
+             std::ranges::none_of(portamento.tracks[0].events,
+                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+         "an explicit portamento export should lower F9 as native portamento");
+
+  // A note pitch envelope owns the same driver motion first. F9 begins only
+  // after that motion finishes and retains the pitch the envelope established.
+  const PerformanceSequence afterEnvelope = renderCommands({0xf1, 0, 2, 2, 10, 0x7f, 0x80, 0xf9, 1, 3, 5, 0});
+  const auto* envelopeTransition = pitchTransitionIntent(afterEnvelope.tracks[0].automations.front());
+  const auto* envelopeSamples =
+      envelopeTransition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&envelopeTransition->curve);
+  expect(envelopeTransition != nullptr && afterEnvelope.tracks[0].automations.front().realization.startTick == 3 &&
+             envelopeTransition->startKey == 26.0 && envelopeTransition->targetKey == 29.0 &&
+             envelopeSamples != nullptr && envelopeSamples->samples.size() == 4,
+         "F9 should start from a completed pitch envelope without losing its queued timing");
+
+  const MidiSequence envelopePitchBend = renderMidiSequence(afterEnvelope);
+  expect(std::ranges::none_of(envelopePitchBend.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                const auto* bend = std::get_if<PitchBend>(&event);
+                                return bend != nullptr && bend->tick == 0 && bend->value != 0;
+                              }) &&
+             std::ranges::any_of(envelopePitchBend.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* bend = std::get_if<PitchBend>(&event);
+                                   return bend != nullptr && bend->tick == 1 && bend->value != 0;
+                                 }),
+         "pitch-bend lowering should not apply F9's post-envelope starting pitch at note attack");
+
+  const MidiSequence envelopePortamento = renderMidiSequence(
+      afterEnvelope, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::any_of(envelopePortamento.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* note = std::get_if<NoteDuration>(&event);
+                               return note != nullptr && note->tick == 0 && note->key == 24;
+                             }) &&
+             std::ranges::any_of(envelopePortamento.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* bend = std::get_if<PitchBend>(&event);
+                                   return bend != nullptr && bend->tick == 3 && bend->value == 0;
+                                 }),
+         "native portamento should preserve the preceding envelope and center its bend at the F9 handoff");
+
+  const PerformanceSequence consecutive =
+      renderCommands({5, 0x7f, 0x80, 0xf9, 0, 3, 3, 0xf9, 0, 3, 6, 10, 0x7f, 0xc8, 0});
+  const MidiSequence consecutivePitchBend = renderMidiSequence(consecutive);
+  expect(std::ranges::none_of(consecutivePitchBend.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                const auto* bend = std::get_if<PitchBend>(&event);
+                                return bend != nullptr && bend->tick == 0 && bend->value != 0;
+                              }),
+         "a later F9 should inherit the preceding transition instead of pre-bending the note attack");
+
+  // Adjacent F9 commands are queued by the driver. If the wait expires before
+  // the first delayed slide starts, the last command replaces it at that tick.
+  const PerformanceSequence queued = renderCommands({5, 0x7f, 0x80, 0xf9, 8, 3, 4, 0xf9, 2, 3, 6, 10, 0x7f, 0xc8, 0});
+  expect(queued.tracks[0].automations.size() == 2 &&
+             queued.tracks[0].automations[0].realization.endReason == PerformanceAutomationEndReason::Continued &&
+             queued.tracks[0].automations[0].realization.endTick ==
+                 queued.tracks[0].automations[0].realization.startTick &&
+             queued.tracks[0].automations[1].realization.startTick == 7,
+         "queued F9 replacement should retain the source driver's execution timing");
+  const MidiSequence queuedPortamento =
+      renderMidiSequence(queued, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::count_if(
+             queuedPortamento.tracks[0].events,
+             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 1,
+         "a canceled delayed F9 should not leave a zero-length portamento behind");
+
+  for (const ProfileId id : kProfileIds) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+    const u8 slide = pitchSlideOpcode(profile(id));
+    std::ranges::copy(std::initializer_list<u8>{12, 0x7f, 0x80, slide, 0, 3, 1, 0}, bytes.begin() + 0x300);
+
+    Layout layout = standardLayout();
+    layout.profile = id;
+    if (profile(id).base == BaseProfile::Intelli) {
+      layout.signature = Signature::Intelligent;
+    } else if (profile(id).base == BaseProfile::Earlier) {
+      layout.signature = Signature::Earlier;
+    }
+    const PerformanceSequence variant = render(std::move(bytes), layout);
+    expect(std::ranges::any_of(
+               variant.tracks[0].automations,
+               [](const PerformanceAutomation& candidate) { return pitchTransitionIntent(candidate) != nullptr; }),
+           std::string(profile(id).name) + " should use the shared pitch-transition path");
+  }
 }
 
 void ninSnesPercussionStartsPerNoteVibratoFade() {

@@ -656,6 +656,11 @@ struct PitchEnvelope {
   s8 semitones = 0;
 };
 
+struct ActivePitchTransition {
+  PitchSlideBinding binding;
+  double baseKey = 0.0;
+};
+
 struct PitchState {
   static constexpr u16 kDefaultRangeCents = 200;
 
@@ -663,6 +668,7 @@ struct PitchState {
     baseValid = false;
     base = 0;
     motion.reset();
+    transition.reset();
     rangeCents = kDefaultRangeCents;
     bend = 0;
   }
@@ -670,8 +676,9 @@ struct PitchState {
   bool baseValid = false;
   s32 base = 0;
   SequenceLinearMotion<s32> motion;
+  std::optional<ActivePitchTransition> transition;
   u16 rangeCents = kDefaultRangeCents;
-  s16 bend = 0;
+  std::optional<s16> bend = 0;
 };
 
 struct QueuedPitchSlide {
@@ -824,7 +831,7 @@ struct Playback {
   }
 
   void emitPitchBend(s16 bend) {
-    if (track.pitch.bend == bend) {
+    if (track.pitch.bend && *track.pitch.bend == bend) {
       return;
     }
     track.pitch.bend = bend;
@@ -842,6 +849,10 @@ struct Playback {
 
   void applyCurrentPitchBend() { emitPitchBend(currentPitchBend()); }
 
+  [[nodiscard]] double pitchKey(s32 pitch, double baseKey) const {
+    return baseKey + static_cast<double>(pitch - track.pitch.base) / 256.0;
+  }
+
   void setPitchBendRange(u16 cents) {
     if (cents == 0 || cents == track.pitch.rangeCents) {
       return;
@@ -854,6 +865,10 @@ struct Playback {
   }
 
   void resetPitchForNote() {
+    if (track.pitch.transition) {
+      track.pitch.transition->binding.stop(out);
+      track.pitch.transition.reset();
+    }
     track.pitch.motion.clear();
     track.pitch.baseValid = false;
     if (track.pitch.rangeCents == PitchState::kDefaultRangeCents && track.pitch.bend == 0) {
@@ -884,6 +899,27 @@ struct Playback {
     applyCurrentPitchBend();
   }
 
+  void activatePitchSlide(u8 delay, u8 length, s32 target) {
+    if (track.pitch.transition) {
+      track.pitch.transition->binding.stop(out);
+      track.pitch.transition.reset();
+    }
+    if (!track.pitch.baseValid || length == 0 || !track.lastNote.valid() || !track.lastKey) {
+      activatePitchMotion(delay, length, target);
+      return;
+    }
+
+    track.pitch.motion.clear();
+    const s32 current = track.pitch.motion.current();
+    static_cast<void>(track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay)));
+    track.pitch.transition = ActivePitchTransition{
+        .binding = out.at(vm.tick() + delay)
+                       .pitchSlide(track.lastNote, pitchKey(current, *track.lastKey), pitchKey(target, *track.lastKey),
+                                   length),
+        .baseKey = *track.lastKey,
+    };
+  }
+
   void beginNotePitch(u8 rawNote) {
     resetPitchForNote();
     track.pitch.baseValid = true;
@@ -907,7 +943,7 @@ struct Playback {
     if (!slide.present) {
       return;
     }
-    activatePitchMotion(slide.delay, slide.length, static_cast<s32>(slide.target & 0x7f) << 8);
+    activatePitchSlide(slide.delay, slide.length, static_cast<s32>(slide.target & 0x7f) << 8);
   }
 
   void beginOrQueuePitchSlide(const Slide& slide) {
@@ -940,7 +976,16 @@ struct Playback {
 
   void advancePitchMotion() {
     const auto tick = track.pitch.motion.tick();
-    if (tick.status != SequenceMotionStatus::Inactive && tick.status != SequenceMotionStatus::Delayed) {
+    if (tick.status == SequenceMotionStatus::Inactive || tick.status == SequenceMotionStatus::Delayed) {
+      return;
+    }
+    if (track.pitch.transition) {
+      track.pitch.transition->binding.sample(out, pitchKey(tick.current, track.pitch.transition->baseKey));
+      track.pitch.bend.reset();
+      if (tick.status == SequenceMotionStatus::Finished) {
+        track.pitch.transition.reset();
+      }
+    } else {
       applyCurrentPitchBend();
     }
   }
@@ -950,13 +995,12 @@ struct Playback {
     switchToMelodicProgram();
     const double key = kMelodicKeyCorrection + noteIndex + track.transpose;
     beginNotePitch(noteIndex);
-    const auto note = out.note(key, math::levelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
+    track.lastNote = out.note(key, math::levelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
+    track.lastKey = key;
     // An inline F9 is only consumed while no pitch motion is active. A stored
     // F1/F2 envelope starts at note-on first, so F9 must wait in source order
     // until that envelope finishes; otherwise it starts immediately.
     beginOrQueuePitchSlide(slide);
-    track.lastNote = note;
-    track.lastKey = key;
     track.lastWasPercussion = false;
     beginWait(track.noteLength);
     return Effects::wait(track.noteLength);
@@ -1236,7 +1280,7 @@ struct Playback {
     if (!track.queuedPitchSlides.empty() && !track.pitch.motion.active() && track.waitTicksRemaining > 1) {
       const QueuedPitchSlide queued = track.queuedPitchSlides.front();
       track.queuedPitchSlides.pop_front();
-      activatePitchMotion(queued.delay, queued.length, static_cast<s32>(queued.target & 0x7f) << 8);
+      activatePitchSlide(queued.delay, queued.length, static_cast<s32>(queued.target & 0x7f) << 8);
     }
     if (track.waitTicksRemaining <= 1) {
       // Once the wait expires, every adjacent F9 executes at the same source
@@ -1244,7 +1288,7 @@ struct Playback {
       while (!track.queuedPitchSlides.empty()) {
         const QueuedPitchSlide queued = track.queuedPitchSlides.front();
         track.queuedPitchSlides.pop_front();
-        activatePitchMotion(queued.delay, queued.length, static_cast<s32>(queued.target & 0x7f) << 8);
+        activatePitchSlide(queued.delay, queued.length, static_cast<s32>(queued.target & 0x7f) << 8);
       }
     }
     if (track.waitTicksRemaining != 0) {
