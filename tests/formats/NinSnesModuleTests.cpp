@@ -193,12 +193,6 @@ void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
   std::ranges::copy(
       std::initializer_list<u8>{0x68, 0xda, 0x90, 0x0a, 0x6d, 0xfd, 0xae, 0x60, 0x96, 0x56, 0x0f, 0xfd, 0x2f, 0xe3},
       bytes.begin() + 0x5a0);
-  constexpr std::array<u8, 27> commandLengths{
-      0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01,
-      0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01,
-  };
-  std::ranges::copy(commandLengths, bytes.begin() + 0x1036);
-
   // Song 2 is an unloaded hole between two valid resident playlists.
   writeLe16(bytes, 0x2002, 0x2100);
   writeLe16(bytes, 0x2004, 0x2200);
@@ -232,9 +226,9 @@ void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
   expect(playing && playing->songIndex == 3 && playing->playlistAddress == 0x2300,
          "the live playlist cursor should select the playing song when no request is pending");
 
-  expect(hasValidSequence(ByteReader(SourceId{7}, bytes),
-                          Layout{.profile = ProfileId::Earlier, .playlistAddress = 0x2100}),
-         "an infinite repeat should not make adjacent data part of the playlist");
+  expect(
+      isValidPlaylist(ByteReader(SourceId{7}, bytes), Layout{.profile = ProfileId::Earlier, .playlistAddress = 0x2100}),
+      "an infinite repeat should not make adjacent data part of the playlist");
 }
 
 void ninSnesProfilesShareSquaredLevelCurve() {

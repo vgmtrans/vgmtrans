@@ -75,6 +75,10 @@ enum class PlaylistModel : u8 {
   Tose,
 };
 
+[[nodiscard]] constexpr bool isInfinitePlaylistRepeat(PlaylistModel model, u16 value) {
+  return value <= 0xff && (model == PlaylistModel::Tose ? value == 0 || value == 0xff : value > 0x80);
+}
+
 enum class NoteParameterModel : u8 {
   Standard,
   Lemmings,
@@ -203,7 +207,7 @@ struct SequenceParse {
 [[nodiscard]] u16 instrumentSlotCount(const Profile& profile);
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
-[[nodiscard]] bool hasValidSequence(core::ByteReader reader, const Layout& layout);
+[[nodiscard]] bool isValidPlaylist(core::ByteReader reader, const Layout& layout);
 [[nodiscard]] const core::SequenceDialect& sequenceDialect();
 [[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,

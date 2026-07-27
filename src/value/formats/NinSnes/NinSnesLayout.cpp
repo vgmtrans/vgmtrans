@@ -527,7 +527,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
             break;
           }
           const u16 value = reader.le16(address);
-          if (value == 0) {
+          if (value == 0 || isInfinitePlaylistRepeat(selected.playlist, value)) {
             break;
           }
           address = static_cast<u16>(address + (value <= 0xff ? 4 : 2));
@@ -573,7 +573,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
     layout.songIndex = entry->index;
     layout.playlistAddress = entry->playlistAddress;
     layout.falcomBaseOffset = entry->falcomOffset;
-    if (!hasValidSequence(reader, layout)) {
+    if (!isValidPlaylist(reader, layout)) {
       continue;
     }
     return layout;
