@@ -252,7 +252,7 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
   const PerformanceNoteId retargetNote = out.note(64, 1.0, 16);
   auto first = out.pitchSlide(retargetNote, 60, 64, 8);
   first.sample(out.at(3), 61.5);
-  out.at(4).pitchSlide(retargetNote, 61.5, 67, 4);
+  out.at(4).retargetPitchSlide(retargetNote, 64, 67, 4);
 
   const auto& firstAutomation = track.automations[0];
   const auto& firstIntent = std::get<PitchTransitionIntent>(firstAutomation.intent);
@@ -267,9 +267,9 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
          "a realized replacement should clip the previous transition and retain the source driver's current pitch");
 
   const PerformanceNoteId chainedNote = out.at(20).note(69, 1.0, 12);
-  out.at(20).pitchSlide(chainedNote, 65, 67, 5);
-  out.at(25).pitchSlide(chainedNote, 67, 69, 3);
-  out.at(28).pitchSlide(chainedNote, 69, 71, 2);
+  out.at(20).retargetPitchSlide(chainedNote, 65, 67, 5);
+  out.at(25).retargetPitchSlide(chainedNote, 65, 69, 3);
+  out.at(28).retargetPitchSlide(chainedNote, 65, 71, 2);
   expect(track.automations[2].realization.endReason == PerformanceAutomationEndReason::Continued &&
              track.automations[3].realization.endReason == PerformanceAutomationEndReason::Continued &&
              track.automations[3].realization.startTick == 25,
@@ -287,10 +287,12 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
 
   const PerformanceNoteId replacedNote = out.at(50).note(76, 1.0, 10);
   out.at(50).pitchSlide(replacedNote, 74, 76, 6);
-  out.at(52).pitchSlide(replacedNote, 75, 79, 3);
+  out.at(52).retargetPitchSlide(replacedNote, 76, 79, 3);
   expect(track.automations[6].realization.endTick == 52 &&
-             track.automations[6].realization.endReason == PerformanceAutomationEndReason::Continued,
-         "a new realized transition should replace active motion without re-simulating the source driver");
+             track.automations[6].realization.endReason == PerformanceAutomationEndReason::Continued &&
+             std::abs(std::get<PitchTransitionIntent>(track.automations[7].intent).startKey - (74.0 + 2.0 / 3.0)) <
+                 0.0001,
+         "retargeting should replace active motion from its shared linear value");
 
   const PerformanceNoteId stoppedNote = out.at(60).note(81, 1.0, 10);
   const auto stopped = out.at(60).pitchSlide(stoppedNote, 79, 81, 6);

@@ -63,6 +63,17 @@ bool hasMidiEvent(const MidiTrack& track) {
   return std::ranges::any_of(track.events, [](const MidiEvent& event) { return std::holds_alternative<Event>(event); });
 }
 
+template <class Event>
+std::vector<const Event*> performanceEvents(const PerformanceTrack& track) {
+  std::vector<const Event*> result;
+  for (const PerformanceEvent& event : track.events) {
+    if (const auto* typed = std::get_if<Event>(&event)) {
+      result.push_back(typed);
+    }
+  }
+  return result;
+}
+
 bool hasNonZeroPitchBendBefore(const MidiTrack& track, u64 tick) {
   return std::ranges::any_of(track.events, [tick](const MidiEvent& event) {
     const auto* pitchBend = std::get_if<PitchBend>(&event);
@@ -208,7 +219,7 @@ PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
 }
 
 PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std::vector<std::vector<u8>>& tracks,
-                                            u32 sequenceLoops = 0) {
+                                            u32 sequenceLoops = 0, bool indexedEchoFilter = false) {
   const auto& dialect = konamiSnesSequenceDialect(version);
   std::vector<TrackProgram> programTracks;
   programTracks.reserve(tracks.size());
@@ -220,7 +231,10 @@ PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std
       .dialect = dialect.id,
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{0},
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .config = SequenceProgramConfig{
+          .profile = static_cast<u32>(version),
+          .driverState = indexedEchoFilter,
+      },
       .behavior = dialect.defaultBehavior,
       .tracks = std::move(programTracks),
   };
@@ -598,6 +612,57 @@ void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo() {
          "early KonamiSnes high rates should fold only after tempo multiplication and preserve triangle direction");
 }
 
+void konamiSnesEchoPreservesGlobalDspState() {
+  const PerformanceSequence performance = renderKonamiSnesProgram(
+      KONAMISNES_V6, {{0xf4, 0x01, 0x40, 0xc0, 0xf5, 0x04, 0xe0, 0xaa, 0xe0, 0x02, 0xf4, 0, 0x7f, 0x7f, 0xff},
+                      {0xe0, 0x04, 0xff}});
+  const auto changes = performanceEvents<ReverbPerformanceEvent>(performance.tracks[0]);
+  expect(changes.size() == 4 && changes[1]->voiceMask == 1 &&
+             std::abs(*changes[1]->leftGain - 64.0 / 127.0) < 0.0001 &&
+             std::abs(*changes[1]->rightGain + 64.0 / 127.0) < 0.0001,
+         "Konami F4 should preserve signed stereo EVOL and the global EON mask");
+  expect(changes[2]->delayMilliseconds == 64.0 && std::abs(*changes[2]->feedback + 0.25) < 0.0001 &&
+             changes[2]->filterIndex == 2 && changes[3]->voiceMask == 0,
+         "Konami F5 should preserve fixed DSP echo state and a zero F4 mask should disable it");
+
+  const PerformanceSequence indexed = renderKonamiSnesProgram(
+      KONAMISNES_V2, {{0xf5, 0x02, 0x10, 0x01, 0xf4, 0x01, 0x20, 0x20, 0xff}}, 0,
+      /*indexedEchoFilter=*/true);
+  const auto indexedChanges = performanceEvents<ReverbPerformanceEvent>(indexed.tracks[0]);
+  expect(indexedChanges.size() == 2 && indexedChanges.back()->filterIndex == 1,
+         "Konami F5 should retain indexed FIR state while echo is disabled");
+}
+
+void konamiSnesLinearDriverPitchUsesSharedTransitions() {
+  struct Case {
+    KonamiSnesVersion version;
+    std::vector<u8> bytes;
+    u64 startTick;
+    double startKey;
+    double targetKey;
+    u32 timelineTicks;
+    double milliseconds;
+  };
+  const std::array cases{
+      Case{KONAMISNES_V2, {0x3c, 2, 0x7f, 0x7f, 0xf0, 4, 0x40, 6, 0x7f, 0x7f, 0xff}, 2, 60, 64, 4, 32},
+      Case{KONAMISNES_V2, {0xf1, 2, 4, 2, 0x3c, 8, 0x7f, 0x7f, 0xff}, 2, 58, 60, 4, 32},
+      Case{KONAMISNES_V6, {0xf1, 1, 3, 2, 0x80, 0, 0x3c, 8, 0x7f, 0x7f, 0xff}, 1, 58, 60, 3, 24},
+  };
+  for (const auto& test : cases) {
+    const auto performance = renderKonamiSnesProgram(test.version, {test.bytes});
+    expect(performance.tracks[0].automations.size() == 1, "Konami pitch should declare one shared transition");
+    const auto& automation = performance.tracks[0].automations.front();
+    const auto* intent = pitchTransitionIntent(automation);
+    const auto* duration =
+        intent == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&intent->timing.physical);
+    expect(intent != nullptr && automation.realization.startTick == test.startTick &&
+               intent->startKey == test.startKey && intent->targetKey == test.targetKey &&
+               intent->timing.timelineTicks == test.timelineTicks && duration != nullptr &&
+               duration->milliseconds == test.milliseconds,
+           "Konami F0/F1 should retain linear fixed-duration intent without a local scheduler");
+  }
+}
+
 void konamiSnesPercussionUsesPackedGsDrumBank() {
   constexpr std::array<u8, 2> bytes{
       0x60,  // percussion on
@@ -764,13 +829,12 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
     return pitchTransitionIntent(automation) != nullptr;
   });
   expect(transition != tied.tracks[0].automations.end() &&
-             std::holds_alternative<SampledAutomationCurve>(pitchTransitionIntent(*transition)->curve) &&
-             std::get<SampledAutomationCurve>(pitchTransitionIntent(*transition)->curve).samples.size() >= 3 &&
+             std::holds_alternative<LinearAutomationCurve>(pitchTransitionIntent(*transition)->curve) &&
              std::ranges::none_of(tied.tracks[0].events,
                                   [](const PerformanceEvent& event) {
                                     return std::holds_alternative<PitchBendPerformanceEvent>(event);
                                   }),
-         "inline pitch slide should retain typed intent and its exact driver-tick curve");
+         "inline pitch slide should remain a shared linear transition");
 
   const MidiSequence exactPitchMidi = renderMidiSequence(tied);
   expect(std::ranges::any_of(exactPitchMidi.tracks[0].events,
@@ -785,13 +849,8 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
   expect(std::ranges::any_of(nativePitchMidi.tracks[0].events,
                              [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
              std::ranges::none_of(nativePitchMidi.tracks[0].events,
-                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }) &&
-             std::ranges::any_of(nativePitchMidi.diagnostics,
-                                 [](const Diagnostic& diagnostic) {
-                                   return diagnostic.severity == Severity::Warning &&
-                                          diagnostic.message.find("exact sampled pitch curve") != std::string::npos;
-                                 }),
-         "the same sampled transition should support a requested native-portamento approximation with a warning");
+                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+         "the shared linear transition should support native portamento");
 }
 
 void konamiSnesCompiledAutomationTicksFades() {

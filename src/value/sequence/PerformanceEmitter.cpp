@@ -491,9 +491,8 @@ PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double 
   const u32 durationTicks = timing.timelineTicks;
   const u64 start = tick_;
 
-  // Playback code supplies the driver's already-realized start pitch and tick.
-  // The core only links adjacent motion and closes a motion replaced at the
-  // same lane; it does not independently queue or retarget source commands.
+  // This explicit-start form trusts playback's realized pitch. Formats that
+  // need the value of an earlier shared transition use retargetPitchSlide().
   for (auto previous = track_.automations.rbegin(); previous != track_.automations.rend(); ++previous) {
     auto* previousPitch = pitchTransitionIntent(*previous);
     if (previousPitch == nullptr || previousPitch->lane != lane || previous->realization.endTick < start) {
@@ -530,6 +529,31 @@ PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double 
           },
   });
   return PitchSlideBinding{track_, static_cast<u32>(track_.automations.size() - 1)};
+}
+
+PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey,
+                                                         double targetKey, u32 durationTicks,
+                                                         PerformanceLaneId lane) {
+  return retargetPitchSlide(note, fallbackStartKey, targetKey, PitchSlideTiming::fromTicks(durationTicks), lane);
+}
+
+PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey,
+                                                         double targetKey, PitchSlideTiming timing,
+                                                         PerformanceLaneId lane) {
+  double startKey = fallbackStartKey;
+  for (auto previous = track_.automations.rbegin(); previous != track_.automations.rend(); ++previous) {
+    const auto* transition = pitchTransitionIntent(*previous);
+    if (transition == nullptr || transition->note != note || transition->lane != lane ||
+        previous->realization.startTick > tick_) {
+      continue;
+    }
+    const u64 realizedTick = std::min(tick_, previous->realization.endTick);
+    const u64 elapsed = realizedTick - previous->realization.startTick;
+    startKey = pitchTransitionValueAt(
+        *transition, static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max())));
+    break;
+  }
+  return pitchSlide(note, startKey, targetKey, std::move(timing), lane);
 }
 
 PerformanceAutomationBinding PerformanceEmitter::beginAutomation(ScalarPerformanceAutomationIntent intent) {

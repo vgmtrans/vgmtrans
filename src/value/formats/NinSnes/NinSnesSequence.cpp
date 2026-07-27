@@ -476,23 +476,75 @@ struct VibratoConfig {
   };
 }
 
-[[nodiscard]] double echoSend(u8 volumeLeft, u8 volumeRight) {
-  // EVOL is signed because negative values invert the echo signal. MIDI has no
-  // polarity control for its reverb send, so preserve the larger wet magnitude.
-  const int left = std::abs(static_cast<int>(static_cast<s8>(volumeLeft)));
-  const int right = std::abs(static_cast<int>(static_cast<s8>(volumeRight)));
-  return std::min(std::max(left, right) / 127.0, 1.0);
-}
+struct EchoState {
+  void reset() {
+    event = ReverbPerformanceEvent{.voiceMask = 0};
+    leftVolume.reset(0);
+    rightVolume.reset(0);
+    lastAdvanceTick.reset();
+  }
+
+  [[nodiscard]] ReverbPerformanceEvent current() const {
+    ReverbPerformanceEvent result = event;
+    const double left = gain(leftVolume.currentFixed());
+    const double right = gain(rightVolume.currentFixed());
+    result.send = std::max(std::abs(left), std::abs(right));
+    result.leftGain = left;
+    result.rightGain = right;
+    return result;
+  }
+
+  void set(u8 mask, u8 left, u8 right) {
+    event.voiceMask = mask;
+    leftVolume.reset(static_cast<s8>(left));
+    rightVolume.reset(static_cast<s8>(right));
+    lastAdvanceTick.reset();
+  }
+
+  void disable() { event.voiceMask = 0; }
+
+  void setParameters(u8 delay, u8 feedback, u8 filter) {
+    event.delayMilliseconds = static_cast<double>(delay & 0x0f) * 16.0;
+    event.feedback = static_cast<s8>(feedback) / 128.0;
+    event.filterIndex = filter;
+  }
+
+  [[nodiscard]] bool beginFade(u8 length, u8 left, u8 right) {
+    if (length == 0) {
+      set(*event.voiceMask, left, right);
+      return true;
+    }
+    static_cast<void>(leftVolume.begin(SequenceFixedPointMotion<s32>::toRawTarget(static_cast<s8>(left), length)));
+    static_cast<void>(rightVolume.begin(SequenceFixedPointMotion<s32>::toRawTarget(static_cast<s8>(right), length)));
+    lastAdvanceTick.reset();
+    return false;
+  }
+
+  [[nodiscard]] bool advanceFade(u64 tick) {
+    // Echo is global, but every active track calls this; advance its fade only once per sequence tick.
+    if (lastAdvanceTick == tick) {
+      return false;
+    }
+    lastAdvanceTick = tick;
+    const bool rightChanged = rightVolume.tick().shouldApply();
+    return leftVolume.tick().shouldApply() || rightChanged;
+  }
+
+private:
+  [[nodiscard]] static double gain(s32 fixedVolume) {
+    return std::clamp(static_cast<double>(fixedVolume) / (127.0 * 256.0), -1.0, 1.0);
+  }
+
+  ReverbPerformanceEvent event{.voiceMask = 0};
+  SequenceFixedPointAutomation<s32> leftVolume;
+  SequenceFixedPointAutomation<s32> rightVolume;
+  std::optional<u64> lastAdvanceTick;
+};
 
 struct ProgramState {
-  struct EchoChange {
-    u64 tick = 0;
-    u8 mask = 0;
-    double send = 0.0;
-  };
-
   explicit ProgramState(const SequenceProgram& program)
-      : selected(profile(static_cast<ProfileId>(program.config.profile))) {
+      : selected(profile(static_cast<ProfileId>(program.config.profile))),
+        intelliConditionalMask(static_cast<u8>(program.config.driverState)) {
     for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
       basePrograms[encoded] =
           encoded < program.sourceProgramMap.size() ? program.sourceProgramMap[encoded].key : encoded;
@@ -521,38 +573,7 @@ struct ProgramState {
     masterVolume = 0xff;
     masterFade.reset(masterVolume);
     masterFadeTrack.reset();
-  }
-
-  void setEcho(u64 tick, u8 mask, double send) {
-    if (collecting) {
-      echoChanges.push_back(EchoChange{.tick = tick, .mask = mask, .send = send});
-    }
-  }
-
-  void finalizePerformance(PerformanceSequence& performance) const {
-    u64 nextSequence = 0;
-    for (const PerformanceTrack& track : performance.tracks) {
-      for (const PerformanceEvent& event : track.events) {
-        nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
-      }
-    }
-
-    // EON is one DSP register write whose mask affects every voice. Materialize
-    // its eight channel results after independent track execution, including
-    // channels that were inactive when the source command ran.
-    for (PerformanceTrack& track : performance.tracks) {
-      for (const EchoChange& change : echoChanges) {
-        track.events.emplace_back(ReverbPerformanceEvent{
-            .header =
-                PerformanceEventHeader{
-                    .track = track.id,
-                    .tick = change.tick,
-                    .sequence = nextSequence++,
-                },
-            .send = (change.mask & (1u << track.sourceTrackNumber)) != 0 ? change.send : 0.0,
-        });
-      }
-    }
+    echo.reset();
   }
 
   [[nodiscard]] u32 resolveProgram(u8 encoded, u8 percussionMinimum, u8* logical = nullptr) const {
@@ -666,16 +687,17 @@ struct ProgramState {
   u8 percussionBase = 0;
   bool customNoteParameters = false;
   u8 intelliFlags = 0;
+  u8 intelliConditionalMask = 0;
   std::vector<VoiceRecord> voiceTable;
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
   u32 nextOverrideProgram = 0x80;
-  std::vector<EchoChange> echoChanges;
   std::map<u8, DrumSlot> standardDrums;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   std::optional<u32> tempoFadeTrack;
   u8 masterVolume = 0xff;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> masterFade;
   std::optional<u32> masterFadeTrack;
+  EchoState echo;
   SequenceRecipes recipes;
   bool collecting = true;
 };
@@ -1250,6 +1272,9 @@ struct Playback {
     if (program.masterFadeTrack == track.trackNumber) {
       advanceMasterFade();
     }
+    if (program.echo.advanceFade(vm.tick())) {
+      out.reverb(program.echo.current());
+    }
   }
 
   void globalTranspose(s8 semitones) {
@@ -1258,10 +1283,25 @@ struct Playback {
   }
 
   void echo(u8 channels, u8 volumeLeft, u8 volumeRight) {
-    program.setEcho(vm.tick(), channels, echoSend(volumeLeft, volumeRight));
+    program.echo.set(channels, volumeLeft, volumeRight);
+    out.reverb(program.echo.current());
   }
 
-  void echoOff() { program.setEcho(vm.tick(), 0, 0.0); }
+  void echoOff() {
+    program.echo.disable();
+    out.reverb(program.echo.current());
+  }
+
+  void echoParameters(u8 delay, u8 feedback, u8 filter) {
+    program.echo.setParameters(delay, feedback, filter);
+    out.reverb(program.echo.current());
+  }
+
+  void echoVolumeFade(u8 length, u8 volumeLeft, u8 volumeRight) {
+    if (program.echo.beginFade(length, volumeLeft, volumeRight)) {
+      out.reverb(program.echo.current());
+    }
+  }
 
   void percussionBase(u8 base) {
     program.percussionBase = base;
@@ -1390,6 +1430,11 @@ struct Playback {
       default:
         break;
     }
+  }
+
+  [[nodiscard]] Effects intelliConditionalJump(Address destination) {
+    const u8 channel = static_cast<u8>(1u << track.trackNumber);
+    return Effects{.step = (program.intelliConditionalMask & channel) == 0 ? vm.jump(destination) : vm.next()};
   }
 
   std::span<const u8> panTable = math::kPan;
@@ -1647,13 +1692,19 @@ struct DecodeContext {
     }
     case EventType::EchoOff:
       return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::echoOff>();
-    case EventType::EchoParameter:
+    case EventType::EchoParameter: {
+      auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
+      const u8 delay = event.u8("delay");
+      const u8 feedback = event.u8("feedback");
+      const u8 filter = event.u8("fir");
+      return event.invoke<&Playback::echoParameters>(delay, feedback, filter);
+    }
     case EventType::EchoVolumeFade: {
-      auto event = cursor.sourceOnly(type == EventType::EchoParameter ? "Echo Parameters" : "Echo Volume Fade");
-      event.u8(type == EventType::EchoParameter ? "delay" : "length");
-      event.u8(type == EventType::EchoParameter ? "feedback" : "volume_left");
-      event.u8(type == EventType::EchoParameter ? "fir" : "volume_right");
-      return event.ignore();
+      auto event = cursor.command("Echo Volume Fade", SequenceSemantic::State);
+      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const u8 volumeLeft = event.u8("volume_left");
+      const u8 volumeRight = event.u8("volume_right");
+      return event.invoke<&Playback::echoVolumeFade>(length, volumeLeft, volumeRight);
     }
     case EventType::PitchSlide: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
@@ -1709,15 +1760,20 @@ struct DecodeContext {
       return cursor.command("Legato Off", SequenceSemantic::State)
           .set<&TrackState::legato>(false)
           .emitLegatoPedal(false);
-    case EventType::IntelliConditionalJump:
-    case EventType::IntelliJump: {
-      auto event = cursor.command(type == EventType::IntelliJump ? "Short Jump" : "Conditional Short Jump",
-                                  SequenceSemantic::Jump);
+    case EventType::IntelliConditionalJump: {
+      auto event = cursor.command("Conditional Short Jump", SequenceSemantic::Jump);
       const u8 distance = event.u8("distance");
       const Address destination{event.nextAddress().value + distance};
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      // The driver's "conditional" form tests a state that legacy conversion
-      // has always treated as taken; retain that established interpretation.
+      return event.invoke<&Playback::intelliConditionalJump>(destination)
+          .mayBranchTo(destination, SemanticOperandRole::JumpTarget)
+          .runtimeControlFlow();
+    }
+    case EventType::IntelliJump: {
+      auto event = cursor.command("Short Jump", SequenceSemantic::Jump);
+      const u8 distance = event.u8("distance");
+      const Address destination{event.nextAddress().value + distance};
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       return event.jump(destination);
     }
     case EventType::IntelliFe3F5: {
@@ -2147,6 +2203,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
 
   SequenceProgram program = sequenceDialect().makeProgram(Address{layout.playlistAddress});
   program.config.profile = static_cast<u32>(layout.profile);
+  program.config.driverState =
+      layout.profile == ProfileId::IntelliFe3 && reader.has(0xb9, 1) ? reader.u8At(0xb9) : u8{0};
   program.sourceProgramMap = buildProgramMap(reader, layout);
   program.sectionPlaylist = std::move(playlist.playlist);
   DecodeContext context{

@@ -265,6 +265,8 @@ struct SequenceProgramBehavior {
 // executor. A single dialect can therefore execute every version of a format.
 struct SequenceProgramConfig {
   u32 profile = 0;
+  // Format-defined state captured alongside the sequence.
+  u32 driverState = 0;
 };
 
 struct SequenceProgram {

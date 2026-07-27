@@ -149,7 +149,15 @@ struct MasterLevelPerformanceEvent {
 
 struct ReverbPerformanceEvent {
   PerformanceEventHeader header;
+  // Song-wide DSP writes use this mask; absent means the event is track-local.
+  std::optional<u8> voiceMask;
   double send = 0.0;
+  // Source DSP state retained beyond the portable MIDI wet-send approximation.
+  std::optional<double> leftGain;
+  std::optional<double> rightGain;
+  std::optional<double> delayMilliseconds;
+  std::optional<double> feedback;
+  std::optional<u8> filterIndex;
 };
 
 struct MonoModePerformanceEvent {

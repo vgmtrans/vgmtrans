@@ -144,6 +144,7 @@ struct KonamiSnesLayout {
   // Only addresses needed after discovery are kept here. A missing optional
   // table still permits sequence export, but prevents synth construction.
   KonamiSnesVersion version = KONAMISNES_NONE;
+  bool indexedEchoFilter = false;
   u32 sequenceHeaderAddress = 0;
   std::optional<u32> spcDirAddress;
   std::optional<u32> commonInstrumentTableAddress;
