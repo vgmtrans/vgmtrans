@@ -310,9 +310,16 @@ struct SimulatedLfoState {
   double phaseCycles = 0.0;
   std::optional<LfoWaveform> waveform;
   std::optional<double> initialPhaseCycles;
+  std::optional<ModulationRange> pitchRangeSemitones;
+  u32 steppedDepthAttackSteps = 0;
+  u32 activeSteppedDepthAttackSteps = 0;
+  u32 steppedDepthAttackStep = 0;
+  double steppedDepthAttackPhaseCycles = 0.0;
+  bool sampleImmediatelyOnNote = false;
   bool phaseRunsAtZeroDepth = false;
   bool configured = false;
   bool started = false;
+  bool producedSample = false;
 };
 
 struct RenderTrackState {
@@ -529,7 +536,11 @@ void restartLfo(SimulatedLfoState& lfo, u64 tick, LfoInitialPhaseFallback fallba
   lfo.delayCounterMilliseconds = 0.0;
   lfo.cursorTick = tick;
   lfo.phaseCycles = initialLfoPhase(lfo, fallback);
+  lfo.activeSteppedDepthAttackSteps = lfo.steppedDepthAttackSteps;
+  lfo.steppedDepthAttackStep = lfo.activeSteppedDepthAttackSteps == 0 ? 0 : 1;
+  lfo.steppedDepthAttackPhaseCycles = 0.0;
   lfo.started = true;
+  lfo.producedSample = false;
 }
 
 void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceEvent& event,
@@ -548,6 +559,13 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   if (event.initialPhaseCycles) {
     lfo.initialPhaseCycles = event.initialPhaseCycles;
   }
+  if (event.pitchRangeSemitones) {
+    lfo.pitchRangeSemitones = event.pitchRangeSemitones;
+  }
+  if (event.steppedDepthAttackSteps) {
+    lfo.steppedDepthAttackSteps = *event.steppedDepthAttackSteps;
+  }
+  lfo.sampleImmediatelyOnNote = event.sampleImmediatelyOnNote;
   if (event.delayTicks) {
     lfo.delayTicks = *event.delayTicks;
   }
@@ -605,19 +623,50 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
       continue;
     }
 
+    const double phaseStep = lfo.cyclesPerTick.value_or(lfo.frequencyHz * tickSeconds);
+    const auto advancePhase = [&]() {
+      lfo.phaseCycles = std::fmod(lfo.phaseCycles + phaseStep, 1.0);
+      if (lfo.activeSteppedDepthAttackSteps != 0 && lfo.steppedDepthAttackStep < lfo.activeSteppedDepthAttackSteps) {
+        const double attackPhase = lfo.steppedDepthAttackPhaseCycles + phaseStep;
+        const u32 completedCycles = static_cast<u32>(std::floor(attackPhase));
+        lfo.steppedDepthAttackPhaseCycles = attackPhase - std::floor(attackPhase);
+        lfo.steppedDepthAttackStep =
+            std::min(lfo.activeSteppedDepthAttackSteps, lfo.steppedDepthAttackStep + completedCycles);
+      }
+    };
+    if (lfo.producedSample && lfo.sampleImmediatelyOnNote) {
+      advancePhase();
+    }
     const double value = lfoValue(lfo.waveform.value_or(LfoWaveform::Triangle), lfo.phaseCycles);
     if (lfo.depth > 0.0) {
       apply(lfo.cursorTick, value);
     }
-    const double phaseStep = lfo.cyclesPerTick.value_or(lfo.frequencyHz * tickSeconds);
-    lfo.phaseCycles = std::fmod(lfo.phaseCycles + phaseStep, 1.0);
+    lfo.producedSample = true;
+    if (!lfo.sampleImmediatelyOnNote) {
+      advancePhase();
+    }
   }
+}
+
+[[nodiscard]] double lfoDepthScale(const SimulatedLfoState& lfo) {
+  if (lfo.activeSteppedDepthAttackSteps == 0) {
+    return 1.0;
+  }
+  return static_cast<double>(lfo.steppedDepthAttackStep) / static_cast<double>(lfo.activeSteppedDepthAttackSteps);
+}
+
+[[nodiscard]] double simulatedVibratoAtPhase(const SimulatedLfoState& lfo, double value) {
+  double semitones = lfo.depth * value;
+  if (lfo.pitchRangeSemitones) {
+    semitones = value >= 0.0 ? value * lfo.pitchRangeSemitones->maximum : -value * lfo.pitchRangeSemitones->minimum;
+  }
+  return semitones * lfoDepthScale(lfo);
 }
 
 void flushSimulatedVibrato(MidiTrack& track, RenderTrackState& state, u64 upToTick, u8 channel,
                            const PerformanceTempoMap& tempos) {
   flushLfo(state.vibrato, upToTick, tempos, [&](u64 tick, double value) {
-    state.simulatedVibratoSemitones = state.vibrato.depth * value;
+    state.simulatedVibratoSemitones = simulatedVibratoAtPhase(state.vibrato, value);
     addCombinedPitchBend(track, state, tick, channel, false);
   });
 }
@@ -636,8 +685,18 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
   }
 
   restartLfo(state.vibrato, tick);
-  if (state.simulatedVibratoSemitones != 0.0) {
-    state.simulatedVibratoSemitones = 0.0;
+  const double previousSemitones = state.simulatedVibratoSemitones;
+  const bool startsImmediately = state.vibrato.sampleImmediatelyOnNote && state.vibrato.delayTicks == 0 &&
+                                 state.vibrato.delayMilliseconds.value_or(0.0) <= 0.0 &&
+                                 state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0 &&
+                                 state.vibrato.depth > 0.0;
+  state.simulatedVibratoSemitones =
+      startsImmediately
+          ? simulatedVibratoAtPhase(state.vibrato, lfoValue(state.vibrato.waveform.value_or(LfoWaveform::Triangle),
+                                                            state.vibrato.phaseCycles))
+          : 0.0;
+  state.vibrato.producedSample = startsImmediately;
+  if (startsImmediately || previousSemitones != 0.0) {
     addCombinedPitchBend(track, state, tick, channel, false);
   }
 }

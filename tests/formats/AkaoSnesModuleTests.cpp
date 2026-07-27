@@ -455,6 +455,112 @@ void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation() {
          "unknown commands should project their opcode field exactly once");
 }
 
+void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
+  constexpr u32 start = 0x20;
+  const AkaoSnesProfile ff5{.version = AKAOSNES_V3, .minorVersion = AKAOSNES_V3_FF5};
+
+  const auto renderVibrato = [&](u8 delay, u8 rate, u8 depth) {
+    std::vector<u8> bytes(0x80, 0xf2);
+    bytes[start] = 0xd7;
+    bytes[start + 1] = delay;
+    bytes[start + 2] = rate;
+    bytes[start + 3] = depth;
+    bytes[start + 4] = 0x00;
+    bytes[start + 5] = 0xf2;
+    return renderTracks(ff5, {decodeTrack(bytes, ff5, start, start + 6)});
+  };
+  const auto depthEvent = [](const PerformanceSequence& performance) -> const ModulationPerformanceEvent* {
+    for (const PerformanceEvent& event : performance.tracks.front().events) {
+      const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+      if (modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoDepth) {
+        return modulation;
+      }
+    }
+    return nullptr;
+  };
+  const auto bendValues = [](const MidiSequence& midi) {
+    std::vector<const PitchBend*> bends;
+    for (const MidiEvent& event : midi.tracks.front().events) {
+      if (const auto* bend = std::get_if<PitchBend>(&event)) {
+        bends.push_back(bend);
+      }
+    }
+    return bends;
+  };
+
+  struct ModeCase {
+    u8 depth = 0;
+    double initialPhase = 0.0;
+    bool hasDownwardExcursion = false;
+    bool hasUpwardExcursion = false;
+  };
+  const std::array<ModeCase, 3> modes{
+      ModeCase{.depth = 0x3f, .initialPhase = 0.5, .hasDownwardExcursion = true},
+      ModeCase{.depth = 0x7f, .initialPhase = 0.0, .hasUpwardExcursion = true},
+      ModeCase{.depth = 0xff, .initialPhase = 0.0, .hasDownwardExcursion = true, .hasUpwardExcursion = true},
+  };
+
+  for (const ModeCase mode : modes) {
+    const PerformanceSequence performance = renderVibrato(0, 0x0c, mode.depth);
+    expect(performance.diagnostics.empty(), "valid AkaoSnes V3 vibrato should render without diagnostics");
+    const ModulationPerformanceEvent* depth = depthEvent(performance);
+    expect(depth != nullptr && depth->waveform == LfoWaveform::Square &&
+               depth->initialPhaseCycles == mode.initialPhase && depth->pitchRangeSemitones &&
+               depth->steppedDepthAttackSteps == 0,
+           "AkaoSnes V3 vibrato should retain its square waveform, phase, and packed direction mode");
+    expect(
+        (depth->pitchRangeSemitones->minimum < 0.0) == mode.hasDownwardExcursion &&
+            (depth->pitchRangeSemitones->maximum > 0.0) == mode.hasUpwardExcursion && depth->pitchDepthSemitones &&
+            std::abs(*depth->pitchDepthSemitones - std::max(std::abs(depth->pitchRangeSemitones->minimum),
+                                                            std::abs(depth->pitchRangeSemitones->maximum))) < 0.000001,
+        "AkaoSnes V3 packed depth modes should retain their full asymmetric pitch endpoints");
+
+    const auto rates = eventsOfType<ModulationPerformanceEvent>(performance.tracks.front());
+    const auto rate = std::ranges::find_if(rates, [](const ModulationPerformanceEvent* event) {
+      return event->target == ModulationPerformanceTarget::VibratoRate;
+    });
+    const double expectedRate = akaoSnesFrameRateHz(0x24) / 26.0;
+    expect(rate != rates.end() && (*rate)->frequencyHz && std::abs(*(*rate)->frequencyHz - expectedRate) < 0.000001,
+           "AkaoSnes V3 vibrato rate should use rate plus one driver frames per held state");
+
+    const MidiSequence midi =
+        renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+    const auto bends = bendValues(midi);
+    const bool hasNegative = std::ranges::any_of(bends, [](const PitchBend* bend) { return bend->value < -3000; });
+    const bool hasPositive = std::ranges::any_of(bends, [](const PitchBend* bend) { return bend->value > 3000; });
+    expect(hasNegative == mode.hasDownwardExcursion && hasPositive == mode.hasUpwardExcursion,
+           "AkaoSnes V3 sequence-event simulation should preserve downward, upward, and bipolar square modes");
+    expect(std::ranges::any_of(bends,
+                               [&](const PitchBend* bend) {
+                                 return bend->tick == 0 &&
+                                        (mode.hasUpwardExcursion ? bend->value > 3000 : bend->value < -3000);
+                               }),
+           "AkaoSnes V3 zero-delay vibrato should calculate its first held sample on the note-on tick");
+  }
+
+  const PerformanceSequence delayed = renderVibrato(1, 0x1f, 0x7f);
+  const ModulationPerformanceEvent* delayedDepth = depthEvent(delayed);
+  expect(delayedDepth != nullptr && delayedDepth->steppedDepthAttackSteps == 4,
+         "a nonzero AkaoSnes V3 delay should configure the four-stage per-note depth attack");
+  expect(std::ranges::count_if(delayed.tracks.front().events,
+                               [](const PerformanceEvent& event) {
+                                 const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+                                 return modulation != nullptr &&
+                                        modulation->target == ModulationPerformanceTarget::VibratoDepth;
+                               }) == 1,
+         "AkaoSnes V3 should not replace its held depth stages with a linear sequence-tick fade");
+
+  const MidiSequence delayedMidi =
+      renderMidiSequence(delayed, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto delayedBends = bendValues(delayedMidi);
+  const auto firstExcursion = std::ranges::find_if(delayedBends, [](const PitchBend* bend) { return bend->value > 0; });
+  expect(firstExcursion != delayedBends.end() && (*firstExcursion)->tick == 1 && (*firstExcursion)->value > 800 &&
+             (*firstExcursion)->value < 1200 &&
+             std::ranges::any_of(
+                 delayedBends, [](const PitchBend* bend) { return bend->value > 3500; }),
+         "AkaoSnes V3 delayed vibrato should begin one tick later at quarter depth and reach full depth by stages");
+}
+
 void akaoSnesCompiledAutomationTicksControllerAndTempoFades() {
   constexpr u32 start = 0x20;
   const AkaoSnesProfile ff6{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};

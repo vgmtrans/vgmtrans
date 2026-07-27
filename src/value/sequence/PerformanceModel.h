@@ -284,6 +284,16 @@ struct LfoPerformanceContext {
   // Oscillator position, in cycles, used when playback starts or a note resets
   // the phase. Zero is the bipolar triangle's center/rising point.
   std::optional<double> initialPhaseCycles;
+  // Optional asymmetric pitch endpoints for one normalized LFO cycle. The
+  // ordinary pitchDepthSemitones value remains the maximum absolute excursion
+  // used by target-neutral modulation planning.
+  std::optional<ModulationRange> pitchRangeSemitones;
+  // A stepped attack starts at 1/N depth and advances one step after each
+  // complete oscillator cycle until it reaches full depth.
+  std::optional<u32> steppedDepthAttackSteps;
+  // Calculate the first oscillator sample on a fresh note instead of waiting
+  // for the first rendered sequence-tick boundary.
+  bool sampleImmediatelyOnNote = false;
   bool phaseRunsAtZeroDepth = false;
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
 };
@@ -306,6 +316,9 @@ struct ModulationPerformanceEvent {
   // A missing waveform retains the renderer's legacy/default LFO shape.
   std::optional<LfoWaveform> waveform;
   std::optional<double> initialPhaseCycles;
+  std::optional<ModulationRange> pitchRangeSemitones;
+  std::optional<u32> steppedDepthAttackSteps;
+  bool sampleImmediatelyOnNote = false;
   // Some drivers keep advancing the oscillator while its depth is zero. This
   // matters when a later command reveals an already-running LFO mid-note.
   bool phaseRunsAtZeroDepth = false;

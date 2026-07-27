@@ -406,6 +406,9 @@ namespace {
       .delayIsTempoRelative = context.delayIsTempoRelative,
       .waveform = context.waveform,
       .initialPhaseCycles = context.initialPhaseCycles,
+      .pitchRangeSemitones = context.pitchRangeSemitones,
+      .steppedDepthAttackSteps = context.steppedDepthAttackSteps,
+      .sampleImmediatelyOnNote = context.sampleImmediatelyOnNote,
       .phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth,
       .tremoloGainMode = context.tremoloGainMode,
   };
