@@ -476,10 +476,19 @@ struct VibratoConfig {
   };
 }
 
+[[nodiscard]] double echoSend(u8 volumeLeft, u8 volumeRight) {
+  // EVOL is signed because negative values invert the echo signal. MIDI has no
+  // polarity control for its reverb send, so preserve the larger wet magnitude.
+  const int left = std::abs(static_cast<int>(static_cast<s8>(volumeLeft)));
+  const int right = std::abs(static_cast<int>(static_cast<s8>(volumeRight)));
+  return std::min(std::max(left, right) / 127.0, 1.0);
+}
+
 struct ProgramState {
   struct EchoChange {
     u64 tick = 0;
     u8 mask = 0;
+    double send = 0.0;
   };
 
   explicit ProgramState(const SequenceProgram& program)
@@ -514,9 +523,9 @@ struct ProgramState {
     masterFadeTrack.reset();
   }
 
-  void setEcho(u64 tick, u8 mask) {
+  void setEcho(u64 tick, u8 mask, double send) {
     if (collecting) {
-      echoChanges.push_back(EchoChange{.tick = tick, .mask = mask});
+      echoChanges.push_back(EchoChange{.tick = tick, .mask = mask, .send = send});
     }
   }
 
@@ -540,7 +549,7 @@ struct ProgramState {
                     .tick = change.tick,
                     .sequence = nextSequence++,
                 },
-            .send = (change.mask & (1u << track.sourceTrackNumber)) != 0 ? 40.0 / 127.0 : 0.0,
+            .send = (change.mask & (1u << track.sourceTrackNumber)) != 0 ? change.send : 0.0,
         });
       }
     }
@@ -729,6 +738,8 @@ struct TrackState {
   u8 patternRemaining = 0;
   Address patternStart;
   Address konamiLoopStart;
+  u8 konamiLoopVolumeDelta = 0;
+  s16 konamiLoopPitchDelta = 0;
   VibratoConfig vibrato;
   PitchEnvelope pitchEnvelope;
   PitchState pitch;
@@ -763,7 +774,9 @@ struct Playback {
     track.noteLength = duration;
     if (hasPacked) {
       track.durationRate = durationValue;
-      track.velocity = velocityValue;
+      track.velocity = program.selected.id == ProfileId::Konami
+                           ? static_cast<u8>(velocityValue + track.konamiLoopVolumeDelta)
+                           : velocityValue;
     }
   }
 
@@ -965,7 +978,8 @@ struct Playback {
 
   [[nodiscard]] Effects note(u8 noteIndex) {
     switchToMelodicProgram();
-    const double key = kMelodicKeyCorrection + noteIndex + track.transpose;
+    const double key =
+        kMelodicKeyCorrection + noteIndex + track.transpose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
     beginNotePitch(noteIndex);
     track.lastNote = out.note(key, math::levelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
     track.lastKey = key;
@@ -999,7 +1013,7 @@ struct Playback {
       const u8 key = static_cast<u8>(0x24 + logical - program.percussionBase);
       program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose);
       switchToDrumProgram(0);
-      const double outputKey = key - program.globalTranspose;
+      const double outputKey = key - program.globalTranspose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
       beginNotePitch(static_cast<u8>(key - program.globalTranspose));
       track.lastNote = out.note(outputKey, math::levelGain(track.velocity), duration);
       track.lastKey = outputKey;
@@ -1243,7 +1257,11 @@ struct Playback {
     out.globalTranspose(semitones);
   }
 
-  void echo(u8 channels) { program.setEcho(vm.tick(), channels); }
+  void echo(u8 channels, u8 volumeLeft, u8 volumeRight) {
+    program.setEcho(vm.tick(), channels, echoSend(volumeLeft, volumeRight));
+  }
+
+  void echoOff() { program.setEcho(vm.tick(), 0, 0.0); }
 
   void percussionBase(u8 base) {
     program.percussionBase = base;
@@ -1258,8 +1276,28 @@ struct Playback {
 
   void pitchEnvelopeOff() { track.pitchEnvelope = {}; }
 
-  [[nodiscard]] Effects konamiLoop(u8 times, Address destination) {
-    return vm.countedRepeatUntil(0, times == 0 ? 256 : times, destination);
+  [[nodiscard]] Effects konamiLoop(u8 times, s8 volumeDelta, s8 pitchDelta, Address destination) {
+    RepeatCounter counter = vm.repeatCounter(0);
+    if (counter.firstVisit()) {
+      counter.start(times == 0 ? 256 : times);
+    }
+
+    if (counter.consumeReplay()) {
+      // The driver accumulates these operands only for another pass. Volume is
+      // an eight-bit add applied when the packed note parameters are read;
+      // pitch uses signed 16-bit units with 1/256 semitone resolution.
+      track.konamiLoopVolumeDelta = static_cast<u8>(track.konamiLoopVolumeDelta + static_cast<u8>(volumeDelta));
+      const u16 pitchBits =
+          static_cast<u16>(track.konamiLoopPitchDelta) + static_cast<u16>(static_cast<s16>(pitchDelta) * 16);
+      track.konamiLoopPitchDelta =
+          pitchBits < 0x8000 ? static_cast<s16>(pitchBits) : static_cast<s16>(static_cast<s32>(pitchBits) - 0x10000);
+      return Effects{.step = vm.jump(destination)};
+    }
+
+    counter.finish();
+    track.konamiLoopVolumeDelta = 0;
+    track.konamiLoopPitchDelta = 0;
+    return Effects{.step = vm.next()};
   }
 
   void defineVoiceTable(u8 size) { program.voiceTable.assign(size, VoiceRecord{}); }
@@ -1603,12 +1641,12 @@ struct DecodeContext {
     case EventType::EchoOn: {
       auto event = cursor.command("Echo", SequenceSemantic::State);
       const u8 channels = event.u8("channels", SourceValueDisplay::Hex);
-      event.u8("volume_left");
-      event.u8("volume_right");
-      return event.invoke<&Playback::echo>(channels);
+      const u8 volumeLeft = event.u8("volume_left");
+      const u8 volumeRight = event.u8("volume_right");
+      return event.invoke<&Playback::echo>(channels, volumeLeft, volumeRight);
     }
     case EventType::EchoOff:
-      return cursor.sourceOnly("Echo Off").ignore();
+      return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::echoOff>();
     case EventType::EchoParameter:
     case EventType::EchoVolumeFade: {
       auto event = cursor.sourceOnly(type == EventType::EchoParameter ? "Echo Parameters" : "Echo Volume Fade");
@@ -1637,9 +1675,9 @@ struct DecodeContext {
     case EventType::KonamiLoopEnd: {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
       const u8 times = event.u8("times", SemanticOperandRole::Count);
-      event.s8("volume_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      event.s8("pitch_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
-      event.invoke<&Playback::konamiLoop>(times, event.state<&TrackState::konamiLoopStart>());
+      const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      event.invoke<&Playback::konamiLoop>(times, volumeDelta, pitchDelta, event.state<&TrackState::konamiLoopStart>());
       return event.runtimeControlFlow();
     }
     case EventType::KonamiAdsrGain: {

@@ -362,6 +362,89 @@ void ninSnesProfilesEmitSubtractiveTremolo() {
   }
 }
 
+void ninSnesStandardEchoUsesMaskLevelAndDisable() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x320}});
+
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0xf5,
+          0x03,
+          0x40,
+          0x20,  // enable both tracks, larger wet level on the left
+          4,
+          0xc9,  // allow the echo state to remain active for four ticks
+          0xf6,  // disable echo globally
+          0,
+      },
+      bytes.begin() + 0x300);
+  std::ranges::copy(std::initializer_list<u8>{8, 0x7f, 0x80, 0}, bytes.begin() + 0x320);
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  expect(performance.tracks.size() == 8, "standard echo fixture should retain all eight DSP voices");
+  for (size_t index = 0; index < performance.tracks.size(); ++index) {
+    const PerformanceTrack& track = performance.tracks[index];
+    const auto enabled = std::ranges::find_if(track.events, [](const PerformanceEvent& event) {
+      const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
+      return reverb != nullptr && reverb->header.tick == 0 && std::abs(reverb->send - (64.0 / 127.0)) < 0.0001;
+    });
+    const auto disabled = std::ranges::find_if(track.events, [](const PerformanceEvent& event) {
+      const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
+      return reverb != nullptr && reverb->header.tick == 4 && reverb->send == 0.0;
+    });
+    expect((enabled != track.events.end()) == (index < 2) && disabled != track.events.end(),
+           "standard echo should apply its wet magnitude through EON only to masked voices and honor echo-off");
+  }
+}
+
+void ninSnesKonamiLoopAppliesAndClearsReplayDeltas() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0xe5,  // loop start
+          4,
+          0x7f,
+          0x80,  // packed parameters and C note
+          0xe6,
+          3,
+          0xf6,
+          0x01,  // three plays; -10 velocity and +1/16 semitone per replay
+          4,
+          0x7f,
+          0x80,  // loop deltas must be clear after the final pass
+          0,
+      },
+      bytes.begin() + 0x300);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  layout.volumeTable.assign(16, 0);
+  layout.volumeTable[15] = 100;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 4, "Konami N-SPC loop should play three passes plus the following note");
+  constexpr std::array expectedVelocities{100, 90, 80, 100};
+  constexpr std::array expectedKeys{24.0, 24.0625, 24.125, 24.0};
+  for (size_t index = 0; index < notes.size(); ++index) {
+    expect(std::abs(notes[index]->linearVelocity - ninSnesLevelGain(expectedVelocities[index])) < 0.0001,
+           "Konami N-SPC loop should apply its accumulated per-note volume delta");
+    expect(std::abs(notes[index]->key - expectedKeys[index]) < 0.0001,
+           "Konami N-SPC loop should apply its accumulated 1/16-semitone pitch delta");
+  }
+}
+
 void ninSnesNoteVelocityPreservesLegacyCurve() {
   std::vector<u8> bytes(kAramSize);
   writeLe16(bytes, 0x100, 0x200);

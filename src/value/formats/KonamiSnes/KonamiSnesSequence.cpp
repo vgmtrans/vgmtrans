@@ -119,13 +119,6 @@ struct DecodedPitchSlide {
   return static_cast<u32>(std::min<double>(std::lround(ticks), std::numeric_limits<u32>::max()));
 }
 
-[[nodiscard]] double vibratoCyclesPerTick(KonamiSnesVersion version, u8 rate) {
-  const u16 factor = vibrato::rateFactor(version, rate, kKonamiSnesDefaultTempo);
-  return factor == 0 ? 0.0
-                     : vibrato::baseHz(version) * factor *
-                           sequenceTickSeconds(version, kKonamiSnesDefaultTempo);
-}
-
 [[nodiscard]] double tuningCents(s8 tuning) {
   return tuning * (400.0 / 256.0);
 }
@@ -301,6 +294,7 @@ struct TrackState {
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   LfoState vibrato;
+  u8 vibratoPhaseStep = 0;
 
   // A slide is stored as an absolute note pitch, but exported pitch bends are
   // measured relative to the note that began the slide.
@@ -417,6 +411,7 @@ struct Playback {
 
   void configureVibrato(u8 delay, u8 rate, u8 depth, u8 builtInFade) {
     track.vibrato.configure(delay, rate, depth);
+    track.vibratoPhaseStep = vibrato::usesEarlyCounter(track.version) ? vibrato::earlyPhaseStep(rate, track.tempo) : 0;
     if (builtInFade != 0) {
       // In later versions a large first argument means "fade in over N ticks"
       // rather than "wait N ticks before starting."
@@ -617,7 +612,7 @@ private:
   }
 
   void emitVibratoDepth(PerformanceEmitter output, bool force = false) {
-    const bool active = vibrato::isActive(track.version, track.vibrato.rate(), track.vibrato.depth());
+    const bool active = vibratoActive();
     double depthSemitones = 0.0;
     if (active) {
       const double currentCents =
@@ -627,9 +622,26 @@ private:
       depthSemitones = currentCents / 100.0;
     }
     if (force || std::abs(depthSemitones - track.lastVibratoDepthSemitones) > 0.0001) {
-      output.vibratoDepth(depthSemitones);
+      output.vibratoDepth(depthSemitones, vibratoLfoContext());
       track.lastVibratoDepthSemitones = depthSemitones;
     }
+  }
+
+  [[nodiscard]] bool vibratoActive() const {
+    if (track.vibrato.depth() == 0) {
+      return false;
+    }
+    return vibrato::usesEarlyCounter(track.version) ? vibrato::foldedPhaseStep(track.vibratoPhaseStep) != 0
+                                                    : track.vibrato.rate() != 0;
+  }
+
+  [[nodiscard]] LfoPerformanceContext vibratoLfoContext() const {
+    return LfoPerformanceContext{
+        .waveform = LfoWaveform::Triangle,
+        // The source phase resets to zero on a note. A phase step above $80
+        // traverses that same triangle backward, so it starts center/falling.
+        .initialPhaseCycles = vibrato::usesEarlyCounter(track.version) && track.vibratoPhaseStep > 0x80 ? 0.5 : 0.0,
+    };
   }
 
   void beginVibratoFadeAutomation(u8 length) {
@@ -643,24 +655,25 @@ private:
   }
 
   void emitVibratoRate() {
-    if (vibrato::usesLegacy(track.version)) {
-      out.vibratoRateCyclesPerTick(vibratoCyclesPerTick(track.version, track.vibrato.rate()));
+    if (vibrato::usesEarlyCounter(track.version)) {
+      const u16 factor = vibratoActive() ? static_cast<u16>(vibrato::foldedPhaseStep(track.vibratoPhaseStep)) << 8 : 0;
+      out.vibratoRate(factor == 0 ? 0.0 : vibrato::baseHz(track.version) * factor, vibratoLfoContext());
       return;
     }
     const u16 factor = vibrato::rateFactor(track.version, track.vibrato.rate(), track.tempo);
-    out.vibratoRate(factor == 0 ? 0.0 : vibrato::baseHz(track.version) * factor);
+    out.vibratoRate(vibratoActive() && factor != 0 ? vibrato::baseHz(track.version) * factor : 0.0,
+                    vibratoLfoContext());
   }
 
   void emitVibratoDelay() {
-    if (!vibrato::isActive(track.version, track.vibrato.rate(), track.vibrato.depth())) {
+    if (!vibratoActive()) {
       // Clear both the simulation delay and the synth controller when vibrato
       // is disabled by either a zero rate or zero depth.
       out.vibratoDelay(0, 0);
       return;
     }
-    if (vibrato::usesLegacy(track.version)) {
-      out.vibratoDelayTicks(
-          vibratoDelayTicks(track.version, track.vibrato.delay(), kKonamiSnesDefaultTempo));
+    if (vibrato::usesEarlyCounter(track.version)) {
+      out.vibratoDelayTicks(vibratoDelayTicks(track.version, track.vibrato.delay(), kKonamiSnesDefaultTempo));
       return;
     }
     out.vibratoDelayPhysical(vibratoDelayTicks(track.version, track.vibrato.delay(), track.tempo),
@@ -1061,8 +1074,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
               .initialLevel = 1.0,
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 2,
-              .initialTempoMicrosecondsPerQuarter =
-                  tempoMicrosecondsPerQuarter(version, kKonamiSnesDefaultTempo),
+              .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(version, kKonamiSnesDefaultTempo),
           },
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
   });
