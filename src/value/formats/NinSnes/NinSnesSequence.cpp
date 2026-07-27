@@ -34,6 +34,7 @@ constexpr u32 kMaxTrackCommands = 32768;
 constexpr u8 kMelodicKeyCorrection = 24;
 constexpr u8 kIntelliDrumSlots = 16;
 constexpr u8 kDefaultTempo = 0x20;
+constexpr u16 kNoEarlierPercussionNote = 0x100;
 constexpr u32 kFixedPercussionBaseFlag = 1u << 8;
 constexpr u32 kFixedPercussionBaseShift = 16;
 
@@ -620,14 +621,17 @@ struct ProgramState {
     return program;
   }
 
-  void rememberStandardDrum(u8 logicalProgram, u32 sourceProgram, u8 key, s8 transpose) {
+  void rememberStandardDrum(u8 logicalProgram, u32 sourceProgram, u8 key, s8 transpose, u16 earlierNote) {
     if (!collecting) {
       return;
+    }
+    if (earlierNote <= 0xff) {
+      standardDrumPitchModel = DrumPitchModel::EarlierTableNote;
     }
     standardDrums[logicalProgram] = DrumSlot{
         .key = key,
         .sourceProgram = sourceProgram,
-        .sourceNote = 0x3c,
+        .sourceNote = earlierNote <= 0xff ? static_cast<u8>(earlierNote) : u8{0x3c},
         .globalTranspose = transpose,
     };
   }
@@ -674,7 +678,7 @@ struct ProgramState {
     if (!standardDrums.empty()) {
       DrumKit kit{
           .program = 0,
-          .pitchModel = DrumPitchModel::StandardMapping,
+          .pitchModel = standardDrumPitchModel,
       };
       for (const auto& [_, slot] : standardDrums) {
         kit.slots.push_back(slot);
@@ -700,6 +704,7 @@ struct ProgramState {
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
   u32 nextOverrideProgram = 0x80;
   std::map<u8, DrumSlot> standardDrums;
+  DrumPitchModel standardDrumPitchModel = DrumPitchModel::StandardMapping;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   std::optional<u32> tempoFadeTrack;
   u8 masterVolume = 0xff;
@@ -1016,7 +1021,7 @@ struct Playback {
     return Effects::wait(track.noteLength);
   }
 
-  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli) {
+  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli, u16 earlierNote) {
     const u8 duration = soundingDuration();
     if (intelli) {
       const bool custom = (program.intelliFlags & 0x40) != 0;
@@ -1037,11 +1042,13 @@ struct Playback {
       track.lastNote = out.note(key, math::levelGain(track.velocity), duration);
       track.lastKey = key;
     } else {
-      u8 logical = 0;
+      const bool earlier = earlierNote <= 0xff;
+      u8 logical = earlier ? slot : 0;
       const u32 sourceProgram =
-          program.resolveProgram(static_cast<u8>(slot + program.percussionBase), percussionMinimum, &logical);
+          earlier ? kEarlierPercussionProgramBase + slot
+                  : program.resolveProgram(static_cast<u8>(slot + program.percussionBase), percussionMinimum, &logical);
       const u8 key = static_cast<u8>(0x24 + logical - program.percussionBase);
-      program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose);
+      program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose, earlierNote);
       switchToDrumProgram(0);
       const double outputKey = key - program.globalTranspose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
       beginNotePitch(static_cast<u8>(key - program.globalTranspose));
@@ -1581,7 +1588,14 @@ struct DecodeContext {
       const bool intelli =
           (context.selected.intelli == IntelliMode::Ta || context.selected.intelli == IntelliMode::Fe4) &&
           slot < kIntelliDrumSlots;
-      return event.invoke<&Playback::percussion>(slot, context.definition.status.percussionMin, intelli);
+      u16 earlierNote = kNoEarlierPercussionNote;
+      if (context.layout.percussionTableAddress) {
+        const u32 address = *context.layout.percussionTableAddress + slot * 6;
+        if (context.reader.has(address, 6)) {
+          earlierNote = context.reader.u8At(address + 5);
+        }
+      }
+      return event.invoke<&Playback::percussion>(slot, context.definition.status.percussionMin, intelli, earlierNote);
     }
     case EventType::Program:
     case EventType::Rd2ProgramAndAdsr: {
@@ -2180,34 +2194,6 @@ struct PlaylistDecode {
   return map;
 }
 
-void resolveEarlierPercussion(ByteReader reader, const Layout& layout, SequenceRecipes& recipes) {
-  if (!layout.percussionTableAddress) {
-    return;
-  }
-  for (DrumKit& kit : recipes.drumKits) {
-    if (kit.pitchModel != DrumPitchModel::StandardMapping) {
-      continue;
-    }
-    bool resolved = false;
-    for (DrumSlot& slot : kit.slots) {
-      if (slot.key < 0x24 || slot.key >= 0x24 + kEarlierPercussionSlotCount) {
-        continue;
-      }
-      const u8 index = static_cast<u8>(slot.key - 0x24);
-      const u32 address = *layout.percussionTableAddress + index * 6;
-      if (!reader.has(address, 6)) {
-        continue;
-      }
-      slot.sourceProgram = kEarlierPercussionProgramBase + index;
-      slot.sourceNote = reader.u8At(address + 5);
-      resolved = true;
-    }
-    if (resolved) {
-      kit.pitchModel = DrumPitchModel::EarlierTableNote;
-    }
-  }
-}
-
 [[nodiscard]] SequenceRecipes projectRecipes(const ProgramState& state) {
   return state.recipes;
 }
@@ -2309,7 +2295,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
 
   SequenceRecipes recipes =
       analyzeCompiledProgram<ProgramState, SequenceRecipes>(program, sequenceDialect(), projectRecipes);
-  resolveEarlierPercussion(reader, layout, recipes);
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(recipes),
