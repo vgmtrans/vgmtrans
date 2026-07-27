@@ -2002,7 +2002,7 @@ struct PlaylistDecode {
       } else {
         const u16 storedDestination = reader.le16(address + 2);
         const u16 destination = layout.resolveAddress(storedDestination);
-        const bool infinite = selected.playlist == PlaylistModel::Tose ? (value == 0 || value == 0xff) : value > 0x80;
+        const bool infinite = isInfinitePlaylistRepeat(selected.playlist, value);
         command.fallthrough = Address{address + 4};
         command.range = reader.range(address, 4);
         command.operation = PlaylistRepeat{
@@ -2209,7 +2209,7 @@ const SequenceDialect& sequenceDialect() {
   return dialect;
 }
 
-bool hasValidSequence(ByteReader reader, const Layout& layout) {
+bool isValidPlaylist(ByteReader reader, const Layout& layout) {
   const SectionPlaylist& playlist = decodePlaylist(reader, layout, AssetId{}, nullptr, nullptr).playlist;
   if (playlist.commands.empty() || playlist.sections.empty()) {
     return false;
