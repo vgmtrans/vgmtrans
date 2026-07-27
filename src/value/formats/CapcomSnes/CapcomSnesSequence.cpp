@@ -256,7 +256,10 @@ struct Playback {
           .key = outputKey,
           .linearVelocity = 1.0,
           .durationTicks = duration + (track.noteSlurred ? 1u : 0u),
-          .restartsLfoPhase = track.resetLfoPhaseOnNote && !track.noteSlurred,
+          // The driver decides whether this note is a new key-on from the
+          // preceding note's slur bit. The current note's slur bit controls
+          // whether the following note will be tied to this one.
+          .restartsLfoPhase = track.resetLfoPhaseOnNote && !track.lastNoteSlurred,
       });
       emitPitchSlideTo(note, key);
       track.lastNote = note;
