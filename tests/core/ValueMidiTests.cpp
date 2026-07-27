@@ -1049,6 +1049,85 @@ void performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato() {
          "sequence-event export should add simulated vibrato around the active pitch slide");
 }
 
+void performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 3,
+          .events =
+              {
+                  PitchBendRangePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .cents = 200,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .frequencyHz = 0.0,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .pitchDepthSemitones = 0.75,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 1},
+                      .semitones = 2.0,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 2},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .frequencyHz = 1.0,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  std::vector<std::pair<u64, u16>> pitchBendRanges;
+  for (const MidiEvent& event : midi.tracks[0].events) {
+    if (const auto* range = std::get_if<PitchBendRange>(&event)) {
+      pitchBendRanges.emplace_back(range->tick, range->cents);
+    }
+  }
+
+  const std::vector<std::pair<u64, u16>> expectedPitchBendRanges{{0, 200}, {2, 300}};
+  expect(pitchBendRanges == expectedPitchBendRanges,
+         "frozen vibrato should reserve only its current offset and restore full-depth headroom when resumed");
+}
+
+void performanceMidiRendererUsesWholeSemitonePitchBendRanges() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 1,
+          .events =
+              {
+                  PitchBendRangePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .cents = 235,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .semitones = 1.6,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  const auto& events = midi.tracks[0].events;
+  expect(std::get<PitchBendRange>(events[1]).cents == 300,
+         "MIDI renderer should round pitch-bend ranges upward to whole semitones");
+  expect(std::get<PitchBend>(events[2]).value == 4369,
+         "MIDI renderer should quantize pitch bends using the emitted whole-semitone range");
+}
+
 void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -2350,6 +2429,8 @@ void runValueMidiTests() {
   performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenNativePortamentoTakesOver();
   performanceMidiRendererResetsHeldPitchBeforeNativePortamentoTakesOver();
   performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato();
+  performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange();
+  performanceMidiRendererUsesWholeSemitonePitchBendRanges();
   performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary();
   performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();
   performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote();
