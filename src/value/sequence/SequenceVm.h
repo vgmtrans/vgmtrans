@@ -138,6 +138,13 @@ public:
                                PerformanceLaneId lane = PerformanceLaneId{0});
   PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, PitchSlideTiming timing,
                                PerformanceLaneId lane = PerformanceLaneId{0});
+  // Starts from the latest realized pitch for this note, or fallbackStartKey
+  // when no earlier transition exists. This keeps source retargeting out of
+  // format-local per-tick schedulers.
+  PitchSlideBinding retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey, double targetKey,
+                                       u32 durationTicks, PerformanceLaneId lane = PerformanceLaneId{0});
+  PitchSlideBinding retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey, double targetKey,
+                                       PitchSlideTiming timing, PerformanceLaneId lane = PerformanceLaneId{0});
 
   [[nodiscard]] PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue,
                                                   u32 durationTicks, u32 delayTicks = 0);

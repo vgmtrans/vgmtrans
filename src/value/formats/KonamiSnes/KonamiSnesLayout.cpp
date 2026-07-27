@@ -8,6 +8,7 @@
 #include "value/scan/BytePattern.h"
 
 #include <algorithm>
+#include <array>
 #include <optional>
 #include <string_view>
 
@@ -68,6 +69,13 @@ constexpr MaskedBytePattern kBranchForVcmd6xMDR2{
 constexpr MaskedBytePattern kBranchForVcmd6xCNTR3{
     "\xe4\x08\x8f\xdb\x04\x68\xe0\xb0\x0c\x68\x65\x90\x05"sv,
     "x?x??xxx?xx??"sv,
+};
+
+constexpr std::array kIndexedEchoFilters{
+    MaskedBytePattern{"\xbc\x8d\x08\xcf\x5d\x8d\x08"sv, "xxxxxxx"sv},
+    MaskedBytePattern{"\xbc\x1c\x1c\x1c\x5d\x8d\x08"sv, "xxxxxxx"sv},
+    MaskedBytePattern{"\x3f\x00\x00\x1c\x1c\x1c\xc4\x04\x8f\x00\x05\xe8\xe0\x8d\x03\x7a\x04"sv,
+                      "x??xxxxxxxxxxxxxx"sv},
 };
 
 constexpr MaskedBytePattern kSetDIRGG4{
@@ -349,6 +357,9 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
       layout.version = KONAMISNES_V6;
     }
   }
+  layout.indexedEchoFilter =
+      std::ranges::any_of(kIndexedEchoFilters,
+                          [&](const auto& pattern) { return findBytePattern(reader, pattern).has_value(); });
 
   if (hasSongList) {
     // Empty song rows are normal; use the first playable row at or after the

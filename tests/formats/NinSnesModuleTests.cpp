@@ -370,33 +370,49 @@ void ninSnesStandardEchoUsesMaskLevelAndDisable() {
 
   std::ranges::copy(
       std::initializer_list<u8>{
-          0xf5,
-          0x03,
-          0x40,
-          0x20,  // enable both tracks, larger wet level on the left
-          4,
-          0xc9,  // allow the echo state to remain active for four ticks
-          0xf6,  // disable echo globally
-          0,
+          0xf5, 0x03, 0x40, 0x20,  // EON 0/1, EVOL +64/+32
+          0xf7, 0x03, 0xc0, 0x02,  // 48 ms, EFB -0.5, FIR 2
+          0xf8, 0x04, 0x00, 0xe0,  // fade EVOL to 0/-32
+          4,    0xc9, 0xf6,        // finish the fade, then disable echo
+          4,    0xc9, 0,
       },
       bytes.begin() + 0x300);
   std::ranges::copy(std::initializer_list<u8>{8, 0x7f, 0x80, 0}, bytes.begin() + 0x320);
 
   const PerformanceSequence performance = render(std::move(bytes));
+  const MidiSequence midi = renderMidiSequence(performance);
   expect(performance.tracks.size() == 8, "standard echo fixture should retain all eight DSP voices");
-  for (size_t index = 0; index < performance.tracks.size(); ++index) {
-    const PerformanceTrack& track = performance.tracks[index];
-    const auto enabled = std::ranges::find_if(track.events, [](const PerformanceEvent& event) {
-      const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
-      return reverb != nullptr && reverb->header.tick == 0 && std::abs(reverb->send - (64.0 / 127.0)) < 0.0001;
+  for (size_t index = 0; index < midi.tracks.size(); ++index) {
+    const bool enabled = std::ranges::any_of(midi.tracks[index].events, [](const MidiEvent& event) {
+      const auto* reverb = std::get_if<Reverb>(&event);
+      return reverb != nullptr && reverb->tick == 0 && reverb->value != 0;
     });
-    const auto disabled = std::ranges::find_if(track.events, [](const PerformanceEvent& event) {
-      const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
-      return reverb != nullptr && reverb->header.tick == 4 && reverb->send == 0.0;
+    const bool disabled = std::ranges::any_of(midi.tracks[index].events, [](const MidiEvent& event) {
+      const auto* reverb = std::get_if<Reverb>(&event);
+      return reverb != nullptr && reverb->tick == 4 && reverb->value == 0;
     });
-    expect((enabled != track.events.end()) == (index < 2) && disabled != track.events.end(),
-           "standard echo should apply its wet magnitude through EON only to masked voices and honor echo-off");
+    expect(enabled == (index < 2) && (index >= 2 || disabled),
+           "standard echo should apply EON globally and honor echo-off on track " + std::to_string(index));
   }
+
+  std::vector<const ReverbPerformanceEvent*> changes;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
+        reverb != nullptr && reverb->leftGain && reverb->rightGain) {
+      changes.push_back(reverb);
+    }
+  }
+
+  expect(changes.size() >= 6, "standard N-SPC echo should retain setup, parameters, and fade samples");
+  expect(changes[1]->delayMilliseconds && *changes[1]->delayMilliseconds == 48.0 && changes[1]->feedback &&
+             std::abs(*changes[1]->feedback + 0.5) < 0.0001 && changes[1]->filterIndex == 2,
+         "standard N-SPC F7 should preserve EDL, signed EFB, and FIR-table state");
+  const bool reachedFadeTarget = std::ranges::any_of(changes, [](const ReverbPerformanceEvent* change) {
+    return std::abs(*change->leftGain) < 0.0001 && std::abs(*change->rightGain + (32.0 / 127.0)) < 0.0001 &&
+           std::abs(change->send - (32.0 / 127.0)) < 0.0001;
+  });
+  expect(reachedFadeTarget,
+         "standard N-SPC F8 should reach its signed stereo target over the requested duration");
 }
 
 void ninSnesKonamiLoopAppliesAndClearsReplayDeltas() {
@@ -513,6 +529,24 @@ void ninSnesIntelligentVoiceTablesUseTypedPlaybackState() {
   });
   expect(instrument != events.end() && level != events.end() && balance != events.end(),
          "an inline Intelligent Systems voice record should execute from typed command state");
+}
+
+void ninSnesFe3ConditionalJumpUsesCapturedDriverState() {
+  const auto endTick = [](u8 mask) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+    std::ranges::copy(std::initializer_list<u8>{0xf7, 3, 3, 0xc9, 0, 1, 0xc9, 0}, bytes.begin() + 0x300);
+    bytes[0xb9] = mask;
+    Layout layout = standardLayout();
+    layout.signature = Signature::Intelligent;
+    layout.profile = ProfileId::IntelliFe3;
+    return render(std::move(bytes), layout).tracks[0].endTick;
+  };
+
+  expect(endTick(0) == 1 && endTick(1) == 3,
+         "FE3 F7 should branch only when the captured per-channel driver condition bit is clear");
 }
 
 void ninSnesControllerFadesRemainInTheSourceDomain() {

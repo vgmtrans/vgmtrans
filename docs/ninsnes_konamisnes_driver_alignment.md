@@ -9,25 +9,19 @@ speculative differences are not listed.
 
 | Format | Driver behavior | Current behavior | Notes |
 | --- | --- | --- | --- |
-| NinSnes (standard N-SPC) | `F7` changes echo delay, feedback, and FIR filter. | Parsed as source-only. | MIDI reverb has no direct representation for these DSP parameters. A richer echo model or an explicit approximation policy is needed. |
-| NinSnes (standard N-SPC) | `F8` fades the signed left/right echo volumes. | Parsed as source-only. | Basic `F5` wet level/mask and `F6` disable are implemented. Fade support needs global reverb automation or sampled reverb events. |
-| NinSnes (Intelligent Systems FE3) | `F7` jumps only when the driver's per-channel condition bit is clear. | The branch is always taken. | The condition is tied to driver/APU state that is not yet represented by offline sequence playback. Related port wait/write commands also remain source-only or approximate. |
+| NinSnes (Intelligent Systems FE3) | `F5 00` can stall the driver until CPU/APU port 2 changes, `F6` writes port 0, and the CPU can subsequently change the condition byte read by `F7`. | The captured `$00b9` condition selects the initial `F7` path; port handshakes remain zero-time source annotations. | Exact later branch choices require a contemporaneous SNES CPU/APU I/O trace, which an SPC sequence or RSN archive does not contain. |
 | NinSnes profiles | Sequence commands replace the current DSP ADSR/GAIN envelope. | Operands are parsed, but the active articulation is unchanged. | Deliberately deferred as a larger dynamic-instrument/envelope feature. This includes the Konami, Quintet, Intelligent Systems, and other profile-specific ADSR/GAIN forms. |
-| KonamiSnes | `E5` applies a changing pseudo-random pitch mask. | Parsed as source-only. | Requires deterministic emulation of the driver's random state and per-tick pitch updates. |
-| KonamiSnes | `F0`, `F1`, and the V2 `FC` form configure portamento or pitch envelopes. | Parsed as source-only. | These are distinct from the already implemented inline `F3` pitch slide. Each version needs its own motion arithmetic. |
-| KonamiSnes | `F4`/`F5` change the global echo mask, signed echo levels, delay, feedback, and filter state. | Parsed as source-only. | Requires global cross-track echo state like NinSnes plus an approximation policy for DSP-only parameters. |
 | KonamiSnes | Version-specific GAIN and ADSR commands replace the current DSP envelope. | Parsed as source-only. | Deliberately deferred with the NinSnes dynamic ADSR/GAIN work. |
+| KonamiSnes pitch | Later `F0` uses a proportional curve; late `F1` uses its explicit delta; V2 `FC` retargets an active envelope; `E5` adds table-driven random pitch. | Linear `F0`/`F1` timing is represented; these additional curve and modulation details remain source-only or approximated. | Deferred until a small shared curve/modulation representation is agreed. |
 
 ## Addressed in the current work
 
-- NinSnes Konami-profile `E6` now applies its per-replay packed-note volume
-  delta and 1/16-semitone pitch delta, then clears both accumulators when the
-  loop finishes.
-- Standard NinSnes `F5` now applies its EON mask and signed wet-level magnitude,
-  and `F6` disables echo globally.
-- Early KonamiSnes vibrato now quantizes `rate * tempo` when `E4` executes,
-  folds the resulting phase step rather than the raw rate, and preserves the
-  triangle's initial direction.
+- NinSnes Konami-profile `E6` applies and clears its loop volume/pitch deltas.
+- Standard NinSnes `F5`-`F8` apply global EON/EVOL, preserve DSP parameters, and advance signed stereo fades.
+- FE3 `F7` branches from the captured `$00b9` condition; later CPU/APU changes remain unavailable offline.
+- Early KonamiSnes vibrato uses its tempo-quantized phase step and original direction.
+- Konami `F3`, early `F0`, and versioned `F1` use shared pitch transitions; MIDI lowering supplies the per-tick bends.
+- Konami `F4`/`F5` apply global EON/EVOL and retain the detected fixed or indexed DSP echo state.
 
 ## Driver references
 

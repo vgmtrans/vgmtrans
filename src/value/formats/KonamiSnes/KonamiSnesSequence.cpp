@@ -78,6 +78,20 @@ struct DecodedPitchSlide {
   u8 targetNote = 0;
 };
 
+struct PersistentPitchEffect {
+  enum class Kind : u8 {
+    None,
+    Portamento,
+    Envelope,
+  };
+
+  Kind kind = Kind::None;
+  u8 delay = 0;
+  u8 duration = 0;
+  s16 depth = 0;
+  std::optional<double> previousKey;
+};
+
 [[nodiscard]] constexpr bool isLateVersion(KonamiSnesVersion version) {
   return version == KONAMISNES_V5 || version == KONAMISNES_V6;
 }
@@ -117,6 +131,18 @@ struct DecodedPitchSlide {
     return 0;
   }
   return static_cast<u32>(std::min<double>(std::lround(ticks), std::numeric_limits<u32>::max()));
+}
+
+[[nodiscard]] u32 pitchEffectTimelineTicks(u8 updates, u8 tempo) {
+  // Pitch effects advance on the timer clock while note lengths use the
+  // tempo-scaled sequence clock. Keep the closest representable sequence tick.
+  return static_cast<u32>(std::lround(static_cast<double>(updates) * tempo / 256.0));
+}
+
+[[nodiscard]] PitchSlideTiming pitchEffectTiming(KonamiSnesVersion version, u8 updates, u8 tempo) {
+  // One effect update is 4 ms in V1 and 8 ms in later engines.
+  return PitchSlideTiming::fixedDuration(std::max<u32>(pitchEffectTimelineTicks(updates, tempo), 1),
+                                         static_cast<double>(updates) * timerFrequency(version) / 8.0);
 }
 
 [[nodiscard]] double tuningCents(s8 tuning) {
@@ -217,6 +243,28 @@ private:
   u8 reusableFadeTicks_ = 0;
 };
 
+struct ProgramState {
+  explicit ProgramState(const SequenceProgram& program) : indexedEchoFilter(program.config.driverState != 0) {}
+
+  void setEcho(u8 mask, u8 left, u8 right) {
+    const double leftGain = static_cast<s8>(left) / 127.0;
+    const double rightGain = static_cast<s8>(right) / 127.0;
+    echo.voiceMask = mask;
+    echo.send = std::min(std::max(std::abs(leftGain), std::abs(rightGain)), 1.0);
+    echo.leftGain = std::clamp(leftGain, -1.0, 1.0);
+    echo.rightGain = std::clamp(rightGain, -1.0, 1.0);
+  }
+
+  void setEchoParameters(u8 delay, u8 feedback, u8 filter) {
+    echo.delayMilliseconds = static_cast<double>(delay & 0x0f) * 16.0;
+    echo.feedback = static_cast<s8>(feedback) / 128.0;
+    echo.filterIndex = indexedEchoFilter ? filter : 2;
+  }
+
+  ReverbPerformanceEvent echo{.voiceMask = 0};
+  bool indexedEchoFilter = false;
+};
+
 // Only values that persist from one executed command to the next live here.
 struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
@@ -296,12 +344,11 @@ struct TrackState {
   LfoState vibrato;
   u8 vibratoPhaseStep = 0;
 
-  // A slide is stored as an absolute note pitch, but exported pitch bends are
-  // measured relative to the note that began the slide.
-  std::optional<double> pitchBase;
-  SequenceAutomatedValue<double> pitchSlide;
+  // Pitch transitions use absolute key-space values; MIDI lowering chooses the
+  // required bend range relative to the emitted note.
+  std::optional<double> notePitch;
   PerformanceNoteId pitchNote;
-  PerformanceAutomationBinding pitchTransition;
+  PersistentPitchEffect pitchEffect;
   double lastVibratoDepthSemitones = -1.0;
 };
 
@@ -310,6 +357,7 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
+  ProgramState& program;
 
   void note(u8 key, u8 sourceVelocity) {
     // Counted loops alter velocity before the later engines pass it through
@@ -325,6 +373,7 @@ struct Playback {
     // A full-length note leaves the voice open. Repeating the same key then
     // extends that voice instead of retriggering its sample and envelope.
     const bool tied = track.previousNoteSlurred && track.previousNoteKey && key == *track.previousNoteKey;
+    const PerformanceNoteId previousPitchNote = track.pitchNote;
     resetPitchForNote(key);
     track.vibrato.beginReusableFade();
     if (track.vibrato.fadeActive()) {
@@ -338,6 +387,7 @@ struct Playback {
                                  LevelScale::linearFromLinear(velocity / 127.0), duration);
       track.previousNoteKey = key;
     }
+    applyPitchEffectToNote(key, previousPitchNote);
     track.previousNoteSlurred = track.noteDurationRate == noteDurationRateMax(track.version) && !track.percussion;
   }
 
@@ -430,10 +480,34 @@ struct Playback {
     beginVibratoFadeAutomation(length);
   }
 
+  void echo(u8 channels, u8 volumeLeft, u8 volumeRight) {
+    program.setEcho(channels, volumeLeft, volumeRight);
+    out.reverb(program.echo);
+  }
+
+  void echoParameters(u8 delay, u8 feedback, u8 filter) {
+    program.setEchoParameters(delay, feedback, filter);
+    if (program.echo.voiceMask != 0) {
+      out.reverb(program.echo);
+    }
+  }
+
+  void configurePortamento(u8 duration) {
+    track.pitchEffect.kind = PersistentPitchEffect::Kind::Portamento;
+    track.pitchEffect.duration = duration;
+  }
+
+  void configurePitchEnvelope(u8 delay, u8 duration, s16 depth) {
+    track.pitchEffect.kind = PersistentPitchEffect::Kind::Envelope;
+    track.pitchEffect.delay = delay;
+    track.pitchEffect.duration = duration;
+    track.pitchEffect.depth = depth;
+  }
+
   void beginPitchSlide(PitchSlideKind kind, u8 delay, u8 length, u8 targetNote) {
     // A slide before any melodic note has no pitch to bend from. Keep the
     // default bend range but do not invent a starting note.
-    if (!track.pitchBase || length == 0) {
+    if (!track.notePitch || length == 0) {
       out.pitchBendRange(2);
       return;
     }
@@ -443,10 +517,7 @@ struct Playback {
     }
 
     auto transitionOut = out.at(vm.tick() + delay);
-    track.pitchTransition = transitionOut.pitchSlide(track.pitchNote, track.pitchSlide.current(), target, length);
-    track.pitchTransition.sample(transitionOut, track.pitchSlide.current());
-    static_cast<void>(track.pitchSlide.begin(SequenceMotionPlan<double>::targetOverTicksWithStep(
-        target, (target - track.pitchSlide.current()) / length, length, delay)));
+    transitionOut.retargetPitchSlide(track.pitchNote, *track.notePitch, target, length);
   }
 
   void beginFade(FadeTarget target, bool stepBased, u8 destination, u8 ticks, s8 step) {
@@ -569,12 +640,6 @@ struct Playback {
       const PanGains gains = panGains(track.version, value);
       track.panFade.output(out).stereoBalance(gains.left, gains.right);
     }));
-    if (track.pitchBase && track.pitchSlide.active()) {
-      const auto pitchTick = track.pitchSlide.tick();
-      if (pitchTick.status != SequenceMotionStatus::Inactive && pitchTick.status != SequenceMotionStatus::Delayed) {
-        track.pitchTransition.sample(out, track.pitchSlide.current());
-      }
-    }
     if (track.vibrato.fadeActive()) {
       const auto fadeTick = track.vibrato.tickFade();
       if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
@@ -584,6 +649,37 @@ struct Playback {
   }
 
 private:
+  void applyPitchEffectToNote(u8 key, PerformanceNoteId previousNote) {
+    auto& effect = track.pitchEffect;
+    if (track.percussion) {
+      effect.previousKey.reset();
+      return;
+    }
+
+    const double target = track.noteSemitones(key, false);
+    if (effect.duration != 0) {
+      switch (effect.kind) {
+        case PersistentPitchEffect::Kind::Portamento:
+          // Later engines use the deferred proportional curve, not this linear
+          // fixed-duration form.
+          if (track.version <= KONAMISNES_V2 && effect.previousKey) {
+            out.pitchSlide(track.pitchNote, *effect.previousKey, target,
+                           pitchEffectTiming(track.version, effect.duration, track.tempo))
+                .continueFrom(previousNote);
+          }
+          break;
+        case PersistentPitchEffect::Kind::Envelope:
+          out.at(vm.tick() + pitchEffectTimelineTicks(effect.delay, track.tempo))
+              .pitchSlide(track.pitchNote, target - effect.depth, target,
+                          pitchEffectTiming(track.version, effect.duration, track.tempo));
+          break;
+        case PersistentPitchEffect::Kind::None:
+          break;
+      }
+    }
+    effect.previousKey = target;
+  }
+
   void applyEffectiveTuning(bool force = false) {
     const double cents = track.totalTuningCents();
     const bool emitted = std::isfinite(track.lastEmittedTuningCents);
@@ -598,17 +694,14 @@ private:
   }
 
   void resetPitchForNote(u8 key) {
-    // A new note cancels any unfinished slide. Drum notes have no melodic base,
-    // so later slide commands cannot bend them as pitched instruments.
-    track.pitchTransition.interrupt(out);
-    track.pitchSlide.clearMotion();
+    // The subsequent note emission cancels the preceding transition. Drum
+    // notes have no melodic base for a later standalone slide.
     track.pitchNote = {};
     if (track.percussion) {
-      track.pitchBase.reset();
+      track.notePitch.reset();
       return;
     }
-    track.pitchBase = track.noteSemitones(key);
-    track.pitchSlide.setCurrent(*track.pitchBase);
+    track.notePitch = track.noteSemitones(key);
   }
 
   void emitVibratoDepth(PerformanceEmitter output, bool force = false) {
@@ -757,8 +850,6 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     event.invoke<&Playback::note>(key, velocity);
     if (const auto slide = readInlinePitchSlide(event, version)) {
       appendPitchSlide(event, *slide);
-    } else {
-      event.emitPitchBendRange(2);
     }
     return event.wait(event.state<&TrackState::noteLength>());
   }
@@ -867,7 +958,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     case 0xe5: {
       auto event = cursor.sourceOnly("Random Pitch");
       event.u8("rate");
-      event.u16le("pitch_mask", SourceValueDisplay::Hex);
+      event.u16be("pitch_mask", SourceValueDisplay::Hex);
       return event.ignore();
     }
     case 0xe6: {
@@ -938,22 +1029,23 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
     }
     case 0xf0: {
-      auto event = cursor.sourceOnly("Portamento");
-      event.u8("speed");
-      return event.ignore();
+      auto event = cursor.command("Portamento", SequenceSemantic::Pitch);
+      return event.invoke<&Playback::configurePortamento>(event.u8("speed", SemanticOperandRole::Duration));
     }
     case 0xf1: {
-      auto event = cursor.sourceOnly("Pitch Envelope");
-      event.u8("delay");
+      auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       if (isLateVersion(version)) {
-        event.u8("length", SemanticOperandRole::Duration);
-        event.u8("offset", SemanticOperandRole::Pitch);
+        const u8 length = event.u8("length", SemanticOperandRole::Duration);
+        const s8 offset = event.s8("offset", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+        // This shapes the exact late curve; fixed-duration playback currently
+        // retains its endpoints and timing while that curve remains deferred.
         event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
-      } else {
-        event.u8("speed");
-        event.u8("depth", SemanticOperandRole::Pitch);
+        return event.invoke<&Playback::configurePitchEnvelope>(delay, length, static_cast<s16>(offset));
       }
-      return event.ignore();
+      const u8 speed = event.u8("speed", SemanticOperandRole::Duration);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Pitch);
+      return event.invoke<&Playback::configurePitchEnvelope>(delay, speed, static_cast<s16>(depth));
     }
     case 0xf2: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
@@ -966,18 +1058,18 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       return event;
     }
     case 0xf4: {
-      auto event = cursor.sourceOnly("Echo");
-      event.u8("channels", SourceValueDisplay::Hex);
-      event.u8("volume_left");
-      event.u8("volume_right");
-      return event.ignore();
+      auto event = cursor.command("Echo", SequenceSemantic::State);
+      const u8 channels = event.u8("channels", SourceValueDisplay::Hex);
+      const u8 volumeLeft = event.u8("volume_left");
+      const u8 volumeRight = event.u8("volume_right");
+      return event.invoke<&Playback::echo>(channels, volumeLeft, volumeRight);
     }
     case 0xf5: {
-      auto event = cursor.sourceOnly("Echo Param");
-      event.u8("delay");
-      event.u8("feedback");
-      event.u8("arg3", SourceValueDisplay::Hex);
-      return event.ignore();
+      auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
+      const u8 delay = event.u8("delay");
+      const u8 feedback = event.u8("feedback");
+      const u8 filter = event.u8("filter_or_ignored", SourceValueDisplay::Hex);
+      return event.invoke<&Playback::echoParameters>(delay, feedback, filter);
     }
     case 0xf6: {
       auto event = cursor.command("Loop With Volta Start", SequenceSemantic::Repeat);
@@ -1022,8 +1114,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       }
       if (version == KONAMISNES_V2) {
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
-        event.u8("delta_fraction", SemanticOperandRole::Pitch);
-        event.u8("delta_integer", SemanticOperandRole::Pitch);
+        event.u8("delta_fraction");
+        event.s8("delta_integer", SourceValueDisplay::SignedDecimal);
         return event.ignore();
       }
       if (version >= KONAMISNES_V4) {
@@ -1064,7 +1156,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 }
 
 [[nodiscard]] SequenceDialect makeDialect(KonamiSnesVersion version) {
-  return makeCompiledDialect<TrackState, Playback>(SequenceDialect{
+  return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
       .id = DialectId{.value = dialectId(version)},
       .commandDetailKindPrefix = "konami-snes",
       .timebase = Timebase{.ppqn = kKonamiSnesPpqn},
@@ -1180,6 +1272,7 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
   // Track and playback state use the profile to select the already-decoded
   // engine rules; they never reopen the source bytes to identify the version.
   program.config.profile = static_cast<u32>(layout.version);
+  program.config.driverState = layout.indexedEchoFilter;
   return program;
 }
 

@@ -349,13 +349,22 @@ using PerformanceTimelines = std::vector<PerformanceTimeline>;
 
 [[nodiscard]] PerformanceTimelines buildPerformanceTimelines(const PerformanceSequence& performance) {
   PerformanceTimelines timelines;
+  PerformanceTimeline globalReverb;
   timelines.reserve(performance.tracks.size());
   for (const auto& track : performance.tracks) {
     auto& timeline = timelines.emplace_back();
     timeline.reserve(track.events.size());
     for (const auto& event : track.events) {
-      timeline.push_back(&event);
+      const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
+      if (reverb != nullptr && reverb->voiceMask) {
+        globalReverb.push_back(&event);
+      } else {
+        timeline.push_back(&event);
+      }
     }
+  }
+  for (auto& timeline : timelines) {
+    timeline.insert(timeline.end(), globalReverb.begin(), globalReverb.end());
     std::ranges::stable_sort(timeline, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
       const auto& left = performanceEventHeader(*lhs);
       const auto& right = performanceEventHeader(*rhs);
@@ -759,6 +768,7 @@ bool shouldRestartSimulatedPanForNote(const PerformanceEvent& event, const Rende
 }
 
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
+                  u32 sourceTrackNumber,
                   std::span<const GlobalTransposeChange> globalTransposes, const PerformanceTempoMap& globalTempos,
                   const MidiExportOptions& options, ModulationConversionPolicy modulationConversion,
                   std::span<const InstrumentSetAsset* const> instrumentSets,
@@ -839,10 +849,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .value = LevelScale::midi14FromLinear(typedEvent.linearGain),
           });
         } else if constexpr (std::is_same_v<TypedEvent, ReverbPerformanceEvent>) {
+          const bool enabled = !typedEvent.voiceMask ||
+                               (sourceTrackNumber < 8 && (*typedEvent.voiceMask & (1u << sourceTrackNumber)) != 0);
           track.events.push_back(Reverb{
               .tick = typedEvent.header.tick,
               .channel = channel,
-              .value = midiNormalized7(typedEvent.send),
+              .value = midiNormalized7(enabled ? typedEvent.send : 0.0),
           });
         } else if constexpr (std::is_same_v<TypedEvent, MonoModePerformanceEvent>) {
           track.events.push_back(MonoMode{
@@ -1118,8 +1130,9 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
       }
       MidiControllerState* automationState =
           header.automation ? &automationControllerStates[*header.automation] : nullptr;
-      addMidiEvent(midiTrack, renderState, *event, assignment.channel, globalTransposes, globalTempos, options,
-                   modulationConversion, instrumentSets, modulationProfile, automationState);
+      addMidiEvent(midiTrack, renderState, *event, assignment.channel, performanceTrack.sourceTrackNumber,
+                   globalTransposes, globalTempos, options, modulationConversion, instrumentSets, modulationProfile,
+                   automationState);
     }
     u64 endTick = performanceTrack.endTick;
     if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
