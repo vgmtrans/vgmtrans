@@ -27,6 +27,11 @@ std::optional<u32> Pattern::find(core::ByteReader reader) const {
 #undef NINSNES_PATTERN_OWNER
 #undef NINSNES_BYTE_PATTERN
 
+// Super Mario World and Pilotwings:
+//   setc / sbc a,#$d0 / mov y,#6 / mov $14,#<table / mov $15,#>table / call instrument-loader
+Pattern Patterns::ptnEarlierPercussionTable("\x80\xa8\xd0\x8d\x06\x8f\x00\x14\x8f\x00\x15\x3f\x00\x00",
+                                            "xxxxxx?xx?xx??", 14);
+
 // Pilotwings:
 //   mov a,$00 / cmp a,#$ff / beq / and a,#$1f / bne start-song
 // $00-$03 are the canonical mirrors of input ports $F4-$F7.

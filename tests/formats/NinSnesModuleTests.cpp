@@ -193,6 +193,9 @@ void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
   std::ranges::copy(
       std::initializer_list<u8>{0x68, 0xda, 0x90, 0x0a, 0x6d, 0xfd, 0xae, 0x60, 0x96, 0x56, 0x0f, 0xfd, 0x2f, 0xe3},
       bytes.begin() + 0x5a0);
+  std::ranges::copy(
+      std::initializer_list<u8>{0x80, 0xa8, 0xd0, 0x8d, 0x06, 0x8f, 0x00, 0x14, 0x8f, 0x30, 0x15, 0x3f, 0x56, 0x0d},
+      bytes.begin() + 0x5c0);
   // Song 2 is an unloaded hole between two valid resident playlists.
   writeLe16(bytes, 0x2002, 0x2100);
   writeLe16(bytes, 0x2004, 0x2200);
@@ -217,7 +220,7 @@ void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
 
   const auto requested = findLayout(ByteReader(SourceId{7}, bytes));
   expect(requested && requested->profile == ProfileId::Earlier && requested->songIndex == 3 &&
-             requested->playlistAddress == 0x2300,
+             requested->playlistAddress == 0x2300 && requested->percussionTableAddress == 0x3000,
          "a pending N-SPC request should select a valid song beyond an unloaded table hole");
 
   bytes[0xf4] = 0;
@@ -911,6 +914,73 @@ void ninSnesFixedPercussionBaseIgnoresFaOperand() {
   expect(sourceProgram(std::nullopt) == 5, "normal drivers should continue applying the FA percussion base");
   expect(sourceProgram(0) == 0, "fixed-base drivers should ignore FA while retaining the detected base");
   expect(sourceProgram(0x23) == 0x23, "a nonzero fixed percussion base should override the FA operand");
+}
+
+void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(std::initializer_list<u8>{3, 0x7f, 0xd0, 0}, bytes.begin() + 0x300);
+
+  // Prototype melodic instruments have five-byte rows. Percussion lives in a
+  // separate six-byte table whose final byte is the note used to pitch the hit.
+  std::ranges::copy(std::initializer_list<u8>{0, 0x8f, 0xe0, 0, 1}, bytes.begin() + 0x4000);
+  std::ranges::copy(std::initializer_list<u8>{1, 0x8f, 0xe0, 0, 1, 0xa8}, bytes.begin() + 0x4005);
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  writeLe16(bytes, 0x5004, 0x6009);
+  writeLe16(bytes, 0x5006, 0x6009);
+  bytes[0x6000] = 0x01;
+  bytes[0x6009] = 0x01;
+
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "earlier-percussion.spc"}, std::move(bytes));
+  Layout layout{
+      .signature = Signature::Earlier,
+      .profile = ProfileId::Earlier,
+      .playlistAddress = 0x100,
+      .instrumentTableAddress = 0x4000,
+      .percussionTableAddress = 0x4005,
+      .spcDirAddress = 0x5000,
+  };
+  const SequenceParse parsed = decodeSequence(sources.reader(source), layout, AssetId{1});
+  expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1 &&
+             parsed.recipes.drumKits[0].pitchModel == DrumPitchModel::EarlierTableNote &&
+             parsed.recipes.drumKits[0].slots[0].sourceProgram == kEarlierPercussionProgramBase &&
+             parsed.recipes.drumKits[0].slots[0].sourceNote == 0xa8,
+         "prototype percussion should resolve its separate row and encoded source note");
+
+  ScanIdAllocator ids;
+  ScanResultBuilder result(
+      ScanInput{
+          .source = sources.source(source),
+          .reader = sources.reader(source),
+          .ids = ids,
+      },
+      "NinSnes");
+  const auto instrumentSet = result.reserveInstrumentSet();
+  const auto sampleCollection = result.reserveSampleCollection();
+  expect(addSynth(result, instrumentSet, sampleCollection, layout, parsed.recipes, "Earlier"),
+         "prototype percussion should produce an exportable drum kit");
+
+  const ScanResult scan = result.finish();
+  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  expect(instruments != nullptr && instruments->instruments.size() == 2,
+         "the separate percussion row should remain an internal drum source");
+  const auto melodic = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
+    return instrument.explicitAddress == InstrumentAddress{.bank = 0, .program = 0};
+  });
+  const auto drum = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
+    return instrument.explicitAddress == InstrumentAddress{.bank = 0x7f, .program = 0};
+  });
+  expect(melodic != instruments->instruments.end() && drum != instruments->instruments.end() &&
+             melodic->regions.size() == 1 && drum->regions.size() == 1 && drum->regions[0].keyRange.low == 0x24 &&
+             drum->regions[0].keyRange.high == 0x24 &&
+             drum->regions[0].sample.index != melodic->regions[0].sample.index,
+         "the drum kit should use the percussion sample on its MIDI drum key");
+  expect(std::abs(drum->regions[0].unityKey - (melodic->regions[0].unityKey - 28.0)) < 0.0001,
+         "the percussion row's sixth byte should determine the exported drum pitch");
 }
 
 void ninSnesGainModeInstrumentsUseDspEnvelope() {

@@ -22,6 +22,8 @@ inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kTrackCount = 8;
 inline constexpr u16 kPpqn = 48;
 inline constexpr std::string_view kInstrumentDomain = "nin-snes.instrument";
+inline constexpr u8 kEarlierPercussionSlotCount = 10;
+inline constexpr u32 kEarlierPercussionProgramBase = 0x100;
 
 enum class Signature : u8 {
   None,
@@ -144,6 +146,7 @@ struct Layout {
   u8 sectionPointerAddress = 0;
 
   std::optional<u32> instrumentTableAddress;
+  std::optional<u32> percussionTableAddress;
   std::optional<u16> spcDirAddress;
   u16 konamiBaseAddress = 0;
   u16 falcomBaseOffset = 0;
@@ -181,6 +184,7 @@ struct DrumSlot {
 
 enum class DrumPitchModel : u8 {
   StandardMapping,
+  EarlierTableNote,
   IntelliPlayedNote,
 };
 

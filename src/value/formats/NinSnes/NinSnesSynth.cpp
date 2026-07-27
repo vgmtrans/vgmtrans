@@ -37,6 +37,7 @@ struct InstrumentInfo {
   u8 pitchLow = 0;
   SourceRange source;
   bool override = false;
+  bool drumSource = false;
 };
 
 struct InstrumentRegion {
@@ -115,6 +116,9 @@ struct InstrumentRegion {
   const u32 size = instrumentHeaderSize(selected);
   for (u16 program = 0; program < instrumentSlotCount(selected); ++program) {
     const u32 address = *layout.instrumentTableAddress + program * size;
+    if (layout.percussionTableAddress && address >= *layout.percussionTableAddress) {
+      break;
+    }
     if (!reader.has(address, size)) {
       break;
     }
@@ -143,6 +147,35 @@ struct InstrumentRegion {
       continue;
     }
     infos.push_back(std::move(info));
+  }
+  return infos;
+}
+
+[[nodiscard]] std::vector<InstrumentInfo> collectEarlierPercussion(ByteReader reader, const Layout& layout,
+                                                                   const SequenceRecipes& recipes) {
+  std::vector<InstrumentInfo> infos;
+  if (!layout.percussionTableAddress || !layout.spcDirAddress) {
+    return infos;
+  }
+  const Profile& selected = profile(layout.profile);
+  for (const DrumKit& kit : recipes.drumKits) {
+    for (const DrumSlot& slot : kit.slots) {
+      if (slot.sourceProgram < kEarlierPercussionProgramBase ||
+          slot.sourceProgram >= kEarlierPercussionProgramBase + kEarlierPercussionSlotCount ||
+          std::ranges::any_of(infos, [&](const InstrumentInfo& info) { return info.program == slot.sourceProgram; })) {
+        continue;
+      }
+      const u32 address = *layout.percussionTableAddress + (slot.sourceProgram - kEarlierPercussionProgramBase) * 6;
+      if (!reader.has(address, 6)) {
+        continue;
+      }
+      InstrumentInfo info = readInstrument(reader, selected, slot.sourceProgram, address);
+      info.source = reader.range(address, 6);
+      info.drumSource = true;
+      if (validHeader(reader, selected, info, *layout.spcDirAddress, true)) {
+        infos.push_back(std::move(info));
+      }
+    }
   }
   return infos;
 }
@@ -232,6 +265,22 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
       builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn), info.source);
       continue;
     }
+    const bool rateBasedGain = (info.adsr1 & 0x80) == 0 && (info.gain & 0x80) != 0;
+    Region region{
+        .unityKey = unityKey(reader, layout, info),
+        // Direct GAIN is fully described by the header. Rate-based GAIN starts
+        // from the DSP's live envelope, so a static region cannot infer it.
+        .envelope = rateBasedGain ? Envelope{} : snesDspEnvelope(info.adsr1, info.adsr2, info.gain),
+    };
+    regionsByProgram.emplace(info.program, InstrumentRegion{
+                                               .sample = *sample,
+                                               .region = region,
+                                               .source = info.source,
+                                           });
+    if (info.drumSource) {
+      continue;
+    }
+
     const std::string name = info.override ? fmt::format("Instrument {} (Overwrite)", info.program)
                                            : fmt::format("Instrument {}", info.program);
     auto instrument = builder.add(info.program, Instrument{
@@ -250,21 +299,9 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     if (info.source.valid()) {
       instrument.source(name, info.source, info.override ? "nin-snes-instrument-override" : "nin-snes-instrument");
     }
-    const bool rateBasedGain = (info.adsr1 & 0x80) == 0 && (info.gain & 0x80) != 0;
-    Region region{
-        .unityKey = unityKey(reader, layout, info),
-        // Direct GAIN is fully described by the header. Rate-based GAIN starts
-        // from the DSP's live envelope, so a static region cannot infer it.
-        .envelope = rateBasedGain ? Envelope{} : snesDspEnvelope(info.adsr1, info.adsr2, info.gain),
-    };
     instrument.region(*sample, region)
         .source("Region", info.source, "nin-snes-region")
         .description(fmt::format("Sample {}", sample->index));
-    regionsByProgram.emplace(info.program, InstrumentRegion{
-                                               .sample = *sample,
-                                               .region = std::move(region),
-                                               .source = info.source,
-                                           });
   }
 
   for (const DrumKit& kit : recipes.drumKits) {
@@ -292,9 +329,12 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     for (const auto& [slot, source] : resolvedSlots) {
       Region region = source->region;
       region.keyRange = KeyRange{.low = slot->key, .high = slot->key};
-      if (kit.pitchModel == DrumPitchModel::IntelliPlayedNote) {
+      if (kit.pitchModel != DrumPitchModel::StandardMapping) {
         region.unityKey +=
             static_cast<int>(slot->key) - static_cast<int>((slot->sourceNote & 0x7f) + kMelodicKeyCorrection);
+        if (kit.pitchModel == DrumPitchModel::EarlierTableNote) {
+          region.unityKey -= slot->globalTranspose;
+        }
       } else {
         region.unityKey += static_cast<int>(slot->key) - 0x3c - slot->globalTranspose;
       }
@@ -315,6 +355,8 @@ bool addSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet, Sc
   std::vector<InstrumentInfo> instruments = collectBaseInstruments(reader, layout);
   std::vector<InstrumentInfo> overrides = collectOverrides(recipes);
   instruments.insert(instruments.end(), overrides.begin(), overrides.end());
+  std::vector<InstrumentInfo> percussion = collectEarlierPercussion(reader, layout, recipes);
+  instruments.insert(instruments.end(), percussion.begin(), percussion.end());
   const SnesBrrCatalog catalog = collectSamples(reader, layout, instruments);
   if (instruments.empty() || catalog.samples.empty()) {
     return false;
