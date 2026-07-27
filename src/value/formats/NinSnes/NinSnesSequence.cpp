@@ -2180,6 +2180,34 @@ struct PlaylistDecode {
   return map;
 }
 
+void resolveEarlierPercussion(ByteReader reader, const Layout& layout, SequenceRecipes& recipes) {
+  if (!layout.percussionTableAddress) {
+    return;
+  }
+  for (DrumKit& kit : recipes.drumKits) {
+    if (kit.pitchModel != DrumPitchModel::StandardMapping) {
+      continue;
+    }
+    bool resolved = false;
+    for (DrumSlot& slot : kit.slots) {
+      if (slot.key < 0x24 || slot.key >= 0x24 + kEarlierPercussionSlotCount) {
+        continue;
+      }
+      const u8 index = static_cast<u8>(slot.key - 0x24);
+      const u32 address = *layout.percussionTableAddress + index * 6;
+      if (!reader.has(address, 6)) {
+        continue;
+      }
+      slot.sourceProgram = kEarlierPercussionProgramBase + index;
+      slot.sourceNote = reader.u8At(address + 5);
+      resolved = true;
+    }
+    if (resolved) {
+      kit.pitchModel = DrumPitchModel::EarlierTableNote;
+    }
+  }
+}
+
 [[nodiscard]] SequenceRecipes projectRecipes(const ProgramState& state) {
   return state.recipes;
 }
@@ -2281,6 +2309,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
 
   SequenceRecipes recipes =
       analyzeCompiledProgram<ProgramState, SequenceRecipes>(program, sequenceDialect(), projectRecipes);
+  resolveEarlierPercussion(reader, layout, recipes);
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(recipes),

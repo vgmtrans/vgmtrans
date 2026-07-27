@@ -467,6 +467,15 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .durationRateTable = std::move(durationRateTable),
   };
 
+  if (selected.base == BaseProfile::Earlier) {
+    if (const auto offset = Patterns::ptnEarlierPercussionTable.find(reader)) {
+      const u16 address = reader.u8At(*offset + 6) | (reader.u8At(*offset + 9) << 8);
+      if (reader.has(address, 6)) {
+        baseLayout.percussionTableAddress = address;
+      }
+    }
+  }
+
   if (const auto instruments = findInstrumentProbe(reader, selected)) {
     if (instruments->tableAddress != 0) {
       baseLayout.instrumentTableAddress = instruments->tableAddress;
