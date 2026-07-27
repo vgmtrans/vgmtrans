@@ -299,8 +299,7 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "KonamiSnes vibrato command should emit target-neutral depth");
   const auto& vibratoDepthEvent = std::get<ModulationPerformanceEvent>(*vibratoDepth);
   const double expectedDepthCents = vibrato::currentDepthCents(KONAMISNES_V6, 0x10, 0x10 << 8);
-  expect(vibratoDepthEvent.amount == 0.0,
-         "KonamiSnes vibrato depth should not contain destination controller scaling");
+  expect(vibratoDepthEvent.amount == 0.0, "KonamiSnes vibrato depth should not contain destination controller scaling");
   expect(vibratoDepthEvent.pitchDepthSemitones &&
              std::abs(*vibratoDepthEvent.pitchDepthSemitones - (expectedDepthCents / 100.0)) < 0.0001,
          "KonamiSnes vibrato depth should retain peak pitch swing for sequence-event simulation");
@@ -313,8 +312,8 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "KonamiSnes vibrato delay should be converted to rendered sequence ticks");
 
   const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
-  const MidiSequence synthModulationMidi = renderMidiSequence(
-      performance, {}, ModulationConversionPolicy::SynthModulators, {}, &modulationProfile);
+  const MidiSequence synthModulationMidi =
+      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, {}, &modulationProfile);
   expect(hasMidiEvent<VibratoDepth>(synthModulationMidi.tracks[0]) &&
              hasMidiEvent<VibratoFrequency>(synthModulationMidi.tracks[0]) &&
              hasMidiEvent<VibratoDelay>(synthModulationMidi.tracks[0]),
@@ -498,7 +497,7 @@ void konamiSnesProgramChangeReemitsCurrentFineTune() {
          "KonamiSnes fine tune should be ordered before the same-tick program change");
 }
 
-void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
+void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo() {
   const PerformanceSequence performance =
       renderKonamiSnesProgram(KONAMISNES_V2, {
                                                  {
@@ -512,7 +511,7 @@ void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
                                                  },
                                                  {
                                                      0xea,
-                                                     0x78,  // tempo 120, seen by legacy as song-level export tempo
+                                                     0x78,  // another track's tempo must not rewrite the stored step
                                                      0xff,
                                                  },
                                              });
@@ -527,10 +526,11 @@ void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
 
   const double baseHz = vibrato::baseHz(KONAMISNES_V2);
   const SequenceModulationProfile profile = analyzeSequenceModulation(performance);
+  const u16 expectedFactor = static_cast<u16>(vibrato::foldedPhaseStep(vibrato::earlyPhaseStep(0x2d, 0x37))) << 8;
   expect(profile.instruments.vibrato &&
-             std::abs(profile.instruments.vibrato->rateHertz.minimum - baseHz * (0x2d * 0x37)) < 0.0001 &&
-             std::abs(profile.instruments.vibrato->rateHertz.maximum - baseHz * (0x2d * 0x78)) < 0.0001,
-         "shared planning should include sequence-global tempo changes in legacy KonamiSnes vibrato");
+             std::abs(profile.instruments.vibrato->rateHertz.minimum - baseHz * expectedFactor) < 0.0001 &&
+             std::abs(profile.instruments.vibrato->rateHertz.maximum - baseHz * expectedFactor) < 0.0001,
+         "legacy KonamiSnes vibrato should retain the phase step quantized when its command executes");
 
   const PerformanceSequence ordered =
       renderKonamiSnesProgram(KONAMISNES_V2, {
@@ -563,10 +563,39 @@ void konamiSnesLegacyObservedVibratoRateUsesGlobalTempoCeiling() {
       sameTickRates.push_back(modulation);
     }
   }
-  expect(sameTickRates.size() == 2 && sameTickRates[0]->cyclesPerTick && sameTickRates[1]->cyclesPerTick &&
-             *sameTickRates[0]->cyclesPerTick > *sameTickRates[1]->cyclesPerTick &&
-             sameTickRates[0]->header.sequence < sameTickRates[1]->header.sequence,
-         "global tempo invalidation should precede a later same-tick KonamiSnes vibrato replacement");
+  expect(sameTickRates.size() == 1 && sameTickRates[0]->frequencyHz && !sameTickRates[0]->cyclesPerTick,
+         "an unrelated tempo event should not synthesize a replacement for an early driver's stored vibrato step");
+
+  const PerformanceSequence direction =
+      renderKonamiSnesProgram(KONAMISNES_V2, {{
+                                                 0xea,
+                                                 0x80,
+                                                 0xe4,
+                                                 0x00,
+                                                 0xff,
+                                                 0x40,  // floor($ff * $80 / 256) = $7f: fast, forward
+                                                 0xe0,
+                                                 0x01,
+                                                 0xea,
+                                                 0xff,
+                                                 0xe4,
+                                                 0x00,
+                                                 0xff,
+                                                 0x40,  // floor($ff * $ff / 256) = $fe: slow, backward
+                                                 0xff,
+                                             }});
+  std::vector<const ModulationPerformanceEvent*> directionRates;
+  for (const PerformanceEvent& event : direction.tracks[0].events) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    if (modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoRate) {
+      directionRates.push_back(modulation);
+    }
+  }
+  expect(directionRates.size() == 2 && directionRates[0]->frequencyHz && directionRates[1]->frequencyHz &&
+             std::abs(*directionRates[0]->frequencyHz - (250.0 * 127.0 / 256.0)) < 0.0001 &&
+             std::abs(*directionRates[1]->frequencyHz - (250.0 * 2.0 / 256.0)) < 0.0001 &&
+             directionRates[0]->initialPhaseCycles == 0.0 && directionRates[1]->initialPhaseCycles == 0.5,
+         "early KonamiSnes high rates should fold only after tempo multiplication and preserve triangle direction");
 }
 
 void konamiSnesPercussionUsesPackedGsDrumBank() {

@@ -62,14 +62,21 @@ namespace vibrato {
 
 // Versions 1-2 advance vibrato with a tempo-dependent counter. Versions 3-6
 // use a fixed-rate counter, so the same bytes need different conversions.
-[[nodiscard]] constexpr bool usesLegacy(KonamiSnesVersion version) {
+[[nodiscard]] constexpr bool usesEarlyCounter(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 || version == KONAMISNES_V2;
 }
 
-[[nodiscard]] constexpr u8 legacyRateStep(u8 rate) {
-  // Values above 0x80 run the same triangle wave in the opposite direction.
-  // Folding them around 0x80 gives the actual speed in either direction.
-  return (rate == 0 || rate == 0x80) ? 0 : static_cast<u8>((rate < 0x80) ? rate : (0x100 - rate));
+[[nodiscard]] constexpr u8 earlyPhaseStep(u8 rate, u8 tempo) {
+  // Early drivers multiply the raw command rate by the current per-track tempo
+  // and retain only the high byte. This quantization happens once, when the
+  // vibrato command executes.
+  return static_cast<u8>((static_cast<u16>(rate) * tempo) >> 8);
+}
+
+[[nodiscard]] constexpr u8 foldedPhaseStep(u8 phaseStep) {
+  // Values above 0x80 traverse the same triangle in the opposite direction.
+  return (phaseStep == 0 || phaseStep == 0x80) ? 0
+                                               : static_cast<u8>((phaseStep < 0x80) ? phaseStep : (0x100 - phaseStep));
 }
 
 [[nodiscard]] constexpr u8 lateEraRateStep(u8 rate) {
@@ -78,14 +85,10 @@ namespace vibrato {
   return (rate == 0xff) ? 16 : (rate >= 0x80) ? 8 : (rate >= 0x40) ? 4 : (rate >= 0x20) ? 2 : 1;
 }
 
-[[nodiscard]] constexpr bool isActive(KonamiSnesVersion version, u8 rate, u8 depth) {
-  return depth != 0 && (usesLegacy(version) ? (legacyRateStep(rate) != 0) : (rate != 0));
-}
-
 [[nodiscard]] inline double maxDepthCents(KonamiSnesVersion version, u8 depth) {
   // Both engines deliberately change scale at 0x80. Keeping the two pieces
   // explicit mirrors the driver and avoids smoothing over that discontinuity.
-  if (usesLegacy(version)) {
+  if (usesEarlyCounter(version)) {
     return (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
   }
   return (depth < 0x80) ? (depth * (100.0 / 128.0)) : ((depth - 126.0) * 50.0);
@@ -94,7 +97,7 @@ namespace vibrato {
 [[nodiscard]] inline double currentDepthCents(KonamiSnesVersion version, u8 targetDepth, u16 currentDepth) {
   // Fades keep eight extra bits for fractions, while the command stores only
   // the target byte. Convert the live value using the target's scale.
-  if (usesLegacy(version)) {
+  if (usesEarlyCounter(version)) {
     return (targetDepth < 0x80) ? (currentDepth * (100.0 / (32.0 * 256.0))) : (currentDepth * (100.0 / (8.0 * 256.0)));
   }
   return (currentDepth < 0x8000) ? (currentDepth * (100.0 / (128.0 * 256.0)))
@@ -102,14 +105,14 @@ namespace vibrato {
 }
 
 [[nodiscard]] inline double baseHz(KonamiSnesVersion version) {
-  return usesLegacy(version) ? (kKonamiSnesTimerHz / 65536.0) : (kKonamiSnesTimerHz / 16384.0);
+  return usesEarlyCounter(version) ? (kKonamiSnesTimerHz / 65536.0) : (kKonamiSnesTimerHz / 16384.0);
 }
 
 [[nodiscard]] inline u16 rateFactor(KonamiSnesVersion version, u8 rate, u8 tempo) {
-  // Early vibrato speeds up and slows down with song tempo. Later vibrato uses
-  // only its rate byte and the driver's range-dependent step size.
-  if (usesLegacy(version)) {
-    return static_cast<u16>(legacyRateStep(rate) * ((tempo == 0) ? 1 : tempo));
+  // Preserve the early driver's quantized eight-bit phase step. Multiplying by
+  // 256 keeps baseHz() in its existing 16-bit phase-counter units.
+  if (usesEarlyCounter(version)) {
+    return static_cast<u16>(foldedPhaseStep(earlyPhaseStep(rate, tempo))) << 8;
   }
   return (rate == 0) ? 0 : static_cast<u16>(rate * lateEraRateStep(rate));
 }
@@ -117,7 +120,7 @@ namespace vibrato {
 [[nodiscard]] inline double delaySeconds(KonamiSnesVersion version, u8 delay, u8 tempo) {
   // Early delay counts music ticks and therefore changes with tempo. Later
   // delay counts the fixed 250 Hz timer directly.
-  if (usesLegacy(version)) {
+  if (usesEarlyCounter(version)) {
     return ((256.0 / kKonamiSnesTimerHz) * (delay + 1.0)) / ((tempo == 0) ? 1 : tempo);
   }
   return (delay + 1.0) / kKonamiSnesTimerHz;
@@ -126,11 +129,11 @@ namespace vibrato {
 [[nodiscard]] constexpr u8 delayFromArg1(KonamiSnesVersion version, u8 arg1) {
   // Later engines overload values 0xc8-0xff: they request a depth fade instead
   // of a start delay. In that form vibrato begins immediately.
-  return (!usesLegacy(version) && arg1 >= kLateEraVibratoFadeThreshold) ? 0 : arg1;
+  return (!usesEarlyCounter(version) && arg1 >= kLateEraVibratoFadeThreshold) ? 0 : arg1;
 }
 
 [[nodiscard]] constexpr u8 inlineFadeLength(KonamiSnesVersion version, u8 arg1) {
-  return (!usesLegacy(version) && arg1 >= kLateEraVibratoFadeThreshold)
+  return (!usesEarlyCounter(version) && arg1 >= kLateEraVibratoFadeThreshold)
              ? static_cast<u8>(arg1 - (kLateEraVibratoFadeThreshold - 1))
              : 0;
 }
