@@ -6,6 +6,7 @@
 
 #include "value/formats/NinSnes/NinSnes.h"
 
+#include "value/formats/NinSnes/NinSnesPatterns.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 
@@ -811,6 +812,49 @@ void ninSnesPercussionStartsPerNoteVibratoFade() {
                modulation->header.tick != 0;
       });
   expect(vibratoFadeSamples != 0, "percussion notes should advance a configured per-note vibrato fade");
+}
+
+void ninSnesFixedPercussionBaseIgnoresFaOperand() {
+  std::vector<u8> driverBytes(0x100);
+  std::ranges::copy(std::initializer_list<u8>{0xd5, 0x11, 0x02, 0xfd, 0x10, 0x03, 0x80, 0xa8, 0xca, 0x8d, 0x06, 0xcf},
+                    driverBytes.begin() + 0x20);
+  expect(detectFixedPercussionBase(ByteReader(SourceId{7}, driverBytes), 0xca) == 0,
+         "the Vegas Stakes loader form should detect fixed percussion base zero");
+
+  std::ranges::fill(driverBytes, 0);
+  std::ranges::copy(std::initializer_list<u8>{0x68, 0xca, 0x90, 0x07, 0xa8, 0xa7, 0x3f, 0x11, 0x0b, 0x8d, 0xa4},
+                    driverBytes.begin() + 0x20);
+  expect(detectFixedPercussionBase(ByteReader(SourceId{7}, driverBytes), 0xca) == 0x23,
+         "the Kirby's Dream Land 3 dispatch form should expose its hard-coded percussion base");
+
+  std::ranges::fill(driverBytes, 0);
+  std::ranges::copy(std::initializer_list<u8>{0xd5, 0x11, 0x02, 0xfd, 0x10, 0x06, 0x80, 0xa8, 0xca, 0x60, 0x84, 0x5f,
+                                              0x8d, 0x06, 0xcf},
+                    driverBytes.begin() + 0x20);
+  expect(!detectFixedPercussionBase(ByteReader(SourceId{7}, driverBytes), 0xca),
+         "the normal FA-controlled loader should remain dynamic");
+
+  std::vector<u8> sequenceBytes(kAramSize);
+  writeLe16(sequenceBytes, 0x100, 0x200);
+  writeLe16(sequenceBytes, 0x102, 0);
+  writeSection(sequenceBytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(std::initializer_list<u8>{3, 0x7f, 0xfa, 5, 0xca, 0}, sequenceBytes.begin() + 0x300);
+
+  const auto sourceProgram = [&](std::optional<u8> fixedBase) {
+    Layout layout = standardLayout();
+    layout.fixedPercussionBase = fixedBase;
+    const SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, sequenceBytes), layout, AssetId{1});
+    const auto command = std::ranges::find(parsed.program.tracks[0].commands, u8{0xfa}, &SourceCommand::opcode);
+    expect(command != parsed.program.tracks[0].commands.end() && command->encodedSize == 2,
+           "FA should still consume its operand in fixed-base drivers");
+    expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1,
+           "the percussion fixture should produce one drum mapping");
+    return parsed.recipes.drumKits[0].slots[0].sourceProgram;
+  };
+
+  expect(sourceProgram(std::nullopt) == 5, "normal drivers should continue applying the FA percussion base");
+  expect(sourceProgram(0) == 0, "fixed-base drivers should ignore FA while retaining the detected base");
+  expect(sourceProgram(0x23) == 0x23, "a nonzero fixed percussion base should override the FA operand");
 }
 
 void ninSnesGainModeInstrumentsUseDspEnvelope() {

@@ -145,6 +145,7 @@ struct Layout {
   u16 falcomBaseOffset = 0;
   u8 quintetBgmInstrumentBase = 0;
   u16 quintetInstrumentLookupAddress = 0;
+  std::optional<u8> fixedPercussionBase;
   u16 konamiTuningTableAddress = 0;
   u8 konamiTuningTableSize = 0;
 

@@ -69,6 +69,7 @@ void ninSnesControllerFadesRemainInTheSourceDomain();
 void ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
 void ninSnesF9UsesSharedPitchTransitions();
 void ninSnesPercussionStartsPerNoteVibratoFade();
+void ninSnesFixedPercussionBaseIgnoresFaOperand();
 void ninSnesGainModeInstrumentsUseDspEnvelope();
 void mameRomDatabaseAndGroupAssemblyAreValueOriented();
 void konamiArcadeModuleBuildsSequencesSynthAndCollections();
@@ -189,6 +190,7 @@ int main() {
     ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
     ninSnesF9UsesSharedPitchTransitions();
     ninSnesPercussionStartsPerNoteVibratoFade();
+    ninSnesFixedPercussionBaseIgnoresFaOperand();
     ninSnesGainModeInstrumentsUseDspEnvelope();
     mameRomDatabaseAndGroupAssemblyAreValueOriented();
     konamiArcadeModuleBuildsSequencesSynthAndCollections();

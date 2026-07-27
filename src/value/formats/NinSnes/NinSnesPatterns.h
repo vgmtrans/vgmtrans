@@ -49,6 +49,9 @@ struct Patterns {
   static Pattern ptnIncSectionPtr;
   static Pattern ptnLoadInstrTableAddress;
   static Pattern ptnLoadInstrTableAddressSMW;
+  // Value-only behavioral probes; these do not participate in legacy format recognition.
+  static Pattern ptnFixedPercussionBaseDispatch;
+  static Pattern ptnFixedPercussionBaseLoader;
   static Pattern ptnSetDIR;
   static Pattern ptnSetDIRYI;
   static Pattern ptnSetDIRVS;
@@ -83,5 +86,7 @@ struct Patterns {
   static Pattern ptnInstrVCmdACTR2;
   static Pattern ptnInstrVCmdTS;
 };
+
+[[nodiscard]] std::optional<u8> detectFixedPercussionBase(core::ByteReader reader, u8 percussionMinimum);
 
 }  // namespace vgmtrans::formats::nin_snes
