@@ -866,7 +866,12 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
   noteBytes[0x3001] = 0x04;
   noteBytes[0x3002] = 0x40;
   noteBytes[0x3003] = 0x42;
-  noteBytes[0x3004] = 0x17;
+  noteBytes[0x3004] = 0x43;
+  noteBytes[0x3005] = 0x04;
+  noteBytes[0x3006] = 0x00;
+  noteBytes[0x3007] = 0x44;
+  noteBytes[0x3008] = 0x45;
+  noteBytes[0x3009] = 0x17;
   const auto noteResetFlags = [&](CapcomSnesEngineVersion noteVersion) {
     const TrackProgram noteTrack = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, noteBytes), noteVersion,
                                                                CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
@@ -885,9 +890,11 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
     }
     return flags;
   };
-  expect(noteResetFlags(CapcomSnesEngineVersion::v3BgmFixedLocation) == std::vector<bool>{true, false},
-         "CapcomSnes V2+ should reset a normal note by default but preserve phase through a slur");
-  expect(noteResetFlags(CapcomSnesEngineVersion::v1BgmInList) == std::vector<bool>{false, false},
+  expect(noteResetFlags(CapcomSnesEngineVersion::v3BgmFixedLocation) ==
+             std::vector<bool>{true, true, false, false, true},
+         "CapcomSnes V2+ should use the preceding note's slur bit to decide whether each note resets LFO phase");
+  expect(noteResetFlags(CapcomSnesEngineVersion::v1BgmInList) ==
+             std::vector<bool>{false, false, false, false, false},
          "CapcomSnes V1 should preserve its disabled-by-default phase reset");
 
   std::vector<u8> frozenBytes(0x4000);
