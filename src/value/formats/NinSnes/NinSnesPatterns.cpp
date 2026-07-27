@@ -27,4 +27,32 @@ std::optional<u32> Pattern::find(core::ByteReader reader) const {
 #undef NINSNES_PATTERN_OWNER
 #undef NINSNES_BYTE_PATTERN
 
+// Some HAL derivatives bypass the variable written by FA and apply a fixed
+// percussion base directly in either note dispatch or the instrument loader.
+//
+// Kirby's Dream Land 3:
+//   cmp a,#$ca / bcc / sbc a,#$a7 / call loader / mov y,#$a4
+Pattern Patterns::ptnFixedPercussionBaseDispatch("\x68\xca\x90\x07\xa8\xa7\x3f\x11\x0b\x8d\xa4", "x?x?x?x??xx", 11);
+
+// Vegas Stakes:
+//   mov abs+x,a / mov y,a / bpl +3 / setc / sbc a,#$ca / mov y,#6 / mul ya
+Pattern Patterns::ptnFixedPercussionBaseLoader("\xd5\x11\x02\xfd\x10\x03\x80\xa8\xca\x8d\x06\xcf", "x??xxxxx?xxx", 12);
+
+std::optional<u8> detectFixedPercussionBase(core::ByteReader reader, u8 percussionMinimum) {
+  if (const auto offset = Patterns::ptnFixedPercussionBaseDispatch.find(reader)) {
+    const u8 detectedMinimum = reader.u8At(*offset + 1);
+    const u8 subtract = reader.u8At(*offset + 5);
+    if (detectedMinimum == percussionMinimum && subtract <= detectedMinimum) {
+      return static_cast<u8>(detectedMinimum - subtract);
+    }
+  }
+  if (const auto offset = Patterns::ptnFixedPercussionBaseLoader.find(reader)) {
+    const u8 subtract = reader.u8At(*offset + 8);
+    if (subtract <= percussionMinimum) {
+      return static_cast<u8>(percussionMinimum - subtract);
+    }
+  }
+  return std::nullopt;
+}
+
 }  // namespace vgmtrans::formats::nin_snes

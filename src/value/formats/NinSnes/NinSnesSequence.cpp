@@ -33,6 +33,8 @@ constexpr u32 kMaxTrackCommands = 32768;
 constexpr u8 kMelodicKeyCorrection = 24;
 constexpr u8 kIntelliDrumSlots = 16;
 constexpr u8 kDefaultTempo = 0x20;
+constexpr u32 kFixedPercussionBaseFlag = 1u << 8;
+constexpr u32 kFixedPercussionBaseShift = 16;
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
   return (0x7fu << 7) | program;
@@ -544,6 +546,10 @@ private:
 struct ProgramState {
   explicit ProgramState(const SequenceProgram& program)
       : selected(profile(static_cast<ProfileId>(program.config.profile))),
+        fixedPercussionBase(
+            (program.config.driverState & kFixedPercussionBaseFlag) != 0
+                ? std::optional<u8>{static_cast<u8>(program.config.driverState >> kFixedPercussionBaseShift)}
+                : std::nullopt),
         intelliConditionalMask(static_cast<u8>(program.config.driverState)) {
     for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
       basePrograms[encoded] =
@@ -560,7 +566,7 @@ struct ProgramState {
   void resetRuntime() {
     tempo = kDefaultTempo;
     globalTranspose = 0;
-    percussionBase = 0;
+    percussionBase = fixedPercussionBase.value_or(0);
     customNoteParameters = false;
     intelliFlags = 0;
     voiceTable.clear();
@@ -685,6 +691,7 @@ struct ProgramState {
   u8 tempo = kDefaultTempo;
   s8 globalTranspose = 0;
   u8 percussionBase = 0;
+  std::optional<u8> fixedPercussionBase;
   bool customNoteParameters = false;
   u8 intelliFlags = 0;
   u8 intelliConditionalMask = 0;
@@ -1304,7 +1311,9 @@ struct Playback {
   }
 
   void percussionBase(u8 base) {
-    program.percussionBase = base;
+    if (!program.fixedPercussionBase) {
+      program.percussionBase = base;
+    }
     if (program.selected.intelli == IntelliMode::Ta) {
       program.intelliFlags &= static_cast<u8>(~0x40);
     }
@@ -2205,6 +2214,10 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   program.config.profile = static_cast<u32>(layout.profile);
   program.config.driverState =
       layout.profile == ProfileId::IntelliFe3 && reader.has(0xb9, 1) ? reader.u8At(0xb9) : u8{0};
+  if (layout.fixedPercussionBase) {
+    program.config.driverState |=
+        kFixedPercussionBaseFlag | (static_cast<u32>(*layout.fixedPercussionBase) << kFixedPercussionBaseShift);
+  }
   program.sourceProgramMap = buildProgramMap(reader, layout);
   program.sectionPlaylist = std::move(playlist.playlist);
   DecodeContext context{

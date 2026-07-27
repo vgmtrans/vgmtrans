@@ -565,6 +565,8 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .falcomBaseOffset = falcomOffset,
       .quintetBgmInstrumentBase = quintetBase,
       .quintetInstrumentLookupAddress = quintetLookup,
+      .fixedPercussionBase =
+          detectFixedPercussionBase(reader, selected.base == BaseProfile::Earlier ? u8{0xd0} : u8{0xca}),
       .volumeTable = std::move(volumeTable),
       .durationRateTable = std::move(durationRateTable),
   };
