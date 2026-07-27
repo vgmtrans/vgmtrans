@@ -625,21 +625,16 @@ struct ProgramState {
     if (!collecting) {
       return;
     }
-    if (earlierNote <= 0xff) {
-      standardDrumPitchModel = DrumPitchModel::EarlierTableNote;
-    }
+    const u8 sourceNote = earlierNote <= 0xff ? static_cast<u8>(earlierNote) : u8{0x24};
     standardDrums[logicalProgram] = DrumSlot{
         .key = key,
         .sourceProgram = sourceProgram,
-        .sourceNote = earlierNote <= 0xff ? static_cast<u8>(earlierNote) : u8{0x3c},
-        .globalTranspose = transpose,
+        .sourceKey = static_cast<s16>((sourceNote & 0x7f) + kMelodicKeyCorrection + transpose),
     };
   }
 
   [[nodiscard]] DrumKit currentIntelliDrumKit(u8 percussionMinimum) const {
-    DrumKit kit{
-        .pitchModel = DrumPitchModel::IntelliPlayedNote,
-    };
+    DrumKit kit;
     kit.slots.reserve(kIntelliDrumSlots);
     const bool useCustom = (intelliFlags & 0x40) != 0;
     for (u8 slot = 0; slot < kIntelliDrumSlots; ++slot) {
@@ -652,7 +647,7 @@ struct ProgramState {
       kit.slots.push_back(DrumSlot{
           .key = static_cast<u8>(0x24 + slot),
           .sourceProgram = resolveProgram(patch, percussionMinimum),
-          .sourceNote = note,
+          .sourceKey = static_cast<s16>((note & 0x7f) + kMelodicKeyCorrection),
       });
     }
     return kit;
@@ -660,9 +655,8 @@ struct ProgramState {
 
   [[nodiscard]] u8 ensureIntelliDrumKit(u8 percussionMinimum) {
     DrumKit candidate = currentIntelliDrumKit(percussionMinimum);
-    const auto found = std::ranges::find_if(recipes.drumKits, [&](const DrumKit& kit) {
-      return kit.pitchModel == candidate.pitchModel && kit.slots == candidate.slots;
-    });
+    const auto found =
+        std::ranges::find_if(recipes.drumKits, [&](const DrumKit& kit) { return kit.slots == candidate.slots; });
     if (found != recipes.drumKits.end()) {
       return found->program;
     }
@@ -678,7 +672,6 @@ struct ProgramState {
     if (!standardDrums.empty()) {
       DrumKit kit{
           .program = 0,
-          .pitchModel = standardDrumPitchModel,
       };
       for (const auto& [_, slot] : standardDrums) {
         kit.slots.push_back(slot);
@@ -704,7 +697,6 @@ struct ProgramState {
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
   u32 nextOverrideProgram = 0x80;
   std::map<u8, DrumSlot> standardDrums;
-  DrumPitchModel standardDrumPitchModel = DrumPitchModel::StandardMapping;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   std::optional<u32> tempoFadeTrack;
   u8 masterVolume = 0xff;

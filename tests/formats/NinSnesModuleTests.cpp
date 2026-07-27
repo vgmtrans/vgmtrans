@@ -946,10 +946,9 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
   };
   const SequenceParse parsed = decodeSequence(sources.reader(source), layout, AssetId{1});
   expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1 &&
-             parsed.recipes.drumKits[0].pitchModel == DrumPitchModel::EarlierTableNote &&
              parsed.recipes.drumKits[0].slots[0].sourceProgram == kEarlierPercussionProgramBase &&
-             parsed.recipes.drumKits[0].slots[0].sourceNote == 0xa8,
-         "prototype percussion should resolve its separate row and encoded source note");
+             parsed.recipes.drumKits[0].slots[0].sourceKey == 0x40,
+         "prototype percussion should resolve its separate row and source pitch");
 
   ScanIdAllocator ids;
   ScanResultBuilder result(

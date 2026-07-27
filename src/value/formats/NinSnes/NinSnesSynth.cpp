@@ -25,8 +25,6 @@ using namespace core;
 
 namespace {
 
-constexpr u8 kMelodicKeyCorrection = 24;
-
 struct InstrumentInfo {
   u32 program = 0;
   u8 srcn = 0;
@@ -154,27 +152,20 @@ struct InstrumentRegion {
 [[nodiscard]] std::vector<InstrumentInfo> collectEarlierPercussion(ByteReader reader, const Layout& layout,
                                                                    const SequenceRecipes& recipes) {
   std::vector<InstrumentInfo> infos;
-  if (!layout.percussionTableAddress || !layout.spcDirAddress) {
+  if (!layout.percussionTableAddress || !layout.spcDirAddress || recipes.drumKits.empty()) {
     return infos;
   }
   const Profile& selected = profile(layout.profile);
-  for (const DrumKit& kit : recipes.drumKits) {
-    for (const DrumSlot& slot : kit.slots) {
-      if (slot.sourceProgram < kEarlierPercussionProgramBase ||
-          slot.sourceProgram >= kEarlierPercussionProgramBase + kEarlierPercussionSlotCount ||
-          std::ranges::any_of(infos, [&](const InstrumentInfo& info) { return info.program == slot.sourceProgram; })) {
-        continue;
-      }
-      const u32 address = *layout.percussionTableAddress + (slot.sourceProgram - kEarlierPercussionProgramBase) * 6;
-      if (!reader.has(address, 6)) {
-        continue;
-      }
-      InstrumentInfo info = readInstrument(reader, selected, slot.sourceProgram, address);
-      info.source = reader.range(address, 6);
-      info.drumSource = true;
-      if (validHeader(reader, selected, info, *layout.spcDirAddress, true)) {
-        infos.push_back(std::move(info));
-      }
+  for (const DrumSlot& slot : recipes.drumKits.front().slots) {
+    if (slot.sourceProgram < kEarlierPercussionProgramBase) {
+      continue;
+    }
+    const u32 address = *layout.percussionTableAddress + (slot.sourceProgram - kEarlierPercussionProgramBase) * 6;
+    InstrumentInfo info = readInstrument(reader, selected, slot.sourceProgram, address);
+    info.source = reader.range(address, 6);
+    info.drumSource = true;
+    if (validHeader(reader, selected, info, *layout.spcDirAddress, true)) {
+      infos.push_back(std::move(info));
     }
   }
   return infos;
@@ -329,15 +320,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     for (const auto& [slot, source] : resolvedSlots) {
       Region region = source->region;
       region.keyRange = KeyRange{.low = slot->key, .high = slot->key};
-      if (kit.pitchModel != DrumPitchModel::StandardMapping) {
-        region.unityKey +=
-            static_cast<int>(slot->key) - static_cast<int>((slot->sourceNote & 0x7f) + kMelodicKeyCorrection);
-        if (kit.pitchModel == DrumPitchModel::EarlierTableNote) {
-          region.unityKey -= slot->globalTranspose;
-        }
-      } else {
-        region.unityKey += static_cast<int>(slot->key) - 0x3c - slot->globalTranspose;
-      }
+      region.unityKey += static_cast<int>(slot->key) - slot->sourceKey;
       drum.region(source->sample, std::move(region))
           .source(fmt::format("Drum {}", slot->key), source->source, "nin-snes-drum-region");
     }

@@ -22,7 +22,6 @@ inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kTrackCount = 8;
 inline constexpr u16 kPpqn = 48;
 inline constexpr std::string_view kInstrumentDomain = "nin-snes.instrument";
-inline constexpr u8 kEarlierPercussionSlotCount = 10;
 inline constexpr u32 kEarlierPercussionProgramBase = 0x100;
 
 enum class Signature : u8 {
@@ -176,24 +175,14 @@ struct InstrumentOverride {
 struct DrumSlot {
   u8 key = 0;
   u32 sourceProgram = 0;
-  u8 sourceNote = 0x3c;
-  s8 globalTranspose = 0;
+  s16 sourceKey = 0x3c;
 
   friend bool operator==(const DrumSlot&, const DrumSlot&) = default;
 };
 
-enum class DrumPitchModel : u8 {
-  StandardMapping,
-  EarlierTableNote,
-  IntelliPlayedNote,
-};
-
 struct DrumKit {
   u8 program = 0;
-  DrumPitchModel pitchModel = DrumPitchModel::StandardMapping;
   std::vector<DrumSlot> slots;
-
-  friend bool operator==(const DrumKit&, const DrumKit&) = default;
 };
 
 struct SequenceRecipes {
