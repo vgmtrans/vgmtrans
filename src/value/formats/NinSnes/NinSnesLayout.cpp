@@ -435,8 +435,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
     quintetLookup = reader.le16(operand);
   }
 
-  u16 falcomOffset = 0;
-  const auto resolveAddress = [&](u16 raw) {
+  const auto resolveAddress = [&](u16 raw, u16 falcomOffset) {
     switch (selected.addresses) {
       case AddressModel::KonamiBase:
         return static_cast<u16>(konamiBase.value_or(0) + raw);
@@ -450,119 +449,16 @@ std::optional<Layout> findLayout(ByteReader reader) {
   const auto sectionListPointer = [&](u32 songPointer) {
     u16 address = reader.le16(songPointer);
     if (selected.addresses == AddressModel::KonamiBase) {
-      address = resolveAddress(address);
+      address = resolveAddress(address, 0);
     }
     return address;
   };
-  const auto updateFalcomOffset = [&](u16 firstSectionPointer) {
-    if (selected.addresses == AddressModel::FalcomBaseOffset && falcomBaseAddress) {
-      falcomOffset = static_cast<u16>(firstSectionPointer - *falcomBaseAddress);
-    }
-  };
-  const auto illegalTrackPointers = [&](u16 sectionAddress) {
-    if (!reader.has(sectionAddress, 16)) {
-      return true;
-    }
-    for (u8 track = 0; track < kTrackCount; ++track) {
-      const u16 raw = reader.le16(sectionAddress + track * 2);
-      if (raw == 0) {
-        continue;
-      }
-      if (raw == 0xffff) {
-        return true;
-      }
-      const u16 address = resolveAddress(raw);
-      if ((address & 0xff00) == 0 || address == 0xffff) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  u8 songListLength = 1;
-  u16 sectionListCutoff = 0xffff;
-  for (u8 song = 1; song <= 0x7f; ++song) {
-    const u32 pointer = songList->address + song * 2;
-    if (!reader.has(pointer, 2) || pointer >= sectionListCutoff) {
-      break;
-    }
-    const u16 firstSectionPointer = sectionListPointer(pointer);
-    if (firstSectionPointer == 0) {
-      continue;
-    }
-    if ((firstSectionPointer & 0xff00) == 0 || firstSectionPointer == 0xffff) {
-      break;
-    }
-    if (firstSectionPointer >= pointer) {
-      sectionListCutoff = std::min(sectionListCutoff, firstSectionPointer);
-    }
-    if (!reader.has(firstSectionPointer, 2)) {
-      break;
-    }
-    u16 firstSection = reader.le16(firstSectionPointer);
-    if (firstSection < 0x100) {
-      continue;
-    }
-    updateFalcomOffset(firstSectionPointer);
-    firstSection = resolveAddress(firstSection);
-    if (illegalTrackPointers(firstSection)) {
-      break;
-    }
-    songListLength = song + 1;
-  }
-
-  if (!reader.has(sectionPointer, 2)) {
-    return std::nullopt;
-  }
-  const u16 currentSection = reader.le16(sectionPointer);
-  if (currentSection < 0x100 || currentSection >= 0xfff0) {
-    return std::nullopt;
-  }
-
-  std::optional<u8> currentSong;
-  for (u8 song = 0; song <= songListLength && !currentSong; ++song) {
-    const u32 pointer = songList->address + song * 2;
-    if (!reader.has(pointer, 2)) {
-      break;
-    }
-    const u16 firstSectionPointer = sectionListPointer(pointer);
-    updateFalcomOffset(firstSectionPointer);
-    if (firstSectionPointer > currentSection || (currentSection % 2) != (firstSectionPointer % 2)) {
-      continue;
-    }
-    u16 address = firstSectionPointer;
-    for (u8 section = 0; address >= 0x100 && address < 0xfff0 && section < 32; ++section, address += 2) {
-      if (!reader.has(address, 2)) {
-        break;
-      }
-      const u16 sectionAddress = resolveAddress(reader.le16(address));
-      if (address == currentSection) {
-        currentSong = song;
-        break;
-      }
-      if ((sectionAddress & 0xff00) == 0) {
-        break;
-      }
-    }
-  }
-  if (!currentSong) {
-    return std::nullopt;
-  }
-
-  u16 playlistAddress = reader.le16(songList->address + *currentSong * 2);
-  if (selected.addresses == AddressModel::KonamiBase) {
-    playlistAddress = resolveAddress(playlistAddress);
-  }
-
-  Layout layout{
+  Layout baseLayout{
       .signature = signature,
       .profile = profileId,
-      .songIndex = *currentSong,
       .songListAddress = songList->address,
-      .playlistAddress = playlistAddress,
       .sectionPointerAddress = sectionPointer,
       .konamiBaseAddress = konamiBase.value_or(0),
-      .falcomBaseOffset = falcomOffset,
       .quintetBgmInstrumentBase = quintetBase,
       .quintetInstrumentLookupAddress = quintetLookup,
       .fixedPercussionBase =
@@ -573,10 +469,10 @@ std::optional<Layout> findLayout(ByteReader reader) {
 
   if (const auto instruments = findInstrumentProbe(reader, selected)) {
     if (instruments->tableAddress != 0) {
-      layout.instrumentTableAddress = instruments->tableAddress;
+      baseLayout.instrumentTableAddress = instruments->tableAddress;
     }
     if (instruments->dirAddress != 0) {
-      layout.spcDirAddress = instruments->dirAddress;
+      baseLayout.spcDirAddress = instruments->dirAddress;
     }
   }
 
@@ -585,12 +481,104 @@ std::optional<Layout> findLayout(ByteReader reader) {
       const u16 low = reader.le16(*offset + 10);
       const u16 high = reader.le16(*offset + 14);
       if (high > low && high - low <= 0x7f) {
-        layout.konamiTuningTableAddress = low;
-        layout.konamiTuningTableSize = static_cast<u8>(high - low);
+        baseLayout.konamiTuningTableAddress = low;
+        baseLayout.konamiTuningTableSize = static_cast<u8>(high - low);
       }
     }
   }
-  return layout;
+
+  struct SongEntry {
+    u8 index = 0;
+    u16 playlistAddress = 0;
+    u16 falcomOffset = 0;
+  };
+  // Standard N-SPC song requests use a five-bit index. Inspect every slot:
+  // games such as Mario Paint leave unloaded holes between valid songs.
+  constexpr u8 kSongSlotCount = 32;
+  std::vector<SongEntry> entries;
+  entries.reserve(kSongSlotCount);
+  for (u8 song = 0; song < kSongSlotCount; ++song) {
+    const u32 pointer = songList->address + song * 2;
+    if (!reader.has(pointer, 2)) {
+      break;
+    }
+    const u16 playlistAddress = sectionListPointer(pointer);
+    if (playlistAddress < 0x100 || playlistAddress >= 0xfff0 || !reader.has(playlistAddress, 2)) {
+      continue;
+    }
+    entries.push_back(SongEntry{
+        .index = song,
+        .playlistAddress = playlistAddress,
+        .falcomOffset = selected.addresses == AddressModel::FalcomBaseOffset && falcomBaseAddress
+                            ? static_cast<u16>(playlistAddress - *falcomBaseAddress)
+                            : u16{0},
+    });
+  }
+
+  const SongEntry* currentSong = nullptr;
+  if (reader.has(sectionPointer, 2)) {
+    const u16 currentAddress = reader.le16(sectionPointer);
+    if (currentAddress >= 0x100 && currentAddress < 0xfff0) {
+      for (const SongEntry& entry : entries) {
+        u16 address = entry.playlistAddress;
+        for (u8 command = 0; reader.has(address, 2) && command < 64; ++command) {
+          if (address == currentAddress) {
+            currentSong = &entry;
+            break;
+          }
+          const u16 value = reader.le16(address);
+          if (value == 0) {
+            break;
+          }
+          address = static_cast<u16>(address + (value <= 0xff ? 4 : 2));
+        }
+        if (currentSong) {
+          break;
+        }
+      }
+    }
+  }
+
+  std::vector<const SongEntry*> candidates;
+  const auto queueCandidate = [&](const SongEntry* entry) {
+    if (entry != nullptr && std::ranges::none_of(candidates, [entry](const SongEntry* queued) {
+          return queued->playlistAddress == entry->playlistAddress;
+        })) {
+      candidates.push_back(entry);
+    }
+  };
+
+  // Some rips are captured before the driver consumes the song request. Detect
+  // the command mirror it actually reads instead of assuming a driver profile.
+  if (const auto requestRead = Patterns::ptnReadSongRequestPort.find(reader)) {
+    const u8 mirror = reader.u8At(*requestRead + 1);
+    if (mirror < 4) {
+      const u8 request = reader.u8At(0xf4 + mirror);
+      const u8 requestedSong = request & 0x1f;
+      if (request != 0xff && requestedSong != 0) {
+        const auto entry = std::ranges::find(entries, requestedSong, &SongEntry::index);
+        if (entry != entries.end()) {
+          queueCandidate(&*entry);
+        }
+      }
+    }
+  }
+  queueCandidate(currentSong);
+  for (const SongEntry& entry : entries) {
+    queueCandidate(&entry);
+  }
+
+  for (const SongEntry* entry : candidates) {
+    Layout layout = baseLayout;
+    layout.songIndex = entry->index;
+    layout.playlistAddress = entry->playlistAddress;
+    layout.falcomBaseOffset = entry->falcomOffset;
+    if (!hasValidSequence(reader, layout)) {
+      continue;
+    }
+    return layout;
+  }
+  return std::nullopt;
 }
 
 }  // namespace vgmtrans::formats::nin_snes

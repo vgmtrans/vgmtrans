@@ -203,6 +203,7 @@ struct SequenceParse {
 [[nodiscard]] u16 instrumentSlotCount(const Profile& profile);
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
+[[nodiscard]] bool hasValidSequence(core::ByteReader reader, const Layout& layout);
 [[nodiscard]] const core::SequenceDialect& sequenceDialect();
 [[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
