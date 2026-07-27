@@ -453,13 +453,23 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
 }
 
 [[nodiscard]] u16 requiredPitchBendRangeCents(const RenderTrackState& state) {
-  const double possibleSemitones = std::abs(state.sourcePitchBendSemitones) + state.vibrato.depth;
+  const bool vibratoPhaseAdvances = state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0;
+  const double possibleSemitones = vibratoPhaseAdvances
+                                       ? std::abs(state.sourcePitchBendSemitones) + state.vibrato.depth
+                                       : std::abs(state.sourcePitchBendSemitones + state.simulatedVibratoSemitones);
   const int cents = std::max<int>(200, static_cast<int>(std::ceil(possibleSemitones * 100.0)));
   return static_cast<u16>(std::min<int>(cents, std::numeric_limits<u16>::max()));
 }
 
+[[nodiscard]] u16 wholeSemitonePitchBendRangeCents(u16 cents) {
+  constexpr u32 kMinimumRangeCents = 200;
+  constexpr u32 kMaximumWholeSemitoneRangeCents = 12'700;
+  const u32 clamped = std::clamp<u32>(cents, kMinimumRangeCents, kMaximumWholeSemitoneRangeCents);
+  return static_cast<u16>(((clamped + 99) / 100) * 100);
+}
+
 void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents) {
-  const u16 range = std::max<u16>(200, cents);
+  const u16 range = wholeSemitonePitchBendRangeCents(cents);
   if (state.lastPitchBendRangeCents && *state.lastPitchBendRangeCents == range) {
     state.pitchBendRangeCents = range;
     return;
@@ -1035,6 +1045,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               }
               case ModulationPerformanceTarget::VibratoRate:
                 configureLfo(state.vibrato, typedEvent.header.tick, typedEvent);
+                if (state.lastPitchBendValue) {
+                  addCombinedPitchBend(track, state, typedEvent.header.tick, channel, false);
+                }
                 break;
               case ModulationPerformanceTarget::TremoloRate:
                 configureLfo(state.tremolo, typedEvent.header.tick, typedEvent,
