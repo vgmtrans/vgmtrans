@@ -27,6 +27,11 @@ std::optional<u32> Pattern::find(core::ByteReader reader) const {
 #undef NINSNES_PATTERN_OWNER
 #undef NINSNES_BYTE_PATTERN
 
+// Pilotwings:
+//   mov a,$00 / cmp a,#$ff / beq / and a,#$1f / bne start-song
+// $00-$03 are the canonical mirrors of input ports $F4-$F7.
+Pattern Patterns::ptnReadSongRequestPort("\xe4\x00\x68\xff\xf0\x00\x28\x1f\xd0\x00", "x?xxx?xxx?", 10);
+
 // Some HAL derivatives bypass the variable written by FA and apply a fixed
 // percussion base directly in either note dispatch or the instrument loader.
 //

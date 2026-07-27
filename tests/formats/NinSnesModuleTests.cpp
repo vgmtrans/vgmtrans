@@ -175,6 +175,68 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
       "early and standard drivers should retain their distinct instrument layouts");
 }
 
+void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
+  std::vector<u8> bytes(kAramSize);
+
+  // Earlier driver signatures and its command tables. Pilotwings uses this
+  // profile while retaining the later five-bit song request protocol.
+  std::ranges::copy(
+      std::initializer_list<u8>{0x8d, 0x00, 0xf7, 0x40, 0x3a, 0x40, 0x2d, 0xf7, 0x40, 0x3a, 0x40, 0xfd, 0xae},
+      bytes.begin() + 0x500);
+  std::ranges::copy(std::initializer_list<u8>{0xf5, 0x01, 0x20, 0xfd, 0xf5, 0x00, 0x20, 0xda, 0x40},
+                    bytes.begin() + 0x520);
+  std::ranges::copy(std::initializer_list<u8>{0x68, 0xe0, 0x90, 0x05, 0x3f, 0x00, 0x00, 0x2f, 0x00},
+                    bytes.begin() + 0x540);
+  std::ranges::copy(std::initializer_list<u8>{0x1c, 0x5d, 0xe8, 0x00, 0x1f, 0x76, 0x0f}, bytes.begin() + 0x560);
+  std::ranges::copy(std::initializer_list<u8>{0xe4, 0x00, 0x68, 0xff, 0xf0, 0xe8, 0x28, 0x1f, 0xd0, 0x8f},
+                    bytes.begin() + 0x580);
+  std::ranges::copy(
+      std::initializer_list<u8>{0x68, 0xda, 0x90, 0x0a, 0x6d, 0xfd, 0xae, 0x60, 0x96, 0x56, 0x0f, 0xfd, 0x2f, 0xe3},
+      bytes.begin() + 0x5a0);
+  constexpr std::array<u8, 27> commandLengths{
+      0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01,
+      0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01,
+  };
+  std::ranges::copy(commandLengths, bytes.begin() + 0x1036);
+
+  // Song 2 is an unloaded hole between two valid resident playlists.
+  writeLe16(bytes, 0x2002, 0x2100);
+  writeLe16(bytes, 0x2004, 0x2200);
+  writeLe16(bytes, 0x2006, 0x2300);
+  writeLe16(bytes, 0x40, 0x2102);
+  bytes[0xf4] = 3;
+
+  writeLe16(bytes, 0x2100, 0x2400);
+  writeLe16(bytes, 0x2102, 0xff);
+  writeLe16(bytes, 0x2104, 0x2100);
+  writeLe16(bytes, 0x2106, 0xffff);
+  writeSection(bytes, 0x2400, {{0, 0x2500}});
+  bytes[0x2500] = 0;
+
+  writeLe16(bytes, 0x2200, 0x2600);
+  writeLe16(bytes, 0x2202, 0);
+
+  writeLe16(bytes, 0x2300, 0x2700);
+  writeLe16(bytes, 0x2302, 0);
+  writeSection(bytes, 0x2700, {{0, 0x2800}});
+  bytes[0x2800] = 0;
+
+  const auto requested = findLayout(ByteReader(SourceId{7}, bytes));
+  expect(requested && requested->profile == ProfileId::Earlier && requested->songIndex == 3 &&
+             requested->playlistAddress == 0x2300,
+         "a pending N-SPC request should select a valid song beyond an unloaded table hole");
+
+  bytes[0xf4] = 0;
+  writeLe16(bytes, 0x40, 0x2302);
+  const auto playing = findLayout(ByteReader(SourceId{7}, bytes));
+  expect(playing && playing->songIndex == 3 && playing->playlistAddress == 0x2300,
+         "the live playlist cursor should select the playing song when no request is pending");
+
+  expect(hasValidSequence(ByteReader(SourceId{7}, bytes),
+                          Layout{.profile = ProfileId::Earlier, .playlistAddress = 0x2100}),
+         "an infinite repeat should not make adjacent data part of the playlist");
+}
+
 void ninSnesProfilesShareSquaredLevelCurve() {
   constexpr u8 kMasterLevel = 120;
   constexpr u8 kChannelLevel = 140;

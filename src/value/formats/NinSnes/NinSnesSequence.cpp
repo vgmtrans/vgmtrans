@@ -18,6 +18,7 @@
 #include <cmath>
 #include <map>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <utility>
@@ -2001,15 +2002,19 @@ struct PlaylistDecode {
       } else {
         const u16 storedDestination = reader.le16(address + 2);
         const u16 destination = layout.resolveAddress(storedDestination);
+        const bool infinite = selected.playlist == PlaylistModel::Tose ? (value == 0 || value == 0xff) : value > 0x80;
         command.fallthrough = Address{address + 4};
         command.range = reader.range(address, 4);
         command.operation = PlaylistRepeat{
             .additionalPlays = value,
             .destination = Address{destination},
-            .infinite = selected.playlist == PlaylistModel::Tose ? (value == 0 || value == 0xff) : value > 0x80,
+            .infinite = infinite,
         };
         queue(destination);
-        queue(address + 4);
+        // Infinite repeats never reach their encoded fallthrough, which may be adjacent song data.
+        if (!infinite) {
+          queue(address + 4);
+        }
       }
     } else {
       const u16 sectionAddress = layout.resolveAddress(value);
@@ -2202,6 +2207,39 @@ struct PlaylistDecode {
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeDialect();
   return dialect;
+}
+
+bool hasValidSequence(ByteReader reader, const Layout& layout) {
+  const SectionPlaylist& playlist = decodePlaylist(reader, layout, AssetId{}, nullptr, nullptr).playlist;
+  if (playlist.commands.empty() || playlist.sections.empty()) {
+    return false;
+  }
+
+  std::set<u64> commandAddresses;
+  std::set<u64> sectionAddresses;
+  for (const PlaylistCommand& command : playlist.commands) {
+    commandAddresses.insert(command.address.value);
+  }
+  for (const SequenceSection& section : playlist.sections) {
+    sectionAddresses.insert(section.address.value);
+  }
+  if (!commandAddresses.contains(playlist.startAddress.value)) {
+    return false;
+  }
+
+  for (const PlaylistCommand& command : playlist.commands) {
+    if (const auto* play = std::get_if<PlaylistPlaySection>(&command.operation)) {
+      if (!sectionAddresses.contains(play->section.value) || !commandAddresses.contains(command.fallthrough.value)) {
+        return false;
+      }
+    } else if (const auto* repeat = std::get_if<PlaylistRepeat>(&command.operation)) {
+      if (!commandAddresses.contains(repeat->destination.value) ||
+          (!repeat->infinite && !commandAddresses.contains(command.fallthrough.value))) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
