@@ -713,7 +713,8 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
 
 bool shouldRestartSimulatedVibratoForNote(const PerformanceEvent& event, const RenderTrackState& state) {
   const auto* note = std::get_if<NotePerformanceEvent>(&event);
-  return note != nullptr && !note->extendsPrevious && note->restartsLfoPhase && state.vibrato.configured;
+  return note != nullptr && note->restartsVibratoLfoPhase.value_or(!note->extendsPrevious && note->restartsLfoPhase) &&
+         state.vibrato.configured;
 }
 
 // Source expression, pan-law compensation, and simulated tremolo all use MIDI
@@ -791,7 +792,8 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
 
 bool shouldRestartSimulatedTremoloForNote(const PerformanceEvent& event, const RenderTrackState& state) {
   const auto* note = std::get_if<NotePerformanceEvent>(&event);
-  return note != nullptr && !note->extendsPrevious && note->restartsLfoPhase && state.tremolo.configured;
+  return note != nullptr && note->restartsTremoloLfoPhase.value_or(!note->extendsPrevious && note->restartsLfoPhase) &&
+         state.tremolo.configured;
 }
 
 void addCombinedPan(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
@@ -847,14 +849,17 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
         if constexpr (std::is_same_v<TypedEvent, NotePerformanceEvent>) {
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
+          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            if (shouldRestartSimulatedVibratoForNote(event, state)) {
+              restartSimulatedVibratoForNote(track, state, typedEvent.header.tick, channel);
+            }
+            if (shouldRestartSimulatedTremoloForNote(event, state)) {
+              restartSimulatedTremoloForNote(track, state, typedEvent.header.tick, channel, options,
+                                             modulationConversion);
+            }
+          }
           if (extendPreviousNote(track, state, typedEvent, channel)) {
             return;
-          }
-          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation &&
-              typedEvent.restartsLfoPhase) {
-            restartSimulatedVibratoForNote(track, state, typedEvent.header.tick, channel);
-            restartSimulatedTremoloForNote(track, state, typedEvent.header.tick, channel, options,
-                                           modulationConversion);
           }
           restartSimulatedPanForNote(track, state, typedEvent.header.tick, channel);
           state.lastNoteIndex = track.events.size();

@@ -527,6 +527,8 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
               static_cast<u32>(std::min<u64>(segment.endTick - segment.startTick, std::numeric_limits<u32>::max())),
           .extendsPrevious = segment.extendsPrevious,
           .restartsLfoPhase = note.source.restartsLfoPhase,
+          .restartsVibratoLfoPhase = note.source.restartsVibratoLfoPhase,
+          .restartsTremoloLfoPhase = note.source.restartsTremoloLfoPhase,
           .note = note.source.note,
           .lane = note.source.lane,
       });
