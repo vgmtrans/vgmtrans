@@ -711,9 +711,8 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
   }
 }
 
-bool shouldRestartSimulatedVibratoForNote(const PerformanceEvent& event, const RenderTrackState& state) {
-  const auto* note = std::get_if<NotePerformanceEvent>(&event);
-  return note != nullptr && note->restartsVibratoLfoPhase.value_or(!note->extendsPrevious && note->restartsLfoPhase) &&
+bool shouldRestartSimulatedVibratoForNote(const NotePerformanceEvent& note, const RenderTrackState& state) {
+  return note.restartsVibratoLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase) &&
          state.vibrato.configured;
 }
 
@@ -790,9 +789,8 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
   }
 }
 
-bool shouldRestartSimulatedTremoloForNote(const PerformanceEvent& event, const RenderTrackState& state) {
-  const auto* note = std::get_if<NotePerformanceEvent>(&event);
-  return note != nullptr && note->restartsTremoloLfoPhase.value_or(!note->extendsPrevious && note->restartsLfoPhase) &&
+bool shouldRestartSimulatedTremoloForNote(const NotePerformanceEvent& note, const RenderTrackState& state) {
+  return note.restartsTremoloLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase) &&
          state.tremolo.configured;
 }
 
@@ -833,9 +831,8 @@ void restartSimulatedPanForNote(MidiTrack& track, RenderTrackState& state, u64 t
   }
 }
 
-bool shouldRestartSimulatedPanForNote(const PerformanceEvent& event, const RenderTrackState& state) {
-  const auto* note = std::get_if<NotePerformanceEvent>(&event);
-  return note != nullptr && !note->extendsPrevious && state.panLfo.configured;
+bool shouldRestartSimulatedPanForNote(const NotePerformanceEvent& note, const RenderTrackState& state) {
+  return !note.extendsPrevious && state.panLfo.configured;
 }
 
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
@@ -850,10 +847,10 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         if constexpr (std::is_same_v<TypedEvent, NotePerformanceEvent>) {
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-            if (shouldRestartSimulatedVibratoForNote(event, state)) {
+            if (shouldRestartSimulatedVibratoForNote(typedEvent, state)) {
               restartSimulatedVibratoForNote(track, state, typedEvent.header.tick, channel);
             }
-            if (shouldRestartSimulatedTremoloForNote(event, state)) {
+            if (shouldRestartSimulatedTremoloForNote(typedEvent, state)) {
               restartSimulatedTremoloForNote(track, state, typedEvent.header.tick, channel, options,
                                              modulationConversion);
             }
@@ -1174,10 +1171,12 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     }
     for (const auto* event : timelines[trackIndex]) {
       u64 flushTick = performanceEventHeader(*event).tick;
-      if (((modulationConversion == ModulationConversionPolicy::SequenceEventSimulation &&
-            (shouldRestartSimulatedVibratoForNote(*event, renderState) ||
-             shouldRestartSimulatedTremoloForNote(*event, renderState))) ||
-           shouldRestartSimulatedPanForNote(*event, renderState)) &&
+      const auto* note = std::get_if<NotePerformanceEvent>(event);
+      if (note != nullptr &&
+          ((modulationConversion == ModulationConversionPolicy::SequenceEventSimulation &&
+            (shouldRestartSimulatedVibratoForNote(*note, renderState) ||
+             shouldRestartSimulatedTremoloForNote(*note, renderState))) ||
+           shouldRestartSimulatedPanForNote(*note, renderState)) &&
           flushTick != 0) {
         --flushTick;
       }

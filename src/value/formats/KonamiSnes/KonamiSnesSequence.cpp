@@ -197,6 +197,22 @@ struct PanGains {
   return total == 0.0 ? 0.0 : std::clamp((gains.right / total) * 2.0 - 1.0, -1.0, 1.0);
 }
 
+struct LfoState {
+  void configure(u8 delayValue, u8 rateValue, u8 depthValue) {
+    delay = delayValue;
+    rate = rateValue;
+    depth = depthValue;
+    depthState.resetDepth(static_cast<s32>(depth) << 8);
+  }
+
+  [[nodiscard]] u16 currentDepthFixed() const { return static_cast<u16>(depthState.currentDepth()); }
+
+  u8 delay = 0;
+  u8 rate = 0;
+  u8 depth = 0;
+  SequenceLfoDepthFadeState depthState;
+};
+
 struct ProgramState {
   explicit ProgramState(const SequenceProgram& program) : indexedEchoFilter(program.config.driverState != 0) {}
 
@@ -297,7 +313,7 @@ struct TrackState {
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
   // The driver restarts this reusable depth fade for every note, independently
   // of the oscillator settings that remain active on the track.
-  SequenceLfoState vibrato;
+  LfoState vibrato;
   u8 vibratoPhaseStep = 0;
 
   // Pitch transitions use absolute key-space values; MIDI lowering chooses the
@@ -330,11 +346,8 @@ struct Playback {
     const bool tied = track.previousNoteSlurred && track.previousNoteKey && key == *track.previousNoteKey;
     const PerformanceNoteId previousPitchNote = track.pitchNote;
     resetPitchForNote(key);
-    if (track.vibrato.reusableFade) {
-      track.vibrato.beginFade(track.vibrato.delay);
-    }
-    if (track.vibrato.fade.active()) {
-      emitVibratoDepth(track.vibrato.fade.output(out), true);
+    if (track.vibrato.depthState.restartFade(track.vibrato.delay)) {
+      emitVibratoDepth(track.vibrato.depthState.fadeOutput(out), true);
     }
     if (tied) {
       track.pitchNote =
@@ -418,17 +431,16 @@ struct Playback {
 
   void configureVibrato(u8 delay, u8 rate, u8 depth, u8 builtInFade) {
     track.vibrato.configure(delay, rate, depth);
-    track.vibrato.setCurrentDepth(8);
     track.vibratoPhaseStep = vibrato::usesEarlyCounter(track.version) ? vibrato::earlyPhaseStep(rate, track.tempo) : 0;
     if (builtInFade != 0) {
       // In later versions a large first argument means "fade in over N ticks"
       // rather than "wait N ticks before starting."
       // Depth uses eight fractional bits so short fades can still make smooth
       // progress when the target byte is small.
-      track.vibrato.setFadeToDepth(builtInFade, 8);
+      track.vibrato.depthState.configureLinearFade(builtInFade);
       beginVibratoFadeAutomation(builtInFade);
     } else {
-      track.vibrato.fade.clearAutomation();
+      track.vibrato.depthState.clearFadeAutomation();
     }
     emitVibratoDelay();
     emitVibratoDepth(out, true);
@@ -436,7 +448,7 @@ struct Playback {
   }
 
   void setVibratoFade(u8 length) {
-    track.vibrato.setFadeToDepth(length, 8);
+    track.vibrato.depthState.configureLinearFade(length);
     beginVibratoFadeAutomation(length);
   }
 
@@ -600,11 +612,9 @@ struct Playback {
       const PanGains gains = panGains(track.version, value);
       track.panFade.output(out).stereoBalance(gains.left, gains.right);
     }));
-    if (track.vibrato.fade.active()) {
-      const auto fadeTick = track.vibrato.fade.tick();
-      if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
-        emitVibratoDepth(track.vibrato.fade.output(out));
-      }
+    const auto fadeTick = track.vibrato.depthState.tickFade();
+    if (fadeTick.shouldApply()) {
+      emitVibratoDepth(track.vibrato.depthState.fadeOutput(out));
     }
   }
 
@@ -669,12 +679,12 @@ private:
     double depthSemitones = 0.0;
     if (active) {
       const double currentCents =
-          vibrato::currentDepthCents(track.version, track.vibrato.depth, track.vibrato.currentDepth(8));
+          vibrato::currentDepthCents(track.version, track.vibrato.depth, track.vibrato.currentDepthFixed());
       // The driver value is already the farthest pitch moves from the note.
       // Convert cents to semitones without reducing that distance again.
       depthSemitones = currentCents / 100.0;
     }
-    track.vibrato.emitDepth(
+    track.vibrato.depthState.emitPhysicalDepth(
         depthSemitones, [&](double value) { output.vibratoDepth(value, vibratoLfoContext()); }, force, 0.0001);
   }
 
@@ -697,12 +707,13 @@ private:
 
   void beginVibratoFadeAutomation(u8 length) {
     if (length == 0) {
-      track.vibrato.fade.clearAutomation();
+      track.vibrato.depthState.clearFadeAutomation();
       return;
     }
     const double targetCents = vibrato::maxDepthCents(track.version, track.vibrato.depth);
-    track.vibrato.fade.bind(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, targetCents / 100.0, length,
-                                             vibratoDelayTicks(track.version, track.vibrato.delay, track.tempo)));
+    track.vibrato.depthState.bindFade(
+        out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, targetCents / 100.0, length,
+                         vibratoDelayTicks(track.version, track.vibrato.delay, track.tempo)));
   }
 
   void emitVibratoRate() {

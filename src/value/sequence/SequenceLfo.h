@@ -15,74 +15,95 @@
 
 namespace vgmtrans::core {
 
-// Driver-facing LFO state shared by sequence formats whose commands use byte
-// delay/rate/depth parameters. Physical rate, depth, phase, and waveform remain
-// format policy; this type only owns the common parameter and depth-fade
-// lifecycle.
+// Source-domain state shared by LFO depth implementations. Depth values are
+// deliberately opaque signed integers: each format chooses its own fixed-point
+// scale and converts the live value to semitones or decibels itself.
 //
 // Some drivers install a fade once and restart it on every note. Keeping its
 // motion plan separate from the active motion preserves that behavior while
-// allowing each format to choose its fixed-point scale, initial depth, and
-// delay.
-struct SequenceLfoState {
-  void configure(u8 delayValue, u8 rateValue, u8 depthValue) {
-    delay = delayValue;
-    rate = rateValue;
-    depth = depthValue;
+// allowing each format to choose the step, initial depth, and delay. The
+// automation binding follows the live motion because each note may attach its
+// restarted fade to a different performance note.
+//
+// This class intentionally does not store an LFO's source bytes, determine
+// whether it is enabled, or interpret its rate, waveform, or physical depth.
+// Those rules belong to the format. It only owns the reusable lifecycle common
+// to depth in different drivers.
+class SequenceLfoDepthFadeState {
+public:
+  // Establishes a new source-domain target and cancels the previous fade.
+  // A depth is a magnitude, so negative targets collapse to zero. The physical
+  // output cache is preserved so equivalent repeated commands stay compact;
+  // formats can force emission when the command itself must remain observable.
+  void resetDepth(s32 targetDepth) {
+    targetDepth_ = std::max(targetDepth, s32{0});
     clearFade();
+    resetCurrentDepth();
   }
 
-  [[nodiscard]] bool active() const { return rate != 0 && depth != 0; }
-  [[nodiscard]] s32 scaledDepth(u8 fractionalBits = 0) const { return static_cast<s32>(depth) << fractionalBits; }
+  [[nodiscard]] s32 targetDepth() const { return targetDepth_; }
+  [[nodiscard]] s32 currentDepth() const { return std::clamp(fade_.current(), s32{0}, targetDepth_); }
+  void resetCurrentDepth() { fade_.setCurrent(targetDepth_); }
 
-  [[nodiscard]] s32 currentDepth(u8 fractionalBits = 0) const {
-    return std::clamp(fade.current(), s32{0}, scaledDepth(fractionalBits));
-  }
-
-  void setCurrentDepth(u8 fractionalBits = 0) { fade.setCurrent(scaledDepth(fractionalBits)); }
-
+  // Cancels both future restarts and live motion while preserving the current
+  // depth value.
   void clearFade() {
-    reusableFade.reset();
-    fade.clearMotion();
-    fade.clearAutomation();
+    fadePlan_.reset();
+    fade_.clearMotion();
+    fade_.clearAutomation();
   }
 
-  void setFade(u32 ticks, s32 target, s32 step) {
-    reusableFade = ticks == 0 ? std::nullopt
-                              : std::optional{SequenceMotionPlan<s32>::targetOverTicksWithStep(target, step, ticks)};
-  }
-
-  void setFadeToDepth(u32 ticks, u8 fractionalBits = 0) {
-    const s32 target = scaledDepth(fractionalBits);
-    setFade(ticks, target, ticks == 0 ? 0 : target / static_cast<s32>(ticks));
-  }
-
-  void beginFade(u32 delayTicks, s32 initialDepth = 0) {
-    if (!reusableFade) {
-      fade.clearMotion();
+  // Installs the plan used by subsequent restart calls. A zero duration
+  // removes the reusable plan without interrupting a fade already in progress.
+  void configureFade(u32 ticks, s32 step) {
+    if (ticks == 0) {
+      fadePlan_.reset();
       return;
     }
-    fade.setCurrent(initialDepth);
-    auto plan = *reusableFade;
-    plan.delay = delayTicks;
-    static_cast<void>(fade.begin(plan));
+    fadePlan_ = SequenceMotionPlan<s32>::targetOverTicksWithStep(targetDepth_, step, ticks);
   }
 
+  void configureLinearFade(u32 ticks) { configureFade(ticks, ticks == 0 ? 0 : targetDepth_ / static_cast<s32>(ticks)); }
+
+  [[nodiscard]] bool fadeConfigured() const { return fadePlan_.has_value(); }
+  [[nodiscard]] u32 fadeDurationTicks() const { return fadePlan_ ? fadePlan_->ticks : 0; }
+
+  // Restarts the installed plan without consuming it. False means no reusable
+  // plan is configured and the live depth is left unchanged.
+  [[nodiscard]] bool restartFade(u32 delayTicks, s32 initialDepth = 0) {
+    if (!fadePlan_) {
+      return false;
+    }
+    fade_.setCurrent(initialDepth);
+    auto plan = *fadePlan_;
+    plan.delay = delayTicks;
+    static_cast<void>(fade_.begin(plan));
+    return true;
+  }
+
+  [[nodiscard]] SequenceMotionTick<s32> tickFade() { return fade_.tick(); }
+
+  void bindFade(PerformanceAutomationBinding binding) { fade_.bind(std::move(binding)); }
+  void clearFadeAutomation() noexcept { fade_.clearAutomation(); }
+  [[nodiscard]] PerformanceEmitter fadeOutput(const PerformanceEmitter& out) const { return fade_.output(out); }
+
+  // Source arithmetic may produce many successive values that map to the same
+  // physical depth. Suppressing those duplicates keeps the performance model
+  // compact without making the format surrender its conversion formula.
   template <typename EmitDepth>
-  void emitDepth(double value, EmitDepth&& emit, bool force = false, double tolerance = 0.000001) {
-    if (!force && lastPhysicalDepth && std::abs(*lastPhysicalDepth - value) < tolerance) {
+  void emitPhysicalDepth(double value, EmitDepth&& emit, bool force = false, double tolerance = 0.000001) {
+    if (!force && std::abs(lastPhysicalDepth_ - value) < tolerance) {
       return;
     }
     std::forward<EmitDepth>(emit)(value);
-    lastPhysicalDepth = value;
+    lastPhysicalDepth_ = value;
   }
 
-  u8 delay = 0;
-  u8 rate = 0;
-  u8 depth = 0;
-  std::optional<SequenceMotionPlan<s32>> reusableFade;
-  PerformanceBoundMotion<SequenceAutomatedValue<s32>> fade;
-  std::optional<double> lastPhysicalDepth;
+private:
+  s32 targetDepth_ = 0;
+  std::optional<SequenceMotionPlan<s32>> fadePlan_;
+  PerformanceBoundMotion<SequenceAutomatedValue<s32>> fade_;
+  double lastPhysicalDepth_ = 0.0;
 };
 
 }  // namespace vgmtrans::core

@@ -96,6 +96,26 @@ constexpr u32 kMaxTrackCommands = 32768;
   return (36.0 * peakAttenuationSteps / 64.0) / 2.0;
 }
 
+struct VibratoState {
+  void configure(u8 delayValue, u8 rateValue, u8 depthValue, bool continuousMode) {
+    delay = delayValue;
+    rate = rateValue;
+    depth = depthValue;
+    continuous = continuousMode && enabled();
+    depthState.resetDepth(static_cast<s32>(depth) << 8);
+  }
+
+  [[nodiscard]] bool enabled() const { return rate != 0 && depth != 0; }
+  [[nodiscard]] s32 targetDepthFixed() const { return depthState.targetDepth(); }
+  [[nodiscard]] s32 currentDepthFixed() const { return depthState.currentDepth(); }
+
+  u8 delay = 0;
+  u8 rate = 0;
+  u8 depth = 0;
+  bool continuous = false;
+  SequenceLfoDepthFadeState depthState;
+};
+
 struct TrackState {
   bool percussionFlag1 = false;
   bool percussionFlag2 = false;
@@ -126,8 +146,7 @@ struct TrackState {
   u8 slideDelay = 0;
   u8 slideDuration = 0;
   s8 slideDepth = 0;
-  SequenceLfoState vibrato;
-  bool continuousVibrato = false;
+  VibratoState vibrato;
   Address subroutineStart;
   Address subroutineReturn;
   bool definingSubroutine = false;
@@ -147,11 +166,10 @@ struct Playback {
   [[nodiscard]] PitchSlideTiming slideTiming(u8 ticks) const {
     return PitchSlideTiming::fixedDuration(ticks, driverMilliseconds(ticks));
   }
-
   [[nodiscard]] LfoPerformanceContext vibratoContext() const {
     const auto& vibrato = track.vibrato;
     return LfoPerformanceContext{
-        .cyclesPerTick = vibrato.active() ? std::optional<double>{vibrato.rate / 256.0} : std::optional<double>{0.0},
+        .cyclesPerTick = vibrato.enabled() ? std::optional<double>{vibrato.rate / 256.0} : std::optional<double>{0.0},
         // E4's delay counter compares before incrementing, so the first
         // nonzero sample occurs on music tick delay+1.
         .delayTicks = static_cast<u32>(vibrato.delay) + 1,
@@ -160,7 +178,7 @@ struct Playback {
         // The shared simulator samples before advancing. Starting one phase
         // step ahead reproduces the driver's add-rate-then-sample order.
         .initialPhaseCycles = vibrato.rate / 256.0,
-        .phaseRunsAtZeroDepth = vibrato.active(),
+        .phaseRunsAtZeroDepth = vibrato.enabled(),
     };
   }
 
@@ -183,19 +201,18 @@ struct Playback {
 
   void emitVibratoDepth(PerformanceEmitter output, bool force = false) {
     auto& vibrato = track.vibrato;
-    const double depth = vibrato.active() ? vibratoDepthSemitones(vibrato.depth, vibrato.currentDepth(8)) : 0.0;
-    vibrato.emitDepth(depth, [&](double value) { output.vibratoDepth(value, vibratoContext()); }, force, 0.0001);
+    const double depth = vibrato.enabled() ? vibratoDepthSemitones(vibrato.depth, vibrato.currentDepthFixed()) : 0.0;
+    vibrato.depthState.emitPhysicalDepth(
+        depth, [&](double value) { output.vibratoDepth(value, vibratoContext()); }, force, 0.0001);
   }
 
   void configureVibrato(u8 delay, u8 rate, u8 depth, bool continuous) {
     auto& vibrato = track.vibrato;
-    vibrato.configure(delay, rate, depth);
-    vibrato.setCurrentDepth(8);
-    track.continuousVibrato = continuous && vibrato.active();
+    vibrato.configure(delay, rate, depth, continuous);
 
     const auto context = vibratoContext();
     emitVibratoDepth(out, true);
-    if (vibrato.active()) {
+    if (vibrato.enabled()) {
       out.vibratoRateCyclesPerTick(vibrato.rate / 256.0, context);
       out.vibratoDelayTicks(static_cast<u32>(vibrato.delay) + 1);
     } else {
@@ -204,7 +221,7 @@ struct Playback {
     }
   }
 
-  void setVibratoFade(u8 ticks) { track.vibrato.setFadeToDepth(ticks, 8); }
+  void setVibratoFade(u8 ticks) { track.vibrato.depthState.configureLinearFade(ticks); }
 
   void configureTremolo(u8 delay, u8 rate, u8 depth) {
     const bool active = rate != 0 && depth != 0;
@@ -221,23 +238,22 @@ struct Playback {
 
   [[nodiscard]] bool beginVibratoForNote() {
     auto& vibrato = track.vibrato;
-    const bool restarts = !track.continuousVibrato && track.driverDurationRate < 0x65;
+    const bool restarts = !vibrato.continuous && track.driverDurationRate < 0x65;
     if (!restarts) {
       return false;
     }
 
-    vibrato.fade.clearAutomation();
-    if (!vibrato.active() || !vibrato.reusableFade) {
-      vibrato.setCurrentDepth(8);
+    vibrato.depthState.clearFadeAutomation();
+    if (!vibrato.enabled() || !vibrato.depthState.restartFade(vibrato.delay)) {
+      vibrato.depthState.resetCurrentDepth();
       return true;
     }
 
-    vibrato.beginFade(vibrato.delay);
     const u32 onsetTick = static_cast<u32>(vibrato.delay) + 1;
-    vibrato.fade.bind(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
-                                       vibratoDepthSemitones(vibrato.depth, vibrato.scaledDepth(8)),
-                                       vibrato.reusableFade->ticks, onsetTick));
-    emitVibratoDepth(vibrato.fade.output(out), true);
+    vibrato.depthState.bindFade(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
+                                                 vibratoDepthSemitones(vibrato.depth, vibrato.targetDepthFixed()),
+                                                 vibrato.depthState.fadeDurationTicks(), onsetTick));
+    emitVibratoDepth(vibrato.depthState.fadeOutput(out), true);
     return true;
   }
 
@@ -523,12 +539,9 @@ struct Playback {
     if (pitchTick.changed) {
       out.pitchBend(track.pitchMotion.current());
     }
-    if (track.vibrato.fade.active()) {
-      const auto vibratoTick = track.vibrato.fade.tick();
-      if (vibratoTick.status != SequenceMotionStatus::Inactive && vibratoTick.status != SequenceMotionStatus::Delayed) {
-        track.vibrato.fade.setCurrentPreservingMotion(std::clamp(vibratoTick.current, 0, track.vibrato.scaledDepth(8)));
-        emitVibratoDepth(track.vibrato.fade.output(out));
-      }
+    const auto vibratoTick = track.vibrato.depthState.tickFade();
+    if (vibratoTick.shouldApply()) {
+      emitVibratoDepth(track.vibrato.depthState.fadeOutput(out));
     }
   }
 };
