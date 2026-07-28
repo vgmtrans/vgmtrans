@@ -218,6 +218,12 @@ void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
   writeSection(bytes, 0x2700, {{0, 0x2800}});
   bytes[0x2800] = 0;
 
+  writeLe16(bytes, 0x2040, 0x2900);
+  writeLe16(bytes, 0x2900, 0x2a00);
+  writeLe16(bytes, 0x2902, 0);
+  writeSection(bytes, 0x2a00, {{0, 0x2b00}});
+  bytes[0x2b00] = 0;
+
   const auto requested = findLayout(ByteReader(SourceId{7}, bytes));
   expect(requested && requested->profile == ProfileId::Earlier && requested->songIndex == 3 &&
              requested->playlistAddress == 0x2300 && requested->percussionTableAddress == 0x3000,
@@ -228,6 +234,11 @@ void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
   const auto playing = findLayout(ByteReader(SourceId{7}, bytes));
   expect(playing && playing->songIndex == 3 && playing->playlistAddress == 0x2300,
          "the live playlist cursor should select the playing song when no request is pending");
+
+  writeLe16(bytes, 0x40, 0x2902);
+  const auto later = findLayout(ByteReader(SourceId{7}, bytes));
+  expect(later && later->songIndex == 32 && later->playlistAddress == 0x2900,
+         "the live playlist cursor should select songs beyond the five-bit request range");
 
   expect(
       isValidPlaylist(ByteReader(SourceId{7}, bytes), Layout{.profile = ProfileId::Earlier, .playlistAddress = 0x2100}),
