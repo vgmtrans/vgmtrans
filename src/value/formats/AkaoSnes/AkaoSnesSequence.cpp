@@ -10,6 +10,7 @@
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
+#include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
 #include <algorithm>
@@ -807,60 +808,6 @@ enum class LfoTarget {
   Tremolo,
 };
 
-struct LfoState {
-  void configure(u8 delayValue, u8 rateValue, u8 depthValue) {
-    delay = delayValue;
-    rate = rateValue;
-    depth = depthValue;
-    clearFade();
-  }
-
-  [[nodiscard]] s32 scaledDepth(u8 fractionalBits = 0) const { return static_cast<s32>(depth) << fractionalBits; }
-
-  void clearFade() {
-    reusableFade.reset();
-    fade.clearMotion();
-    fade.clearAutomation();
-  }
-
-  void setFade(u32 ticks, s32 target, s32 step) {
-    reusableFade = ticks == 0 ? std::nullopt
-                              : std::optional{SequenceMotionPlan<s32>::targetOverTicksWithStep(target, step, ticks)};
-  }
-
-  void setFadeToDepth(u32 ticks, u8 fractionalBits = 0) {
-    const s32 target = scaledDepth(fractionalBits);
-    setFade(ticks, target, ticks == 0 ? 0 : target / static_cast<s32>(ticks));
-  }
-
-  void beginFade(u32 delayTicks, s32 initialDepth = 0) {
-    if (!reusableFade) {
-      fade.clearMotion();
-      return;
-    }
-    fade.setCurrent(initialDepth);
-    auto plan = *reusableFade;
-    plan.delay = delayTicks;
-    static_cast<void>(fade.begin(plan));
-  }
-
-  template <typename EmitDepth>
-  void emitDepth(double value, EmitDepth&& emit, bool force = false) {
-    if (!force && lastPhysicalDepth && std::abs(*lastPhysicalDepth - value) < 0.000001) {
-      return;
-    }
-    std::forward<EmitDepth>(emit)(value);
-    lastPhysicalDepth = value;
-  }
-
-  u8 delay = 0;
-  u8 rate = 0;
-  u8 depth = 0;
-  std::optional<SequenceMotionPlan<s32>> reusableFade;
-  PerformanceBoundMotion<SequenceAutomatedValue<s32>> fade;
-  std::optional<double> lastPhysicalDepth;
-};
-
 struct SharedTempoChange {
   u64 tick = 0;
   u8 tempo = 0;
@@ -1110,8 +1057,8 @@ struct TrackState {
   PerformanceNoteId pitchSlideNote;
   PitchSlideBinding pitchSlideAutomation;
   PerformanceAutomationBinding pitchEnvelopeAutomation;
-  LfoState vibrato;
-  LfoState tremolo;
+  SequenceLfoState vibrato;
+  SequenceLfoState tremolo;
 };
 
 // Playback holds the history-dependent services shared by several commands or
@@ -1387,7 +1334,7 @@ struct Playback {
 
   void syncLfoRateAndDelay(LfoTarget target) {
     const bool isVibrato = target == LfoTarget::Vibrato;
-    LfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
+    SequenceLfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
     if (!isLfoActive(context.version, lfo.rate, lfo.depth)) {
       return;
     }
@@ -1412,7 +1359,7 @@ struct Playback {
     const bool isVibrato = target == LfoTarget::Vibrato;
     const bool active =
         (isVibrato || akaoSnesExportsTremolo(context.version)) && isLfoActive(context.version, rate, depth);
-    LfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
+    SequenceLfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
     lfo.configure(delay, rate, depth);
     const auto initialTempo = program.initialTempo();
     const bool beforeInitialTempoTrack = initialTempo && track.trackNumber < initialTempo->sourceTrackNumber;
@@ -1465,7 +1412,7 @@ struct Playback {
   }
 
   void clearLfo(LfoTarget target) {
-    LfoState& lfo = target == LfoTarget::Vibrato ? track.vibrato : track.tremolo;
+    SequenceLfoState& lfo = target == LfoTarget::Vibrato ? track.vibrato : track.tremolo;
     lfo.depth = 0;
     lfo.clearFade();
     setLfoOutputDepth(lfo.fade.output(out), target, 0, true);

@@ -5,6 +5,7 @@
  */
 
 #include "value/extractors/MameRomSetExtractor.h"
+#include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/sequence/SequenceVm.h"
@@ -33,6 +34,13 @@ void expect(bool condition, const std::string& message) {
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
+}
+
+void writeBe32(std::vector<u8>& bytes, size_t offset, u32 value) {
+  bytes[offset] = static_cast<u8>(value >> 24);
+  bytes[offset + 1] = static_cast<u8>(value >> 16);
+  bytes[offset + 2] = static_cast<u8>(value >> 8);
+  bytes[offset + 3] = static_cast<u8>(value);
 }
 
 void writeBytes(std::vector<u8>& bytes, size_t offset, std::initializer_list<u8> values) {
@@ -88,6 +96,8 @@ KonamiArcadeFixture makeMysticWarriorFixture() {
                  0xe2, 0x00,              // program
                  0xee, 0x7f,              // volume
                  0xe3, 0x08,              // pan
+                 0xe4, 0x01, 0x40, 0x20,  // vibrato: delay, rate, depth
+                 0xf9, 0x04,              // fade vibrato depth over four ticks
                  0x30, 0x06, 0x32, 0x7f,  // note, delta, duration rate, velocity
                  0x26, 0x04, 0x64, 0x0a,  // quiet note entering duration-tie mode
                  0x26, 0x04, 0x63, 0x7f,  // same note: extend it and raise expression
@@ -220,7 +230,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(sequence != nullptr && instruments != nullptr && samples != nullptr,
          "KonamiArcade result should use the core value asset types");
   expect(sequence->program.dialect.value == kKonamiArcadeSequenceDialectId && sequence->program.tracks.size() == 1 &&
-             sequence->program.tracks[0].commands.size() == 19,
+             sequence->program.tracks[0].commands.size() == 21,
          "KonamiArcade sequence should compile the source track into typed command values");
   expect(instruments->instruments.size() == 2,
          "KonamiArcade synth should contain one melodic instrument and one drum kit");
@@ -233,6 +243,20 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
       SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, konamiArcadeSequenceDialect());
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1 && performance.tracks[0].endTick == 36,
          "KonamiArcade playback should execute counted loops and timing without source bytes");
+  const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
+  const double expectedVibratoRate = (0x40 / 256.0) * (0x80 / 256.0) * layout->nmiRateHertz;
+  expect(modulationProfile.instruments.vibrato &&
+             std::abs(modulationProfile.instruments.vibrato->maxDepthCents - 100.0) < 0.0001 &&
+             std::abs(modulationProfile.instruments.vibrato->rateHertz.minimum - expectedVibratoRate) < 0.0001 &&
+             modulationProfile.instruments.vibrato->delaySeconds,
+         "KonamiArcade E4 should preserve physical triangle-LFO depth, tempo-relative rate, and delay");
+  expect(!instruments->instruments.front().modulation.vibrato,
+         "scanned KonamiArcade instruments should not guess sequence-independent vibrato");
+  InstrumentSetAsset preparedInstruments = *instruments;
+  applySequenceModulation(preparedInstruments, modulationProfile);
+  expect(preparedInstruments.instruments.front().modulation.vibrato &&
+             std::abs(preparedInstruments.instruments.front().modulation.vibrato->maxDepthCents - 100.0) < 0.0001,
+         "collection preparation should apply the sequence's vibrato range to KonamiArcade instruments");
   std::vector<const NotePerformanceEvent*> notes;
   std::vector<const ExpressionPerformanceEvent*> expressions;
   bool chronological = true;
@@ -287,7 +311,15 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{instruments};
   const MidiSequence midi = renderMidiSequence(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat},
-      ModulationConversionPolicy::SynthModulators, instrumentSets);
+      ModulationConversionPolicy::SynthModulators, instrumentSets, &modulationProfile);
+  expect(
+      std::ranges::any_of(midi.tracks[0].events,
+                          [](const MidiEvent& event) { return std::holds_alternative<VibratoDepth>(event); }) &&
+          std::ranges::any_of(midi.tracks[0].events,
+                              [](const MidiEvent& event) { return std::holds_alternative<VibratoFrequency>(event); }) &&
+          std::ranges::any_of(midi.tracks[0].events,
+                              [](const MidiEvent& event) { return std::holds_alternative<VibratoDelay>(event); }),
+      "KonamiArcade synth-modulator lowering should retain vibrato depth, rate, and delay controls");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* bank = std::get_if<BankSelect>(&event);
@@ -345,6 +377,87 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
                                return note != nullptr && note->tick == 22 && note->key == 68 && note->duration == 10;
                              }),
          "pitch-bend lowering should retain the delayed slide's one nominal source note");
+}
+
+void konamiArcadeGxLfosMatchDriverState() {
+  std::vector<u8> bytes(0x200);
+  writeBe32(bytes, 0x20, 0x80);
+  writeBytes(bytes, 0x80,
+             {
+                 0xea, 0x80,              // tempo
+                 0xe4, 0x01, 0x20, 0x10,  // retriggered vibrato
+                 0xf9, 0x04,              // four-tick depth fade
+                 0x30, 0x06, 0x32, 0x7f,  // restarts phase and fade
+                 0xdf, 0x00, 0x10, 0x08,  // continuous vibrato
+                 0xed, 0x01, 0x40, 0x20,  // tremolo: delay, rate, depth
+                 0x32, 0x06, 0x32, 0x7f,  // preserves phase
+                 0xe4, 0x00, 0x10, 0x80,  // high-depth scale
+                 0xe5, 0x20, 0x01, 0xff,  // random pitch spikes: rate, mask
+                 0x34, 0x06, 0x32, 0x7f,  // restarts phase
+                 0xff,
+             });
+
+  const SourceFile source{
+      .id = SourceId{77},
+      .name = "Salamander 2 LFO fixture",
+      .title = "fixture",
+      .size = bytes.size(),
+  };
+  KonamiArcadeLayout layout{
+      .version = KonamiArcadeVersion::Gx,
+      .game = "fixture",
+      .code = SourceRange{.source = source.id, .offset = 0, .size = bytes.size()},
+      .nmiRateHertz = 245.0,
+  };
+  const KonamiArcadeSequenceLayout sequenceLayout{
+      .index = 0,
+      .offset = 0x20,
+      .name = "LFO",
+  };
+  std::vector<Diagnostic> diagnostics;
+  const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(source.id, bytes), layout, sequenceLayout,
+                                                             AssetId{1}, nullptr, &diagnostics);
+  expect(diagnostics.empty() && program.tracks.size() == 1 && program.tracks[0].commands.size() == 11,
+         "GX LFO commands should decode into typed sequence commands");
+
+  const PerformanceSequence performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
+         "GX LFO playback should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 3 && notes[0]->restartsLfoPhase && !notes[1]->restartsLfoPhase && notes[2]->restartsLfoPhase,
+         "E4 should restart vibrato on ordinary notes while active DF preserves oscillator phase");
+  expect(notes[1]->restartsVibratoLfoPhase == false && notes[1]->restartsTremoloLfoPhase == true,
+         "DF should preserve vibrato without suppressing ED's independent note-on tremolo reset");
+
+  const auto fade = std::ranges::find_if(performance.tracks[0].automations, [](const PerformanceAutomation& value) {
+    const auto* scalar = std::get_if<ScalarPerformanceAutomationIntent>(&value.intent);
+    return scalar != nullptr && scalar->target == PerformanceAutomationTarget::VibratoDepth;
+  });
+  expect(fade != performance.tracks[0].automations.end(),
+         "F9 should create a reusable note-scoped vibrato depth envelope");
+  const auto& fadeIntent = std::get<ScalarPerformanceAutomationIntent>(fade->intent);
+  expect(fadeIntent.motion == PerformanceAutomationMotion::Envelope && fadeIntent.durationTicks == 4 &&
+             fadeIntent.delayTicks == 2 && fadeIntent.targetValue && std::abs(*fadeIntent.targetValue - 0.5) < 0.0001,
+         "F9 depth fade should begin after E4's delay and reach the configured piecewise depth");
+
+  const SequenceModulationProfile profile = analyzeSequenceModulation(performance);
+  expect(profile.instruments.vibrato && std::abs(profile.instruments.vibrato->maxDepthCents - 1600.0) < 0.0001 &&
+             std::abs(profile.instruments.vibrato->rateHertz.maximum - 15.3125) < 0.0001,
+         "GX vibrato should preserve the 0x80 depth discontinuity and tempo-relative physical rate");
+  const double expectedTremoloRate = (0x40 / 256.0) * (0x80 / 256.0) * layout.nmiRateHertz;
+  expect(profile.instruments.tremolo &&
+             std::abs(profile.instruments.tremolo->maxDepthDb - 4.5) < 0.0001 &&
+             std::abs(profile.instruments.tremolo->rateHertz.maximum - expectedTremoloRate) < 0.0001 &&
+             profile.instruments.tremolo->delaySeconds &&
+             profile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
+         "ED tremolo should preserve its attenuation-only triangle depth, tempo-relative rate, and delay");
 }
 
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples() {

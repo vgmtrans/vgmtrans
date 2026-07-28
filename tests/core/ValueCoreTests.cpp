@@ -75,6 +75,7 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable();
 void ninSnesGainModeInstrumentsUseDspEnvelope();
 void mameRomDatabaseAndGroupAssemblyAreValueOriented();
 void konamiArcadeModuleBuildsSequencesSynthAndCollections();
+void konamiArcadeGxLfosMatchDriverState();
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
 void akaoSnesLayoutDiscoversFf4StyleAram();
 void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
@@ -198,6 +199,7 @@ int main() {
     ninSnesGainModeInstrumentsUseDspEnvelope();
     mameRomDatabaseAndGroupAssemblyAreValueOriented();
     konamiArcadeModuleBuildsSequencesSynthAndCollections();
+    konamiArcadeGxLfosMatchDriverState();
     konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
     akaoSnesLayoutDiscoversFf4StyleAram();
     akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();

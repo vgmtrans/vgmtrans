@@ -56,6 +56,11 @@ struct NotePerformanceEvent {
   // Source voices normally restart their LFOs on a fresh attack, but some
   // drivers can disable that reset or suppress it for legato notes.
   bool restartsLfoPhase = true;
+  // Target-specific overrides preserve formats where pitch and amplitude LFOs
+  // have independent note-reset rules. Absent overrides retain the legacy
+  // combined restartsLfoPhase behavior.
+  std::optional<bool> restartsVibratoLfoPhase;
+  std::optional<bool> restartsTremoloLfoPhase;
   // Source-level extensions normally share one identity. A stable identity
   // lets later commands attach automation to a sounding note without rewriting
   // that note into MIDI-specific fragments.

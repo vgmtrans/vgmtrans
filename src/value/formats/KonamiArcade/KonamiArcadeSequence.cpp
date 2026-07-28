@@ -9,6 +9,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
+#include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
 #include <algorithm>
@@ -77,11 +78,30 @@ constexpr u32 kMaxTrackCommands = 32768;
   return std::trunc(ticks * tickMilliseconds(nmiRateHertz, tempo));
 }
 
+[[nodiscard]] double vibratoDepthSemitones(u8 targetDepth, s32 currentDepth) {
+  // The driver retains fade depth as 8.8 fixed point, but its triangle-wave
+  // multiply uses only the integer byte. The configured target selects one of
+  // two deliberately discontinuous depth scales.
+  const s32 targetFixed = static_cast<s32>(targetDepth) << 8;
+  const auto integerDepth = static_cast<u8>(std::clamp(currentDepth, 0, targetFixed) >> 8);
+  return targetDepth < 0x80 ? integerDepth / 32.0 : integerDepth / 8.0;
+}
+
+[[nodiscard]] double tremoloDepthDecibels(u8 depth) {
+  // ED subtracts floor(depth * 128 / 256) from the driver's seven-bit
+  // loudness. One loudness step is 36/64 dB. The shared bipolar LFO uses
+  // NoBoost center attenuation, so its depth is half the driver's full
+  // nominal-to-trough attenuation.
+  const int peakAttenuationSteps = (static_cast<int>(depth) * 128) >> 8;
+  return (36.0 * peakAttenuationSteps / 64.0) / 2.0;
+}
+
 struct TrackState {
   bool percussionFlag1 = false;
   bool percussionFlag2 = false;
   u8 previousDelta = 0;
   u8 durationRate = 0;
+  u8 driverDurationRate = 0;
   u8 releaseRate = 0;
   u8 program = 0;
   s32 transpose = 0;
@@ -106,6 +126,8 @@ struct TrackState {
   u8 slideDelay = 0;
   u8 slideDuration = 0;
   s8 slideDepth = 0;
+  SequenceLfoState vibrato;
+  bool continuousVibrato = false;
   Address subroutineStart;
   Address subroutineReturn;
   bool definingSubroutine = false;
@@ -124,6 +146,99 @@ struct Playback {
   }
   [[nodiscard]] PitchSlideTiming slideTiming(u8 ticks) const {
     return PitchSlideTiming::fixedDuration(ticks, driverMilliseconds(ticks));
+  }
+
+  [[nodiscard]] LfoPerformanceContext vibratoContext() const {
+    const auto& vibrato = track.vibrato;
+    return LfoPerformanceContext{
+        .cyclesPerTick = vibrato.active() ? std::optional<double>{vibrato.rate / 256.0} : std::optional<double>{0.0},
+        // E4's delay counter compares before incrementing, so the first
+        // nonzero sample occurs on music tick delay+1.
+        .delayTicks = static_cast<u32>(vibrato.delay) + 1,
+        .delayIsTempoRelative = true,
+        .waveform = LfoWaveform::Triangle,
+        // The shared simulator samples before advancing. Starting one phase
+        // step ahead reproduces the driver's add-rate-then-sample order.
+        .initialPhaseCycles = vibrato.rate / 256.0,
+        .phaseRunsAtZeroDepth = vibrato.active(),
+    };
+  }
+
+  [[nodiscard]] static LfoPerformanceContext tremoloContext(u8 delay, u8 rate, bool active) {
+    return LfoPerformanceContext{
+        .cyclesPerTick = active ? std::optional<double>{rate / 256.0} : std::optional<double>{0.0},
+        // ED begins advancing between music ticks once its delay counter has
+        // reached delay. At sequence-tick resolution, the first changed
+        // sample is therefore observed at delay+1.
+        .delayTicks = static_cast<u32>(delay) + 1,
+        .delayIsTempoRelative = true,
+        .waveform = LfoWaveform::Triangle,
+        // The driver's absolute signed-byte phase starts at nominal gain and
+        // advances before the first coarse tick sample.
+        .initialPhaseCycles = std::fmod(0.25 + rate / 256.0, 1.0),
+        .phaseRunsAtZeroDepth = false,
+        .tremoloGainMode = TremoloGainMode::NoBoost,
+    };
+  }
+
+  void emitVibratoDepth(PerformanceEmitter output, bool force = false) {
+    auto& vibrato = track.vibrato;
+    const double depth = vibrato.active() ? vibratoDepthSemitones(vibrato.depth, vibrato.currentDepth(8)) : 0.0;
+    vibrato.emitDepth(depth, [&](double value) { output.vibratoDepth(value, vibratoContext()); }, force, 0.0001);
+  }
+
+  void configureVibrato(u8 delay, u8 rate, u8 depth, bool continuous) {
+    auto& vibrato = track.vibrato;
+    vibrato.configure(delay, rate, depth);
+    vibrato.setCurrentDepth(8);
+    track.continuousVibrato = continuous && vibrato.active();
+
+    const auto context = vibratoContext();
+    emitVibratoDepth(out, true);
+    if (vibrato.active()) {
+      out.vibratoRateCyclesPerTick(vibrato.rate / 256.0, context);
+      out.vibratoDelayTicks(static_cast<u32>(vibrato.delay) + 1);
+    } else {
+      out.vibratoRateCyclesPerTick(0.0, context);
+      out.vibratoDelay(0, 0);
+    }
+  }
+
+  void setVibratoFade(u8 ticks) { track.vibrato.setFadeToDepth(ticks, 8); }
+
+  void configureTremolo(u8 delay, u8 rate, u8 depth) {
+    const bool active = rate != 0 && depth != 0;
+    const auto context = tremoloContext(delay, rate, active);
+    out.tremoloDepth(active ? tremoloDepthDecibels(depth) : 0.0, context);
+    if (active) {
+      out.tremoloRateCyclesPerTick(rate / 256.0, context);
+      out.tremoloDelayTicks(static_cast<u32>(delay) + 1);
+    } else {
+      out.tremoloRateCyclesPerTick(0.0, context);
+      out.tremoloDelay(0, 0);
+    }
+  }
+
+  [[nodiscard]] bool beginVibratoForNote() {
+    auto& vibrato = track.vibrato;
+    const bool restarts = !track.continuousVibrato && track.driverDurationRate < 0x65;
+    if (!restarts) {
+      return false;
+    }
+
+    vibrato.fade.clearAutomation();
+    if (!vibrato.active() || !vibrato.reusableFade) {
+      vibrato.setCurrentDepth(8);
+      return true;
+    }
+
+    vibrato.beginFade(vibrato.delay);
+    const u32 onsetTick = static_cast<u32>(vibrato.delay) + 1;
+    vibrato.fade.bind(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
+                                       vibratoDepthSemitones(vibrato.depth, vibrato.scaledDepth(8)),
+                                       vibrato.reusableFade->ticks, onsetTick));
+    emitVibratoDepth(vibrato.fade.output(out), true);
+    return true;
   }
 
   void setPercussion(u8 flag, bool enabled) {
@@ -154,6 +269,8 @@ struct Playback {
 
   void note(u8 sourceKey, u8 delta, u8 velocity, u8 drumDuration, u8 drumPan) {
     const bool isDrum = percussion();
+    const bool restartsTremolo = track.driverDurationRate < 0x65;
+    const bool restartsVibrato = beginVibratoForNote();
     const int loopAttenuation = track.loopAttenuation[0] + track.loopAttenuation[1];
     const int attenuation = 127 - velocity + loopAttenuation;
     const double gain = attenuationGain(attenuation);
@@ -196,10 +313,22 @@ struct Playback {
       noteGain = 1.0;
     }
 
+    const auto emitNote = [&](double noteKey, double linearVelocity, u32 noteDuration, bool extendsPrevious = false) {
+      return out.note(NotePerformanceEvent{
+          .key = noteKey,
+          .linearVelocity = linearVelocity,
+          .durationTicks = noteDuration,
+          .extendsPrevious = extendsPrevious,
+          .restartsLfoPhase = restartsVibrato,
+          .restartsVibratoLfoPhase = restartsVibrato,
+          .restartsTremoloLfoPhase = restartsTremolo,
+      });
+    };
+
     PerformanceNoteId note;
     if (!isDrum && track.portamentoTime != 0 && track.previousKey && track.previousNote.valid() &&
         std::abs(*track.previousKey - key) >= 0.001) {
-      note = out.note(key, noteGain, duration);
+      note = emitNote(key, noteGain, duration);
       if (track.previousNoteStart + track.previousNoteDuration == vm.tick()) {
         auto slide = out.pitchSlide(note, *track.previousKey, key, track.portamentoTime);
         slide.continueFrom(track.previousNote).useCurrentPortamentoTiming();
@@ -211,10 +340,10 @@ struct Playback {
     } else if (track.slideDuration != 0 && track.slideDepth != 0 && !isDrum &&
                duration > static_cast<u32>(track.slideDelay + 1)) {
       const double slideStartKey = std::clamp(key - track.slideDepth, 0.0, 127.0);
-      note = out.note(key, noteGain, duration);
+      note = emitNote(key, noteGain, duration);
       out.at(vm.tick() + track.slideDelay).pitchSlide(note, slideStartKey, key, slideTiming(track.slideDuration));
     } else {
-      note = out.note(key, noteGain, duration, tied);
+      note = emitNote(key, noteGain, duration, tied);
     }
 
     if (track.previousTied && (track.durationRate != 100 || isDrum)) {
@@ -227,6 +356,9 @@ struct Playback {
     track.previousNote = note;
     track.previousTied = track.durationRate == 100 && !isDrum;
     track.durationTieCanceled = false;
+    if (track.durationRate != 0) {
+      track.driverDurationRate = track.durationRate;
+    }
   }
 
   void hold(u8 delta, u8 rate) {
@@ -234,6 +366,8 @@ struct Playback {
     if (extension != 0 && track.previousKey) {
       track.previousNote = out.note(*track.previousKey, 1.0, extension, true);
     }
+    track.durationRate = rate;
+    track.driverDurationRate = rate;
     track.durationTieCanceled = true;
   }
 
@@ -389,6 +523,13 @@ struct Playback {
     if (pitchTick.changed) {
       out.pitchBend(track.pitchMotion.current());
     }
+    if (track.vibrato.fade.active()) {
+      const auto vibratoTick = track.vibrato.fade.tick();
+      if (vibratoTick.status != SequenceMotionStatus::Inactive && vibratoTick.status != SequenceMotionStatus::Delayed) {
+        track.vibrato.fade.setCurrentPreservingMotion(std::clamp(vibratoTick.current, 0, track.vibrato.scaledDepth(8)));
+        emitVibratoDepth(track.vibrato.fade.output(out));
+      }
+    }
   }
 };
 
@@ -488,12 +629,18 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Percussion State", SequenceSemantic::Instrument);
       return event.invoke<&Playback::setPercussion>(u8{1}, event.u8("enabled", SemanticOperandRole::State) != 0);
     }
-    case 0xdf:
-      return ignored(cursor, "Unknown Driver State", 3);
+    case 0xdf: {
+      auto event = cursor.command("Continuous Vibrato", SequenceSemantic::Modulation);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      return event.invoke<&Playback::configureVibrato>(delay, rate, depth, true);
+    }
     case 0xe0: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       event.set<&TrackState::previousDelta>(delta);
+      event.set<&TrackState::driverDurationRate>(u8{0});
       event.set<&TrackState::durationTieCanceled>(true);
       return event.wait(delta);
     }
@@ -513,10 +660,28 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
     }
-    case 0xe4:
-      return ignored(cursor, "Vibrato", 3);
-    case 0xe5:
-      return ignored(cursor, "Unknown Driver State", 3);
+    case 0xe4: {
+      auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      return event.invoke<&Playback::configureVibrato>(delay, rate, depth, false);
+    }
+    case 0xe5: {
+      // The driver adds rate to an 8-bit accumulator on every K054539 update.
+      // On carry, it briefly adds the next masked word from its random table
+      // to pitch; otherwise the offset is zero. This sub-tick impulse effect
+      // has no faithful sequence-tick/MIDI representation yet, but retain its
+      // decoded parameters instead of presenting it as unknown.
+      auto event = cursor.sourceOnly("Random Pitch Spikes");
+      static_cast<void>(event.u8("rate", SemanticOperandRole::Modulation));
+      const u8 maskHigh = event.u8("mask_high", SourceValueDisplay::Hex, SemanticOperandRole::Modulation);
+      const u8 maskLow = event.u8("mask_low", SourceValueDisplay::Hex, SemanticOperandRole::Modulation);
+      const u16 mask = static_cast<u16>((static_cast<u16>(maskHigh) << 8) | maskLow);
+      static_cast<void>(
+          event.derived("maximum_offset_semitones", mask / 256.0, SemanticOperandRole::Pitch));
+      return event.ignore();
+    }
     case 0xe6:
     case 0xe8: {
       auto event = cursor.command(opcode == 0xe6 ? "Loop Start" : "Loop Start #2", SequenceSemantic::Loop);
@@ -559,8 +724,13 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       return event.set<&TrackState::transpose>(
           event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
     }
-    case 0xed:
-      return ignored(cursor, "Unknown Driver State", 3);
+    case 0xed: {
+      auto event = cursor.command("Tremolo", SequenceSemantic::Modulation);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      return event.invoke<&Playback::configureTremolo>(delay, rate, depth);
+    }
     case 0xee: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
       return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
@@ -613,8 +783,10 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 target = event.u8("target", SemanticOperandRole::Pan);
       return event.invoke<&Playback::beginSlide>(u8{2}, duration, target, 0.0);
     }
-    case 0xf9:
-      return ignored(cursor, "Unknown Driver State", 1);
+    case 0xf9: {
+      auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::setVibratoFade>(event.u8("length", SemanticOperandRole::Duration));
+    }
     case 0xfa: {
       auto event = cursor.command("Release Rate", SequenceSemantic::State);
       return event.set<&TrackState::releaseRate>(event.u8("rate"));

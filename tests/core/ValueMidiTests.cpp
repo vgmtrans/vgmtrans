@@ -787,6 +787,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
            lhs.header.automation == rhs.header.automation && lhs.key == rhs.key &&
            lhs.linearVelocity == rhs.linearVelocity && lhs.durationTicks == rhs.durationTicks &&
            lhs.extendsPrevious == rhs.extendsPrevious && lhs.restartsLfoPhase == rhs.restartsLfoPhase &&
+           lhs.restartsVibratoLfoPhase == rhs.restartsVibratoLfoPhase &&
+           lhs.restartsTremoloLfoPhase == rhs.restartsTremoloLfoPhase &&
            lhs.note == rhs.note && lhs.lane == rhs.lane;
   };
   expect(sourceNote != performance.tracks[0].events.end() && loweredNote != bendLowering.tracks[0].events.end() &&
@@ -1810,7 +1812,7 @@ void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
       .tracks = {PerformanceTrack{
           .id = TrackId{0},
           .sourceTrackNumber = 0,
-          .endTick = 5,
+          .endTick = 7,
           .events =
               {
                   TempoPerformanceEvent{
@@ -1846,7 +1848,15 @@ void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 4},
                       .key = 64,
+                      .durationTicks = 2,
+                      .restartsLfoPhase = false,
+                      .restartsTremoloLfoPhase = true,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 6},
+                      .key = 65,
                       .durationTicks = 1,
+                      .restartsTremoloLfoPhase = false,
                   },
               },
       }},
@@ -1867,7 +1877,9 @@ void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
              std::ranges::find(expressions, std::pair<u64, u8>{2, 90}) == expressions.end(),
          "a note that preserves LFO phase should continue the existing tremolo curve");
   expect(std::ranges::find(expressions, std::pair<u64, u8>{4, 90}) != expressions.end(),
-         "a note that resets LFO phase should return no-boost tremolo to its trough");
+         "a target-specific reset should override the note's legacy preserve policy");
+  expect(std::ranges::find(expressions, std::pair<u64, u8>{6, 90}) == expressions.end(),
+         "a target-specific preserve should override the note's legacy reset policy");
   expect(std::ranges::all_of(expressions, [](const auto& expression) { return expression.second <= 127; }),
          "no-boost tremolo should never emit expression above nominal gain");
 }
