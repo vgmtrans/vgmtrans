@@ -108,7 +108,7 @@ void sessionSharesOneImmutableSnapshotPerRevision() {
   expect(&afterNoOpScan.assets() == &afterScan.assets(),
          "a no-op scan should retain the already materialized snapshot revision");
 
-  session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
+  const auto secondSource = session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
   const SessionSnapshot afterAdd = session.snapshot();
   expect(&afterAdd.sources() != &afterScan.sources(),
          "adding a source should invalidate the materialized snapshot revision");
@@ -116,6 +116,27 @@ void sessionSharesOneImmutableSnapshotPerRevision() {
          "the post-add revision should include the pending source without changing scanned assets");
   expect(afterScan.sources().size() == 2 && afterScan.assets().size() == 1,
          "adding a source should leave the previous snapshot revision stable");
+  expect(&afterAdd.assets().front() == &afterScan.assets().front() &&
+             &afterAdd.matchFacts().front() == &afterScan.matchFacts().front() &&
+             &afterAdd.sourceMap().annotations().front() == &afterScan.sourceMap().annotations().front(),
+         "a new revision should reuse unchanged admitted scan values");
+
+  session.scanPendingSources();
+  const SessionSnapshot afterSecondScan = session.snapshot();
+  expect(afterSecondScan.assets().size() == 2, "scanning the pending source should append its discovered asset");
+  expect(&afterSecondScan.assets().front() == &afterScan.assets().front() &&
+             &afterSecondScan.matchFacts().front() == &afterScan.matchFacts().front() &&
+             &afterSecondScan.sourceMap().annotations().front() == &afterScan.sourceMap().annotations().front(),
+         "appending scan data should preserve the backing of earlier chunks");
+
+  session.removeSource(secondSource);
+  const SessionSnapshot afterRemoval = session.snapshot();
+  expect(afterRemoval.assets().size() == 1 && afterSecondScan.assets().size() == 2,
+         "removing a source should publish a new revision without changing its predecessor");
+  expect(&afterRemoval.assets().front() == &afterScan.assets().front() &&
+             &afterRemoval.matchFacts().front() == &afterScan.matchFacts().front() &&
+             &afterRemoval.sourceMap().annotations().front() == &afterScan.sourceMap().annotations().front(),
+         "removal should retain the backing of unaffected chunks");
 }
 
 void sessionReportsUnregisteredSequenceDialect() {

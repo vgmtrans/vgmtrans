@@ -16,13 +16,21 @@ namespace vgmtrans::core::detail {
 // into the public read-only model.
 class SessionSnapshotAccess {
 public:
-  [[nodiscard]] static SessionSnapshot create(std::vector<SourceFile> sources, std::vector<Asset> assets,
-                                              std::vector<MatchFact> matchFacts, std::vector<Collection> collections,
+  [[nodiscard]] static SessionSnapshot create(std::vector<SourceFile> sources, SharedSequence<Asset> assets,
+                                              SharedSequence<MatchFact> matchFacts, std::vector<Collection> collections,
                                               SourceMap sourceMap, std::vector<Diagnostic> diagnostics) {
     return SessionSnapshot{
         std::move(sources),     std::move(assets),    std::move(matchFacts),
         std::move(collections), std::move(sourceMap), std::move(diagnostics),
     };
+  }
+
+  [[nodiscard]] static SessionSnapshot create(std::vector<SourceFile> sources, std::vector<Asset> assets,
+                                              std::vector<MatchFact> matchFacts, std::vector<Collection> collections,
+                                              SourceMap sourceMap, std::vector<Diagnostic> diagnostics) {
+    return create(std::move(sources), SharedSequence<Asset>{std::move(assets)},
+                  SharedSequence<MatchFact>{std::move(matchFacts)}, std::move(collections), std::move(sourceMap),
+                  std::move(diagnostics));
   }
 };
 
