@@ -17,6 +17,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <set>
 #include <span>
 #include <unordered_set>
@@ -65,6 +66,7 @@ public:
   [[nodiscard]] const SequenceDialectRegistry& dialects() const noexcept { return dialects_; }
 
 private:
+  void invalidateSnapshot() noexcept;
   void sealRegistries() noexcept;
   void scanSourceAndDerived(SourceId id);
   void scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued);
@@ -79,6 +81,9 @@ private:
   SequenceDialectRegistry dialects_;
   ScanIdAllocator ids_;
   std::unordered_set<u32> scannedSources_;
+  // Session is single-thread-confined. This memoized immutable revision is
+  // populated on the first snapshot read after a mutation.
+  mutable std::optional<SessionSnapshot> snapshotCache_;
 };
 
 }  // namespace vgmtrans::core

@@ -72,6 +72,7 @@ void Session::registerFormat(FormatModule module, SequenceDialect dialect) {
 
 SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
   sealRegistries();
+  invalidateSnapshot();
   file.kind = SourceKind::UserLoaded;
   return sources_.add(std::move(file), std::move(bytes));
 }
@@ -121,6 +122,9 @@ void Session::removeSources(std::span<const SourceId> ids) {
   std::vector<SourceId> removed;
   for (const SourceId id : ids) {
     if (sources_.contains(id)) {
+      if (removed.empty()) {
+        invalidateSnapshot();
+      }
       removeSourceFamily(id, removed);
     }
   }
@@ -134,6 +138,10 @@ void Session::removeSources(std::span<const SourceId> ids) {
 
 void Session::removeAssets(std::span<const AssetId> assets) {
   sealRegistries();
+  if (!std::ranges::any_of(assets, [&](AssetId id) { return state_->containsAsset(id); })) {
+    return;
+  }
+
   std::vector<SourceId> affectedRoots;
   for (const AssetId id : assets) {
     const auto* asset = state_->asset(id);
@@ -149,9 +157,8 @@ void Session::removeAssets(std::span<const AssetId> assets) {
     }
   }
 
-  if (!state_->removeAssets(assets)) {
-    return;
-  }
+  invalidateSnapshot();
+  static_cast<void>(state_->removeAssets(assets));
 
   std::vector<SourceId> removedSources;
   for (const SourceId root : affectedRoots) {
@@ -183,6 +190,7 @@ void Session::scanSource(SourceId id) {
     return;
   }
 
+  invalidateSnapshot();
   scanSourceAndDerived(id);
   rebuildCollections();
 }
@@ -197,6 +205,9 @@ void Session::scanPendingSources() {
       continue;
     }
 
+    if (!scannedAny) {
+      invalidateSnapshot();
+    }
     scanSourceAndDerived(source);
     scannedAny = true;
   }
@@ -207,8 +218,12 @@ void Session::scanPendingSources() {
 }
 
 SessionSnapshot Session::snapshot() const {
-  return detail::SessionSnapshotAccess::create(sources_.sourceFiles(), state_->assets(), state_->matchFacts(),
-                                               state_->collections(), state_->sourceMap(), state_->diagnostics());
+  if (!snapshotCache_) {
+    snapshotCache_.emplace(detail::SessionSnapshotAccess::create(sources_.sourceFiles(), state_->assets(),
+                                                                 state_->matchFacts(), state_->collections(),
+                                                                 state_->sourceMap(), state_->diagnostics()));
+  }
+  return *snapshotCache_;
 }
 
 std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
@@ -249,6 +264,10 @@ std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest&
 void Session::sealRegistries() noexcept {
   formats_.seal();
   dialects_.seal();
+}
+
+void Session::invalidateSnapshot() noexcept {
+  snapshotCache_.reset();
 }
 
 // Scan the requested source, then scan any sources extracted from it. This lets an

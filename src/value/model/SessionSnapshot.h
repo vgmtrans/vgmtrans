@@ -12,6 +12,7 @@
 #include "value/sequence/SequenceProgram.h"
 #include "value/synth/SynthModel.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -46,16 +47,17 @@ struct Collection {
   std::vector<CollectionIssue> issues;
 };
 
-// Copyable read-only view of the current Session state. UI, tests, and export
-// read this snapshot; SessionState owns the mutable discovered values.
+// Copyable read-only view of one Session revision. Copies share immutable
+// storage, so a snapshot remains stable across later Session mutations without
+// duplicating the discovered value graph.
 class SessionSnapshot {
 public:
-  [[nodiscard]] const std::vector<SourceFile>& sources() const noexcept { return sources_; }
-  [[nodiscard]] const std::vector<Asset>& assets() const noexcept { return assets_; }
-  [[nodiscard]] const std::vector<MatchFact>& matchFacts() const noexcept { return matchFacts_; }
-  [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return collections_; }
-  [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
-  [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return diagnostics_; }
+  [[nodiscard]] const std::vector<SourceFile>& sources() const noexcept { return storage_->sources; }
+  [[nodiscard]] const std::vector<Asset>& assets() const noexcept { return storage_->assets; }
+  [[nodiscard]] const std::vector<MatchFact>& matchFacts() const noexcept { return storage_->matchFacts; }
+  [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return storage_->collections; }
+  [[nodiscard]] const SourceMap& sourceMap() const noexcept { return storage_->sourceMap; }
+  [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return storage_->diagnostics; }
 
   [[nodiscard]] const SourceFile* source(SourceId id) const;
   [[nodiscard]] const Asset* asset(AssetId id) const;
@@ -73,10 +75,22 @@ private:
   friend class detail::SessionSnapshotAccess;
 
   struct Index {
-    // Store vector indexes rather than pointers so snapshots stay easy to copy/move.
     std::unordered_map<u32, size_t> sourcesById;
     std::unordered_map<u32, size_t> assetsById;
     std::unordered_map<u32, size_t> collectionsById;
+  };
+
+  struct Storage {
+    Storage(std::vector<SourceFile> sources, std::vector<Asset> assets, std::vector<MatchFact> matchFacts,
+            std::vector<Collection> collections, SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
+
+    std::vector<SourceFile> sources;
+    std::vector<Asset> assets;
+    std::vector<MatchFact> matchFacts;
+    std::vector<Collection> collections;
+    SourceMap sourceMap;
+    std::vector<Diagnostic> diagnostics;
+    Index index;
   };
 
   SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets, std::vector<MatchFact> matchFacts,
@@ -85,13 +99,7 @@ private:
   [[nodiscard]] static Index buildIndex(const std::vector<SourceFile>& sources, const std::vector<Asset>& assets,
                                         const std::vector<Collection>& collections);
 
-  std::vector<SourceFile> sources_;
-  std::vector<Asset> assets_;
-  std::vector<MatchFact> matchFacts_;
-  std::vector<Collection> collections_;
-  SourceMap sourceMap_;
-  std::vector<Diagnostic> diagnostics_;
-  Index index_;
+  std::shared_ptr<const Storage> storage_;
 };
 
 [[nodiscard]] AssetMetadata& metadata(Asset& asset);

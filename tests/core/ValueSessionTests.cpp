@@ -81,6 +81,43 @@ void sessionScansValuesAndDerivedSources() {
   expect(snapshot.collections().size() == 1, "pending-source scan should not duplicate already-resolved collections");
 }
 
+void sessionSharesOneImmutableSnapshotPerRevision() {
+  Session session;
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+
+  const auto firstSource = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
+  const SessionSnapshot beforeScan = session.snapshot();
+  const SessionSnapshot beforeScanCopy = session.snapshot();
+  expect(&beforeScan.sources() == &beforeScanCopy.sources(),
+         "repeated snapshot reads should share the current immutable revision");
+  expect(beforeScan.assets().empty(), "unscanned snapshot revision should not contain assets");
+
+  session.scanPendingSources();
+  const SessionSnapshot afterScan = session.snapshot();
+  expect(&afterScan.sources() != &beforeScan.sources(),
+         "scanning should publish new snapshot storage on the next read");
+  expect(afterScan.assets().size() == 1, "scanned snapshot revision should contain the discovered asset");
+  expect(beforeScan.assets().empty(), "publishing a new revision should not mutate an older snapshot");
+
+  const SessionSnapshot afterScanCopy = afterScan;
+  expect(&afterScan.assets() == &afterScanCopy.assets() && &afterScan.sourceMap() == &afterScanCopy.sourceMap(),
+         "copying a snapshot should share its complete immutable backing");
+
+  session.scanSource(firstSource);
+  const SessionSnapshot afterNoOpScan = session.snapshot();
+  expect(&afterNoOpScan.assets() == &afterScan.assets(),
+         "a no-op scan should retain the already materialized snapshot revision");
+
+  session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
+  const SessionSnapshot afterAdd = session.snapshot();
+  expect(&afterAdd.sources() != &afterScan.sources(),
+         "adding a source should invalidate the materialized snapshot revision");
+  expect(afterAdd.sources().size() == afterScan.sources().size() + 1 && afterAdd.assets().size() == 1,
+         "the post-add revision should include the pending source without changing scanned assets");
+  expect(afterScan.sources().size() == 2 && afterScan.assets().size() == 1,
+         "adding a source should leave the previous snapshot revision stable");
+}
+
 void sessionReportsUnregisteredSequenceDialect() {
   Session session;
   session.registerFormat(probeSequenceModule());
@@ -958,6 +995,7 @@ void snapshotFindsTheFirstCollectionContainingAnAsset() {
 
 void runValueSessionTests() {
   sessionScansValuesAndDerivedSources();
+  sessionSharesOneImmutableSnapshotPerRevision();
   sessionReportsUnregisteredSequenceDialect();
   sessionScansIndividualSourcesWithoutDuplicating();
   sessionKeepsScannerKnownCollectionsWithoutResolver();
