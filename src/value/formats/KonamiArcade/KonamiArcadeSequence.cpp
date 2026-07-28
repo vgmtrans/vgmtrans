@@ -705,6 +705,8 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
   }
 
   const u8 opcode = cursor.opcode();
+  const bool gx = layout.version == KonamiArcadeVersion::Gx;
+  const bool mystic = layout.version == KonamiArcadeVersion::MysticWarrior;
   if (opcode == 0x60 || opcode == 0x61) {
     const bool enabled = opcode == 0x60;
     return cursor.command(enabled ? "Percussion On" : "Percussion Off", SequenceSemantic::Instrument)
@@ -739,7 +741,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     event.invoke<&Playback::note>(key, event.state<&TrackState::previousDelta>(),
                                   event.state<&TrackState::previousDurationParameter>(), durationSpecified, velocity,
                                   sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
-                                  drum.pan, layout.version == KonamiArcadeVersion::Gx);
+                                  drum.pan, gx);
     return event.wait(event.state<&TrackState::previousDelta>());
   }
 
@@ -752,8 +754,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xc4:
     case 0xc5:
     case 0xc6:
-      return ignored(cursor, layout.version == KonamiArcadeVersion::Gx ? "DSP Command" : "Unknown Driver State",
-                     layout.version == KonamiArcadeVersion::Gx ? 7 : 0);
+      return ignored(cursor, gx ? "DSP Command" : "Unknown Driver State", gx ? 7 : 0);
     case 0xc7:
     case 0xc8:
     case 0xc9:
@@ -762,9 +763,9 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xcc:
       return ignored(cursor, "Unknown Driver State", 0);
     case 0xcd:
-      return ignored(cursor, "Unknown Driver State", layout.version == KonamiArcadeVersion::Gx ? 1 : 0);
+      return ignored(cursor, "Unknown Driver State", gx ? 1 : 0);
     case 0xce:
-      return ignored(cursor, "Unknown Driver State", layout.version == KonamiArcadeVersion::Gx ? 2 : 0);
+      return ignored(cursor, "Unknown Driver State", gx ? 2 : 0);
     case 0xcf:
     case 0xd0:
       return ignored(cursor, "Unknown Driver State", 3);
@@ -778,7 +779,6 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Reverb Volume", SequenceSemantic::Level);
       const u8 first = event.u8("first_nibble", SemanticOperandRole::Level);
       const u8 second = event.u8("second_nibble", SemanticOperandRole::Level);
-      const bool gx = layout.version == KonamiArcadeVersion::Gx;
       event.derived("linear_gain", reverbGain(first, second, gx), SemanticOperandRole::Level);
       return event.invoke<&Playback::reverb>(first, second, gx);
     }
@@ -791,7 +791,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xdb:
       return ignored(cursor, "Unknown Driver State", 1);
     case 0xdc: {
-      if (layout.version == KonamiArcadeVersion::MysticWarrior) {
+      if (mystic) {
         return ignored(cursor, "Unknown Driver State", 0);
       }
       auto event = cursor.command("Sample Loop Program", SequenceSemantic::State);
@@ -808,7 +808,6 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 rawDelay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 rawRate = event.u8("rate", SemanticOperandRole::Modulation);
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      const bool mystic = layout.version == KonamiArcadeVersion::MysticWarrior;
       const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
       const u8 rate = mystic ? static_cast<u8>(rawRate >> 1) : rawRate;
       event.derived("effective_delay", delay, SemanticOperandRole::Duration);
@@ -819,7 +818,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       event.set<&TrackState::previousDelta>(delta);
-      if (layout.version == KonamiArcadeVersion::Gx) {
+      if (gx) {
         // GX clears the live duration but retains the separately stored
         // duration parameter used by later velocity-only notes.
         event.set<&TrackState::driverDurationRate>(u8{0});
@@ -832,7 +831,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
       event.set<&TrackState::previousDelta>(delta);
-      event.invoke<&Playback::hold>(delta, rate, layout.version == KonamiArcadeVersion::Gx);
+      event.invoke<&Playback::hold>(delta, rate, gx);
       return event.wait(delta);
     }
     case 0xe2: {
@@ -848,7 +847,6 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 rawDelay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 rawRate = event.u8("rate", SemanticOperandRole::Modulation);
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      const bool mystic = layout.version == KonamiArcadeVersion::MysticWarrior;
       const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
       const u8 rate = mystic && rawRate == 0 ? 1 : rawRate;
       event.derived("effective_delay", delay, SemanticOperandRole::Duration);
@@ -911,9 +909,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 rawTarget = event.u8("target");
       // GX applies the sequence tempo offset to both EA and EB. The Z80
       // driver applies it only to an immediate EA tempo command.
-      const u8 target = layout.version == KonamiArcadeVersion::Gx
-                            ? effectiveTempo(rawTarget, sequence.tempoOffset, layout.version)
-                            : rawTarget;
+      const u8 target = gx ? effectiveTempo(rawTarget, sequence.tempoOffset, layout.version) : rawTarget;
       event.derived("effective_target", target);
       return event.invoke<&Playback::beginSlide>(u8{0}, duration, target, layout.nmiRateHertz);
     }
@@ -927,7 +923,6 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 rawDelay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      const bool mystic = layout.version == KonamiArcadeVersion::MysticWarrior;
       const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
       event.derived("effective_delay", delay, SemanticOperandRole::Duration);
       event.derived("peak_attenuation_steps", static_cast<u8>(depth >> 1), SemanticOperandRole::Modulation);
@@ -957,20 +952,18 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xf2: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
       return event.invoke<&Playback::pitchBend>(
-          event.s8("bend", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch),
-          layout.version == KonamiArcadeVersion::Gx);
+          event.s8("bend", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch), gx);
     }
     case 0xf3: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Portamento);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
       const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-      return event.invoke<&Playback::pitchSlide>(delay, duration, target, sequence.initialTranspose,
-                                                 layout.version == KonamiArcadeVersion::Gx);
+      return event.invoke<&Playback::pitchSlide>(delay, duration, target, sequence.initialTranspose, gx);
     }
     case 0xf4:
     case 0xf5:
-      return ignored(cursor, "Unknown Driver State", layout.version == KonamiArcadeVersion::MysticWarrior ? 3 : 0);
+      return ignored(cursor, "Unknown Driver State", mystic ? 3 : 0);
     case 0xf6: {
       auto event = cursor.command("Subroutine Definition", SequenceSemantic::State);
       discoveredSubroutine = event.nextAddress();
@@ -993,7 +986,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xf9: {
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
       const u8 rawLength = event.u8("length", SemanticOperandRole::Duration);
-      const u8 length = layout.version == KonamiArcadeVersion::MysticWarrior && rawLength == 0 ? 1 : rawLength;
+      const u8 length = mystic && rawLength == 0 ? 1 : rawLength;
       event.derived("effective_length", length, SemanticOperandRole::Duration);
       return event.invoke<&Playback::setVibratoFade>(length);
     }
@@ -1002,7 +995,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       return event.set<&TrackState::releaseRate>(event.u8("rate"));
     }
     case 0xfb: {
-      if (layout.version == KonamiArcadeVersion::Gx) {
+      if (gx) {
         return ignored(cursor, "Unknown Driver State", 0);
       }
       if (sequence.indexedNoteTableOffset == 0) {
