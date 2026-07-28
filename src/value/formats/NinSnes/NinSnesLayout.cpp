@@ -501,19 +501,23 @@ std::optional<Layout> findLayout(ByteReader reader) {
     u16 playlistAddress = 0;
     u16 falcomOffset = 0;
   };
-  // Standard N-SPC song requests use a five-bit index. Inspect every slot:
-  // games such as Mario Paint leave unloaded holes between valid songs.
-  constexpr u8 kSongSlotCount = 32;
+  // Inspect the full addressable table: games such as Mario Paint leave
+  // unloaded holes, while Hyper Zone uses song slots beyond 31.
+  constexpr u8 kSongSlotCount = 0x80;
   std::vector<SongEntry> entries;
   entries.reserve(kSongSlotCount);
+  u32 songListEnd = kAramSize;
   for (u8 song = 0; song < kSongSlotCount; ++song) {
     const u32 pointer = songList->address + song * 2;
-    if (!reader.has(pointer, 2)) {
+    if (!reader.has(pointer, 2) || pointer >= songListEnd) {
       break;
     }
     const u16 playlistAddress = sectionListPointer(pointer);
     if (playlistAddress < 0x100 || playlistAddress >= 0xfff0 || !reader.has(playlistAddress, 2)) {
       continue;
+    }
+    if (playlistAddress >= pointer) {
+      songListEnd = std::min(songListEnd, static_cast<u32>(playlistAddress));
     }
     entries.push_back(SongEntry{
         .index = song,
