@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/base/CoreTypes.h"
+#include "value/model/SourceInspection.h"
 
 #include <memory>
 #include <unordered_map>
@@ -26,13 +26,15 @@ public:
   explicit VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
                            QWidget* parent = nullptr);
 
+  [[nodiscard]] vgmtrans::core::SourceInspectionItem sourceItemForItem(const QTreeWidgetItem* item) const;
   [[nodiscard]] vgmtrans::core::SourceAnnotationId annotationForItem(const QTreeWidgetItem* item) const;
+  void setSelectedItem(vgmtrans::core::SourceInspectionItem item);
   void setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation);
   void updateStatusBar();
   void setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations);
 
 signals:
-  void statusAnnotationChanged(vgmtrans::core::SourceAnnotationId annotation);
+  void statusItemChanged(vgmtrans::core::SourceInspectionItem item);
   void seekToAnnotationRequested(vgmtrans::core::SourceAnnotationId annotation);
 
 protected:
@@ -44,8 +46,11 @@ protected:
   void mouseMoveEvent(QMouseEvent* event) override;
 
 private:
-  [[nodiscard]] QTreeWidgetItem* treeItem(vgmtrans::core::SourceAnnotationId annotation) const;
+  [[nodiscard]] static u64 itemKey(vgmtrans::core::SourceInspectionItem item);
+  [[nodiscard]] QTreeWidgetItem* treeItem(vgmtrans::core::SourceInspectionItem item) const;
   void appendChildren(QTreeWidgetItem* parent, std::span<const vgmtrans::core::SourceAnnotationId> children);
+  void appendProjectedChildren(QTreeWidgetItem* parent, vgmtrans::core::SourceAnnotationId annotation);
+  void appendItem(QTreeWidgetItem* parent, vgmtrans::core::SourceInspectionItem item);
   void setItemText(QTreeWidgetItem* item) const;
   void onShowDetailsChanged(bool show);
   void updateItemTextRecursively(QTreeWidgetItem* item);
@@ -53,7 +58,7 @@ private:
 
   std::shared_ptr<const vgmtrans::core::SourceInspection> inspection_;
   bool showDetails_ = false;
-  std::unordered_map<u32, QTreeWidgetItem*> items_;
+  std::unordered_map<u64, QTreeWidgetItem*> items_;
   QTreeWidgetItem* lastSeekItem_{};
   std::unordered_set<QTreeWidgetItem*> playbackTreeItems_;
   QBrush playbackBrush_;

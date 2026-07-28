@@ -991,6 +991,17 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
          "the drum kit should use the percussion sample on its MIDI drum key");
   expect(std::abs(drum->regions[0].unityKey - (melodic->regions[0].unityKey - 28.0)) < 0.0001,
          "the percussion row's sixth byte should determine the exported drum pitch");
+
+  const auto drumSource = std::ranges::find_if(scan.sourceMap.annotations(), [](const SourceAnnotation& annotation) {
+    return annotation.localKind == "nin-snes-drum-region";
+  });
+  expect(drumSource != scan.sourceMap.annotations().end() && drumSource->fieldsAsChildren,
+         "NinSnes drum records should opt their exact fields into TreeView child projection");
+  const auto sourceBackedFields = std::ranges::count_if(
+      drumSource->fields, [](const SourceField& field) { return field.range.valid(); });
+  expect(sourceBackedFields == 6 && drumSource->fields[0].name == "srcn" &&
+             drumSource->fields[5].name == "note" && drumSource->fields[5].range.offset == 0x400a,
+         "a prototype drum record should retain all six individually selectable source fields");
 }
 
 void ninSnesGainModeInstrumentsUseDspEnvelope() {

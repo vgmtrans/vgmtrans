@@ -134,8 +134,17 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
       700, Instrument{.explicitAddress = InstrumentAddress{.bank = 127, .program = 5}, .name = "Drum Kit"});
   auto firstRegion = kit.region(SampleRef{.collection = samplesAsset, .index = 3},
                                 Region{.keyRange = KeyRange{.low = 36, .high = 36}});
-  const auto firstRegionSource =
-      firstRegion.source("Kick", SourceRange{.source = source, .offset = 20, .size = 4}, "probe-kick");
+  const auto firstRegionSource = firstRegion.source(
+      "Kick",
+      SourceRecord{
+          .range = SourceRange{.source = source, .offset = 20, .size = 4},
+          .fields = {SourceField{
+              .name = "sample",
+              .range = SourceRange{.source = source, .offset = 20, .size = 1},
+              .value = makeSourceValue(u8{3}),
+          }},
+      },
+      "probe-kick");
   firstRegion.source("Kick Tuning", SourceRange{.source = source, .offset = 60, .size = 2}, "probe-kick-tuning");
 
   const auto instrumentSource =
@@ -190,8 +199,9 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
          "builder finish should project final synth properties without format-authored annotation bookkeeping");
 
   const auto firstRegionSources = annotations.ownedBy(ObjectRefs::region(instrumentsAsset, 0, 0));
-  expect(firstRegionSources.size() == 2 && annotations.get(firstRegionSource.id()).parent == std::nullopt,
-         "several source records should share one stable region owner without guessed parentage");
+  expect(firstRegionSources.size() == 2 && annotations.get(firstRegionSource.id()).parent == std::nullopt &&
+             annotations.get(firstRegionSource.id()).fieldsAsChildren,
+         "region records should share stable ownership, avoid guessed parents, and expose exact fields as children");
   const auto secondRegionSources = annotations.ownedBy(ObjectRefs::region(instrumentsAsset, 0, 1));
   expect(secondRegionSources == std::vector<SourceAnnotationId>{secondRegionSource.id()} &&
              annotations.get(secondRegionSource.id()).parent == instrumentSource.id(),

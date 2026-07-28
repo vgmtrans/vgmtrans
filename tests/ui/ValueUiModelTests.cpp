@@ -44,8 +44,13 @@ ScanResult scanUiProbe(const ScanInput& input) {
   result.sourceMap()
       .annotation(SourceRole::Field, "Magic", input.reader.range(0, 1))
       .parent(section.id())
-      .field("value", input.reader.range(0, 1), 0x7f, SourceValueDisplay::Hex);
-  result.sourceMap().annotation(SourceRole::Payload, "Payload", input.reader.range(1, 2)).parent(section.id());
+      .fieldsAsChildren()
+      .field("value", input.reader.range(0, 1), 0x7f, SourceValueDisplay::Hex)
+      .derived("decoded", true, SourceValueDisplay::Boolean);
+  result.sourceMap()
+      .annotation(SourceRole::Payload, "Payload", input.reader.range(1, 2))
+      .parent(section.id())
+      .field("first", input.reader.range(1, 1), 1);
   result.sourceCollection("Probe collection").misc(misc);
   result.warning("Probe warning", input.reader.range(0, 1));
   return result.finish();
@@ -124,6 +129,15 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
          "source inspector hit testing should prefer the most specific annotation");
   expect(payload && inspector->annotation(*payload)->label == "Payload",
          "source inspector hit testing should follow byte ranges");
+  const auto magicField = inspector->itemAt(0);
+  expect(magicField && magicField->isField() && magicField->annotation == *magic && magicField->field == 0,
+         "opted-in source fields should be addressable as transient inspection children");
+  expect(inspector->field(*magicField) != nullptr && inspector->field(*magicField)->name == "value" &&
+             inspector->range(*magicField) == SourceRange{.source = SourceId{0}, .offset = 0, .size = 1},
+         "a transient field child should retain its exact source range for HexView selection");
+  const auto payloadItem = inspector->itemAt(1);
+  expect(payloadItem && !payloadItem->isField() && payloadItem->annotation == *payload,
+         "fields should remain annotation details unless their owner explicitly opts into child projection");
 
   const std::array assetIds{assetId};
   expect(workspace.removeAssets(assetIds) == 1, "workspace should remove selected detected assets");

@@ -45,7 +45,7 @@ signals:
   void playbackSeekRequested(int position, PositionChangeOrigin origin);
 
 public slots:
-  void onSelectionChange(vgmtrans::core::SourceAnnotationId annotation);
+  void onSelectionChange(vgmtrans::core::SourceInspectionItem item);
   void seekToAnnotation(vgmtrans::core::SourceAnnotationId annotation);
   void setSeekModifierActive(bool active);
   void setPlaybackTimeline(std::vector<vgmtrans::core::SourcePlaybackSpan> timeline);
@@ -64,7 +64,7 @@ private:
   void resetSnapRanges() const;
   void updateHexViewFont(qreal sizeIncrement) const;
   void applyHexViewFont(QFont font) const;
-  void updateStatus(vgmtrans::core::SourceAnnotationId annotation);
+  void updateStatus(vgmtrans::core::SourceInspectionItem item);
   void setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
                               const std::vector<QColor>& colors = {});
   void clearPlaybackAnnotations(bool fade = true);

@@ -317,4 +317,25 @@ QString tooltipHtml(const SourceAnnotation& annotation) {
   return QStringLiteral("<table cellspacing=\"0\" cellpadding=\"6\"><tr><td>%1</td></tr></table>").arg(body);
 }
 
+QString fieldLabel(const SourceField& field) {
+  return fieldName(field.name);
+}
+
+QString fieldValue(const SourceField& field) {
+  return valueText(field);
+}
+
+QIcon fieldIcon() {
+  static const QIcon iconValue = icon(SourceAnnotation{.role = SourceRole::Field});
+  return iconValue;
+}
+
+QString tooltipHtml(const SourceField& field) {
+  const QString name = escaped(fieldLabel(field));
+  const QString value = escaped(fieldValue(field));
+  return QStringLiteral("<table cellspacing=\"0\" cellpadding=\"6\"><tr><td><nobr><h3>%1</h3>%2</nobr></td></tr>"
+                        "</table>")
+      .arg(name, value);
+}
+
 }  // namespace SourceInspectorPresentation

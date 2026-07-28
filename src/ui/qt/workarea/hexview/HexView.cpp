@@ -550,11 +550,10 @@ void HexView::clearCurrentSelection(bool animateSelection) {
 
 // Select the current item's byte range and refresh highlight visuals.
 void HexView::selectCurrentItem(bool animateSelection) {
-  const auto* selected = annotation(m_selectedAnnotation);
-  if (selected == nullptr) {
+  if (!m_selectedItem.valid()) {
     return;
   }
-  const auto range = visibleRange(*selected);
+  const auto range = visibleRange(m_inspection->range(m_selectedItem));
   if (!range) {
     return;
   }
@@ -567,22 +566,25 @@ void HexView::selectCurrentItem(bool animateSelection) {
 }
 
 // Set selected item, update selection, and scroll it into view when needed.
-void HexView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotationId) {
-  m_selectedAnnotation = annotationId;
-  const auto* selected = annotation(m_selectedAnnotation);
-
-  if (selected == nullptr) {
-    m_selectedAnnotation = {};
+void HexView::setSelectedItem(vgmtrans::core::SourceInspectionItem item) {
+  m_selectedItem = item;
+  if (m_inspection->annotation(item) == nullptr ||
+      (item.isField() && m_inspection->field(item) == nullptr)) {
+    m_selectedItem = {};
     clearCurrentSelection(true);
     return;
   }
 
   selectCurrentItem(true);
-  const auto selectedRange = visibleRange(*selected);
+  const auto selectedRange = visibleRange(m_inspection->range(item));
   if (!selectedRange) {
     return;
   }
   scrollRangeIntoView(*selectedRange);
+}
+
+void HexView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotationId) {
+  setSelectedItem(vgmtrans::core::SourceInspectionItem::forAnnotation(annotationId));
 }
 
 void HexView::scrollRangeIntoView(SelectionRange range) {
@@ -637,13 +639,13 @@ void HexView::setSelectedAnnotations(
     setSelectedAnnotation({});
     return;
   }
-  const auto primaryRange = visibleRange(*primary);
+  const auto primaryRange = visibleRange(primary->range);
   if (!primaryRange) {
     setSelectedAnnotation({});
     return;
   }
 
-  m_selectedAnnotation = primaryAnnotation;
+  m_selectedItem = vgmtrans::core::SourceInspectionItem::forAnnotation(primaryAnnotation);
   m_selectedOffset = primaryRange->offset;
 
   std::vector<SelectionRange> selections;
@@ -657,7 +659,7 @@ void HexView::setSelectedAnnotations(
       continue;
     }
     // Zero-length items still need a visible caret-width highlight in the hex view, so normalize them to a one-byte range.
-    const auto range = visibleRange(*item);
+    const auto range = visibleRange(item->range);
     if (!range) {
       continue;
     }
@@ -698,7 +700,7 @@ void HexView::setPlaybackSelectionsForAnnotations(
     if (item == nullptr) {
       continue;
     }
-    const auto range = visibleRange(*item);
+    const auto range = visibleRange(item->range);
     if (!range) {
       continue;
     }
@@ -1052,7 +1054,7 @@ bool HexView::viewportEvent(QEvent* event) {
       hideTooltip();
       return true;
     }
-    const auto item = annotationAt(static_cast<u32>(offset));
+    const auto item = itemAt(static_cast<u32>(offset));
     if (item.valid()) {
       showTooltip(item, helpEvent->pos());
     } else {
@@ -1146,15 +1148,14 @@ void HexView::changeEvent(QEvent* event) {
 
 // Handle keyboard navigation between adjacent items.
 void HexView::keyPressEvent(QKeyEvent* event) {
-  const auto* selected = annotation(m_selectedAnnotation);
-  if (selected == nullptr) {
+  if (!m_selectedItem.valid()) {
     QAbstractScrollArea::keyPressEvent(event);
     return;
   }
 
   const u32 baseOffset = static_cast<u32>(m_inspection->range().offset);
   const u32 endOffset = baseOffset + static_cast<u32>(m_inspection->bytes().size());
-  const auto selectedRange = visibleRange(*selected);
+  const auto selectedRange = visibleRange(m_inspection->range(m_selectedItem));
   if (!selectedRange) {
     QAbstractScrollArea::keyPressEvent(event);
     return;
@@ -1198,7 +1199,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
     selectNewOffset:
       if (newOffset >= baseOffset && newOffset < endOffset) {
         m_selectedOffset = newOffset;
-        const auto item = annotationAt(newOffset);
+        const auto item = itemAt(newOffset);
         if (item.valid()) {
           emit selectionChanged(item);
         }
@@ -1242,12 +1243,12 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
   return offset;
 }
 
-void HexView::handleSeekPress(vgmtrans::core::SourceAnnotationId item, const QPoint& pos) {
+void HexView::handleSeekPress(vgmtrans::core::SourceInspectionItem item, const QPoint& pos) {
   if (item.valid()) {
-    if (item != m_lastSeekAnnotation) {
-      m_lastSeekAnnotation = item;
-      emit seekToEventRequested(item);
-      emit notePreviewRequested(item, true);
+    if (item.annotation != m_lastSeekAnnotation) {
+      m_lastSeekAnnotation = item.annotation;
+      emit seekToEventRequested(item.annotation);
+      emit notePreviewRequested(item.annotation, true);
     }
     showTooltip(item, pos);
   } else {
@@ -1256,7 +1257,7 @@ void HexView::handleSeekPress(vgmtrans::core::SourceAnnotationId item, const QPo
   }
 }
 
-void HexView::handleSelectionPress(int offset, vgmtrans::core::SourceAnnotationId item) {
+void HexView::handleSelectionPress(int offset, vgmtrans::core::SourceInspectionItem item) {
   if (offset == -1) {
     emit selectionChanged({});
     stopNotePreview();
@@ -1264,13 +1265,13 @@ void HexView::handleSelectionPress(int offset, vgmtrans::core::SourceAnnotationI
   }
 
   m_selectedOffset = offset;
-  if (item == m_selectedAnnotation) {
+  if (item == m_selectedItem) {
     emit selectionChanged({});
     stopNotePreview();
   } else {
     emit selectionChanged(item);
     if (item.valid()) {
-      emit notePreviewRequested(item, false);
+      emit notePreviewRequested(item.annotation, false);
     } else {
       stopNotePreview();
     }
@@ -1280,12 +1281,12 @@ void HexView::handleSelectionPress(int offset, vgmtrans::core::SourceAnnotationI
 
 void HexView::handleSeekScrubDrag(int offset) {
   if (offset >= 0) {
-    const auto item = annotationAt(static_cast<u32>(offset));
+    const auto item = itemAt(static_cast<u32>(offset));
     if (item.valid()) {
-      if (item != m_lastSeekAnnotation) {
-        m_lastSeekAnnotation = item;
-        emit seekToEventRequested(item);
-        emit notePreviewRequested(item, true);
+      if (item.annotation != m_lastSeekAnnotation) {
+        m_lastSeekAnnotation = item.annotation;
+        emit seekToEventRequested(item.annotation);
+        emit notePreviewRequested(item.annotation, true);
       }
     } else {
       stopNotePreview();
@@ -1305,18 +1306,18 @@ void HexView::handleSelectionDrag(int offset) {
   }
 
   m_selectedOffset = offset;
-  const auto* selected = annotation(m_selectedAnnotation);
-  if (selected != nullptr && m_selectedOffset >= selected->range.offset &&
-      m_selectedOffset < selected->range.endOffset()) {
+  const auto selectedRange = m_inspection->range(m_selectedItem);
+  if (selectedRange.valid() && m_selectedOffset >= selectedRange.offset &&
+      m_selectedOffset < selectedRange.endOffset()) {
     hideTooltip();
     return;
   }
 
-  const auto item = annotationAt(static_cast<u32>(offset));
-  if (item != m_selectedAnnotation) {
+  const auto item = itemAt(static_cast<u32>(offset));
+  if (item != m_selectedItem) {
     emit selectionChanged(item);
     if (item.valid()) {
-      emit notePreviewRequested(item, false);
+      emit notePreviewRequested(item.annotation, false);
     } else {
       stopNotePreview();
     }
@@ -1328,8 +1329,8 @@ void HexView::handleSelectionDrag(int offset) {
 void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const int offset = getOffsetFromPoint(event->pos());
-    const auto item = offset >= 0 ? annotationAt(static_cast<u32>(offset))
-                                  : vgmtrans::core::SourceAnnotationId{};
+    const auto item = offset >= 0 ? itemAt(static_cast<u32>(offset))
+                                  : vgmtrans::core::SourceInspectionItem{};
     const DragMode mode = dragModeForModifiers(event->modifiers());
     if (mode == DragMode::SeekScrub) {
       handleSeekPress(item, event->pos());
@@ -1389,7 +1390,7 @@ void HexView::handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mo
     hideTooltip();
     return;
   }
-  const auto item = annotationAt(static_cast<u32>(offset));
+  const auto item = itemAt(static_cast<u32>(offset));
   if (item.valid()) {
     showTooltip(item, pos);
   } else {
@@ -1670,31 +1671,33 @@ void HexView::stopNotePreview() {
 }
 
 // Show rich HTML tooltip for a hovered item, avoiding redundant re-show for same item.
-void HexView::showTooltip(vgmtrans::core::SourceAnnotationId item, const QPoint& pos) {
-  const auto* value = annotation(item);
+void HexView::showTooltip(vgmtrans::core::SourceInspectionItem item, const QPoint& pos) {
+  const auto* value = m_inspection->annotation(item);
   if (value == nullptr) {
     hideTooltip();
     return;
   }
-  if (m_tooltipAnnotation == item) {
+  if (m_tooltipItem == item) {
     return;
   }
-  const QString description = SourceInspectorPresentation::tooltipHtml(*value);
+  const auto* field = m_inspection->field(item);
+  const QString description = field != nullptr ? SourceInspectorPresentation::tooltipHtml(*field)
+                                               : SourceInspectorPresentation::tooltipHtml(*value);
   if (description.isEmpty()) {
     hideTooltip();
     return;
   }
   QToolTip::showText(viewport()->mapToGlobal(pos), description, this);
-  m_tooltipAnnotation = item;
+  m_tooltipItem = item;
 }
 
 // Hide active tooltip and clear tracked tooltip item.
 void HexView::hideTooltip() {
-  if (!m_tooltipAnnotation.valid()) {
+  if (!m_tooltipItem.valid()) {
     return;
   }
   QToolTip::hideText();
-  m_tooltipAnnotation = {};
+  m_tooltipItem = {};
 }
 
 const vgmtrans::core::SourceAnnotation* HexView::annotation(
@@ -1702,18 +1705,17 @@ const vgmtrans::core::SourceAnnotation* HexView::annotation(
   return m_inspection->annotation(id);
 }
 
-std::optional<HexView::SelectionRange> HexView::visibleRange(
-    const vgmtrans::core::SourceAnnotation& annotation) const {
+std::optional<HexView::SelectionRange> HexView::visibleRange(vgmtrans::core::SourceRange range) const {
   if (m_inspection->bytes().empty()) {
     return std::nullopt;
   }
   const u64 viewBegin = m_inspection->range().offset;
   const u64 viewEnd = m_inspection->range().endOffset();
-  const u64 annotationEnd = annotation.range.endOffset();
-  u64 begin = std::max(annotation.range.offset, viewBegin);
-  u64 end = std::min(annotationEnd, viewEnd);
-  if (annotation.range.size == 0) {
-    begin = std::clamp(annotation.range.offset, viewBegin, viewEnd - 1);
+  const u64 rangeEnd = range.endOffset();
+  u64 begin = std::max(range.offset, viewBegin);
+  u64 end = std::min(rangeEnd, viewEnd);
+  if (range.size == 0) {
+    begin = std::clamp(range.offset, viewBegin, viewEnd - 1);
     end = begin + 1;
   }
   if (end <= begin) {
@@ -1722,6 +1724,6 @@ std::optional<HexView::SelectionRange> HexView::visibleRange(
   return SelectionRange{static_cast<u32>(begin), static_cast<u32>(end - begin)};
 }
 
-vgmtrans::core::SourceAnnotationId HexView::annotationAt(u32 offset) const {
-  return m_inspection->annotationAt(offset).value_or(vgmtrans::core::SourceAnnotationId{});
+vgmtrans::core::SourceInspectionItem HexView::itemAt(u32 offset) const {
+  return m_inspection->itemAt(offset).value_or(vgmtrans::core::SourceInspectionItem{});
 }

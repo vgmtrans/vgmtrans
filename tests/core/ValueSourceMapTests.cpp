@@ -19,6 +19,7 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
 
   const auto header =
       builder.header("Probe Header", headerRange)
+          .fieldsAsChildren()
           .field("Magic", SourceRange{.source = source, .offset = 0, .size = 1}, u8{0xaa}, SourceValueDisplay::Hex)
           .derived("Decoded", "yes")
           .link(SourceLinkRole::PointsTo, tableRange, "Table");
@@ -39,6 +40,8 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   expect(std::get<u64>(headerAnnotation.fields[0].value) == 0xaa, "source map should preserve field values");
   expect(headerAnnotation.fields[0].display == SourceValueDisplay::Hex,
          "source map should preserve field display hints");
+  expect(headerAnnotation.fieldsAsChildren && !sourceMap.get(command.id()).fieldsAsChildren,
+         "field child projection should be explicit and disabled by default");
   expect(headerAnnotation.links.size() == 1 && headerAnnotation.links[0].role == SourceLinkRole::PointsTo,
          "source map should preserve structured links");
   expect(sourceMap.linksTo(SourceTarget{tableRange}) == std::vector<SourceAnnotationId>{header.id()},

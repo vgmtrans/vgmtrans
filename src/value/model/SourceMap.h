@@ -208,6 +208,10 @@ struct SourceAnnotation {
   std::optional<ObjectRef> owner;
   std::optional<SourceAnnotationId> parent;
   SourceOutlinePolicy outline = SourceOutlinePolicy::Auto;
+  // Source-backed fields may be projected as transient outline children by an
+  // inspector. They remain fields rather than persistent annotations: their
+  // identity is local to the immutable annotation that owns them.
+  bool fieldsAsChildren = false;
   std::vector<SourceField> fields;
   std::vector<SourceLink> links;
 };
@@ -283,6 +287,7 @@ public:
   AnnotationBuilder& parent(SourceAnnotationId parent);
   AnnotationBuilder& owner(ObjectRef owner);
   AnnotationBuilder& outline(SourceOutlinePolicy policy);
+  AnnotationBuilder& fieldsAsChildren(bool enabled = true);
   AnnotationBuilder& sequenceSemantic(SequenceSemantic semantic);
   AnnotationBuilder& playbackStatus(CommandPlaybackStatus status);
   AnnotationBuilder& field(std::string_view name, SourceRange range, SourceValue value,

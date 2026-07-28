@@ -354,6 +354,13 @@ AnnotationBuilder& AnnotationBuilder::outline(SourceOutlinePolicy policy) {
   return *this;
 }
 
+AnnotationBuilder& AnnotationBuilder::fieldsAsChildren(bool enabled) {
+  if (auto* found = annotation()) {
+    found->fieldsAsChildren = enabled;
+  }
+  return *this;
+}
+
 AnnotationBuilder& AnnotationBuilder::sequenceSemantic(SequenceSemantic semantic) {
   if (auto* found = annotation()) {
     found->sequenceSemantic = semantic;

@@ -525,7 +525,7 @@ AnnotationBuilder InstrumentSetBuilder::RegionEntry::source(std::string_view lab
 
 AnnotationBuilder InstrumentSetBuilder::RegionEntry::source(std::string_view label, const SourceRecord& record,
                                                             std::string_view kind) const {
-  return source(label, record.range, kind).fields(record.fields);
+  return source(label, record.range, kind).fields(record.fields).fieldsAsChildren();
 }
 
 bool InstrumentSetBuilder::validInstrument(u32 index) const noexcept {
