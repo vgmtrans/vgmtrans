@@ -16,6 +16,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -45,6 +46,24 @@ void writeBe32(std::vector<u8>& bytes, size_t offset, u32 value) {
 
 void writeBytes(std::vector<u8>& bytes, size_t offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + static_cast<std::ptrdiff_t>(offset));
+}
+
+KonamiArcadeSequenceLayout makeGxSequenceLayout(SourceId source, std::string name) {
+  return KonamiArcadeSequenceLayout{
+      .index = 0,
+      .offset = 0x20,
+      .trackTable = SourceRange{.source = source, .offset = 0x20, .size = 64},
+      .tracks =
+          {
+              KonamiArcadeTrackLayout{
+                  .number = 0,
+                  .encodedAddress = 0x80,
+                  .offset = 0x80,
+                  .pointer = SourceRange{.source = source, .offset = 0x20, .size = 4},
+              },
+          },
+      .name = std::move(name),
+  };
 }
 
 template <class T>
@@ -220,6 +239,11 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "complete KonamiArcade fixture should produce a layout without diagnostics");
   expect(layout->version == KonamiArcadeVersion::MysticWarrior && layout->sequences.size() == 1,
          "layout should retain its engine version and discover one sequence");
+  const auto& sequenceLayout = layout->sequences.front();
+  expect(sequenceLayout.trackTable.offset == 0x300 && sequenceLayout.trackTable.size == 16 &&
+             sequenceLayout.tracks.size() == 1 && sequenceLayout.tracks.front().encodedAddress == 0x8320 &&
+             sequenceLayout.tracks.front().offset == 0x320,
+         "layout should retain the exact track table and its normalized track addresses");
   expect(layout->sampleInfos.size() == 2 && layout->melodicSampleCount == 1 && layout->drumCount == 1,
          "layout should separate melodic and drum sample metadata");
 
@@ -442,11 +466,7 @@ void konamiArcadeGxLfosMatchDriverState() {
       .code = SourceRange{.source = source.id, .offset = 0, .size = bytes.size()},
       .nmiRateHertz = 245.0,
   };
-  const KonamiArcadeSequenceLayout sequenceLayout{
-      .index = 0,
-      .offset = 0x20,
-      .name = "LFO",
-  };
+  const KonamiArcadeSequenceLayout sequenceLayout = makeGxSequenceLayout(source.id, "LFO");
   std::vector<Diagnostic> diagnostics;
   const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(source.id, bytes), layout, sequenceLayout,
                                                              AssetId{1}, nullptr, &diagnostics);
@@ -535,14 +555,10 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
       .defaultDuration = 0,
   };
   layout.drumCount = 1;
-  const KonamiArcadeSequenceLayout sequenceLayout{
-      .index = 0,
-      .offset = 0x20,
-      .initialAttenuation = 1,
-      .initialTranspose = 2,
-      .tempoOffset = 1,
-      .name = "Driver quirks",
-  };
+  KonamiArcadeSequenceLayout sequenceLayout = makeGxSequenceLayout(source.id, "Driver quirks");
+  sequenceLayout.initialAttenuation = 1;
+  sequenceLayout.initialTranspose = 2;
+  sequenceLayout.tempoOffset = 1;
   std::vector<Diagnostic> diagnostics;
   const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(source.id, bytes), layout, sequenceLayout,
                                                              AssetId{1}, nullptr, &diagnostics);

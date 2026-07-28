@@ -13,6 +13,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <utility>
 
 namespace vgmtrans::formats::konami_arcade {
 
@@ -277,6 +278,64 @@ void readDrums(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Diagno
   }
 }
 
+struct ParsedTrackTable {
+  SourceRange range;
+  std::vector<KonamiArcadeTrackLayout> tracks;
+};
+
+[[nodiscard]] std::optional<ParsedTrackTable> readTrackTable(const KonamiArcadeLayout& layout, ByteReader reader,
+                                                             u32 sequenceOffset, u32 memoryBase = 0) {
+  const bool mystic = layout.version == KonamiArcadeVersion::MysticWarrior;
+  const u32 pointerSize = mystic ? 2 : 4;
+  u32 trackCount = kKonamiArcadeMaxTracks;
+  if (mystic) {
+    for (u32 track = 8; track < kKonamiArcadeMaxTracks; ++track) {
+      const u32 pointer = sequenceOffset + track * pointerSize;
+      if (!reader.has(pointer, pointerSize) || reader.le16(pointer) == 0) {
+        trackCount = 8;
+        break;
+      }
+    }
+  }
+
+  const u32 tableSize = trackCount * pointerSize;
+  if (!reader.has(sequenceOffset, tableSize)) {
+    return std::nullopt;
+  }
+
+  ParsedTrackTable result{
+      .range = reader.range(sequenceOffset, tableSize),
+  };
+  for (u32 track = 0; track < trackCount; ++track) {
+    const u32 pointer = sequenceOffset + track * pointerSize;
+    const u32 encoded = mystic ? reader.le16(pointer) : reader.be32(pointer);
+    if (encoded == 0) {
+      if (track == 0) {
+        return std::nullopt;
+      }
+      continue;
+    }
+
+    const s64 resolved = mystic ? static_cast<s64>(sequenceOffset) + encoded - memoryBase
+                                : static_cast<s64>(layout.code.offset) + encoded;
+    if (resolved < static_cast<s64>(layout.code.offset) || resolved >= static_cast<s64>(layout.code.endOffset()) ||
+        !reader.has(static_cast<u64>(resolved), 1)) {
+      return std::nullopt;
+    }
+
+    result.tracks.push_back(KonamiArcadeTrackLayout{
+        .number = track,
+        .encodedAddress = encoded,
+        .offset = static_cast<u32>(resolved),
+        .pointer = reader.range(pointer, pointerSize),
+    });
+  }
+  if (result.tracks.empty()) {
+    return std::nullopt;
+  }
+  return result;
+}
+
 void readSequences(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Diagnostic>* diagnostics) {
   const u32 codeEnd = static_cast<u32>(layout.code.endOffset());
   u32 offset = layout.sequenceTableOffset;
@@ -298,26 +357,8 @@ void readSequences(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Di
       if (unknown >= 0x5000 || sequenceRelative == 0 || !sequenceOffset) {
         break;
       }
-      bool hasTrack = false;
-      bool validTracks = reader.has(*sequenceOffset, kKonamiArcadeMaxTracks * 4);
-      if (validTracks && reader.be32(*sequenceOffset) == 0) {
-        validTracks = false;
-      }
-      if (validTracks) {
-        for (u32 track = 0; track < kKonamiArcadeMaxTracks; ++track) {
-          const u32 trackRelative = reader.be32(*sequenceOffset + track * 4);
-          if (trackRelative == 0) {
-            continue;
-          }
-          const auto trackOffset = absoluteOffset(layout.code, trackRelative);
-          if (!trackOffset || !reader.has(*trackOffset, 1)) {
-            validTracks = false;
-            break;
-          }
-          hasTrack = true;
-        }
-      }
-      if (!validTracks || !hasTrack) {
+      auto trackTable = readTrackTable(layout, reader, *sequenceOffset);
+      if (!trackTable) {
         continue;
       }
       layout.sequences.push_back(KonamiArcadeSequenceLayout{
@@ -327,6 +368,8 @@ void readSequences(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Di
           .initialTranspose = reader.s8At(offset + 4),
           .tempoOffset = reader.s8At(offset + 5),
           .tableEntry = reader.range(offset, 12),
+          .trackTable = trackTable->range,
+          .tracks = std::move(trackTable->tracks),
           .name = layout.game + " " + std::to_string(index),
       });
     }
@@ -347,35 +390,8 @@ void readSequences(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Di
       if (sequenceRelative == 0 || !sequenceOffset) {
         break;
       }
-      u32 trackCount = kKonamiArcadeMaxTracks;
-      for (u32 track = 8; track < kKonamiArcadeMaxTracks; ++track) {
-        const u32 pointer = *sequenceOffset + track * 2;
-        if (!reader.has(pointer, 2) || reader.le16(pointer) == 0) {
-          trackCount = 8;
-          break;
-        }
-      }
-      bool hasTrack = false;
-      bool validTracks = reader.has(*sequenceOffset, trackCount * 2);
-      if (validTracks && reader.le16(*sequenceOffset) == 0) {
-        validTracks = false;
-      }
-      if (validTracks) {
-        for (u32 track = 0; track < trackCount; ++track) {
-          const u16 trackAddress = reader.le16(*sequenceOffset + track * 2);
-          if (trackAddress == 0) {
-            continue;
-          }
-          const s64 trackRelative = static_cast<s64>(*sequenceOffset) + trackAddress - destination;
-          if (trackRelative < static_cast<s64>(layout.code.offset) ||
-              trackRelative >= static_cast<s64>(layout.code.endOffset())) {
-            validTracks = false;
-            break;
-          }
-          hasTrack = true;
-        }
-      }
-      if (!validTracks || !hasTrack) {
+      auto trackTable = readTrackTable(layout, reader, *sequenceOffset, destination);
+      if (!trackTable) {
         continue;
       }
       const u16 indexedNoteTable = reader.le16(offset + 10);
@@ -391,6 +407,8 @@ void readSequences(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Di
           .initialTranspose = reader.s8At(offset + 5),
           .tempoOffset = reader.s8At(offset + 3),
           .tableEntry = reader.range(offset, 14),
+          .trackTable = trackTable->range,
+          .tracks = std::move(trackTable->tracks),
           .name = layout.game + " " + std::to_string(index),
       });
     }
