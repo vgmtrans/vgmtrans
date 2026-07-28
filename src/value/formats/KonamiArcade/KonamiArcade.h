@@ -52,7 +52,9 @@ struct KonamiArcadeSampleInfo {
 struct KonamiArcadeDrum {
   u8 sample = 0;
   u8 unityKey = 0;
-  s8 pitchBend = 0;
+  // GX interprets this as the fractional byte of an unsigned 8.8 pitch.
+  // MysticWarrior interprets bits 2..7 as unsigned six-bit sixteenths.
+  u8 pitch = 0;
   u8 pan = 0;
   u8 defaultDuration = 0;
   u8 attenuation = 0;
@@ -63,6 +65,10 @@ struct KonamiArcadeSequenceLayout {
   u32 index = 0;
   u32 offset = 0;
   u32 memoryBase = 0;
+  u32 indexedNoteTableOffset = 0;
+  s8 initialAttenuation = 0;
+  s8 initialTranspose = 0;
+  s8 tempoOffset = 0;
   core::SourceRange tableEntry;
   std::string name;
 };

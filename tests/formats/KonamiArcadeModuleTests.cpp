@@ -73,9 +73,14 @@ KonamiArcadeFixture makeMysticWarriorFixture() {
 
   // One sequence-table entry followed by a non-entry sentinel.
   writeLe16(bytes, 0x100, 0);
+  bytes[0x103] = 1;     // tempo offset
+  bytes[0x104] = 0xff;  // initial loudness offset (-1)
+  bytes[0x105] = 2;     // initial transpose
   bytes[0x107] = 0;
   writeLe16(bytes, 0x108, 0x8300);
+  writeLe16(bytes, 0x10a, 0x0280);
   writeLe16(bytes, 0x10e, 1);
+  writeBytes(bytes, 0x280, {0x2a, 0x01, 0xff, 0xff});
 
   // One melodic sample-info row, plus one drum sample-info row.
   writeLe16(bytes, 0x200, 0x210);
@@ -83,8 +88,9 @@ KonamiArcadeFixture makeMysticWarriorFixture() {
   writeBytes(bytes, 0x210, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   writeBytes(bytes, 0x220, {0x10, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00});
 
-  // Drum zero uses the drum sample, middle pan, and a 50% default duration.
-  writeBytes(bytes, 0x229, {0x00, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x32, 0x00});
+  // MysticWarrior uses the high six bits as unsigned sixteenths, so 0x80 is
+  // two semitones. Unlike GX, its zero default duration remains zero.
+  writeBytes(bytes, 0x229, {0x00, 0x2a, 0x80, 0x08, 0x00, 0x00, 0x00, 0x00});
   bytes[0x232] = 0x60;
 
   // MysticWarrior track pointers are addresses relative to the sequence's
@@ -92,26 +98,31 @@ KonamiArcadeFixture makeMysticWarriorFixture() {
   writeLe16(bytes, 0x300, 0x8320);
   writeBytes(bytes, 0x320,
              {
-                 0xea, 0x80,              // tempo
-                 0xe2, 0x00,              // program
-                 0xee, 0x7f,              // volume
-                 0xe3, 0x08,              // pan
-                 0xe4, 0x01, 0x40, 0x20,  // vibrato: delay, rate, depth
-                 0xf9, 0x04,              // fade vibrato depth over four ticks
-                 0x30, 0x06, 0x32, 0x7f,  // note, delta, duration rate, velocity
-                 0x26, 0x04, 0x64, 0x0a,  // quiet note entering duration-tie mode
-                 0x26, 0x04, 0x63, 0x7f,  // same note: extend it and raise expression
-                 0xf0, 0x04,              // continuous portamento over four ticks
-                 0x28, 0x08, 0x63, 0x7f,  // glide up two semitones
-                 0xf0, 0x00,              // continuous portamento off
-                 0xec, 0x04,              // transpose ordinary notes up four semitones
-                 0x28, 0x0a, 0x63, 0x7f,  // note followed by a delayed pitch slide
-                 0xf3, 0x02, 0x03, 0x2a,  // absolute target ignores channel transpose
-                 0x60,                    // percussion on
-                 0xe6,                    // loop start
-                 0x00, 0x02, 0x00, 0x7f,  // drum note, delta, duration rate, velocity
-                 0xe7, 0x02, 0x00, 0x20,  // repeat once, transpose the replay by one key
-                 0x61,                    // percussion off
+                 0xea, 0x80,                                         // tempo
+                 0xe2, 0x00,                                         // program
+                 0xee, 0x7f,                                         // volume
+                 0xe3, 0x08,                                         // pan
+                 0xe4, 0x01, 0x40, 0x20,                             // vibrato: delay, rate, depth
+                 0xf9, 0x04,                                         // fade vibrato depth over four ticks
+                 0x30, 0x06, 0x32, 0x7f,                             // note, delta, duration rate, velocity
+                 0x26, 0x04, 0x64, 0x0a,                             // quiet note entering duration-tie mode
+                 0x26, 0x04, 0x63, 0x7f,                             // same note: extend it and raise expression
+                 0xf0, 0x04,                                         // continuous portamento over four ticks
+                 0x28, 0x08, 0x63, 0x7f,                             // glide up two semitones
+                 0xf0, 0x00,                                         // continuous portamento off
+                 0xec, 0x04,                                         // transpose ordinary notes up four semitones
+                 0x28, 0x0a, 0x63, 0x7f,                             // note followed by a delayed pitch slide
+                 0xf3, 0x02, 0x03, 0x2a,                             // Z80 target uses the note transpose path
+                 0x60,                                               // percussion on
+                 0xe6,                                               // loop start
+                 0x00, 0x02, 0x00, 0x7f,                             // drum note, delta, duration rate, velocity
+                 0xe7, 0x02, 0x80, 0x20,                             // replay silently, transposed by one key
+                 0x61,                                               // percussion off
+                 0xc4, 0xc5, 0xc6, 0xcd, 0xce, 0xdc, 0xdd,           // Z80 zero-data driver states
+                 0xf4, 1,    2,    3,    0xf5, 4,    5,    6, 0xfc,  // Z80-only command widths
+                 0xd2, 0x0f, 0x00,                                   // low nibble is encoded first on Z80
+                 0xf2, 0xfd,                                         // Z80 negative packed pitch (-2/16)
+                 0xfb, 0x00,                                         // indexed jump to a four-byte note
                  0xff,
              });
 
@@ -230,21 +241,25 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(sequence != nullptr && instruments != nullptr && samples != nullptr,
          "KonamiArcade result should use the core value asset types");
   expect(sequence->program.dialect.value == kKonamiArcadeSequenceDialectId && sequence->program.tracks.size() == 1 &&
-             sequence->program.tracks[0].commands.size() == 21,
+             sequence->program.tracks[0].commands.size() == 35,
          "KonamiArcade sequence should compile the source track into typed command values");
   expect(instruments->instruments.size() == 2,
          "KonamiArcade synth should contain one melodic instrument and one drum kit");
   expect(samples->samples.samples.size() == 2 && samples->samples.samples[0].codec == AudioCodec::PcmS8 &&
              samples->samples.samples[0].encodedData.size == 4 && !samples->samples.samples[0].loop.enabled &&
-             samples->samples.samples[0].loop.start == 0 && samples->samples.samples[0].loop.length == 0,
-         "KonamiArcade samples should preserve codec and bounded encoded ranges");
+             samples->samples.samples[0].loop.start == 0 && samples->samples.samples[0].loop.length == 0 &&
+             std::abs(samples->samples.samples[0].attenuationDb) < 0.0001,
+         "MysticWarrior samples should preserve codec and bounds without GX's fixed attenuation");
+  expect(instruments->instruments[1].regions.size() == 1 &&
+             std::abs(instruments->instruments[1].regions[0].unityKey - 22.0) < 0.0001,
+         "MysticWarrior drums should preserve the Z80 driver's six-bit-sixteenths pitch");
 
   const PerformanceSequence performance =
       SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, konamiArcadeSequenceDialect());
-  expect(performance.diagnostics.empty() && performance.tracks.size() == 1 && performance.tracks[0].endTick == 36,
-         "KonamiArcade playback should execute counted loops and timing without source bytes");
+  expect(performance.diagnostics.empty() && performance.tracks.size() == 1 && performance.tracks[0].endTick == 37,
+         "KonamiArcade playback should execute loops and retain MysticWarrior command alignment");
   const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
-  const double expectedVibratoRate = (0x40 / 256.0) * (0x80 / 256.0) * layout->nmiRateHertz;
+  const double expectedVibratoRate = (0x40 / 256.0) * (0x81 / 256.0) * layout->nmiRateHertz;
   expect(modulationProfile.instruments.vibrato &&
              std::abs(modulationProfile.instruments.vibrato->maxDepthCents - 100.0) < 0.0001 &&
              std::abs(modulationProfile.instruments.vibrato->rateHertz.minimum - expectedVibratoRate) < 0.0001 &&
@@ -272,16 +287,34 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     }
   }
   expect(chronological, "KonamiArcade delayed slides should leave the performance timeline chronological");
-  expect(notes.size() == 7 && notes[0]->key == 72.0 && notes[1]->key == 62.0 && notes[2]->key == 62.0 &&
-             notes[3]->key == 64.0 && notes[4]->key == 68.0 && notes[5]->key == 24.0 && notes[6]->key == 25.0,
+  expect(notes.size() == 8 && notes[0]->key == 74.0 && notes[1]->key == 64.0 && notes[2]->key == 64.0 &&
+             notes[3]->key == 66.0 && notes[4]->key == 70.0 && notes[5]->key == 24.0 && notes[6]->key == 24.0 &&
+             notes[7]->key == 72.0 && notes[7]->durationTicks == 1,
          "KonamiArcade playback should retain nominal notes without synthesizing MIDI slide fragments");
+  expect(notes[5]->durationTicks == 2 && notes[6]->durationTicks == 2,
+         "MysticWarrior should preserve a zero drum-table duration instead of applying GX's fallback");
+  expect(notes[6]->linearVelocity < notes[5]->linearVelocity,
+         "the full signed range of loop loudness deltas should survive attenuation-domain conversion");
+  expect(std::ranges::any_of(performance.tracks[0].events,
+                             [](const PerformanceEvent& event) {
+                               const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
+                               return reverb != nullptr && reverb->send < 0.0001;
+                             }),
+         "MysticWarrior D2 should pack its low-nibble operand before its high-nibble operand");
+  expect(std::ranges::any_of(performance.tracks[0].events,
+                             [](const PerformanceEvent& event) {
+                               const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+                               return bend != nullptr && bend->header.tick == 36 &&
+                                      std::abs(bend->semitones + 0.125) < 0.0001;
+                             }),
+         "MysticWarrior F2 should preserve its asymmetric negative packed-fraction conversion");
   expect(notes[1]->linearVelocity == 1.0 && !notes[1]->extendsPrevious && notes[2]->linearVelocity == 1.0 &&
              notes[2]->extendsPrevious,
          "100% duration notes should use full note velocity and extend an existing same-key voice");
   expect(expressions.size() == 3 && expressions[0]->header.tick == 6 && expressions[0]->linearGain < 0.01 &&
-             expressions[1]->header.tick == 10 && expressions[1]->linearGain == 1.0 &&
-             expressions[2]->header.tick == 14 && expressions[2]->linearGain == 1.0,
-         "duration-tie velocity changes should become expression changes across the sustained voice");
+             expressions[1]->header.tick == 10 && expressions[1]->linearGain > 0.9 &&
+             expressions[1]->linearGain < 1.0 && expressions[2]->header.tick == 14 && expressions[2]->linearGain == 1.0,
+         "duration-tie velocity and header attenuation should become expression changes across the sustained voice");
 
   const auto settings = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* glide = std::get_if<PitchTransitionSettingsPerformanceEvent>(&event);
@@ -295,16 +328,16 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
       transitions.push_back(transition);
     }
   }
-  expect(transitions.size() == 2 && transitions[0]->startKey == 62.0 && transitions[0]->targetKey == 64.0 &&
-             transitions[0]->previousNote == notes[2]->note && transitions[0]->nativePortamento.useCurrentTiming &&
-             transitions[1]->startKey == 68.0 && transitions[1]->targetKey == 66.0 &&
-             std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
-         "continuous and delayed slides should retain typed intent, including F3's absolute target");
+  expect(
+      transitions.size() == 2 && transitions[0]->startKey == 64.0 && transitions[0]->targetKey == 66.0 &&
+          transitions[0]->previousNote == notes[2]->note && transitions[0]->nativePortamento.useCurrentTiming &&
+          transitions[1]->startKey == 70.0 && transitions[1]->targetKey == 72.0 &&
+          std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
+      "continuous and delayed slides should retain typed intent, including MysticWarrior's fully transposed F3 target");
   expect(std::ranges::none_of(performance.tracks[0].events,
                               [](const PerformanceEvent& event) {
                                 return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
-                                       std::holds_alternative<PortamentoControlPerformanceEvent>(event) ||
-                                       std::holds_alternative<PitchBendPerformanceEvent>(event);
+                                       std::holds_alternative<PortamentoControlPerformanceEvent>(event);
                               }),
          "KonamiArcade format code should not preselect a MIDI slide representation");
 
@@ -328,27 +361,27 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "KonamiArcade percussion should select SF2 bank 2 under MSB-only MIDI lowering");
   const auto tiedNote = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
     const auto* note = std::get_if<NoteDuration>(&event);
-    return note != nullptr && note->tick == 6 && note->key == 62;
+    return note != nullptr && note->tick == 6 && note->key == 64;
   });
   expect(tiedNote != midi.tracks[0].events.end() && std::get<NoteDuration>(*tiedNote).duration == 9,
          "MIDI lowering should retain one note-on and the one-tick overlap needed for portamento");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* control = std::get_if<PortamentoControl>(&event);
-                               return control != nullptr && control->tick == 14 && control->key == 62;
+                               return control != nullptr && control->tick == 14 && control->key == 64;
                              }),
          "MIDI lowering should retain the continuous-portamento source key");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 22 && note->key == 68 && note->duration == 3;
+                               return note != nullptr && note->tick == 22 && note->key == 70 && note->duration == 3;
                              }) &&
              std::ranges::any_of(midi.tracks[0].events,
                                  [](const MidiEvent& event) {
                                    const auto* note = std::get_if<NoteDuration>(&event);
-                                   return note != nullptr && note->tick == 24 && note->key == 66 && note->duration == 8;
+                                   return note != nullptr && note->tick == 24 && note->key == 72 && note->duration == 8;
                                  }),
-         "delayed slides should overlap the source and target notes by one tick");
+         "MysticWarrior F3 timing should overlap the fully transposed source and target notes by one tick");
 
   const MidiSequence pitchBendMidi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},
@@ -368,13 +401,13 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
                               [](const MidiEvent& event) {
                                 const auto* note = std::get_if<NoteDuration>(&event);
-                                return note != nullptr && note->tick == 14 && note->key == 64;
+                                return note != nullptr && note->tick == 14 && note->key == 66;
                               }),
          "continuous KonamiArcade pitch bend should not retrigger its destination note");
   expect(std::ranges::any_of(pitchBendMidi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 22 && note->key == 68 && note->duration == 10;
+                               return note != nullptr && note->tick == 22 && note->key == 70 && note->duration == 10;
                              }),
          "pitch-bend lowering should retain the delayed slide's one nominal source note");
 }
@@ -452,12 +485,108 @@ void konamiArcadeGxLfosMatchDriverState() {
              std::abs(profile.instruments.vibrato->rateHertz.maximum - 15.3125) < 0.0001,
          "GX vibrato should preserve the 0x80 depth discontinuity and tempo-relative physical rate");
   const double expectedTremoloRate = (0x40 / 256.0) * (0x80 / 256.0) * layout.nmiRateHertz;
-  expect(profile.instruments.tremolo &&
-             std::abs(profile.instruments.tremolo->maxDepthDb - 4.5) < 0.0001 &&
+  expect(profile.instruments.tremolo && std::abs(profile.instruments.tremolo->maxDepthDb - 4.5) < 0.0001 &&
              std::abs(profile.instruments.tremolo->rateHertz.maximum - expectedTremoloRate) < 0.0001 &&
              profile.instruments.tremolo->delaySeconds &&
              profile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
          "ED tremolo should preserve its attenuation-only triangle depth, tempo-relative rate, and delay");
+}
+
+void konamiArcadeGxDriverQuirksRemainRepresented() {
+  std::vector<u8> bytes(0x200);
+  writeBe32(bytes, 0x20, 0x80);
+  writeBytes(bytes, 0x80,
+             {
+                 0xea, 0x80,                          // tempo
+                 0xfa, 0x01,                          // enable a software release
+                 0xe3, 0x81,                          // encoded hard-left pan
+                 0x30, 0x0a, 0x1e, 0x7f,              // establish the Salamander 2 track's 30% duration
+                 0xe0, 0x24,                          // Salamander 2 0x102bd: clears only live duration
+                 0x2e, 0x18, 0xfd,                    // 0x102bf A#4 reuses the stored 30% duration
+                 0x91, 0xfd,                          // 0x102c2 B4 reuses both delta and duration
+                 0xf2, 0x40,                          // tune future notes up one semitone
+                 0x92, 0x00, 0x7f,                    // explicit zero preserves 30%
+                 0xe3, 0x00,                          // let drums supply pan
+                 0x60,                                // percussion on
+                 0x00, 0x02, 0x00, 0x7f,              // zero table duration becomes 99%
+                 0xd2, 0x0f, 0x0f,                    // maximum reverb send
+                 0xc1, 0x55,                          // valid one-byte driver state
+                 0xc4, 1,    2,    3,    4, 5, 6, 7,  // seven-byte DSP command
+                 0xdb, 0x44,                          // valid one-byte driver state
+                 0xdc, 0x03,                          // loop-point program selection
+                 0xff,
+             });
+
+  const SourceFile source{
+      .id = SourceId{78},
+      .name = "Salamander 2 driver-quirk fixture",
+      .title = "fixture",
+      .size = bytes.size(),
+  };
+  KonamiArcadeLayout layout{
+      .version = KonamiArcadeVersion::Gx,
+      .game = "fixture",
+      .code = SourceRange{.source = source.id, .offset = 0, .size = bytes.size()},
+      .nmiRateHertz = 245.0,
+  };
+  layout.drums[0] = KonamiArcadeDrum{
+      .unityKey = 0x2a,
+      .pan = 0x82,
+      .defaultDuration = 0,
+  };
+  layout.drumCount = 1;
+  const KonamiArcadeSequenceLayout sequenceLayout{
+      .index = 0,
+      .offset = 0x20,
+      .initialAttenuation = 1,
+      .initialTranspose = 2,
+      .tempoOffset = 1,
+      .name = "Driver quirks",
+  };
+  std::vector<Diagnostic> diagnostics;
+  const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(source.id, bytes), layout, sequenceLayout,
+                                                             AssetId{1}, nullptr, &diagnostics);
+  expect(diagnostics.empty() && program.tracks.size() == 1 && program.tracks[0].commands.size() == 18,
+         "valid GX state and DSP commands should not truncate sequence decoding");
+
+  const PerformanceSequence performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
+         "GX driver-state commands should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  std::vector<const StereoBalancePerformanceEvent*> balances;
+  std::vector<const ReverbPerformanceEvent*> reverbs;
+  std::vector<const PitchBendPerformanceEvent*> pitchBends;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+      balances.push_back(balance);
+    } else if (const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event)) {
+      reverbs.push_back(reverb);
+    } else if (const auto* pitchBend = std::get_if<PitchBendPerformanceEvent>(&event)) {
+      pitchBends.push_back(pitchBend);
+    }
+  }
+  expect(notes.size() == 5 && notes[0]->key == 74.0 && notes[1]->key == 72.0 && notes[2]->key == 73.0 &&
+             notes[3]->key == 74.0 && notes[4]->key == 24.0 && notes[0]->durationTicks == 3 &&
+             notes[1]->durationTicks == 7 && notes[2]->durationTicks == 7 && notes[3]->durationTicks == 7 &&
+             notes[4]->durationTicks == 1 && notes[0]->linearVelocity < 1.0,
+         "GX should retain its encoded duration across a rest while keeping live duration and drum fallback distinct");
+  expect(balances.size() == 2 && std::abs(balances[0]->leftGain - 1.0) < 0.0001 &&
+             std::abs(balances[0]->rightGain) < 0.0001 && balances[1]->leftGain > balances[1]->rightGain,
+         "encoded sequence and drum pan bytes should use their low-nibble positions");
+  expect(std::ranges::any_of(
+             reverbs, [](const ReverbPerformanceEvent* reverb) { return std::abs(reverb->send - 1.0) < 0.0001; }),
+         "D2's two loudness nibbles should preserve the K054539 reverb gain");
+  expect(
+      std::ranges::none_of(pitchBends, [](const PitchBendPerformanceEvent* bend) { return bend->header.tick < 94; }) &&
+          std::ranges::any_of(pitchBends,
+                              [](const PitchBendPerformanceEvent* bend) {
+                                return bend->header.tick == 94 && std::abs(bend->semitones - 1.0) < 0.0001;
+                              }),
+      "F2 should retune the following note without bending the voice that is already playing");
 }
 
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples() {

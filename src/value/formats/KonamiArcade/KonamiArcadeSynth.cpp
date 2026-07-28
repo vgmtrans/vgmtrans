@@ -21,10 +21,18 @@ namespace {
 
 constexpr double kMelodicReleaseSeconds = 0.5;
 constexpr double kDrumReleaseSeconds = 0.7;
+constexpr u8 kDriverInstrumentAttenuation = 16;
 
-[[nodiscard]] double attenuationDb(u8 value) {
+[[nodiscard]] double attenuationDb(u32 value) {
   // K054539's table is 36 dB per 64 source steps.
   return 36.0 * value / 64.0;
+}
+
+[[nodiscard]] double drumPitch(const KonamiArcadeLayout& layout, const KonamiArcadeDrum& drum) {
+  if (layout.version == KonamiArcadeVersion::Gx) {
+    return drum.unityKey + drum.pitch / 256.0;
+  }
+  return drum.unityKey + (drum.pitch >> 2) / 16.0;
 }
 
 [[nodiscard]] std::optional<u32> sampleByteLength(ByteReader reader, SourceRange sound,
@@ -154,7 +162,11 @@ bool addKonamiArcadeSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instr
                          .start = info.loops ? loopStart : 0,
                          .length = info.loops && frameCount >= loopStart ? frameCount - loopStart : 0,
                      },
-                 .attenuationDb = attenuationDb(info.attenuation),
+                 // The 68000 GX driver adds a fixed 0x10 to every sample-info
+                 // attenuation byte. The older Z80 driver uses it directly.
+                 .attenuationDb =
+                     attenuationDb(static_cast<u32>(info.attenuation) +
+                                   (layout.version == KonamiArcadeVersion::Gx ? kDriverInstrumentAttenuation : 0)),
              })
         .source(name + " Info", info.range, "konami-arcade-sample-info");
   }
@@ -228,10 +240,11 @@ bool addKonamiArcadeSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instr
       const auto sample = samples.find(sourceSample);
       const SampleRef sampleRef = sample.value_or(SampleRef{.index = invalidIdValue});
       const u8 key = static_cast<u8>(index + 24);
+      const double driverPitch = drumPitch(layout, drum);
       auto region = drumKit.region(sampleRef, Region{
                                                   .keyRange = KeyRange{.low = key, .high = key},
                                                   .range = drum.range,
-                                                  .unityKey = static_cast<double>(key) + (0x2a - drum.unityKey),
+                                                  .unityKey = static_cast<double>(key) + 0x2a - driverPitch,
                                                   .envelope = Envelope{.releaseSeconds = kDrumReleaseSeconds},
                                                   .attenuationDb = attenuationDb(drum.attenuation),
                                               });
