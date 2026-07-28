@@ -20,10 +20,9 @@
 
 namespace vgmtrans::core {
 
-// Private mutable state for a Session. Each validated ScanResult is admitted as
-// one immutable shared chunk. New snapshots reuse those chunks; removals replace
-// only affected chunk components while this class keeps cross-reference cleanup
-// as one state transition.
+// Private mutable state for a Session. Large scan-owned sequences retain
+// immutable per-scan backing so snapshots can share them across revisions.
+// Session-only bookkeeping remains ordinary mutable state.
 class SessionState {
 public:
   [[nodiscard]] const SharedSequence<Asset>& assets() const noexcept { return assets_; }
@@ -48,18 +47,23 @@ public:
   void addError(std::string message, std::optional<SourceRange> range = std::nullopt);
   void addDiagnostics(std::vector<Diagnostic> diagnostics);
 
-  [[nodiscard]] SourceMap sourceMap() const;
+  [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
   [[nodiscard]] SourceMap sourceMapForAsset(AssetId asset) const;
   [[nodiscard]] std::map<std::string, std::vector<DesiredCollection>> desiredCollectionsByResolver() const;
   void reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired, ScanIdAllocator& ids);
 
 private:
   struct ScanChunk {
-    SourceId origin;
     std::shared_ptr<const std::vector<Asset>> assets;
     std::shared_ptr<const std::vector<MatchFact>> matchFacts;
-    std::shared_ptr<const std::vector<ExplicitCollection>> explicitCollections;
     SourceMap sourceMap;
+
+    [[nodiscard]] bool empty() const noexcept { return assets->empty() && matchFacts->empty() && sourceMap.empty(); }
+  };
+
+  struct ExplicitCollectionEntry {
+    SourceId origin;
+    ExplicitCollection collection;
   };
 
   void removeDiscoveredData(const std::unordered_set<u32>& sourceIds, const std::unordered_set<u32>& assetIds);
@@ -70,10 +74,11 @@ private:
   void rebuildViews();
   void rebuildIndexes();
 
-  std::vector<std::shared_ptr<const ScanChunk>> scanChunks_;
+  std::vector<ScanChunk> scanChunks_;
   SharedSequence<Asset> assets_;
   SharedSequence<MatchFact> matchFacts_;
   SourceMap sourceMap_;
+  std::vector<ExplicitCollectionEntry> explicitCollections_;
   std::vector<Collection> collections_;
   std::vector<Diagnostic> diagnostics_;
 

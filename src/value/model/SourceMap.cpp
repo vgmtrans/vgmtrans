@@ -161,12 +161,8 @@ const SharedSequence<SourceAnnotation>& SourceMap::annotations() const noexcept 
 const SourceAnnotation* SourceMap::find(SourceAnnotationId id) const {
   for (const auto& part : storage_->parts) {
     const auto found = part.index->annotationsById.find(id.value);
-    if (found == part.index->annotationsById.end() || found->second >= part.annotations->size()) {
-      continue;
-    }
-    const auto& annotation = (*part.annotations)[found->second];
-    if (annotation.id == id) {
-      return &annotation;
+    if (found != part.index->annotationsById.end()) {
+      return &(*part.annotations)[found->second];
     }
   }
   return nullptr;
