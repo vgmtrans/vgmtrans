@@ -205,8 +205,8 @@ public:
   }
 
 private:
-  // MatchContext is a small pair of references. Store the pair itself so an
-  // index constructed from a temporary MatchContext does not retain a dangling
+  // MatchContext is a small shared read view. Store the view itself so an index
+  // constructed from a temporary MatchContext does not retain a dangling
   // reference to that wrapper.
   MatchContext context_;
   std::unordered_map<u32, const Asset*> assetsById_;

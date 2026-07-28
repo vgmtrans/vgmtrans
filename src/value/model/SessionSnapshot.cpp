@@ -20,23 +20,23 @@ const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
 }
 
-SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, std::vector<Asset> assetsValue,
-                                  std::vector<MatchFact> matchFactsValue, std::vector<Collection> collectionsValue,
+SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, SharedSequence<Asset> assetsValue,
+                                  SharedSequence<MatchFact> matchFactsValue, std::vector<Collection> collectionsValue,
                                   SourceMap sourceMapValue, std::vector<Diagnostic> diagnosticsValue)
     : sources(std::move(sourcesValue)), assets(std::move(assetsValue)), matchFacts(std::move(matchFactsValue)),
       collections(std::move(collectionsValue)), sourceMap(std::move(sourceMapValue)),
       diagnostics(std::move(diagnosticsValue)), index(buildIndex(sources, assets, collections)) {
 }
 
-SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets,
-                                 std::vector<MatchFact> matchFacts, std::vector<Collection> collections,
+SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets,
+                                 SharedSequence<MatchFact> matchFacts, std::vector<Collection> collections,
                                  SourceMap sourceMap, std::vector<Diagnostic> diagnostics)
     : storage_(std::make_shared<const Storage>(std::move(sources), std::move(assets), std::move(matchFacts),
                                                std::move(collections), std::move(sourceMap), std::move(diagnostics))) {
 }
 
 SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<SourceFile>& sources,
-                                                   const std::vector<Asset>& assets,
+                                                   const SharedSequence<Asset>& assets,
                                                    const std::vector<Collection>& collections) {
   Index index;
   index.sourcesById.reserve(sources.size());
@@ -48,10 +48,10 @@ SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<SourceFile>
   }
 
   index.assetsById.reserve(assets.size());
-  for (size_t i = 0; i < assets.size(); ++i) {
-    const AssetId id = metadata(assets[i]).id;
+  for (const auto& asset : assets) {
+    const AssetId id = metadata(asset).id;
     if (id.valid()) {
-      index.assetsById.emplace(id.value, i);
+      index.assetsById.emplace(id.value, &asset);
     }
   }
 
@@ -76,10 +76,7 @@ const SourceFile* SessionSnapshot::source(SourceId id) const {
 
 const Asset* SessionSnapshot::asset(AssetId id) const {
   const auto found = storage_->index.assetsById.find(id.value);
-  if (found == storage_->index.assetsById.end() || found->second >= storage_->assets.size()) {
-    return nullptr;
-  }
-  return &storage_->assets[found->second];
+  return found != storage_->index.assetsById.end() ? found->second : nullptr;
 }
 
 const Collection* SessionSnapshot::collection(CollectionId id) const {

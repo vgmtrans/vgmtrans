@@ -7,10 +7,12 @@
 #pragma once
 
 #include "value/base/CoreTypes.h"
+#include "value/model/SharedSequence.h"
 
 #include <concepts>
-#include <optional>
 #include <functional>
+#include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -212,11 +214,11 @@ struct SourceAnnotation {
 
 class SourceMap {
 public:
-  SourceMap() = default;
+  SourceMap();
   explicit SourceMap(std::vector<SourceAnnotation> annotations);
 
-  [[nodiscard]] bool empty() const noexcept { return annotations_.empty(); }
-  [[nodiscard]] std::span<const SourceAnnotation> annotations() const noexcept { return annotations_; }
+  [[nodiscard]] bool empty() const noexcept;
+  [[nodiscard]] const SharedSequence<SourceAnnotation>& annotations() const noexcept;
   [[nodiscard]] const SourceAnnotation* find(SourceAnnotationId id) const;
   [[nodiscard]] const SourceAnnotation& get(SourceAnnotationId id) const;
 
@@ -236,12 +238,31 @@ public:
 private:
   friend class SessionState;
 
-  void buildIndexes();
+  struct Index {
+    explicit Index(const std::vector<SourceAnnotation>& annotations);
 
-  std::vector<SourceAnnotation> annotations_;
-  std::unordered_map<u32, size_t> annotationsById_;
-  std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsBySource_;
-  std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByParent_;
+    std::unordered_map<u32, size_t> annotationsById;
+    std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsBySource;
+    std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByParent;
+  };
+
+  struct Part {
+    std::shared_ptr<const std::vector<SourceAnnotation>> annotations;
+    std::shared_ptr<const Index> index;
+  };
+
+  struct Storage {
+    explicit Storage(std::vector<Part> parts);
+
+    std::vector<Part> parts;
+    SharedSequence<SourceAnnotation> annotations;
+  };
+
+  explicit SourceMap(std::shared_ptr<const Storage> storage);
+  [[nodiscard]] static SourceMap join(std::span<const SourceMap> maps);
+  [[nodiscard]] static std::shared_ptr<const Storage> emptyStorage();
+
+  std::shared_ptr<const Storage> storage_;
 };
 
 class SourceMapBuilder;

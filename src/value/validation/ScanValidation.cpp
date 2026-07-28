@@ -325,7 +325,7 @@ void validateExtractedSources(ValidationReport& report, const ScanResult& result
 }  // namespace
 
 ValidationReport validateScanResult(SourceId source, const ScanResult& result, const SourceStore& sources,
-                                    std::span<const Asset> existingAssets) {
+                                    const SharedSequence<Asset>& existingAssets) {
   ValidationReport report;
 
   // This is the boundary between scanner output and durable Session state. Keep

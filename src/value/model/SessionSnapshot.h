@@ -8,6 +8,7 @@
 
 #include "value/base/Source.h"
 #include "value/model/MatchModel.h"
+#include "value/model/SharedSequence.h"
 #include "value/model/SourceMap.h"
 #include "value/sequence/SequenceProgram.h"
 #include "value/synth/SynthModel.h"
@@ -49,12 +50,13 @@ struct Collection {
 
 // Copyable read-only view of one Session revision. Copies share immutable
 // storage, so a snapshot remains stable across later Session mutations without
-// duplicating the discovered value graph.
+// duplicating the discovered value graph. Scan-owned domains remain ordered
+// logical sequences even when their backing is shared in multiple chunks.
 class SessionSnapshot {
 public:
   [[nodiscard]] const std::vector<SourceFile>& sources() const noexcept { return storage_->sources; }
-  [[nodiscard]] const std::vector<Asset>& assets() const noexcept { return storage_->assets; }
-  [[nodiscard]] const std::vector<MatchFact>& matchFacts() const noexcept { return storage_->matchFacts; }
+  [[nodiscard]] const SharedSequence<Asset>& assets() const noexcept { return storage_->assets; }
+  [[nodiscard]] const SharedSequence<MatchFact>& matchFacts() const noexcept { return storage_->matchFacts; }
   [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return storage_->collections; }
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return storage_->sourceMap; }
   [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return storage_->diagnostics; }
@@ -76,27 +78,27 @@ private:
 
   struct Index {
     std::unordered_map<u32, size_t> sourcesById;
-    std::unordered_map<u32, size_t> assetsById;
+    std::unordered_map<u32, const Asset*> assetsById;
     std::unordered_map<u32, size_t> collectionsById;
   };
 
   struct Storage {
-    Storage(std::vector<SourceFile> sources, std::vector<Asset> assets, std::vector<MatchFact> matchFacts,
+    Storage(std::vector<SourceFile> sources, SharedSequence<Asset> assets, SharedSequence<MatchFact> matchFacts,
             std::vector<Collection> collections, SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
 
     std::vector<SourceFile> sources;
-    std::vector<Asset> assets;
-    std::vector<MatchFact> matchFacts;
+    SharedSequence<Asset> assets;
+    SharedSequence<MatchFact> matchFacts;
     std::vector<Collection> collections;
     SourceMap sourceMap;
     std::vector<Diagnostic> diagnostics;
     Index index;
   };
 
-  SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets, std::vector<MatchFact> matchFacts,
+  SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets, SharedSequence<MatchFact> matchFacts,
                   std::vector<Collection> collections, SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
 
-  [[nodiscard]] static Index buildIndex(const std::vector<SourceFile>& sources, const std::vector<Asset>& assets,
+  [[nodiscard]] static Index buildIndex(const std::vector<SourceFile>& sources, const SharedSequence<Asset>& assets,
                                         const std::vector<Collection>& collections);
 
   std::shared_ptr<const Storage> storage_;

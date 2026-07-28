@@ -27,7 +27,9 @@ public:
   [[nodiscard]] const AssetMetadata& metadata() const noexcept { return metadata_; }
   [[nodiscard]] SourceRange range() const noexcept { return range_; }
   [[nodiscard]] std::span<const u8> bytes() const noexcept;
-  [[nodiscard]] std::span<const SourceAnnotation> annotations() const noexcept { return sourceMap_.annotations(); }
+  [[nodiscard]] const SharedSequence<SourceAnnotation>& annotations() const noexcept {
+    return sourceMap_.annotations();
+  }
 
   [[nodiscard]] const SourceAnnotation* annotation(SourceAnnotationId id) const;
   [[nodiscard]] std::span<const SourceAnnotationId> roots() const noexcept { return roots_; }
