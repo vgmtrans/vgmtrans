@@ -55,13 +55,13 @@ class VGMTreeItem final : public QTreeWidgetItem {
 public:
   static constexpr auto ItemType = QTreeWidgetItem::UserType + 1;
 
-  explicit VGMTreeItem(vgmtrans::core::SourceAnnotationId annotation)
-      : QTreeWidgetItem(ItemType), annotation_(annotation) {}
+  explicit VGMTreeItem(vgmtrans::core::SourceInspectionItem item)
+      : QTreeWidgetItem(ItemType), item_(item) {}
 
-  [[nodiscard]] vgmtrans::core::SourceAnnotationId annotation() const noexcept { return annotation_; }
+  [[nodiscard]] vgmtrans::core::SourceInspectionItem sourceItem() const noexcept { return item_; }
 
 private:
-  vgmtrans::core::SourceAnnotationId annotation_;
+  vgmtrans::core::SourceInspectionItem item_;
 };
 
 class VGMTreeDisplayItem final : public QStyledItemDelegate {
@@ -243,38 +243,96 @@ VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceIns
 void VGMFileTreeView::appendChildren(QTreeWidgetItem* parent,
                                      std::span<const vgmtrans::core::SourceAnnotationId> children) {
   for (const auto id : children) {
-    const auto* annotation = inspection_->annotation(id);
-    if (annotation == nullptr) {
-      continue;
-    }
-    auto* item = new VGMTreeItem(id);
-    setItemText(item);
-    parent->addChild(item);
-    items_.emplace(id.value, item);
-    const auto grandchildren = inspection_->children(id);
-    appendChildren(item, grandchildren);
+    appendItem(parent, vgmtrans::core::SourceInspectionItem::forAnnotation(id));
   }
 }
 
-QTreeWidgetItem* VGMFileTreeView::treeItem(vgmtrans::core::SourceAnnotationId annotation) const {
-  const auto found = items_.find(annotation.value);
+void VGMFileTreeView::appendProjectedChildren(QTreeWidgetItem* parent,
+                                              vgmtrans::core::SourceAnnotationId annotationId) {
+  const auto* annotation = inspection_->annotation(annotationId);
+  if (annotation == nullptr) {
+    return;
+  }
+
+  std::vector<vgmtrans::core::SourceInspectionItem> children;
+  const auto annotations = inspection_->children(annotationId);
+  children.reserve(annotations.size() + (annotation->fieldsAsChildren ? annotation->fields.size() : 0));
+  for (const auto child : annotations) {
+    children.push_back(vgmtrans::core::SourceInspectionItem::forAnnotation(child));
+  }
+  if (annotation->fieldsAsChildren) {
+    for (u32 fieldIndex = 0; fieldIndex < annotation->fields.size(); ++fieldIndex) {
+      const auto item = vgmtrans::core::SourceInspectionItem::forField(annotationId, fieldIndex);
+      if (inspection_->range(item).valid()) {
+        children.push_back(item);
+      }
+    }
+  }
+  std::ranges::sort(children, [this](const auto lhs, const auto rhs) {
+    const auto left = inspection_->range(lhs);
+    const auto right = inspection_->range(rhs);
+    if (left.offset != right.offset) {
+      return left.offset < right.offset;
+    }
+    if (left.size != right.size) {
+      return left.size > right.size;
+    }
+    if (lhs.isField() != rhs.isField()) {
+      return !lhs.isField();
+    }
+    return itemKey(lhs) < itemKey(rhs);
+  });
+  for (const auto child : children) {
+    appendItem(parent, child);
+  }
+}
+
+void VGMFileTreeView::appendItem(QTreeWidgetItem* parent, vgmtrans::core::SourceInspectionItem sourceItem) {
+  if (inspection_->annotation(sourceItem) == nullptr ||
+      (sourceItem.isField() && inspection_->field(sourceItem) == nullptr)) {
+    return;
+  }
+  auto* item = new VGMTreeItem(sourceItem);
+  setItemText(item);
+  parent->addChild(item);
+  items_.emplace(itemKey(sourceItem), item);
+  if (!sourceItem.isField()) {
+    appendProjectedChildren(item, sourceItem.annotation);
+  }
+}
+
+u64 VGMFileTreeView::itemKey(vgmtrans::core::SourceInspectionItem item) {
+  const u64 field = item.field ? static_cast<u64>(*item.field) + 1 : 0;
+  return (static_cast<u64>(item.annotation.value) << 32) | field;
+}
+
+QTreeWidgetItem* VGMFileTreeView::treeItem(vgmtrans::core::SourceInspectionItem item) const {
+  const auto found = items_.find(itemKey(item));
   return found == items_.end() ? nullptr : found->second;
 }
 
-vgmtrans::core::SourceAnnotationId VGMFileTreeView::annotationForItem(const QTreeWidgetItem* item) const {
+vgmtrans::core::SourceInspectionItem VGMFileTreeView::sourceItemForItem(const QTreeWidgetItem* item) const {
   if (item == nullptr || item->type() != VGMTreeItem::ItemType) {
     return {};
   }
-  return static_cast<const VGMTreeItem*>(item)->annotation();
+  return static_cast<const VGMTreeItem*>(item)->sourceItem();
 }
 
-void VGMFileTreeView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation) {
-  if (!annotation.valid()) {
+vgmtrans::core::SourceAnnotationId VGMFileTreeView::annotationForItem(const QTreeWidgetItem* item) const {
+  return sourceItemForItem(item).annotation;
+}
+
+void VGMFileTreeView::setSelectedItem(vgmtrans::core::SourceInspectionItem item) {
+  if (!item.valid()) {
     setCurrentItem(nullptr);
     clearSelection();
     return;
   }
-  setCurrentItem(treeItem(annotation));
+  setCurrentItem(treeItem(item));
+}
+
+void VGMFileTreeView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation) {
+  setSelectedItem(vgmtrans::core::SourceInspectionItem::forAnnotation(annotation));
 }
 
 void VGMFileTreeView::focusInEvent(QFocusEvent*) {
@@ -332,14 +390,14 @@ void VGMFileTreeView::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void VGMFileTreeView::updateStatusBar() {
-  emit statusAnnotationChanged(annotationForItem(currentItem()));
+  emit statusItemChanged(sourceItemForItem(currentItem()));
 }
 
 void VGMFileTreeView::setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations) {
   std::unordered_set<QTreeWidgetItem*> next;
   next.reserve(annotations.size());
   for (const auto id : annotations) {
-    if (auto* item = treeItem(id)) {
+    if (auto* item = treeItem(vgmtrans::core::SourceInspectionItem::forAnnotation(id))) {
       next.insert(item);
     }
   }
@@ -369,20 +427,30 @@ void VGMFileTreeView::seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat) {
 }
 
 void VGMFileTreeView::setItemText(QTreeWidgetItem* item) const {
-  const auto* annotation = inspection_->annotation(annotationForItem(item));
+  const auto sourceItem = sourceItemForItem(item);
+  const auto* annotation = inspection_->annotation(sourceItem);
   if (annotation == nullptr) {
     return;
   }
-  const CapsuleText description = SourceInspectorPresentation::description(*annotation);
-  item->setText(0, QString::fromStdString(annotation->label));
+  CapsuleText description;
+  if (const auto* field = inspection_->field(sourceItem)) {
+    item->setText(0, SourceInspectorPresentation::fieldLabel(*field));
+    description.prefix = SourceInspectorPresentation::fieldValue(*field);
+    item->setIcon(0, SourceInspectorPresentation::fieldIcon());
+    item->setToolTip(0, QStringLiteral("%1: %2").arg(item->text(0), description.prefix));
+  } else {
+    description = SourceInspectorPresentation::description(*annotation);
+    item->setText(0, QString::fromStdString(annotation->label));
+    item->setIcon(0, SourceInspectorPresentation::icon(*annotation));
+    item->setToolTip(0, description.plainText());
+  }
+  const auto range = inspection_->range(sourceItem);
   item->setData(0, DescriptionRole, QVariant::fromValue(description));
   item->setData(0, RangeRole,
                 QStringLiteral("Offset: 0x%1 | Length: 0x%2")
-                    .arg(annotation->range.offset, 0, 16)
-                    .arg(annotation->range.size, 0, 16));
+                    .arg(range.offset, 0, 16)
+                    .arg(range.size, 0, 16));
   item->setData(0, ShowDetailsRole, showDetails_);
-  item->setIcon(0, SourceInspectorPresentation::icon(*annotation));
-  item->setToolTip(0, description.plainText());
 }
 
 void VGMFileTreeView::onShowDetailsChanged(bool show) {

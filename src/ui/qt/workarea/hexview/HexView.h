@@ -7,7 +7,7 @@
 #pragma once
 
 #include "HexViewFrameData.h"
-#include "value/base/CoreTypes.h"
+#include "value/model/SourceInspection.h"
 #include "workarea/SplitterSnapProvider.h"
 
 #include <array>
@@ -30,7 +30,6 @@ class QParallelAnimationGroup;
 class QWidget;
 class HexViewRhiHost;
 namespace vgmtrans::core {
-class SourceInspection;
 struct SourceAnnotation;
 }
 
@@ -48,6 +47,7 @@ public:
                    QWidget* parent = nullptr);
   ~HexView() override;
   [[nodiscard]] static QFont defaultViewFont();
+  void setSelectedItem(vgmtrans::core::SourceInspectionItem item);
   void setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation);
   void setSelectedAnnotations(
       const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
@@ -77,7 +77,7 @@ public:
   void handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods);
 
 signals:
-  void selectionChanged(vgmtrans::core::SourceAnnotationId annotation);
+  void selectionChanged(vgmtrans::core::SourceInspectionItem item);
   void seekToEventRequested(vgmtrans::core::SourceAnnotationId annotation);
   void notePreviewRequested(vgmtrans::core::SourceAnnotationId annotation,
                             bool includeActiveNotesAtTick);
@@ -124,8 +124,8 @@ private:
   int getVirtualHeight() const;
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
-  void handleSelectionPress(int offset, vgmtrans::core::SourceAnnotationId annotation);
-  void handleSeekPress(vgmtrans::core::SourceAnnotationId annotation, const QPoint& pos);
+  void handleSelectionPress(int offset, vgmtrans::core::SourceInspectionItem item);
+  void handleSeekPress(vgmtrans::core::SourceInspectionItem item, const QPoint& pos);
   void handleSelectionDrag(int offset);
   void handleSeekScrubDrag(int offset);
   void requestRhiUpdate(bool markBaseDirty = false,
@@ -153,22 +153,21 @@ private:
   void ensurePlaybackFadeTimer();
   qint64 playbackNowMs();
   void updateHighlightState(bool animateSelection);
-  void showTooltip(vgmtrans::core::SourceAnnotationId annotation, const QPoint& pos);
+  void showTooltip(vgmtrans::core::SourceInspectionItem item, const QPoint& pos);
   void hideTooltip();
   void stopNotePreview();
   [[nodiscard]] const vgmtrans::core::SourceAnnotation* annotation(
       vgmtrans::core::SourceAnnotationId id) const;
-  [[nodiscard]] vgmtrans::core::SourceAnnotationId annotationAt(u32 offset) const;
-  [[nodiscard]] std::optional<SelectionRange> visibleRange(
-      const vgmtrans::core::SourceAnnotation& annotation) const;
+  [[nodiscard]] vgmtrans::core::SourceInspectionItem itemAt(u32 offset) const;
+  [[nodiscard]] std::optional<SelectionRange> visibleRange(vgmtrans::core::SourceRange range) const;
 
   std::shared_ptr<const vgmtrans::core::SourceInspection> m_inspection;
   // Interaction state.
-  vgmtrans::core::SourceAnnotationId m_selectedAnnotation;
+  vgmtrans::core::SourceInspectionItem m_selectedItem;
   u32 m_selectedOffset = 0;
   bool m_isDragging = false;
   bool m_seekModifierActive = false;
-  vgmtrans::core::SourceAnnotationId m_tooltipAnnotation;
+  vgmtrans::core::SourceInspectionItem m_tooltipItem;
   vgmtrans::core::SourceAnnotationId m_lastSeekAnnotation;
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;

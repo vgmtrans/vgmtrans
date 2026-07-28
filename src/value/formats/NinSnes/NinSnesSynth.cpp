@@ -33,7 +33,7 @@ struct InstrumentInfo {
   u8 gain = 0;
   u8 pitchHigh = 0;
   u8 pitchLow = 0;
-  SourceRange source;
+  SourceRecord source;
   bool override = false;
   bool drumSource = false;
 };
@@ -41,7 +41,7 @@ struct InstrumentInfo {
 struct InstrumentRegion {
   SampleRef sample;
   Region region;
-  SourceRange source;
+  SourceRecord source;
 };
 
 [[nodiscard]] bool blankSlot(ByteReader reader, const Profile& selected, u32 address) {
@@ -65,7 +65,7 @@ struct InstrumentRegion {
                                u16 directoryAddress, bool inspectSample) {
   bool onlyPaddingBytes = true;
   for (u32 offset = 0; offset < instrumentHeaderSize(selected); ++offset) {
-    const u8 byte = reader.u8At(static_cast<u32>(info.source.offset) + offset);
+    const u8 byte = reader.u8At(static_cast<u32>(info.source.range.offset) + offset);
     onlyPaddingBytes &= byte == 0x00 || byte == 0xff;
   }
   if (onlyPaddingBytes) {
@@ -101,7 +101,7 @@ struct InstrumentRegion {
       .gain = gain,
       .pitchHigh = pitchHigh,
       .pitchLow = pitchLow,
-      .source = std::move(record).finish().range,
+      .source = std::move(record).finish(),
   };
 }
 
@@ -162,7 +162,13 @@ struct InstrumentRegion {
     }
     const u32 address = *layout.percussionTableAddress + (slot.sourceProgram - kEarlierPercussionProgramBase) * 6;
     InstrumentInfo info = readInstrument(reader, selected, slot.sourceProgram, address);
-    info.source = reader.range(address, 6);
+    info.source.range = reader.range(address, 6);
+    info.source.fields.push_back(SourceField{
+        .name = "note",
+        .range = reader.range(address + 5, 1),
+        .value = makeSourceValue(reader.u8At(address + 5)),
+        .display = SourceValueDisplay::Hex,
+    });
     info.drumSource = true;
     if (validHeader(reader, selected, info, *layout.spcDirAddress, true)) {
       infos.push_back(std::move(info));
@@ -183,7 +189,7 @@ struct InstrumentRegion {
         .gain = definition.gain,
         .pitchHigh = definition.pitchHigh,
         .pitchLow = definition.pitchLow,
-        .source = definition.source,
+        .source = SourceRecord{.range = definition.source},
         .override = true,
     });
   }
@@ -253,7 +259,8 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
   for (const InstrumentInfo& info : infos) {
     auto sample = samples.findSrcn(info.srcn);
     if (!sample) {
-      builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn), info.source);
+      builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn),
+                      info.source.range);
       continue;
     }
     const bool rateBasedGain = (info.adsr1 & 0x80) == 0 && (info.gain & 0x80) != 0;
@@ -287,7 +294,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
                                                         },
                                                     .name = name,
                                                 });
-    if (info.source.valid()) {
+    if (info.source.range.valid()) {
       instrument.source(name, info.source, info.override ? "nin-snes-instrument-override" : "nin-snes-instrument");
     }
     instrument.region(*sample, region)

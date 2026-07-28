@@ -18,6 +18,26 @@ namespace vgmtrans::core {
 
 class Session;
 
+// Identifies either a persistent source annotation or one of its transient
+// field projections inside an immutable inspection. Field indexes are stable
+// for the lifetime of that inspection and never escape into the session model
+// as fabricated SourceAnnotationIds.
+struct SourceInspectionItem {
+  SourceAnnotationId annotation;
+  std::optional<u32> field;
+
+  [[nodiscard]] static SourceInspectionItem forAnnotation(SourceAnnotationId annotation) {
+    return SourceInspectionItem{.annotation = annotation};
+  }
+  [[nodiscard]] static SourceInspectionItem forField(SourceAnnotationId annotation, u32 field) {
+    return SourceInspectionItem{.annotation = annotation, .field = field};
+  }
+  [[nodiscard]] bool valid() const noexcept { return annotation.valid(); }
+  [[nodiscard]] bool isField() const noexcept { return field.has_value(); }
+
+  friend bool operator==(const SourceInspectionItem&, const SourceInspectionItem&) = default;
+};
+
 // Immutable source data for one asset. The annotation graph is copied from the
 // session, while the underlying source blob is shared and never
 // mutated. An open inspection therefore remains valid after the session changes.
@@ -32,9 +52,13 @@ public:
   }
 
   [[nodiscard]] const SourceAnnotation* annotation(SourceAnnotationId id) const;
+  [[nodiscard]] const SourceAnnotation* annotation(SourceInspectionItem item) const;
+  [[nodiscard]] const SourceField* field(SourceInspectionItem item) const;
+  [[nodiscard]] SourceRange range(SourceInspectionItem item) const;
   [[nodiscard]] std::span<const SourceAnnotationId> roots() const noexcept { return roots_; }
   [[nodiscard]] std::vector<SourceAnnotationId> children(SourceAnnotationId parent) const;
   [[nodiscard]] std::optional<SourceAnnotationId> annotationAt(u64 offset) const;
+  [[nodiscard]] std::optional<SourceInspectionItem> itemAt(u64 offset) const;
 
 private:
   friend class Session;

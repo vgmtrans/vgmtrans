@@ -10,6 +10,17 @@
 
 namespace vgmtrans::core {
 
+namespace {
+
+[[nodiscard]] bool containsOffset(SourceRange range, SourceId source, u64 offset) {
+  if (!range.valid() || range.source != source) {
+    return false;
+  }
+  return range.size == 0 ? range.offset == offset : range.offset <= offset && offset < range.endOffset();
+}
+
+}  // namespace
+
 std::shared_ptr<const SourceInspection> SourceInspection::create(AssetMetadata metadata, SourceMap sourceMap,
                                                                  SharedSourceBytes sourceBytes) {
   if (sourceBytes == nullptr) {
@@ -63,6 +74,30 @@ const SourceAnnotation* SourceInspection::annotation(SourceAnnotationId id) cons
   return sourceMap_.find(id);
 }
 
+const SourceAnnotation* SourceInspection::annotation(SourceInspectionItem item) const {
+  return annotation(item.annotation);
+}
+
+const SourceField* SourceInspection::field(SourceInspectionItem item) const {
+  if (!item.field) {
+    return nullptr;
+  }
+  const auto* owner = annotation(item.annotation);
+  if (owner == nullptr || *item.field >= owner->fields.size()) {
+    return nullptr;
+  }
+  return &owner->fields[*item.field];
+}
+
+SourceRange SourceInspection::range(SourceInspectionItem item) const {
+  if (item.isField()) {
+    const auto* projectedField = field(item);
+    return projectedField != nullptr ? projectedField->range : SourceRange{};
+  }
+  const auto* owner = annotation(item.annotation);
+  return owner != nullptr ? owner->range : SourceRange{};
+}
+
 std::vector<SourceAnnotationId> SourceInspection::children(SourceAnnotationId parent) const {
   auto children = sourceMap_.childrenOf(parent);
   sortBySourceOrder(children);
@@ -70,15 +105,17 @@ std::vector<SourceAnnotationId> SourceInspection::children(SourceAnnotationId pa
 }
 
 std::optional<SourceAnnotationId> SourceInspection::annotationAt(u64 offset) const {
-  const SourceAnnotation* best = nullptr;
+  const auto item = itemAt(offset);
+  return item ? std::optional{item->annotation} : std::nullopt;
+}
+
+std::optional<SourceInspectionItem> SourceInspection::itemAt(u64 offset) const {
+  SourceInspectionItem best;
+  SourceRange bestRange;
   size_t bestDepth = 0;
 
-  for (const SourceAnnotationId id : sourceMap_.at(range_.source, offset)) {
-    const auto* candidate = sourceMap_.find(id);
-    if (candidate == nullptr) {
-      continue;
-    }
-
+  for (const SourceAnnotation& candidateValue : sourceMap_.annotations()) {
+    const auto* candidate = &candidateValue;
     size_t depth = 0;
     auto parent = candidate->parent;
     while (parent) {
@@ -90,13 +127,32 @@ std::optional<SourceAnnotationId> SourceInspection::annotationAt(u64 offset) con
       parent = ancestor->parent;
     }
 
-    if (best == nullptr || candidate->range.size < best->range.size ||
-        (candidate->range.size == best->range.size && depth > bestDepth)) {
-      best = candidate;
+    if (containsOffset(candidate->range, range_.source, offset) &&
+        (!best.valid() || candidate->range.size < bestRange.size ||
+         (candidate->range.size == bestRange.size && depth > bestDepth))) {
+      best = SourceInspectionItem::forAnnotation(candidate->id);
+      bestRange = candidate->range;
       bestDepth = depth;
     }
+
+    if (!candidate->fieldsAsChildren) {
+      continue;
+    }
+    for (u32 fieldIndex = 0; fieldIndex < candidate->fields.size(); ++fieldIndex) {
+      const SourceField& field = candidate->fields[fieldIndex];
+      if (!containsOffset(field.range, range_.source, offset)) {
+        continue;
+      }
+      const size_t fieldDepth = depth + 1;
+      if (!best.valid() || field.range.size < bestRange.size ||
+          (field.range.size == bestRange.size && fieldDepth > bestDepth)) {
+        best = SourceInspectionItem::forField(candidate->id, fieldIndex);
+        bestRange = field.range;
+        bestDepth = fieldDepth;
+      }
+    }
   }
-  return best != nullptr ? std::optional{best->id} : std::nullopt;
+  return best.valid() ? std::optional{best} : std::nullopt;
 }
 
 void SourceInspection::sortBySourceOrder(std::vector<SourceAnnotationId>& annotations) const {

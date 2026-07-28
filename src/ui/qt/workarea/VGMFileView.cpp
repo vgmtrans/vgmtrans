@@ -65,9 +65,9 @@ VGMFileView::VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection>
   connect(hexView_, &HexView::notePreviewRequested, this, &VGMFileView::notePreviewRequested);
   connect(hexView_, &HexView::notePreviewStopped, this, &VGMFileView::notePreviewStopped);
   connect(treeView_, &VGMFileTreeView::seekToAnnotationRequested, this, &VGMFileView::seekToAnnotation);
-  connect(treeView_, &VGMFileTreeView::statusAnnotationChanged, this, &VGMFileView::updateStatus);
+  connect(treeView_, &VGMFileTreeView::statusItemChanged, this, &VGMFileView::updateStatus);
   connect(treeView_, &QTreeWidget::currentItemChanged, this,
-          [this](QTreeWidgetItem* item, QTreeWidgetItem*) { onSelectionChange(treeView_->annotationForItem(item)); });
+          [this](QTreeWidgetItem* item, QTreeWidgetItem*) { onSelectionChange(treeView_->sourceItemForItem(item)); });
 
   connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, this, &VGMFileView::increaseHexViewFont);
   connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this), &QShortcut::activated, this,
@@ -136,11 +136,11 @@ void VGMFileView::decreaseHexViewFont() {
   updateHexViewFont(-0.5);
 }
 
-void VGMFileView::onSelectionChange(vgmtrans::core::SourceAnnotationId annotation) {
-  hexView_->setSelectedAnnotation(annotation);
+void VGMFileView::onSelectionChange(vgmtrans::core::SourceInspectionItem item) {
+  hexView_->setSelectedItem(item);
   const QSignalBlocker blocker(treeView_);
-  treeView_->setSelectedAnnotation(annotation);
-  updateStatus(annotation);
+  treeView_->setSelectedItem(item);
+  updateStatus(item);
 }
 
 void VGMFileView::seekToAnnotation(vgmtrans::core::SourceAnnotationId annotation) {
@@ -275,10 +275,18 @@ VGMFileView::playbackSpansInRange(int startTick, int endTick) const {
   return result;
 }
 
-void VGMFileView::updateStatus(vgmtrans::core::SourceAnnotationId annotationId) {
-  const auto* annotation = inspection_->annotation(annotationId);
+void VGMFileView::updateStatus(vgmtrans::core::SourceInspectionItem item) {
+  const auto* annotation = inspection_->annotation(item);
   if (annotation == nullptr) {
     emit statusChanged({}, {}, {}, -1, -1);
+    return;
+  }
+  if (const auto* field = inspection_->field(item)) {
+    const auto range = inspection_->range(item);
+    emit statusChanged(
+        QStringLiteral("<b>%1</b>").arg(SourceInspectorPresentation::fieldLabel(*field)),
+        CapsuleText{.prefix = SourceInspectorPresentation::fieldValue(*field)},
+        SourceInspectorPresentation::fieldIcon(), boundedInt(range.offset), boundedInt(range.size));
     return;
   }
   emit statusChanged(QStringLiteral("<b>%1</b>").arg(QString::fromStdString(annotation->label)),
