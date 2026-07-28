@@ -38,7 +38,18 @@ constexpr u32 kMaxTrackCommands = 32768;
   return attenuationGain(static_cast<u8>(~raw) & 0x7f);
 }
 
+[[nodiscard]] double reverbGain(u8 firstNibble, u8 secondNibble, bool gx) {
+  // GX reads the high digit first. The Z80 interpreter builds the same byte
+  // in the opposite operand order.
+  const u8 loudness =
+      gx ? static_cast<u8>((firstNibble << 4) | secondNibble) : static_cast<u8>((secondNibble << 4) | firstNibble);
+  return attenuationGain(static_cast<u8>(~loudness));
+}
+
 [[nodiscard]] u8 panIndex(u8 raw) {
+  if (raw >= 1 && raw <= 0x0f) {
+    return raw - 1;
+  }
   if (raw >= 0x81 && raw <= 0x8f) {
     return raw - 0x81;
   }
@@ -78,6 +89,38 @@ constexpr u32 kMaxTrackCommands = 32768;
   return std::trunc(ticks * tickMilliseconds(nmiRateHertz, tempo));
 }
 
+[[nodiscard]] u8 effectiveTempo(u8 raw, s8 offset, KonamiArcadeVersion version) {
+  const int value = static_cast<int>(raw) + offset;
+  // The Z80 driver saturates positive overflow. GX uses an ordinary byte add.
+  if (version == KonamiArcadeVersion::MysticWarrior && offset >= 0 && value > 0xff) {
+    return 0xff;
+  }
+  return static_cast<u8>(value);
+}
+
+[[nodiscard]] double mysticPitchBendSemitones(s8 raw) {
+  if (raw == 0) {
+    return 0.0;
+  }
+  const u8 encoded = static_cast<u8>(raw);
+  if (raw > 0) {
+    const int coarse = (encoded & 0x40) != 0 ? 1 : 0;
+    const int fraction = (encoded >> 2) & 0x0f;
+    return coarse + fraction / 16.0;
+  }
+
+  // The negative path is not a plain arithmetic shift: after two SRA
+  // instructions the driver complements carry and subtracts it, then forces
+  // the result into a signed fractional nibble.
+  int shifted = static_cast<int>(std::floor(raw / 4.0));
+  if ((encoded & 0x02) == 0) {
+    --shifted;
+  }
+  const int fraction = ((shifted % 16) + 16) % 16 - 16;
+  const int coarse = (encoded & 0x40) != 0 ? 0 : -1;
+  return coarse + fraction / 16.0;
+}
+
 [[nodiscard]] double vibratoDepthSemitones(u8 targetDepth, s32 currentDepth) {
   // The driver retains fade depth as 8.8 fixed point, but its triangle-wave
   // multiply uses only the integer byte. The configured target selects one of
@@ -88,10 +131,10 @@ constexpr u32 kMaxTrackCommands = 32768;
 }
 
 [[nodiscard]] double tremoloDepthDecibels(u8 depth) {
-  // ED subtracts floor(depth * 128 / 256) from the driver's seven-bit
-  // loudness. One loudness step is 36/64 dB. The shared bipolar LFO uses
-  // NoBoost center attenuation, so its depth is half the driver's full
-  // nominal-to-trough attenuation.
+  // GX computes floor(depth * 128 / 256); the Z80 driver stores depth >> 1
+  // directly. Both produce the same peak attenuation. One loudness step is
+  // 36/64 dB. The shared bipolar LFO uses NoBoost center attenuation, so its
+  // depth is half the driver's full nominal-to-trough attenuation.
   const int peakAttenuationSteps = (static_cast<int>(depth) * 128) >> 8;
   return (36.0 * peakAttenuationSteps / 64.0) / 2.0;
 }
@@ -117,10 +160,12 @@ struct VibratoState {
 };
 
 struct TrackState {
+  TrackState() { panMotion.setCurrent(8.0); }
+
   bool percussionFlag1 = false;
   bool percussionFlag2 = false;
   u8 previousDelta = 0;
-  u8 durationRate = 0;
+  u8 previousDurationParameter = 0;
   u8 driverDurationRate = 0;
   u8 releaseRate = 0;
   u8 program = 0;
@@ -128,18 +173,18 @@ struct TrackState {
   std::array<Address, 2> loopStart;
   std::array<s16, 2> loopAttenuation{};
   std::array<s16, 2> loopTranspose{};
-  u8 pan = 8;
   double tempo = 120.0;
   double nmiRateHertz = 0.0;
   PerformanceBoundMotion<SequenceAutomatedValue<double>> volumeMotion;
   PerformanceBoundMotion<SequenceAutomatedValue<double>> panMotion;
   PerformanceBoundMotion<SequenceAutomatedValue<double>> tempoMotion;
-  SequenceAutomatedValue<double> pitchMotion;
+  double pitchBendSemitones = 0.0;
+  std::optional<double> emittedPitchBend;
+  std::optional<double> emittedTuningCents;
   std::optional<double> previousKey;
   PerformanceNoteId previousNote;
   u64 previousNoteStart = 0;
   u32 previousNoteDuration = 0;
-  double previousNoteGain = 1.0;
   bool previousTied = false;
   bool durationTieCanceled = false;
   u8 portamentoTime = 0;
@@ -236,9 +281,9 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] bool beginVibratoForNote() {
+  [[nodiscard]] bool beginVibratoForNote(u8 durationRateAtNoteOn) {
     auto& vibrato = track.vibrato;
-    const bool restarts = !vibrato.continuous && track.driverDurationRate < 0x65;
+    const bool restarts = !vibrato.continuous && durationRateAtNoteOn < 0x65;
     if (!restarts) {
       return false;
     }
@@ -283,45 +328,105 @@ struct Playback {
     track.durationTieCanceled = true;
   }
 
-  void note(u8 sourceKey, u8 delta, u8 velocity, u8 drumDuration, u8 drumPan) {
+  void emitNotePitchState(bool isDrum, s8 initialTranspose, bool gx) {
+    // Drum selection and drum pitch are independent in the driver: the
+    // source note chooses the table row, while channel/loop transpose and F2
+    // tune that row's sample. Keep the kit key stable and express the latter
+    // as tuning rather than selecting a different drum.
+    const double tuningCents = isDrum ? (track.pitchBendSemitones + track.transpose + (gx ? 0 : initialTranspose) +
+                                         track.loopTranspose[0] / 32.0 + track.loopTranspose[1] / 32.0) *
+                                            100.0
+                                      : 0.0;
+    if (!track.emittedTuningCents || std::abs(*track.emittedTuningCents - tuningCents) > 0.0001) {
+      if (track.emittedTuningCents || std::abs(tuningCents) > 0.0001) {
+        out.tuning(tuningCents);
+      }
+      track.emittedTuningCents = tuningCents;
+    }
+
+    const double outputBend = isDrum ? 0.0 : track.pitchBendSemitones;
+    if (!track.emittedPitchBend || std::abs(*track.emittedPitchBend - outputBend) > 0.0001) {
+      if (track.emittedPitchBend || std::abs(outputBend) > 0.0001) {
+        out.pitchBendRange(
+            static_cast<u8>(std::clamp<int>(std::max(2, static_cast<int>(std::ceil(std::abs(outputBend)))), 2, 127)));
+        out.pitchBend(outputBend);
+      }
+      track.emittedPitchBend = outputBend;
+    }
+  }
+
+  void note(u8 sourceKey, u8 delta, u8 durationParameter, bool durationSpecified, u8 velocity, s8 initialAttenuation,
+            s8 initialTranspose, u8 drumDuration, u8 drumPan, bool gx) {
     const bool isDrum = percussion();
-    const bool restartsTremolo = track.driverDurationRate < 0x65;
-    const bool restartsVibrato = beginVibratoForNote();
+    bool usesDrumDefaultDuration = false;
+
+    // The Z80 installs an explicit duration before drum setup, including
+    // zero. GX does not install its separately retained duration parameter
+    // until after set_note and its LFO-reset checks.
+    if (durationSpecified && !gx) {
+      track.driverDurationRate = durationParameter;
+    }
+
+    u8 durationRateAtNoteOn = track.driverDurationRate;
+    if (isDrum) {
+      if (gx) {
+        // GX drum setup runs before the note-on/LFO-reset checks and always
+        // installs the table duration, replacing zero with 99%.
+        durationRateAtNoteOn = drumDuration == 0 ? 99 : drumDuration;
+        track.driverDurationRate = durationRateAtNoteOn;
+        usesDrumDefaultDuration = durationParameter == 0;
+      } else if (track.driverDurationRate == 0) {
+        // The Z80 driver only consults the drum table when the live duration
+        // is zero and does not substitute for a zero table value.
+        durationRateAtNoteOn = drumDuration;
+        track.driverDurationRate = drumDuration;
+        usesDrumDefaultDuration = drumDuration != 0;
+      }
+    }
+    const bool restartsTremolo = durationRateAtNoteOn < 0x65;
+    const bool restartsVibrato = beginVibratoForNote(durationRateAtNoteOn);
+    if (gx && durationParameter != 0) {
+      track.driverDurationRate = durationParameter;
+    }
+    const u8 durationRate = track.driverDurationRate;
+
     const int loopAttenuation = track.loopAttenuation[0] + track.loopAttenuation[1];
-    const int attenuation = 127 - velocity + loopAttenuation;
+    // GX stores table byte 3 directly in its signed attenuation accumulator.
+    // The Z80 loader negates table byte 4 into the same domain.
+    const int headerAttenuation = gx ? initialAttenuation : -initialAttenuation;
+    const int attenuation = std::clamp(127 - static_cast<int>(velocity) + loopAttenuation + headerAttenuation, 0, 127);
     const double gain = attenuationGain(attenuation);
 
     u32 duration = delta;
-    if (track.durationRate == 0 && isDrum && sourceKey < 46) {
-      duration = static_cast<u32>(delta) * drumDuration / 100;
-      if (track.pan == 0) {
-        const auto [left, right] = stereoGains(drumPan | 0x10);
+    if (usesDrumDefaultDuration && sourceKey < 46) {
+      duration = std::max<u32>(1, static_cast<u32>(delta) * durationRate / 100);
+      if (track.panMotion.current() == 0.0) {
+        const auto [left, right] = stereoGains(drumPan);
         out.stereoBalance(left, right);
       }
-    } else if (track.durationRate != 0 && track.releaseRate != 0) {
-      duration = std::max<u32>(1, static_cast<u32>(delta) * track.durationRate / 100);
+    } else if (durationRate != 0 && track.releaseRate != 0) {
+      duration = std::max<u32>(1, static_cast<u32>(delta) * durationRate / 100);
     }
 
     double key = sourceKey + 24.0;
     if (!isDrum) {
-      key += track.transpose;
+      key += initialTranspose + track.transpose;
+      key += track.loopTranspose[0] / 32.0 + track.loopTranspose[1] / 32.0;
     }
-    // Unlike the channel transpose command, loop transpose also applies while
-    // percussion is active. In that mode it intentionally selects another key
-    // in the drum kit, and therefore potentially another sample.
-    key += track.loopTranspose[0] / 32 + track.loopTranspose[1] / 32;
     key = std::clamp(key, 0.0, 127.0);
+
+    emitNotePitchState(isDrum, initialTranspose, gx);
 
     if (track.durationTieCanceled && track.previousTied) {
       track.previousTied = false;
-      if (track.durationRate != 100 || isDrum) {
+      if (durationRate < 100 || isDrum) {
         out.expression(1.0);
       }
     }
 
     const bool tied = !isDrum && track.previousTied && track.previousKey && std::abs(*track.previousKey - key) < 0.001;
     double noteGain = gain;
-    if (!isDrum && (track.previousTied || track.durationRate == 100)) {
+    if (!isDrum && (track.previousTied || durationRate >= 100)) {
       // A 100% duration is the driver's tie mode. Velocity remains live while
       // the voice is tied, so represent it as expression and keep the note
       // itself at full velocity.
@@ -357,40 +462,44 @@ struct Playback {
                duration > static_cast<u32>(track.slideDelay + 1)) {
       const double slideStartKey = std::clamp(key - track.slideDepth, 0.0, 127.0);
       note = emitNote(key, noteGain, duration);
-      out.at(vm.tick() + track.slideDelay).pitchSlide(note, slideStartKey, key, slideTiming(track.slideDuration));
+      out.at(vm.tick() + static_cast<u32>(track.slideDelay) + 1)
+          .pitchSlide(note, slideStartKey, key, slideTiming(track.slideDuration));
     } else {
       note = emitNote(key, noteGain, duration, tied);
     }
 
-    if (track.previousTied && (track.durationRate != 100 || isDrum)) {
+    if (track.previousTied && (durationRate < 100 || isDrum)) {
       out.at(vm.tick() + duration).expression(1.0);
     }
     track.previousNoteStart = vm.tick();
     track.previousNoteDuration = duration;
-    track.previousNoteGain = noteGain;
     track.previousKey = key;
     track.previousNote = note;
-    track.previousTied = track.durationRate == 100 && !isDrum;
+    track.previousTied = durationRate >= 100 && !isDrum;
     track.durationTieCanceled = false;
-    if (track.durationRate != 0) {
-      track.driverDurationRate = track.durationRate;
-    }
   }
 
-  void hold(u8 delta, u8 rate) {
-    const u32 extension = static_cast<u32>(delta) * rate / 100;
+  void hold(u8 delta, u8 rate, bool gx) {
+    const u32 scaled = static_cast<u32>(delta) * rate / 100;
+    const u32 extension = gx ? std::max<u32>(1, scaled) : scaled;
     if (extension != 0 && track.previousKey) {
       track.previousNote = out.note(*track.previousKey, 1.0, extension, true);
     }
-    track.durationRate = rate;
+    track.previousDurationParameter = rate;
     track.driverDurationRate = rate;
     track.durationTieCanceled = true;
   }
 
   void pan(u8 raw) {
-    track.pan = raw;
-    track.panMotion.setCurrent(raw);
-    const auto [left, right] = stereoGains(raw | 0x10);
+    if (raw == 0) {
+      // Zero disables sequence pan and lets a subsequent drum choose its pan;
+      // it does not force the current voice to center.
+      track.panMotion.clearMotion();
+      track.panMotion.setCurrent(0.0);
+      return;
+    }
+    track.panMotion.setCurrent(raw & 0x0f);
+    const auto [left, right] = stereoGains(raw);
     out.stereoBalance(left, right);
   }
 
@@ -398,6 +507,8 @@ struct Playback {
     track.volumeMotion.setCurrent(raw);
     out.level(LevelScale::linearFromLinear(volumeGain(raw)), LevelPrecisionHint::FourteenBit);
   }
+
+  void reverb(u8 firstNibble, u8 secondNibble, bool gx) { out.reverb(reverbGain(firstNibble, secondNibble, gx)); }
 
   void tempo(u8 raw, double nmiRate) {
     track.tempo = raw;
@@ -433,28 +544,45 @@ struct Playback {
   }
 
   void slideMode(u8 delay, u8 duration, s8 depth) {
-    track.slideDelay = delay == 0 ? 1 : delay;
+    track.slideDelay = delay;
     track.slideDuration = duration;
     track.slideDepth = depth;
   }
 
-  void pitchBend(s8 raw) {
-    track.pitchMotion.setCurrent(raw / 64.0);
-    out.pitchBendRange(
-        static_cast<u8>(std::clamp<int>(std::max(2, static_cast<int>(std::ceil(std::abs(raw / 64.0)))), 2, 127)));
-    out.pitchBend(raw / 64.0);
+  void pitchBend(s8 raw, bool gx) {
+    track.pitchBendSemitones = gx ? raw / 64.0 : mysticPitchBendSemitones(raw);
+    // F2 only updates the source pitch used by the next note calculation; it
+    // does not retune an already playing voice.
   }
 
-  void pitchSlide(u8 delay, u8 duration, u8 target) {
-    delay = delay == 0 ? 1 : delay;
-    if (!track.previousKey || !track.previousNote.valid() || duration == 0 || delay >= track.previousNoteDuration) {
+  void pitchSlide(u8 delay, u8 duration, u8 target, s8 initialTranspose, bool gx) {
+    if (!track.previousKey || !track.previousNote.valid() || (gx && duration == 0)) {
       return;
     }
-    // F3's operand is already the driver's absolute destination note. Unlike
-    // ordinary note commands, the legacy driver does not apply channel or
-    // loop transpose to this target.
-    const double destination = target + 24.0;
-    const u64 slideStart = track.previousNoteStart + delay;
+    double destination;
+    u64 slideStart;
+    if (gx) {
+      // GX's look-ahead path adds channel transpose (but not loop transpose)
+      // and clamps to its 0..95 pitch domain.
+      destination = std::clamp<int>(static_cast<int>(target) + track.transpose, 0, 95) + 24.0;
+      // It recognizes F3 one music tick after note-on, after that tick's
+      // effect update.
+      slideStart = track.previousNoteStart + static_cast<u64>(delay) + 2;
+    } else {
+      // The Z80 driver consumes F3 as part of the preceding note-on and
+      // evaluates its target through the same transpose path as that note.
+      delay = delay == 0 ? 1 : delay;
+      duration = static_cast<u8>(duration + 1);
+      if (duration == 0) {
+        return;
+      }
+      destination = target + 24.0 + initialTranspose + track.transpose + track.loopTranspose[0] / 32.0 +
+                    track.loopTranspose[1] / 32.0;
+      slideStart = track.previousNoteStart + delay;
+    }
+    if (slideStart >= track.previousNoteStart + track.previousNoteDuration) {
+      return;
+    }
     auto slide =
         out.at(slideStart).pitchSlide(track.previousNote, *track.previousKey, destination, slideTiming(duration));
     if (track.portamentoTime != 0) {
@@ -462,7 +590,7 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] Effects loopEnd(u8 slot, u8 totalPlays, s8 attenuationDelta, s8 transposeDelta) {
+  [[nodiscard]] Effects loopEnd(u8 slot, u8 totalPlays, s16 attenuationDelta, s8 transposeDelta) {
     const Address destination = track.loopStart[slot];
     if (destination.value == 0) {
       return {};
@@ -535,10 +663,6 @@ struct Playback {
       track.tempo = track.tempoMotion.current();
       track.tempoMotion.output(out).tempo(tempoMicrosecondsPerQuarter(track.nmiRateHertz, track.tempo));
     }
-    const auto pitchTick = track.pitchMotion.tick();
-    if (pitchTick.changed) {
-      out.pitchBend(track.pitchMotion.current());
-    }
     const auto vibratoTick = track.vibrato.depthState.tickFade();
     if (vibratoTick.shouldApply()) {
       emitVibratoDepth(track.vibrato.depthState.fadeOutput(out));
@@ -600,60 +724,106 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
                               SemanticOperandRole::NoteKey);
     }
     const u8 durationOrVelocity = event.u8("duration_or_velocity", SemanticOperandRole::Duration);
+    const bool durationSpecified = durationOrVelocity < 0x80;
+    u8 durationParameter = 0;
     u8 velocity = durationOrVelocity;
-    if (durationOrVelocity < 0x80) {
-      event.set<&TrackState::durationRate>(durationOrVelocity);
+    if (durationSpecified) {
+      durationParameter = durationOrVelocity;
+      event.set<&TrackState::previousDurationParameter>(durationParameter);
       velocity = event.u8("velocity", SemanticOperandRole::Level);
     } else {
       velocity = durationOrVelocity - 0x80;
     }
 
     const KonamiArcadeDrum& drum = layout.drums[std::min<u8>(key, 45)];
-    event.invoke<&Playback::note>(key, event.state<&TrackState::previousDelta>(), velocity, drum.defaultDuration,
-                                  drum.pan);
+    event.invoke<&Playback::note>(key, event.state<&TrackState::previousDelta>(),
+                                  event.state<&TrackState::previousDurationParameter>(), durationSpecified, velocity,
+                                  sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
+                                  drum.pan, layout.version == KonamiArcadeVersion::Gx);
     return event.wait(event.state<&TrackState::previousDelta>());
   }
 
   switch (opcode) {
     case 0xc0:
+    case 0xc1:
     case 0xc2:
     case 0xc3:
-    case 0xcd:
       return ignored(cursor, "Unknown Driver State", 1);
+    case 0xc4:
+    case 0xc5:
+    case 0xc6:
+      return ignored(cursor, layout.version == KonamiArcadeVersion::Gx ? "DSP Command" : "Unknown Driver State",
+                     layout.version == KonamiArcadeVersion::Gx ? 7 : 0);
+    case 0xc7:
+    case 0xc8:
+    case 0xc9:
+    case 0xca:
+    case 0xcb:
+    case 0xcc:
+      return ignored(cursor, "Unknown Driver State", 0);
+    case 0xcd:
+      return ignored(cursor, "Unknown Driver State", layout.version == KonamiArcadeVersion::Gx ? 1 : 0);
     case 0xce:
-      return ignored(cursor, "Unknown Driver State", 2);
+      return ignored(cursor, "Unknown Driver State", layout.version == KonamiArcadeVersion::Gx ? 2 : 0);
     case 0xcf:
     case 0xd0:
       return ignored(cursor, "Unknown Driver State", 3);
     case 0xd1:
-    case 0xd2:
     case 0xd3:
     case 0xd4:
     case 0xd5:
     case 0xd6:
-      return ignored(cursor, opcode == 0xd2 ? "Reverb Volume" : "Unknown Driver State", 2);
+      return ignored(cursor, "Unknown Driver State", 2);
+    case 0xd2: {
+      auto event = cursor.command("Reverb Volume", SequenceSemantic::Level);
+      const u8 first = event.u8("first_nibble", SemanticOperandRole::Level);
+      const u8 second = event.u8("second_nibble", SemanticOperandRole::Level);
+      const bool gx = layout.version == KonamiArcadeVersion::Gx;
+      event.derived("linear_gain", reverbGain(first, second, gx), SemanticOperandRole::Level);
+      return event.invoke<&Playback::reverb>(first, second, gx);
+    }
     case 0xd7:
     case 0xd9:
       return ignored(cursor, "Unknown Driver State", 3);
     case 0xd8:
     case 0xda:
       return ignored(cursor, "Unknown Driver State", 2);
+    case 0xdb:
+      return ignored(cursor, "Unknown Driver State", 1);
+    case 0xdc: {
+      if (layout.version == KonamiArcadeVersion::MysticWarrior) {
+        return ignored(cursor, "Unknown Driver State", 0);
+      }
+      auto event = cursor.command("Sample Loop Program", SequenceSemantic::State);
+      return event.set<&TrackState::program>(event.u8("program", SemanticOperandRole::InstrumentProgram));
+    }
+    case 0xdd:
+      return ignored(cursor, "Unknown Driver State", 0);
     case 0xde: {
       auto event = cursor.command("Percussion State", SequenceSemantic::Instrument);
       return event.invoke<&Playback::setPercussion>(u8{1}, event.u8("enabled", SemanticOperandRole::State) != 0);
     }
     case 0xdf: {
       auto event = cursor.command("Continuous Vibrato", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 rawDelay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 rawRate = event.u8("rate", SemanticOperandRole::Modulation);
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      const bool mystic = layout.version == KonamiArcadeVersion::MysticWarrior;
+      const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
+      const u8 rate = mystic ? static_cast<u8>(rawRate >> 1) : rawRate;
+      event.derived("effective_delay", delay, SemanticOperandRole::Duration);
+      event.derived("effective_rate", rate, SemanticOperandRole::Modulation);
       return event.invoke<&Playback::configureVibrato>(delay, rate, depth, true);
     }
     case 0xe0: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       event.set<&TrackState::previousDelta>(delta);
-      event.set<&TrackState::driverDurationRate>(u8{0});
+      if (layout.version == KonamiArcadeVersion::Gx) {
+        // GX clears the live duration but retains the separately stored
+        // duration parameter used by later velocity-only notes.
+        event.set<&TrackState::driverDurationRate>(u8{0});
+      }
       event.set<&TrackState::durationTieCanceled>(true);
       return event.wait(delta);
     }
@@ -662,7 +832,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
       event.set<&TrackState::previousDelta>(delta);
-      event.invoke<&Playback::hold>(delta, rate);
+      event.invoke<&Playback::hold>(delta, rate, layout.version == KonamiArcadeVersion::Gx);
       return event.wait(delta);
     }
     case 0xe2: {
@@ -675,9 +845,14 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xe4: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 rawDelay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 rawRate = event.u8("rate", SemanticOperandRole::Modulation);
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      const bool mystic = layout.version == KonamiArcadeVersion::MysticWarrior;
+      const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
+      const u8 rate = mystic && rawRate == 0 ? 1 : rawRate;
+      event.derived("effective_delay", delay, SemanticOperandRole::Duration);
+      event.derived("effective_rate", rate, SemanticOperandRole::Modulation);
       return event.invoke<&Playback::configureVibrato>(delay, rate, depth, false);
     }
     case 0xe5: {
@@ -691,8 +866,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 maskHigh = event.u8("mask_high", SourceValueDisplay::Hex, SemanticOperandRole::Modulation);
       const u8 maskLow = event.u8("mask_low", SourceValueDisplay::Hex, SemanticOperandRole::Modulation);
       const u16 mask = static_cast<u16>((static_cast<u16>(maskHigh) << 8) | maskLow);
-      static_cast<void>(
-          event.derived("maximum_offset_semitones", mask / 256.0, SemanticOperandRole::Pitch));
+      static_cast<void>(event.derived("maximum_offset_semitones", mask / 256.0, SemanticOperandRole::Pitch));
       return event.ignore();
     }
     case 0xe6:
@@ -711,8 +885,11 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command(opcode == 0xe7 ? "Loop End" : "Loop End #2", SequenceSemantic::Repeat);
       const u8 slot = event.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
       const u8 count = event.u8("count", SemanticOperandRole::Count);
-      const u8 encodedAttenuation = event.u8("attenuation_delta", SemanticOperandRole::Level);
-      const s8 attenuation = static_cast<s8>(-static_cast<int>(encodedAttenuation));
+      const s8 loudnessDelta =
+          event.s8("loudness_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      // The driver adds this signed byte to loudness. Convert it to the
+      // attenuation-domain state used by the performance model.
+      const s16 attenuation = -static_cast<s16>(loudnessDelta);
       const s8 transpose = event.s8("transpose_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
       if (discoveredLoops[slot].value != 0) {
         event.mayBranchTo(discoveredLoops[slot], SemanticOperandRole::RepeatTarget);
@@ -723,13 +900,21 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xea: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const u8 raw = event.u8("tempo");
-      event.derived("microseconds_per_quarter", tempoMicrosecondsPerQuarter(layout.nmiRateHertz, raw));
-      return event.invoke<&Playback::tempo>(raw, layout.nmiRateHertz);
+      const u8 effective = effectiveTempo(raw, sequence.tempoOffset, layout.version);
+      event.derived("effective_tempo", effective);
+      event.derived("microseconds_per_quarter", tempoMicrosecondsPerQuarter(layout.nmiRateHertz, effective));
+      return event.invoke<&Playback::tempo>(effective, layout.nmiRateHertz);
     }
     case 0xeb: {
       auto event = cursor.command("Tempo Slide", SequenceSemantic::Tempo);
       const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
-      const u8 target = event.u8("target");
+      const u8 rawTarget = event.u8("target");
+      // GX applies the sequence tempo offset to both EA and EB. The Z80
+      // driver applies it only to an immediate EA tempo command.
+      const u8 target = layout.version == KonamiArcadeVersion::Gx
+                            ? effectiveTempo(rawTarget, sequence.tempoOffset, layout.version)
+                            : rawTarget;
+      event.derived("effective_target", target);
       return event.invoke<&Playback::beginSlide>(u8{0}, duration, target, layout.nmiRateHertz);
     }
     case 0xec: {
@@ -739,9 +924,13 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xed: {
       auto event = cursor.command("Tremolo", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 rawDelay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      const bool mystic = layout.version == KonamiArcadeVersion::MysticWarrior;
+      const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
+      event.derived("effective_delay", delay, SemanticOperandRole::Duration);
+      event.derived("peak_attenuation_steps", static_cast<u8>(depth >> 1), SemanticOperandRole::Modulation);
       return event.invoke<&Playback::configureTremolo>(delay, rate, depth);
     }
     case 0xee: {
@@ -768,15 +957,20 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xf2: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
       return event.invoke<&Playback::pitchBend>(
-          event.s8("bend", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+          event.s8("bend", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch),
+          layout.version == KonamiArcadeVersion::Gx);
     }
     case 0xf3: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Portamento);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
       const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-      return event.invoke<&Playback::pitchSlide>(delay, duration, target);
+      return event.invoke<&Playback::pitchSlide>(delay, duration, target, sequence.initialTranspose,
+                                                 layout.version == KonamiArcadeVersion::Gx);
     }
+    case 0xf4:
+    case 0xf5:
+      return ignored(cursor, "Unknown Driver State", layout.version == KonamiArcadeVersion::MysticWarrior ? 3 : 0);
     case 0xf6: {
       auto event = cursor.command("Subroutine Definition", SequenceSemantic::State);
       discoveredSubroutine = event.nextAddress();
@@ -798,12 +992,32 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xf9: {
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::setVibratoFade>(event.u8("length", SemanticOperandRole::Duration));
+      const u8 rawLength = event.u8("length", SemanticOperandRole::Duration);
+      const u8 length = layout.version == KonamiArcadeVersion::MysticWarrior && rawLength == 0 ? 1 : rawLength;
+      event.derived("effective_length", length, SemanticOperandRole::Duration);
+      return event.invoke<&Playback::setVibratoFade>(length);
     }
     case 0xfa: {
       auto event = cursor.command("Release Rate", SequenceSemantic::State);
       return event.set<&TrackState::releaseRate>(event.u8("rate"));
     }
+    case 0xfb: {
+      if (layout.version == KonamiArcadeVersion::Gx) {
+        return ignored(cursor, "Unknown Driver State", 0);
+      }
+      if (sequence.indexedNoteTableOffset == 0) {
+        return cursor.unsupported("Indexed Note Table Is Missing").stop();
+      }
+      auto event = cursor.command("Indexed Note Jump", SequenceSemantic::Jump);
+      const u8 index = event.u8("index");
+      const Address destination{
+          static_cast<u64>(sequence.indexedNoteTableOffset) + static_cast<u64>(index) * 4,
+      };
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+      return event.jump(destination);
+    }
+    case 0xfc:
+      return ignored(cursor, "Unknown Driver State", 0);
     case 0xfd: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
       const Address destination = readDestination(event, layout, sequence, SemanticOperandRole::JumpTarget);
@@ -836,7 +1050,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
               .initialLevel = 1.0,
-              .initialReverbSend = 0.25,
+              .initialReverbSend = 0.0,
           },
   });
 }

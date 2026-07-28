@@ -267,7 +267,7 @@ void readDrums(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Diagno
     layout.drums[index] = KonamiArcadeDrum{
         .sample = reader.u8At(offset),
         .unityKey = unityKey,
-        .pitchBend = reader.s8At(offset + 2),
+        .pitch = reader.u8At(offset + 2),
         .pan = reader.u8At(offset + 3),
         .defaultDuration = reader.u8At(offset + 6),
         .attenuation = reader.u8At(offset + 7),
@@ -323,6 +323,9 @@ void readSequences(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Di
       layout.sequences.push_back(KonamiArcadeSequenceLayout{
           .index = index,
           .offset = *sequenceOffset,
+          .initialAttenuation = reader.s8At(offset + 3),
+          .initialTranspose = reader.s8At(offset + 4),
+          .tempoOffset = reader.s8At(offset + 5),
           .tableEntry = reader.range(offset, 12),
           .name = layout.game + " " + std::to_string(index),
       });
@@ -375,10 +378,18 @@ void readSequences(KonamiArcadeLayout& layout, ByteReader reader, std::vector<Di
       if (!validTracks || !hasTrack) {
         continue;
       }
+      const u16 indexedNoteTable = reader.le16(offset + 10);
       layout.sequences.push_back(KonamiArcadeSequenceLayout{
           .index = index,
           .offset = *sequenceOffset,
           .memoryBase = destination,
+          .indexedNoteTableOffset =
+              indexedNoteTable == 0 ? 0 : absoluteOffset(layout.code, indexedNoteTable).value_or(0),
+          // The Z80 loader copies these three table bytes into each channel
+          // as tempo, loudness, and transpose offsets, respectively.
+          .initialAttenuation = reader.s8At(offset + 4),
+          .initialTranspose = reader.s8At(offset + 5),
+          .tempoOffset = reader.s8At(offset + 3),
           .tableEntry = reader.range(offset, 14),
           .name = layout.game + " " + std::to_string(index),
       });

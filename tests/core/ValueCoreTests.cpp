@@ -76,6 +76,7 @@ void ninSnesGainModeInstrumentsUseDspEnvelope();
 void mameRomDatabaseAndGroupAssemblyAreValueOriented();
 void konamiArcadeModuleBuildsSequencesSynthAndCollections();
 void konamiArcadeGxLfosMatchDriverState();
+void konamiArcadeGxDriverQuirksRemainRepresented();
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
 void akaoSnesLayoutDiscoversFf4StyleAram();
 void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
@@ -200,6 +201,7 @@ int main() {
     mameRomDatabaseAndGroupAssemblyAreValueOriented();
     konamiArcadeModuleBuildsSequencesSynthAndCollections();
     konamiArcadeGxLfosMatchDriverState();
+    konamiArcadeGxDriverQuirksRemainRepresented();
     konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
     akaoSnesLayoutDiscoversFf4StyleAram();
     akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
