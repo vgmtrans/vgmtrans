@@ -20,12 +20,19 @@ const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
 }
 
+SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, std::vector<Asset> assetsValue,
+                                  std::vector<MatchFact> matchFactsValue, std::vector<Collection> collectionsValue,
+                                  SourceMap sourceMapValue, std::vector<Diagnostic> diagnosticsValue)
+    : sources(std::move(sourcesValue)), assets(std::move(assetsValue)), matchFacts(std::move(matchFactsValue)),
+      collections(std::move(collectionsValue)), sourceMap(std::move(sourceMapValue)),
+      diagnostics(std::move(diagnosticsValue)), index(buildIndex(sources, assets, collections)) {
+}
+
 SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, std::vector<Asset> assets,
                                  std::vector<MatchFact> matchFacts, std::vector<Collection> collections,
                                  SourceMap sourceMap, std::vector<Diagnostic> diagnostics)
-    : sources_(std::move(sources)), assets_(std::move(assets)), matchFacts_(std::move(matchFacts)),
-      collections_(std::move(collections)), sourceMap_(std::move(sourceMap)), diagnostics_(std::move(diagnostics)),
-      index_(buildIndex(sources_, assets_, collections_)) {
+    : storage_(std::make_shared<const Storage>(std::move(sources), std::move(assets), std::move(matchFacts),
+                                               std::move(collections), std::move(sourceMap), std::move(diagnostics))) {
 }
 
 SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<SourceFile>& sources,
@@ -60,31 +67,31 @@ SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<SourceFile>
 }
 
 const SourceFile* SessionSnapshot::source(SourceId id) const {
-  const auto found = index_.sourcesById.find(id.value);
-  if (found == index_.sourcesById.end() || found->second >= sources_.size()) {
+  const auto found = storage_->index.sourcesById.find(id.value);
+  if (found == storage_->index.sourcesById.end() || found->second >= storage_->sources.size()) {
     return nullptr;
   }
-  return &sources_[found->second];
+  return &storage_->sources[found->second];
 }
 
 const Asset* SessionSnapshot::asset(AssetId id) const {
-  const auto found = index_.assetsById.find(id.value);
-  if (found == index_.assetsById.end() || found->second >= assets_.size()) {
+  const auto found = storage_->index.assetsById.find(id.value);
+  if (found == storage_->index.assetsById.end() || found->second >= storage_->assets.size()) {
     return nullptr;
   }
-  return &assets_[found->second];
+  return &storage_->assets[found->second];
 }
 
 const Collection* SessionSnapshot::collection(CollectionId id) const {
-  const auto found = index_.collectionsById.find(id.value);
-  if (found == index_.collectionsById.end() || found->second >= collections_.size()) {
+  const auto found = storage_->index.collectionsById.find(id.value);
+  if (found == storage_->index.collectionsById.end() || found->second >= storage_->collections.size()) {
     return nullptr;
   }
-  return &collections_[found->second];
+  return &storage_->collections[found->second];
 }
 
 const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) const {
-  for (const auto& collection : collections_) {
+  for (const auto& collection : storage_->collections) {
     if (collection.sequence == asset ||
         std::ranges::find(collection.instrumentSets, asset) != collection.instrumentSets.end() ||
         std::ranges::find(collection.sampleCollections, asset) != collection.sampleCollections.end() ||
