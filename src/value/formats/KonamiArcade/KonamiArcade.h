@@ -61,6 +61,13 @@ struct KonamiArcadeDrum {
   core::SourceRange range;
 };
 
+struct KonamiArcadeTrackLayout {
+  u32 number = 0;
+  u64 encodedAddress = 0;
+  u32 offset = 0;
+  core::SourceRange pointer;
+};
+
 struct KonamiArcadeSequenceLayout {
   u32 index = 0;
   u32 offset = 0;
@@ -70,6 +77,8 @@ struct KonamiArcadeSequenceLayout {
   s8 initialTranspose = 0;
   s8 tempoOffset = 0;
   core::SourceRange tableEntry;
+  core::SourceRange trackTable;
+  std::vector<KonamiArcadeTrackLayout> tracks;
   std::string name;
 };
 

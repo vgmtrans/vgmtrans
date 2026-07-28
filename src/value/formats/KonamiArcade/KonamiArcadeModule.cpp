@@ -42,14 +42,8 @@ namespace {
   }
 
   for (const auto& sourceSequence : layout->sequences) {
-    const u32 pointerSize = layout->version == KonamiArcadeVersion::MysticWarrior ? 2 : 4;
-    const u32 maximumHeaderSize = pointerSize * kKonamiArcadeMaxTracks;
-    const u32 available = sourceSequence.offset < layout->code.endOffset()
-                              ? static_cast<u32>(layout->code.endOffset() - sourceSequence.offset)
-                              : 0;
-    const SourceRange sequenceRange = input.reader.range(sourceSequence.offset, std::min(maximumHeaderSize, available));
     const auto sequence = result.reserveSequence();
-    result.sequence(sequence, sourceSequence.name, sequenceRange)
+    result.sequence(sequence, sourceSequence.name, sourceSequence.trackTable)
         .program(decodeKonamiArcadeSequence(input.reader, *layout, sourceSequence, sequence.id, &result.sourceMap(),
                                             &result.diagnostics()));
 

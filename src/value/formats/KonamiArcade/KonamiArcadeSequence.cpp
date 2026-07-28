@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -160,8 +159,12 @@ struct VibratoState {
 };
 
 struct TrackState {
-  TrackState() { panMotion.setCurrent(8.0); }
+  explicit TrackState(const SequenceProgram& program)
+      : version(static_cast<KonamiArcadeVersion>(program.config.profile)) {
+    panMotion.setCurrent(8.0);
+  }
 
+  KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;
   bool percussionFlag1 = false;
   bool percussionFlag2 = false;
   u8 previousDelta = 0;
@@ -204,6 +207,7 @@ struct Playback {
   PerformanceEmitter& out;
   VmApi& vm;
 
+  [[nodiscard]] bool isGx() const { return track.version == KonamiArcadeVersion::Gx; }
   [[nodiscard]] bool percussion() const { return track.percussionFlag1 || track.percussionFlag2; }
   [[nodiscard]] double driverMilliseconds(u8 ticks) const {
     return portamentoMilliseconds(ticks, track.nmiRateHertz, track.tempo);
@@ -328,12 +332,12 @@ struct Playback {
     track.durationTieCanceled = true;
   }
 
-  void emitNotePitchState(bool isDrum, s8 initialTranspose, bool gx) {
+  void emitNotePitchState(bool isDrum, s8 initialTranspose) {
     // Drum selection and drum pitch are independent in the driver: the
     // source note chooses the table row, while channel/loop transpose and F2
     // tune that row's sample. Keep the kit key stable and express the latter
     // as tuning rather than selecting a different drum.
-    const double tuningCents = isDrum ? (track.pitchBendSemitones + track.transpose + (gx ? 0 : initialTranspose) +
+    const double tuningCents = isDrum ? (track.pitchBendSemitones + track.transpose + (isGx() ? 0 : initialTranspose) +
                                          track.loopTranspose[0] / 32.0 + track.loopTranspose[1] / 32.0) *
                                             100.0
                                       : 0.0;
@@ -356,7 +360,8 @@ struct Playback {
   }
 
   void note(u8 sourceKey, u8 delta, u8 durationParameter, bool durationSpecified, u8 velocity, s8 initialAttenuation,
-            s8 initialTranspose, u8 drumDuration, u8 drumPan, bool gx) {
+            s8 initialTranspose, u8 drumDuration, u8 drumPan) {
+    const bool gx = isGx();
     const bool isDrum = percussion();
     bool usesDrumDefaultDuration = false;
 
@@ -415,7 +420,7 @@ struct Playback {
     }
     key = std::clamp(key, 0.0, 127.0);
 
-    emitNotePitchState(isDrum, initialTranspose, gx);
+    emitNotePitchState(isDrum, initialTranspose);
 
     if (track.durationTieCanceled && track.previousTied) {
       track.previousTied = false;
@@ -479,9 +484,9 @@ struct Playback {
     track.durationTieCanceled = false;
   }
 
-  void hold(u8 delta, u8 rate, bool gx) {
+  void hold(u8 delta, u8 rate) {
     const u32 scaled = static_cast<u32>(delta) * rate / 100;
-    const u32 extension = gx ? std::max<u32>(1, scaled) : scaled;
+    const u32 extension = isGx() ? std::max<u32>(1, scaled) : scaled;
     if (extension != 0 && track.previousKey) {
       track.previousNote = out.note(*track.previousKey, 1.0, extension, true);
     }
@@ -508,7 +513,7 @@ struct Playback {
     out.level(LevelScale::linearFromLinear(volumeGain(raw)), LevelPrecisionHint::FourteenBit);
   }
 
-  void reverb(u8 firstNibble, u8 secondNibble, bool gx) { out.reverb(reverbGain(firstNibble, secondNibble, gx)); }
+  void reverb(u8 firstNibble, u8 secondNibble) { out.reverb(reverbGain(firstNibble, secondNibble, isGx())); }
 
   void tempo(u8 raw, double nmiRate) {
     track.tempo = raw;
@@ -549,13 +554,14 @@ struct Playback {
     track.slideDepth = depth;
   }
 
-  void pitchBend(s8 raw, bool gx) {
-    track.pitchBendSemitones = gx ? raw / 64.0 : mysticPitchBendSemitones(raw);
+  void pitchBend(s8 raw) {
+    track.pitchBendSemitones = isGx() ? raw / 64.0 : mysticPitchBendSemitones(raw);
     // F2 only updates the source pitch used by the next note calculation; it
     // does not retune an already playing voice.
   }
 
-  void pitchSlide(u8 delay, u8 duration, u8 target, s8 initialTranspose, bool gx) {
+  void pitchSlide(u8 delay, u8 duration, u8 target, s8 initialTranspose) {
+    const bool gx = isGx();
     if (!track.previousKey || !track.previousNote.valid() || (gx && duration == 0)) {
       return;
     }
@@ -646,23 +652,19 @@ struct Playback {
   }
 
   void tick() {
-    const auto volumeTick = track.volumeMotion.tick();
-    if (volumeTick.changed) {
-      track.volumeMotion.output(out).level(LevelScale::linearFromLinear(volumeGain(static_cast<u8>(
-                                               std::clamp<double>(track.volumeMotion.current(), 0.0, 255.0)))),
-                                           LevelPrecisionHint::FourteenBit);
-    }
-    const auto panTick = track.panMotion.tick();
-    if (panTick.changed) {
-      const auto [left, right] =
-          stereoGains(static_cast<u8>(std::clamp<double>(track.panMotion.current(), 0.0, 255.0)) | 0x10);
+    static_cast<void>(track.volumeMotion.tickChanged([&](double value) {
+      track.volumeMotion.output(out).level(
+          LevelScale::linearFromLinear(volumeGain(static_cast<u8>(std::clamp(value, 0.0, 255.0)))),
+          LevelPrecisionHint::FourteenBit);
+    }));
+    static_cast<void>(track.panMotion.tickChanged([&](double value) {
+      const auto [left, right] = stereoGains(static_cast<u8>(std::clamp(value, 0.0, 255.0)) | 0x10);
       track.panMotion.output(out).stereoBalance(left, right);
-    }
-    const auto tempoTick = track.tempoMotion.tick();
-    if (tempoTick.changed) {
-      track.tempo = track.tempoMotion.current();
+    }));
+    static_cast<void>(track.tempoMotion.tickChanged([&](double value) {
+      track.tempo = value;
       track.tempoMotion.output(out).tempo(tempoMicrosecondsPerQuarter(track.nmiRateHertz, track.tempo));
-    }
+    }));
     const auto vibratoTick = track.vibrato.depthState.tickFade();
     if (vibratoTick.shouldApply()) {
       emitVibratoDepth(track.vibrato.depthState.fadeOutput(out));
@@ -741,7 +743,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     event.invoke<&Playback::note>(key, event.state<&TrackState::previousDelta>(),
                                   event.state<&TrackState::previousDurationParameter>(), durationSpecified, velocity,
                                   sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
-                                  drum.pan, gx);
+                                  drum.pan);
     return event.wait(event.state<&TrackState::previousDelta>());
   }
 
@@ -780,7 +782,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 first = event.u8("first_nibble", SemanticOperandRole::Level);
       const u8 second = event.u8("second_nibble", SemanticOperandRole::Level);
       event.derived("linear_gain", reverbGain(first, second, gx), SemanticOperandRole::Level);
-      return event.invoke<&Playback::reverb>(first, second, gx);
+      return event.invoke<&Playback::reverb>(first, second);
     }
     case 0xd7:
     case 0xd9:
@@ -831,7 +833,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
       event.set<&TrackState::previousDelta>(delta);
-      event.invoke<&Playback::hold>(delta, rate, gx);
+      event.invoke<&Playback::hold>(delta, rate);
       return event.wait(delta);
     }
     case 0xe2: {
@@ -952,14 +954,14 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xf2: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
       return event.invoke<&Playback::pitchBend>(
-          event.s8("bend", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch), gx);
+          event.s8("bend", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
     }
     case 0xf3: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Portamento);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
       const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-      return event.invoke<&Playback::pitchSlide>(delay, duration, target, sequence.initialTranspose, gx);
+      return event.invoke<&Playback::pitchSlide>(delay, duration, target, sequence.initialTranspose);
     }
     case 0xf4:
     case 0xf5:
@@ -1058,61 +1060,23 @@ const SequenceDialect& konamiArcadeSequenceDialect() {
 SequenceProgram decodeKonamiArcadeSequence(ByteReader reader, const KonamiArcadeLayout& layout,
                                            const KonamiArcadeSequenceLayout& sequenceLayout, AssetId sequenceAsset,
                                            SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  const u32 pointerSize = layout.version == KonamiArcadeVersion::MysticWarrior ? 2 : 4;
-  u32 trackCount = kKonamiArcadeMaxTracks;
-  if (layout.version == KonamiArcadeVersion::MysticWarrior) {
-    for (u32 index = 8; index < kKonamiArcadeMaxTracks; ++index) {
-      const u32 pointer = sequenceLayout.offset + index * pointerSize;
-      if (!reader.has(pointer, pointerSize) || reader.le16(pointer) == 0) {
-        trackCount = 8;
-        break;
-      }
-    }
-  }
-  while (trackCount != 0 && !reader.has(sequenceLayout.offset, static_cast<u64>(trackCount) * pointerSize)) {
-    --trackCount;
-  }
-
-  const SourceRange headerRange = reader.range(sequenceLayout.offset, static_cast<u64>(trackCount) * pointerSize);
   SequenceDecodeSession sequence{
       reader,
       konamiArcadeSequenceDialect(),
       sequenceAsset,
-      headerRange,
+      sequenceLayout.trackTable,
       sourceMap,
       kMaxTrackCommands,
       static_cast<u32>(layout.code.endOffset()),
   };
 
-  for (u32 trackNumber = 0; trackNumber < trackCount; ++trackNumber) {
-    const u32 pointerOffset = sequenceLayout.offset + trackNumber * pointerSize;
-    u32 start = 0;
-    u64 encoded = 0;
-    if (layout.version == KonamiArcadeVersion::MysticWarrior) {
-      encoded = reader.le16(pointerOffset);
-      if (encoded >= sequenceLayout.memoryBase) {
-        const u64 absolute = static_cast<u64>(sequenceLayout.offset) + encoded - sequenceLayout.memoryBase;
-        if (absolute <= std::numeric_limits<u32>::max()) {
-          start = static_cast<u32>(absolute);
-        }
-      }
-    } else {
-      encoded = reader.be32(pointerOffset);
-      const u64 absolute = layout.code.offset + encoded;
-      if (absolute <= std::numeric_limits<u32>::max()) {
-        start = static_cast<u32>(absolute);
-      }
-    }
-    if (encoded == 0 || start < layout.code.offset || !reader.has(start, 1)) {
-      continue;
-    }
-
+  for (const KonamiArcadeTrackLayout& track : sequenceLayout.tracks) {
     std::array<Address, 2> discoveredLoops;
     Address discoveredSubroutine;
     const auto decode = [&](u32 offset) {
       return decodeCommand(reader, offset, layout, sequenceLayout, discoveredLoops, discoveredSubroutine, diagnostics);
     };
-    sequence.addLinearTrack(trackNumber, reader.range(pointerOffset, pointerSize), start, decode, encoded);
+    sequence.addLinearTrack(track.number, track.pointer, track.offset, decode, track.encodedAddress);
   }
 
   SequenceProgram program = sequence.finish();
