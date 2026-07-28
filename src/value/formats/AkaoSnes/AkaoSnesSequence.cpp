@@ -808,6 +808,23 @@ enum class LfoTarget {
   Tremolo,
 };
 
+struct LfoState {
+  void configure(u8 delayValue, u8 rateValue, u8 depthValue) {
+    delay = delayValue;
+    rate = rateValue;
+    depth = depthValue;
+    depthState.resetDepth(static_cast<s32>(depth) << 8);
+  }
+
+  [[nodiscard]] s32 targetDepthFixed() const { return depthState.targetDepth(); }
+  [[nodiscard]] s32 currentDepthFixed() const { return depthState.currentDepth(); }
+
+  u8 delay = 0;
+  u8 rate = 0;
+  u8 depth = 0;
+  SequenceLfoDepthFadeState depthState;
+};
+
 struct SharedTempoChange {
   u64 tick = 0;
   u8 tempo = 0;
@@ -977,34 +994,34 @@ struct TrackState {
 
   void configureVibratoFade(AkaoSnesVersion version) {
     if (!isLfoActive(version, vibrato.rate, vibrato.depth)) {
-      vibrato.clearFade();
+      vibrato.depthState.clearFade();
       return;
     }
     if (version == AKAOSNES_V1) {
-      vibrato.setFadeToDepth(v1VibratoRampTicks(vibrato.rate, tempo), 8);
+      vibrato.depthState.configureLinearFade(v1VibratoRampTicks(vibrato.rate, tempo));
       return;
     }
     if (version == AKAOSNES_V4 && vibrato.delay != 0) {
       const u32 ticks = v4VibratoRampTicks(vibrato.rate, tempo);
-      const s32 targetDepth = vibrato.scaledDepth(8);
+      const s32 targetDepth = vibrato.targetDepthFixed();
       const s32 initialDepth = targetDepth / 4;
       const s32 step = ticks == 0 ? 0 : (targetDepth - initialDepth) / static_cast<s32>(ticks);
-      vibrato.setFade(ticks, targetDepth, step);
+      vibrato.depthState.configureFade(ticks, step);
       return;
     }
-    vibrato.clearFade();
+    vibrato.depthState.clearFade();
   }
 
   void configureTremoloFade(AkaoSnesVersion version) {
     if (version != AKAOSNES_V3 || !isLfoActive(version, tremolo.rate, tremolo.depth) || tremolo.delay == 0) {
-      tremolo.clearFade();
+      tremolo.depthState.clearFade();
       return;
     }
-    tremolo.setFadeToDepth(v3LfoRampTicks(tremolo.rate, tempo), 8);
+    tremolo.depthState.configureLinearFade(v3LfoRampTicks(tremolo.rate, tempo));
   }
 
   [[nodiscard]] double vibratoFadeDepthSemitones(AkaoSnesVersion version, s32 depth) const {
-    const s32 targetDepth = vibrato.scaledDepth(8);
+    const s32 targetDepth = vibrato.targetDepthFixed();
     if (targetDepth <= 0) {
       return 0.0;
     }
@@ -1013,7 +1030,7 @@ struct TrackState {
   }
 
   [[nodiscard]] double tremoloFadeDepthDecibels(AkaoSnesVersion version, s32 depth) const {
-    const s32 targetDepth = tremolo.scaledDepth(8);
+    const s32 targetDepth = tremolo.targetDepthFixed();
     if (targetDepth <= 0) {
       return 0.0;
     }
@@ -1057,8 +1074,8 @@ struct TrackState {
   PerformanceNoteId pitchSlideNote;
   PitchSlideBinding pitchSlideAutomation;
   PerformanceAutomationBinding pitchEnvelopeAutomation;
-  SequenceLfoState vibrato;
-  SequenceLfoState tremolo;
+  LfoState vibrato;
+  LfoState tremolo;
 };
 
 // Playback holds the history-dependent services shared by several commands or
@@ -1307,11 +1324,12 @@ struct Playback {
   }
 
   void emitVibratoDepth(PerformanceEmitter output, double semitones, bool force = false) {
-    track.vibrato.emitDepth(semitones, [&](double value) { output.vibratoDepth(value, vibratoLfoContext()); }, force);
+    track.vibrato.depthState.emitPhysicalDepth(
+        semitones, [&](double value) { output.vibratoDepth(value, vibratoLfoContext()); }, force);
   }
 
   void emitTremoloDepth(PerformanceEmitter output, double decibels, bool force = false) {
-    track.tremolo.emitDepth(decibels, [&](double value) { output.tremoloDepth(value); }, force);
+    track.tremolo.depthState.emitPhysicalDepth(decibels, [&](double value) { output.tremoloDepth(value); }, force);
   }
 
   void setLfoOutputDepth(PerformanceEmitter output, LfoTarget target, double depth, bool force = false) {
@@ -1334,7 +1352,7 @@ struct Playback {
 
   void syncLfoRateAndDelay(LfoTarget target) {
     const bool isVibrato = target == LfoTarget::Vibrato;
-    SequenceLfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
+    LfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
     if (!isLfoActive(context.version, lfo.rate, lfo.depth)) {
       return;
     }
@@ -1359,7 +1377,7 @@ struct Playback {
     const bool isVibrato = target == LfoTarget::Vibrato;
     const bool active =
         (isVibrato || akaoSnesExportsTremolo(context.version)) && isLfoActive(context.version, rate, depth);
-    SequenceLfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
+    LfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
     lfo.configure(delay, rate, depth);
     const auto initialTempo = program.initialTempo();
     const bool beforeInitialTempoTrack = initialTempo && track.trackNumber < initialTempo->sourceTrackNumber;
@@ -1378,23 +1396,23 @@ struct Playback {
       physicalDepth = isVibrato ? vibratoDepthSemitones(context.version, rate, depth)
                                 : tremoloDepthDecibels(context.version, rate, depth, delay);
     }
-    if (isVibrato && context.version == AKAOSNES_V4 && active && track.vibrato.reusableFade) {
+    if (isVibrato && context.version == AKAOSNES_V4 && active) {
       const u32 delayTicks = lfoDelayTicks(context.version, track.vibrato.delay);
-      const s32 initialDepth = track.vibrato.scaledDepth(8) / 4;
-      track.vibrato.beginFade(delayTicks, initialDepth);
-      physicalDepth = delayTicks == 0 ? track.vibratoFadeDepthSemitones(context.version, initialDepth) : 0.0;
+      const s32 initialDepth = track.vibrato.targetDepthFixed() / 4;
+      if (track.vibrato.depthState.restartFade(delayTicks, initialDepth)) {
+        physicalDepth = delayTicks == 0 ? track.vibratoFadeDepthSemitones(context.version, initialDepth) : 0.0;
+      }
     }
-    const auto& fade = isVibrato ? track.vibrato.reusableFade : track.tremolo.reusableFade;
-    if (active && fade) {
-      lfo.fade.bind(out.noteEnvelope(
+    if (active && lfo.depthState.fadeConfigured()) {
+      lfo.depthState.bindFade(out.noteEnvelope(
           isVibrato ? PerformanceAutomationTarget::VibratoDepth : PerformanceAutomationTarget::TremoloDepth,
           isVibrato ? vibratoDepthSemitones(context.version, rate, depth)
                     : tremoloDepthDecibels(context.version, rate, depth, delay),
-          fade->ticks, lfoDelayTicks(context.version, delay)));
+          lfo.depthState.fadeDurationTicks(), lfoDelayTicks(context.version, delay)));
     } else {
-      lfo.fade.clearAutomation();
+      lfo.depthState.clearFadeAutomation();
     }
-    setLfoOutputDepth(lfo.fade.output(out), target, physicalDepth, true);
+    setLfoOutputDepth(lfo.depthState.fadeOutput(out), target, physicalDepth, true);
     if (active) {
       syncLfoRateAndDelay(target);
       if (vm.tick() == 0 && initialTempo && beforeInitialTempoTrack && initialTempo->tempo != track.tempo) {
@@ -1412,53 +1430,51 @@ struct Playback {
   }
 
   void clearLfo(LfoTarget target) {
-    SequenceLfoState& lfo = target == LfoTarget::Vibrato ? track.vibrato : track.tremolo;
+    LfoState& lfo = target == LfoTarget::Vibrato ? track.vibrato : track.tremolo;
     lfo.depth = 0;
-    lfo.clearFade();
-    setLfoOutputDepth(lfo.fade.output(out), target, 0, true);
+    lfo.depthState.resetDepth(0);
+    setLfoOutputDepth(lfo.depthState.fadeOutput(out), target, 0, true);
   }
 
   void beginVibratoForNote() {
-    if (context.version == AKAOSNES_V2 || !track.vibrato.reusableFade ||
-        !isLfoActive(context.version, track.vibrato.rate, track.vibrato.depth)) {
+    if (context.version == AKAOSNES_V2 || !isLfoActive(context.version, track.vibrato.rate, track.vibrato.depth)) {
       return;
     }
     const u32 delay = lfoDelayTicks(context.version, track.vibrato.delay);
-    const s32 initialDepth = context.version == AKAOSNES_V4 ? track.vibrato.scaledDepth(8) / 4 : 0;
-    track.vibrato.beginFade(delay, initialDepth);
-    emitVibratoDepth(track.vibrato.fade.output(out),
+    const s32 initialDepth = context.version == AKAOSNES_V4 ? track.vibrato.targetDepthFixed() / 4 : 0;
+    if (!track.vibrato.depthState.restartFade(delay, initialDepth)) {
+      return;
+    }
+    emitVibratoDepth(track.vibrato.depthState.fadeOutput(out),
                      delay == 0 ? track.vibratoFadeDepthSemitones(context.version, initialDepth) : 0.0, true);
   }
 
   void beginTremoloForNote() {
-    if (context.version != AKAOSNES_V3 || !track.tremolo.reusableFade) {
+    if (context.version != AKAOSNES_V3 || !track.tremolo.depthState.restartFade(track.tremolo.delay)) {
       return;
     }
-    track.tremolo.beginFade(track.tremolo.delay);
-    emitTremoloDepth(track.tremolo.fade.output(out), 0, true);
+    emitTremoloDepth(track.tremolo.depthState.fadeOutput(out), 0, true);
   }
 
   void updateVibratoFade() {
-    if (context.version == AKAOSNES_V2 || !track.vibrato.fade.active()) {
+    if (context.version == AKAOSNES_V2) {
       return;
     }
-    const auto fadeTick = track.vibrato.fade.tick();
-    if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
-      const s32 current = std::min(track.vibrato.scaledDepth(8), fadeTick.current);
-      track.vibrato.fade.setCurrentPreservingMotion(current);
-      emitVibratoDepth(track.vibrato.fade.output(out), track.vibratoFadeDepthSemitones(context.version, current));
+    const auto fadeTick = track.vibrato.depthState.tickFade();
+    if (fadeTick.shouldApply()) {
+      emitVibratoDepth(track.vibrato.depthState.fadeOutput(out),
+                       track.vibratoFadeDepthSemitones(context.version, track.vibrato.currentDepthFixed()));
     }
   }
 
   void updateTremoloFade() {
-    if (context.version != AKAOSNES_V3 || !track.tremolo.fade.active()) {
+    if (context.version != AKAOSNES_V3) {
       return;
     }
-    const auto fadeTick = track.tremolo.fade.tick();
-    if (fadeTick.status != SequenceMotionStatus::Inactive && fadeTick.status != SequenceMotionStatus::Delayed) {
-      const s32 current = std::min(track.tremolo.scaledDepth(8), fadeTick.current);
-      track.tremolo.fade.setCurrentPreservingMotion(current);
-      emitTremoloDepth(track.tremolo.fade.output(out), track.tremoloFadeDepthDecibels(context.version, current));
+    const auto fadeTick = track.tremolo.depthState.tickFade();
+    if (fadeTick.shouldApply()) {
+      emitTremoloDepth(track.tremolo.depthState.fadeOutput(out),
+                       track.tremoloFadeDepthDecibels(context.version, track.tremolo.currentDepthFixed()));
     }
   }
 

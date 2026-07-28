@@ -9,6 +9,7 @@
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
+#include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
 #include <fmt/format.h>
@@ -741,7 +742,7 @@ struct TrackState {
   TrackState(const SequenceProgram&, const TrackProgram& track) : trackNumber(track.sourceTrackNumber) {
     volumeFade.reset(0xff);
     panFade.reset(10);
-    vibratoDepth.reset(0);
+    vibratoDepth.resetDepth(0);
     pitch.reset();
   }
 
@@ -778,8 +779,7 @@ struct TrackState {
   std::optional<double> lastKey;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
   PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
-  PerformanceBoundMotion<SequenceAutomatedValue<s32>> vibratoDepth;
-  double lastVibratoDepthSemitones = 0.0;
+  SequenceLfoDepthFadeState vibratoDepth;
 };
 
 struct Playback {
@@ -1108,15 +1108,13 @@ struct Playback {
 
   void vibratoOn(u8 delay, u8 rate, u8 depth) {
     track.vibrato = VibratoConfig{.delay = delay, .rate = rate, .depth = depth};
-    track.vibratoDepth.setCurrent(depth);
-    track.vibratoDepth.clearAutomation();
+    track.vibratoDepth.resetDepth(depth);
     emitConfiguredVibrato();
   }
 
   void vibratoOff() {
     track.vibrato = {};
-    track.vibratoDepth.setCurrent(0);
-    track.vibratoDepth.clearAutomation();
+    track.vibratoDepth.resetDepth(0);
     emitConfiguredVibrato();
   }
 
@@ -1124,11 +1122,7 @@ struct Playback {
 
   void emitVibratoDepth(u8 rawDepth, PerformanceEmitter output) {
     const double depthSemitones = math::vibratoDepthCents(rawDepth) / 100.0;
-    if (std::abs(depthSemitones - track.lastVibratoDepthSemitones) < 0.000001) {
-      return;
-    }
-    track.lastVibratoDepthSemitones = depthSemitones;
-    output.vibratoDepth(depthSemitones);
+    track.vibratoDepth.emitPhysicalDepth(depthSemitones, [&](double value) { output.vibratoDepth(value); });
   }
 
   void emitVibratoRateAndDelay() {
@@ -1151,14 +1145,12 @@ struct Playback {
     if (!track.vibrato.active() || track.vibrato.fade == 0) {
       return;
     }
-    track.vibratoDepth.setCurrent(0);
-    const s32 target = track.vibrato.depth;
-    track.vibratoDepth.begin(
-        out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
-                         math::vibratoDepthCents(track.vibrato.depth) / 100.0, track.vibrato.fade, track.vibrato.delay),
-        SequenceMotionPlan<s32>::targetOverTicksWithStep(target, target / static_cast<s32>(track.vibrato.fade),
-                                                         track.vibrato.fade, track.vibrato.delay));
-    emitVibratoDepth(0, track.vibratoDepth.output(out));
+    track.vibratoDepth.configureLinearFade(track.vibrato.fade);
+    static_cast<void>(track.vibratoDepth.restartFade(track.vibrato.delay));
+    track.vibratoDepth.bindFade(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
+                                                 math::vibratoDepthCents(track.vibrato.depth) / 100.0,
+                                                 track.vibrato.fade, track.vibrato.delay));
+    emitVibratoDepth(0, track.vibratoDepth.fadeOutput(out));
   }
 
   void tremoloOn(u8 delay, u8 rate, u8 depth) {
@@ -1237,13 +1229,11 @@ struct Playback {
   }
 
   void advanceVibratoFade() {
-    const auto tick = track.vibratoDepth.tick();
+    const auto tick = track.vibratoDepth.tickFade();
     if (!tick.shouldApply()) {
       return;
     }
-    const u8 value = static_cast<u8>(std::clamp<s32>(tick.current, 0, track.vibrato.depth));
-    track.vibratoDepth.setCurrentPreservingMotion(value);
-    emitVibratoDepth(value, track.vibratoDepth.output(out));
+    emitVibratoDepth(static_cast<u8>(track.vibratoDepth.currentDepth()), track.vibratoDepth.fadeOutput(out));
   }
 
   void advancePanFade() {
