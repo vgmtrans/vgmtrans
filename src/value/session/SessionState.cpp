@@ -20,6 +20,10 @@ namespace {
 
 template <typename T>
 [[nodiscard]] std::shared_ptr<const std::vector<T>> sharedVector(std::vector<T> values) {
+  if (values.empty()) {
+    static const auto empty = std::make_shared<const std::vector<T>>();
+    return empty;
+  }
   return std::make_shared<const std::vector<T>>(std::move(values));
 }
 
@@ -107,34 +111,34 @@ void SessionState::appendScan(SourceId origin, ScanResult result) {
   assetsById_.reserve(assetsById_.size() + result.assets.size());
   annotationsById_.reserve(annotationsById_.size() + result.sourceMap.annotations().size());
 
-  auto assets = sharedVector(std::move(result.assets));
-  auto matchFacts = sharedVector(std::move(result.matchFacts));
-  auto explicitCollections = sharedVector(std::move(result.explicitCollections));
-  SourceMap sourceMap = std::move(result.sourceMap);
-  auto diagnostics = std::move(result.diagnostics);
-
-  if (!assets->empty() || !matchFacts->empty() || !explicitCollections->empty() || !sourceMap.empty()) {
-    auto chunk = std::make_shared<const ScanChunk>(ScanChunk{
-        .origin = origin,
-        .assets = std::move(assets),
-        .matchFacts = std::move(matchFacts),
-        .explicitCollections = std::move(explicitCollections),
-        .sourceMap = std::move(sourceMap),
+  if (!result.assets.empty() || !result.matchFacts.empty() || !result.sourceMap.empty()) {
+    scanChunks_.push_back(ScanChunk{
+        .assets = sharedVector(std::move(result.assets)),
+        .matchFacts = sharedVector(std::move(result.matchFacts)),
+        .sourceMap = std::move(result.sourceMap),
     });
-    scanChunks_.push_back(chunk);
+    const auto& chunk = scanChunks_.back();
 
-    for (const auto& value : *chunk->assets) {
+    for (const auto& value : *chunk.assets) {
       assetsById_.emplace(metadata(value).id.value, &value);
     }
-    for (const auto& annotation : chunk->sourceMap.annotations()) {
+    for (const auto& annotation : chunk.sourceMap.annotations()) {
       if (annotation.id.valid()) {
         annotationsById_.emplace(annotation.id.value, &annotation);
       }
     }
+    rebuildViews();
   }
-  diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(diagnostics.begin()),
-                      std::make_move_iterator(diagnostics.end()));
-  rebuildViews();
+
+  explicitCollections_.reserve(explicitCollections_.size() + result.explicitCollections.size());
+  for (auto& collection : result.explicitCollections) {
+    explicitCollections_.push_back(ExplicitCollectionEntry{
+        .origin = origin,
+        .collection = std::move(collection),
+    });
+  }
+  diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(result.diagnostics.begin()),
+                      std::make_move_iterator(result.diagnostics.end()));
 }
 
 bool SessionState::removeAssets(std::span<const AssetId> assets) {
@@ -184,10 +188,6 @@ void SessionState::addDiagnostics(std::vector<Diagnostic> diagnostics) {
                       std::make_move_iterator(diagnostics.end()));
 }
 
-SourceMap SessionState::sourceMap() const {
-  return sourceMap_;
-}
-
 SourceMap SessionState::sourceMapForAsset(AssetId asset) const {
   std::vector<SourceAnnotation> selected;
   for (const auto& annotation : sourceMap_.annotations()) {
@@ -205,11 +205,9 @@ std::map<std::string, std::vector<DesiredCollection>> SessionState::desiredColle
       grouped.try_emplace(collection.key.resolver);
     }
   }
-  for (const auto& chunk : scanChunks_) {
-    for (const auto& collection : *chunk->explicitCollections) {
-      if (!collection.key.resolver.empty()) {
-        grouped[collection.key.resolver].push_back(desiredCollection(collection));
-      }
+  for (const auto& entry : explicitCollections_) {
+    if (!entry.collection.key.resolver.empty()) {
+      grouped[entry.collection.key.resolver].push_back(desiredCollection(entry.collection));
     }
   }
   return grouped;
@@ -240,32 +238,33 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
     }
 
     validateCollectionAssetReferences(resolver, candidate);
+    const CollectionStatus status = validatedCollectionStatus(candidate);
     const auto sameKey = [&](const Collection& collection) { return collection.key == candidate.key; };
     if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
       if (found->origin == CollectionOrigin::UserCreated) {
         found->status = CollectionStatus::Stale;
         continue;
       }
-      found->name = candidate.name;
-      found->status = validatedCollectionStatus(candidate);
+      found->name = std::move(candidate.name);
+      found->status = status;
       found->sequence = candidate.sequence;
-      found->instrumentSets = candidate.instrumentSets;
-      found->sampleCollections = candidate.sampleCollections;
-      found->miscAssets = candidate.miscAssets;
+      found->instrumentSets = std::move(candidate.instrumentSets);
+      found->sampleCollections = std::move(candidate.sampleCollections);
+      found->miscAssets = std::move(candidate.miscAssets);
       found->issues = std::move(candidate.issues);
       continue;
     }
 
     collections_.push_back(Collection{
         .id = nextCollectionId(ids),
-        .name = candidate.name,
-        .status = validatedCollectionStatus(candidate),
+        .name = std::move(candidate.name),
+        .status = status,
         .origin = CollectionOrigin::Discovered,
-        .key = candidate.key,
+        .key = std::move(candidate.key),
         .sequence = candidate.sequence,
-        .instrumentSets = candidate.instrumentSets,
-        .sampleCollections = candidate.sampleCollections,
-        .miscAssets = candidate.miscAssets,
+        .instrumentSets = std::move(candidate.instrumentSets),
+        .sampleCollections = std::move(candidate.sampleCollections),
+        .miscAssets = std::move(candidate.miscAssets),
         .issues = std::move(candidate.issues),
     });
   }
@@ -317,16 +316,17 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
     return removedSource || removedObject || removedAnnotation;
   };
 
-  std::vector<std::shared_ptr<const ScanChunk>> remainingChunks;
+  std::erase_if(explicitCollections_, [&](const ExplicitCollectionEntry& entry) {
+    return sourceIds.contains(entry.origin.value) || referencesAnyAsset(entry.collection, assetIds);
+  });
+
+  std::vector<ScanChunk> remainingChunks;
   remainingChunks.reserve(scanChunks_.size());
   for (const auto& chunk : scanChunks_) {
-    auto assets = without(chunk->assets, removesAsset);
-    auto matchFacts = without(chunk->matchFacts, removesFact);
-    auto explicitCollections = without(chunk->explicitCollections, [&](const ExplicitCollection& collection) {
-      return sourceIds.contains(chunk->origin.value) || referencesAnyAsset(collection, assetIds);
-    });
+    auto assets = without(chunk.assets, removesAsset);
+    auto matchFacts = without(chunk.matchFacts, removesFact);
 
-    SourceMap sourceMap = chunk->sourceMap;
+    SourceMap sourceMap = chunk.sourceMap;
     const bool sourceMapChanged = std::ranges::any_of(sourceMap.annotations(), [&](const SourceAnnotation& annotation) {
       return removedAnnotations.contains(annotation.id.value) ||
              (annotation.parent && removedAnnotations.contains(annotation.parent->value)) ||
@@ -349,22 +349,19 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
       sourceMap = SourceMap{std::move(annotations)};
     }
 
-    const bool changed = assets != chunk->assets || matchFacts != chunk->matchFacts ||
-                         explicitCollections != chunk->explicitCollections || sourceMapChanged;
+    const bool changed = assets != chunk.assets || matchFacts != chunk.matchFacts || sourceMapChanged;
     if (!changed) {
       remainingChunks.push_back(chunk);
       continue;
     }
-    if (assets->empty() && matchFacts->empty() && explicitCollections->empty() && sourceMap.empty()) {
-      continue;
-    }
-    remainingChunks.push_back(std::make_shared<const ScanChunk>(ScanChunk{
-        .origin = chunk->origin,
+    ScanChunk filtered{
         .assets = std::move(assets),
         .matchFacts = std::move(matchFacts),
-        .explicitCollections = std::move(explicitCollections),
         .sourceMap = std::move(sourceMap),
-    }));
+    };
+    if (!filtered.empty()) {
+      remainingChunks.push_back(std::move(filtered));
+    }
   }
   scanChunks_ = std::move(remainingChunks);
 
@@ -485,14 +482,17 @@ void SessionState::rebuildViews() {
   factChunks.reserve(scanChunks_.size());
   sourceMaps.reserve(scanChunks_.size());
   for (const auto& chunk : scanChunks_) {
-    assetChunks.push_back(chunk->assets);
-    factChunks.push_back(chunk->matchFacts);
-    sourceMaps.push_back(chunk->sourceMap);
+    assetChunks.push_back(chunk.assets);
+    factChunks.push_back(chunk.matchFacts);
+    sourceMaps.push_back(chunk.sourceMap);
   }
 
-  assets_ = detail::SharedSequenceAccess::fromChunks(std::move(assetChunks));
-  matchFacts_ = detail::SharedSequenceAccess::fromChunks(std::move(factChunks));
-  sourceMap_ = SourceMap::join(sourceMaps);
+  auto assets = detail::SharedSequenceAccess::fromChunks(std::move(assetChunks));
+  auto matchFacts = detail::SharedSequenceAccess::fromChunks(std::move(factChunks));
+  auto sourceMap = SourceMap::join(sourceMaps);
+  assets_ = std::move(assets);
+  matchFacts_ = std::move(matchFacts);
+  sourceMap_ = std::move(sourceMap);
 }
 
 void SessionState::rebuildIndexes() {

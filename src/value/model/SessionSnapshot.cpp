@@ -68,10 +68,7 @@ SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<SourceFile>
 
 const SourceFile* SessionSnapshot::source(SourceId id) const {
   const auto found = storage_->index.sourcesById.find(id.value);
-  if (found == storage_->index.sourcesById.end() || found->second >= storage_->sources.size()) {
-    return nullptr;
-  }
-  return &storage_->sources[found->second];
+  return found != storage_->index.sourcesById.end() ? &storage_->sources[found->second] : nullptr;
 }
 
 const Asset* SessionSnapshot::asset(AssetId id) const {
@@ -81,10 +78,7 @@ const Asset* SessionSnapshot::asset(AssetId id) const {
 
 const Collection* SessionSnapshot::collection(CollectionId id) const {
   const auto found = storage_->index.collectionsById.find(id.value);
-  if (found == storage_->index.collectionsById.end() || found->second >= storage_->collections.size()) {
-    return nullptr;
-  }
-  return &storage_->collections[found->second];
+  return found != storage_->index.collectionsById.end() ? &storage_->collections[found->second] : nullptr;
 }
 
 const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) const {

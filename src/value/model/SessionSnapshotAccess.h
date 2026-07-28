@@ -24,14 +24,6 @@ public:
         std::move(collections), std::move(sourceMap), std::move(diagnostics),
     };
   }
-
-  [[nodiscard]] static SessionSnapshot create(std::vector<SourceFile> sources, std::vector<Asset> assets,
-                                              std::vector<MatchFact> matchFacts, std::vector<Collection> collections,
-                                              SourceMap sourceMap, std::vector<Diagnostic> diagnostics) {
-    return create(std::move(sources), SharedSequence<Asset>{std::move(assets)},
-                  SharedSequence<MatchFact>{std::move(matchFacts)}, std::move(collections), std::move(sourceMap),
-                  std::move(diagnostics));
-  }
 };
 
 }  // namespace vgmtrans::core::detail

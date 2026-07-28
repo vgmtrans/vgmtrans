@@ -24,7 +24,8 @@ public:
   std::vector<Diagnostic> diagnostics;
 
   [[nodiscard]] SessionSnapshot finish() {
-    return detail::SessionSnapshotAccess::create(std::move(sources), std::move(assets), std::move(matchFacts),
+    return detail::SessionSnapshotAccess::create(std::move(sources), SharedSequence<Asset>{std::move(assets)},
+                                                 SharedSequence<MatchFact>{std::move(matchFacts)},
                                                  std::move(collections), std::move(sourceMap), std::move(diagnostics));
   }
 };
