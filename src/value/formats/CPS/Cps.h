@@ -94,6 +94,7 @@ struct CpsLayout {
 [[nodiscard]] bool isCps3(CpsVersion version);
 [[nodiscard]] bool usesLateSequence(CpsVersion version);
 [[nodiscard]] double cpsDriverRateHertz(CpsVersion version);
+[[nodiscard]] std::optional<u32> cpsSequenceAddress(const CpsLayout& layout, u32 encodedPointer);
 [[nodiscard]] constexpr double cpsVolumeAdjustmentGain(s32 adjustment) noexcept {
   return static_cast<double>(static_cast<u32>(adjustment + 64) & 0x7fU) / 64.0;
 }
