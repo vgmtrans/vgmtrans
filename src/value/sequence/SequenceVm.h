@@ -163,7 +163,6 @@ private:
   [[nodiscard]] PerformanceEventHeader header();
   void append(PerformanceEvent event);
   void automationSample(u32 automation, double value);
-  void stopAutomation(u32 automation);
   void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
 
   PerformanceTrack& track_;
@@ -195,6 +194,9 @@ public:
   }
   void stop(const PerformanceEmitter& out) const;
   void interrupt(const PerformanceEmitter& out);
+  // Song-wide automation can be interrupted by a command emitted from a
+  // different track, where no owner-track PerformanceEmitter is available.
+  void interruptAt(u64 tick);
   void sample(const PerformanceEmitter& out, double value) const;
 
 private:
@@ -202,6 +204,7 @@ private:
   friend class PitchSlideBinding;
 
   PerformanceAutomationBinding(PerformanceTrack& owner, u32 automation) : owner_(&owner), automation_(automation) {}
+  void stopAt(u64 tick) const;
 
   PerformanceTrack* owner_ = nullptr;
   u32 automation_ = 0;
@@ -241,6 +244,7 @@ public:
   using Motion::begin;
 
   void bind(PerformanceAutomationBinding binding) { binding_ = std::move(binding); }
+  void interruptAutomationAt(u64 tick) { binding_.interruptAt(tick); }
 
   template <class Plan>
   decltype(auto) begin(PerformanceAutomationBinding binding, const Plan& plan) {
