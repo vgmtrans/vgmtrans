@@ -662,6 +662,33 @@ void ninSnesControllerFadesRemainInTheSourceDomain() {
          "volume fades should interpolate the driver's eight-bit level instead of MIDI controller values");
 }
 
+void ninSnesPrepassClearsMasterVolumeAutomationBinding() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  // The scheduled recipe prepass leaves the completed fade bound to its
+  // discarded performance track. The real render must start with fresh
+  // performance bindings while retaining the reset source-domain value.
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0xe5, 0xff,        // master volume
+          0xe6, 4, 0x80,    // master volume fade
+          4,    0xc9, 0,    // wait for the fade, then end
+      },
+      bytes.begin() + 0x300);
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  expect(performance.tracks[0].automations.size() == 1,
+         "the real render should replace the discarded prepass master-volume binding");
+  const auto* automation =
+      std::get_if<ScalarPerformanceAutomationIntent>(&performance.tracks[0].automations[0].intent);
+  expect(automation != nullptr && automation->target == PerformanceAutomationTarget::MasterLevel &&
+             automation->durationTicks == 4,
+         "the real render should retain the structured master-volume fade");
+}
+
 void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
   std::vector<u8> bytes(kAramSize);
   writeLe16(bytes, 0x100, 0x200);
