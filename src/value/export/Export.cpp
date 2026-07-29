@@ -653,13 +653,8 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     return midiUsage ? &*midiUsage : nullptr;
   };
 
-  const PerformanceSequence emptySequenceUsage;
-  const auto requireSequenceUsage = [&]() -> const PerformanceSequence* {
-    if (!request.exportOnlyUsedInstruments) {
-      return nullptr;
-    }
-    const auto& rendering = requireRendering();
-    return rendering.performance ? &*rendering.performance : &emptySequenceUsage;
+  const auto requireSequenceUsage = [&]() -> const SequenceRenderResult* {
+    return request.exportOnlyUsedInstruments ? &requireRendering() : nullptr;
   };
 
   const auto synthModulationConversion = [&]() {
@@ -688,6 +683,12 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
         break;
       }
       case ExportKind::SoundFont2: {
+        const auto* sequenceUsage = requireSequenceUsage();
+        if (sequenceUsage != nullptr && !sequenceUsage->performance) {
+          artifacts.push_back(synthArtifact(prepared, SynthExportResult{.diagnostics = sequenceUsage->diagnostics},
+                                            ".sf2", "audio/soundfont"));
+          break;
+        }
         const auto conversion = synthModulationConversion();
         if (conversion == ModulationConversionPolicy::SynthModulators && usesSequenceModulation()) {
           requireSequenceModulation();
@@ -695,10 +696,16 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
         artifacts.push_back(exportSoundFont2(
             prepared, sources, request,
             conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
-            conversion, requireSequenceUsage()));
+            conversion, sequenceUsage != nullptr ? &*sequenceUsage->performance : nullptr));
         break;
       }
       case ExportKind::Dls: {
+        const auto* sequenceUsage = requireSequenceUsage();
+        if (sequenceUsage != nullptr && !sequenceUsage->performance) {
+          artifacts.push_back(synthArtifact(prepared, SynthExportResult{.diagnostics = sequenceUsage->diagnostics},
+                                            ".dls", "audio/dls"));
+          break;
+        }
         const auto conversion = synthModulationConversion();
         if (conversion == ModulationConversionPolicy::SynthModulators && usesSequenceModulation()) {
           requireSequenceModulation();
@@ -706,7 +713,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
         artifacts.push_back(exportDls(
             prepared, sources, request,
             conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
-            conversion, requireSequenceUsage()));
+            conversion, sequenceUsage != nullptr ? &*sequenceUsage->performance : nullptr));
         break;
       }
     }

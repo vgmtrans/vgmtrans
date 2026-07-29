@@ -30,8 +30,8 @@ using SynthInstrumentList = std::vector<const Instrument*>;
 }
 
 template <typename Predicate>
-[[nodiscard]] bool markMatchingInstruments(SynthInstrumentList& used, std::span<const Instrument* const> instruments,
-                                           Predicate matches) {
+bool markMatchingInstruments(SynthInstrumentList& used, std::span<const Instrument* const> instruments,
+                             Predicate matches) {
   bool found = false;
   for (const auto* instrument : instruments) {
     if (matches(*instrument)) {
@@ -80,7 +80,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
                                                     const PerformanceSequence* sequenceUsage) {
   SynthInstrumentList instruments;
   for (const auto* instrumentSet : instrumentSets) {
-      if (instrumentSet == nullptr) {
+    if (instrumentSet == nullptr) {
       continue;
     }
     for (const auto& instrument : instrumentSet->instruments) {
