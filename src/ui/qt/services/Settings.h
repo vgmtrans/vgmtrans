@@ -51,6 +51,8 @@ public:
     void setPitchTransitionRendering(vgmtrans::core::MidiPitchTransitionRendering rendering) const;
     [[nodiscard]] vgmtrans::core::ModulationConversionPolicy modulationConversion() const;
     void setModulationConversion(vgmtrans::core::ModulationConversionPolicy policy) const;
+    [[nodiscard]] bool exportOnlyUsedInstruments() const;
+    void setExportOnlyUsedInstruments(bool enabled) const;
   } conversion;
 
   struct RecentFilesSettings : SettingsGroup {

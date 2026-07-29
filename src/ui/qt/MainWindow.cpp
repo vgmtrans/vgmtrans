@@ -323,6 +323,7 @@ void applyMidiExportSettings(vgmtrans::core::SequenceRenderOptions& options) {
 void applyCollectionExportSettings(vgmtrans::core::ExportRequest& request) {
   applyMidiExportSettings(request.sequence);
   request.modulationConversion = Settings::the()->conversion.modulationConversion();
+  request.exportOnlyUsedInstruments = Settings::the()->conversion.exportOnlyUsedInstruments();
 }
 }  // namespace
 

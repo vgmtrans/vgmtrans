@@ -122,6 +122,20 @@ void Settings::ConversionSettings::setModulationConversion(
   emit owner->conversionOptionsChanged();
 }
 
+bool Settings::ConversionSettings::exportOnlyUsedInstruments() const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  const bool enabled = settings.value(QStringLiteral("exportOnlyUsedInstruments"), false).toBool();
+  settings.endGroup();
+  return enabled;
+}
+
+void Settings::ConversionSettings::setExportOnlyUsedInstruments(bool enabled) const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  settings.setValue(QStringLiteral("exportOnlyUsedInstruments"), enabled);
+  settings.endGroup();
+  emit owner->conversionOptionsChanged();
+}
+
 QStringList Settings::RecentFilesSettings::list() const {
   settings.beginGroup(QStringLiteral("RecentFiles"));
   const QStringList files = settings.value(QStringLiteral("files")).toStringList();
