@@ -576,12 +576,12 @@ struct ProgramState {
     percussionTable = {};
     programs = basePrograms;
     nextOverrideProgram = 0x80;
-    tempoFade.reset(kDefaultTempo);
-    tempoFade.clearAutomation();
-    tempoFadeTrack.reset();
+    tempoState.reset(kDefaultTempo);
+    tempoState.clearAutomation();
+    tempoAutomationTrack.reset();
     masterVolume = 0xff;
-    masterFade.reset(masterVolume);
-    masterFadeTrack.reset();
+    masterVolumeState.reset(masterVolume);
+    masterVolumeAutomationTrack.reset();
     echo.reset();
   }
 
@@ -688,6 +688,11 @@ struct ProgramState {
   std::array<u32, 256> programs{};
   std::map<u64, SourceRange> sourceRanges;
   u8 tempo = kDefaultTempo;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
+  std::optional<u32> tempoAutomationTrack;
+  u8 masterVolume = 0xff;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> masterVolumeState;
+  std::optional<u32> masterVolumeAutomationTrack;
   s8 globalTranspose = 0;
   u8 percussionBase = 0;
   std::optional<u8> fixedPercussionBase;
@@ -698,11 +703,6 @@ struct ProgramState {
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
   u32 nextOverrideProgram = 0x80;
   std::map<u8, DrumSlot> standardDrums;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
-  std::optional<u32> tempoFadeTrack;
-  u8 masterVolume = 0xff;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> masterFade;
-  std::optional<u32> masterFadeTrack;
   EchoState echo;
   SequenceRecipes recipes;
   bool collecting = true;
@@ -740,8 +740,8 @@ struct PitchState {
 
 struct TrackState {
   TrackState(const SequenceProgram&, const TrackProgram& track) : trackNumber(track.sourceTrackNumber) {
-    volumeFade.reset(0xff);
-    panFade.reset(10);
+    volume.reset(0xff);
+    pan.reset(10);
     vibratoDepth.resetDepth(0);
     pitch.reset();
   }
@@ -777,8 +777,8 @@ struct TrackState {
   u8 percussionProgram = 0;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
   SequenceLfoDepthFadeState vibratoDepth;
 };
 
@@ -1090,7 +1090,7 @@ struct Playback {
   }
 
   void pan(u8 value) {
-    track.panFade.setCurrentRaw(value);
+    track.pan.setCurrentAt(vm.tick(), value);
     emitPan(out, value);
   }
 
@@ -1102,18 +1102,20 @@ struct Playback {
     // Interpolate the source pan index before applying its non-linear table.
     const auto gains = math::panGains(program.selected, panTable, value);
     static_cast<void>(
-        track.panFade.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
-                            SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
+        track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
+                        SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
   }
 
   void vibratoOn(u8 delay, u8 rate, u8 depth) {
     track.vibrato = VibratoConfig{.delay = delay, .rate = rate, .depth = depth};
+    track.vibratoDepth.interruptFadeAutomationAt(vm.tick());
     track.vibratoDepth.resetDepth(depth);
     emitConfiguredVibrato();
   }
 
   void vibratoOff() {
     track.vibrato = {};
+    track.vibratoDepth.interruptFadeAutomationAt(vm.tick());
     track.vibratoDepth.resetDepth(0);
     emitConfiguredVibrato();
   }
@@ -1163,9 +1165,8 @@ struct Playback {
   void tremoloOff() { out.tremoloDepth(0.0, tremoloLfoContext()); }
 
   void tempo(u8 value) {
-    program.tempoFade.setCurrentRaw(value);
-    program.tempoFade.clearAutomation();
-    program.tempoFadeTrack.reset();
+    program.tempoState.setCurrentAt(vm.tick(), value);
+    program.tempoAutomationTrack.reset();
     program.tempo = value;
     out.tempo(math::tempoMicrosecondsPerQuarter(value));
   }
@@ -1175,16 +1176,16 @@ struct Playback {
       tempo(value);
       return;
     }
-    program.tempoFade.setCurrentRaw(program.tempo);
-    program.tempoFade.begin(out.fade(PerformanceAutomationTarget::Tempo,
-                                     static_cast<double>(math::tempoMicrosecondsPerQuarter(value)), length),
-                            SequenceFixedPointMotion<s32>::toRawTarget(value, length));
-    program.tempoFadeTrack = track.trackNumber;
+    program.tempoState.setCurrentRaw(program.tempo);
+    program.tempoState.begin(out.fade(PerformanceAutomationTarget::Tempo,
+                                      static_cast<double>(math::tempoMicrosecondsPerQuarter(value)), length),
+                             SequenceFixedPointMotion<s32>::toRawTarget(value, length));
+    program.tempoAutomationTrack = track.trackNumber;
     advanceTempoFade();
   }
 
   void volume(u8 value) {
-    track.volumeFade.setCurrentRaw(value);
+    track.volume.setCurrentAt(vm.tick(), value);
     out.level(math::levelGain(value), ValueQuantization{.levels = 256});
   }
 
@@ -1194,14 +1195,14 @@ struct Playback {
       return;
     }
     static_cast<void>(
-        track.volumeFade.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
-                               SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
+        track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
+                           SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
   }
 
   void masterVolume(u8 value) {
     program.masterVolume = value;
-    program.masterFade.setCurrentRaw(value);
-    program.masterFadeTrack.reset();
+    program.masterVolumeState.setCurrentAt(vm.tick(), value);
+    program.masterVolumeAutomationTrack.reset();
     out.masterLevel(math::levelGain(value));
   }
 
@@ -1210,21 +1211,22 @@ struct Playback {
       masterVolume(value);
       return;
     }
-    program.masterFade.setCurrentRaw(program.masterVolume);
+    program.masterVolumeState.setCurrentRaw(program.masterVolume);
     static_cast<void>(
-        program.masterFade.begin(out.fade(PerformanceAutomationTarget::MasterLevel, math::levelGain(value), length),
-                                 SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
-    program.masterFadeTrack = track.trackNumber;
+        program.masterVolumeState.begin(
+            out.fade(PerformanceAutomationTarget::MasterLevel, math::levelGain(value), length),
+            SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
+    program.masterVolumeAutomationTrack = track.trackNumber;
   }
 
   void advanceTempoFade() {
-    static_cast<void>(program.tempoFade.tickRaw([&](s32 raw) {
+    static_cast<void>(program.tempoState.tickRaw([&](s32 raw) {
       const u8 value = static_cast<u8>(std::clamp<s32>(raw, 0, 0xff));
       program.tempo = value;
-      program.tempoFade.output(out).tempo(math::tempoMicrosecondsPerQuarter(value));
+      program.tempoState.output(out).tempo(math::tempoMicrosecondsPerQuarter(value));
     }));
-    if (!program.tempoFade.active()) {
-      program.tempoFadeTrack.reset();
+    if (!program.tempoState.active()) {
+      program.tempoAutomationTrack.reset();
     }
   }
 
@@ -1237,24 +1239,24 @@ struct Playback {
   }
 
   void advancePanFade() {
-    static_cast<void>(track.panFade.tickRaw(
-        [&](s32 value) { emitPan(track.panFade.output(out), static_cast<u8>(std::clamp<s32>(value, 0, 0xff))); }));
+    static_cast<void>(track.pan.tickRaw(
+        [&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(std::clamp<s32>(value, 0, 0xff))); }));
   }
 
   void advanceVolumeFade() {
-    static_cast<void>(track.volumeFade.tickRaw([&](s32 value) {
-      track.volumeFade.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
-                                         ValueQuantization{.levels = 256});
+    static_cast<void>(track.volume.tickRaw([&](s32 value) {
+      track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
+                                     ValueQuantization{.levels = 256});
     }));
   }
 
   void advanceMasterFade() {
-    static_cast<void>(program.masterFade.tickRaw([&](s32 value) {
+    static_cast<void>(program.masterVolumeState.tickRaw([&](s32 value) {
       program.masterVolume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
-      program.masterFade.output(out).masterLevel(math::levelGain(program.masterVolume));
+      program.masterVolumeState.output(out).masterLevel(math::levelGain(program.masterVolume));
     }));
-    if (!program.masterFade.active()) {
-      program.masterFadeTrack.reset();
+    if (!program.masterVolumeState.active()) {
+      program.masterVolumeAutomationTrack.reset();
     }
   }
 
@@ -1263,10 +1265,10 @@ struct Playback {
     advancePanFade();
     advanceVibratoFade();
     advancePitchMotion();
-    if (program.tempoFadeTrack == track.trackNumber) {
+    if (program.tempoAutomationTrack == track.trackNumber) {
       advanceTempoFade();
     }
-    if (program.masterFadeTrack == track.trackNumber) {
+    if (program.masterVolumeAutomationTrack == track.trackNumber) {
       advanceMasterFade();
     }
     if (program.echo.advanceFade(vm.tick())) {

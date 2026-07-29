@@ -705,6 +705,16 @@ void PerformanceAutomationBinding::stopAt(u64 tick) const {
   realization.endReason = PerformanceAutomationEndReason::Interrupted;
 }
 
+void PerformanceAutomationBinding::replaceWith(PerformanceAutomationBinding binding) {
+  if (binding.valid()) {
+    if (binding.automation_ >= binding.owner_->automations.size()) {
+      throw std::logic_error("Performance automation binding was not valid for its track");
+    }
+    stopAt(binding.owner_->automations[binding.automation_].header.tick);
+  }
+  *this = std::move(binding);
+}
+
 void PerformanceAutomationBinding::interrupt(const PerformanceEmitter& out) {
   stop(out);
   clear();

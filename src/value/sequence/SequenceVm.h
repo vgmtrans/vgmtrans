@@ -202,9 +202,12 @@ public:
 private:
   friend class PerformanceEmitter;
   friend class PitchSlideBinding;
+  template <class ValueState>
+  friend class PerformanceBoundValue;
 
   PerformanceAutomationBinding(PerformanceTrack& owner, u32 automation) : owner_(&owner), automation_(automation) {}
   void stopAt(u64 tick) const;
+  void replaceWith(PerformanceAutomationBinding binding);
 
   PerformanceTrack* owner_ = nullptr;
   u32 automation_ = 0;
@@ -236,20 +239,33 @@ private:
   [[nodiscard]] PitchTransitionIntent* intent() const;
 };
 
-// Adds an output binding to an existing sequence-motion type without coupling
-// the arithmetic type itself to PerformanceSequence.
-template <class Motion>
-class PerformanceBoundMotion : public Motion {
+// Adds a performance binding to an existing source-domain value without
+// coupling its arithmetic to PerformanceSequence. Rebinding or setting an
+// immediate value ends the prior automation where the new command takes over.
+template <class ValueState>
+class PerformanceBoundValue : public ValueState {
 public:
-  using Motion::begin;
+  using ValueState::begin;
 
-  void bind(PerformanceAutomationBinding binding) { binding_ = std::move(binding); }
+  void bind(PerformanceAutomationBinding binding) { binding_.replaceWith(std::move(binding)); }
   void interruptAutomationAt(u64 tick) { binding_.interruptAt(tick); }
+
+  // Fixed-point motion types accept their raw source value here; their
+  // fractional representation remains an implementation detail.
+  template <class Value>
+  void setCurrentAt(u64 tick, Value value) {
+    binding_.interruptAt(tick);
+    if constexpr (requires(ValueState& state) { state.setCurrentRaw(value); }) {
+      ValueState::setCurrentRaw(value);
+    } else {
+      ValueState::setCurrent(value);
+    }
+  }
 
   template <class Plan>
   decltype(auto) begin(PerformanceAutomationBinding binding, const Plan& plan) {
     bind(std::move(binding));
-    return Motion::begin(plan);
+    return ValueState::begin(plan);
   }
 
   void clearAutomation() noexcept { binding_.clear(); }

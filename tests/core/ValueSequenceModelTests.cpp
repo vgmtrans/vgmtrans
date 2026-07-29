@@ -5,6 +5,7 @@
  */
 
 #include "ValueTestSupport.h"
+#include "value/sequence/SequenceMotion.h"
 
 namespace {
 
@@ -218,6 +219,31 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   expect(rejectedOtherTrack, "an automation binding should not attach to another performance track");
 }
 
+void performanceBoundValueOwnsReplacementLifecycle() {
+  PerformanceTrack track{.id = TrackId{3}};
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{9}, SourceAnnotationId{11}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceBoundValue<SequenceAutomatedValue<double>> value;
+  value.reset(0.0);
+
+  static_cast<void>(
+      value.begin(out.fade(PerformanceAutomationTarget::Level, 1.0, 8),
+                  SequenceMotionPlan<double>::targetOverTicks(1.0, 8)));
+  static_cast<void>(
+      value.begin(out.at(3).fade(PerformanceAutomationTarget::Level, 0.5, 4),
+                  SequenceMotionPlan<double>::targetOverTicks(0.5, 4)));
+  value.setCurrentAt(5, 0.25);
+
+  expect(track.automations.size() == 2 && track.automations[0].realization.endTick == 3 &&
+             track.automations[0].realization.endReason == PerformanceAutomationEndReason::Interrupted &&
+             track.automations[1].realization.endTick == 5 &&
+             track.automations[1].realization.endReason == PerformanceAutomationEndReason::Interrupted &&
+             value.current() == 0.25,
+         "bound values should end automation when a new motion or immediate value takes over");
+}
+
 void performanceEmitterResolvesDeclaredPanLawIntoEvents() {
   PerformanceTrack track{.id = TrackId{3}};
   u64 nextSequence = 0;
@@ -327,6 +353,7 @@ void runValueSequenceModelTests() {
   collectionIssueHelpersValidateStoredStatus();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
+  performanceBoundValueOwnsReplacementLifecycle();
   performanceEmitterResolvesDeclaredPanLawIntoEvents();
   pitchTransitionApiPreservesSamplesAndRealizedLifecycle();
 }
