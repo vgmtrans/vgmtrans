@@ -1345,15 +1345,17 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
   out.at(4).pitchSlide(second, 60, 64, PitchSlideTiming::fromTicks(0)).continueFrom(first);
   out.at(6).pitchBend(-0.25);
+  out.at(6).pitchBendRange(8);
   out.at(8).note(67, 1.0, 4);
+  out.at(8).pitchBendRange(6);
 
-  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
-      PerformanceSequence{
-          .timebase = Timebase{.ppqn = 48},
-          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-          .tracks = {track},
-      },
-      {});
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      .tracks = {track},
+  };
+  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(performance, {});
+  const MidiSequence midi = renderMidiSequence(performance);
   const auto hasBend = [&](u64 tick, double semitones) {
     return std::ranges::any_of(lowered.tracks[0].events, [&](const PerformanceEvent& event) {
       const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
@@ -1361,14 +1363,15 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
     });
   };
   const auto hasRange = [&](u64 tick, u16 cents) {
-    return std::ranges::any_of(lowered.tracks[0].events, [&](const PerformanceEvent& event) {
-      const auto* range = std::get_if<PitchBendRangePerformanceEvent>(&event);
-      return range != nullptr && range->header.tick == tick && range->cents == cents;
+    return std::ranges::any_of(midi.tracks[0].events, [&](const MidiEvent& event) {
+      const auto* range = std::get_if<PitchBendRange>(&event);
+      return range != nullptr && range->tick == tick && range->cents == cents;
     });
   };
-  expect(hasBend(4, 4.25) && hasBend(6, 3.75) && hasBend(8, -0.25) && hasRange(0, 425) &&
-             hasRange(8, 1200),
-         "held transitions should combine with source bends using a voice-local range that restores at the next attack");
+  expect(
+      hasBend(4, 4.25) && hasBend(6, 3.75) && hasBend(8, -0.25) && hasRange(0, 500) && !hasRange(6, 800) &&
+          hasRange(8, 600),
+      "a held transition should mask source range changes until the next physical attack");
 
   PerformanceTrack sameVoiceTrack{
       .id = TrackId{1},
