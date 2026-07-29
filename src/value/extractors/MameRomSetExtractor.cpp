@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -310,10 +311,127 @@ void appendBuffer(std::vector<u8>& output, std::span<const u8> bytes, bool swap1
   }
 }
 
+[[nodiscard]] u32 hexAttribute(const RomGroupDefinition& group, std::string_view name) {
+  const auto found = group.attributes.find(name);
+  if (found == group.attributes.end()) {
+    throw std::runtime_error("ROM group encryption is missing attribute '" + std::string(name) + "'");
+  }
+  std::string_view text = found->second;
+  int base = 10;
+  if (text.starts_with("0x") || text.starts_with("0X")) {
+    text.remove_prefix(2);
+    base = 16;
+  }
+  u32 value = 0;
+  const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value, base);
+  if (error != std::errc{} || end != text.data() + text.size()) {
+    throw std::runtime_error("ROM group encryption attribute '" + std::string(name) + "' is not an integer");
+  }
+  return value;
+}
+
+[[nodiscard]] constexpr u8 kabukiBitswap1(u8 source, u32 key, u32 select) {
+  u32 value = source;
+  if ((select & (1u << ((key >> 0) & 7u))) != 0) {
+    value = (value & 0xfcu) | ((value & 0x01u) << 1) | ((value & 0x02u) >> 1);
+  }
+  if ((select & (1u << ((key >> 4) & 7u))) != 0) {
+    value = (value & 0xf3u) | ((value & 0x04u) << 1) | ((value & 0x08u) >> 1);
+  }
+  if ((select & (1u << ((key >> 8) & 7u))) != 0) {
+    value = (value & 0xcfu) | ((value & 0x10u) << 1) | ((value & 0x20u) >> 1);
+  }
+  if ((select & (1u << ((key >> 12) & 7u))) != 0) {
+    value = (value & 0x3fu) | ((value & 0x40u) << 1) | ((value & 0x80u) >> 1);
+  }
+  return static_cast<u8>(value);
+}
+
+[[nodiscard]] constexpr u8 kabukiBitswap2(u8 source, u32 key, u32 select) {
+  u32 value = source;
+  if ((select & (1u << ((key >> 12) & 7u))) != 0) {
+    value = (value & 0xfcu) | ((value & 0x01u) << 1) | ((value & 0x02u) >> 1);
+  }
+  if ((select & (1u << ((key >> 8) & 7u))) != 0) {
+    value = (value & 0xf3u) | ((value & 0x04u) << 1) | ((value & 0x08u) >> 1);
+  }
+  if ((select & (1u << ((key >> 4) & 7u))) != 0) {
+    value = (value & 0xcfu) | ((value & 0x10u) << 1) | ((value & 0x20u) >> 1);
+  }
+  if ((select & (1u << ((key >> 0) & 7u))) != 0) {
+    value = (value & 0x3fu) | ((value & 0x40u) << 1) | ((value & 0x80u) >> 1);
+  }
+  return static_cast<u8>(value);
+}
+
+[[nodiscard]] constexpr u8 rotateLeft1(u8 value) {
+  return static_cast<u8>((value << 1) | (value >> 7));
+}
+
+[[nodiscard]] constexpr u8 kabukiByteDecode(u8 source, u32 swapKey1, u32 swapKey2, u32 xorKey, u32 select) {
+  u8 value = kabukiBitswap1(source, swapKey1 & 0xffffu, select & 0xffu);
+  value = rotateLeft1(value);
+  value = kabukiBitswap2(value, swapKey1 >> 16, select & 0xffu);
+  value ^= static_cast<u8>(xorKey);
+  value = rotateLeft1(value);
+  value = kabukiBitswap2(value, swapKey2 & 0xffffu, select >> 8);
+  value = rotateLeft1(value);
+  return kabukiBitswap1(value, swapKey2 >> 16, select >> 8);
+}
+
+void decryptKabukiData(std::vector<u8>& bytes, u32 swapKey1, u32 swapKey2, u32 addressKey, u32 xorKey) {
+  constexpr size_t kEncryptedLength = 0x8000;
+  if (bytes.size() < kEncryptedLength) {
+    throw std::runtime_error("Kabuki encryption requires at least 0x8000 bytes");
+  }
+  for (u32 address = 0; address < kEncryptedLength; ++address) {
+    const u32 select = (address ^ 0x1fc0u) + addressKey + 1;
+    bytes[address] = kabukiByteDecode(bytes[address], swapKey1, swapKey2, xorKey, select);
+  }
+}
+
+[[nodiscard]] constexpr u16 rotateLeft16(u16 value, u32 count) {
+  return static_cast<u16>((value << count) | (value >> (16 - count)));
+}
+
+[[nodiscard]] constexpr u16 cps3RotateXor(u16 value, u16 xorValue) {
+  u16 result = static_cast<u16>(value + rotateLeft16(value, 2));
+  result = static_cast<u16>(rotateLeft16(result, 4) ^ (result & (value ^ xorValue)));
+  return result;
+}
+
+[[nodiscard]] constexpr u32 cps3Mask(u32 address, u32 key1, u32 key2) {
+  address ^= key1;
+  u16 value = static_cast<u16>((address & 0xffff) ^ 0xffff);
+  value = cps3RotateXor(value, static_cast<u16>(key2));
+  value ^= static_cast<u16>((address >> 16) ^ 0xffff);
+  value = cps3RotateXor(value, static_cast<u16>(key2 >> 16));
+  value ^= static_cast<u16>(address) ^ static_cast<u16>(key2);
+  return value | (static_cast<u32>(value) << 16);
+}
+
+void decryptCps3(std::vector<u8>& bytes, u32 key1, u32 key2) {
+  if ((bytes.size() & 3u) != 0) {
+    throw std::runtime_error("CPS3 encryption requires a ROM group whose size is divisible by four");
+  }
+  if (key1 == 0 || key2 == 0) {
+    return;
+  }
+  for (size_t offset = 0; offset < bytes.size(); offset += 4) {
+    const u32 encoded = (static_cast<u32>(bytes[offset]) << 24) | (static_cast<u32>(bytes[offset + 1]) << 16) |
+                        (static_cast<u32>(bytes[offset + 2]) << 8) | bytes[offset + 3];
+    const u32 decoded = encoded ^ cps3Mask(0x06000000 + static_cast<u32>(offset), key1, key2);
+    bytes[offset] = static_cast<u8>(decoded >> 24);
+    bytes[offset + 1] = static_cast<u8>(decoded >> 16);
+    bytes[offset + 2] = static_cast<u8>(decoded >> 8);
+    bytes[offset + 3] = static_cast<u8>(decoded);
+  }
+}
+
 }  // namespace
 
 std::vector<u8> assembleRomGroup(const RomGroupDefinition& group, std::vector<std::vector<u8>> buffers) {
-  if (!group.encryption.empty()) {
+  if (!group.encryption.empty() && group.encryption != "kabuki" && group.encryption != "cps3") {
     throw std::runtime_error("unsupported ROM group encryption '" + group.encryption + "'");
   }
   if (group.loadOrder == RomLoadOrder::Reverse && group.loadMethod != RomLoadMethod::DeinterlacePairs) {
@@ -367,6 +485,12 @@ std::vector<u8> assembleRomGroup(const RomGroupDefinition& group, std::vector<st
         }
       }
       break;
+  }
+  if (group.encryption == "kabuki") {
+    decryptKabukiData(output, hexAttribute(group, "kabuki_swap_key1"), hexAttribute(group, "kabuki_swap_key2"),
+                      hexAttribute(group, "kabuki_addr_key"), hexAttribute(group, "kabuki_xor_key"));
+  } else if (group.encryption == "cps3") {
+    decryptCps3(output, hexAttribute(group, "key1"), hexAttribute(group, "key2"));
   }
   return output;
 }

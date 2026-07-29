@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <set>
+#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -42,6 +43,39 @@ void validateEnvelope(ValidationReport& report, const Envelope& envelope, Source
   }
 }
 
+void validateYm2151Voice(ValidationReport& report, const Ym2151Voice& voice, SourceRange range) {
+  const auto error = [&](std::string_view field) {
+    report.error("synth.ym2151." + std::string(field), "YM2151 voice " + std::string(field) + " was out of range",
+                 validRange(range));
+  };
+  if (voice.algorithm > 7) {
+    error("algorithm");
+  }
+  if (voice.feedback > 7) {
+    error("feedback");
+  }
+  if (voice.operatorMask > 0x0f) {
+    error("operator-mask");
+  }
+  if (voice.amplitudeModulationSensitivity > 3) {
+    error("amplitude-modulation-sensitivity");
+  }
+  if (voice.pitchModulationSensitivity > 7) {
+    error("pitch-modulation-sensitivity");
+  }
+  if (voice.noiseFrequency > 31) {
+    error("noise-frequency");
+  }
+  for (const auto& op : voice.operators) {
+    if (op.attackRate > 31 || op.firstDecayRate > 31 || op.secondDecayRate > 31 || op.releaseRate > 15 ||
+        op.sustainLevel > 15 || op.totalLevel > 127 || op.keyScale > 3 || op.multiplier > 15 || op.detune1 > 7 ||
+        op.detune2 > 3) {
+      error("operator");
+      break;
+    }
+  }
+}
+
 }  // namespace
 
 ValidationReport validateInstrumentSet(const InstrumentSetAsset& instrumentSet) {
@@ -61,6 +95,16 @@ ValidationReport validateInstrumentSet(const InstrumentSetAsset& instrumentSet) 
     if (!std::isfinite(instrument.reverb) || instrument.reverb < 0.0) {
       report.error("synth.instrument.reverb", "Synth instrument reverb send was not finite and nonnegative",
                    validRange(instrument.range));
+    }
+    if (instrument.synthVoice) {
+      std::visit(
+          [&](const auto& voice) {
+            using Voice = std::decay_t<decltype(voice)>;
+            if constexpr (std::is_same_v<Voice, Ym2151Voice>) {
+              validateYm2151Voice(report, voice, instrument.range);
+            }
+          },
+          *instrument.synthVoice);
     }
 
     for (const auto& region : instrument.regions) {

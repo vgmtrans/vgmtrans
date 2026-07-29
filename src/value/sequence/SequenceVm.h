@@ -119,6 +119,7 @@ public:
   void vibratoRate(double hertz, LfoPerformanceContext context = {});
   void vibratoRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
   void tremoloDepth(double decibels, LfoPerformanceContext context = {});
+  void tremoloLinearGainDepth(double gain, LfoPerformanceContext context = {});
   void tremoloRate(double hertz, LfoPerformanceContext context = {});
   void tremoloRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
   void panLfoDepth(double depth, LfoPerformanceContext context = {});

@@ -103,6 +103,12 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
         if (std::abs(*event.volumeDepthDecibels) > 0.0) {
           tremolo.gainMode = event.tremoloGainMode;
         }
+      } else if (event.volumeDepthLinearGain) {
+        const double depth = std::clamp(std::abs(*event.volumeDepthLinearGain), 0.0, 1.0 - 1e-9);
+        tremolo.maxDepth = std::max(tremolo.maxDepth, -20.0 * std::log10(1.0 - depth));
+        if (depth > 0.0) {
+          tremolo.gainMode = TremoloGainMode::BipolarAroundNominal;
+        }
       }
       break;
     case ModulationPerformanceTarget::TremoloRate:
@@ -202,6 +208,10 @@ double modulationControllerAmount(const ModulationPerformanceEvent& event,
     case ModulationPerformanceTarget::TremoloDepth:
       if (event.volumeDepthDecibels && profile->instruments.tremolo) {
         return normalizedLinear(std::abs(*event.volumeDepthDecibels), profile->instruments.tremolo->maxDepthDb);
+      }
+      if (event.volumeDepthLinearGain && profile->instruments.tremolo) {
+        const double depth = std::clamp(std::abs(*event.volumeDepthLinearGain), 0.0, 1.0 - 1e-9);
+        return normalizedLinear(-20.0 * std::log10(1.0 - depth), profile->instruments.tremolo->maxDepthDb);
       }
       break;
     case ModulationPerformanceTarget::PanDepth:

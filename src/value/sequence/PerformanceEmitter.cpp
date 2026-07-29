@@ -440,6 +440,12 @@ void PerformanceEmitter::tremoloDepth(double decibels, LfoPerformanceContext con
   modulation(std::move(event));
 }
 
+void PerformanceEmitter::tremoloLinearGainDepth(double gain, LfoPerformanceContext context) {
+  auto event = physicalLfoEvent(ModulationPerformanceTarget::TremoloDepth, std::move(context));
+  event.volumeDepthLinearGain = gain;
+  modulation(std::move(event));
+}
+
 void PerformanceEmitter::tremoloRate(double hertz, LfoPerformanceContext context) {
   context.frequencyHz = hertz;
   context.cyclesPerTick.reset();
@@ -629,8 +635,8 @@ void PerformanceEmitter::append(PerformanceEvent event) {
             using T = std::decay_t<decltype(typedEvent)>;
             if constexpr (std::is_same_v<T, ModulationPerformanceEvent>) {
               return typedEvent.pitchDepthSemitones.has_value() || typedEvent.volumeDepthDecibels.has_value() ||
-                     typedEvent.panDepth.has_value() || typedEvent.frequencyHz.has_value() ||
-                     typedEvent.cyclesPerTick.has_value();
+                     typedEvent.volumeDepthLinearGain.has_value() || typedEvent.panDepth.has_value() ||
+                     typedEvent.frequencyHz.has_value() || typedEvent.cyclesPerTick.has_value();
             } else if constexpr (std::is_same_v<T, VibratoDelayPerformanceEvent> ||
                                  std::is_same_v<T, TremoloDelayPerformanceEvent>) {
               return typedEvent.milliseconds.has_value() || typedEvent.tempoRelative;

@@ -336,7 +336,12 @@ struct RenderTrackState {
   std::optional<ValueQuantization> sourceExpressionQuantization;
   double panExpressionGain = 1.0;
   double simulatedTremoloGain = 1.0;
-  bool tremoloDepthIsDecibels = false;
+  enum class TremoloDepthUnit {
+    LegacyUnipolar,
+    Decibels,
+    LinearGain,
+  };
+  TremoloDepthUnit tremoloDepthUnit = TremoloDepthUnit::LegacyUnipolar;
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
   SimulatedLfoState tremolo;
   double sourcePanPosition = 0.0;
@@ -729,12 +734,15 @@ void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, 
 }
 
 [[nodiscard]] double simulatedTremoloGain(const RenderTrackState& state, double lfoValue) {
-  if (state.tremoloDepthIsDecibels) {
+  if (state.tremoloDepthUnit == RenderTrackState::TremoloDepthUnit::Decibels) {
     double gainDecibels = state.tremolo.depth * lfoValue;
     if (state.tremoloGainMode == TremoloGainMode::NoBoost) {
       gainDecibels -= state.tremolo.depth;
     }
     return std::pow(10.0, gainDecibels / 20.0);
+  }
+  if (state.tremoloDepthUnit == RenderTrackState::TremoloDepthUnit::LinearGain) {
+    return std::max(0.0, 1.0 + state.tremolo.depth * lfoValue);
   }
 
   const double normalizedLfo = (lfoValue + 1.0) / 2.0;
@@ -760,10 +768,10 @@ void flushSimulatedTremolo(MidiTrack& track, RenderTrackState& state, u64 upToTi
 }
 
 void setSimulatedTremoloDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double depth,
-                              bool decibels, TremoloGainMode gainMode, const MidiExportOptions& options,
-                              ModulationConversionPolicy modulationConversion) {
+                              RenderTrackState::TremoloDepthUnit unit, TremoloGainMode gainMode,
+                              const MidiExportOptions& options, ModulationConversionPolicy modulationConversion) {
   state.tremolo.depth = std::max(0.0, depth);
-  state.tremoloDepthIsDecibels = decibels;
+  state.tremoloDepthUnit = unit;
   state.tremoloGainMode = gainMode;
   const double gain = tremoloGainAtCurrentPhase(state);
   if (gain != state.simulatedTremoloGain) {
@@ -778,9 +786,10 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
     return;
   }
 
-  const auto fallback = !state.tremolo.waveform && !state.tremoloDepthIsDecibels
-                            ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
-                            : LfoInitialPhaseFallback::Zero;
+  const auto fallback =
+      !state.tremolo.waveform && state.tremoloDepthUnit == RenderTrackState::TremoloDepthUnit::LegacyUnipolar
+          ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
+          : LfoInitialPhaseFallback::Zero;
   restartLfo(state.tremolo, tick, fallback);
   const double gain = tremoloGainAtCurrentPhase(state);
   if (gain != state.simulatedTremoloGain) {
@@ -1035,14 +1044,21 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               }
               case ModulationPerformanceTarget::TremoloDepth: {
                 const bool physicalDecibels = typedEvent.volumeDepthDecibels.has_value();
-                const auto fallback = !typedEvent.waveform && !physicalDecibels
+                const bool physicalLinearGain = typedEvent.volumeDepthLinearGain.has_value();
+                const auto fallback = !typedEvent.waveform && !physicalDecibels && !physicalLinearGain
                                           ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
                                           : LfoInitialPhaseFallback::Zero;
                 configureLfo(state.tremolo, typedEvent.header.tick, typedEvent, fallback);
-                setSimulatedTremoloDepth(
-                    track, state, typedEvent.header.tick, channel,
-                    physicalDecibels ? *typedEvent.volumeDepthDecibels : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5,
-                    physicalDecibels, typedEvent.tremoloGainMode, options, modulationConversion);
+                const auto unit = physicalDecibels
+                                      ? RenderTrackState::TremoloDepthUnit::Decibels
+                                      : (physicalLinearGain ? RenderTrackState::TremoloDepthUnit::LinearGain
+                                                            : RenderTrackState::TremoloDepthUnit::LegacyUnipolar);
+                setSimulatedTremoloDepth(track, state, typedEvent.header.tick, channel,
+                                         physicalDecibels
+                                             ? *typedEvent.volumeDepthDecibels
+                                             : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
+                                                                   : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
+                                         unit, typedEvent.tremoloGainMode, options, modulationConversion);
                 break;
               }
               case ModulationPerformanceTarget::VibratoRate:
