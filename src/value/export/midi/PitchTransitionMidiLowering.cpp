@@ -243,6 +243,11 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 
     auto bend = write.bend;
     bend.semitones = pitch.semitones + heldVoice.semitones;
+    if (write.reset) {
+      // The reset occurs at the next attack, but it is not part of that voice's
+      // transition path.
+      bend.header.automation.reset();
+    }
     resolved.push_back(std::move(bend));
   }
   return resolved;
@@ -333,163 +338,6 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   return bends;
 }
 
-struct SourcePitchBendRange {
-  PerformanceEventHeader header;
-  u16 cents = 200;
-};
-
-[[nodiscard]] std::vector<SourcePitchBendRange> sourcePitchBendRanges(const std::vector<PerformanceEvent>& events) {
-  std::vector<SourcePitchBendRange> ranges;
-  for (const auto& event : events) {
-    if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(&event)) {
-      ranges.push_back(SourcePitchBendRange{
-          .header = range->header,
-          .cents = range->cents,
-      });
-    }
-  }
-  std::ranges::stable_sort(ranges, [](const SourcePitchBendRange& lhs, const SourcePitchBendRange& rhs) {
-    return std::tie(lhs.header.tick, lhs.header.sequence) < std::tie(rhs.header.tick, rhs.header.sequence);
-  });
-  return ranges;
-}
-
-[[nodiscard]] u16 sourcePitchBendRangeAt(const std::vector<SourcePitchBendRange>& ranges, u64 tick) {
-  u16 cents = 200;
-  for (const auto& range : ranges) {
-    if (range.header.tick > tick) {
-      break;
-    }
-    cents = range.cents;
-  }
-  return cents;
-}
-
-[[nodiscard]] bool inside(u64 tick, u64 startTick, std::optional<u64> endTick) {
-  return tick >= startTick && (!endTick || tick < *endTick);
-}
-
-[[nodiscard]] u16 pitchBendRangeFor(const std::vector<PitchBendPerformanceEvent>& bends, u64 startTick,
-                                    std::optional<u64> endTick) {
-  double activeBend = 0.0;
-  double extent = 0.0;
-  for (const auto& bend : bends) {
-    if (bend.header.tick < startTick) {
-      activeBend = bend.semitones;
-      continue;
-    }
-    if (endTick && bend.header.tick >= *endTick) {
-      break;
-    }
-    extent = std::max(extent, std::abs(activeBend));
-    activeBend = bend.semitones;
-    extent = std::max(extent, std::abs(activeBend));
-  }
-  extent = std::max(extent, std::abs(activeBend));
-
-  return std::max<u16>(
-      200, static_cast<u16>(std::clamp(std::ceil(extent * 100.0), 0.0, 12'700.0)));
-}
-
-[[nodiscard]] PerformanceEventHeader pitchBendRangeHeader(const PerformanceAutomation& origin, u64 tick,
-                                                          const std::vector<PitchBendPerformanceEvent>& bends) {
-  auto header = atAutomationTick(origin, tick);
-  for (const auto& bend : bends) {
-    if (bend.header.tick == tick) {
-      header.sequence = std::min(header.sequence, bend.header.sequence);
-    }
-  }
-  return header;
-}
-
-void stabilizePitchBendRanges(std::vector<PerformanceEvent>& events, const std::vector<NoteSpan>& notes,
-                              const std::vector<const PerformanceAutomation*>& transitions,
-                              const std::vector<PitchBendPerformanceEvent>& bends) {
-  struct VoiceRange {
-    PerformanceNoteId voice;
-    const PerformanceAutomation* origin = nullptr;
-    u64 startTick = 0;
-    u64 lastAttackTick = 0;
-    std::optional<u64> endTick;
-    u16 cents = 200;
-  };
-
-  const auto sourceRanges = sourcePitchBendRanges(events);
-  std::vector<VoiceRange> ranges;
-  for (const auto* automation : transitions) {
-    const auto& transition = *pitchTransitionIntent(*automation);
-    const auto* anchor = findNote(notes, transition.note);
-    if (anchor == nullptr) {
-      continue;
-    }
-    for (const auto& note : notes) {
-      if (!affectsNote(*automation, transition, *anchor, note)) {
-        continue;
-      }
-      if (std::ranges::none_of(ranges, [&](const VoiceRange& range) { return range.voice == note.pitchBendVoice; })) {
-        ranges.push_back(VoiceRange{
-            .voice = note.pitchBendVoice,
-            .origin = automation,
-        });
-      }
-    }
-  }
-
-  for (auto& range : ranges) {
-    bool foundVoice = false;
-    for (const auto& note : notes) {
-      if (note.pitchBendVoice != range.voice) {
-        continue;
-      }
-      if (!foundVoice) {
-        range.startTick = note.source.header.tick;
-        range.lastAttackTick = note.source.header.tick;
-        foundVoice = true;
-      } else {
-        range.startTick = std::min(range.startTick, note.source.header.tick);
-        range.lastAttackTick = std::max(range.lastAttackTick, note.source.header.tick);
-      }
-    }
-    for (const auto& note : notes) {
-      if (note.pitchBendVoice == range.voice || note.source.header.tick <= range.lastAttackTick) {
-        continue;
-      }
-      range.endTick = range.endTick ? std::min(*range.endTick, note.source.header.tick) : note.source.header.tick;
-    }
-    range.cents = pitchBendRangeFor(bends, range.startTick, range.endTick);
-  }
-
-  for (auto& event : events) {
-    auto* sourceRange = std::get_if<PitchBendRangePerformanceEvent>(&event);
-    if (sourceRange == nullptr) {
-      continue;
-    }
-    for (const auto& range : ranges) {
-      if (inside(sourceRange->header.tick, range.startTick, range.endTick)) {
-        sourceRange->cents = range.cents;
-      }
-    }
-  }
-
-  // Sensitivity is channel state, so establish one range at the physical
-  // attack and retain it for the complete sounding voice.
-  for (const auto& range : ranges) {
-    events.emplace_back(PitchBendRangePerformanceEvent{
-        .header = pitchBendRangeHeader(*range.origin, range.startTick, bends),
-        .cents = range.cents,
-    });
-    const bool nextVoiceSetsRange = range.endTick && std::ranges::any_of(ranges, [&](const VoiceRange& next) {
-                                      return next.startTick == *range.endTick;
-                                    });
-    if (range.endTick && !nextVoiceSetsRange) {
-      events.emplace_back(PitchBendRangePerformanceEvent{
-          .header = pitchBendRangeHeader(*range.origin, *range.endTick, bends),
-          .cents = sourcePitchBendRangeAt(sourceRanges, *range.endTick),
-      });
-    }
-  }
-}
-
 void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
                      const std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions) {
   auto bends = takeSourcePitchBends(events);
@@ -525,7 +373,6 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
   }
 
   auto resolved = resolvePitchBends(std::move(bends));
-  stabilizePitchBendRanges(events, notes, renderedTransitions, resolved);
   for (auto& bend : resolved) {
     events.emplace_back(std::move(bend));
   }
