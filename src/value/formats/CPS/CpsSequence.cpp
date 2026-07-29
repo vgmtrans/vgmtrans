@@ -911,8 +911,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         event.warning("CPS repeat has no discovered start");
         return event.ignore();
       }
-      return count == 0 ? event.declaredLoop(destination)
-                        : event.repeatUntil(slot, static_cast<u32>(count) + 1, destination);
+      const Address next = event.nextAddress();
+      // CPS3 uses a terminal 127-pass top-level repeat as a practical infinity.
+      const bool practicalLoop =
+          isCps3(version) && slot == 0 && count == 0x7e && reader.has(next.value, 1) && reader.u8At(next.value) == 0xff;
+      return count == 0 || practicalLoop ? event.declaredLoop(destination)
+                                         : event.repeatUntil(slot, static_cast<u32>(count) + 1, destination);
     }
     case 0xd8:
     case 0xd9:

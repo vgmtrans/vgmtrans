@@ -412,6 +412,23 @@ Fixture cps3RepeatBreakFixture() {
   return fixture;
 }
 
+Fixture cps3PracticalLoopFixture() {
+  auto fixture = cps3Fixture();
+  std::fill(fixture.bytes.begin() + 0x921, fixture.bytes.begin() + 0x940, 0);
+  bytesAt(fixture.bytes, 0x921,
+          {
+              0xd0,  // repeat start
+              0xbf,
+              0x3c,
+              1,
+              1,  // note and wait
+              0xd4,
+              0x7e,  // 127 total passes
+              0xff,
+          });
+  return fixture;
+}
+
 Fixture lateCps2SignedRepeatBreakFixture() {
   auto fixture = lateCps2Fixture();
   bytesAt(fixture.bytes, 0x1121,
@@ -965,6 +982,25 @@ void cpsLateRepeatBreakUsesEndOfCommandBase() {
   }
   expect(notes == std::vector<std::pair<u64, double>>{{0, 60}, {1, 61}, {2, 60}, {3, 62}},
          "late repeat breaks should resolve their forward displacement from the end of the encoded command");
+}
+
+void cps3TerminalMaxRepeatActsAsPracticalLoop() {
+  const auto result = scan(cps3PracticalLoopFixture());
+  expect(result.diagnostics.empty(), "CPS3 practical-loop fixture should scan without diagnostics");
+  const auto& sequence = onlySequence(result);
+  const auto& commands = sequence.program.tracks[0].commands;
+  const auto repeat =
+      std::ranges::find_if(commands, [](const SourceCommand& command) { return command.opcode == 0xd4; });
+  expect(repeat != commands.end() && repeat->flow.unconditionalJump(),
+         "a terminal CPS3 D4 7E repeat should decode through the declared-loop path");
+
+  const auto performance = SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1})
+                               .render(sequence.program, cpsLateDialect());
+  const auto notes = std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 2 && notes == 2,
+         "one requested loop should replay a CPS3 practical loop once instead of expanding all 127 passes");
 }
 
 void cpsLateControlFlowOffsetsFollowEachDriver() {
