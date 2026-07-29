@@ -563,40 +563,29 @@ struct Playback {
   }
 
   void pitchSlide(u8 delay, u8 duration, u8 target, s8 initialTranspose) {
-    const bool gx = isGx();
-    if (!track.previousKey || !track.previousNote.valid() || (gx && duration == 0)) {
+    if (!track.previousKey || !track.previousNote.valid()) {
+      return;
+    }
+    // The Z80 driver consumes F3 as part of the preceding note-on and
+    // evaluates its target through the same transpose path as that note.
+    delay = delay == 0 ? 1 : delay;
+    duration = static_cast<u8>(duration + 1);
+    if (duration == 0) {
       return;
     }
     double destination;
-    u64 slideStart;
-    if (gx) {
-      // GX's look-ahead path adds channel transpose (but not loop transpose)
-      // and clamps to its 0..95 pitch domain.
-      destination = std::clamp<int>(static_cast<int>(target) + track.transpose, 0, 95) + 24.0;
-      // It recognizes F3 one music tick after note-on, after that tick's
-      // effect update.
-      slideStart = track.previousNoteStart + static_cast<u64>(delay) + 2;
+    if (track.previousDrumPitch) {
+      // Drum notes use the sequence key only to select a table row. Before
+      // F3 is evaluated, the driver replaces it with that row's sounding
+      // pitch. The drum region already bakes this substitution into its
+      // tuning, so express F3 as the same relative change while keeping the
+      // exported kit key stable.
+      destination = *track.previousKey + target - *track.previousDrumPitch;
     } else {
-      // The Z80 driver consumes F3 as part of the preceding note-on and
-      // evaluates its target through the same transpose path as that note.
-      delay = delay == 0 ? 1 : delay;
-      duration = static_cast<u8>(duration + 1);
-      if (duration == 0) {
-        return;
-      }
-      if (track.previousDrumPitch) {
-        // Drum notes use the sequence key only to select a table row. Before
-        // F3 is evaluated, the driver replaces it with that row's sounding
-        // pitch. The drum region already bakes this substitution into its
-        // tuning, so express F3 as the same relative change while keeping the
-        // exported kit key stable.
-        destination = *track.previousKey + target - *track.previousDrumPitch;
-      } else {
-        destination = target + 24.0 + initialTranspose + track.transpose + track.loopTranspose[0] / 32.0 +
-                      track.loopTranspose[1] / 32.0;
-      }
-      slideStart = track.previousNoteStart + delay;
+      destination = target + 24.0 + initialTranspose + track.transpose + track.loopTranspose[0] / 32.0 +
+                    track.loopTranspose[1] / 32.0;
     }
+    const u64 slideStart = track.previousNoteStart + delay;
     if (slideStart >= track.previousNoteStart + track.previousNoteDuration) {
       return;
     }
@@ -968,6 +957,13 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
           event.s8("bend", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
     }
     case 0xf3: {
+      if (gx) {
+        auto event = cursor.sourceOnly("Ignored Pitch Slide");
+        static_cast<void>(event.u8("delay", SemanticOperandRole::Duration));
+        static_cast<void>(event.u8("duration", SemanticOperandRole::Duration));
+        static_cast<void>(event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey));
+        return event.ignore();
+      }
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Portamento);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
