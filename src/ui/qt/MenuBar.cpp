@@ -162,13 +162,6 @@ void MenuBar::appendOptionsMenu() {
         Settings::the()->conversion.setModulationConversion(conversion);
       });
 
-  QAction* onlyUsedInstruments = m_optionsMenu->addAction(tr("Export only used instruments"));
-  onlyUsedInstruments->setCheckable(true);
-  onlyUsedInstruments->setChecked(Settings::the()->conversion.exportOnlyUsedInstruments());
-  connect(onlyUsedInstruments, &QAction::toggled, this, [](bool checked) {
-    Settings::the()->conversion.setExportOnlyUsedInstruments(checked);
-  });
-
   QMenu* loops = m_optionsMenu->addMenu(tr("Sequence Loops"));
   auto* loopsGroup = new QActionGroup(loops);
   loopsGroup->setExclusive(true);
@@ -226,6 +219,13 @@ void MenuBar::appendOptionsMenu() {
   });
   connect(loops, &QMenu::aboutToShow, this, updateLoopMenu);
   updateLoopMenu();
+
+  QAction* onlyUsedInstruments = m_optionsMenu->addAction(tr("Export used instrument data only"));
+  onlyUsedInstruments->setCheckable(true);
+  onlyUsedInstruments->setChecked(Settings::the()->conversion.exportOnlyUsedInstruments());
+  connect(onlyUsedInstruments, &QAction::toggled, this, [](bool checked) {
+    Settings::the()->conversion.setExportOnlyUsedInstruments(checked);
+  });
 
   QAction* skipChannel10 = m_optionsMenu->addAction(tr("Skip MIDI channel 10"));
   skipChannel10->setCheckable(true);

@@ -72,6 +72,7 @@ public:
 
   [[nodiscard]] const Collection* collection(CollectionId id) const;
   [[nodiscard]] const Collection* firstCollectionContaining(AssetId asset) const;
+  [[nodiscard]] size_t countCollectionsContaining(AssetId asset) const;
 
 private:
   friend class detail::SessionSnapshotAccess;

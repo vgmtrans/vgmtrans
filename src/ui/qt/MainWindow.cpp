@@ -746,20 +746,35 @@ void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::S
     return;
   }
 
+  const auto instrumentSet =
+      vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()};
   vgmtrans::core::ExportRequest request;
-  applySequenceRenderSettings(request.sequence);
+  const bool fromDetectedFiles = index.model() == m_vgmfile_listview->model();
+  if (fromDetectedFiles) {
+    applyCollectionExportSettings(request);
+  } else {
+    applySequenceRenderSettings(request.sequence);
+  }
+  const bool ambiguousCollection =
+      fromDetectedFiles && request.exportOnlyUsedInstruments &&
+      m_workspace.snapshot().countCollectionsContaining(instrumentSet) > 1;
   const bool soundFont = format == vgmtrans::core::SynthExportFormat::SoundFont2;
   try {
-    saveArtifact(index,
-                 m_workspace.exportInstrumentSet(
-                     vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, format, request),
+    auto artifact = m_workspace.exportInstrumentSet(instrumentSet, format, request);
+    const bool exportable = !artifact.bytes.empty();
+    saveArtifact(index, std::move(artifact),
                  soundFont ? tr("The instrument set could not be exported as SF2.")
                            : tr("The instrument set could not be exported as DLS."),
                  soundFont ? "sf2" : "dls");
+    if (ambiguousCollection && exportable) {
+      showToast(tr("No instrument data was excluded because this instrument set is used by multiple collections."
+                   "\n\nExport directly from a collection to resolve this ambiguity."),
+                ToastType::Info, 10000);
+    }
   } catch (const std::exception& error) {
     const QString message = QString::fromUtf8(error.what());
     statusBarContent->setStatus(index.data(Qt::DisplayRole).toString(), message);
-    showToast(message, ToastType::Error, 15000);
+    showToast(message, ToastType::Error, 10000);
   }
 }
 

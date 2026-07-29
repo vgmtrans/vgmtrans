@@ -490,6 +490,9 @@ Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore&
   if (const auto* collection = snapshot.firstCollectionContaining(instrumentSetId)) {
     auto collectionRequest = request;
     collectionRequest.kinds = {kind};
+    if (snapshot.countCollectionsContaining(instrumentSetId) > 1) {
+      collectionRequest.exportOnlyUsedInstruments = false;
+    }
     auto artifacts = exportCollection(snapshot, sources, collection->id, collectionRequest, dialects, formats);
     if (!artifacts.empty()) {
       artifacts.front().filename = baseName + extension;
