@@ -1329,20 +1329,22 @@ void performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack() {
          "pitch-bend lowering should not reset a release tail merely because the track has no later attack");
 }
 
-void performanceMidiRendererYieldsDeferredResetToAnExplicitPitchBend() {
+void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   PerformanceTrack track{
       .id = TrackId{0},
       .sourceTrackNumber = 0,
-      .endTick = 16,
+      .endTick = 12,
   };
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{11}, SourceAnnotationId{12}, 0, nextSequence, nextNote, nextAutomation};
-  const PerformanceNoteId slidingNote = out.note(60, 1.0, 8);
-  out.pitchSlide(slidingNote, 60, 64, 4);
-  out.at(10).pitchBend(-1.0);
-  out.at(12).note(67, 1.0, 4);
+  const PerformanceNoteId first = out.note(60, 1.0, 4);
+  out.at(4).pitchBend(0.25);
+  const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
+  out.at(4).pitchSlide(second, 60, 64, PitchSlideTiming::fromTicks(0)).continueFrom(first);
+  out.at(6).pitchBend(-0.25);
+  out.at(8).note(67, 1.0, 4);
 
   const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
       PerformanceSequence{
@@ -1351,12 +1353,54 @@ void performanceMidiRendererYieldsDeferredResetToAnExplicitPitchBend() {
           .tracks = {track},
       },
       {});
-  const auto resetAtNextAttack = std::ranges::find_if(lowered.tracks[0].events, [](const PerformanceEvent& event) {
-    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-    return bend != nullptr && bend->header.tick == 12 && bend->semitones == 0.0;
-  });
-  expect(resetAtNextAttack == lowered.tracks[0].events.end(),
-         "a later explicit pitch bend should own the channel instead of being erased by a deferred slide reset");
+  const auto hasBend = [&](u64 tick, double semitones) {
+    return std::ranges::any_of(lowered.tracks[0].events, [&](const PerformanceEvent& event) {
+      const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+      return bend != nullptr && bend->header.tick == tick && bend->semitones == semitones;
+    });
+  };
+  expect(hasBend(4, 4.25) && hasBend(6, 3.75) && hasBend(8, -0.25),
+         "source bends should stay relative to a held transition and survive its reset at the next attack");
+
+  PerformanceTrack sameVoiceTrack{
+      .id = TrackId{1},
+      .sourceTrackNumber = 1,
+      .endTick = 12,
+  };
+  PerformanceEmitter sameVoiceOut{sameVoiceTrack, CommandId{13}, SourceAnnotationId{14}, 0,
+                                  nextSequence,   nextNote,      nextAutomation};
+  const PerformanceNoteId sameVoiceNote = sameVoiceOut.note(64, 1.0, 8);
+  sameVoiceOut.pitchBend(1.0);
+  sameVoiceOut.at(4).pitchSlide(sameVoiceNote, 65, 67, 2);
+  sameVoiceOut.at(7).pitchBend(-1.0);
+  sameVoiceOut.at(8).note(60, 1.0, 4);
+  const PerformanceSequence sameVoiceLowered = lowerMidiPerformanceAutomation(
+      PerformanceSequence{
+          .timebase = Timebase{.ppqn = 48},
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+          .tracks = {sameVoiceTrack},
+      },
+      {});
+  const auto sameVoiceStart =
+      std::ranges::find_if(sameVoiceLowered.tracks[0].events, [](const PerformanceEvent& event) {
+        const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+        return bend != nullptr && bend->header.tick == 4;
+      });
+  const auto sourceTakeover =
+      std::ranges::find_if(sameVoiceLowered.tracks[0].events, [](const PerformanceEvent& event) {
+        const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+        return bend != nullptr && bend->header.tick == 7 && bend->semitones == -1.0;
+      });
+  const auto resetAtNextAttack =
+      std::ranges::find_if(sameVoiceLowered.tracks[0].events, [](const PerformanceEvent& event) {
+        const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+        return bend != nullptr && bend->header.tick == 8 && bend->semitones == 0.0;
+      });
+  expect(sameVoiceStart != sameVoiceLowered.tracks[0].events.end() &&
+             std::get<PitchBendPerformanceEvent>(*sameVoiceStart).semitones == 1.0 &&
+             sourceTakeover != sameVoiceLowered.tracks[0].events.end() &&
+             resetAtNextAttack == sameVoiceLowered.tracks[0].events.end(),
+         "a same-voice transition should replace its starting bend and yield to a later source bend");
 }
 
 void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
@@ -2465,7 +2509,7 @@ void runValueMidiTests() {
   performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote();
   performanceMidiRendererDefersPitchResetUntilTheNextAttack();
   performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack();
-  performanceMidiRendererYieldsDeferredResetToAnExplicitPitchBend();
+  performanceMidiRendererCombinesSourceBendWithPitchTransitions();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
