@@ -430,6 +430,13 @@ const char* konamiArcadeVersionName(KonamiArcadeVersion version) {
   return "Unknown";
 }
 
+double konamiArcadeDrumPitch(KonamiArcadeVersion version, const KonamiArcadeDrum& drum) {
+  if (version == KonamiArcadeVersion::Gx) {
+    return drum.unityKey + drum.pitch / 256.0;
+  }
+  return drum.unityKey + (drum.pitch >> 2) / 16.0;
+}
+
 std::optional<KonamiArcadeLayout> findKonamiArcadeLayout(const SourceFile& source, ByteReader reader,
                                                          std::vector<Diagnostic>* diagnostics) {
   if (source.attribute(mame::kMameFormatAttribute) != kKonamiArcadeFormatName) {

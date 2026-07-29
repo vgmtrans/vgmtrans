@@ -185,6 +185,7 @@ struct TrackState {
   std::optional<double> emittedPitchBend;
   std::optional<double> emittedTuningCents;
   std::optional<double> previousKey;
+  std::optional<double> previousDrumPitch;
   PerformanceNoteId previousNote;
   u64 previousNoteStart = 0;
   u32 previousNoteDuration = 0;
@@ -360,7 +361,7 @@ struct Playback {
   }
 
   void note(u8 sourceKey, u8 delta, u8 durationParameter, bool durationSpecified, u8 velocity, s8 initialAttenuation,
-            s8 initialTranspose, u8 drumDuration, u8 drumPan) {
+            s8 initialTranspose, u8 drumDuration, u8 drumPan, double drumPitch) {
     const bool gx = isGx();
     const bool isDrum = percussion();
     bool usesDrumDefaultDuration = false;
@@ -479,6 +480,7 @@ struct Playback {
     track.previousNoteStart = vm.tick();
     track.previousNoteDuration = duration;
     track.previousKey = key;
+    track.previousDrumPitch = isDrum ? std::optional<double>{drumPitch} : std::nullopt;
     track.previousNote = note;
     track.previousTied = durationRate >= 100 && !isDrum;
     track.durationTieCanceled = false;
@@ -582,8 +584,17 @@ struct Playback {
       if (duration == 0) {
         return;
       }
-      destination = target + 24.0 + initialTranspose + track.transpose + track.loopTranspose[0] / 32.0 +
-                    track.loopTranspose[1] / 32.0;
+      if (track.previousDrumPitch) {
+        // Drum notes use the sequence key only to select a table row. Before
+        // F3 is evaluated, the driver replaces it with that row's sounding
+        // pitch. The drum region already bakes this substitution into its
+        // tuning, so express F3 as the same relative change while keeping the
+        // exported kit key stable.
+        destination = *track.previousKey + target - *track.previousDrumPitch;
+      } else {
+        destination = target + 24.0 + initialTranspose + track.transpose + track.loopTranspose[0] / 32.0 +
+                      track.loopTranspose[1] / 32.0;
+      }
       slideStart = track.previousNoteStart + delay;
     }
     if (slideStart >= track.previousNoteStart + track.previousNoteDuration) {
@@ -743,7 +754,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     event.invoke<&Playback::note>(key, event.state<&TrackState::previousDelta>(),
                                   event.state<&TrackState::previousDurationParameter>(), durationSpecified, velocity,
                                   sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
-                                  drum.pan);
+                                  drum.pan, konamiArcadeDrumPitch(layout.version, drum));
     return event.wait(event.state<&TrackState::previousDelta>());
   }
 

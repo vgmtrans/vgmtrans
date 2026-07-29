@@ -61,6 +61,8 @@ struct KonamiArcadeDrum {
   core::SourceRange range;
 };
 
+[[nodiscard]] double konamiArcadeDrumPitch(KonamiArcadeVersion version, const KonamiArcadeDrum& drum);
+
 struct KonamiArcadeTrackLayout {
   u32 number = 0;
   u64 encodedAddress = 0;
