@@ -203,6 +203,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/base/Source.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SynthModel.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/Ym2151.h
       ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h
@@ -237,6 +238,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSequence.cpp
@@ -266,6 +271,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/Akao.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/Cps.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h

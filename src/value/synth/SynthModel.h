@@ -9,9 +9,11 @@
 #include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
 #include "value/model/ModulationModel.h"
+#include "value/synth/Ym2151.h"
 
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -113,6 +115,10 @@ struct Instrument {
   double reverb = kDefaultInstrumentReverbSend;
   std::string name;
   SourceRange range;
+  // Hardware-synth voices are retained in their native, exporter-neutral form.
+  // An instrument may also have sampled regions for layered hardware designs.
+  using SynthVoice = std::variant<Ym2151Voice>;
+  std::optional<SynthVoice> synthVoice;
   std::vector<Region> regions;
   InstrumentModulation modulation;
 };

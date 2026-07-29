@@ -13,6 +13,7 @@
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/AkaoSnes/AkaoSnes.h"
 #include "value/formats/CapcomSnes/CapcomSnes.h"
+#include "value/formats/CPS/Cps.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/formats/NinSnes/NinSnes.h"
@@ -77,6 +78,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(snes_spc::snesSpcExtractorDefinition());
   session.registerFormat(psf::psfExtractorDefinition());
   session.registerFormat(capcom_snes::capcomSnesDefinition());
+  session.registerFormat(cps::cpsDefinition());
   session.registerFormat(nds::ndsDefinition());
   session.registerFormat(akao_snes::akaoSnesDefinition());
   session.registerFormat(akao::akaoDefinition());

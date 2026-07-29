@@ -312,6 +312,10 @@ struct ModulationPerformanceEvent {
   // modulation from these physical values.
   std::optional<double> pitchDepthSemitones;
   std::optional<double> volumeDepthDecibels;
+  // Maximum linear-gain excursion for hardware that multiplies nominal
+  // amplitude by 1 + depth * LFO. Unlike decibels, this exactly preserves an
+  // asymmetric pair such as 0.25x/1.75x around nominal gain.
+  std::optional<double> volumeDepthLinearGain;
   std::optional<double> panDepth;
   std::optional<double> frequencyHz;
   std::optional<double> cyclesPerTick;

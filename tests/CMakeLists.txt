@@ -2,6 +2,7 @@ add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
+    formats/CpsModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
     formats/NinSnesModuleTests.cpp
@@ -54,6 +55,7 @@ set(VGMTRANS_PARITY_KONAMI_SNES_FILE "" CACHE FILEPATH "Konami SNES RSN or SPC f
 set(VGMTRANS_PARITY_NIN_SNES_FILES "" CACHE STRING
     "Semicolon-separated NinSnes RSN or SPC files used for original/value parity")
 set(VGMTRANS_PARITY_KONAMI_ARCADE_FILE "" CACHE FILEPATH "Konami Arcade MAME ZIP file used for original/value parity")
+set(VGMTRANS_PARITY_CPS_FILES "" CACHE STRING "Semicolon-separated CPS1/CPS2/CPS3 MAME ZIP files used for parity")
 set(VGMTRANS_PARITY_AKAO_FILE "" CACHE FILEPATH "Akao PSF or raw file used for original/value parity")
 set(VGMTRANS_PARITY_NDS_FILE "" CACHE FILEPATH "NDS or 2SF file used for original/value parity")
 
@@ -114,6 +116,17 @@ if(VGMTRANS_PARITY_KONAMI_ARCADE_FILE)
   add_vgmtrans_parity_corpus_test(
     konami-arcade-summary konami-arcade konami-arcade-direct-summary "${VGMTRANS_PARITY_KONAMI_ARCADE_FILE}")
 endif()
+
+set(cps_parity_index 0)
+foreach(cps_file IN LISTS VGMTRANS_PARITY_CPS_FILES)
+  math(EXPR cps_parity_index "${cps_parity_index} + 1")
+  add_vgmtrans_parity_corpus_test(
+    "cps-${cps_parity_index}-summary" cps cps-direct-summary "${cps_file}")
+  add_vgmtrans_parity_corpus_test(
+    "cps-${cps_parity_index}-midi" cps cps-direct-midi "${cps_file}")
+  add_vgmtrans_parity_corpus_test(
+    "cps-${cps_parity_index}-synth" cps cps-direct-synth "${cps_file}")
+endforeach()
 
 if(VGMTRANS_PARITY_AKAO_FILE)
   add_vgmtrans_parity_corpus_test(

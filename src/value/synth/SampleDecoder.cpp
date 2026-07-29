@@ -28,6 +28,12 @@ constexpr unsigned kNdsAdpcmTable[89] = {
     0x315B, 0x364B, 0x3BB9, 0x41B2, 0x4844, 0x4F7E, 0x5771, 0x602F, 0x69CE, 0x7462, 0x7FFF};
 
 constexpr int kNdsImaIndexTable[9] = {-1, -1, -1, -1, 2, 4, 6, 8};
+constexpr std::array<s16, 49> kOkiStepTable = {
+    16,  17,  19,  21,  23,  25,  28,  31,  34,  37,  41,   45,   50,   55,   60,   66,  73,
+    80,  88,  97,  107, 118, 130, 143, 157, 173, 190, 209,  230,  253,  279,  307,  337, 371,
+    408, 449, 494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552,
+};
+constexpr std::array<s8, 8> kOkiIndexShift = {-1, -1, -1, -1, 2, 4, 6, 8};
 constexpr double kPi = 3.14159265358979323846264338327950288;
 
 s32 clipSigned15(s32 x) {
@@ -290,6 +296,53 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
+[[nodiscard]] std::optional<DecodedSample> decodeOkiAdpcm(const Sample& sample, std::span<const u8> sourceBytes) {
+  if (!rangeIsValid(sample, sourceBytes)) {
+    return std::nullopt;
+  }
+
+  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  DecodedSample decoded{
+      .sampleRate = sample.sampleRate,
+      .channels = sample.channels,
+      .loop = sample.loop,
+  };
+  if (encoded.empty() && sample.codecParameter != 0) {
+    decoded.pcm.assign(sample.codecParameter, 0);
+    return decoded;
+  }
+  decoded.pcm.reserve(encoded.size() * 2);
+
+  s32 signal = 0;
+  s32 stepIndex = 0;
+  auto emit = [&](u8 nibble) {
+    const s32 step = kOkiStepTable[stepIndex];
+    s32 difference = step / 8;
+    if ((nibble & 1) != 0) {
+      difference += step / 4;
+    }
+    if ((nibble & 2) != 0) {
+      difference += step / 2;
+    }
+    if ((nibble & 4) != 0) {
+      difference += step;
+    }
+    signal += (nibble & 8) != 0 ? -difference : difference;
+    signal = std::clamp<s32>(signal, -2048, 2047);
+    stepIndex = std::clamp<s32>(stepIndex + kOkiIndexShift[nibble & 7], 0, 48);
+
+    // The MSM6295 path used by CPS1 scales the 12-bit decoder output by 11
+    // before presenting PCM. Keeping that conversion here preserves the
+    // hardware level without target-specific negative attenuation.
+    decoded.pcm.push_back(static_cast<s16>(std::clamp<s32>(signal * 11, -32768, 32767)));
+  };
+  for (const u8 value : encoded) {
+    emit(value >> 4);
+    emit(value & 0x0f);
+  }
+  return decoded;
+}
+
 [[nodiscard]] std::optional<DecodedSample> decodeNdsImaAdpcm(const Sample& sample, std::span<const u8> sourceBytes) {
   if (!rangeIsValid(sample, sourceBytes) || sample.encodedData.offset < 4) {
     return std::nullopt;
@@ -413,8 +466,9 @@ std::optional<DecodedSample> decodeSample(const Sample& sample, std::span<const 
       return decodePsxAdpcm(sample, sourceBytes);
     case AudioCodec::KonamiK054539Adpcm:
       return decodeKonamiK054539Adpcm(sample, sourceBytes);
-    case AudioCodec::Unknown:
     case AudioCodec::OkiAdpcm:
+      return decodeOkiAdpcm(sample, sourceBytes);
+    case AudioCodec::Unknown:
       return std::nullopt;
   }
   return std::nullopt;
