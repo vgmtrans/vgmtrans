@@ -244,6 +244,13 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
         .precisionHint = LevelPrecisionHint::SevenBit,
     });
   }
+  if (behavior.initialExpression) {
+    track.events.emplace_back(ExpressionPerformanceEvent{
+        .header = header,
+        .linearGain = *behavior.initialExpression,
+        .precisionHint = LevelPrecisionHint::SevenBit,
+    });
+  }
   if (behavior.initialMonoModeChannels) {
     track.events.emplace_back(MonoModePerformanceEvent{
         .header = header,
@@ -568,8 +575,8 @@ private:
     if (dialect_.tick == nullptr) {
       return;
     }
-    PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,      runtime_.tick,
-                           outputSequence_, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
+    PerformanceEmitter out{performanceTrack_, command.id,        command.annotation,      runtime_.tick,
+                           outputSequence_,   runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr) {
       warn("Missing sequence program state", command.range);
@@ -627,8 +634,8 @@ private:
     const u64 beginTick = runtime_.tick;
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
-    PerformanceEmitter out{performanceTrack_,       command.id,        command.annotation,      beginTick,
-                           outputSequence_, runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
+    PerformanceEmitter out{performanceTrack_, command.id,        command.annotation,      beginTick,
+                           outputSequence_,   runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr || dialect_.execute == nullptr) {
       warn("Missing sequence dialect executor state", command.range);
@@ -1150,14 +1157,8 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         };
         VmTrackRuntime runtime;
         for (const SourceCommand& command : track.commands) {
-          PerformanceEmitter out{output,
-                                 command.id,
-                                 command.annotation,
-                                 0,
-                                 outputSequence,
-                                 runtime.nextNote,
-                                 runtime.nextAutomation,
-                                 behavior.panLaw};
+          PerformanceEmitter out{output,         command.id,       command.annotation,     0,
+                                 outputSequence, runtime.nextNote, runtime.nextAutomation, behavior.panLaw};
           VmApi vm = detail::VmApiAccess::make(runtime, prepass, command);
           static_cast<void>(dialect.execute(command, programState, trackState, out, vm));
         }
@@ -1242,6 +1243,12 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
     behavior.initialLevel = program.behavior.initialLevel;
   } else if (dialect.defaultBehavior.initialLevel) {
     behavior.initialLevel = dialect.defaultBehavior.initialLevel;
+  }
+
+  if (program.behavior.initialExpression) {
+    behavior.initialExpression = program.behavior.initialExpression;
+  } else if (dialect.defaultBehavior.initialExpression) {
+    behavior.initialExpression = dialect.defaultBehavior.initialExpression;
   }
 
   if (program.behavior.initialMonoModeChannels) {

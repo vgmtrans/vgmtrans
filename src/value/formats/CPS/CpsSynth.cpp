@@ -97,7 +97,7 @@ struct QSoundSampleInfo {
                                       u8 release) {
   const u16 ar = kAttackRates[std::min<u8>(attack, 63)];
   const u16 dr = kDecayRates[std::min<u8>(decay, 63)];
-  u16 sl = isCps3(version) ? static_cast<u16>(std::min<u8>(sustainLevel, 127) * 0x0202)
+  u16 sl = isCps3(version) ? static_cast<u16>((static_cast<u32>(std::min<u8>(sustainLevel, 127)) + 1) * 65535 / 128)
                            : kSustainLevels[std::min<u8>(sustainLevel, 127)];
   const u16 sr = kDecayRates[std::min<u8>(sustain, 63)];
   const u16 rr = kDecayRates[std::min<u8>(release, 63)];
@@ -114,12 +114,16 @@ struct QSoundSampleInfo {
   };
 
   double decaySeconds = stageSeconds(dr, true);
+  bool combinedDecay = false;
   if (sustainLevel >= 0x7e && sustain > 0 && decay > 1 && dr != 0 && sr != 0) {
     const double ticks = std::ceil((0xffff - sl) / static_cast<double>(dr)) + std::ceil(sl / static_cast<double>(sr));
     decaySeconds = ticks / rate;
     sl = 0;
+    combinedDecay = true;
   }
-  const double sustainAmplitude = dr <= 1 ? 1.0 : sl / 65535.0;
+  const double sustainAmplitude = combinedDecay ? 0.0
+                                                : (isCps3(version) ? (std::min<u8>(sustainLevel, 127) + 1) / 128.0
+                                                                   : (dr <= 1 ? 1.0 : sl / 65535.0));
   return Envelope{
       .attackSeconds = stageSeconds(ar, true),
       .decaySeconds = std::isinf(decaySeconds) ? decaySeconds : linearDecayToDbSeconds(decaySeconds),
@@ -299,7 +303,7 @@ void addQSoundRegion(InstrumentSetBuilder& instruments, InstrumentSetBuilder::En
     instruments.warning("CPS instrument refers to sample data outside the QSound ROM", range);
     return;
   }
-  const double fineSemitones = isCps3(version) ? fineTune / 128.0 : fineTune / 256.0;
+  const double fineSemitones = fineTune / 256.0;
   instrument
       .region(*sample,
               Region{
@@ -557,11 +561,11 @@ bool addCpsQSoundSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrume
         const InstrumentAddress address{.bank = sourceBank * 2, .program = program};
         auto instrument = addInstrument(address.bank * 128 + program, address, reader.range(begin, end - begin));
         u8 keyLow = 0;
-        for (u32 row = begin; row + 12 <= end && reader.has(row, 12) && reader.be16(row) != 0xffff; row += 12) {
+        for (u32 row = begin; row + 12 <= end && reader.has(row, 12) && reader.u8At(row) != 0xff; row += 12) {
           const u8 keyHigh = reader.u8At(row);
           const s8 panOverride = reader.s8At(row + 1);
           const s8 volumeAdjustment = reader.s8At(row + 2);
-          const double gain = static_cast<u8>(volumeAdjustment + 64) / 64.0;
+          const double gain = cpsVolumeAdjustmentGain(volumeAdjustment);
           addQSoundRegion(instruments, instrument, samples, sampleInfos, layout.version, reader.range(row, 12),
                           reader.be16(row + 4), reader.s8At(row + 6), reader.u8At(row + 7), reader.u8At(row + 8),
                           reader.u8At(row + 9), reader.u8At(row + 10), reader.u8At(row + 11),
