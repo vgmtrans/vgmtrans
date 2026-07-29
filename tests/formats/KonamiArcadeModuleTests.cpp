@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -610,6 +611,72 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
                                 return bend->header.tick == 94 && std::abs(bend->semitones - 1.0) < 0.0001;
                               }),
       "F2 should retune the following note without bending the voice that is already playing");
+}
+
+void konamiArcadeTempoSlidesAreCanceledAcrossTracks() {
+  std::vector<u8> bytes(0x200);
+  writeBe32(bytes, 0x20, 0x80);
+  writeBe32(bytes, 0x24, 0xa0);
+  writeBytes(bytes, 0x80,
+             {
+                 0xea, 0x80,        // establish the shared tempo
+                 0xe0, 0x01,        // let every channel finish its initial setup
+                 0xeb, 0x40, 0x01,  // begin a long global slowdown
+                 0xe0, 0x10,
+                 0xff,
+             });
+  writeBytes(bytes, 0xa0,
+             {
+                 0xea, 0x80,
+                 0xe0, 0x01,
+                 0xea, 0x80,  // any channel's immediate tempo cancels the global slide
+                 0xe0, 0x10,
+                 0xff,
+             });
+
+  const SourceFile source{
+      .id = SourceId{81},
+      .name = "Konami Arcade global tempo-slide fixture",
+      .title = "fixture",
+      .size = bytes.size(),
+  };
+  const KonamiArcadeLayout layout{
+      .version = KonamiArcadeVersion::Gx,
+      .game = "fixture",
+      .code = SourceRange{.source = source.id, .offset = 0, .size = bytes.size()},
+      .nmiRateHertz = 245.0,
+  };
+  KonamiArcadeSequenceLayout sequenceLayout = makeGxSequenceLayout(source.id, "Global tempo slide");
+  sequenceLayout.tracks.push_back(KonamiArcadeTrackLayout{
+      .number = 1,
+      .encodedAddress = 0xa0,
+      .offset = 0xa0,
+      .pointer = SourceRange{.source = source.id, .offset = 0x24, .size = 4},
+  });
+
+  std::vector<Diagnostic> diagnostics;
+  const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(source.id, bytes), layout, sequenceLayout,
+                                                             AssetId{1}, nullptr, &diagnostics);
+  const PerformanceSequence performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  expect(diagnostics.empty() && performance.diagnostics.empty() && performance.tracks.size() == 2,
+         "the cross-track tempo-slide fixture should render without diagnostics");
+
+  const auto automation = std::ranges::find_if(performance.tracks[0].automations, [](const auto& candidate) {
+    const auto* intent = std::get_if<ScalarPerformanceAutomationIntent>(&candidate.intent);
+    return intent != nullptr && intent->target == PerformanceAutomationTarget::Tempo;
+  });
+  expect(automation != performance.tracks[0].automations.end() && automation->realization.endTick == 1 &&
+             automation->realization.endReason == PerformanceAutomationEndReason::Interrupted,
+         "an immediate tempo command on another channel should interrupt the one shared tempo slide");
+  const u32 steadyTempo = static_cast<u32>(
+      std::lround((256.0 / 0x80) / layout.nmiRateHertz * kKonamiArcadePpqn * 1'000'000.0));
+  expect(std::ranges::all_of(performance.tracks, [&](const PerformanceTrack& track) {
+    return std::ranges::none_of(track.events, [&](const PerformanceEvent& event) {
+      const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
+      return tempo != nullptr && tempo->microsecondsPerQuarter != steadyTempo;
+    });
+  }), "a same-tick cross-channel tempo command should prevent the canceled slide from emitting any falling tempo");
 }
 
 void konamiArcadeMysticDrumPitchSlidesUseTablePitch() {

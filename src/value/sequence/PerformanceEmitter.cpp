@@ -680,18 +680,6 @@ void PerformanceEmitter::automationSample(u32 automation, double value) {
   }
 }
 
-void PerformanceEmitter::stopAutomation(u32 automation) {
-  if (automation >= track_.automations.size()) {
-    throw std::logic_error("Performance automation binding was not valid for this track");
-  }
-  auto& realization = track_.automations[automation].realization;
-  if (tick_ >= realization.endTick) {
-    return;
-  }
-  realization.endTick = std::max(realization.startTick, tick_);
-  realization.endReason = PerformanceAutomationEndReason::Interrupted;
-}
-
 void PerformanceAutomationBinding::stop(const PerformanceEmitter& out) const {
   if (owner_ == nullptr) {
     return;
@@ -699,12 +687,31 @@ void PerformanceAutomationBinding::stop(const PerformanceEmitter& out) const {
   if (owner_ != &out.track_) {
     throw std::logic_error("Performance automation binding belongs to another track");
   }
-  auto output = out;
-  output.stopAutomation(automation_);
+  stopAt(out.tick_);
+}
+
+void PerformanceAutomationBinding::stopAt(u64 tick) const {
+  if (owner_ == nullptr) {
+    return;
+  }
+  if (automation_ >= owner_->automations.size()) {
+    throw std::logic_error("Performance automation binding was not valid for its track");
+  }
+  auto& realization = owner_->automations[automation_].realization;
+  if (tick >= realization.endTick) {
+    return;
+  }
+  realization.endTick = std::max(realization.startTick, tick);
+  realization.endReason = PerformanceAutomationEndReason::Interrupted;
 }
 
 void PerformanceAutomationBinding::interrupt(const PerformanceEmitter& out) {
   stop(out);
+  clear();
+}
+
+void PerformanceAutomationBinding::interruptAt(u64 tick) {
+  stopAt(tick);
   clear();
 }
 
