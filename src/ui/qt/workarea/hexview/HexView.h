@@ -29,9 +29,6 @@
 class QParallelAnimationGroup;
 class QWidget;
 class HexViewRhiHost;
-namespace vgmtrans::core {
-struct SourceAnnotation;
-}
 
 static constexpr int OUTLINE_FADE_DURATION_MS = 150;
 
@@ -132,7 +129,6 @@ private:
                         bool markSelectionDirty = false,
                         bool markPlaybackDirty = false);
   void clearCurrentSelection(bool animateSelection);
-  void selectCurrentItem(bool animateSelection);
   void scrollRangeIntoView(SelectionRange range);
   void updateLayout();
   void updateScrollBars();

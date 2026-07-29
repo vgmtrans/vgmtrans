@@ -16,10 +16,6 @@
 #include <QBrush>
 #include <QTreeWidget>
 
-namespace vgmtrans::core {
-class SourceInspection;
-}
-
 class VGMFileTreeView final : public QTreeWidget {
   Q_OBJECT
 public:
@@ -48,8 +44,7 @@ protected:
 private:
   [[nodiscard]] static u64 itemKey(vgmtrans::core::SourceInspectionItem item);
   [[nodiscard]] QTreeWidgetItem* treeItem(vgmtrans::core::SourceInspectionItem item) const;
-  void appendChildren(QTreeWidgetItem* parent, std::span<const vgmtrans::core::SourceAnnotationId> children);
-  void appendProjectedChildren(QTreeWidgetItem* parent, vgmtrans::core::SourceAnnotationId annotation);
+  void appendChildren(QTreeWidgetItem* parent, vgmtrans::core::SourceAnnotationId annotation);
   void appendItem(QTreeWidgetItem* parent, vgmtrans::core::SourceInspectionItem item);
   void setItemText(QTreeWidgetItem* item) const;
   void onShowDetailsChanged(bool show);

@@ -548,43 +548,27 @@ void HexView::clearCurrentSelection(bool animateSelection) {
   requestRhiUpdate(false, true);
 }
 
-// Select the current item's byte range and refresh highlight visuals.
-void HexView::selectCurrentItem(bool animateSelection) {
-  if (!m_selectedItem.valid()) {
-    return;
-  }
-  const auto range = visibleRange(m_inspection->range(m_selectedItem));
-  if (!range) {
-    return;
-  }
-  m_selectedOffset = range->offset;
-  m_selections.clear();
-  m_selections.push_back(*range);
-  m_fadeSelections.clear();
-  updateHighlightState(animateSelection);
-  requestRhiUpdate(false, true);
-}
-
 // Set selected item, update selection, and scroll it into view when needed.
 void HexView::setSelectedItem(vgmtrans::core::SourceInspectionItem item) {
   m_selectedItem = item;
+  const auto selectedRange = visibleRange(m_inspection->range(item));
   if (m_inspection->annotation(item) == nullptr ||
-      (item.isField() && m_inspection->field(item) == nullptr)) {
+      (item.isField() && m_inspection->field(item) == nullptr) || !selectedRange) {
     m_selectedItem = {};
     clearCurrentSelection(true);
     return;
   }
 
-  selectCurrentItem(true);
-  const auto selectedRange = visibleRange(m_inspection->range(item));
-  if (!selectedRange) {
-    return;
-  }
+  m_selectedOffset = selectedRange->offset;
+  m_selections = {*selectedRange};
+  m_fadeSelections.clear();
+  updateHighlightState(true);
+  requestRhiUpdate(false, true);
   scrollRangeIntoView(*selectedRange);
 }
 
-void HexView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotationId) {
-  setSelectedItem(vgmtrans::core::SourceInspectionItem::forAnnotation(annotationId));
+void HexView::setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation) {
+  setSelectedItem(vgmtrans::core::SourceInspectionItem::forAnnotation(annotation));
 }
 
 void HexView::scrollRangeIntoView(SelectionRange range) {
@@ -1706,7 +1690,8 @@ const vgmtrans::core::SourceAnnotation* HexView::annotation(
 }
 
 std::optional<HexView::SelectionRange> HexView::visibleRange(vgmtrans::core::SourceRange range) const {
-  if (m_inspection->bytes().empty()) {
+  if (!range.valid() || range.source != m_inspection->range().source ||
+      m_inspection->bytes().empty()) {
     return std::nullopt;
   }
   const u64 viewBegin = m_inspection->range().offset;
