@@ -162,7 +162,7 @@ struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
       : version(static_cast<KonamiArcadeVersion>(program.config.profile)),
         sourceTrackNumber(track.sourceTrackNumber) {
-    panMotion.setCurrent(8.0);
+    pan.setCurrent(8.0);
   }
 
   KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;
@@ -179,8 +179,8 @@ struct TrackState {
   std::array<s16, 2> loopAttenuation{};
   std::array<s16, 2> loopTranspose{};
   double nmiRateHertz = 0.0;
-  PerformanceBoundMotion<SequenceAutomatedValue<double>> volumeMotion;
-  PerformanceBoundMotion<SequenceAutomatedValue<double>> panMotion;
+  PerformanceBoundValue<SequenceAutomatedValue<double>> volume;
+  PerformanceBoundValue<SequenceAutomatedValue<double>> pan;
   double pitchBendSemitones = 0.0;
   std::optional<double> emittedPitchBend;
   std::optional<double> emittedTuningCents;
@@ -205,13 +205,13 @@ struct TrackState {
 
 struct SequenceState {
   SequenceState() {
-    tempoMotion.setCurrent(120.0);
+    tempo.setCurrent(120.0);
     channelTempos.fill(120.0);
   }
 
   // EB owns one song-wide accumulator. EA on any channel cancels it, and
   // each update copies its tempo into every active channel.
-  PerformanceBoundMotion<SequenceAutomatedValue<double>> tempoMotion;
+  PerformanceBoundValue<SequenceAutomatedValue<double>> tempo;
   std::array<double, kKonamiArcadeMaxTracks> channelTempos;
   std::optional<u64> tempoSlideLastTick;
   double nmiRateHertz = 0.0;
@@ -273,6 +273,7 @@ struct Playback {
 
   void configureVibrato(u8 delay, u8 rate, u8 depth, bool continuous) {
     auto& vibrato = track.vibrato;
+    vibrato.depthState.interruptFadeAutomationAt(vm.tick());
     vibrato.configure(delay, rate, depth, continuous);
 
     const auto context = vibratoContext();
@@ -308,7 +309,7 @@ struct Playback {
       return false;
     }
 
-    vibrato.depthState.clearFadeAutomation();
+    vibrato.depthState.interruptFadeAutomationAt(vm.tick());
     if (!vibrato.enabled() || !vibrato.depthState.restartFade(vibrato.delay)) {
       vibrato.depthState.resetCurrentDepth();
       return true;
@@ -421,7 +422,7 @@ struct Playback {
     u32 duration = delta;
     if (usesDrumDefaultDuration && sourceKey < 46) {
       duration = std::max<u32>(1, static_cast<u32>(delta) * durationRate / 100);
-      if (track.panMotion.current() == 0.0) {
+      if (track.pan.current() == 0.0) {
         const auto [left, right] = stereoGains(drumPan);
         out.stereoBalance(left, right);
       }
@@ -513,22 +514,19 @@ struct Playback {
   }
 
   void pan(u8 raw) {
-    track.panMotion.interruptAutomationAt(vm.tick());
     if (raw == 0) {
       // Zero disables sequence pan and lets a subsequent drum choose its pan;
       // it does not force the current voice to center.
-      track.panMotion.clearMotion();
-      track.panMotion.setCurrent(0.0);
+      track.pan.setCurrentAt(vm.tick(), 0.0);
       return;
     }
-    track.panMotion.setCurrent(raw & 0x0f);
+    track.pan.setCurrentAt(vm.tick(), raw & 0x0f);
     const auto [left, right] = stereoGains(raw);
     out.stereoBalance(left, right);
   }
 
   void volume(u8 raw) {
-    track.volumeMotion.interruptAutomationAt(vm.tick());
-    track.volumeMotion.setCurrent(raw);
+    track.volume.setCurrentAt(vm.tick(), raw);
     out.level(LevelScale::linearFromLinear(volumeGain(raw)), LevelPrecisionHint::FourteenBit);
   }
 
@@ -536,8 +534,7 @@ struct Playback {
 
   void tempo(u8 raw, double nmiRate) {
     track.nmiRateHertz = nmiRate;
-    sequence.tempoMotion.interruptAutomationAt(vm.tick());
-    sequence.tempoMotion.setCurrent(raw);
+    sequence.tempo.setCurrentAt(vm.tick(), raw);
     sequence.channelTempos[track.sourceTrackNumber] = raw;
     sequence.tempoSlideLastTick.reset();
     out.tempo(tempoMicrosecondsPerQuarter(nmiRate, raw));
@@ -546,25 +543,23 @@ struct Playback {
   void beginSlide(u8 kind, u8 duration, u8 target, double nmiRate) {
     if (kind == 0) {
       track.nmiRateHertz = nmiRate;
-      sequence.tempoMotion.interruptAutomationAt(vm.tick());
-      sequence.tempoMotion.setCurrent(sequence.channelTempos[track.sourceTrackNumber]);
+      sequence.tempo.setCurrentAt(vm.tick(), sequence.channelTempos[track.sourceTrackNumber]);
       sequence.tempoSlideLastTick = vm.tick();
       sequence.nmiRateHertz = nmiRate;
-      static_cast<void>(sequence.tempoMotion.begin(
+      static_cast<void>(sequence.tempo.begin(
           out.fade(PerformanceAutomationTarget::Tempo, tempoMicrosecondsPerQuarter(nmiRate, target), duration),
           SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration)));
       return;
     }
 
-    auto* motion = kind == 1 ? &track.volumeMotion : &track.panMotion;
-    motion->interruptAutomationAt(vm.tick());
+    auto* state = kind == 1 ? &track.volume : &track.pan;
     const PerformanceAutomationTarget automationTarget =
         kind == 1 ? PerformanceAutomationTarget::Level : PerformanceAutomationTarget::Pan;
     const double targetValue =
         kind == 1 ? volumeGain(target) : (static_cast<double>(panIndex(target)) - 7.0) / 7.0;
     static_cast<void>(
-        motion->begin(out.fade(automationTarget, targetValue, duration),
-                      SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration)));
+        state->begin(out.fade(automationTarget, targetValue, duration),
+                     SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration)));
   }
 
   void portamento(u8 raw) {
@@ -689,18 +684,18 @@ struct Playback {
   }
 
   void tick() {
-    static_cast<void>(track.volumeMotion.tickChanged([&](double value) {
-      track.volumeMotion.output(out).level(
+    static_cast<void>(track.volume.tickChanged([&](double value) {
+      track.volume.output(out).level(
           LevelScale::linearFromLinear(volumeGain(static_cast<u8>(std::clamp(value, 0.0, 255.0)))),
           LevelPrecisionHint::FourteenBit);
     }));
-    static_cast<void>(track.panMotion.tickChanged([&](double value) {
+    static_cast<void>(track.pan.tickChanged([&](double value) {
       const auto [left, right] = stereoGains(static_cast<u8>(std::clamp(value, 0.0, 255.0)) | 0x10);
-      track.panMotion.output(out).stereoBalance(left, right);
+      track.pan.output(out).stereoBalance(left, right);
     }));
     if (sequence.tempoSlideLastTick && vm.tick() > *sequence.tempoSlideLastTick) {
       sequence.tempoSlideLastTick = vm.tick();
-      const auto tempoTick = sequence.tempoMotion.tickChanged([&](double value) {
+      const auto tempoTick = sequence.tempo.tickChanged([&](double value) {
         sequence.channelTempos.fill(value);
         out.tempo(tempoMicrosecondsPerQuarter(sequence.nmiRateHertz, value));
       });

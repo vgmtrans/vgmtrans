@@ -239,9 +239,9 @@ struct ProgramState {
 struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
       : version(static_cast<KonamiSnesVersion>(program.config.profile)) {
-    panFade.reset(version <= KONAMISNES_V2 ? 10 : 20);
-    volumeFade.reset(0xff);
-    tempoFade.reset(kKonamiSnesDefaultTempo);
+    pan.reset(version <= KONAMISNES_V2 ? 10 : 20);
+    volume.reset(0xff);
+    tempoState.reset(kKonamiSnesDefaultTempo);
   }
 
   [[nodiscard]] u8 noteDuration(u8 length) const {
@@ -306,11 +306,11 @@ struct TrackState {
   double lastEmittedTuningCents = std::numeric_limits<double>::quiet_NaN();
   u8 tempo = kKonamiSnesDefaultTempo;
 
-  // Fades retain fractional progress between note ticks. Their raw values are
-  // converted to exported tempo, gain, or pan only when a tick changes them.
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
+  // These controls retain fractional fade progress between note ticks. Their
+  // raw values are converted to tempo, gain, or pan only when a tick changes.
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
   // The driver restarts this reusable depth fade for every note, independently
   // of the oscillator settings that remain active on the track.
   LfoState vibrato;
@@ -407,13 +407,13 @@ struct Playback {
   }
 
   void volume(u8 rawVolume) {
-    track.volumeFade.setCurrentRaw(rawVolume);
+    track.volume.setCurrentAt(vm.tick(), rawVolume);
     out.level(LevelScale::linearFromLinear(linearGainFromRawVolume(rawVolume)), LevelPrecisionHint::FourteenBit);
   }
 
   void pan(u8 rawPan) {
     const u8 value = clampPan(track.version, rawPan);
-    track.panFade.setCurrentRaw(value);
+    track.pan.setCurrentAt(vm.tick(), value);
     const PanGains gains = panGains(track.version, value);
     out.stereoBalance(gains.left, gains.right);
   }
@@ -425,11 +425,12 @@ struct Playback {
 
   void tempo(u8 value) {
     track.tempo = value;
-    track.tempoFade.setCurrentRaw(value);
+    track.tempoState.setCurrentAt(vm.tick(), value);
     out.tempo(tempoMicrosecondsPerQuarter(track.version, value));
   }
 
   void configureVibrato(u8 delay, u8 rate, u8 depth, u8 builtInFade) {
+    track.vibrato.depthState.interruptFadeAutomationAt(vm.tick());
     track.vibrato.configure(delay, rate, depth);
     track.vibratoPhaseStep = vibrato::usesEarlyCounter(track.version) ? vibrato::earlyPhaseStep(rate, track.tempo) : 0;
     if (builtInFade != 0) {
@@ -439,8 +440,6 @@ struct Playback {
       // progress when the target byte is small.
       track.vibrato.depthState.configureLinearFade(builtInFade);
       beginVibratoFadeAutomation(builtInFade);
-    } else {
-      track.vibrato.depthState.clearFadeAutomation();
     }
     emitVibratoDelay();
     emitVibratoDepth(out, true);
@@ -500,7 +499,7 @@ struct Playback {
         stepBased
             ? SequenceFixedPointMotion<s32>::toRawTargetByFixedStep(clampedDestination, static_cast<s32>(step) * 16)
             : SequenceFixedPointMotion<s32>::toRawTarget(clampedDestination, ticks);
-    auto* fade = &track.tempoFade;
+    auto* state = &track.tempoState;
     auto automationTarget = PerformanceAutomationTarget::Tempo;
     double targetValue = 0.0;
     switch (target) {
@@ -508,19 +507,19 @@ struct Playback {
         targetValue = tempoMicrosecondsPerQuarter(track.version, clampedDestination);
         break;
       case FadeTarget::Volume:
-        fade = &track.volumeFade;
+        state = &track.volume;
         automationTarget = PerformanceAutomationTarget::Level;
         targetValue = linearGainFromRawVolume(clampedDestination);
         break;
       case FadeTarget::Pan:
-        fade = &track.panFade;
+        state = &track.pan;
         automationTarget = PerformanceAutomationTarget::Pan;
         targetValue = stereoPositionFromPan(track.version, clampedDestination);
         break;
     }
     auto automation =
         stepBased ? out.step(automationTarget, targetValue, ticks) : out.fade(automationTarget, targetValue, ticks);
-    static_cast<void>(fade->begin(std::move(automation), motion));
+    static_cast<void>(state->begin(std::move(automation), motion));
   }
 
   [[nodiscard]] Effects loopEnd(u8 slot, u8 times, s8 volumeDelta, s8 pitchDelta) {
@@ -594,23 +593,23 @@ struct Playback {
   void tick() {
     // Commands start motion, but only note/rest time advances it. Emit changes
     // on each elapsed music tick so MIDI and event simulation see the ramp.
-    static_cast<void>(track.tempoFade.tickRaw([&](s32 rawTempo) {
+    static_cast<void>(track.tempoState.tickRaw([&](s32 rawTempo) {
       const u8 value = static_cast<u8>(std::clamp<s32>(rawTempo, 0, 0xff));
       if (value == track.tempo) {
         return;
       }
       track.tempo = value;
-      track.tempoFade.output(out).tempo(tempoMicrosecondsPerQuarter(track.version, value));
+      track.tempoState.output(out).tempo(tempoMicrosecondsPerQuarter(track.version, value));
     }));
-    static_cast<void>(track.volumeFade.tickRaw([&](s32 rawVolume) {
+    static_cast<void>(track.volume.tickRaw([&](s32 rawVolume) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff));
-      track.volumeFade.output(out).level(LevelScale::linearFromLinear(linearGainFromRawVolume(value)),
+      track.volume.output(out).level(LevelScale::linearFromLinear(linearGainFromRawVolume(value)),
                                          LevelPrecisionHint::FourteenBit);
     }));
-    static_cast<void>(track.panFade.tickRaw([&](s32 rawPan) {
+    static_cast<void>(track.pan.tickRaw([&](s32 rawPan) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawPan, 0, 0xff));
       const PanGains gains = panGains(track.version, value);
-      track.panFade.output(out).stereoBalance(gains.left, gains.right);
+      track.pan.output(out).stereoBalance(gains.left, gains.right);
     }));
     const auto fadeTick = track.vibrato.depthState.tickFade();
     if (fadeTick.shouldApply()) {
@@ -707,7 +706,7 @@ private:
 
   void beginVibratoFadeAutomation(u8 length) {
     if (length == 0) {
-      track.vibrato.depthState.clearFadeAutomation();
+      track.vibrato.depthState.interruptFadeAutomationAt(vm.tick());
       return;
     }
     const double targetCents = vibrato::maxDepthCents(track.version, track.vibrato.depth);

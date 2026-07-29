@@ -84,7 +84,7 @@ public:
   [[nodiscard]] SequenceMotionTick<s32> tickFade() { return fade_.tick(); }
 
   void bindFade(PerformanceAutomationBinding binding) { fade_.bind(std::move(binding)); }
-  void clearFadeAutomation() noexcept { fade_.clearAutomation(); }
+  void interruptFadeAutomationAt(u64 tick) { fade_.interruptAutomationAt(tick); }
   [[nodiscard]] PerformanceEmitter fadeOutput(const PerformanceEmitter& out) const { return fade_.output(out); }
 
   // Source arithmetic may produce many successive values that map to the same
@@ -102,7 +102,7 @@ public:
 private:
   s32 targetDepth_ = 0;
   std::optional<SequenceMotionPlan<s32>> fadePlan_;
-  PerformanceBoundMotion<SequenceAutomatedValue<s32>> fade_;
+  PerformanceBoundValue<SequenceAutomatedValue<s32>> fade_;
   double lastPhysicalDepth_ = 0.0;
 };
 

@@ -938,9 +938,9 @@ struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
       : trackNumber(track.sourceTrackNumber),
         pan8Bit(akaoSnesUses8BitPan(decodeAkaoSnesProfile(program.config.profile))) {
-    volumeFade.reset(0xff);
-    panFade.reset(0x80);
-    tempoFade.reset(kDefaultTempo);
+    volume.reset(0xff);
+    pan.reset(0x80);
+    tempoState.reset(kDefaultTempo);
   }
 
   [[nodiscard]] bool pitchBendAtRest() const {
@@ -1051,9 +1051,9 @@ struct TrackState {
   u8 tempo = kDefaultTempo;
   bool pan8Bit = true;
   bool sharedTempoApplied = false;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> volumeFade;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> panFade;
-  PerformanceBoundMotion<SequenceFixedPointAutomation<s32>> tempoFade;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
   std::optional<u64> lastTieableNoteTick;
   std::optional<u64> pitchAutomationStopTick;
   PitchEnvelopeState pitchEnvelope;
@@ -1097,7 +1097,7 @@ struct Playback {
   void emitVolume(PerformanceEmitter output, u8 volume) { output.level(channelLevel(volume)); }
 
   void volume(u8 value) {
-    track.volumeFade.setCurrentRaw(value);
+    track.volume.setCurrentAt(vm.tick(), value);
     emitVolume(out, value);
   }
 
@@ -1108,7 +1108,7 @@ struct Playback {
 
   void pan(u8 rawPan) {
     const u8 panValue = static_cast<u8>(rawPan << (track.pan8Bit ? 0 : 1));
-    track.panFade.setCurrentRaw(panValue);
+    track.pan.setCurrentAt(vm.tick(), panValue);
     emitPan(out, panValue);
   }
 
@@ -1378,6 +1378,7 @@ struct Playback {
     const bool active =
         (isVibrato || akaoSnesExportsTremolo(context.version)) && isLfoActive(context.version, rate, depth);
     LfoState& lfo = isVibrato ? track.vibrato : track.tremolo;
+    lfo.depthState.interruptFadeAutomationAt(vm.tick());
     lfo.configure(delay, rate, depth);
     const auto initialTempo = program.initialTempo();
     const bool beforeInitialTempoTrack = initialTempo && track.trackNumber < initialTempo->sourceTrackNumber;
@@ -1409,8 +1410,6 @@ struct Playback {
           isVibrato ? vibratoDepthSemitones(context.version, rate, depth)
                     : tremoloDepthDecibels(context.version, rate, depth, delay),
           lfo.depthState.fadeDurationTicks(), lfoDelayTicks(context.version, delay)));
-    } else {
-      lfo.depthState.clearFadeAutomation();
     }
     setLfoOutputDepth(lfo.depthState.fadeOutput(out), target, physicalDepth, true);
     if (active) {
@@ -1432,6 +1431,7 @@ struct Playback {
   void clearLfo(LfoTarget target) {
     LfoState& lfo = target == LfoTarget::Vibrato ? track.vibrato : track.tremolo;
     lfo.depth = 0;
+    lfo.depthState.interruptFadeAutomationAt(vm.tick());
     lfo.depthState.resetDepth(0);
     setLfoOutputDepth(lfo.depthState.fadeOutput(out), target, 0, true);
   }
@@ -1493,7 +1493,7 @@ struct Playback {
 
   void tempoChange(u8 rawTempo) {
     const u8 tempo = normalizedTempo(rawTempo);
-    track.tempoFade.setCurrentRaw(tempo);
+    track.tempoState.setCurrentAt(vm.tick(), tempo);
     applyTempo(out, tempo);
   }
 
@@ -1553,11 +1553,11 @@ struct Playback {
   void tick() {
     syncSharedTempoAtTick();
     static_cast<void>(
-        track.volumeFade.tickRaw([&](s32 value) { emitVolume(track.volumeFade.output(out), static_cast<u8>(value)); }));
+        track.volume.tickRaw([&](s32 value) { emitVolume(track.volume.output(out), static_cast<u8>(value)); }));
     static_cast<void>(
-        track.panFade.tickRaw([&](s32 value) { emitPan(track.panFade.output(out), static_cast<u8>(value)); }));
+        track.pan.tickRaw([&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(value)); }));
     static_cast<void>(
-        track.tempoFade.tickRaw([&](s32 value) { applyTempo(track.tempoFade.output(out), static_cast<u8>(value)); }));
+        track.tempoState.tickRaw([&](s32 value) { applyTempo(track.tempoState.output(out), static_cast<u8>(value)); }));
     if (terminalPitchWaitBoundary()) {
       return;
     }
@@ -1636,7 +1636,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       return length == 0 ? event.invoke<&Playback::volume>(target)
                          : event.invoke(
                                [](Playback& playback, u16 ticks, u8 volume) {
-                                 static_cast<void>(playback.track.volumeFade.begin(
+                                 static_cast<void>(playback.track.volume.begin(
                                      playback.out.fade(PerformanceAutomationTarget::Level, channelLevel(volume), ticks),
                                      SequenceFixedPointMotion<s32>::toRawTarget(volume, ticks)));
                                },
@@ -1656,7 +1656,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
                        [](Playback& playback, u16 ticks, u8 rawPan) {
                          const u8 pan = static_cast<u8>(rawPan << (playback.track.pan8Bit ? 0 : 1));
                          const double rightGain = rightGainFromPan(pan);
-                         static_cast<void>(playback.track.panFade.begin(
+                         static_cast<void>(playback.track.pan.begin(
                              playback.out.fade(PerformanceAutomationTarget::Pan, (rightGain * 2.0) - 1.0, ticks),
                              SequenceFixedPointMotion<s32>::toRawTarget(pan, ticks)));
                        },
@@ -1910,9 +1910,9 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
                  ? event.invoke<&Playback::tempoChange>(target)
                  : event.invoke(
                        [](Playback& playback, u16 ticks, u8 rawTempo) {
-                         playback.track.tempoFade.setCurrentRaw(playback.track.tempo);
+                         playback.track.tempoState.setCurrentRaw(playback.track.tempo);
                          const u8 tempo = playback.normalizedTempo(rawTempo);
-                         static_cast<void>(playback.track.tempoFade.begin(
+                         static_cast<void>(playback.track.tempoState.begin(
                              playback.out.fade(PerformanceAutomationTarget::Tempo,
                                                static_cast<double>(tempoMicrosecondsPerQuarter(
                                                    playback.context.version, playback.context.minorVersion, tempo)),
