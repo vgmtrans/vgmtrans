@@ -213,6 +213,31 @@ Fixture earlyCps2Fixture() {
   return Fixture{.source = std::move(source), .bytes = std::move(bytes)};
 }
 
+Fixture earlyCps2ZeroRateSlurFixture() {
+  auto fixture = earlyCps2Fixture();
+  fixture.source.name = "cps2 zero-rate slur fixture";
+  fixture.source.attributes[std::string(mame::kMameGameAttribute)] = "cps2-zero-rate-slur-fixture";
+  fixture.source.attributes[std::string(mame::kMameFormatVersionAttribute)] = "CPS2_V1.31";
+  bytesAt(fixture.bytes, 0x1121,
+          {
+              0x09,
+              0x02,  // octave 2
+              0x8b,  // A#1, independent attack
+              0x04,
+              0x68,  // octave bank 1 + tie
+              0x51,  // E4, first tied note
+              0x0d,
+              0x00,  // instantaneous portamento
+              0x52,  // F4
+              0x53,  // F#4
+              0x02,
+              0x00,  // select the third duration table
+              0x94,  // G4
+              0x17,
+          });
+  return fixture;
+}
+
 Fixture lateCps2Fixture() {
   constexpr u32 programSize = 0x3000;
   constexpr u32 sampleSize = 0x200;
@@ -671,6 +696,73 @@ void cps2EarlyModuleUsesPhysicalModulation() {
   expect(performance.tracks[0].hasPhysicalModulation && physicalVibrato && physicalTremolo && physicalPan &&
              physicalCenter && !markerWorkaround,
          "early CPS2 modulation and balance should stay physical without legacy MIDI marker workarounds");
+}
+
+void cps2EarlyZeroRateSlursRemainLinked() {
+  const auto result = scan(earlyCps2ZeroRateSlurFixture());
+  expect(result.diagnostics.empty(), "mshvsf zero-rate slur fixture should scan without diagnostics");
+  const auto& sequence = onlySequence(result);
+  const auto& commands = sequence.program.tracks[0].commands;
+  const auto firstNote = std::ranges::find_if(
+      commands, [](const SourceCommand& command) { return command.semantic == SequenceSemantic::Note; });
+  const auto* noteIndex = firstNote == commands.end() ? nullptr : semanticOperand(*firstNote, "note_index");
+  expect(noteIndex != nullptr && noteIndex->display == SourceValueDisplay::Default &&
+             semanticOperand(*firstNote, "note") == nullptr,
+         "early CPS annotations should identify the encoded note index without presenting it as an absolute MIDI key");
+
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsEarlyDialect());
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  const std::array<double, 5> expectedKeys{34, 64, 65, 66, 67};
+  expect(notes.size() == expectedKeys.size(), "the mshvsf slur chain should retain all five source notes");
+  for (size_t index = 0; index < expectedKeys.size(); ++index) {
+    expect(notes[index]->key == expectedKeys[index], "early CPS octave state should resolve the slur chain's pitches");
+  }
+
+  expect(performance.tracks[0].automations.size() == 3,
+         "each zero-rate tied key change should remain an explicit pitch transition");
+  for (size_t index = 0; index < performance.tracks[0].automations.size(); ++index) {
+    const auto* transition = pitchTransitionIntent(performance.tracks[0].automations[index]);
+    expect(transition != nullptr && transition->note == notes[index + 2]->note &&
+               transition->previousNote == std::optional{notes[index + 1]->note} &&
+               transition->startKey == expectedKeys[index + 1] && transition->targetKey == expectedKeys[index + 2] &&
+               transition->timing.timelineTicks == 0 &&
+               transition->preferredRendering == PitchTransitionRenderingHint::Portamento,
+           "zero-rate early CPS portamento should preserve immediate, attack-free voice linkage");
+  }
+
+  const auto verifyPitchBend = [&](ModulationConversionPolicy modulationPolicy) {
+    const MidiSequence midi = renderMidiSequence(
+        performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend}, modulationPolicy);
+    std::vector<u8> attacks;
+    bool hasPitchBend = false;
+    bool hasPortamento = false;
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* note = std::get_if<NoteDuration>(&event)) {
+        attacks.push_back(note->key);
+      } else {
+        hasPitchBend |= std::holds_alternative<PitchBend>(event);
+        hasPortamento |= std::holds_alternative<PortamentoControl>(event);
+      }
+    }
+    expect(attacks == std::vector<u8>{34, 64} && hasPitchBend && !hasPortamento,
+           "pitch-bend export and preview should sustain the E4 attack through the F4/F#4/G4 slur");
+  };
+  verifyPitchBend(ModulationConversionPolicy::SynthModulators);
+  verifyPitchBend(ModulationConversionPolicy::SequenceEventSimulation);
+
+  const MidiSequence portamento =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::count_if(
+             portamento.tracks[0].events,
+             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 3 &&
+             std::ranges::none_of(portamento.tracks[0].events,
+                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+         "native-portamento export should retain all three zero-rate target changes");
 }
 
 void cps2LateDriverSemanticsRemainProfileSpecific() {
