@@ -498,6 +498,8 @@ void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
 void sequenceVmEmitsDialectInitialChannelDefaults() {
   const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{
       .defaultLoopPolicy = LoopPolicy::Default,
+      .initialLevel = 0.0,
+      .initialExpression = 0.5,
       .initialReverbSend = 0.0,
       .initialMonoModeChannels = 0,
   });
@@ -520,12 +522,18 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.tracks.size() == 1, "initial-default fixture should render one track");
   const auto& events = performance.tracks[0].events;
-  expect(events.size() == 2, "VM should emit dialect initial channel defaults before source commands");
+  expect(events.size() == 4, "VM should emit dialect initial channel defaults before source commands");
 
   const auto* reverb = std::get_if<ReverbPerformanceEvent>(&events[0]);
   expect(reverb != nullptr && reverb->send == 0.0 && !reverb->header.sourceCommand.valid(),
          "initial reverb should preserve explicit zero and should not pretend to come from a source command");
-  const auto* mono = std::get_if<MonoModePerformanceEvent>(&events[1]);
+  const auto* level = std::get_if<LevelPerformanceEvent>(&events[1]);
+  expect(level != nullptr && level->linearGain == 0.0 && !level->header.sourceCommand.valid(),
+         "initial level should preserve explicit zero and should not pretend to come from a source command");
+  const auto* expression = std::get_if<ExpressionPerformanceEvent>(&events[2]);
+  expect(expression != nullptr && expression->linearGain == 0.5 && !expression->header.sourceCommand.valid(),
+         "initial expression should preserve its physical gain and should not pretend to come from a source command");
+  const auto* mono = std::get_if<MonoModePerformanceEvent>(&events[3]);
   expect(mono != nullptr && mono->channels == 0 && !mono->header.sourceCommand.valid(),
          "initial mono mode should preserve explicit zero and should not pretend to come from a source command");
 
@@ -535,7 +543,10 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   const auto* midiReverb = std::get_if<Reverb>(&midi.tracks[0].events[1]);
   expect(midiReverb != nullptr && midiReverb->channel == 0 && midiReverb->value == 0,
          "performance renderer should lower initial reverb to MIDI CC91");
-  const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[2]);
+  expect(std::holds_alternative<Volume>(midi.tracks[0].events[2]) &&
+             std::holds_alternative<Expression>(midi.tracks[0].events[3]),
+         "performance renderer should lower initial level and expression to their distinct MIDI controllers");
+  const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[4]);
   expect(midiMono != nullptr && midiMono->channel == 0 && midiMono->channels == 0,
          "performance renderer should lower initial mono mode to MIDI CC126");
 }

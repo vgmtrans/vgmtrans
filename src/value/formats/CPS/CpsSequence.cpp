@@ -9,7 +9,6 @@
 #include "value/formats/CPS/CpsTables.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
-#include "value/synth/SynthMath.h"
 
 #include <algorithm>
 #include <array>
@@ -31,6 +30,37 @@ enum class SynthKind : u8 {
   OkiM6295,
   QSound,
 };
+
+struct StereoGains {
+  double left = 1.0;
+  double right = 1.0;
+};
+
+[[nodiscard]] StereoGains qsoundPanGains(u8 position) {
+  if (position <= 16) {
+    return StereoGains{.left = 1.0, .right = position / 16.0};
+  }
+  return StereoGains{.left = (32 - std::min<u8>(position, 32)) / 16.0, .right = 1.0};
+}
+
+[[nodiscard]] StereoGains earlyPanGains(u8 raw, CpsVersion version) {
+  if (!isCps1(version)) {
+    return qsoundPanGains(std::min<u8>(raw, 32));
+  }
+  const double right = std::min<u8>(raw, 32) / 32.0;
+  return StereoGains{.left = 1.0 - right, .right = right};
+}
+
+[[nodiscard]] StereoGains latePanGains(u8 raw, CpsVersion version) {
+  if (!isCps3(version)) {
+    const u8 position = raw == 0x7f ? 32 : static_cast<u8>(raw >> 2);
+    return qsoundPanGains(position);
+  }
+  if (raw <= 0x3f) {
+    return StereoGains{.left = 1.0, .right = raw / 64.0};
+  }
+  return StereoGains{.left = (0x7f - raw) / 64.0, .right = 1.0};
+}
 
 [[nodiscard]] u32 tempoFromDriverTicks(u16 ticksPerIteration, double driverRate) {
   if (ticksPerIteration == 0 || driverRate <= 0.0) {
@@ -74,6 +104,7 @@ struct TrackState {
   u8 noteState = 0;
   u8 bank = 0;
   s32 transpose = 0;
+  s32 transposeAdjustment = 0;
   s32 patchTranspose = 0;
   s32 cps1V1Transpose = 0;
   u8 shortenCount = 0;
@@ -84,6 +115,7 @@ struct TrackState {
   PerformanceNoteId previousNote;
   u16 portamentoRate = 0;
   u8 lateExpression = 0x40;
+  s16 lateVolumeBaseAdjustment = 0;
   s16 lateVolumeAdjustment = 0;
   bool conditional = false;
   bool resetLfoOnNote = false;
@@ -102,7 +134,7 @@ struct Playback {
         .waveform = LfoWaveform::Triangle,
         .initialPhaseCycles = 0.0,
         .sampleImmediatelyOnNote = true,
-        .phaseRunsAtZeroDepth = true,
+        .phaseRunsAtZeroDepth = !isCps3(track.version),
     };
   }
 
@@ -306,11 +338,18 @@ struct Playback {
     }
   }
 
-  void lateVolume(u8 raw) { out.level(raw / 128.0, LevelPrecisionHint::FourteenBit); }
+  void lateVolume(u8 raw) {
+    const double level = isCps3(track.version) ? raw / 128.0 : tables::earlyVolume[raw & 0x7f] / 8191.0;
+    out.level(level, LevelPrecisionHint::FourteenBit);
+  }
 
   void emitLateExpression() {
-    const double expression = track.lateExpression == 0 ? 0.0 : (track.lateExpression + 1) / 128.0;
-    const double adjustment = static_cast<u8>(track.lateVolumeAdjustment + 64) / 64.0;
+    const double expression = isCps3(track.version)
+                                  ? (track.lateExpression == 0 ? 0.0 : (track.lateExpression + 1) / 128.0)
+                                  : tables::qsoundExpression[track.lateExpression & 0x7f] / 512.0;
+    const s32 combinedAdjustment = track.lateVolumeBaseAdjustment + track.lateVolumeAdjustment;
+    const double adjustment = isCps3(track.version) ? cpsVolumeAdjustmentGain(combinedAdjustment)
+                                                    : (std::clamp<s32>(combinedAdjustment, -64, 63) + 64) / 64.0;
     out.expression(expression * adjustment, LevelPrecisionHint::FourteenBit);
   }
 
@@ -320,13 +359,35 @@ struct Playback {
   }
 
   void setVolumeAdjustment(s8 raw) {
-    track.lateVolumeAdjustment = raw;
+    track.lateVolumeBaseAdjustment = raw;
+    if (isCps3(track.version)) {
+      track.lateVolumeAdjustment = 0;
+    }
     emitLateExpression();
   }
 
   void addVolumeAdjustment(s8 raw) {
-    track.lateVolumeAdjustment = static_cast<s16>(track.lateVolumeAdjustment + raw);
+    if (isCps3(track.version)) {
+      track.lateVolumeBaseAdjustment = static_cast<s16>(track.lateVolumeBaseAdjustment + raw);
+    } else {
+      track.lateVolumeAdjustment = static_cast<s16>(std::clamp<s32>(track.lateVolumeAdjustment + raw, -64, 63));
+    }
     emitLateExpression();
+  }
+
+  void setTranspose(s8 raw) {
+    track.transpose = raw;
+    if (isCps3(track.version)) {
+      track.transposeAdjustment = 0;
+    }
+  }
+
+  void addTranspose(s8 raw) {
+    if (isCps3(track.version)) {
+      track.transpose += raw;
+    } else {
+      track.transposeAdjustment = std::clamp<s32>(track.transposeAdjustment + raw, -64, 63);
+    }
   }
 
   [[nodiscard]] Effects lateWait(u32 ticks) { return Effects::wait(ticks); }
@@ -334,7 +395,8 @@ struct Playback {
   [[nodiscard]] Effects lateNote(u8 velocity, u8 encodedKey, u32 duration) {
     const bool hold = (encodedKey & 0x80) != 0;
     const bool extends = track.held;
-    const double key = std::clamp<double>((encodedKey & 0x7f) + track.transpose, 0.0, 127.0);
+    const double key =
+        std::clamp<double>((encodedKey & 0x7f) + track.transpose + track.transposeAdjustment, 0.0, 127.0);
     const bool restart = track.resetLfoOnNote && !extends;
     const auto note = out.note(NotePerformanceEvent{
         .key = key,
@@ -352,7 +414,9 @@ struct Playback {
     return {};
   }
 
-  void latePortamento(u8 raw) { track.portamentoRate = raw == 0 ? 0 : static_cast<u16>(raw) + 1; }
+  void latePortamento(u8 raw) {
+    track.portamentoRate = raw == 0 ? 0 : static_cast<u16>(raw) + (isCps3(track.version) ? 1 : 0);
+  }
 
   [[nodiscard]] Effects repeatBreak(u8 slot, Address destination) {
     return vm.countedRepeatBreak(slot, destination).effects;
@@ -455,9 +519,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x08: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
-      const u8 shifted = event.u8("tuning") >> 2;
-      const double semitones = (shifted >= 32 ? -100.0 : 0.0) + shifted * 1.587301587301587;
-      return event.emitPitchBend(semitones / 100.0);
+      const s8 raw = event.s8("tuning");
+      const double semitones = raw / 256.0;
+      event.derived("cents", semitones * 100.0, SourceValueDisplay::Cents);
+      return event.emitPitchBend(semitones);
     }
     case 0x09:
     case 0x0a:
@@ -628,8 +693,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x18: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       const u8 raw = event.u8("pan", SemanticOperandRole::Pan);
-      const double pan = std::clamp(raw, static_cast<u8>(0), static_cast<u8>(32)) / 32.0;
-      return event.emitPan(pan);
+      const auto gains = earlyPanGains(raw, version);
+      return event.emitStereoBalance(gains.left, gains.right);
     }
     case 0x19:
       return cursor.ignored(isCps1(version) ? "Effect" : "QSound Effect Depth", 1);
@@ -758,7 +823,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xc7: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       const u8 raw = event.u8("pan", SemanticOperandRole::Pan);
-      return event.emitPan(panPositionFrom7Bit(raw));
+      const auto gains = latePanGains(raw, version);
+      return event.emitStereoBalance(gains.left, gains.right);
     }
     case 0xc8: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);
@@ -780,7 +846,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xcd: {
       auto event = cursor.command(opcode == 0xcc ? "Branch On First Pass" : "Branch On Repeat", SequenceSemantic::Jump);
       const u16 raw = event.u16be("relative_destination", SourceValueDisplay::Address);
-      const Address destination = relative16(event.nextAddress().value, raw);
+      // CPS3's CD handler sign-extends each byte separately; CC uses a normal signed word.
+      const s32 displacement = opcode == 0xcd && isCps3(version)
+                                   ? static_cast<s8>(raw >> 8) * 256 + static_cast<s8>(raw & 0xff)
+                                   : static_cast<s16>(raw);
+      const Address destination{static_cast<u32>(event.nextAddress().value + displacement)};
       event.mayBranchTo(destination, SemanticOperandRole::JumpTarget);
       return opcode == 0xcc ? event.invoke<&Playback::branchIfFirst>(destination)
                             : event.invoke<&Playback::branchIfRepeated>(destination);
@@ -791,8 +861,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const Address destination = relative16(event.nextAddress().value, relative);
       return event.declaredLoop(destination);
     }
-    case 0xcf:
-      return cursor.ignored("Switch Track Cursor", 1);
+    case 0xcf: {
+      auto event = cursor.command("Switch Track Cursor", SequenceSemantic::State);
+      event.u8("track", SemanticOperandRole::State);
+      event.warning("Cross-track cursor switching is not represented by the sequence VM");
+      return event.ignore();
+    }
     case 0xd0:
     case 0xd1:
     case 0xd2:
@@ -825,17 +899,18 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const u8 slot = opcode - 0xd8;
       const u16 relative = event.u16be("relative_destination", SourceValueDisplay::Address);
-      const Address destination = relative16(event.nextAddress().value, relative);
+      const s32 displacement = isCps3(version) ? relative : static_cast<s16>(relative);
+      const Address destination{static_cast<u32>(event.nextAddress().value + displacement)};
       event.mayBranchTo(destination, SemanticOperandRole::RepeatTarget);
       return event.invoke<&Playback::repeatBreak>(slot, destination);
     }
     case 0xdc: {
       auto event = cursor.command("Set Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones"));
+      return event.invoke<&Playback::setTranspose>(event.s8("semitones"));
     }
     case 0xdd: {
       auto event = cursor.command("Add Transpose", SequenceSemantic::Pitch);
-      return event.add<&TrackState::transpose>(event.s8("semitones"));
+      return event.invoke<&Playback::addTranspose>(event.s8("semitones"));
     }
     case 0xde: {
       auto event = cursor.command("Set Volume Adjustment", SequenceSemantic::Level);
@@ -865,6 +940,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xe6:
       return cursor.ignored("Driver State", 1);
     case 0xe7: {
+      if (!isCps3(version)) {
+        return cursor.unsupported("CPS3 Fine Tune").stop();
+      }
       auto event = cursor.command("Fine Tune", SequenceSemantic::Pitch);
       const u8 raw = event.u8("tuning");
       const double cents =
@@ -872,6 +950,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.emitTuning(cents);
     }
     case 0xe8: {
+      if (!isCps3(version)) {
+        return cursor.unsupported("CPS3 Meta Event").stop();
+      }
       auto event = cursor.command("Meta Event", SequenceSemantic::Meta);
       const u8 slot = event.u8("slot");
       const u8 value = event.u8("value");
@@ -885,7 +966,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }
 
 [[nodiscard]] SequenceDialect makeDialect(std::string_view id, std::string_view prefix, u32 ppqn,
-                                          u8 initialPitchBendRange) {
+                                          u8 initialPitchBendRange, double initialLevel = 1.0) {
   return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
       .id = DialectId{std::string(id)},
       .commandDetailKindPrefix = std::string(prefix),
@@ -895,7 +976,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
               .panLaw = PanLaw::ConstantSum,
-              .initialLevel = 1.0,
+              .initialLevel = initialLevel,
               .initialMonoModeChannels = 16,
               .initialPitchBendRangeSemitones = initialPitchBendRange,
               .initialTempoMicrosecondsPerQuarter = 500000,
@@ -917,7 +998,7 @@ const SequenceDialect& cpsEarlyDialect() {
 }
 
 const SequenceDialect& cpsLateDialect() {
-  static const SequenceDialect dialect = makeDialect(kCpsLateDialectId, "cps.late", kCpsPpqn, 12);
+  static const SequenceDialect dialect = makeDialect(kCpsLateDialectId, "cps.late", kCpsPpqn, 12, 0.0);
   return dialect;
 }
 
@@ -945,6 +1026,9 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
     empty.sourceBaseAddress = Address{sourceSequence.offset};
     empty.config.profile = static_cast<u32>(layout.version);
     empty.config.driverState = layout.masterVolume;
+    if (usesLateSequence(layout.version)) {
+      empty.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
+    }
     return empty;
   }
 
@@ -988,6 +1072,9 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
   program.sourceBaseAddress = Address{sourceSequence.offset};
   program.config.profile = static_cast<u32>(layout.version);
   program.config.driverState = layout.masterVolume;
+  if (usesLateSequence(layout.version)) {
+    program.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
+  }
   return program;
 }
 

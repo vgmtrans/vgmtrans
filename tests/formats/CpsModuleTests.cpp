@@ -116,7 +116,7 @@ Fixture cps1V1Fixture() {
 
   bytes[0x300] = 0;
   le16(bytes, 0x301, 0x400);
-  bytesAt(bytes, 0x400, {0x07, 65, 0x5f, 0x0f});
+  bytesAt(bytes, 0x400, {0x07, 65, 0x08, 0xfc, 0x5f, 0x0f});
 
   SourceFile source{
       .id = SourceId{53},
@@ -165,6 +165,10 @@ Fixture earlyCps2Fixture() {
               0,  // bank
               0x08,
               0,  // program
+              0x18,
+              16,  // QSound center keeps both channels at full gain
+              0x18,
+              0,  // hard-left balance
               0x06,
               0x80,  // duration
               0x4d,  // note
@@ -206,6 +210,64 @@ Fixture earlyCps2Fixture() {
   return Fixture{.source = std::move(source), .bytes = std::move(bytes)};
 }
 
+Fixture lateCps2Fixture() {
+  constexpr u32 programSize = 0x3000;
+  constexpr u32 sampleSize = 0x200;
+  std::vector<u8> bytes(programSize + sampleSize);
+
+  le16(bytes, 0x180, 0x400);
+  bytesAt(bytes, 0x200, {0, 0, 0, 0, 0, 0, 1, 0x3c});
+  bytesAt(bytes, 0x300, {63, 32, 96, 16, 24});
+  bytesAt(bytes, 0x400, {0, 0, 0, 0});
+
+  be32(bytes, 0x1000, 0x1100);
+  bytesAt(bytes, 0x1100, {0});
+  be16(bytes, 0x1101, 0x21);
+  bytesAt(bytes, 0x1121,
+          {
+              0xe1, 0x40,  // LFO rate
+              0xc5, 0x20,  // vibrato
+              0xe2, 0x30,  // tremolo
+              0xc6, 64,    // nonlinear QSound volume
+              0xc8, 1,     // QSound expression lookup
+              0xc7, 126,   // quantized one step from hard right
+              0xdd, 2,     // additive transpose
+              0xdc, 5,     // base transpose
+              0xbf, 0x3c, 1, 0xff,
+          });
+
+  SourceFile source{
+      .id = SourceId{54},
+      .name = "late cps2 fixture",
+      .size = bytes.size(),
+      .attributes =
+          {
+              {std::string(mame::kMameGameAttribute), "late-cps2-fixture"},
+              {std::string(mame::kMameFormatAttribute), "CPS2"},
+              {std::string(mame::kMameFormatVersionAttribute), "CPS2_V2.10"},
+          },
+      .segments =
+          {
+              SourceSegment{
+                  .name = "audiocpu",
+                  .offset = 0,
+                  .size = programSize,
+                  .attributes =
+                      {
+                          {"seq_table", "0x1000"},
+                          {"samp_table", "0x200"},
+                          {"samp_table_length", "8"},
+                          {"instr_table_ptrs", "0x180"},
+                          {"num_instr_banks", "1"},
+                          {"artic_table", "0x300"},
+                      },
+              },
+              SourceSegment{.name = "qsound", .offset = programSize, .size = sampleSize},
+          },
+  };
+  return Fixture{.source = std::move(source), .bytes = std::move(bytes)};
+}
+
 Fixture cps3Fixture() {
   constexpr u32 programSize = 0x1000;
   constexpr u32 sampleSize = 0x200;
@@ -217,29 +279,30 @@ Fixture cps3Fixture() {
   be32(bytes, 0x208, 0x100);
   be32(bytes, 0x20c, 60);
   be16(bytes, 0x300, 0x100);
-  bytesAt(bytes, 0x400, {127, 0xff, 0, 0, 0, 0, 0, 63, 32, 96, 16, 24});
-  bytesAt(bytes, 0x40c, {0xff, 0xff});
+  bytesAt(bytes, 0x400, {127, 0xff, 64, 0, 0, 0, 32, 63, 32, 96, 16, 24});
+  bytesAt(bytes, 0x40c, {0xff, 0});
 
   be32(bytes, 0x800, 0x108);
   bytesAt(bytes, 0x900, {0});
   be16(bytes, 0x901, 0x21);
   bytesAt(bytes, 0x921,
           {
-              0xe1, 0x40,            // LFO rate
-              0xc5, 0x20,            // vibrato
-              0xe2, 0x30,            // bipolar linear-gain tremolo
-              0xe0, 1,               // restart LFO on a fresh attack
-              0xc2, 0,    0xc4, 0,   // bank/program
-              0xdc, 2,    0xe7, 64,  // transpose and neutral fine tune
-              0xbf, 0x3c, 4,         // fresh note
-              5,                     // delay prefix
-              0xbf, 0xbc, 4,         // fresh note which establishes hold
-              2,                     // delay prefix
-              0xbf, 0x3e, 4,         // legato continuation
-              3,                     // delay prefix
-              0xe8, 2,    9,         // game-facing meta event
-              0xc6, 100,  0xc8, 64,  // volume/expression remain separate
-              0xde, 1,    0xdf, 1,   // volume adjustment set/add
+              0xe1, 0x40,                      // LFO rate
+              0xc5, 0x20,                      // vibrato
+              0xe2, 0x30,                      // bipolar linear-gain tremolo
+              0xe0, 1,                         // restart LFO on a fresh attack
+              0xc2, 0,    0xc4, 0,             // bank/program
+              0xdd, 3,    0xdc, 2,  0xe7, 64,  // set replaces add; neutral fine tune
+              0xc7, 0,                         // hard-left QSound balance
+              0xbf, 0x3c, 4,                   // fresh note
+              5,                               // delay prefix
+              0xbf, 0xbc, 4,                   // fresh note which establishes hold
+              2,                               // delay prefix
+              0xbf, 0x3e, 4,                   // legato continuation
+              3,                               // delay prefix
+              0xe8, 2,    9,                   // game-facing meta event
+              0xc6, 100,  0xc8, 64,            // volume/expression remain separate
+              0xdf, 1,    0xde, 64, 0xdf, 0,   // set replaces add; wrapped adjustment reaches silence
               0xff,
           });
   for (u32 offset = 0; offset < 0x100; ++offset) {
@@ -300,6 +363,30 @@ Fixture cps3RepeatBreakFixture() {
               0x3e,
               1,
               0xff,  // C, end
+          });
+  return fixture;
+}
+
+Fixture lateCps2SignedRepeatBreakFixture() {
+  auto fixture = lateCps2Fixture();
+  bytesAt(fixture.bytes, 0x1121,
+          {
+              0xd8,
+              0xff,
+              0xfd,  // -3 from the end of this command, back to itself
+              0xff,
+          });
+  return fixture;
+}
+
+Fixture cps3ByteSignedBranchFixture() {
+  auto fixture = cps3Fixture();
+  bytesAt(fixture.bytes, 0x921,
+          {
+              0xcd,
+              0x00,
+              0xfd,  // CPS3 sign-extends this low byte, branching back to CD
+              0xff,
           });
   return fixture;
 }
@@ -430,8 +517,15 @@ void cps1V1DefaultsAndPitchWrappingMatchLegacyDriver() {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });
   const auto* typed = note == performance.tracks[0].events.end() ? nullptr : std::get_if<NotePerformanceEvent>(&*note);
+  const auto bend = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<PitchBendPerformanceEvent>(event);
+  });
+  const auto* typedBend =
+      bend == performance.tracks[0].events.end() ? nullptr : std::get_if<PitchBendPerformanceEvent>(&*bend);
   expect(typed != nullptr && typed->key == 108.0 && typed->durationTicks == 1,
          "CPS1 V1 should wrap its pre-offset key at 96 and initialize note duration to one driver tick");
+  expect(typedBend != nullptr && std::abs(typedBend->semitones + 4.0 / 256.0) < 0.0001,
+         "CPS1 V1 tuning should retain the driver's signed 8.8 fixed-point pitch units");
 }
 
 void cps2EarlyModuleUsesPhysicalModulation() {
@@ -450,16 +544,56 @@ void cps2EarlyModuleUsesPhysicalModulation() {
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsEarlyDialect());
   bool physicalVibrato = false;
   bool physicalTremolo = false;
+  bool physicalPan = false;
+  bool physicalCenter = false;
   bool markerWorkaround = false;
   for (const auto& event : performance.tracks[0].events) {
     if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-      physicalVibrato |= modulation->pitchDepthSemitones.has_value();
-      physicalTremolo |= modulation->volumeDepthLinearGain.has_value();
+      physicalVibrato |= modulation->pitchDepthSemitones.has_value() && modulation->phaseRunsAtZeroDepth;
+      physicalTremolo |= modulation->volumeDepthLinearGain.has_value() && modulation->phaseRunsAtZeroDepth;
+    } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+      physicalPan |= balance->leftGain == 1.0 && balance->rightGain == 0.0;
+      physicalCenter |= balance->leftGain == 1.0 && balance->rightGain == 1.0;
     }
     markerWorkaround |= std::holds_alternative<MarkerPerformanceEvent>(event);
   }
-  expect(performance.tracks[0].hasPhysicalModulation && physicalVibrato && physicalTremolo && !markerWorkaround,
-         "early CPS2 LFO commands should emit physical modulation without legacy MIDI marker workarounds");
+  expect(performance.tracks[0].hasPhysicalModulation && physicalVibrato && physicalTremolo && physicalPan &&
+             physicalCenter && !markerWorkaround,
+         "early CPS2 modulation and balance should stay physical without legacy MIDI marker workarounds");
+}
+
+void cps2LateDriverSemanticsRemainProfileSpecific() {
+  const auto result = scan(lateCps2Fixture());
+  expect(result.diagnostics.empty(), result.diagnostics.empty()
+                                         ? "complete late CPS2 fixture should scan without diagnostics"
+                                         : result.diagnostics.front().message);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(result).program, cpsLateDialect());
+
+  const NotePerformanceEvent* note = nullptr;
+  bool initialExpression = false;
+  bool sourceExpression = false;
+  bool nonlinearVolume = false;
+  bool quantizedPan = false;
+  bool runningLfo = false;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* typed = std::get_if<NotePerformanceEvent>(&event)) {
+      note = typed;
+    } else if (const auto* expression = std::get_if<ExpressionPerformanceEvent>(&event)) {
+      initialExpression |= !expression->header.sourceCommand.valid() && std::abs(expression->linearGain - 0.5) < 0.0001;
+      sourceExpression |=
+          expression->header.sourceCommand.valid() && std::abs(expression->linearGain - 6.0 / 512.0) < 0.0001;
+    } else if (const auto* level = std::get_if<LevelPerformanceEvent>(&event)) {
+      nonlinearVolume |= level->header.sourceCommand.valid() && std::abs(level->linearGain - 0x4c8 / 8191.0) < 0.0001;
+    } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+      quantizedPan |= std::abs(balance->leftGain - 1.0 / 16.0) < 0.0001 && balance->rightGain == 1.0;
+    } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
+      runningLfo |= modulation->phaseRunsAtZeroDepth;
+    }
+  }
+  expect(note != nullptr && note->key == 67.0 && initialExpression && sourceExpression && nonlinearVolume &&
+             quantizedPan && runningLfo,
+         "late CPS2 should retain its independent transpose fields, QSound gain tables, pan quantization, and "
+         "free-running LFO");
 }
 
 void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
@@ -473,9 +607,10 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
              instruments->instruments[0].regions.size() == 1,
          "CPS3 bank and relative instrument pointers should produce one variable-region instrument");
   const auto& region = instruments->instruments[0].regions[0];
-  expect(region.keyRange.low == 0 && region.keyRange.high == 127 && std::abs(region.unityKey - 60.0) < 0.0001 &&
-             std::abs(region.attenuationDb) < 0.0001,
-         "CPS3 regions should preserve key range, tuning, and unhalved unity gain");
+  expect(region.keyRange.low == 0 && region.keyRange.high == 127 && std::abs(region.unityKey - 59.875) < 0.0001 &&
+             std::abs(region.attenuationDb - 96.0) < 0.0001 && region.envelope.sustainAmplitude &&
+             std::abs(*region.envelope.sustainAmplitude - 97.0 / 128.0) < 0.0001,
+         "CPS3 regions should use driver units for tuning, wrapped gain adjustment, and sustain level");
 
   const auto& sequence = onlySequence(result);
   expect(sequence.program.dialect.value == kCpsLateDialectId && sequence.program.tracks.size() == 1,
@@ -490,19 +625,28 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsLateDialect());
   std::vector<const NotePerformanceEvent*> notes;
   bool linearTremolo = false;
+  bool hardLeftBalance = false;
+  bool initialExpression = false;
+  bool wrappedAdjustmentSilence = false;
   for (const auto& event : performance.tracks[0].events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       notes.push_back(note);
     } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-      linearTremolo |= modulation->volumeDepthLinearGain.has_value();
+      linearTremolo |= modulation->volumeDepthLinearGain.has_value() && !modulation->phaseRunsAtZeroDepth;
+    } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+      hardLeftBalance |= balance->leftGain == 1.0 && balance->rightGain == 0.0;
+    } else if (const auto* expression = std::get_if<ExpressionPerformanceEvent>(&event)) {
+      initialExpression |=
+          !expression->header.sourceCommand.valid() && std::abs(expression->linearGain - 65.0 / 128.0) < 0.0001;
+      wrappedAdjustmentSilence |= expression->header.sourceCommand.valid() && expression->linearGain == 0.0;
     }
   }
   expect(notes.size() == 3 && notes[0]->header.tick == 0 && notes[1]->header.tick == 5 && notes[2]->header.tick == 7 &&
              !notes[0]->extendsPrevious && !notes[1]->extendsPrevious && notes[2]->extendsPrevious,
          "CPS3 delay prefixes and held-note bit should produce the driver event timeline and legato transition");
   expect(notes[0]->key == 62.0 && notes[2]->key == 64.0 && notes[0]->restartsLfoPhase && !notes[2]->restartsLfoPhase &&
-             linearTremolo,
-         "CPS3 transpose and note-triggered shared LFO reset behavior should remain physical");
+             linearTremolo && hardLeftBalance && initialExpression && wrappedAdjustmentSilence,
+         "CPS3 tuning, LFO reset, exact balance, initial expression, and wrapped gain should remain physical");
 }
 
 void cpsLateRepeatBreakUsesEndOfCommandBase() {
@@ -517,5 +661,23 @@ void cpsLateRepeatBreakUsesEndOfCommandBase() {
     }
   }
   expect(notes == std::vector<std::pair<u64, double>>{{0, 60}, {1, 61}, {2, 60}, {3, 62}},
-         "late repeat breaks should resolve their signed displacement from the end of the encoded command");
+         "late repeat breaks should resolve their forward displacement from the end of the encoded command");
+}
+
+void cpsLateControlFlowOffsetsFollowEachDriver() {
+  const auto cps2Result = scan(lateCps2SignedRepeatBreakFixture());
+  const auto& cps2Commands = onlySequence(cps2Result).program.tracks[0].commands;
+  const auto cps2Break =
+      std::ranges::find_if(cps2Commands, [](const SourceCommand& command) { return command.address.value == 0x1121; });
+  expect(cps2Break != cps2Commands.end() && cps2Break->flow.staticTargets.size() == 1 &&
+             cps2Break->flow.staticTargets[0].value == 0x1121,
+         "late CPS2 repeat breaks should sign-extend their 16-bit displacement");
+
+  const auto cps3Result = scan(cps3ByteSignedBranchFixture());
+  const auto& cps3Commands = onlySequence(cps3Result).program.tracks[0].commands;
+  const auto cps3Branch =
+      std::ranges::find_if(cps3Commands, [](const SourceCommand& command) { return command.address.value == 0x921; });
+  expect(cps3Branch != cps3Commands.end() && cps3Branch->flow.staticTargets.size() == 1 &&
+             cps3Branch->flow.staticTargets[0].value == 0x921,
+         "CPS3 CD should preserve the driver's independent sign extension of its low displacement byte");
 }

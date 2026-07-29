@@ -252,6 +252,7 @@ struct SequenceProgramBehavior {
   // them in behavior so formats opt in explicitly and exporters can emit stable
   // initialization without attaching it to a fake source command.
   std::optional<double> initialLevel;
+  std::optional<double> initialExpression;
   std::optional<double> initialReverbSend;
   std::optional<u8> initialMonoModeChannels;
   std::optional<u8> initialPitchBendRangeSemitones;

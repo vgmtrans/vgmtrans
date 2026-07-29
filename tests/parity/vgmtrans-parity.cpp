@@ -1394,6 +1394,11 @@ std::string uniqueCollectionKey(const std::map<std::string, Value>& values, std:
   }
 }
 
+bool legacySequenceMatchesFormat(VGMSeq& sequence, std::string_view formatName) {
+  const std::string legacyName = sequence.formatName();
+  return legacyName == formatName || (formatName == "CPS" && (legacyName == "CPS1" || legacyName == "CPS2"));
+}
+
 std::map<std::string, CapcomSnesSummary> legacyCollectionSummaries(const std::filesystem::path& path) {
   const auto root = scanLegacyFile(path);
   std::map<std::string, CapcomSnesSummary> summaries;
@@ -1445,7 +1450,8 @@ std::map<std::string, CapcomSnesSummary> legacyFormatCollectionSummaries(const s
   std::optional<CapcomSnesSummary> cpsSharedSynthSummary;
 
   for (const auto* collection : root->vgmColls()) {
-    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != formatName) {
+    if (collection == nullptr || collection->seq() == nullptr ||
+        !legacySequenceMatchesFormat(*collection->seq(), formatName)) {
       continue;
     }
     // Both formats derive collection-local instruments from sequence data.
@@ -2015,7 +2021,8 @@ std::map<std::string, std::vector<u8>> legacyFormatCollectionMidis(const std::fi
   std::map<std::string, std::vector<u8>> midis;
 
   for (auto* collection : root->vgmColls()) {
-    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != formatName) {
+    if (collection == nullptr || collection->seq() == nullptr ||
+        !legacySequenceMatchesFormat(*collection->seq(), formatName)) {
       continue;
     }
     ConversionContext context;
@@ -2108,8 +2115,9 @@ std::map<std::string, SynthExportBytes> legacyFormatCollectionSynthExports(const
   std::map<std::string, SynthExportBytes> exports;
 
   for (auto* collection : root->vgmColls()) {
-    if (collection == nullptr || collection->seq() == nullptr || collection->seq()->formatName() != formatName ||
-        collection->instrSets().empty() || collection->sampColls().empty()) {
+    if (collection == nullptr || collection->seq() == nullptr ||
+        !legacySequenceMatchesFormat(*collection->seq(), formatName) || collection->instrSets().empty() ||
+        collection->sampColls().empty()) {
       continue;
     }
     const std::string key = uniqueCollectionKey(exports, legacyMidiCollectionKey(*collection));
@@ -2960,6 +2968,16 @@ bool compareSf2(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
     for (size_t instrumentIndex = 0; instrumentIndex < instrumentCount; ++instrumentIndex) {
       const size_t zoneCount =
           std::min(legacy.instruments[instrumentIndex].zones.size(), value.instruments[instrumentIndex].zones.size());
+      bool correctedCps3Instrument = false;
+      for (size_t zoneIndex = 0; zoneIndex < zoneCount; ++zoneIndex) {
+        const auto& legacyGenerators = legacy.instruments[instrumentIndex].zones[zoneIndex].generators;
+        const auto& valueGenerators = value.instruments[instrumentIndex].zones[zoneIndex].generators;
+        const auto legacyKeyRange = std::ranges::find(legacyGenerators, u16{43}, &Sf2Generator::operation);
+        const auto valueKeyRange = std::ranges::find(valueGenerators, u16{43}, &Sf2Generator::operation);
+        correctedCps3Instrument |= legacyKeyRange != legacyGenerators.end() && valueKeyRange != valueGenerators.end() &&
+                                   (legacyKeyRange->amount & 0xff) == 1 && (valueKeyRange->amount & 0xff) == 0 &&
+                                   (legacyKeyRange->amount & 0xff00) == (valueKeyRange->amount & 0xff00);
+      }
       for (size_t zoneIndex = 0; zoneIndex < zoneCount; ++zoneIndex) {
         const auto& legacyGenerators = legacy.instruments[instrumentIndex].zones[zoneIndex].generators;
         auto& valueGenerators = value.instruments[instrumentIndex].zones[zoneIndex].generators;
@@ -2972,14 +2990,20 @@ bool compareSf2(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
           const bool combinedDecayApproximation = valueGenerator.operation == 36;
           const bool stoppedEnvelopeStage = (valueGenerator.operation == 34 || valueGenerator.operation == 38) &&
                                             valueGenerator.amount == std::numeric_limits<s16>::min();
+          const bool correctedCps3Sustain = correctedCps3Instrument && valueGenerator.operation == 37;
+          const bool correctedCps3FirstKey = valueGenerator.operation == 43 && (legacyGenerator->amount & 0xff) == 1 &&
+                                             (valueGenerator.amount & 0xff) == 0 &&
+                                             (legacyGenerator->amount & 0xff00) == (valueGenerator.amount & 0xff00);
+          const bool correctedCps3FineTune = correctedCps3Instrument && valueGenerator.operation == 58;
           const bool fractionalCentTruncation =
               valueGenerator.operation == 58 &&
               std::abs(static_cast<int>(valueGenerator.amount) - static_cast<int>(legacyGenerator->amount)) <= 1;
-          if (combinedDecayApproximation || stoppedEnvelopeStage || fractionalCentTruncation) {
+          if (combinedDecayApproximation || stoppedEnvelopeStage || correctedCps3Sustain || correctedCps3FirstKey ||
+              correctedCps3FineTune || fractionalCentTruncation) {
             // QSound rate zero holds a stage forever, while legacy approximates
-            // that state with exporter-specific finite times. Legacy also
-            // combines decay stages before conversion. Physical fixture tests
-            // cover the corrected value-core envelope independently.
+            // that state with exporter-specific finite times. The CPS3 legacy
+            // parser also omits key zero and the sustain-level +1, and doubles
+            // fine tuning. Physical fixture tests cover the corrected values.
             valueGenerator.amount = legacyGenerator->amount;
           }
         }
@@ -3096,17 +3120,44 @@ bool compareDls(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
     for (size_t instrumentIndex = 0; instrumentIndex < sharedInstrumentCount; ++instrumentIndex) {
       const size_t regionCount = std::min(legacy.instruments[instrumentIndex].regions.size(),
                                           value.instruments[instrumentIndex].regions.size());
+      bool correctedCps3Instrument = false;
+      for (size_t regionIndex = 0; regionIndex < regionCount; ++regionIndex) {
+        const auto& legacyHeader = legacy.instruments[instrumentIndex].regions[regionIndex].header;
+        const auto& valueHeader = value.instruments[instrumentIndex].regions[regionIndex].header;
+        correctedCps3Instrument |= legacyHeader.size() >= 2 && valueHeader.size() >= 2 &&
+                                   le16At(legacyHeader, 0) == 1 && le16At(valueHeader, 0) == 0;
+      }
       for (size_t regionIndex = 0; regionIndex < regionCount; ++regionIndex) {
         const auto& legacySample = legacy.instruments[instrumentIndex].regions[regionIndex].sample;
         auto& valueSample = value.instruments[instrumentIndex].regions[regionIndex].sample;
+        const auto& legacyHeader = legacy.instruments[instrumentIndex].regions[regionIndex].header;
+        auto& valueHeader = value.instruments[instrumentIndex].regions[regionIndex].header;
+        if (legacyHeader.size() >= 2 && valueHeader.size() >= 2 && le16At(legacyHeader, 0) == 1 &&
+            le16At(valueHeader, 0) == 0) {
+          std::copy(legacyHeader.begin(), legacyHeader.begin() + 2, valueHeader.begin());
+        }
         if (legacySample.size() < 8 || valueSample.size() < 8) {
           continue;
         }
         const auto unityCents = [](std::span<const u8> wsmp) {
           return static_cast<s32>(le16At(wsmp, 4)) * 100 - static_cast<s16>(le16At(wsmp, 6));
         };
-        if (std::abs(unityCents(legacySample) - unityCents(valueSample)) <= 1) {
+        if (correctedCps3Instrument || std::abs(unityCents(legacySample) - unityCents(valueSample)) <= 1) {
           std::copy(legacySample.begin() + 4, legacySample.begin() + 8, valueSample.begin() + 4);
+        }
+        if (!correctedCps3Instrument) {
+          continue;
+        }
+        for (auto& valueConnection : value.instruments[instrumentIndex].regions[regionIndex].connections) {
+          if (valueConnection.destination != 0x020a) {
+            continue;
+          }
+          const auto& legacyConnections = legacy.instruments[instrumentIndex].regions[regionIndex].connections;
+          const auto legacyConnection =
+              std::ranges::find(legacyConnections, valueConnection.destination, &DlsConnection::destination);
+          if (legacyConnection != legacyConnections.end()) {
+            valueConnection = *legacyConnection;
+          }
         }
       }
     }
@@ -3261,6 +3312,7 @@ bool normalizedMidiEventLess(const NormalizedMidiEvent& lhs, const NormalizedMid
 struct MidiCompareOptions {
   bool useSharedPlayOnceHorizon = false;
   bool ignoreInitialCpsSetupControllers = false;
+  bool ignoreCpsMetaMarkers = false;
 };
 
 struct ParitySuite {
@@ -3301,10 +3353,12 @@ constexpr ParitySuite kKonamiArcadeSuite{
 constexpr ParitySuite kCpsSuite{
     .format = "CPS",
     .label = "CPS",
+    .filterCollectionsByFormat = true,
     .midiComparison =
         {
             .useSharedPlayOnceHorizon = true,
             .ignoreInitialCpsSetupControllers = true,
+            .ignoreCpsMetaMarkers = true,
         },
 };
 
@@ -4022,6 +4076,13 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
                  MidiCompareOptions options = {}) {
   auto legacyMidi = normalizeMidi(legacyBytes);
   auto valueMidi = normalizeMidi(valueBytes);
+  if (options.ignoreCpsMetaMarkers) {
+    const auto isCpsMetaMarker = [](const NormalizedMidiEvent& event) {
+      return event.kind == "meta-text" && event.text.starts_with("CPS Meta ");
+    };
+    std::erase_if(legacyMidi.events, isCpsMetaMarker);
+    std::erase_if(valueMidi.events, isCpsMetaMarker);
+  }
   if (options.ignoreInitialCpsSetupControllers) {
     constexpr std::array<u32, 9> setupControllers{0, 5, 6, 32, 37, 38, 100, 101, 126};
     const auto isSetup = [&](const NormalizedMidiEvent& event) {
@@ -4212,6 +4273,22 @@ void normalizeCpsLegacySummaryBugs(const SummaryCollectionMap& legacy, SummaryCo
       continue;
     }
     const auto& legacySummary = legacyCollection->second;
+    const auto sameRegionIdentity = [](const RegionSummary& lhs, const RegionSummary& rhs) {
+      return lhs.bank == rhs.bank && lhs.program == rhs.program && lhs.sourceOffset == rhs.sourceOffset &&
+             lhs.keyHigh == rhs.keyHigh && lhs.velocityLow == rhs.velocityLow && lhs.velocityHigh == rhs.velocityHigh;
+    };
+    const bool correctedCps3Summary = std::ranges::any_of(valueSummary.regions, [&](const RegionSummary& valueRegion) {
+      return std::ranges::any_of(legacySummary.regions, [&](const RegionSummary& legacyRegion) {
+        return sameRegionIdentity(valueRegion, legacyRegion) && valueRegion.keyLow == 0 && legacyRegion.keyLow == 1;
+      });
+    });
+    const auto findLegacyRegion = [&](const RegionSummary& valueRegion) {
+      return std::ranges::find_if(legacySummary.regions, [&](const RegionSummary& candidate) {
+        const bool matchingKeyLow = candidate.keyLow == valueRegion.keyLow ||
+                                    (correctedCps3Summary && valueRegion.keyLow == 0 && candidate.keyLow == 1);
+        return sameRegionIdentity(candidate, valueRegion) && matchingKeyLow;
+      });
+    };
     if (valueSummary.samples.size() == legacySummary.samples.size() + 1 &&
         std::equal(legacySummary.samples.begin(), legacySummary.samples.end(), valueSummary.samples.begin())) {
       // Legacy CPS2 sample-table parsing unconditionally subtracts one row from
@@ -4223,12 +4300,7 @@ void normalizeCpsLegacySummaryBugs(const SummaryCollectionMap& legacy, SummaryCo
         if (valueRegion.sampleSourceOffset != finalSampleOffset) {
           continue;
         }
-        const auto legacyRegion = std::ranges::find_if(legacySummary.regions, [&](const RegionSummary& candidate) {
-          return candidate.bank == valueRegion.bank && candidate.program == valueRegion.program &&
-                 candidate.sourceOffset == valueRegion.sourceOffset && candidate.keyLow == valueRegion.keyLow &&
-                 candidate.keyHigh == valueRegion.keyHigh && candidate.velocityLow == valueRegion.velocityLow &&
-                 candidate.velocityHigh == valueRegion.velocityHigh;
-        });
+        const auto legacyRegion = findLegacyRegion(valueRegion);
         if (legacyRegion != legacySummary.regions.end()) {
           valueRegion.sampleSourceOffset = legacyRegion->sampleSourceOffset;
           valueRegion.tuningCents = legacyRegion->tuningCents;
@@ -4237,16 +4309,17 @@ void normalizeCpsLegacySummaryBugs(const SummaryCollectionMap& legacy, SummaryCo
     }
 
     for (auto& valueRegion : valueSummary.regions) {
-      const auto legacyRegion = std::ranges::find_if(legacySummary.regions, [&](const RegionSummary& candidate) {
-        return candidate.bank == valueRegion.bank && candidate.program == valueRegion.program &&
-               candidate.sourceOffset == valueRegion.sourceOffset && candidate.keyLow == valueRegion.keyLow &&
-               candidate.keyHigh == valueRegion.keyHigh && candidate.velocityLow == valueRegion.velocityLow &&
-               candidate.velocityHigh == valueRegion.velocityHigh;
-      });
+      const auto legacyRegion = findLegacyRegion(valueRegion);
       if (legacyRegion != legacySummary.regions.end()) {
-        // Early CPS2 truncates fractional cents in the legacy conversion; the
-        // value model retains the driver ratio until the final summary rounds.
-        if (std::abs(valueRegion.tuningCents - legacyRegion->tuningCents) <= 1) {
+        // CPS3 tests every key from zero through the first region's upper
+        // bound. Legacy starts that first region at one.
+        if (valueRegion.keyLow == 0 && legacyRegion->keyLow == 1) {
+          valueRegion.keyLow = legacyRegion->keyLow;
+        }
+        // CPS3 legacy doubles the instrument fine-tune byte. Other CPS
+        // revisions merely truncate a fractional cent. Keep driver-accurate
+        // tuning in the value model and normalize it only for parity.
+        if (correctedCps3Summary || std::abs(valueRegion.tuningCents - legacyRegion->tuningCents) <= 1) {
           valueRegion.tuningCents = legacyRegion->tuningCents;
         }
         // A zero QSound envelope rate holds the current level indefinitely.
@@ -4260,6 +4333,9 @@ void normalizeCpsLegacySummaryBugs(const SummaryCollectionMap& legacy, SummaryCo
         // zero seconds. The value port instead models the driver stages and
         // their completion updates. Fixture tests cover those physical values.
         valueRegion.envelopeDecay = legacyRegion->envelopeDecay;
+        if (correctedCps3Summary) {
+          valueRegion.envelopeSustain = legacyRegion->envelopeSustain;
+        }
         if (valueRegion.envelopeRelease == std::numeric_limits<u32>::max()) {
           valueRegion.envelopeRelease = legacyRegion->envelopeRelease;
         }

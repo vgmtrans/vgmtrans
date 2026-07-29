@@ -94,6 +94,9 @@ struct CpsLayout {
 [[nodiscard]] bool isCps3(CpsVersion version);
 [[nodiscard]] bool usesLateSequence(CpsVersion version);
 [[nodiscard]] double cpsDriverRateHertz(CpsVersion version);
+[[nodiscard]] constexpr double cpsVolumeAdjustmentGain(s32 adjustment) noexcept {
+  return static_cast<double>(static_cast<u32>(adjustment + 64) & 0x7fU) / 64.0;
+}
 
 [[nodiscard]] std::optional<CpsLayout> findCpsLayout(const core::SourceFile& source, core::ByteReader reader,
                                                      std::vector<core::Diagnostic>* diagnostics = nullptr);
