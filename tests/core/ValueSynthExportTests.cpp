@@ -623,6 +623,37 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   expect(packedBankData.instruments.size() == 1 && packedBankData.instruments[0].instrument->name == "Lead" &&
              packedBankData.samples.size() == 1 && packedBankData.samples[0].name == "Lead Wave",
          "shared synth preparation should map packed MIDI banks back to collection instrument banks");
+
+  auto exactBankInstruments = packedBankInstruments;
+  exactBankInstruments.instruments[2].explicitAddress = InstrumentAddress{.bank = 1 << 7, .program = 1};
+  const std::array<const InstrumentSetAsset*, 1> exactBankSets{&exactBankInstruments};
+  const auto exactBankData = prepareSynthData(
+      SynthExportInput{
+          .instrumentSets = exactBankSets,
+          .sampleCollections = sampleSets,
+          .sequenceUsage = &packedBankPerformance,
+      },
+      sources);
+  expect(exactBankData.instruments.size() == 1 && exactBankData.instruments[0].instrument->name == "Noise" &&
+             exactBankData.samples.size() == 1 && exactBankData.samples[0].name == "Noise Wave",
+         "an exact instrument address should take precedence over a packed-bank fallback");
+
+  for (const auto kind : {ExportKind::SoundFont2, ExportKind::Dls}) {
+    const auto failed = exportCollection(snapshot, sources, CollectionId{0},
+                                         ExportRequest{
+                                             .kinds = {kind},
+                                             .exportOnlyUsedInstruments = true,
+                                         },
+                                         SequenceDialectRegistry{});
+    expect(failed.size() == 1 && failed[0].bytes.empty(),
+           "used-instrument export should stop when sequence rendering fails");
+    diagnosticWithMessage(failed[0].diagnostics, "No sequence dialect registered for 'probe'");
+    expect(std::ranges::none_of(failed[0].diagnostics,
+                                [](const Diagnostic& diagnostic) {
+                                  return diagnostic.message.starts_with("No decodable samples available");
+                                }),
+           "used-instrument export should report the sequence failure instead of a sample error");
+  }
 }
 
 PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepareContext& context) {
