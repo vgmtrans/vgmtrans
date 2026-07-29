@@ -167,8 +167,14 @@ struct Playback {
   }
 
   void emitPortamento(PerformanceNoteId note, double key) {
-    if (!track.held || !track.previousKey || !track.previousNote.valid() || track.portamentoRate == 0 ||
+    if (!track.held || !track.previousKey || !track.previousNote.valid() ||
         std::abs(*track.previousKey - key) < 0.0001) {
+      return;
+    }
+    if (track.portamentoRate == 0) {
+      out.pitchSlide(note, *track.previousKey, key, PitchSlideTiming::fromTicks(0))
+          .continueFrom(track.previousNote)
+          .preferPortamento();
       return;
     }
     const double semitonesPerSecond = track.portamentoRate * 2.0 / 256.0 * cpsDriverRateHertz(track.version);
@@ -481,7 +487,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   const u8 opcode = cursor.opcode();
   if (opcode >= 0x40) {
     auto event = cursor.command("Note", (opcode & 0x1f) == 0 ? SequenceSemantic::Rest : SequenceSemantic::Note);
-    event.opcodeValue("note", opcode & 0x1f, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+    event.opcodeValue("note_index", opcode & 0x1f, SourceValueDisplay::Default, SemanticOperandRole::NoteKey);
     return event.invoke<&Playback::cps1V1Note>(opcode);
   }
   if (opcode >= 0x20) {
@@ -584,7 +590,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   const u8 opcode = cursor.opcode();
   if (opcode >= 0x20) {
     auto event = cursor.command("Note", (opcode & 0x1f) == 0 ? SequenceSemantic::Rest : SequenceSemantic::Note);
-    event.opcodeValue("note", opcode & 0x1f, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+    event.opcodeValue("note_index", opcode & 0x1f, SourceValueDisplay::Default, SemanticOperandRole::NoteKey);
     return event.invoke<&Playback::earlyNote>(opcode);
   }
 
