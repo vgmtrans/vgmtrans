@@ -77,6 +77,7 @@ void mameRomDatabaseAndGroupAssemblyAreValueOriented();
 void konamiArcadeModuleBuildsSequencesSynthAndCollections();
 void konamiArcadeGxLfosMatchDriverState();
 void konamiArcadeGxDriverQuirksRemainRepresented();
+void konamiArcadeMysticDrumPitchSlidesUseTablePitch();
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
 void akaoSnesLayoutDiscoversFf4StyleAram();
 void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
@@ -202,6 +203,7 @@ int main() {
     konamiArcadeModuleBuildsSequencesSynthAndCollections();
     konamiArcadeGxLfosMatchDriverState();
     konamiArcadeGxDriverQuirksRemainRepresented();
+    konamiArcadeMysticDrumPitchSlidesUseTablePitch();
     konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
     akaoSnesLayoutDiscoversFf4StyleAram();
     akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();

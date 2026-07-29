@@ -28,13 +28,6 @@ constexpr u8 kDriverInstrumentAttenuation = 16;
   return 36.0 * value / 64.0;
 }
 
-[[nodiscard]] double drumPitch(const KonamiArcadeLayout& layout, const KonamiArcadeDrum& drum) {
-  if (layout.version == KonamiArcadeVersion::Gx) {
-    return drum.unityKey + drum.pitch / 256.0;
-  }
-  return drum.unityKey + (drum.pitch >> 2) / 16.0;
-}
-
 [[nodiscard]] std::optional<u32> sampleByteLength(ByteReader reader, SourceRange sound,
                                                   const KonamiArcadeSampleInfo& info) {
   if (info.type == KonamiSampleType::Unknown) {
@@ -240,7 +233,7 @@ bool addKonamiArcadeSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instr
       const auto sample = samples.find(sourceSample);
       const SampleRef sampleRef = sample.value_or(SampleRef{.index = invalidIdValue});
       const u8 key = static_cast<u8>(index + 24);
-      const double driverPitch = drumPitch(layout, drum);
+      const double driverPitch = konamiArcadeDrumPitch(layout.version, drum);
       auto region = drumKit.region(sampleRef, Region{
                                                   .keyRange = KeyRange{.low = key, .high = key},
                                                   .range = drum.range,

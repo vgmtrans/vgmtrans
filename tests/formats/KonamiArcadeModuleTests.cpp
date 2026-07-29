@@ -605,6 +605,48 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
       "F2 should retune the following note without bending the voice that is already playing");
 }
 
+void konamiArcadeMysticDrumPitchSlidesUseTablePitch() {
+  auto fixture = makeMysticWarriorFixture();
+  writeBytes(fixture.bytes, 0x320,
+             {
+                 0xea, 0x80,                    // tempo
+                 0xde, 0x01,                    // secondary percussion flag on
+                 0x61,                          // primary percussion flag off
+                 0x00, 0x60, 0x63, 0x7f,        // drum 0 for 96 ticks
+                 0xf3, 0x0a, 0x23, 0x1f,        // slide to driver note 31
+                 0xff,
+             });
+
+  std::vector<Diagnostic> diagnostics;
+  const auto layout =
+      findKonamiArcadeLayout(fixture.source, ByteReader(fixture.source.id, fixture.bytes), &diagnostics);
+  expect(layout && diagnostics.empty() && layout->sequences.size() == 1,
+         "MysticWarrior drum-slide fixture should produce a valid layout");
+
+  const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(fixture.source.id, fixture.bytes), *layout,
+                                                             layout->sequences[0], AssetId{1}, nullptr, &diagnostics);
+  const PerformanceSequence performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  expect(diagnostics.empty() && performance.diagnostics.empty() && performance.tracks.size() == 1,
+         "MysticWarrior drum-slide fixture should render without diagnostics");
+
+  const auto transition = std::ranges::find_if(performance.tracks[0].automations, [](const auto& automation) {
+    return pitchTransitionIntent(automation) != nullptr;
+  });
+  expect(transition != performance.tracks[0].automations.end(),
+         "F3 after a MysticWarrior drum note should retain its pitch transition");
+  const PitchTransitionIntent& slide = *pitchTransitionIntent(*transition);
+  expect(std::abs(slide.startKey - 24.0) < 0.0001 && std::abs(slide.targetKey - 11.0) < 0.0001,
+         "MysticWarrior drum F3 should slide from the table pitch toward the target instead of from the selector key");
+
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(std::ranges::any_of(midi.tracks[0].events, [](const MidiEvent& event) {
+    const auto* bend = std::get_if<PitchBend>(&event);
+    return bend != nullptr && bend->value < 0;
+  }), "MIDI lowering should preserve the drum slide's downward direction");
+}
+
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples() {
   const std::array<u8, 2> bytes{0x12, 0x34};
   Sample sample{
