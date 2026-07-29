@@ -910,7 +910,7 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
       ranges.emplace_back(range->tick, range->cents);
     }
   }
-  expect(ranges == std::vector<std::pair<u64, u16>>{{4, 700}},
+  expect(ranges == std::vector<std::pair<u64, u16>>{{0, 700}},
          "one linked MIDI voice should keep a stable range large enough for its entire pitch path");
   const auto hasMidiBend = [&](u64 tick, s16 value) {
     return std::ranges::any_of(midi.tracks[0].events, [&](const MidiEvent& event) {
@@ -1339,6 +1339,7 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   u32 nextNote = 0;
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{11}, SourceAnnotationId{12}, 0, nextSequence, nextNote, nextAutomation};
+  out.pitchBendRange(12);
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   out.at(4).pitchBend(0.25);
   const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
@@ -1359,8 +1360,15 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       return bend != nullptr && bend->header.tick == tick && bend->semitones == semitones;
     });
   };
-  expect(hasBend(4, 4.25) && hasBend(6, 3.75) && hasBend(8, -0.25),
-         "source bends should stay relative to a held transition and survive its reset at the next attack");
+  const auto hasRange = [&](u64 tick, u16 cents) {
+    return std::ranges::any_of(lowered.tracks[0].events, [&](const PerformanceEvent& event) {
+      const auto* range = std::get_if<PitchBendRangePerformanceEvent>(&event);
+      return range != nullptr && range->header.tick == tick && range->cents == cents;
+    });
+  };
+  expect(hasBend(4, 4.25) && hasBend(6, 3.75) && hasBend(8, -0.25) && hasRange(0, 425) &&
+             hasRange(8, 1200),
+         "held transitions should combine with source bends using a voice-local range that restores at the next attack");
 
   PerformanceTrack sameVoiceTrack{
       .id = TrackId{1},
