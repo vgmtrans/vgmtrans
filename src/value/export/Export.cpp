@@ -368,11 +368,13 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
 
 [[nodiscard]] SynthExportInput synthExportInput(const PreparedExport& prepared, const ExportRequest& request,
                                                 const MidiModulationUsage* midiModulation,
-                                                ModulationConversionPolicy modulationConversion) {
+                                                ModulationConversionPolicy modulationConversion,
+                                                const PerformanceSequence* sequenceUsage) {
   return SynthExportInput{
       .name = prepared.baseName,
       .instrumentSets = prepared.instrumentSets,
       .sampleCollections = prepared.sampleCollections,
+      .sequenceUsage = sequenceUsage,
       .midiModulationUsage = midiModulation,
       .modulationScaling = request.modulationScaling,
       .modulationConversion = modulationConversion,
@@ -397,18 +399,18 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
 
 [[nodiscard]] Artifact exportSoundFont2(const PreparedExport& prepared, const SourceStore& sources,
                                         const ExportRequest& request, const MidiModulationUsage* midiModulation,
-                                        ModulationConversionPolicy modulationConversion) {
-  return synthArtifact(
-      prepared, buildSoundFont2(synthExportInput(prepared, request, midiModulation, modulationConversion), sources),
-      ".sf2", "audio/soundfont");
+                                        ModulationConversionPolicy modulationConversion,
+                                        const PerformanceSequence* sequenceUsage = nullptr) {
+  const auto input = synthExportInput(prepared, request, midiModulation, modulationConversion, sequenceUsage);
+  return synthArtifact(prepared, buildSoundFont2(input, sources), ".sf2", "audio/soundfont");
 }
 
 [[nodiscard]] Artifact exportDls(const PreparedExport& prepared, const SourceStore& sources,
                                  const ExportRequest& request, const MidiModulationUsage* midiModulation,
-                                 ModulationConversionPolicy modulationConversion) {
-  return synthArtifact(prepared,
-                       buildDls(synthExportInput(prepared, request, midiModulation, modulationConversion), sources),
-                       ".dls", "audio/dls");
+                                 ModulationConversionPolicy modulationConversion,
+                                 const PerformanceSequence* sequenceUsage = nullptr) {
+  const auto input = synthExportInput(prepared, request, midiModulation, modulationConversion, sequenceUsage);
+  return synthArtifact(prepared, buildDls(input, sources), ".dls", "audio/dls");
 }
 
 Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId,
@@ -651,6 +653,15 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     return midiUsage ? &*midiUsage : nullptr;
   };
 
+  const PerformanceSequence emptySequenceUsage;
+  const auto requireSequenceUsage = [&]() -> const PerformanceSequence* {
+    if (!request.exportOnlyUsedInstruments) {
+      return nullptr;
+    }
+    const auto& rendering = requireRendering();
+    return rendering.performance ? &*rendering.performance : &emptySequenceUsage;
+  };
+
   const auto synthModulationConversion = [&]() {
     if (request.modulationConversion == ModulationConversionPolicy::SynthModulators) {
       return ModulationConversionPolicy::SynthModulators;
@@ -684,7 +695,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
         artifacts.push_back(exportSoundFont2(
             prepared, sources, request,
             conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
-            conversion));
+            conversion, requireSequenceUsage()));
         break;
       }
       case ExportKind::Dls: {
@@ -695,7 +706,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
         artifacts.push_back(exportDls(
             prepared, sources, request,
             conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
-            conversion));
+            conversion, requireSequenceUsage()));
         break;
       }
     }

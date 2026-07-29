@@ -480,6 +480,151 @@ void standaloneSynthExportsKeepNativeModulation() {
          "standalone DLS export should retain native modulation when no MIDI replacement exists");
 }
 
+void collectionSynthExportsCanExportOnlyUsedInstruments() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "usage.pcm"}, {0, 0, 0});
+
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder trackBuilder(track);
+  const std::array<u8, 3> defaultNote{0x90, 0x3c, 0x01};
+  const std::array<u8, 2> selectLead{0x80, 0x01};
+  const std::array<u8, 3> leadNote{0x90, 0x40, 0x01};
+  const std::array<u8, 1> end{0xff};
+  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, defaultNote.size()),
+                                    defaultNote);
+  addProbeCommand<ProbeProgramCommand>(trackBuilder, dialect, Address{3}, probeRange(3, selectLead.size()),
+                                       selectLead);
+  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{5}, probeRange(5, leadNote.size()), leadNote);
+  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{8}, probeRange(8, end.size()), end);
+
+  const SequenceProgramAsset sequence{
+      .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "Usage"},
+      .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+  };
+  const AssetId sampleCollectionId{2};
+  const auto sample = [&](std::string name, u64 offset) {
+    return Sample{
+        .name = std::move(name),
+        .codec = AudioCodec::PcmS8,
+        .encodedData = SourceRange{.source = source, .offset = offset, .size = 1},
+        .sampleRate = 16000,
+    };
+  };
+  const SampleCollectionAsset samples{
+      .metadata = AssetMetadata{.id = sampleCollectionId, .format = "Probe", .name = "Samples"},
+      .samples = SampleCollection{.samples = {
+                                      sample("Piano Wave", 0),
+                                      sample("Lead Wave", 1),
+                                      sample("Noise Wave", 2),
+                                  }},
+  };
+  const auto instrument = [&](std::string name, u32 program, u32 sampleIndex) {
+    return Instrument{
+        .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
+        .name = std::move(name),
+        .regions = {Region{.sample = SampleRef{.collection = sampleCollectionId, .index = sampleIndex}}},
+    };
+  };
+  const InstrumentSetAsset instruments{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
+      .instruments = {
+          instrument("Piano", 0, 0),
+          instrument("Lead", 1, 1),
+          instrument("Noise", 2, 2),
+      },
+  };
+
+  test::SessionSnapshotBuilder builder;
+  builder.assets.emplace_back(sequence);
+  builder.assets.emplace_back(instruments);
+  builder.assets.emplace_back(samples);
+  builder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Usage",
+      .sequence = sequence.metadata.id,
+      .instrumentSets = {instruments.metadata.id},
+      .sampleCollections = {samples.metadata.id},
+  });
+  SequenceDialectRegistry dialects;
+  dialects.add(dialect);
+  const SessionSnapshot snapshot = builder.finish();
+
+  const auto complete = exportCollection(
+      snapshot, sources, CollectionId{0},
+      ExportRequest{.kinds = {ExportKind::SoundFont2, ExportKind::Dls}}, dialects);
+  const auto restricted = exportCollection(
+      snapshot, sources, CollectionId{0},
+      ExportRequest{
+          .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
+          .exportOnlyUsedInstruments = true,
+      },
+      dialects);
+
+  expect(complete.size() == 2 && restricted.size() == 2, "collection fixture should export SF2 and DLS pairs");
+  expect(chunkSize(complete[0].bytes, "phdr") == 4 * 38 && chunkSize(complete[0].bytes, "shdr") == 4 * 46,
+         "unrestricted SF2 export should retain all three instruments and samples");
+  expect(chunkSize(restricted[0].bytes, "phdr") == 3 * 38 && chunkSize(restricted[0].bytes, "shdr") == 3 * 46,
+         "restricted SF2 export should retain two used instruments and samples plus terminal records");
+  expect(readLe32(complete[1].bytes, asciiOffset(complete[1].bytes, "colh") + 8) == 3 &&
+             chunkSize(complete[1].bytes, "ptbl") == 20,
+         "unrestricted DLS export should retain all three instruments and samples");
+  expect(readLe32(restricted[1].bytes, asciiOffset(restricted[1].bytes, "colh") + 8) == 2 &&
+             chunkSize(restricted[1].bytes, "ptbl") == 16,
+         "restricted DLS export should retain only the two used instruments and samples");
+  for (const auto& artifact : restricted) {
+    expect(containsAscii(artifact.bytes, "Piano") && containsAscii(artifact.bytes, "Lead") &&
+               !containsAscii(artifact.bytes, "Noise"),
+           "restricted collection exports should preserve used data order and omit unused data");
+  }
+
+  const InstrumentIdentity semanticIdentity{.domain = "probe.instrument", .key = 2};
+  auto semanticInstruments = instruments;
+  semanticInstruments.instruments[2].identity = semanticIdentity;
+  PerformanceSequence semanticPerformance{
+      .tracks = {PerformanceTrack{
+          .events = {
+              InstrumentPerformanceEvent{.sourceInstrument = semanticIdentity},
+              NotePerformanceEvent{},
+          },
+      }},
+  };
+  const std::array<const InstrumentSetAsset*, 1> semanticSets{&semanticInstruments};
+  const std::array<const SampleCollectionAsset*, 1> sampleSets{&samples};
+  const auto semanticData = prepareSynthData(
+      SynthExportInput{
+          .instrumentSets = semanticSets,
+          .sampleCollections = sampleSets,
+          .sequenceUsage = &semanticPerformance,
+      },
+      sources);
+  expect(semanticData.instruments.size() == 1 && semanticData.instruments[0].instrument->name == "Noise" &&
+             semanticData.samples.size() == 1 && semanticData.samples[0].name == "Noise Wave",
+         "shared synth preparation should resolve semantic instrument identities and their samples");
+
+  auto packedBankInstruments = instruments;
+  packedBankInstruments.instruments[1].explicitAddress = InstrumentAddress{.bank = 1, .program = 1};
+  PerformanceSequence packedBankPerformance{
+      .tracks = {PerformanceTrack{
+          .events = {
+              InstrumentPerformanceEvent{.bank = 1 << 7, .program = 1},
+              NotePerformanceEvent{},
+          },
+      }},
+  };
+  const std::array<const InstrumentSetAsset*, 1> packedBankSets{&packedBankInstruments};
+  const auto packedBankData = prepareSynthData(
+      SynthExportInput{
+          .instrumentSets = packedBankSets,
+          .sampleCollections = sampleSets,
+          .sequenceUsage = &packedBankPerformance,
+      },
+      sources);
+  expect(packedBankData.instruments.size() == 1 && packedBankData.instruments[0].instrument->name == "Lead" &&
+             packedBankData.samples.size() == 1 && packedBankData.samples[0].name == "Lead Wave",
+         "shared synth preparation should map packed MIDI banks back to collection instrument banks");
+}
+
 PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepareContext& context) {
   const AssetId samples = context.collection.sampleCollections.front();
   return PreparedCollectionAssets{
@@ -848,6 +993,7 @@ void runValueSynthExportTests() {
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
+  collectionSynthExportsCanExportOnlyUsedInstruments();
   collectionPreparationReplacesDurableInstrumentSets();
   synthOnlyExportSkipsSequencesWithoutModulation();
   exportDiagnosticsPreserveSourceRanges();

@@ -7,6 +7,7 @@
 #include "value/export/synth/SynthExportData.h"
 
 #include "value/export/ExportDiagnostics.h"
+#include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
 
 #include <algorithm>
@@ -21,14 +22,96 @@ namespace {
 
 using SynthSampleIndexKey = std::pair<u32, u32>;
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
+using SynthSampleIndexList = std::vector<SynthSampleIndexKey>;
+using SynthInstrumentList = std::vector<const Instrument*>;
 
 [[nodiscard]] u16 clampU16(u32 value) {
   return static_cast<u16>(std::min<u32>(value, std::numeric_limits<u16>::max()));
 }
 
+template <typename Predicate>
+[[nodiscard]] bool markMatchingInstruments(SynthInstrumentList& used, std::span<const Instrument* const> instruments,
+                                           Predicate matches) {
+  bool found = false;
+  for (const auto* instrument : instruments) {
+    if (matches(*instrument)) {
+      found = true;
+      if (std::ranges::find(used, instrument) == used.end()) {
+        used.push_back(instrument);
+      }
+    }
+  }
+  return found;
+}
+
+void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
+                            std::span<const Instrument* const> instruments, SynthInstrumentList& used) {
+  if (selection.sourceInstrument) {
+    if (markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
+          return instrument.identity && *instrument.identity == *selection.sourceInstrument;
+        })) {
+      return;
+    }
+    const auto fallbackAddress = resolveInstrumentAddress({}, selection.sourceInstrument);
+    markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
+      return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == fallbackAddress;
+    });
+    return;
+  }
+
+  const InstrumentAddress directAddress{.bank = selection.bank, .program = selection.program};
+  if (markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
+        return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == directAddress;
+      })) {
+    return;
+  }
+
+  // Legacy performance events use MIDI's packed bank, while container
+  // instruments generally retain their logical preset bank.
+  if ((selection.bank & 0x7f) == 0) {
+    const InstrumentAddress logicalAddress{.bank = selection.bank >> 7, .program = selection.program};
+    markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
+      return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == logicalAddress;
+    });
+  }
+}
+
+[[nodiscard]] SynthInstrumentList selectInstruments(std::span<const InstrumentSetAsset* const> instrumentSets,
+                                                    const PerformanceSequence* sequenceUsage) {
+  SynthInstrumentList instruments;
+  for (const auto* instrumentSet : instrumentSets) {
+      if (instrumentSet == nullptr) {
+      continue;
+    }
+    for (const auto& instrument : instrumentSet->instruments) {
+      instruments.push_back(&instrument);
+    }
+  }
+  if (sequenceUsage == nullptr) {
+    return instruments;
+  }
+
+  SynthInstrumentList used;
+  for (const auto& track : sequenceUsage->tracks) {
+    // A track uses bank/program zero until its first instrument change.
+    InstrumentPerformanceEvent selection;
+    for (const auto& event : track.events) {
+      if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
+        selection = *change;
+      } else if (std::get_if<NotePerformanceEvent>(&event) != nullptr) {
+        markSelectedInstrument(selection, instruments, used);
+      }
+    }
+  }
+  std::erase_if(instruments,
+                [&](const Instrument* instrument) { return std::ranges::find(used, instrument) == used.end(); });
+  return instruments;
+}
+
 [[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(
     std::span<const SampleCollectionAsset* const> sampleCollections, const SourceStore& sources,
-    std::vector<Diagnostic>& diagnostics, const SynthSampleDecodeOptions& options) {
+    std::vector<Diagnostic>& diagnostics, const SynthSampleDecodeOptions& options,
+    const SynthSampleIndexList* sampleFilter) {
   // Decode once into a flat vector. Container exporters then decide how to lay out that
   // PCM, but all of them share the same source-range diagnostics.
   std::vector<DecodedSynthSample> samples;
@@ -39,6 +122,10 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
     }
 
     for (u32 sampleIndex = 0; sampleIndex < collection->samples.samples.size(); ++sampleIndex) {
+      const SynthSampleIndexKey sampleKey{collection->metadata.id.value, sampleIndex};
+      if (sampleFilter != nullptr && std::ranges::find(*sampleFilter, sampleKey) == sampleFilter->end()) {
+        continue;
+      }
       const auto& sample = collection->samples.samples[sampleIndex];
       if (!sources.contains(sample.encodedData.source)) {
         diagnostics.push_back(exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
@@ -92,6 +179,25 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
   return std::nullopt;
 }
 
+[[nodiscard]] SynthSampleIndexList referencedSamples(std::span<const Instrument* const> instruments,
+                                                     std::span<const SampleCollectionAsset* const> sampleCollections) {
+  SynthSampleIndexList samples;
+  const auto fallbackCollection = firstSampleCollectionId(sampleCollections);
+  for (const auto* instrument : instruments) {
+    for (const auto& region : instrument->regions) {
+      const auto collection = region.sample.collection ? region.sample.collection : fallbackCollection;
+      if (!collection) {
+        continue;
+      }
+      const SynthSampleIndexKey sample{collection->value, region.sample.index};
+      if (std::ranges::find(samples, sample) == samples.end()) {
+        samples.push_back(sample);
+      }
+    }
+  }
+  return samples;
+}
+
 [[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region,
                                                           std::optional<AssetId> fallbackCollection,
                                                           const SynthSampleIndexMap& samples,
@@ -115,7 +221,7 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 }
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
-    std::span<const InstrumentSetAsset* const> instrumentSets,
+    std::span<const Instrument* const> selectedInstruments,
     std::span<const SampleCollectionAsset* const> sampleCollections, const SynthSampleIndexMap& samples,
     std::vector<Diagnostic>& diagnostics) {
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
@@ -123,34 +229,28 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
   std::vector<ResolvedSynthInstrument> instruments;
   const auto fallbackCollection = firstSampleCollectionId(sampleCollections);
 
-  for (const auto* instrumentSet : instrumentSets) {
-    if (instrumentSet == nullptr) {
-      continue;
+  for (const auto* instrument : selectedInstruments) {
+    auto modulation = lowerSynthModulation(instrument->modulation);
+    ResolvedSynthInstrument resolvedInstrument{
+        .instrument = instrument,
+        .address = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity),
+        .generators = std::move(modulation.generators),
+        .modulators = std::move(modulation.modulators),
+    };
+    for (const auto& region : instrument->regions) {
+      const auto sampleIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
+      if (!sampleIndex) {
+        continue;
+      }
+
+      resolvedInstrument.regions.push_back(ResolvedSynthRegion{
+          .region = &region,
+          .sampleIndex = *sampleIndex,
+      });
     }
 
-    for (const auto& instrument : instrumentSet->instruments) {
-      auto modulation = lowerSynthModulation(instrument.modulation);
-      ResolvedSynthInstrument resolvedInstrument{
-          .instrument = &instrument,
-          .address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity),
-          .generators = std::move(modulation.generators),
-          .modulators = std::move(modulation.modulators),
-      };
-      for (const auto& region : instrument.regions) {
-        const auto sampleIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
-        if (!sampleIndex) {
-          continue;
-        }
-
-        resolvedInstrument.regions.push_back(ResolvedSynthRegion{
-            .region = &region,
-            .sampleIndex = *sampleIndex,
-        });
-      }
-
-      if (!resolvedInstrument.regions.empty()) {
-        instruments.push_back(std::move(resolvedInstrument));
-      }
+    if (!resolvedInstrument.regions.empty()) {
+      instruments.push_back(std::move(resolvedInstrument));
     }
   }
 
@@ -162,10 +262,16 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
-  prepared.samples = decodeSynthSamples(input.sampleCollections, sources, prepared.diagnostics, options);
+  const auto instruments = selectInstruments(input.instrumentSets, input.sequenceUsage);
+  std::optional<SynthSampleIndexList> sampleFilter;
+  if (input.sequenceUsage != nullptr) {
+    sampleFilter = referencedSamples(instruments, input.sampleCollections);
+  }
+  prepared.samples = decodeSynthSamples(input.sampleCollections, sources, prepared.diagnostics, options,
+                                        sampleFilter ? &*sampleFilter : nullptr);
   const auto samplesByReference = synthSampleIndexMap(prepared.samples);
   prepared.instruments =
-      resolveSynthInstruments(input.instrumentSets, input.sampleCollections, samplesByReference, prepared.diagnostics);
+      resolveSynthInstruments(instruments, input.sampleCollections, samplesByReference, prepared.diagnostics);
   return prepared;
 }
 

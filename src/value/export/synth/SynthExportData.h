@@ -16,10 +16,15 @@
 
 namespace vgmtrans::core {
 
+struct PerformanceSequence;
+
 struct SynthExportInput {
   std::string name;
   std::span<const InstrumentSetAsset* const> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
+  // Null retains the complete collection. A performance filters instruments
+  // selected by its notes and the samples referenced by those instruments.
+  const PerformanceSequence* sequenceUsage = nullptr;
   const MidiModulationUsage* midiModulationUsage = nullptr;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;

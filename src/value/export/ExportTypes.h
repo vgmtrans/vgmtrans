@@ -84,6 +84,9 @@ struct ExportRequest {
   SequenceRenderOptions sequence;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
+  // Instrument-container exports retain only instruments selected by rendered
+  // notes, plus the samples referenced by those instruments.
+  bool exportOnlyUsedInstruments = false;
 };
 
 // Artifact carries diagnostics even when no bytes were produced, so UI/CLI
