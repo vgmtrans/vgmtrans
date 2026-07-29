@@ -1048,8 +1048,12 @@ void snapshotFindsTheFirstCollectionContainingAnAsset() {
   const auto* collection = snapshot.firstCollectionContaining(AssetId{4});
   expect(collection != nullptr && collection->id == CollectionId{8},
          "asset association lookup should preserve collection order");
+  expect(snapshot.countCollectionsContaining(AssetId{4}) == 2,
+         "asset association lookup should count every containing collection");
   expect(snapshot.firstCollectionContaining(AssetId{99}) == nullptr,
          "asset association lookup should return null for an unassociated asset");
+  expect(snapshot.countCollectionsContaining(AssetId{99}) == 0,
+         "asset association lookup should report zero for an unassociated asset");
 }
 
 }  // namespace

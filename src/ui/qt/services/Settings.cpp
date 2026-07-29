@@ -124,7 +124,7 @@ void Settings::ConversionSettings::setModulationConversion(
 
 bool Settings::ConversionSettings::exportOnlyUsedInstruments() const {
   settings.beginGroup(QStringLiteral("ConversionOptions"));
-  const bool enabled = settings.value(QStringLiteral("exportOnlyUsedInstruments"), false).toBool();
+  const bool enabled = settings.value(QStringLiteral("exportOnlyUsedInstruments"), true).toBool();
   settings.endGroup();
   return enabled;
 }

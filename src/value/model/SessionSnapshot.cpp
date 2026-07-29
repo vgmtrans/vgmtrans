@@ -12,6 +12,17 @@
 
 namespace vgmtrans::core {
 
+namespace {
+
+[[nodiscard]] bool collectionContains(const Collection& collection, AssetId asset) {
+  return collection.sequence == asset ||
+         std::ranges::find(collection.instrumentSets, asset) != collection.instrumentSets.end() ||
+         std::ranges::find(collection.sampleCollections, asset) != collection.sampleCollections.end() ||
+         std::ranges::find(collection.miscAssets, asset) != collection.miscAssets.end();
+}
+
+}  // namespace
+
 AssetMetadata& metadata(Asset& asset) {
   return std::visit([](auto& typedAsset) -> AssetMetadata& { return typedAsset.metadata; }, asset);
 }
@@ -83,14 +94,16 @@ const Collection* SessionSnapshot::collection(CollectionId id) const {
 
 const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) const {
   for (const auto& collection : storage_->collections) {
-    if (collection.sequence == asset ||
-        std::ranges::find(collection.instrumentSets, asset) != collection.instrumentSets.end() ||
-        std::ranges::find(collection.sampleCollections, asset) != collection.sampleCollections.end() ||
-        std::ranges::find(collection.miscAssets, asset) != collection.miscAssets.end()) {
+    if (collectionContains(collection, asset)) {
       return &collection;
     }
   }
   return nullptr;
+}
+
+size_t SessionSnapshot::countCollectionsContaining(AssetId asset) const {
+  return std::ranges::count_if(storage_->collections,
+                               [asset](const Collection& collection) { return collectionContains(collection, asset); });
 }
 
 }  // namespace vgmtrans::core

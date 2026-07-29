@@ -578,6 +578,39 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
            "restricted collection exports should preserve used data order and omit unused data");
   }
 
+  const ExportRequest onlyUsed{.exportOnlyUsedInstruments = true};
+  const auto uniqueSoundFont =
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed, dialects);
+  const auto uniqueDls =
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed, dialects);
+  expect(chunkSize(uniqueSoundFont.bytes, "phdr") == 3 * 38 && chunkSize(uniqueSoundFont.bytes, "shdr") == 3 * 46 &&
+             readLe32(uniqueDls.bytes, asciiOffset(uniqueDls.bytes, "colh") + 8) == 2 &&
+             chunkSize(uniqueDls.bytes, "ptbl") == 16,
+         "instrument-set export should cull data when exactly one collection supplies sequence context");
+
+  test::SessionSnapshotBuilder ambiguousBuilder;
+  ambiguousBuilder.assets = {sequence, instruments, samples};
+  ambiguousBuilder.collections = {
+      snapshot.collections().front(),
+      Collection{
+          .id = CollectionId{1},
+          .name = "Other Usage",
+          .sequence = sequence.metadata.id,
+          .instrumentSets = {instruments.metadata.id},
+          .sampleCollections = {samples.metadata.id},
+      },
+  };
+  const SessionSnapshot ambiguousSnapshot = ambiguousBuilder.finish();
+  const auto ambiguousSoundFont = exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id,
+                                                      SynthExportFormat::SoundFont2, onlyUsed, dialects);
+  const auto ambiguousDls = exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id,
+                                                SynthExportFormat::Dls, onlyUsed, dialects);
+  expect(chunkSize(ambiguousSoundFont.bytes, "phdr") == 4 * 38 &&
+             chunkSize(ambiguousSoundFont.bytes, "shdr") == 4 * 46 &&
+             readLe32(ambiguousDls.bytes, asciiOffset(ambiguousDls.bytes, "colh") + 8) == 3 &&
+             chunkSize(ambiguousDls.bytes, "ptbl") == 20,
+         "instrument-set export should retain all data when multiple collections could supply sequence context");
+
   const InstrumentIdentity semanticIdentity{.domain = "probe.instrument", .key = 2};
   auto semanticInstruments = instruments;
   semanticInstruments.instruments[2].identity = semanticIdentity;
