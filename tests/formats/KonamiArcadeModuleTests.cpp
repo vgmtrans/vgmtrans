@@ -521,7 +521,7 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
                  0xfa, 0x01,                          // enable a software release
                  0xe3, 0x81,                          // encoded hard-left pan
                  0x30, 0x0a, 0x1e, 0x7f,              // establish the Salamander 2 track's 30% duration
-                 0xf3, 0x00, 0x10, 0x30,              // GX consumes F3 without installing a pitch slide
+                 0xf3, 0x00, 0x10, 0x30,              // GX recognizes F3 through its post-note look-ahead
                  0xe0, 0x24,                          // Salamander 2 0x102bd: clears only live duration
                  0x2e, 0x18, 0xfd,                    // 0x102bf A#4 reuses the stored 30% duration
                  0x91, 0xfd,                          // 0x102c2 B4 reuses both delta and duration
@@ -570,9 +570,12 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
       SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
          "GX driver-state commands should render without diagnostics");
-  expect(std::ranges::none_of(performance.tracks[0].automations,
-                              [](const auto& automation) { return pitchTransitionIntent(automation) != nullptr; }),
-         "GX F3 should consume its three operands without creating pitch automation");
+  const auto slide = std::ranges::find_if(performance.tracks[0].automations, [](const auto& automation) {
+    return pitchTransitionIntent(automation) != nullptr;
+  });
+  expect(slide != performance.tracks[0].automations.end() &&
+             pitchTransitionIntent(*slide)->startKey == 74.0 && pitchTransitionIntent(*slide)->targetKey == 72.0,
+         "GX F3 look-ahead should slide toward its channel-transposed target without applying initial transpose");
 
   std::vector<const NotePerformanceEvent*> notes;
   std::vector<const StereoBalancePerformanceEvent*> balances;
