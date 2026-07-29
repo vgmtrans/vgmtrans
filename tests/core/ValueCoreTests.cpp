@@ -67,6 +67,7 @@ void ninSnesNoteVelocityPreservesLegacyCurve();
 void ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
 void ninSnesFe3ConditionalJumpUsesCapturedDriverState();
 void ninSnesControllerFadesRemainInTheSourceDomain();
+void ninSnesPrepassClearsMasterVolumeAutomationBinding();
 void ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
 void ninSnesF9UsesSharedPitchTransitions();
 void ninSnesPercussionStartsPerNoteVibratoFade();
@@ -206,6 +207,7 @@ int main() {
     ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
     ninSnesFe3ConditionalJumpUsesCapturedDriverState();
     ninSnesControllerFadesRemainInTheSourceDomain();
+    ninSnesPrepassClearsMasterVolumeAutomationBinding();
     ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
     ninSnesF9UsesSharedPitchTransitions();
     ninSnesPercussionStartsPerNoteVibratoFade();

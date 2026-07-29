@@ -581,6 +581,7 @@ struct ProgramState {
     tempoAutomationTrack.reset();
     masterVolume = 0xff;
     masterVolumeState.reset(masterVolume);
+    masterVolumeState.clearAutomation();
     masterVolumeAutomationTrack.reset();
     echo.reset();
   }
