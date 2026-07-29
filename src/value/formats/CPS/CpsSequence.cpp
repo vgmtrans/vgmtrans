@@ -179,6 +179,16 @@ struct Playback {
         .preferPortamento();
   }
 
+  void emitLateHeldTransition(PerformanceNoteId note, double key) {
+    if (track.portamentoRate != 0) {
+      emitPortamento(note, key);
+      return;
+    }
+    out.pitchSlide(note, *track.previousKey, key, PitchSlideTiming::fromTicks(0))
+        .continueFrom(track.previousNote)
+        .preferPitchBend();
+  }
+
   void emitInstrument(u32 key) {
     if (track.synth == SynthKind::Ym2151) {
       out.instrument(InstrumentIdentity{.domain = std::string(kCps1Ym2151Domain), .key = key});
@@ -394,20 +404,26 @@ struct Playback {
 
   [[nodiscard]] Effects lateNote(u8 velocity, u8 encodedKey, u32 duration) {
     const bool hold = (encodedKey & 0x80) != 0;
-    const bool extends = track.held;
+    const bool continuesPreviousVoice = track.held && track.previousKey && track.previousNote.valid();
+    if (continuesPreviousVoice) {
+      static_cast<void>(out.setPreviousNoteEnd(vm.tick()));
+    }
     const double key =
         std::clamp<double>((encodedKey & 0x7f) + track.transpose + track.transposeAdjustment, 0.0, 127.0);
-    const bool restart = track.resetLfoOnNote && !extends;
+    const bool extendsPrevious = continuesPreviousVoice && std::abs(*track.previousKey - key) < 0.0001;
+    const bool restart = track.resetLfoOnNote && !continuesPreviousVoice;
     const auto note = out.note(NotePerformanceEvent{
         .key = key,
         .linearVelocity = std::min(velocity * 2, 127) / 127.0,
         .durationTicks = std::max<u32>(1, duration),
-        .extendsPrevious = extends,
+        .extendsPrevious = extendsPrevious,
         .restartsLfoPhase = restart,
         .restartsVibratoLfoPhase = restart,
         .restartsTremoloLfoPhase = restart,
     });
-    emitPortamento(note, key);
+    if (continuesPreviousVoice && !extendsPrevious) {
+      emitLateHeldTransition(note, key);
+    }
     track.previousKey = key;
     track.previousNote = note;
     track.held = hold;
