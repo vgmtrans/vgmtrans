@@ -110,14 +110,25 @@ std::optional<SourceAnnotationId> SourceInspection::annotationAt(u64 offset) con
 }
 
 std::optional<SourceInspectionItem> SourceInspection::itemAt(u64 offset) const {
-  SourceInspectionItem best;
+  std::optional<SourceInspectionItem> best;
   SourceRange bestRange;
   size_t bestDepth = 0;
 
-  for (const SourceAnnotation& candidateValue : sourceMap_.annotations()) {
-    const auto* candidate = &candidateValue;
+  const auto consider = [&](SourceInspectionItem item, SourceRange candidateRange, size_t depth) {
+    if (!containsOffset(candidateRange, range_.source, offset)) {
+      return;
+    }
+    if (!best || candidateRange.size < bestRange.size ||
+        (candidateRange.size == bestRange.size && depth > bestDepth)) {
+      best = item;
+      bestRange = candidateRange;
+      bestDepth = depth;
+    }
+  };
+
+  for (const SourceAnnotation& candidate : sourceMap_.annotations()) {
     size_t depth = 0;
-    auto parent = candidate->parent;
+    auto parent = candidate.parent;
     while (parent) {
       const auto* ancestor = sourceMap_.find(*parent);
       if (ancestor == nullptr) {
@@ -127,32 +138,16 @@ std::optional<SourceInspectionItem> SourceInspection::itemAt(u64 offset) const {
       parent = ancestor->parent;
     }
 
-    if (containsOffset(candidate->range, range_.source, offset) &&
-        (!best.valid() || candidate->range.size < bestRange.size ||
-         (candidate->range.size == bestRange.size && depth > bestDepth))) {
-      best = SourceInspectionItem::forAnnotation(candidate->id);
-      bestRange = candidate->range;
-      bestDepth = depth;
-    }
-
-    if (!candidate->fieldsAsChildren) {
+    consider(SourceInspectionItem::forAnnotation(candidate.id), candidate.range, depth);
+    if (!candidate.fieldsAsChildren) {
       continue;
     }
-    for (u32 fieldIndex = 0; fieldIndex < candidate->fields.size(); ++fieldIndex) {
-      const SourceField& field = candidate->fields[fieldIndex];
-      if (!containsOffset(field.range, range_.source, offset)) {
-        continue;
-      }
-      const size_t fieldDepth = depth + 1;
-      if (!best.valid() || field.range.size < bestRange.size ||
-          (field.range.size == bestRange.size && fieldDepth > bestDepth)) {
-        best = SourceInspectionItem::forField(candidate->id, fieldIndex);
-        bestRange = field.range;
-        bestDepth = fieldDepth;
-      }
+    for (u32 fieldIndex = 0; fieldIndex < candidate.fields.size(); ++fieldIndex) {
+      consider(SourceInspectionItem::forField(candidate.id, fieldIndex),
+               candidate.fields[fieldIndex].range, depth + 1);
     }
   }
-  return best.valid() ? std::optional{best} : std::nullopt;
+  return best;
 }
 
 void SourceInspection::sortBySourceOrder(std::vector<SourceAnnotationId>& annotations) const {

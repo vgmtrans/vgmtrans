@@ -236,19 +236,14 @@ VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceIns
   setItemDelegate(new VGMTreeDisplayItem(this));
   playbackBrush_ = QBrush(palette().color(QPalette::Accent));
 
-  appendChildren(invisibleRootItem(), inspection_->roots());
+  for (const auto root : inspection_->roots()) {
+    appendItem(invisibleRootItem(), vgmtrans::core::SourceInspectionItem::forAnnotation(root));
+  }
   connect(Settings::the(), &Settings::vgmFileTreeShowDetailsChanged, this, &VGMFileTreeView::onShowDetailsChanged);
 }
 
 void VGMFileTreeView::appendChildren(QTreeWidgetItem* parent,
-                                     std::span<const vgmtrans::core::SourceAnnotationId> children) {
-  for (const auto id : children) {
-    appendItem(parent, vgmtrans::core::SourceInspectionItem::forAnnotation(id));
-  }
-}
-
-void VGMFileTreeView::appendProjectedChildren(QTreeWidgetItem* parent,
-                                              vgmtrans::core::SourceAnnotationId annotationId) {
+                                     vgmtrans::core::SourceAnnotationId annotationId) {
   const auto* annotation = inspection_->annotation(annotationId);
   if (annotation == nullptr) {
     return;
@@ -297,7 +292,7 @@ void VGMFileTreeView::appendItem(QTreeWidgetItem* parent, vgmtrans::core::Source
   parent->addChild(item);
   items_.emplace(itemKey(sourceItem), item);
   if (!sourceItem.isField()) {
-    appendProjectedChildren(item, sourceItem.annotation);
+    appendChildren(item, sourceItem.annotation);
   }
 }
 
