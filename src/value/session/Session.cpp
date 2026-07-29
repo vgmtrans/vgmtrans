@@ -277,11 +277,21 @@ void Session::scanSourceAndDerived(SourceId id) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
 
+  const size_t assetsBefore = state_->assets().size();
+  const size_t diagnosticsBefore = state_->diagnostics().size();
   std::vector<SourceId> queue{id};
   std::set<u32> queued{id.value};
 
   for (size_t index = 0; index < queue.size(); ++index) {
     scanOneSource(queue[index], queue, queued);
+  }
+
+  // Diagnostic-only scans remain open so their failures retain valid source
+  // ranges. A scan that produced nothing can release its complete source family.
+  if (state_->assets().size() == assetsBefore && state_->diagnostics().size() == diagnosticsBefore) {
+    std::vector<SourceId> removed;
+    removeSourceFamily(id, removed);
+    state_->removeSources(removed);
   }
 }
 

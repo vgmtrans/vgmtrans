@@ -194,6 +194,46 @@ void sessionScansIndividualSourcesWithoutDuplicating() {
   expect(project.collections().size() == 2, "pending-source scan should leave existing collections unchanged");
 }
 
+void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
+  Session session;
+  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(FormatModule{
+      .name = "ProbeEmptyExtractor",
+      .canScan = [](const SourceFile&, std::span<const u8> bytes) { return !bytes.empty() && bytes[0] == 0x00; },
+      .scan =
+          [](const ScanInput& input) {
+            ScanResult result;
+            if (!input.source.derived()) {
+              result.extractedSources.push_back(ExtractedSource{
+                  .file = SourceFile{.name = input.source.name + ".empty-child"},
+                  .bytes = {0x00},
+                  .origin = input.reader.range(0, 1),
+              });
+            }
+            return result;
+          },
+  });
+
+  const SourceId detected = session.addSource(SourceFile{.name = "detected.probe"}, {0xaa});
+  const SourceId empty = session.addSource(SourceFile{.name = "empty.probe"}, {0x00});
+  session.scanPendingSources();
+
+  SessionSnapshot project = session.snapshot();
+  expect(project.source(detected) != nullptr && project.assets().size() == 1,
+         "a source family with a detected asset should remain open");
+  expect(project.source(empty) == nullptr,
+         "a source family should close when neither it nor an extracted child contains detected assets");
+  expect(project.sources().size() == 2,
+         "closing an empty family should preserve the detected source and its extracted child");
+  expect(!session.sources().contains(empty), "closing an empty scan should release its source bytes");
+
+  const SourceId individuallyScanned = session.addSource(SourceFile{.name = "individual-empty.probe"}, {0x00});
+  session.scanSource(individuallyScanned);
+  project = session.snapshot();
+  expect(project.source(individuallyScanned) == nullptr,
+         "an individual scan should also close a source family without detected assets");
+}
+
 void sessionKeepsScannerKnownCollectionsWithoutResolver() {
   Session session;
   session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
@@ -1019,6 +1059,7 @@ void runValueSessionTests() {
   sessionSharesOneImmutableSnapshotPerRevision();
   sessionReportsUnregisteredSequenceDialect();
   sessionScansIndividualSourcesWithoutDuplicating();
+  sessionClosesSourceFamiliesWhenScansFindNoAssets();
   sessionKeepsScannerKnownCollectionsWithoutResolver();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
   sessionRemovesSourceFamilyAndDiscoveredData();

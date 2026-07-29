@@ -159,12 +159,43 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
          "an open source inspection should retain its immutable source data after removal");
 }
 
+void workspaceDoesNotPublishEmptyScansAsSources() {
+  QTemporaryDir directory;
+  expect(directory.isValid(), "temporary directory should be available");
+  const QString filename = directory.filePath(QStringLiteral("empty-scan.bin"));
+  QFile source(filename);
+  expect(source.open(QIODevice::WriteOnly), "empty-scan source should open for writing");
+  expect(source.write(QByteArray::fromHex("000102")) == 3, "empty-scan source should be written");
+  source.close();
+
+  WorkspaceController workspace([](Session& session) {
+    session.registerFormat(FormatModule{
+        .name = "UI Probe",
+        .scan = scanUiProbe,
+    });
+  });
+  SourceTableModel sources(workspace);
+
+#ifdef Q_OS_WIN
+  const std::array path{std::filesystem::path(filename.toStdWString())};
+#else
+  const QByteArray utf8Filename = filename.toUtf8();
+  const std::array path{
+      std::filesystem::path(utf8Filename.constData(), utf8Filename.constData() + utf8Filename.size())};
+#endif
+  const OpenResult opened = workspace.openPaths(path);
+  expect(opened.opened.size() == 1 && opened.failures.empty(), "workspace should read and scan the source");
+  expect(sources.rowCount() == 0, "a scan with no detected files should not appear in Scanned Files");
+  expect(workspace.snapshot().sources().empty(), "the workspace should close a source after an empty scan");
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
   QCoreApplication app(argc, argv);
   try {
     workspacePublishesModelsAndRemovesSourceFamilies();
+    workspaceDoesNotPublishEmptyScansAsSources();
     std::cout << "Value Qt model tests passed\n";
     return 0;
   } catch (const std::exception& error) {
