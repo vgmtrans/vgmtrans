@@ -49,9 +49,10 @@ struct NotePerformanceEvent {
   // are applied only by MIDI-like renderers.
   double linearVelocity = 1.0;
   u32 durationTicks = 0;
-  // Extend the previously emitted voice without another attack. Source ties
-  // set this directly; target-specific lowering can also use it when one
-  // logical note continues through a different representation.
+  // Extend the previously emitted voice at the same pitch without another
+  // attack. Key-changing continuations are pitch transitions linked with
+  // continueFrom(previousNote); target-specific lowering may then use this
+  // flag for the resulting same-voice MIDI representation.
   bool extendsPrevious = false;
   // Source voices normally restart their LFOs on a fresh attack, but some
   // drivers can disable that reset or suppress it for legato notes.

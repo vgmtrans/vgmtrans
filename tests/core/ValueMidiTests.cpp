@@ -904,6 +904,23 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
   expect(notes.size() == 1 && notes[0].tick == 0 && notes[0].key == 60 && notes[0].duration == 12,
          "linked pitch bends should sustain one MIDI note instead of retriggering each destination");
 
+  std::vector<std::pair<u64, u16>> ranges;
+  for (const auto& event : midi.tracks[0].events) {
+    if (const auto* range = std::get_if<PitchBendRange>(&event)) {
+      ranges.emplace_back(range->tick, range->cents);
+    }
+  }
+  expect(ranges == std::vector<std::pair<u64, u16>>{{4, 700}},
+         "one linked MIDI voice should keep a stable range large enough for its entire pitch path");
+  const auto hasMidiBend = [&](u64 tick, s16 value) {
+    return std::ranges::any_of(midi.tracks[0].events, [&](const MidiEvent& event) {
+      const auto* bend = std::get_if<PitchBend>(&event);
+      return bend != nullptr && bend->tick == tick && bend->value == value;
+    });
+  };
+  expect(hasMidiBend(8, 4681) && hasMidiBend(12, 8191),
+         "chained transitions should change bend values without retuning through mid-voice RPN updates");
+
   const auto chainedStart = std::ranges::find_if(lowered.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
     return bend != nullptr && bend->header.tick == 8 && std::abs(bend->semitones - 4.0) < 0.000001;

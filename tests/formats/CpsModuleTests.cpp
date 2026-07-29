@@ -5,6 +5,8 @@
  */
 
 #include "value/extractors/MameRomSetExtractor.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/export/midi/PitchTransitionMidiLowering.h"
 #include "value/formats/CPS/Cps.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
@@ -340,6 +342,23 @@ Fixture cps3Fixture() {
   return Fixture{.source = std::move(source), .bytes = std::move(bytes)};
 }
 
+Fixture cps3HeldPitchChainFixture() {
+  auto fixture = cps3Fixture();
+  bytesAt(fixture.bytes, 0x921,
+          {
+              0xad, 0x53, 0x0c, 0x0c,  // attack 83, wait 12
+              0xad, 0xd6, 0x0c, 0x0c,  // attack 86 and hold, wait 12
+              0xad, 0x5a, 0x06, 0x06,  // change held voice to 90, wait 6
+              0xad, 0xdb, 0x06, 0x06,  // attack 91 and hold, wait 6
+              0xad, 0xdd, 0x0c, 0x0c,  // change held voice to 93 and hold, wait 12
+              0xd0, 0xd1,              // repeat slots begin, as in sfiii2 song 13
+              0xa8, 0x5f, 0x82, 0x68,  // change held voice to 95 for 360 ticks
+              0x02, 0x68,              // wait 360
+              0xff,
+          });
+  return fixture;
+}
+
 Fixture cps3RepeatBreakFixture() {
   auto fixture = cps3Fixture();
   std::fill(fixture.bytes.begin() + 0x921, fixture.bytes.begin() + 0x940, 0);
@@ -642,11 +661,98 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
     }
   }
   expect(notes.size() == 3 && notes[0]->header.tick == 0 && notes[1]->header.tick == 5 && notes[2]->header.tick == 7 &&
-             !notes[0]->extendsPrevious && !notes[1]->extendsPrevious && notes[2]->extendsPrevious,
+             !notes[0]->extendsPrevious && !notes[1]->extendsPrevious && !notes[2]->extendsPrevious &&
+             notes[0]->note != notes[1]->note && notes[1]->note != notes[2]->note,
          "CPS3 delay prefixes and held-note bit should produce the driver event timeline and legato transition");
+  const auto* transition = performance.tracks[0].automations.size() == 1
+                               ? pitchTransitionIntent(performance.tracks[0].automations.front())
+                               : nullptr;
+  expect(transition != nullptr && transition->note == notes[2]->note &&
+             transition->previousNote == std::optional{notes[1]->note} && transition->startKey == 62.0 &&
+             transition->targetKey == 64.0 && transition->timing.timelineTicks == 0 &&
+             transition->preferredRendering == PitchTransitionRenderingHint::PitchBend,
+         "a CPS3 held-note key change should retain its pitch and attack-free voice linkage");
   expect(notes[0]->key == 62.0 && notes[2]->key == 64.0 && notes[0]->restartsLfoPhase && !notes[2]->restartsLfoPhase &&
              linearTremolo && hardLeftBalance && initialExpression && wrappedAdjustmentSilence,
          "CPS3 tuning, LFO reset, exact balance, initial expression, and wrapped gain should remain physical");
+}
+
+void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
+  const auto result = scan(cps3HeldPitchChainFixture());
+  expect(result.diagnostics.empty(), "sfiii2 held-note regression fixture should scan without diagnostics");
+  const auto& sequence = onlySequence(result);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsLateDialect());
+
+  std::vector<const NotePerformanceEvent*> sourceNotes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      sourceNotes.push_back(note);
+    }
+  }
+  const std::array<u64, 6> expectedTicks{0, 12, 24, 30, 36, 48};
+  const std::array<double, 6> expectedKeys{83, 86, 90, 91, 93, 95};
+  const std::array<u32, 6> expectedDurations{12, 12, 6, 6, 12, 360};
+  expect(sourceNotes.size() == expectedTicks.size(), "every CPS3 note command should survive target-neutral rendering");
+  for (size_t index = 0; index < sourceNotes.size(); ++index) {
+    expect(sourceNotes[index]->header.tick == expectedTicks[index] && sourceNotes[index]->key == expectedKeys[index] &&
+               sourceNotes[index]->durationTicks == expectedDurations[index] && !sourceNotes[index]->extendsPrevious,
+           "CPS3 held-note source events should preserve their own key, time, duration, and identity");
+  }
+
+  expect(performance.tracks[0].automations.size() == 3,
+         "the three attack-free CPS3 key changes should remain explicit pitch transitions");
+  const std::array<size_t, 3> destinations{2, 4, 5};
+  const std::array<size_t, 3> predecessors{1, 3, 4};
+  for (size_t index = 0; index < destinations.size(); ++index) {
+    const auto* transition = pitchTransitionIntent(performance.tracks[0].automations[index]);
+    expect(transition != nullptr && transition->note == sourceNotes[destinations[index]]->note &&
+               transition->previousNote == std::optional{sourceNotes[predecessors[index]]->note} &&
+               transition->startKey == expectedKeys[predecessors[index]] &&
+               transition->targetKey == expectedKeys[destinations[index]] &&
+               transition->preferredRendering == PitchTransitionRenderingHint::PitchBend,
+           "each CPS3 held-note destination should continue the immediately preceding physical voice");
+  }
+
+  const MidiExportOptions bendOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend};
+  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(performance, bendOptions);
+  const MidiSequence midi = renderMidiSequence(performance, bendOptions);
+  const MidiSequence previewMidi =
+      renderMidiSequence(performance, bendOptions, ModulationConversionPolicy::SequenceEventSimulation);
+  std::vector<NoteDuration> attacks;
+  for (const auto& event : midi.tracks[0].events) {
+    if (const auto* note = std::get_if<NoteDuration>(&event)) {
+      attacks.push_back(*note);
+    }
+  }
+  expect(attacks.size() == 3 && attacks[0].tick == 0 && attacks[0].key == 83 && attacks[0].duration == 12 &&
+             attacks[1].tick == 12 && attacks[1].key == 86 && attacks[1].duration == 18 && attacks[2].tick == 30 &&
+             attacks[2].key == 91 && attacks[2].duration == 378,
+         "MIDI lowering should retain three physical attacks while sustaining each held CPS3 voice");
+
+  for (const auto* rendered : {&midi, &previewMidi}) {
+    std::vector<std::pair<u64, u16>> midiRanges;
+    std::vector<std::pair<u64, s16>> midiBends;
+    for (const auto& event : rendered->tracks[0].events) {
+      if (const auto* range = std::get_if<PitchBendRange>(&event); range != nullptr && range->tick >= 24) {
+        midiRanges.emplace_back(range->tick, range->cents);
+      } else if (const auto* bend = std::get_if<PitchBend>(&event)) {
+        midiBends.emplace_back(bend->tick, bend->value);
+      }
+    }
+    expect(midiRanges == std::vector<std::pair<u64, u16>>{{24, 400}},
+           "the sfiii2 held voices should use one compatible four-semitone range");
+    expect(midiBends == std::vector<std::pair<u64, s16>>{{24, 8191}, {30, 0}, {36, 4096}, {48, 8191}},
+           "the sfiii2 pitch commands should produce actual bend-value changes in export and preview MIDI");
+  }
+
+  const auto hasBend = [&](u64 tick, double semitones) {
+    return std::ranges::any_of(lowered.tracks[0].events, [&](const PerformanceEvent& event) {
+      const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+      return bend != nullptr && bend->header.tick == tick && std::abs(bend->semitones - semitones) < 0.000001;
+    });
+  };
+  expect(hasBend(24, 4.0) && hasBend(36, 2.0) && hasBend(48, 4.0),
+         "MIDI lowering should emit every attack-free CPS3 pitch change relative to its sounding attack");
 }
 
 void cpsLateRepeatBreakUsesEndOfCommandBase() {

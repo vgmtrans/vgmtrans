@@ -87,6 +87,7 @@ void cps1V1DefaultsAndPitchWrappingMatchLegacyDriver();
 void cps2EarlyModuleUsesPhysicalModulation();
 void cps2LateDriverSemanticsRemainProfileSpecific();
 void cps3ModuleDecodesDelayPrefixesLegatoAndRegions();
+void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch();
 void cpsLateRepeatBreakUsesEndOfCommandBase();
 void cpsLateControlFlowOffsetsFollowEachDriver();
 void akaoSnesLayoutDiscoversFf4StyleAram();
@@ -223,6 +224,7 @@ int main() {
     cps2EarlyModuleUsesPhysicalModulation();
     cps2LateDriverSemanticsRemainProfileSpecific();
     cps3ModuleDecodesDelayPrefixesLegatoAndRegions();
+    cps3HeldNotesRetargetOneVoiceWithoutLosingPitch();
     cpsLateRepeatBreakUsesEndOfCommandBase();
     cpsLateControlFlowOffsetsFollowEachDriver();
     akaoSnesLayoutDiscoversFf4StyleAram();

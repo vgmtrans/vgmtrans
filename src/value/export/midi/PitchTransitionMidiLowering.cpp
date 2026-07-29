@@ -12,6 +12,7 @@
 #include <optional>
 #include <tuple>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -36,6 +37,9 @@ struct NoteSpan {
   // A boundary pitch bend can carry the preceding MIDI voice into this
   // logical note instead of retriggering its attack.
   bool continuesPreviousVoice = false;
+  // Linked logical notes share one sounding MIDI voice and therefore one
+  // stable pitch-bend range.
+  PerformanceNoteId pitchBendVoice;
   double bendBaseKey = 0.0;
   // Empty unless native portamento must replace this source note.
   std::vector<PortamentoSegment> portamentoSegments;
@@ -70,6 +74,7 @@ struct NoteSpan {
       notes.push_back(NoteSpan{
           .source = *source,
           .endTick = noteEnd(*source),
+          .pitchBendVoice = source->note,
           .bendBaseKey = source->key,
       });
     }
@@ -273,8 +278,15 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
                      const std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
                      u64& nextSequence) {
-  // Bend range is channel state, so choose one range that covers every linked
-  // transition affecting a note.
+  struct RangeRequirement {
+    const NoteSpan* note = nullptr;
+    const PerformanceAutomation* origin = nullptr;
+    u16 cents = 200;
+  };
+
+  std::vector<RangeRequirement> requirements;
+  requirements.reserve(notes.size());
+  std::unordered_map<u32, u16> rangeByVoice;
   for (const auto& note : notes) {
     const PerformanceAutomation* origin = nullptr;
     u16 rangeCents = 200;
@@ -287,12 +299,24 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
       origin = origin == nullptr ? automation : origin;
       rangeCents = std::max(rangeCents, pitchRangeCents(*automation, transition, note));
     }
+    requirements.push_back(RangeRequirement{.note = &note, .origin = origin, .cents = rangeCents});
     if (origin != nullptr) {
-      events.emplace_back(PitchBendRangePerformanceEvent{
-          .header = atTick(origin->header, note.source.header.tick, nextSequence),
-          .cents = rangeCents,
-      });
+      auto& voiceRange = rangeByVoice[note.pitchBendVoice.value];
+      voiceRange = std::max(voiceRange, rangeCents);
     }
+  }
+
+  // Pitch-bend range is channel state. Keep it stable across every logical
+  // note linked into one sounding voice so a pitch change never depends on a
+  // synth recalculating an existing bend after an RPN update.
+  for (const auto& requirement : requirements) {
+    if (requirement.origin == nullptr) {
+      continue;
+    }
+    events.emplace_back(PitchBendRangePerformanceEvent{
+        .header = atTick(requirement.origin->header, requirement.note->source.header.tick, nextSequence),
+        .cents = rangeByVoice.at(requirement.note->pitchBendVoice.value),
+    });
   }
 
   // Emit every transition first so a later pitch-bend writer can take
@@ -413,6 +437,7 @@ void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const P
 
     const double baseKey = bendBaseKeyAt(*previous, automation->realization.startTick);
     note->continuesPreviousVoice = true;
+    note->pitchBendVoice = previous->pitchBendVoice;
     note->bendBaseKey = baseKey;
     if (!note->portamentoSegments.empty()) {
       auto& first = note->portamentoSegments.front();
