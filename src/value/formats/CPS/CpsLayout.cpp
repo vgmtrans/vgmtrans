@@ -169,18 +169,18 @@ void warning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRa
     if (encoded == 0) {
       continue;
     }
-    const u32 offset = static_cast<u32>(program.offset + encoded);
-    if (!reader.has(offset, 1)) {
+    const auto offset = cpsSequenceAddress(layout, encoded);
+    if (!offset || !reader.has(*offset, 1)) {
       warning(diagnostics, "CPS1 sequence pointer is outside the audio CPU ROM", reader.range(entry, 2));
       continue;
     }
     const u32 maxTracks = layout.version == CpsVersion::Cps1V100 ? 8 : 12;
-    if (!hasPlayableSequenceHeader(reader, offset, maxTracks, layout.version == CpsVersion::Cps1V100)) {
+    if (!hasPlayableSequenceHeader(reader, *offset, maxTracks, layout.version == CpsVersion::Cps1V100)) {
       continue;
     }
     layout.sequences.push_back(CpsSequenceInfo{
         .index = index,
-        .offset = offset,
+        .offset = *offset,
         .pointer = reader.range(entry, 2),
         .name = layout.game + " song " + std::to_string(index),
     });
@@ -254,8 +254,7 @@ void warning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRa
       continue;
     }
     firstEntry = entry;
-    firstSequence = isCps3(layout.version) ? static_cast<u32>(static_cast<s64>(layout.sequenceTableOffset) - 8 + raw)
-                                           : static_cast<u32>(program.offset + (raw & 0x000fffff));
+    firstSequence = cpsSequenceAddress(layout, raw).value_or(0);
     break;
   }
   if (firstSequence <= layout.sequenceTableOffset || !reader.has(firstSequence, 1)) {
@@ -271,18 +270,17 @@ void warning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRa
     if (raw == 0) {
       continue;
     }
-    const u32 offset = isCps3(layout.version) ? static_cast<u32>(static_cast<s64>(layout.sequenceTableOffset) - 8 + raw)
-                                              : static_cast<u32>(program.offset + (raw & 0x000fffff));
-    if (!reader.has(offset, 1)) {
+    const auto offset = cpsSequenceAddress(layout, raw);
+    if (!offset || !reader.has(*offset, 1)) {
       warning(diagnostics, "CPS sequence pointer is outside the audio CPU ROM", reader.range(entry, 4));
       continue;
     }
-    if (!hasPlayableSequenceHeader(reader, offset, 16, false)) {
+    if (!hasPlayableSequenceHeader(reader, *offset, 16, false)) {
       continue;
     }
     layout.sequences.push_back(CpsSequenceInfo{
         .index = index,
-        .offset = offset,
+        .offset = *offset,
         .pointer = reader.range(entry, 4),
         .name = layout.game + " song " + std::to_string(index),
     });
@@ -388,6 +386,35 @@ bool isCps3(CpsVersion version) {
 bool usesLateSequence(CpsVersion version) {
   return version == CpsVersion::Cps2V200 || version == CpsVersion::Cps2V201B || version == CpsVersion::Cps2V210 ||
          version == CpsVersion::Cps2V211 || isCps3(version);
+}
+
+std::optional<u32> cpsSequenceAddress(const CpsLayout& layout, u32 encodedPointer) {
+  if (encodedPointer == 0) {
+    return std::nullopt;
+  }
+
+  constexpr u64 maxAddress = std::numeric_limits<u32>::max();
+  u64 address = 0;
+  if (isCps1(layout.version)) {
+    if (layout.program.offset > maxAddress) {
+      return std::nullopt;
+    }
+    address = layout.program.offset + encodedPointer;
+  } else if (isCps3(layout.version)) {
+    if (layout.sequenceTableOffset < 8) {
+      return std::nullopt;
+    }
+    address = static_cast<u64>(layout.sequenceTableOffset - 8) + encodedPointer;
+  } else {
+    if (layout.program.offset > maxAddress) {
+      return std::nullopt;
+    }
+    address = layout.program.offset + (encodedPointer & 0x000fffff);
+  }
+  if (address > maxAddress || address < layout.program.offset || address >= layout.program.endOffset()) {
+    return std::nullopt;
+  }
+  return static_cast<u32>(address);
 }
 
 double cpsDriverRateHertz(CpsVersion version) {

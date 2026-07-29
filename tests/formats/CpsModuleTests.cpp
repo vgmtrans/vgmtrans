@@ -10,6 +10,7 @@
 #include "value/formats/CPS/Cps.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
+#include "value/validation/ScanValidation.h"
 
 #include <algorithm>
 #include <array>
@@ -148,7 +149,7 @@ Fixture earlyCps2Fixture() {
   bytesAt(bytes, 0x300, {63, 32, 96, 16, 24});
   bytesAt(bytes, 0x400, {0, 0, 0, 0});
 
-  be32(bytes, 0x1000, 0x1100);
+  be32(bytes, 0x1000, 0x101100);
   bytesAt(bytes, 0x1100, {0});
   be16(bytes, 0x1101, 0x21);
   bytesAt(bytes, 0x1121,
@@ -411,12 +412,18 @@ Fixture cps3ByteSignedBranchFixture() {
 }
 
 ScanResult scan(const Fixture& fixture) {
+  SourceStore sources;
+  const SourceId source = sources.add(fixture.source, fixture.bytes);
   ScanIdAllocator ids;
-  return cpsDefinition().module.scan(ScanInput{
-      .source = fixture.source,
-      .reader = ByteReader(fixture.source.id, fixture.bytes),
+  auto result = cpsDefinition().module.scan(ScanInput{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
       .ids = ids,
   });
+  const auto validation = validateScanResult(source, result, sources, {});
+  expect(validation.empty(), validation.empty() ? "CPS fixture scan should pass admission validation"
+                                                : validation.diagnostics().front().message);
+  return result;
 }
 
 template <class AssetType>
@@ -444,6 +451,51 @@ const SequenceProgramAsset& onlySequence(const ScanResult& result) {
   const auto sequences = assets<SequenceProgramAsset>(result);
   expect(sequences.size() == 1, "fixture should produce exactly one sequence");
   return *sequences.front();
+}
+
+const MiscAsset& miscAt(const ScanResult& result, u64 offset, u64 size) {
+  const auto miscAssets = assets<MiscAsset>(result);
+  const auto found = std::ranges::find_if(miscAssets, [&](const MiscAsset* asset) {
+    return asset->metadata.range.offset == offset && asset->metadata.range.size == size;
+  });
+  expect(found != miscAssets.end(), "fixture should contain the expected misc asset");
+  return **found;
+}
+
+const SourceAnnotation& miscRoot(const ScanResult& result, const MiscAsset& misc, std::string_view kind) {
+  const auto roots = result.sourceMap.ownedBy(ObjectRefs::misc(misc.metadata.id));
+  expect(roots.size() == 1, "misc asset should have exactly one explicitly owned annotation root");
+  const auto& root = result.sourceMap.get(roots.front());
+  expect(root.role == SourceRole::Table && root.localKind == kind && root.range == misc.metadata.range,
+         "misc asset annotation root should describe its complete typed table");
+  return root;
+}
+
+const SourceAnnotation& onlyChild(const ScanResult& result, const SourceAnnotation& parent) {
+  const auto children = result.sourceMap.childrenOf(parent.id);
+  expect(children.size() == 1, "fixture table should contain exactly one meaningful annotated entry");
+  const auto& child = result.sourceMap.get(children.front());
+  expect(child.parent == parent.id && result.sourceMap.assetOwner(child.id) == result.sourceMap.assetOwner(parent.id),
+         "misc table entry should inherit ownership from its table root");
+  return child;
+}
+
+bool fieldMatches(const SourceAnnotation& annotation, std::string_view name, u64 offset, u64 size, u64 value) {
+  const auto field = std::ranges::find_if(annotation.fields, [&](const SourceField& candidate) {
+    return candidate.name == name && candidate.range.offset == offset && candidate.range.size == size;
+  });
+  if (field == annotation.fields.end()) {
+    return false;
+  }
+  const auto* typed = std::get_if<u64>(&field->value);
+  return typed != nullptr && *typed == value;
+}
+
+bool pointsTo(const SourceAnnotation& annotation, u64 offset) {
+  return std::ranges::any_of(annotation.links, [&](const SourceLink& link) {
+    const auto* range = std::get_if<SourceRange>(&link.target);
+    return link.role == SourceLinkRole::PointsTo && range != nullptr && range->offset == offset;
+  });
 }
 
 }  // namespace
@@ -510,6 +562,14 @@ void cps1ModuleRetainsYm2151AndOkiDomains() {
              std::ranges::all_of(decodedEmpty->pcm, [](s16 frame) { return frame == 0; }),
          "CPS1 OKI ADPCM and structural empty directory slots should both decode through the shared sample path");
 
+  const auto& sequenceTable = miscAt(result, 0x106, 2);
+  const auto& sequenceTableRoot = miscRoot(result, sequenceTable, "cps-sequence-pointer-table");
+  const auto& sequencePointer = onlyChild(result, sequenceTableRoot);
+  expect(sequencePointer.role == SourceRole::Pointer && sequencePointer.localKind == "cps-sequence-pointer" &&
+             sequencePointer.range.offset == 0x106 && sequencePointer.range.size == 2 &&
+             fieldMatches(sequencePointer, "encoded_pointer", 0x106, 2, 0x500) && pointsTo(sequencePointer, 0x500),
+         "CPS1 misc sequence table should annotate its big-endian pointer and resolved target");
+
   const auto* voice =
       ym->instruments[0].synthVoice ? std::get_if<Ym2151Voice>(&*ym->instruments[0].synthVoice) : nullptr;
   expect(voice != nullptr && voice->algorithm == 6 && voice->feedback == 2 && voice->operatorMask == 0x0f &&
@@ -530,6 +590,11 @@ void cps1ModuleRetainsYm2151AndOkiDomains() {
 void cps1V1DefaultsAndPitchWrappingMatchLegacyDriver() {
   const auto result = scan(cps1V1Fixture());
   expect(result.diagnostics.empty(), "complete CPS1 V1 fixture should scan without diagnostics");
+  const auto& sequenceTable = miscAt(result, 0x103, 2);
+  const auto& sequencePointer = onlyChild(result, miscRoot(result, sequenceTable, "cps-sequence-pointer-table"));
+  expect(fieldMatches(sequencePointer, "encoded_pointer", 0x103, 2, 0x300) && pointsTo(sequencePointer, 0x300),
+         "CPS1 V1 misc sequence table should decode its little-endian pointers");
+
   const auto& sequence = onlySequence(result);
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cps1V1Dialect());
   const auto note = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
@@ -558,6 +623,33 @@ void cps2EarlyModuleUsesPhysicalModulation() {
          "early CPS2 should retain its fixed 256-entry first instrument bank");
   expect(std::abs(instruments->instruments[0].regions[0].unityKey - 60.0) < 0.0001,
          "little-endian QSound sample indexes should resolve to their sample unity key");
+
+  const auto& sequenceTable = miscAt(result, 0x1000, 0x100);
+  const auto& sequencePointer = onlyChild(result, miscRoot(result, sequenceTable, "cps-sequence-pointer-table"));
+  expect(sequencePointer.role == SourceRole::Pointer &&
+             fieldMatches(sequencePointer, "encoded_pointer", 0x1000, 4, 0x101100) && pointsTo(sequencePointer, 0x1100),
+         "CPS2 misc sequence table should mask its driver flag while preserving the encoded pointer");
+
+  const auto& sampleTable = miscAt(result, 0x200, 8);
+  const auto& sampleInfo = onlyChild(result, miscRoot(result, sampleTable, "cps-qsound-sample-info-table"));
+  expect(sampleInfo.role == SourceRole::TableEntry && sampleInfo.localKind == "cps-qsound-sample-info" &&
+             sampleInfo.fieldsAsChildren && fieldMatches(sampleInfo, "bank", 0x200, 1, 0) &&
+             fieldMatches(sampleInfo, "start_offset", 0x201, 2, 0) &&
+             fieldMatches(sampleInfo, "loop_offset", 0x203, 2, 0) &&
+             fieldMatches(sampleInfo, "end_offset", 0x205, 2, 0x100) &&
+             fieldMatches(sampleInfo, "unity_key", 0x207, 1, 60),
+         "CPS2 sample-info misc asset should expose each raw driver field as an inspector child");
+
+  const auto& articulationTable = miscAt(result, 0x300, 0x800);
+  const auto& articulation = onlyChild(result, miscRoot(result, articulationTable, "cps-qsound-articulation-table"));
+  expect(articulation.role == SourceRole::TableEntry && articulation.localKind == "cps-qsound-articulation" &&
+             articulation.fieldsAsChildren && fieldMatches(articulation, "attack_rate", 0x300, 1, 63) &&
+             fieldMatches(articulation, "decay_rate", 0x301, 1, 32) &&
+             fieldMatches(articulation, "sustain_level", 0x302, 1, 96) &&
+             fieldMatches(articulation, "sustain_rate", 0x303, 1, 16) &&
+             fieldMatches(articulation, "release_rate", 0x304, 1, 24) &&
+             fieldMatches(articulation, "unknown", 0x305, 3, 0),
+         "CPS2 articulation misc asset should expose meaningful rows and their exact fields");
 
   const auto& sequence = onlySequence(result);
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsEarlyDialect());
@@ -630,6 +722,19 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
              std::abs(region.attenuationDb - 96.0) < 0.0001 && region.envelope.sustainAmplitude &&
              std::abs(*region.envelope.sustainAmplitude - 97.0 / 128.0) < 0.0001,
          "CPS3 regions should use driver units for tuning, wrapped gain adjustment, and sustain level");
+
+  const auto& sequenceTable = miscAt(result, 0x800, 0x100);
+  const auto& sequencePointer = onlyChild(result, miscRoot(result, sequenceTable, "cps-sequence-pointer-table"));
+  expect(fieldMatches(sequencePointer, "encoded_pointer", 0x800, 4, 0x108) && pointsTo(sequencePointer, 0x900),
+         "CPS3 misc sequence table should resolve its driver-relative pointer base");
+
+  const auto& sampleTable = miscAt(result, 0x200, 16);
+  const auto& sampleInfo = onlyChild(result, miscRoot(result, sampleTable, "cps-qsound-sample-info-table"));
+  expect(sampleInfo.fieldsAsChildren && fieldMatches(sampleInfo, "start_address", 0x200, 4, 0) &&
+             fieldMatches(sampleInfo, "loop_address", 0x204, 4, 0x20) &&
+             fieldMatches(sampleInfo, "end_address", 0x208, 4, 0x100) &&
+             fieldMatches(sampleInfo, "unity_key", 0x20c, 4, 60),
+         "CPS3 sample-info misc asset should expose its big-endian 32-bit fields");
 
   const auto& sequence = onlySequence(result);
   expect(sequence.program.dialect.value == kCpsLateDialectId && sequence.program.tracks.size() == 1,
