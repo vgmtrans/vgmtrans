@@ -66,6 +66,11 @@ void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
     annotation.derived(std::isinf(*envelope.decaySeconds) ? "decay_infinite" : "decay_seconds",
                        std::isinf(*envelope.decaySeconds) ? SourceValue{true} : SourceValue{*envelope.decaySeconds});
   }
+  if (envelope.secondDecaySeconds) {
+    annotation.derived(
+        std::isinf(*envelope.secondDecaySeconds) ? "second_decay_infinite" : "second_decay_seconds",
+        std::isinf(*envelope.secondDecaySeconds) ? SourceValue{true} : SourceValue{*envelope.secondDecaySeconds});
+  }
   if (envelope.sustainAmplitude) {
     annotation.derived("sustain_level", *envelope.sustainAmplitude, SourceValueDisplay::Percent);
   }

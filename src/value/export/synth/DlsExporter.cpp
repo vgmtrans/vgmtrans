@@ -385,13 +385,14 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   const Region& region = *resolvedRegion.region;
   std::vector<u8> connections;
   writeConnection(connections, kDlsConnDstPan, dlsPanScale(region.pan));
-  const bool explicitEnvelope = hasExplicitEnvelope(region.envelope);
-  writeConnection(connections, kDlsConnDstEg1AttackTime, dlsEnvelopeTimecents(region.envelope.attackSeconds));
-  writeConnection(connections, kDlsConnDstEg1HoldTime, dlsEnvelopeTimecents(region.envelope.holdSeconds));
-  writeConnection(connections, kDlsConnDstEg1DecayTime, dlsEnvelopeTimecents(region.envelope.decaySeconds));
+  const Envelope envelope = approximateEnvelopeAsAdsr(region.envelope);
+  const bool explicitEnvelope = hasExplicitEnvelope(envelope);
+  writeConnection(connections, kDlsConnDstEg1AttackTime, dlsEnvelopeTimecents(envelope.attackSeconds));
+  writeConnection(connections, kDlsConnDstEg1HoldTime, dlsEnvelopeTimecents(envelope.holdSeconds));
+  writeConnection(connections, kDlsConnDstEg1DecayTime, dlsEnvelopeTimecents(envelope.decaySeconds));
   writeConnection(connections, kDlsConnDstEg1SustainLevel,
-                  explicitEnvelope ? dlsSustainLevel(region.envelope) : kDlsSustainLevelFullScale);
-  writeConnection(connections, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(region.envelope.releaseSeconds));
+                  explicitEnvelope ? dlsSustainLevel(envelope) : kDlsSustainLevelFullScale);
+  writeConnection(connections, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(envelope.releaseSeconds));
   for (const auto& generator : instrument.generators) {
     if (!shouldExportSynthGenerator(generator, modulationConversion)) {
       continue;

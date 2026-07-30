@@ -21,6 +21,7 @@
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/synth/ModulationScaling.h"
+#include "value/export/synth/SynthExportData.h"
 #include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
@@ -1017,6 +1018,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
         }
 
         const s32 tuningCents = static_cast<s32>(std::lround((region.unityKey - 96.0) * 100.0));
+        const Envelope envelope = approximateEnvelopeAsAdsr(region.envelope);
 
         summary.regions.push_back(RegionSummary{
             .bank = address.bank,
@@ -1028,10 +1030,10 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
             .velocityHigh = region.velocityRange.high,
             .sampleSourceOffset = sampleSourceOffset,
             .tuningCents = tuningCents,
-            .envelopeAttack = envelopeMicros(region.envelope.attackSeconds),
-            .envelopeDecay = envelopeMicros(region.envelope.decaySeconds),
-            .envelopeSustain = envelopePermille(region.envelope.sustainAmplitude.value_or(0.0)),
-            .envelopeRelease = envelopeMicros(region.envelope.releaseSeconds),
+            .envelopeAttack = envelopeMicros(envelope.attackSeconds),
+            .envelopeDecay = envelopeMicros(envelope.decaySeconds),
+            .envelopeSustain = envelopePermille(envelope.sustainAmplitude.value_or(0.0)),
+            .envelopeRelease = envelopeMicros(envelope.releaseSeconds),
         });
       }
     }

@@ -33,6 +33,7 @@ void validateEnvelope(ValidationReport& report, const Envelope& envelope, Source
   checkSeconds(envelope.attackSeconds, "synth.envelope.attack", "attack");
   checkSeconds(envelope.holdSeconds, "synth.envelope.hold", "hold");
   checkSeconds(envelope.decaySeconds, "synth.envelope.decay", "decay");
+  checkSeconds(envelope.secondDecaySeconds, "synth.envelope.second-decay", "second decay");
   checkSeconds(envelope.releaseSeconds, "synth.envelope.release", "release");
 
   if (envelope.sustainAmplitude &&
