@@ -9,11 +9,11 @@
 #include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
 #include "value/model/SourceMap.h"
+#include "value/sequence/SequenceExecution.h"
 
-#include <limits>
+#include <functional>
 #include <optional>
 #include <span>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -29,76 +29,179 @@ struct DialectId {
   friend bool operator==(const DialectId&, const DialectId&) noexcept = default;
 };
 
-// Where decoding can continue after an opcode. Walkers use this before playback
-// so jumps and calls can point at commands that have already been decoded.
-struct DecodeFlow {
-  enum class Kind {
-    Fallthrough,
-    Jump,
-    Call,
-    Return,
-    Terminal,
-  };
+enum class StaticTransitionKind {
+  Fallthrough,
+  Jump,
+  Call,
+  Return,
+  End,
+  EndSection,
+};
 
-  Kind kind = Kind::Fallthrough;
-  std::optional<Address> fallthrough;
-  std::vector<Address> staticTargets;
-  bool terminal = false;
+struct StaticTransition {
+  StaticTransitionKind kind = StaticTransitionKind::Fallthrough;
+  Address destination;
+  JumpSemantics jumpSemantics = JumpSemantics::Normal;
 
-  [[nodiscard]] static DecodeFlow fallthroughTo(Address next) {
-    return DecodeFlow{
-        .kind = Kind::Fallthrough,
-        .fallthrough = next,
+  [[nodiscard]] static constexpr StaticTransition fallthrough() noexcept { return {}; }
+  [[nodiscard]] static constexpr StaticTransition jump(Address destination,
+                                                       JumpSemantics semantics = JumpSemantics::Normal) noexcept {
+    return StaticTransition{
+        .kind = StaticTransitionKind::Jump,
+        .destination = destination,
+        .jumpSemantics = semantics,
+    };
+  }
+  [[nodiscard]] static constexpr StaticTransition call(Address destination) noexcept {
+    return StaticTransition{
+        .kind = StaticTransitionKind::Call,
+        .destination = destination,
+    };
+  }
+  [[nodiscard]] static constexpr StaticTransition return_() noexcept {
+    return StaticTransition{.kind = StaticTransitionKind::Return};
+  }
+  [[nodiscard]] static constexpr StaticTransition end() noexcept {
+    return StaticTransition{.kind = StaticTransitionKind::End};
+  }
+  [[nodiscard]] static constexpr StaticTransition endSection() noexcept {
+    return StaticTransition{.kind = StaticTransitionKind::EndSection};
+  }
+};
+
+enum class FlowOverridePolicy {
+  Forbidden,
+  Optional,
+  Required,
+};
+
+enum class DiscoveryDisposition {
+  FromDefaultTransition,
+  ReturnBoundary,
+};
+
+// Static command flow is authoritative for both discovery and ordinary
+// execution. continuation is recorded independently because every encoded
+// command has a physical successor even when its default transition is a jump,
+// call, return, or end.
+struct CommandFlow {
+  Address continuation;
+  std::optional<StaticTransition> defaultTransition;
+  FlowOverridePolicy overridePolicy = FlowOverridePolicy::Forbidden;
+  std::vector<Address> additionalTargets;
+  DiscoveryDisposition discovery = DiscoveryDisposition::FromDefaultTransition;
+
+  [[nodiscard]] static CommandFlow fallthroughTo(Address continuation) {
+    return CommandFlow{
+        .continuation = continuation,
+        .defaultTransition = StaticTransition::fallthrough(),
     };
   }
 
-  [[nodiscard]] static DecodeFlow jump(Address destination) {
-    return DecodeFlow{
-        .kind = Kind::Jump,
-        .staticTargets = {destination},
+  [[nodiscard]] static CommandFlow jumpTo(Address destination, Address continuation = {},
+                                          JumpSemantics semantics = JumpSemantics::Normal) {
+    return CommandFlow{
+        .continuation = continuation,
+        .defaultTransition = StaticTransition::jump(destination, semantics),
     };
   }
 
-  [[nodiscard]] static DecodeFlow call(Address destination, Address returnAddress) {
-    return DecodeFlow{
-        .kind = Kind::Call,
-        .fallthrough = returnAddress,
-        .staticTargets = {destination},
+  [[nodiscard]] static CommandFlow call(Address destination, Address continuation = {}) {
+    return CommandFlow{
+        .continuation = continuation,
+        .defaultTransition = StaticTransition::call(destination),
     };
   }
 
-  [[nodiscard]] static DecodeFlow return_() { return DecodeFlow{.kind = Kind::Return}; }
-
-  [[nodiscard]] static DecodeFlow terminalFlow() {
-    return DecodeFlow{
-        .kind = Kind::Terminal,
-        .terminal = true,
+  [[nodiscard]] static CommandFlow return_(Address continuation = {}) {
+    return CommandFlow{
+        .continuation = continuation,
+        .defaultTransition = StaticTransition::return_(),
     };
   }
 
-  [[nodiscard]] bool unconditionalJump() const noexcept { return kind == Kind::Jump && !staticTargets.empty(); }
-  [[nodiscard]] bool callTarget() const noexcept { return kind == Kind::Call && !staticTargets.empty(); }
+  [[nodiscard]] static CommandFlow end(Address continuation = {}) {
+    return CommandFlow{
+        .continuation = continuation,
+        .defaultTransition = StaticTransition::end(),
+    };
+  }
+
+  [[nodiscard]] static CommandFlow endSection(Address continuation = {}) {
+    return CommandFlow{
+        .continuation = continuation,
+        .defaultTransition = StaticTransition::endSection(),
+    };
+  }
+
+  [[nodiscard]] std::optional<Address> discoveryContinuation() const noexcept {
+    if (discovery == DiscoveryDisposition::ReturnBoundary || !defaultTransition) {
+      return std::nullopt;
+    }
+    switch (defaultTransition->kind) {
+      case StaticTransitionKind::Fallthrough:
+      case StaticTransitionKind::Call:
+        return continuation;
+      case StaticTransitionKind::Jump:
+      case StaticTransitionKind::Return:
+      case StaticTransitionKind::End:
+      case StaticTransitionKind::EndSection:
+        return std::nullopt;
+    }
+    return std::nullopt;
+  }
+
+  template <class Visitor>
+  void forEachDiscoveryTarget(Visitor&& visitor) const {
+    if (defaultTransition && (defaultTransition->kind == StaticTransitionKind::Jump ||
+                              defaultTransition->kind == StaticTransitionKind::Call)) {
+      std::invoke(visitor, defaultTransition->destination);
+    }
+    for (const Address target : additionalTargets) {
+      std::invoke(visitor, target);
+    }
+  }
+
+  [[nodiscard]] bool endsPlayback() const noexcept {
+    return defaultTransition && (defaultTransition->kind == StaticTransitionKind::End ||
+                                 defaultTransition->kind == StaticTransitionKind::EndSection);
+  }
+
+  [[nodiscard]] bool unconditionalJump() const noexcept {
+    return defaultTransition && defaultTransition->kind == StaticTransitionKind::Jump;
+  }
+
+  [[nodiscard]] bool callTarget() const noexcept {
+    return defaultTransition && defaultTransition->kind == StaticTransitionKind::Call;
+  }
+
+  [[nodiscard]] std::optional<Address> defaultDestination() const noexcept {
+    if (!defaultTransition || (defaultTransition->kind != StaticTransitionKind::Jump &&
+                               defaultTransition->kind != StaticTransitionKind::Call)) {
+      return std::nullopt;
+    }
+    return defaultTransition->destination;
+  }
 };
 
 using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
+using CommandExecutor = Effects (*)(std::span<const SemanticOperandValue> arguments, void* playback);
+using CommandPredicateEvaluator = bool (*)(void* playback);
 
 struct CommandAction {
-  static constexpr u32 kInvalidExecutor = std::numeric_limits<u32>::max();
-
-  // CompilerCursor assigns this slot from a generated typed thunk. Arguments
-  // contain its literal constants in evaluation order; deferred state-member
-  // reads live in the thunk's type. Playback never looks up source-field names
-  // and never needs the encoded command bytes.
-  u32 executor = kInvalidExecutor;
+  // CompilerCursor stores a generated typed thunk directly. Compiled programs
+  // are executable process-local values; no durable meaning is implied by the
+  // callback address.
+  CommandExecutor execute = nullptr;
   std::vector<SemanticOperandValue> arguments;
 
-  [[nodiscard]] bool valid() const noexcept { return executor != kInvalidExecutor; }
+  [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
 };
 
 struct CommandPredicate {
-  u32 evaluator = CommandAction::kInvalidExecutor;
+  CommandPredicateEvaluator evaluate = nullptr;
 
-  [[nodiscard]] bool valid() const noexcept { return evaluator != CommandAction::kInvalidExecutor; }
+  [[nodiscard]] bool valid() const noexcept { return evaluate != nullptr; }
 };
 
 struct CommandExecution {
@@ -166,7 +269,7 @@ struct SourceCommand {
   SourceAnnotationId annotation;
   SequenceSemantic semantic = SequenceSemantic::Unknown;
   std::vector<SemanticOperand> operands;
-  DecodeFlow flow;
+  CommandFlow flow;
   CommandExecution execution;
 };
 
@@ -299,7 +402,7 @@ public:
   explicit TrackProgramBuilder(TrackProgram& track);
 
   const SourceCommand& addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
-                                   std::vector<SemanticOperand> operands, DecodeFlow flow,
+                                   std::vector<SemanticOperand> operands, CommandFlow flow,
                                    SourceAnnotationId annotation = {}, CommandExecution execution = {},
                                    SequenceSemantic semantic = SequenceSemantic::Unknown);
 

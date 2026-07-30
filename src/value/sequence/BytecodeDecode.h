@@ -41,7 +41,7 @@ struct DecodedBytecodeCommand {
   SourceAnnotationId annotation;
   u8 opcode = 0;
   u32 encodedSize = 0;
-  DecodeFlow flow;
+  CommandFlow flow;
   std::vector<SemanticOperand> operands;
   CommandExecution execution;
   DecodedCommandPresentation presentation;
@@ -132,29 +132,19 @@ template <class DecodeCommand>
 
     const u32 begin = offset;
     auto decoded = decodeCommand(begin);
-    const auto next = decoded.flow.fallthrough;
-    const bool terminal = decoded.flow.terminal;
-    const auto targets = decoded.flow.staticTargets;
-    const std::optional<Address> followedJump = !next && policy.followUnconditionalJumps && targets.size() == 1
-                                                    ? std::optional<Address>{targets.front()}
+    const auto next = decoded.flow.discoveryContinuation();
+    const std::optional<Address> followedJump = decoded.flow.unconditionalJump() && policy.followUnconditionalJumps
+                                                    ? decoded.flow.defaultDestination()
                                                     : std::nullopt;
     appendDecodedBytecodeCommand(builder, decoded, begin);
 
-    for (const Address target : targets) {
+    decoded.flow.forEachDiscoveryTarget([&](Address target) {
       if ((next && target.value == next->value) || (followedJump && target.value == followedJump->value)) {
-        continue;
+        return;
       }
       queueSideTarget(target);
-    }
+    });
 
-    if (terminal) {
-      const auto pending = nextPendingOffset();
-      if (!pending) {
-        break;
-      }
-      offset = *pending;
-      continue;
-    }
     if (next) {
       offset = next->value;
       continue;
@@ -205,12 +195,12 @@ template <class DecodeCommand>
       ++decodedCommands;
       // Jump and call targets start new blocks. The next sequential command stays
       // in this inner loop.
-      for (const Address target : decoded.flow.staticTargets) {
+      decoded.flow.forEachDiscoveryTarget([&](Address target) {
         if (target.value < bytecodeEnd && !commandsByOffset.contains(target.value)) {
           pendingBlocks.push_back(target.value);
         }
-      }
-      const auto next = decoded.flow.fallthrough;
+      });
+      const auto next = decoded.flow.discoveryContinuation();
       commandsByOffset.emplace(offset, std::move(decoded));
       if (!next) {
         break;

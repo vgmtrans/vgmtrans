@@ -9,7 +9,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 
 #include <algorithm>
 #include <cmath>
@@ -301,6 +301,8 @@ struct Playback {
     track.portamentoKey = static_cast<u8>(key);
     return track.noteWait ? Effects::wait(duration) : Effects{};
   }
+
+  void pitchBend(s8 encoded) { out.pitchBend((encoded / 128.0) * track.pitchBendRangeSemitones); }
 };
 
 using NdsCompilerCursor = CompilerCursor<TrackState, Playback>;
@@ -432,7 +434,7 @@ struct SequenceDecodeContext {
     }
     case 0xc4: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      return event.emitPitchBendScaledBy<&TrackState::pitchBendRangeSemitones>(event.s8("bend") / 128.0);
+      return event.invoke<&Playback::pitchBend>(event.s8("bend"));
     }
     case 0xc5: {
       auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
@@ -534,7 +536,7 @@ struct SequenceDecodeContext {
       .range = context.reader().range(offset, 1),
       .opcode = context.reader().u8At(offset),
       .encodedSize = 1,
-      .flow = DecodeFlow::terminalFlow(),
+      .flow = CommandFlow::end(Address{offset + 1}),
       .presentation =
           DecodedCommandPresentation{
               .label = "Recovery Stop",
@@ -580,7 +582,7 @@ struct SequenceDecodeContext {
       }
 
       if (decoded.flow.unconditionalJump()) {
-        const u32 destination = decoded.flow.staticTargets.front().value;
+        const u32 destination = decoded.flow.defaultDestination()->value;
         track.append(std::move(decoded), begin);
         if (decodedOffsets.contains(destination)) {
           break;
@@ -590,16 +592,15 @@ struct SequenceDecodeContext {
       }
 
       if (decoded.flow.callTarget()) {
-        const u32 destination = decoded.flow.staticTargets.front().value;
+        const u32 destination = decoded.flow.defaultDestination()->value;
         if (!decodedOffsets.contains(destination) && callTargetOffsets.insert(destination).second) {
           pendingBlocks.push_back(PendingBlock{.offset = destination, .callTarget = true});
         }
       }
 
-      const auto next = decoded.flow.fallthrough;
-      const bool terminal = decoded.flow.terminal;
+      const auto next = decoded.flow.discoveryContinuation();
       track.append(std::move(decoded), begin);
-      if (!next || terminal) {
+      if (!next) {
         break;
       }
       offset = next->value;

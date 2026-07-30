@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
@@ -160,8 +160,7 @@ struct VibratoState {
 
 struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
-      : version(static_cast<KonamiArcadeVersion>(program.config.profile)),
-        sourceTrackNumber(track.sourceTrackNumber) {
+      : version(static_cast<KonamiArcadeVersion>(program.config.profile)), sourceTrackNumber(track.sourceTrackNumber) {
     pan.setCurrent(8.0);
   }
 
@@ -555,11 +554,9 @@ struct Playback {
     auto* state = kind == 1 ? &track.volume : &track.pan;
     const PerformanceAutomationTarget automationTarget =
         kind == 1 ? PerformanceAutomationTarget::Level : PerformanceAutomationTarget::Pan;
-    const double targetValue =
-        kind == 1 ? volumeGain(target) : (static_cast<double>(panIndex(target)) - 7.0) / 7.0;
-    static_cast<void>(
-        state->begin(out.fade(automationTarget, targetValue, duration),
-                     SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration)));
+    const double targetValue = kind == 1 ? volumeGain(target) : (static_cast<double>(panIndex(target)) - 7.0) / 7.0;
+    static_cast<void>(state->begin(out.fade(automationTarget, targetValue, duration),
+                                   SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration)));
   }
 
   void portamento(u8 raw) {
@@ -634,11 +631,11 @@ struct Playback {
       return {};
     }
     if (totalPlays == 0) {
-      return Effects{.step = vm.declaredLoop(destination)};
+      return Effects::overrideWith(vm.declaredLoop(destination));
     }
 
     Effects effects = vm.countedRepeatUntil(slot, totalPlays, destination);
-    if (effects.step.kind == StepKind::Next) {
+    if (!effects.flowOverride) {
       track.loopAttenuation[slot] = 0;
       track.loopTranspose[slot] = 0;
     } else {
@@ -660,27 +657,24 @@ struct Playback {
     }
     if (track.inSubroutine) {
       track.inSubroutine = false;
-      return Effects{.step = vm.finiteBranch(track.subroutineReturn)};
+      return Effects::overrideWith(vm.finiteBranch(track.subroutineReturn));
     }
     if (track.subroutineStart.value == 0) {
       return {};
     }
     track.inSubroutine = true;
     track.subroutineReturn = next;
-    return Effects{.step = vm.finiteBranch(track.subroutineStart)};
+    return Effects::overrideWith(vm.finiteBranch(track.subroutineStart));
   }
 
-  [[nodiscard]] Effects call(Address destination) {
-    ++track.callDepth;
-    return Effects{.step = vm.call(destination)};
-  }
+  void beginCall() { ++track.callDepth; }
 
   [[nodiscard]] Effects returnOrEnd() {
     if (track.callDepth != 0) {
       --track.callDepth;
-      return Effects{.step = vm.return_()};
+      return Effects::overrideWith(vm.return_());
     }
-    return Effects{.step = vm.end()};
+    return Effects::overrideWith(vm.end());
   }
 
   void tick() {
@@ -713,17 +707,20 @@ struct Playback {
 using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] Address readDestination(KonamiArcadeCursor::Event& event, const KonamiArcadeLayout& layout,
-                                      const KonamiArcadeSequenceLayout& sequence, SemanticOperandRole role) {
+                                      const KonamiArcadeSequenceLayout& sequence, SemanticOperandRole role,
+                                      std::optional<u64> loopBoundary = std::nullopt) {
   if (layout.version == KonamiArcadeVersion::MysticWarrior) {
     const auto encoded = event.rawU16le("encoded_destination", SourceValueDisplay::Address);
     const u64 destination = encoded.value >= sequence.memoryBase
                                 ? static_cast<u64>(sequence.offset) + encoded.value - sequence.memoryBase
                                 : 0;
-    return event.resolvedValue("destination", encoded, Address{destination}, SourceValueDisplay::Address, role);
+    const auto resolvedRole = loopBoundary && destination < *loopBoundary ? SemanticOperandRole::LoopTarget : role;
+    return event.resolvedValue("destination", encoded, Address{destination}, SourceValueDisplay::Address, resolvedRole);
   }
   const auto encoded = event.rawU32be("encoded_destination", SourceValueDisplay::Address);
   const u64 destination = static_cast<u64>(layout.code.offset) + encoded.value;
-  return event.resolvedValue("destination", encoded, Address{destination}, SourceValueDisplay::Address, role);
+  const auto resolvedRole = loopBoundary && destination < *loopBoundary ? SemanticOperandRole::LoopTarget : role;
+  return event.resolvedValue("destination", encoded, Address{destination}, SourceValueDisplay::Address, resolvedRole);
 }
 
 [[nodiscard]] DecodedBytecodeCommand ignored(KonamiArcadeCursor& cursor, std::string_view label, u8 bytes) {
@@ -930,7 +927,9 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const s16 attenuation = -static_cast<s16>(loudnessDelta);
       const s8 transpose = event.s8("transpose_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
       if (discoveredLoops[slot].value != 0) {
-        event.mayBranchTo(discoveredLoops[slot], SemanticOperandRole::RepeatTarget);
+        event.derived("destination", discoveredLoops[slot], SourceValueDisplay::Address,
+                      SemanticOperandRole::RepeatTarget);
+        event.mayBranchTo(discoveredLoops[slot]);
       }
       event.invoke<&Playback::loopEnd>(slot, count, attenuation, transpose);
       return event.runtimeControlFlow();
@@ -1012,7 +1011,9 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xf7: {
       auto event = cursor.command("Subroutine Boundary", SequenceSemantic::Call);
       if (discoveredSubroutine.value != 0) {
-        event.mayBranchTo(discoveredSubroutine, SemanticOperandRole::CallTarget);
+        event.derived("destination", discoveredSubroutine, SourceValueDisplay::Address,
+                      SemanticOperandRole::CallTarget);
+        event.mayBranchTo(discoveredSubroutine);
       }
       event.invoke<&Playback::subroutineBoundary>(event.nextAddress());
       return event.runtimeControlFlow();
@@ -1053,15 +1054,14 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       return ignored(cursor, "Unknown Driver State", 0);
     case 0xfd: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      const Address destination = readDestination(event, layout, sequence, SemanticOperandRole::JumpTarget);
+      const Address destination = readDestination(event, layout, sequence, SemanticOperandRole::JumpTarget, begin);
       return destination.value < begin ? event.loopCandidate(destination) : event.jump(destination);
     }
     case 0xfe: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
       const Address destination = readDestination(event, layout, sequence, SemanticOperandRole::CallTarget);
-      event.mayBranchTo(destination, SemanticOperandRole::CallTarget);
-      event.invoke<&Playback::call>(destination);
-      return event.runtimeControlFlow();
+      event.invoke<&Playback::beginCall>();
+      return event.call(destination);
     }
     case 0xff: {
       auto event = cursor.command("Return / End", SequenceSemantic::End);

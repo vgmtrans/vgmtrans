@@ -14,7 +14,7 @@
 #include "value/base/LevelScale.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SampleDecoder.h"
@@ -813,22 +813,22 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
     case 0xfe: {
       auto event =
           cursor.command(ProbeJumpCommand::name, SequenceSemantic::Jump, ProbeJumpCommand::playbackStatus, "jump");
-      return event.jump(event.addressLe("destination"));
+      return event.jump(event.addressLe("destination", SemanticOperandRole::JumpTarget));
     }
     case 0xfb: {
       auto event = cursor.command(ProbeDeclaredLoopCommand::name, SequenceSemantic::Loop,
                                   ProbeDeclaredLoopCommand::playbackStatus, "declared-loop");
-      return event.declaredLoop(event.addressLe("destination"));
+      return event.declaredLoop(event.addressLe("destination", SemanticOperandRole::LoopTarget));
     }
     case 0xfc: {
       auto event = cursor.command(ProbeLoopCandidateCommand::name, SequenceSemantic::Loop,
                                   ProbeLoopCandidateCommand::playbackStatus, "loop-candidate");
-      return event.loopCandidate(event.addressLe("destination"));
+      return event.loopCandidate(event.addressLe("destination", SemanticOperandRole::LoopTarget));
     }
     case 0xc0: {
       auto event =
           cursor.command(ProbeCallCommand::name, SequenceSemantic::Call, ProbeCallCommand::playbackStatus, "call");
-      return event.call(event.addressLe("destination"));
+      return event.call(event.addressLe("destination", SemanticOperandRole::CallTarget));
     }
     case 0xfd:
       return cursor
@@ -839,14 +839,14 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
                                   "repeat");
       const u8 slot = event.u8("slot");
       const u8 count = event.u8("count");
-      const Address destination = event.addressLe("destination");
+      const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
       return event.repeatUntil(slot, count, destination);
     }
     case 0xf1: {
       auto event = cursor.command(ProbeRepeatBreakCommand::name, SequenceSemantic::Loop,
                                   ProbeRepeatBreakCommand::playbackStatus, "repeat-break");
       const u8 slot = event.u8("slot");
-      const Address destination = event.addressLe("destination");
+      const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
       return event.invoke<&ProbePlayback::repeatBreak>(slot, destination).mayBranchTo(destination);
     }
     case 0xff:
@@ -880,6 +880,10 @@ const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const Sequenc
   static_cast<void>(dialect);
   const ByteReader reader(range.source, std::span<const u8>{bytes});
   auto decoded = decodeProbeCommand(reader, 0);
+  // This helper decodes an isolated command buffer and then places the command
+  // at its fixture address. Rebase only its physical continuation; encoded
+  // flow destinations already use the fixture's track address space.
+  decoded.flow.continuation.value += address.value;
   return builder.addSemantic(address, decoded.opcode, decoded.encodedSize, range, std::move(decoded.operands),
                              std::move(decoded.flow), decoded.annotation, std::move(decoded.execution));
 }

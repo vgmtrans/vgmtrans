@@ -8,7 +8,7 @@
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
@@ -840,7 +840,7 @@ struct Playback {
   }
 
   [[nodiscard]] Effects fe3ParameterFlow(Address standardDestination, Address customDestination) {
-    return Effects{.step = vm.jump(program.customNoteParameters ? customDestination : standardDestination)};
+    return Effects::overrideWith(vm.jump(program.customNoteParameters ? customDestination : standardDestination));
   }
 
   void switchToMelodicProgram() {
@@ -1074,15 +1074,15 @@ struct Playback {
 
   [[nodiscard]] Effects endOrReturn() {
     if (!track.inPattern) {
-      return Effects{.step = vm.endSection()};
+      return Effects::overrideWith(vm.endSection());
     }
     if (track.patternRemaining > 1) {
       --track.patternRemaining;
-      return Effects{.step = vm.jump(track.patternStart)};
+      return Effects::overrideWith(vm.jump(track.patternStart));
     }
     track.inPattern = false;
     track.patternRemaining = 0;
-    return Effects{.step = vm.return_()};
+    return Effects::overrideWith(vm.return_());
   }
 
   void emitPan(PerformanceEmitter output, u8 value) const {
@@ -1102,9 +1102,8 @@ struct Playback {
     }
     // Interpolate the source pan index before applying its non-linear table.
     const auto gains = math::panGains(program.selected, panTable, value);
-    static_cast<void>(
-        track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
-                        SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
+    static_cast<void>(track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
+                                      SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
   }
 
   void vibratoOn(u8 delay, u8 rate, u8 depth) {
@@ -1195,9 +1194,8 @@ struct Playback {
       volume(value);
       return;
     }
-    static_cast<void>(
-        track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
-                           SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
+    static_cast<void>(track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
+                                         SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
   }
 
   void masterVolume(u8 value) {
@@ -1213,10 +1211,9 @@ struct Playback {
       return;
     }
     program.masterVolumeState.setCurrentRaw(program.masterVolume);
-    static_cast<void>(
-        program.masterVolumeState.begin(
-            out.fade(PerformanceAutomationTarget::MasterLevel, math::levelGain(value), length),
-            SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
+    static_cast<void>(program.masterVolumeState.begin(
+        out.fade(PerformanceAutomationTarget::MasterLevel, math::levelGain(value), length),
+        SequenceFixedPointMotion<s32>::toRawTarget(value, length)));
     program.masterVolumeAutomationTrack = track.trackNumber;
   }
 
@@ -1333,13 +1330,13 @@ struct Playback {
           static_cast<u16>(track.konamiLoopPitchDelta) + static_cast<u16>(static_cast<s16>(pitchDelta) * 16);
       track.konamiLoopPitchDelta =
           pitchBits < 0x8000 ? static_cast<s16>(pitchBits) : static_cast<s16>(static_cast<s32>(pitchBits) - 0x10000);
-      return Effects{.step = vm.jump(destination)};
+      return Effects::overrideWith(vm.jump(destination));
     }
 
     counter.finish();
     track.konamiLoopVolumeDelta = 0;
     track.konamiLoopPitchDelta = 0;
-    return Effects{.step = vm.next()};
+    return Effects{};
   }
 
   void defineVoiceTable(u8 size) { program.voiceTable.assign(size, VoiceRecord{}); }
@@ -1436,7 +1433,7 @@ struct Playback {
 
   [[nodiscard]] Effects intelliConditionalJump(Address destination) {
     const u8 channel = static_cast<u8>(1u << track.trackNumber);
-    return Effects{.step = (program.intelliConditionalMask & channel) == 0 ? vm.jump(destination) : vm.next()};
+    return (program.intelliConditionalMask & channel) == 0 ? Effects::overrideWith(vm.jump(destination)) : Effects{};
   }
 
   std::span<const u8> panTable = math::kPan;
@@ -1532,9 +1529,12 @@ struct DecodeContext {
   }
   const Address standardDestination{begin + 1 + (hasPacked ? 1u : 0u)};
   const Address customDestination = event.nextAddress();
+  event.derived("standard_destination", standardDestination, SourceValueDisplay::Address,
+                SemanticOperandRole::JumpTarget);
+  event.derived("custom_destination", customDestination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
   event.invoke<&Playback::fe3ParameterFlow>(standardDestination, customDestination);
-  event.mayBranchTo(standardDestination, SemanticOperandRole::JumpTarget);
-  return event.runtimeControlFlow();
+  event.mayBranchTo(standardDestination);
+  return event.requireRuntimeControlFlow();
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const DecodeContext& context, u32 begin) {
@@ -1774,9 +1774,7 @@ struct DecodeContext {
       const u8 distance = event.u8("distance");
       const Address destination{event.nextAddress().value + distance};
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::intelliConditionalJump>(destination)
-          .mayBranchTo(destination, SemanticOperandRole::JumpTarget)
-          .runtimeControlFlow();
+      return event.invoke<&Playback::intelliConditionalJump>(destination).mayBranchTo(destination).runtimeControlFlow();
     }
     case EventType::IntelliJump: {
       auto event = cursor.command("Short Jump", SequenceSemantic::Jump);
@@ -2130,12 +2128,12 @@ struct PlaylistDecode {
     pending.pop_back();
     while (reader.has(address, 1) && !commands.contains(address) && commands.size() < kMaxTrackCommands) {
       DecodedBytecodeCommand command = decodeCommand(context, address);
-      for (const Address target : command.flow.staticTargets) {
+      command.flow.forEachDiscoveryTarget([&](Address target) {
         if (reader.has(target.value, 1) && !commands.contains(static_cast<u32>(target.value))) {
           pending.push_back(static_cast<u32>(target.value));
         }
-      }
-      const auto fallthrough = command.flow.fallthrough;
+      });
+      const auto fallthrough = command.flow.discoveryContinuation();
       commands.emplace(address, std::move(command));
       if (!fallthrough) {
         break;

@@ -1008,15 +1008,15 @@ void cpsLateControlFlowOffsetsFollowEachDriver() {
   const auto& cps2Commands = onlySequence(cps2Result).program.tracks[0].commands;
   const auto cps2Break =
       std::ranges::find_if(cps2Commands, [](const SourceCommand& command) { return command.address.value == 0x1121; });
-  expect(cps2Break != cps2Commands.end() && cps2Break->flow.staticTargets.size() == 1 &&
-             cps2Break->flow.staticTargets[0].value == 0x1121,
+  expect(cps2Break != cps2Commands.end() && cps2Break->flow.additionalTargets.size() == 1 &&
+             cps2Break->flow.additionalTargets[0].value == 0x1121,
          "late CPS2 repeat breaks should sign-extend their 16-bit displacement");
 
   const auto cps3Result = scan(cps3ByteSignedBranchFixture());
   const auto& cps3Commands = onlySequence(cps3Result).program.tracks[0].commands;
   const auto cps3Branch =
       std::ranges::find_if(cps3Commands, [](const SourceCommand& command) { return command.address.value == 0x921; });
-  expect(cps3Branch != cps3Commands.end() && cps3Branch->flow.staticTargets.size() == 1 &&
-             cps3Branch->flow.staticTargets[0].value == 0x921,
+  expect(cps3Branch != cps3Commands.end() && cps3Branch->flow.additionalTargets.size() == 1 &&
+             cps3Branch->flow.additionalTargets[0].value == 0x921,
          "CPS3 CD should preserve the driver's independent sign extension of its low displacement byte");
 }

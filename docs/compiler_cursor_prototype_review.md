@@ -6,7 +6,7 @@ Adopt the compiler-cursor architecture as the target sequence-authoring model, w
 
 The NDS prototype satisfies the important criterion that the rejected designs did not: an ordinary command is again readable as one short interpreter block. It still gives the value architecture source-once decoding, durable annotations, source-free playback, shared scheduling, and testable control flow.
 
-The result is not free. It adds 761 lines of generic compiler-cursor infrastructure and relies on templates plus a process-local executor registry. That cost is acceptable only because it is centralized and because the format surface is substantially simpler. If later formats force the cursor into a symbolic language or universal command taxonomy, revise it rather than protecting this implementation.
+The result is not free. It adds roughly a thousand lines of generic compiler-cursor infrastructure and relies on templates plus direct, type-erased callback pointers. That cost is acceptable only because it is centralized and because the format surface is substantially simpler. If later formats force the cursor into a symbolic language or universal command taxonomy, revise it rather than protecting this implementation.
 
 ## Representative command comparison
 
@@ -87,17 +87,20 @@ case 0xc5: {
 
 Every operation appends one typed action and returns the same builder. Chained calls and separate statements compile to the same ordered action list. This keeps `set` and `emit` honest instead of hiding two effects behind one convenience method.
 
-Simple state-derived outputs use deferred values rather than tiny playback helpers:
+Deferred state reads remain useful when an operation can consume the value
+directly:
 
 ```cpp
 const auto enabled = event.state<&TrackState::modulationEnabled>();
 event.set<&TrackState::tremoloAmount>(amount);
-return event.emitModulation(
-    ModulationPerformanceTarget::TremoloDepth,
-    event.select(enabled, amount, 0.0));
+return event.invoke<&Playback::emitTremolo>(enabled, amount);
 ```
 
-`state()` reads at the point the consuming action executes, after preceding actions in the same command. `select()` makes both outcomes explicit. The deliberately restricted expression vocabulary contains constants, state reads, and selection only; inline handlers and named methods remain the escape hatches for real logic.
+`state()` reads at the point the consuming action executes, after preceding
+actions in the same command. Conditional or calculated behavior belongs in a
+concrete playback method such as `emitTremolo`; the cursor does not grow a
+general expression language for it. Captureless inline handlers remain the
+escape hatch for truly one-off logic.
 
 Behavior that needs more than read-only state selection has one explicit indirection, to a concrete method beside the switch:
 
@@ -135,8 +138,9 @@ Broader production counts are:
 |---|---:|
 | Current value NDS format directory | 1,681 |
 | Original NDS format directory | 1,586 |
-| Generic `CompilerCursor.h` | 999 |
-| Focused compiler-cursor tests | 368 |
+| Author-facing `CompilerCursor.h` | 872 |
+| Compiled-dialect adapter | 177 |
+| Focused compiler-cursor tests | 498 |
 
 The two NDS directory totals are not like-for-like: the value implementation also owns durable source maps, neutral assets, bounded recovery, and source-free VM integration. The important author-facing comparison is the sequence implementation and the individual command blocks.
 
@@ -153,7 +157,7 @@ The two NDS directory totals are not like-for-like: the value implementation als
 | No playback source-byte access | Pass |
 | No format-visible `std::any` or slot management | Pass |
 | Multiple effects remain explicit and ordered | Pass |
-| Control-flow target describes discovery and execution together | Pass |
+| Static flow, discovery, and runtime override policy are explicit and distinct | Pass |
 | Driver behavior is concrete and locally named | Pass |
 | VM still owns scheduling, loops, calls, and repeats | Pass |
 | Automatic bounded truncation | Pass |
@@ -166,15 +170,19 @@ The two NDS directory totals are not like-for-like: the value implementation als
 
 `CompilerCursor.h` is large. It contains the deliberately explicit set of checked fields and executable operations, generated typed dispatch, action composition, and the restricted deferred-value machinery. This is preferable to spreading those mechanics across formats, but it must not become a home for driver-specific semantics.
 
-The rule should be: express state, output, time, and flow as separate operations and compose them in source order. Use `state()` and `select()` only for simple read-only state-derived values. Use `invoke<&Playback::method>` for substantial or reused driver behavior. Captureless inline handlers are permitted as an escape hatch, but decoded values must remain explicit arguments and no closure is stored.
+The rule should be: express state, output, time, and flow as separate operations and compose them in source order. Use `state()` for simple deferred reads. Use `invoke<&Playback::method>` for calculated, conditional, substantial, or reused driver behavior. Captureless inline handlers are permitted as an escape hatch, but decoded values must remain explicit arguments and no closure is stored.
 
-### Executor registry
+### Executable callbacks
 
-Each command action stores a small automatically assigned slot, not a closure or manual ID. The registry is keyed by the format's concrete `Playback` type and stores generated function thunks. It is thread-safe and process-local. Slot stability across application versions is intentionally not promised because sequence-program serialization is outside the architecture's goals.
+Each command action stores a direct type-erased pointer to a generated function
+thunk plus its durable arguments. There is no global registry, slot allocation,
+or initialization-order dependency. These pointers intentionally make compiled
+programs process-local; sequence-program serialization remains outside the
+architecture's goals.
 
 ### Templates
 
-Member pointers give compile-time checking for state and local methods, but an incorrect signature can produce a template diagnostic. Deferred values add shallow expression templates for constants, state reads, and selection; they intentionally omit arithmetic, comparisons, mutation, and arbitrary calls. If real format work exposes unreadable errors, add focused constraints and static assertions rather than expanding the expression language or adding a declarative schema.
+Member pointers give compile-time checking for state and local methods, but an incorrect signature can produce a template diagnostic. Deferred values are deliberately limited to constants and state reads; they omit selection, arithmetic, comparisons, mutation, and arbitrary calls. If real format work exposes unreadable errors, add focused constraints and static assertions rather than expanding the expression language or adding a declarative schema.
 
 ### Multiple historical paths
 

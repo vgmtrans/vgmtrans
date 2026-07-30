@@ -97,28 +97,6 @@ constexpr u32 kFallbackCommandLimit = 100000;
   };
 }
 
-[[nodiscard]] std::optional<u32> nextCommandIndex(const TrackProgram& track, u32 index) {
-  if (index < track.commands.size()) {
-    const SourceCommand& command = track.commands[index];
-    if (command.encodedSize > 0) {
-      // The next command is usually at address + size. Use that address instead of
-      // vector order, because decoding can store commands out of byte order.
-      if (command.address.value > std::numeric_limits<u64>::max() - command.encodedSize) {
-        return std::nullopt;
-      }
-      if (const auto byAddress = track.addressIndex.find(Address{command.address.value + command.encodedSize})) {
-        return byAddress;
-      }
-    }
-  }
-
-  const u32 next = index + 1;
-  if (next >= track.commands.size()) {
-    return std::nullopt;
-  }
-  return next;
-}
-
 [[nodiscard]] std::optional<u32> destinationIndex(const TrackProgram& track, Address destination) {
   return track.addressIndex.find(destination);
 }
@@ -465,7 +443,7 @@ public:
       std::visit([&](auto& typedEvent) { typedEvent.header.sequence = outputSequence_++; }, event);
     }
     if (startsActive && !current_ && !track_.commands.empty()) {
-      current_ = 0;
+      warn(fmt::format("Sequence track start ${:04X} was not decoded", track_.startAddress.value), {});
     }
   }
 
@@ -644,11 +622,17 @@ private:
     }
     const Effects effects = dialect_.execute(command, *programState_, trackState_, out, vm);
     if (duringWait) {
-      if (effects.advanceTicks != 0 || effects.step.kind != StepKind::Next) {
+      if (effects.advanceTicks != 0 || effects.flowOverride || !command.flow.defaultTransition ||
+          command.flow.defaultTransition->kind != StaticTransitionKind::Fallthrough) {
         throw std::logic_error("A command executed during a wait must not advance time or alter control flow");
       }
     } else {
       scheduleTicks(commandIndex, effects.advanceTicks);
+    }
+    const auto effectiveStep = resolveStep(command, effects);
+    if (!effectiveStep) {
+      current_ = std::nullopt;
+      return false;
     }
     if (command.annotation.valid()) {
       u64 endTick = beginTick == std::numeric_limits<u64>::max() ? beginTick : beginTick + 1;
@@ -671,11 +655,55 @@ private:
       });
     }
     runtime_.lastCommand = command.id;
-    const bool endedSection = effects.step.kind == StepKind::EndSection;
-    applyStep(command, effects.step);
+    const bool endedSection = effectiveStep->kind == StepKind::EndSection;
+    applyStep(command, *effectiveStep);
 
     ++executedCommands_;
     return endedSection;
+  }
+
+  [[nodiscard]] std::optional<Step> resolveStep(const SourceCommand& command, const Effects& effects) {
+    switch (command.flow.overridePolicy) {
+      case FlowOverridePolicy::Forbidden:
+        if (effects.flowOverride) {
+          warn("Sequence command produced a forbidden runtime flow override", command.range);
+          return std::nullopt;
+        }
+        break;
+      case FlowOverridePolicy::Optional:
+        break;
+      case FlowOverridePolicy::Required:
+        if (!effects.flowOverride) {
+          warn("Sequence command did not produce its required runtime flow override", command.range);
+          return std::nullopt;
+        }
+        break;
+    }
+
+    if (effects.flowOverride) {
+      return effects.flowOverride;
+    }
+    if (!command.flow.defaultTransition) {
+      warn("Sequence command had no default transition", command.range);
+      return std::nullopt;
+    }
+
+    const StaticTransition& transition = *command.flow.defaultTransition;
+    switch (transition.kind) {
+      case StaticTransitionKind::Fallthrough:
+        return Step::next();
+      case StaticTransitionKind::Jump:
+        return Step::jump(transition.destination, transition.jumpSemantics);
+      case StaticTransitionKind::Call:
+        return Step::call(transition.destination);
+      case StaticTransitionKind::Return:
+        return Step::return_();
+      case StaticTransitionKind::End:
+        return Step::end();
+      case StaticTransitionKind::EndSection:
+        return Step::endSection();
+    }
+    return std::nullopt;
   }
 
   [[nodiscard]] LoopAction handleLoop(const LoopPoint& loop, u32 replayIndex,
@@ -732,8 +760,12 @@ private:
   void applyStep(const SourceCommand& command, const Step& step) {
     switch (step.kind) {
       case StepKind::Next:
-        current_ = nextCommandIndex(track_, *current_);
+        current_ = destinationIndex(track_, command.flow.continuation);
         arrivedByControlFlow_ = false;
+        if (!current_) {
+          warn(fmt::format("Sequence continuation ${:04X} was not decoded", command.flow.continuation.value),
+               command.range);
+        }
         break;
 
       case StepKind::End:
@@ -751,8 +783,14 @@ private:
         break;
 
       case StepKind::Call:
-        if (const auto returnIndex = nextCommandIndex(track_, *current_)) {
+        if (const auto returnIndex = destinationIndex(track_, command.flow.continuation)) {
           runtime_.callStack.push_back(*returnIndex);
+        } else {
+          warn(fmt::format("Sequence call continuation ${:04X} was not decoded", command.flow.continuation.value),
+               command.range);
+          current_ = std::nullopt;
+          arrivedByControlFlow_ = false;
+          break;
         }
         current_ = destinationIndex(track_, step.destination);
         arrivedByControlFlow_ = true;
@@ -966,11 +1004,11 @@ Effects VmApi::countedRepeatUntil(u8 slot, u32 totalPlays, Address destination) 
   }
 
   if (counter.consumeReplay()) {
-    return Effects{.step = jump(destination)};
+    return Effects::overrideWith(jump(destination));
   }
 
   counter.finish();
-  return Effects{.step = next()};
+  return Effects{};
 }
 
 BranchResult VmApi::countedRepeatBreak(u8 slot, Address destination) {
@@ -979,13 +1017,13 @@ BranchResult VmApi::countedRepeatBreak(u8 slot, Address destination) {
     counter.finish();
     return BranchResult{
         .taken = true,
-        .effects = Effects{.step = finiteBranch(destination)},
+        .effects = Effects::overrideWith(finiteBranch(destination)),
     };
   }
 
   return BranchResult{
       .taken = false,
-      .effects = Effects{.step = next()},
+      .effects = Effects{},
   };
 }
 

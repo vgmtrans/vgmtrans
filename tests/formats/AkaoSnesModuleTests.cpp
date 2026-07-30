@@ -680,10 +680,10 @@ void akaoSnesCompilerCursorCoversLoopsAndCpuBranches() {
   cpuBranch[0x30] = 0x0d;
   cpuBranch[0x31] = 0xec;
   const TrackProgram branch = decodeTrack(cpuBranch, profile, start, static_cast<u32>(cpuBranch.size()));
-  expect(branch.commands.size() == 5 && branch.commands.front().flow.fallthrough &&
-             branch.commands.front().flow.fallthrough->value == 0x23 &&
-             branch.commands.front().flow.staticTargets.size() == 1 &&
-             branch.commands.front().flow.staticTargets.front().value == 0x30,
+  expect(branch.commands.size() == 5 && branch.commands.front().flow.discoveryContinuation() &&
+             branch.commands.front().flow.continuation.value == 0x23 &&
+             branch.commands.front().flow.additionalTargets.size() == 1 &&
+             branch.commands.front().flow.additionalTargets.front().value == 0x30,
          "CPU-controlled AkaoSnes jumps should retain both indeterminate fallthrough and branch blocks");
 }
 
@@ -734,16 +734,12 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
   const auto slideAutomation = std::ranges::find_if(
       slide.tracks.front().automations,
       [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
-  const auto* slideIntent = slideAutomation == slide.tracks.front().automations.end()
-                                ? nullptr
-                                : pitchTransitionIntent(*slideAutomation);
-  const auto* slideCurve =
-      slideIntent == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&slideIntent->curve);
-  const bool retainsDriverCurve =
-      slideCurve != nullptr && slideCurve->samples.size() == 3 &&
-      std::abs((slideCurve->samples[1].value - slideCurve->samples[0].value) -
-               (slideCurve->samples[2].value - slideCurve->samples[1].value)) >
-          0.1;
+  const auto* slideIntent =
+      slideAutomation == slide.tracks.front().automations.end() ? nullptr : pitchTransitionIntent(*slideAutomation);
+  const auto* slideCurve = slideIntent == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&slideIntent->curve);
+  const bool retainsDriverCurve = slideCurve != nullptr && slideCurve->samples.size() == 3 &&
+                                  std::abs((slideCurve->samples[1].value - slideCurve->samples[0].value) -
+                                           (slideCurve->samples[2].value - slideCurve->samples[1].value)) > 0.1;
   expect(slideNotes.size() == 1 && slideIntent != nullptr && slideIntent->note == slideNotes.front()->note &&
              slideIntent->preferredRendering == PitchTransitionRenderingHint::PitchBend &&
              slideIntent->timing.timelineTicks == 2 && retainsDriverCurve &&
@@ -751,20 +747,17 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
          "a pending AkaoSnes pitch slide should attach its exact driver curve to the next sounding note");
 
   const MidiSequence bendSlide = renderMidiSequence(slide);
-  expect(std::ranges::count_if(bendSlide.tracks.front().events, [](const MidiEvent& event) {
-           return std::holds_alternative<PitchBend>(event);
-         }) >= 3,
+  expect(std::ranges::count_if(bendSlide.tracks.front().events,
+                               [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }) >= 3,
          "preserve-format MIDI should lower an AkaoSnes pitch slide through its sampled pitch-bend curve");
 
   MidiExportOptions portamentoOptions;
   portamentoOptions.pitchTransitions = MidiPitchTransitionRendering::Portamento;
   const MidiSequence portamentoSlide = renderMidiSequence(slide, portamentoOptions);
-  expect(
-      std::ranges::any_of(portamentoSlide.tracks.front().events, [](const MidiEvent& event) {
-        return std::holds_alternative<PortamentoControl>(event);
-      }) &&
-          std::ranges::none_of(portamentoSlide.tracks.front().events,
-                               [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+  expect(std::ranges::any_of(portamentoSlide.tracks.front().events,
+                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
+             std::ranges::none_of(portamentoSlide.tracks.front().events,
+                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
          "explicit portamento MIDI should lower the same AkaoSnes pitch-slide intent natively");
 
   slideBytes[start + 1] = 0;

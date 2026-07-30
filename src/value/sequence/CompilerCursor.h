@@ -11,10 +11,8 @@
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
-#include <any>
 #include <functional>
 #include <limits>
-#include <mutex>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -124,39 +122,6 @@ template <class T>
 template <class T>
 using DeferredValueType = typename decltype(defer(std::declval<T>()))::value_type;
 
-template <class Condition, class WhenTrue, class WhenFalse>
-struct SelectedValue {
-  using deferred_value_tag = void;
-  using value_type = std::common_type_t<typename WhenTrue::value_type, typename WhenFalse::value_type>;
-
-  Condition condition;
-  WhenTrue whenTrue;
-  WhenFalse whenFalse;
-
-  void store(std::vector<SemanticOperandValue>& arguments) const {
-    condition.store(arguments);
-    whenTrue.store(arguments);
-    whenFalse.store(arguments);
-  }
-
-  template <class Playback>
-  [[nodiscard]] static value_type evaluate(std::span<const SemanticOperandValue> arguments, size_t& next,
-                                           Playback& playback) {
-    const bool selected = static_cast<bool>(Condition::template evaluate<Playback>(arguments, next, playback));
-    const value_type trueValue =
-        static_cast<value_type>(WhenTrue::template evaluate<Playback>(arguments, next, playback));
-    const value_type falseValue =
-        static_cast<value_type>(WhenFalse::template evaluate<Playback>(arguments, next, playback));
-    return selected ? trueValue : falseValue;
-  }
-};
-
-template <class Playback>
-using CompiledExecutor = Effects (*)(std::span<const SemanticOperandValue>, Playback&);
-
-template <class Playback>
-using CompiledPredicate = bool (*)(Playback&);
-
 template <class Playback, auto Operation, class... Values>
 [[nodiscard]] Effects executeOperation(std::span<const SemanticOperandValue> arguments, Playback& playback) {
   size_t next = 0;
@@ -181,54 +146,20 @@ template <class Playback, auto Operation, class... Values>
       std::move(values));
 }
 
-// Commands retain a small slot rather than a callback. The dialect-owned
-// registry stores one generated thunk for each operation used by the format.
-template <class Callback>
-class CompiledCallbackRegistry {
-public:
-  [[nodiscard]] u32 add(Callback callback) {
-    std::scoped_lock lock(mutex_);
-    const auto found = std::ranges::find(callbacks_, callback);
-    if (found != callbacks_.end()) {
-      return static_cast<u32>(std::distance(callbacks_.begin(), found));
-    }
-    callbacks_.push_back(callback);
-    return static_cast<u32>(callbacks_.size() - 1);
+template <class Playback, auto Operation, class... Values>
+[[nodiscard]] Effects executeErased(std::span<const SemanticOperandValue> arguments, void* playback) {
+  if (playback == nullptr) {
+    throw std::logic_error("Compiled sequence action received no playback state");
   }
-
-  template <class... Arguments>
-  [[nodiscard]] decltype(auto) execute(u32 slot, Arguments&&... arguments) {
-    Callback callback = nullptr;
-    {
-      std::scoped_lock lock(mutex_);
-      if (slot >= callbacks_.size()) {
-        throw std::logic_error("Compiled sequence command referenced an unknown callback slot");
-      }
-      callback = callbacks_[slot];
-    }
-    return std::invoke(callback, std::forward<Arguments>(arguments)...);
-  }
-
-private:
-  std::mutex mutex_;
-  std::vector<Callback> callbacks_;
-};
-
-template <class Playback>
-[[nodiscard]] CompiledCallbackRegistry<CompiledExecutor<Playback>>& compiledExecutors() {
-  static CompiledCallbackRegistry<CompiledExecutor<Playback>> registry;
-  return registry;
+  return executeOperation<Playback, Operation, Values...>(arguments, *static_cast<Playback*>(playback));
 }
 
 template <class Playback, auto Predicate>
-[[nodiscard]] bool invokePredicate(Playback& playback) {
-  return std::invoke(Predicate, playback);
-}
-
-template <class Playback>
-[[nodiscard]] CompiledCallbackRegistry<CompiledPredicate<Playback>>& compiledPredicates() {
-  static CompiledCallbackRegistry<CompiledPredicate<Playback>> registry;
-  return registry;
+[[nodiscard]] bool evaluateErased(void* playback) {
+  if (playback == nullptr) {
+    throw std::logic_error("Compiled sequence predicate received no playback state");
+  }
+  return std::invoke(Predicate, *static_cast<Playback*>(playback));
 }
 
 template <class Playback, auto Method, class... Arguments>
@@ -345,74 +276,14 @@ void emitPitchBend(Playback& playback, double semitones) {
   playback.out.pitchBend(semitones);
 }
 
-template <class Playback, auto ScaleMember>
-void emitPitchBendScaledBy(Playback& playback, double fraction) {
-  playback.out.pitchBend(fraction * static_cast<double>(playback.track.*ScaleMember));
-}
-
 template <class Playback>
 void emitPitchBendRange(Playback& playback, u8 semitones) {
   playback.out.pitchBendRange(semitones);
 }
 
 template <class Playback>
-void emitVibratoDepth(Playback& playback, double semitones) {
-  playback.out.vibratoDepth(semitones);
-}
-
-template <class Playback>
-void emitTremoloDepth(Playback& playback, double decibels, TremoloGainMode gainMode) {
-  playback.out.tremoloDepth(decibels, LfoPerformanceContext{.tremoloGainMode = gainMode});
-}
-
-template <class Playback>
-void emitVibratoRate(Playback& playback, double hertz) {
-  playback.out.vibratoRate(hertz);
-}
-
-template <class Playback>
-void emitTremoloRate(Playback& playback, double hertz) {
-  playback.out.tremoloRate(hertz);
-}
-
-template <class Playback>
-void emitPortamentoEnable(Playback& playback, bool enabled) {
-  playback.out.portamentoEnable(enabled);
-}
-
-template <class Playback>
-void emitPortamentoTime(Playback& playback, double milliseconds) {
-  playback.out.portamentoTime(milliseconds);
-}
-
-template <class Playback>
 [[nodiscard]] Effects wait(Playback&, u32 ticks) {
   return Effects::wait(ticks);
-}
-
-template <class Playback>
-[[nodiscard]] Effects jump(Playback& playback, Address destination) {
-  return Effects{.step = playback.vm.jump(destination)};
-}
-
-template <class Playback>
-[[nodiscard]] Effects loopCandidate(Playback& playback, Address destination) {
-  return Effects{.step = playback.vm.loopCandidate(destination)};
-}
-
-template <class Playback>
-[[nodiscard]] Effects declaredLoop(Playback& playback, Address destination) {
-  return Effects{.step = playback.vm.declaredLoop(destination)};
-}
-
-template <class Playback>
-[[nodiscard]] Effects call(Playback& playback, Address destination) {
-  return Effects{.step = playback.vm.call(destination)};
-}
-
-template <class Playback>
-[[nodiscard]] Effects return_(Playback& playback) {
-  return Effects{.step = playback.vm.return_()};
 }
 
 template <class Playback>
@@ -610,14 +481,16 @@ public:
     }
 
     Event& stop() {
-      flow_ = DecodeFlow::terminalFlow();
+      flow_.defaultTransition = StaticTransition::end();
+      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
       return *this;
     }
 
     Event& end() {
       presentation_.semantic = SequenceSemantic::End;
       presentation_.playback = CommandPlaybackStatus::StopsPlayback;
-      flow_ = DecodeFlow::terminalFlow();
+      flow_.defaultTransition = StaticTransition::end();
+      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
       return *this;
     }
 
@@ -629,25 +502,6 @@ public:
       static_assert(std::is_same_v<typename State::owner_type, TrackState>,
                     "Compiler cursor state members must belong to its TrackState");
       return State{};
-    }
-
-    // Both outcomes are explicit; the boolean condition is read when the
-    // consuming action executes.
-    template <class Condition, class WhenTrue, class WhenFalse>
-    [[nodiscard]] auto select(Condition condition, WhenTrue whenTrue, WhenFalse whenFalse) const {
-      auto deferredCondition = detail::defer(std::move(condition));
-      auto deferredTrue = detail::defer(std::move(whenTrue));
-      auto deferredFalse = detail::defer(std::move(whenFalse));
-      using ConditionValue = decltype(deferredCondition);
-      using TrueValue = decltype(deferredTrue);
-      using FalseValue = decltype(deferredFalse);
-      static_assert(std::is_same_v<typename ConditionValue::value_type, bool>,
-                    "Compiler cursor select conditions must be boolean");
-      return detail::SelectedValue<ConditionValue, TrueValue, FalseValue>{
-          .condition = std::move(deferredCondition),
-          .whenTrue = std::move(deferredTrue),
-          .whenFalse = std::move(deferredFalse),
-      };
     }
 
     Event& wait(auto ticks) { return append<&detail::wait<Playback>>(std::move(ticks)); }
@@ -692,37 +546,8 @@ public:
 
     Event& emitPitchBend(auto semitones) { return append<&detail::emitPitchBend<Playback>>(std::move(semitones)); }
 
-    template <auto ScaleMember>
-    Event& emitPitchBendScaledBy(auto fraction) {
-      return append<&detail::emitPitchBendScaledBy<Playback, ScaleMember>>(std::move(fraction));
-    }
-
     Event& emitPitchBendRange(auto semitones) {
       return append<&detail::emitPitchBendRange<Playback>>(std::move(semitones));
-    }
-
-    Event& emitVibratoDepth(auto semitones) {
-      return append<&detail::emitVibratoDepth<Playback>>(std::move(semitones));
-    }
-
-    Event& emitTremoloDepth(auto decibels, TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal) {
-      return append<&detail::emitTremoloDepth<Playback>>(std::move(decibels), gainMode);
-    }
-
-    Event& emitVibratoRate(auto hertz) {
-      return append<&detail::emitVibratoRate<Playback>>(std::move(hertz));
-    }
-
-    Event& emitTremoloRate(auto hertz) {
-      return append<&detail::emitTremoloRate<Playback>>(std::move(hertz));
-    }
-
-    Event& emitPortamentoEnable(auto enabled) {
-      return append<&detail::emitPortamentoEnable<Playback>>(std::move(enabled));
-    }
-
-    Event& emitPortamentoTime(auto milliseconds) {
-      return append<&detail::emitPortamentoTime<Playback>>(std::move(milliseconds));
     }
 
     template <auto Member, class Value>
@@ -767,47 +592,42 @@ public:
       if (execution_.duringWait.valid()) {
         throw std::logic_error("Compiled sequence command declared more than one during-wait predicate");
       }
-      execution_.duringWait.evaluator =
-          detail::compiledPredicates<Playback>().add(&detail::invokePredicate<Playback, Predicate>);
+      execution_.duringWait.evaluate = &detail::evaluateErased<Playback, Predicate>;
       return *this;
     }
 
     Event& jump(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      targetRole(destination, SemanticOperandRole::JumpTarget);
-      append<&detail::jump<Playback>>(destination);
-      flow_ = DecodeFlow::jump(destination);
+      flow_.defaultTransition = StaticTransition::jump(destination);
+      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
       return *this;
     }
 
-    Event& loopCandidate(Address destination, SemanticOperandRole role = SemanticOperandRole::LoopTarget) {
+    Event& loopCandidate(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      targetRole(destination, role);
-      append<&detail::loopCandidate<Playback>>(destination);
-      flow_ = DecodeFlow::jump(destination);
+      flow_.defaultTransition = StaticTransition::jump(destination, JumpSemantics::LoopCandidate);
+      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
       return *this;
     }
 
-    Event& declaredLoop(Address destination, SemanticOperandRole role = SemanticOperandRole::LoopTarget) {
+    Event& declaredLoop(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      targetRole(destination, role);
-      append<&detail::declaredLoop<Playback>>(destination);
-      flow_ = DecodeFlow::jump(destination);
+      flow_.defaultTransition = StaticTransition::jump(destination, JumpSemantics::DeclaredLoop);
+      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
       return *this;
     }
 
     Event& call(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      targetRole(destination, SemanticOperandRole::CallTarget);
-      append<&detail::call<Playback>>(destination);
-      flow_ = DecodeFlow::call(destination, Address{cursor_.record_.position()});
+      flow_.defaultTransition = StaticTransition::call(destination);
+      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
       return *this;
     }
 
     Event& return_() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      append<&detail::return_<Playback>>();
-      flow_ = DecodeFlow::return_();
+      flow_.defaultTransition = StaticTransition::return_();
+      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
       return *this;
     }
 
@@ -816,7 +636,9 @@ public:
     // action chooses the actual result from call history.
     Event& discoverReturn() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_ = DecodeFlow::return_();
+      flow_.defaultTransition.reset();
+      flow_.overridePolicy = FlowOverridePolicy::Required;
+      flow_.discovery = DiscoveryDisposition::ReturnBoundary;
       return *this;
     }
 
@@ -824,23 +646,40 @@ public:
     // discovery still follows the command's ordinary fallthrough.
     Event& runtimeControlFlow() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      flow_.overridePolicy = FlowOverridePolicy::Optional;
+      return *this;
+    }
+
+    // The action must choose a runtime transition even when its chosen address
+    // equals continuation. This preserves the semantic distinction between a
+    // jump and an ordinary fallthrough for loop detection.
+    Event& requireRuntimeControlFlow() {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      flow_.overridePolicy = FlowOverridePolicy::Required;
       return *this;
     }
 
     Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      targetRole(destination, SemanticOperandRole::RepeatTarget);
       append<&detail::repeatUntil<Playback>>(slot, totalPlays, destination);
-      flow_.staticTargets.push_back(destination);
+      flow_.additionalTargets.push_back(destination);
+      flow_.overridePolicy = FlowOverridePolicy::Optional;
       return *this;
     }
 
     // Record a conditional branch destination while a format-specific action
     // decides at runtime whether the branch is taken.
-    Event& mayBranchTo(Address destination, SemanticOperandRole role = SemanticOperandRole::Address) {
+    Event& mayBranchTo(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      targetRole(destination, role);
-      flow_.staticTargets.push_back(destination);
+      flow_.additionalTargets.push_back(destination);
+      flow_.overridePolicy = FlowOverridePolicy::Optional;
+      return *this;
+    }
+
+    // Records a decoder-only alternative without permitting runtime actions to
+    // override a static transition.
+    Event& discoverTarget(Address destination) {
+      flow_.additionalTargets.push_back(destination);
       return *this;
     }
 
@@ -864,8 +703,7 @@ public:
         presentation_.playback = CommandPlaybackStatus::AffectsPlayback;
       }
       CommandAction action{
-          .executor =
-              detail::compiledExecutors<Playback>().add(&detail::executeOperation<Playback, Operation, Values...>),
+          .execute = &detail::executeErased<Playback, Operation, Values...>,
       };
       action.arguments.reserve(sizeof...(Values));
       (values.store(action.arguments), ...);
@@ -885,21 +723,6 @@ public:
       };
     }
 
-    void targetRole(Address destination, SemanticOperandRole role) {
-      const auto found = std::ranges::find_if(cursor_.operands_.rbegin(), cursor_.operands_.rend(),
-                                              [destination](const SemanticOperand& operand) {
-                                                const auto* address = std::get_if<Address>(&operand.value);
-                                                if (address != nullptr) {
-                                                  return address->value == destination.value;
-                                                }
-                                                const auto* unsignedValue = std::get_if<u64>(&operand.value);
-                                                return unsignedValue != nullptr && *unsignedValue == destination.value;
-                                              });
-      if (found != cursor_.operands_.rend()) {
-        found->role = role;
-      }
-    }
-
     [[nodiscard]] DecodedBytecodeCommand finish() {
       if (finished_) {
         throw std::logic_error("Compiler cursor event was finalized more than once");
@@ -912,7 +735,7 @@ public:
     DecodedCommandPresentation presentation_;
     CommandPlaybackStatus initialPlayback_;
     CommandExecution execution_;
-    DecodeFlow flow_;
+    CommandFlow flow_;
     bool finished_ = false;
   };
 
@@ -972,9 +795,7 @@ public:
     return event.ignore();
   }
 
-  [[nodiscard]] DecodedBytecodeCommand truncated() {
-    return finish(truncatedPresentation(), {}, DecodeFlow::terminalFlow());
-  }
+  [[nodiscard]] DecodedBytecodeCommand truncated() { return finish(truncatedPresentation(), {}, CommandFlow::end()); }
 
 private:
   template <class T>
@@ -1018,14 +839,15 @@ private:
   }
 
   [[nodiscard]] DecodedBytecodeCommand finish(DecodedCommandPresentation presentation, CommandExecution execution,
-                                              DecodeFlow flow) {
+                                              CommandFlow flow) {
     const bool truncated = !record_.ok();
+    flow.continuation = Address{record_.position()};
     if (truncated) {
       presentation = truncatedPresentation();
       execution = {};
-      flow = DecodeFlow::terminalFlow();
-    } else if (flow.kind == DecodeFlow::Kind::Fallthrough && !flow.fallthrough) {
-      flow.fallthrough = Address{record_.position()};
+      flow = CommandFlow::end(Address{record_.position()});
+    } else if (!flow.defaultTransition && flow.discovery != DiscoveryDisposition::ReturnBoundary) {
+      flow.defaultTransition = StaticTransition::fallthrough();
     }
 
     return DecodedBytecodeCommand{
@@ -1046,167 +868,5 @@ private:
   SourceRange opcodeRange_;
   std::vector<SemanticOperand> operands_;
 };
-
-// This adapter is the only place a compiled format sees std::any. Format
-// commands and Playback methods remain fully typed.
-struct EmptyCompiledProgramState {};
-
-template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
-struct CompiledCommandDialect {
-  [[nodiscard]] static std::any createProgramState(const SequenceProgram& program) {
-    // A format can read immutable program settings in its constructor. Formats
-    // that need no settings keep working with an ordinary default constructor.
-    if constexpr (std::constructible_from<ProgramState, const SequenceProgram&>) {
-      return ProgramState{program};
-    } else {
-      return ProgramState{};
-    }
-  }
-
-  [[nodiscard]] static std::any createTrackState(const SequenceProgram& program, const TrackProgram& track) {
-    // Choose the most informative constructor the state type provides. This
-    // keeps version and track identity out of loosely typed extra settings.
-    if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&>) {
-      return TrackState{program, track};
-    } else if constexpr (std::constructible_from<TrackState, const SequenceProgram&>) {
-      return TrackState{program};
-    } else if constexpr (std::constructible_from<TrackState, const TrackProgram&>) {
-      return TrackState{track};
-    } else {
-      return TrackState{};
-    }
-  }
-
-  template <class Execute>
-  [[nodiscard]] static decltype(auto) withPlayback(std::any& programState, std::any& trackState,
-                                                   PerformanceEmitter& out, VmApi& vm, Execute execute) {
-    auto& typedProgramState = std::any_cast<ProgramState&>(programState);
-    auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    // Playback may ask for song-wide state as a fourth reference. Simpler
-    // formats continue to use the original three-reference form.
-    if constexpr (requires { Playback{typedTrackState, out, vm, typedProgramState}; }) {
-      Playback playback{typedTrackState, out, vm, typedProgramState};
-      return execute(playback);
-    } else {
-      Playback playback{typedTrackState, out, vm};
-      return execute(playback);
-    }
-  }
-
-  [[nodiscard]] static Effects execute(const SourceCommand& command, std::any& programState, std::any& trackState,
-                                       PerformanceEmitter& out, VmApi& vm) {
-    return withPlayback(programState, trackState, out, vm, [&](Playback& playback) {
-      // Formats use this optional hook for information that must be emitted
-      // before whichever command happens to be first.
-      if constexpr (requires { playback.beforeCommand(); }) {
-        playback.beforeCommand();
-      }
-      Effects combined;
-      for (const CommandAction& action : command.execution.actions) {
-        const Effects next = detail::compiledExecutors<Playback>().execute(action.executor, action.arguments, playback);
-        if (next.advanceTicks > std::numeric_limits<u32>::max() - combined.advanceTicks) {
-          throw std::overflow_error("Compiled sequence command advanced time beyond the supported range");
-        }
-        combined.advanceTicks += next.advanceTicks;
-        if (next.step.kind != StepKind::Next) {
-          if (combined.step.kind != StepKind::Next) {
-            throw std::logic_error("Compiled sequence command produced more than one control-flow result");
-          }
-          combined.step = next.step;
-        }
-      }
-
-      if (command.flow.terminal) {
-        if (combined.step.kind != StepKind::Next) {
-          throw std::logic_error("Terminal compiled sequence command also produced a control-flow result");
-        }
-        combined.step = vm.end();
-      }
-      return combined;
-    });
-  }
-
-  [[nodiscard]] static bool readyDuringWait(const SourceCommand& command, std::any& programState, std::any& trackState,
-                                            PerformanceEmitter& out, VmApi& vm) {
-    if (!command.execution.duringWait.valid()) {
-      return false;
-    }
-    return withPlayback(programState, trackState, out, vm, [&](Playback& playback) {
-      return detail::compiledPredicates<Playback>().execute(command.execution.duringWait.evaluator, playback);
-    });
-  }
-
-  static void tick(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
-                   VmApi& vm) {
-    // Rebuild the lightweight Playback view for each elapsed tick so active
-    // fades can use the current emitter and VM position without storing either.
-    static_cast<void>(withPlayback(programState, trackState, out, vm, [](Playback& playback) {
-      if constexpr (requires { playback.tick(); }) {
-        playback.tick();
-      }
-      return Effects{};
-    }));
-  }
-
-  static void finishPrepass(std::any& programState) {
-    auto& typedProgramState = std::any_cast<ProgramState&>(programState);
-    // Give the format one clear boundary between silent collection and the
-    // real render. Collected results remain in the same typed object.
-    if constexpr (requires { typedProgramState.finishPrepass(); }) {
-      typedProgramState.finishPrepass();
-    }
-  }
-
-  static void beginTrackSection(std::any& trackState) {
-    auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    if constexpr (requires { typedTrackState.beginSection(); }) {
-      typedTrackState.beginSection();
-    }
-  }
-
-  static void finalizePerformance(std::any& programState, PerformanceSequence& performance) {
-    auto& typedProgramState = std::any_cast<ProgramState&>(programState);
-    if constexpr (requires { typedProgramState.finalizePerformance(performance); }) {
-      typedProgramState.finalizePerformance(performance);
-    }
-  }
-};
-
-// Fill the mechanical executor hooks while leaving identity, timebase, and
-// playback defaults visible in the format's ordinary SequenceDialect value.
-template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
-[[nodiscard]] SequenceDialect makeCompiledDialect(SequenceDialect dialect) {
-  using Compiled = CompiledCommandDialect<TrackState, Playback, ProgramState>;
-  dialect.createProgramState = Compiled::createProgramState;
-  dialect.createTrackState = Compiled::createTrackState;
-  dialect.execute = Compiled::execute;
-  dialect.readyDuringWait = Compiled::readyDuringWait;
-  if constexpr (requires(Playback& playback) { playback.tick(); }) {
-    dialect.tick = Compiled::tick;
-  }
-  if constexpr (requires(ProgramState& state) { state.finishPrepass(); }) {
-    dialect.finishPrepass = Compiled::finishPrepass;
-  }
-  if constexpr (requires(TrackState& state) { state.beginSection(); }) {
-    dialect.beginTrackSection = Compiled::beginTrackSection;
-  }
-  if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
-                  state.finalizePerformance(performance);
-                }) {
-    dialect.finalizePerformance = Compiled::finalizePerformance;
-  }
-  return dialect;
-}
-
-// Execute a compiled program and project its final typed song state into a
-// durable value. This is intended for sequence-defined synth preparation and
-// similar analysis that must share playback's calls, repeats, and timing. The
-// format-facing projector remains fully typed; only this adapter touches any.
-template <class ProgramState, class Result>
-[[nodiscard]] Result analyzeCompiledProgram(const SequenceProgram& program, const SequenceDialect& dialect,
-                                            Result (*project)(const ProgramState&), SequenceVmOptions options = {}) {
-  const std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program, dialect);
-  return project(std::any_cast<const ProgramState&>(state));
-}
 
 }  // namespace vgmtrans::core

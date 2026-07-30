@@ -9,7 +9,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
@@ -532,13 +532,13 @@ struct Playback {
     if (times == 0) {
       // Zero means the song's repeating loop, not a 256-pass counted loop.
       // Volume and pitch changes belong only to finite repeats.
-      return Effects{.step = vm.declaredLoop(destination)};
+      return Effects::overrideWith(vm.declaredLoop(destination));
     }
 
     Effects effects = vm.countedRepeatUntil(slot, times, destination);
     s16& accumulatedVolume = slot == 0 ? track.loopVolumeDelta : track.loopVolumeDelta2;
     s16& accumulatedPitch = slot == 0 ? track.loopPitchDelta : track.loopPitchDelta2;
-    if (effects.step.kind == StepKind::Next) {
+    if (!effects.flowOverride) {
       // Leaving the loop removes its accumulated changes so later notes start
       // from the values that were active before the loop.
       accumulatedVolume = 0;
@@ -565,14 +565,14 @@ struct Playback {
       track.voltaEndMeansPlayFromStart = false;
       track.voltaEndMeansPlayNextVolta = true;
       track.voltaLoopEnd = next;
-      return Effects{.step = vm.finiteBranch(track.voltaLoopStart)};
+      return Effects::overrideWith(vm.finiteBranch(track.voltaLoopStart));
     }
 
     if (track.voltaEndMeansPlayNextVolta) {
       // On replay, the first marker skips the ending that already played.
       track.voltaEndMeansPlayFromStart = true;
       track.voltaEndMeansPlayNextVolta = false;
-      return Effects{.step = vm.finiteBranch(track.voltaLoopEnd)};
+      return Effects::overrideWith(vm.finiteBranch(track.voltaLoopEnd));
     }
 
     // The first marker begins the first ending; playback simply continues.
@@ -585,9 +585,9 @@ struct Playback {
     // pattern; the next 0xff returns from it, while a top-level 0xff ends music.
     if (track.inSubroutine) {
       track.inSubroutine = false;
-      return Effects{.step = vm.return_()};
+      return Effects::overrideWith(vm.return_());
     }
-    return Effects{.step = vm.end()};
+    return Effects::overrideWith(vm.end());
   }
 
   void tick() {
@@ -604,7 +604,7 @@ struct Playback {
     static_cast<void>(track.volume.tickRaw([&](s32 rawVolume) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff));
       track.volume.output(out).level(LevelScale::linearFromLinear(linearGainFromRawVolume(value)),
-                                         LevelPrecisionHint::FourteenBit);
+                                     LevelPrecisionHint::FourteenBit);
     }));
     static_cast<void>(track.pan.tickRaw([&](s32 rawPan) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawPan, 0, 0xff));
@@ -1078,7 +1078,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
         const Address alternate = event.addressLe("alternate_destination", SemanticOperandRole::JumpTarget);
         event.jump(destination);
-        return event.mayBranchTo(alternate, SemanticOperandRole::JumpTarget);
+        return event.discoverTarget(alternate);
       }
       if (version == KONAMISNES_V2) {
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
@@ -1099,7 +1099,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
       // Backward jumps normally form the song loop. The shared VM decides
       // whether to preserve, replay, or stop when it reaches that loop.
-      return event.loopCandidate(event.addressLe("destination", SemanticOperandRole::JumpTarget));
+      return event.loopCandidate(event.addressLe("destination", SemanticOperandRole::LoopTarget));
     }
     case 0xfe: {
       auto event = cursor.command("Pattern Play", SequenceSemantic::Call);

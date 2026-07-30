@@ -231,10 +231,11 @@ PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std
       .dialect = dialect.id,
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{0},
-      .config = SequenceProgramConfig{
-          .profile = static_cast<u32>(version),
-          .driverState = indexedEchoFilter,
-      },
+      .config =
+          SequenceProgramConfig{
+              .profile = static_cast<u32>(version),
+              .driverState = indexedEchoFilter,
+          },
       .behavior = dialect.defaultBehavior,
       .tracks = std::move(programTracks),
   };
@@ -614,20 +615,19 @@ void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo() {
 
 void konamiSnesEchoPreservesGlobalDspState() {
   const PerformanceSequence performance = renderKonamiSnesProgram(
-      KONAMISNES_V6, {{0xf4, 0x01, 0x40, 0xc0, 0xf5, 0x04, 0xe0, 0xaa, 0xe0, 0x02, 0xf4, 0, 0x7f, 0x7f, 0xff},
-                      {0xe0, 0x04, 0xff}});
+      KONAMISNES_V6,
+      {{0xf4, 0x01, 0x40, 0xc0, 0xf5, 0x04, 0xe0, 0xaa, 0xe0, 0x02, 0xf4, 0, 0x7f, 0x7f, 0xff}, {0xe0, 0x04, 0xff}});
   const auto changes = performanceEvents<ReverbPerformanceEvent>(performance.tracks[0]);
-  expect(changes.size() == 4 && changes[1]->voiceMask == 1 &&
-             std::abs(*changes[1]->leftGain - 64.0 / 127.0) < 0.0001 &&
+  expect(changes.size() == 4 && changes[1]->voiceMask == 1 && std::abs(*changes[1]->leftGain - 64.0 / 127.0) < 0.0001 &&
              std::abs(*changes[1]->rightGain + 64.0 / 127.0) < 0.0001,
          "Konami F4 should preserve signed stereo EVOL and the global EON mask");
   expect(changes[2]->delayMilliseconds == 64.0 && std::abs(*changes[2]->feedback + 0.25) < 0.0001 &&
              changes[2]->filterIndex == 2 && changes[3]->voiceMask == 0,
          "Konami F5 should preserve fixed DSP echo state and a zero F4 mask should disable it");
 
-  const PerformanceSequence indexed = renderKonamiSnesProgram(
-      KONAMISNES_V2, {{0xf5, 0x02, 0x10, 0x01, 0xf4, 0x01, 0x20, 0x20, 0xff}}, 0,
-      /*indexedEchoFilter=*/true);
+  const PerformanceSequence indexed =
+      renderKonamiSnesProgram(KONAMISNES_V2, {{0xf5, 0x02, 0x10, 0x01, 0xf4, 0x01, 0x20, 0x20, 0xff}}, 0,
+                              /*indexedEchoFilter=*/true);
   const auto indexedChanges = performanceEvents<ReverbPerformanceEvent>(indexed.tracks[0]);
   expect(indexedChanges.size() == 2 && indexedChanges.back()->filterIndex == 1,
          "Konami F5 should retain indexed FIR state while echo is disabled");
@@ -695,10 +695,10 @@ void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
   expect(conditionalIndex && callIndex, "Konami compiler decoding should retain reachable branch and call blocks");
   const SourceCommand& conditional = flow.commands[*conditionalIndex];
   const SourceCommand& call = flow.commands[*callIndex];
-  expect(conditional.flow.staticTargets.size() == 2 && conditional.flow.staticTargets[0].value == 8 &&
-             conditional.flow.staticTargets[1].value == 12,
+  expect(conditional.flow.defaultDestination() && conditional.flow.defaultDestination()->value == 8 &&
+             conditional.flow.additionalTargets.size() == 1 && conditional.flow.additionalTargets.front().value == 12,
          "Konami conditional jump should expose both decoded branch targets");
-  expect(call.flow.callTarget() && call.flow.staticTargets.front().value == 12,
+  expect(call.flow.callTarget() && call.flow.defaultDestination()->value == 12,
          "Konami call should expose its decoded little-endian target");
   expect(std::ranges::all_of(flow.commands, [](const SourceCommand& command) { return command.encodedSize != 0; }),
          "valid Konami compiler commands should retain semantic IR and source ranges");
@@ -707,7 +707,7 @@ void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
   std::vector<Diagnostic> diagnostics;
   const TrackProgram truncated =
       decodeKonamiSnesSourceTrack(ByteReader(SourceId{31}, truncatedBytes), KONAMISNES_V6, 0, 0, nullptr, &diagnostics);
-  expect(truncated.commands.size() == 1 && truncated.commands[0].flow.terminal &&
+  expect(truncated.commands.size() == 1 && truncated.commands[0].flow.endsPlayback() &&
              !truncated.commands[0].execution.valid() && truncated.commands[0].range.size == 3,
          "truncated Konami commands should keep their partial source range but no executable behavior");
   expect(!diagnostics.empty() && diagnostics.front().code == "truncated-record",
