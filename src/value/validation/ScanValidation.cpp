@@ -296,6 +296,18 @@ void validateMatchFacts(ValidationReport& report, const ScanResult& result, cons
                    "Scan result contained a match fact for missing asset id " + std::to_string(fact.asset.value));
     }
 
+    if (const auto* relation = std::get_if<AssetRelationFact>(&fact.payload)) {
+      if (!relation->target.valid()) {
+        report.error("scan.match-fact.missing-related-asset",
+                     "Scan result contained an asset relation without a target asset id");
+      } else if (!batchAssetIds.contains(relation->target.value) &&
+                 !existingAssetIds.contains(relation->target.value)) {
+        report.error("scan.match-fact.unknown-related-asset",
+                     "Scan result contained an asset relation for missing target asset id " +
+                         std::to_string(relation->target.value));
+      }
+    }
+
     if (fact.scope.kind == MatchScopeKind::Source && !fact.scope.source) {
       report.error("scan.match-fact.missing-source-scope",
                    "Scan result contained a source-scoped match fact without a source id");

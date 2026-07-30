@@ -8,6 +8,7 @@
 #include "value/scan/CollectionResolver.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cctype>
 #include <limits>
 #include <optional>
@@ -47,6 +48,20 @@ struct InstrumentSetFactEntry {
   AssetId asset;
   AssetId sequenceAsset;
 };
+
+[[nodiscard]] bool covers(const AkaoSampleCoverageProvider& provider, u32 value) {
+  return value >= provider.first && static_cast<u64>(value) < static_cast<u64>(provider.first) + provider.count;
+}
+
+void markCovered(std::set<u32>& remaining, const AkaoSampleCoverageProvider& provider) {
+  for (auto it = remaining.begin(); it != remaining.end();) {
+    if (covers(provider, *it)) {
+      it = remaining.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
 
 [[nodiscard]] bool psfLike(const SourceFile* source) {
   if (source == nullptr) {
@@ -90,7 +105,7 @@ struct InstrumentSetFactEntry {
         .source = facts.source,
         .sequenceId = *sequenceId,
         .sampleSetId = facts.id(kAkaoSampleSetDomain),
-        .offset = static_cast<u32>(facts.offset().value_or(0)),
+        .offset = static_cast<u32>(facts.asset().metadata.range.offset),
         .requiredArticulations = std::move(required),
     });
   }
@@ -111,7 +126,7 @@ struct InstrumentSetFactEntry {
         .sampleSetId = facts.id(kAkaoSampleSetDomain),
         .firstArticulationId = coverage->first,
         .articulationCount = coverage->count,
-        .sourceOffset = static_cast<u32>(facts.offset().value_or(0)),
+        .sourceOffset = static_cast<u32>(facts.asset().metadata.range.offset),
     });
   }
   std::ranges::sort(entries, {}, &SampleFactEntry::sourceOffset);
@@ -120,14 +135,14 @@ struct InstrumentSetFactEntry {
 
 [[nodiscard]] std::vector<InstrumentSetFactEntry> instrumentSetFacts(const MatchFactIndex& index) {
   std::vector<InstrumentSetFactEntry> entries;
-  for (const auto& facts : index.formatFacts<InstrumentSetAsset>(kAkaoFormatName, kAkaoInstrumentSetFact)) {
-    const auto sequenceAsset = fieldU32(facts.payload, kAkaoSequenceAssetField);
+  for (const auto& facts : index.assets<InstrumentSetAsset>(kAkaoFormatName)) {
+    const auto sequenceAsset = facts.relation(kAkaoInstrumentSequenceDomain);
     if (!sequenceAsset) {
       continue;
     }
     entries.push_back(InstrumentSetFactEntry{
-        .asset = facts.asset.metadata.id,
-        .sequenceAsset = AssetId{*sequenceAsset},
+        .asset = facts.asset().metadata.id,
+        .sequenceAsset = *sequenceAsset,
     });
   }
   return entries;
@@ -146,23 +161,23 @@ std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& s
   }
   std::ranges::sort(candidates, std::ranges::greater{}, &SampleFactEntry::sourceOffset);
 
-  std::vector<SampleCoverageProvider> providers;
+  std::vector<AkaoSampleCoverageProvider> providers;
   providers.reserve(candidates.size());
   for (std::size_t i = 0; i < candidates.size(); ++i) {
     const auto& candidate = candidates[i];
-    providers.push_back(SampleCoverageProvider{
+    providers.push_back(AkaoSampleCoverageProvider{
         .index = i,
-        .groupId = candidate.sampleSetId,
+        .sampleSetId = candidate.sampleSetId,
         .first = candidate.firstArticulationId,
         .count = candidate.articulationCount,
-        .priority = candidate.sourceOffset,
+        .sourceOffset = candidate.sourceOffset,
     });
   }
 
   std::vector<u32> required(remaining.begin(), remaining.end());
-  const auto selection = selectSampleCoverage(sequence.sampleSetId, required, providers);
+  const auto selection = selectAkaoSampleCoverage(sequence.sampleSetId, required, providers);
   if (sequence.sampleSetId && *sequence.sampleSetId > 0 && !psfLike(sequence.source) &&
-      !selection.preferredGroupFound) {
+      !selection.requestedSampleSetFound) {
     collection.incomplete(CollectionIssue{
         .severity = Severity::Warning,
         .code = "missing-preferred-sample-set",
@@ -284,6 +299,66 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
 }
 
 }  // namespace
+
+AkaoSampleCoverageSelection selectAkaoSampleCoverage(std::optional<u32> requestedSampleSetId,
+                                                     const std::vector<u32>& required,
+                                                     const std::vector<AkaoSampleCoverageProvider>& providers) {
+  // An Akao sequence refers to articulation IDs, while each discovered sample
+  // collection supplies only a range of those IDs. A sequence may therefore
+  // need several collections. If the sequence header specifies a sample-set
+  // ID, first select the matching collection with the greatest source offset.
+  // Then examine the remaining collections in order from greatest to smallest
+  // source offset. Select one when its sample-set ID matches the ID from the
+  // sequence header or when it supplies an articulation the sequence still
+  // needs. Return any required articulation IDs that remain uncovered so the
+  // resolver can explain an incomplete match.
+  std::vector<AkaoSampleCoverageProvider> ordered = providers;
+  std::ranges::sort(ordered, std::ranges::greater{}, &AkaoSampleCoverageProvider::sourceOffset);
+
+  std::set<u32> remaining(required.begin(), required.end());
+  std::vector<AkaoSampleCoverageProvider> selected;
+  bool requestedSampleSetFound = false;
+
+  // First honor the sequence's explicit sample-set ID, when it has one.
+  if (requestedSampleSetId && *requestedSampleSetId > 0) {
+    const auto preferred = std::ranges::find_if(ordered, [&](const AkaoSampleCoverageProvider& provider) {
+      return provider.sampleSetId && *provider.sampleSetId == *requestedSampleSetId;
+    });
+    if (preferred != ordered.end()) {
+      requestedSampleSetFound = true;
+      selected.push_back(*preferred);
+      markCovered(remaining, *preferred);
+    }
+  }
+
+  // A missing or zero sample-set ID denotes Akao's unnamed sample set.
+  for (const auto& provider : ordered) {
+    if (std::ranges::find(selected, provider.index, &AkaoSampleCoverageProvider::index) != selected.end()) {
+      continue;
+    }
+    const bool sameSampleSet = requestedSampleSetId.value_or(0) == provider.sampleSetId.value_or(0);
+    const bool contributes = std::ranges::any_of(remaining, [&](u32 value) { return covers(provider, value); });
+    if (!sameSampleSet && !contributes) {
+      continue;
+    }
+    selected.push_back(provider);
+    markCovered(remaining, provider);
+    if (remaining.empty()) {
+      break;
+    }
+  }
+
+  // Order the chosen collections by the articulation ranges they supply rather
+  // than by source offset, giving later sample binding a stable order.
+  std::ranges::sort(selected, {}, &AkaoSampleCoverageProvider::first);
+  AkaoSampleCoverageSelection result{.requestedSampleSetFound = requestedSampleSetFound};
+  result.providers.reserve(selected.size());
+  for (const auto& provider : selected) {
+    result.providers.push_back(provider.index);
+  }
+  result.missing.assign(remaining.begin(), remaining.end());
+  return result;
+}
 
 std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& context) {
   const MatchFactIndex index(context);

@@ -59,7 +59,7 @@ void matchFactsAreJoinedOncePerAsset() {
   };
   addFact(sequenceId, IdMatchFact{.domain = "sequence", .value = 9});
   addFact(sequenceId, IdMatchFact{.domain = "sample-set", .value = 3});
-  addFact(sequenceId, OffsetOrderFact{.offset = 4});
+  addFact(sequenceId, AssetRelationFact{.domain = "samples", .target = samplesId});
   addFact(sequenceId, SampleRequirementFact{.domain = "articulation", .required = {7, 5}});
   addFact(sequenceId, SampleRequirementFact{.domain = "articulation", .required = {7, 8}});
   addFact(samplesId, SampleCoverageFact{.domain = "articulation", .first = 5, .count = 4});
@@ -70,9 +70,10 @@ void matchFactsAreJoinedOncePerAsset() {
   expect(sequences.size() == 1 && sequences[0].asset().metadata.id == sequenceId && sequences[0].sourceId == source &&
              sequences[0].source != nullptr,
          "the match index should expose one source-aware fact set per asset");
-  expect(sequences[0].id("sequence") == 9 && sequences[0].id("sample-set") == 3 && sequences[0].offset() == 4 &&
+  expect(sequences[0].id("sequence") == 9 && sequences[0].id("sample-set") == 3 &&
+             sequences[0].relation("samples") == samplesId &&
              sequences[0].requirements("articulation") == std::vector<u32>({5, 7, 8}),
-         "an asset fact set should join ids, offsets, and deduplicated requirements without caller maps");
+         "an asset fact set should join ids, typed relations, and deduplicated requirements without caller maps");
 
   const auto sampleSets = index.assets<SampleCollectionAsset>("Probe");
   const auto coverage = sampleSets[0].coverage("articulation");

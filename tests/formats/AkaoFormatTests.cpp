@@ -626,17 +626,17 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
 }
 
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
-  const std::vector<SampleCoverageProvider> candidates{
-      SampleCoverageProvider{.index = 0, .groupId = 0, .first = 0, .count = 32, .priority = 0},
-      SampleCoverageProvider{.index = 1, .groupId = 5, .first = 32, .count = 81, .priority = 1},
-      SampleCoverageProvider{.index = 2, .groupId = 29, .first = 128, .count = 22, .priority = 2},
+  const std::vector<AkaoSampleCoverageProvider> candidates{
+      AkaoSampleCoverageProvider{.index = 0, .sampleSetId = 0, .first = 0, .count = 32, .sourceOffset = 0},
+      AkaoSampleCoverageProvider{.index = 1, .sampleSetId = 5, .first = 32, .count = 81, .sourceOffset = 1},
+      AkaoSampleCoverageProvider{.index = 2, .sampleSetId = 29, .first = 128, .count = 22, .sourceOffset = 2},
   };
   const std::vector<u32> required{32, 128};
 
-  const auto selected = selectSampleCoverage(29, required, candidates);
-  expect(
-      selected.providers == std::vector<std::size_t>{1, 2} && selected.missing.empty() && selected.preferredGroupFound,
-      "Akao sample selection should combine the preferred sample set with required-articulation coverage");
+  const auto selected = selectAkaoSampleCoverage(29, required, candidates);
+  expect(selected.providers == std::vector<std::size_t>{1, 2} && selected.missing.empty() &&
+             selected.requestedSampleSetFound,
+         "Akao sample selection should combine the preferred sample set with required-articulation coverage");
 }
 
 void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {

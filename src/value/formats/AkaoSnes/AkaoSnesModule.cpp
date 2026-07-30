@@ -49,17 +49,6 @@ using namespace core;
                    input.reader.range(0, input.reader.size()));
   }
 
-  result.sourceFact(
-      sequence.id(),
-      FormatSpecificFact{
-          .kind = "akao-snes-version",
-          .fields =
-              {
-                  MatchField{.name = "version", .value = std::string(akaoSnesVersionName(layout->version))},
-                  MatchField{.name = "minor", .value = std::string(akaoSnesMinorVersionName(layout->minorVersion))},
-              },
-      });
-
   return result.finish();
 }
 

@@ -587,12 +587,13 @@ These explicit collections are stored and later reconciled like any other desire
 Some formats cannot bind everything during scanning. For those, scanners emit facts. A fact says something small and durable, such as:
 
 - this sequence has ID 12 in this domain;
+- this instrument set is related to this sequence asset;
 - this sample collection covers articulation IDs 40 through 59;
-- this sequence requires articulation IDs 41, 42, and 55;
-- this asset came at source offset 0x1234;
-- this asset belongs to a named collection.
+- this sequence requires articulation IDs 41, 42, and 55.
 
-Facts are not collections. They are evidence used by a resolver.
+Facts are not collections or descriptive format metadata. They are narrow,
+typed evidence that a production resolver actually queries. Information meant
+for source inspection belongs in source annotations instead.
 
 ### 13.3 Resolvers
 
@@ -1245,7 +1246,7 @@ Formats enter through `FormatDefinition` and `Session::registerFormat`, which re
 
 ### 21.6 `ScanResultBuilder`
 
-`ScanResultBuilder` is the intended scanner authoring API. It creates assets, explicit collections, facts, diagnostics, source annotations, and extracted sources. It tracks reserved handles and validates that referenced handles were committed. Parsers can append directly to its diagnostic collection instead of creating a temporary vector and copying diagnostics back into the result.
+`ScanResultBuilder` is the intended scanner authoring API. It creates result-owned asset drafts, explicit collections, facts, diagnostics, source annotations, and extracted sources. Draft creation allocates stable IDs immediately, and collection membership is checked against the draft’s declared asset role. Parsers can append directly to its diagnostic collection instead of creating a temporary vector and copying diagnostics back into the result.
 
 This is a major readability win for format code.
 

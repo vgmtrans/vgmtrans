@@ -44,17 +44,6 @@ namespace {
     auto collection = result.collection(sourceSequence.name, collectionKey(input.source.id, sourceSequence.index));
     collection.sequence(sequence);
     collection.instrumentSet(synth.instruments).samples(synth.samples);
-
-    result.sourceFact(sequence.id(),
-                      FormatSpecificFact{
-                          .kind = "konami-arcade-sequence",
-                          .fields =
-                              {
-                                  MatchField{.name = "game", .value = layout->game},
-                                  MatchField{.name = "version", .value = konamiArcadeVersionName(layout->version)},
-                                  MatchField{.name = "index", .value = std::to_string(sourceSequence.index)},
-                              },
-                      });
   }
 
   return result.finish();

@@ -177,17 +177,6 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     for (const auto misc : miscAssets) {
       collection.misc(misc);
     }
-
-    result.sourceFact(sequence.id(),
-                      FormatSpecificFact{
-                          .kind = "cps-sequence",
-                          .fields =
-                              {
-                                  MatchField{.name = "game", .value = layout->game},
-                                  MatchField{.name = "version", .value = cpsVersionName(layout->version)},
-                                  MatchField{.name = "index", .value = std::to_string(sourceSequence.index)},
-                              },
-                      });
   }
   return result.finish();
 }

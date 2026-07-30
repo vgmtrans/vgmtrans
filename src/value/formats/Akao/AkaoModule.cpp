@@ -6,8 +6,6 @@
 
 #include "value/formats/Akao/Akao.h"
 
-#include "value/scan/CollectionResolver.h"
-
 #include <fmt/format.h>
 
 #include <string>
@@ -35,7 +33,6 @@ void addSampleFacts(ScanResultBuilder& result, const AkaoSampleCollectionParse& 
     result.sourceFact(parsed.ref.id,
                       IdMatchFact{.domain = std::string(kAkaoSampleSetDomain), .value = *parsed.sampleSetId});
   }
-  result.sourceFact(parsed.ref.id, OffsetOrderFact{.offset = parsed.offset});
   result.sourceFact(parsed.ref.id, SampleCoverageFact{
                                        .domain = std::string(kAkaoArticulationDomain),
                                        .first = parsed.firstArticulationId,
@@ -51,7 +48,6 @@ void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const
     result.sourceFact(sequence.id,
                       IdMatchFact{.domain = std::string(kAkaoSampleSetDomain), .value = *analysis.header.sampleSetId});
   }
-  result.sourceFact(sequence.id, OffsetOrderFact{.offset = analysis.header.offset});
   std::vector<u32> required;
   for (const u32 articulation : requiredArticulations) {
     if (articulation != 0) {
@@ -67,11 +63,10 @@ void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const
 }
 
 void addInstrumentSetFacts(ScanResultBuilder& result, ScanInstrumentSetRef instruments, ScanSequenceRef sequence) {
-  const MatchField sequenceAsset{
-      .name = std::string(kAkaoSequenceAssetField),
-      .value = std::to_string(sequence.id.value),
-  };
-  result.sourceFact(instruments.id, formatFact(std::string(kAkaoInstrumentSetFact), {sequenceAsset}));
+  result.sourceFact(instruments.id, AssetRelationFact{
+                                        .domain = std::string(kAkaoInstrumentSequenceDomain),
+                                        .target = sequence.id,
+                                    });
 }
 
 void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets) {
