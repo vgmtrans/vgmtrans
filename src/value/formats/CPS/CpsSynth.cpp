@@ -97,8 +97,9 @@ struct QSoundSampleInfo {
                                       u8 release) {
   const u16 ar = kAttackRates[std::min<u8>(attack, 63)];
   const u16 dr = kDecayRates[std::min<u8>(decay, 63)];
-  u16 sl = isCps3(version) ? static_cast<u16>((static_cast<u32>(std::min<u8>(sustainLevel, 127)) + 1) * 65535 / 128)
-                           : kSustainLevels[std::min<u8>(sustainLevel, 127)];
+  const u16 sl = isCps3(version)
+                     ? static_cast<u16>((static_cast<u32>(std::min<u8>(sustainLevel, 127)) + 1) * 65535 / 128)
+                     : kSustainLevels[std::min<u8>(sustainLevel, 127)];
   const u16 sr = kDecayRates[std::min<u8>(sustain, 63)];
   const u16 rr = kDecayRates[std::min<u8>(release, 63)];
   const double rate = cpsDriverRateHertz(version);
@@ -113,20 +114,17 @@ struct QSoundSampleInfo {
     return std::floor(65535.0 / sourceRate) / rate;
   };
 
-  double decaySeconds = stageSeconds(dr, true);
-  bool combinedDecay = false;
-  if (sustainLevel >= 0x7e && sustain > 0 && decay > 1 && dr != 0 && sr != 0) {
-    const double ticks = std::ceil((0xffff - sl) / static_cast<double>(dr)) + std::ceil(sl / static_cast<double>(sr));
-    decaySeconds = ticks / rate;
-    sl = 0;
-    combinedDecay = true;
-  }
-  const double sustainAmplitude = combinedDecay ? 0.0
-                                                : (isCps3(version) ? (std::min<u8>(sustainLevel, 127) + 1) / 128.0
-                                                                   : (dr <= 1 ? 1.0 : sl / 65535.0));
+  const double decaySeconds = stageSeconds(dr, true);
+  const double secondDecaySeconds = stageSeconds(sr, true);
+  const double sustainAmplitude = isCps3(version) ? (std::min<u8>(sustainLevel, 127) + 1) / 128.0 : sl / 65535.0;
   return Envelope{
       .attackSeconds = stageSeconds(ar, true),
       .decaySeconds = std::isinf(decaySeconds) ? decaySeconds : linearDecayToDbSeconds(decaySeconds),
+      .secondDecaySeconds =
+          dr == 0 || sustainAmplitude == 0.0
+              ? std::nullopt
+              : std::optional{std::isinf(secondDecaySeconds) ? secondDecaySeconds
+                                                             : linearDecayToDbSeconds(secondDecaySeconds)},
       .releaseSeconds = linearDecayToDbSeconds(stageSeconds(rr, true)),
       .sustainAmplitude = sustainAmplitude,
   };

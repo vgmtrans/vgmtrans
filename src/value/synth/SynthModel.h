@@ -53,7 +53,8 @@ struct Envelope {
   std::optional<double> attackSeconds;
   std::optional<double> holdSeconds;
   std::optional<double> decaySeconds;
-  // Time to decay from sustainAmplitude to silence while the key remains held.
+  // Full-scale decay time for the rate used after the sustain level is reached.
+  // Some sound chips keep fading during a held note instead of sustaining.
   std::optional<double> secondDecaySeconds;
   std::optional<double> releaseSeconds;
   std::optional<double> sustainAmplitude;

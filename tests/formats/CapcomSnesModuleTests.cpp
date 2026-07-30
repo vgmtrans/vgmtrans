@@ -244,7 +244,7 @@ std::vector<u8> makeCapcomSnesAram() {
 
   bytes[0x4000] = 0x00;
   bytes[0x4001] = 0x8f;
-  bytes[0x4002] = 0xe0;
+  bytes[0x4002] = 0x6a;
   bytes[0x4003] = 0x00;
   writeBe16(bytes, 0x4004, 0x0100);
 
@@ -660,9 +660,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto& envelope = instrument.regions[0].envelope;
   expect(envelope.attackSeconds && std::abs(*envelope.attackSeconds - 0.0000625) < 0.000001,
          "instrument envelope should convert SNES attack to seconds");
-  expect(envelope.decaySeconds && std::isinf(*envelope.decaySeconds),
-         "instrument envelope should preserve infinite SNES sustain decay");
-  expect(envelope.sustainAmplitude == 1.0, "instrument envelope should convert SNES sustain to linear amplitude");
+  expect(envelope.decaySeconds && envelope.secondDecaySeconds && *envelope.decaySeconds > 0.0 &&
+             *envelope.secondDecaySeconds > 0.0 && envelope.sustainAmplitude == 0.5,
+         "instrument envelope should retain the SNES chip's two decay stages");
   expect(envelope.releaseSeconds == 0.0, "instrument envelope should match Capcom legacy gain-based release handling");
   expect(!instrument.modulation.vibrato && !instrument.modulation.tremolo,
          "scanned instruments should not contain sequence-independent Capcom LFO ranges");
