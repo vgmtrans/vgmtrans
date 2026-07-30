@@ -146,7 +146,7 @@ Fixture earlyCps2Fixture() {
 
   le16(bytes, 0x180, 0x400);
   bytesAt(bytes, 0x200, {0, 0, 0, 0, 0, 0, 1, 0x3c});
-  bytesAt(bytes, 0x300, {63, 32, 96, 16, 24});
+  bytesAt(bytes, 0x300, {63, 63, 127, 0, 0});
   bytesAt(bytes, 0x400, {0, 0, 0, 0});
 
   be32(bytes, 0x1000, 0x101100);
@@ -665,6 +665,11 @@ void cps2EarlyModuleUsesPhysicalModulation() {
          "early CPS2 should retain its fixed 256-entry first instrument bank");
   expect(std::abs(instruments->instruments[0].regions[0].unityKey - 60.0) < 0.0001,
          "little-endian QSound sample indexes should resolve to their sample unity key");
+  const auto& envelope = instruments->instruments[0].regions[0].envelope;
+  expect(envelope.attackSeconds == 0.0 && envelope.decaySeconds == 0.0 && envelope.secondDecaySeconds &&
+             std::isinf(*envelope.secondDecaySeconds) && envelope.releaseSeconds &&
+             std::isinf(*envelope.releaseSeconds),
+         "zero QSound sustain and release rates should remain infinite in the instrument model");
 
   const auto& sequenceTable = miscAt(result, 0x1000, 0x100);
   const auto& sequencePointer = onlyChild(result, miscRoot(result, sequenceTable, "cps-sequence-pointer-table"));
@@ -686,10 +691,10 @@ void cps2EarlyModuleUsesPhysicalModulation() {
   const auto& articulation = onlyChild(result, miscRoot(result, articulationTable, "cps-qsound-articulation-table"));
   expect(articulation.role == SourceRole::TableEntry && articulation.localKind == "cps-qsound-articulation" &&
              articulation.fieldsAsChildren && fieldMatches(articulation, "attack_rate", 0x300, 1, 63) &&
-             fieldMatches(articulation, "decay_rate", 0x301, 1, 32) &&
-             fieldMatches(articulation, "sustain_level", 0x302, 1, 96) &&
-             fieldMatches(articulation, "sustain_rate", 0x303, 1, 16) &&
-             fieldMatches(articulation, "release_rate", 0x304, 1, 24) &&
+             fieldMatches(articulation, "decay_rate", 0x301, 1, 63) &&
+             fieldMatches(articulation, "sustain_level", 0x302, 1, 127) &&
+             fieldMatches(articulation, "sustain_rate", 0x303, 1, 0) &&
+             fieldMatches(articulation, "release_rate", 0x304, 1, 0) &&
              fieldMatches(articulation, "unknown", 0x305, 3, 0),
          "CPS2 articulation misc asset should expose meaningful rows and their exact fields");
 

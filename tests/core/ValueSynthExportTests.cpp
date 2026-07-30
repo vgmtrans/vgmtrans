@@ -86,7 +86,13 @@ void envelopePredicateDetectsCanonicalData() {
   expect(hasExplicitEnvelope(sustain), "envelope predicate should detect a specified sustain amplitude");
 }
 
-void adsrApproximationKeepsAudibleSecondDecay() {
+void adsrApproximationLowersUnsupportedStages() {
+  const Envelope exportableRelease = approximateEnvelopeAsAdsr(Envelope{
+      .releaseSeconds = std::numeric_limits<double>::infinity(),
+  });
+  expect(exportableRelease.releaseSeconds == 150.0,
+         "ADSR export should replace an endless release with a finite fallback");
+
   const Envelope envelope = approximateEnvelopeAsAdsr(Envelope{
       .decaySeconds = 1.009728,
       .secondDecaySeconds = 5.100173,
@@ -1278,7 +1284,7 @@ void runValueSynthExportTests() {
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   pcm16DecoderHonorsExplicitByteOrder();
   envelopePredicateDetectsCanonicalData();
-  adsrApproximationKeepsAudibleSecondDecay();
+  adsrApproximationLowersUnsupportedStages();
   physicalModulationLowersToLegacySynthControls();
   fixedPhysicalLfoValuesNeedNoZeroRangeModulators();
   regionModulationExportsAtTheRegionScope();
