@@ -1638,8 +1638,11 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
     for (const auto& diagnostic : prepared.diagnostics) {
       diagnostics << "value preparation diagnostic: " << diagnostic.message << "\n";
     }
+    if (!prepared.replacementInstrumentSets) {
+      throw std::runtime_error("Akao collection preparation did not provide resolved instrument sets");
+    }
     const auto detailed =
-        valueCapcomSnesSummary(project, session.sources(), collection, prepared.replacementInstrumentSets);
+        valueCapcomSnesSummary(project, session.sources(), collection, *prepared.replacementInstrumentSets);
     shape.sampleCount = static_cast<u32>(detailed.samples.size());
     shape.samples = detailed.samples;
     for (auto& sample : shape.samples) {
@@ -4248,6 +4251,182 @@ std::vector<NormalizedMidiEvent> eventsBeforeHorizons(const std::vector<Normaliz
   return result;
 }
 
+void normalizeSegSatRendererEvents(std::vector<NormalizedMidiEvent>& events, bool isValueRenderer,
+                                   bool soleBankWasRemapped) {
+  // The value path emits a Program Change with a bank write so MIDI activates
+  // the new bank immediately. Legacy emits only the bank write.
+  using InstrumentPosition = std::tuple<u32, u64, u8>;
+  std::set<InstrumentPosition> bankSelectPositions;
+  for (const auto& event : events) {
+    if (event.kind == "control" && (event.a == 0 || event.a == 32)) {
+      bankSelectPositions.insert(InstrumentPosition{event.track, event.tick, event.channel});
+    }
+  }
+  if (isValueRenderer) {
+    std::map<std::pair<u32, u8>, u32> activeProgram;
+    std::erase_if(events, [&](const NormalizedMidiEvent& event) {
+      if (event.kind != "program") {
+        return false;
+      }
+      const auto channel = std::pair{event.track, event.channel};
+      const auto previousProgram = activeProgram.find(channel);
+      const u32 previous = previousProgram == activeProgram.end() ? 0 : previousProgram->second;
+      const InstrumentPosition position{event.track, event.tick, event.channel};
+      const bool bankReactivation = bankSelectPositions.contains(position) && event.a == previous;
+      activeProgram.insert_or_assign(channel, event.a);
+      if (bankReactivation) {
+        bankSelectPositions.erase(position);
+      }
+      return bankReactivation;
+    });
+  }
+
+  // A collection with one bank is exported as bank zero. Legacy can leave the
+  // original bank write in its MIDI output.
+  if (soleBankWasRemapped) {
+    std::erase_if(events, [](const NormalizedMidiEvent& event) {
+      return event.kind == "control" && (event.a == 0 || event.a == 32);
+    });
+  }
+
+  // Legacy forwards one otherwise-unused source byte as MIDI CC93.
+  std::erase_if(events, [](const NormalizedMidiEvent& event) { return event.kind == "control" && event.a == 93; });
+
+  std::set<size_t> remove;
+  std::map<std::tuple<u32, u64, u8, u32>, size_t> controllerAtTick;
+  for (size_t i = 0; i < events.size(); ++i) {
+    const auto& event = events[i];
+    if (event.kind != "control") {
+      continue;
+    }
+    const auto key = std::tuple{event.track, event.tick, event.channel, event.a};
+    if (const auto previous = controllerAtTick.find(key); previous != controllerAtTick.end()) {
+      remove.insert(previous->second);
+    }
+    controllerAtTick.insert_or_assign(key, i);
+  }
+
+  std::map<std::tuple<u32, u8, u32>, u32> controllerState;
+  std::map<std::pair<u32, u8>, u32> pitchByTrack;
+  std::map<u32, u32> tempoByTrack;
+  for (size_t i = 0; i < events.size(); ++i) {
+    if (remove.contains(i)) {
+      continue;
+    }
+    const auto& event = events[i];
+    if (event.kind == "control") {
+      const auto key = std::tuple{event.track, event.channel, event.a};
+      const auto previous = controllerState.find(key);
+      if ((previous != controllerState.end() && previous->second == event.b) ||
+          (previous == controllerState.end() && event.a == 10 && event.b == 64)) {
+        remove.insert(i);
+      }
+      controllerState.insert_or_assign(key, event.b);
+    } else if (event.kind == "pitch-bend") {
+      const auto key = std::pair{event.track, event.channel};
+      const auto previous = pitchByTrack.find(key);
+      if (previous != pitchByTrack.end() && previous->second == event.a) {
+        remove.insert(i);
+      } else {
+        pitchByTrack.insert_or_assign(key, event.a);
+      }
+    } else if (event.kind == "tempo") {
+      const auto previous = tempoByTrack.find(event.track);
+      if (previous != tempoByTrack.end() && previous->second == event.a) {
+        remove.insert(i);
+      } else {
+        tempoByTrack.insert_or_assign(event.track, event.a);
+      }
+    }
+  }
+
+  size_t index = 0;
+  std::erase_if(events, [&](const NormalizedMidiEvent&) { return remove.contains(index++); });
+  for (auto& event : events) {
+    // Track identity is stable even though the two renderers allocate MIDI
+    // ports and channels differently.
+    event.channel = 0;
+  }
+}
+
+void normalizeSegSatSilentNotes(NormalizedMidi& legacy, NormalizedMidi& value) {
+  // Legacy writes a zero-duration, velocity-one note as two note-offs. Match
+  // only exact two-to-one groups at the same position.
+  using NotePosition = std::tuple<u32, u64, u8, u32>;
+  std::map<NotePosition, size_t> legacyNoteOffCounts;
+  std::map<NotePosition, size_t> valueZeroDurationCounts;
+  for (const auto& event : legacy.events) {
+    if (event.kind == "note-off") {
+      ++legacyNoteOffCounts[NotePosition{event.track, event.tick, event.channel, event.a}];
+    }
+  }
+  for (const auto& event : value.events) {
+    if (event.kind == "note" && event.c == 0) {
+      ++valueZeroDurationCounts[NotePosition{event.track, event.tick, event.channel, event.a}];
+    }
+  }
+
+  std::set<NotePosition> silentNotePositions;
+  for (const auto& [position, count] : valueZeroDurationCounts) {
+    const auto legacyCount = legacyNoteOffCounts.find(position);
+    if (legacyCount != legacyNoteOffCounts.end() && legacyCount->second == count * 2) {
+      silentNotePositions.insert(position);
+    }
+  }
+  std::erase_if(legacy.events, [&](const NormalizedMidiEvent& event) {
+    return event.kind == "note-off" &&
+           silentNotePositions.contains(NotePosition{event.track, event.tick, event.channel, event.a});
+  });
+  for (auto& event : value.events) {
+    const NotePosition position{event.track, event.tick, event.channel, event.a};
+    if (event.kind == "note" && event.c == 0 && silentNotePositions.contains(position)) {
+      event.b = 0;
+      legacy.events.push_back(event);
+    }
+  }
+  std::ranges::sort(legacy.events, normalizedMidiEventLess);
+  std::ranges::sort(value.events, normalizedMidiEventLess);
+}
+
+void removeSegSatTerminalReplayPan(NormalizedMidi& legacy, const NormalizedMidi& value) {
+  std::vector<u64> legacyLastEvent(legacy.endOfTrackTicks.size());
+  for (const auto& event : legacy.events) {
+    if (event.track < legacyLastEvent.size()) {
+      legacyLastEvent[event.track] = std::max(legacyLastEvent[event.track], event.tick);
+    }
+  }
+  std::erase_if(legacy.events, [&](const NormalizedMidiEvent& event) {
+    if (event.kind != "control" || event.a != 10 || event.b != 64 || event.track >= legacy.endOfTrackTicks.size() ||
+        event.track >= value.endOfTrackTicks.size() ||
+        legacy.endOfTrackTicks[event.track] != value.endOfTrackTicks[event.track] ||
+        legacyLastEvent[event.track] != event.tick) {
+      return false;
+    }
+    const bool followsFinalLeftStep = std::ranges::any_of(legacy.events, [&](const NormalizedMidiEvent& previous) {
+      return previous.track == event.track && previous.kind == "control" && previous.a == 10 && previous.b == 56 &&
+             previous.tick <= event.tick && event.tick - previous.tick == 18;
+    });
+    const bool unmatched = std::ranges::none_of(value.events, [&](const NormalizedMidiEvent& valueEvent) {
+      return valueEvent.track == event.track && valueEvent.tick == event.tick && valueEvent.kind == event.kind &&
+             valueEvent.a == event.a && valueEvent.b == event.b;
+    });
+    return followsFinalLeftStep && unmatched;
+  });
+}
+
+bool segSatDiffersOnlyInMultiBankVelocity(const NormalizedMidi& legacy, const NormalizedMidi& value) {
+  auto legacyWithoutVelocity = legacy.events;
+  auto valueWithoutVelocity = value.events;
+  for (auto* events : {&legacyWithoutVelocity, &valueWithoutVelocity}) {
+    for (auto& event : *events) {
+      if (event.kind == "note") {
+        event.b = 0;
+      }
+    }
+  }
+  return legacyWithoutVelocity == valueWithoutVelocity;
+}
+
 bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes, std::ostream& out,
                  MidiCompareOptions options = {}) {
   auto legacyMidi = normalizeMidi(legacyBytes);
@@ -4256,218 +4435,20 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
     const bool soleBankWasRemapped = std::ranges::none_of(valueMidi.events, [](const NormalizedMidiEvent& event) {
       return event.kind == "control" && (event.a == 0 || event.a == 32) && event.b != 0;
     });
-    const auto normalize = [soleBankWasRemapped](std::vector<NormalizedMidiEvent>& events,
-                                                 bool valuePerformanceIsAtomic) {
-      // A SegSat bank command changes only the source bank register. The value
-      // performance emits the complete effective instrument selection so MIDI
-      // receives the Program Change needed to activate that bank immediately.
-      // For parity, discard only a Program Change paired with a bank write when
-      // it repeats the program that was already active on that track/channel.
-      using InstrumentPosition = std::tuple<u32, u64, u8>;
-      std::set<InstrumentPosition> bankSelectPositions;
-      for (const auto& event : events) {
-        if (event.kind == "control" && (event.a == 0 || event.a == 32)) {
-          bankSelectPositions.insert(InstrumentPosition{event.track, event.tick, event.channel});
-        }
-      }
-      if (valuePerformanceIsAtomic) {
-        std::map<std::pair<u32, u8>, u32> activeProgram;
-        std::erase_if(events, [&](const NormalizedMidiEvent& event) {
-          if (event.kind != "program") {
-            return false;
-          }
-          const auto channel = std::pair{event.track, event.channel};
-          const auto previousProgram = activeProgram.find(channel);
-          const u32 previous = previousProgram == activeProgram.end() ? 0 : previousProgram->second;
-          const InstrumentPosition position{event.track, event.tick, event.channel};
-          const bool bankReactivation = bankSelectPositions.contains(position) && event.a == previous;
-          activeProgram.insert_or_assign(channel, event.a);
-          if (bankReactivation) {
-            // Consume the bank command: a separate source Program Change at
-            // the same tick remains observable and comparable with legacy.
-            bankSelectPositions.erase(position);
-          }
-          return bankReactivation;
-        });
-      }
+    normalizeSegSatRendererEvents(legacyMidi.events, false, soleBankWasRemapped);
+    normalizeSegSatRendererEvents(valueMidi.events, true, soleBankWasRemapped);
 
-      // Collection export remaps a sole Saturn source bank to destination bank
-      // zero. Legacy leaves one inconsistent source-bank LSB behind, while the
-      // value preparation applies the remap to sequence and instruments alike.
-      // Multi-bank collections retain their bank writes for exact comparison.
-      if (soleBankWasRemapped) {
-        std::erase_if(events, [](const NormalizedMidiEvent& event) {
-          return event.kind == "control" && (event.a == 0 || event.a == 32);
-        });
-      }
+    normalizeSegSatSilentNotes(legacyMidi, valueMidi);
+    removeSegSatTerminalReplayPan(legacyMidi, valueMidi);
 
-      // The neutral performance model has no chorus-send concept. Legacy
-      // forwards this otherwise-uninterpreted source byte as MIDI CC93.
-      std::erase_if(events, [](const NormalizedMidiEvent& event) {
-        return event.kind == "control" && event.a == 93;
-      });
-
-      // The value renderer tracks destination controller state and omits
-      // no-op writes. Retain the last source write at a tick, which is the
-      // effective value seen by both renderers.
-      std::set<size_t> remove;
-      std::map<std::tuple<u32, u64, u8, u32>, size_t> controllerAtTick;
-      for (size_t i = 0; i < events.size(); ++i) {
-        const auto& event = events[i];
-        if (event.kind != "control") {
-          continue;
-        }
-        const auto key = std::tuple{event.track, event.tick, event.channel, event.a};
-        if (const auto previous = controllerAtTick.find(key); previous != controllerAtTick.end()) {
-          remove.insert(previous->second);
-        }
-        controllerAtTick.insert_or_assign(key, i);
-      }
-      std::map<std::tuple<u32, u8, u32>, u32> controllerState;
-      for (size_t i = 0; i < events.size(); ++i) {
-        if (remove.contains(i)) {
-          continue;
-        }
-        const auto& event = events[i];
-        if (event.kind != "control") {
-          continue;
-        }
-        const auto key = std::tuple{event.track, event.channel, event.a};
-        const auto previous = controllerState.find(key);
-        if (previous != controllerState.end() && previous->second == event.b) {
-          remove.insert(i);
-        } else if (previous == controllerState.end() && event.a == 10 && event.b == 64) {
-          // MIDI pan begins centered, so an initial center write is a no-op.
-          // A later return to center after another pan value remains observable.
-          remove.insert(i);
-          controllerState.insert_or_assign(key, event.b);
-        } else {
-          controllerState.insert_or_assign(key, event.b);
-        }
-      }
-
-      std::map<std::pair<u32, u8>, u32> pitchByTrack;
-      std::map<u32, u32> tempoByTrack;
-      for (size_t i = 0; i < events.size(); ++i) {
-        const auto& event = events[i];
-        if (event.kind == "pitch-bend") {
-          const auto key = std::pair{event.track, event.channel};
-          const auto previous = pitchByTrack.find(key);
-          if (previous != pitchByTrack.end() && previous->second == event.a) {
-            remove.insert(i);
-          } else {
-            pitchByTrack.insert_or_assign(key, event.a);
-          }
-        } else if (event.kind == "tempo") {
-          const auto previous = tempoByTrack.find(event.track);
-          if (previous != tempoByTrack.end() && previous->second == event.a) {
-            remove.insert(i);
-          } else {
-            tempoByTrack.insert_or_assign(event.track, event.a);
-          }
-        }
-      }
-
-      size_t index = 0;
-      std::erase_if(events, [&](const NormalizedMidiEvent&) { return remove.contains(index++); });
-      for (auto& event : events) {
-        // Both exporters split the interleaved Saturn stream into one MIDI
-        // track per source channel, but their multi-port channel allocation
-        // policies differ. Track identity is the stable source relationship.
-        event.channel = 0;
-      }
-    };
-    normalize(legacyMidi.events, false);
-    normalize(valueMidi.events, true);
-
-    // A zero-duration Saturn note whose MM8 VL conversion reaches MIDI
-    // velocity one is silent, but the legacy MIDI path writes both of its
-    // messages with velocity zero. The parser consequently sees two unmatched
-    // note-offs instead of one zero-duration note. Canonicalize only exact
-    // two-to-one groups at the same source position.
-    using NotePosition = std::tuple<u32, u64, u8, u32>;
-    std::map<NotePosition, size_t> legacyNoteOffCounts;
-    std::map<NotePosition, size_t> valueZeroDurationCounts;
-    for (const auto& event : legacyMidi.events) {
-      if (event.kind == "note-off") {
-        ++legacyNoteOffCounts[NotePosition{event.track, event.tick, event.channel, event.a}];
-      }
-    }
-    for (const auto& event : valueMidi.events) {
-      if (event.kind == "note" && event.c == 0) {
-        ++valueZeroDurationCounts[NotePosition{event.track, event.tick, event.channel, event.a}];
-      }
-    }
-    std::set<NotePosition> silentNotePositions;
-    for (const auto& [position, count] : valueZeroDurationCounts) {
-      const auto legacyCount = legacyNoteOffCounts.find(position);
-      if (legacyCount != legacyNoteOffCounts.end() && legacyCount->second == count * 2) {
-        silentNotePositions.insert(position);
-      }
-    }
-    std::erase_if(legacyMidi.events, [&](const NormalizedMidiEvent& event) {
-      return event.kind == "note-off" &&
-             silentNotePositions.contains(NotePosition{event.track, event.tick, event.channel, event.a});
-    });
-    for (auto& event : valueMidi.events) {
-      const NotePosition position{event.track, event.tick, event.channel, event.a};
-      if (event.kind != "note" || event.c != 0 || !silentNotePositions.contains(position)) {
-        continue;
-      }
-      event.b = 0;
-      legacyMidi.events.push_back(event);
-    }
-    std::ranges::sort(legacyMidi.events, normalizedMidiEventLess);
-    std::ranges::sort(valueMidi.events, normalizedMidiEventLess);
-
-    // VGMSeqNoTrks can execute the first command of the next pass before its
-    // play-once stop check. One observed driver begins that pass with a
-    // center-pan write 18 ticks after the final left-pan step. Remove only an
-    // unmatched, terminal center write with that exact boundary shape.
-    std::vector<u64> legacyLastEvent(legacyMidi.endOfTrackTicks.size());
-    for (const auto& event : legacyMidi.events) {
-      if (event.track < legacyLastEvent.size()) {
-        legacyLastEvent[event.track] = std::max(legacyLastEvent[event.track], event.tick);
-      }
-    }
-    std::erase_if(legacyMidi.events, [&](const NormalizedMidiEvent& event) {
-      if (event.kind != "control" || event.a != 10 || event.b != 64 ||
-          event.track >= legacyMidi.endOfTrackTicks.size() || event.track >= valueMidi.endOfTrackTicks.size() ||
-          legacyMidi.endOfTrackTicks[event.track] != valueMidi.endOfTrackTicks[event.track] ||
-          legacyLastEvent[event.track] != event.tick) {
-        return false;
-      }
-      const bool followsFinalLeftStep =
-          std::ranges::any_of(legacyMidi.events, [&](const NormalizedMidiEvent& previous) {
-            return previous.track == event.track && previous.kind == "control" && previous.a == 10 &&
-                   previous.b == 56 && previous.tick <= event.tick && event.tick - previous.tick == 18;
-          });
-      const bool unmatched = std::ranges::none_of(valueMidi.events, [&](const NormalizedMidiEvent& valueEvent) {
-        return valueEvent.track == event.track && valueEvent.tick == event.tick && valueEvent.kind == event.kind &&
-               valueEvent.a == event.a && valueEvent.b == event.b;
-      });
-      return followsFinalLeftStep && unmatched;
-    });
-
-    if (!soleBankWasRemapped) {
-      auto legacyWithoutVelocity = legacyMidi.events;
-      auto valueWithoutVelocity = valueMidi.events;
-      for (auto* events : {&legacyWithoutVelocity, &valueWithoutVelocity}) {
-        for (auto& event : *events) {
-          if (event.kind == "note") {
-            event.b = 0;
-          }
-        }
-      }
-      if (legacyWithoutVelocity == valueWithoutVelocity) {
-        // SegSatSeq::useColl() always consults the first attached instrument
-        // set. The driver and value port instead select VL data by the active
-        // bank; keep placement, pitch, duration, and state exact while allowing
-        // that known multi-bank legacy velocity error.
-        out << "MIDI parity ok apart from legacy first-bank VL lookup in a multi-bank collection: "
-            << legacyMidi.events.size() << " normalized events\n";
-        return true;
-      }
+    if (!soleBankWasRemapped && segSatDiffersOnlyInMultiBankVelocity(legacyMidi, valueMidi)) {
+      // SegSatSeq::useColl() always consults the first attached instrument
+      // set. The driver and value port instead select VL data by the active
+      // bank; keep placement, pitch, duration, and state exact while allowing
+      // that known multi-bank legacy velocity error.
+      out << "MIDI parity ok apart from legacy first-bank VL lookup in a multi-bank collection: "
+          << legacyMidi.events.size() << " normalized events\n";
+      return true;
     }
   }
   if (options.ignoreCpsMetaMarkers) {

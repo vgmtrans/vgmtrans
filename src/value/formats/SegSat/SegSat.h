@@ -30,6 +30,22 @@ inline constexpr std::string_view kSegSatInstrumentDomain = "segsat";
   };
 }
 
+struct SegSatInstrumentAddress {
+  u8 sourceBank = 0;
+  u8 program = 0;
+};
+
+[[nodiscard]] inline std::optional<SegSatInstrumentAddress> decodeSegSatInstrumentIdentity(
+    const core::InstrumentIdentity& identity) {
+  if (identity.domain != kSegSatInstrumentDomain || identity.key > 0xffff) {
+    return std::nullopt;
+  }
+  return SegSatInstrumentAddress{
+      .sourceBank = static_cast<u8>(identity.key >> 8),
+      .program = static_cast<u8>(identity.key),
+  };
+}
+
 enum class SegSatDriverVersion : u8 {
   V1_28,
   V2_08,
@@ -59,7 +75,6 @@ struct SegSatVlTable {
 struct SegSatBankLayout {
   u32 offset = 0;
   u32 instrumentDataEnd = 0;
-  u16 mixerTables = 0;
   u16 velocityTables = 0;
   u16 pegTables = 0;
   u16 plfoTables = 0;
@@ -76,6 +91,7 @@ struct SegSatSequenceLayout {
   u16 ppqn = 0;
   u16 tempoEventCount = 0;
   u16 normalTrack = 0;
+  u32 normalTrackEnd = 0;
   u16 tempoLoop = 0;
   std::vector<u8> referencedBanks;
 };
@@ -83,12 +99,6 @@ struct SegSatSequenceLayout {
 struct SegSatScannedBank {
   core::ScanInstrumentSetRef instruments;
   core::ScanSampleCollectionRef samples;
-  SegSatBankLayout layout;
-};
-
-struct SegSatBankBinding {
-  SegSatBankLayout layout;
-  u8 sourceBank = 0;
 };
 
 struct SegSatVelocityRegion {
@@ -110,21 +120,20 @@ struct SegSatVelocityBank {
 };
 
 // Mega Man 8's driver converts a VL-table result into the MIDI velocity used
-// by the legacy exporter. Kept public so the source arithmetic can be tested
-// independently from collection and VM plumbing.
+// by the legacy exporter. This is public so the velocity math can be tested on
+// its own.
 [[nodiscard]] u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias);
 
+[[nodiscard]] std::optional<SegSatBankLayout> readSegSatBankLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<SegSatBankLayout> findSegSatBanks(core::ByteReader reader);
 [[nodiscard]] std::vector<SegSatSequenceLayout> findSegSatSequences(core::ByteReader reader);
 [[nodiscard]] SegSatDriverVersion determineSegSatDriverVersion(core::ByteReader reader);
 [[nodiscard]] std::optional<SegSatScannedBank> addSegSatBank(core::ScanResultBuilder& builder,
                                                              const SegSatBankLayout& layout,
                                                              SegSatDriverVersion version, u8 exportBank);
-// VL tables live in the instrument bank rather than the sequence. Collection
-// preparation reads this typed, format-local context once, then applies it to
-// the transient performance after the standalone sequence VM has rendered.
-[[nodiscard]] std::vector<SegSatVelocityBank> readSegSatVelocityBanks(core::ByteReader reader,
-                                                                      const std::vector<SegSatBankBinding>& banks);
+[[nodiscard]] SegSatVelocityBank readSegSatVelocityBank(core::ByteReader reader, const SegSatBankLayout& layout,
+                                                        u8 sourceBank);
+[[nodiscard]] std::vector<u8> segSatSequenceBanks(const core::SequenceProgram& program);
 void applySegSatVelocityTables(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks);
 
 [[nodiscard]] core::SequenceProgram parseSegSatSequenceProgram(core::ByteReader reader, core::AssetId id,

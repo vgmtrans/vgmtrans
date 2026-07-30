@@ -796,10 +796,10 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
       .snapshot = project,
       .collection = collection,
   });
-  expect(prepared.replacementInstrumentSets.size() == 1 &&
-             prepared.replacementInstrumentSets.front().instruments.size() == 1 &&
-             prepared.replacementInstrumentSets.front().instruments.front().regions.size() == 1 &&
-             prepared.replacementInstrumentSets.front().instruments.front().regions.front().sample.collection ==
+  expect(prepared.replacementInstrumentSets && prepared.replacementInstrumentSets->size() == 1 &&
+             prepared.replacementInstrumentSets->front().instruments.size() == 1 &&
+             prepared.replacementInstrumentSets->front().instruments.front().regions.size() == 1 &&
+             prepared.replacementInstrumentSets->front().instruments.front().regions.front().sample.collection ==
                  collection.sampleCollections.front(),
          "Akao collection preparation should bind the detected structure to its selected samples");
 

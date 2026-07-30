@@ -24,7 +24,6 @@ namespace {
 
 struct BankAssets {
   SegSatBankLayout layout;
-  u8 exportBank = 0;
   ScanInstrumentSetRef instruments;
   ScanSampleCollectionRef samples;
 };
@@ -34,32 +33,6 @@ struct BankAssets {
       .resolver = std::string(kSegSatCollectionResolver),
       .value = "source:" + std::to_string(source.value) + ":sequence:" + std::to_string(sequence.offset),
   };
-}
-
-[[nodiscard]] u32 normalStreamEnd(ByteReader reader, const SegSatSequenceLayout& sequence) {
-  u32 offset = sequence.offset + sequence.normalTrack;
-  while (offset < sequence.end) {
-    const u8 status = reader.u8At(offset);
-    u32 size = 1;
-    if (status <= 0x7f) {
-      size = 5;
-    } else if ((status & 0xf0) == 0xb0) {
-      size = 4;
-    } else if ((status & 0xf0) == 0xc0 || (status & 0xf0) == 0xd0 || (status & 0xf0) == 0xe0) {
-      size = 3;
-    } else if (status == 0x81) {
-      size = 4;
-    } else if (status == 0x82) {
-      size = 2;
-    } else if (status == 0x83) {
-      return offset + 1;
-    }
-    if (size > sequence.end - offset) {
-      break;
-    }
-    offset += size;
-  }
-  return std::min(offset, sequence.end);
 }
 
 [[nodiscard]] ScanResult scanSegSat(const ScanInput& input) {
@@ -79,7 +52,6 @@ struct BankAssets {
     if (scanned) {
       banks.push_back(BankAssets{
           .layout = layout,
-          .exportBank = bankNumber,
           .instruments = scanned->instruments,
           .samples = scanned->samples,
       });
@@ -90,9 +62,8 @@ struct BankAssets {
     const std::string sourceName =
         result.sourceFile().name.empty() ? result.sourceDisplayName() : result.sourceFile().name;
     const std::string name = fmt::format("{} {}_{}", sourceName, sequence.tableIndex, sequence.sequenceIndex);
-    const u32 sequenceEnd = normalStreamEnd(input.reader, sequence);
     const auto sequenceRef = result.reserveSequence();
-    result.sequence(sequenceRef, name, input.reader.range(sequence.offset, sequenceEnd - sequence.offset))
+    result.sequence(sequenceRef, name, input.reader.range(sequence.offset, sequence.normalTrackEnd - sequence.offset))
         .program(parseSegSatSequenceProgram(input.reader, sequenceRef.id, sequence, &result.sourceMap(),
                                             &result.diagnostics()));
 
@@ -130,38 +101,6 @@ struct BankAssets {
   };
 }
 
-[[nodiscard]] std::vector<u8> sequenceBankAliases(const SequenceProgram& program) {
-  std::vector<u8> aliases;
-  for (const auto& track : program.tracks) {
-    for (const auto& command : track.commands) {
-      const auto bank =
-          std::ranges::find(command.operands, SemanticOperandRole::InstrumentBank, &SemanticOperand::role);
-      if (bank == command.operands.end()) {
-        continue;
-      }
-      const auto* value = std::get_if<u64>(&bank->value);
-      if (value == nullptr || *value > std::numeric_limits<u8>::max()) {
-        continue;
-      }
-      const u8 alias = static_cast<u8>(*value);
-      if (std::ranges::find(aliases, alias) == aliases.end()) {
-        aliases.push_back(alias);
-      }
-    }
-  }
-
-  // A stream without an explicit command starts on Saturn bank zero.
-  if (aliases.empty()) {
-    aliases.push_back(0);
-  } else {
-    // Collection discovery stores referenced banks in numeric order. Keep the
-    // reconstructed aliases in that same order so each selected instrument
-    // set is rebound to the source bank that caused it to be attached.
-    std::ranges::sort(aliases);
-  }
-  return aliases;
-}
-
 [[nodiscard]] PreparedCollectionAssets prepareSegSatCollection(const CollectionPrepareContext& context) {
   PreparedCollectionAssets prepared;
   if (!context.collection.sequence) {
@@ -172,9 +111,17 @@ struct BankAssets {
     return prepared;
   }
 
-  std::vector<SegSatBankBinding> bindings;
-  std::optional<SourceId> bindingSource;
-  const std::vector<u8> bankAliases = sequenceBankAliases(sequence->program);
+  std::vector<SegSatVelocityBank> velocityBanks;
+  velocityBanks.reserve(context.collection.instrumentSets.size());
+  const std::vector<u8> bankAliases = segSatSequenceBanks(sequence->program);
+  if (bankAliases.size() != context.collection.instrumentSets.size()) {
+    prepared.diagnostics.push_back(preparationWarning(
+        fmt::format("SegSat sequence refers to {} banks, but the collection contains {} instrument sets",
+                    bankAliases.size(), context.collection.instrumentSets.size()),
+        sequence->metadata.range));
+  }
+  auto& replacementInstrumentSets = prepared.replacementInstrumentSets.emplace();
+  replacementInstrumentSets.reserve(context.collection.instrumentSets.size());
   for (size_t bankIndex = 0; bankIndex < context.collection.instrumentSets.size(); ++bankIndex) {
     const AssetId asset = context.collection.instrumentSets[bankIndex];
     const auto* instruments = context.snapshot.asset<InstrumentSetAsset>(asset);
@@ -193,37 +140,29 @@ struct BankAssets {
       instrument.explicitAddress = InstrumentAddress{.bank = exportBank, .program = address.program};
       instrument.identity = segSatInstrumentIdentity(sourceBank, static_cast<u8>(address.program));
     }
-    prepared.replacementInstrumentSets.push_back(std::move(replacement));
+    replacementInstrumentSets.push_back(std::move(replacement));
 
     if (!instruments->metadata.range.valid() || !context.sources.contains(instruments->metadata.range.source)) {
       prepared.diagnostics.push_back(preparationWarning("SegSat preparation could not read an instrument bank source",
                                                         instruments->metadata.range));
       continue;
     }
-    if (bindingSource && *bindingSource != instruments->metadata.range.source) {
+    if (instruments->metadata.range.offset > std::numeric_limits<u32>::max()) {
       prepared.diagnostics.push_back(
-          preparationWarning("SegSat velocity banks came from different sources; only the first source was used",
-                             instruments->metadata.range));
+          preparationWarning("SegSat instrument bank offset is too large", instruments->metadata.range));
       continue;
     }
-    bindingSource = instruments->metadata.range.source;
     const ByteReader reader = context.sources.reader(instruments->metadata.range.source);
-    const auto layouts = findSegSatBanks(reader);
-    const auto layout =
-        std::ranges::find(layouts, static_cast<u32>(instruments->metadata.range.offset), &SegSatBankLayout::offset);
-    if (layout == layouts.end()) {
+    const auto layout = readSegSatBankLayout(reader, static_cast<u32>(instruments->metadata.range.offset));
+    if (!layout) {
       prepared.diagnostics.push_back(preparationWarning(
-          "SegSat preparation could not rediscover the selected instrument bank", instruments->metadata.range));
+          "SegSat preparation could not read the selected instrument bank", instruments->metadata.range));
       continue;
     }
-    bindings.push_back(SegSatBankBinding{
-        .layout = *layout,
-        .sourceBank = sourceBank,
-    });
+    velocityBanks.push_back(readSegSatVelocityBank(reader, *layout, sourceBank));
   }
 
-  if (!bindings.empty() && bindingSource && context.sources.contains(*bindingSource)) {
-    auto velocityBanks = readSegSatVelocityBanks(context.sources.reader(*bindingSource), bindings);
+  if (!velocityBanks.empty()) {
     prepared.finalizePerformance = [velocityBanks = std::move(velocityBanks)](PerformanceSequence& performance) {
       applySegSatVelocityTables(performance, velocityBanks);
     };

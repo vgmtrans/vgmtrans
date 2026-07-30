@@ -160,27 +160,28 @@ struct PreparedExport {
       continue;
     }
 
-    // A preparer returns the collection's authoritative export-time view.
-    // Durable scanned banks remain available for inspection, but formats such
-    // as Akao may need to bind them to collection-selected samples here.
-    prepared.instrumentSets.clear();
     try {
       auto result = module.prepareCollection(CollectionPrepareContext{
           .sources = sources,
           .snapshot = snapshot,
           .collection = collection,
       });
-      prepared.diagnostics.instrumentSets.insert(prepared.diagnostics.instrumentSets.end(),
-                                                 std::make_move_iterator(result.diagnostics.begin()),
-                                                 std::make_move_iterator(result.diagnostics.end()));
+      prepared.diagnostics.collection.insert(prepared.diagnostics.collection.end(),
+                                             std::make_move_iterator(result.diagnostics.begin()),
+                                             std::make_move_iterator(result.diagnostics.end()));
       prepared.finalizePerformance = std::move(result.finalizePerformance);
-      prepared.ownedInstrumentSets = std::move(result.replacementInstrumentSets);
-      prepared.instrumentSets.reserve(prepared.ownedInstrumentSets.size());
-      for (const auto& instrumentSet : prepared.ownedInstrumentSets) {
-        prepared.instrumentSets.push_back(&instrumentSet);
+      if (result.replacementInstrumentSets) {
+        // Replace the collection's instruments only when the format asks us to.
+        // A format that only changes sequence playback keeps the originals.
+        prepared.ownedInstrumentSets = std::move(*result.replacementInstrumentSets);
+        prepared.instrumentSets.clear();
+        prepared.instrumentSets.reserve(prepared.ownedInstrumentSets.size());
+        for (const auto& instrumentSet : prepared.ownedInstrumentSets) {
+          prepared.instrumentSets.push_back(&instrumentSet);
+        }
       }
     } catch (const std::exception& ex) {
-      prepared.diagnostics.instrumentSets.push_back(
+      prepared.diagnostics.collection.push_back(
           exportError(module.name + " collection preparation failed: " + ex.what()));
     }
     break;
@@ -212,7 +213,19 @@ struct SequenceRenderResult {
                                 })
                          .render(sequence.program, *dialect);
   if (finalizePerformance != nullptr && *finalizePerformance) {
-    (*finalizePerformance)(performance);
+    try {
+      (*finalizePerformance)(performance);
+    } catch (const std::exception& ex) {
+      auto diagnostics = std::move(performance.diagnostics);
+      diagnostics.push_back(exportError("Collection performance finalization failed: " + std::string(ex.what()),
+                                        validDiagnosticRange(sequence.metadata.range)));
+      return SequenceRenderResult{.diagnostics = std::move(diagnostics)};
+    } catch (...) {
+      auto diagnostics = std::move(performance.diagnostics);
+      diagnostics.push_back(
+          exportError("Collection performance finalization failed", validDiagnosticRange(sequence.metadata.range)));
+      return SequenceRenderResult{.diagnostics = std::move(diagnostics)};
+    }
   }
   auto modulation = analyzeSequenceModulation(performance);
   return SequenceRenderResult{
@@ -582,7 +595,9 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
 
   playback.midi = std::move(midi.bytes);
   playback.soundFont = std::move(soundFont.bytes);
-  playback.diagnostics = std::move(midi.diagnostics);
+  playback.diagnostics = prepared.diagnostics.collection;
+  playback.diagnostics.insert(playback.diagnostics.end(), std::make_move_iterator(midi.diagnostics.begin()),
+                              std::make_move_iterator(midi.diagnostics.end()));
   playback.diagnostics.insert(playback.diagnostics.end(), std::make_move_iterator(soundFont.diagnostics.begin()),
                               std::make_move_iterator(soundFont.diagnostics.end()));
   if (rendering.performance) {
@@ -729,6 +744,10 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     }
   }
 
+  for (auto& artifact : artifacts) {
+    artifact.diagnostics.insert(artifact.diagnostics.begin(), prepared.diagnostics.collection.begin(),
+                                prepared.diagnostics.collection.end());
+  }
   return artifacts;
 }
 

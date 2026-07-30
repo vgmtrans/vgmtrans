@@ -148,6 +148,7 @@ void segSatVlCurveMatchesMm8Saturation();
 void segSatCollectionPreparationSuppliesVlTablesToSequence();
 void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
 void segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
+void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources();
 void segSatSsfExtractorUsesFourByteMiniHeader();
 
 int main() {
@@ -293,6 +294,7 @@ int main() {
     segSatCollectionPreparationSuppliesVlTablesToSequence();
     segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
     segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
+    segSatCollectionPreparationReadsVelocityBanksFromSeparateSources();
     segSatSsfExtractorUsesFourByteMiniHeader();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';

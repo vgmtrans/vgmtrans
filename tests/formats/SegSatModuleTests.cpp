@@ -12,6 +12,8 @@
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
 
+#include "../core/SessionSnapshotBuilder.h"
+
 #include <zlib.h>
 
 #include <algorithm>
@@ -20,6 +22,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace vgmtrans::core;
@@ -194,6 +197,13 @@ std::vector<u8> multiBankVelocityFixture() {
   return bytes;
 }
 
+std::vector<u8> velocityBankSource(u8 totalLevel) {
+  constexpr u32 bank = 0x100;
+  std::vector<u8> bytes(0x300);
+  writeOneInstrumentBank(bytes, bank, 0x100, 4, totalLevel);
+  return bytes;
+}
+
 const SequenceProgramAsset& sequenceAsset(const SessionSnapshot& snapshot, const Collection& collection) {
   expect(collection.sequence.has_value(), "SegSat fixture collection should reference a sequence");
   const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.sequence);
@@ -352,15 +362,16 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
   const CollectionPlayback playback =
       session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
 
-  std::vector<const NotePerformanceEvent*> notes;
-  std::vector<u8> selectedBanks;
+  std::vector<std::pair<u8, const NotePerformanceEvent*>> notes;
+  u8 selectedBank = 0;
   for (const auto& event : playback.performance.tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-      notes.push_back(note);
+      notes.emplace_back(selectedBank, note);
     } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event);
-               instrument != nullptr && instrument->sourceInstrument &&
-               instrument->sourceInstrument->domain == kSegSatInstrumentDomain) {
-      selectedBanks.push_back(static_cast<u8>(instrument->sourceInstrument->key >> 8));
+               instrument != nullptr && instrument->sourceInstrument) {
+      if (const auto address = decodeSegSatInstrumentIdentity(*instrument->sourceInstrument)) {
+        selectedBank = address->sourceBank;
+      }
     }
   }
 
@@ -376,10 +387,97 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
       .level2 = 127,
       .rate3 = 2,
   };
-  expect(notes.size() == 2 && selectedBanks == std::vector<u8>({6, 6, 5}) &&
+  expect(notes.size() == 2 && notes[0].first == 6 && notes[1].first == 5 &&
+             LevelScale::midi7FromLinear(notes[0].second->linearVelocity) == segSatMidiVelocity(64, identity, 128, 0) &&
+             LevelScale::midi7FromLinear(notes[1].second->linearVelocity) == segSatMidiVelocity(64, identity, 0, 0),
+         "source bank aliases should remain paired with sorted collection banks regardless of command order");
+}
+
+void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources() {
+  SourceStore sources;
+  const SourceId bank5Source = sources.add(SourceFile{.name = "bank-5.bin"}, velocityBankSource(0));
+  const SourceId bank6Source = sources.add(SourceFile{.name = "bank-6.bin"}, velocityBankSource(128));
+
+  const std::vector<u8> sequenceBytes = multiBankVelocityFixture();
+  const ByteReader sequenceReader(SourceId{99}, sequenceBytes);
+  const auto sequenceLayouts = findSegSatSequences(sequenceReader);
+  expect(sequenceLayouts.size() == 1, "multi-source fixture should contain one sequence");
+
+  const SequenceProgramAsset sequence{
+      .metadata = AssetMetadata{.id = AssetId{0}, .format = "SegSat", .name = "Sequence"},
+      .program = parseSegSatSequenceProgram(sequenceReader, AssetId{0}, sequenceLayouts.front()),
+  };
+  const InstrumentSetAsset bank5{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{1},
+              .format = "SegSat",
+              .name = "Bank 5",
+              .range = SourceRange{.source = bank5Source, .offset = 0x100, .size = 0x58},
+          },
+      .instruments = {Instrument{
+          .explicitAddress = InstrumentAddress{.bank = 5, .program = 0},
+          .identity = segSatInstrumentIdentity(5, 0),
+      }},
+  };
+  const InstrumentSetAsset bank6{
+      .metadata =
+          AssetMetadata{
+              .id = AssetId{2},
+              .format = "SegSat",
+              .name = "Bank 6",
+              .range = SourceRange{.source = bank6Source, .offset = 0x100, .size = 0x58},
+          },
+      .instruments = {Instrument{
+          .explicitAddress = InstrumentAddress{.bank = 6, .program = 0},
+          .identity = segSatInstrumentIdentity(6, 0),
+      }},
+  };
+  const Collection collection{
+      .id = CollectionId{0},
+      .name = "Multi-source SegSat",
+      .sequence = sequence.metadata.id,
+      .instrumentSets = {bank5.metadata.id, bank6.metadata.id},
+  };
+  test::SessionSnapshotBuilder builder;
+  builder.sources = sources.sourceFiles();
+  builder.assets = {sequence, bank5, bank6};
+  builder.collections = {collection};
+  const SessionSnapshot snapshot = builder.finish();
+
+  const FormatDefinition format = segSatDefinition();
+  const PreparedCollectionAssets prepared = format.module.prepareCollection(CollectionPrepareContext{
+      .sources = sources,
+      .snapshot = snapshot,
+      .collection = snapshot.collections().front(),
+  });
+  expect(prepared.diagnostics.empty() && prepared.finalizePerformance,
+         "SegSat preparation should read attached banks from separate sources");
+
+  PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, segSatSequenceDialect());
+  prepared.finalizePerformance(performance);
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks.front().events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  const SegSatVlTable identity{
+      .rate0 = 2,
+      .point0 = 127,
+      .level0 = 127,
+      .rate1 = 2,
+      .point1 = 127,
+      .level1 = 127,
+      .rate2 = 2,
+      .point2 = 127,
+      .level2 = 127,
+      .rate3 = 2,
+  };
+  expect(notes.size() == 2 &&
              LevelScale::midi7FromLinear(notes[0]->linearVelocity) == segSatMidiVelocity(64, identity, 128, 0) &&
              LevelScale::midi7FromLinear(notes[1]->linearVelocity) == segSatMidiVelocity(64, identity, 0, 0),
-         "source bank aliases should remain paired with sorted collection banks regardless of command order");
+         "each note should use the VL table from its selected bank source");
 }
 
 void segSatSsfExtractorUsesFourByteMiniHeader() {

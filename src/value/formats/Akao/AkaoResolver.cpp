@@ -366,15 +366,17 @@ PreparedCollectionAssets prepareAkaoCollection(const CollectionPrepareContext& c
   InstrumentSetBuilder instruments(AssetId{}, nullptr, &prepared.diagnostics);
   (void)buildAkaoInstrumentSet(*input, *analysis, articulations, instruments);
   auto built = std::move(instruments).finish();
-  prepared.replacementInstrumentSets.push_back(InstrumentSetAsset{
-      .metadata =
-          AssetMetadata{
-              .format = std::string(kAkaoFormatName),
-              .name = detectedInstrumentSet->metadata.name,
-              .range = built.range,
-          },
-      .instruments = std::move(built.values),
-  });
+  prepared.replacementInstrumentSets = std::vector<InstrumentSetAsset>{
+      InstrumentSetAsset{
+          .metadata =
+              AssetMetadata{
+                  .format = std::string(kAkaoFormatName),
+                  .name = detectedInstrumentSet->metadata.name,
+                  .range = built.range,
+              },
+          .instruments = std::move(built.values),
+      },
+  };
   return prepared;
 }
 
