@@ -271,18 +271,30 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope) {
   const double secondDecay = *envelope.secondDecaySeconds;
   const double sustain = envelope.sustainAmplitude.value_or(1.0);
   const double firstDecayDropDb = sustain > 0.0 ? -20.0 * std::log10(sustain) : std::numeric_limits<double>::infinity();
-  const bool shortFirstDecay =
-      envelope.decaySeconds && std::isfinite(*envelope.decaySeconds) && *envelope.decaySeconds >= 0.0 &&
-      *envelope.decaySeconds < 2.0;
-  if (std::isfinite(secondDecay) && (sustain >= 1.0 || (firstDecayDropDb <= 1.0 && shortFirstDecay))) {
-    // A drop of at most 1 dB is barely audible. Ignore that short first stage
-    // and preserve the second decay instead of leaving the sound sustained.
+  constexpr double usefulDecayRangeDb = 70.0;
+  constexpr double negligibleStageSeconds = 0.02;
+  const double firstStageSeconds =
+      envelope.decaySeconds && std::isfinite(*envelope.decaySeconds) && *envelope.decaySeconds >= 0.0
+          ? *envelope.decaySeconds * std::clamp(firstDecayDropDb / usefulDecayRangeDb, 0.0, 1.0)
+          : std::numeric_limits<double>::infinity();
+  const bool negligibleFirstStage = firstDecayDropDb <= 1.0 && firstStageSeconds <= negligibleStageSeconds;
+  const bool briefFirstStage = firstStageSeconds <= 0.05;
+  constexpr double prominentDecayRateDbPerSecond = 7.0;
+  const bool prominentSecondStage = std::isfinite(secondDecay) && secondDecay > 0.0 &&
+                                    secondDecay <= usefulDecayRangeDb / prominentDecayRateDbPerSecond;
+  const bool useSecondDecay = negligibleFirstStage || (briefFirstStage && prominentSecondStage);
+  if (std::isfinite(secondDecay) && sustain >= 1.0) {
     envelope.decaySeconds = secondDecay;
     envelope.sustainAmplitude = 0.0;
   } else if (secondDecay >= 0.0 && secondDecay < 2.0) {
     // A short second decay sounds closer to one continuous fade than to a
     // permanent sustain level.
     envelope.decaySeconds = envelope.decaySeconds.value_or(0.0) + secondDecay;
+    envelope.sustainAmplitude = 0.0;
+  } else if (std::isfinite(secondDecay) && useSecondDecay) {
+    // Keep the audible fade when the first stage is negligible, or when it is
+    // only a brief lead-in to a much clearer decay.
+    envelope.decaySeconds = secondDecay;
     envelope.sustainAmplitude = 0.0;
   }
   envelope.secondDecaySeconds.reset();

@@ -86,6 +86,16 @@ void envelopePredicateDetectsCanonicalData() {
   expect(hasExplicitEnvelope(sustain), "envelope predicate should detect a specified sustain amplitude");
 }
 
+void adsrApproximationKeepsAudibleSecondDecay() {
+  const Envelope envelope = approximateEnvelopeAsAdsr(Envelope{
+      .decaySeconds = 1.009728,
+      .secondDecaySeconds = 5.100173,
+      .sustainAmplitude = 0.8125,
+  });
+  expect(envelope.decaySeconds == 5.100173 && !envelope.secondDecaySeconds && envelope.sustainAmplitude == 0.0,
+         "a brief first stage should not hide an audible second decay");
+}
+
 void physicalModulationLowersToLegacySynthControls() {
   constexpr double stepHertz = 1000.0 / 16384.0;
   const auto lowered = lowerSynthModulation(InstrumentModulation{
@@ -1240,6 +1250,7 @@ void runValueSynthExportTests() {
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   pcm16DecoderHonorsExplicitByteOrder();
   envelopePredicateDetectsCanonicalData();
+  adsrApproximationKeepsAudibleSecondDecay();
   physicalModulationLowersToLegacySynthControls();
   fixedPhysicalLfoValuesNeedNoZeroRangeModulators();
   regionModulationExportsAtTheRegionScope();

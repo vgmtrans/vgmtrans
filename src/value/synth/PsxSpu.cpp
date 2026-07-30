@@ -10,6 +10,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 namespace vgmtrans::core {
 
@@ -197,12 +198,8 @@ Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
   if (sustainLevel == 0) {
     realSustainLevel = 0x07ffffff;
   }
-  double sustainAmplitude = realSustainLevel / static_cast<double>(0x7fffffff);
-  if ((decaySeconds < 2.0 || (decayRate >= 0x0e && sustainLevel >= 0x0c)) && sustainRate < 0x7e &&
-      sustainDirection == 1) {
-    sustainAmplitude = 0.0;
-    decaySeconds = sustainSeconds;
-  }
+  const double sustainAmplitude = realSustainLevel / static_cast<double>(0x7fffffff);
+  const bool hasSecondDecay = sustainDirection != 0;
 
   envelopeLevel = 0x7fffffff;
   if (releaseMode == 0) {
@@ -250,6 +247,9 @@ Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
   return Envelope{
       .attackSeconds = attackSeconds,
       .decaySeconds = decaySeconds < 0.0 ? std::numeric_limits<double>::infinity() : decaySeconds,
+      .secondDecaySeconds =
+          hasSecondDecay ? std::optional{sustainRate == 0x7f ? std::numeric_limits<double>::infinity() : sustainSeconds}
+                         : std::nullopt,
       .releaseSeconds = releaseSeconds,
       .sustainAmplitude = sustainAmplitude,
   };

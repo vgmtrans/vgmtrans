@@ -829,8 +829,8 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
   const auto& region = instruments->instruments[0].regions[0];
   expect(region.keyRange.low == 0 && region.keyRange.high == 127 && std::abs(region.unityKey - 59.875) < 0.0001 &&
              std::abs(region.attenuationDb - 96.0) < 0.0001 && region.envelope.sustainAmplitude &&
-             std::abs(*region.envelope.sustainAmplitude - 97.0 / 128.0) < 0.0001,
-         "CPS3 regions should use driver units for tuning, wrapped gain adjustment, and sustain level");
+             region.envelope.secondDecaySeconds && std::abs(*region.envelope.sustainAmplitude - 97.0 / 128.0) < 0.0001,
+         "CPS3 regions should retain driver tuning, gain, sustain level, and sustain rate");
 
   const auto& sequenceTable = miscAt(result, 0x800, 0x100);
   const auto& sequencePointer = onlyChild(result, miscRoot(result, sequenceTable, "cps-sequence-pointer-table"));

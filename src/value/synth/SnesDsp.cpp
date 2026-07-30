@@ -236,26 +236,14 @@ struct SnesEnvelopeSeconds {
 }  // namespace
 
 Envelope snesDspEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
-  auto envelope = convertSnesAdsr(adsr1, adsr2, gain, 0x7ff);
-  if ((adsr1 & 0x80) != 0) {
-    const u8 sustainLevel = (adsr2 & 0xe0) >> 5;
-    if (sustainLevel == 7) {
-      envelope.decay = envelope.sustain;
-      if (envelope.sustain != -1.0) {
-        envelope.sustainLevel = 0.0;
-      }
-    } else if (envelope.sustain != -1.0) {
-      const double dbAtSustainStart = ampToDb(envelope.sustainLevel);
-      const double decayTimeRate = dbAtSustainStart / 100.0;
-      envelope.decay = (envelope.decay * decayTimeRate) + (envelope.sustain * (1.0 - decayTimeRate));
-      envelope.sustainLevel = 0.0;
-    }
-  }
+  const auto envelope = convertSnesAdsr(adsr1, adsr2, gain, 0x7ff);
+  const bool adsrEnabled = (adsr1 & 0x80) != 0;
 
   return Envelope{
       .attackSeconds = envelopeSeconds(envelope.attack),
       .holdSeconds = 0.0,
       .decaySeconds = envelopeSeconds(envelope.decay),
+      .secondDecaySeconds = adsrEnabled ? std::optional{envelopeSeconds(envelope.sustain)} : std::nullopt,
       .releaseSeconds = envelopeSeconds(envelope.release),
       .sustainAmplitude = std::clamp(envelope.sustainLevel, 0.0, 1.0),
   };
