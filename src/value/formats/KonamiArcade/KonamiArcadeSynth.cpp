@@ -113,11 +113,11 @@ constexpr u8 kDriverInstrumentAttenuation = 16;
 
 }  // namespace
 
-bool addKonamiArcadeSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
-                          ScanSampleCollectionRef sampleCollection, const KonamiArcadeLayout& layout) {
+ScanSynthRefs addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiArcadeLayout& layout) {
   const ByteReader reader = builder.reader();
-  auto samples = builder.samples(sampleCollection);
-  samples.include(layout.sound);
+  const u32 melodicCount = std::min<u32>(layout.melodicSampleCount, static_cast<u32>(layout.sampleInfos.size()));
+  auto instruments = builder.instrumentSet(layout.game + " Instruments");
+  auto samples = builder.sampleCollection(layout.game + " Samples", layout.sound);
 
   for (u32 index = 0; index < layout.sampleInfos.size(); ++index) {
     const auto& info = layout.sampleInfos[index];
@@ -136,6 +136,7 @@ bool addKonamiArcadeSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instr
       samples.warning("KonamiArcade sample data range is outside the sound ROM region", info.range);
       continue;
     }
+
     const SourceRange encoded = reader.range(layout.sound.offset + relativeStart, *byteLength);
     const u32 frameCount = decodedFrames(info.type, *byteLength);
     const u32 loopStart = decodedLoopStart(info, *byteLength);
@@ -164,11 +165,9 @@ bool addKonamiArcadeSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instr
         .source(name + " Info", info.range, "konami-arcade-sample-info");
   }
   if (samples.empty()) {
-    return false;
+    samples.warning("KonamiArcade sample table contained no usable sample data", layout.sound);
   }
 
-  auto instruments = builder.instruments(instrumentSet);
-  const u32 melodicCount = std::min<u32>(layout.melodicSampleCount, static_cast<u32>(layout.sampleInfos.size()));
   if (melodicCount != 0) {
     const SourceRange tableRange{
         .source = layout.code.source,
@@ -251,11 +250,12 @@ bool addKonamiArcadeSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instr
   }
 
   if (instruments.empty()) {
-    return false;
+    instruments.warning("KonamiArcade layout contained no usable instruments", layout.code);
   }
-  builder.instrumentSet(layout.game + " Instruments", std::move(instruments));
-  builder.sampleCollection(layout.game + " Samples", std::move(samples));
-  return true;
+  return ScanSynthRefs{
+      .instruments = instruments.ref(),
+      .samples = samples.ref(),
+  };
 }
 
 }  // namespace vgmtrans::formats::konami_arcade

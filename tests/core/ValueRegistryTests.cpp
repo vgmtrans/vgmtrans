@@ -91,19 +91,16 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
                                 .dialect = DialectId{.value = "probe"},
                                 .timebase = Timebase{.ppqn = 48},
                             });
-  const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1)).instruments({});
-
-  SampleCollection sampleCollection;
-  sampleCollection.samples.push_back(Sample{
-      .name = "Builder Sample",
-      .codec = AudioCodec::PcmS8,
-      .encodedData = input.reader.range(1, 2),
-      .sampleRate = 32000,
-      .channels = 1,
-      .bitsPerSample = 8,
-  });
-  const auto samples =
-      out.sampleCollection("Builder Samples", input.reader.range(1, 2)).samples(std::move(sampleCollection));
+  const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1));
+  auto samples = out.sampleCollection("Builder Samples", input.reader.range(1, 2));
+  samples.add(0, Sample{
+                     .name = "Builder Sample",
+                     .codec = AudioCodec::PcmS8,
+                     .encodedData = input.reader.range(1, 2),
+                     .sampleRate = 32000,
+                     .channels = 1,
+                     .bitsPerSample = 8,
+                 });
 
   out.collection("Builder Song", CollectionKey{.resolver = "ProbeBuilder", .value = "song:1"})
       .sequence(sequence)
@@ -119,11 +116,11 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   expect(metadata(result.assets[2]).id == AssetId{2}, "scan result builder should assign sample metadata");
   expect(result.matchFacts.empty(), "scan result builder should not need match facts for explicit collections");
   expect(result.explicitCollections.size() == 1, "scan result builder should emit one explicit collection");
-  expect(result.explicitCollections[0].sequence == sequence.id,
+  expect(result.explicitCollections[0].sequence == sequence.id(),
          "scan result builder should preserve the collection sequence");
-  expect(result.explicitCollections[0].instrumentSets == std::vector<AssetId>{bank.id},
+  expect(result.explicitCollections[0].instrumentSets == std::vector<AssetId>{bank.id()},
          "scan result builder should preserve the collection instrument set");
-  expect(result.explicitCollections[0].sampleCollections == std::vector<AssetId>{samples.id},
+  expect(result.explicitCollections[0].sampleCollections == std::vector<AssetId>{samples.id()},
          "scan result builder should preserve the collection sample collection");
   expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
          "scan result builder should preserve diagnostics");
@@ -150,14 +147,14 @@ void scanResultBuilderNamesSourceCollections() {
          "source collection identity should not depend on its display name");
 }
 
-void scanResultBuilderRejectsReferencedUncommittedHandles() {
+void scanResultBuilderRejectsIncompleteSequenceDrafts() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "builder-uncommitted.probe"}, {0xaa});
   ScanIdAllocator ids;
   ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
 
   ScanResultBuilder out(input, "ProbeBuilder");
-  const auto sequence = out.reserveSequence();
+  const auto sequence = out.sequence("Incomplete Sequence");
   out.collection("Broken").sequence(sequence);
 
   bool threw = false;
@@ -166,7 +163,7 @@ void scanResultBuilderRejectsReferencedUncommittedHandles() {
   } catch (const std::logic_error&) {
     threw = true;
   }
-  expect(threw, "scan result builder should reject referenced handles that were never added");
+  expect(threw, "scan result builder should reject a sequence draft that was never given a program");
 }
 
 void scanResultBuilderRejectsWrongRoleHandleReuse() {
@@ -176,35 +173,33 @@ void scanResultBuilderRejectsWrongRoleHandleReuse() {
   ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
 
   ScanResultBuilder out(input, "ProbeBuilder");
-  const auto sequence = out.reserveSequence();
+  const auto sequence = out.sequence("Sequence").program(SequenceProgram{});
 
   bool threw = false;
   try {
-    out.collection("Broken").instrumentSet(ScanInstrumentSetRef{.id = sequence.id});
+    out.collection("Broken").instrumentSet(ScanInstrumentSetRef{.id = sequence.id()});
   } catch (const std::logic_error&) {
     threw = true;
   }
   expect(threw, "scan result builder should reject using one handle id with the wrong role");
 }
 
-void scanResultBuilderRejectsUncommittedSampleRefs() {
+void scanResultBuilderPublishesEmptySynthDrafts() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "builder-sample-ref.probe"}, {0xaa});
   ScanIdAllocator ids;
   ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
 
   ScanResultBuilder out(input, "ProbeBuilder");
-  const auto samples = out.reserveSampleCollection();
-  const SampleRef ref = out.sampleRef(samples, 7);
-  expect(ref.collection == samples.id && ref.index == 7, "scan result builder should create typed sample refs");
-
-  bool threw = false;
-  try {
-    static_cast<void>(out.finish());
-  } catch (const std::logic_error&) {
-    threw = true;
-  }
-  expect(threw, "scan result builder should reject sample refs to collections that were never added");
+  const auto samples = out.sampleCollection("Recognized Samples");
+  const auto instruments = out.instrumentSet("Recognized Instruments");
+  const ScanResult result = out.finish();
+  expect(result.assets.size() == 2 && metadata(result.assets[0]).id == samples.id() &&
+             metadata(result.assets[1]).id == instruments.id(),
+         "creating a synth draft should publish it in creation order even when it remains empty");
+  expect(std::get<SampleCollectionAsset>(result.assets[0]).samples.samples.empty() &&
+             std::get<InstrumentSetAsset>(result.assets[1]).instruments.empty(),
+         "empty published synth assets should remain ordinary visible assets");
 }
 
 void scanResultBuilderCursorReportsMalformedFields() {
@@ -245,8 +240,8 @@ void runValueRegistryTests() {
   sessionRegistersOneFormatDefinitionAtTheAuthoringSurface();
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderNamesSourceCollections();
-  scanResultBuilderRejectsReferencedUncommittedHandles();
+  scanResultBuilderRejectsIncompleteSequenceDrafts();
   scanResultBuilderRejectsWrongRoleHandleReuse();
-  scanResultBuilderRejectsUncommittedSampleRefs();
+  scanResultBuilderPublishesEmptySynthDrafts();
   scanResultBuilderCursorReportsMalformedFields();
 }

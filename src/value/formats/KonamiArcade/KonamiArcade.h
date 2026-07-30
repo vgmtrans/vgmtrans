@@ -113,9 +113,8 @@ struct KonamiArcadeLayout {
                                                                core::SourceMapBuilder* sourceMap = nullptr,
                                                                std::vector<core::Diagnostic>* diagnostics = nullptr);
 
-[[nodiscard]] bool addKonamiArcadeSynth(core::ScanResultBuilder& builder, core::ScanInstrumentSetRef instrumentSet,
-                                        core::ScanSampleCollectionRef sampleCollection,
-                                        const KonamiArcadeLayout& layout);
+[[nodiscard]] core::ScanSynthRefs addKonamiArcadeSynth(core::ScanResultBuilder& builder,
+                                                       const KonamiArcadeLayout& layout);
 
 [[nodiscard]] core::FormatDefinition konamiArcadeDefinition();
 

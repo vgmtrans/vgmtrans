@@ -1000,22 +1000,20 @@ void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "CapcomSnes");
-  const auto instrumentSet = result.reserveInstrumentSet();
-  const auto sampleCollection = result.reserveSampleCollection();
-  expect(addCapcomSnesSynth(result, instrumentSet, sampleCollection, 0x4000, 0x5000, "Sparse"),
-         "CapcomSnes synth builder fixture should accept sparse instrument entries");
+  const auto synth = addCapcomSnesSynth(result, 0x4000, 0x5000, "Sparse");
+  expect(synth.has_value(), "CapcomSnes synth builder fixture should accept sparse instrument entries");
   const ScanResult scan = result.finish();
   const auto* builtInstruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
   expect(builtInstruments != nullptr && builtInstruments->instruments.size() == 2,
          "CapcomSnes builder should retain both sparse instruments");
   expect(builtInstruments->instruments[1].identity && builtInstruments->instruments[1].identity->key == 2,
          "a sparse source identity should remain distinct from its dense model position");
-  const auto secondInstrumentSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentSet.id, 1));
+  const auto secondInstrumentSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->instruments.id, 1));
   expect(secondInstrumentSources.size() == 1 && scan.sourceMap.get(secondInstrumentSources[0]).range.offset == 0x400c,
          "CapcomSnes annotations should use dense instrument ownership while preserving sparse source ranges");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentSet.id, 2)).empty(),
+  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->instruments.id, 2)).empty(),
          "a sparse source program must not leak into the dense annotation owner");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::region(instrumentSet.id, 1, 0)).size() == 1,
+  expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->instruments.id, 1, 0)).size() == 1,
          "CapcomSnes sparse instruments should expose stable region ownership");
 
   std::vector<u8> fullTable(0x10000);

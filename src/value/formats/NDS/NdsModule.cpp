@@ -19,8 +19,8 @@ using namespace core;
 namespace {
 
 struct BankAssets {
-  std::optional<ScanInstrumentSetRef> instruments;
-  std::array<std::optional<ScanSampleCollectionRef>, 4> samples;
+  std::optional<ScanInstrumentSetDraft> instruments;
+  std::array<std::optional<ScanSampleCollectionDraft>, 4> samples;
 };
 
 // Gives each sequence collection a stable identity within its source SDAT.
@@ -56,7 +56,7 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
     }
   }
 
-  std::vector<std::optional<ScanSampleCollectionRef>> waveAssets(layout.waveArchives.size());
+  std::vector<std::optional<ScanSampleCollectionDraft>> waveAssets(layout.waveArchives.size());
   for (const u16 waveIndex : referencedWaves) {
     const auto& wave = layout.waveArchives[waveIndex];
     if (wave.file) {
@@ -86,9 +86,9 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
 
     const NdsSequenceRange range = ndsSequenceRangeForFatEntry(reader, *sequence.file);
     const SourceRange sourceRange = reader.range(range.offset, range.sequenceEnd - range.offset);
-    const auto sequenceAsset = result.reserveSequence();
-    result.sequence(sequenceAsset, sequence.name, sourceRange)
-        .program(parseNdsSequenceProgram(reader, sequenceAsset.id, range, &result.sourceMap(), &result.diagnostics()));
+    auto sequenceAsset = result.sequence(sequence.name, sourceRange);
+    sequenceAsset.program(
+        parseNdsSequenceProgram(reader, sequenceAsset.id(), range, &result.sourceMap(), &result.diagnostics()));
 
     auto collection =
         result.collection(sequence.name, ndsCollectionKey(result.source(), layout.range.offset, sequenceIndex));

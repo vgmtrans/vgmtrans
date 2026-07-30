@@ -218,7 +218,7 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
          "genuinely derived values without ranges should not receive fabricated annotations");
 }
 
-void scanResultBuilderCommitsSynthBuildersExplicitly() {
+void scanResultBuilderOwnsSynthDraftsUntilFinish() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "synth-builder.probe"}, std::vector<u8>(64));
   ScanIdAllocator ids;
@@ -228,11 +228,11 @@ void scanResultBuilderCommitsSynthBuildersExplicitly() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
-  const auto instrumentRef = result.reserveInstrumentSet();
-  const auto sampleRef = result.reserveSampleCollection();
+  auto instruments = result.instrumentSet("Probe Instruments", input.reader.range(8, 8));
+  auto samples = result.sampleCollection("Probe Samples", input.reader.range(0, 8));
+  const auto instrumentRef = instruments.ref();
+  const auto sampleRef = samples.ref();
 
-  auto samples = result.samples(sampleRef);
-  samples.include(input.reader.range(0, 8));
   const auto concreteSample = samples
                                   .add(12,
                                        Sample{
@@ -241,28 +241,24 @@ void scanResultBuilderCommitsSynthBuildersExplicitly() {
                                        })
                                   .ref();
 
-  auto instruments = result.instruments(instrumentRef);
-  instruments.include(input.reader.range(8, 8));
   auto instrument = instruments.add(90, Instrument{.name = "Probe Instrument"});
   instrument.source("Probe Instrument", input.reader.range(8, 4));
   instrument.region(concreteSample, Region{}).source("Region", input.reader.range(12, 4));
 
-  result.instrumentSet("Probe Instruments", std::move(instruments));
-  result.sampleCollection("Probe Samples", std::move(samples));
   const ScanResult scan = result.finish();
 
-  expect(scan.assets.size() == 2, "consuming synth-builder commits should add two ordinary assets");
+  expect(scan.assets.size() == 2, "finish should materialize the two result-owned synth drafts");
   const auto* instrumentAsset = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
   const auto* sampleAsset = std::get_if<SampleCollectionAsset>(&scan.assets[1]);
   expect(instrumentAsset != nullptr && sampleAsset != nullptr,
-         "consuming commits should preserve explicit instrument-then-sample asset order");
+         "draft creation order should determine materialized asset order");
   expect(
       instrumentAsset->metadata.id == instrumentRef.id && instrumentAsset->metadata.range == input.reader.range(8, 8),
-      "instrument commit should use the builder's reserved id and accumulated range");
+      "instrument materialization should use the draft's stable id and accumulated range");
   expect(sampleAsset->metadata.id == sampleRef.id && sampleAsset->metadata.range == input.reader.range(0, 8),
-         "sample commit should use the builder's reserved id and included range");
+         "sample materialization should use the draft's stable id and included range");
   expect(instrumentAsset->instruments[0].regions[0].sample.collection == sampleRef.id,
-         "concrete sample references should survive the builder commit boundary");
+         "concrete sample references should survive the finish boundary");
   expect(!scan.sourceMap.ownedBy(ObjectRefs::region(instrumentRef.id, 0, 0)).empty(),
          "scan-time builders should publish stable region ownership into the finished source map");
 }
@@ -278,21 +274,19 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
 
-  auto samples = result.samples();
-  const AssetId samplesAsset = samples.assetId();
+  auto samples = result.sampleCollection("Sparse Samples");
+  const AssetId samplesAsset = samples.id();
   samples.add(12, Sample{.name = "Sparse Sample", .encodedData = input.reader.range(32, 4)});
   samples.alias(20, 12);
-  const auto sampleCollection = result.sampleCollection("Sparse Samples", std::move(samples));
-  const auto sample = result.sampleByKey(sampleCollection, 20);
+  const auto sample = samples.find(20);
   expect(sample && sample->collection == samplesAsset && sample->index == 0,
-         "a consumed sample builder should retain sparse and alias keys for later instrument tables");
-  expect(!result.sampleByKeyOrWarning(sampleCollection, 99, "Required sample 99", input.reader.range(4, 1)),
-         "the shared lookup helper should reject a missing source key");
-  expect(!result.sampleByKeyOrWarning(std::nullopt, 12, "Required sample collection", input.reader.range(5, 1)),
-         "the shared lookup helper should reject an absent sample collection");
+         "a sample draft should retain sparse and alias keys for later instrument tables");
+  if (!samples.find(99)) {
+    samples.warning("Required sample 99 was not found", input.reader.range(4, 1));
+  }
 
-  auto instruments = result.instruments();
-  const AssetId instrumentsAsset = instruments.assetId();
+  auto instruments = result.instrumentSet("Prebuilt Instruments");
+  const AssetId instrumentsAsset = instruments.id();
   auto instrument = instruments.add(7, Instrument{
                                            .name = "Prebuilt Instrument",
                                            .range = input.reader.range(8, 8),
@@ -306,15 +300,12 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
          "regionAt should expose a region supplied in the ordinary Instrument value");
   instrument.regionAt(0).source("Prebuilt Region", input.reader.range(12, 4), "probe-prebuilt-region");
   expect(!instrument.regionAt(1), "regionAt should reject an index outside the prebuilt region vector");
-  result.instrumentSet("Prebuilt Instruments", std::move(instruments));
-
   const ScanResult scan = result.finish();
   expect(scan.assets.size() == 2 && metadata(scan.assets[0]).id == samplesAsset &&
              metadata(scan.assets[1]).id == instrumentsAsset,
-         "auto-reserving synth builders should commit ordinary assets with their reserved IDs");
-  expect(scan.diagnostics.size() == 2 && scan.diagnostics[0].message == "Required sample 99 was not found" &&
-             scan.diagnostics[1].message == "Required sample collection was not found",
-         "the shared missing-sample helper should explain missing keys and collections");
+         "result-owned drafts should materialize ordinary assets with stable IDs");
+  expect(scan.diagnostics.size() == 1 && scan.diagnostics[0].message == "Required sample 99 was not found",
+         "a draft should report a format-authored warning through the shared diagnostic stream");
   const auto regionSources = scan.sourceMap.ownedBy(ObjectRefs::region(instrumentsAsset, 0, 0));
   expect(regionSources.size() == 1 && scan.sourceMap.get(regionSources[0]).localKind == "probe-prebuilt-region",
          "a prebuilt region should accept an exact source record without being removed and added again");
@@ -330,14 +321,14 @@ void valueEscapeHatchContributesFinalRanges() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
-  const auto instrumentRef = result.reserveInstrumentSet();
-  const auto sampleRef = result.reserveSampleCollection();
+  auto instruments = result.instrumentSet("Late Instruments");
+  auto samples = result.sampleCollection("Late Samples");
+  const auto instrumentRef = instruments.ref();
+  const auto sampleRef = samples.ref();
 
-  auto samples = result.samples(sampleRef);
   auto sample = samples.add(0, Sample{.name = "Late Sample"});
   sample.value().encodedData = input.reader.range(32, 9);
 
-  auto instruments = result.instruments(instrumentRef);
   auto instrument = instruments.add(0, Instrument{.name = "Late Instrument"});
   instrument.value().range = input.reader.range(8, 4);
   instrument.source("Late Instrument", input.reader.range(8, 4));
@@ -345,8 +336,6 @@ void valueEscapeHatchContributesFinalRanges() {
   region.value().range = input.reader.range(12, 4);
   region.source("Late Region", input.reader.range(12, 4));
 
-  result.instrumentSet("Late Instruments", std::move(instruments));
-  result.sampleCollection("Late Samples", std::move(samples));
   const ScanResult scan = result.finish();
   const auto* instrumentAsset = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
   const auto* sampleAsset = std::get_if<SampleCollectionAsset>(&scan.assets[1]);
@@ -361,6 +350,37 @@ void valueEscapeHatchContributesFinalRanges() {
              !scan.sourceMap.ownedBy(ObjectRefs::region(instrumentRef.id, 0, 0)).empty() &&
              !scan.sourceMap.ownedBy(ObjectRefs::sample(sampleRef.id, 0)).empty(),
          "late source-backed values should still receive generic annotations with durable owners");
+}
+
+void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "stable-draft.probe"}, std::vector<u8>(64));
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+  ScanResultBuilder result(input, "SynthBuilderProbe");
+  auto samples = result.sampleCollection("Stable Samples");
+  auto sample = samples.add(7, Sample{.name = "Stable Sample", .encodedData = input.reader.range(32, 4)});
+
+  // Growing the result must not invalidate a draft proxy or an entry returned
+  // from one of its domain builders.
+  for (u32 index = 0; index < 64; ++index) {
+    result.misc("Padding", input.reader.range(index, 1)).payload({static_cast<u8>(index)});
+  }
+  samples.alias(9, 7);
+  sample.source("Stable Sample", input.reader.range(12, 4), "probe-stable-sample");
+  const auto alias = samples.find(9);
+
+  const ScanResult scan = result.finish();
+  const auto& sampleAsset = std::get<SampleCollectionAsset>(scan.assets.front());
+  expect(sampleAsset.samples.samples.size() == 1 && samples.id() == sampleAsset.metadata.id &&
+             alias && alias->collection == samples.id() && alias->index == 0,
+         "draft proxies and sparse lookups should survive growth of the result-owned draft list");
+  expect(scan.sourceMap.ownedBy(ObjectRefs::sample(samples.id(), 0)).size() == 1,
+         "entries obtained before result growth should still publish their source annotations");
 }
 
 void detachedBuildersUseTheSameAuthoringSurface() {
@@ -399,8 +419,9 @@ void runValueSynthBuilderTests() {
   recordReaderFinishesOnePortableSourceValue();
   sampleBuilderKeepsKeysDenseAndAnnotationsOwned();
   instrumentBuilderGroupsEntriesAndProjectsRegionIdentity();
-  scanResultBuilderCommitsSynthBuildersExplicitly();
+  scanResultBuilderOwnsSynthDraftsUntilFinish();
   scanResultBuilderRetainsSampleKeysAndExposesExistingRegions();
   valueEscapeHatchContributesFinalRanges();
+  scanResultBuilderDraftViewsRemainStableAsTheResultGrows();
   detachedBuildersUseTheSameAuthoringSurface();
 }

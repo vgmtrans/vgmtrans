@@ -300,7 +300,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   ScanResultBuilder out(input, "ProbeMisc");
   const SourceRange range = input.reader.range(0, input.reader.size());
   const auto asset = out.misc(input.source.name, range).payload({input.reader.u8At(0), input.reader.u8At(1)});
-  out.sourceMap().annotation(SourceRole::Payload, input.source.name, range).owner(ObjectRefs::misc(asset.id));
+  out.sourceMap().annotation(SourceRole::Payload, input.source.name, range).owner(ObjectRefs::misc(asset.id()));
   return out.finish();
 }
 
@@ -325,12 +325,12 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
                             });
   out.sourceMap()
       .header("Probe Header", input.reader.range(0, 1))
-      .owner(ObjectRefs::sequence(sequence.id))
+      .owner(ObjectRefs::sequence(sequence.id()))
       .field("Magic", input.reader.range(0, 1), input.reader.u8At(0), SourceValueDisplay::Hex);
   if (input.reader.size() > 1) {
     out.sourceMap()
         .annotation(SourceRole::Payload, "Probe Payload", input.reader.range(1, input.reader.size() - 1))
-        .owner(ObjectRefs::sequence(sequence.id));
+        .owner(ObjectRefs::sequence(sequence.id()));
   }
   out.collection(input.source.name,
                  CollectionKey{.resolver = "ProbeExplicit", .value = "source:" + std::to_string(input.source.id.value)})

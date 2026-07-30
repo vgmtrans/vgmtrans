@@ -113,8 +113,15 @@ struct AkaoSequenceAnalysis {
   std::vector<u32> requiredArticulations;
 };
 
+// Parsing the header establishes that the block is a publishable sequence.
+// Decoding commands happens afterward, once its result-owned asset ID exists.
+struct AkaoSequenceLayout {
+  AkaoSequenceHeader header;
+  std::vector<u32> trackAddresses;
+};
+
 struct AkaoSequenceParse {
-  core::SequenceProgramAsset asset;
+  core::SequenceProgram program;
   AkaoSequenceAnalysis analysis;
 };
 
@@ -168,10 +175,11 @@ struct AkaoSplitSampleLocation {
 [[nodiscard]] AkaoSequenceReferences akaoSequenceReferences(const core::TrackProgram& track);
 [[nodiscard]] std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(const core::ScanInput& input,
                                                                       const core::SequenceProgramAsset& sequence);
-[[nodiscard]] std::optional<AkaoSequenceParse> parseAkaoSequence(const core::ScanInput& input, core::AssetId id,
-                                                                 u32 offset,
-                                                                 core::SourceMapBuilder* sourceMap = nullptr,
-                                                                 std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const core::ScanInput& input, u32 offset);
+[[nodiscard]] AkaoSequenceParse parseAkaoSequence(const core::ScanInput& input, core::AssetId id,
+                                                  const AkaoSequenceLayout& layout,
+                                                  core::SourceMapBuilder* sourceMap = nullptr,
+                                                  std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] std::vector<core::SequenceDialect> akaoSequenceDialects();
 
 [[nodiscard]] std::optional<AkaoSplitSampleLocation> ff7HardcodedAkaoSampleLocation(core::ByteReader reader);
@@ -185,11 +193,9 @@ struct AkaoSplitSampleLocation {
                                                                                      AkaoSplitSampleLocation location);
 [[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const core::ScanInput& input,
                                                                                  core::ScanResultBuilder& result,
-                                                                                 core::ScanSampleCollectionRef ref,
                                                                                  u32 offset, AkaoPs1Version version);
 [[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const core::ScanInput& input,
                                                                                  core::ScanResultBuilder& result,
-                                                                                 core::ScanSampleCollectionRef ref,
                                                                                  AkaoSplitSampleLocation location);
 
 [[nodiscard]] std::string akaoInstrumentSetName(const AkaoSequenceAnalysis& sequence);

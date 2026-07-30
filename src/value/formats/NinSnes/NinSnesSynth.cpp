@@ -336,10 +336,10 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
 
 }  // namespace
 
-bool addSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet, ScanSampleCollectionRef sampleCollection,
-              const Layout& layout, const SequenceRecipes& recipes, std::string_view displayName) {
+std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout, const SequenceRecipes& recipes,
+                                      std::string_view displayName) {
   if (!layout.instrumentTableAddress || !layout.spcDirAddress) {
-    return false;
+    return std::nullopt;
   }
   const ByteReader reader = builder.reader();
   std::vector<InstrumentInfo> instruments = collectBaseInstruments(reader, layout);
@@ -349,16 +349,17 @@ bool addSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet, Sc
   instruments.insert(instruments.end(), percussion.begin(), percussion.end());
   const SnesBrrCatalog catalog = collectSamples(reader, layout, instruments);
   if (instruments.empty() || catalog.samples.empty()) {
-    return false;
+    return std::nullopt;
   }
 
-  auto samples = builder.samples(sampleCollection);
-  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(samples, reader, catalog);
-  auto instrumentBuilder = builder.instruments(instrumentSet);
-  addInstruments(instrumentBuilder, reader, layout, recipes, instruments, sampleRefs);
-  builder.instrumentSet(fmt::format("{} Instruments", displayName), std::move(instrumentBuilder));
-  builder.sampleCollection(fmt::format("{} Samples", displayName), std::move(samples));
-  return true;
+  auto instrumentDraft = builder.instrumentSet(fmt::format("{} Instruments", displayName));
+  auto samples = builder.sampleCollection(fmt::format("{} Samples", displayName));
+  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(samples.builder(), reader, catalog);
+  addInstruments(instrumentDraft.builder(), reader, layout, recipes, instruments, sampleRefs);
+  return ScanSynthRefs{
+      .instruments = instrumentDraft.ref(),
+      .samples = samples.ref(),
+  };
 }
 
 }  // namespace vgmtrans::formats::nin_snes

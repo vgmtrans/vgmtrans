@@ -25,11 +25,9 @@ namespace {
 
   ScanResultBuilder result(input, "CapcomSnes");
   const std::string displayName = result.sourceDisplayName();
-  const auto sequence = result.reserveSequence();
-
-  result.sequence(sequence, displayName, layout->sequenceHeaderRange)
-      .program(
-          decodeCapcomSnesSequence(input.reader, *layout, sequence.id, &result.sourceMap(), &result.diagnostics()));
+  auto sequence = result.sequence(displayName, layout->sequenceHeaderRange);
+  sequence.program(
+      decodeCapcomSnesSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
   auto collection = result.sourceCollection(displayName);
   collection.sequence(sequence);
@@ -38,11 +36,9 @@ namespace {
     result.warning("CapcomSnes sequence found, but instrument table or SPC DIR address was not detected",
                    input.reader.range(0, input.reader.size()));
   } else {
-    const auto instrumentSet = result.reserveInstrumentSet();
-    const auto samples = result.reserveSampleCollection();
-    if (addCapcomSnesSynth(result, instrumentSet, samples, *layout->instrumentTableAddress, *layout->spcDirAddress,
-                           displayName)) {
-      collection.instrumentSet(instrumentSet).samples(samples);
+    if (const auto synth =
+            addCapcomSnesSynth(result, *layout->instrumentTableAddress, *layout->spcDirAddress, displayName)) {
+      collection.instrumentSet(synth->instruments).samples(synth->samples);
     } else {
       result.warning("CapcomSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));

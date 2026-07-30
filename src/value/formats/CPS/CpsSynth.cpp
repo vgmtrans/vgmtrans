@@ -287,8 +287,8 @@ struct QSoundSampleInfo {
   return raw < sampleCount ? raw : 0;
 }
 
-void addQSoundRegion(InstrumentSetBuilder& instruments, InstrumentSetBuilder::Entry instrument,
-                     const SampleCollectionBuilder& samples, const std::vector<QSoundSampleInfo>& sampleInfos,
+void addQSoundRegion(ScanInstrumentSetDraft& instruments, InstrumentSetBuilder::Entry instrument,
+                     const ScanSampleCollectionDraft& samples, const std::vector<QSoundSampleInfo>& sampleInfos,
                      CpsVersion version, SourceRange range, u32 rawSample, s8 fineTune, u8 attack, u8 decay,
                      u8 sustainLevel, u8 sustain, u8 release, KeyRange keys = {}, double pan = 0.5,
                      double attenuationDb = 0.0) {
@@ -319,52 +319,59 @@ void addQSoundRegion(InstrumentSetBuilder& instruments, InstrumentSetBuilder::En
 
 }  // namespace
 
-Cps1SynthAvailability addCps1Synth(ScanResultBuilder& builder, ScanInstrumentSetRef ymInstrumentSet,
-                                   ScanInstrumentSetRef okiInstrumentSet, ScanSampleCollectionRef sampleCollection,
-                                   CpsLayout& layout) {
-  Cps1SynthAvailability availability;
+Cps1SynthRefs addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
+  Cps1SynthRefs refs;
   const ByteReader reader = builder.reader();
   const u32 patchSize = layout.version == CpsVersion::Cps1V200 || layout.version == CpsVersion::Cps1V500 ||
                                 layout.version == CpsVersion::Cps1V502
                             ? 32
                             : 40;
-  auto ym = builder.instruments(ymInstrumentSet);
-  ym.include(reader.range(layout.instrumentTableOffset, layout.instrumentTableLength));
-  ym.source(SourceRole::Table, "YM2151 Patch Table",
-            reader.range(layout.instrumentTableOffset, layout.instrumentTableLength), "cps1-ym2151-patch-table");
 
   const u32 patchCount = std::min<u32>(127, layout.instrumentTableLength / patchSize);
+  // Determine publication before creating a draft. Transposes are also needed
+  // by sequence decoding, so this small plan is useful beyond asset emission.
+  std::vector<u32> patchOffsets;
   layout.cps1InstrumentTransposes.clear();
   for (u32 index = 0; index < patchCount; ++index) {
     const u32 offset = layout.instrumentTableOffset + index * patchSize;
     if (!reader.has(offset, patchSize) || (all(reader, offset, 4, 0) && all(reader, offset + 4, 4, 0))) {
       break;
     }
-    const SourceRange range = reader.range(offset, patchSize);
-    const std::string name = fmt::format("YM2151 Instrument {}", index);
-    const s8 transpose = patchSize == 40 ? reader.s8At(offset) : 0;
-    layout.cps1InstrumentTransposes.push_back(transpose);
-    auto instrument = ym.add(
-        index, Instrument{
-                   .explicitAddress = InstrumentAddress{.bank = 0, .program = index},
-                   .identity = InstrumentIdentity{.domain = std::string(kCps1Ym2151Domain), .key = index},
-                   .reverb = 0.0,
-                   .name = name,
-                   .range = range,
-                   .synthVoice = Instrument::SynthVoice{cps1Voice(reader, offset, layout.version, layout.masterVolume)},
-               });
-    instrument.source(name, range, "cps1-ym2151-patch").derived("transpose", transpose);
+    patchOffsets.push_back(offset);
+    layout.cps1InstrumentTransposes.push_back(patchSize == 40 ? reader.s8At(offset) : 0);
   }
-  if (!ym.empty()) {
-    builder.instrumentSet(layout.game + " YM2151 Instruments", std::move(ym));
-    availability.ym2151 = true;
+
+  if (!patchOffsets.empty()) {
+    auto ym = builder.instrumentSet(layout.game + " YM2151 Instruments");
+    ym.include(reader.range(layout.instrumentTableOffset, layout.instrumentTableLength));
+    ym.source(SourceRole::Table, "YM2151 Patch Table",
+              reader.range(layout.instrumentTableOffset, layout.instrumentTableLength), "cps1-ym2151-patch-table");
+    for (u32 index = 0; index < patchOffsets.size(); ++index) {
+      const u32 offset = patchOffsets[index];
+      const SourceRange range = reader.range(offset, patchSize);
+      const std::string name = fmt::format("YM2151 Instrument {}", index);
+      const s8 transpose = layout.cps1InstrumentTransposes[index];
+      auto instrument = ym.add(
+          index,
+          Instrument{
+              .explicitAddress = InstrumentAddress{.bank = 0, .program = index},
+              .identity = InstrumentIdentity{.domain = std::string(kCps1Ym2151Domain), .key = index},
+              .reverb = 0.0,
+              .name = name,
+              .range = range,
+              .synthVoice = Instrument::SynthVoice{cps1Voice(reader, offset, layout.version, layout.masterVolume)},
+          });
+      instrument.source(name, range, "cps1-ym2151-patch").derived("transpose", transpose);
+    }
+    refs.ym2151 = ym.ref();
   }
 
   if (!layout.sampleRom.valid() || layout.sampleRom.size < 0x400) {
-    return availability;
+    return refs;
   }
-  auto samples = builder.samples(sampleCollection);
-  samples.include(layout.sampleRom);
+
+  auto oki = builder.instrumentSet(layout.game + " OKI Instruments");
+  auto samples = builder.sampleCollection(layout.game + " OKI Samples", layout.sampleRom);
   const SourceRange directory =
       reader.range(layout.sampleRom.offset + 8, std::min<u64>(0x3f8, layout.sampleRom.size - 8));
   samples.source(SourceRole::Table, "OKI Sample Directory", directory, "cps1-oki-sample-directory");
@@ -392,11 +399,7 @@ Cps1SynthAvailability addCps1Synth(ScanResultBuilder& builder, ScanInstrumentSet
              })
         .source(name + " Directory Entry", reader.range(row, 8), "cps1-oki-sample-info");
   }
-  if (samples.empty()) {
-    return availability;
-  }
 
-  auto oki = builder.instruments(okiInstrumentSet);
   if (layout.version == CpsVersion::Cps1V425 && layout.cps1SampleInstrumentTableOffset) {
     const u32 table = *layout.cps1SampleInstrumentTableOffset;
     for (u32 program = 0; program < 128 && reader.has(table + program * 4, 4); ++program) {
@@ -444,23 +447,32 @@ Cps1SynthAvailability addCps1Synth(ScanResultBuilder& builder, ScanInstrumentSet
           .source("Region", range, "cps1-oki-region");
     }
   }
-  if (!oki.empty()) {
-    builder.sampleCollection(layout.game + " OKI Samples", std::move(samples));
-    builder.instrumentSet(layout.game + " OKI Instruments", std::move(oki));
-    availability.oki = true;
-  }
-  return availability;
+  refs.oki = ScanSynthRefs{
+      .instruments = oki.ref(),
+      .samples = samples.ref(),
+  };
+  return refs;
 }
 
-bool addCpsQSoundSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
-                       ScanSampleCollectionRef sampleCollection, const CpsLayout& layout) {
+ScanSynthRefs addCpsQSoundSynth(ScanResultBuilder& builder, const CpsLayout& layout) {
   const ByteReader reader = builder.reader();
+  auto instruments = builder.instrumentSet(layout.game + " QSound Instruments");
+  auto samples = builder.sampleCollection(layout.game + " QSound Samples");
+  const ScanSynthRefs refs{
+      .instruments = instruments.ref(),
+      .samples = samples.ref(),
+  };
+
   const auto sampleInfos = qsoundSampleInfos(reader, layout);
-  if (sampleInfos.empty() || !layout.sampleRom.valid()) {
-    return false;
+  if (sampleInfos.empty()) {
+    samples.warning("CPS QSound sample table contained no entries", layout.program);
+    return refs;
+  }
+  if (!layout.sampleRom.valid()) {
+    samples.warning("CPS QSound sample ROM region is unavailable", layout.program);
+    return refs;
   }
 
-  auto samples = builder.samples(sampleCollection);
   const u32 addressBase = sampleInfos.front().start & 0xff0000;
   for (const auto& info : sampleInfos) {
     if (info.start < addressBase || info.end <= info.start) {
@@ -492,10 +504,9 @@ bool addCpsQSoundSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrume
         .derived("unity_key", info.unityKey, SourceValueDisplay::MidiNote);
   }
   if (samples.empty()) {
-    return false;
+    samples.warning("CPS QSound sample table contained no usable sample ranges", layout.sampleRom);
   }
 
-  auto instruments = builder.instruments(instrumentSet);
   const auto addInstrument = [&](u32 key, InstrumentAddress address, SourceRange range) {
     const std::string name = fmt::format("QSound Instrument {} Bank {}", address.program, address.bank);
     auto entry =
@@ -620,11 +631,9 @@ bool addCpsQSoundSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrume
   }
 
   if (instruments.empty()) {
-    return false;
+    instruments.warning("CPS QSound instrument table contained no usable instruments", layout.program);
   }
-  builder.sampleCollection(layout.game + " QSound Samples", std::move(samples));
-  builder.instrumentSet(layout.game + " QSound Instruments", std::move(instruments));
-  return true;
+  return refs;
 }
 
 }  // namespace vgmtrans::formats::cps

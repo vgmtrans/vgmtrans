@@ -103,9 +103,8 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
 
 // Builds Capcom's instruments and samples together, then links every instrument
 // region to its matching sample.
-bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
-                        ScanSampleCollectionRef sampleCollection, u32 instrumentTableAddress, u32 spcDirAddress,
-                        std::string_view displayName) {
+std::optional<ScanSynthRefs> addCapcomSnesSynth(ScanResultBuilder& builder, u32 instrumentTableAddress,
+                                                u32 spcDirAddress, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseCapcomSnesInstrumentInfos(reader, instrumentTableAddress, spcDirAddress);
   std::vector<u8> referencedSrcns;
@@ -115,16 +114,16 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
   }
   const auto sampleCatalog = readSnesBrrCatalog(reader, spcDirAddress, referencedSrcns);
   if (sampleCatalog.samples.empty()) {
-    return false;
+    return std::nullopt;
   }
-
-  auto samples = builder.samples(sampleCollection);
-  const auto sampleRefs = addSnesBrrSamples(samples, reader, sampleCatalog);
 
   const u32 rootOffset = static_cast<u32>(instrumentInfos.front().source.range.offset);
   const u32 rootSize = static_cast<u32>(instrumentInfos.back().source.range.endOffset() - rootOffset);
   const SourceRange instrumentTableRange = reader.range(rootOffset, rootSize);
-  auto instruments = builder.instruments(instrumentSet);
+  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
+  auto samples = builder.sampleCollection(fmt::format("{} Samples", displayName));
+  const auto sampleRefs = addSnesBrrSamples(samples.builder(), reader, sampleCatalog);
+
   instruments.include(instrumentTableRange);
   const SourceAnnotationId root =
       instruments.source(SourceRole::Table, "Instrument Table", instrumentTableRange, "capcom-snes-instrument-table")
@@ -171,9 +170,10 @@ bool addCapcomSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrum
     }
   }
 
-  builder.instrumentSet(fmt::format("{} Instruments", displayName), std::move(instruments));
-  builder.sampleCollection(fmt::format("{} Samples", displayName), std::move(samples));
-  return true;
+  return ScanSynthRefs{
+      .instruments = instruments.ref(),
+      .samples = samples.ref(),
+  };
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

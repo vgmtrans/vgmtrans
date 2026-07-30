@@ -373,13 +373,18 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
     return std::nullopt;
   }
 
-  auto samples = builder.samples();
   std::map<u32, ParsedRegion*> uniqueSamples;
   for (auto& instrument : parsed) {
     for (auto& region : instrument.regions) {
       uniqueSamples.try_emplace(region.sample.offset, &region);
     }
   }
+  if (uniqueSamples.empty()) {
+    return std::nullopt;
+  }
+
+  auto instruments = builder.instrumentSet(fmt::format("SegSat Bank {} Instruments", exportBank));
+  auto samples = builder.sampleCollection(fmt::format("SegSat Bank {} Samples", exportBank));
   for (const auto& [offset, parsedRegion] : uniqueSamples) {
     const std::string name = fmt::format("Sample 0x{:X}", offset);
     samples
@@ -401,13 +406,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
              })
         .source(name, reader.range(offset, parsedRegion->sample.bytes), "segsat-sample");
   }
-  if (samples.empty()) {
-    return std::nullopt;
-  }
-  const auto sampleRef =
-      builder.sampleCollection(fmt::format("SegSat Bank {} Samples", exportBank), std::move(samples));
 
-  auto instruments = builder.instruments();
   const SourceRange headerRange = reader.range(
       layout.offset,
       std::min<u32>(layout.instrumentDataEnd - layout.offset, static_cast<u32>(reader.size() - layout.offset)));
@@ -421,8 +420,8 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
   for (auto& parsedInstrument : parsed) {
     Instrument instrument{
         .explicitAddress = InstrumentAddress{.bank = exportBank, .program = parsedInstrument.index},
-        .identity = segSatInstrumentIdentity(layout.sourceBank.value_or(exportBank),
-                                             static_cast<u8>(parsedInstrument.index)),
+        .identity =
+            segSatInstrumentIdentity(layout.sourceBank.value_or(exportBank), static_cast<u8>(parsedInstrument.index)),
         .name = fmt::format("Instrument {}", parsedInstrument.index),
         .range = parsedInstrument.range,
     };
@@ -431,7 +430,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
     entry.source(entry.value().name, parsedInstrument.range, "segsat-instrument")
         .derived("volume_bias", parsedInstrument.volumeBias, SourceValueDisplay::SignedDecimal);
     for (auto& parsedRegion : parsedInstrument.regions) {
-      const auto sample = builder.sampleByKey(sampleRef, parsedRegion.sample.offset);
+      const auto sample = samples.find(parsedRegion.sample.offset);
       if (!sample) {
         continue;
       }
@@ -442,14 +441,9 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
           .derived("total_level", parsedRegion.totalLevel);
     }
   }
-  if (instruments.empty()) {
-    return std::nullopt;
-  }
-  const auto instrumentRef =
-      builder.instrumentSet(fmt::format("SegSat Bank {} Instruments", exportBank), std::move(instruments));
   return SegSatScannedBank{
-      .instruments = instrumentRef,
-      .samples = sampleRef,
+      .instruments = instruments.ref(),
+      .samples = samples.ref(),
   };
 }
 
