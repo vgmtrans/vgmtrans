@@ -1368,10 +1368,43 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       return range != nullptr && range->tick == tick && range->cents == cents;
     });
   };
-  expect(
-      hasBend(4, 4.25) && hasBend(6, 3.75) && hasBend(8, -0.25) && hasRange(0, 500) && !hasRange(6, 800) &&
-          hasRange(8, 600),
-      "a held transition should mask source range changes until the next physical attack");
+  expect(hasBend(4, 4.25) && hasBend(6, 3.75) && hasBend(8, -0.25) && hasRange(0, 500) && !hasRange(6, 800) &&
+             hasRange(8, 600),
+         "a held transition should mask source range changes until the next physical attack");
+
+  PerformanceTrack delayedTransitionTrack{
+      .id = TrackId{1},
+      .sourceTrackNumber = 1,
+      .endTick = 12,
+  };
+  PerformanceEmitter delayedTransitionOut{delayedTransitionTrack, CommandId{13}, SourceAnnotationId{14}, 0,
+                                          nextSequence,           nextNote,      nextAutomation};
+  delayedTransitionOut.pitchBendRange(2);
+  delayedTransitionOut.note(60, 1.0, 4);
+  delayedTransitionOut.at(2).pitchBend(0.25);
+  const PerformanceNoteId delayedTransitionNote = delayedTransitionOut.at(4).note(62, 1.0, 8);
+  delayedTransitionOut.at(6).pitchSlide(delayedTransitionNote, 62, 72, 2);
+  const PerformanceSequence delayedTransitionPerformance{
+      .timebase = Timebase{.ppqn = 48},
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      .tracks = {delayedTransitionTrack},
+  };
+  for (const auto policy :
+       {ModulationConversionPolicy::SynthModulators, ModulationConversionPolicy::SequenceEventSimulation}) {
+    const MidiSequence delayedTransitionMidi = renderMidiSequence(delayedTransitionPerformance, {}, policy);
+    const auto preservedBend = std::ranges::find_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
+      const auto* bend = std::get_if<PitchBend>(&event);
+      return bend != nullptr && bend->tick == 4 && bend->value == 205;
+    });
+    const auto delayedTransitionRange =
+        std::ranges::find_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
+          const auto* range = std::get_if<PitchBendRange>(&event);
+          return range != nullptr && range->tick == 4 && range->cents == 1000;
+        });
+    expect(delayedTransitionRange != delayedTransitionMidi.tracks[0].events.end() &&
+               preservedBend != delayedTransitionMidi.tracks[0].events.end(),
+           "changing sensitivity for a later transition should re-encode an active bend at the new voice attack");
+  }
 
   PerformanceTrack sameVoiceTrack{
       .id = TrackId{1},
