@@ -8,7 +8,7 @@
 
 #include "value/formats/CPS/CpsTables.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 
 #include <algorithm>
 #include <array>
@@ -447,23 +447,23 @@ struct Playback {
   [[nodiscard]] Effects conditionalStartRepeat() {
     if (!track.conditional) {
       track.conditional = true;
-      return Effects{.step = vm.jump(track.trackStart)};
+      return Effects::overrideWith(vm.jump(track.trackStart));
     }
     return {};
   }
 
-  [[nodiscard]] Effects conditionalEnd() { return track.conditional ? Effects{.step = vm.end()} : Effects{}; }
+  [[nodiscard]] Effects conditionalEnd() { return track.conditional ? Effects::overrideWith(vm.end()) : Effects{}; }
 
   [[nodiscard]] Effects branchIfFirst(Address destination) {
     if (!track.conditional) {
       track.conditional = true;
-      return Effects{.step = vm.finiteBranch(destination)};
+      return Effects::overrideWith(vm.finiteBranch(destination));
     }
     return {};
   }
 
   [[nodiscard]] Effects branchIfRepeated(Address destination) {
-    return track.conditional ? Effects{.step = vm.finiteBranch(destination)} : Effects{};
+    return track.conditional ? Effects::overrideWith(vm.finiteBranch(destination)) : Effects{};
   }
 
   void meta(u8 slot, u8 value) {
@@ -517,8 +517,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x02: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
-      const Address destination{programBase + event.u16le("destination", SourceValueDisplay::Address)};
-      event.mayBranchTo(destination, SemanticOperandRole::RepeatTarget);
+      const auto stored = event.rawU16le("stored_destination", SourceValueDisplay::Address);
+      const Address destination = event.resolvedValue("destination", stored, Address{programBase + stored.value},
+                                                      SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      event.mayBranchTo(destination);
       return event.invoke<&Playback::repeatBreak>(0, destination);
     }
     case 0x03:
@@ -526,7 +528,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x05: {
       auto event = cursor.command("Repeat Until", SequenceSemantic::Repeat);
       const u8 count = event.u8("count", SemanticOperandRole::Count);
-      const Address destination{programBase + event.u16le("destination", SourceValueDisplay::Address)};
+      const auto stored = event.rawU16le("stored_destination", SourceValueDisplay::Address);
+      const Address destination = event.resolvedValue("destination", stored, Address{programBase + stored.value},
+                                                      SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       const u8 slot = opcode - 3;
       return count == 0 ? event.declaredLoop(destination)
                         : event.repeatUntil(slot, static_cast<u32>(count) + 1, destination);
@@ -571,13 +575,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] Address earlyRelativeDestination(Cursor::Event& event) {
-  const u8 first = event.u8("jump_byte", SourceValueDisplay::Hex);
+[[nodiscard]] Address earlyRelativeDestination(Cursor::Event& event, SemanticOperandRole role) {
+  const u8 first = event.u8("relative_high", SourceValueDisplay::Hex);
+  Address destination;
   if ((first & 0x80) == 0) {
-    return Address{event.nextAddress().value - first};
+    destination = Address{event.nextAddress().value - first};
+  } else {
+    const u8 low = event.u8("relative_low", SourceValueDisplay::Hex);
+    destination = relative16(event.nextAddress().value, static_cast<u16>((first << 8) | low));
   }
-  const u8 low = event.u8("jump_low", SourceValueDisplay::Hex);
-  return relative16(event.nextAddress().value, static_cast<u16>((first << 8) | low));
+  return event.derived("destination", destination, SourceValueDisplay::Address, role);
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeEarlyCommand(ByteReader reader, u32 offset, CpsVersion version,
@@ -680,9 +687,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 count = event.u8("count", SemanticOperandRole::Count);
       Address destination;
       if (isCps1(version) && version <= CpsVersion::Cps1V425) {
-        destination = Address{programBase + event.u16be("destination", SourceValueDisplay::Address)};
+        const auto stored = event.rawU16be("stored_destination", SourceValueDisplay::Address);
+        destination = event.resolvedValue("destination", stored, Address{programBase + stored.value},
+                                          SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       } else {
-        destination = earlyRelativeDestination(event);
+        destination = earlyRelativeDestination(event, SemanticOperandRole::RepeatTarget);
       }
       const u8 slot = opcode - 0x0e;
       return count == 0 ? event.declaredLoop(destination)
@@ -695,19 +704,21 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const u8 slot = opcode - 0x12;
       static_cast<void>(event.u8("note_state", SourceValueDisplay::Hex));
-      const u16 raw = event.u16be("relative_destination", SourceValueDisplay::Address);
+      const u16 raw = event.u16be("stored_relative_destination", SourceValueDisplay::Address);
       const Address destination = isCps1(version) && version <= CpsVersion::Cps1V425
                                       ? Address{programBase + raw}
                                       : relative16(event.nextAddress().value, raw);
-      event.mayBranchTo(destination, SemanticOperandRole::RepeatTarget);
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      event.mayBranchTo(destination);
       return event.invoke<&Playback::repeatBreak>(slot, destination);
     }
     case 0x16: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      const u16 raw = event.u16be("destination", SourceValueDisplay::Address);
+      const u16 raw = event.u16be("stored_destination", SourceValueDisplay::Address);
       const Address destination = isCps1(version) && version <= CpsVersion::Cps1V425
                                       ? Address{programBase + raw}
                                       : relative16(event.nextAddress().value, raw);
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
       return event.declaredLoop(destination);
     }
     case 0x17:
@@ -867,20 +878,22 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xcc:
     case 0xcd: {
       auto event = cursor.command(opcode == 0xcc ? "Branch On First Pass" : "Branch On Repeat", SequenceSemantic::Jump);
-      const u16 raw = event.u16be("relative_destination", SourceValueDisplay::Address);
+      const u16 raw = event.u16be("stored_relative_destination", SourceValueDisplay::Address);
       // CPS3's CD handler sign-extends each byte separately; CC uses a normal signed word.
       const s32 displacement = opcode == 0xcd && isCps3(version)
                                    ? static_cast<s8>(raw >> 8) * 256 + static_cast<s8>(raw & 0xff)
                                    : static_cast<s16>(raw);
       const Address destination{static_cast<u32>(event.nextAddress().value + displacement)};
-      event.mayBranchTo(destination, SemanticOperandRole::JumpTarget);
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+      event.mayBranchTo(destination);
       return opcode == 0xcc ? event.invoke<&Playback::branchIfFirst>(destination)
                             : event.invoke<&Playback::branchIfRepeated>(destination);
     }
     case 0xce: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      const u16 relative = event.u16be("relative_destination", SourceValueDisplay::Address);
+      const u16 relative = event.u16be("stored_relative_destination", SourceValueDisplay::Address);
       const Address destination = relative16(event.nextAddress().value, relative);
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
       return event.declaredLoop(destination);
     }
     case 0xcf: {
@@ -915,6 +928,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       // CPS3 uses a terminal 127-pass top-level repeat as a practical infinity.
       const bool practicalLoop =
           isCps3(version) && slot == 0 && count == 0x7e && reader.has(next.value, 1) && reader.u8At(next.value) == 0xff;
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       return count == 0 || practicalLoop ? event.declaredLoop(destination)
                                          : event.repeatUntil(slot, static_cast<u32>(count) + 1, destination);
     }
@@ -924,10 +938,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xdb: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const u8 slot = opcode - 0xd8;
-      const u16 relative = event.u16be("relative_destination", SourceValueDisplay::Address);
+      const u16 relative = event.u16be("stored_relative_destination", SourceValueDisplay::Address);
       const s32 displacement = isCps3(version) ? relative : static_cast<s16>(relative);
       const Address destination{static_cast<u32>(event.nextAddress().value + displacement)};
-      event.mayBranchTo(destination, SemanticOperandRole::RepeatTarget);
+      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      event.mayBranchTo(destination);
       return event.invoke<&Playback::repeatBreak>(slot, destination);
     }
     case 0xdc: {

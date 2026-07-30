@@ -60,8 +60,8 @@ const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) 
 }
 
 bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic) {
-  return std::ranges::any_of(
-      track.commands, [semantic](const SourceCommand& command) { return command.semantic == semantic; });
+  return std::ranges::any_of(track.commands,
+                             [semantic](const SourceCommand& command) { return command.semantic == semantic; });
 }
 
 bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic semantic) {
@@ -92,7 +92,7 @@ TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
 }
 
 const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
-                                                      std::vector<SemanticOperand> operands, DecodeFlow flow,
+                                                      std::vector<SemanticOperand> operands, CommandFlow flow,
                                                       SourceAnnotationId annotation, CommandExecution execution,
                                                       SequenceSemantic semantic) {
   if (encodedSize == 0) {

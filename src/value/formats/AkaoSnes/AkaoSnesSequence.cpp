@@ -9,7 +9,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
@@ -836,13 +836,13 @@ struct ProgramState {
   explicit ProgramState(const SequenceProgram& program) : profile(decodeAkaoSnesProfile(program.config.profile)) {
     for (const TrackProgram& track : program.tracks) {
       for (const SourceCommand& command : track.commands) {
-        const Address fallthrough{command.address.value + command.encodedSize};
+        const Address fallthrough = command.flow.continuation;
         const auto nextIndex = track.addressIndex.find(fallthrough);
         if (!nextIndex) {
           continue;
         }
         const SourceCommand& next = track.commands[*nextIndex];
-        if (next.flow.terminal) {
+        if (next.flow.endsPlayback()) {
           terminalPitchBoundaries.insert(fallthrough.value);
           continue;
         }
@@ -851,20 +851,20 @@ struct ProgramState {
         if (clearsEnvelope == nullptr || !*clearsEnvelope) {
           continue;
         }
-        const Address afterOff{next.address.value + next.encodedSize};
+        const Address afterOff = next.flow.continuation;
         const auto afterIndex = track.addressIndex.find(afterOff);
         if (!afterIndex) {
           continue;
         }
         const SourceCommand& after = track.commands[*afterIndex];
-        if (after.flow.terminal) {
+        if (after.flow.endsPlayback()) {
           terminalPitchBoundaries.insert(fallthrough.value);
           continue;
         }
         if (!after.flow.unconditionalJump()) {
           continue;
         }
-        if (after.flow.staticTargets.front().value <= command.address.value) {
+        if (after.flow.defaultDestination()->value <= command.address.value) {
           terminalPitchBoundaries.insert(fallthrough.value);
         }
       }
@@ -1193,9 +1193,7 @@ struct Playback {
     return track.pitchSlideBaseKey + (akaoSnesPitchCents(pitch, track.pitchBase) / 100.0);
   }
 
-  void samplePitchSlide() {
-    track.pitchSlideAutomation.sample(out, pitchSlideKey(track.currentPitch));
-  }
+  void samplePitchSlide() { track.pitchSlideAutomation.sample(out, pitchSlideKey(track.currentPitch)); }
 
   [[nodiscard]] bool advancePitchSlide() {
     if (!track.pitchSlideActive || !track.pitchBaseValid) {
@@ -1238,14 +1236,12 @@ struct Playback {
     // steps - 1 timeline ticks between that pitch and the destination.
     if (steps == 1) {
       track.pitchSlideAutomation.interrupt(out);
-      emitPitchBendRange(
-          akaoSnesPitchBendRangeCents(track.pitchBase, track.currentPitch, kDefaultPitchBendRangeCents));
+      emitPitchBendRange(akaoSnesPitchBendRangeCents(track.pitchBase, track.currentPitch, kDefaultPitchBendRangeCents));
       emitPitchBendForCurrentPitch(out);
       return;
     }
-    track.pitchSlideAutomation =
-        out.pitchSlide(track.pitchSlideNote, pitchSlideKey(track.currentPitch), pitchSlideKey(track.pitchSlideFinalPitch),
-                       steps - 1);
+    track.pitchSlideAutomation = out.pitchSlide(track.pitchSlideNote, pitchSlideKey(track.currentPitch),
+                                                pitchSlideKey(track.pitchSlideFinalPitch), steps - 1);
     track.pitchSlideAutomation.preferPitchBend();
     samplePitchSlide();
   }
@@ -1515,10 +1511,10 @@ struct Playback {
       ++frame.incrementCount;
     }
     if (frame.totalPlays == 0) {
-      return Effects{.step = vm.declaredLoop(frame.start)};
+      return Effects::overrideWith(vm.declaredLoop(frame.start));
     }
     Effects effects = vm.countedRepeatUntil(slot, frame.totalPlays, frame.start);
-    if (effects.step.kind == StepKind::Next) {
+    if (!effects.flowOverride) {
       track.loopLevel = slot;
       frame.remainingPlays = 1;
     } else if (frame.remainingPlays > 1) {
@@ -1547,15 +1543,14 @@ struct Playback {
     if (counter.active()) {
       counter.finish();
     }
-    return Effects{.step = vm.finiteBranch(destination)};
+    return Effects::overrideWith(vm.finiteBranch(destination));
   }
 
   void tick() {
     syncSharedTempoAtTick();
     static_cast<void>(
         track.volume.tickRaw([&](s32 value) { emitVolume(track.volume.output(out), static_cast<u8>(value)); }));
-    static_cast<void>(
-        track.pan.tickRaw([&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(value)); }));
+    static_cast<void>(track.pan.tickRaw([&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(value)); }));
     static_cast<void>(
         track.tempoState.tickRaw([&](s32 value) { applyTempo(track.tempoState.output(out), static_cast<u8>(value)); }));
     if (terminalPitchWaitBoundary()) {
@@ -1947,9 +1942,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Loop Break", SequenceSemantic::RepeatBreak);
       const u8 count = event.u8("count");
       const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::loopBreak>(count, destination)
-          .mayBranchTo(destination, SemanticOperandRole::JumpTarget)
-          .runtimeControlFlow();
+      return event.invoke<&Playback::loopBreak>(count, destination).mayBranchTo(destination).runtimeControlFlow();
     }
     case EventType::Goto: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
@@ -1981,7 +1974,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event =
           cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::AffectsControlFlow);
       const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
-      return event.mayBranchTo(destination, SemanticOperandRole::JumpTarget);
+      return event.mayBranchTo(destination);
     }
     case EventType::CpuControlledJumpV2: {
       auto event = cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::SourceOnly);

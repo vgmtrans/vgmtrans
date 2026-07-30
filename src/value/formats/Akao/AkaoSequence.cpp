@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -186,6 +186,16 @@ using AkaoEvent = AkaoCursor::Event;
   return destination;
 }
 
+[[nodiscard]] Address relativeJumpAddress(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset,
+                                          std::string_view name, u32 commandAddress) {
+  const s16 relative = event.s16le(name);
+  const Address destination{profile.relativeDestination(operandOffset, relative)};
+  const SemanticOperandRole role =
+      destination.value <= commandAddress ? SemanticOperandRole::LoopTarget : SemanticOperandRole::JumpTarget;
+  event.derived(fmt::format("{}_absolute", name), destination, SourceValueDisplay::Address, role);
+  return destination;
+}
+
 void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset, SemanticOperandRole role) {
   const s16 relative = event.s16le("relative");
   const Address destination{profile.relativeDestination(operandOffset, relative)};
@@ -250,12 +260,13 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
 
 [[nodiscard]] DecodedBytecodeCommand repeatBranch(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset) {
   const u16 count = event.resolved("count", event.rawU8("raw_count"), akaoZeroAs256);
-  const Address destination = relativeAddress(event, profile, operandOffset, "relative");
+  const Address destination =
+      relativeAddress(event, profile, operandOffset, "relative", SemanticOperandRole::RepeatTarget);
   event.mayBranchTo(destination).runtimeControlFlow();
   return event.invoke(
       [](Playback& playback, u16 matchingPlay, Address branchDestination) -> Effects {
         if (playback.track.repeats.currentCompletedPlays() + 1 == matchingPlay) {
-          return Effects{.step = playback.vm.finiteBranch(branchDestination)};
+          return Effects::overrideWith(playback.vm.finiteBranch(branchDestination));
         }
         return {};
       },
@@ -265,7 +276,8 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
 [[nodiscard]] DecodedBytecodeCommand passiveBranch(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset,
                                                    std::string_view conditionName) {
   event.u8(conditionName);
-  const Address destination = relativeAddress(event, profile, operandOffset + 1, "relative");
+  const Address destination =
+      relativeAddress(event, profile, operandOffset + 1, "relative", SemanticOperandRole::JumpTarget);
   return event.mayBranchTo(destination);
 }
 
@@ -317,7 +329,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0x06: {
       auto event = subCommand(cursor, "Jump", SequenceSemantic::Jump);
-      return jumpOrLoop(event, relativeAddress(event, profile, begin + 2, "relative"), begin);
+      return jumpOrLoop(event, relativeJumpAddress(event, profile, begin + 2, "relative", begin), begin);
     }
     case 0x07: {
       auto event = subCommand(cursor, "CPU Conditional Jump", SequenceSemantic::Jump);
@@ -338,7 +350,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     case 0x0e: {
       if (profile.version32()) {
         auto event = subCommand(cursor, "Play Pattern", SequenceSemantic::Call);
-        return event.call(relativeAddress(event, profile, begin + 2, "relative"));
+        return event.call(relativeAddress(event, profile, begin + 2, "relative", SemanticOperandRole::CallTarget));
       }
       auto event = subSourceOnly(cursor, "Unknown FE 0E", "unknown-fe-0e");
       return preserve(event, profile.subOperandBytes(sub));
@@ -575,14 +587,14 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       repeats.completeCurrentPlay();
       repeats.finishFallthrough();
       event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(target, SemanticOperandRole::RepeatTarget).runtimeControlFlow();
+      event.mayBranchTo(target).runtimeControlFlow();
       return event.invoke(
           [](Playback& playback, u16 totalPlays) -> Effects {
             const u8 slot = playback.track.repeats.layer;
             const Address start = playback.track.repeats.current();
             playback.track.repeats.completeCurrentPlay();
             Effects effects = playback.vm.countedRepeatUntil(slot, totalPlays, start);
-            if (effects.step.kind == StepKind::Next) {
+            if (!effects.flowOverride) {
               playback.track.repeats.finishFallthrough();
             }
             return effects;
@@ -673,7 +685,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     case 0xee:
       if (profile.legacyFamily()) {
         auto event = cursor.command("Jump", SequenceSemantic::Jump);
-        return jumpOrLoop(event, relativeAddress(event, profile, begin + 1, "relative"), begin);
+        return jumpOrLoop(event, relativeJumpAddress(event, profile, begin + 1, "relative", begin), begin);
       }
       break;
     case 0xef:

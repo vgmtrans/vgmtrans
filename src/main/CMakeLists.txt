@@ -174,6 +174,8 @@ target_sources(vgmtransvaluecore
     FILES
       ${PROJECT_SOURCE_DIR}/src/value/sequence/BytecodeDecode.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/CompiledCommandDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/CompilerCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/base/Types.h
       ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
@@ -195,6 +197,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceExecution.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceMotion.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h

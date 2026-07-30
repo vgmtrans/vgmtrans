@@ -8,7 +8,7 @@
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -425,9 +425,8 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
       // one less than the total VM visit count; zero declares a loop.
       const u8 slot = event.derived("slot", static_cast<u8>(cursor.opcode() - 0x0e + 1));
       const u8 count = event.u8("count");
-      const Address destination = event.address("destination");
-      return count == 0 ? event.declaredLoop(destination, SemanticOperandRole::RepeatTarget)
-                        : event.repeatUntil(slot - 1, count + 1, destination);
+      const Address destination = event.address("destination", SemanticOperandRole::RepeatTarget);
+      return count == 0 ? event.declaredLoop(destination) : event.repeatUntil(slot - 1, count + 1, destination);
     }
     case 0x12:
     case 0x13:
@@ -436,14 +435,14 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const u8 slot = event.derived("slot", static_cast<u8>(cursor.opcode() - 0x12 + 1));
       const u8 attributes = event.u8("attributes", SourceValueDisplay::Hex);
-      const Address destination = event.address("destination");
-      event.mayBranchTo(destination, SemanticOperandRole::RepeatTarget);
+      const Address destination = event.address("destination", SemanticOperandRole::RepeatTarget);
+      event.mayBranchTo(destination);
       return event.invoke<&Playback::repeatBreak>(slot - 1, attributes, destination);
     }
     case 0x16: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      const Address destination = event.address("destination");
-      return event.loopCandidate(destination, SemanticOperandRole::JumpTarget);
+      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
+      return event.loopCandidate(destination);
     }
     case 0x17:
       return cursor.command("End", SequenceSemantic::End).end();

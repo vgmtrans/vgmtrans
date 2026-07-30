@@ -21,50 +21,6 @@ namespace vgmtrans::core {
 class PerformanceEmitter;
 class VmApi;
 
-enum class StepKind {
-  Next,
-  End,
-  EndSection,
-  Jump,
-  Call,
-  Return,
-};
-
-enum class JumpSemantics {
-  Normal,
-  FiniteBranch,
-  LoopCandidate,
-  DeclaredLoop,
-};
-
-// Step names the primitive control-flow result of a command. JumpSemantics
-// annotates jump-like steps when the VM needs loop-policy context.
-struct Step {
-  StepKind kind = StepKind::Next;
-  Address destination;
-  JumpSemantics jumpSemantics = JumpSemantics::Normal;
-
-  [[nodiscard]] static constexpr Step next() noexcept { return Step{.kind = StepKind::Next}; }
-  [[nodiscard]] static constexpr Step end() noexcept { return Step{.kind = StepKind::End}; }
-  [[nodiscard]] static constexpr Step endSection() noexcept { return Step{.kind = StepKind::EndSection}; }
-  [[nodiscard]] static constexpr Step jump(Address destination,
-                                           JumpSemantics semantics = JumpSemantics::Normal) noexcept {
-    return Step{.kind = StepKind::Jump, .destination = destination, .jumpSemantics = semantics};
-  }
-  [[nodiscard]] static constexpr Step call(Address destination) noexcept {
-    return Step{.kind = StepKind::Call, .destination = destination};
-  }
-  [[nodiscard]] static constexpr Step return_() noexcept { return Step{.kind = StepKind::Return}; }
-};
-
-struct Effects {
-  u32 advanceTicks = 0;
-  Step step = Step::next();
-
-  [[nodiscard]] static constexpr Effects none() noexcept { return Effects{}; }
-  [[nodiscard]] static constexpr Effects wait(u32 ticks) noexcept { return Effects{.advanceTicks = ticks}; }
-};
-
 // Formats play only command values saved during decoding. They do not receive
 // the original source bytes or loosely typed format context.
 using CreateProgramState = std::any (*)(const SequenceProgram&);

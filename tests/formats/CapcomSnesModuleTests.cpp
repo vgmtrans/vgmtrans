@@ -84,13 +84,12 @@ std::string decodedTrackSnapshot(const TrackProgram& track) {
         snapshot += '<' + semanticValueSnapshot(*operand.encodedValue) + '>';
       }
     }
-    snapshot += ",flow=" + std::to_string(static_cast<int>(command.flow.kind));
-    if (command.flow.fallthrough) {
-      snapshot += "->" + hexAddress(command.flow.fallthrough->value);
+    const auto kind = command.flow.defaultTransition ? static_cast<int>(command.flow.defaultTransition->kind) : -1;
+    snapshot += ",flow=" + std::to_string(kind);
+    if (command.flow.discoveryContinuation()) {
+      snapshot += "->" + hexAddress(command.flow.continuation.value);
     }
-    for (const Address target : command.flow.staticTargets) {
-      snapshot += "=>" + hexAddress(target.value);
-    }
+    command.flow.forEachDiscoveryTarget([&](Address target) { snapshot += "=>" + hexAddress(target.value); });
   }
   return snapshot;
 }
@@ -400,8 +399,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "semantic operands should retain generic SourceMap presentation metadata");
   expect(tempo->range.offset == 0x3001 && tempo->range.size == 2,
          "typed operands should retain their exact source range");
-  expect(firstTrack.commands[0].flow.fallthrough && firstTrack.commands[0].flow.fallthrough->value == 0x3003,
-         "semantic commands should retain decode-time control flow");
+  expect(
+      firstTrack.commands[0].flow.discoveryContinuation() && firstTrack.commands[0].flow.continuation.value == 0x3003,
+      "semantic commands should retain decode-time control flow");
   const SourceMap& sourceMap = project.sourceMap();
   const SourceAnnotation& programAnnotation = commandAnnotation(sourceMap, firstTrack.commands[1]);
   const auto programInstrumentLink = std::ranges::find_if(
@@ -890,11 +890,10 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
     }
     return flags;
   };
-  expect(noteResetFlags(CapcomSnesEngineVersion::v3BgmFixedLocation) ==
-             std::vector<bool>{true, true, false, false, true},
-         "CapcomSnes V2+ should use the preceding note's slur bit to decide whether each note resets LFO phase");
-  expect(noteResetFlags(CapcomSnesEngineVersion::v1BgmInList) ==
-             std::vector<bool>{false, false, false, false, false},
+  expect(
+      noteResetFlags(CapcomSnesEngineVersion::v3BgmFixedLocation) == std::vector<bool>{true, true, false, false, true},
+      "CapcomSnes V2+ should use the preceding note's slur bit to decide whether each note resets LFO phase");
+  expect(noteResetFlags(CapcomSnesEngineVersion::v1BgmInList) == std::vector<bool>{false, false, false, false, false},
          "CapcomSnes V1 should preserve its disabled-by-default phase reset");
 
   std::vector<u8> frozenBytes(0x4000);

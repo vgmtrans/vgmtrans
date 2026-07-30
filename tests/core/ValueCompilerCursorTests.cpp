@@ -7,7 +7,7 @@
 #include "ValueTestSupport.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CompiledCommandDialect.h"
 
 namespace {
 
@@ -41,6 +41,10 @@ struct CompilerProbePlayback {
 
   void deferredExpression(u8 value) { out.expression(value / 127.0); }
 
+  void pitchBend(s8 encoded) { out.pitchBend((encoded / 128.0) * track.pitchBendRange); }
+
+  void enabledExpression(bool enabled) { out.expression(enabled ? 0.75 : 0.25); }
+
   [[nodiscard]] Effects deferredWait() { return Effects::wait(1); }
 };
 
@@ -71,7 +75,7 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x23: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      return event.emitPitchBendScaledBy<&CompilerProbeState::pitchBendRange>(event.s8("fraction") / 128.0);
+      return event.invoke<&CompilerProbePlayback::pitchBend>(event.s8("fraction"));
     }
     case 0x24: {
       auto event = cursor.command("Separate Actions", SequenceSemantic::State);
@@ -86,15 +90,16 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x26: {
       auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
-      return event.invoke([](CompilerProbePlayback&) { return Effects{.step = Step::end()}; })
-          .invoke([](CompilerProbePlayback&) { return Effects{.step = Step::return_()}; });
+      return event.invoke([](CompilerProbePlayback&) { return Effects::overrideWith(Step::end()); })
+          .invoke([](CompilerProbePlayback&) { return Effects::overrideWith(Step::return_()); })
+          .runtimeControlFlow();
     }
     case 0x27: {
       auto event = cursor.command("Deferred State", SequenceSemantic::State);
       const auto enabled = event.state<&CompilerProbeState::enabled>();
       event.toggle<&CompilerProbeState::enabled>();
       event.emitLegatoPedal(enabled);
-      return event.emitExpression(event.select(enabled, 0.75, 0.25));
+      return event.invoke<&CompilerProbePlayback::enabledExpression>(enabled);
     }
     case 0x28:
       return cursor.sourceOnly("Promoted Action").set<&CompilerProbeState::enabled>(true);
@@ -131,21 +136,26 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x60: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      return event.jump(event.address("destination"));
+      return event.jump(event.address("destination", SemanticOperandRole::JumpTarget));
     }
     case 0x61: {
       auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
       const u8 slot = event.u8("slot");
       const u32 totalPlays = event.u8("total_plays");
-      const Address destination = event.address("destination");
+      const Address destination = event.address("destination", SemanticOperandRole::RepeatTarget);
       return event.repeatUntil(slot, totalPlays, destination);
     }
     case 0x62: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
-      return event.call(event.address("destination"));
+      return event.call(event.address("destination", SemanticOperandRole::CallTarget));
     }
     case 0x63:
       return cursor.command("Return", SequenceSemantic::Return).return_();
+    case 0x64: {
+      auto event = cursor.command("Equal-Valued Target", SequenceSemantic::Jump);
+      event.u16be("count", SourceValueDisplay::Default, SemanticOperandRole::Count);
+      return event.jump(event.address("destination", SemanticOperandRole::JumpTarget));
+    }
     case 0x70: {
       auto event = cursor.sourceOnly("Conditional Fields");
       const u8 wide = event.u8("wide");
@@ -208,7 +218,7 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   expect(track.commands.size() == 8, "compiler cursor should decode every probe command once");
   expect(track.commands[0].execution.valid() && track.commands[1].execution.valid() &&
              track.commands[2].execution.valid() && track.commands[3].execution.valid(),
-         "output, state, toggle, and local handlers should compile to executor slots");
+         "output, state, toggle, and local handlers should compile to direct executors");
 
   const auto annotations = sourceMap.withRole(SourceId{7}, SourceRole::Command);
   expect(annotations.size() == 8, "compiler cursor should project one annotation per source command");
@@ -257,6 +267,9 @@ void compilerCursorCompilesControlFlow() {
   expect(track.commands.size() == 6, "reachable decoding should compile call and jump targets");
   expect(track.commands[0].flow.callTarget() && track.commands[2].flow.unconditionalJump(),
          "compiled flow should preserve discovery targets beside runtime behavior");
+  expect(track.commands[0].execution.actions.empty() && track.commands[2].execution.actions.empty() &&
+             track.commands[4].execution.actions.empty() && track.commands[5].execution.actions.empty(),
+         "static call, jump, return, and end flow should compile no redundant runtime actions");
   const SourceAnnotation& callAnnotation = sourceMap.get(track.commands[0].annotation);
   const SourceAnnotation& jumpAnnotation = sourceMap.get(track.commands[2].annotation);
   const SourceAnnotation& returnAnnotation = sourceMap.get(track.commands[4].annotation);
@@ -268,7 +281,7 @@ void compilerCursorCompilesControlFlow() {
   const SemanticOperand* jumpDestination = semanticOperand(track.commands[2], "destination");
   expect(callDestination != nullptr && callDestination->role == SemanticOperandRole::CallTarget &&
              jumpDestination != nullptr && jumpDestination->role == SemanticOperandRole::JumpTarget,
-         "compiler-cursor flow operations should annotate decoded integer addresses as targets");
+         "target roles declared at operand creation should remain attached to the exact operands");
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
@@ -352,8 +365,8 @@ void compilerCursorEvaluatesDeferredStateInActionOrder() {
   expect(track.commands.size() == 3 && track.commands[0].execution.actions.size() == 3,
          "deferred-state fixture should compile toggle and both outputs as separate actions");
   expect(track.commands[0].execution.actions[1].arguments.empty() &&
-             track.commands[0].execution.actions[2].arguments.size() == 2,
-         "state identities should require no durable arguments while select retains its two constants");
+             track.commands[0].execution.actions[2].arguments.empty(),
+         "deferred state-member identities should require no durable arguments");
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
@@ -368,7 +381,7 @@ void compilerCursorEvaluatesDeferredStateInActionOrder() {
          "state() should observe each toggle immediately before the dependent output action");
   expect(std::get<ExpressionPerformanceEvent>(events[1]).linearGain == 0.75 &&
              std::get<ExpressionPerformanceEvent>(events[3]).linearGain == 0.25,
-         "select() should evaluate both true and false branches from runtime state");
+         "a local playback operation should select output from runtime state");
 }
 
 void compilerCursorExecutesEligibleCommandsDuringWaits() {
@@ -416,12 +429,22 @@ void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
   std::vector<Diagnostic> diagnostics;
   const TrackProgram track =
       decodeProbeTrack(ByteReader(SourceId{11}, bytes), static_cast<u32>(bytes.size()), nullptr, &diagnostics);
-  expect(track.commands.size() == 1 && track.commands[0].flow.terminal,
+  expect(track.commands.size() == 1 && track.commands[0].flow.endsPlayback(),
          "truncated compiler command should become a terminal command automatically");
   expect(track.commands[0].range.size == 1 && !track.commands[0].execution.valid(),
          "truncated compiler command should retain its partial source range but no executable behavior");
   expect(!diagnostics.empty() && diagnostics[0].code == "truncated-record",
          "truncated compiler field should retain the shared RecordReader diagnostic");
+}
+
+void compilerCursorKeepsExactTargetOperandRoles() {
+  const std::vector<u8> bytes{0x64, 0x12, 0x34, 0x12, 0x34};
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{17}, bytes), static_cast<u32>(bytes.size()));
+  expect(track.commands.size() == 1 && track.commands[0].operands.size() == 2,
+         "equal-valued target fixture should decode both operands");
+  expect(track.commands[0].operands[0].role == SemanticOperandRole::Count &&
+             track.commands[0].operands[1].role == SemanticOperandRole::JumpTarget,
+         "flow declaration must not relabel a different operand with the same numeric value");
 }
 
 void compilerCursorRejectsConflictingComposedFlow() {
@@ -469,6 +492,7 @@ void runValueCompilerCursorTests() {
   compilerCursorEvaluatesDeferredStateInActionOrder();
   compilerCursorExecutesEligibleCommandsDuringWaits();
   compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
+  compilerCursorKeepsExactTargetOperandRoles();
   compilerCursorRejectsConflictingComposedFlow();
   compilerCursorAnalysisStopsAfterItsScheduledPrepass();
 }

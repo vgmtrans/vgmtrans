@@ -91,12 +91,12 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
       .id = DialectId{.value = "source-timeline-probe"},
       .timebase = Timebase{.ppqn = 48},
       .execute = [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter&,
-                    VmApi& vm) { return command.address.value == 0 ? Effects::wait(7) : Effects{.step = vm.end()}; },
+                    VmApi&) { return command.address.value == 0 ? Effects::wait(7) : Effects{}; },
   };
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
-  builder.addSemantic(Address{0}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
-  builder.addSemantic(Address{1}, 0, 1, {}, {}, DecodeFlow::terminalFlow(), SourceAnnotationId{21});
+  builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
+  builder.addSemantic(Address{1}, 0, 1, {}, {}, CommandFlow::end(Address{2}), SourceAnnotationId{21});
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
@@ -877,6 +877,9 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x04};
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{std::numeric_limits<u64>::max() - 1}, SourceRange{},
                                     noteBytes);
+  // The decoded continuation is authoritative and must not wrap to the other
+  // command merely because address + encodedSize would overflow.
+  track.commands.back().flow.continuation = Address{std::numeric_limits<u64>::max()};
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{1}, SourceRange{}, noteBytes);
 
   const SequenceProgram program{
@@ -886,9 +889,126 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
   };
 
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
-  expect(performance.diagnostics.empty(), "address-overflow fixture should not report diagnostics");
+  expect(performance.diagnostics.size() == 1 &&
+             performance.diagnostics.front().message.find("continuation") != std::string::npos,
+         "an unresolved authoritative continuation should produce one focused diagnostic");
   expect(performance.tracks[0].events.size() == 1 && performance.tracks[0].endTick == 4,
          "source-address fallthrough should not wrap around the address space");
+}
+
+SequenceDialect authoritativeFlowProbeDialect() {
+  return SequenceDialect{
+      .id = DialectId{.value = "authoritative-flow-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .execute =
+          [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi& vm) {
+            if (command.opcode == 0xfe) {
+              return Effects::overrideWith(vm.jump(command.flow.continuation));
+            }
+            if (command.opcode == 0xfd) {
+              return Effects::overrideWith(vm.end());
+            }
+            if (command.opcode != 0) {
+              out.note(command.opcode, 1.0, 1);
+            }
+            return Effects{};
+          },
+  };
+}
+
+void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
+  const SequenceDialect dialect = authoritativeFlowProbeDialect();
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{100}};
+  TrackProgramBuilder builder(track);
+  builder.addSemantic(Address{100}, 1, 37, {}, {}, CommandFlow::fallthroughTo(Address{200}));
+  builder.addSemantic(Address{101}, 99, 1, {}, {}, CommandFlow::end(Address{102}));
+  builder.addSemantic(Address{200}, 2, 1, {}, {}, CommandFlow::end(Address{201}));
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty() && performance.tracks[0].events.size() == 2,
+         "an explicit continuation should execute without inferred-successor diagnostics");
+  expect(std::get<NotePerformanceEvent>(performance.tracks[0].events[0]).key == 1.0 &&
+             std::get<NotePerformanceEvent>(performance.tracks[0].events[1]).key == 2.0,
+         "execution should follow the decoded continuation rather than encoded size or adjacent storage");
+}
+
+void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
+  const SequenceDialect dialect = authoritativeFlowProbeDialect();
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder builder(track);
+  builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::call(Address{10}, Address{20}));
+  builder.addSemantic(Address{1}, 99, 1, {}, {}, CommandFlow::end(Address{2}));
+  builder.addSemantic(Address{10}, 10, 1, {}, {}, CommandFlow::return_(Address{11}));
+  builder.addSemantic(Address{20}, 20, 1, {}, {}, CommandFlow::end(Address{21}));
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.diagnostics.empty() && performance.tracks[0].events.size() == 2,
+         "a call with a noncontiguous continuation should return without diagnostics");
+  expect(std::get<NotePerformanceEvent>(performance.tracks[0].events[0]).key == 10.0 &&
+             std::get<NotePerformanceEvent>(performance.tracks[0].events[1]).key == 20.0,
+         "call return should use the decoded continuation rather than address plus encoded size");
+}
+
+void sequenceVmPreservesExplicitJumpToContinuation() {
+  const SequenceDialect dialect = authoritativeFlowProbeDialect();
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{1}};
+  TrackProgramBuilder builder(track);
+  builder.addSemantic(Address{1}, 1, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
+  CommandFlow explicitJump = CommandFlow::fallthroughTo(Address{1});
+  explicitJump.overridePolicy = FlowOverridePolicy::Required;
+  builder.addSemantic(Address{0}, 0xfe, 1, {}, {}, std::move(explicitJump));
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program, dialect);
+  const auto notes = std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  const auto markers = std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<MarkerPerformanceEvent>(event);
+  });
+  expect(performance.diagnostics.empty() && notes == 1 && markers == 2,
+         "a runtime jump to the continuation should remain explicit for loop detection");
+}
+
+void sequenceVmEnforcesFlowOverridePolicies() {
+  const SequenceDialect dialect = authoritativeFlowProbeDialect();
+  const auto render = [&](u8 opcode, CommandFlow flow) {
+    TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+    TrackProgramBuilder builder(track);
+    builder.addSemantic(Address{0}, opcode, 1, {}, {}, std::move(flow));
+    return SequenceVm().render(
+        SequenceProgram{
+            .dialect = dialect.id,
+            .timebase = dialect.timebase,
+            .tracks = {track},
+        },
+        dialect);
+  };
+
+  CommandFlow required = CommandFlow::end(Address{1});
+  required.overridePolicy = FlowOverridePolicy::Required;
+  const PerformanceSequence missing = render(0, required);
+  expect(missing.diagnostics.size() == 1 && missing.diagnostics.front().message.find("required") != std::string::npos,
+         "a missing required runtime override should stop with a focused diagnostic");
+
+  const PerformanceSequence forbidden = render(0xfd, CommandFlow::end(Address{1}));
+  expect(
+      forbidden.diagnostics.size() == 1 && forbidden.diagnostics.front().message.find("forbidden") != std::string::npos,
+      "a forbidden runtime override should stop with a focused diagnostic");
 }
 
 void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
@@ -939,7 +1059,7 @@ Effects executeScheduledProbe(const SourceCommand& command, std::any& programSta
     out.note(state.sharedValue, 1.0, 1);
     return Effects::wait(command.opcode);
   }
-  return Effects{.step = vm.end()};
+  return Effects{};
 }
 
 void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
@@ -952,16 +1072,16 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder0(track0);
-  builder0.addSemantic(Address{0}, 7, 1, {}, {}, DecodeFlow::fallthroughTo(Address{1}));
-  builder0.addSemantic(Address{1}, 4, 1, {}, {}, DecodeFlow::fallthroughTo(Address{2}));
-  builder0.addSemantic(Address{2}, 9, 1, {}, {}, DecodeFlow::fallthroughTo(Address{3}));
-  builder0.addSemantic(Address{3}, 0, 1, {}, {}, DecodeFlow::terminalFlow());
+  builder0.addSemantic(Address{0}, 7, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  builder0.addSemantic(Address{1}, 4, 1, {}, {}, CommandFlow::fallthroughTo(Address{2}));
+  builder0.addSemantic(Address{2}, 9, 1, {}, {}, CommandFlow::fallthroughTo(Address{3}));
+  builder0.addSemantic(Address{3}, 0, 1, {}, {}, CommandFlow::end(Address{4}));
 
   TrackProgram track1{.id = TrackId{1}, .sourceTrackNumber = 1, .startAddress = Address{10}};
   TrackProgramBuilder builder1(track1);
-  builder1.addSemantic(Address{10}, 2, 1, {}, {}, DecodeFlow::fallthroughTo(Address{11}));
-  builder1.addSemantic(Address{11}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{12}));
-  builder1.addSemantic(Address{12}, 0, 1, {}, {}, DecodeFlow::terminalFlow());
+  builder1.addSemantic(Address{10}, 2, 1, {}, {}, CommandFlow::fallthroughTo(Address{11}));
+  builder1.addSemantic(Address{11}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{12}));
+  builder1.addSemantic(Address{12}, 0, 1, {}, {}, CommandFlow::end(Address{13}));
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -990,13 +1110,13 @@ Effects executeScheduledLoopProbe(const SourceCommand& command, std::any&, std::
       out.note(60.0, 1.0, 6);
       return Effects::wait(4);
     case 1:
-      return Effects{.step = vm.loopCandidate(Address{0})};
+      return Effects{};
     case 101:
-      return Effects{.step = vm.loopCandidate(Address{110})};
+      return Effects{};
     case 111:
-      return Effects{.step = vm.loopCandidate(Address{110})};
+      return Effects{};
     default:
-      return Effects{.step = vm.end()};
+      return Effects{};
   }
 }
 
@@ -1009,17 +1129,20 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder0(track0);
-  builder0.addSemantic(Address{0}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{1}));
-  builder0.addSemantic(Address{1}, 0, 1, {}, {}, DecodeFlow::jump(Address{0}));
+  builder0.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  builder0.addSemantic(Address{1}, 0, 1, {}, {},
+                       CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate));
 
   // This track first jumps into an unvisited block. A per-track loop detector
   // stops track 0 too early while this track is still establishing its loop.
   TrackProgram track1{.id = TrackId{1}, .startAddress = Address{100}};
   TrackProgramBuilder builder1(track1);
-  builder1.addSemantic(Address{100}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{101}));
-  builder1.addSemantic(Address{101}, 0, 1, {}, {}, DecodeFlow::jump(Address{110}));
-  builder1.addSemantic(Address{110}, 0, 1, {}, {}, DecodeFlow::fallthroughTo(Address{111}));
-  builder1.addSemantic(Address{111}, 0, 1, {}, {}, DecodeFlow::jump(Address{110}));
+  builder1.addSemantic(Address{100}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{101}));
+  builder1.addSemantic(Address{101}, 0, 1, {}, {},
+                       CommandFlow::jumpTo(Address{110}, Address{102}, JumpSemantics::LoopCandidate));
+  builder1.addSemantic(Address{110}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{111}));
+  builder1.addSemantic(Address{111}, 0, 1, {}, {},
+                       CommandFlow::jumpTo(Address{110}, Address{112}, JumpSemantics::LoopCandidate));
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -1072,7 +1195,7 @@ Effects executePlaylistProbe(const SourceCommand& command, std::any&, std::any& 
                              VmApi& vm) {
   auto& state = std::any_cast<PlaylistProbeTrackState&>(trackState);
   if ((command.address.value & 1) != 0) {
-    return Effects{.step = vm.endSection()};
+    return Effects{};
   }
 
   ++state.persistentValue;
@@ -1096,8 +1219,8 @@ TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32
   };
   TrackProgramBuilder builder(track);
   for (const auto [address, duration] : sections) {
-    builder.addSemantic(Address{address}, duration, 1, {}, {}, DecodeFlow::fallthroughTo(Address{address + 1}));
-    builder.addSemantic(Address{address + 1}, 0, 1, {}, {}, DecodeFlow::terminalFlow());
+    builder.addSemantic(Address{address}, duration, 1, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}));
+    builder.addSemantic(Address{address + 1}, 0, 1, {}, {}, CommandFlow::endSection(Address{address + 2}));
   }
   return track;
 }
@@ -1233,6 +1356,10 @@ void runValueSequenceVmTests() {
   sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode();
   sequenceVmPreservesLoopMarkersForInteriorJumpTarget();
   sequenceVmDoesNotWrapCommandAddressOverflow();
+  sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder();
+  sequenceVmUsesDecodedCallContinuationAsReturnAddress();
+  sequenceVmPreservesExplicitJumpToContinuation();
+  sequenceVmEnforcesFlowOverridePolicies();
   sequenceVmReportsMissingJumpTargetAfterEmittedEvents();
   sequenceVmSchedulesSemanticTracksAgainstOneProgramState();
   sequenceVmCoordinatesSemanticLoopsAtSequenceScope();
