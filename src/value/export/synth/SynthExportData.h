@@ -75,6 +75,10 @@ struct PreparedSynthData {
   std::vector<Diagnostic> diagnostics;
 };
 
+// SF2 and DLS have one decay followed by a fixed sustain level. Approximate a
+// richer envelope without changing the instrument data kept by the scanner.
+[[nodiscard]] Envelope approximateEnvelopeAsAdsr(Envelope envelope);
+
 // Decode samples and resolve instrument references once before a format-specific
 // writer lays out its container.
 [[nodiscard]] PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,

@@ -310,6 +310,9 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
              parsedRegion.modulation.vibrato->maxDepthCents == 7.0 &&
              parsedRegion.modulation.vibrato->rateHertz.minimum == 0.17,
          "SegSat region LFO should remain a layer-local fixed-depth triangle modulation");
+  expect(parsedRegion.envelope.decaySeconds == 100.0 && parsedRegion.envelope.secondDecaySeconds == 100.0 &&
+             parsedRegion.envelope.sustainAmplitude == 1.0,
+         "SegSat regions should preserve both SCSP decay stages");
   const auto decoded = decodeSample(samples->samples.samples.front(), session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 4 && decoded->pcm[0] == 0x1234 && decoded->pcm[1] == -292,
          "SegSat PCM16 samples should decode in the SCSP's big-endian byte order");

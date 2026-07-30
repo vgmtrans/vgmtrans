@@ -262,9 +262,10 @@ void soundFontExporterWritesSfbkRiffFile() {
               .envelope =
                   Envelope{
                       .attackSeconds = 1.0,
-                      .decaySeconds = 2.0,
+                      .decaySeconds = 0.11,
+                      .secondDecaySeconds = 5.5,
                       .releaseSeconds = 0.25,
-                      .sustainAmplitude = 0.5,
+                      .sustainAmplitude = 29.0 / 31.0,
                   },
               .pan = 1.0,
           }},
@@ -356,10 +357,10 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write attackVolEnv from Region envelope");
   expect(soundFontIgenContainsAmount(result.bytes, 35, -32768),
          "SoundFont export should write holdVolEnv from Region envelope");
-  expect(soundFontIgenContainsAmount(result.bytes, 36, 1200),
-         "SoundFont export should write decayVolEnv from Region envelope");
-  expect(soundFontIgenContainsAmount(result.bytes, 37, 60),
-         "SoundFont export should write sustainVolEnv from Region envelope");
+  expect(soundFontIgenContainsAmount(result.bytes, 36, 2951),
+         "SoundFont export should preserve the second decay after a barely audible first-stage drop");
+  expect(soundFontIgenContainsAmount(result.bytes, 37, 1000),
+         "SoundFont export should end the approximated second decay at silence");
   expect(soundFontIgenContainsAmount(result.bytes, 38, -2400),
          "SoundFont export should write releaseVolEnv from Region envelope");
 
@@ -422,6 +423,7 @@ void dlsExporterWritesDlsRiffFile() {
                   Envelope{
                       .attackSeconds = 1.0,
                       .decaySeconds = 2.0,
+                      .secondDecaySeconds = 1.0,
                       .releaseSeconds = 0.25,
                       .sustainAmplitude = 0.5,
                   },
@@ -496,10 +498,10 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should write EG1 attack time from Region envelope");
   expect(dlsArt2ContainsConnection(result.bytes, 0x020c, std::numeric_limits<s32>::min()),
          "DLS export should write EG1 hold time from Region envelope");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 78643200),
-         "DLS export should write EG1 decay time from Region envelope");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x020a, 61425937),
-         "DLS export should write EG1 sustain level from Region envelope");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 124646523),
+         "DLS export should combine short first and second decay stages");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x020a, 0),
+         "DLS export should end a combined two-stage decay at silence");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0209, -157286400),
          "DLS export should write EG1 release time from Region envelope");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0000, 0x0114, -8479 * 65536),

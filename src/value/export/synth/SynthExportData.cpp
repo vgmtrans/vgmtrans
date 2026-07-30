@@ -11,6 +11,7 @@
 #include "value/synth/SampleDecoder.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <map>
 #include <optional>
@@ -261,6 +262,32 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 }
 
 }  // namespace
+
+Envelope approximateEnvelopeAsAdsr(Envelope envelope) {
+  if (!envelope.secondDecaySeconds) {
+    return envelope;
+  }
+
+  const double secondDecay = *envelope.secondDecaySeconds;
+  const double sustain = envelope.sustainAmplitude.value_or(1.0);
+  const double firstDecayDropDb = sustain > 0.0 ? -20.0 * std::log10(sustain) : std::numeric_limits<double>::infinity();
+  const bool shortFirstDecay =
+      envelope.decaySeconds && std::isfinite(*envelope.decaySeconds) && *envelope.decaySeconds >= 0.0 &&
+      *envelope.decaySeconds < 2.0;
+  if (std::isfinite(secondDecay) && (sustain >= 1.0 || (firstDecayDropDb <= 1.0 && shortFirstDecay))) {
+    // A drop of at most 1 dB is barely audible. Ignore that short first stage
+    // and preserve the second decay instead of leaving the sound sustained.
+    envelope.decaySeconds = secondDecay;
+    envelope.sustainAmplitude = 0.0;
+  } else if (secondDecay >= 0.0 && secondDecay < 2.0) {
+    // A short second decay sounds closer to one continuous fade than to a
+    // permanent sustain level.
+    envelope.decaySeconds = envelope.decaySeconds.value_or(0.0) + secondDecay;
+    envelope.sustainAmplitude = 0.0;
+  }
+  envelope.secondDecaySeconds.reset();
+  return envelope;
+}
 
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {

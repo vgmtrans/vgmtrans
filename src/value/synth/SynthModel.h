@@ -53,13 +53,16 @@ struct Envelope {
   std::optional<double> attackSeconds;
   std::optional<double> holdSeconds;
   std::optional<double> decaySeconds;
+  // Time to decay from sustainAmplitude to silence while the key remains held.
+  std::optional<double> secondDecaySeconds;
   std::optional<double> releaseSeconds;
   std::optional<double> sustainAmplitude;
 };
 
 [[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
   return envelope.attackSeconds.has_value() || envelope.holdSeconds.has_value() || envelope.decaySeconds.has_value() ||
-         envelope.releaseSeconds.has_value() || envelope.sustainAmplitude.has_value();
+         envelope.secondDecaySeconds.has_value() || envelope.releaseSeconds.has_value() ||
+         envelope.sustainAmplitude.has_value();
 }
 
 struct Loop {

@@ -101,24 +101,14 @@ struct ParsedInstrument {
   const u8 release = static_cast<u8>(adsr2 & 0x1f);
   const u8 decayLevel = static_cast<u8>((adsr2 >> 5) & 0x1f);
 
-  double decaySeconds = kDecayMilliseconds[decay1 * 2] / 1000.0;
-  double sustain = (31 - decayLevel) / 31.0;
-  const double decay2Seconds = kDecayMilliseconds[decay2 * 2] / 1000.0;
-  if (sustain == 1.0 && decay2Seconds < 1000.0) {
-    decaySeconds = decay2Seconds;
-    sustain = 0.0;
-  } else if (decay2Seconds < 2.0) {
-    decaySeconds += decay2Seconds;
-    sustain = 0.0;
-  }
-
   // MAME begins SCSP attack at 0x17f rather than silence. The original
   // converter's 0.625 factor retains that audible portion of the envelope.
   return Envelope{
       .attackSeconds = (kAttackMilliseconds[attack * 2] / 1000.0) * 0.625,
-      .decaySeconds = decaySeconds,
+      .decaySeconds = kDecayMilliseconds[decay1 * 2] / 1000.0,
+      .secondDecaySeconds = kDecayMilliseconds[decay2 * 2] / 1000.0,
       .releaseSeconds = kDecayMilliseconds[release * 2] / 1000.0,
-      .sustainAmplitude = sustain,
+      .sustainAmplitude = (31 - decayLevel) / 31.0,
   };
 }
 
