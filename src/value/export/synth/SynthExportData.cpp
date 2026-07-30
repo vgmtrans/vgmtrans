@@ -264,6 +264,12 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 }  // namespace
 
 Envelope approximateEnvelopeAsAdsr(Envelope envelope) {
+  constexpr double endlessReleaseFallbackSeconds = 150.0;
+  if (envelope.releaseSeconds && std::isinf(*envelope.releaseSeconds) && *envelope.releaseSeconds > 0.0) {
+    // SF2 and DLS cannot represent an endless release, so use 150 seconds.
+    envelope.releaseSeconds = endlessReleaseFallbackSeconds;
+  }
+
   if (!envelope.secondDecaySeconds) {
     return envelope;
   }
