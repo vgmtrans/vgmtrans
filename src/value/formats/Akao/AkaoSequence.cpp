@@ -178,6 +178,9 @@ using AkaoEvent = AkaoCursor::Event;
   return event;
 }
 
+// Akao stores many addresses as signed distances rather than absolute
+// positions. This general helper converts one when the caller already knows
+// what the address is for, such as a repeat, call, or conditional jump.
 [[nodiscard]] Address relativeAddress(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset,
                                       std::string_view name, SemanticOperandRole role = SemanticOperandRole::Address) {
   const s16 relative = event.s16le(name);
@@ -186,14 +189,17 @@ using AkaoEvent = AkaoCursor::Event;
   return destination;
 }
 
-[[nodiscard]] Address relativeJumpAddress(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset,
-                                          std::string_view name, u32 commandAddress) {
+// Read an unconditional jump whose destination is stored as a signed distance,
+// record the resulting absolute address, and declare its playback behavior.
+// Forward jumps skip ahead; backward jumps are marked as possible song loops.
+[[nodiscard]] DecodedBytecodeCommand relativeJump(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset,
+                                                  std::string_view name, u32 commandAddress) {
   const s16 relative = event.s16le(name);
   const Address destination{profile.relativeDestination(operandOffset, relative)};
-  const SemanticOperandRole role =
-      destination.value <= commandAddress ? SemanticOperandRole::LoopTarget : SemanticOperandRole::JumpTarget;
+  const bool backward = destination.value <= commandAddress;
+  const SemanticOperandRole role = backward ? SemanticOperandRole::LoopTarget : SemanticOperandRole::JumpTarget;
   event.derived(fmt::format("{}_absolute", name), destination, SourceValueDisplay::Address, role);
-  return destination;
+  return backward ? event.loopCandidate(destination) : event.jump(destination);
 }
 
 void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset, SemanticOperandRole role) {
@@ -252,10 +258,6 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
         playback.out.timeSignature(beats, denominator, ticks);
       },
       ticksPerBeat, beatsPerMeasure);
-}
-
-[[nodiscard]] DecodedBytecodeCommand jumpOrLoop(AkaoEvent& event, Address destination, u32 commandAddress) {
-  return destination.value <= commandAddress ? event.loopCandidate(destination) : event.jump(destination);
 }
 
 [[nodiscard]] DecodedBytecodeCommand repeatBranch(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset) {
@@ -329,7 +331,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0x06: {
       auto event = subCommand(cursor, "Jump", SequenceSemantic::Jump);
-      return jumpOrLoop(event, relativeJumpAddress(event, profile, begin + 2, "relative", begin), begin);
+      return relativeJump(event, profile, begin + 2, "relative", begin);
     }
     case 0x07: {
       auto event = subCommand(cursor, "CPU Conditional Jump", SequenceSemantic::Jump);
@@ -685,7 +687,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     case 0xee:
       if (profile.legacyFamily()) {
         auto event = cursor.command("Jump", SequenceSemantic::Jump);
-        return jumpOrLoop(event, relativeJumpAddress(event, profile, begin + 1, "relative", begin), begin);
+        return relativeJump(event, profile, begin + 1, "relative", begin);
       }
       break;
     case 0xef:
