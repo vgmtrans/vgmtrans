@@ -90,8 +90,8 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x26: {
       auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
-      return event.invoke([](CompilerProbePlayback&) { return Effects::overrideWith(Step::end()); })
-          .invoke([](CompilerProbePlayback&) { return Effects::overrideWith(Step::return_()); })
+      return event.invoke([](CompilerProbePlayback& playback) { return playback.vm.end(); })
+          .invoke([](CompilerProbePlayback& playback) { return playback.vm.return_(); })
           .runtimeControlFlow();
     }
     case 0x27: {

@@ -532,7 +532,7 @@ struct Playback {
     if (times == 0) {
       // Zero means the song's repeating loop, not a 256-pass counted loop.
       // Volume and pitch changes belong only to finite repeats.
-      return Effects::overrideWith(vm.declaredLoop(destination));
+      return vm.declaredLoop(destination);
     }
 
     Effects effects = vm.countedRepeatUntil(slot, times, destination);
@@ -565,14 +565,14 @@ struct Playback {
       track.voltaEndMeansPlayFromStart = false;
       track.voltaEndMeansPlayNextVolta = true;
       track.voltaLoopEnd = next;
-      return Effects::overrideWith(vm.finiteBranch(track.voltaLoopStart));
+      return vm.finiteBranch(track.voltaLoopStart);
     }
 
     if (track.voltaEndMeansPlayNextVolta) {
       // On replay, the first marker skips the ending that already played.
       track.voltaEndMeansPlayFromStart = true;
       track.voltaEndMeansPlayNextVolta = false;
-      return Effects::overrideWith(vm.finiteBranch(track.voltaLoopEnd));
+      return vm.finiteBranch(track.voltaLoopEnd);
     }
 
     // The first marker begins the first ending; playback simply continues.
@@ -585,9 +585,9 @@ struct Playback {
     // pattern; the next 0xff returns from it, while a top-level 0xff ends music.
     if (track.inSubroutine) {
       track.inSubroutine = false;
-      return Effects::overrideWith(vm.return_());
+      return vm.return_();
     }
-    return Effects::overrideWith(vm.end());
+    return vm.end();
   }
 
   void tick() {

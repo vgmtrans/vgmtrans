@@ -12,8 +12,8 @@
 
 namespace vgmtrans::core {
 
-enum class StepKind {
-  Next,
+enum class RuntimeTransitionKind {
+  Fallthrough,
   End,
   EndSection,
   Jump,
@@ -28,36 +28,50 @@ enum class JumpSemantics {
   DeclaredLoop,
 };
 
-// A Step is a transition selected while executing one command. Most commands
+// A RuntimeTransition is selected while executing one command. Most commands
 // do not produce one: SequenceVm applies their static CommandFlow instead.
-struct Step {
-  StepKind kind = StepKind::Next;
+struct RuntimeTransition {
+  RuntimeTransitionKind kind = RuntimeTransitionKind::Fallthrough;
   Address destination;
   JumpSemantics jumpSemantics = JumpSemantics::Normal;
 
-  [[nodiscard]] static constexpr Step next() noexcept { return Step{.kind = StepKind::Next}; }
-  [[nodiscard]] static constexpr Step end() noexcept { return Step{.kind = StepKind::End}; }
-  [[nodiscard]] static constexpr Step endSection() noexcept { return Step{.kind = StepKind::EndSection}; }
-  [[nodiscard]] static constexpr Step jump(Address destination,
-                                           JumpSemantics semantics = JumpSemantics::Normal) noexcept {
-    return Step{.kind = StepKind::Jump, .destination = destination, .jumpSemantics = semantics};
+  [[nodiscard]] static constexpr RuntimeTransition fallthrough() noexcept {
+    return RuntimeTransition{.kind = RuntimeTransitionKind::Fallthrough};
   }
-  [[nodiscard]] static constexpr Step call(Address destination) noexcept {
-    return Step{.kind = StepKind::Call, .destination = destination};
+  [[nodiscard]] static constexpr RuntimeTransition end() noexcept {
+    return RuntimeTransition{.kind = RuntimeTransitionKind::End};
   }
-  [[nodiscard]] static constexpr Step return_() noexcept { return Step{.kind = StepKind::Return}; }
+  [[nodiscard]] static constexpr RuntimeTransition endSection() noexcept {
+    return RuntimeTransition{.kind = RuntimeTransitionKind::EndSection};
+  }
+  [[nodiscard]] static constexpr RuntimeTransition jump(Address destination,
+                                                        JumpSemantics semantics = JumpSemantics::Normal) noexcept {
+    return RuntimeTransition{
+        .kind = RuntimeTransitionKind::Jump,
+        .destination = destination,
+        .jumpSemantics = semantics,
+    };
+  }
+  [[nodiscard]] static constexpr RuntimeTransition call(Address destination) noexcept {
+    return RuntimeTransition{
+        .kind = RuntimeTransitionKind::Call,
+        .destination = destination,
+    };
+  }
+  [[nodiscard]] static constexpr RuntimeTransition return_() noexcept {
+    return RuntimeTransition{.kind = RuntimeTransitionKind::Return};
+  }
 };
 
 struct Effects {
   u32 advanceTicks = 0;
-  // Empty means "use the command's static transition." An explicit Next is
-  // retained for the rare case where runtime state selects the continuation
-  // instead of a different static default.
-  std::optional<Step> flowOverride;
+  // Empty means "use the command's static transition." An explicit
+  // Fallthrough remains distinct when runtime state selects the continuation
+  // instead of the static default.
+  std::optional<RuntimeTransition> flowOverride;
 
   [[nodiscard]] static constexpr Effects none() noexcept { return Effects{}; }
   [[nodiscard]] static constexpr Effects wait(u32 ticks) noexcept { return Effects{.advanceTicks = ticks}; }
-  [[nodiscard]] static constexpr Effects overrideWith(Step step) noexcept { return Effects{.flowOverride = step}; }
 };
 
 }  // namespace vgmtrans::core

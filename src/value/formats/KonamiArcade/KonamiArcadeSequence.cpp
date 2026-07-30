@@ -631,7 +631,7 @@ struct Playback {
       return {};
     }
     if (totalPlays == 0) {
-      return Effects::overrideWith(vm.declaredLoop(destination));
+      return vm.declaredLoop(destination);
     }
 
     Effects effects = vm.countedRepeatUntil(slot, totalPlays, destination);
@@ -657,14 +657,14 @@ struct Playback {
     }
     if (track.inSubroutine) {
       track.inSubroutine = false;
-      return Effects::overrideWith(vm.finiteBranch(track.subroutineReturn));
+      return vm.finiteBranch(track.subroutineReturn);
     }
     if (track.subroutineStart.value == 0) {
       return {};
     }
     track.inSubroutine = true;
     track.subroutineReturn = next;
-    return Effects::overrideWith(vm.finiteBranch(track.subroutineStart));
+    return vm.finiteBranch(track.subroutineStart);
   }
 
   void beginCall() { ++track.callDepth; }
@@ -672,9 +672,9 @@ struct Playback {
   [[nodiscard]] Effects returnOrEnd() {
     if (track.callDepth != 0) {
       --track.callDepth;
-      return Effects::overrideWith(vm.return_());
+      return vm.return_();
     }
-    return Effects::overrideWith(vm.end());
+    return vm.end();
   }
 
   void tick() {

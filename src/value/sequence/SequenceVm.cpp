@@ -629,8 +629,8 @@ private:
     } else {
       scheduleTicks(commandIndex, effects.advanceTicks);
     }
-    const auto effectiveStep = resolveStep(command, effects);
-    if (!effectiveStep) {
+    const auto effectiveTransition = resolveTransition(command, effects);
+    if (!effectiveTransition) {
       current_ = std::nullopt;
       return false;
     }
@@ -655,14 +655,15 @@ private:
       });
     }
     runtime_.lastCommand = command.id;
-    const bool endedSection = effectiveStep->kind == StepKind::EndSection;
-    applyStep(command, *effectiveStep);
+    const bool endedSection = effectiveTransition->kind == RuntimeTransitionKind::EndSection;
+    applyTransition(command, *effectiveTransition);
 
     ++executedCommands_;
     return endedSection;
   }
 
-  [[nodiscard]] std::optional<Step> resolveStep(const SourceCommand& command, const Effects& effects) {
+  [[nodiscard]] std::optional<RuntimeTransition> resolveTransition(const SourceCommand& command,
+                                                                   const Effects& effects) {
     switch (command.flow.overridePolicy) {
       case FlowOverridePolicy::Forbidden:
         if (effects.flowOverride) {
@@ -691,17 +692,17 @@ private:
     const StaticTransition& transition = *command.flow.defaultTransition;
     switch (transition.kind) {
       case StaticTransitionKind::Fallthrough:
-        return Step::next();
+        return RuntimeTransition::fallthrough();
       case StaticTransitionKind::Jump:
-        return Step::jump(transition.destination, transition.jumpSemantics);
+        return RuntimeTransition::jump(transition.destination, transition.jumpSemantics);
       case StaticTransitionKind::Call:
-        return Step::call(transition.destination);
+        return RuntimeTransition::call(transition.destination);
       case StaticTransitionKind::Return:
-        return Step::return_();
+        return RuntimeTransition::return_();
       case StaticTransitionKind::End:
-        return Step::end();
+        return RuntimeTransition::end();
       case StaticTransitionKind::EndSection:
-        return Step::endSection();
+        return RuntimeTransition::endSection();
     }
     return std::nullopt;
   }
@@ -757,9 +758,9 @@ private:
     return LoopAction{.kind = LoopActionKind::StopTrack};
   }
 
-  void applyStep(const SourceCommand& command, const Step& step) {
-    switch (step.kind) {
-      case StepKind::Next:
+  void applyTransition(const SourceCommand& command, const RuntimeTransition& transition) {
+    switch (transition.kind) {
+      case RuntimeTransitionKind::Fallthrough:
         current_ = destinationIndex(track_, command.flow.continuation);
         arrivedByControlFlow_ = false;
         if (!current_) {
@@ -768,21 +769,21 @@ private:
         }
         break;
 
-      case StepKind::End:
+      case RuntimeTransitionKind::End:
         current_ = std::nullopt;
         arrivedByControlFlow_ = false;
         break;
 
-      case StepKind::EndSection:
+      case RuntimeTransitionKind::EndSection:
         current_ = std::nullopt;
         arrivedByControlFlow_ = false;
         break;
 
-      case StepKind::Jump:
-        applyJump(command, step.destination, step.jumpSemantics);
+      case RuntimeTransitionKind::Jump:
+        applyJump(command, transition.destination, transition.jumpSemantics);
         break;
 
-      case StepKind::Call:
+      case RuntimeTransitionKind::Call:
         if (const auto returnIndex = destinationIndex(track_, command.flow.continuation)) {
           runtime_.callStack.push_back(*returnIndex);
         } else {
@@ -792,14 +793,15 @@ private:
           arrivedByControlFlow_ = false;
           break;
         }
-        current_ = destinationIndex(track_, step.destination);
+        current_ = destinationIndex(track_, transition.destination);
         arrivedByControlFlow_ = true;
         if (!current_) {
-          warn(fmt::format("Sequence call target ${:04X} was not decoded", step.destination.value), command.range);
+          warn(fmt::format("Sequence call target ${:04X} was not decoded", transition.destination.value),
+               command.range);
         }
         break;
 
-      case StepKind::Return:
+      case RuntimeTransitionKind::Return:
         if (runtime_.callStack.empty()) {
           warn("Sequence return had no active call", command.range);
           current_ = std::nullopt;
@@ -957,40 +959,40 @@ void RepeatCounter::finish() {
   }
 }
 
-Step VmApi::next() const noexcept {
-  return Step::next();
+Effects VmApi::fallthrough() const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::fallthrough()};
 }
 
-Step VmApi::end() const noexcept {
-  return Step::end();
+Effects VmApi::end() const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::end()};
 }
 
-Step VmApi::endSection() const noexcept {
-  return Step::endSection();
+Effects VmApi::endSection() const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::endSection()};
 }
 
-Step VmApi::jump(Address destination) const noexcept {
-  return Step::jump(destination);
+Effects VmApi::jump(Address destination) const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::jump(destination)};
 }
 
-Step VmApi::finiteBranch(Address destination) const noexcept {
-  return Step::jump(destination, JumpSemantics::FiniteBranch);
+Effects VmApi::finiteBranch(Address destination) const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::jump(destination, JumpSemantics::FiniteBranch)};
 }
 
-Step VmApi::loopCandidate(Address destination) const noexcept {
-  return Step::jump(destination, JumpSemantics::LoopCandidate);
+Effects VmApi::loopCandidate(Address destination) const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::jump(destination, JumpSemantics::LoopCandidate)};
 }
 
-Step VmApi::declaredLoop(Address destination) const noexcept {
-  return Step::jump(destination, JumpSemantics::DeclaredLoop);
+Effects VmApi::declaredLoop(Address destination) const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::jump(destination, JumpSemantics::DeclaredLoop)};
 }
 
-Step VmApi::call(Address destination) const noexcept {
-  return Step::call(destination);
+Effects VmApi::call(Address destination) const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::call(destination)};
 }
 
-Step VmApi::return_() const noexcept {
-  return Step::return_();
+Effects VmApi::return_() const noexcept {
+  return Effects{.flowOverride = RuntimeTransition::return_()};
 }
 
 RepeatCounter VmApi::repeatCounter(u8 slot) {
@@ -1004,7 +1006,7 @@ Effects VmApi::countedRepeatUntil(u8 slot, u32 totalPlays, Address destination) 
   }
 
   if (counter.consumeReplay()) {
-    return Effects::overrideWith(jump(destination));
+    return jump(destination);
   }
 
   counter.finish();
@@ -1017,7 +1019,7 @@ BranchResult VmApi::countedRepeatBreak(u8 slot, Address destination) {
     counter.finish();
     return BranchResult{
         .taken = true,
-        .effects = Effects::overrideWith(finiteBranch(destination)),
+        .effects = finiteBranch(destination),
     };
   }
 

@@ -276,19 +276,21 @@ private:
   PerformanceAutomationBinding binding_;
 };
 
-// Commands use VmApi for playback flow that is shared across formats: next, end,
-// jump, call, return, repeat handling, diagnostics, and current tick.
+// Commands use VmApi for playback flow that is shared across formats:
+// fallthrough, end, jump, call, return, repeat handling, diagnostics, and
+// current tick. Flow methods return complete Effects so format code can state
+// the runtime operation directly.
 class VmApi {
 public:
-  [[nodiscard]] Step next() const noexcept;
-  [[nodiscard]] Step end() const noexcept;
-  [[nodiscard]] Step endSection() const noexcept;
-  [[nodiscard]] Step jump(Address destination) const noexcept;
-  [[nodiscard]] Step finiteBranch(Address destination) const noexcept;
-  [[nodiscard]] Step loopCandidate(Address destination) const noexcept;
-  [[nodiscard]] Step declaredLoop(Address destination) const noexcept;
-  [[nodiscard]] Step call(Address destination) const noexcept;
-  [[nodiscard]] Step return_() const noexcept;
+  [[nodiscard]] Effects fallthrough() const noexcept;
+  [[nodiscard]] Effects end() const noexcept;
+  [[nodiscard]] Effects endSection() const noexcept;
+  [[nodiscard]] Effects jump(Address destination) const noexcept;
+  [[nodiscard]] Effects finiteBranch(Address destination) const noexcept;
+  [[nodiscard]] Effects loopCandidate(Address destination) const noexcept;
+  [[nodiscard]] Effects declaredLoop(Address destination) const noexcept;
+  [[nodiscard]] Effects call(Address destination) const noexcept;
+  [[nodiscard]] Effects return_() const noexcept;
 
   // Formats can manage repeat counters directly when their driver does not fit
   // the counted-repeat helpers below.

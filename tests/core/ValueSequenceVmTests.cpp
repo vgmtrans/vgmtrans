@@ -903,10 +903,13 @@ SequenceDialect authoritativeFlowProbeDialect() {
       .execute =
           [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi& vm) {
             if (command.opcode == 0xfe) {
-              return Effects::overrideWith(vm.jump(command.flow.continuation));
+              return vm.jump(command.flow.continuation);
             }
             if (command.opcode == 0xfd) {
-              return Effects::overrideWith(vm.end());
+              return vm.end();
+            }
+            if (command.opcode == 0xfc) {
+              return vm.fallthrough();
             }
             if (command.opcode != 0) {
               out.note(command.opcode, 1.0, 1);
@@ -1009,6 +1012,22 @@ void sequenceVmEnforcesFlowOverridePolicies() {
   expect(
       forbidden.diagnostics.size() == 1 && forbidden.diagnostics.front().message.find("forbidden") != std::string::npos,
       "a forbidden runtime override should stop with a focused diagnostic");
+
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder builder(track);
+  CommandFlow explicitFallthrough = CommandFlow::end(Address{1});
+  explicitFallthrough.overridePolicy = FlowOverridePolicy::Required;
+  builder.addSemantic(Address{0}, 0xfc, 1, {}, {}, std::move(explicitFallthrough));
+  builder.addSemantic(Address{1}, 1, 1, {}, {}, CommandFlow::end(Address{2}));
+  const PerformanceSequence fallthrough = SequenceVm().render(
+      SequenceProgram{
+          .dialect = dialect.id,
+          .timebase = dialect.timebase,
+          .tracks = {track},
+      },
+      dialect);
+  expect(fallthrough.diagnostics.empty() && fallthrough.tracks[0].events.size() == 1,
+         "a required runtime transition should be able to select the decoded continuation explicitly");
 }
 
 void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
