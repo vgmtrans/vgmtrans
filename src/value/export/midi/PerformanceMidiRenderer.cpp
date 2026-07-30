@@ -587,18 +587,36 @@ void addPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channe
   state.lastPitchBendValue = value;
 }
 
+[[nodiscard]] double currentPitchBendSemitones(const RenderTrackState& state,
+                                               ModulationConversionPolicy modulationConversion) {
+  return state.sourcePitchBendSemitones + (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation
+                                               ? state.simulatedVibratoSemitones
+                                               : 0.0);
+}
+
+void ensurePitchBendRangePreservingPitch(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents,
+                                         ModulationConversionPolicy modulationConversion) {
+  const u16 previousRange = state.pitchBendRangeCents;
+  ensurePitchBendRange(track, state, tick, channel, cents);
+  if (state.pitchBendRangeCents != previousRange && state.lastPitchBendValue) {
+    addPitchBend(track, state, tick, channel,
+                 midiPitchBend(currentPitchBendSemitones(state, modulationConversion), state.pitchBendRangeCents));
+  }
+}
+
 void applyVoicePitchBendRangeChange(MidiTrack& track, RenderTrackState& state, const VoicePitchBendRangeChange& change,
                                     u8 channel, ModulationConversionPolicy modulationConversion) {
   state.sourcePitchBendRangeCents = change.sourceCents;
   state.voicePitchBendRangeCents = change.voiceCents;
-  ensurePitchBendRange(track, state, change.tick, channel, effectivePitchBendRangeCents(state, modulationConversion));
+  ensurePitchBendRangePreservingPitch(track, state, change.tick, channel,
+                                      effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
 }
 
 void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, bool force = true) {
   ensurePitchBendRange(track, state, tick, channel,
                        effectivePitchBendRangeCents(state, ModulationConversionPolicy::SequenceEventSimulation));
-  const s16 value =
-      midiPitchBend(state.sourcePitchBendSemitones + state.simulatedVibratoSemitones, state.pitchBendRangeCents);
+  const s16 value = midiPitchBend(currentPitchBendSemitones(state, ModulationConversionPolicy::SequenceEventSimulation),
+                                  state.pitchBendRangeCents);
   addPitchBend(track, state, tick, channel, value, force);
 }
 
@@ -1046,8 +1064,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // Global transpose changes how later notes and portamento controls are written. It does not
           // become a MIDI event itself.
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendPerformanceEvent>) {
+          state.sourcePitchBendSemitones = typedEvent.semitones;
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-            state.sourcePitchBendSemitones = typedEvent.semitones;
             addCombinedPitchBend(track, state, typedEvent.header.tick, channel, false);
           } else {
             addPitchBend(track, state, typedEvent.header.tick, channel,
@@ -1055,8 +1073,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           }
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
           state.sourcePitchBendRangeCents = std::max<u16>(200, typedEvent.cents);
-          ensurePitchBendRange(track, state, typedEvent.header.tick, channel,
-                               effectivePitchBendRangeCents(state, modulationConversion));
+          ensurePitchBendRangePreservingPitch(track, state, typedEvent.header.tick, channel,
+                                              effectivePitchBendRangeCents(state, modulationConversion),
+                                              modulationConversion);
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
           setLfoDelay(state.vibrato, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
                       typedEvent.tempoRelative);
