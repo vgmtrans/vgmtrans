@@ -265,11 +265,6 @@ BuiltSampleCollection SampleCollectionBuilder::finish() && {
   if (finished_) {
     throw std::logic_error("SampleCollectionBuilder was finished more than once");
   }
-  // value() is an intentional escape hatch, so account for any payload range
-  // that the format filled in after adding the sample.
-  for (const auto& sample : samples_) {
-    recordRange(sample.encodedData, false);
-  }
   addFallbackSources();
   annotateValues();
   const SourceRange finalRange = range();
@@ -296,7 +291,7 @@ SampleRef SampleCollectionBuilder::Entry::ref() const {
   return SampleRef{.collection = builder_->asset_, .index = index_};
 }
 
-Sample& SampleCollectionBuilder::Entry::value() const {
+const Sample& SampleCollectionBuilder::Entry::value() const {
   if (!*this) {
     throw std::logic_error("Invalid SampleCollectionBuilder entry");
   }
@@ -463,15 +458,6 @@ BuiltInstrumentSet InstrumentSetBuilder::finish() && {
   if (finished_) {
     throw std::logic_error("InstrumentSetBuilder was finished more than once");
   }
-  for (u32 index = 0; index < instruments_.size(); ++index) {
-    syncPrepopulatedRegions(index);
-    // value() may also be used to fill fields after insertion. Re-read the
-    // durable ranges here so the enclosing asset still covers those bytes.
-    recordRange(instruments_[index].range, false);
-    for (const auto& region : instruments_[index].regions) {
-      recordRange(region.range, false);
-    }
-  }
   addFallbackSources();
   annotateValues();
   const SourceRange finalRange = range();
@@ -490,7 +476,7 @@ InstrumentSetBuilder::Entry::operator bool() const noexcept {
   return builder_ != nullptr && builder_->validInstrument(index_);
 }
 
-Instrument& InstrumentSetBuilder::Entry::value() const {
+const Instrument& InstrumentSetBuilder::Entry::value() const {
   if (!*this) {
     throw std::logic_error("Invalid InstrumentSetBuilder entry");
   }
@@ -515,10 +501,6 @@ InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::Entry::regionAt(u32 regi
   if (!*this) {
     return {};
   }
-  // value() may have received complete regions before the format attached
-  // their source records. Bring those regions into the builder's bookkeeping
-  // without asking the format to remove and add them again.
-  builder_->syncPrepopulatedRegions(index_);
   return builder_->validRegion(index_, regionIndex) ? RegionEntry{*builder_, index_, regionIndex} : RegionEntry{};
 }
 
@@ -530,7 +512,7 @@ InstrumentSetBuilder::RegionEntry::operator bool() const noexcept {
   return builder_ != nullptr && builder_->validRegion(instrumentIndex_, regionIndex_);
 }
 
-Region& InstrumentSetBuilder::RegionEntry::value() const {
+const Region& InstrumentSetBuilder::RegionEntry::value() const {
   if (!*this) {
     throw std::logic_error("Invalid InstrumentSetBuilder region entry");
   }
@@ -618,23 +600,6 @@ AnnotationBuilder InstrumentSetBuilder::addRegionSource(u32 instrumentIndex, u32
   return annotation;
 }
 
-void InstrumentSetBuilder::syncPrepopulatedRegions(u32 instrumentIndex) {
-  auto& state = states_[instrumentIndex];
-  const auto& regions = instruments_[instrumentIndex].regions;
-  if (state.regions.size() > regions.size()) {
-    throw std::logic_error(
-        "Instrument regions cannot be removed through value(); stable source owners already refer to their indexes");
-  }
-  while (state.regions.size() < regions.size()) {
-    const auto& region = regions[state.regions.size()];
-    state.regions.push_back(RegionState{.rangeWasExplicit = region.range.valid()});
-    recordRange(region.range, false);
-  }
-  for (const auto source : state.sources) {
-    linkInstrumentSamples(instrumentIndex, source);
-  }
-}
-
 void InstrumentSetBuilder::addFallbackSources() {
   if (sourceMap_ == nullptr) {
     return;
@@ -700,12 +665,6 @@ void InstrumentSetBuilder::linkSample(SourceAnnotationId annotation, SampleRef s
 
 void InstrumentSetBuilder::recordInstrumentRange(u32 index, SourceRange range) {
   auto& state = states_[index];
-  // A format may fill a durable range through value() after insertion. Treat a
-  // range that did not come from us as explicit before recording source spans.
-  if (!state.rangeWasExplicit && instruments_[index].range.valid() &&
-      (!state.observedRange || instruments_[index].range != *state.observedRange)) {
-    state.rangeWasExplicit = true;
-  }
   recordRange(range, false);
   mergeRange(state.observedRange, range);
   if (!state.rangeWasExplicit && state.observedRange) {
@@ -715,11 +674,6 @@ void InstrumentSetBuilder::recordInstrumentRange(u32 index, SourceRange range) {
 
 void InstrumentSetBuilder::recordRegionRange(u32 instrumentIndex, u32 regionIndex, SourceRange range) {
   auto& state = states_[instrumentIndex].regions[regionIndex];
-  const auto& region = instruments_[instrumentIndex].regions[regionIndex];
-  if (!state.rangeWasExplicit && region.range.valid() &&
-      (!state.observedRange || region.range != *state.observedRange)) {
-    state.rangeWasExplicit = true;
-  }
   recordRange(range, false);
   mergeRange(state.observedRange, range);
   if (!state.rangeWasExplicit && state.observedRange) {

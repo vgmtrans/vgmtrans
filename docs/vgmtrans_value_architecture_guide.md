@@ -906,7 +906,7 @@ NDS demonstrates separate asset lifetimes. When a SWAR sample builder is committ
 
 `source()` returns the existing `AnnotationBuilder`. The shared code supplies dense owners, basic fallback annotations, range accumulation, and order-independent sample links; the format supplies meaningful labels, fields, table structure, and descriptions. A region owner contains both its instrument and region indexes, so several disjoint source records can all point to one logical region.
 
-`value()` is a narrow escape hatch for unusual format adjustments, not a second construction path. `regionAt()` similarly permits an exact source record to be attached to a region that was already present in an ordinary `Instrument` value. The builder rechecks final model ranges during `finish()`, but additions should normally use `add`, `append`, and `region()` so stable indexing and links stay automatic.
+`value()` is read-only. Samples, instruments, and regions are completed before insertion; structural additions use `add`, `append`, and `region()` so stable indexes and sample links stay automatic. `regionAt()` permits an exact source record to be attached to a region that was already present in an ordinary `Instrument` value.
 
 Both builders work without a source-map sink for detached value construction. Their `source()` calls remain harmless and still contribute ranges. Detached code can retain a `SampleRefLookup`; ordinary scan code gets the same behavior automatically from `ScanResultBuilder` after committing a sample builder.
 
