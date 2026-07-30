@@ -34,26 +34,18 @@ namespace {
     return result.finish();
   }
 
-  const auto instruments = result.reserveInstrumentSet();
-  const auto samples = result.reserveSampleCollection();
-  const bool hasSynth = addKonamiArcadeSynth(result, instruments, samples, *layout);
-  if (!hasSynth) {
-    result.warning("KonamiArcade sequences found, but no valid instruments or samples were discovered", layout->code);
-  }
+  const auto synth = addKonamiArcadeSynth(result, *layout);
 
   for (const auto& sourceSequence : layout->sequences) {
-    const auto sequence = result.reserveSequence();
-    result.sequence(sequence, sourceSequence.name, sourceSequence.trackTable)
-        .program(decodeKonamiArcadeSequence(input.reader, *layout, sourceSequence, sequence.id, &result.sourceMap(),
-                                            &result.diagnostics()));
+    auto sequence = result.sequence(sourceSequence.name, sourceSequence.trackTable);
+    sequence.program(decodeKonamiArcadeSequence(input.reader, *layout, sourceSequence, sequence.id(),
+                                                &result.sourceMap(), &result.diagnostics()));
 
     auto collection = result.collection(sourceSequence.name, collectionKey(input.source.id, sourceSequence.index));
     collection.sequence(sequence);
-    if (hasSynth) {
-      collection.instrumentSet(instruments).samples(samples);
-    }
+    collection.instrumentSet(synth.instruments).samples(synth.samples);
 
-    result.sourceFact(sequence.id,
+    result.sourceFact(sequence.id(),
                       FormatSpecificFact{
                           .kind = "konami-arcade-sequence",
                           .fields =

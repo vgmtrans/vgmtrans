@@ -8,6 +8,8 @@
 
 #include <filesystem>
 #include <stdexcept>
+#include <type_traits>
+#include <variant>
 
 namespace vgmtrans::core {
 
@@ -15,16 +17,6 @@ namespace {
 
 [[nodiscard]] std::string namedSourceCollectionKey(SourceId source, std::string_view name) {
   return "source:" + std::to_string(source.value) + ":collection:" + std::string(name);
-}
-
-void ensureAssetId(AssetMetadata& metadata, AssetId expectedId) {
-  if (!metadata.id.valid()) {
-    metadata.id = expectedId;
-    return;
-  }
-  if (metadata.id != expectedId) {
-    throw std::logic_error("ScanResultBuilder asset factory returned the wrong asset id");
-  }
 }
 
 [[nodiscard]] std::string roleName(CollectionMemberRole role) {
@@ -40,85 +32,223 @@ void ensureAssetId(AssetMetadata& metadata, AssetId expectedId) {
   }
 }
 
+struct PendingSequence {
+  AssetId id;
+  std::string name;
+  SourceRange range;
+  std::optional<SequenceProgram> program;
+};
+
+struct PendingInstrumentSet {
+  AssetId id;
+  std::string name;
+  InstrumentSetBuilder instruments;
+};
+
+struct PendingSampleCollection {
+  AssetId id;
+  std::string name;
+  SampleCollectionBuilder samples;
+};
+
+struct PendingMisc {
+  AssetId id;
+  std::string name;
+  SourceRange range;
+  std::optional<std::vector<u8>> payload;
+};
+
 }  // namespace
+
+struct ScanResultBuilder::DraftSlot {
+  using Value = std::variant<PendingSequence, PendingInstrumentSet, PendingSampleCollection, PendingMisc>;
+
+  explicit DraftSlot(Value value) : value(std::move(value)) {}
+
+  Value value;
+};
+
+ScanSequenceDraft::ScanSequenceDraft(ScanResultBuilder& out, size_t slot, AssetId id)
+    : out_(&out), slot_(slot), id_(id) {
+}
+
+ScanSequenceDraft& ScanSequenceDraft::range(SourceRange range) {
+  out_->setSequenceRange(slot_, range);
+  return *this;
+}
+
+ScanSequenceDraft& ScanSequenceDraft::program(SequenceProgram program) {
+  out_->setSequenceProgram(slot_, std::move(program));
+  return *this;
+}
+
+ScanInstrumentSetDraft::ScanInstrumentSetDraft(ScanResultBuilder& out, size_t slot, AssetId id)
+    : out_(&out), slot_(slot), id_(id) {
+}
+
+InstrumentSetBuilder::Entry ScanInstrumentSetDraft::append(Instrument instrument) {
+  return builder().append(std::move(instrument));
+}
+
+InstrumentSetBuilder::Entry ScanInstrumentSetDraft::add(u64 groupingKey, Instrument instrument) {
+  return builder().add(groupingKey, std::move(instrument));
+}
+
+InstrumentSetBuilder::Entry ScanInstrumentSetDraft::getOrAdd(u64 groupingKey, Instrument initialValue) {
+  return builder().getOrAdd(groupingKey, std::move(initialValue));
+}
+
+std::optional<InstrumentSetBuilder::Entry> ScanInstrumentSetDraft::find(u64 groupingKey) {
+  return builder().find(groupingKey);
+}
+
+AnnotationBuilder ScanInstrumentSetDraft::source(SourceRole role, std::string_view label, SourceRange range,
+                                                 std::string_view kind) {
+  return builder().source(role, label, range, kind);
+}
+
+AnnotationBuilder ScanInstrumentSetDraft::source(SourceRole role, std::string_view label, const SourceRecord& record,
+                                                 std::string_view kind) {
+  return builder().source(role, label, record, kind);
+}
+
+ScanInstrumentSetDraft& ScanInstrumentSetDraft::include(SourceRange range) {
+  builder().include(range);
+  return *this;
+}
+
+SourceRange ScanInstrumentSetDraft::range() const noexcept {
+  return out_->instrumentDraft(slot_).range();
+}
+
+bool ScanInstrumentSetDraft::empty() const noexcept {
+  return out_->instrumentDraft(slot_).empty();
+}
+
+size_t ScanInstrumentSetDraft::size() const noexcept {
+  return out_->instrumentDraft(slot_).size();
+}
+
+void ScanInstrumentSetDraft::warning(std::string message, SourceRange range) {
+  builder().warning(std::move(message), range);
+}
+
+void ScanInstrumentSetDraft::error(std::string message, SourceRange range) {
+  builder().error(std::move(message), range);
+}
+
+InstrumentSetBuilder& ScanInstrumentSetDraft::builder() {
+  return out_->instrumentDraft(slot_);
+}
+
+ScanSampleCollectionDraft::ScanSampleCollectionDraft(ScanResultBuilder& out, size_t slot, AssetId id)
+    : out_(&out), slot_(slot), id_(id) {
+}
+
+SampleCollectionBuilder::Entry ScanSampleCollectionDraft::add(u64 sourceKey, Sample sample) {
+  return builder().add(sourceKey, std::move(sample));
+}
+
+SampleCollectionBuilder::Entry ScanSampleCollectionDraft::alias(u64 aliasKey, u64 existingKey) {
+  return builder().alias(aliasKey, existingKey);
+}
+
+std::optional<SampleRef> ScanSampleCollectionDraft::find(u64 sourceKey) const {
+  return builder().find(sourceKey);
+}
+
+AnnotationBuilder ScanSampleCollectionDraft::source(SourceRole role, std::string_view label, SourceRange range,
+                                                    std::string_view kind) {
+  return builder().source(role, label, range, kind);
+}
+
+AnnotationBuilder ScanSampleCollectionDraft::source(SourceRole role, std::string_view label, const SourceRecord& record,
+                                                    std::string_view kind) {
+  return builder().source(role, label, record, kind);
+}
+
+ScanSampleCollectionDraft& ScanSampleCollectionDraft::include(SourceRange range) {
+  builder().include(range);
+  return *this;
+}
+
+SourceRange ScanSampleCollectionDraft::range() const noexcept {
+  return builder().range();
+}
+
+bool ScanSampleCollectionDraft::empty() const noexcept {
+  return builder().empty();
+}
+
+size_t ScanSampleCollectionDraft::size() const noexcept {
+  return builder().size();
+}
+
+void ScanSampleCollectionDraft::warning(std::string message, SourceRange range) {
+  builder().warning(std::move(message), range);
+}
+
+void ScanSampleCollectionDraft::error(std::string message, SourceRange range) {
+  builder().error(std::move(message), range);
+}
+
+SampleCollectionBuilder& ScanSampleCollectionDraft::builder() {
+  return out_->sampleDraft(slot_);
+}
+
+const SampleCollectionBuilder& ScanSampleCollectionDraft::builder() const {
+  return out_->sampleDraft(slot_);
+}
+
+ScanMiscDraft::ScanMiscDraft(ScanResultBuilder& out, size_t slot, AssetId id) : out_(&out), slot_(slot), id_(id) {
+}
+
+ScanMiscDraft& ScanMiscDraft::payload(std::vector<u8> payload) {
+  out_->setMiscPayload(slot_, std::move(payload));
+  return *this;
+}
 
 ScanCollectionBuilder::ScanCollectionBuilder(ScanResultBuilder& out, size_t index) : out_(out), index_(index) {
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::sequence(ScanSequenceRef asset) {
-  out_.markReferenced(asset.id, CollectionMemberRole::Sequence);
+  out_.validateDraftReference(asset.id, CollectionMemberRole::Sequence);
   out_.explicitCollection(index_).sequence = asset.id;
   return *this;
 }
 
+ScanCollectionBuilder& ScanCollectionBuilder::sequence(const ScanSequenceDraft& asset) {
+  return sequence(asset.ref());
+}
+
 ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(ScanInstrumentSetRef asset) {
-  out_.markReferenced(asset.id, CollectionMemberRole::InstrumentSet);
+  out_.validateDraftReference(asset.id, CollectionMemberRole::InstrumentSet);
   out_.explicitCollection(index_).instrumentSets.push_back(asset.id);
   return *this;
 }
 
+ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(const ScanInstrumentSetDraft& asset) {
+  return instrumentSet(asset.ref());
+}
+
 ScanCollectionBuilder& ScanCollectionBuilder::samples(ScanSampleCollectionRef asset) {
-  out_.markReferenced(asset.id, CollectionMemberRole::SampleCollection);
+  out_.validateDraftReference(asset.id, CollectionMemberRole::SampleCollection);
   out_.explicitCollection(index_).sampleCollections.push_back(asset.id);
   return *this;
 }
 
+ScanCollectionBuilder& ScanCollectionBuilder::samples(const ScanSampleCollectionDraft& asset) {
+  return samples(asset.ref());
+}
+
 ScanCollectionBuilder& ScanCollectionBuilder::misc(ScanMiscAssetRef asset) {
-  out_.markReferenced(asset.id, CollectionMemberRole::Misc);
+  out_.validateDraftReference(asset.id, CollectionMemberRole::Misc);
   out_.explicitCollection(index_).miscAssets.push_back(asset.id);
   return *this;
 }
 
-ScanSequenceAssetBuilder::ScanSequenceAssetBuilder(ScanResultBuilder& out, ScanSequenceRef ref, std::string name,
-                                                   SourceRange range)
-    : out_(out), ref_(ref), name_(std::move(name)), range_(range) {
-}
-
-ScanSequenceRef ScanSequenceAssetBuilder::program(SequenceProgram program) {
-  out_.addSequenceAsset(ref_, SequenceProgramAsset{
-                                  .metadata = out_.metadata(ref_.id, std::move(name_), range_),
-                                  .program = std::move(program),
-                              });
-  return ref_;
-}
-
-ScanInstrumentSetAssetBuilder::ScanInstrumentSetAssetBuilder(ScanResultBuilder& out, ScanInstrumentSetRef ref,
-                                                             std::string name, SourceRange range)
-    : out_(out), ref_(ref), name_(std::move(name)), range_(range) {
-}
-
-ScanInstrumentSetRef ScanInstrumentSetAssetBuilder::instruments(std::vector<Instrument> instruments) {
-  out_.addInstrumentSetAsset(ref_, InstrumentSetAsset{
-                                       .metadata = out_.metadata(ref_.id, std::move(name_), range_),
-                                       .instruments = std::move(instruments),
-                                   });
-  return ref_;
-}
-
-ScanSampleCollectionAssetBuilder::ScanSampleCollectionAssetBuilder(ScanResultBuilder& out, ScanSampleCollectionRef ref,
-                                                                   std::string name, SourceRange range)
-    : out_(out), ref_(ref), name_(std::move(name)), range_(range) {
-}
-
-ScanSampleCollectionRef ScanSampleCollectionAssetBuilder::samples(SampleCollection samples) {
-  out_.addSampleCollectionAsset(ref_, SampleCollectionAsset{
-                                          .metadata = out_.metadata(ref_.id, std::move(name_), range_),
-                                          .samples = std::move(samples),
-                                      });
-  return ref_;
-}
-
-ScanMiscAssetBuilder::ScanMiscAssetBuilder(ScanResultBuilder& out, ScanMiscAssetRef ref, std::string name,
-                                           SourceRange range)
-    : out_(out), ref_(ref), name_(std::move(name)), range_(range) {
-}
-
-ScanMiscAssetRef ScanMiscAssetBuilder::payload(std::vector<u8> payload) {
-  out_.addMiscAsset(ref_, MiscAsset{
-                              .metadata = out_.metadata(ref_.id, std::move(name_), range_),
-                              .payload = std::move(payload),
-                          });
-  return ref_;
+ScanCollectionBuilder& ScanCollectionBuilder::misc(const ScanMiscDraft& asset) {
+  return misc(asset.ref());
 }
 
 ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format)
@@ -130,6 +260,8 @@ ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format,
       collectionResolver_(collectionResolver.empty() ? format_ : std::move(collectionResolver)),
       sourceMap_([this]() { return input_.ids.nextSourceAnnotationId(); }) {
 }
+
+ScanResultBuilder::~ScanResultBuilder() = default;
 
 std::string ScanResultBuilder::sourceDisplayName() const {
   if (input_.source.title && !input_.source.title->empty()) {
@@ -144,89 +276,48 @@ std::string ScanResultBuilder::sourceDisplayName() const {
   return format_;
 }
 
-ScanSequenceRef ScanResultBuilder::reserveSequence() {
-  const auto id = input_.ids.nextAssetId();
-  reserveHandle(id, CollectionMemberRole::Sequence);
-  return ScanSequenceRef{.id = id};
+ScanSequenceDraft ScanResultBuilder::sequence(std::string name, SourceRange range) {
+  const AssetId id = input_.ids.nextAssetId();
+  const size_t slot = drafts_.size();
+  drafts_.push_back(std::make_unique<DraftSlot>(PendingSequence{.id = id, .name = std::move(name), .range = range}));
+  return ScanSequenceDraft(*this, slot, id);
 }
 
-ScanInstrumentSetRef ScanResultBuilder::reserveInstrumentSet() {
-  const auto id = input_.ids.nextAssetId();
-  reserveHandle(id, CollectionMemberRole::InstrumentSet);
-  return ScanInstrumentSetRef{.id = id};
+ScanInstrumentSetDraft ScanResultBuilder::instrumentSet(std::string name, SourceRange range) {
+  const AssetId id = input_.ids.nextAssetId();
+  const size_t slot = drafts_.size();
+  drafts_.push_back(std::make_unique<DraftSlot>(PendingInstrumentSet{
+      .id = id,
+      .name = std::move(name),
+      .instruments = InstrumentSetBuilder{id, &sourceMap_, &result_.diagnostics},
+  }));
+  ScanInstrumentSetDraft draft(*this, slot, id);
+  if (range.valid()) {
+    draft.include(range);
+  }
+  return draft;
 }
 
-ScanSampleCollectionRef ScanResultBuilder::reserveSampleCollection() {
-  const auto id = input_.ids.nextAssetId();
-  reserveHandle(id, CollectionMemberRole::SampleCollection);
-  return ScanSampleCollectionRef{.id = id};
+ScanSampleCollectionDraft ScanResultBuilder::sampleCollection(std::string name, SourceRange range) {
+  const AssetId id = input_.ids.nextAssetId();
+  const size_t slot = drafts_.size();
+  drafts_.push_back(std::make_unique<DraftSlot>(PendingSampleCollection{
+      .id = id,
+      .name = std::move(name),
+      .samples = SampleCollectionBuilder{id, &sourceMap_, &result_.diagnostics},
+  }));
+  ScanSampleCollectionDraft draft(*this, slot, id);
+  if (range.valid()) {
+    draft.include(range);
+  }
+  return draft;
 }
 
-ScanMiscAssetRef ScanResultBuilder::reserveMisc() {
-  const auto id = input_.ids.nextAssetId();
-  reserveHandle(id, CollectionMemberRole::Misc);
-  return ScanMiscAssetRef{.id = id};
-}
-
-ScanSequenceAssetBuilder ScanResultBuilder::sequence(std::string name, SourceRange range) {
-  return sequence(reserveSequence(), std::move(name), range);
-}
-
-ScanSequenceAssetBuilder ScanResultBuilder::sequence(ScanSequenceRef ref, std::string name, SourceRange range) {
-  return ScanSequenceAssetBuilder(*this, ref, std::move(name), range);
-}
-
-ScanInstrumentSetAssetBuilder ScanResultBuilder::instrumentSet(std::string name, SourceRange range) {
-  return instrumentSet(reserveInstrumentSet(), std::move(name), range);
-}
-
-ScanInstrumentSetAssetBuilder ScanResultBuilder::instrumentSet(ScanInstrumentSetRef ref, std::string name,
-                                                               SourceRange range) {
-  return ScanInstrumentSetAssetBuilder(*this, ref, std::move(name), range);
-}
-
-ScanInstrumentSetRef ScanResultBuilder::instrumentSet(std::string name, InstrumentSetBuilder&& instruments) {
-  auto built = std::move(instruments).finish();
-  const ScanInstrumentSetRef ref{.id = built.asset};
-  return instrumentSet(ref, std::move(name), built.range).instruments(std::move(built.values));
-}
-
-ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(std::string name, SourceRange range) {
-  return sampleCollection(reserveSampleCollection(), std::move(name), range);
-}
-
-ScanSampleCollectionAssetBuilder ScanResultBuilder::sampleCollection(ScanSampleCollectionRef ref, std::string name,
-                                                                     SourceRange range) {
-  return ScanSampleCollectionAssetBuilder(*this, ref, std::move(name), range);
-}
-
-ScanSampleCollectionRef ScanResultBuilder::sampleCollection(std::string name, SampleCollectionBuilder&& samples) {
-  auto built = std::move(samples).finish();
-  const ScanSampleCollectionRef ref{.id = built.asset};
-  sampleLookups_.insert_or_assign(ref.id.value, std::move(built.refs));
-  return sampleCollection(ref, std::move(name), built.range).samples(std::move(built.value));
-}
-
-InstrumentSetBuilder ScanResultBuilder::instruments() {
-  return instruments(reserveInstrumentSet());
-}
-
-InstrumentSetBuilder ScanResultBuilder::instruments(ScanInstrumentSetRef ref) {
-  reserveHandle(ref.id, CollectionMemberRole::InstrumentSet);
-  return InstrumentSetBuilder{ref.id, &sourceMap_, &result_.diagnostics};
-}
-
-SampleCollectionBuilder ScanResultBuilder::samples() {
-  return samples(reserveSampleCollection());
-}
-
-SampleCollectionBuilder ScanResultBuilder::samples(ScanSampleCollectionRef ref) {
-  reserveHandle(ref.id, CollectionMemberRole::SampleCollection);
-  return SampleCollectionBuilder{ref.id, &sourceMap_, &result_.diagnostics};
-}
-
-ScanMiscAssetBuilder ScanResultBuilder::misc(std::string name, SourceRange range) {
-  return ScanMiscAssetBuilder(*this, reserveMisc(), std::move(name), range);
+ScanMiscDraft ScanResultBuilder::misc(std::string name, SourceRange range) {
+  const AssetId id = input_.ids.nextAssetId();
+  const size_t slot = drafts_.size();
+  drafts_.push_back(std::make_unique<DraftSlot>(PendingMisc{.id = id, .name = std::move(name), .range = range}));
+  return ScanMiscDraft(*this, slot, id);
 }
 
 ScanCollectionBuilder ScanResultBuilder::collection(std::string name) {
@@ -253,45 +344,6 @@ ScanCollectionBuilder ScanResultBuilder::sourceCollection(std::string name) {
       .value = "source:" + std::to_string(input_.source.id.value),
   };
   return collection(std::move(name), std::move(key));
-}
-
-SampleRef ScanResultBuilder::sampleRef(ScanSampleCollectionRef collection, u32 index) {
-  markReferenced(collection.id, CollectionMemberRole::SampleCollection);
-  return SampleRef{
-      .collection = collection.id,
-      .index = index,
-  };
-}
-
-SampleRef ScanResultBuilder::sampleRef(std::optional<ScanSampleCollectionRef> collection, u32 index) {
-  if (collection) {
-    return sampleRef(*collection, index);
-  }
-  return SampleRef{.index = index};
-}
-
-std::optional<SampleRef> ScanResultBuilder::sampleByKey(ScanSampleCollectionRef collection, u64 sourceKey) {
-  const auto lookup = sampleLookups_.find(collection.id.value);
-  if (lookup == sampleLookups_.end()) {
-    return std::nullopt;
-  }
-  const auto sample = lookup->second.find(sourceKey);
-  if (sample) {
-    markReferenced(collection.id, CollectionMemberRole::SampleCollection);
-  }
-  return sample;
-}
-
-std::optional<SampleRef> ScanResultBuilder::sampleByKeyOrWarning(std::optional<ScanSampleCollectionRef> collection,
-                                                                 u64 sourceKey, std::string description,
-                                                                 SourceRange range) {
-  if (collection) {
-    if (const auto sample = sampleByKey(*collection, sourceKey)) {
-      return sample;
-    }
-  }
-  warning(std::move(description) + " was not found", range);
-  return std::nullopt;
 }
 
 void ScanResultBuilder::fact(AssetId asset, MatchScope scope, MatchFactPayload payload) {
@@ -337,7 +389,56 @@ void ScanResultBuilder::extractedSource(ExtractedSource source) {
 }
 
 ScanResult ScanResultBuilder::finish() {
-  validateReferencedHandles();
+  for (const auto& slot : drafts_) {
+    std::visit(
+        [](const auto& pending) {
+          using Pending = std::decay_t<decltype(pending)>;
+          if constexpr (std::is_same_v<Pending, PendingSequence>) {
+            if (!pending.program) {
+              throw std::logic_error("ScanResultBuilder sequence draft was never given a program");
+            }
+          } else if constexpr (std::is_same_v<Pending, PendingMisc>) {
+            if (!pending.payload) {
+              throw std::logic_error("ScanResultBuilder misc draft was never given a payload");
+            }
+          }
+        },
+        slot->value);
+  }
+
+  result_.assets.reserve(result_.assets.size() + drafts_.size());
+  for (auto& slot : drafts_) {
+    Asset asset = std::visit(
+        [this](auto& pending) -> Asset {
+          using Pending = std::decay_t<decltype(pending)>;
+          if constexpr (std::is_same_v<Pending, PendingSequence>) {
+            return SequenceProgramAsset{
+                .metadata = metadata(pending.id, std::move(pending.name), pending.range),
+                .program = std::move(*pending.program),
+            };
+          } else if constexpr (std::is_same_v<Pending, PendingInstrumentSet>) {
+            auto built = std::move(pending.instruments).finish();
+            return InstrumentSetAsset{
+                .metadata = metadata(pending.id, std::move(pending.name), built.range),
+                .instruments = std::move(built.values),
+            };
+          } else if constexpr (std::is_same_v<Pending, PendingSampleCollection>) {
+            auto built = std::move(pending.samples).finish();
+            return SampleCollectionAsset{
+                .metadata = metadata(pending.id, std::move(pending.name), built.range),
+                .samples = std::move(built.value),
+            };
+          } else {
+            return MiscAsset{
+                .metadata = metadata(pending.id, std::move(pending.name), pending.range),
+                .payload = std::move(*pending.payload),
+            };
+          }
+        },
+        slot->value);
+    result_.assets.push_back(std::move(asset));
+  }
+
   result_.sourceMap = sourceMap_.finish();
   return std::move(result_);
 }
@@ -362,72 +463,69 @@ ExplicitCollection& ScanResultBuilder::explicitCollection(size_t index) {
   return result_.explicitCollections.at(index);
 }
 
-void ScanResultBuilder::reserveHandle(AssetId id, CollectionMemberRole role) {
-  auto [found, inserted] = handles_.try_emplace(id.value, HandleState{.role = role});
-  if (!inserted && found->second.role != role) {
-    throw std::logic_error("ScanResultBuilder asset handle reused with a different role");
-  }
-}
-
-void ScanResultBuilder::markCommitted(AssetId id, CollectionMemberRole role) {
-  auto [found, inserted] = handles_.try_emplace(id.value, HandleState{.role = role});
-  if (!inserted && found->second.role != role) {
-    throw std::logic_error("ScanResultBuilder asset handle reused with a different role");
-  }
-  found->second.committed = true;
-}
-
-void ScanResultBuilder::markReferenced(AssetId id, CollectionMemberRole role) {
-  auto [found, inserted] = handles_.try_emplace(id.value, HandleState{.role = role});
-  if (!inserted && found->second.role != role) {
-    throw std::logic_error("ScanResultBuilder collection referenced an asset handle with the wrong role");
-  }
-  found->second.referenced = true;
-}
-
-void ScanResultBuilder::validateReferencedHandles() const {
-  for (const auto& [id, state] : handles_) {
-    if (state.referenced && !state.committed) {
-      throw std::logic_error("ScanResultBuilder collection referenced " + roleName(state.role) + " asset id " +
-                             std::to_string(id) + " before it was added");
+void ScanResultBuilder::validateDraftReference(AssetId id, CollectionMemberRole role) const {
+  for (const auto& slot : drafts_) {
+    const auto found = std::visit([&](const auto& pending) { return pending.id == id; }, slot->value);
+    if (!found) {
+      continue;
     }
+    const CollectionMemberRole actual = std::visit(
+        [](const auto& pending) {
+          using Pending = std::decay_t<decltype(pending)>;
+          if constexpr (std::is_same_v<Pending, PendingSequence>) {
+            return CollectionMemberRole::Sequence;
+          } else if constexpr (std::is_same_v<Pending, PendingInstrumentSet>) {
+            return CollectionMemberRole::InstrumentSet;
+          } else if constexpr (std::is_same_v<Pending, PendingSampleCollection>) {
+            return CollectionMemberRole::SampleCollection;
+          } else {
+            return CollectionMemberRole::Misc;
+          }
+        },
+        slot->value);
+    if (actual != role) {
+      throw std::logic_error("ScanResultBuilder collection used " + roleName(actual) + " draft as a " + roleName(role));
+    }
+    return;
   }
+  throw std::logic_error("ScanResultBuilder collection referenced an unknown " + roleName(role) + " asset id " +
+                         std::to_string(id.value));
 }
 
-void ScanResultBuilder::addSequenceAsset(ScanSequenceRef ref, SequenceProgramAsset asset) {
-  Asset variant = std::move(asset);
-  prepareAsset(variant, ref.id);
-  markCommitted(ref.id, CollectionMemberRole::Sequence);
-  result_.assets.push_back(std::move(variant));
-}
-
-void ScanResultBuilder::addInstrumentSetAsset(ScanInstrumentSetRef ref, InstrumentSetAsset asset) {
-  Asset variant = std::move(asset);
-  prepareAsset(variant, ref.id);
-  markCommitted(ref.id, CollectionMemberRole::InstrumentSet);
-  result_.assets.push_back(std::move(variant));
-}
-
-void ScanResultBuilder::addSampleCollectionAsset(ScanSampleCollectionRef ref, SampleCollectionAsset asset) {
-  Asset variant = std::move(asset);
-  prepareAsset(variant, ref.id);
-  markCommitted(ref.id, CollectionMemberRole::SampleCollection);
-  result_.assets.push_back(std::move(variant));
-}
-
-void ScanResultBuilder::addMiscAsset(ScanMiscAssetRef ref, MiscAsset asset) {
-  Asset variant = std::move(asset);
-  prepareAsset(variant, ref.id);
-  markCommitted(ref.id, CollectionMemberRole::Misc);
-  result_.assets.push_back(std::move(variant));
-}
-
-void ScanResultBuilder::prepareAsset(Asset& asset, AssetId expectedId) const {
-  auto& meta = vgmtrans::core::metadata(asset);
-  ensureAssetId(meta, expectedId);
-  if (meta.format.empty()) {
-    meta.format = format_;
+void ScanResultBuilder::setSequenceProgram(size_t slot, SequenceProgram program) {
+  auto& pending = std::get<PendingSequence>(drafts_.at(slot)->value);
+  if (pending.program) {
+    throw std::logic_error("ScanResultBuilder sequence draft was given more than one program");
   }
+  pending.program = std::move(program);
+}
+
+void ScanResultBuilder::setSequenceRange(size_t slot, SourceRange range) {
+  std::get<PendingSequence>(drafts_.at(slot)->value).range = range;
+}
+
+void ScanResultBuilder::setMiscPayload(size_t slot, std::vector<u8> payload) {
+  auto& pending = std::get<PendingMisc>(drafts_.at(slot)->value);
+  if (pending.payload) {
+    throw std::logic_error("ScanResultBuilder misc draft was given more than one payload");
+  }
+  pending.payload = std::move(payload);
+}
+
+InstrumentSetBuilder& ScanResultBuilder::instrumentDraft(size_t slot) {
+  return std::get<PendingInstrumentSet>(drafts_.at(slot)->value).instruments;
+}
+
+const InstrumentSetBuilder& ScanResultBuilder::instrumentDraft(size_t slot) const {
+  return std::get<PendingInstrumentSet>(drafts_.at(slot)->value).instruments;
+}
+
+SampleCollectionBuilder& ScanResultBuilder::sampleDraft(size_t slot) {
+  return std::get<PendingSampleCollection>(drafts_.at(slot)->value).samples;
+}
+
+const SampleCollectionBuilder& ScanResultBuilder::sampleDraft(size_t slot) const {
+  return std::get<PendingSampleCollection>(drafts_.at(slot)->value).samples;
 }
 
 }  // namespace vgmtrans::core

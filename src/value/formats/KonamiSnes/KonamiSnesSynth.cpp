@@ -317,28 +317,28 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
 
 }  // namespace
 
-bool addKonamiSnesSynth(ScanResultBuilder& builder, ScanInstrumentSetRef instrumentSet,
-                        ScanSampleCollectionRef sampleCollection, const KonamiSnesLayout& layout,
-                        std::string_view displayName) {
+std::optional<ScanSynthRefs> addKonamiSnesSynth(ScanResultBuilder& builder, const KonamiSnesLayout& layout,
+                                                std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseKonamiSnesInstrumentInfos(reader, layout);
   const auto sampleCatalog = parseKonamiSnesSampleInfos(reader, *layout.spcDirAddress, instrumentInfos);
   // Do not publish half of a synth. An instrument set without sample data (or
   // vice versa) cannot produce a usable export.
   if (instrumentInfos.empty() || sampleCatalog.samples.empty()) {
-    return false;
+    return std::nullopt;
   }
 
-  auto samples = builder.samples(sampleCollection);
-  const auto sampleRefs = addSnesBrrSamples(samples, reader, sampleCatalog);
+  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
+  auto samples = builder.sampleCollection(fmt::format("{} Samples", displayName));
+  const auto sampleRefs = addSnesBrrSamples(samples.builder(), reader, sampleCatalog);
 
-  auto instruments = builder.instruments(instrumentSet);
-  addKonamiSnesInstruments(instruments, reader, layout.version, *layout.spcDirAddress, instrumentInfos, sampleCatalog,
-                           sampleRefs);
+  addKonamiSnesInstruments(instruments.builder(), reader, layout.version, *layout.spcDirAddress, instrumentInfos,
+                           sampleCatalog, sampleRefs);
 
-  builder.instrumentSet(fmt::format("{} Instruments", displayName), std::move(instruments));
-  builder.sampleCollection(fmt::format("{} Samples", displayName), std::move(samples));
-  return true;
+  return ScanSynthRefs{
+      .instruments = instruments.ref(),
+      .samples = samples.ref(),
+  };
 }
 
 }  // namespace vgmtrans::formats::konami_snes

@@ -20,17 +20,17 @@ using namespace core;
 
   ScanResultBuilder result(input, std::string(kAkaoSnesFormatName));
   const std::string displayName = result.sourceDisplayName();
-  const auto sequence = result.reserveSequence();
+  auto sequence = result.sequence(
+      displayName, input.reader.range(layout->sequenceHeaderAddress,
+                                      akaoSnesSequenceHeaderSize(layout->version, layout->minorVersion)));
   SequenceProgram program =
-      parseAkaoSnesSequence(input.reader, *layout, sequence.id, &result.sourceMap(), &result.diagnostics());
+      parseAkaoSnesSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
   if (program.tracks.empty()) {
-    return {};
+    result.warning("AkaoSnes sequence header was recognized, but no valid tracks were found",
+                   input.reader.range(layout->sequenceHeaderAddress,
+                                      akaoSnesSequenceHeaderSize(layout->version, layout->minorVersion)));
   }
-  result
-      .sequence(sequence, displayName,
-                input.reader.range(layout->sequenceHeaderAddress,
-                                   akaoSnesSequenceHeaderSize(layout->version, layout->minorVersion)))
-      .program(std::move(program));
+  sequence.program(std::move(program));
 
   auto collection = result.sourceCollection(displayName);
   collection.sequence(sequence);
@@ -38,10 +38,8 @@ using namespace core;
   const bool hasSynthLayout = layout->spcDirAddress && layout->tuningTableAddress &&
                               (layout->version == AKAOSNES_V1 || layout->adsrTableAddress);
   if (hasSynthLayout) {
-    const auto instrumentSet = result.reserveInstrumentSet();
-    const auto samples = result.reserveSampleCollection();
-    if (addAkaoSnesSynth(result, instrumentSet, samples, *layout, displayName)) {
-      collection.instrumentSet(instrumentSet).samples(samples);
+    if (const auto synth = addAkaoSnesSynth(result, *layout, displayName)) {
+      collection.instrumentSet(synth->instruments).samples(synth->samples);
     } else {
       result.warning("AkaoSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));
@@ -52,7 +50,7 @@ using namespace core;
   }
 
   result.sourceFact(
-      sequence.id,
+      sequence.id(),
       FormatSpecificFact{
           .kind = "akao-snes-version",
           .fields =

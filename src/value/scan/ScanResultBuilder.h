@@ -11,17 +11,17 @@
 #include "value/synth/SynthBuilder.h"
 
 #include <cstddef>
+#include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
 
-// These handles let scanners reserve asset IDs before the asset is parsed. That is
-// useful when a sequence needs to refer to its instrument set, or an instrument
-// set needs to refer to its sample collection.
+// Drafts expose these small durable references when another asset needs to keep
+// the identity but not the draft's authoring surface.
 struct ScanSequenceRef {
   AssetId id;
 };
@@ -38,7 +38,118 @@ struct ScanMiscAssetRef {
   AssetId id;
 };
 
+struct ScanSynthRefs {
+  ScanInstrumentSetRef instruments;
+  ScanSampleCollectionRef samples;
+};
+
 class ScanResultBuilder;
+
+// Drafts are lightweight views into result-owned pending assets. Creating a
+// draft is the publication decision: ScanResultBuilder::finish() materializes
+// it even when an instrument set or sample collection remains empty.
+class ScanSequenceDraft {
+public:
+  [[nodiscard]] ScanSequenceRef ref() const noexcept { return ScanSequenceRef{.id = id_}; }
+  [[nodiscard]] AssetId id() const noexcept { return id_; }
+  ScanSequenceDraft& range(SourceRange range);
+  ScanSequenceDraft& program(SequenceProgram program);
+
+private:
+  friend class ScanResultBuilder;
+
+  ScanSequenceDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+
+  ScanResultBuilder* out_ = nullptr;
+  size_t slot_ = 0;
+  AssetId id_;
+};
+
+class ScanInstrumentSetDraft {
+public:
+  [[nodiscard]] ScanInstrumentSetRef ref() const noexcept { return ScanInstrumentSetRef{.id = id_}; }
+  [[nodiscard]] AssetId id() const noexcept { return id_; }
+
+  InstrumentSetBuilder::Entry append(Instrument instrument);
+  InstrumentSetBuilder::Entry add(u64 groupingKey, Instrument instrument);
+  InstrumentSetBuilder::Entry getOrAdd(u64 groupingKey, Instrument initialValue);
+  [[nodiscard]] std::optional<InstrumentSetBuilder::Entry> find(u64 groupingKey);
+
+  AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
+  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
+                           std::string_view kind = {});
+
+  ScanInstrumentSetDraft& include(SourceRange range);
+  [[nodiscard]] SourceRange range() const noexcept;
+  [[nodiscard]] bool empty() const noexcept;
+  [[nodiscard]] size_t size() const noexcept;
+
+  void warning(std::string message, SourceRange range = {});
+  void error(std::string message, SourceRange range = {});
+
+  // Existing reusable synth helpers may operate on the domain builder
+  // directly. The draft remains its owner and finish() remains scan-owned.
+  [[nodiscard]] InstrumentSetBuilder& builder();
+
+private:
+  friend class ScanResultBuilder;
+
+  ScanInstrumentSetDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+
+  ScanResultBuilder* out_ = nullptr;
+  size_t slot_ = 0;
+  AssetId id_;
+};
+
+class ScanSampleCollectionDraft {
+public:
+  [[nodiscard]] ScanSampleCollectionRef ref() const noexcept { return ScanSampleCollectionRef{.id = id_}; }
+  [[nodiscard]] AssetId id() const noexcept { return id_; }
+
+  SampleCollectionBuilder::Entry add(u64 sourceKey, Sample sample);
+  SampleCollectionBuilder::Entry alias(u64 aliasKey, u64 existingKey);
+  [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
+
+  AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
+  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
+                           std::string_view kind = {});
+
+  ScanSampleCollectionDraft& include(SourceRange range);
+  [[nodiscard]] SourceRange range() const noexcept;
+  [[nodiscard]] bool empty() const noexcept;
+  [[nodiscard]] size_t size() const noexcept;
+
+  void warning(std::string message, SourceRange range = {});
+  void error(std::string message, SourceRange range = {});
+
+  [[nodiscard]] SampleCollectionBuilder& builder();
+  [[nodiscard]] const SampleCollectionBuilder& builder() const;
+
+private:
+  friend class ScanResultBuilder;
+
+  ScanSampleCollectionDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+
+  ScanResultBuilder* out_ = nullptr;
+  size_t slot_ = 0;
+  AssetId id_;
+};
+
+class ScanMiscDraft {
+public:
+  [[nodiscard]] ScanMiscAssetRef ref() const noexcept { return ScanMiscAssetRef{.id = id_}; }
+  [[nodiscard]] AssetId id() const noexcept { return id_; }
+  ScanMiscDraft& payload(std::vector<u8> payload);
+
+private:
+  friend class ScanResultBuilder;
+
+  ScanMiscDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+
+  ScanResultBuilder* out_ = nullptr;
+  size_t slot_ = 0;
+  AssetId id_;
+};
 
 // Builds one scanner-known collection. This is the common path when a format has
 // already discovered the sequence, instruments, and samples together.
@@ -47,66 +158,17 @@ public:
   ScanCollectionBuilder(ScanResultBuilder& out, size_t index);
 
   ScanCollectionBuilder& sequence(ScanSequenceRef asset);
+  ScanCollectionBuilder& sequence(const ScanSequenceDraft& asset);
   ScanCollectionBuilder& instrumentSet(ScanInstrumentSetRef asset);
+  ScanCollectionBuilder& instrumentSet(const ScanInstrumentSetDraft& asset);
   ScanCollectionBuilder& samples(ScanSampleCollectionRef asset);
+  ScanCollectionBuilder& samples(const ScanSampleCollectionDraft& asset);
   ScanCollectionBuilder& misc(ScanMiscAssetRef asset);
+  ScanCollectionBuilder& misc(const ScanMiscDraft& asset);
 
 private:
   ScanResultBuilder& out_;
   size_t index_ = 0;
-};
-
-class ScanSequenceAssetBuilder {
-public:
-  ScanSequenceAssetBuilder(ScanResultBuilder& out, ScanSequenceRef ref, std::string name, SourceRange range);
-
-  ScanSequenceRef program(SequenceProgram program);
-
-private:
-  ScanResultBuilder& out_;
-  ScanSequenceRef ref_;
-  std::string name_;
-  SourceRange range_;
-};
-
-class ScanInstrumentSetAssetBuilder {
-public:
-  ScanInstrumentSetAssetBuilder(ScanResultBuilder& out, ScanInstrumentSetRef ref, std::string name, SourceRange range);
-
-  ScanInstrumentSetRef instruments(std::vector<Instrument> instruments);
-
-private:
-  ScanResultBuilder& out_;
-  ScanInstrumentSetRef ref_;
-  std::string name_;
-  SourceRange range_;
-};
-
-class ScanSampleCollectionAssetBuilder {
-public:
-  ScanSampleCollectionAssetBuilder(ScanResultBuilder& out, ScanSampleCollectionRef ref, std::string name,
-                                   SourceRange range);
-
-  ScanSampleCollectionRef samples(SampleCollection samples);
-
-private:
-  ScanResultBuilder& out_;
-  ScanSampleCollectionRef ref_;
-  std::string name_;
-  SourceRange range_;
-};
-
-class ScanMiscAssetBuilder {
-public:
-  ScanMiscAssetBuilder(ScanResultBuilder& out, ScanMiscAssetRef ref, std::string name, SourceRange range);
-
-  ScanMiscAssetRef payload(std::vector<u8> payload);
-
-private:
-  ScanResultBuilder& out_;
-  ScanMiscAssetRef ref_;
-  std::string name_;
-  SourceRange range_;
 };
 
 // Convenience wrapper for the normal scanner path. It still produces ordinary
@@ -116,6 +178,7 @@ class ScanResultBuilder {
 public:
   ScanResultBuilder(const ScanInput& input, std::string format);
   ScanResultBuilder(const ScanInput& input, std::string format, std::string collectionResolver);
+  ~ScanResultBuilder();
 
   [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
   [[nodiscard]] const SourceFile& sourceFile() const noexcept { return input_.source; }
@@ -125,100 +188,16 @@ public:
   [[nodiscard]] SourceMapBuilder& sourceMap() noexcept { return sourceMap_; }
   [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }
 
-  [[nodiscard]] ScanSequenceRef reserveSequence();
-  [[nodiscard]] ScanInstrumentSetRef reserveInstrumentSet();
-  [[nodiscard]] ScanSampleCollectionRef reserveSampleCollection();
-  [[nodiscard]] ScanMiscAssetRef reserveMisc();
-
-  template <typename Factory>
-  ScanSequenceRef sequence(Factory&& factory) {
-    return sequence(reserveSequence(), std::forward<Factory>(factory));
-  }
-
-  template <typename Factory>
-  ScanSequenceRef sequence(ScanSequenceRef ref, Factory&& factory) {
-    auto asset = std::forward<Factory>(factory)(ref.id);
-    addSequenceAsset(ref, std::move(asset));
-    return ref;
-  }
-
-  [[nodiscard]] ScanSequenceAssetBuilder sequence(ScanSequenceRef ref, std::string name, SourceRange range);
-  [[nodiscard]] ScanSequenceAssetBuilder sequence(std::string name, SourceRange range);
-
-  template <typename Factory>
-  ScanInstrumentSetRef instrumentSet(Factory&& factory) {
-    return instrumentSet(reserveInstrumentSet(), std::forward<Factory>(factory));
-  }
-
-  template <typename Factory>
-  ScanInstrumentSetRef instrumentSet(ScanInstrumentSetRef ref, Factory&& factory) {
-    auto asset = std::forward<Factory>(factory)(ref.id);
-    addInstrumentSetAsset(ref, std::move(asset));
-    return ref;
-  }
-
-  [[nodiscard]] ScanInstrumentSetAssetBuilder instrumentSet(std::string name, SourceRange range);
-  [[nodiscard]] ScanInstrumentSetAssetBuilder instrumentSet(ScanInstrumentSetRef ref, std::string name,
-                                                            SourceRange range);
-  ScanInstrumentSetRef instrumentSet(std::string name, InstrumentSetBuilder&& instruments);
-
-  template <typename Factory>
-  ScanSampleCollectionRef sampleCollection(Factory&& factory) {
-    return sampleCollection(reserveSampleCollection(), std::forward<Factory>(factory));
-  }
-
-  template <typename Factory>
-  ScanSampleCollectionRef sampleCollection(ScanSampleCollectionRef ref, Factory&& factory) {
-    auto asset = std::forward<Factory>(factory)(ref.id);
-    addSampleCollectionAsset(ref, std::move(asset));
-    return ref;
-  }
-
-  [[nodiscard]] ScanSampleCollectionAssetBuilder sampleCollection(std::string name, SourceRange range);
-  [[nodiscard]] ScanSampleCollectionAssetBuilder sampleCollection(ScanSampleCollectionRef ref, std::string name,
-                                                                  SourceRange range);
-  ScanSampleCollectionRef sampleCollection(std::string name, SampleCollectionBuilder&& samples);
-
-  // These factories inject scan-owned annotation and diagnostic sinks. The
-  // no-argument forms reserve an asset ID for the common case. Pass an
-  // existing handle only when another object needed that ID first.
-  [[nodiscard]] InstrumentSetBuilder instruments();
-  [[nodiscard]] InstrumentSetBuilder instruments(ScanInstrumentSetRef ref);
-  [[nodiscard]] SampleCollectionBuilder samples();
-  [[nodiscard]] SampleCollectionBuilder samples(ScanSampleCollectionRef ref);
-
-  template <typename Factory>
-  ScanMiscAssetRef misc(Factory&& factory) {
-    return misc(reserveMisc(), std::forward<Factory>(factory));
-  }
-
-  template <typename Factory>
-  ScanMiscAssetRef misc(ScanMiscAssetRef ref, Factory&& factory) {
-    auto asset = std::forward<Factory>(factory)(ref.id);
-    addMiscAsset(ref, std::move(asset));
-    return ref;
-  }
-
-  [[nodiscard]] ScanMiscAssetBuilder misc(std::string name, SourceRange range);
+  [[nodiscard]] ScanSequenceDraft sequence(std::string name, SourceRange range = {});
+  [[nodiscard]] ScanInstrumentSetDraft instrumentSet(std::string name, SourceRange range = {});
+  [[nodiscard]] ScanSampleCollectionDraft sampleCollection(std::string name, SourceRange range = {});
+  [[nodiscard]] ScanMiscDraft misc(std::string name, SourceRange range);
 
   [[nodiscard]] ScanCollectionBuilder collection(std::string name);
   [[nodiscard]] ScanCollectionBuilder collection(std::string name, CollectionKey key);
   // Use when a scanner produces one collection per source and its display name
   // should not affect collection identity.
   [[nodiscard]] ScanCollectionBuilder sourceCollection(std::string name);
-
-  // Builds a region sample reference from a scanner handle and records that the
-  // sample collection must be committed before finish().
-  [[nodiscard]] SampleRef sampleRef(ScanSampleCollectionRef collection, u32 index);
-  [[nodiscard]] SampleRef sampleRef(std::optional<ScanSampleCollectionRef> collection, u32 index);
-
-  // A consumed SampleCollectionBuilder leaves its source-key lookup here for
-  // the rest of the scan. Later instrument tables can therefore resolve sparse
-  // source keys without carrying a second format-specific handle.
-  [[nodiscard]] std::optional<SampleRef> sampleByKey(ScanSampleCollectionRef collection, u64 sourceKey);
-  [[nodiscard]] std::optional<SampleRef> sampleByKeyOrWarning(std::optional<ScanSampleCollectionRef> collection,
-                                                              u64 sourceKey, std::string description,
-                                                              SourceRange range);
 
   void fact(AssetId asset, MatchScope scope, MatchFactPayload payload);
   void sourceFact(AssetId asset, MatchFactPayload payload);
@@ -234,26 +213,23 @@ public:
 
 private:
   friend class ScanCollectionBuilder;
-  friend class ScanSequenceAssetBuilder;
-  friend class ScanInstrumentSetAssetBuilder;
-  friend class ScanSampleCollectionAssetBuilder;
-  friend class ScanMiscAssetBuilder;
+  friend class ScanSequenceDraft;
+  friend class ScanInstrumentSetDraft;
+  friend class ScanSampleCollectionDraft;
+  friend class ScanMiscDraft;
 
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
   [[nodiscard]] CollectionKey defaultCollectionKey(std::string_view name) const;
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 
-  void reserveHandle(AssetId id, CollectionMemberRole role);
-  void markCommitted(AssetId id, CollectionMemberRole role);
-  void markReferenced(AssetId id, CollectionMemberRole role);
-  void validateReferencedHandles() const;
-
-  void addSequenceAsset(ScanSequenceRef ref, SequenceProgramAsset asset);
-  void addInstrumentSetAsset(ScanInstrumentSetRef ref, InstrumentSetAsset asset);
-  void addSampleCollectionAsset(ScanSampleCollectionRef ref, SampleCollectionAsset asset);
-  void addMiscAsset(ScanMiscAssetRef ref, MiscAsset asset);
-
-  void prepareAsset(Asset& asset, AssetId expectedId) const;
+  void validateDraftReference(AssetId id, CollectionMemberRole role) const;
+  void setSequenceRange(size_t slot, SourceRange range);
+  void setSequenceProgram(size_t slot, SequenceProgram program);
+  void setMiscPayload(size_t slot, std::vector<u8> payload);
+  [[nodiscard]] InstrumentSetBuilder& instrumentDraft(size_t slot);
+  [[nodiscard]] const InstrumentSetBuilder& instrumentDraft(size_t slot) const;
+  [[nodiscard]] SampleCollectionBuilder& sampleDraft(size_t slot);
+  [[nodiscard]] const SampleCollectionBuilder& sampleDraft(size_t slot) const;
 
   const ScanInput& input_;
   std::string format_;
@@ -261,13 +237,10 @@ private:
   ScanResult result_;
   SourceMapBuilder sourceMap_;
 
-  struct HandleState {
-    CollectionMemberRole role = CollectionMemberRole::Misc;
-    bool committed = false;
-    bool referenced = false;
-  };
-  std::unordered_map<u32, HandleState> handles_;
-  std::unordered_map<u32, SampleRefLookup> sampleLookups_;
+  struct DraftSlot;
+  // Domain-builder entries retain pointers to their builders, so each slot has
+  // a stable address even while the list of published drafts grows.
+  std::vector<std::unique_ptr<DraftSlot>> drafts_;
 };
 
 }  // namespace vgmtrans::core

@@ -996,10 +996,8 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
           .ids = ids,
       },
       "NinSnes");
-  const auto instrumentSet = result.reserveInstrumentSet();
-  const auto sampleCollection = result.reserveSampleCollection();
-  expect(addSynth(result, instrumentSet, sampleCollection, layout, parsed.recipes, "Earlier"),
-         "prototype percussion should produce an exportable drum kit");
+  const auto synth = addSynth(result, layout, parsed.recipes, "Earlier");
+  expect(synth.has_value(), "prototype percussion should produce an exportable drum kit");
 
   const ScanResult scan = result.finish();
   const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
@@ -1057,14 +1055,12 @@ void ninSnesGainModeInstrumentsUseDspEnvelope() {
           .ids = ids,
       },
       "NinSnes");
-  const auto instrumentSet = result.reserveInstrumentSet();
-  const auto sampleCollection = result.reserveSampleCollection();
   Layout layout = standardLayout();
   layout.instrumentTableAddress = 0x4000;
   layout.spcDirAddress = 0x5000;
 
-  expect(addSynth(result, instrumentSet, sampleCollection, layout, {}, "GAIN"),
-         "NinSnes synth builder should accept a direct-GAIN instrument");
+  const auto synth = addSynth(result, layout, {}, "GAIN");
+  expect(synth.has_value(), "NinSnes synth builder should accept a direct-GAIN instrument");
   const ScanResult scan = result.finish();
   const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
   expect(

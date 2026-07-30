@@ -26,11 +26,9 @@ using namespace core;
 
   ScanResultBuilder result(input, "KonamiSnes");
   const std::string displayName = result.sourceDisplayName();
-  const auto sequence = result.reserveSequence();
-
-  result.sequence(sequence, displayName, konamiSnesSequenceHeaderRange(input.reader, *layout))
-      .program(
-          decodeKonamiSnesSequence(input.reader, *layout, sequence.id, &result.sourceMap(), &result.diagnostics()));
+  auto sequence = result.sequence(displayName, konamiSnesSequenceHeaderRange(input.reader, *layout));
+  sequence.program(
+      decodeKonamiSnesSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
   // A sequence is useful on its own, so publish it even when the snapshot does
   // not contain enough information to reconstruct instruments and samples.
@@ -40,12 +38,8 @@ using namespace core;
   const bool hasSynthLayout = layout->spcDirAddress && layout->commonInstrumentTableAddress &&
                               layout->bankedInstrumentTableAddress && layout->percussionInstrumentTableAddress;
   if (hasSynthLayout) {
-    // Reserve synth IDs only after every required table was found. This avoids
-    // leaving empty assets in sequence-only scan results.
-    const auto instrumentSet = result.reserveInstrumentSet();
-    const auto samples = result.reserveSampleCollection();
-    if (addKonamiSnesSynth(result, instrumentSet, samples, *layout, displayName)) {
-      collection.instrumentSet(instrumentSet).samples(samples);
+    if (const auto synth = addKonamiSnesSynth(result, *layout, displayName)) {
+      collection.instrumentSet(synth->instruments).samples(synth->samples);
     } else {
       result.warning("KonamiSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));
@@ -55,7 +49,7 @@ using namespace core;
                    input.reader.range(0, input.reader.size()));
   }
 
-  result.sourceFact(sequence.id,
+  result.sourceFact(sequence.id(),
                     FormatSpecificFact{
                         .kind = "konami-snes-version",
                         .fields = {MatchField{.name = "version", .value = konamiSnesVersionName(layout->version)}},

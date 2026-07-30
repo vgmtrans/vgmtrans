@@ -49,23 +49,20 @@ namespace {
 
   ScanResultBuilder result(input, "NinSnes");
   const std::string displayName = result.sourceDisplayName();
-  const auto sequence = result.reserveSequence();
+  // The sequence range depends on its decoded playlist, so decode against the
+  // stable draft ID before filling the draft.
+  auto sequence = result.sequence(displayName);
   SequenceParse parsed =
-      decodeSequence(input.reader, *layout, sequence.id, &result.sourceMap(), &result.diagnostics());
-  result.sequence(sequence, displayName, sequenceRange(input.reader, *layout, parsed.program))
-      .program(std::move(parsed.program));
+      decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
+  sequence.range(sequenceRange(input.reader, *layout, parsed.program));
+  sequence.program(std::move(parsed.program));
 
   // A recognizable driver can still have its instrument loader stripped (a
   // few unused SPCs do). Preserve the sequence as a standalone asset, but only
   // advertise an exportable collection once all three musical parts exist.
   if (layout->instrumentTableAddress && layout->spcDirAddress) {
-    const auto instrumentSet = result.reserveInstrumentSet();
-    const auto samples = result.reserveSampleCollection();
-    if (addSynth(result, instrumentSet, samples, *layout, parsed.recipes, displayName)) {
-      result.sourceCollection(displayName)
-          .sequence(sequence)
-          .instrumentSet(instrumentSet)
-          .samples(samples);
+    if (const auto synth = addSynth(result, *layout, parsed.recipes, displayName)) {
+      result.sourceCollection(displayName).sequence(sequence).instrumentSet(synth->instruments).samples(synth->samples);
     } else {
       result.warning("NinSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));
@@ -75,16 +72,15 @@ namespace {
                    input.reader.range(0, input.reader.size()));
   }
 
-  result.sourceFact(
-      sequence.id,
-      FormatSpecificFact{
-          .kind = "nin-snes-profile",
-          .fields =
-              {
-                  MatchField{.name = "profile", .value = std::string(profile(layout->profile).name)},
-                  MatchField{.name = "song_index", .value = std::to_string(layout->songIndex)},
-              },
-      });
+  result.sourceFact(sequence.id(),
+                    FormatSpecificFact{
+                        .kind = "nin-snes-profile",
+                        .fields =
+                            {
+                                MatchField{.name = "profile", .value = std::string(profile(layout->profile).name)},
+                                MatchField{.name = "song_index", .value = std::to_string(layout->songIndex)},
+                            },
+                    });
   return result.finish();
 }
 

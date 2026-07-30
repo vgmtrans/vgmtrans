@@ -117,10 +117,6 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     return result.finish();
   }
 
-  const auto firstInstruments = result.reserveInstrumentSet();
-  const auto secondInstruments = isCps1(layout->version) ? std::optional{result.reserveInstrumentSet()} : std::nullopt;
-  const auto samples = result.reserveSampleCollection();
-
   std::vector<ScanMiscAssetRef> miscAssets;
   const auto addTable = [&](std::string name, std::string_view kind, u32 offset,
                             u32 size) -> std::optional<SourceAnnotationId> {
@@ -131,8 +127,8 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     const auto bytes = input.reader.slice(offset, size);
     const auto misc = result.misc(name, range).payload(std::vector<u8>(bytes.begin(), bytes.end()));
     const SourceAnnotationId table =
-        result.sourceMap().table(name, range).owner(ObjectRefs::misc(misc.id)).kind(kind).id();
-    miscAssets.push_back(misc);
+        result.sourceMap().table(name, range).owner(ObjectRefs::misc(misc.id())).kind(kind).id();
+    miscAssets.push_back(misc.ref());
     return table;
   };
 
@@ -153,37 +149,36 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     }
   }
 
-  Cps1SynthAvailability cps1Availability;
-  bool qsoundAvailable = false;
+  Cps1SynthRefs cps1Synth;
+  std::optional<ScanSynthRefs> qsoundSynth;
   if (isCps1(layout->version)) {
-    cps1Availability = addCps1Synth(result, firstInstruments, *secondInstruments, samples, *layout);
+    cps1Synth = addCps1Synth(result, *layout);
   } else {
-    qsoundAvailable = addCpsQSoundSynth(result, firstInstruments, samples, *layout);
+    qsoundSynth = addCpsQSoundSynth(result, *layout);
   }
 
   for (const auto& sourceSequence : layout->sequences) {
-    const auto sequence = result.reserveSequence();
-    result.sequence(sequence, sourceSequence.name, input.reader.range(sourceSequence.offset, 1))
-        .program(decodeCpsSequence(input.reader, *layout, sourceSequence, sequence.id, &result.sourceMap(),
-                                   &result.diagnostics()));
+    auto sequence = result.sequence(sourceSequence.name, input.reader.range(sourceSequence.offset, 1));
+    sequence.program(decodeCpsSequence(input.reader, *layout, sourceSequence, sequence.id(), &result.sourceMap(),
+                                       &result.diagnostics()));
 
     auto collection = result.collection(sourceSequence.name, collectionKey(input.source.id, sourceSequence.index));
     collection.sequence(sequence);
     if (isCps1(layout->version)) {
-      if (cps1Availability.ym2151) {
-        collection.instrumentSet(firstInstruments);
+      if (cps1Synth.ym2151) {
+        collection.instrumentSet(*cps1Synth.ym2151);
       }
-      if (cps1Availability.oki) {
-        collection.instrumentSet(*secondInstruments).samples(samples);
+      if (cps1Synth.oki) {
+        collection.instrumentSet(cps1Synth.oki->instruments).samples(cps1Synth.oki->samples);
       }
-    } else if (qsoundAvailable) {
-      collection.instrumentSet(firstInstruments).samples(samples);
+    } else if (qsoundSynth) {
+      collection.instrumentSet(qsoundSynth->instruments).samples(qsoundSynth->samples);
     }
     for (const auto misc : miscAssets) {
       collection.misc(misc);
     }
 
-    result.sourceFact(sequence.id,
+    result.sourceFact(sequence.id(),
                       FormatSpecificFact{
                           .kind = "cps-sequence",
                           .fields =

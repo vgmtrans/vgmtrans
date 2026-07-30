@@ -66,16 +66,16 @@ struct NdsLayout {
                                                             core::SourceMapBuilder* sourceMap = nullptr,
                                                             std::vector<core::Diagnostic>* diagnostics = nullptr);
 
-// SBNK instruments and SWAR/PSG samples. These functions add complete synth
-// assets directly to the scan result and return the handles used by collections.
-[[nodiscard]] core::ScanSampleCollectionRef addNdsPsgSamples(core::ScanResultBuilder& builder);
-[[nodiscard]] std::optional<core::ScanSampleCollectionRef> addNdsWaveArchive(core::ScanResultBuilder& builder,
-                                                                             core::SourceRange range,
-                                                                             std::string_view name);
-[[nodiscard]] std::optional<core::ScanInstrumentSetRef> addNdsInstrumentSet(
+// SBNK instruments and SWAR/PSG samples remain live drafts until the containing
+// scan finishes, so sparse wave indexes stay available to later bank parsing.
+[[nodiscard]] core::ScanSampleCollectionDraft addNdsPsgSamples(core::ScanResultBuilder& builder);
+[[nodiscard]] std::optional<core::ScanSampleCollectionDraft> addNdsWaveArchive(core::ScanResultBuilder& builder,
+                                                                               core::SourceRange range,
+                                                                               std::string_view name);
+[[nodiscard]] std::optional<core::ScanInstrumentSetDraft> addNdsInstrumentSet(
     core::ScanResultBuilder& builder, core::SourceRange range, std::string_view name,
-    core::ScanSampleCollectionRef psgCollection,
-    const std::array<std::optional<core::ScanSampleCollectionRef>, 4>& waveCollections);
+    const core::ScanSampleCollectionDraft& psgCollection,
+    const std::array<std::optional<core::ScanSampleCollectionDraft>, 4>& waveCollections);
 [[nodiscard]] core::FormatDefinition ndsDefinition();
 
 }  // namespace vgmtrans::formats::nds

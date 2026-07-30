@@ -107,17 +107,13 @@ struct CpsLayout {
                                                       core::SourceMapBuilder* sourceMap = nullptr,
                                                       std::vector<core::Diagnostic>* diagnostics = nullptr);
 
-struct Cps1SynthAvailability {
-  bool ym2151 = false;
-  bool oki = false;
+struct Cps1SynthRefs {
+  std::optional<core::ScanInstrumentSetRef> ym2151;
+  std::optional<core::ScanSynthRefs> oki;
 };
 
-[[nodiscard]] Cps1SynthAvailability addCps1Synth(core::ScanResultBuilder& builder,
-                                                 core::ScanInstrumentSetRef ymInstrumentSet,
-                                                 core::ScanInstrumentSetRef okiInstrumentSet,
-                                                 core::ScanSampleCollectionRef sampleCollection, CpsLayout& layout);
-[[nodiscard]] bool addCpsQSoundSynth(core::ScanResultBuilder& builder, core::ScanInstrumentSetRef instrumentSet,
-                                     core::ScanSampleCollectionRef sampleCollection, const CpsLayout& layout);
+[[nodiscard]] Cps1SynthRefs addCps1Synth(core::ScanResultBuilder& builder, CpsLayout& layout);
+[[nodiscard]] core::ScanSynthRefs addCpsQSoundSynth(core::ScanResultBuilder& builder, const CpsLayout& layout);
 
 [[nodiscard]] const core::SequenceDialect& cps1V1Dialect();
 [[nodiscard]] const core::SequenceDialect& cpsEarlyDialect();

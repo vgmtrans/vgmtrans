@@ -40,7 +40,7 @@ ScanResult scanUiProbe(const ScanInput& input) {
   // owned annotation graph describes the full decoded source extent.
   const auto misc = result.misc("Probe asset", input.reader.range(0, 1)).payload({0x01, 0x02});
   const auto section =
-      result.sourceMap().section("Probe section", input.reader.range(0, 1)).owner(ObjectRefs::asset(misc.id));
+      result.sourceMap().section("Probe section", input.reader.range(0, 1)).owner(ObjectRefs::asset(misc.id()));
   result.sourceMap()
       .annotation(SourceRole::Field, "Magic", input.reader.range(0, 1))
       .parent(section.id())

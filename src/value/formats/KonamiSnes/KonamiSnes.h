@@ -188,9 +188,9 @@ struct KonamiSnesInstrumentInfo {
                                                                                    const KonamiSnesLayout& layout);
 [[nodiscard]] core::SnesBrrCatalog parseKonamiSnesSampleInfos(core::ByteReader reader, u32 spcDirAddress,
                                                               const std::vector<KonamiSnesInstrumentInfo>& instruments);
-[[nodiscard]] bool addKonamiSnesSynth(core::ScanResultBuilder& builder, core::ScanInstrumentSetRef instrumentSet,
-                                      core::ScanSampleCollectionRef sampleCollection, const KonamiSnesLayout& layout,
-                                      std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSynthRefs> addKonamiSnesSynth(core::ScanResultBuilder& builder,
+                                                                    const KonamiSnesLayout& layout,
+                                                                    std::string_view displayName);
 
 [[nodiscard]] core::FormatDefinition konamiSnesDefinition();
 

@@ -763,14 +763,29 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
   return cursor.ignored("Akao Event", profile.directOperandBytes(status), "event");
 }
 
-struct SequenceLayout {
-  AkaoSequenceHeader header;
-  std::vector<u32> trackAddresses;
-};
+}  // namespace
 
-[[nodiscard]] std::optional<SequenceLayout> readSequenceLayout(const ScanInput& input, u32 offset) {
+std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const ScanInput& input, u32 offset) {
   const ByteReader reader = input.reader;
-  if (!reader.has(offset, 0x10)) {
+  if (!reader.has(offset, 0x10) || reader.be32(offset) != kAkaoSignature || reader.le16(offset + 6) == 0) {
+    return std::nullopt;
+  }
+
+  // Use the header's own profile for false-positive filtering. A known source
+  // may identify a more exact driver version below, but it should not make an
+  // unrelated AKAO block look more sequence-like than its bytes do.
+  const AkaoProfile candidateProfile{.version = guessSequenceVersion(reader, offset)};
+  const u32 candidateBitsOffset = candidateProfile.trackAllocationBitsOffset();
+  if (!reader.has(offset + candidateBitsOffset, 4)) {
+    return std::nullopt;
+  }
+  const u32 candidateTrackBits = reader.le32(offset + candidateBitsOffset);
+  if (!candidateProfile.version3OrLater() && (candidateTrackBits & ~0xffffffu) != 0) {
+    return std::nullopt;
+  }
+  if (candidateProfile.version3OrLater() &&
+      (!reader.has(offset + 0x40, 1) || reader.le32(offset + 0x28) != 0 || reader.le32(offset + 0x2c) != 0 ||
+       reader.le32(offset + 0x38) != 0 || reader.le32(offset + 0x3c) != 0)) {
     return std::nullopt;
   }
 
@@ -789,19 +804,20 @@ struct SequenceLayout {
   if (!reader.has(offset, minimumHeaderSize)) {
     return std::nullopt;
   }
+  const u32 trackBits = reader.le32(offset + profile.trackAllocationBitsOffset());
   const u32 declaredLength = profile.sequenceLength(reader, offset);
   if (declaredLength == 0) {
     return std::nullopt;
   }
 
-  SequenceLayout layout{
+  AkaoSequenceLayout layout{
       .header =
           AkaoSequenceHeader{
               .offset = offset,
               .length = static_cast<u32>(std::min<u64>(declaredLength, reader.size() - offset)),
               .version = version,
               .sequenceId = reader.le16(offset + 4),
-              .trackBits = reader.le32(offset + profile.trackAllocationBitsOffset()),
+              .trackBits = trackBits,
               .trackHeaderOffset = profile.trackHeaderOffset(),
           },
   };
@@ -836,8 +852,6 @@ struct SequenceLayout {
   }
   return layout;
 }
-
-}  // namespace
 
 SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
   const std::string id = dialectId(version);
@@ -942,7 +956,7 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(const ScanInput& input, 
   if (sequence.metadata.range.offset > std::numeric_limits<u32>::max()) {
     return std::nullopt;
   }
-  auto layout = readSequenceLayout(input, static_cast<u32>(sequence.metadata.range.offset));
+  auto layout = readAkaoSequenceLayout(input, static_cast<u32>(sequence.metadata.range.offset));
   if (!layout) {
     return std::nullopt;
   }
@@ -954,19 +968,17 @@ std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(const ScanInput& input, 
   return analysis;
 }
 
-std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, AssetId id, u32 offset,
-                                                   SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+// The layout is deliberately read before a draft is created. From this point
+// onward malformed track data is part of a recognized sequence and is reported
+// through the shared diagnostics rather than retracting the asset.
+AkaoSequenceParse parseAkaoSequence(const ScanInput& input, AssetId id, const AkaoSequenceLayout& layout,
+                                    SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const ByteReader reader = input.reader;
-  auto layout = readSequenceLayout(input, offset);
-  if (!layout) {
-    return std::nullopt;
-  }
-
-  AkaoSequenceAnalysis analysis{.header = layout->header};
+  const u32 offset = layout.header.offset;
+  AkaoSequenceAnalysis analysis{.header = layout.header};
   const AkaoProfile profile{.version = analysis.header.version};
   const u32 sequenceEnd = offset + analysis.header.length;
   const SequenceDialect dialect = makeAkaoDialect(analysis.header.version);
-  const std::string name = fmt::format("Akao Seq {:02X}", analysis.header.sequenceId);
   SequenceProgram program = dialect.makeProgram(Address{offset});
   program.config.profile = static_cast<u32>(analysis.header.version);
   program.behavior.panLaw = determinePanLawFromSource(input.source, analysis.header.version);
@@ -991,26 +1003,16 @@ std::optional<AkaoSequenceParse> parseAkaoSequence(const ScanInput& input, Asset
       .sequenceAsset = id,
       .sourceMap = sourceMap,
   };
-  for (u32 trackIndex = 0; trackIndex < layout->trackAddresses.size(); ++trackIndex) {
+  for (u32 trackIndex = 0; trackIndex < layout.trackAddresses.size(); ++trackIndex) {
     auto track =
-        decodeAkaoTrack(analysis.header.version, tracks, trackIndex, layout->trackAddresses[trackIndex], diagnostics);
+        decodeAkaoTrack(analysis.header.version, tracks, trackIndex, layout.trackAddresses[trackIndex], diagnostics);
     track.sourceTrackNumber = trackIndex;
     analysis.references.merge(akaoSequenceReferences(track));
     program.tracks.push_back(std::move(track));
   }
 
   return AkaoSequenceParse{
-      .asset =
-          SequenceProgramAsset{
-              .metadata =
-                  AssetMetadata{
-                      .id = id,
-                      .format = std::string(kAkaoFormatName),
-                      .name = name,
-                      .range = reader.range(offset, analysis.header.length),
-                  },
-              .program = std::move(program),
-          },
+      .program = std::move(program),
       .analysis = std::move(analysis),
   };
 }

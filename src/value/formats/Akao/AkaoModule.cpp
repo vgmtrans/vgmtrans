@@ -8,6 +8,8 @@
 
 #include "value/scan/CollectionResolver.h"
 
+#include <fmt/format.h>
+
 #include <string>
 #include <utility>
 #include <vector>
@@ -26,31 +28,6 @@ namespace {
     }
   }
   return offsets;
-}
-
-[[nodiscard]] bool isAkaoSequenceCandidate(ByteReader reader, u32 offset) {
-  if (!reader.has(offset, 0x10) || reader.be32(offset) != kAkaoSignature || reader.le16(offset + 6) == 0) {
-    return false;
-  }
-  const AkaoProfile profile{.version = guessSequenceVersion(reader, offset)};
-  const u32 bitsOffset = profile.trackAllocationBitsOffset();
-  if (!reader.has(offset + bitsOffset, 4)) {
-    return false;
-  }
-  const u32 trackBits = reader.le32(offset + bitsOffset);
-  if (!profile.version3OrLater() && (trackBits & ~0xffffffu) != 0) {
-    return false;
-  }
-  if (profile.version3OrLater()) {
-    if (!reader.has(offset + 0x40, 1)) {
-      return false;
-    }
-    if (reader.le32(offset + 0x28) != 0 || reader.le32(offset + 0x2c) != 0 || reader.le32(offset + 0x38) != 0 ||
-        reader.le32(offset + 0x3c) != 0) {
-      return false;
-    }
-  }
-  return true;
 }
 
 void addSampleFacts(ScanResultBuilder& result, const AkaoSampleCollectionParse& parsed) {
@@ -94,8 +71,7 @@ void addInstrumentSetFacts(ScanResultBuilder& result, ScanInstrumentSetRef instr
       .name = std::string(kAkaoSequenceAssetField),
       .value = std::to_string(sequence.id.value),
   };
-  result.sourceFact(instruments.id,
-                    formatFact(std::string(kAkaoInstrumentSetFact), {sequenceAsset}));
+  result.sourceFact(instruments.id, formatFact(std::string(kAkaoInstrumentSetFact), {sequenceAsset}));
 }
 
 void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets) {
@@ -107,8 +83,7 @@ void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, st
     }
     const AkaoPs1Version version =
         sourceVersion == AkaoPs1Version::Unknown ? guessSampleVersion(input.reader, offset) : sourceVersion;
-    auto ref = result.reserveSampleCollection();
-    if (auto parsed = parseAkaoSampleCollection(input, result, ref, offset, version)) {
+    if (auto parsed = parseAkaoSampleCollection(input, result, offset, version)) {
       addSampleFacts(result, *parsed);
     } else {
       result.warning("Akao sample collection header was detected but sample data could not be parsed",
@@ -117,8 +92,7 @@ void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, st
   }
 
   if (const auto hardcoded = ff7HardcodedAkaoSampleLocation(input.reader)) {
-    auto ref = result.reserveSampleCollection();
-    if (auto parsed = parseAkaoSampleCollection(input, result, ref, *hardcoded)) {
+    if (auto parsed = parseAkaoSampleCollection(input, result, *hardcoded)) {
       addSampleFacts(result, *parsed);
     }
   }
@@ -126,22 +100,19 @@ void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, st
 
 void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets) {
   for (const u32 offset : offsets) {
-    if (!isAkaoSequenceCandidate(input.reader, offset)) {
-      continue;
-    }
-    const auto sequenceRef = result.reserveSequence();
-    auto parsed = parseAkaoSequence(input, sequenceRef.id, offset, &result.sourceMap(), &result.diagnostics());
-    if (!parsed) {
+    const auto layout = readAkaoSequenceLayout(input, offset);
+    if (!layout) {
       continue;
     }
 
-    const auto instrumentSetRef = result.reserveInstrumentSet();
-    auto instruments = result.instruments(instrumentSetRef);
-    parsed->analysis.requiredArticulations = buildAkaoInstrumentSet(input, parsed->analysis, {}, instruments);
-    addSequenceFacts(result, sequenceRef, parsed->analysis, parsed->analysis.requiredArticulations);
-    addInstrumentSetFacts(result, instrumentSetRef, sequenceRef);
-    result.sequence(sequenceRef, [&](AssetId) { return std::move(parsed->asset); });
-    result.instrumentSet(akaoInstrumentSetName(parsed->analysis), std::move(instruments));
+    const std::string sequenceName = fmt::format("Akao Seq {:02X}", layout->header.sequenceId);
+    auto sequence = result.sequence(sequenceName, input.reader.range(offset, layout->header.length));
+    auto parsed = parseAkaoSequence(input, sequence.id(), *layout, &result.sourceMap(), &result.diagnostics());
+    auto instruments = result.instrumentSet(akaoInstrumentSetName(parsed.analysis));
+    parsed.analysis.requiredArticulations = buildAkaoInstrumentSet(input, parsed.analysis, {}, instruments.builder());
+    addSequenceFacts(result, sequence.ref(), parsed.analysis, parsed.analysis.requiredArticulations);
+    addInstrumentSetFacts(result, instruments.ref(), sequence.ref());
+    sequence.program(std::move(parsed.program));
   }
 }
 

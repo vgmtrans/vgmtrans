@@ -62,12 +62,12 @@ struct BankAssets {
     const std::string sourceName =
         result.sourceFile().name.empty() ? result.sourceDisplayName() : result.sourceFile().name;
     const std::string name = fmt::format("{} {}_{}", sourceName, sequence.tableIndex, sequence.sequenceIndex);
-    const auto sequenceRef = result.reserveSequence();
-    result.sequence(sequenceRef, name, input.reader.range(sequence.offset, sequence.normalTrackEnd - sequence.offset))
-        .program(parseSegSatSequenceProgram(input.reader, sequenceRef.id, sequence, &result.sourceMap(),
-                                            &result.diagnostics()));
+    auto sequenceDraft =
+        result.sequence(name, input.reader.range(sequence.offset, sequence.normalTrackEnd - sequence.offset));
+    sequenceDraft.program(parseSegSatSequenceProgram(input.reader, sequenceDraft.id(), sequence, &result.sourceMap(),
+                                                     &result.diagnostics()));
 
-    auto collection = result.collection(name, collectionKey(result.source(), sequence)).sequence(sequenceRef);
+    auto collection = result.collection(name, collectionKey(result.source(), sequence)).sequence(sequenceDraft);
     if (banks.size() == 1) {
       collection.instrumentSet(banks.front().instruments).samples(banks.front().samples);
       continue;
